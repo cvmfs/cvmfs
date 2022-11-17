@@ -1215,8 +1215,6 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression.cc
-                  crypto/hash.cc
-                  crypto/signature.cc
                   dns.cc
                   download.cc
                   gateway_util.cc
@@ -1263,20 +1261,13 @@ if (BUILD_PRELOADER)
                   upload_local.cc
                   upload_s3.cc
                   upload_spooler_definition.cc
-                  util/algorithm.cc
-                  util/concurrency.cc
-                  util/exception.cc
-                  util/file_backed_buffer.cc
-                  util/logging.cc
-                  util/mmap_file.cc
-                  util/posix.cc
-                  util/string.cc
-                  util/uuid.cc
                   whitelist.cc
                   xattr.cc
   )  # preloader sources
 
   target_link_libraries(cvmfs_preload_bin
+                        cvmfs_crypto
+                        cvmfs_util
                         ${SQLITE3_LIBRARY}
                         ${CURL_LIBRARIES}
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
@@ -1285,7 +1276,6 @@ if (BUILD_PRELOADER)
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
-                        ${SHA3_LIBRARIES}
                         pthread
                         dl
   )
