@@ -72,6 +72,7 @@
 #include "clientctx.h"
 #include "compat.h"
 #include "compression.h"
+#include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
@@ -1464,7 +1465,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 /**
  * Returns information about a mounted filesystem. In this case it returns
  * information about the local cache occupancy of cvmfs.
- * 
+ *
  * Note: If the elements of the struct statvfs *info are set to 0, it will cause
  *       it to be ignored in commandline tool "df".
  */
@@ -1972,6 +1973,9 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
+
+  crypto::SetupLibcryptoMt();
+
   InitOptionsMgr(loader_exports);
 
   FileSystem::FileSystemInfo fs_info;
@@ -2189,6 +2193,8 @@ static void Fini() {
   delete g_boot_error;
   g_boot_error = NULL;
   auto_umount::SetMountpoint("");
+
+  crypto::CleanupLibcryptoMt();
 }
 
 

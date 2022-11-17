@@ -164,6 +164,9 @@ if (BUILD_CVMFS)
 
   #
   # /usr/bin/cvmfs2
+  # Note: we must _not_ depend on cvmfs-util. The utility functions are
+  # compiled in the stub namespace so that their symbols don't conflict
+  # with libcvmfs-fuse.
   #
   add_executable (cvmfs2
                   fuse_main.cc
@@ -180,10 +183,11 @@ if (BUILD_CVMFS)
 
   #
   # /usr/lib/libcvmfs_fuse_stub[3]
+  # Note: we must _not_ depend on cvmfs-util. The utility functions are compiled
+  # in the loader namespace so that their symbols don't conflict with
+  # libcvmfs-fuse.
   #
   set (CVMFS_STUB_SOURCES
-       crypto/crypto_util.cc
-       crypto/hash.cc
        globals.cc
        loader.cc
        loader_talk.cc
@@ -197,13 +201,7 @@ if (BUILD_CVMFS)
   )
   set (CVMFS_STUB_CFLAGS "-DCVMFS_FUSE_MODULE -DCVMFS_NAMESPACE_GUARD=loader -D_FILE_OFFSET_BITS=64 -fexceptions")
   set (CVMFS_STUB_LDFLAGS "-ldl -lm")
-  set (CVMFS_STUB_LINK_LIBRARIES "")
-  list (APPEND CVMFS_STUB_LINK_LIBRARIES
-        ${OPENSSL_LIBRARIES}
-        ${SHA3_LIBRARIES}
-        pthread
-        dl
-  )
+  set (CVMFS_STUB_LINK_LIBRARIES pthread dl)
   add_library (cvmfs_fuse_stub SHARED ${CVMFS_STUB_SOURCES})
   set_target_properties (cvmfs_fuse_stub PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
