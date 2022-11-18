@@ -50,7 +50,7 @@ Description: CernVM-FS client library
 Package: cvmfs-shrinkwrap
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: openssl, python, ${misc:Depends}
+Depends: openssl, python, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees

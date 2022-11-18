@@ -260,6 +260,7 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package shrinkwrap
 Summary: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
 Group: Application/System
+Requires: cvmfs-libs = %{version}
 %description shrinkwrap
 CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
 images.

@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "crypto/crypto_util.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_main.h"
@@ -678,8 +677,6 @@ int FuseMain(int argc, char *argv[]) {
     return cvmfs_exports_->fnAltProcessFlavor(argc, argv);
   }
 
-  crypto::SetupLibcryptoMt();
-
   // Option parsing
   struct fuse_args *mount_options;
   mount_options = ParseCmdLine(argc, argv);
@@ -1071,8 +1068,6 @@ int FuseMain(int argc, char *argv[]) {
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
-
-  crypto::CleanupLibcryptoMt();
 
   delete fence_reload_;
   delete loader_exports_;

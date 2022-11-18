@@ -57,9 +57,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
-       crypto/crypto_util.cc
-       crypto/hash.cc
-       crypto/signature.cc
        directory_entry.cc
        duplex_fuse.cc
        dns.cc
@@ -91,13 +88,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        ssl.cc
        statistics.cc
        tracer.cc
-       util/algorithm.cc
-       util/concurrency.cc
-       util/exception.cc
-       util/logging.cc
-       util/posix.cc
-       util/string.cc
-       util/uuid.cc
        whitelist.cc
        wpad.cc
        xattr.cc
@@ -111,6 +101,22 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
       add_definitions (-DCVMFS_ENABLE_INOTIFY)
     endif ()
   endif ()
+
+  #
+  # For /usr/lib/libcvmfs.a which is not linked against cvmfs-libs
+  #
+  set (CVMFS_COMMON_CLIENT_UTILITY_SOURCES
+    crypto/crypto_util.cc
+    crypto/hash.cc
+    crypto/signature.cc
+    util/algorithm.cc
+    util/concurrency.cc
+    util/exception.cc
+    util/logging.cc
+    util/posix.cc
+    util/string.cc
+    util/uuid.cc
+  ) # CVMFS_COMMON_CLIENT_UTILITY_SOURCES
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
 
 
@@ -164,6 +170,9 @@ if (BUILD_CVMFS)
 
   #
   # /usr/bin/cvmfs2
+  # Note: we must _not_ depend on cvmfs-util. The utility functions are
+  # compiled in the stub namespace so that their symbols don't conflict
+  # with libcvmfs-fuse.
   #
   add_executable (cvmfs2
                   fuse_main.cc
@@ -180,10 +189,11 @@ if (BUILD_CVMFS)
 
   #
   # /usr/lib/libcvmfs_fuse_stub[3]
+  # Note: we must _not_ depend on cvmfs-util. The utility functions are compiled
+  # in the loader namespace so that their symbols don't conflict with
+  # libcvmfs-fuse.
   #
   set (CVMFS_STUB_SOURCES
-       crypto/crypto_util.cc
-       crypto/hash.cc
        globals.cc
        loader.cc
        loader_talk.cc
@@ -197,13 +207,7 @@ if (BUILD_CVMFS)
   )
   set (CVMFS_STUB_CFLAGS "-DCVMFS_FUSE_MODULE -DCVMFS_NAMESPACE_GUARD=loader -D_FILE_OFFSET_BITS=64 -fexceptions")
   set (CVMFS_STUB_LDFLAGS "-ldl -lm")
-  set (CVMFS_STUB_LINK_LIBRARIES "")
-  list (APPEND CVMFS_STUB_LINK_LIBRARIES
-        ${OPENSSL_LIBRARIES}
-        ${SHA3_LIBRARIES}
-        pthread
-        dl
-  )
+  set (CVMFS_STUB_LINK_LIBRARIES pthread dl)
   add_library (cvmfs_fuse_stub SHARED ${CVMFS_STUB_SOURCES})
   set_target_properties (cvmfs_fuse_stub PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
@@ -263,7 +267,6 @@ if (BUILD_CVMFS)
        ${ZLIB_LIBRARIES}
        ${SPARSEHASH_LIBRARIES}
        ${LEVELDB_LIBRARIES}
-       ${SHA3_LIBRARIES}
        ${PROTOBUF_LITE_LIBRARY}
        ${VJSON_LIBRARIES}
        ${RT_LIBRARY}
@@ -286,9 +289,13 @@ if (BUILD_CVMFS)
     LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
   )
   target_link_libraries (cvmfs_fuse
+                         cvmfs_crypto
+                         cvmfs_util
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
   )
   target_link_libraries (cvmfs_fuse_debug
+                         cvmfs_crypto_debug
+                         cvmfs_util_debug
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
   )
   if (FUSE3_FOUND)
@@ -307,9 +314,13 @@ if (BUILD_CVMFS)
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3
+                           cvmfs_crypto
+                           cvmfs_util
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
     target_link_libraries (cvmfs_fuse3_debug
+                           cvmfs_crypto_debug
+                           cvmfs_util_debug
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
   endif ()
@@ -361,6 +372,7 @@ endif (BUILD_CVMFS)
 if (BUILD_LIBCVMFS)
   add_library (cvmfs_only STATIC
                ${CVMFS_COMMON_CLIENT_SOURCES}
+               ${CVMFS_COMMON_CLIENT_UTILITY_SOURCES}
                libcvmfs.cc
                libcvmfs_int.cc
                libcvmfs_legacy.cc
@@ -1147,7 +1159,6 @@ endif (BUILD_RECEIVER)
 
 if (BUILD_SHRINKWRAP)
   add_executable (cvmfs_shrinkwrap
-                  crypto/hash.cc
                   monitor.cc
                   shrinkwrap/fs_traversal.cc
                   shrinkwrap/fs_traversal_libcvmfs.cc
@@ -1159,11 +1170,6 @@ if (BUILD_SHRINKWRAP)
                   shrinkwrap/spec_tree.cc
                   shrinkwrap/util.cc
                   statistics.cc
-                  util/concurrency.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
                   xattr.cc
   )
   add_dependencies (cvmfs_shrinkwrap libcvmfs)
@@ -1171,6 +1177,8 @@ if (BUILD_SHRINKWRAP)
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions"
   )
   target_link_libraries(cvmfs_shrinkwrap
+                        cvmfs_crypto
+                        cvmfs_util
                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
                         ${SQLITE3_LIBRARY}
                         ${CURL_LIBRARIES}
@@ -1178,7 +1186,6 @@ if (BUILD_SHRINKWRAP)
                         ${PACPARSER_LIBRARIES}
                         ${ZLIB_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
-                        ${SHA3_LIBRARIES}
                         ${VJSON_LIBRARIES}
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
@@ -1208,8 +1215,6 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression.cc
-                  crypto/hash.cc
-                  crypto/signature.cc
                   dns.cc
                   download.cc
                   gateway_util.cc
@@ -1256,20 +1261,13 @@ if (BUILD_PRELOADER)
                   upload_local.cc
                   upload_s3.cc
                   upload_spooler_definition.cc
-                  util/algorithm.cc
-                  util/concurrency.cc
-                  util/exception.cc
-                  util/file_backed_buffer.cc
-                  util/logging.cc
-                  util/mmap_file.cc
-                  util/posix.cc
-                  util/string.cc
-                  util/uuid.cc
                   whitelist.cc
                   xattr.cc
   )  # preloader sources
 
   target_link_libraries(cvmfs_preload_bin
+                        cvmfs_crypto
+                        cvmfs_util
                         ${SQLITE3_LIBRARY}
                         ${CURL_LIBRARIES}
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
@@ -1278,7 +1276,6 @@ if (BUILD_PRELOADER)
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
-                        ${SHA3_LIBRARIES}
                         pthread
                         dl
   )
