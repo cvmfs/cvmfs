@@ -1,11 +1,11 @@
+#
+# This file is part of the CernVM File System
+#
+
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
-
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_COMMON_CFLAGS "-DGTEST_USE_OWN_TR1_TUPLE=1 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -D_GLIBCXX_DEBUG -fexceptions")
-include_directories (${CMAKE_CURRENT_BINARY_DIR}
-                     ${CMAKE_CURRENT_SOURCE_DIR}/../common)
-
+set (CVMFS_UNITTEST_COMMON_CFLAGS "-DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 
 #
 # Protobuf generated sources
@@ -19,6 +19,10 @@ add_custom_command (OUTPUT cache.pb.h cache.pb.cc
                             ${CVMFS_SOURCE_DIR}/cache.proto
                     COMMENT "Generating protobuf sources")
 add_custom_target (cache.pb.generated-unittests DEPENDS cache.pb.h cache.pb.cc)
+
+include_directories (${CMAKE_CURRENT_BINARY_DIR}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../common
+                     ${INCLUDE_DIRECTORIES})
 
 
 
@@ -35,26 +39,20 @@ if (BUILD_LIBCVMFS_CACHE)
                   ${CVMFS_SOURCE_DIR}/cache_extern.cc
                   ${CVMFS_SOURCE_DIR}/cache_transport.cc
                   ${CVMFS_SOURCE_DIR}/compression.cc
-                  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
                   ${CVMFS_SOURCE_DIR}/manifest.cc
                   ${CVMFS_SOURCE_DIR}/quota.cc
-                  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
-                  ${CVMFS_SOURCE_DIR}/util/exception.cc
-                  ${CVMFS_SOURCE_DIR}/util/logging.cc
-                  ${CVMFS_SOURCE_DIR}/util/posix.cc
-                  ${CVMFS_SOURCE_DIR}/util/string.cc
   )
   add_dependencies (cvmfs_test_cache cache.pb.generated-unittests)
   set_target_properties (cvmfs_test_cache PROPERTIES
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
   target_link_libraries (cvmfs_test_cache
+                         cvmfs_crypto
+                         cvmfs_util
                          ${GTEST_LIBRARIES}
                          ${GMOCK_LIBRARIES}
-                         ${OPENSSL_LIBRARIES}
                          ${ZLIB_LIBRARIES}
                          ${RT_LIBRARY}
-                         ${SHA3_LIBRARIES}
                          ${PROTOBUF_LITE_LIBRARY}
                          pthread
   )
@@ -66,7 +64,6 @@ if (BUILD_LIBCVMFS_CACHE)
     )
   endif ()
 endif (BUILD_LIBCVMFS_CACHE)
-
 
 
 
@@ -257,8 +254,6 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
                   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
                   ${CVMFS_SOURCE_DIR}/compression.cc
-                  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
-                  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
                   ${CVMFS_SOURCE_DIR}/directory_entry.cc
                   ${CVMFS_SOURCE_DIR}/dns.cc
                   ${CVMFS_SOURCE_DIR}/download.cc
@@ -307,15 +302,6 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/upload_local.cc
                   ${CVMFS_SOURCE_DIR}/upload_s3.cc
                   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
-                  ${CVMFS_SOURCE_DIR}/util/algorithm.cc
-                  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
-                  ${CVMFS_SOURCE_DIR}/util/exception.cc
-                  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
-                  ${CVMFS_SOURCE_DIR}/util/logging.cc
-                  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
-                  ${CVMFS_SOURCE_DIR}/util/posix.cc
-                  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
-                  ${CVMFS_SOURCE_DIR}/util/string.cc
                   ${CVMFS_SOURCE_DIR}/whitelist.cc
                   ${CVMFS_SOURCE_DIR}/xattr.cc
   )
@@ -323,6 +309,8 @@ if (BUILD_SERVER)
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
   target_link_libraries (cvmfs_test_publish
+                         cvmfs_crypto
+                         cvmfs_util
                          ${GTEST_LIBRARIES}
                          ${GMOCK_LIBRARIES}
                          ${OPENSSL_LIBRARIES}
@@ -331,7 +319,6 @@ if (BUILD_SERVER)
                          ${OPENSSL_LIBRARIES}
                          ${SQLITE3_LIBRARY}
                          ${ZLIB_LIBRARIES}
-                         ${SHA3_LIBRARIES}
                          ${VJSON_LIBRARIES}
                          ${CAP_LIBRARIES}
                          ${LibArchive_LIBRARY}
@@ -495,10 +482,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
-  ${CVMFS_SOURCE_DIR}/crypto/crypto_util.cc
-  ${CVMFS_SOURCE_DIR}/crypto/encrypt.cc
-  ${CVMFS_SOURCE_DIR}/crypto/hash.cc
-  ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
@@ -586,17 +569,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/upload_s3.cc
   ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
   ${CVMFS_SOURCE_DIR}/url.cc
-  ${CVMFS_SOURCE_DIR}/util/algorithm.cc
-  ${CVMFS_SOURCE_DIR}/util/concurrency.cc
-  ${CVMFS_SOURCE_DIR}/util/exception.cc
-  ${CVMFS_SOURCE_DIR}/util/file_backed_buffer.cc
-  ${CVMFS_SOURCE_DIR}/util/logging.cc
-  ${CVMFS_SOURCE_DIR}/util/mmap_file.cc
-  ${CVMFS_SOURCE_DIR}/util/namespace.cc
-  ${CVMFS_SOURCE_DIR}/util/posix.cc
-  ${CVMFS_SOURCE_DIR}/util/string.cc
-  ${CVMFS_SOURCE_DIR}/util/raii_temp_dir.cc
-  ${CVMFS_SOURCE_DIR}/util/uuid.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
@@ -641,7 +613,10 @@ add_dependencies (cvmfs_unittests cache.pb.generated-unittests)
 set_target_properties (cvmfs_unittests PROPERTIES
                        COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
 )
-target_link_libraries (cvmfs_unittests ${CVMFS_UNITTESTS_LINK_LIBRARIES})
+target_link_libraries (cvmfs_unittests
+                       cvmfs_crypto
+                       cvmfs_util
+                       ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
 if (INSTALL_UNITTESTS)
   install (
@@ -657,7 +632,10 @@ if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (cvmfs_unittests_debug PROPERTIES
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
   )
-  target_link_libraries (cvmfs_unittests_debug ${CVMFS_UNITTESTS_LINK_LIBRARIES})
+  target_link_libraries (cvmfs_unittests_debug
+                         cvmfs_crypto
+                         cvmfs_util
+                         ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
   if (INSTALL_UNITTESTS)
     install (

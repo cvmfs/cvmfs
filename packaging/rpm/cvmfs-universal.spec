@@ -268,6 +268,7 @@ images.
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
+Requires: cvmfs-libs = %{version}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 

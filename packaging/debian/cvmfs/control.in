@@ -59,7 +59,7 @@ Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
 Package: cvmfs-unittests
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libssl-dev, uuid-dev, ${misc:Depends}
+Depends: libssl-dev, uuid-dev, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests
