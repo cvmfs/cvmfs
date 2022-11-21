@@ -204,7 +204,7 @@ Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
-Requires: openssl
+Requires: cvmfs-libs = %{version}
 %description devel
 CernVM-FS static client library for pure user-space use
 
@@ -641,7 +641,8 @@ systemctl daemon-reload
 
 %files devel
 %defattr(-,root,root)
-%{_libdir}/libcvmfs.a
+%{_libdir}/libcvmfs_client.so
+%{_libdir}/libcvmfs_client.so.%{version}
 %{_libdir}/libcvmfs_cache.a
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h

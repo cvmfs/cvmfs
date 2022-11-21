@@ -36,7 +36,7 @@ endif ()  # Protobuf generated sources
 
 if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   #
-  # /usr/lib/libcvmfs_fuse[3] and /usr/lib/libcvmfs.a
+  # /usr/lib/libcvmfs_fuse[3] and /usr/lib/libcvmfs_client
   #
   set (CVMFS_COMMON_CLIENT_SOURCES
        authz/authz.cc
@@ -101,22 +101,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
       add_definitions (-DCVMFS_ENABLE_INOTIFY)
     endif ()
   endif ()
-
-  #
-  # For /usr/lib/libcvmfs.a which is not linked against cvmfs-libs
-  #
-  set (CVMFS_COMMON_CLIENT_UTILITY_SOURCES
-    crypto/crypto_util.cc
-    crypto/hash.cc
-    crypto/signature.cc
-    util/algorithm.cc
-    util/concurrency.cc
-    util/exception.cc
-    util/logging.cc
-    util/posix.cc
-    util/string.cc
-    util/uuid.cc
-  ) # CVMFS_COMMON_CLIENT_UTILITY_SOURCES
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
 
 
@@ -152,8 +136,6 @@ if (BUILD_CVMFS)
                          cvmfs_crypto
                          cvmfs_util
                          ${ZLIB_LIBRARIES}
-                         ${OPENSSL_LIBRARIES}
-                         ${SHA3_LIBRARIES}
                          ${RT_LIBRARY}
                          pthread
   )
@@ -370,58 +352,59 @@ endif (BUILD_CVMFS)
 
 
 if (BUILD_LIBCVMFS)
-  add_library (cvmfs_only STATIC
+  #
+  # /usr/lib/libcvmfs_client
+  #
+  add_library (cvmfs_client SHARED
                ${CVMFS_COMMON_CLIENT_SOURCES}
-               ${CVMFS_COMMON_CLIENT_UTILITY_SOURCES}
                libcvmfs.cc
                libcvmfs_int.cc
                libcvmfs_legacy.cc
                libcvmfs_options.cc
   )
-  add_dependencies (cvmfs_only cache.pb.generated)
-  set_target_properties (cvmfs_only PROPERTIES
+  add_dependencies (cvmfs_client cache.pb.generated)
+  set_target_properties (cvmfs_client PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions -fPIC"
   )
-  set (LIBCVMFS_LIBS
-       ${CARES_LIBRARIES}
-       ${CURL_LIBRARIES}
-       ${PACPARSER_LIBRARIES}
-       ${SQLITE3_LIBRARY}
-       ${ZLIB_LIBRARIES}
-       ${SPARSEHASH_LIBRARIES}
-       ${SHA3_LIBRARIES}
-       ${VJSON_LIBRARIES}
-       ${PROTOBUF_LITE_LIBRARY}
-       ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_only.a
-  )
-  # Note: it would be a good idea to try to unify the next block for macOS and
-  #       Linux. It may be possible to use libtool on both platforms, including
-  #       the ability to hide private symbols in the library - which is
-  #       currently done by the `combine_libs` script, on Linux only.
-  if (MACOSX)
-    add_custom_command(
-        OUTPUT libcvmfs.a
-        COMMAND libtool -static -o libcvmfs.a ${LIBCVMFS_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
-    )
-  else (MACOSX)
-    set (LIBCVMFS_PUBLIC_SYMS "-public"
-         "${CMAKE_CURRENT_SOURCE_DIR}/libcvmfs_public_syms.txt")
-    add_custom_command(
-        OUTPUT libcvmfs.a
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_PUBLIC_SYMS} libcvmfs.a ${LIBCVMFS_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_LIBS}
-    )
-  endif (MACOSX)
-  # dummy target to cause merged libcvmfs to be produced
-  add_custom_target (libcvmfs ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a)
-  add_dependencies (libcvmfs cvmfs_only)
 
+  # Make the libcvmfs interface public
+  set_property (SOURCE libcvmfs.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
+  set_property (SOURCE libcvmfs_legacy.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
+  set_property (SOURCE libcvmfs_options.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
+
+  # Make shared libraries private to libcvmfs_client
+  set_property (TARGET cvmfs_client PROPERTY INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/cvmfs")
+  set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
+  set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
+  target_include_directories (cvmfs_client PRIVATE ${GTEST_INCLUDE_DIRS})
+  target_include_directories (cvmfs_client PRIVATE ${SQLITE3_INCLUDE_DIR})
+  target_include_directories (cvmfs_client PRIVATE ${CARES_INCLUDE_DIRS})
+  target_include_directories (cvmfs_client PRIVATE ${CURL_INCLUDE_DIRS})
+  target_include_directories (cvmfs_client PRIVATE ${LEVELDB_INCLUDE_DIR})
+  target_include_directories (cvmfs_client PRIVATE ${PACPARSER_INCLUDE_DIR})
+  target_include_directories (cvmfs_client PRIVATE ${ZLIB_INCLUDE_DIRS})
+  target_include_directories (cvmfs_client PRIVATE ${VJSON_INCLUDE_DIRS})
+  target_include_directories (cvmfs_client PRIVATE ${PROTOBUF_INCLUDE_DIRS})
+
+  target_link_libraries (cvmfs_client
+                         PUBLIC cvmfs_crypto
+                                cvmfs_util
+                                ${CARES_LDFLAGS}
+                                ${OPENSSL_LIBRARIES}
+                         PRIVATE ${SQLITE3_LIBRARY}
+                                 ${CURL_LIBRARIES}
+                                 ${CARES_LIBRARIES}
+                                 ${LEVELDB_LIBRARIES}
+                                 ${PACPARSER_LIBRARIES}
+                                 ${ZLIB_LIBRARIES}
+                                 ${VJSON_LIBRARIES}
+                                 ${PROTOBUF_LITE_LIBRARY}
+  )
 
   install (
-    FILES        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
+    TARGETS      cvmfs_client
+    LIBRARY
     DESTINATION  ${CMAKE_INSTALL_LIBDIR}
   )
   install (
@@ -1156,23 +1139,13 @@ if (BUILD_SHRINKWRAP)
                   statistics.cc
                   xattr.cc
   )
-  add_dependencies (cvmfs_shrinkwrap libcvmfs)
   set_target_properties (cvmfs_shrinkwrap PROPERTIES
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions"
   )
   target_link_libraries(cvmfs_shrinkwrap
+                        cvmfs_client
                         cvmfs_crypto
                         cvmfs_util
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY}
-                        ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${PACPARSER_LIBRARIES}
-                        ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES}
-                        ${VJSON_LIBRARIES}
-                        ${RT_LIBRARY}
-                        ${UUID_LIBRARIES}
                         pthread
                         dl
   )
