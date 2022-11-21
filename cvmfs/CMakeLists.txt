@@ -420,22 +420,6 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
 
-  add_executable (test_libcvmfs test_libcvmfs.cc)
-  add_dependencies(test_libcvmfs libcvmfs)
-  target_link_libraries(test_libcvmfs
-                        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
-                        ${SQLITE3_LIBRARY}
-                        ${CURL_LIBRARIES}
-                        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                        ${PACPARSER_LIBRARIES}
-                        ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES}
-                        ${RT_LIBRARY}
-                        ${UUID_LIBRARIES}
-                        pthread
-                        dl)
-
-
   install (
     FILES        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a
     DESTINATION  ${CMAKE_INSTALL_LIBDIR}
