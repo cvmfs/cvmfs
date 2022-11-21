@@ -617,6 +617,8 @@ systemctl daemon-reload
 
 %files libs
 %defattr(-,root,root)
+%{_libdir}/libcvmfs_cache.so
+%{_libdir}/libcvmfs_cache.so.%{version}
 %{_libdir}/libcvmfs_crypto.so
 %{_libdir}/libcvmfs_crypto.so.%{version}
 %{_libdir}/libcvmfs_crypto_debug.so
@@ -643,7 +645,6 @@ systemctl daemon-reload
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_client.so
 %{_libdir}/libcvmfs_client.so.%{version}
-%{_libdir}/libcvmfs_cache.a
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h
 %doc COPYING AUTHORS README.md ChangeLog

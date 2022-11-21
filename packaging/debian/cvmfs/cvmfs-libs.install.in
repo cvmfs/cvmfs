@@ -1,3 +1,5 @@
+usr/lib/libcvmfs_cache.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_cache.so
 usr/lib/libcvmfs_crypto.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_crypto.so
 usr/lib/libcvmfs_crypto_debug.so.@CVMFS_VERSION@

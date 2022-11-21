@@ -368,12 +368,12 @@ if (BUILD_LIBCVMFS)
     COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions -fPIC"
   )
 
-  # Make the libcvmfs interface public
+  # Make the libcvmfs_client interface public
   set_property (SOURCE libcvmfs.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
   set_property (SOURCE libcvmfs_legacy.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
   set_property (SOURCE libcvmfs_options.cc PROPERTY COMPILE_FLAGS -fvisibility=default)
 
-  # Make shared libraries private to libcvmfs_client
+  # Make static libraries private to libcvmfs_client
   set_property (TARGET cvmfs_client PROPERTY INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/cvmfs")
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
   set_property (TARGET cvmfs_client APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
@@ -418,70 +418,51 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_LIBCVMFS_CACHE)
   #
-  # /usr/lib/libcvmfs_cache.a
+  # /usr/lib/libcvmfs_cache
   #
-  add_library (cvmfs_cache_only STATIC
+  add_library (cvmfs_cache SHARED
                cache.pb.cc cache.pb.h
                cache_plugin/libcvmfs_cache.cc
                cache_plugin/libcvmfs_cache_options.cc
                cache_plugin/channel.cc
                cache_transport.cc
-               crypto/hash.cc
                monitor.cc
                options.cc
                sanitizer.cc
-               util/concurrency.cc
-               util/exception.cc
-               util/logging.cc
-               util/posix.cc
-               util/string.cc
   )
-  add_dependencies (cvmfs_cache_only cache.pb.generated)
-  set (LIBCVMFS_CACHE_LIBS
-       ${SHA3_LIBRARIES}
-       ${PROTOBUF_LITE_LIBRARY}
-       ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache_only.a
-  )
-  if (MACOSX)
-    list (APPEND LIBCVMFS_CACHE_LIBS ${OPENSSL_LIBRARIES})
-  endif ()
-  set_target_properties (cvmfs_cache_only PROPERTIES
-    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions"
+  add_dependencies (cvmfs_cache cache.pb.generated)
+  set_target_properties (cvmfs_cache PROPERTIES
+    VERSION ${CernVM-FS_VERSION_STRING}
+    COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBCVMFS -fexceptions -fPIC"
   )
 
-  # See libcvmfs.a for details
-  if (MACOSX)
-    add_custom_command(
-        OUTPUT libcvmfs_cache.a
-        COMMAND libtool -static -o libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_CACHE_LIBS}
-      )
-  else (MACOSX)
-    set (LIBCVMFS_CACHE_PUBLIC_SYMS "-public"
-         "${CMAKE_CURRENT_SOURCE_DIR}/cache_plugin/libcvmfs_cache_public_syms.txt"
-    )
-    add_custom_command(
-        OUTPUT libcvmfs_cache.a
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/combine_libs ${LIBCVMFS_CACHE_PUBLIC_SYMS} libcvmfs_cache.a ${LIBCVMFS_CACHE_LIBS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${LIBCVMFS_CACHE_LIBS}
-      )
-  endif (MACOSX)
+  # Make the libcvmfs_cache interface public
+  set_property (SOURCE cache_plugin/libcvmfs_cache.cc PROPERTY
+                COMPILE_FLAGS -fvisibility=default
+  )
+  set_property (SOURCE cache_plugin/libcvmfs_cache_options.cc PROPERTY
+                COMPILE_FLAGS -fvisibility=default
+  )
 
-  # dummy target to cause merged libcvmfs_cache to be produced
-  add_custom_target (libcvmfs_cache ALL DEPENDS
-                     ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a)
-  add_dependencies (libcvmfs_cache cvmfs_cache_only)
+  # Make static libraries private to libcvmfs_cache
+  set_property (TARGET cvmfs_cache PROPERTY INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/cvmfs")
+  set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
+  set_property (TARGET cvmfs_cache APPEND PROPERTY INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
+  target_include_directories (cvmfs_cache PRIVATE ${GTEST_INCLUDE_DIRS})
+  target_include_directories (cvmfs_cache PRIVATE ${PROTOBUF_INCLUDE_DIRS})
+
+  target_link_libraries(cvmfs_cache
+                        PUBLIC cvmfs_crypto
+                               cvmfs_util
+                        PRIVATE ${PROTOBUF_LITE_LIBRARY}
+  )
 
   #
   # Cache plugins
   #
   add_executable (cvmfs_cache_null cache_plugin/cvmfs_cache_null.cc)
-  add_dependencies (cvmfs_cache_null libcvmfs_cache)
   target_link_libraries (cvmfs_cache_null
-                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                         ${OPENSSL_LIBRARIES}
+                         cvmfs_cache
                          ${RT_LIBRARY}
                          pthread
   )
@@ -490,17 +471,11 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache_plugin/cvmfs_cache_ram.cc
                   malloc_heap.cc
                   statistics.cc
-                  util/concurrency.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
   )
-  add_dependencies (cvmfs_cache_ram libcvmfs_cache)
   set_target_properties (cvmfs_cache_ram PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
   target_link_libraries (cvmfs_cache_ram
-                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                         ${OPENSSL_LIBRARIES}
+                         cvmfs_cache
+                         cvmfs_util_debug
                          ${RT_LIBRARY}
                          pthread)
 
@@ -509,27 +484,22 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression.cc
-                  crypto/hash.cc
                   manifest.cc
                   quota.cc
-                  util/exception.cc
-                  util/logging.cc
-                  util/posix.cc
-                  util/string.cc
   )
-  add_dependencies (cvmfs_cache_posix libcvmfs_cache)
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
   target_link_libraries (cvmfs_cache_posix
-                         ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
-                         ${OPENSSL_LIBRARIES}
-                         ${SHA3_LIBRARIES}
+                         cvmfs_cache
+                         cvmfs_crypto
+                         cvmfs_util_debug
                          ${ZLIB_LIBRARIES}
                          pthread
   )
 
 
   install (
-    FILES        ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs_cache.a
+    TARGETS      cvmfs_cache
+    LIBRARY
     DESTINATION  ${CMAKE_INSTALL_LIBDIR}
   )
   install (
