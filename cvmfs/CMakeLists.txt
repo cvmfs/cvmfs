@@ -1095,6 +1095,12 @@ endif (BUILD_RECEIVER)
 
 
 if (BUILD_SHRINKWRAP)
+  if (NOT BUILD_LIBCVMFS)
+    message (FATAL_ERROR
+             "BUILD_SHRINKWRAP needs to be on with BUILD_LIBCVMFS set. Exiting."
+    )
+  endif ()
+
   add_executable (cvmfs_shrinkwrap
                   monitor.cc
                   shrinkwrap/fs_traversal.cc
