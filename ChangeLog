@@ -1,4 +1,5 @@
 2.10.1:
+  * Fix building leveldb external with non-GNU patch (#3110)
   * [rpm] Fix python build requirements (#2986)
 
 2.10.0:
