@@ -442,7 +442,8 @@ TEST_F(T_Util, SplitPath) {
 
 
 TEST_F(T_Util, CreateFile) {
-  EXPECT_THROW(CreateFile("myfakepath/otherfakepath.txt", 0777), ECvmfsException);
+  EXPECT_THROW(CreateFile("myfakepath/otherfakepath.txt", 0777),
+               ECvmfsException);
   string filename = sandbox + "/createfile.txt";
   CreateFile(filename, 0600);
   FILE* myfile = fopen(filename.c_str(), "w");
