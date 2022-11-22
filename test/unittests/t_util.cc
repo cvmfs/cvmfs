@@ -442,7 +442,7 @@ TEST_F(T_Util, SplitPath) {
 
 
 TEST_F(T_Util, CreateFile) {
-  ASSERT_DEATH(CreateFile("myfakepath/otherfakepath.txt", 0777), ".*");
+  EXPECT_THROW(CreateFile("myfakepath/otherfakepath.txt", 0777), ECvmfsException);
   string filename = sandbox + "/createfile.txt";
   CreateFile(filename, 0600);
   FILE* myfile = fopen(filename.c_str(), "w");
@@ -1566,7 +1566,7 @@ TEST_F(T_Util, WaitForSignal) {
 
 TEST_F(T_Util, WaitForChild) {
   ASSERT_DEATH(WaitForChild(0), ".*");
-  ASSERT_DEATH(WaitForChild(getpid()), ".*");
+  EXPECT_THROW(WaitForChild(getpid()), ECvmfsException);
 
   pid_t pid = fork();
   switch (pid) {

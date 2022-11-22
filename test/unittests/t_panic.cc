@@ -10,25 +10,7 @@
 #include "util/logging.h"
 #include "util/posix.h"
 
-static void LogPanic(const LogSource source, const int mask, const char *msg)
-{
-  CreateFile("cvmfs_test_panic", 0600);
-}
-
 TEST(T_Panic, Call) {
-  EXPECT_FALSE(FileExists("cvmfs_test_panic"));
-  SetAltLogFunc(LogPanic);
-  EXPECT_DEATH(PANIC(kLogStderr, "unit test"), ".*");
-  SetAltLogFunc(NULL);
-  EXPECT_TRUE(FileExists("cvmfs_test_panic"));
-  unlink("cvmfs_test_panic");
-}
-
-TEST(T_Panic, CallNullPANIC) {
-  EXPECT_FALSE(FileExists("cvmfs_test_panic"));
-  SetAltLogFunc(LogPanic);
-  EXPECT_DEATH(PANIC(NULL), ".*");
-  SetAltLogFunc(NULL);
-  EXPECT_TRUE(FileExists("cvmfs_test_panic"));
-  unlink("cvmfs_test_panic");
+  EXPECT_THROW(PANIC(kLogStderr, "unit test"), ECvmfsException);
+  EXPECT_THROW(PANIC(NULL), ECvmfsException);
 }
