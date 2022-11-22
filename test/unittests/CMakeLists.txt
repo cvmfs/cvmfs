@@ -50,7 +50,6 @@ if (BUILD_LIBCVMFS_CACHE)
                          cvmfs_crypto
                          cvmfs_util
                          ${GTEST_LIBRARIES}
-                         ${GMOCK_LIBRARIES}
                          ${ZLIB_LIBRARIES}
                          ${RT_LIBRARY}
                          ${PROTOBUF_LITE_LIBRARY}
@@ -100,7 +99,6 @@ if (BUILD_SHRINKWRAP)
                          cvmfs_crypto
                          cvmfs_util
                          ${GTEST_LIBRARIES}
-                         ${GMOCK_LIBRARIES}
                          pthread
                          dl
   )
@@ -218,7 +216,6 @@ if (BUILD_SERVER)
                          cvmfs_crypto
                          cvmfs_util
                          ${GTEST_LIBRARIES}
-                         ${GMOCK_LIBRARIES}
                          ${OPENSSL_LIBRARIES}
                          ${CURL_LIBRARIES}
                          ${CARES_LIBRARIES} ${CARES_LDFLAGS}
@@ -496,7 +493,6 @@ endif ()
 set (CVMFS_UNITTESTS_LINK_LIBRARIES "")
 list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${GTEST_LIBRARIES}
-      ${GMOCK_LIBRARIES}
       ${OPENSSL_LIBRARIES}
       ${CURL_LIBRARIES}
       ${CARES_LIBRARIES} ${CARES_LDFLAGS}
