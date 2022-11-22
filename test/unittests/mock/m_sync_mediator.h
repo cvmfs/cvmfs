@@ -9,26 +9,40 @@
 
 #include <string>
 
+#include "ingestion/ingestion_source.h"
+#include "sync_item.h"
 #include "sync_mediator.h"
+#include "util/pointer.h"
 #include "util/shared_ptr.h"
 
 namespace publish {
 
 class MockSyncMediator : public AbstractSyncMediator {
  public:
-  MockSyncMediator() : n_register(0) {}
+  MockSyncMediator() : n_register(0), n_reg(0), n_lnk(0), n_dir(0) {}
   virtual ~MockSyncMediator() {}
 
   virtual void RegisterUnionEngine(SyncUnion * /* engine */) { n_register++; }
 
-  virtual void Add(SharedPtr<SyncItem> /* entry */) {}
+  virtual void Add(SharedPtr<SyncItem> entry) {
+    if (entry->IsRegularFile()) {
+      // wake up the tar engine
+      UniquePtr<IngestionSource> is(entry->CreateIngestionSource());
+      is->Close();
+      n_reg++;
+    } else {
+      n_lnk++;
+    }
+  }
   virtual void Touch(SharedPtr<SyncItem> /* entry */) {}
   virtual void Remove(SharedPtr<SyncItem> /* entry */) {}
   virtual void Replace(SharedPtr<SyncItem> /* entry */) {}
   virtual void Clone(const std::string /* from */,
                      const std::string /* to */) {}
 
-  virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> /* entry */) {}
+  virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> /* entry */) {
+    n_dir++;
+  }
 
   virtual void EnterDirectory(SharedPtr<SyncItem> /* entry */) {}
   virtual void LeaveDirectory(SharedPtr<SyncItem> /* entry */) {}
@@ -42,6 +56,9 @@ class MockSyncMediator : public AbstractSyncMediator {
   }
 
   int n_register;
+  int n_reg;
+  int n_lnk;
+  int n_dir;
 };  // class MockSyncMediator
 
 }  // namespace publish

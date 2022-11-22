@@ -46,13 +46,44 @@ class T_SyncUnionTarball : public ::testing::Test {
   std::string tmp_tar_filename_;
 };
 
-TEST_F(T_SyncUnionTarball, Init) {
+TEST_F(T_SyncUnionTarball, Simple) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
   publish::SyncUnionTarball sync_union(
     m_sync_mediator_.weak_ref(), "", tar_filename, "tmpsync", "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
+
+  sync_union.Traverse();
+  EXPECT_EQ(2, m_sync_mediator_->n_reg);
+  EXPECT_EQ(3, m_sync_mediator_->n_dir);
+}
+
+TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
+  std::string tar_filename = CreateTarFile("tar.tar", four_empty_files);
+  publish::SyncUnionTarball sync_union(
+    m_sync_mediator_.weak_ref(), "", tar_filename, "tmpsync", "", false);
+
+  EXPECT_TRUE(sync_union.Initialize());
+  EXPECT_EQ(1, m_sync_mediator_->n_register);
+
+  sync_union.Traverse();
+  EXPECT_EQ(4, m_sync_mediator_->n_reg);
+  EXPECT_EQ(1, m_sync_mediator_->n_dir);
+}
+
+TEST_F(T_SyncUnionTarball, Complex) {
+  std::string tar_filename = CreateTarFile("tar.tar", complex_tar);
+  publish::SyncUnionTarball sync_union(
+    m_sync_mediator_.weak_ref(), "", tar_filename, "tmpsync", "", false);
+
+  EXPECT_TRUE(sync_union.Initialize());
+  EXPECT_EQ(1, m_sync_mediator_->n_register);
+
+  sync_union.Traverse();
+  EXPECT_EQ(3, m_sync_mediator_->n_reg);
+  EXPECT_EQ(1, m_sync_mediator_->n_lnk);
+  EXPECT_EQ(3, m_sync_mediator_->n_dir);
 }
 
 }  // namespace
