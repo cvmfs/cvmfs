@@ -505,7 +505,6 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${ZLIB_LIBRARIES}
       ${UUID_LIBRARIES}
       ${PACPARSER_LIBRARIES}
-      ${SHA3_LIBRARIES}
       ${VJSON_LIBRARIES}
       ${PROTOBUF_LITE_LIBRARY}
       ${LibArchive_LIBRARY}
@@ -539,8 +538,8 @@ if (BUILD_UNITTESTS_DEBUG)
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_unittests_debug
-                         cvmfs_crypto
-                         cvmfs_util
+                         cvmfs_crypto_debug
+                         cvmfs_util_debug
                          ${CVMFS_UNITTESTS_LINK_LIBRARIES})
 
   if (INSTALL_UNITTESTS)
