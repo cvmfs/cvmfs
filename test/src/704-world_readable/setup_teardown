@@ -22,45 +22,16 @@ create_world_readable_repo() {
   echo ""
 }
 
-# add_some_tmp_file_to_repo() {
-#   echo "Adding some random file to the repo $CVMFS_TEST_REPO"
-#   start_transaction $CVMFS_TEST_REPO || return $?
-#   local tmpfile="$(mktemp /cvmfs/$CVMFS_TEST_REPO/tmpfile.XXXXX)"
-#   publish_repo $CVMFS_TEST_REPO || return 200
-# }
-
 private_mount_world_readable() {
   local mntpnt="$1"
-  local fuse_version="$2"
-  local config_file_path="$3"
+  local world_readable_status="$2"
   TEST704_PRIVATE_MOUNT="$mntpnt"
-
-  local mount_options="rw,system_mount,fsname=cvmfs2"
 
   do_local_mount_as_root "$mntpnt"          \
                  "$CVMFS_TEST_REPO" \
                  "$(get_repo_url $CVMFS_TEST_REPO)" \
                  "" \
-                 "CVMFS_WORLD_READABLE=ON
-CVMFS_SYSLOG_LEVEL=2" \
-                 "$mount_options" || return 1
-}
-
-private_mount_not_world_readable() {
-  local mntpnt="$1"
-  local fuse_version="$2"
-  local config_file_path="$3"
-  TEST704_PRIVATE_MOUNT="$mntpnt"
-
-  local mount_options="rw,system_mount,fsname=cvmfs2"
-
-  do_local_mount_as_root "$mntpnt"          \
-                 "$CVMFS_TEST_REPO" \
-                 "$(get_repo_url $CVMFS_TEST_REPO)" \
-                 "" \
-                 "CVMFS_WORLD_READABLE=OFF
-CVMFS_SYSLOG_LEVEL=2" \
-                 "$mount_options" || return 1
+                 "CVMFS_WORLD_READABLE=$world_readable_status" || return 1
 }
 
 
@@ -71,9 +42,6 @@ private_unmount() {
 
 cleanup() {
   echo "running cleanup()..."
-  if [ "x$TEST704_PIDS" != "x" ]; then
-    sudo kill -9 $TEST704_PIDS
-  fi
   if [ "x$TEST704_PRIVATE_MOUNT" != "x" ]; then
     private_unmount
   fi
