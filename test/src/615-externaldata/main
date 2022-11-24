@@ -1,6 +1,7 @@
 
 cvmfs_test_name="External data"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 is_external_file() {
   local full_file_path="$1"
