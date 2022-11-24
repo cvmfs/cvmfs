@@ -83,7 +83,7 @@ static void MakeAcquireRequest(
   shash::HmacString(key.secret(), payload, &hmac);
   SslCertificateStore cs;
   cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl); 
+  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +
@@ -94,8 +94,6 @@ static void MakeAcquireRequest(
 
   // Make request to acquire lease from repo services
   curl_easy_setopt(h_curl, CURLOPT_URL, (repo_service_url + "/leases").c_str());
-  //curl_easy_setopt(h_curl, CURLOPT_SSL_VERIFYPEER, 0);
-  //curl_easy_setopt(h_curl, CURLOPT_SSL_VERIFYHOST, 0);
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(payload.length()));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, payload.c_str());
@@ -130,7 +128,7 @@ static void MakeDropRequest(
   shash::HmacString(key.secret(), session_token, &hmac);
   SslCertificateStore cs;
   cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl); 
+  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +
@@ -141,8 +139,6 @@ static void MakeDropRequest(
 
   curl_easy_setopt(h_curl, CURLOPT_URL,
                    (repo_service_url + "/leases/" + session_token).c_str());
-  //curl_easy_setopt(h_curl, CURLOPT_SSL_VERIFYPEER, 0);
-  //curl_easy_setopt(h_curl, CURLOPT_SSL_VERIFYHOST, 0);
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDSIZE_LARGE,
                    static_cast<curl_off_t>(0));
   curl_easy_setopt(h_curl, CURLOPT_POSTFIELDS, NULL);
