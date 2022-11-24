@@ -11,6 +11,6 @@
 #include "util/posix.h"
 
 TEST(T_Panic, Call) {
-  EXPECT_THROW(PANIC(kLogStderr, "unit test"), ECvmfsException);
-  EXPECT_THROW(PANIC(NULL), ECvmfsException);
+  EXPECT_THROW(PANIC(kLogStderr, "unit test"), std::runtime_error);
+  EXPECT_THROW(PANIC(NULL), std::runtime_error);
 }
