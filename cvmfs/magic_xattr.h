@@ -363,4 +363,9 @@ class VersionMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
+class ExternalURLMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced();
+  virtual std::string GetValue();
+};
+
 #endif  // CVMFS_MAGIC_XATTR_H_
