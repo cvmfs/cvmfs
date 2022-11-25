@@ -113,7 +113,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   old_path.Append("/", 1);
   PathString new_path(path);
   new_path.Append("/", 1);
-  unsigned char length_after_truncate = old_path.GetLength();
+  unsigned length_after_truncate = old_path.GetLength();
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);

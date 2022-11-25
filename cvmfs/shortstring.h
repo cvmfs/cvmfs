@@ -87,7 +87,13 @@ class ShortString {
     this->length_ = new_length;
   }
 
-  void Truncate(unsigned char new_length) {
+  /**
+   * Truncates the current string to be of size smaller or equal to current size
+   * 
+   * Note: Can lead to a heap allocated string that is shorter than
+   *       the reserved stack space.
+  */
+  void Truncate(unsigned new_length) {
     assert(new_length <= this->GetLength());
     if (long_string_) {
       long_string_->erase(new_length);
