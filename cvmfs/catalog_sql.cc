@@ -749,6 +749,14 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   if (expand_symlink && !g_raw_symlinks)
     ExpandSymlink(&result.symlink_);
 
+  if (g_world_readable) {
+    if (S_ISDIR(result.mode_)) {
+       result.mode_ |= 0555;
+    } else {
+       result.mode_ |= 0444;
+    }
+  }
+
   return result;
 }
 
