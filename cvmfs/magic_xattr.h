@@ -26,6 +26,7 @@ enum MagicXattrFlavor {
   kXattrAuthz
 };
 
+class MagicXattrManager;  // needed for BaseMagicXattr
 /**
  * This is a base class for magic extended attribute. Concrete extended
  * attributes inherit from this class. It should be generally used only
@@ -60,7 +61,7 @@ class BaseMagicXattr {
   /**
    * Access right check before normal fence
   */
-  bool PrepareValueFencedProtected(uid_t uid, gid_t gid, pid_t pid);
+  bool PrepareValueFencedProtected(gid_t gid);
 
   /**
   * This function is used to obtain the necessary information while
@@ -91,7 +92,7 @@ class BaseMagicXattr {
   virtual ~BaseMagicXattr() {}
 
  protected:
-  MountPoint *mount_point_;
+  MagicXattrManager *xattr_mgr_;
   PathString path_;
   catalog::DirectoryEntry *dirent_;
 
@@ -162,32 +163,49 @@ class MagicXattrManager : public SingleCopy {
   enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
 
   MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
-                    std::set<std::string> protected_xattrs,
-                    std::set<unsigned long> protected_xattr_gids);
+                    const std::set<std::string> &protected_xattrs,
+                    const std::set<gid_t> &privileged_xattr_gids);
   /// The returned BaseMagicXattr* is supposed to be wrapped by a
   /// MagicXattrRAIIWrapper
   BaseMagicXattr* GetLocked(const std::string &name, PathString path,
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
+  /**
+   * Registers a new extended attribute.
+   * Will fail if called after Freeze().
+  */
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
 
+  /**
+   * Freezes the current setup of MagicXattrManager.
+   * No new extended attributes can be added.
+   * Only after freezing MagicXattrManager can registered attributes be
+   * accessed.
+  */
+  void Freeze() { is_frozen_ = true; SanityCheckProtectedXattrs(); }
+  bool IsPrivilegedGid(gid_t gid);
+
+
   EVisibility visibility() { return visibility_; }
-  std::set<unsigned long> protected_xattr_gids()
-                                { return protected_xattr_gids_; }
+  std::set<gid_t> privileged_xattr_gids()
+                                { return privileged_xattr_gids_; }
+  MountPoint* mount_point() { return mount_point_; }
+  bool is_frozen() const {return is_frozen_; }
 
  protected:
   std::map<std::string, BaseMagicXattr *> xattr_list_;
   MountPoint *mount_point_;
   EVisibility visibility_;
-  std::set<std::string> protected_xattrs_;
-  std::set<unsigned long> protected_xattr_gids_;
+
+  // privileged_xattr_gids_ contains the (fuse) gids that
+  // can access xattrs that are part of protected_xattrs_
+  const std::set<std::string> protected_xattrs_;
+  const std::set<gid_t> privileged_xattr_gids_;
 
  private:
- /**
-   * If Xattr name is in set protected_xattrs_ mark it protected so that only
-   * certain users with the correct gid can access it.
-  */
-  void MarkProtected();
+  bool is_frozen_;
+
+  void SanityCheckProtectedXattrs();
 };
 
 class AuthzMagicXattr : public BaseMagicXattr {

@@ -1,6 +1,42 @@
 cvmfs_test_name="Test magic extended attributes"
 cvmfs_test_suites="quick"
 
+# Test for protected extended attribute access
+check_protected_xattr() {
+  echo "Test protected extended attributes"
+  echo "  Having no restrictions"
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no" || return 3
+  local no_restrictions=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  
+  [ "$no_restrictions" = "grid.cern.ch" ] || return 30 
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+
+
+  echo "  Only root access"
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
+CVMFS_XATTR_PRIVILEGED_GIDS=0
+CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
+  local only_root=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  
+  [ "$only_root" = "grid.cern.ch" ] && return 31
+
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+  
+  echo "  Adding current user's gid to access"
+  local user_gid=$(id -g `whoami`)
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
+CVMFS_XATTR_PRIVILEGED_GIDS=$user_gid
+CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
+  local also_this_user=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  
+  [ "$also_this_user" = "grid.cern.ch" ] || return 32
+
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -67,19 +103,9 @@ cvmfs_run_test() {
   get_xattr logbuffer /cvmfs/grid.cern.ch/
   [ "x$logbuffer" != "x" ] || return 20
 
-  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
-  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
-  echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx"
-  list_xattrs /cvmfs/grid.cern.ch
-  echo "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
-
   cvmfs_umount grid.cern.ch || return 2
 
-  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
-CVMFS_PRIVILEGED_XATTR_GIDS=0
-CVMFS_PRIVILEGED_XATTRS=user.fqrn" || return 3
-
-  list_xattrs /cvmfs/grid.cern.ch
+  check_protected_xattr || return $?
 
   return 0
 }
