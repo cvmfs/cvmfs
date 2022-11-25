@@ -1,4 +1,5 @@
 2.11.0:
+  * Change libcvmfs static library to libcvmfs_client shared library (#3113)
   * Add HTTPS support for connecting to gateway (#3060)
   * Add CVMFS_WORLD_READABLE client option (#3012)
   * Let client depend on cvmfs-libs (#3107)
