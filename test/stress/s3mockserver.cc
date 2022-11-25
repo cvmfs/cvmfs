@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <functional>
 #include <set>
 #include <string>
 
@@ -54,8 +55,10 @@ int GetValue(std::string body, std::string param,
     }
     if (j == param.size()) {
       std::string l = GetField(body.substr(i), delim1, 1);
-      l.erase(l.begin(), std::find_if(l.begin(), l.end(),
-              std::not1(std::ptr_fun<int, int>(std::isspace))));
+      std::string::iterator ispc = l.begin();
+      while ((ispc != l.end()) && !std::isspace(*ispc))
+        ispc++;
+      l.erase(l.begin(), ispc);
       return atoi(GetField(l, delim2, 0).c_str());
     }
   }

@@ -42,7 +42,9 @@
 // 30: CernVM-FS 2.8
 //     * Implement cvmfs_remount()
 //     * Add cvmfs_get_revision()
-#define LIBCVMFS_REVISION 30
+// 31: CernVM-FS 2.11
+//     * Move from static libcvmfs.a to shared libcvmfs_client.so
+#define LIBCVMFS_REVISION 31
 
 #include <stdint.h>
 #include <sys/stat.h>
