@@ -633,6 +633,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  bool use_custom_sharding_;
+  CustomSharding *custom_sharding_;
 };  // DownloadManager
 
 }  // namespace download
