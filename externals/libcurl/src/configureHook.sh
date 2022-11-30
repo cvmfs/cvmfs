@@ -51,7 +51,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --disable-tls-srp \
   --disable-unix-sockets \
   --disable-cookies \
-  --disable-http-auth \
   --disable-doh \
   --disable-mime \
   --disable-dateparse \
