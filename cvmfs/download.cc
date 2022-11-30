@@ -1420,12 +1420,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         (info->destination == kDestinationPath))
     {
       if ((fflush(info->destination_file) != 0) ||
+          (fseek(info->destination_file, 0, SEEK_SET) != 0) ||
           (ftruncate(fileno(info->destination_file), 0) != 0))
       {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
       }
-      rewind(info->destination_file);
     }
     if (info->destination == kDestinationSink) {
       if (info->destination_sink->Reset() != 0) {
