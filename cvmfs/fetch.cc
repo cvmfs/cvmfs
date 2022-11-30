@@ -150,10 +150,17 @@ int Fetcher::Fetch(
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
   TransactionSink sink(cache_mgr_, txn);
+  if (external_) {
+    tls->download_job.name  = name;
+  } else {
+    tls->download_job.name  = id.ToString();
+  }
   tls->download_job.url = &url;
   tls->download_job.destination_sink = &sink;
   tls->download_job.expected_hash = &id;
   tls->download_job.extra_info = &name;
+  tls->download_job.proxy = "";
+
   ClientCtx *ctx = ClientCtx::GetInstance();
   if (ctx->IsSet()) {
     ctx->Get(&tls->download_job.uid,

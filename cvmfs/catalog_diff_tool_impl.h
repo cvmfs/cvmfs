@@ -106,15 +106,6 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   sort(old_listing.begin(), old_listing.end(), IsSmaller);
   AppendLastEntry(&old_listing);
 
-  // create these paths here so it can be "reused" in the loop without
-  // re-initializing every time, this should save time in doing memcpy
-  // especially when the path gets longer
-  PathString old_path(path);
-  old_path.Append("/", 1);
-  PathString new_path(path);
-  new_path.Append("/", 1);
-  unsigned length_after_truncate = old_path.GetLength();
-
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
   new_catalog_mgr_->Listing(path, &new_listing);
@@ -144,9 +135,11 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     while (old_entry.IsHidden()) old_entry = old_listing[++i_from];
     while (new_entry.IsHidden()) new_entry = new_listing[++i_to];
 
-    old_path.Truncate(length_after_truncate);
+    PathString old_path(path);
+    old_path.Append("/", 1);
     old_path.Append(old_entry.name().GetChars(), old_entry.name().GetLength());
-    new_path.Truncate(length_after_truncate);
+    PathString new_path(path);
+    new_path.Append("/", 1);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
     XattrList xattrs;

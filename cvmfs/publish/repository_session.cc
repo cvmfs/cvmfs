@@ -19,7 +19,6 @@
 #include "gateway_util.h"
 #include "json_document.h"
 #include "publish/except.h"
-#include "ssl.h"
 #include "upload.h"
 #include "util/logging.h"
 #include "util/pointer.h"
@@ -81,9 +80,6 @@ static void MakeAcquireRequest(
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), payload, &hmac);
-  SslCertificateStore cs;
-  cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +
@@ -126,9 +122,6 @@ static void MakeDropRequest(
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), session_token, &hmac);
-  SslCertificateStore cs;
-  cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +

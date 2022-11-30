@@ -1,9 +1,5 @@
-if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
-    BUILD_SERVER OR
-    BUILD_RECEIVER OR
-    BUILD_SHRINKWRAP OR
-    BUILD_PRELOADER OR
-    BUILD_UNITTESTS)
+if (BUILD_CVMFS OR BUILD_SERVER OR BUILD_RECEIVER OR
+    BUILD_SHRINKWRAP OR BUILD_PRELOADER OR BUILD_UNITTESTS)
 
 set (LIBCVMFS_CRYPTO_SOURCES
      crypto/crypto_util.cc
@@ -13,17 +9,13 @@ set (LIBCVMFS_CRYPTO_SOURCES
 )
 
 set (LIBCVMFS_CRYPTO_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
-set (LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES ${RT_LIBRARY} "")
-list (APPEND LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES
-      ${RT_LIBRARY}
-      pthread
-      dl
-)
-set (LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES "")
-list (APPEND LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES
+set (LIBCVMFS_CRYPTO_LINK_LIBRARIES "")
+list (APPEND LIBCVMFS_CRYPTO_LINK_LIBRARIES
       ${Libcrypto_LIBRARIES}
       ${SHA3_LIBRARIES}
-)
+      ${RT_LIBRARY}
+      pthread
+      dl)
 
 add_library(cvmfs_crypto SHARED ${LIBCVMFS_CRYPTO_SOURCES})
 set_target_properties (cvmfs_crypto PROPERTIES
@@ -31,9 +23,8 @@ set_target_properties (cvmfs_crypto PROPERTIES
     COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS}")
 target_include_directories (cvmfs_crypto PRIVATE ${Libcrypto_INCLUDE_DIRS})
 target_link_libraries (cvmfs_crypto
-                       PUBLIC cvmfs_util
-                              ${LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES}
-                       PRIVATE ${LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES}
+                       cvmfs_util
+                       ${LIBCVMFS_CRYPTO_LINK_LIBRARIES}
 )
 
 install (TARGETS cvmfs_crypto LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -46,11 +37,9 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR BUILD_UNITTESTS
       COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -DDEBUGMSG")
   target_include_directories (cvmfs_crypto_debug PRIVATE ${Libcrypto_INCLUDE_DIRS})
   target_link_libraries (cvmfs_crypto_debug
-                         PUBLIC cvmfs_util_debug
-                                ${LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES}
-                         PRIVATE ${LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES}
+                         cvmfs_util_debug
+                         ${LIBCVMFS_CRYPTO_LINK_LIBRARIES}
   )
-
   install (TARGETS cvmfs_crypto_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif () # debug binaries
 

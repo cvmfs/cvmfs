@@ -2040,13 +2040,6 @@ bool MountPoint::SetupOwnerMaps() {
   {
     g_claim_ownership = true;
   }
-  if (options_mgr_->GetValue("CVMFS_WORLD_READABLE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    g_world_readable = true;
-  }
-
-
 
   return true;
 }

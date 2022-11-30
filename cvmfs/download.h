@@ -28,6 +28,8 @@
 #include "util/atomic.h"
 #include "util/prng.h"
 
+#include "custom_sharding.h"
+
 class InterruptCue;
 
 namespace download {
@@ -152,6 +154,7 @@ struct Counters {
  * Contains all the information to specify a download job.
  */
 struct JobInfo {
+  std::string name;
   const std::string *url;
   bool compressed;
   bool probe_hosts;
@@ -181,6 +184,7 @@ struct JobInfo {
 
   // Default initialization of fields
   void Init() {
+    name = "";
     url = NULL;
     compressed = false;
     probe_hosts = false;
@@ -404,7 +408,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static int ParseHttpCode(const char digits[3]);
 
   void Init(const unsigned max_pool_handles,
-            const perf::StatisticsTemplate &statistics);
+            const perf::StatisticsTemplate &statistics );
   void Fini();
   void Spawn();
   DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
@@ -633,6 +637,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  bool use_custom_sharding_;
+  CustomSharding *custom_sharding_;
 };  // DownloadManager
 
 }  // namespace download

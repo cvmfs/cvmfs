@@ -1,0 +1,67 @@
+#!/bin/sh
+
+PUBLIC_SYMS=""
+if [ "$1" = "-public" ]; then
+    shift
+    PUBLIC_SYMS=$1
+    shift
+fi
+
+OUTLIB=$1
+shift
+
+OBJECTS=""
+TDIRS=""
+for inlib; do
+  inlib_base=`basename $inlib`
+  tmpdir=${inlib_base}.objdir.$$
+  TDIRS="$TDIRS $tmpdir"
+
+  if ( mkdir $tmpdir &&
+       cp $inlib $tmpdir/${inlib_base} &&
+       cd $tmpdir &&
+       ar x $inlib_base &&
+       rm $inlib_base ); then
+    OBJECTS="${OBJECTS} `ls $tmpdir/*`"
+  else
+    echo "Failed to extract $inlib for $OUTLIB."
+    exit 1
+  fi
+done
+
+# if a file containing a list of public symbols was specified, merge
+# all the objects together and localize all non-public symbols
+if [ "$PUBLIC_SYMS" != "" ]; then
+  tmpdir=${OUTLIB}.objdir.$$
+  TDIRS="$TDIRS $tmpdir"
+
+  MERGED_OBJ=$tmpdir/`basename $OUTLIB`.o
+  MERGED_PUBLIC_OBJ=$tmpdir/`basename $OUTLIB`_pub.o
+
+  # Note that we avoid localizing weak global symbols, because doing so
+  # causes STL stuff to fail when the library is linked.
+  if ( mkdir $tmpdir &&
+       ld -r ${OBJECTS} -o ${MERGED_OBJ} &&
+       ( nm ${MERGED_OBJ} | awk ' $2 == "W" {print $3}' | sort | uniq > $tmpdir/W_syms ) &&
+       # On some older systems (SLES11, SLC5) the static data members of the ShortString class template
+       # appear as weak objects (V), not weak symbols (W). Unless they are explicitly kept around,
+       # they are localized and cause linking errors. The following line prevents this error.
+       ( nm ${MERGED_OBJ} | awk ' $2 == "V" {print $3}' | grep ShortString | sort | uniq >> $tmpdir/W_syms ) &&
+       objcopy --keep-global-symbols=$PUBLIC_SYMS --keep-global-symbols=$tmpdir/W_syms $MERGED_OBJ $MERGED_PUBLIC_OBJ); then
+
+    # we just need this one merged object file
+    OBJECTS=$MERGED_PUBLIC_OBJ
+  else
+    echo "Failed to produce merged public object for $OUTLIB."
+    exit 1
+  fi
+fi
+
+rm -f $OUTLIB
+ar r $OUTLIB ${OBJECTS} || exit 1
+
+for dir in $TDIRS; do
+  rm -rf $dir
+done
+
+exit 0

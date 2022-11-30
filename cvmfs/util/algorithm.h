@@ -189,7 +189,7 @@ friend class UTLog2Histogram;
  * UTLog2Histogram class is a helper for the unit tests
  * to extract internals from Log2Histogram.
  */
-class CVMFS_EXPORT UTLog2Histogram {
+class UTLog2Histogram {
  public:
   std::vector<atomic_int32> GetBins(const Log2Histogram &h);
 };

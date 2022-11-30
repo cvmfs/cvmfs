@@ -204,7 +204,7 @@ Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
-Requires: cvmfs-libs = %{version}
+Requires: openssl
 %description devel
 CernVM-FS static client library for pure user-space use
 
@@ -268,7 +268,6 @@ images.
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
-Requires: cvmfs-libs = %{version}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
@@ -617,10 +616,6 @@ systemctl daemon-reload
 
 %files libs
 %defattr(-,root,root)
-%{_libdir}/libcvmfs_cache.so
-%{_libdir}/libcvmfs_cache.so.%{version}
-%{_libdir}/libcvmfs_client.so
-%{_libdir}/libcvmfs_client.so.%{version}
 %{_libdir}/libcvmfs_crypto.so
 %{_libdir}/libcvmfs_crypto.so.%{version}
 %{_libdir}/libcvmfs_crypto_debug.so
@@ -645,6 +640,8 @@ systemctl daemon-reload
 
 %files devel
 %defattr(-,root,root)
+%{_libdir}/libcvmfs.a
+%{_libdir}/libcvmfs_cache.a
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h
 %doc COPYING AUTHORS README.md ChangeLog

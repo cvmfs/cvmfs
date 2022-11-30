@@ -9,7 +9,6 @@
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
-#include "ssl.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
@@ -63,10 +62,6 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, payload, &hmac);
 
-  SslCertificateStore cs;
-  cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl);
-
   const std::string header_str = std::string("Authorization: ") + key_id + " " +
                                  Base64(hmac.ToString(false));
   struct curl_slist* auth_header = NULL;
@@ -107,10 +102,6 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, session_token, &hmac);
-
-  SslCertificateStore cs;
-  cs.UseSystemCertificatePath();
-  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str = std::string("Authorization: ") + key_id + " " +
                                  Base64(hmac.ToString(false));

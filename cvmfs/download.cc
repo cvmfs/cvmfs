@@ -907,7 +907,16 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   string url_prefix;
 
   MutexLockGuard m(lock_options_);
+  if (use_custom_sharding_){
+    if (info->proxy!="") {
+      perf::Inc(counters_->n_proxy_failover); // proxy already set, so this is a failover event
+    }
+    info->proxy = custom_sharding_->GetNextProxy( info->name, info->proxy, info->range_offset );
+    curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+
+  } else {
   // Check if proxy group needs to be reset from backup to primary
+
   if (opt_timestamp_backup_proxies_ > 0) {
     const time_t now = time(NULL);
     if (static_cast<int64_t>(now) >
@@ -967,6 +976,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "0.0.0.0");
     }
   }
+
+  } // !sharding
+
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
   if (info->proxy != "DIRECT") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
@@ -1370,8 +1382,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
          ( (info->error_code == kFailProxyResolve) ||
            IsProxyTransferError(info->error_code) ||
            (info->error_code == kFailProxyHttp)) )
-       )
-    {
+       ) {
+     if( use_custom_sharding_ ) {
+       try_again = true;
+       same_url_retry = false;
+     } else
+     {
       try_again = true;
       // If all proxies failed, do a next round with the next host
       if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
@@ -1400,6 +1416,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         }
       }  // Make a proxy failure a host failure
     }  // Proxy failure assumed
+    }
   }
 
   if (try_again) {
@@ -1439,6 +1456,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       zlib::DecompressInit(&info->zstream);
     SetRegularCache(info);
 
+  if( use_custom_sharding_ ) { 
+      ReleaseCredential(info);
+      SetUrlOptions(info);
+  } else {
     // Failure handling
     bool switch_proxy = false;
     bool switch_host = false;
@@ -1484,6 +1505,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       SwitchHost(info);
       info->num_used_hosts++;
       SetUrlOptions(info);
+    }
+
     }
 
     return true;  // try again
@@ -1656,10 +1679,23 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
     kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
+
+  if ((getenv("CVMFS_CUSTOM_SHARDING") != NULL) &&
+      (strlen(getenv("CVMFS_CUSTOM_SHARDING")) > 0))
+  {
+    use_custom_sharding_ = true;
+    custom_sharding_ = new CustomSharding();
+  }
+
 }
 
 
 void DownloadManager::Fini() {
+
+  if (use_custom_sharding_) {
+   custom_sharding_->StopHealthCheck();
+  }
+
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
     char buf = 'T';
@@ -1720,6 +1756,10 @@ void DownloadManager::Spawn() {
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
+
+  if (use_custom_sharding_) {
+   custom_sharding_->StartHealthCheck();
+  }
 }
 
 
@@ -2541,6 +2581,9 @@ void DownloadManager::SetProxyChain(
       for (; iter_ips != best_addresses.end(); ++iter_ips) {
         string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
         infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
+        if (use_custom_sharding_) {
+          custom_sharding_->AddProxy(url_ip);         
+        }
       }
     }
     opt_proxy_groups_->push_back(infos);

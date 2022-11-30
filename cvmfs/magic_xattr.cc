@@ -64,7 +64,6 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("xfsroot.rawlink", new RawlinkMagicXattr());
 
   Register("user.authz", new AuthzMagicXattr());
-  Register("user.external_url", new ExternalURLMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -548,24 +547,3 @@ std::string UsedDirPMagicXattr::GetValue() {
 std::string VersionMagicXattr::GetValue() {
   return std::string(VERSION) + "." + std::string(CVMFS_PATCH_LEVEL);
 }
-
-std::string ExternalURLMagicXattr::GetValue() {
-  std::vector<std::string> host_chain;
-  std::vector<int> rtt;
-  unsigned current_host;
-  if (mount_point_->external_download_mgr() != NULL) {
-    mount_point_->external_download_mgr()->GetHostInfo(
-      &host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      return std::string(host_chain[current_host]) + std::string(path_.c_str());
-    }
-  } else {
-    return std::string("");
-  }
-}
-
-bool ExternalURLMagicXattr::PrepareValueFenced() {
-  return dirent_->IsRegular() && dirent_->IsExternalFile();
-}
-
-
