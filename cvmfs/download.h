@@ -20,6 +20,7 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
+#include "custom_sharding.h"
 #include "dns.h"
 #include "duplex_curl.h"
 #include "sink.h"
