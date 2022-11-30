@@ -21,7 +21,7 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --disable-shared \
   --enable-static \
   --enable-http \
-  --enable-http-basic-auth \
+  --enable-http-auth \
   --enable-proxy \
   --enable-file \
   --enable-ipv6 \
