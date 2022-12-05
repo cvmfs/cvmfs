@@ -171,7 +171,7 @@ TEST_F(T_Util, GetArch) {
   int fd_stdout;
   int fd_stderr;
   ASSERT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
-  ASSERT_TRUE(SafeWrite(fd_stdin, "/usr/bin/uname -m\n", 18));
+  ASSERT_TRUE(SafeWrite(fd_stdin, "uname -m\n", 18));
   close(fd_stdin);
   char arch[257];
   ssize_t nbytes = SafeRead(fd_stdout, arch, 256);
