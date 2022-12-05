@@ -16,13 +16,12 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
-
 #include "compression.h"
 #include "crypto/hash.h"
 #include "custom_sharding.h"
 #include "dns.h"
 #include "duplex_curl.h"
+#include "gtest/gtest_prod.h"
 #include "sink.h"
 #include "ssl.h"
 #include "statistics.h"
@@ -62,7 +61,6 @@ enum Failures {
 
   kFailNumEntries
 };  // Failures
-
 
 inline bool IsHostTransferError(const Failures error) {
   switch (error) {
@@ -124,7 +122,6 @@ enum Destination {
   kDestinationNone
 };  // Destination
 
-
 struct Counters {
   perf::Counter *sz_transferred_bytes;
   perf::Counter *sz_transfer_time;  // measured in miliseconds
@@ -134,26 +131,24 @@ struct Counters {
   perf::Counter *n_host_failover;
 
   explicit Counters(perf::StatisticsTemplate statistics) {
-    sz_transferred_bytes = statistics.RegisterTemplated("sz_transferred_bytes",
-        "Number of transferred bytes");
-    sz_transfer_time = statistics.RegisterTemplated("sz_transfer_time",
-        "Transfer time (miliseconds)");
-    n_requests = statistics.RegisterTemplated("n_requests",
-        "Number of requests");
+    sz_transferred_bytes = statistics.RegisterTemplated(
+        "sz_transferred_bytes", "Number of transferred bytes");
+    sz_transfer_time = statistics.RegisterTemplated(
+        "sz_transfer_time", "Transfer time (miliseconds)");
+    n_requests =
+        statistics.RegisterTemplated("n_requests", "Number of requests");
     n_retries = statistics.RegisterTemplated("n_retries", "Number of retries");
-    n_proxy_failover = statistics.RegisterTemplated("n_proxy_failover",
-        "Number of proxy failovers");
+    n_proxy_failover = statistics.RegisterTemplated(
+        "n_proxy_failover", "Number of proxy failovers");
     n_host_failover = statistics.RegisterTemplated("n_host_failover",
-        "Number of host failovers");
+                                                   "Number of host failovers");
   }
 };  // Counters
-
 
 /**
  * Contains all the information to specify a download job.
  */
 struct JobInfo {
-  std::string name;
   const std::string *url;
   bool compressed;
   bool probe_hosts;
@@ -222,8 +217,7 @@ struct JobInfo {
   // One constructor per destination + head request
   JobInfo() { Init(); }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const std::string *p, const shash::Any *h)
-  {
+          const std::string *p, const shash::Any *h) {
     Init();
     url = u;
     compressed = c;
@@ -233,8 +227,7 @@ struct JobInfo {
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
-          const shash::Any *h)
-  {
+          const shash::Any *h) {
     Init();
     url = u;
     compressed = c;
@@ -244,8 +237,7 @@ struct JobInfo {
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h)
-  {
+          const shash::Any *h) {
     Init();
     url = u;
     compressed = c;
@@ -253,9 +245,8 @@ struct JobInfo {
     destination = kDestinationMem;
     expected_hash = h;
   }
-  JobInfo(const std::string *u, const bool c, const bool ph,
-          cvmfs::Sink *s, const shash::Any *h)
-  {
+  JobInfo(const std::string *u, const bool c, const bool ph, cvmfs::Sink *s,
+          const shash::Any *h) {
     Init();
     url = u;
     compressed = c;
@@ -290,7 +281,7 @@ struct JobInfo {
   char *info_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
-  int wait_at[2];  /**< Pipe used for the return value */
+  int wait_at[2]; /**< Pipe used for the return value */
   std::string proxy;
   bool nocache;
   Failures error_code;
@@ -301,7 +292,6 @@ struct JobInfo {
   unsigned backoff_ms;
   unsigned int current_host_chain_index;
 };  // JobInfo
-
 
 /**
  * Manages blocks of arrays of curl_slist storing header strings.  In contrast
@@ -314,6 +304,7 @@ struct JobInfo {
  */
 class HeaderLists {
   FRIEND_TEST(T_HeaderLists, Intrinsics);
+
  public:
   ~HeaderLists();
   curl_slist *GetList(const char *header);
@@ -324,7 +315,7 @@ class HeaderLists {
   std::string Print(curl_slist *slist);
 
  private:
-  static const unsigned kBlockSize = 4096/sizeof(curl_slist);
+  static const unsigned kBlockSize = 4096 / sizeof(curl_slist);
 
   bool IsUsed(curl_slist *slist) { return slist->data != NULL; }
   curl_slist *Get(const char *header);
@@ -334,7 +325,6 @@ class HeaderLists {
   std::vector<curl_slist *> blocks_;  // List of curl_slist blocks
 };
 
-
 /**
  * Provides hooks to attach per-transfer credentials to curl handles.
  * Overwritten by the AuthzX509Attachment in authz_curl.cc.  Needs to be
@@ -342,13 +332,11 @@ class HeaderLists {
  */
 class CredentialsAttachment {
  public:
-  virtual ~CredentialsAttachment() { }
-  virtual bool ConfigureCurlHandle(CURL *curl_handle,
-                                   pid_t pid,
+  virtual ~CredentialsAttachment() {}
+  virtual bool ConfigureCurlHandle(CURL *curl_handle, pid_t pid,
                                    void **info_data) = 0;
   virtual void ReleaseCurlHandle(CURL *curl_handle, void *info_data) = 0;
 };
-
 
 /**
  * Note when adding new fields: Clone() probably needs to be adjusted, too.
@@ -360,12 +348,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
  public:
   struct ProxyInfo {
-    ProxyInfo() { }
-    explicit ProxyInfo(const std::string &url) : url(url) { }
+    ProxyInfo() {}
+    explicit ProxyInfo(const std::string &url) : url(url) {}
     ProxyInfo(const dns::Host &host, const std::string &url)
-      : host(host)
-      , url(url)
-    { }
+        : host(host), url(url) {}
     std::string Print();
     dns::Host host;
     std::string url;
@@ -423,23 +409,22 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetLowSpeedLimit(const unsigned low_speed_limit);
   void SetHostChain(const std::string &host_list);
   void SetHostChain(const std::vector<std::string> &host_list);
-  void GetHostInfo(std::vector<std::string> *host_chain,
-                   std::vector<int> *rtt, unsigned *current_host);
+  void GetHostInfo(std::vector<std::string> *host_chain, std::vector<int> *rtt,
+                   unsigned *current_host);
   void ProbeHosts();
   bool ProbeGeo();
-    // Sort list of servers using the Geo API.  If the output_order
-    // vector is NULL, then the servers vector input is itself sorted.
-    // If it is non-NULL, then servers is left unchanged and the zero-based
-    // ordering is stored into output_order.
+  // Sort list of servers using the Geo API.  If the output_order
+  // vector is NULL, then the servers vector input is itself sorted.
+  // If it is non-NULL, then servers is left unchanged and the zero-based
+  // ordering is stored into output_order.
   bool GeoSortServers(std::vector<std::string> *servers,
-                      std::vector<uint64_t>    *output_order = NULL);
+                      std::vector<uint64_t> *output_order = NULL);
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
                      const std::string &fallback_proxy_list,
                      const ProxySetModes set_mode);
-  void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
-                    unsigned *current_group,
-                    unsigned *fallback_group);
+  void GetProxyInfo(std::vector<std::vector<ProxyInfo> > *proxy_chain,
+                    unsigned *current_group, unsigned *fallback_group);
   std::string GetProxyList();
   std::string GetFallbackProxyList();
   void ShardProxies();
@@ -461,9 +446,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     return 0;
   }
 
-  dns::IpPreference opt_ip_preference() const {
-    return opt_ip_preference_;
-  }
+  dns::IpPreference opt_ip_preference() const { return opt_ip_preference_; }
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
@@ -496,8 +479,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void CloneProxyConfig(DownloadManager *clone);
 
   inline std::vector<ProxyInfo> *current_proxy_group() const {
-    return (opt_proxy_groups_ ?
-            &((*opt_proxy_groups_)[opt_proxy_groups_current_]) : NULL);
+    return (opt_proxy_groups_
+                ? &((*opt_proxy_groups_)[opt_proxy_groups_current_])
+                : NULL);
   }
 
   Prng prng_;
@@ -542,7 +526,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   unsigned opt_host_chain_current_;
 
   // Proxy list
-  std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
+  std::vector<std::vector<ProxyInfo> > *opt_proxy_groups_;
   /**
    * The current load-balancing group (first dimension in opt_proxy_groups_).
    */
