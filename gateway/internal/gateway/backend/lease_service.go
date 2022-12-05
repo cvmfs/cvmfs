@@ -17,7 +17,7 @@ type LeaseDTO struct {
 }
 
 // NewLease for the specified path, using keyID
-func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error) {
+func (s *Services) NewLease(ctx context.Context, keyID, leasePath, hostname string, protocolVersion int) (string, error) {
 	t0 := time.Now()
 
 	outcome := "success"
@@ -81,6 +81,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		KeyID:           keyID,
 		Expiration:      time.Now().Add(s.Config.MaxLeaseTime),
 		ProtocolVersion: protocolVersion,
+		Hostname:        hostname,
 	}
 
 	if err := CreateLease(ctx, tx, lease); err != nil {
@@ -130,7 +131,7 @@ func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
 	ret := make(map[string]LeaseDTO)
 	for _, l := range leases {
 		leasePath := l.Repository + l.Path
-		ret[leasePath] = LeaseDTO{KeyID: l.KeyID, LeasePath: leasePath, Expires: l.Expiration.String()}
+		ret[leasePath] = LeaseDTO{KeyID: l.KeyID, LeasePath: leasePath, Expires: l.Expiration.String(), Hostname: l.Hostname}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -173,6 +174,7 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 		KeyID:     lease.KeyID,
 		LeasePath: lease.CombinedLeasePath(),
 		Expires:   lease.Expiration.String(),
+		Hostname:  lease.Hostname,
 	}
 	return ret, nil
 }
