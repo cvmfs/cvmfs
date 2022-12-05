@@ -165,6 +165,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
     file_system(new FileSystem(fs_info));
 
+  file_system->SetupGlobalEnvironmentParams();
+
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
            file_system->options_mgr()->Dump().c_str());
@@ -808,6 +810,14 @@ bool FileSystem::SetupCwd() {
   //  ...
   // }
   return true;
+}
+
+
+/**
+ * Environment variables useful, e.g., for variant symlinks
+ */
+void FileSystem::SetupGlobalEnvironmentParams() {
+  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
 }
 
 
