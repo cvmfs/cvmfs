@@ -13,6 +13,7 @@ type LeaseDTO struct {
 	KeyID     string `json:"key_id,omitempty"`
 	LeasePath string `json:"path,omitempty"`
 	Expires   string `json:"expires,omitempty"`
+	Hostname  string `json:"hostname,omitempty"`
 }
 
 // NewLease for the specified path, using keyID

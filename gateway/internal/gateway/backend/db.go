@@ -90,9 +90,9 @@ create table if not exists Lease (
 	Repository string not null,
 	Path string not null,
 	KeyID string not null,
-	Hostname string,
 	Expiration integer not null,
-	ProtocolVersion integer not null
+	ProtocolVersion integer not null,
+	Hostname string
 );
 create index lease_repository_path_idx ON Lease(Repository,Path);
 create table if not exists Repository (
