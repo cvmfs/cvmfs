@@ -559,9 +559,8 @@ std::string ExternalURLMagicXattr::GetValue() {
     if (host_chain.size()) {
       return std::string(host_chain[current_host]) + std::string(path_.c_str());
     }
-  } else {
-    return std::string("");
   }
+  return std::string("");
 }
 
 bool ExternalURLMagicXattr::PrepareValueFenced() {
