@@ -153,6 +153,7 @@ struct Counters {
  * Contains all the information to specify a download job.
  */
 struct JobInfo {
+  std::string name;
   const std::string *url;
   bool compressed;
   bool probe_hosts;
