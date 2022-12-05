@@ -34,4 +34,20 @@ class CustomSharding {
               std::string current_proxy, size_t off);
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void *shard_init(void);
+int   shard_free(void*data);
+int   shard_add_proxy(void*data, const char* proxy);
+char* shard_get_next_proxy(void*data, const char*path,
+    const char*current_proxy, size_t offset);
+void  shard_start_healthcheck(void*data);
+void  shard_stop_healthcheck(void*data);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif  // CVMFS_CUSTOM_SHARDING_H_

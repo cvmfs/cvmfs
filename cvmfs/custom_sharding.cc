@@ -24,9 +24,9 @@ CustomSharding:: CustomSharding() {
       sharding_free = (int (*)(void *)) dlsym(dso_object, "shard_free");
       sharding_add_proxy = (int (*)(void *, const char*))
            dlsym(dso_object, "shard_add_proxy");
-      sharding_next_proxy =
+      sharding_get_next_proxy =
            (char* (*)(void *, const char *, const char *, size_t))
-           dlsym(dso_object, "shard_next_proxy");
+           dlsym(dso_object, "shard_get_next_proxy");
       sharding_start_healthcheck = (void (*)(void*))
            dlsym(dso_object, "shard_start_healthcheck");
       sharding_stop_healthcheck = (void (*)(void*))
@@ -34,7 +34,7 @@ CustomSharding:: CustomSharding() {
     }
     if ( !sharding_init || !sharding_free
         || !sharding_add_proxy
-        || !sharding_next_proxy
+        || !sharding_get_next_proxy
         || !sharding_start_healthcheck || !sharding_stop_healthcheck ) {
       LogCvmfs(kLogCvmfs, kLogDebug,
            "One or more dlsym failed: %s", dlerror() );
@@ -61,7 +61,7 @@ void CustomSharding::AddProxy(std::string proxy) {
 }
 std::string CustomSharding::GetNextProxy(std::string url,
             std::string current_proxy, size_t off) {
-    if (dso_object) { return std::string(sharding_next_proxy(dso_data,
+    if (dso_object) { return std::string(sharding_get_next_proxy(dso_data,
                        url.c_str(), current_proxy.c_str(), off)); }
 
     return "";
