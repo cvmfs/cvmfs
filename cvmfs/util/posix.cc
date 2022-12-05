@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
 // If valgrind headers are present on the build system, then we can detect
@@ -1425,6 +1426,16 @@ std::string GetHomeDirectory() {
   std::string home_dir = result->pw_dir;
   free(buf);
   return home_dir;
+}
+
+/**
+ * Returns the output of `uname -m`
+ */
+std::string GetArch() {
+  struct utsname info;
+  int retval = uname(&info);
+  assert(retval == 0);
+  return info.machine;
 }
 
 
