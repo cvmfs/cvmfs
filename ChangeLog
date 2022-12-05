@@ -1,4 +1,5 @@
 2.11.0:
+  * Improve file reset logic on download retries (#3085)
   * Add user.external_url extended attribute (#3101)
   * Change libcvmfs static library to libcvmfs_client shared library (#3113)
   * Add HTTPS support for connecting to gateway (#3060)
