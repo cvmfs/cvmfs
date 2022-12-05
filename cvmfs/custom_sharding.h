@@ -21,7 +21,7 @@ class CustomSharding {
   void* (*sharding_init)( void );
   int   (*sharding_free)( void* );
   int   (*sharding_add_proxy)( void *, const char * );
-  char* (*sharding_next_proxy)( void *, const char*, const char*, size_t off );
+  char* (*sharding_get_next_proxy)( void *, const char*, const char*, size_t off );
   void  (*sharding_start_healthcheck)( void * );
   void  (*sharding_stop_healthcheck)( void * );
  public:
