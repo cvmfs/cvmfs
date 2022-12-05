@@ -61,9 +61,14 @@ void CustomSharding::AddProxy(std::string proxy) {
 }
 std::string CustomSharding::GetNextProxy(std::string url,
             std::string current_proxy, size_t off) {
-    if (dso_object) { return std::string(sharding_get_next_proxy(dso_data,
-                       url.c_str(), current_proxy.c_str(), off)); }
-
+   
+    if (dso_object) { 
+      char *tmp = sharding_get_next_proxy(dso_data,
+                       url.c_str(), current_proxy.c_str(), off);
+      std::string t = std::string(tmp); 
+      free(tmp);
+      return t;
+    }
     return "";
 }
 
