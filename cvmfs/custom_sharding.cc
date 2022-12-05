@@ -1,5 +1,8 @@
 // This file is part of the CernVM File System
 //
+#include "custom_sharding.h"
+#include <dlfcn.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -7,34 +10,61 @@
 #include <string>
 #include <vector>
 
-#include "custom_sharding.h"
 #include "util/logging.h"
 
 using namespace std; // NOLINT
 
 CustomSharding:: CustomSharding() {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding constructor run");
+    dso_object = dlopen("libcvmfs_custom_sharding.so", RTLD_NOW);
+    if (!dso_object) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "dlopen failed: %s", dlerror());
+      return;
+    } else {
+      sharding_init = (void * (*) (void) )dlsym(dso_object, "shard_init");
+      sharding_free = (int (*)(void *)) dlsym(dso_object, "shard_free");
+      sharding_add_proxy = (int (*)(void *, const char*))
+           dlsym(dso_object, "shard_add_proxy");
+      sharding_next_proxy =
+           (char* (*)(void *, const char *, const char *, size_t))
+           dlsym(dso_object, "shard_next_proxy");
+      sharding_start_healthcheck = (void (*)(void*))
+           dlsym(dso_object, "shard_start_healthcheck");
+      sharding_stop_healthcheck = (void (*)(void*))
+           dlsym(dso_object, "shard_stop_healthcheck");
+    }
+    if ( !sharding_init || !sharding_free
+        || !sharding_add_proxy
+        || !sharding_next_proxy
+        || !sharding_start_healthcheck || !sharding_stop_healthcheck ) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+           "One or more dlsym failed: %s", dlerror() );
+      dlclose(dso_object);
+      dso_object = NULL;
+      return;
+    }
+    dso_data = sharding_init();
 }
+
 CustomSharding:: ~CustomSharding() {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding destructor run");
+    if (dso_object) { sharding_free( dso_data ); }
+    if (dso_object) { dlclose( dso_object ); }
 }
 
 void CustomSharding::StartHealthCheck() {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding healthcheck start");
+    if (dso_object) { sharding_start_healthcheck( dso_data ); }
 }
 void CustomSharding::StopHealthCheck() {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding healthcheck stop");
+    if (dso_object) { sharding_stop_healthcheck( dso_data ); }
 }
 void CustomSharding::AddProxy(std::string proxy) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding add proxy [%s]",
-             proxy.c_str());
-    proxies.push_back(proxy);
+    if (dso_object) { sharding_add_proxy( dso_data, proxy.c_str() ); }
 }
 std::string CustomSharding::GetNextProxy(std::string url,
             std::string current_proxy, size_t off) {
-    std::string ret = proxies[ rand() % proxies.size() ];
-    LogCvmfs(kLogCvmfs, kLogDebug, "CustomSharding current proxy is [%s], returning randomized proxy [%s]", current_proxy.c_str(), ret.c_str()); // NOLINT
-    return ret;
+    if (dso_object) { return std::string(sharding_next_proxy(dso_data,
+                       url.c_str(), current_proxy.c_str(), off)); }
+
+    return "";
 }
 
 
