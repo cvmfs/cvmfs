@@ -40,6 +40,7 @@ cd ${CVMFS_RESULT_LOCATION}/build
 cmake -DBUILD_SERVER=no -DBUILD_RECEIVER=no -DBUILD_GEOAPI=no \
   -DBUILD_LIBCVMFS=no -DBUILD_LIBCVMFS_CACHE=no \
   -DINSTALL_BASH_COMPLETION=no \
+  -DINSTALL_MOUNT_SCRIPTS=yes \
   -DEXTERNALS_PREFIX=${CVMFS_RESULT_LOCATION}/externals \
   ${CVMFS_SOURCE_LOCATION}
 make -j4
@@ -56,6 +57,12 @@ rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/cvmfs_config
 # Add system automounter
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin
 cp -v /usr/sbin/automount ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin/
+mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/etc/sysconfig
+touch ${CVMFS_RESULT_LOCATION}/rootfs/etc/sysconfig/autofs
+touch ${CVMFS_RESULT_LOCATION}/rootfs/etc/autofs.conf
+echo "/cvmfs program:/etc/auto.cvmfs" > ${CVMFS_RESULT_LOCATION}/rootfs/etc/auto.master
+mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/tmp # autmount requires /tmp
+
 
 # Add dependent libraries (openssl, libfuse, etc)
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib \
