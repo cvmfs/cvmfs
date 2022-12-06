@@ -1665,15 +1665,28 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   }
 }
 
-
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
   fuse_remounter_->fence()->Enter();
   const bool found = (GetDirentForPath(PathString(path), &dirent) > 0);
-  fuse_remounter_->fence()->Leave();
 
-  if (!found || !dirent.IsRegular())
+  if (!found || !dirent.IsRegular()) {
+    fuse_remounter_->fence()->Leave();
     return false;
+  }
+
+  if (!dirent.IsChunkedFile()) {
+    fuse_remounter_->fence()->Leave();
+  } else {
+    FileChunkList chunks;
+    mount_point_->catalog_mgr()->ListFileChunks(
+      PathString(path), dirent.hash_algorithm(), &chunks);
+    fuse_remounter_->fence()->Leave();
+    for (unsigned i = 0; i < chunks.size(); ++i) {
+        file_system_->cache_mgr()->quota_mgr()
+           ->Remove(chunks.AtPtr(i)->content_hash());
+    }
+  }
   file_system_->cache_mgr()->quota_mgr()->Remove(dirent.checksum());
   return true;
 }
