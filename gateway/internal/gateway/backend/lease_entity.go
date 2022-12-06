@@ -43,6 +43,7 @@ type Lease struct {
 	KeyID           string
 	Expiration      time.Time
 	ProtocolVersion int
+	Hostname        string
 }
 
 func (l Lease) CombinedLeasePath() string {
@@ -53,8 +54,8 @@ func CreateLease(ctx context.Context, tx *sql.Tx, lease Lease) error {
 	t0 := time.Now()
 
 	res, err := tx.ExecContext(ctx,
-		"insert into Lease (Token, Repository, Path, KeyID, Expiration, ProtocolVersion) values (?, ?, ?, ?, ?, ?);",
-		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.UnixMilli(), lease.ProtocolVersion)
+		"insert into Lease (Token, Repository, Path, KeyID, Expiration, ProtocolVersion, Hostname) values (?, ?, ?, ?, ?, ?, ?);",
+		lease.Token, lease.Repository, lease.Path, lease.KeyID, lease.Expiration.UnixMilli(), lease.ProtocolVersion, lease.Hostname)
 	if err != nil {
 		return fmt.Errorf("could not insert new lease: %w", err)
 	}
@@ -67,7 +68,7 @@ func CreateLease(ctx context.Context, tx *sql.Tx, lease Lease) error {
 	gw.LogC(ctx, "lease_entity", gw.LogDebug).
 		Str("operation", "create").
 		Dur("task_dt", time.Since(t0)).
-		Msgf("key: %v, repo: %v, path: %v", lease.KeyID, lease.Repository, lease.Path)
+		Msgf("key: %v, repo: %v, path: %v, hostname: %v", lease.KeyID, lease.Repository, lease.Path, lease.Hostname)
 
 	return nil
 }
@@ -256,7 +257,8 @@ func scanLease(rows *sql.Rows, lease *Lease) error {
 		&lease.Path,
 		&lease.KeyID,
 		&expMilli,
-		&lease.ProtocolVersion); err != nil {
+		&lease.ProtocolVersion,
+		&lease.Hostname); err != nil {
 		return err
 	}
 

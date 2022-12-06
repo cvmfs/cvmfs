@@ -98,6 +98,7 @@ CVMFS_EXPORT void Block2Nonblock(int filedes);
 CVMFS_EXPORT void SendMsg2Socket(const int fd, const std::string &msg);
 CVMFS_EXPORT bool SendFd2Socket(int socket_fd, int passing_fd);
 CVMFS_EXPORT int RecvFdFromSocket(int msg_fd);
+CVMFS_EXPORT std::string GetHostname();
 
 CVMFS_EXPORT bool SwitchCredentials(const uid_t uid, const gid_t gid,
                                     const bool temporarily);
