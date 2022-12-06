@@ -817,6 +817,11 @@ TEST_F(T_Util, SendRecvFd) {
 }
 
 
+TEST_F(T_Util, GetHostname) {
+  EXPECT_FALSE(GetHostname().empty());
+}
+
+
 TEST_F(T_Util, TcpEndpoints) {
   EXPECT_EQ(-1, MakeTcpEndpoint("foobar", 0));
   int fd_server = MakeTcpEndpoint("", 12345);

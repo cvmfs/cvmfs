@@ -743,6 +743,14 @@ int RecvFdFromSocket(int msg_fd) {
 }
 
 
+std::string GetHostname() {
+  char name[HOST_NAME_MAX + 1];
+  int retval = gethostname(name, HOST_NAME_MAX);
+  assert(retval == 0);
+  return name;
+}
+
+
 /**
  * set(e){g/u}id wrapper.
  */
