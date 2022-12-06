@@ -166,6 +166,24 @@ TEST_F(T_Util, GetHomeDirectory) {
 }
 
 
+TEST_F(T_Util, GetArch) {
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  ASSERT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
+  ASSERT_TRUE(SafeWrite(fd_stdin, "uname -m\n", 18));
+  close(fd_stdin);
+  char arch[257];
+  ssize_t nbytes = SafeRead(fd_stdout, arch, 256);
+  close(fd_stdout);
+  close(fd_stderr);
+  ASSERT_GT(nbytes, 0);
+  ASSERT_LT(nbytes, 257);
+  arch[nbytes] = '\0';
+  EXPECT_EQ(Trim(arch, true /* trim_newline */), GetArch());
+}
+
+
 TEST_F(T_Util, GetGidOf) {
 #ifdef __APPLE__
   const std::string group_name = "wheel";

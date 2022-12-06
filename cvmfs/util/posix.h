@@ -149,6 +149,8 @@ CVMFS_EXPORT mode_t GetUmask();
 CVMFS_EXPORT bool AddGroup2Persona(const gid_t gid);
 CVMFS_EXPORT std::string GetHomeDirectory();
 
+CVMFS_EXPORT std::string GetArch();
+
 CVMFS_EXPORT int SetLimitNoFile(unsigned limit_nofile);
 CVMFS_EXPORT void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
 

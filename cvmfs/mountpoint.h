@@ -273,6 +273,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
+  void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -406,8 +407,8 @@ class FileSystem : SingleCopy, public BootFactory {
 
 /**
  * The StatfsCache class is a class purely designed as "struct" (= holding
- * object for all its parameters). 
- * All its logic, including the locking mechanism, is implemented in the 
+ * object for all its parameters).
+ * All its logic, including the locking mechanism, is implemented in the
  * function cvmfs_statfs in cvmfs.cc
  */
 class StatfsCache : SingleCopy {
