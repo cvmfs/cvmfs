@@ -2526,8 +2526,13 @@ find_or_build_cvmfs_preload() {
 set_up_repository_gateway() {
     echo "Setting up repository gateway"
 
+    gateway_script=/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    if [ -f /usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
+      gateway_script=/usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    fi
+
     echo "  Stopping repository gateway"
-    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+    sudo $gateway_script stop
 
     echo "  Cleaning up the repository gateway db"
     sudo rm -rf /var/lib/cvmfs-gateway/*
@@ -2567,12 +2572,12 @@ EOF'
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
     echo "  Starting repository gateway"
-    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
+    sudo $gateway_script start
     # Let the service boot up
     sleep 1
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    $gateway_script status
+    $gateway_script status
+    $gateway_script status
 }
 
 lockfile() {
