@@ -77,7 +77,8 @@ static void MakeAcquireRequest(
 
   const std::string payload = "{\"path\" : \"" + repo_path +
                               "\", \"api_version\" : \"" +
-                              StringifyInt(gateway::APIVersion()) + "\"}";
+                              StringifyInt(gateway::APIVersion()) + "\", " +
+                              "\"hostname\" : \"" + GetHostname() + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), payload, &hmac);
