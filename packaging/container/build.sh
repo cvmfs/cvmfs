@@ -55,7 +55,7 @@ rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/cvmfs_config
 
 # Add system automounter
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin
-cp -v /usr/sbin/automounter ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin/
+cp -v /usr/sbin/automount ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin/
 
 # Add dependent libraries (openssl, libfuse, etc)
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib \
