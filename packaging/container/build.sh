@@ -45,15 +45,17 @@ cmake -DBUILD_SERVER=no -DBUILD_RECEIVER=no -DBUILD_GEOAPI=no \
 make -j4
 make DESTDIR=${CVMFS_RESULT_LOCATION}/rootfs install
 
-# Remove fuse2 and autofs related parts
-rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/mount.cvmfs
+# Remove fuse2 related parts
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/libcvmfs_fuse.*
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/libcvmfs_fuse_debug.*
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/libcvmfs_fuse_stub.*
-rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib*/cvmfs/auto.cvmfs
 
 # cvmfs_config uses bash, which we don't have as a busybox applet
 rm -f ${CVMFS_RESULT_LOCATION}/rootfs/usr/bin/cvmfs_config
+
+# Add system automounter
+mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin
+cp -v /usr/sbin/automounter ${CVMFS_RESULT_LOCATION}/rootfs/usr/sbin/
 
 # Add dependent libraries (openssl, libfuse, etc)
 mkdir -p ${CVMFS_RESULT_LOCATION}/rootfs/usr/lib \
