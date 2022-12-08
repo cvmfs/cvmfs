@@ -432,6 +432,7 @@ class SettingsPublisher {
   uid_t owner_gid() const { return owner_gid_(); }
   bool is_silent() const { return is_silent_(); }
   bool is_managed() const { return is_managed_(); }
+  bool ignore_invalid_lease() const { return ignore_invalid_lease_(); }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
