@@ -147,9 +147,11 @@ int CmdAbort::Main(const Options &options) {
     publisher->Abort();
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailTransactionState) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "%s", e.msg().c_str());
       return EINVAL;
     }
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+    return EIO;
   }
 
   rvi = CallServerHook("abort_after_hook", settings->fqrn());
