@@ -15,6 +15,30 @@
 #include "util/logging.h"
 #include "util/posix.h"
 
+namespace {
+
+void TrySessionDrop(publish::Publisher::Session *session,
+                    bool ignore_invalid_lease)
+{
+  try {
+    session->Drop();
+  } catch (const publish::EPublish &e) {
+    if (ignore_invalid_lease &&
+        ((e.failure() == e.kFailLeaseBody) ||
+        (e.failure() == e.kFailLeaseNoEntry)))
+    {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogWarn,
+               "force abort, continue despite error while trying to drop lease,"
+               " removing session token. Error: %s", e.msg().c_str());
+      unlink(session->token_path().c_str());
+      return;
+    }
+    throw e;
+  }
+}
+
+}  // anonymous namespace
+
 namespace publish {
 
 void Publisher::WipeScratchArea() {
@@ -32,14 +56,14 @@ void Publisher::Abort() {
     if (session_->has_lease()) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn, "removing stale session token for %s",
                settings_.fqrn().c_str());
-      session_->Drop();
+      TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
     }
     throw EPublish(
       "Repository " + settings_.fqrn() + " is not in a transaction",
       EPublish::kFailTransactionState);
   }
 
-  session_->Drop();
+  TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
 
   if (managed_node_.IsValid()) {
     // We already checked for is_publishing and in_transaction.  Normally, at
