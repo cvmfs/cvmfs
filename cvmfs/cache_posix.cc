@@ -409,10 +409,11 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 
   result = link(oldpath, newpath);
   if (result < 0) {
-    if (errno == EEXIST)
+    if (errno == EEXIST) {
       LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
-    else
+    } else {
       return -errno;
+    }
   }
   result = unlink(oldpath);
   if (result < 0)
