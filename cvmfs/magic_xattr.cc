@@ -172,7 +172,7 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
 
   if (tmp.size() > 0) {
     tmp.resize(tmp.size() - 2);
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, 
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                                 "Following CVMFS_XATTR_PROTECTED_XATTRS are "
                                 "set but not recognized: %s", tmp.c_str());
   }
