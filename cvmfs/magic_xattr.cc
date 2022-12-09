@@ -623,8 +623,8 @@ std::string ExternalURLMagicXattr::GetValue() {
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
-  if (mount_point_->external_download_mgr() != NULL) {
-    mount_point_->external_download_mgr()->GetHostInfo(
+  if (xattr_mgr_->mount_point()->external_download_mgr() != NULL) {
+    xattr_mgr_->mount_point()->external_download_mgr()->GetHostInfo(
       &host_chain, &rtt, &current_host);
     if (host_chain.size()) {
       return std::string(host_chain[current_host]) + std::string(path_.c_str());

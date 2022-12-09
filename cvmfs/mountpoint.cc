@@ -1838,7 +1838,7 @@ bool MountPoint::SetupBehavior() {
 
     for (size_t i = 0; i < tmp.size(); i++) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
-               "GID TO ADD: %d", tmp[i]);
+               "GID TO ADD: %s", tmp[i].c_str());
       protected_xattr_gids.insert((gid_t) String2Uint64(tmp[i]));
     }
 
