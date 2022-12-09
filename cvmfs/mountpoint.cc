@@ -1838,23 +1838,31 @@ bool MountPoint::SetupBehavior() {
 
     for (size_t i = 0; i < tmp.size(); i++) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
-               "GID TO ADD: %s", tmp[i].c_str());
+               "Privileged gid for xattr added: %s", tmp[i].c_str());
       protected_xattr_gids.insert((gid_t) String2Uint64(tmp[i]));
     }
 
     protected_xattr_gids.insert(0);  // root is always permitted
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "Automatically added root as privileged gid for xattr");
   }
   std::set<std::string> protected_xattrs;
   if (options_mgr_->GetValue("CVMFS_XATTR_PROTECTED_XATTRS", &optarg)) {
     std::vector<string> tmp = SplitString(optarg, ',');
 
     for (size_t i = 0; i < tmp.size(); i++) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Protected xattr added: %s", tmp[i].c_str());
       protected_xattrs.insert(tmp[i]);
     }
 
     // only CVMFS_XATTRS_PROTECTED given but not CVMFS_XATTR_PRIVILEGED_GIDS
     // --> expect that only root can access them
-    protected_xattr_gids.insert(0);
+    if (protected_xattr_gids.empty()) {
+      protected_xattr_gids.insert(0);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+              "Automatically added root as the only privileged gid for xattr.");
+    }
   }
   magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility,
                                     protected_xattrs, protected_xattr_gids);

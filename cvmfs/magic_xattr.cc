@@ -172,7 +172,8 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
 
   if (tmp.size() > 0) {
     tmp.resize(tmp.size() - 2);
-    LogCvmfs(kLogCvmfs, kLogDebug, "Following CVMFS_XATTR_PROTECTED_XATTRS are "
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, 
+                                "Following CVMFS_XATTR_PROTECTED_XATTRS are "
                                 "set but not recognized: %s", tmp.c_str());
   }
 
@@ -180,7 +181,7 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   std::set<gid_t>::const_iterator iter_gid;
   for (iter_gid = privileged_xattr_gids_.begin();
        iter_gid != privileged_xattr_gids_.end(); iter_gid++) {
-    tmp += std::to_string(*iter_gid) + ", ";
+    tmp += StringifyUint(*iter_gid) + ", ";
   }
 
   if (tmp.size() > 0) {
