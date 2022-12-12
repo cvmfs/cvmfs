@@ -583,7 +583,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   canonical_headers +=
     "host:" + canonical_hostname + "\n";
   if (config_.x_amz_acl != "") {
-    canoncial_headers += "x-amz-acl:" + config_.x_amz_config +"\n"
+    canonical_headers += "x-amz-acl:" + config_.x_amz_acl +"\n";
   }
   canonical_headers += "x-amz-content-sha256:" + payload_hash + "\n" +
     "x-amz-date:" + timestamp + "\n";
@@ -612,7 +612,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string signing_key = GetAwsV4SigningKey(date);
   string signature = shash::Hmac256(signing_key, string_to_sign);
 
-  headers->push_back("X-Amz-Acl: "+config_.z_amz_acl);
+  headers->push_back("X-Amz-Acl: "+config_.x_amz_acl);
   headers->push_back("X-Amz-Content-Sha256: " + payload_hash);
   headers->push_back("X-Amz-Date: " + timestamp);
   headers->push_back(
