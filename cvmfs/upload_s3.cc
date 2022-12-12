@@ -38,6 +38,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , timeout_sec_(kDefaultTimeoutSec)
   , authz_method_(s3fanout::kAuthzAwsV2)
   , peek_before_put_(true)
+  , peek_after_put_(false)
   , use_https_(false)
   , proxy_("")
   , temporary_path_(spooler_definition.temporary_path)
@@ -177,6 +178,9 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
   }
+  if (options_manager.GetValue("CVMFS_S3_PEEK_AFTER_PUT", &parameter)) {
+    peek_after_put_ = options_manager.IsOn(parameter);
+  }
   if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
     use_https_ = options_manager.IsOn(parameter);
   }
@@ -190,6 +194,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.IsDefined("CVMFS_S3_PROXY")) {
     options_manager.GetValue("CVMFS_S3_PROXY", &proxy_);
   }
+
 
   return true;
 }
@@ -338,6 +343,7 @@ void S3Uploader::DoUpload(
     if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
   }
+  info->peek_after_put = peek_after_put_;
 
   RequestCtrl req_ctrl;
   MakePipe(req_ctrl.pipe_wait);
@@ -412,6 +418,9 @@ void S3Uploader::FinalizeStreamedUpload(
 
   if (peek_before_put_)
       info->request = s3fanout::JobInfo::kReqHeadPut;
+
+  info->peek_after_put = peek_after_put_;
+
   UploadJobInfo(info);
 
   // Remove the temporary file
