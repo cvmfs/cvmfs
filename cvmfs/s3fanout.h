@@ -252,12 +252,11 @@ class S3FanoutManager : SingleCopy {
   std::string GetRequestString(const JobInfo &info) const;
   std::string GetContentType(const JobInfo &info) const;
   std::string GetUriEncode(const std::string &val, bool encode_slash) const;
-  std::string GetAwsV4SigningKey(const std::string &date) const;
   bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
   bool MkV2Authz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   bool MkV4Authz(const JobInfo &info,
-                 std::vector<std::string> *headers) const;
+                 std::vector<std::string> *headers, CURL *handle) const;
   bool MkAzureAuthz(const JobInfo &info,
                  std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {

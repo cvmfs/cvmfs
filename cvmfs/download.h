@@ -453,6 +453,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableInfoHeader();
   void EnableRedirects();
   void UseSystemCertificatePath();
+  void SetAWSCredentials(const std::string &credentials);
+  void SetAWSRegion(const std::string &region);
+
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -633,6 +636,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  // AWS credentials
+  std::string aws_credentials_;
+  std::string aws_region_;
 };  // DownloadManager
 
 }  // namespace download

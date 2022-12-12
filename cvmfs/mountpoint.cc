@@ -1344,6 +1344,7 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->SetHostChain(optarg);
   }
 
+
   SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
 
@@ -1394,6 +1395,13 @@ bool MountPoint::CreateDownloadManagers() {
   if (options_mgr_->GetValue("CVMFS_PROXY_SHARD", &optarg) &&
       options_mgr_->IsOn(optarg)) {
     download_mgr_->ShardProxies();
+  }
+
+  if (options_mgr_->GetValue("CVMFS_SERVER_URL_AWS_CREDENTIALS", &optarg)) {
+    download_mgr_->SetAWSCredentials(optarg);
+  }
+  if (options_mgr_->GetValue("CVMFS_SERVER_URL_AWS_REGION", &optarg)) {
+    download_mgr_->SetAWSRegion(optarg);
   }
 
   return SetupExternalDownloadMgr(do_geosort);
@@ -1992,6 +2000,14 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_CREDENTIALS", &optarg)) {
+    external_download_mgr_->SetAWSCredentials(optarg);
+  }
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL_AWS_REGION", &optarg)) {
+    external_download_mgr_->SetAWSRegion(optarg);
+  }
 
   return true;
 }

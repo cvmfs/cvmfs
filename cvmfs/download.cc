@@ -895,6 +895,15 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
   }
+
+  if (aws_credentials_  != "") {
+     header_lists_->AppendHeader(info->headers,
+           "x-amz-content-sha256: UNSIGNED_PAYLOAD");
+     curl_easy_setopt(handle, CURLOPT_AWS_SIGV4,
+          ("aws:amz:" + aws_region_ + ":s3").c_str());
+     curl_easy_setopt(handle, CURLOPT_USERPWD,
+           aws_credentials_.c_str());
+  }
 }
 
 
@@ -1570,6 +1579,8 @@ DownloadManager::DownloadManager() {
   credentials_attachment_ = NULL;
 
   counters_ = NULL;
+  aws_credentials_ = "";
+  aws_region_ = "us-east-1";
 }
 
 
@@ -2828,6 +2839,14 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
     *opt_proxy_groups_);
   clone->UpdateProxiesUnlocked("cloned");
+}
+
+void DownloadManager::SetAWSCredentials(const std::string &credentials) {
+  aws_credentials_ = std::string(credentials);
+}
+
+void DownloadManager::SetAWSRegion(const std::string &region) {
+  aws_region_ = std::string(region);
 }
 
 }  // namespace download

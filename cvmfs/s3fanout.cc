@@ -526,92 +526,28 @@ string S3FanoutManager::GetUriEncode(const string &val, bool encode_slash)
 }
 
 
-string S3FanoutManager::GetAwsV4SigningKey(const string &date) const
-{
-  if (last_signing_key_.first == date)
-    return last_signing_key_.second;
-
-  string date_key = shash::Hmac256("AWS4" + config_.secret_key, date, true);
-  string date_region_key = shash::Hmac256(date_key, config_.region, true);
-  string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
-  string signing_key =
-    shash::Hmac256(date_region_service_key, "aws4_request", true);
-  last_signing_key_.first = date;
-  last_signing_key_.second = signing_key;
-  return signing_key;
-}
-
 
 /**
  * The Amazon AWS4 authorization header according to
  * http://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
  */
-bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
+bool S3FanoutManager::MkV4Authz(const JobInfo &info,
+     vector<string> *headers, CURL *handle)
   const
 {
   string payload_hash;
-  bool retval = MkPayloadHash(info, &payload_hash);
-  if (!retval)
+  bool ok = MkPayloadHash(info, &payload_hash);
+  if (!ok)
     return false;
-  string content_type = GetContentType(info);
-  string timestamp = IsoTimestamp();
-  string date = timestamp.substr(0, 8);
-  vector<string> tokens = SplitString(complete_hostname_, ':');
-  assert(tokens.size() <= 2);
-  string canonical_hostname = tokens[0];
 
-  // if we could split the hostname in two and if the port is *NOT* a default
-  // one
-  if (tokens.size() == 2 && !((String2Uint64(tokens[1]) == kDefaultHTTPPort) ||
-                              (String2Uint64(tokens[1]) == kDefaultHTTPSPort)))
-    canonical_hostname += ":" + tokens[1];
+  CURLcode retval;
+  retval = curl_easy_setopt(handle, CURLOPT_AWS_SIGV4,
+        ("aws:amz:" + config_.region +":s3").c_str());
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_USERPWD,
+        (config_.access_key + ":" + config_.secret_key).c_str());
+  assert(retval == CURLE_OK);
 
-  string signed_headers;
-  string canonical_headers;
-  if (!content_type.empty()) {
-    signed_headers += "content-type;";
-    headers->push_back("Content-Type: " + content_type);
-    canonical_headers += "content-type:" + content_type + "\n";
-  }
-  signed_headers += "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
-  canonical_headers +=
-    "host:" + canonical_hostname + "\n" +
-    "x-amz-acl:public-read\n"
-    "x-amz-content-sha256:" + payload_hash + "\n" +
-    "x-amz-date:" + timestamp + "\n";
-
-  string scope = date + "/" + config_.region + "/s3/aws4_request";
-  string uri = config_.dns_buckets ?
-                 (string("/") + info.object_key) :
-                 (string("/") + config_.bucket + "/" + info.object_key);
-
-  string canonical_request =
-    GetRequestString(info) + "\n" +
-    GetUriEncode(uri, false) + "\n" +
-    "\n" +
-    canonical_headers + "\n" +
-    signed_headers + "\n" +
-    payload_hash;
-
-  string hash_request = shash::Sha256String(canonical_request.c_str());
-
-  string string_to_sign =
-    "AWS4-HMAC-SHA256\n" +
-    timestamp + "\n" +
-    scope + "\n" +
-    hash_request;
-
-  string signing_key = GetAwsV4SigningKey(date);
-  string signature = shash::Hmac256(signing_key, string_to_sign);
-
-  headers->push_back("X-Amz-Acl: public-read");
-  headers->push_back("X-Amz-Content-Sha256: " + payload_hash);
-  headers->push_back("X-Amz-Date: " + timestamp);
-  headers->push_back(
-    "Authorization: AWS4-HMAC-SHA256 "
-    "Credential=" + config_.access_key + "/" + scope + ","
-    "SignedHeaders=" + signed_headers + ","
-    "Signature=" + signature);
   return true;
 }
 
@@ -917,7 +853,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       retval_b = MkV2Authz(*info, &authz_headers);
       break;
     case kAuthzAwsV4:
-      retval_b = MkV4Authz(*info, &authz_headers);
+      retval_b = MkV4Authz(*info, &authz_headers, handle);
       break;
     case kAuthzAzure:
       retval_b = MkAzureAuthz(*info, &authz_headers);

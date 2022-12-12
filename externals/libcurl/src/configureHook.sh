@@ -46,7 +46,6 @@ sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \
   --disable-threaded-resolver \
   --disable-verbose \
   --disable-sspi \
-  --disable-crypto-auth \
   --disable-ntlm \
   --disable-ntlm-wb \
   --disable-tls-srp \
