@@ -226,6 +226,15 @@ class FileSystem : SingleCopy, public BootFactory {
   NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
+  perf::Counter *n_eio_total() { return n_eio_total_; }
+  perf::Counter *n_eio_01() { return n_eio_01_; }
+  perf::Counter *n_eio_02() { return n_eio_02_; }
+  perf::Counter *n_eio_03() { return n_eio_03_; }
+  perf::Counter *n_eio_04() { return n_eio_04_; }
+  perf::Counter *n_eio_05() { return n_eio_05_; }
+  perf::Counter *n_eio_06() { return n_eio_06_; }
+  perf::Counter *n_eio_07() { return n_eio_07_; }
+  perf::Counter *n_eio_08() { return n_eio_08_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -324,6 +333,15 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_inode_replace_;
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
+  perf::Counter *n_eio_total_;
+  perf::Counter *n_eio_01_;
+  perf::Counter *n_eio_02_;
+  perf::Counter *n_eio_03_;
+  perf::Counter *n_eio_04_;
+  perf::Counter *n_eio_05_;
+  perf::Counter *n_eio_06_;
+  perf::Counter *n_eio_07_;
+  perf::Counter *n_eio_08_;
   IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 
