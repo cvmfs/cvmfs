@@ -120,7 +120,7 @@ std::string TelemetryAggregatorInflux::MakePayload() {
     ret += tok + influx_extra_fields_;
   }
 
-  //timestamp
+  // timestamp
   ret += " " + StringifyUint(timestamp_);
 
   return ret;
@@ -157,7 +157,7 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
       ret += tok + it->first + "=" + StringifyInt(value - old_value);
     }
   }
-  
+
   if (influx_extra_fields_ != "") {
     ret += tok + influx_extra_fields_;
   }

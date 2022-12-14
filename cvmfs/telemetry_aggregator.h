@@ -1,6 +1,6 @@
 /**
  * This file is part of the CernVM File System.
- * 
+ *
  * TelemetryAggregator class is a thread that snapshots the internal counters
  * of cvmfs statistic object. A custom telemetry class is needed to perform
  * the step of manipulating and sending/storing the counters.
@@ -42,7 +42,7 @@ class TelemetryAggregator : SingleCopy {
   /**
    * Creates the requested telemetry aggregator. This function is also used to
    * register new classes to aggregate telemetry.
-   * 
+   *
    * Returns the newly created TelemetryAggregator or NULL if the creation
    * was not successful.
   */
@@ -66,7 +66,7 @@ class TelemetryAggregator : SingleCopy {
   std::string fqrn_;
   // State of constructed object. Used in custom telemetry classes to
   // specify that the object was correctly constructed.
-  bool is_zombie_; 
+  bool is_zombie_;
 
   uint64_t timestamp_;
   std::map<std::string, int64_t> counters_;
@@ -76,10 +76,10 @@ class TelemetryAggregator : SingleCopy {
    * Checks every x seconds if the telemetry thread should continue running.
    * If yes, takes a snapshot of all statistic counters that are not 0 and
    * calls PushMetrics()
-   * 
+   *
    * PushMetrics() is defined by the custom telemetry classes and performs all
    * operation on the statistic counters to send/store them.
-   * 
+   *
   */
   static void *MainTelemetry(void *data);
 
@@ -100,9 +100,9 @@ class TelemetryAggregator : SingleCopy {
 
   /**
    * PushMetrics is called after the snapshot of the counters.
-   * It should perform all manipulation needed for the counters and the 
+   * It should perform all manipulation needed for the counters and the
    * sending/storing of the counters.
-   * 
+   *
    * Needs to be implemented in the custom telemetry class.
   */
   virtual void PushMetrics() = 0;

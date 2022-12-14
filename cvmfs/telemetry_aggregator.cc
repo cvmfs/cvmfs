@@ -25,7 +25,7 @@ TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
   UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
   UniquePtr<TelemetryAggregator> *telemetry;
 
-  switch(type) {
+  switch (type) {
     case kTelemetryInflux:
       telemetryInflux = new TelemetryAggregatorInflux(statistics, send_rate,
                                   options_mgr, fqrn);
