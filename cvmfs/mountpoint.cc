@@ -63,7 +63,6 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "telemetry_aggregator.h"
-#include "telemetry_aggregator_influx.h"
 #include "tracer.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -1956,17 +1955,22 @@ bool MountPoint::SetupBehavior() {
   // telemetryAggregators
   if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
       && options_mgr_->IsOn(optarg)) {
-    uint64_t telemetry_send_rate = 0;
+    uint64_t telemetry_send_rate = 5*60; // default send rate: 5min
     if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
-      telemetry_send_rate = static_cast<uint64_t>(String2Uint64(optarg));
+      telemetry_send_rate = String2Uint64(optarg);
 
-      telemetry_aggr_ = (perf::TelemetryAggregator*)
-                         perf::TelemetryAggregatorInflux::Create(statistics_,
-                                                    telemetry_send_rate,
-                                                    options_mgr_,
-                                                    fqrn_);
-      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
-               "TELEMETRY: Enable telemetry to report every %d seconds",
+      // minimum send rate: 5sec
+      if (telemetry_send_rate < 5) {
+        telemetry_send_rate = 5;
+      }
+
+      telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
+                                    telemetry_send_rate,
+                                    options_mgr_,
+                                    fqrn_,
+                                    perf::TelemetrySelector::kTelemetryInflux);
+      LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
+               "Enable telemetry to report every %d seconds",
                telemetry_send_rate);
     }
   }

@@ -669,7 +669,6 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
-  statistics_.catalog_revision->Set(revision);
 
   return revision;
 }
@@ -973,6 +972,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    statistics_.catalog_revision->Set(revision_cache_);
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();
   }

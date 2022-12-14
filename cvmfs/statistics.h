@@ -60,8 +60,8 @@ inline int64_t Xadd(class Counter *counter, const int64_t delta) {
 class Statistics {
  private:
   // must be on top here because of CounterInfo
-  struct AtomicCounterInfo {
-    explicit AtomicCounterInfo(const std::string &desc) : desc(desc) {
+  struct CounterInfo {
+    explicit CounterInfo(const std::string &desc) : desc(desc) {
       atomic_init32(&refcnt);
       atomic_inc32(&refcnt);
     }
@@ -75,21 +75,6 @@ class Statistics {
     kPrintSimple = 0,
     kPrintHeader
   };
-  struct CounterInfo {
-    explicit CounterInfo(AtomicCounterInfo atomicCounterInfo)
-                          : refcnt(atomicCounterInfo.refcnt),
-                            counter(atomicCounterInfo.counter),
-                            desc(atomicCounterInfo.desc) {}
-    CounterInfo(int32_t refcnt, Counter counter, std::string desc)
-                          : refcnt(refcnt),
-                            counter(counter),
-                            desc(desc) {}
-    CounterInfo() : refcnt(0), desc("") { counter.Set(0); }
-
-    int32_t refcnt;
-    Counter counter;
-    std::string desc;
-  };
 
   Statistics();
   ~Statistics();
@@ -99,13 +84,13 @@ class Statistics {
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
   std::string PrintJSON();
-  void SnapshotCounters(std::map<std::string, CounterInfo> *counters,
-                        uint64_t *monotonic_clock);
+  void SnapshotCounters(std::map<std::string, int64_t> *counters,
+                        uint64_t *timestamp_ns);
 
  private:
   Statistics(const Statistics &other);
   Statistics& operator=(const Statistics &other);
-  std::map<std::string, AtomicCounterInfo *> counters_;
+  std::map<std::string, CounterInfo *> counters_;
   mutable pthread_mutex_t *lock_;
 };
 

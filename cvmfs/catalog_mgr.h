@@ -91,7 +91,7 @@ struct Statistics {
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
     catalog_revision = statistics->Register("catalog_revision",
-                                            "Catalog revision");
+                                    "Revision number of the root file catalog");
   }
 };
 

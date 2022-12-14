@@ -40,7 +40,7 @@ std::string Counter::PrintRatio(Counter divider) {
 /**
  * Creates a new Statistics binder which maintains the same Counters as the
  * existing one.  Changes to those counters are visible in both Statistics
- * objects. The child can then independently add more counters.AtomicCounterInfo
+ * objects. The child can then independently add more counters. CounterInfo
  * objects are reference counted and deleted when all the statistics objects
  * dealing with it are destroyed.
  */
@@ -48,7 +48,7 @@ Statistics *Statistics::Fork() {
   Statistics *child = new Statistics();
 
   MutexLockGuard lock_guard(lock_);
-  for (map<string, AtomicCounterInfo *>::iterator i = counters_.begin(),
+  for (map<string, CounterInfo *>::iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
     atomic_inc32(&i->second->refcnt);
@@ -61,7 +61,7 @@ Statistics *Statistics::Fork() {
 
 Counter *Statistics::Lookup(const std::string &name) const {
   MutexLockGuard lock_guard(lock_);
-  map<string, AtomicCounterInfo *>::const_iterator i = counters_.find(name);
+  map<string, CounterInfo *>::const_iterator i = counters_.find(name);
   if (i != counters_.end())
     return &i->second->counter;
   return NULL;
@@ -70,7 +70,7 @@ Counter *Statistics::Lookup(const std::string &name) const {
 
 string Statistics::LookupDesc(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
-  map<string, AtomicCounterInfo *>::const_iterator i = counters_.find(name);
+  map<string, CounterInfo *>::const_iterator i = counters_.find(name);
   if (i != counters_.end())
     return i->second->desc;
   return "";
@@ -82,7 +82,7 @@ string Statistics::PrintList(const PrintOptions print_options) {
     result += "Name|Value|Description\n";
 
   MutexLockGuard lock_guard(lock_);
-  for (map<string, AtomicCounterInfo *>::const_iterator i = counters_.begin(),
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
     result += i->first + "|" + i->second->counter.ToString() +
@@ -111,7 +111,7 @@ string Statistics::PrintJSON() {
   // Make use of std::map key ordering and add counters namespace by namespace
   JsonStringGenerator json_statistics_namespace;
   std::string last_namespace = "";
-  for (map<string, AtomicCounterInfo *>::const_iterator i = counters_.begin(),
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
                                                   iEnd = counters_.end();
        i != iEnd; ++i) {
     std::vector<std::string> tokens = SplitString(i->first, '.');
@@ -137,29 +137,30 @@ string Statistics::PrintJSON() {
 }
 
 /**
- * Snapshot current state of the counters in a map of string and non-atomic
- * CounterInfo struct.
+ * Snapshot current state of the counters.
  * Elements will either be updated or inserted into the map.
  * 
  * Note: This function does NOT clear previous elements part of the map.
+ * 
+ * Returns map of the updated counters and the timestamp of the snapshot.
 */
 void Statistics::SnapshotCounters(
-                        std::map<std::string, CounterInfo> *counters,
-                        uint64_t *monotonic_clock) {
+                        std::map<std::string, int64_t> *counters,
+                        uint64_t *timestamp_ns) {
   MutexLockGuard lock_guard(lock_);
-  *monotonic_clock = platform_realtime_ns();
-  for (map<string, AtomicCounterInfo *>::const_iterator i = counters_.begin(),
+  *timestamp_ns = platform_realtime_ns();
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
     // modify or insert
-    (*counters)[i->first] = CounterInfo(*i->second);
+    (*counters)[i->first] = (*i->second).counter.Get();
   }
 }
 
 Counter *Statistics::Register(const string &name, const string &desc) {
   MutexLockGuard lock_guard(lock_);
   assert(counters_.find(name) == counters_.end());
-  AtomicCounterInfo *counter_info = new AtomicCounterInfo(desc);
+  CounterInfo *counter_info = new CounterInfo(desc);
   counters_[name] = counter_info;
   return &counter_info->counter;
 }
@@ -174,7 +175,7 @@ Statistics::Statistics() {
 
 
 Statistics::~Statistics() {
-  for (map<string, AtomicCounterInfo *>::iterator i = counters_.begin(),
+  for (map<string, CounterInfo *>::iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
     int32_t old_value = atomic_xadd32(&i->second->refcnt, -1);

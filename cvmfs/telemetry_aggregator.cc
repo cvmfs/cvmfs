@@ -2,34 +2,52 @@
  * This file is part of the CernVM File System.
  */
 
+#include "telemetry_aggregator.h"
+
 #include <errno.h>
 #include <poll.h>
 #include <unistd.h>
 
-#include "telemetry_aggregator.h"
-
+#include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 
-#ifdef CVMFS_NAMESPACE_GUARD
-namespace CVMFS_NAMESPACE_GUARD {
-#endif
-
+#include "telemetry_aggregator_influx.h"
 namespace perf {
 
-TelemetryAggregator *TelemetryAggregator::Create(Statistics* statistics,
-                                            uint64_t send_rate,
-                                            OptionsManager *options_mgr,
-                                            std::string fqrn) {
-  UniquePtr<TelemetryAggregator>
-    telemetry(new TelemetryAggregator(statistics, send_rate,
-                                      options_mgr, fqrn));
+TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
+                                                 uint64_t send_rate,
+                                                 OptionsManager *options_mgr,
+                                                 const std::string &fqrn,
+                                                 const TelemetrySelector type) {
+  UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
+  UniquePtr<TelemetryAggregator> *telemetry;
 
-  LogCvmfs(kLogTalk, kLogDebug, "TELEMETRY: TelemetryAggregator created");
+  switch(type) {
+    case kTelemetryInflux:
+      telemetryInflux = new TelemetryAggregatorInflux(statistics, send_rate,
+                                  options_mgr, fqrn);
+      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator>*>
+                                                            (&telemetryInflux);
+    break;
+    default:
+      LogCvmfs(kLogTelemetry, kLogDebug,
+                      "No implementation available for given telemetry class.");
+      return NULL;
+    break;
+  }
 
-  return telemetry.Release();
+  if (telemetry->weak_ref()->is_zombie_) {
+    LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
+      "Requested telemetry will NOT be used. "
+      "It was not constructed correctly.");
+    return NULL;
+  }
+
+  LogCvmfs(kLogTelemetry, kLogDebug, "TelemetryAggregator created.");
+  return telemetry->Release();
 }
 
 TelemetryAggregator::~TelemetryAggregator() {
@@ -42,19 +60,12 @@ TelemetryAggregator::~TelemetryAggregator() {
 }
 
 void TelemetryAggregator::Spawn() {
-  if (allow_spawning_ == true) {
-    assert(pipe_terminate_[0] == -1);
-    assert(maximum_send_rate_ > 0);
-    MakePipe(pipe_terminate_);
-    int retval = pthread_create(&thread_telemetry_, NULL, MainTelemetry, this);
-    assert(retval == 0);
-    LogCvmfs(kLogCvmfs, kLogDebug,
-              "TELEMETRY: Spawning of telemetry thread.");
-  } else {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-              "TELEMETRY: Spawning of telemetry thread not allowed. "
-              "All parameters set?");
-  }
+  assert(pipe_terminate_[0] == -1);
+  assert(maximum_send_rate_ > 0);
+  MakePipe(pipe_terminate_);
+  int retval = pthread_create(&thread_telemetry_, NULL, MainTelemetry, this);
+  assert(retval == 0);
+  LogCvmfs(kLogTelemetry, kLogDebug, "Spawning of telemetry thread.");
 }
 
 void *TelemetryAggregator::MainTelemetry(void *data) {
@@ -78,13 +89,14 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
         }
         continue;
       }
-      abort();
+      PANIC(kLogSyslogErr | kLogDebug, "Error in telemetry thread. "
+            "Poll returned %d", retval);
     }
 
     // aggregate + send stuff
     if (retval == 0) {
       statistics->SnapshotCounters(&telemetry->counters_,
-                                   &telemetry->monotonic_clock_);
+                                   &telemetry->timestamp_);
       telemetry->PushMetrics();
       continue;
     }
@@ -97,14 +109,8 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
     assert(c == 'T');
     break;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "TELEMETRY: "
-                                 "Stopping TelemetryAggregator thread");
+  LogCvmfs(kLogTelemetry, kLogDebug, "Stopping telemetry thread");
   return NULL;
 }
 
-
 }  // namespace perf
-
-#ifdef CVMFS_NAMESPACE_GUARD
-}  // namespace CVMFS_NAMESPACE_GUARD
-#endif

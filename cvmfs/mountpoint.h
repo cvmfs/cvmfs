@@ -22,7 +22,6 @@
 #include "gtest/gtest_prod.h"
 #include "loader.h"
 #include "magic_xattr.h"
-#include "telemetry_aggregator.h"
 #include "util/algorithm.h"
 #include "util/pointer.h"
 
@@ -58,6 +57,7 @@ class OptionsManager;
 namespace perf {
 class Counter;
 class Statistics;
+class TelemetryAggregator;
 }
 namespace signature {
 class SignatureManager;

@@ -103,6 +103,7 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
+#include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
