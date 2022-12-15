@@ -847,6 +847,10 @@ int FuseMain(int argc, char *argv[]) {
       return kFailPermission;
     }
   }
+  if (disable_watchdog_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+  }
 
   // Only set usyslog now, otherwise file permissions are wrong
   usyslog_path_ = new string();
