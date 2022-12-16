@@ -39,14 +39,23 @@ check_if_new_root_catalog() {
 
   private_mount $mntpnt
 
+  # ls $mntpnt
+  local oldRevision=$(attr -q -g revision $mntpnt)
+
+
   add_some_tmp_file_to_repo
-  local updateStatus=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount)
+
+  echo "   New files were added to the repository."
+
+  local updateStatus=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync)
+
+  local newRevision=$(attr -q -g revision $mntpnt)
 
   private_unmount
 
-  echo "   '$updateStatus' should be 'New revision applied'"
+  echo "   Revision $oldRevision should be smaller than $newRevision"
 
-  [ "$updateStatus" = "New revision applied" ] || return 20
+  [ $oldRevision -lt $newRevision ] || return 20
 
   echo "   ... success"
 }
@@ -138,7 +147,7 @@ cvmfs_run_test() {
   create_nested_repo
 
   load_new_root_catalog ${mntpnt} || return $?
-  check_if_new_root_catalog ${mntpnt} || return $?
+  check_if_new_root_catalog ${mntpnt} || return $? 
   cache_evict_files_for_catalog ${mntpnt} || return $?
   # see test 674 for loading new catalog from aliencache
 
