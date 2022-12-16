@@ -908,6 +908,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   // Find the immediate parent catalog
   WritableCatalog *parent = NULL;
   if (!FindCatalog(parent_path, &parent)) {
+    SyncUnlock();  // this is needed for the unittest. otherwise they get stuck
     PANIC(kLogStderr,
           "failed to swap nested catalog '%s': could not find parent '%s'",
           nested_root_path.c_str(), parent_path.c_str());
@@ -922,6 +923,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     // that it has not been modified, get counters, and detach it.
     WritableCatalogList list;
     if (GetModifiedCatalogLeafsRecursively(old_attached_catalog, &list)) {
+      SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': already modified",
             nested_root_path.c_str());
@@ -937,6 +939,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     const bool old_found = parent->FindNested(nested_root_ps, &old_hash,
                                               &old_size);
     if (!old_found) {
+      SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': not found in parent",
             nested_root_path.c_str());
@@ -944,6 +947,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     UniquePtr<Catalog> old_free_catalog(
       LoadFreeCatalog(nested_root_ps, old_hash));
     if (!old_free_catalog.IsValid()) {
+      SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': failed to load old catalog",
             nested_root_path.c_str());
@@ -954,6 +958,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   // Load freely attached new catalog
   UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
+    SyncUnlock();
     PANIC(kLogStderr,
           "failed to swap nested catalog '%s': failed to load new catalog",
           nested_root_path.c_str());
@@ -964,6 +969,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   XattrList xattrs;
   const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
   if (!dirent_found) {
+    SyncUnlock();
     PANIC(kLogStderr,
           "failed to swap nested catalog '%s': missing dirent in new catalog",
           nested_root_path.c_str());
@@ -972,6 +978,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
                                                             &xattrs);
     if (!xattrs_found) {
+      SyncUnlock();
       PANIC(kLogStderr,
             "failed to swap nested catalog '%s': missing xattrs in new catalog",
             nested_root_path.c_str());
