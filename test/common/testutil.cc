@@ -76,6 +76,39 @@ pid_t GetParentPid(const pid_t pid) {
   return parent_pid;
 }
 
+std::string GetProcessname(const pid_t pid) {
+#ifdef __APPLE__
+  std::err << "Implementation missing to get process name by pid on MAC\n";
+  return NULL;
+#else
+  static const std::string label = "Name:";
+
+  std::stringstream proc_status_path;
+  proc_status_path << "/proc/" << pid << "/status";
+
+  std::ifstream proc_status(proc_status_path.str().c_str());
+
+  std::string line;
+  while (std::getline(proc_status, line)) {
+    if (line.compare(0, label.size(), label) == 0) {
+      const std::string line_without_label = line.substr(label.size());
+
+      // left trim whitespace 
+      size_t l_last_space = line_without_label.find_first_not_of(" ");
+      size_t l_last_tab = line_without_label.find_first_not_of("\t");
+      const std::string line_without_label_ltrim =
+            line_without_label.substr(
+                  l_last_space > l_last_tab ? l_last_space : l_last_tab);
+      // right trim whitespace
+      std::istringstream value(line_without_label_ltrim);
+      SkipWhitespace(&value);
+      return value.str();
+    }
+  }
+  return NULL;
+#endif  
+}
+
 
 class ShowOpenFilesHelper {
  public:
