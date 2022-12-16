@@ -995,16 +995,12 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
 }
 
 TEST_F(T_Dns, HostfileResolverBlankLines) {
-  g_log_messages.clear();
-  SetAltLogFunc(TDnsAltLogFunc);
   CreateHostfile("   \n  #comment\n\n\n127.0.0.1 localhost\n\n");
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
   set<string> expected_ipv4;
   expected_ipv4.insert("127.0.0.1");
   EXPECT_EQ(expected_ipv4, host.ipv4_addresses());
-  EXPECT_EQ(0U, g_log_messages.size());
-  SetAltLogFunc(NULL);
 }
 
 TEST_F(T_Dns, HostfileResolverTooLong) {
