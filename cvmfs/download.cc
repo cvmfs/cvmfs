@@ -1684,7 +1684,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   // this is a transitional feature to allow site-
   // specific overriding of proxy selection behaviour.
   // It requires compile-time replacement
-  // custom_sharding.cc . 
+  // custom_sharding.cc
   // By default, setting this option will cause a runtime PANIC
   if ((getenv("CVMFS_CUSTOM_SHARDING") != NULL) &&
       (strlen(getenv("CVMFS_CUSTOM_SHARDING")) > 0))
