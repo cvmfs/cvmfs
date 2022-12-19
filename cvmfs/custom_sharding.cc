@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "util/exception.h"
 #include "util/logging.h"
 
 using namespace std;  // NOLINT
