@@ -684,7 +684,7 @@ int main(int argc, char **argv) {
   close(fd_stdout);
   close(fd_stderr);
 
-  if(!ended) {
+  if (!ended) {
     retval = waitpid(pid_cvmfs, &status, 0);
     if (retval == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code");
