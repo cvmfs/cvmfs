@@ -489,7 +489,7 @@ bool S3FanoutManager::MkV2Authz(const JobInfo &info, vector<string> *headers)
                      Base64(string(reinterpret_cast<char *>(hmac.digest),
                                    hmac.GetDigestSize())));
   headers->push_back("Date: " + timestamp);
-  headers->push_back("X-Amz-Acl: "+config_.x_amz_acl);
+  headers->push_back("X-Amz-Acl: " + config_.x_amz_acl);
   if (!payload_hash.empty())
     headers->push_back("Content-MD5: " + payload_hash);
   if (!content_type.empty())
@@ -612,7 +612,7 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info, vector<string> *headers)
   string signing_key = GetAwsV4SigningKey(date);
   string signature = shash::Hmac256(signing_key, string_to_sign);
 
-  headers->push_back("X-Amz-Acl: "+config_.x_amz_acl);
+  headers->push_back("X-Amz-Acl: " + config_.x_amz_acl);
   headers->push_back("X-Amz-Content-Sha256: " + payload_hash);
   headers->push_back("X-Amz-Date: " + timestamp);
   headers->push_back(

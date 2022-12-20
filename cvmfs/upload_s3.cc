@@ -22,6 +22,20 @@
 
 namespace upload {
 
+/*
+ * Allowed values of x-amz-acl according to S3 API
+ */
+static const char* x_amz_acl_allowed_values_[8] = {
+    "private",
+    "public-read",
+    "public-write",
+    "authenticated-read",
+    "aws-exec-read",
+    "bucket-owner-read",
+    "bucket-owner-full-control",
+    ""
+};
+
 void S3Uploader::RequestCtrl::WaitFor() {
   char c;
   ReadPipe(pipe_wait[0], &c, 1);
