@@ -8,7 +8,7 @@
 #include <string>
 
 #include "catalog_traversal.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "object_fetcher.h"
 #include "swissknife.h"
 

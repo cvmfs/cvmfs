@@ -18,16 +18,17 @@
 
 #include "gtest/gtest_prod.h"
 
-#include "atomic.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "dns.h"
 #include "duplex_curl.h"
-#include "hash.h"
-#include "prng.h"
 #include "sink.h"
 #include "ssl.h"
 #include "statistics.h"
+#include "util/atomic.h"
+#include "util/prng.h"
 
+class InterruptCue;
 
 namespace download {
 
@@ -56,6 +57,7 @@ enum Failures {
   kFailHostTooSlow,
   kFailProxyShortTransfer,
   kFailHostShortTransfer,
+  kFailCanceled,
 
   kFailNumEntries
 };  // Failures
@@ -105,7 +107,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[15] = "host serving data too slowly";
   texts[16] = "proxy data transfer cut short";
   texts[17] = "host data transfer cut short";
-  texts[18] = "no text";
+  texts[18] = "request canceled";
+  texts[19] = "no text";
   return texts[error];
 }
 
@@ -159,6 +162,7 @@ struct JobInfo {
   uid_t uid;
   gid_t gid;
   void *cred_data;  // Per-transfer credential data
+  InterruptCue *interrupt_cue;
   Destination destination;
   struct {
     size_t size;
@@ -187,6 +191,7 @@ struct JobInfo {
     uid = -1;
     gid = -1;
     cred_data = NULL;
+    interrupt_cue = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;

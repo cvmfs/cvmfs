@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "platform.h"
+#include "util/platform.h"
 
 // TODO(Radu): Could add some unit tests for all the functions in
 //             platform_{linux,osx}.h

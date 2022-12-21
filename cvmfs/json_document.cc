@@ -8,8 +8,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "logging.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

@@ -4,8 +4,8 @@
 
 #include "subscriber_supervisor.h"
 
-#include "logging.h"
 #include "subscriber.h"
+#include "util/logging.h"
 
 namespace {
 

@@ -9,8 +9,8 @@
 #include <string>
 
 #include "c_file_sandbox.h"
-#include "hash.h"
-#include "prng.h"
+#include "crypto/hash.h"
+#include "util/prng.h"
 
 
 class T_FileSandbox : public FileSandbox {

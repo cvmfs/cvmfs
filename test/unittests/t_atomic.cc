@@ -6,7 +6,7 @@
 
 #include <pthread.h>
 
-#include "atomic.h"
+#include "util/atomic.h"
 
 class T_Atomic : public ::testing::Test {
  protected:

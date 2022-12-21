@@ -81,25 +81,26 @@ create_cvmfs_source_tarball() {
   local tmpd=$(mktemp -d)
   mkdir ${tmpd}/${tar_name}
   cd $tmpd
-  cp -R ${source_directory}/AUTHORS            \
-        ${source_directory}/CMakeLists.txt     \
-        ${source_directory}/COPYING            \
-        ${source_directory}/ChangeLog          \
-        ${source_directory}/INSTALL            \
-        ${source_directory}/NEWS               \
-        ${source_directory}/README.md          \
-        ${source_directory}/add-ons            \
-        ${source_directory}/bootstrap.sh       \
-        ${source_directory}/cmake              \
-        ${source_directory}/config_cmake.h.in  \
-        ${source_directory}/cvmfs              \
-        ${source_directory}/doc                \
-        ${source_directory}/externals          \
-        ${source_directory}/gateway            \
-        ${source_directory}/mount              \
-        ${source_directory}/test               \
-        ${source_directory}/ducc               \
-        $tar_name
+  cp -R --dereference ${source_directory}/AUTHORS            \
+                      ${source_directory}/CMakeLists.txt     \
+                      ${source_directory}/COPYING            \
+                      ${source_directory}/ChangeLog          \
+                      ${source_directory}/INSTALL            \
+                      ${source_directory}/NEWS               \
+                      ${source_directory}/README.md          \
+                      ${source_directory}/add-ons            \
+                      ${source_directory}/bootstrap.sh       \
+                      ${source_directory}/cmake              \
+                      ${source_directory}/config_cmake.h.in  \
+                      ${source_directory}/cvmfs              \
+                      ${source_directory}/doc                \
+                      ${source_directory}/externals          \
+                      ${source_directory}/gateway            \
+                      ${source_directory}/mount              \
+                      ${source_directory}/test               \
+                      ${source_directory}/ducc               \
+                      $tar_name
+  rm -r $tar_name/test/benchmarks
   tar czf $destination_path $tar_name || true
   local retval=$?
   cd ..
@@ -119,9 +120,11 @@ generate_package_map() {
   local ducc="$8"
   local fuse3="$9"
   local gateway="${10}"
+  local libs="${11}"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
+libs=$libs
 client=$client
 server=$server
 devel=$devel
@@ -233,35 +236,9 @@ expand_template() {
 can_build_ducc() {
   arch=$(go env GOARCH)
   if [ $arch != "amd64" ]; then
-    echo "0"
-    return
+    return 1
   fi
-  if which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1 ; then
-    go_version=$(go version)
-    go_major=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\1/p')
-    go_minor=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\2/p')
-    go_patch=$(echo $go_version | sed -n 's/go version go\([0-9]\)\.\([0-9]*\)\.\([0-9]*\).*/\3/p')
-
-    if [ $go_major -gt 1 ]; then
-      echo "1"
-    elif [ $go_major -lt 1 ]; then
-      echo "0"
-    else
-      if [ $go_minor -gt 12 ]; then
-        echo "1"
-      elif [ $go_minor -lt 12 ]; then
-        echo "0"
-      else
-        if [ $go_patch -ge 0 ]; then
-          echo "1"
-        else
-          echo "0"
-        fi
-      fi
-    fi
-  else
-    echo "0"
-  fi
+  which go > /dev/null 2>&1 && which go-junit-report > /dev/null 2>&1
 }
 
 # The gateway services require a Go compiler

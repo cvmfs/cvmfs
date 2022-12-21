@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make libcares.la
+make
 # Don't strip debug symbols
 # strip -S .libs/libcares.a
 make install

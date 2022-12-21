@@ -11,8 +11,7 @@
 #include <vector>
 
 #include "compression.h"
-#include "hash.h"
-
+#include "crypto/hash.h"
 #include "swissknife.h"
 #include "util/string.h"
 

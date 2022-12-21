@@ -16,14 +16,14 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog_mgr.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "ingestion/ingestion_source.h"
 #include "history.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
@@ -689,7 +689,6 @@ class MockHistory : public history::History,
   bool GetByName(const std::string &name, Tag *tag) const;
   bool GetByDate(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
-  bool Tips(std::vector<Tag> *channel_tips) const;
 
   bool GetBranchHead(const std::string &branch_name, Tag *tag) const;
   bool InsertBranch(const Branch &branch);
@@ -726,16 +725,6 @@ class MockHistory : public history::History,
     return tag.root_hash;
   }
 
-  static bool gt_channel_revision(const Tag &lhs, const Tag &rhs) {
-    return (lhs.channel == rhs.channel)
-              ? lhs.revision > rhs.revision
-              : lhs.channel > rhs.channel;
-  }
-
-  static bool eq_channel(const Tag &lhs, const Tag &rhs) {
-    return lhs.channel == rhs.channel;
-  }
-
   static bool gt_hashes(const Tag &lhs, const Tag &rhs) {
     return lhs.root_hash > rhs.root_hash;
   }
@@ -758,8 +747,7 @@ class MockHistory : public history::History,
       , inverse_(inverse)
     { }
     bool operator()(const Tag &tag) const {
-      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name) &&
-                      tag.channel == tag_.channel;
+      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name);
       return inverse_ ^ p;
     }
     const Tag  &tag_;

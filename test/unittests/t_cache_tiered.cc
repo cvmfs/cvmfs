@@ -7,7 +7,7 @@
 #include "cache.h"
 #include "cache_ram.h"
 #include "cache_tiered.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "statistics.h"
 
 using namespace std;  // NOLINT

@@ -11,11 +11,12 @@
 #include "cache.h"
 #include "clientctx.h"
 #include "download.h"
-#include "logging.h"
+#include "interrupt.h"
 #include "quota.h"
 #include "statistics.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -157,7 +158,8 @@ int Fetcher::Fetch(
   if (ctx->IsSet()) {
     ctx->Get(&tls->download_job.uid,
              &tls->download_job.gid,
-             &tls->download_job.pid);
+             &tls->download_job.pid,
+             &tls->download_job.interrupt_cue);
   }
   tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
   tls->download_job.range_offset = range_offset;

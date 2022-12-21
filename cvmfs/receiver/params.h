@@ -8,7 +8,7 @@
 #include <string>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 
 namespace receiver {
 

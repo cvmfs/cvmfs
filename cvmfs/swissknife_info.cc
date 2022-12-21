@@ -12,10 +12,10 @@
 
 #include <string>
 
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
-#include "logging.h"
 #include "manifest.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 

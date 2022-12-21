@@ -11,7 +11,7 @@
 #include <cstring>
 
 #include "libcvmfs.h"
-#include "platform.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "xattr.h"
 

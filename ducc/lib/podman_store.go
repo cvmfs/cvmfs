@@ -92,6 +92,9 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 
 	storedlayersdata := []LayerInfo{}
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
 		storedlayerdata := []LayerInfo{}
 		layerDigest := strings.Split(layer.Digest, ":")[1]
 		storedlayerinfopath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
@@ -115,6 +118,9 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 	sizeMap := make(map[string]int)
 	lastLayer := ""
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
 		sizeMap[layer.Digest] = layer.Size
 		if lastLayer != "" {
 			parentMap[layer.Digest] = digestMap[lastLayer]
@@ -165,6 +171,7 @@ func (img *Image) PublishImageInfo(CVMFSRepo string, digestMap map[string]string
 		json.Unmarshal(file, &imagedata)
 	}
 
+	// TODO(jblomer): fix me if top layer is foreign
 	topLayerDigest := manifest.Layers[len(manifest.Layers)-1].Digest
 
 	id := strings.Split(manifest.Config.Digest, ":")[1]
@@ -203,6 +210,9 @@ func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, 
 	// this is extremelly bad, we are making one transaction for each layer
 	// all of them could be done in a single transaction
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
 		layerid := strings.Split(layer.Digest, ":")[1]
 		layerdir := digestMap[layer.Digest]
 
@@ -231,6 +241,9 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 	}
 	// also here, we are making one transaction for each layer
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
 		layerdir := digestMap[layer.Digest]
 		linkPath := filepath.Join(rootPath, rootfsDir, layerdir, "link")
 		if _, err := os.Stat(linkPath); os.IsNotExist(err) {
@@ -281,6 +294,9 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 	lastDigest := ""
 	// again, for each layer, one more transaction
 	for _, layer := range manifest.Layers {
+		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
+			continue;
+		}
 		if lastDigest != "" {
 			layerdir := digestMap[layer.Digest]
 			lowerPath := filepath.Join(rootPath, rootfsDir, layerdir, "lower")
@@ -327,8 +343,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 	imageID := strings.Split(manifest.Config.Digest, ":")[1]
 	configFilePath := filepath.Join(rootPath, imageMetadataDir, imageID, fname)
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
-		configUrl := fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
-			img.Scheme, img.Registry, img.Repository, manifest.Config.Digest)
+		configUrl := fmt.Sprintf("%sblobs/%s", img.GetBaseUrl(), manifest.Config.Digest)
 
 		token, err := firstRequestForAuth(configUrl)
 		if err != nil {
@@ -344,6 +359,7 @@ func (img *Image) CreateConfigFile(CVMFSRepo string) (err error) {
 		}
 		req.Header.Set("Authorization", token)
 		req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+		req.Header.Set("Accept", "application/vnd.oci.image.manifest.v1+json")
 
 		resp, err := client.Do(req)
 		defer resp.Body.Close()

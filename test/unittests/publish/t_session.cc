@@ -6,10 +6,10 @@
 
 #include "../c_http_server.h"
 #include "c_repository.h"
-#include "logging.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT

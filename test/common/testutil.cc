@@ -15,10 +15,10 @@
 #include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
-#include "fs_traversal.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "testutil.h"
+#include "util/fs_traversal.h"
 
 
 #ifndef __APPLE__
@@ -656,20 +656,6 @@ bool MockHistory::GetByDate(const time_t timestamp, Tag *tag) const {
 bool MockHistory::List(std::vector<Tag> *tags) const {
   GetTags(tags);
   std::sort(tags->rbegin(), tags->rend());
-  return true;
-}
-
-bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
-  // extract tags from TagMap
-  GetTags(channel_tips);
-
-  // find hash duplicates
-  std::sort(channel_tips->begin(), channel_tips->end(),
-            MockHistory::gt_channel_revision);
-  std::vector<Tag>::iterator last = std::unique(channel_tips->begin(),
-                                                channel_tips->end(),
-                                                MockHistory::eq_channel);
-  channel_tips->erase(last, channel_tips->end());
   return true;
 }
 

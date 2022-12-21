@@ -9,12 +9,12 @@
 
 #include <map>
 
-#include "atomic.h"
 #include "ingestion/item.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
-#include "murmur.hxx"
 #include "smallhash.h"
+#include "util/atomic.h"
+#include "util/murmur.hxx"
 #include "util/posix.h"
 
 class ItemAllocator;

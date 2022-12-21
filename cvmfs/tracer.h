@@ -12,8 +12,8 @@
 #include <cstdio>
 #include <string>
 
-#include "atomic.h"
 #include "shortstring.h"
+#include "util/atomic.h"
 #include "util/single_copy.h"
 
 /**

@@ -23,6 +23,7 @@ install_from_repo epel-release
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
+install_rpm $LIBS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
@@ -94,7 +95,7 @@ install_from_repo acl
 # install docker for testing DUCC
 sudo yum install -y yum-utils
 sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo yum install docker-ce docker-ce-cli containerd.io
+sudo yum install -y docker-ce docker-ce-cli containerd.io
 
 # Migration test needs lsb_release
 echo "install lsb_release..."

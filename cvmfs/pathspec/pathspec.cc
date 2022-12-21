@@ -6,8 +6,8 @@
 
 #include <cassert>
 
-#include "logging.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/smalloc.h"
 
 Pathspec::Pathspec(const std::string &spec) :
   regex_(NULL),

@@ -17,16 +17,16 @@
 #include <vector>
 
 #include "duplex_libarchive.h"
-#include "fs_traversal.h"
-#include "smalloc.h"
 #include "sync_item.h"
 #include "sync_item_dummy.h"
 #include "sync_item_tar.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/fs_traversal.h"
 #include "util/posix.h"
-#include "util_concurrency.h"
+#include "util/smalloc.h"
 
 namespace publish {
 
@@ -146,6 +146,7 @@ void SyncUnionTarball::Traverse() {
 
       case ARCHIVE_EOF: {
         if (create_catalog_on_root_ && (base_directory_ != "/")) {
+          CreateDirectories(base_directory_);  // necessary for empty archives
           SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
               new SyncItemDummyCatalog(base_directory_, this));
           ProcessFile(catalog);

@@ -49,20 +49,20 @@
 #include <map>
 #include <vector>
 
-#include "atomic.h"
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "directory_entry.h"
 #include "download.h"
-#include "hash.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
-#include "signature.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/atomic.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -409,10 +409,11 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 
   result = link(oldpath, newpath);
   if (result < 0) {
-    if (errno == EEXIST)
+    if (errno == EEXIST) {
       LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
-    else
+    } else {
       return -errno;
+    }
   }
   result = unlink(oldpath);
   if (result < 0)

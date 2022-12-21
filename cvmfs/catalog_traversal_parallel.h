@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog_traversal.h"
 #include "ingestion/tube.h"
+#include "util/atomic.h"
 #include "util/exception.h"
 
 namespace swissknife {

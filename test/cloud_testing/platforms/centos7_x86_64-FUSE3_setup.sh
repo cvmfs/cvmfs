@@ -10,6 +10,7 @@ install_from_repo epel-release
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
+install_rpm $LIBS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $FUSE3_PACKAGE

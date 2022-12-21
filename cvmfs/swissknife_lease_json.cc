@@ -8,7 +8,7 @@
 #include "json_document.h"
 #include "util/pointer.h"
 
-#include "logging.h"
+#include "util/logging.h"
 
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
                              std::string *session_token) {

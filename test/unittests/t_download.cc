@@ -12,15 +12,25 @@
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "download.h"
-#include "hash.h"
-#include "prng.h"
+#include "interrupt.h"
 #include "sink.h"
 #include "statistics.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
+
+namespace {
+
+class TestInterruptCue : public InterruptCue {
+ public:
+  virtual bool IsCanceled() { return true; }
+};
+
+}  // anonymous namespace
 
 namespace download {
 
@@ -283,6 +293,22 @@ TEST_F(T_Download, RemoteFileSwitchHosts) {
   ASSERT_EQ(info.error_code, kFailOk);
   ASSERT_EQ(info.destination_mem.pos, src_content.length());
   EXPECT_STREQ(info.destination_mem.data, src_content.c_str());
+}
+
+TEST_F(T_Download, CancelRequest) {
+  string src_path = GetSmallFile();
+  string src_content = GetFileContents(src_path);
+
+  MockFileServer file_server(8082, sandbox_path_);
+  download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
+  string url = "/" + GetFileName(src_path);
+  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL);
+  TestInterruptCue tci;
+  info.interrupt_cue = &tci;
+  download_mgr.Fetch(&info);
+  ASSERT_EQ(info.num_used_hosts, 1);
+  ASSERT_EQ(info.error_code, kFailCanceled);
+  EXPECT_EQ(NULL, info.destination_mem.data);
 }
 
 TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {

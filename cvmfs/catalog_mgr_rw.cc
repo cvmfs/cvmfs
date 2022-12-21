@@ -16,13 +16,13 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
-#include "logging.h"
 #include "manifest.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "upload.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -299,7 +299,7 @@ void WritableCatalogManager::Clone(const std::string destination,
   const std::string relative_source = MakeRelativePath(source);
 
   DirectoryEntry source_dirent;
-  if (!LookupPath(relative_source, kLookupSole, &source_dirent)) {
+  if (!LookupPath(relative_source, kLookupDefault, &source_dirent)) {
     PANIC(kLogStderr, "catalog for file '%s' cannot be found, aborting",
           source.c_str());
   }
@@ -311,7 +311,7 @@ void WritableCatalogManager::Clone(const std::string destination,
   // if the file is already there we remove it and we add it back
   DirectoryEntry check_dirent;
   bool destination_already_present =
-      LookupPath(MakeRelativePath(destination), kLookupSole, &check_dirent);
+      LookupPath(MakeRelativePath(destination), kLookupDefault, &check_dirent);
   if (destination_already_present) {
     this->RemoveFile(destination);
   }
@@ -356,7 +356,7 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
   }
 
   DirectoryEntry source_dirent;
-  if (!LookupPath(relative_source, kLookupSole, &source_dirent)) {
+  if (!LookupPath(relative_source, kLookupDefault, &source_dirent)) {
     PANIC(kLogStderr, "path '%s' cannot be found, aborting", from_dir.c_str());
   }
   if (!source_dirent.IsDirectory()) {
@@ -365,13 +365,13 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
   }
 
   DirectoryEntry dest_dirent;
-  if (LookupPath(relative_dest, kLookupSole, &dest_dirent)) {
+  if (LookupPath(relative_dest, kLookupDefault, &dest_dirent)) {
     PANIC(kLogStderr, "destination '%s' exists, aborting", to_dir.c_str());
   }
 
   const std::string dest_parent = GetParentPath(relative_dest);
   DirectoryEntry dest_parent_dirent;
-  if (!LookupPath(dest_parent, kLookupSole, &dest_parent_dirent)) {
+  if (!LookupPath(dest_parent, kLookupDefault, &dest_parent_dirent)) {
     PANIC(kLogStderr, "destination '%s' not on a known path, aborting",
           to_dir.c_str());
   }
@@ -396,7 +396,7 @@ void WritableCatalogManager::CloneTreeImpl(
   PathString relative_source(MakeRelativePath(source_dir.ToString()));
 
   DirectoryEntry source_dirent;
-  bool retval = LookupPath(relative_source, kLookupSole, &source_dirent);
+  bool retval = LookupPath(relative_source, kLookupDefault, &source_dirent);
   assert(retval);
   assert(!source_dirent.IsBindMountpoint());
 

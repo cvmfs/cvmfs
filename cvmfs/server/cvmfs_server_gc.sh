@@ -237,7 +237,6 @@ __do_gc_cmd()
     fi
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
-    is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
     # figure out the URL of the repository
     local repository_url="$CVMFS_STRATUM0"
@@ -253,13 +252,23 @@ __do_gc_cmd()
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
 
+    local trapcmd
     if [ $dry_run -eq 0 ]; then
+      # if a check or other gc is in progress on this repo, abort
+      acquire_gc_lock $name gc 1 || die "Failed to acquire gc lock for $name"
+      trapcmd="release_gc_lock $name"
+      trap "$trapcmd" EXIT HUP INT TERM
       if is_stratum0 $name; then
-        trap "close_transaction $name 0" EXIT HUP INT TERM
-        open_transaction $name || die "Failed to open transaction for garbage collection"
+        is_in_transaction $name  && die "Cannot run garbage collection while in a transaction"
+        trapcmd="close_transaction $name 0; $trapcmd"
+        trap "$trapcmd" EXIT HUP INT TERM
+        open_transaction $name   || die "Failed to open transaction for garbage collection"
       else
-        acquire_update_lock $name gc || die "Failed to acquire update lock for garbage collection"
-        trap "release_update_lock $name" EXIT HUP INT TERM
+        # on stratum1
+        # if an update is in progress, wait for it
+        acquire_update_lock $name gc || die "Failed to acquire update lock for $name"
+        trapcmd="release_update_lock $name; $trapcmd"
+        trap "$trapcmd" EXIT HUP INT TERM
       fi
     fi
 
@@ -280,19 +289,14 @@ __do_gc_cmd()
              $additional_switches || die "Fail ($?)!"
 
     if [ $dry_run -eq 0 ]; then
-      # sign the result
       if is_stratum0 $name; then
-        # close the transaction
-        trap - EXIT HUP INT TERM
         if [ "x$CVMFS_UPLOAD_STATS_PLOTS" = "xtrue" ]; then
           /usr/share/cvmfs-server/upload_stats_plots.sh $name
         fi
-        close_transaction $name 0
-      else
-        # release the update lock
-        trap - EXIT HUP INT TERM
-        release_update_lock $name
       fi
+      # release lock(s) and close transaction
+      eval $trapcmd
+      trap - EXIT HUP INT TERM
     fi
 
     syncfs cautious

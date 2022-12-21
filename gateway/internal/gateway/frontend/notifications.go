@@ -17,8 +17,6 @@ const (
 	notificationTimeout = 2 * time.Hour
 )
 
-type reply map[string]interface{}
-
 // MakeNotificationsHandler creates an HTTP handler for the notifications API
 func MakeNotificationsHandler(services be.ActionController) httprouter.Handle {
 	return func(w http.ResponseWriter, h *http.Request, ps httprouter.Params) {
@@ -56,10 +54,7 @@ func handlePublish(
 
 	rep := map[string]interface{}{"status": "ok"}
 
-	if err := services.PublishManifest(ctx, req.Repository, body.Bytes()); err != nil {
-		rep["status"] = "error"
-		rep["reason"] = err.Error()
-	}
+	services.PublishManifest(ctx, req.Repository, be.NotificationMessage(body.String()))
 
 	gw.LogC(ctx, "http", gw.LogInfo).Msg("request_processed")
 

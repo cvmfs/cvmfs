@@ -14,10 +14,10 @@
 #include <cstring>
 #include <string>
 
-#include "atomic.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

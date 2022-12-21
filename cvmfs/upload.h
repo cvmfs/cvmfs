@@ -113,17 +113,17 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "file_chunk.h"
-#include "hash.h"
 #include "ingestion/ingestion_source.h"
 #include "ingestion/pipeline.h"
 #include "repository_tag.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
 #include "upload_spooler_result.h"
+#include "util/concurrency.h"
 #include "util/pointer.h"
 #include "util/shared_ptr.h"
-#include "util_concurrency.h"
 
 namespace upload {
 

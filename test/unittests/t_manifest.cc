@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <string>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "util/posix.h"
 

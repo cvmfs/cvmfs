@@ -10,7 +10,7 @@
 
 #include <map>
 
-#include "signature.h"
+#include "crypto/signature.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

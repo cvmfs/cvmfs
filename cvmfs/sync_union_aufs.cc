@@ -9,8 +9,8 @@
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 
-#include "fs_traversal.h"
 #include "sync_mediator.h"
+#include "util/fs_traversal.h"
 
 namespace publish {
 

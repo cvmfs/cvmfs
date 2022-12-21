@@ -15,10 +15,10 @@
 
 #include "catalog_counters.h"
 #include "catalog_sql.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "gtest/gtest_prod.h"
-#include "hash.h"
 #include "shortstring.h"
 #include "sql.h"
 #include "uid_map.h"

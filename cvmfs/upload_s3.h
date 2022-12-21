@@ -11,9 +11,9 @@
 #include <utility>
 #include <vector>
 
-#include "atomic.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 #include "util/file_backed_buffer.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"

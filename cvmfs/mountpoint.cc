@@ -38,6 +38,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
+#include "crypto/signature.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
@@ -47,7 +48,6 @@
 #include "google/protobuf/stubs/common.h"
 #include "history.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -57,19 +57,19 @@
 #include "nfs_maps_sqlite.h"
 #endif
 #include "options.h"
-#include "platform.h"
 #include "quota_posix.h"
 #include "resolv_conf_event_handler.h"
-#include "signature.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "tracer.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-#include "util_concurrency.h"
-#include "uuid.h"
+#include "util/uuid.h"
 #include "wpad.h"
 
 using namespace std;  // NOLINT
@@ -165,6 +165,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
     file_system(new FileSystem(fs_info));
 
+  file_system->SetupGlobalEnvironmentParams();
+
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
            file_system->options_mgr()->Dump().c_str());
@@ -224,17 +226,43 @@ void FileSystem::CreateStatistics() {
   n_fs_lookup_negative_ = statistics_->Register("cvmfs.n_fs_lookup_negative",
                                                 "Number of negative lookups");
   n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
+  n_fs_stat_stale_ = statistics_->Register("cvmfs.n_fs_stat_stale",
+    "Number of stats for stale (open, meanwhile changed) regular files");
+  n_fs_statfs_ = statistics_->Register("cvmfs.n_fs_statfs",
+                                       "Overall number of statsfs calls");
+  n_fs_statfs_cached_ = statistics_->Register("cvmfs.n_fs_statfs_cached",
+                "Number of statsfs calls that accessed the cached statfs info");
   n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
   n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
                                          "Number of links read");
   n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
                                        "Number of inode forgets");
+  n_fs_inode_replace_ = statistics_->Register("cvmfs.n_fs_inode_replace",
+    "Number of stale inodes that got replaced by an up-to-date version");
   no_open_files_ = statistics_->Register("cvmfs.no_open_files",
                                          "Number of currently opened files");
   no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
+  n_eio_total_ =  statistics_->Register("eio.total",
+     "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ =  statistics_->Register("eio.01",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ =  statistics_->Register("eio.02",
+     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ =  statistics_->Register("eio.03",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ =  statistics_->Register("eio.04",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ =  statistics_->Register("eio.05",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ =  statistics_->Register("eio.06",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ =  statistics_->Register("eio.07",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ =  statistics_->Register("eio.08",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -372,11 +400,24 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_lookup_(NULL)
   , n_fs_lookup_negative_(NULL)
   , n_fs_stat_(NULL)
+  , n_fs_stat_stale_(NULL)
+  , n_fs_statfs_(NULL)
+  , n_fs_statfs_cached_(NULL)
   , n_fs_read_(NULL)
   , n_fs_readlink_(NULL)
   , n_fs_forget_(NULL)
+  , n_fs_inode_replace_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
+  , n_eio_total_(NULL)
+  , n_eio_01_(NULL)
+  , n_eio_02_(NULL)
+  , n_eio_03_(NULL)
+  , n_eio_04_(NULL)
+  , n_eio_05_(NULL)
+  , n_eio_06_(NULL)
+  , n_eio_07_(NULL)
+  , n_eio_08_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -551,6 +592,15 @@ string FileSystem::MkCacheParm(
 
 void FileSystem::ResetErrorCounters() {
   io_error_info_.Reset();
+  n_eio_total_->Set(0);
+  n_eio_01_->Set(0);
+  n_eio_02_->Set(0);
+  n_eio_03_->Set(0);
+  n_eio_04_->Set(0);
+  n_eio_05_->Set(0);
+  n_eio_06_->Set(0);
+  n_eio_07_->Set(0);
+  n_eio_08_->Set(0);
 }
 
 
@@ -796,6 +846,14 @@ bool FileSystem::SetupCwd() {
   //  ...
   // }
   return true;
+}
+
+
+/**
+ * Environment variables useful, e.g., for variant symlinks
+ */
+void FileSystem::SetupGlobalEnvironmentParams() {
+  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
 }
 
 
@@ -1350,7 +1408,7 @@ bool MountPoint::CreateResolvConfWatcher() {
              "DNS roaming is enabled for this repository.");
     // Create a file watcher to update the DNS settings of the download
     // managers when there are changes to /etc/resolv.conf
-    resolv_conf_watcher_ = platform_file_watcher();
+    resolv_conf_watcher_ = file_watcher::FileWatcher::Create();
 
     if (resolv_conf_watcher_) {
       ResolvConfEventHandler *handler =
@@ -1436,12 +1494,23 @@ void MountPoint::CreateStatistics() {
   statistics_->Register("inode_tracker.n_miss_path",
                         "overall number of unsuccessful path lookups");
 
-  statistics_->Register("nentry_tracker.n_insert",
+  statistics_->Register("dentry_tracker.n_insert",
                         "overall number of added negative cache entries");
-  statistics_->Register("nentry_tracker.n_remove",
+  statistics_->Register("dentry_tracker.n_remove",
                         "overall number of evicted negative cache entries");
-  statistics_->Register("nentry_tracker.n_prune",
+  statistics_->Register("dentry_tracker.n_prune",
                         "overall number of prune calls");
+
+  statistics_->Register("page_cache_tracker.n_insert",
+                        "overall number of added page cache entries");
+  statistics_->Register("page_cache_tracker.n_remove",
+                        "overall number of evicted page cache entries");
+  statistics_->Register("page_cache_tracker.n_open_direct",
+                        "overall number of direct I/O open calls");
+  statistics_->Register("page_cache_tracker.n_open_flush",
+    "overall number of open calls where the file's page cache gets flushed");
+  statistics_->Register("page_cache_tracker.n_open_cached",
+    "overall number of open calls where the file's page cache is reused");
 }
 
 
@@ -1473,7 +1542,10 @@ void MountPoint::CreateTables() {
                                          statistics_);
 
   inode_tracker_ = new glue::InodeTracker();
-  nentry_tracker_ = new glue::NentryTracker();
+  dentry_tracker_ = new glue::DentryTracker();
+  page_cache_tracker_ = new glue::PageCacheTracker();
+  if (file_system_->IsNfsSource())
+    page_cache_tracker_->Disable();
 }
 
 /**
@@ -1672,7 +1744,9 @@ MountPoint::MountPoint(
   , md5path_cache_(NULL)
   , tracer_(NULL)
   , inode_tracker_(NULL)
-  , nentry_tracker_(NULL)
+  , dentry_tracker_(NULL)
+  , page_cache_tracker_(NULL)
+  , statfs_cache_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
@@ -1691,7 +1765,8 @@ MountPoint::MountPoint(
 MountPoint::~MountPoint() {
   pthread_mutex_destroy(&lock_max_ttl_);
 
-  delete nentry_tracker_;
+  delete page_cache_tracker_;
+  delete dentry_tracker_;
   delete inode_tracker_;
   delete tracer_;
   delete md5path_cache_;
@@ -1728,6 +1803,8 @@ MountPoint::~MountPoint() {
   delete authz_fetcher_;
   delete statistics_;
   delete uuid_;
+
+  delete statfs_cache_;
 }
 
 
@@ -1761,13 +1838,36 @@ bool MountPoint::SetupBehavior() {
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
 
-  bool hide_magic_xattrs = false;
-  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
-    hide_magic_xattrs = true;
+  uint64_t statfs_time_cache_valid = 0;
+  if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
+    statfs_time_cache_valid = static_cast<uint64_t>(String2Uint64(optarg));
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, hide_magic_xattrs);
+  LogCvmfs(kLogCvmfs, kLogDebug, "statfs cache expires after %d seconds",
+           static_cast<int>(statfs_time_cache_valid));
+  statfs_cache_ = new StatfsCache(statfs_time_cache_valid);
+
+  MagicXattrManager::EVisibility xattr_visibility =
+    MagicXattrManager::kVisibilityRootOnly;
+  if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)) {
+    if (options_mgr_->IsOn(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    else if (options_mgr_->IsOff(optarg))
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
+  }
+  if (options_mgr_->GetValue("CVMFS_MAGIC_XATTRS_VISIBILITY", &optarg)) {
+    if (ToUpper(optarg) == "ROOTONLY") {
+      xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
+    } else if (ToUpper(optarg) == "NEVER") {
+      xattr_visibility = MagicXattrManager::kVisibilityNever;
+    } else if (ToUpper(optarg) == "ALWAYS") {
+      xattr_visibility = MagicXattrManager::kVisibilityAlways;
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "unsupported setting: CVMFS_MAGIC_XATTRS_VISIBILITY=%s",
+               optarg.c_str());
+    }
+  }
+  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
@@ -1986,6 +2086,13 @@ bool MountPoint::SetupOwnerMaps() {
   {
     g_claim_ownership = true;
   }
+  if (options_mgr_->GetValue("CVMFS_WORLD_READABLE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    g_world_readable = true;
+  }
+
+
 
   return true;
 }

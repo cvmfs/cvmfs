@@ -97,13 +97,19 @@ TEST_F(T_Libcvmfs, InitFailures) {
   stderr = fdevnull_;
   retval = cvmfs_init("bad option");
   stderr = save_stderr;
-  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",max_open_files=100000000").c_str());
-  ASSERT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  retval = cvmfs_init((opt_cache_ + ",max_open_files=2000000000").c_str());
+  EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   retval = cvmfs_init("");
-  ASSERT_EQ(LIBCVMFS_FAIL_MKCACHE, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_MKCACHE, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   sqlite3_shutdown();
 }
@@ -175,37 +181,51 @@ TEST_F(T_Libcvmfs, OptionAliases) {
   FILE *save_stderr = stderr;
 
   retval = cvmfs_init((opt_cache_ +
-    ",nofiles=100000000,max_open_files=100000000").c_str());
-  ASSERT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+    ",nofiles=2000000000,max_open_files=2000000000").c_str());
+  EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",nofiles=100000000").c_str());
-  ASSERT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  retval = cvmfs_init((opt_cache_ + ",nofiles=2000000000").c_str());
+  EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
-  retval = cvmfs_init((opt_cache_ + ",max_open_files=100000000").c_str());
-  ASSERT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  retval = cvmfs_init((opt_cache_ + ",max_open_files=2000000000").c_str());
+  EXPECT_EQ(LIBCVMFS_FAIL_NOFILES, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   stderr = fdevnull_;
   retval = cvmfs_init((opt_cache_ + ",nofiles=999,max_open_files=888").c_str());
   stderr = save_stderr;
-  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   stderr = fdevnull_;
   retval =
     cvmfs_init((opt_cache_ + ",syslog_level=0,log_syslog_level=1").c_str());
   stderr = save_stderr;
-  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   stderr = fdevnull_;
   retval =
     cvmfs_init((opt_cache_ + ",log_file=abc,logfile=efg").c_str());
   stderr = save_stderr;
-  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   stderr = fdevnull_;
   retval =
     cvmfs_init((opt_cache_ + ",cachedir=/abc").c_str());
   stderr = save_stderr;
-  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  EXPECT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   retval =
     cvmfs_init((opt_cache_ + ",cachedir=" + tmp_path_).c_str());
@@ -222,8 +242,11 @@ TEST_F(T_Libcvmfs, Initv2) {
   EXPECT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
   cvmfs_fini();
 
-  cvmfs_options_set(opts, "CVMFS_NFILES", "100000000");
-  EXPECT_EQ(LIBCVMFS_ERR_PERMISSION, cvmfs_init_v2(opts));
+  cvmfs_options_set(opts, "CVMFS_NFILES", "2000000000");
+  int retval = cvmfs_init_v2(opts);
+  EXPECT_EQ(LIBCVMFS_ERR_PERMISSION, retval);
+  if (retval == LIBCVMFS_FAIL_OK)
+    cvmfs_fini();
 
   cvmfs_options_fini(opts);
 }
@@ -781,12 +804,23 @@ TEST_F(T_Libcvmfs, Remount) {
   pid_t pid;
   if ((pid = fork()) == 0) {
     // Initialize client repo based on options
-    ASSERT_EQ(LIBCVMFS_ERR_OK, cvmfs_init_v2(opts));
+    int retval = cvmfs_init_v2(opts);
+    EXPECT_EQ(LIBCVMFS_ERR_OK, retval);
+    if (retval != LIBCVMFS_ERR_OK) {
+      char c = '!';
+      WritePipe(pipe_send[1], &c, 1);
+      exit(1);
+    }
 
     // Attach to client repo
     cvmfs_context *ctx;
-    EXPECT_EQ(LIBCVMFS_ERR_OK,
-              cvmfs_attach_repo_v2("keys.cern.ch", opts, &ctx));
+    retval = cvmfs_attach_repo_v2("keys.cern.ch", opts, &ctx);
+    EXPECT_EQ(LIBCVMFS_ERR_OK, retval);
+    if (retval != LIBCVMFS_ERR_OK) {
+      char c = '!';
+      WritePipe(pipe_send[1], &c, 1);
+      exit(1);
+    }
 
     EXPECT_EQ(0u, cvmfs_get_revision(ctx));
     EXPECT_EQ(0, cvmfs_remount(ctx));
@@ -807,11 +841,14 @@ TEST_F(T_Libcvmfs, Remount) {
 
   char c;
   ReadPipe(pipe_send[0], &c, 1);
-  DirSpec spec1 = MakeBaseSpec();
-  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
-  tester.UpdateManifest();
-  tester.DestroyCatalogManager();
-  WritePipe(pipe_recv[1], &c, 1);
+  if (c != '!') {
+    DirSpec spec1 = MakeBaseSpec();
+    EXPECT_TRUE(
+      tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec1));
+    tester.UpdateManifest();
+    tester.DestroyCatalogManager();
+    WritePipe(pipe_recv[1], &c, 1);
+  }
 
   int retcode = WaitForChild(pid);
   EXPECT_EQ(0, retcode);

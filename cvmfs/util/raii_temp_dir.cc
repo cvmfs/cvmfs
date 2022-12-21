@@ -4,7 +4,7 @@
 
 #include "raii_temp_dir.h"
 
-#include "posix.h"
+#include "util/posix.h"
 
 RaiiTempDir* RaiiTempDir::Create(const std::string& prefix) {
   RaiiTempDir* tmp = new RaiiTempDir(prefix);

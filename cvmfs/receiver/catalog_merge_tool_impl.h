@@ -8,13 +8,13 @@
 #include <string>
 
 #include "catalog.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "lease_path_util.h"
-#include "logging.h"
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 

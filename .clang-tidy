@@ -1,6 +1,7 @@
 ---
 Checks: -*
   ,bugprone-*
+  ,-bugprone-easily-swappable-parameters
   ,cert-*
   ,-cert-err34-c
   ,-cert-err58-cpp

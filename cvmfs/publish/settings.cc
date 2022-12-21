@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "options.h"
 #include "publish/except.h"
 #include "publish/repository.h"
@@ -371,6 +371,10 @@ void SettingsPublisher::SetIsSilent(bool value) {
 
 void SettingsPublisher::SetIsManaged(bool value) {
   is_managed_ = value;
+}
+
+void SettingsPublisher::SetIgnoreInvalidLease(bool value) {
+  ignore_invalid_lease_ = value;
 }
 
 

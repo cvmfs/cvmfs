@@ -10,9 +10,9 @@
 
 #include "cache.h"
 #include "cache_ram.h"
-#include "hash.h"
-#include "prng.h"
+#include "crypto/hash.h"
 #include "statistics.h"
+#include "util/prng.h"
 
 using namespace std;  // NOLINT
 

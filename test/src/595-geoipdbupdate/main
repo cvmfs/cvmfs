@@ -176,7 +176,11 @@ cvmfs_run_test() {
   sudo -E cvmfs_server update-geodb > $update_4_log 2>&1 || return 14
 
   echo "check output logs for the expected status messages"
-  cat $update_4_log | grep "Updating GeoIP Database" || return 16
+  cat $update_4_log | grep "Updating GeoIP Database" || return 15
+
+  echo "check repositories.json for geodb update UTC date"
+  local rj=/srv/cvmfs/info/v1/repositories.json
+  [[ "$(jq .last_geodb_update <$rj)" == *UTC* ]] || return 16
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -323,16 +327,25 @@ cvmfs_run_test() {
   echo "change ownership of $(dirname $CVMFS_TEST_595_GEODB) to 'root'"
   sudo chown root:root $(dirname $CVMFS_TEST_595_GEODB) || return 49
 
-  echo "create a stratum1 snapshot (should 'fail' due to permissions)"
+  echo "create a stratum1 snapshot (geo update should fail due to permissions)"
   local snapshot_5_log="snapshot_5.log"
   cvmfs_server snapshot $replica_name > $snapshot_5_log 2>&1 || return 50
 
+  echo "try unprivileged snapshot with auto updates disabled"
+  local snapshot_6_log="snapshot_6.log"
+  echo CVMFS_GEO_AUTO_UPDATE=false | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 51
+  cvmfs_server snapshot $replica_name > $snapshot_6_log 2>&1 || return 52
+
+  echo "removing $CVMFS_TEST_595_SERVER_HOOKS"
+  recreate_server_hooks_from_stashed_if_needed || return 53
+
   echo "check output logs for the expected status messages"
-  test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 51
-  cat $snapshot_2_log | grep "Linking GeoIP Database"                            || return 52
-  test -z "`cat $snapshot_3_log | grep GeoIP`"                                   || return 53
-  cat $snapshot_4_log | grep "Linking GeoIP Database"                            || return 54
-  cat $snapshot_5_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 55
+  test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 61
+  cat $snapshot_2_log | grep "Linking GeoIP Database"                            || return 62
+  test -z "`cat $snapshot_3_log | grep GeoIP`"                                   || return 63
+  cat $snapshot_4_log | grep "Linking GeoIP Database"                            || return 64
+  cat $snapshot_5_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 65
+  cat $snapshot_6_log | grep -e "Directory.*not writable"                        && return 66
 
   return 0
 }

@@ -62,6 +62,7 @@ echo "done"
 # install deb packages
 echo "installing DEB packages... "
 install_deb "$CONFIG_PACKAGES"
+install_deb $LIBS_PACKAGE
 install_deb $CLIENT_PACKAGE
 install_deb $FUSE3_PACKAGE
 install_deb $SERVER_PACKAGE
@@ -94,6 +95,7 @@ install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
+install_from_repo patch                         || die "fail (installing bc)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"

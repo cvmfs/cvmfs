@@ -61,12 +61,17 @@ fi
 # Fuse3 is only available as of Debian 10 "buster" and Ubuntu 20.04
 if [ x"$(lsb_release -sc)" = x"bullseye" -o \
      x"$(lsb_release -sc)" = x"buster" -o \
-     x"$(lsb_release -sc)" = x"focal" ]; then
+     x"$(lsb_release -sc)" = x"focal" -o \
+     x"$(lsb_release -sc)" = x"jammy" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
   sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
 else
   cat debian/control | awk '/#FUSE3-BEGIN/{flag=1;next}/#FUSE3-END/{flag=0;next}!flag' > debian/control.tmp
   mv debian/control.tmp debian/control
+fi
+# Depend on python3-dev instead of python-dev on Ubuntu 22.04
+if [ x"$(lsb_release -sc)" = x"jammy" ]; then
+  sed -i -e "s/python-dev/python3-dev/g" debian/control
 fi
 # The cvmfs-gateway requires a go compiler
 if ! go version >/dev/null 2>&1; then
@@ -94,7 +99,8 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -name 'cvmfs-shrinkwrap*.deb'))"\
                        ""                                                   \
                        "$(basename $(find . -name 'cvmfs-fuse3*.deb'))"     \
-                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"
+                       "$(basename $(find . -name 'cvmfs-gateway*.deb'))"   \
+                       "$(basename $(find . -name 'cvmfs-libs*.deb'))"
 fi
 
 # clean up the source tree

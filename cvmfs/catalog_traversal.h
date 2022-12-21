@@ -14,12 +14,12 @@
 
 #include "catalog.h"
 #include "compression.h"
+#include "crypto/signature.h"
 #include "history_sqlite.h"
-#include "logging.h"
 #include "manifest.h"
 #include "object_fetcher.h"
-#include "signature.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 
 namespace catalog {
 class Catalog;

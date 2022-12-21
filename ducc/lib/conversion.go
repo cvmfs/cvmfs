@@ -318,11 +318,11 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	}
 	manifestPath := filepath.Join("/", "cvmfs", repo, ".metadata", inputImage.GetSimpleName(), "manifest.json")
 	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
-	l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
-		"Already converted the image, skipping.")
 
 	if alreadyConverted == ConversionMatch {
-		if convertAgain == false {
+		if !convertAgain {
+			l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
+				"Already converted the image, skipping.")
 			return nil
 		}
 	}

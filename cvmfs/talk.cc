@@ -45,16 +45,16 @@
 #include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
-#include "logging.h"
 #include "monitor.h"
 #include "mountpoint.h"
 #include "nfs_maps.h"
 #include "options.h"
-#include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "tracer.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "wpad.h"
 
@@ -523,8 +523,10 @@ void *TalkManager::MainResponder(void *data) {
       // Manually setting the inode tracker numbers
       glue::InodeTracker::Statistics inode_stats =
         mount_point->inode_tracker()->GetStatistics();
-      glue::NentryTracker::Statistics nentry_stats =
-        mount_point->nentry_tracker()->GetStatistics();
+      glue::DentryTracker::Statistics dentry_stats =
+        mount_point->dentry_tracker()->GetStatistics();
+      glue::PageCacheTracker::Statistics page_cache_stats =
+        mount_point->page_cache_tracker()->GetStatistics();
       mount_point->statistics()->Lookup("inode_tracker.n_insert")->Set(
         atomic_read64(&inode_stats.num_inserts));
       mount_point->statistics()->Lookup("inode_tracker.n_remove")->Set(
@@ -537,12 +539,22 @@ void *TalkManager::MainResponder(void *data) {
         atomic_read64(&inode_stats.num_hits_path));
       mount_point->statistics()->Lookup("inode_tracker.n_miss_path")->Set(
         atomic_read64(&inode_stats.num_misses_path));
-      mount_point->statistics()->Lookup("nentry_tracker.n_insert")->Set(
-        nentry_stats.num_insert);
-      mount_point->statistics()->Lookup("nentry_tracker.n_remove")->Set(
-        nentry_stats.num_remove);
-      mount_point->statistics()->Lookup("nentry_tracker.n_prune")->Set(
-        nentry_stats.num_prune);
+      mount_point->statistics()->Lookup("dentry_tracker.n_insert")->Set(
+        dentry_stats.num_insert);
+      mount_point->statistics()->Lookup("dentry_tracker.n_remove")->Set(
+        dentry_stats.num_remove);
+      mount_point->statistics()->Lookup("dentry_tracker.n_prune")->Set(
+        dentry_stats.num_prune);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_insert")->Set(
+        page_cache_stats.n_insert);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_remove")->Set(
+        page_cache_stats.n_remove);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_direct")->
+        Set(page_cache_stats.n_open_direct);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_flush")->
+        Set(page_cache_stats.n_open_flush);
+      mount_point->statistics()->Lookup("page_cache_tracker.n_open_cached")->
+        Set(page_cache_stats.n_open_cached);
 
       if (file_system->cache_mgr()->id() == kPosixCacheManager) {
         PosixCacheManager *cache_mgr =

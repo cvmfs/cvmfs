@@ -10,7 +10,7 @@
 #include "ingestion/chunk_detector.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
-#include "prng.h"
+#include "util/prng.h"
 
 
 class T_ChunkDetectors : public ::testing::Test {

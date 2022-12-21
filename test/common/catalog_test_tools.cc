@@ -11,8 +11,8 @@
 
 #include "catalog_rw.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -404,7 +404,7 @@ bool CatalogTestTool::LookupNestedCatalogHash(
 
   catalog::DirectoryEntry entry;
   // This lookup is used to ensure the needed catalogs are mounted
-  catalog_mgr->LookupPath(path, catalog::kLookupSole, &entry);
+  catalog_mgr->LookupPath(path, catalog::kLookupDefault, &entry);
 
   p.Assign(&path[0], path.length());
   shash::Any hash = catalog_mgr->GetNestedCatalogHash(p);
@@ -436,7 +436,7 @@ bool CatalogTestTool::FindEntry(
     return false;
   }
 
-  if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, entry)) {
+  if (!catalog_mgr->LookupPath(path, catalog::kLookupDefault, entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
              path.c_str());

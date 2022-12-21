@@ -7,9 +7,9 @@
 #include <cstdlib>
 #include <string>
 
-#include "prng.h"
 #include "testutil.h"
 #include "util/plugin.h"
+#include "util/prng.h"
 
 struct DecisionType {
   DecisionType() : type(-1), fail(false) {}

@@ -25,6 +25,7 @@
 #endif
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -39,11 +40,11 @@
 #if defined(CVMFS_FUSE_MODULE)
 #include "cvmfs.h"
 #endif
-#include "logging.h"
-#include "platform.h"
-#include "smalloc.h"
 #include "util/exception.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 // Used for address offset calculation
@@ -249,7 +250,7 @@ string Watchdog::ReportStacktrace() {
   SetLogMicroSyslog(GetLogMicroSyslog());
 
   CrashData crash_data;
-  if (!pipe_watchdog_->Read(&crash_data)) {
+  if (!pipe_watchdog_->TryRead(&crash_data)) {
     return "failed to read crash data (" + StringifyInt(errno) + ")";
   }
 
@@ -282,6 +283,16 @@ string Watchdog::ReportStacktrace() {
   }
 
   return debug;
+}
+
+
+void Watchdog::ReportSignalAndTerminate(
+  int sig, siginfo_t *siginfo, void * /* context */)
+{
+  LogCvmfs(kLogMonitor, kLogSyslogErr,
+           "watchdog: received unexpected signal %d from PID %d / UID %d",
+           sig, siginfo->si_pid, siginfo->si_uid);
+  _exit(1);
 }
 
 
@@ -401,7 +412,13 @@ void Watchdog::Spawn() {
           string debuglog_save = GetLogDebugFile();
           // SetLogMicroSyslog("");
           SetLogDebugFile("");
-          for (int fd = 0; fd < max_fd; fd++) {
+          // Gracefully close the syslog before closing all fds. The next call
+          // to syslog will reopen it.
+          closelog();
+          // Let's keep stdin, stdout, stderr open at /dev/null (daemonized)
+          // in order to prevent accidental outputs from messing with another
+          // file descriptor
+          for (int fd = 3; fd < max_fd; fd++) {
             if (fd == pipe_watchdog_->read_end)
               continue;
             if (fd == pipe_listener_->write_end)
@@ -477,7 +494,7 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
   struct pollfd watch_fds[2];
   watch_fds[0].fd = watchdog->pipe_listener_->read_end;
-  watch_fds[0].events = POLLIN | POLLPRI;
+  watch_fds[0].events = 0;  // Only check for POLL[ERR,HUP,NVAL] in revents
   watch_fds[0].revents = 0;
   watch_fds[1].fd = watchdog->pipe_terminate_->read_end;
   watch_fds[1].events = POLLIN | POLLPRI;
@@ -498,7 +515,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
           (watch_fds[0].revents & POLLNVAL))
       {
         LogCvmfs(kLogMonitor, kLogDebug | kLogSyslogErr,
-                 "watchdog disappeared, disabling stack trace reporting");
+                 "watchdog disappeared, disabling stack trace reporting "
+                 "(revents: %d / %d|%d|%d)",
+                 watch_fds[0].revents, POLLERR, POLLHUP, POLLNVAL);
         watchdog->SetSignalHandlers(watchdog->old_signal_handlers_);
         PANIC(kLogDebug | kLogSyslogErr, "watchdog disappeared, aborting");
       }
@@ -513,13 +532,40 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
 
 void Watchdog::Supervise() {
+  // We want that the reading from the pipe fd fails if the pipe breaks,
+  // instead of receiving a signal
   signal(SIGPIPE, SIG_IGN);
-  ControlFlow::Flags control_flow;
 
-  if (!pipe_watchdog_->Read(&control_flow)) {
+  // The watchdog is not supposed to receive signals. If it does, report it.
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = ReportSignalAndTerminate;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+
+  SigactionMap signal_handlers;
+  signal_handlers[SIGHUP]  = sa;
+  signal_handlers[SIGINT]  = sa;
+  signal_handlers[SIGQUIT] = sa;
+  signal_handlers[SIGILL]  = sa;
+  signal_handlers[SIGABRT] = sa;
+  signal_handlers[SIGBUS]  = sa;
+  signal_handlers[SIGFPE]  = sa;
+  signal_handlers[SIGUSR1] = sa;
+  signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGUSR2] = sa;
+  signal_handlers[SIGTERM] = sa;
+  signal_handlers[SIGXCPU] = sa;
+  signal_handlers[SIGXFSZ] = sa;
+  SetSignalHandlers(signal_handlers);
+
+  ControlFlow::Flags control_flow = ControlFlow::kUnknown;
+
+  if (!pipe_watchdog_->TryRead(&control_flow)) {
     // Re-activate µSyslog, if necessary
     SetLogMicroSyslog(GetLogMicroSyslog());
-    LogEmergency("unexpected termination (" + StringifyInt(control_flow) + ")");
+    LogEmergency("watchdog: unexpected termination (" +
+                 StringifyInt(control_flow) + ")");
     if (on_crash_) on_crash_();
   } else {
     switch (control_flow) {
@@ -534,7 +580,7 @@ void Watchdog::Supervise() {
       default:
         // Re-activate µSyslog, if necessary
         SetLogMicroSyslog(GetLogMicroSyslog());
-        LogEmergency("unexpected error");
+        LogEmergency("watchdog: unexpected error");
         break;
     }
   }

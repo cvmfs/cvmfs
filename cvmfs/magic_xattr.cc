@@ -9,17 +9,17 @@
 #include <vector>
 
 #include "catalog_mgr_client.h"
+#include "crypto/signature.h"
 #include "fetch.h"
-#include "logging.h"
 #include "mountpoint.h"
 #include "quota.h"
-#include "signature.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
-                                     bool hide_magic_xattrs)
+                                     EVisibility visibility)
   : mount_point_(mountpoint),
-    hide_magic_xattrs_(hide_magic_xattrs)
+    visibility_(visibility)
 {
   Register("user.catalog_counters", new CatalogCountersMagicXattr());
   Register("user.external_host", new ExternalHostMagicXattr());
@@ -64,10 +64,15 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("xfsroot.rawlink", new RawlinkMagicXattr());
 
   Register("user.authz", new AuthzMagicXattr());
+  Register("user.external_url", new ExternalURLMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
-  if (hide_magic_xattrs()) {
+  if (visibility() == kVisibilityNever) {
+    return "";
+  }
+  // Only the root entry has an empty name
+  if (visibility() == kVisibilityRootOnly && !dirent->name().IsEmpty()) {
     return "";
   }
 
@@ -143,13 +148,15 @@ MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
 
 bool CatalogCountersMagicXattr::PrepareValueFenced() {
   counters_ =
-    mount_point_->catalog_mgr()->LookupCounters(path_, &subcatalog_path_);
+    mount_point_->catalog_mgr()->
+      LookupCounters(path_, &subcatalog_path_, &hash_);
   return true;
 }
 
 std::string CatalogCountersMagicXattr::GetValue() {
   std::string res;
-  res = "catalog_mountpoint: " + subcatalog_path_ + "\n";
+  res = "catalog_hash: " + hash_.ToString() + "\n";
+  res += "catalog_mountpoint: " + subcatalog_path_ + "\n";
   res += counters_.GetCsvMap();
   return res;
 }
@@ -541,3 +548,23 @@ std::string UsedDirPMagicXattr::GetValue() {
 std::string VersionMagicXattr::GetValue() {
   return std::string(VERSION) + "." + std::string(CVMFS_PATCH_LEVEL);
 }
+
+std::string ExternalURLMagicXattr::GetValue() {
+  std::vector<std::string> host_chain;
+  std::vector<int> rtt;
+  unsigned current_host;
+  if (mount_point_->external_download_mgr() != NULL) {
+    mount_point_->external_download_mgr()->GetHostInfo(
+      &host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      return std::string(host_chain[current_host]) + std::string(path_.c_str());
+    }
+  }
+  return std::string("");
+}
+
+bool ExternalURLMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular() && dirent_->IsExternalFile();
+}
+
+

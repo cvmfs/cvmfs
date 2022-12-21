@@ -11,11 +11,11 @@
 #include <cstdlib>
 
 #include "catalog_mgr.h"
-#include "logging.h"
 #include "quota.h"
-#include "smalloc.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

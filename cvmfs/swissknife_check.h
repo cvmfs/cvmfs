@@ -9,7 +9,7 @@
 #include <string>
 
 #include "catalog.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "swissknife.h"
 
 namespace download {

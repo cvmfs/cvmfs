@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "prng.h"
+#include "util/prng.h"
 
 class T_Prng : public ::testing::Test {
  protected:

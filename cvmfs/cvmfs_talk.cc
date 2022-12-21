@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "options.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"

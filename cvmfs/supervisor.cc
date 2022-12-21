@@ -4,8 +4,8 @@
 
 #include "supervisor.h"
 
-#include "logging.h"
-#include "platform.h"
+#include "util/logging.h"
+#include "util/platform.h"
 
 Supervisor::Supervisor(uint64_t max_retries, uint64_t interval_sec)
     : max_retries_(max_retries), interval_(interval_sec) {}

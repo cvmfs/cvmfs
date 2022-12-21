@@ -8,6 +8,7 @@
 #define CVMFS_MOUNTPOINT_H_
 
 #include <pthread.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <ctime>
@@ -16,9 +17,9 @@
 #include <vector>
 
 #include "cache.h"
+#include "crypto/hash.h"
 #include "file_watcher.h"
 #include "gtest/gtest_prod.h"
-#include "hash.h"
 #include "loader.h"
 #include "magic_xattr.h"
 #include "util/algorithm.h"
@@ -43,7 +44,8 @@ class DownloadManager;
 }
 namespace glue {
 class InodeTracker;
-class NentryTracker;
+class DentryTracker;
+class PageCacheTracker;
 }
 namespace lru {
 class InodeCache;
@@ -209,17 +211,30 @@ class FileSystem : SingleCopy, public BootFactory {
 
   perf::Counter *n_fs_dir_open() { return n_fs_dir_open_; }
   perf::Counter *n_fs_forget() { return n_fs_forget_; }
+  perf::Counter *n_fs_inode_replace() { return n_fs_inode_replace_; }
   perf::Counter *n_fs_lookup() { return n_fs_lookup_; }
   perf::Counter *n_fs_lookup_negative() { return n_fs_lookup_negative_; }
   perf::Counter *n_fs_open() { return n_fs_open_; }
   perf::Counter *n_fs_read() { return n_fs_read_; }
   perf::Counter *n_fs_readlink() { return n_fs_readlink_; }
   perf::Counter *n_fs_stat() { return n_fs_stat_; }
+  perf::Counter *n_fs_stat_stale() { return n_fs_stat_stale_; }
+  perf::Counter *n_fs_statfs() { return n_fs_statfs_; }
+  perf::Counter *n_fs_statfs_cached() { return n_fs_statfs_cached_; }
   IoErrorInfo *io_error_info() { return &io_error_info_; }
   std::string name() { return name_; }
   NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
+  perf::Counter *n_eio_total() { return n_eio_total_; }
+  perf::Counter *n_eio_01() { return n_eio_01_; }
+  perf::Counter *n_eio_02() { return n_eio_02_; }
+  perf::Counter *n_eio_03() { return n_eio_03_; }
+  perf::Counter *n_eio_04() { return n_eio_04_; }
+  perf::Counter *n_eio_05() { return n_eio_05_; }
+  perf::Counter *n_eio_06() { return n_eio_06_; }
+  perf::Counter *n_eio_07() { return n_eio_07_; }
+  perf::Counter *n_eio_08() { return n_eio_08_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -267,6 +282,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
+  void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -308,11 +324,24 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_lookup_;
   perf::Counter *n_fs_lookup_negative_;
   perf::Counter *n_fs_stat_;
+  perf::Counter *n_fs_stat_stale_;
+  perf::Counter *n_fs_statfs_;
+  perf::Counter *n_fs_statfs_cached_;
   perf::Counter *n_fs_read_;
   perf::Counter *n_fs_readlink_;
   perf::Counter *n_fs_forget_;
+  perf::Counter *n_fs_inode_replace_;
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
+  perf::Counter *n_eio_total_;
+  perf::Counter *n_eio_01_;
+  perf::Counter *n_eio_02_;
+  perf::Counter *n_eio_03_;
+  perf::Counter *n_eio_04_;
+  perf::Counter *n_eio_05_;
+  perf::Counter *n_eio_06_;
+  perf::Counter *n_eio_07_;
+  perf::Counter *n_eio_08_;
   IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 
@@ -394,6 +423,39 @@ class FileSystem : SingleCopy, public BootFactory {
   bool has_custom_sqlitevfs_;
 };
 
+/**
+ * The StatfsCache class is a class purely designed as "struct" (= holding
+ * object for all its parameters).
+ * All its logic, including the locking mechanism, is implemented in the
+ * function cvmfs_statfs in cvmfs.cc
+ */
+class StatfsCache : SingleCopy {
+ public:
+  explicit StatfsCache(uint64_t cacheValid) : expiry_deadline_(0),
+                                     cache_timeout_(cacheValid) {
+    memset(&info_, 0, sizeof(info_));
+    lock_ =
+      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    int retval = pthread_mutex_init(lock_, NULL);
+    assert(retval == 0);
+  }
+  ~StatfsCache() {
+    pthread_mutex_destroy(lock_);
+    free(lock_);
+  }
+  uint64_t *expiry_deadline() { return &expiry_deadline_; }
+  const uint64_t cache_timeout() { return cache_timeout_; }
+  struct statvfs *info() { return &info_; }
+  pthread_mutex_t *lock() { return lock_; }
+
+ private:
+  pthread_mutex_t *lock_;
+  // Timestamp/deadline when the currently cached statvfs info_ becomes invalid
+  uint64_t expiry_deadline_;
+  // Time in seconds how long statvfs info_ should be cached
+  uint64_t cache_timeout_;
+  struct statvfs info_;
+};
 
 /**
  * A MountPoint provides a clip around all the different *Manager objects that
@@ -451,7 +513,8 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
   lru::Md5PathCache *md5path_cache() { return md5path_cache_; }
   std::string membership_req() { return membership_req_; }
-  glue::NentryTracker *nentry_tracker() { return nentry_tracker_; }
+  glue::DentryTracker *dentry_tracker() { return dentry_tracker_; }
+  glue::PageCacheTracker *page_cache_tracker() { return page_cache_tracker_; }
   lru::PathCache *path_cache() { return path_cache_; }
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
@@ -462,6 +525,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path() { return talk_socket_path_; }
   Tracer *tracer() { return tracer_; }
   cvmfs::Uuid *uuid() { return uuid_; }
+  StatfsCache *statfs_cache() { return statfs_cache_; }
 
   bool ReloadBlacklists();
 
@@ -564,8 +628,10 @@ class MountPoint : SingleCopy, public BootFactory {
   lru::Md5PathCache *md5path_cache_;
   Tracer *tracer_;
   glue::InodeTracker *inode_tracker_;
-  glue::NentryTracker *nentry_tracker_;
+  glue::DentryTracker *dentry_tracker_;
+  glue::PageCacheTracker *page_cache_tracker_;
   MagicXattrManager *magic_xattr_mgr_;
+  StatfsCache *statfs_cache_;
 
   file_watcher::FileWatcher* resolv_conf_watcher_;
 
