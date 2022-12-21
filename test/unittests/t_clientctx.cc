@@ -20,7 +20,7 @@ TEST(T_ClientCtx, GetInstance) {
 
   TestInterruptCue tic;
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Set(1, 2, 3, &tic);
+  ClientCtx::GetInstance()->Set(1, 2, 3, &tic, 4, 5);
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
   ClientCtx::CleanupInstance();
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
@@ -31,45 +31,57 @@ TEST(T_ClientCtx, GetSet) {
   uid_t uid;
   gid_t gid;
   pid_t pid;
+  uint64_t txn_id;
+  uint32_t txn_seq;
   InterruptCue *ic;
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
   EXPECT_EQ(uid_t(-1), uid);
   EXPECT_EQ(gid_t(-1), gid);
   EXPECT_EQ(pid_t(-1), pid);
+  EXPECT_EQ(0, txn_id);
+  EXPECT_EQ(0, txn_seq);
   EXPECT_EQ(NULL, ic);
 
   TestInterruptCue tic;
-  ClientCtx::GetInstance()->Set(1, 2, 3, &tic);
+  ClientCtx::GetInstance()->Set(1, 2, 3, &tic, 4, 5);
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_EQ(1U, uid);
   EXPECT_EQ(2U, gid);
   EXPECT_EQ(3, pid);
+  EXPECT_EQ(4, txn_id);
+  EXPECT_EQ(5, txn_seq);
   EXPECT_TRUE(ic->IsCanceled());
 
-  ClientCtx::GetInstance()->Set(5, 6, 7, &tic);
+  ClientCtx::GetInstance()->Set(5, 6, 7, &tic, 8, 9);
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_EQ(5U, uid);
   EXPECT_EQ(6U, gid);
   EXPECT_EQ(7, pid);
+  EXPECT_EQ(8, txn_id);
+  EXPECT_EQ(9, txn_seq);
   EXPECT_TRUE(ic->IsCanceled());
 
   ClientCtx::GetInstance()->Unset();
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_EQ(uid_t(-1), uid);
   EXPECT_EQ(gid_t(-1), gid);
   EXPECT_EQ(pid_t(-1), pid);
+  EXPECT_EQ(0, txn_id);
+  EXPECT_EQ(0, txn_seq);
   EXPECT_EQ(NULL, ic);
 
-  ClientCtx::GetInstance()->Set(10, 11, 12, &tic);
+  ClientCtx::GetInstance()->Set(10, 11, 12, &tic, 13, 14);
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_EQ(10U, uid);
   EXPECT_EQ(11U, gid);
   EXPECT_EQ(12, pid);
+  EXPECT_EQ(13, txn_id);
+  EXPECT_EQ(14, txn_seq);
   EXPECT_TRUE(ic->IsCanceled());
 
   ClientCtx::CleanupInstance();
@@ -79,37 +91,45 @@ TEST(T_ClientCtx, Guard) {
   uid_t uid;
   gid_t gid;
   pid_t pid;
+  uint64_t txn_id;
+  uint32_t txn_seq;
   InterruptCue *ic;
 
   {
     TestInterruptCue tic;
-    ClientCtxGuard guard(1, 2, 3, &tic);
+    ClientCtxGuard guard(1, 2, 3, &tic, 15, 16);
     EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-    ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+    ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
     EXPECT_EQ(1U, uid);
     EXPECT_EQ(2U, gid);
     EXPECT_EQ(3, pid);
+    EXPECT_EQ(15, txn_id);
+    EXPECT_EQ(16, txn_seq);
     EXPECT_TRUE(ic->IsCanceled());
   }
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
 
   InterruptCue default_ic;
-  ClientCtx::GetInstance()->Set(4, 5, 6, &default_ic);
+  ClientCtx::GetInstance()->Set(4, 5, 6, &default_ic, 11, 12);
   {
     TestInterruptCue tic;
-    ClientCtxGuard guard(7, 8, 9, &tic);
+    ClientCtxGuard guard(7, 8, 9, &tic, 13, 14);
     EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-    ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+    ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
     EXPECT_EQ(7U, uid);
     EXPECT_EQ(8U, gid);
     EXPECT_EQ(9, pid);
     EXPECT_TRUE(ic->IsCanceled());
+    EXPECT_EQ(13, txn_id);
+    EXPECT_EQ(14, txn_seq);
   }
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
-  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic);
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid, &ic, &txn_id, &txn_seq);
   EXPECT_EQ(4U, uid);
   EXPECT_EQ(5U, gid);
   EXPECT_EQ(6, pid);
+  EXPECT_EQ(11, txn_id);
+  EXPECT_EQ(12, txn_seq);
   EXPECT_FALSE(ic->IsCanceled());
 
   ClientCtx::CleanupInstance();
