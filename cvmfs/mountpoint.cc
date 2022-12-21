@@ -1767,6 +1767,7 @@ MountPoint::MountPoint(
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
   , talk_socket_gid_(0)
+  , curl_debug_logfile_(NULL)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
