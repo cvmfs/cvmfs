@@ -472,7 +472,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   void SetHTTPTracing(bool on) { enable_http_tracing_ = on; }
   bool GetHTTPTracing() { return enable_http_tracing_; }
-  void AddHTTPTracingHeader(std::string header)
+  void AddHTTPTracingHeader(const std::string &header)
        { http_tracing_headers_.push_back(header); }
 
  private:

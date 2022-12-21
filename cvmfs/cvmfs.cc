@@ -115,8 +115,7 @@
 #include "wpad.h"
 #include "xattr.h"
 
-#define TXN (cvmfs::mount_point_->download_mgr()->GetHTTPTracing() ? \
-                platform_monotonic_time_ns() : 0), 0
+#define TXN (true == cvmfs::mount_point_->download_mgr()->GetHTTPTracing() ? platform_monotonic_time_ns() : 0), 0 // NOLINT
 using namespace std;  // NOLINT
 
 namespace cvmfs {
