@@ -76,12 +76,8 @@ class ClientCtx {
  */
 class ClientCtxGuard {
  public:
-  ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid,
-                 InterruptCue *ic) {
-    ClientCtxGuard(uid, gid, pid, ic, 0 , 0);
-  }
-  ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid,
-                 InterruptCue *ic, uint64_t http_txn_id, uint32_t http_txn_seq)
+    ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid,
+          InterruptCue *ic, uint64_t http_txn_id = 0, uint32_t http_txn_seq = 0)
     : set_on_construction_(false)
     , old_uid_(-1)
     , old_gid_(-1)
