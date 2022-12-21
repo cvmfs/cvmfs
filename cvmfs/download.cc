@@ -848,6 +848,13 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   if (info->info_header) {
     header_lists_->AppendHeader(info->headers, info->info_header);
   }
+
+  vector<string>::iterator it;
+  for (it=info->http_tracing_headers.begin();
+       it != info->http_tracing_headers.end(); it++) {
+    header_lists_->AppendHeader(info->headers, it->c_str());
+  }
+
   if (info->force_nocache) {
     SetNocache(info);
   } else {
@@ -1570,6 +1577,8 @@ DownloadManager::DownloadManager() {
   credentials_attachment_ = NULL;
 
   counters_ = NULL;
+
+  enable_http_tracing_ = false;
 }
 
 
@@ -1754,6 +1763,20 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     EscapeHeader(*(info->extra_info), info->info_header + header_name_len,
                  header_size - header_name_len);
     info->info_header[header_size-1] = '\0';
+  }
+
+  info->http_tracing_headers = http_tracing_headers_;
+  if (enable_http_tracing_) {
+    char buf[100];
+    snprintf(buf, sizeof(buf), "X-CVMFS-PID: %u", info->pid);
+    info->http_tracing_headers.push_back(std::string(buf));
+    snprintf(buf, sizeof(buf), "X-CVMFS-GID: %u", info->gid);
+    info->http_tracing_headers.push_back(std::string(buf));
+    snprintf(buf, sizeof(buf), "X-CVMFS-UID: %u", info->uid);
+    info->http_tracing_headers.push_back(std::string(buf));
+    snprintf(buf, sizeof(buf), "X-CVMFS-ID: %lu.%06u",
+                   info->http_txn_id, info->http_txn_step);
+    info->http_tracing_headers.push_back(std::string(buf));
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {

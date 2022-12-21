@@ -178,6 +178,9 @@ struct JobInfo {
   // Allow byte ranges to be specified.
   off_t range_offset;
   off_t range_size;
+  std::vector<std::string> http_tracing_headers;
+  uint64_t http_txn_id;
+  uint32_t http_txn_step;
 
   // Default initialization of fields
   void Init() {
@@ -215,6 +218,10 @@ struct JobInfo {
     range_offset = -1;
     range_size = -1;
     http_code = -1;
+
+    std::vector<std::string> http_tracing_headers;
+    http_txn_id = 0;
+    http_txn_step = 0;
   }
 
   // One constructor per destination + head request
@@ -463,6 +470,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     return opt_ip_preference_;
   }
 
+  void SetHTTPTracing(bool on) { enable_http_tracing_ = on; }
+  bool GetHTTPTracing() { return enable_http_tracing_; }
+  void AddHTTPTracingHeader(std::string header)
+       { http_tracing_headers_.push_back(header); }
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -529,6 +541,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+  bool enable_http_tracing_;
+  std::vector<std::string> http_tracing_headers_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
