@@ -895,6 +895,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
   }
+  if (curl_debug_file_) {
+    curl_easy_setopt(handle, CURLOPT_STDERR, curl_debug_file_);
+    curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+  }
 }
 
 
@@ -1656,8 +1660,12 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
     kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
+  curl_debug_file_ = NULL;
 }
 
+void DownloadManager::SetCurlDebug(std::string f) {
+  curl_debug_file_ = fopen(f.c_str(), "w");
+}
 
 void DownloadManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
@@ -1671,6 +1679,8 @@ void DownloadManager::Fini() {
     close(pipe_jobs_[1]);
     close(pipe_jobs_[0]);
   }
+
+  if (curl_debug_file_) { fclose(curl_debug_file_); }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
        iEnd = pool_handles_idle_->end(); i != iEnd; ++i)
