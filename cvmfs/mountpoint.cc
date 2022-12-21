@@ -1455,6 +1455,10 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->ShardProxies();
   }
 
+  if (options_mgr_->GetValue("CVMFS_CURL_DEBUGLOG", &optarg)) {
+    download_mgr_->SetCurlDebug(optarg);
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
@@ -2113,6 +2117,10 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_CURL_DEBUGLOG", &optarg)) {
+    download_mgr_->SetCurlDebug(optarg);
+  }
 
   return true;
 }
