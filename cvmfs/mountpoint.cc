@@ -1246,6 +1246,17 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
 
   mountpoint->boot_status_ = loader::kFailOk;
+
+  std::string optarg;
+  if (options_mgr->GetValue("CVMFS_CURL_DEBUGLOG", &optarg)) {
+    mountpoint->curl_debug_logfile_ = fopen(optarg.c_str(), "w");
+    mountpoint->download_mgr_->SetCurlDebugFile(
+       mountpoint->curl_debug_logfile_);
+    mountpoint->external_download_mgr_->SetCurlDebugFile(
+       mountpoint->curl_debug_logfile_);
+  } else {
+    mountpoint->curl_debug_logfile_ = NULL;
+  }
   return mountpoint.Release();
 }
 
@@ -1394,10 +1405,6 @@ bool MountPoint::CreateDownloadManagers() {
   if (options_mgr_->GetValue("CVMFS_PROXY_SHARD", &optarg) &&
       options_mgr_->IsOn(optarg)) {
     download_mgr_->ShardProxies();
-  }
-
-  if (options_mgr_->GetValue("CVMFS_CURL_DEBUGLOG", &optarg)) {
-    download_mgr_->SetCurlDebug(optarg);
   }
 
   return SetupExternalDownloadMgr(do_geosort);
@@ -1809,6 +1816,11 @@ MountPoint::~MountPoint() {
   delete uuid_;
 
   delete statfs_cache_;
+
+  if (curl_debug_logfile_) {
+     fclose(curl_debug_logfile_);
+     curl_debug_logfile_ = NULL;
+  }
 }
 
 
@@ -1996,10 +2008,6 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
-
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_CURL_DEBUGLOG", &optarg)) {
-    download_mgr_->SetCurlDebug(optarg);
-  }
 
   return true;
 }

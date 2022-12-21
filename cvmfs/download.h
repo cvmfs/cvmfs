@@ -453,7 +453,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableInfoHeader();
   void EnableRedirects();
   void UseSystemCertificatePath();
-  void SetCurlDebug(const std::string debugfile);
+  void SetCurlDebugFile(FILE *f);
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();

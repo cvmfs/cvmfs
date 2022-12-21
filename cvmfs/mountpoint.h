@@ -597,7 +597,6 @@ class MountPoint : SingleCopy, public BootFactory {
   bool FetchHistory(std::string *history_path);
   std::string ReplaceHosts(std::string hosts);
   std::string GetUniqFileSuffix();
-
   std::string fqrn_;
   cvmfs::Uuid *uuid_;
   /**
@@ -650,6 +649,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path_;
   uid_t talk_socket_uid_;
   gid_t talk_socket_gid_;
+  FILE *curl_debug_logfile_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
