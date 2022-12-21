@@ -1756,6 +1756,7 @@ MountPoint::MountPoint(
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
   , talk_socket_gid_(0)
+  , close_chunk_fds_after_read_(false)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1826,6 +1827,11 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
 
 bool MountPoint::SetupBehavior() {
   string optarg;
+
+  if (options_mgr_->GetValue("CVMFS_CLOSE_CHUNK_FD_AFTER_READ", &optarg)) {
+    if (options_mgr_->IsOn(optarg)) {
+     close_chunk_fds_after_read_ = true;
+  }
 
   if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
     SetMaxTtlMn(String2Uint64(optarg));

@@ -504,6 +504,7 @@ class MountPoint : SingleCopy, public BootFactory {
   FileSystem *file_system() { return file_system_; }
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
+  bool close_chunk_fds_after_read() return close_chunk_fds_after_read_; }
   bool enforce_acls() { return enforce_acls_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
@@ -650,6 +651,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path_;
   uid_t talk_socket_uid_;
   gid_t talk_socket_gid_;
+  bool close_chunk_fds_after_read_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_

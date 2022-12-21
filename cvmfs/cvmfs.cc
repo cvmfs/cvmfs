@@ -1418,7 +1418,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
     catalog::DirectoryEntry dirent;
     bool found = GetDirentForInode(ino, &dirent);
-    if (found && dirent.IsExternalFile() && chunk_fd.fd != -1) {
+    if (found && dirent.IsExternalFile()
+        && chunk_fd.fd != -1
+        && cvmfs::mount_point_->close_chunk_fds_after_read()) {
       int tmpfd = chunk_fd.fd;
       chunk_fd.fd = -1;
       chunk_tables->Lock();
