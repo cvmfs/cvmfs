@@ -402,7 +402,7 @@ std::string SignatureManager::GetActivePubkeys() const {
 
 
 std::string SignatureManager::GetCertificate() const {
-  //only used in publishing pathway, no need to lock on lock_certificate_
+  // only used in publishing pathway, no need to lock on lock_certificate_
   if (!certificate_) return "";
 
   BIO *bp = BIO_new(BIO_s_mem());
