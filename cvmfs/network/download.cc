@@ -1578,8 +1578,8 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_debug_file_ = NULL;
 }
 
-void DownloadManager::SetCurlDebug(std::string f) {
-  curl_debug_file_ = fopen(f.c_str(), "w");
+void DownloadManager::SetCurlDebugFile(FILE *f) {
+  curl_debug_file_ = f;
 }
 
 void DownloadManager::Fini() {
@@ -1591,8 +1591,6 @@ void DownloadManager::Fini() {
     pipe_terminate_.Destroy();
     pipe_jobs_.Destroy();
   }
-
-  if (curl_debug_file_) { fclose(curl_debug_file_); }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
        iEnd = pool_handles_idle_->end(); i != iEnd; ++i)
