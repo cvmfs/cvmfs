@@ -1249,7 +1249,7 @@ MountPoint *MountPoint::Create(
 
   std::string optarg;
   if (options_mgr->GetValue("CVMFS_CURL_DEBUGLOG", &optarg)) {
-    mountpoint->curl_debug_logfile_ = fopen(optarg.c_str(), "w");
+    mountpoint->curl_debug_logfile_ = fopen(optarg.c_str(), "a");
     mountpoint->download_mgr_->SetCurlDebugFile(
        mountpoint->curl_debug_logfile_);
     mountpoint->external_download_mgr_->SetCurlDebugFile(
