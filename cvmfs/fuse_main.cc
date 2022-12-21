@@ -17,9 +17,9 @@
 #include <vector>
 
 #include "fuse_main.h"
-#include "logging.h"
-#include "platform.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/platform.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 using namespace stub; // NOLINT

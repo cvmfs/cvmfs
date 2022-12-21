@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
 #include "publish/cmd_util.h"
 #include "publish/except.h"
 #include "publish/repository.h"
 #include "publish/settings.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 #include "whitelist.h"
@@ -29,7 +29,7 @@ int CmdTransaction::Main(const Options &options) {
   std::string lease_path;
   if (!options.plain_args().empty()) {
     std::vector<std::string> tokens =
-      SplitString(options.plain_args()[0].value_str, '/', 2);
+      SplitStringBounded(2, options.plain_args()[0].value_str, '/');
     fqrn = tokens[0];
     if (tokens.size() == 2)
       lease_path = MakeCanonicalPath(tokens[1]);
@@ -93,12 +93,13 @@ int CmdTransaction::Main(const Options &options) {
                      EPublish::kFailWhitelistExpired);
     }
   } catch (const EPublish &e) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
     if (e.failure() == EPublish::kFailLayoutRevision ||
         e.failure() == EPublish::kFailWhitelistExpired)
     {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
       return EINVAL;
     }
+    return EIO;
   }
 
   double whitelist_valid_s =

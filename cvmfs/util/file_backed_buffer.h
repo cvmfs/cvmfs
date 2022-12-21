@@ -10,6 +10,7 @@
 #include <string>
 
 #include "gtest/gtest_prod.h"
+#include "util/export.h"
 #include "util/mmap_file.h"
 #include "util/single_copy.h"
 
@@ -33,7 +34,7 @@
  * 3. Commit
  * 4. Data/Read/ReadP, Rewind
  */
-class FileBackedBuffer : SingleCopy {
+class CVMFS_EXPORT FileBackedBuffer : SingleCopy {
   FRIEND_TEST(T_FileBackedBuffer, SimpleWriteAndRead);
   FRIEND_TEST(T_FileBackedBuffer, EmptyBuffer);
   FRIEND_TEST(T_FileBackedBuffer, EmptyWrite);

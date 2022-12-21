@@ -11,7 +11,7 @@
 
 #include <set>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "smallhash.h"
 
 /**

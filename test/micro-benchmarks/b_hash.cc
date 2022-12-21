@@ -7,7 +7,7 @@
 #include <cstring>
 
 #include "bm_util.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/string.h"
 
 class BM_Hash : public benchmark::Fixture {

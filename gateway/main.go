@@ -24,13 +24,13 @@ func main() {
 	}
 	gw.ConfigLogging(cfg)
 
-	gw.Log("main", gw.LogDebug).
+	gw.Log("main", gw.LogInfo).
 		Msgf("configuration read: %+v", cfg)
 
 	gw.Log("main", gw.LogInfo).
 		Msg("starting repository gateway")
 
-	services, err := be.StartBackend(cfg)
+	services, err := be.StartBackend(*cfg)
 	if err != nil {
 		gw.Log("main", gw.LogError).
 			Err(err).

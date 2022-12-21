@@ -13,14 +13,14 @@
 
 #include <stdint.h>
 
-#include "atomic.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_fuse.h"
-#include "hash.h"
-#include "logging.h"
 #include "lru.h"
-#include "murmur.hxx"
 #include "shortstring.h"
+#include "util/atomic.h"
+#include "util/logging.h"
+#include "util/murmur.hxx"
 
 
 namespace lru {

@@ -10,7 +10,7 @@
 
 namespace {
   RepositoryTag TestRepositoryTag() {
-    return RepositoryTag("tag_name", "trunk", "");
+    return RepositoryTag("tag_name", "");
   }
 }
 

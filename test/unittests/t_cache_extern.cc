@@ -23,9 +23,9 @@
 #include "cache_extern.h"
 #include "cache_plugin/channel.h"
 #include "cache_transport.h"
-#include "hash.h"
-#include "smalloc.h"
+#include "crypto/hash.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

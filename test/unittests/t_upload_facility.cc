@@ -8,9 +8,9 @@
 
 #include <cstdlib>
 
-#include "hash.h"
-#include "smalloc.h"
+#include "crypto/hash.h"
 #include "testutil.h"
+#include "util/smalloc.h"
 
 namespace upload {
 

@@ -12,7 +12,7 @@ class T_FuseInvalidator : public ::testing::Test {
  protected:
   virtual void SetUp() {
     invalidator_ =
-      new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
+      new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
     invalidator_->Spawn();
   }
 
@@ -22,19 +22,19 @@ class T_FuseInvalidator : public ::testing::Test {
 
  protected:
   glue::InodeTracker inode_tracker_;
-  glue::NentryTracker nentry_tracker_;
+  glue::DentryTracker dentry_tracker_;
   FuseInvalidator *invalidator_;
 };
 
 
 TEST_F(T_FuseInvalidator, StartStop) {
   FuseInvalidator *idle_invalidator =
-    new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
+    new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
   EXPECT_FALSE(idle_invalidator->spawned_);
   delete idle_invalidator;
 
   FuseInvalidator *noop_invalidator =
-    new FuseInvalidator(&inode_tracker_, &nentry_tracker_, NULL, true);
+    new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
   noop_invalidator->Spawn();
   EXPECT_TRUE(noop_invalidator->spawned_);
   EXPECT_GE(noop_invalidator->pipe_ctrl_[0], 0);
@@ -61,12 +61,14 @@ TEST_F(T_FuseInvalidator, InvalidateTimeout) {
 
 TEST_F(T_FuseInvalidator, InvalidateOps) {
   invalidator_->fuse_channel_or_session_ = reinterpret_cast<void **>(this);
-  inode_tracker_.VfsGet(1, PathString(""));
+  inode_tracker_.VfsGet(
+    glue::InodeEx(1, glue::InodeEx::kDirectory), PathString(""));
   for (unsigned i = 2; i <= 1024; ++i) {
-    inode_tracker_.VfsGet(i, PathString("/" + StringifyInt(i)));
+    inode_tracker_.VfsGet(glue::InodeEx(i, glue::InodeEx::kRegular),
+                          PathString("/" + StringifyInt(i)));
   }
   for (unsigned i = 0; i < 1024; ++i) {
-    nentry_tracker_.Add(i, "404", 100000);
+    dentry_tracker_.Add(i, "404", 100000);
   }
 
   FuseInvalidator::Handle handle(0);
@@ -88,7 +90,7 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   EXPECT_EQ(1024U, fuse_lowlevel_notify_inval_entry_cnt);
 
   for (unsigned i = 0; i < 1024; ++i) {
-    nentry_tracker_.Add(i, "404", 100000);
+    dentry_tracker_.Add(i, "404", 100000);
   }
   invalidator_->terminated_ = 1;
   handle2.Reset();

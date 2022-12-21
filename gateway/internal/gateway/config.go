@@ -1,9 +1,9 @@
 package gateway
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -14,10 +14,6 @@ type Config struct {
 	Port int `mapstructure:"port"`
 	// MaxLeaseTime is the maximum lease duration in seconds
 	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
-	// LeaseDB backend boltdb, sqlite, or etcd
-	LeaseDB string `mapstructure:"lease_db"`
-	// EtcdEndpoints is a list of etcd endpoint URLs
-	EtcdEndpoints []string `mapstructure:"etcd_endpoints"`
 	// LogLevel sets the logging level
 	LogLevel string `mapstructure:"log_level"`
 	// LogTimestamps enables timestamps in the logging output
@@ -41,9 +37,6 @@ func ReadConfig() (*Config, error) {
 	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
 	pflag.Int("port", 4929, "HTTP frontend port")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
-	pflag.String("lease_db", "boltdb", "lease DB backend to use: boltdb, sqlite, or etcd (default boltdb)")
-	pflag.Bool("use_etcd", false, "use etcd as a consistent data store for lease information (for gateway clustering)")
-	pflag.StringSlice("etcd_endpoints", []string{}, "etcd cluster endpoints (for gateway clustering)")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
 	pflag.Int("num_receivers", 1, "number of parallel cvmfs_receiver processes to run")
@@ -58,7 +51,7 @@ func ReadConfig() (*Config, error) {
 
 	var conf Config
 	if err := viper.Unmarshal(&conf); err != nil {
-		return nil, errors.Wrap(err, "could not populate configuration object")
+		return nil, fmt.Errorf("could not populate configuration object: %w", err)
 	}
 
 	// max_lease_time is given in seconds in the config file or at the command line
@@ -76,7 +69,7 @@ func ReadConfig() (*Config, error) {
 	v1 := viper.Sub("receiver_config")
 	if v1 != nil {
 		if err := v1.Unmarshal(&sc1); err != nil {
-			return nil, errors.Wrap(err, "could not load receiver config")
+			return nil, fmt.Errorf("could not load receiver config: %w", err)
 		}
 		if !pflag.CommandLine.Changed("num_receivers") {
 			conf.NumReceivers = sc1.Size
@@ -89,7 +82,7 @@ func ReadConfig() (*Config, error) {
 	v2 := viper.Sub("receiver_worker_config")
 	if v2 != nil {
 		if err := v2.Unmarshal(&sc2); err != nil {
-			return nil, errors.Wrap(err, "could not load receiver config")
+			return nil, fmt.Errorf("could not load receiver config: %w", err)
 		}
 		if !pflag.CommandLine.Changed("receiver_path") {
 			conf.ReceiverPath = sc2.Executable

@@ -17,13 +17,13 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "catalog.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
-#include "hash.h"
-#include "logging.h"
 #include "statistics.h"
+#include "util/atomic.h"
+#include "util/logging.h"
 
 class XattrList;
 
@@ -31,15 +31,15 @@ namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
 
-/**
- * Lookup a directory entry including its parent entry or not.
- */
-enum LookupOptions {
-  kLookupSole        = 0x01,
-  // kLookupFull        = 0x02  not used anymore
-  kLookupRawSymlink  = 0x10,
-};
 
+/**
+ * LookupOption for a directory entry (bitmask).
+ * kLookupDefault = Look solely at the given directory entry (parent is ignored)
+ * kLookupRawSymlink = Don't resolve environment variables in symlink targets
+ */
+typedef unsigned LookupOptions;
+const unsigned kLookupDefault = 0b1;
+const unsigned kLookupRawSymlink = 0b10;
 
 /**
  * Results upon loading a catalog file.
@@ -201,7 +201,8 @@ class AbstractCatalogManager : public SingleCopy {
   }
 
   catalog::Counters LookupCounters(const PathString &path,
-                                   std::string *subcatalog_path);
+                                   std::string *subcatalog_path,
+                                   shash::Any *hash);
 
  protected:
   /**

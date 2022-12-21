@@ -1292,7 +1292,11 @@ cvmfs_config_fuser() {
   fi
   [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
 
-  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
+  local skip_afs_opt=
+  if [ -d /afs ]; then
+    skip_afs_opt="-e /afs"
+  fi
+  lsof $skip_afs_opt | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
 }
 
 cvmfs_umount() {
@@ -1316,7 +1320,11 @@ cvmfs_umount() {
       RETVAL=1
       if [ "x$silent" = "x" ]; then
         echo "Failed!"
-        $fuser -m -a -v $m
+        if [ "$sys_arch" = "Linux" ]; then
+          $fuser -m -a -v $m
+        else
+          $fuser -u -c $m
+        fi
       fi
     else
       [ "x$silent" != "x" ] || echo "OK"
@@ -1481,7 +1489,7 @@ cvmfs_bugreport() {
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
    echo "Please attach this file to your problem description and send it as a"
-   echo "JIRA bug report to https://sft.its.cern.ch/jira/browse/CVM"
+   echo "bug report to https://github.com/cvmfs/cvmfs/issues"
 }
 
 

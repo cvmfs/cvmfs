@@ -15,9 +15,9 @@
 
 #include "catalog_mgr.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
-#include "hash.h"
-#include "logging.h"
+#include "util/logging.h"
 
 
 using namespace std;  // NOLINT
@@ -59,7 +59,7 @@ void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(string path) {
   XattrList xattr;
   DirectoryEntry parent;
   bool retval;
-  retval = catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
+  retval = catalog_mgr_->LookupPath(PathString(path), kLookupDefault, &parent);
   assert(retval);
   DirectoryEntryBase cvmfscatalog =
       MakeEmptyDirectoryEntryBase(".cvmfscatalog", parent.uid(),

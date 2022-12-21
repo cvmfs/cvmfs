@@ -1,9 +1,11 @@
 
 cvmfs_test_name="Ingest tarball to various subdirectories in the repository"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 produce_tarball() {
   local tarball_name=$1
+  local script_location=$2
 
   mkdir tarball_foo
   mkdir -p tarball_foo/a/b/c
@@ -229,6 +231,10 @@ cvmfs_run_test() {
   if [ $file_size -eq 5120 ]; then
     echo "*** It compare well"
   fi
+
+  echo "*** ingesting empty tarball with nested catalog"
+  cat $script_location/layer.tar | cvmfs_server ingest --base_dir layer -c --tar_file - $CVMFS_TEST_REPO || return 42
+  ls /cvmfs/$CVMFS_TEST_REPO/layer/.cvmfscatalog || return 42
 
   return 0
 }

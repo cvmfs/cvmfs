@@ -40,11 +40,9 @@
 #include "catalog_mgr_rw.h"
 #include "catalog_virtual.h"
 #include "download.h"
-#include "logging.h"
 #include "manifest.h"
 #include "monitor.h"
 #include "path_filters/dirtab.h"
-#include "platform.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "statistics.h"
@@ -54,6 +52,8 @@
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -451,7 +451,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // a new directory and thus not in any catalog yet.
     catalog::DirectoryEntry dirent;
     const bool lookup_success = catalog_manager->LookupPath(
-        candidate_rel, catalog::kLookupSole, &dirent);
+        candidate_rel, catalog::kLookupDefault, &dirent);
     if (!lookup_success) {
       LogCvmfs(kLogCatalog, kLogDebug,
                "Didn't find '%s' in catalogs, could "
@@ -717,10 +717,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('D') != args.end()) {
     params.repo_tag.SetName(*args.find('D')->second);
-  }
-
-  if (args.find('G') != args.end()) {
-    params.repo_tag.SetChannel(*args.find('G')->second);
   }
 
   if (args.find('J') != args.end()) {

@@ -9,12 +9,12 @@
 #include <vector>
 
 #include "cache_posix.h"
+#include "crypto/signature.h"
 #include "download.h"
 #include "fetch.h"
 #include "manifest.h"
 #include "mountpoint.h"
 #include "quota.h"
-#include "signature.h"
 #include "statistics.h"
 #include "util/posix.h"
 #include "util/string.h"

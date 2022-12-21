@@ -1,9 +1,83 @@
+2.11.0:
+  * Improve logging of I/O errors (#2941)
+  * [gw] Store publisher hostname in lease (#3130)
+  * Make CVMFS_ARCH env available for variant symlinks (#3127, CVM-910)
+  * Improve file reset logic on download retries (#3085)
+  * Add user.external_url extended attribute (#3101)
+  * Change libcvmfs static library to libcvmfs_client shared library (#3113)
+  * Add HTTPS support for connecting to gateway (#3060)
+  * Add CVMFS_WORLD_READABLE client option (#3012)
+  * Let client depend on cvmfs-libs (#3107)
+  * Bump libcurl to version 7.86.0 (#3093)
+  * Gracefully handle CURLE_SEND_ERROR in download manager (#2925)
+  * Add CVMFS_STATFS_CACHE_TIMEOUT parameter to cache statfs results (#3015)
+  * Restrict ShortString overflow counters to debug mode (#3081)
+  * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
+
+2.10.1:
+  * Restore ability of cvmfs_server abort -f to survive invalid lease (#3088)
+  * Ignore /afs in cvmfs_config fuser (#3090)
+  * Fix building leveldb external with non-GNU patch (#3110)
+  * [rpm] Fix python build requirements (#2986)
+
 2.10.0:
-  * Updating GeoAPI to Python 3 (PR #2829)
-  * cvmfs-release: use 20.04 fallback packages on Ubuntu >= 20.04 (PR #2828)
-  * Proxy sharding support (PR #2812)
+  * [server] Ignore size of directories in snapshot diff output
+  * [server] Remove partial support for "channels" from manifest (#2838)
+  * [server] Fix counting of open file descriptors
+  * [ducc] Support images with OCI manifest (#2851)
+  * [server] Fix ingestion (with catalog) of empty tarfile (#3055)
+  * [client] Gracefully handle open, changing files (CVM-2001)
+  * [ducc] Add support for container registry proxies through
+    DUCC_<REGISTRY_NAME>_PROXY (#2893)
+  * Add catalog hash to catalog_counters xattr (#2900)
+  * Fix fuse callback latency measurement (#3025)
+  * [server] Use libressl crypto on server
+  * Bump libressl to version 3.5.3
+  * Fix compile warnings for cxx17 (#3014)
+  * Add cvmfs-libs package containing libcvmfs_util, libcvmfs_crypto
+  * [server] Work around openssl signature issues on EL9 (#2990)
+  * [client] Diagnose errors due to changing file type (#2834)
+  * [server] Catch unexpected errors in transaction command (#3004)
+  * [server] Avoid double-slash URLs in HTTP HEAD requests (#2989)
+  * Cancel network fail-over cycle when fuse request is canceled (#2983)
+  * Update c-ares to version 1.18.1 (#2977)
+  * [gw] Remove too strict repository name check (#2973)
+  * Fix minor memory leak during reload (#2976)
+  * Fix race in the startup of the shared cache manager in debug mode (#2910)
+  * Fix creation of stratum 1 from https stratum 0 (#2974)
+  * Update sqlite to version 3.38.2
+  * [rpm] Add /var/log/cvmfs to cvmfs-server including SELinux label (CVM-2070)
+  * Improve use of page cache (#2879)
+  * Updated Pacparser to version 1.3.8 and fixes for macOS > 10.15 (#2963)
+  * Add OS version to meta.json (PR #2863)
+  * Change default magic xattr visibility to "rootonly"
+  * Add support for sharding proxies support with new client option
+    CVMFS_PROXY_SHARD={yes|no} (CVM-2060)
+
+2.9.4:
+  * Fix packaging on Ubuntu 22.04 (#2987)
+
+2.9.3:
+  * Fix releasing of GC lock (#2982)
+  * Improve robustness of link between watchdog and fuse module (#2971)
+
+2.9.2:
+  * GO 1.18 is bundled as an external depedency, facilitating building on
+    older platforms (#2867)
 
 2.9.1:
+  * Fix build for CentOS Stream 9 (#2862)
+  * Improve error reporting in watchdog process (#2859)
+  * Fix potential use-after-free error in swissknife check (#2860)
+  * Fix conflict in commandline arguments of cvmfs_ducc (#2853)
+  * Running cvmfs_server check -a and gc -a is now mutually exclusive
+    (CVM-2043)
+  * Enable external monitoring of geodb updates, add the CVMFS_GEO_AUTO_UPDATE
+    option (CVM-1857)
+  * Ignore trailing path after repo name in `cvmfs_server abort` (CVM-2055)
+  * New option to list magic xattrs on root node only (CVM-2058)
+  * Fix integrity check for external chunked files (CVM-2050)
+  * Fix for GeoAPI and Python3 (CVM-2052)
   * Fix initialization of upstream type in cvmfs_server ingest (#2816)
   * Fix bug where trailing slash in base dir crashes tarball ingest (CVM-2044)
 

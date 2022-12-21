@@ -258,6 +258,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
     void SetKeepAlive(bool value);
 
     bool has_lease() const { return has_lease_; }
+    std::string token_path() const { return settings_.token_path; }
 
    private:
     Settings settings_;
@@ -291,7 +292,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   /**
    * Automatically exit the ephemeral shell after abort or commit.
-   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI class. 
+   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI class.
    * We should move at least the core functionality to libcvmfs_server and this includes
    * the ExitShell() method.
    */

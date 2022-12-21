@@ -10,8 +10,8 @@
 
 #include "compression.h"
 #include "history_sqlite.h"
-#include "prng.h"
 #include "testutil.h"
+#include "util/prng.h"
 
 using history::History;
 using history::SqliteHistory;
@@ -176,7 +176,6 @@ class T_History : public ::testing::Test {
   History::Tag GetDummyTag(
         const std::string            &name      = "foobar",
         const uint64_t                revision  = 42,
-        const History::UpdateChannel  channel   = History::kChannelTest,
         const time_t                  timestamp = 1492266893) const {
       shash::Any root_hash(shash::kSha1);
       root_hash.Randomize();
@@ -187,7 +186,6 @@ class T_History : public ::testing::Test {
       dummy.size        = 1337;
       dummy.revision    = revision;
       dummy.timestamp   = timestamp;
-      dummy.channel     = channel;
       dummy.description = "This is just a small dummy";
 
       return dummy;
@@ -206,7 +204,6 @@ class T_History : public ::testing::Test {
       dummy.size        = prng_.Next(1024);
       dummy.revision    = i;
       dummy.timestamp   = 1492266893;
-      dummy.channel     = History::kChannelDevel;
       dummy.description = "This is just a small dummy with number " +
                           StringifyInt(i);
 
@@ -281,7 +278,6 @@ class T_History : public ::testing::Test {
            (lhs.size        == rhs.size)        &&
            (lhs.revision    == rhs.revision)    &&
            (lhs.timestamp   == rhs.timestamp)   &&
-           (lhs.channel     == rhs.channel)     &&
            (lhs.description == rhs.description) &&
            (lhs.branch      == rhs.branch);
   }
@@ -292,7 +288,6 @@ class T_History : public ::testing::Test {
     EXPECT_EQ(lhs.size,        rhs.size);
     EXPECT_EQ(lhs.revision,    rhs.revision);
     EXPECT_EQ(lhs.timestamp,   rhs.timestamp);
-    EXPECT_EQ(lhs.channel,     rhs.channel);
     EXPECT_EQ(lhs.description, rhs.description);
     EXPECT_EQ(lhs.branch,      rhs.branch);
   }
@@ -744,78 +739,6 @@ TYPED_TEST(T_History, RemoveTagsWithReOpen) {
 }
 
 
-TYPED_TEST(T_History, GetChannelTips) {
-  typedef typename TestFixture::TagVector TagVector;
-  typedef TestFixture                     TF;
-
-  const std::string hp = TestFixture::GetHistoryFilename();
-  History *history1 = TestFixture::CreateHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history1);
-  EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
-
-  history1->BeginTransaction();
-  const History::Tag trunk_tip =
-    TF::GetDummyTag("zap", 4, History::kChannelTrunk);
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("foo", 1, History::kChannelTrunk)));
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("bar", 2, History::kChannelTrunk)));
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("baz", 3, History::kChannelTrunk)));
-  ASSERT_TRUE(history1->Insert(trunk_tip));
-
-  const History::Tag test_tip =
-    TF::GetDummyTag("yolo",   6, History::kChannelTest);
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("moep", 3, History::kChannelTest)));
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("lol", 4, History::kChannelTest)));
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("cheers", 5, History::kChannelTest)));
-  ASSERT_TRUE(history1->Insert(test_tip));
-  history1->CommitTransaction();
-
-  TagVector tags;
-  ASSERT_TRUE(history1->Tips(&tags));
-  EXPECT_EQ(2u, tags.size());
-
-  TagVector expected;  // TODO(rmeusel): C++11 initializer lists
-  expected.push_back(trunk_tip);
-  expected.push_back(test_tip);
-  EXPECT_TRUE(TestFixture::CheckListing(tags, expected));
-
-  history1->BeginTransaction();
-  const History::Tag prod_tip =
-    TF::GetDummyTag("prod", 10, History::kChannelProd);
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("vers", 3, History::kChannelProd)));
-  ASSERT_TRUE(history1->Insert(
-    TF::GetDummyTag("bug",  6, History::kChannelProd)));
-  ASSERT_TRUE(history1->Insert(prod_tip));
-  history1->CommitTransaction();
-
-  tags.clear();
-  ASSERT_TRUE(history1->Tips(&tags));
-  EXPECT_EQ(3u, tags.size());
-
-  expected.push_back(prod_tip);
-  EXPECT_TRUE(TestFixture::CheckListing(tags, expected));
-
-  TestFixture::CloseHistory(history1);
-
-  History *history2 = TestFixture::OpenHistory(hp);
-  ASSERT_NE(static_cast<History*>(NULL), history2);
-  EXPECT_EQ(TestFixture::fqrn, history2->fqrn());
-
-  tags.clear();
-  ASSERT_TRUE(history2->Tips(&tags));
-  EXPECT_EQ(3u, tags.size());
-  EXPECT_TRUE(TestFixture::CheckListing(tags, expected));
-
-  TestFixture::CloseHistory(history2);
-}
-
-
 TYPED_TEST(T_History, GetHashes) {
   typedef typename TestFixture::TagVector            TagVector;
   typedef typename TagVector::const_iterator         TagVectorItr;
@@ -923,12 +846,11 @@ TYPED_TEST(T_History, GetTagByDate) {
   ASSERT_NE(static_cast<History*>(NULL), history);
   EXPECT_EQ(TestFixture::fqrn, history->fqrn());
 
-  const History::UpdateChannel c = History::kChannelTest;
-  const History::Tag t3010 = TestFixture::GetDummyTag("f5", 1, c, 1414690911);
-  const History::Tag t3110 = TestFixture::GetDummyTag("f4", 2, c, 1414777311);
-  const History::Tag t0111 = TestFixture::GetDummyTag("f3", 3, c, 1414863711);
-  const History::Tag t0211 = TestFixture::GetDummyTag("f2", 4, c, 1414950111);
-  const History::Tag t0311 = TestFixture::GetDummyTag("f1", 5, c, 1415036511);
+  const History::Tag t3010 = TestFixture::GetDummyTag("f5", 1, 1414690911);
+  const History::Tag t3110 = TestFixture::GetDummyTag("f4", 2, 1414777311);
+  const History::Tag t0111 = TestFixture::GetDummyTag("f3", 3, 1414863711);
+  const History::Tag t0211 = TestFixture::GetDummyTag("f2", 4, 1414950111);
+  const History::Tag t0311 = TestFixture::GetDummyTag("f1", 5, 1415036511);
 
   history->BeginTransaction();
   ASSERT_TRUE(history->Insert(t0311));
@@ -968,21 +890,14 @@ TYPED_TEST(T_History, RollbackToOldTag) {
   ASSERT_NE(static_cast<History*>(NULL), history1);
   EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
 
-  const History::UpdateChannel c_test = History::kChannelTest;
-  const History::UpdateChannel c_prod = History::kChannelProd;
-
   ASSERT_TRUE(history1->BeginTransaction());
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",            1, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",            2, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("first_release",  3, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep_duplicate", 4, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",            5, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("second_release", 6, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("third_release",  7, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("rofl",           8, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("also_rofl",      8, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("forth_release",  9, c_prod)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",            1)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",            2)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep_duplicate", 4)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",            5)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("rofl",           8)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("also_rofl",      8)));
   ASSERT_TRUE(history1->CommitTransaction());
 
   TestFixture::CloseHistory(history1);
@@ -1018,12 +933,8 @@ TYPED_TEST(T_History, RollbackToOldTag) {
 
   EXPECT_TRUE(history2->Exists("foo"));
   EXPECT_TRUE(history2->Exists("bar"));
-  EXPECT_TRUE(history2->Exists("first_release"));
   EXPECT_TRUE(history2->Exists("moep"));
   EXPECT_TRUE(history2->Exists("moep_duplicate"));
-  EXPECT_TRUE(history2->Exists("second_release"));
-  EXPECT_TRUE(history2->Exists("third_release"));
-  EXPECT_TRUE(history2->Exists("forth_release"));
   EXPECT_FALSE(history2->Exists("lol"));
   EXPECT_FALSE(history2->Exists("rofl"));
   EXPECT_FALSE(history2->Exists("also_rofl"));
@@ -1050,12 +961,8 @@ TYPED_TEST(T_History, RollbackToOldTag) {
 
   EXPECT_TRUE(history3->Exists("foo"));
   EXPECT_TRUE(history3->Exists("bar"));
-  EXPECT_TRUE(history3->Exists("first_release"));
   EXPECT_TRUE(history3->Exists("moep"));
   EXPECT_TRUE(history3->Exists("moep_duplicate"));
-  EXPECT_TRUE(history3->Exists("second_release"));
-  EXPECT_TRUE(history3->Exists("third_release"));
-  EXPECT_TRUE(history3->Exists("forth_release"));
   EXPECT_FALSE(history3->Exists("lol"));
   EXPECT_FALSE(history3->Exists("rofl"));
   EXPECT_FALSE(history3->Exists("also_rofl"));
@@ -1073,22 +980,15 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   ASSERT_NE(static_cast<History*>(NULL), history1);
   EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
 
-  const History::UpdateChannel c_test = History::kChannelTest;
-  const History::UpdateChannel c_prod = History::kChannelProd;
-
   ASSERT_TRUE(history1->BeginTransaction());
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",            1, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",            2, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("first_release",  3, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("test_release",   3, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep_duplicate", 4, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",            5, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("second_release", 6, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("third_release",  7, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("rofl",           8, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("also_rofl",      8, c_test)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("forth_release",  9, c_prod)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",            1)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",            2)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("test_release",   3)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep_duplicate", 4)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",            5)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("rofl",           8)));
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("also_rofl",      8)));
   ASSERT_TRUE(history1->CommitTransaction());
 
   TagVector gone;
@@ -1107,13 +1007,6 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   gone.clear();
   EXPECT_FALSE(history1->ListTagsAffectedByRollback("unobtainium", &gone));
   EXPECT_TRUE(gone.empty());
-
-  gone.clear();
-  EXPECT_TRUE(history1->ListTagsAffectedByRollback("second_release", &gone));
-  ASSERT_EQ(3u, gone.size());
-  EXPECT_EQ("forth_release",  gone[0].name); EXPECT_EQ(9u, gone[0].revision);
-  EXPECT_EQ("third_release",  gone[1].name); EXPECT_EQ(7u, gone[1].revision);
-  EXPECT_EQ("second_release", gone[2].name); EXPECT_EQ(6u, gone[2].revision);
 
   gone.clear();
   EXPECT_TRUE(history1->ListTagsAffectedByRollback("bar", &gone));
@@ -1136,11 +1029,6 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   EXPECT_EQ("test_release",   gone[5].name); EXPECT_EQ(3u, gone[5].revision);
   EXPECT_EQ("bar",            gone[6].name); EXPECT_EQ(2u, gone[6].revision);
 
-  gone.clear();
-  EXPECT_TRUE(history1->ListTagsAffectedByRollback("forth_release", &gone));
-  ASSERT_EQ(1u, gone.size());
-  EXPECT_EQ("forth_release", gone[0].name); EXPECT_EQ(9u, gone[0].revision);
-
   TestFixture::CloseHistory(history1);
 }
 
@@ -1160,7 +1048,6 @@ TYPED_TEST(T_History, EmptyRecycleBin) {
       shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
       shash::kSuffixCatalog);
   dummy_foo.revision  = 1;
-  dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
   EXPECT_EQ(1u, history1->GetNumberOfTags());
 
@@ -1191,7 +1078,6 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
       shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
       shash::kSuffixCatalog);
   dummy_foo.revision  = 1;
-  dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
 
   History::Tag dummy_bar;
@@ -1201,7 +1087,6 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
       shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
       shash::kSuffixCatalog);
   dummy_bar.revision  = 2;
-  dummy_bar.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_bar));
 
   History::Tag dummy_baz;
@@ -1211,7 +1096,6 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
       shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
       shash::kSuffixCatalog);
   dummy_baz.revision  = 3;
-  dummy_baz.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_baz));
   EXPECT_TRUE(history1->CommitTransaction());
 
@@ -1308,7 +1192,6 @@ TYPED_TEST(T_History, InsertBranchedTags) {
       shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
       shash::kSuffixCatalog);
   tag_foo.revision = 1;
-  tag_foo.channel = History::kChannelTest;
   EXPECT_TRUE(history1->Insert(tag_foo));
 
   History::Tag tag_bar;
@@ -1318,7 +1201,6 @@ TYPED_TEST(T_History, InsertBranchedTags) {
       shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
       shash::kSuffixCatalog);
   tag_bar.revision = 2;
-  tag_bar.channel = History::kChannelTest;
   tag_bar.branch = "br1";
   EXPECT_TRUE(history1->Insert(tag_bar));
 
@@ -1329,7 +1211,6 @@ TYPED_TEST(T_History, InsertBranchedTags) {
       shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
       shash::kSuffixCatalog);
   tag_invalid.revision = 2;
-  tag_invalid.channel = History::kChannelTest;
   tag_invalid.branch = "brX";
   EXPECT_FALSE(history1->Insert(tag_invalid));
 
@@ -1381,7 +1262,6 @@ TYPED_TEST(T_History, PruneBranches) {
       shash::HexPtr("0000000000000000000000000000000000000001"),
       shash::kSuffixCatalog);
   tag_foo.revision = 1;
-  tag_foo.channel = History::kChannelTest;
   EXPECT_TRUE(history1->Insert(tag_foo));
 
   History::Tag tag_bar;
@@ -1391,7 +1271,6 @@ TYPED_TEST(T_History, PruneBranches) {
       shash::HexPtr("0000000000000000000000000000000000000002"),
       shash::kSuffixCatalog);
   tag_bar.revision = 2;
-  tag_bar.channel = History::kChannelTest;
   tag_bar.branch = "br2";
   EXPECT_TRUE(history1->Insert(tag_bar));
 
@@ -1402,7 +1281,6 @@ TYPED_TEST(T_History, PruneBranches) {
       shash::HexPtr("0000000000000000000000000000000000000003"),
       shash::kSuffixCatalog);
   tag_baz.revision = 2;
-  tag_baz.channel = History::kChannelTest;
   tag_baz.branch = "br3";
   EXPECT_TRUE(history1->Insert(tag_baz));
 
@@ -1413,7 +1291,6 @@ TYPED_TEST(T_History, PruneBranches) {
       shash::HexPtr("0000000000000000000000000000000000000004"),
       shash::kSuffixCatalog);
   tag_baz_deep.revision = 3;
-  tag_baz_deep.channel = History::kChannelTest;
   tag_baz_deep.branch = "br3_1_1";
   EXPECT_TRUE(history1->Insert(tag_baz_deep));
 
@@ -1456,7 +1333,6 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
   EXPECT_EQ(0u,                                            trunk.size);
   EXPECT_EQ(1u,                                            trunk.revision);
   EXPECT_EQ(1403013589,                                    trunk.timestamp);
-  EXPECT_EQ(History::kChannelTrunk,                        trunk.channel);
   EXPECT_EQ("",                                            trunk.branch);
 
   std::vector<History::Tag> tags;
@@ -1496,7 +1372,6 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
   EXPECT_EQ(14336u,                                        trunk_p.size);
   EXPECT_EQ(2u,                                            trunk_p.revision);
   EXPECT_EQ(1416826665,                                    trunk_p.timestamp);
-  EXPECT_EQ(History::kChannelTrunk,                        trunk_p.channel);
   EXPECT_EQ("",                                            trunk_p.branch);
 
   std::vector<History::Tag> tags;
@@ -1538,7 +1413,6 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision2) {
   EXPECT_EQ(56131584u,                                     trunk_p.size);
   EXPECT_EQ(2170u,                                         trunk_p.revision);
   EXPECT_EQ(1492264898,                                    trunk_p.timestamp);
-  EXPECT_EQ(History::kChannelTrunk,                        trunk_p.channel);
   EXPECT_EQ("",                                            trunk_p.branch);
 
   std::vector<History::Tag> tags;

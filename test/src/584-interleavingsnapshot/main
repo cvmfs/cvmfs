@@ -2,24 +2,6 @@
 cvmfs_test_name="Interleaving Stratum1 Snapshot Behaviour"
 cvmfs_test_autofs_on_startup=false
 
-
-create_fake_lock() {
-  local name=$1
-  local pid=${2:-$$} # use our own PID by default to fool the stale lock check
-
-  load_repo_config $name
-
-  echo "creating ${CVMFS_SPOOL_DIR}/is_updating.lock with PID $pid"
-  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_updating.lock
-}
-
-remove_fake_lock() {
-  local name=$1
-  load_repo_config $name
-  echo "removing ${CVMFS_SPOOL_DIR}/is_updating.lock"
-  rm -f ${CVMFS_SPOOL_DIR}/is_updating.lock
-}
-
 check_lock() {
   local name=$1
   load_repo_config $name
@@ -72,10 +54,14 @@ count_fetched_catalogs() {
 
 
 CVMFS_TEST_584_REPLICA_NAME=""
+CVMFS_TEST584_KILLPID=
 cleanup() {
   echo "running cleanup()"
   if [ ! -z $CVMFS_TEST_584_REPLICA_NAME ]; then
     sudo cvmfs_server rmfs -f $CVMFS_TEST_584_REPLICA_NAME
+  fi
+  if [ ! -z $CVMFS_TEST584_KILLPID ]; then
+    kill $CVMFS_TEST584_KILLPID
   fi
 }
 
@@ -106,7 +92,8 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "*** {1} fake a running snapshot"
-  create_fake_lock $replica_name || return 2
+  lockfile /var/spool/cvmfs/$replica_name/is_updating.lock || return 2
+  CVMFS_TEST584_KILLPID=$!
 
   echo "*** {1} create an initial snapshot (should immediately fail)"
   local snapshot_log_1="snapshot_1.log"
@@ -129,7 +116,9 @@ cvmfs_run_test() {
   cat $snapshot_log_2 | grep 'another .*in progress.*abort' || return 7
 
   echo "*** {1} remove faked lock"
-  remove_fake_lock $replica_name || return 8
+  kill $CVMFS_TEST584_KILLPID
+  CVMFS_TEST584_KILLPID=
+  rm -f /var/spool/cvmfs/$replica_name/is_updating.lock
 
   # ============================================================================
 
@@ -188,7 +177,8 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "*** {4} create a fake lock"
-  create_fake_lock $replica_name || return 16
+  lockfile /var/spool/cvmfs/$replica_name/is_updating.lock || return 16
+  CVMFS_TEST584_KILLPID=$!
 
   echo "*** {4} try to snapshot (should hang forever)"
   local snapshot_log_4="snapshot_4.log"
@@ -211,7 +201,9 @@ cvmfs_run_test() {
   cat $snapshot_log_2 | grep 'another .*in progress.*abort' || return 22
 
   echo "*** {4} remove the fake log"
-  remove_fake_lock $replica_name || return 23
+  kill $CVMFS_TEST584_KILLPID
+  CVMFS_TEST584_KILLPID=
+  rm -f /var/spool/cvmfs/$replica_name/is_updating.lock
 
   # ============================================================================
 
@@ -280,7 +272,7 @@ sh -x /usr/bin/cvmfs_server snapshot $replica_name 2>&1|(sleep 20;cat)
   # ============================================================================
 
   echo "*** {6} place a fake lock that is stale"
-  create_fake_lock $replica_name 3282168345613 || return 39
+  touch /var/spool/cvmfs/$replica_name/is_updating.lock || return 39
 
   echo "*** {6} create a snapshot (should work - despite the stale lock)"
   local snapshot_log_9="snapshot_9.log"

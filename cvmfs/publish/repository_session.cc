@@ -13,14 +13,15 @@
 
 #include "backoff.h"
 #include "catalog_mgr_ro.h"
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "duplex_curl.h"
 #include "gateway_util.h"
-#include "hash.h"
 #include "json_document.h"
-#include "logging.h"
 #include "publish/except.h"
+#include "ssl.h"
 #include "upload.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -76,10 +77,14 @@ static void MakeAcquireRequest(
 
   const std::string payload = "{\"path\" : \"" + repo_path +
                               "\", \"api_version\" : \"" +
-                              StringifyInt(gateway::APIVersion()) + "\"}";
+                              StringifyInt(gateway::APIVersion()) + "\", " +
+                              "\"hostname\" : \"" + GetHostname() + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), payload, &hmac);
+  SslCertificateStore cs;
+  cs.UseSystemCertificatePath();
+  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +
@@ -122,6 +127,9 @@ static void MakeDropRequest(
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), session_token, &hmac);
+  SslCertificateStore cs;
+  cs.UseSystemCertificatePath();
+  cs.ApplySslCertificatePath(h_curl);
 
   const std::string header_str =
     std::string("Authorization: ") + key.id() + " " +
@@ -221,7 +229,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
-      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error from gateway: '%s'",
                (reason != NULL) ? reason->string_value : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
@@ -348,7 +356,8 @@ void Publisher::Session::Drop() {
       break;
     case kLeaseReplyFailure:
     default:
-      throw EPublish("cannot drop request reply", EPublish::kFailLeaseBody);
+      throw EPublish("gateway doesn't recognize the lease or cannot drop it",
+                     EPublish::kFailLeaseBody);
   }
 }
 

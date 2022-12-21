@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "hash.h"
+#include "crypto/hash.h"
 #include "util/single_copy.h"
 
 /**

@@ -22,18 +22,18 @@
 #include <set>
 #include <string>
 
-#include "atomic.h"
 #include "cache.pb.h"
-#include "hash.h"
-#include "logging.h"
-#ifdef __APPLE__
-#include "smalloc.h"
-#endif
+#include "crypto/hash.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#ifdef __APPLE__
+#include "util/smalloc.h"
+#endif
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

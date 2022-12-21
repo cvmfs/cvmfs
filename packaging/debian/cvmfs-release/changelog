@@ -1,3 +1,10 @@
+cvmfs-release (4.0-1) lucid; urgency=low
+
+  * Add Ubuntu 22.04 "jammy" platform
+  * Change apt repository base URLs to S3 mirror
+
+ -- Jakob Blomer <jblomer@cern.ch>  Mon, 04 Jul 2022 23:35:00 +0200
+
 cvmfs-release (3.3-1) lucid; urgency=low
 
   * Add Debian 11 "bullseye" platform

@@ -11,11 +11,11 @@
 #include <cassert>
 
 #include "authz/authz_session.h"
+#include "crypto/openssl_version.h"
 #include "duplex_curl.h"
-#include "duplex_ssl.h"
-#include "logging.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
 #include "util/pointer.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

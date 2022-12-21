@@ -11,10 +11,10 @@
 #include <cassert>
 
 #include "catalog_mgr.h"
-#include "logging.h"
-#include "platform.h"
-#include "smalloc.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
+#include "util/platform.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

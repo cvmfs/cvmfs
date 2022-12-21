@@ -50,20 +50,21 @@
 #include <set>
 #include <utility>
 
-#include "atomic.h"
 #include "compression.h"
+#include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "hash.h"
-#include "logging.h"
-#include "prng.h"
+#include "interrupt.h"
 #include "sanitizer.h"
-#include "smalloc.h"
 #include "ssl.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/prng.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -1323,6 +1324,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_WRITE_ERROR:
       // Error set by callback
       break;
+    case CURLE_SEND_ERROR:
+      // The curl error CURLE_SEND_ERROR can be seen when a cache is misbehaving
+      // and closing connections before the http request send is completed.
+      // Handle this error, treating it as a short transfer error.
+      info->error_code = (info->proxy == "DIRECT") ?
+        kFailHostShortTransfer : kFailProxyShortTransfer;
+      break;
     default:
       LogCvmfs(kLogDownload, kLogSyslogErr, "unexpected curl error (%d) while "
                "trying to fetch %s", curl_error, info->url->c_str());
@@ -1404,16 +1412,20 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->destination_mem.size = 0;
       info->destination_mem.pos = 0;
     }
+    if (info->interrupt_cue && info->interrupt_cue->IsCanceled()) {
+      info->error_code = kFailCanceled;
+      goto verify_and_finalize_stop;
+    }
     if ((info->destination == kDestinationFile) ||
         (info->destination == kDestinationPath))
     {
       if ((fflush(info->destination_file) != 0) ||
+          (fseek(info->destination_file, 0, SEEK_SET) != 0) ||
           (ftruncate(fileno(info->destination_file), 0) != 0))
       {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
       }
-      rewind(info->destination_file);
     }
     if (info->destination == kDestinationSink) {
       if (info->destination_sink->Reset() != 0) {

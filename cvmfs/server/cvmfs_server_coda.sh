@@ -9,6 +9,7 @@
 #   per-repo in replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
+CVMFS_GEO_AUTO_UPDATE=true # Automatically update from cvmfs_server snapshot
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=14 # Minimum days between update attempts
@@ -21,6 +22,10 @@ CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
 LATEST_JSON_INFO_SCHEMA=1
+
+# Should we publish CVMFS and OS versions in meta.json?
+# Set to any non-true string to turn off this feature.
+CVMFS_PUBLISH_VERSIONS_IN_META_FILE=true
 
 if [ -f /etc/cvmfs/server.local ]; then
   if [ -r /etc/cvmfs/server.local ]; then

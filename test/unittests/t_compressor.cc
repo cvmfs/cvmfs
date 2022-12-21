@@ -6,8 +6,8 @@
 
 
 #include "compression.h"
-#include "smalloc.h"
 #include "util/pointer.h"
+#include "util/smalloc.h"
 
 // TODO(jblomer): typed tests
 

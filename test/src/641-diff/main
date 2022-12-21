@@ -80,7 +80,7 @@ S D 1
 S N 1
 M[N] D /dir2
 A F /dir2/.cvmfscatalog +0
-A D /dir3 +4096
+A D /dir3
 A F /dir3/new_file +0
 A F /dir3/.cvmfscatalog +0
 M[SC] F /file
@@ -101,7 +101,7 @@ S D -1
 S N -1
 M[N] D /dir2
 R F /dir2/.cvmfscatalog -0
-R D /dir3 -4096
+R D /dir3
 M[SC] F /file
 A S /symlink +4
 M[SMLC] SF /directory/foo

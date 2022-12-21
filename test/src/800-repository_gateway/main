@@ -38,6 +38,12 @@ cvmfs_run_test() {
     echo "***  Starting transaction 1"
     cvmfs_server transaction test.repo.org || return 20
 
+    echo "*** Checking lease database"
+    local hostname_lease=$(curl http://localhost:4929/api/v1/leases | jq -r '.data | .["test.repo.org/"].hostname')
+    echo "  Hostname from lease DB: $hostname_lease"
+    echo "  Hostname from env: $HOSTNAME"
+    [ x"$hostname_lease" = x"$HOSTNAME" ] || return 21
+
     echo "  Writing to a new file"
     echo "test" >> /cvmfs/test.repo.org/new_file.txt || return 21
 
@@ -202,6 +208,15 @@ cvmfs_run_test() {
     echo "  Publishing changes 10"
     cvmfs_server publish test.repo.org || return 101
     cvmfs_server check -i test.repo.org || return 102
+
+    ## Transactions 11 and 12 (Abort command should use repository name and ignore trailing path)
+    echo "***  Starting transaction 11"
+    cvmfs_server transaction test.repo.org/path || return 112
+    cvmfs_server abort -f test.repo.org || return 113
+
+    echo "***  Starting transaction 12"
+    cvmfs_server transaction test.repo.org/path || return 114
+    cvmfs_server abort -f test.repo.org/path || return 115
 
     echo "  Verify the contents of the repository"
     compare_file_checksum /cvmfs/test.repo.org/new/c/another_file_trailing.txt \

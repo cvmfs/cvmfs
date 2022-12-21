@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "atomic.h"
+#include "util/atomic.h"
 #include "util/string.h"
 
 typedef std::vector< std::pair<std::string, std::string> > HTTPHeaderList;

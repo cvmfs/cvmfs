@@ -7,8 +7,8 @@
 #include <limits>
 #include <vector>
 
-#include "smalloc.h"
 #include "util/pointer.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

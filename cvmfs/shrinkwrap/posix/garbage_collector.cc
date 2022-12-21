@@ -5,16 +5,18 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <stdio.h>
+
+#include <cstdio>
+#include <cstring>
 
 #include <map>
 #include <string>
 
 #include "helpers.h"
-#include "logging.h"
 #include "shrinkwrap/fs_traversal.h"
-#include "smalloc.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 /**
  * Initializes garbage collection by setting up the corresponding hash map

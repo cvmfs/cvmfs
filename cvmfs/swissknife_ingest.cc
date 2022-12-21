@@ -8,7 +8,6 @@
 #include <unistd.h>
 
 #include "catalog_virtual.h"
-#include "logging.h"
 #include "manifest.h"
 #include "statistics.h"
 #include "statistics_database.h"
@@ -16,6 +15,7 @@
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_tarball.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 

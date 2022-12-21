@@ -5,7 +5,7 @@
 #include "cvmfs_config.h"
 #include "sql.h"
 
-#include "logging.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT

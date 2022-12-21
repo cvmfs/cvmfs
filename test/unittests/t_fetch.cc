@@ -7,14 +7,14 @@
 #include <fcntl.h>
 #include <pthread.h>
 
-#include "atomic.h"
 #include "backoff.h"
 #include "cache_posix.h"
+#include "crypto/hash.h"
 #include "download.h"
 #include "fetch.h"
-#include "hash.h"
 #include "statistics.h"
 #include "testutil.h"
+#include "util/atomic.h"
 
 using namespace std;  // NOLINT
 

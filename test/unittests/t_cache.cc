@@ -16,11 +16,11 @@
 
 #include "cache_posix.h"
 #include "compression.h"
-#include "hash.h"
-#include "platform.h"
+#include "crypto/hash.h"
 #include "quota.h"
-#include "smalloc.h"
 #include "testutil.h"
+#include "util/platform.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

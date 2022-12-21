@@ -15,11 +15,11 @@
 #include <cstring>
 
 #include "glue_buffer.h"
-#include "logging.h"
-#include "platform.h"
 #include "shortstring.h"
-#include "smalloc.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -67,11 +67,11 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
-  glue::NentryTracker *nentry_tracker,
+  glue::DentryTracker *dentry_tracker,
   void **fuse_channel_or_session,
   bool fuse_notify_invalidation)
   : inode_tracker_(inode_tracker)
-  , nentry_tracker_(nentry_tracker)
+  , dentry_tracker_(dentry_tracker)
   , fuse_channel_or_session_(fuse_channel_or_session)
   , spawned_(false)
 {
@@ -100,17 +100,60 @@ void FuseInvalidator::InvalidateInodes(Handle *handle) {
   WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
 }
 
+void FuseInvalidator::InvalidateDentry(
+  uint64_t parent_ino, const NameString &name)
+{
+  char c = 'D';
+  WritePipe(pipe_ctrl_[1], &c, 1);
+  WritePipe(pipe_ctrl_[1], &parent_ino, sizeof(parent_ino));
+  unsigned len = name.GetLength();
+  WritePipe(pipe_ctrl_[1], &len, sizeof(len));
+  WritePipe(pipe_ctrl_[1], name.GetChars(), len);
+}
+
 
 void *FuseInvalidator::MainInvalidator(void *data) {
   FuseInvalidator *invalidator = reinterpret_cast<FuseInvalidator *>(data);
   LogCvmfs(kLogCvmfs, kLogDebug, "starting dentry invalidator thread");
 
+  bool reported_missing_inval_support = false;
   char c;
   Handle *handle;
   while (true) {
     ReadPipe(invalidator->pipe_ctrl_[0], &c, 1);
     if (c == 'Q')
       break;
+
+    if (c == 'D') {
+      uint64_t parent_ino;
+      unsigned len;
+      ReadPipe(invalidator->pipe_ctrl_[0], &parent_ino, sizeof(parent_ino));
+      ReadPipe(invalidator->pipe_ctrl_[0], &len, sizeof(len));
+      char *name = static_cast<char *>(smalloc(len + 1));
+      ReadPipe(invalidator->pipe_ctrl_[0], name, len);
+      name[len] = '\0';
+      if (invalidator->fuse_channel_or_session_ == NULL) {
+        if (!reported_missing_inval_support) {
+          LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+                   "missing fuse support for dentry invalidation (%d/%s)",
+                   parent_ino, name);
+          reported_missing_inval_support = true;
+        }
+        free(name);
+        continue;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
+               parent_ino, name);
+#if CVMFS_USE_LIBFUSE == 2
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
+        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+#else
+      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
+        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+#endif
+      free(name);
+      continue;
+    }
 
     assert(c == 'I');
     ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
@@ -176,16 +219,18 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       }
     }
 
-    // Do the nentry tracker last to increase the effectiveness of pruning
-    invalidator->nentry_tracker_->Prune();
-    // Copy and empty the nentry tracker in a single atomic operation
-    glue::NentryTracker *nentries_copy = invalidator->nentry_tracker_->Move();
-    glue::NentryTracker::Cursor nentry_cursor = nentries_copy->BeginEnumerate();
+    // Do the dentry tracker last to increase the effectiveness of pruning
+    invalidator->dentry_tracker_->Prune();
+    // Copy and empty the dentry tracker in a single atomic operation
+    glue::DentryTracker *dentries_copy = invalidator->dentry_tracker_->Move();
+    glue::DentryTracker::Cursor dentry_cursor = dentries_copy->BeginEnumerate();
     uint64_t entry_parent;
     NameString entry_name;
     i = 0;
-    while (nentries_copy->NextEntry(&nentry_cursor, &entry_parent, &entry_name))
+    while (dentries_copy->NextEntry(&dentry_cursor, &entry_parent, &entry_name))
     {
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %d --> %s",
+               entry_parent, entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
 #if CVMFS_USE_LIBFUSE == 2
       fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
@@ -204,8 +249,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         }
       }
     }
-    nentries_copy->EndEnumerate(&nentry_cursor);
-    delete nentries_copy;
+    dentries_copy->EndEnumerate(&dentry_cursor);
+    delete dentries_copy;
 
     handle->SetDone();
     invalidator->evict_list_.Clear();

@@ -1,11 +1,23 @@
 
 cvmfs_test_name="External data"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 is_external_file() {
   local full_file_path="$1"
   [ x"$(attr -qg external_file "$full_file_path")" = x"1" ]
 }
+
+has_correct_external_url() {
+  cvmfs_mntpnt=${1}
+  external_base=${2}
+  filename=${3}
+
+  local cvmfs_fullpath=$cvmfs_mntpnt/$filename
+  local external_fullpath=$external_base/$filename
+
+  [ x"$(attr -qg external_url "$cvmfs_fullpath")" = x"$external_fullpath" ]
+} 
 
 get_content_hash() {
   local full_file_path="$1"
@@ -18,9 +30,12 @@ get_chunk_count() {
 }
 
 CVMFS_TEST_615_HTTP_PID=
+CVMFS_TEST_615_REPLICA_NAME=
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_615_HTTP_PID ] || sudo kill $CVMFS_TEST_615_HTTP_PID
+  [ -z $CVMFS_TEST_615_REPLICA_NAME ] || \
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_615_REPLICA_NAME > /dev/null 2>&1
 }
 
 cvmfs_run_test() {
@@ -156,6 +171,10 @@ cvmfs_run_test() {
     echo "Chunk count is $chunk_count"
     return 28
   fi
+  if ! has_correct_external_url ${cvmfs_mnt} $external_http_base chunked_file ; then
+    echo "External URL of chunked file points to the wrong place."
+    return 29
+  fi
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -204,8 +223,22 @@ cvmfs_run_test() {
 
   ##############################################################################
 
-  # This part has to be second last
+  echo "*** Create snapshot of repository with external data"
+  CVMFS_TEST_615_REPLICA_NAME="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  create_stratum1 $CVMFS_TEST_615_REPLICA_NAME          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 110
+  sudo cvmfs_server snapshot $CVMFS_TEST_615_REPLICA_NAME || return 111
+  echo "*** Check integrity of replica"
+  check_repository $CVMFS_TEST_615_REPLICA_NAME -i || return 112
 
+
+  ##############################################################################
+
+  # This part has to be second last
+  
+  echo "*** Cleanup: Remove files"
   start_transaction $CVMFS_TEST_REPO || return $?
   is_external_file ${cvmfs_mnt}/external/file || return 90
   is_external_file ${cvmfs_mnt}/chunked_file || return 90

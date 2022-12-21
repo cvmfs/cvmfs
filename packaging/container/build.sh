@@ -66,11 +66,15 @@ while [ $libs_missing -eq 1 ]; do
   for f in $(find ${CVMFS_RESULT_LOCATION}/rootfs/usr -type f); do
     libs=
     if ldd $f >/dev/null 2>&1; then
+      # ldd may not find dependencies between cvmfs' own libraries in the
+      # rootfs directory
       echo "[DEP] $f"
-      libs="$(ldd $f | awk '{print $3}' | grep -v 0x | grep -v '^$' || true)"
+      libs="$(ldd $f | grep -v "not found" | awk '{print $3}' | grep -v 0x | \
+              grep -v '^$' || true)"
       echo "  --> $(echo $libs | tr \n ' ')"
     fi
     if [ -z "$libs" ]; then
+      echo "[CHECK] $f"
       echo "  --> empty list of dependencies, skipping"
       continue
     fi

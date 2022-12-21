@@ -8,11 +8,11 @@
 
 #include <limits>
 
-#include "encrypt.h"
+#include "crypto/encrypt.h"
 #include "json.h"
 #include "json_document.h"
-#include "logging.h"
-#include "platform.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/string.h"
 

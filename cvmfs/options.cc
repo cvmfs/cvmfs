@@ -18,9 +18,9 @@
 #include <cstdlib>
 #include <utility>
 
-#include "logging.h"
 #include "sanitizer.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -410,6 +410,13 @@ bool OptionsManager::IsOn(const std::string &param_value) const {
   const string uppercase = ToUpper(param_value);
   return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1") ||
           (uppercase == "TRUE"));
+}
+
+
+bool OptionsManager::IsOff(const std::string &param_value) const {
+  const string uppercase = ToUpper(param_value);
+  return ((uppercase == "NO") || (uppercase == "OFF") || (uppercase == "0") ||
+          (uppercase == "FALSE"));
 }
 
 

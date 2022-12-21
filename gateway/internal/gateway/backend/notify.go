@@ -1,16 +1,11 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path"
 	"sync"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
-	"github.com/pkg/errors"
-	bolt "go.etcd.io/bbolt"
 )
 
 // NotificationMessage is an alias for a UTF-8 string
@@ -25,45 +20,25 @@ type SubscriberSet map[SubscriberHandle]struct{}
 // SubscriberMap holds a set of subscriber handles for each repository
 type SubscriberMap map[string]SubscriberSet
 
+type NotificationStore map[string]NotificationMessage
+
 // NotificationSystem encapsulates the functionality of the repository
 // activity notification system
 type NotificationSystem struct {
 	Subscribers    SubscriberMap
 	SubscriberLock sync.RWMutex
-	WorkDir        string
-	Store          *bolt.DB
+	Store          NotificationStore
 }
 
 // NewNotificationSystem is a constructor function for the NotificationSystem type
 func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
-	workDir = path.Join(workDir, "notify")
-	if err := os.MkdirAll(workDir, 0777); err != nil {
-		return nil, errors.Wrap(err, "could not create directory for backing store")
-	}
-	store, err := bolt.Open(workDir+"/messages.db", 0666, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not open backing store")
-	}
-
-	// Create a bucket in the backing store to hold the last message published for
-	// each repository
-	store.Update(func(txn *bolt.Tx) error {
-		_, err := txn.CreateBucketIfNotExists([]byte("last_message"))
-		if err != nil {
-			return errors.Wrap(err, "could not create bucket: 'last_message'")
-		}
-
-		return nil
-	})
-
 	gw.Log("notify", gw.LogInfo).
 		Msgf("database opened (work dir: %v)", workDir)
 
 	ns := &NotificationSystem{
 		Subscribers:    make(SubscriberMap),
 		SubscriberLock: sync.RWMutex{},
-		WorkDir:        workDir,
-		Store:          store,
+		Store:          make(NotificationStore),
 	}
 
 	return ns, nil
@@ -71,30 +46,17 @@ func NewNotificationSystem(workDir string) (*NotificationSystem, error) {
 
 // Publish a new repository manifest to the notification system
 func (ns *NotificationSystem) Publish(
-	ctx context.Context, repository string, message []byte) error {
+	ctx context.Context, repository string, message NotificationMessage) {
 
-	shouldNotify := false
-	ns.Store.Update(func(txn *bolt.Tx) error {
-		existing := getLastMessage(txn, repository)
-		if existing == nil || !bytes.Equal(message, existing) {
-			if err := setMessage(txn, repository, message); err != nil {
-				return err
-			}
-			shouldNotify = true
-		}
-
-		return nil
-	})
-
-	if shouldNotify {
+	existing := ns.getMessage(repository)
+	if existing == "" || message != existing {
+		ns.setMessage(repository, message)
 		ns.notify(repository, message)
 	}
 
 	gw.LogC(ctx, "notify", gw.LogDebug).
 		Str("repository", repository).
 		Msg("manifest published")
-
-	return nil
 }
 
 // Subscribe the handle to messages for the given repository
@@ -121,13 +83,9 @@ func (ns *NotificationSystem) Subscribe(
 	}()
 
 	if added {
-		message := make([]byte, 0)
-		ns.Store.View(func(txn *bolt.Tx) error {
-			message = getLastMessage(txn, repository)
-			return nil
-		})
+		message := ns.getMessage(repository)
 
-		if message != nil {
+		if message != "" {
 			ns.notify(repository, message)
 		}
 
@@ -163,23 +121,21 @@ func (ns *NotificationSystem) Unsubscribe(
 	return nil
 }
 
-func (ns *NotificationSystem) notify(repository string, message []byte) {
+func (ns *NotificationSystem) notify(repository string, message NotificationMessage) {
 	ns.SubscriberLock.RLock()
 	defer ns.SubscriberLock.RUnlock()
 	subsForRepo, present := ns.Subscribers[repository]
 	if present {
 		for s := range subsForRepo {
-			s <- NotificationMessage(message)
+			s <- message
 		}
 	}
 }
 
-func getLastMessage(txn *bolt.Tx, repository string) []byte {
-	b := txn.Bucket([]byte("last_message"))
-	return b.Get([]byte(repository))
+func (ns *NotificationSystem) getMessage(repository string) NotificationMessage {
+	return ns.Store[repository]
 }
 
-func setMessage(txn *bolt.Tx, repository string, message []byte) error {
-	b := txn.Bucket([]byte("last_message"))
-	return b.Put([]byte(repository), message)
+func (ns *NotificationSystem) setMessage(repository string, message NotificationMessage) {
+	ns.Store[repository] = message
 }

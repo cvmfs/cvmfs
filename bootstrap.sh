@@ -2,10 +2,11 @@
 
 set -e
 
-SSL_VERSION=3.1.2
-CARES_VERSION=1.16.1
-CURL_VERSION=7.71.1
-PACPARSER_VERSION=1.3.5
+SSL_VERSION=3.5.3
+CRYPTO_VERSION=3.5.3
+CARES_VERSION=1.18.1
+CURL_VERSION=7.86.0
+PACPARSER_VERSION=1.3.8
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -15,6 +16,7 @@ MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
+GO_VERSION=1.18
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -34,6 +36,7 @@ echo "Bootstrap - Externals build location: $EXTERNALS_BUILD_LOCATION"
 echo "Bootstrap - Externals install location: $EXTERNALS_INSTALL_LOCATION"
 echo "Bootstrap - Base CVMFS C flags: $CVMFS_BASE_C_FLAGS"
 echo "Bootstrap - Base CVMFS C++ flags: $CVMFS_BASE_CXX_FLAGS"
+echo "Bootstrap - 64bit: $IS_64_BIT"
 
 externals_lib_dir=$EXTERNALS_LIB_LOCATION
 externals_build_dir=$EXTERNALS_BUILD_LOCATION
@@ -71,6 +74,23 @@ do_extract() {
     tar xvfz "$library_dir/$library_archive"
   fi
   mv $library_decompressed_dir $dest_dir
+  cd $cdir
+  cp -r $library_dir/src/* $dest_dir
+}
+
+do_extract_go() {
+  local library_name="$1"
+  local library_archive="$2"
+
+  local library_dir="$externals_lib_dir/$library_name"
+  local dest_dir=$(get_destination_dir $library_name)
+  local cdir=$(pwd)
+
+  print_hint "Extracting $library_archive"
+
+  cd $externals_build_dir
+  tar xvf "$library_dir/$library_archive"
+  mv go $dest_dir
   cd $cdir
   cp -r $library_dir/src/* $dest_dir
 }
@@ -146,15 +166,17 @@ build_lib() {
       do_extract "c-ares" "c-ares-${CARES_VERSION}.tar.gz"
       do_build "c-ares"
 
-      do_extract "libcurl" "curl-${CURL_VERSION}.tar.gz"
+      do_extract "libcurl" "curl-${CURL_VERSION}.tar.bz2"
       patch_external "libcurl" "reenable_poll_darwin.patch"
       do_build "libcurl"
       ;;
+    libcrypto)
+      do_extract "libcrypto" "libressl-${CRYPTO_VERSION}.tar.gz"
+      do_build "libcrypto"
+      ;;
     pacparser)
-      do_extract "pacparser"    "pacparser-${PACPARSER_VERSION}.tar.gz"
-      patch_external "pacparser"   "fix_find_proxy_ex.patch" \
-                                   "fix_cflags.patch"        \
-                                   "fix_python.patch"
+      do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
+      patch_external "pacparser" "fix_cflags.patch"
       do_build "pacparser"
       ;;
     zlib)
@@ -195,6 +217,7 @@ build_lib() {
       ;;
     protobuf)
       do_extract "protobuf"     "protobuf-${PROTOBUF_VERSION}.tar.bz2"
+      patch_external "protobuf" "fix-iterator-cxx17.patch"
       do_build "protobuf"
       ;;
     googlebench)
@@ -212,10 +235,6 @@ build_lib() {
       patch_external "vjson"       "missing_include.patch"
       do_build "vjson"
       ;;
-    sha2)
-      do_copy "sha2"
-      do_build "sha2"
-      ;;
     sha3)
       do_copy "sha3"
       do_build "sha3"
@@ -228,7 +247,14 @@ build_lib() {
       ;;
     libarchive)
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
+      patch_external "libarchive" "fix-new-glibc.patch"
       do_build "libarchive"
+      ;;
+    go)
+      if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+        do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
+        do_build "go"
+      fi
       ;;
     *)
       echo "Unknown library name. Exiting."
@@ -240,7 +266,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha2 sha3 libarchive"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive go"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi

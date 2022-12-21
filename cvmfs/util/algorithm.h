@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
-#include "murmur.hxx"
-// TODO(jblomer): should be also part of algorithm
-#include "platform.h"
-#include "prng.h"
+#include "util/atomic.h"
+#include "util/export.h"
+#include "util/murmur.hxx"
+#include "util/platform.h"
+#include "util/prng.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -23,7 +23,23 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 
-double DiffTimeSeconds(struct timeval start, struct timeval end);
+CVMFS_EXPORT double DiffTimeSeconds(struct timeval start, struct timeval end);
+
+// Bitfield manipulation for different integer types T
+template <typename T>
+inline void SetBit(unsigned int bit, T *field) {
+  *field |= static_cast<T>(1) << bit;
+}
+
+template <typename T>
+inline void ClearBit(unsigned int bit, T *field) {
+  *field &= ~(static_cast<T>(1) << bit);
+}
+
+template <typename T>
+inline bool TestBit(unsigned int bit, const T field) {
+  return field & (static_cast<T>(1) << bit);
+}
 
 
 /**
@@ -92,7 +108,7 @@ struct hash_murmur {
  * watch.Stop();
  * printf("%f", watch.GetTime());
  */
-class StopWatch : SingleCopy {
+class CVMFS_EXPORT StopWatch : SingleCopy {
  public:
   StopWatch() : running_(false) {}
 
@@ -121,13 +137,13 @@ class StopWatch : SingleCopy {
  * hist.PrintLog2Histogram();
  */
 
-class Log2Histogram {
+class CVMFS_EXPORT Log2Histogram {
 friend class UTLog2Histogram;
 
  public:
   explicit Log2Histogram(unsigned int nbins);
 
-  void Add(unsigned int value) {
+  void Add(uint64_t value) {
     unsigned int i;
     const unsigned int n = this->bins_.size() - 1;
 
@@ -173,13 +189,13 @@ friend class UTLog2Histogram;
  * UTLog2Histogram class is a helper for the unit tests
  * to extract internals from Log2Histogram.
  */
-class UTLog2Histogram {
+class CVMFS_EXPORT UTLog2Histogram {
  public:
   std::vector<atomic_int32> GetBins(const Log2Histogram &h);
 };
 
 
-class HighPrecisionTimer : SingleCopy {
+class CVMFS_EXPORT HighPrecisionTimer : SingleCopy {
  public:
   static bool g_is_enabled;  // false by default
 

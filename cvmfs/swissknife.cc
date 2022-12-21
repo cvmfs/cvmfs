@@ -14,9 +14,9 @@
 #include <cassert>
 #include <vector>
 
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "util/logging.h"
 
 using namespace std;  // NOLINT
 

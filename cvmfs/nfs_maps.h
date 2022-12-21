@@ -14,8 +14,8 @@
 
 #include <string>
 
-#include "logging.h"
 #include "shortstring.h"
+#include "util/logging.h"
 #include "util/single_copy.h"
 
 class NfsMaps : SingleCopy {

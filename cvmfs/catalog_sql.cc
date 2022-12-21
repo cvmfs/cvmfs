@@ -10,7 +10,7 @@
 
 #include "catalog.h"
 #include "globals.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "xattr.h"
 
@@ -748,6 +748,14 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.symlink_.Assign(symlink, strlen(symlink));
   if (expand_symlink && !g_raw_symlinks)
     ExpandSymlink(&result.symlink_);
+
+  if (g_world_readable) {
+    if (S_ISDIR(result.mode_)) {
+       result.mode_ |= 0555;
+    } else {
+       result.mode_ |= 0444;
+    }
+  }
 
   return result;
 }

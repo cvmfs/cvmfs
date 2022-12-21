@@ -24,15 +24,15 @@
 #include <vector>
 
 #include "cache_plugin/libcvmfs_cache.h"
-#include "logging.h"
 #include "lru.h"
 #include "malloc_heap.h"
-#include "murmur.hxx"
-#include "platform.h"
 #include "smallhash.h"
-#include "smalloc.h"
+#include "util/concurrency.h"
+#include "util/logging.h"
+#include "util/murmur.hxx"
+#include "util/platform.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 

@@ -8,13 +8,13 @@
 #include <string>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/task.h"
 #include "ingestion/tube.h"
 #include "upload_spooler_result.h"
-#include "util_concurrency.h"
+#include "util/concurrency.h"
 
 namespace upload {
 class AbstractUploader;

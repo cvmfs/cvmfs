@@ -141,7 +141,9 @@ class SymlinkMagicXattr : public BaseMagicXattr {
  */
 class MagicXattrManager : public SingleCopy {
  public:
-  MagicXattrManager(MountPoint *mountpoint, bool hide_magic_xattrs);
+  enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
+
+  MagicXattrManager(MountPoint *mountpoint, EVisibility visibility);
   /// The returned BaseMagicXattr* is supposed to be wrapped by a
   /// MagicXattrRAIIWrapper
   BaseMagicXattr* GetLocked(const std::string &name, PathString path,
@@ -149,12 +151,12 @@ class MagicXattrManager : public SingleCopy {
   std::string GetListString(catalog::DirectoryEntry *dirent);
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
 
-  bool hide_magic_xattrs() { return hide_magic_xattrs_; }
+  EVisibility visibility() { return visibility_; }
 
  protected:
   std::map<std::string, BaseMagicXattr *> xattr_list_;
   MountPoint *mount_point_;
-  bool hide_magic_xattrs_;
+  EVisibility visibility_;
 };
 
 class AuthzMagicXattr : public BaseMagicXattr {
@@ -165,6 +167,7 @@ class AuthzMagicXattr : public BaseMagicXattr {
 
 class CatalogCountersMagicXattr : public BaseMagicXattr {
   std::string subcatalog_path_;
+  shash::Any hash_;
   catalog::Counters counters_;
 
   virtual bool PrepareValueFenced();
@@ -357,6 +360,11 @@ class UsedDirPMagicXattr : public BaseMagicXattr {
 };
 
 class VersionMagicXattr : public BaseMagicXattr {
+  virtual std::string GetValue();
+};
+
+class ExternalURLMagicXattr : public BaseMagicXattr {
+  virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
 

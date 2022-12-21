@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "util/export.h"
+
 /**
  * RAII based temporary directory helper class
  *
@@ -16,7 +18,7 @@
  * The temporary directory is created using the given prefix string
  * ("prefix.<UNIQUE_SUFFIX>")
  */
-class RaiiTempDir {
+class CVMFS_EXPORT RaiiTempDir {
  public:
   static RaiiTempDir* Create(const std::string& prefix);
 

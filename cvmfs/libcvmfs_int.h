@@ -23,6 +23,7 @@
 #include "backoff.h"
 #include "catalog_mgr.h"
 #include "file_chunk.h"
+#include "interrupt.h"
 #include "loader.h"
 #include "lru.h"
 #include "mountpoint.h"
@@ -69,11 +70,6 @@ class LibGlobals : SingleCopy {
  private:
   LibGlobals();
   ~LibGlobals();
-  static void CallbackLibcryptoLock(int mode, int type,
-                                    const char *file, int line);
-  // unsigned long type required by libcrypto (openssl)
-  static unsigned long CallbackLibcryptoThreadId();  // NOLINT
-
   static LibGlobals *instance_;
 
   /**
@@ -82,8 +78,6 @@ class LibGlobals : SingleCopy {
    */
   OptionsManager *options_mgr_;
   FileSystem *file_system_;
-
-  pthread_mutex_t  *libcrypto_locks_;
 };
 
 
@@ -155,6 +149,12 @@ class LibContext : SingleCopy {
    */
   OptionsManager *options_mgr_;
   MountPoint *mount_point_;
+
+  /**
+   * Used to prevent construction/destruction of an InterruptCue object in every
+   * file system operation.
+   */
+  InterruptCue default_interrupt_cue_;
 };
 
 #endif  // CVMFS_LIBCVMFS_INT_H_

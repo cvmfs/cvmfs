@@ -10,10 +10,10 @@
 #include <ctime>
 
 #include "catalog_rw.h"
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "download.h"
-#include "hash.h"
 #include "manifest_fetch.h"
-#include "signature.h"
 #include "upload.h"
 
 using namespace std;         // NOLINT
@@ -316,7 +316,6 @@ bool CommandTag::UpdateUndoTags(
     if (!undo_rollback) {
       current_old_head = current_head;
       current_old_head.name = CommandTag::kPreviousHeadTag;
-      current_old_head.channel = history::History::kChannelTrunk;
       current_old_head.description = CommandTag::kPreviousHeadTagDescription;
       if (!env->history->Insert(current_old_head)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to set previous HEAD tag");
@@ -328,7 +327,6 @@ bool CommandTag::UpdateUndoTags(
   // set the current HEAD to the catalog provided by the template HEAD
   current_head = current_head_template;
   current_head.name = CommandTag::kHeadTag;
-  current_head.channel = history::History::kChannelTrunk;
   current_head.description = CommandTag::kHeadTagDescription;
   if (!env->history->Insert(current_head)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to set new current HEAD");
@@ -412,9 +410,9 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
 
 void CommandTag::PrintTagMachineReadable(
     const history::History::Tag &tag) const {
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s %s", tag.name.c_str(),
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s", tag.name.c_str(),
            tag.root_hash.ToString().c_str(), tag.size, tag.revision,
-           tag.timestamp, tag.GetChannelName(),
+           tag.timestamp,
            (tag.branch == "") ? "(default)" : tag.branch.c_str(),
            tag.description.c_str());
 }
@@ -448,7 +446,6 @@ ParameterList CommandEditTag::GetParams() const {
   r.push_back(Parameter::Optional('B', "branch of the new tag"));
   r.push_back(Parameter::Optional('P', "predecessor branch"));
   r.push_back(Parameter::Optional('h', "root hash of the new tag"));
-  r.push_back(Parameter::Optional('c', "channel of the new tag"));
   r.push_back(Parameter::Switch('x', "maintain undo tags"));
   return r;
 }
@@ -486,15 +483,10 @@ int CommandEditTag::Main(const ArgumentList &args) {
 }
 
 int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
-  typedef history::History::UpdateChannel TagChannel;
   const std::string tag_name =
       (args.find('a') != args.end()) ? *args.find('a')->second : "";
   const std::string tag_description =
       (args.find('D') != args.end()) ? *args.find('D')->second : "";
-  const TagChannel tag_channel =
-      (args.find('c') != args.end())
-          ? static_cast<TagChannel>(String2Uint64(*args.find('c')->second))
-          : history::History::kChannelTrunk;
   const bool undo_tags = (args.find('x') != args.end());
   const std::string root_hash_string =
       (args.find('h') != args.end()) ? *args.find('h')->second : "";
@@ -551,7 +543,6 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
   tag_template.revision = catalog->GetRevision();
   tag_template.timestamp = catalog->GetLastModified();
   tag_template.branch = branch_name;
-  tag_template.channel = tag_channel;
   tag_template.description = tag_description;
 
   // manipulate the tag database by creating a new tag or moving an existing one
@@ -648,13 +639,6 @@ bool CommandEditTag::MoveTag(Environment *env,
   if (old_tag.root_hash == new_tag.root_hash) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' already points to '%s'",
              tag_name.c_str(), old_tag.root_hash.ToString().c_str());
-    return false;
-  }
-
-  // check that tag is not moved to another channel
-  if (new_tag.channel != old_tag.channel) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "cannot move tag '%s' to another channel",
-             tag_name.c_str());
     return false;
   }
 
@@ -776,7 +760,6 @@ void CommandListTags::PrintHumanReadableTagList(
   // go through the list of tags and figure out the column widths
   const std::string name_label = "Name";
   const std::string rev_label = "Revision";
-  const std::string chan_label = "Channel";
   const std::string time_label = "Timestamp";
   const std::string branch_label = "Branch";
   const std::string desc_label = "Description";
@@ -786,13 +769,11 @@ void CommandListTags::PrintHumanReadableTagList(
   const TagList::const_reverse_iterator iend = tags.rend();
   size_t max_name_len = name_label.size();
   size_t max_rev_len = rev_label.size();
-  size_t max_chan_len = chan_label.size();
   size_t max_time_len = desc_label.size();
   size_t max_branch_len = branch_label.size();
   for (; i != iend; ++i) {
     max_name_len = std::max(max_name_len, i->name.size());
     max_rev_len = std::max(max_rev_len, StringifyInt(i->revision).size());
-    max_chan_len = std::max(max_chan_len, strlen(i->GetChannelName()));
     max_time_len =
         std::max(max_time_len, StringifyTime(i->timestamp, true).size());
     max_branch_len = std::max(max_branch_len, i->branch.size());
@@ -800,19 +781,17 @@ void CommandListTags::PrintHumanReadableTagList(
 
   // print the list header
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+           "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
            AddPadding(name_label, max_name_len).c_str(),
            AddPadding(rev_label, max_rev_len).c_str(),
-           AddPadding(chan_label, max_chan_len).c_str(),
            AddPadding(time_label, max_time_len).c_str(),
            AddPadding(branch_label, max_branch_len).c_str(),
            desc_label.c_str());
   LogCvmfs(kLogCvmfs, kLogStdout,
            "%s\u2500\u253C\u2500%s\u2500\u253C\u2500%s"
-           "\u2500\u253C\u2500%s\u2500\u253C\u2500%s\u2500\u253C\u2500%s",
+           "\u2500\u253C\u2500%s\u2500\u253C\u2500%s",
            AddPadding("", max_name_len, false, "\u2500").c_str(),
            AddPadding("", max_rev_len, false, "\u2500").c_str(),
-           AddPadding("", max_chan_len, false, "\u2500").c_str(),
            AddPadding("", max_time_len, false, "\u2500").c_str(),
            AddPadding("", max_branch_len, false, "\u2500").c_str(),
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
@@ -822,10 +801,9 @@ void CommandListTags::PrintHumanReadableTagList(
   for (; i != iend; ++i) {
     LogCvmfs(
         kLogCvmfs, kLogStdout,
-        "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+        "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
         AddPadding(i->name, max_name_len).c_str(),
         AddPadding(StringifyInt(i->revision), max_rev_len, true).c_str(),
-        AddPadding(i->GetChannelName(), max_chan_len).c_str(),
         AddPadding(StringifyTime(i->timestamp, true), max_time_len).c_str(),
         AddPadding(i->branch, max_branch_len).c_str(),
         i->description.c_str());
@@ -834,10 +812,9 @@ void CommandListTags::PrintHumanReadableTagList(
   // print the list footer
   LogCvmfs(kLogCvmfs, kLogStdout,
            "%s\u2500\u2534\u2500%s\u2500\u2534\u2500%s"
-           "\u2500\u2534\u2500%s\u2500\u2534\u2500%s\u2500\u2534\u2500%s",
+           "\u2500\u2534\u2500%s\u2500\u2534\u2500%s",
            AddPadding("", max_name_len, false, "\u2500").c_str(),
            AddPadding("", max_rev_len, false, "\u2500").c_str(),
-           AddPadding("", max_chan_len, false, "\u2500").c_str(),
            AddPadding("", max_time_len, false, "\u2500").c_str(),
            AddPadding("", max_branch_len, false, "\u2500").c_str(),
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
@@ -994,13 +971,12 @@ void CommandInfoTag::PrintHumanReadableInfo(
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Name:         %s\n"
            "Revision:     %d\n"
-           "Channel:      %s\n"
            "Timestamp:    %s\n"
            "Branch:       %s\n"
            "Root Hash:    %s\n"
            "Catalog Size: %s\n"
            "%s",
-           tag.name.c_str(), tag.revision, tag.GetChannelName(),
+           tag.name.c_str(), tag.revision,
            StringifyTime(tag.timestamp, true /* utc */).c_str(),
            tag.branch.c_str(),
            tag.root_hash.ToString().c_str(),

@@ -13,10 +13,10 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "gtest/gtest_prod.h"
-#include "hash.h"
+#include "util/concurrency.h"
 #include "util/single_copy.h"
-#include "util_concurrency.h"
 
 /**
  * Multiple content-addressable objects in a single BLOB.  A (serialized)

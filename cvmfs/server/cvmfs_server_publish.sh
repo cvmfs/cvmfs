@@ -8,7 +8,6 @@ cvmfs_server_publish() {
   local hash_algorithm
   local tweaks_option=
   local tag_name=
-  local tag_channel=00
   local tag_description=
   local retcode=0
   local verbosity=""
@@ -33,9 +32,6 @@ cvmfs_server_publish() {
       ;;
       a)
         tag_name="$OPTARG"
-      ;;
-      c)
-        tag_channel="$OPTARG"
       ;;
       m)
         tag_description="$OPTARG"
@@ -213,9 +209,6 @@ cvmfs_server_publish() {
     if [ ! -z "$tag_name" ]; then
       sync_command="$sync_command -D $tag_name"
     fi
-    if [ ! -z "$tag_channel" ]; then
-      sync_command="$sync_command -G $tag_channel"
-    fi
 
     if [ x"$tag_description" != x"" ]; then
       sync_command="$sync_command -J $tag_description"
@@ -324,9 +317,6 @@ cvmfs_server_publish() {
     fi
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
-    fi
-    if [ ! -z "$tag_channel" ]; then
-      tag_command="$tag_command -c $tag_channel"
     fi
     if [ ! -z "$tag_description" ]; then
       tag_command="$tag_command -D \"$tag_description\""

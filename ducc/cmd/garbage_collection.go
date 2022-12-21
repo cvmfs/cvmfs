@@ -24,7 +24,7 @@ var (
 )
 
 func init() {
-	garbageCollectionCmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Dry run the garbage collection")
+	garbageCollectionCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Dry run the garbage collection")
 	rootCmd.AddCommand(garbageCollectionCmd)
 }
 

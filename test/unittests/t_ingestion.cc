@@ -10,10 +10,9 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "atomic.h"
 #include "c_mock_uploader.h"
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
@@ -23,11 +22,12 @@
 #include "ingestion/task_hash.h"
 #include "ingestion/task_read.h"
 #include "ingestion/task_write.h"
-#include "smalloc.h"
 #include "testutil.h"
 #include "upload_facility.h"
+#include "util/atomic.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 

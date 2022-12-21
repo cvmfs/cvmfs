@@ -7,7 +7,7 @@
 #include <fcntl.h>
 
 #include "compression.h"
-#include "hash.h"
+#include "crypto/hash.h"
 
 TEST(T_Compression, CompressFd2Null) {
   shash::Any hash(shash::kSha1);

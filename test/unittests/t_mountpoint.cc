@@ -17,17 +17,17 @@
 #include "catalog_mgr_client.h"
 #include "catalog_mgr_rw.h"
 #include "catalog_test_tools.h"
+#include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "mountpoint.h"
 #include "options.h"
-#include "signature.h"
 #include "testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-#include "uuid.h"
+#include "util/uuid.h"
 
 using namespace std;  // NOLINT
 

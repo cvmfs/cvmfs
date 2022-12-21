@@ -1,0 +1,12 @@
+test097_mount() {
+  local repo=$1
+  local params=$2
+
+  cvmfs_mount $repo $params
+}
+
+test097_unmount() {
+  local repo=$1
+
+  cvmfs_umount $repo
+}

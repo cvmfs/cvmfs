@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "cache.h"
+#include "crypto/hash.h"
 #include "download.h"
 #include "gtest/gtest_prod.h"
-#include "hash.h"
 #include "sink.h"
 
 class BackoffThrottle;

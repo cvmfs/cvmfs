@@ -9,9 +9,9 @@
 
 #include <limits>
 
-#include "hash.h"
-#include "murmur.hxx"
+#include "crypto/hash.h"
 #include "smallhash.h"
+#include "util/murmur.hxx"
 
 static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
@@ -147,9 +147,12 @@ TEST_F(T_Smallhash, EraseUnknown) {
   for (unsigned i = 0; i < N; ++i) {
     smallhash_.Insert(i, i);
   }
-  smallhash_.Erase(N+1);
+  EXPECT_FALSE(smallhash_.Erase(N+1));
 
   EXPECT_EQ(N, smallhash_.size());
+
+  EXPECT_TRUE(smallhash_.Erase(0));
+  EXPECT_EQ(N - 1, smallhash_.size());
 }
 
 

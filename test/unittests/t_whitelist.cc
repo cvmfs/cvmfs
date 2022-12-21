@@ -6,7 +6,7 @@
 
 #include <ctime>
 
-#include "signature.h"
+#include "crypto/signature.h"
 #include "util/string.h"
 #include "whitelist.h"
 

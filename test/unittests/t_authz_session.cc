@@ -10,8 +10,8 @@
 #include "authz/authz.h"
 #include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
-#include "platform.h"
 #include "statistics.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 
 

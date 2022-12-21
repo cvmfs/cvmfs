@@ -10,7 +10,7 @@
 #include <string>
 
 #include "compression.h"
-#include "logging.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 namespace upload {

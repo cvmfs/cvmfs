@@ -45,18 +45,18 @@
 #include <string>
 #include <vector>
 
+#include "crypto/hash.h"
 #include "duplex_sqlite3.h"
-#include "hash.h"
-#include "logging.h"
 #include "monitor.h"
-#include "platform.h"
-#include "smalloc.h"
 #include "statistics.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
+#include "util/logging.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
-#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -953,10 +953,6 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
-  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
-  assert(watchdog.IsValid());
-  watchdog->Spawn();
-
   PosixQuotaManager shared_manager(0, 0, "");
   shared_manager.shared_ = true;
   shared_manager.spawned_ = true;
@@ -984,6 +980,10 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   if (!foreground)
     Daemonize();
+
+  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  assert(watchdog.IsValid());
+  watchdog->Spawn();
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =

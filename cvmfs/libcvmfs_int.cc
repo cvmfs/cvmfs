@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <google/dense_hash_map>
-#include <openssl/crypto.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -46,30 +45,31 @@
 #include <string>
 #include <vector>
 
-#include "atomic.h"
 #include "cache_posix.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compression.h"
+#include "crypto/crypto_util.h"
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "directory_entry.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "globals.h"
-#include "hash.h"
+#include "interrupt.h"
 #include "libcvmfs.h"
-#include "logging.h"
 #include "lru_md.h"
-#include "murmur.hxx"
-#include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
-#include "signature.h"
-#include "smalloc.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
+#include "util/atomic.h"
+#include "util/logging.h"
+#include "util/murmur.hxx"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 #include "xattr.h"
 
@@ -101,14 +101,7 @@ loader::Failures LibGlobals::Initialize(OptionsManager *options_mgr) {
   assert(instance_ != NULL);
 
   // Multi-threaded libcrypto (otherwise done by the loader)
-  instance_->libcrypto_locks_ = static_cast<pthread_mutex_t *>(
-    OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
-  for (int i = 0; i < CRYPTO_num_locks(); ++i) {
-    int retval = pthread_mutex_init(&(instance_->libcrypto_locks_[i]), NULL);
-    assert(retval == 0);
-  }
-  CRYPTO_set_id_callback(LibGlobals::CallbackLibcryptoThreadId);
-  CRYPTO_set_locking_callback(LibGlobals::CallbackLibcryptoLock);
+  crypto::SetupLibcryptoMt();
 
   FileSystem::FileSystemInfo fs_info;
   fs_info.name = "libcvmfs";
@@ -146,7 +139,6 @@ void LibGlobals::CleanupInstance() {
 LibGlobals::LibGlobals()
   : options_mgr_(NULL)
   , file_system_(NULL)
-  , libcrypto_locks_(NULL)
 { }
 
 
@@ -154,41 +146,7 @@ LibGlobals::~LibGlobals() {
   delete file_system_;
   delete options_mgr_;
 
-  if (libcrypto_locks_) {
-    CRYPTO_set_locking_callback(NULL);
-    for (int i = 0; i < CRYPTO_num_locks(); ++i)
-      pthread_mutex_destroy(&(libcrypto_locks_[i]));
-    OPENSSL_free(libcrypto_locks_);
-  }
-}
-
-
-void LibGlobals::CallbackLibcryptoLock(
-  int mode,
-  int type,
-  const char *file,
-  int line)
-{
-  (void)file;
-  (void)line;
-
-  int retval;
-  LibGlobals *globals = LibGlobals::GetInstance();
-  pthread_mutex_t *locks = globals->libcrypto_locks_;
-  pthread_mutex_t *lock = &(locks[type]);
-
-  if (mode & CRYPTO_LOCK) {
-    retval = pthread_mutex_lock(lock);
-  } else {
-    retval = pthread_mutex_unlock(lock);
-  }
-  assert(retval == 0);
-}
-
-
-// Type unsigned long required by libcrypto (openssl)
-unsigned long LibGlobals::CallbackLibcryptoThreadId() {  // NOLINT
-  return platform_gettid();
+  crypto::CleanupLibcryptoMt();
 }
 
 
@@ -237,7 +195,7 @@ bool LibContext::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // TODO(jblomer): not twice md5 calculation
-  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupSole,
+  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupDefault,
                                               dirent))
   {
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
@@ -295,7 +253,7 @@ void LibContext::AppendStatToList(const cvmfs_stat_t   st,
 
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
   perf::Inc(file_system()->n_fs_stat());
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -333,7 +291,7 @@ void LibContext::CvmfsAttrFromDirent(
 
 
 int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -384,7 +342,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
 int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   perf::Inc(file_system()->n_fs_readlink());
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -416,7 +374,7 @@ int LibContext::ListDirectory(
   bool self_reference
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -471,7 +429,7 @@ int LibContext::ListDirectoryStat(
   size_t *listlen,
   size_t *buflen) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -511,7 +469,7 @@ int LibContext::GetNestedCatalogAttr(
   const char *c_path,
   struct cvmfs_nc_attr *nc_attr
 ) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug,
     "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
 
@@ -530,8 +488,10 @@ int LibContext::GetNestedCatalogAttr(
   }
 
   std::string subcat_path;
+  shash::Any tmp_hash;
   std::map<std::string, uint64_t> counters =
-    mount_point_->catalog_mgr()->LookupCounters(p, &subcat_path).GetValues();
+    mount_point_->catalog_mgr()->
+      LookupCounters(p, &subcat_path, &tmp_hash).GetValues();
 
   // Set values of the passed structure
   nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
@@ -559,7 +519,7 @@ int LibContext::ListNestedCatalogs(
   char ***buf,
   size_t *buflen
 ) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug,
     "cvmfs_list_nc on path: %s", c_path);
 
@@ -592,7 +552,7 @@ int LibContext::ListNestedCatalogs(
 
 int LibContext::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -664,7 +624,8 @@ int64_t LibContext::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
-    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                        &default_interrupt_cue_);
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks =
       mount_point_->simple_chunk_tables()->Get(chunk_handle);

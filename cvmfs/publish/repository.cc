@@ -11,19 +11,18 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "crypto/hash.h"
+#include "crypto/signature.h"
 #include "download.h"
 #include "gateway_util.h"
-#include "hash.h"
 #include "history_sqlite.h"
 #include "ingestion/ingestion_source.h"
-#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "reflog.h"
-#include "signature.h"
 #include "statistics.h"
 #include "sync_mediator.h"
 #include "sync_union_aufs.h"
@@ -31,6 +30,7 @@
 #include "sync_union_tarball.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
+#include "util/logging.h"
 #include "util/pointer.h"
 #include "whitelist.h"
 
@@ -336,8 +336,7 @@ void Publisher::CreateRootObjects() {
   history::History::Tag tag_trunk(
     "trunk",
     manifest_->catalog_hash(), manifest_->catalog_size(), manifest_->revision(),
-    manifest_->publish_timestamp(), history::History::kChannelTrunk,
-    "empty repository", "" /* branch */);
+    manifest_->publish_timestamp(), "empty repository", "" /* branch */);
   history_->Insert(tag_trunk);
 
   // Meta information, TODO(jblomer)

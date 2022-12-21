@@ -15,10 +15,10 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.10.0
+## CVMFS_VERSION 2.11.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 10)
+set (CernVM-FS_VERSION_MINOR 11)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
@@ -32,23 +32,23 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set (MACOSX TRUE)
-else (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+else ()
   set (MACOSX FALSE)
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+endif ()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set (LINUX TRUE)
   if (EXISTS /etc/debian_version)
     set (DEBIAN TRUE)
-  endif (EXISTS /etc/debian_version)
+  endif ()
   if (EXISTS /etc/arch-release OR EXISTS /etc/manjaro-release)
     set (ARCHLINUX TRUE)
-  endif (EXISTS /etc/arch-release OR EXISTS /etc/manjaro-release)
-else (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  endif ()
+else ()
   set (LINUX FALSE)
   set (DEBIAN FALSE)
   set (ARCHLINUX FALSE)
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+endif ()
 
 #
 # Set install prefix to /usr by default.
@@ -56,7 +56,7 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 if (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set (CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "CVMFS install path default is /usr" FORCE)
   message("Setting default install prefix to ${CMAKE_INSTALL_PREFIX} on Linux")
-endif (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+endif ()
 
 #
 # Explicitly check that the install prefix is not /usr/local.
@@ -65,7 +65,7 @@ if (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
   message("######################################################################")
   message(WARNING "The installation path has been set to ${CMAKE_INSTALL_PREFIX}.")
   message("######################################################################")
-endif (LINUX AND "${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr/local")
+endif ()
 
 #
 # check if we use Clang
@@ -81,18 +81,18 @@ endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 #
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT FALSE)
-else (CMAKE_SIZEOF_VOID_P EQUAL 4)
+else ()
   set (IS_64_BIT TRUE)
-endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+endif ()
 
 #
 # check if we are compiling on ARM
 #
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
   set (ARM TRUE)
-else (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+else ()
   set (ARM FALSE)
-endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+endif ()
 
 #
 # define the installation location of the shared library files
@@ -134,12 +134,12 @@ message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 if (NOT DEFINED SYSCONF_INSTALL_DIR)
   if ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
     set (SYSCONF_INSTALL_DIR "/etc") # conform to LFSH
-  else ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+  else ()
     set(SYSCONF_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/etc")
-  endif ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
-else (NOT DEFINED SYSCONF_INSTALL_DIR)
+  endif ()
+else ()
   set (SYSCONF_INSTALL_DIR "${SYSCONF_INSTALL_DIR}" CACHE STRING "The sysconfig install dir")
-endif (NOT DEFINED SYSCONF_INSTALL_DIR)
+endif ()
 
 #
 # include file with user-defined options
@@ -158,8 +158,8 @@ include (cvmfs_compiler)
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
 if (NOT EXTERNALS_PREFIX)
-    set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
-endif(NOT EXTERNALS_PREFIX)
+  set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
+endif()
 set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build")
 set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")
 
@@ -174,19 +174,29 @@ if (BUILTIN_EXTERNALS)
     set(ENV{EXTERNALS_INSTALL_LOCATION} ${EXTERNALS_INSTALL_LOCATION})
     set(ENV{CVMFS_BASE_C_FLAGS} ${CVMFS_BASE_C_FLAGS})
     set(ENV{CVMFS_BASE_CXX_FLAGS} ${CVMFS_BASE_CXX_FLAGS})
+    set(ENV{IS_64_BIT} ${IS_64_BIT})
 
     if (BUILD_UBENCHMARKS)
       set(ENV{BUILD_UBENCHMARKS} "true")
-    endif(BUILD_UBENCHMARKS)
+    endif ()
     if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
       set(ENV{BUILD_SERVER} "true")
-    endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+    endif ()
     if (BUILD_GEOAPI)
       set(ENV{BUILD_GEOAPI} "true")
-    endif (BUILD_GEOAPI)
+    endif ()
     if (BUILD_QC_TESTS)
       set(ENV{BUILD_QC_TESTS} "true")
-    endif(BUILD_QC_TESTS)
+    endif()
+    if (BUILD_GATEWAY)
+      set(ENV{BUILD_GATEWAY} "true")
+    endif ()
+    if (BUILD_DUCC)
+      set(ENV{BUILD_DUCC} "true")
+    endif ()
+    if (BUILD_SNAPSHOTTER)
+      set(ENV{BUILD_SNAPSHOTTER} "true")
+    endif()
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -196,7 +206,7 @@ if (BUILTIN_EXTERNALS)
     )
     if (BOOTSTRAPPING_RESULT GREATER 0)
       message (FATAL_ERROR "bootstrapping failed")
-    endif (BOOTSTRAPPING_RESULT GREATER 0)
+    endif ()
 
     # Unset environment variables after the bootstrap script was executed
     set(ENV{EXTERNALS_LIB_LOCATION} "")
@@ -204,9 +214,13 @@ if (BUILTIN_EXTERNALS)
     set(ENV{EXTERNALS_INSTALL_LOCATION} "")
     set(ENV{CVMFS_BASE_C_FLAGS} "")
     set(ENV{CVMFS_BASE_CXX_FLAGS} "")
+    set(ENV{IS_64_BIT} "")
     set(ENV{BUILD_UBENCHMARKS} "")
     set(ENV{BUILD_SERVER} "")
     set(ENV{BUILD_QC_TESTS} "")
+    set(ENV{BUILD_GATEWAY} "")
+    set(ENV{BUILD_DUCC} "")
+    set(ENV{BUILD_SNAPSHOTTER} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
@@ -234,7 +248,7 @@ macro (pedantic_include_check HEADERFILE VARIABLENAME)
   check_include_file (${HEADERFILE} ${VARIABLENAME})
   if (NOT ${VARIABLENAME})
     message (FATAL_ERROR "${HEADERFILE} is missing on your system")
-  endif (NOT ${VARIABLENAME})
+  endif ()
 endmacro (pedantic_include_check)
 
 macro (permissive_include_check HEADERFILE VARIABLENAME)
@@ -242,7 +256,7 @@ macro (permissive_include_check HEADERFILE VARIABLENAME)
   if (${VARIABLENAME})
     set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -D${VARIABLENAME}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D${VARIABLENAME}")
-  endif (${VARIABLENAME})
+  endif ()
 endmacro (permissive_include_check)
 
 macro (look_for_required_include_files)
@@ -307,27 +321,29 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 find_package (Valgrind)
 if (VALGRIND_FOUND)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VALGRIND_INCLUDE_DIR})
-  add_definitions(-DHAS_VALGRIND_HEADERS)
-endif (VALGRIND_FOUND)
+  add_definitions (-DHAS_VALGRIND_HEADERS)
+endif ()
 
 if (NOT MACOSX)
   set (HAVE_LIB_RT TRUE)
   set (RT_LIBRARY "rt")
-else (NOT MACOSX)
+else ()
   set (HAVE_LIB_RT FALSE)
   set (RT_LIBRARY "")
-endif (NOT MACOSX)
+endif ()
 
 # Required libraries depending on build target
 
 find_package (OpenSSL REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
+find_package (Libcrypto REQUIRED)
+# We do not add the Libcrypto include directories to INCLUDE_DIRECTORIES
+# to avoid a clash with the system openssl. We only use it for libcvmfs_crypto
+message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
+
 find_package (GTest REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
-
-find_package (GMock REQUIRED)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GMOCK_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
@@ -335,26 +351,22 @@ set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
 find_package (LibArchive REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LibArchive_INCLUDE_DIRS})
 
-# Almost all build targets require zlib, sha2/3
+# Almost all build targets require zlib and sha3
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
     BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
     BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
   find_package (ZLIB REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 
-  find_package (SHA2 REQUIRED)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA2_INCLUDE_DIRS})
-
   find_package (SHA3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SHA3_INCLUDE_DIRS})
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
-       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
-       BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
+endif ()
 
 
 # Most build target require also curl/c-ares, sqlite, uuid, leveldb
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
-    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR BUILD_SHRINKWRAP)
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR
+    BUILD_SHRINKWRAP)
   find_package (CARES REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CARES_INCLUDE_DIRS})
 
@@ -371,11 +383,11 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
         )
       if (NOT ${_libcurl_features} MATCHES AsynchDNS)
         message(FATAL_ERROR "libcurl was not compiled with c-ares")
-      endif (NOT ${_libcurl_features} MATCHES AsynchDNS)
+      endif ()
     else (CURL_CONFIG_EXEC)
       message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
-    endif (CURL_CONFIG_EXEC)
-  endif(CURL_INCLUDE_DIRS)
+    endif ()
+  endif (CURL_INCLUDE_DIRS)
 
   find_package (SQLite3 REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
@@ -384,8 +396,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${LEVELDB_INCLUDE_DIR})
 
   find_package (UUID REQUIRED)
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_SERVER OR BUILD_SERVER_DEBUG OR
-       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_PRELOADER OR BUILD_SHRINKWRAP)
+endif ()
 
 # Client/libcvmfs/preloader only: pacparser, sparsehash
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
@@ -395,15 +406,14 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
 
   find_package(Sparsehash)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SPARSEHASH_INCLUDE_DIR})
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_PRELOADER OR
-       BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_SHRINKWRAP)
+endif ()
 
 if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
-BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
+    BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR
+    BUILD_SHRINKWRAP)
   find_package(Protobuf REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROTOBUF_INCLUDE_DIRS})
-endif (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
-BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG OR BUILD_UBENCHMARKS OR BUILD_SHRINKWRAP)
+endif ()
 
 # Fuse client only
 if (BUILD_CVMFS)
@@ -420,7 +430,7 @@ if (BUILD_CVMFS)
       add_definitions(-DHAS_FUSE3)
     endif ()
   endif (MACOSX)
-endif (BUILD_CVMFS)
+endif ()
 
 # Server only: unzip, libcap
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
@@ -429,15 +439,15 @@ if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_program(UNZIP_EXE NAMES unzip)
   if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
     message(FATAL_ERROR "unzip utility missing. Please install unzip...")
-  endif (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
-endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
+  endif ()
+endif ()
 
 
 # Only micro benchmarks need google bench
 if (BUILD_UBENCHMARKS)
   find_package(GOOGLEBENCH REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GOOGLEBENCH_INCLUDE_DIRS})
-endif (BUILD_UBENCHMARKS)
+endif ()
 
 include_directories (${INCLUDE_DIRECTORIES})
 
@@ -448,7 +458,7 @@ add_subdirectory (cvmfs)
 
 if (INSTALL_MOUNT_SCRIPTS)
   add_subdirectory (mount)
-endif (INSTALL_MOUNT_SCRIPTS)
+endif ()
 
 #
 # compile the unit tests, if necessary
@@ -457,42 +467,51 @@ if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   enable_testing ()
   add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
   add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+endif ()
 
 if (BUILD_UBENCHMARKS)
   add_subdirectory (test/micro-benchmarks)
-endif (BUILD_UBENCHMARKS)
+endif ()
 
 if (BUILD_QC_TESTS)
   find_package(RapidCheck REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${RAPIDCHECK_INCLUDE_DIRS})
   add_subdirectory (test/quickcheck)
-endif(BUILD_QC_TESTS)
+endif ()
+
+if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
+  find_program(GO_COMPILER go)
+  if(NOT GO_COMPILER)
+    message(FATAL_ERROR "go compiler not found")
+  else()
+    message("Found go compiler: ${GO_COMPILER}")
+  endif()
+endif ()
 
 if (BUILD_GATEWAY)
   add_subdirectory (gateway)
-endif(BUILD_GATEWAY)
+endif ()
 
 if (BUILD_DUCC)
   add_subdirectory (ducc)
-endif(BUILD_DUCC)
+endif ()
 
 if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
-endif(BUILD_SNAPSHOTTER)
+endif ()
 
 if (BUILD_STRESS_TESTS)
   include(test/stress/CMakeLists.txt)
-endif (BUILD_STRESS_TESTS)
+endif ()
 
 #
 # Documentation
 #
 install (
-    FILES                   README.md AUTHORS ChangeLog COPYING
-    DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
-    PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
-        )
+  FILES                   README.md AUTHORS ChangeLog COPYING
+  DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
+  PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
+)
 
 #
 # Generate the documentation using doxygen
@@ -513,4 +532,4 @@ if (BUILD_DOCUMENTATION)
     COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
   )
   include (cmake/Modules/UseDoxygen)
-endif (BUILD_DOCUMENTATION)
+endif ()

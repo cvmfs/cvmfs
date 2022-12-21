@@ -13,11 +13,11 @@
 
 #include "cache_posix.h"
 #include "compression.h"
-#include "fs_traversal.h"
-#include "hash.h"
+#include "crypto/hash.h"
 #include "quota_posix.h"
 #include "testutil.h"
 #include "util/algorithm.h"
+#include "util/fs_traversal.h"
 
 using namespace std;  // NOLINT
 

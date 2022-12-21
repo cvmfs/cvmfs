@@ -10,12 +10,12 @@
 
 #include "catalog_traversal.h"
 #include "catalog_traversal_parallel.h"
+#include "crypto/hash.h"
 #include "garbage_collection/garbage_collector.h"
 #include "garbage_collection/hash_filter.h"
-#include "hash.h"
 #include "manifest.h"
-#include "prng.h"
 #include "testutil.h"
+#include "util/prng.h"
 
 using swissknife::CatalogTraversalParallel;
 using swissknife::CatalogTraversal;
@@ -404,13 +404,13 @@ class T_GarbageCollector : public ::testing::Test {
                                       "other-branch", "", 4)));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision2", c[mp(2, "00")]->hash(), 1337, 2, t(27, 11, 1987),
-        history::History::kChannelProd, "this is rev 2", "")));
+        "this is rev 2", "")));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision4", c[mp(4, "00")]->hash(), 42, 4, t(11, 9, 2001),
-        history::History::kChannelProd, "this is revision 4", "other-branch")));
+        "this is revision 4", "other-branch")));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision5", c[mp(5, "00")]->hash(), 7, 5, t(10, 7, 2014),
-        history::History::kChannelTrunk, "this is revision 5 - the newest!",
+        "this is revision 5 - the newest!",
         "")));
     history->CommitTransaction();
   }

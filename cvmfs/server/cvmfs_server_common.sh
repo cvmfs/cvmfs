@@ -7,7 +7,7 @@
 #
 
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_json.sh
 
@@ -233,7 +233,7 @@ get_tag_branch() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    -n "$tag" 2>/dev/null | cut -d" " -f7)
+    -n "$tag" 2>/dev/null | cut -d" " -f6)
   if [ "x$branch" = "x(default)" ]; then
     branch=
   fi
@@ -272,7 +272,7 @@ get_head_of() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    | cut -d" " -f1,2,7 | grep " $branch\$" | head -n 1
+    | cut -d" " -f1,2,6 | grep " $branch\$" | head -n 1
 }
 
 
@@ -836,6 +836,55 @@ acquire_update_lock()
 }
 
 
+# Release a gc lock
+#
+# @param name             the repository to release
+
+release_gc_lock() {
+  local name=$1
+
+  load_repo_config $name
+  release_lock ${CVMFS_SPOOL_DIR}/is_collecting || echo "Warning: failed to release gc lock"
+}
+
+# Acquire a gc lock for a repository.  Always pair with a call to
+#   release_gc_lock if returns successful.
+#
+# @param name               the repository to lock
+# @param check_type         check type, either check or gc
+# @param abort_on_conflict  0 to wait for lock, 1 to abort if already acquired.
+#                           Default 0.
+# @return                   0 if lock successfully acquired
+
+acquire_gc_lock()
+{
+  local name=$1
+  local check_type=$2
+  local abort_on_conflict=${3:-0}
+
+  load_repo_config $name
+  local gc_lock=${CVMFS_SPOOL_DIR}/is_collecting
+
+  # look for another check or gc in progress
+  if ! acquire_lock $gc_lock; then
+    if [ $abort_on_conflict -eq 1 ]; then
+      echo "A check or other gc on $name is in progress... aborting"
+      to_syslog_for_repo $name "did not $check_type (check or gc in progress)"
+      return 1
+    fi
+
+    echo "Waiting for gc on $name to finish..."
+    if ! wait_and_acquire_lock $gc_lock; then
+      echo "failed to acquire gc lock"
+      to_syslog_for_repo $name "did not $check_type (locking issues)"
+      return 1
+    fi
+  fi
+
+  # The lock is now acquired
+}
+
+
 handle_read_only_file_descriptors_on_mount_point() {
   local name=$1
   local open_fd_dialog=${2:-1}
@@ -1001,7 +1050,7 @@ CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
 CVMFS_NFS_SOURCE=no
-CVMFS_HIDE_MAGIC_XATTRS=yes
+CVMFS_MAGIC_XATTRS_VISIBILITY=never
 CVMFS_FOLLOW_REDIRECTS=yes
 CVMFS_SERVER_CACHE_MODE=yes
 CVMFS_NFILES=65536

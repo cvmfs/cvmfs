@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 	be "github.com/cvmfs/gateway/internal/gateway/backend"
@@ -178,7 +177,7 @@ func parseHeader(h *http.Header) (string, []byte, error) {
 
 	HMAC, err := base64.StdEncoding.DecodeString(tokens[1])
 	if err != nil {
-		return "", nil, errors.Wrap(err, "could not base64 decode HMAC")
+		return "", nil, fmt.Errorf("could not base64 decode HMAC: %w", err)
 	}
 
 	return keyID, HMAC, nil

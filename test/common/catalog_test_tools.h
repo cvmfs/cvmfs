@@ -14,11 +14,11 @@
 
 #include "catalog_mgr_rw.h"
 #include "compression.h"
+#include "crypto/signature.h"
 #include "directory_entry.h"
 #include "manifest.h"
 #include "options.h"
 #include "server_tool.h"
-#include "signature.h"
 #include "statistics.h"
 #include "upload.h"
 

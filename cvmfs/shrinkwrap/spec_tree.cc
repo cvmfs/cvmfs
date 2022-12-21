@@ -10,11 +10,11 @@
 #include <string>
 #include <vector>
 
-#include "logging.h"
-#include "smalloc.h"
 #include "util.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
+#include "util/smalloc.h"
 #include "util/string.h"
 
 
@@ -57,7 +57,7 @@ bool SpecTree::IsMatching(std::string path) {
   if (path.length() > 0 && path.at(path.length()-1) == '/') {
     path.erase(path.length()-1);
   }
-  std::vector<std::string> path_parts = SplitString(path, '/', 256);
+  std::vector<std::string> path_parts = SplitString(path, '/');
   for (std::vector<std::string>::const_iterator part_it = path_parts.begin()+1;
       part_it != path_parts.end();
       part_it++) {
@@ -147,9 +147,8 @@ void SpecTree::Parse(FILE *spec_file) {
     }
     char passthrough_mode = '_';
     if (inclusion_mode == '!') passthrough_mode = '-';
-    // TODO(steuber): max_chunks?
     // Split remaining path into its parts
-    std::vector<std::string> path_parts = SplitString(line, '/', 256);
+    std::vector<std::string> path_parts = SplitString(line, '/');
     cur_node = node_cache.top()->node;
     // Store second last mode to check whether it is NOT passthrough!
     char past_1_mode = node_cache.top()->node->mode;
@@ -206,7 +205,7 @@ int SpecTree::ListDir(const char *dir,
   if (path.length() > 0 && path.at(path.length()-1) == '/') {
     path.erase(path.length()-1);
   }
-  std::vector<std::string> path_parts = SplitString(path, '/', 256);
+  std::vector<std::string> path_parts = SplitString(path, '/');
   for (std::vector<std::string>::const_iterator part_it = path_parts.begin()+1;
       part_it != path_parts.end();
       part_it++) {

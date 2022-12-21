@@ -15,9 +15,9 @@
 #include <cstdio>
 #include <cstring>
 
-#include "hash.h"
-#include "logging.h"
+#include "crypto/hash.h"
 #include "publish/except.h"
+#include "util/logging.h"
 
 int publish::CmdHash::Main(const Options &options) {
   std::string algorithm = options.GetString("algorithm");

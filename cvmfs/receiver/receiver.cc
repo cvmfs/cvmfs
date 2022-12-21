@@ -6,12 +6,12 @@
 
 #include "cvmfs_config.h"
 
-#include "../logging.h"
-#include "../monitor.h"
-#include "../swissknife.h"
-#include "../util/exception.h"
-#include "../util/posix.h"
-#include "../util/string.h"
+#include "monitor.h"
+#include "swissknife.h"
+#include "util/exception.h"
+#include "util/logging.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 #include "reactor.h"
 
