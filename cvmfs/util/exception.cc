@@ -16,6 +16,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+bool g_conditional_assert = true;
+
 void Panic(const char* coordinates, const LogSource source, const int mask,
            const char* format, ...) {
   char* msg = NULL;
