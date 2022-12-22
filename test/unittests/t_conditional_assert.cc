@@ -17,7 +17,9 @@ bool g_conditional_assert;
 bool asserted = false;
 
 void handler(int sig) {
-  asserted = true;
+  if (sig == SIGABRT) {
+    asserted = true;
+  }
 }
 
 #undef assert
