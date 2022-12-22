@@ -5,10 +5,10 @@
 #ifndef CVMFS_UTIL_EXCEPTION_H_
 #define CVMFS_UTIL_EXCEPTION_H_
 
+#include <signal.h>
+
 #include <stdexcept>
 #include <string>
-
-#include <signal.h>
 
 #include "util/export.h"
 #include "util/logging.h"
