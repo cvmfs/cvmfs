@@ -17,6 +17,7 @@ PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
 GO_VERSION=1.18
+ZSTD_VERSION=1.5.2
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -256,6 +257,10 @@ build_lib() {
         do_build "go"
       fi
       ;;
+    zstd)
+      do_extract "zstd"         "zstd-${ZSTD_VERSION}.tar.gz"
+      do_build "zstd"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -266,7 +271,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive go"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive go zstd"
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
