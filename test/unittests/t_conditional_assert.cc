@@ -53,8 +53,8 @@ TEST_F(T_Conditional_Assert, WithoutAssert) {
   EXPECT_EQ(0, has_asserted);
 
   asserted = false;
-  has_asserted = asserted;
   conditional_assert(1);
+  has_asserted = asserted;
   EXPECT_EQ(0, has_asserted);
 
   signal(SIGABRT, SIG_DFL);
@@ -70,8 +70,8 @@ TEST_F(T_Conditional_Assert, WithAssert) {
   EXPECT_EQ(0, has_asserted);
 
   asserted = false;
-  has_asserted = asserted;
   conditional_assert(1);
+  has_asserted = asserted;
   EXPECT_EQ(1, has_asserted);
 
   signal(SIGABRT, SIG_DFL);
