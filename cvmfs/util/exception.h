@@ -31,11 +31,10 @@ class CVMFS_EXPORT ECvmfsException : public std::runtime_error {
 
 
 // set to true to prevent conditional_assert() from asserting
-extern bool g_conditional_assert;
+extern bool g_suppress_conditional_assert;
 
-static inline bool conditional_assert(bool t) {
-  if ( !t && !g_conditional_assert ) { raise(SIGABRT); }
-  return t;
+static inline void conditional_assert(int t) {
+  if ( !(t == 0) && !g_suppress_conditional_assert ) { raise(SIGABRT); }
 }
 
 CVMFS_EXPORT

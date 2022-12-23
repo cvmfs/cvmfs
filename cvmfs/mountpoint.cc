@@ -1890,9 +1890,9 @@ bool MountPoint::SetupBehavior() {
   if (options_mgr_->GetValue("CVMFS_SUPPRESS_ASSERTS", &optarg) &&
       options_mgr_->IsOn(optarg))
   {
-    g_conditional_assert = true;
+    g_suppress_conditional_assert = true;
   } else {
-    g_conditional_assert = false;
+    g_suppress_conditional_assert = false;
   }
 
   return true;

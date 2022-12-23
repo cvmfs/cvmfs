@@ -6,13 +6,14 @@
 
 #include <signal.h>
 
+bool g_suppress_conditional_assert;
+
 #include "util/exception.h"
 
 #include "wpad.h"
 
 using namespace std;  // NOLINT
 
-bool g_conditional_assert;
 
 bool asserted = false;
 
@@ -42,36 +43,34 @@ class T_Conditional_Assert : public ::testing::Test {
 
 
 TEST_F(T_Conditional_Assert, WithoutAssert) {
-  g_conditional_assert = false;
-  asserted = false;
-  bool ret = conditional_assert(0);
+  signal(SIGABRT, handler);
 
-  EXPECT_EQ(0, ret);
+  g_suppress_conditional_assert = true;
+
+  asserted = false;
+  conditional_assert(0);
   int has_asserted = asserted;
-  EXPECT_EQ(1, has_asserted);
+  EXPECT_EQ(0, has_asserted);
 
   asserted = false;
-  ret = conditional_assert(1);
-  EXPECT_EQ(1, ret);
-  has_asserted = asserted;
+  conditional_assert(1);
   EXPECT_EQ(0, has_asserted);
+
+  signal(SIGABRT, SIG_DFL);
 }
 
 TEST_F(T_Conditional_Assert, WithAssert) {
   signal(SIGABRT, handler);
 
-  g_conditional_assert = true;
+  g_suppress_conditional_assert = false;
   asserted = false;
-  bool ret = conditional_assert(0);
-  EXPECT_EQ(0, ret);
+  conditional_assert(0);
   int has_asserted = asserted;
   EXPECT_EQ(0, has_asserted);
 
   asserted = false;
-  ret = conditional_assert(1);
-  EXPECT_EQ(1,  ret);
-  has_asserted = asserted;
-  EXPECT_EQ(0, has_asserted);
+  conditional_assert(1);
+  EXPECT_EQ(1, has_asserted);
 
   signal(SIGABRT, SIG_DFL);
 }
