@@ -1955,7 +1955,7 @@ bool MountPoint::SetupBehavior() {
   // telemetryAggregators
   if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
       && options_mgr_->IsOn(optarg)) {
-    uint64_t telemetry_send_rate = 5*60;  // default send rate: 5min
+    int telemetry_send_rate = 5 * 60;  // default send rate: 5min
     if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
       telemetry_send_rate = String2Uint64(optarg);
 

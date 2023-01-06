@@ -60,7 +60,7 @@ class TelemetryAggregator : SingleCopy {
 
  protected:
   Statistics* statistics_;
-  const uint64_t maximum_send_rate_;
+  const int maximum_send_rate_;
   int pipe_terminate_[2];
   pthread_t thread_telemetry_;
   std::string fqrn_;
@@ -87,7 +87,7 @@ class TelemetryAggregator : SingleCopy {
    * Base constructor taking care of threading infrastructure.
    * Must always be called in the constructor of the custom telemetry classes.
   */
-  TelemetryAggregator(Statistics* statistics, uint64_t maximum_send_rate,
+  TelemetryAggregator(Statistics* statistics, int maximum_send_rate,
                       const std::string &fqrn) :
                       statistics_(statistics),
                       maximum_send_rate_(maximum_send_rate),

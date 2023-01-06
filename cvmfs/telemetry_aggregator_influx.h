@@ -38,7 +38,7 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
 
   std::string MakePayload();
   std::string MakeDeltaPayload();
-  TelemetryError SendToInflux(std::string payload);
+  TelemetryError SendToInflux(const std::string &payload);
 
   virtual void PushMetrics();
 };

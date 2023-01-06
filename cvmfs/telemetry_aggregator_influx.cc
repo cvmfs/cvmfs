@@ -168,7 +168,8 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
   return ret;
 }
 
-TelemetryError TelemetryAggregatorInflux::SendToInflux(std::string payload) {
+TelemetryError TelemetryAggregatorInflux::SendToInflux(
+                                            const std::string &payload) {
     const char *hostname = influx_host_.c_str();
     int port = influx_port_;
 
@@ -200,11 +201,11 @@ TelemetryError TelemetryAggregatorInflux::SendToInflux(std::string payload) {
     dest_addr->sin_port = htons(port);
 
     ssize_t num_bytes_sent = sendto(sockfd,
-                                    payload.data(),
-                                    payload.size(),
-                                    0,
-                                    (struct sockaddr*)dest_addr,
-                                    sizeof(struct sockaddr_in));
+                                  payload.data(),
+                                  payload.size(),
+                                  0,
+                                  reinterpret_cast<struct sockaddr*>(dest_addr),
+                                  sizeof(struct sockaddr_in));
 
     close(sockfd);
     freeaddrinfo(res);
@@ -213,7 +214,7 @@ TelemetryError TelemetryAggregatorInflux::SendToInflux(std::string payload) {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                                 "Failed to send to influx. errno=%d", errno);
       return TelemetryError::kTelemetrySend;
-    } else if ((size_t) num_bytes_sent != payload.size())  {
+    } else if (static_cast<size_t>(num_bytes_sent) != payload.size())  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                     "Incomplete send. Bytes transferred: %d. Bytes expected %d",
                     num_bytes_sent, payload.size());
