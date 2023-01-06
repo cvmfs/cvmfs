@@ -1968,7 +1968,7 @@ bool MountPoint::SetupBehavior() {
                                     telemetry_send_rate,
                                     options_mgr_,
                                     fqrn_,
-                                    perf::TelemetrySelector::kTelemetryInflux);
+                                    perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
                "Enable telemetry to report every %d seconds",
                telemetry_send_rate);
