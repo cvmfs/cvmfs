@@ -1840,7 +1840,7 @@ bool MountPoint::SetupBehavior() {
       std::string trimmed = Trim(tmp[i]);
       LogCvmfs(kLogCvmfs, kLogDebug,
                "Privileged gid for xattr added: %s", trimmed.c_str());
-      protected_xattr_gids.insert((gid_t) String2Uint64(trimmed));
+      protected_xattr_gids.insert(static_cast<gid_t>(String2Uint64(trimmed)));
     }
   }
   std::set<std::string> protected_xattrs;

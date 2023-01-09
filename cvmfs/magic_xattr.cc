@@ -534,7 +534,7 @@ std::string RepoMetainfoMagicXattr::GetValue() {
     return "Failed to open: metadata file is too big";
   }
   char buffer[kMaxMetainfoLength];
-  int bytes_read =
+  int64_t bytes_read =
     xattr_mgr_->mount_point()->file_system()->cache_mgr()
                                             ->Pread(fd, buffer, actual_size, 0);
   xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
