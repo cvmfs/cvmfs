@@ -160,34 +160,33 @@ bool BaseMagicXattr::PrepareValueFencedProtected(gid_t gid) {
 }
 
 void MagicXattrManager::SanityCheckProtectedXattrs() {
-  // std::map<std::string, BaseMagicXattr *>::const_iterator iter;
   std::set<std::string>::const_iterator iter;
-  std::string tmp = "";
+  std::vector<string> tmp;
   for (iter = protected_xattrs_.begin();
        iter != protected_xattrs_.end(); iter++) {
     if (xattr_list_.find(*iter) == xattr_list_.end()) {
-      tmp += *iter + ", ";
+      tmp.push_back(*iter);
     }
   }
 
   if (tmp.size() > 0) {
-    tmp.resize(tmp.size() - 2);
+    std::string msg = JoinStrings(tmp, ",");
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                                 "Following CVMFS_XATTR_PROTECTED_XATTRS are "
-                                "set but not recognized: %s", tmp.c_str());
+                                "set but not recognized: %s", msg.c_str());
   }
 
-  tmp = "";
+  tmp.clear();
   std::set<gid_t>::const_iterator iter_gid;
   for (iter_gid = privileged_xattr_gids_.begin();
        iter_gid != privileged_xattr_gids_.end(); iter_gid++) {
-    tmp += StringifyUint(*iter_gid) + ", ";
+    tmp.push_back(StringifyUint(*iter_gid));
   }
 
   if (tmp.size() > 0) {
-    tmp.resize(tmp.size() - 2);
-    LogCvmfs(kLogCvmfs, kLogDebug, "Following CVMFS_XATTR_PRIVILEGED_GIDS are "
-                                "set: %s", tmp.c_str());
+    std::string msg = JoinStrings(tmp, ",");
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+            "Following CVMFS_XATTR_PRIVILEGED_GIDS are set: %s", msg.c_str());
   }
 }
 

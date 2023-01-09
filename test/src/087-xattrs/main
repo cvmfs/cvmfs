@@ -12,26 +12,29 @@ check_protected_xattr() {
   cvmfs_umount grid.cern.ch || return 2
   echo "  ...Success"
 
-
-  echo "  Only root access"
-  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
-CVMFS_XATTR_PRIVILEGED_GIDS=0
-CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
-  local only_root=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
-  
-  [ "$only_root" = "grid.cern.ch" ] && return 31
-
-  cvmfs_umount grid.cern.ch || return 2
-  echo "  ...Success"
-  
   echo "  Adding current user's gid to access"
-  local user_gid=$(id -g `whoami`)
+  local user_gid=$(id -g ${CVMFS_TEST_USER})
   cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
 CVMFS_XATTR_PRIVILEGED_GIDS=$user_gid
 CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
-  local also_this_user=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  local ok_user=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
   
-  [ "$also_this_user" = "grid.cern.ch" ] || return 32
+  [ "$ok_user" = "grid.cern.ch" ] || return 31
+
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+
+  echo "  Only root access"
+  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no
+CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
+
+  echo "    Test root"
+  local root_access=$(sudo attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  echo "    Test non-root"
+  local non_root_denied=$(attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  
+  [ "$root_access" = "grid.cern.ch" ] || return 32
+  [ "$non_root_denied" = "grid.cern.ch" ] && return 33
 
   cvmfs_umount grid.cern.ch || return 2
   echo "  ...Success"

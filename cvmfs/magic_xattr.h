@@ -41,6 +41,8 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  */
 class BaseMagicXattr {
   friend class MagicXattrManager;
+  FRIEND_TEST(T_MagicXattr, ProtectedXattr);
+  FRIEND_TEST(T_MagicXattr, TestFqrn);
 
  public:
   BaseMagicXattr() : is_protected_(false) {
@@ -51,7 +53,7 @@ class BaseMagicXattr {
   /**
    * Mark a Xattr protected so that only certain users with the correct gid
    * can access it.
-  */
+   */
   void MarkProtected() {
     is_protected_ = true;
   }
@@ -60,14 +62,9 @@ class BaseMagicXattr {
   // TODO(hereThereBeDragons) from C++11 should be marked final
   /**
    * Access right check before normal fence
-  */
+   */
   bool PrepareValueFencedProtected(gid_t gid);
 
-  /**
-  * This function is used to obtain the necessary information while
-  * inside FuseRemounter::fence(), which should prevent data races.
-  */
-  virtual bool PrepareValueFenced() { return true; }
   /**
    * This function needs to be called after PrepareValueFenced(),
    * which prepares the necessary data.
@@ -92,6 +89,12 @@ class BaseMagicXattr {
   virtual ~BaseMagicXattr() {}
 
  protected:
+  /**
+  * This function is used to obtain the necessary information while
+  * inside FuseRemounter::fence(), which should prevent data races.
+  */
+  virtual bool PrepareValueFenced() { return true; }
+
   MagicXattrManager *xattr_mgr_;
   PathString path_;
   catalog::DirectoryEntry *dirent_;
@@ -173,7 +176,7 @@ class MagicXattrManager : public SingleCopy {
   /**
    * Registers a new extended attribute.
    * Will fail if called after Freeze().
-  */
+   */
   void Register(const std::string &name, BaseMagicXattr *magic_xattr);
 
   /**
@@ -181,7 +184,7 @@ class MagicXattrManager : public SingleCopy {
    * No new extended attributes can be added.
    * Only after freezing MagicXattrManager can registered attributes be
    * accessed.
-  */
+   */
   void Freeze() { is_frozen_ = true; SanityCheckProtectedXattrs(); }
   bool IsPrivilegedGid(gid_t gid);
 
@@ -190,7 +193,7 @@ class MagicXattrManager : public SingleCopy {
   std::set<gid_t> privileged_xattr_gids()
                                 { return privileged_xattr_gids_; }
   MountPoint* mount_point() { return mount_point_; }
-  bool is_frozen() const {return is_frozen_; }
+  bool is_frozen() const { return is_frozen_; }
 
  protected:
   std::map<std::string, BaseMagicXattr *> xattr_list_;
