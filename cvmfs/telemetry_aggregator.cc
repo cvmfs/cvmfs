@@ -18,7 +18,7 @@
 namespace perf {
 
 TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
-                                                 uint64_t send_rate,
+                                                 int send_rate,
                                                  OptionsManager *options_mgr,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
@@ -85,7 +85,7 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
       if (errno == EINTR) {  // external interrupt occured - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
-          timeout_ms = (now > deadline) ? 0 : 
+          timeout_ms = (now > deadline) ? 0 :
                                       static_cast<int>((deadline - now) * 1000);
         }
         continue;

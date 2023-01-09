@@ -47,7 +47,7 @@ class TelemetryAggregator : SingleCopy {
    * was not successful.
   */
   static TelemetryAggregator* Create(Statistics* statistics,
-                                     uint64_t send_rate,
+                                     int send_rate,
                                      OptionsManager *options_mgr,
                                      const std::string &fqrn,
                                      const TelemetrySelector type);
