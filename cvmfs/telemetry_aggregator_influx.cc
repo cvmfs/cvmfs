@@ -186,7 +186,7 @@ TelemetryError TelemetryAggregatorInflux::SendToInflux(
        LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                 "Failed to resolve influx server [%s]. errno=%d",
                 hostname, errno);
-       return TelemetryError::kTelemetryHostAddress;
+       return kTelemetryHostAddress;
     }
 
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -194,7 +194,7 @@ TelemetryError TelemetryAggregatorInflux::SendToInflux(
        LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                                               "Failed to open socket");
        freeaddrinfo(res);
-       return TelemetryError::kTelemetrySocket;
+       return kTelemetrySocket;
     }
 
     dest_addr = reinterpret_cast<sockaddr_in*>(res->ai_addr);
@@ -213,16 +213,16 @@ TelemetryError TelemetryAggregatorInflux::SendToInflux(
     if (num_bytes_sent < 0)  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                                 "Failed to send to influx. errno=%d", errno);
-      return TelemetryError::kTelemetrySend;
+      return kTelemetrySend;
     } else if (static_cast<size_t>(num_bytes_sent) != payload.size())  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                     "Incomplete send. Bytes transferred: %d. Bytes expected %d",
                     num_bytes_sent, payload.size());
-      return TelemetryError::kTelemetrySend;
+      return kTelemetrySend;
     }
 
     LogCvmfs(kLogTelemetry, kLogDebug, "INFLUX: POSTING [%s]", payload.c_str());
-    return TelemetryError::kTelemetrySuccess;
+    return kTelemetrySuccess;
 }
 
 
