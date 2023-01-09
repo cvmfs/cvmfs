@@ -2252,8 +2252,8 @@ static void Spawn() {
 
   cvmfs::fuse_remounter_->Spawn();
   if (cvmfs::mount_point_->dentry_tracker()->is_active()) {
-    cvmfs::mount_point_->dentry_tracker()->SpawnCleaner(
-    cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
+    cvmfs::mount_point_->dentry_tracker()->SpawnCleaner( // Usually every minute
+        static_cast<unsigned int>(cvmfs::mount_point_->kcache_timeout_sec()));
   }
 
   cvmfs::mount_point_->download_mgr()->Spawn();

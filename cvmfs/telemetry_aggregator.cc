@@ -85,7 +85,8 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
       if (errno == EINTR) {  // external interrupt occured - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
-          timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000ul;
+          timeout_ms = (now > deadline) ? 0 : 
+                                      static_cast<int>((deadline - now) * 1000);
         }
         continue;
       }

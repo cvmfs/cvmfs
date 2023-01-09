@@ -23,7 +23,7 @@ namespace perf {
 class TelemetryAggregatorInflux : TelemetryAggregator {
  public:
   TelemetryAggregatorInflux(Statistics* statistics,
-                            uint64_t maximum_send_rate,
+                            int maximum_send_rate,
                             OptionsManager *options_mgr,
                             const std::string &fqrn);
   virtual ~TelemetryAggregatorInflux();

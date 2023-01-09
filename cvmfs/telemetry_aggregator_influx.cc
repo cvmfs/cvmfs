@@ -27,7 +27,7 @@ TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
 }
 
 TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
-                                                    uint64_t maximum_send_rate,
+                                                    int maximum_send_rate,
                                                     OptionsManager *options_mgr,
                                                     const std::string &fqrn) :
                       TelemetryAggregator(statistics, maximum_send_rate, fqrn) {
@@ -44,7 +44,7 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
 
   std::string opt;
   if (options_mgr->GetValue("CVMFS_INFLUX_PORT", &opt)) {
-      influx_port_ = String2Int64(opt.c_str());
+      influx_port_ = static_cast<int>(String2Int64(opt.c_str()));
       if (influx_port_ > 0 && influx_port_ < 65536) {
         params++;
       } else {

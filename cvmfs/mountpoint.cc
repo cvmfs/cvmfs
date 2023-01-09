@@ -1957,7 +1957,7 @@ bool MountPoint::SetupBehavior() {
       && options_mgr_->IsOn(optarg)) {
     int telemetry_send_rate = 5 * 60;  // default send rate: 5min
     if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
-      telemetry_send_rate = String2Uint64(optarg);
+      telemetry_send_rate = static_cast<int>(String2Uint64(optarg));
 
       // minimum send rate: 5sec
       if (telemetry_send_rate < 5) {
