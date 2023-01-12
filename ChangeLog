@@ -1,4 +1,6 @@
 2.11.0:
+  * Add support for protected xattrs, new client parameters
+    CVMFS_XATTR_[PRIVILEGED_GIDS,PROTECTED_XATTRS] (#3103)
   * Improve logging of I/O errors (#2941)
   * [gw] Store publisher hostname in lease (#3130)
   * Make CVMFS_ARCH env available for variant symlinks (#3127, CVM-910)
