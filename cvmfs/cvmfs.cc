@@ -1637,7 +1637,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
     attr, path, &d));
   if (!magic_xattr.IsNull()) {
-    magic_xattr_success = magic_xattr->PrepareValueFenced();
+    magic_xattr_success = magic_xattr->
+                              PrepareValueFencedProtected(fuse_ctx->gid);
   }
 
   fuse_remounter_->fence()->Leave();
@@ -1931,7 +1932,7 @@ class InodeMaxMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue() {
     return StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
-      mount_point_->catalog_mgr()->inode_gauge());
+      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge());
   }
 };
 
@@ -1964,6 +1965,8 @@ static void RegisterMagicXattrs() {
   mgr->Register("user.pid", new PidMagicXattr());
   mgr->Register("user.maxfd", new MaxFdMagicXattr());
   mgr->Register("user.uptime", new UptimeMagicXattr());
+
+  mgr->Freeze();
 }
 
 /**

@@ -62,8 +62,11 @@ class T_MagicXattr : public ::testing::Test {
 };
 
 TEST_F(T_MagicXattr, TestFqrn) {
+  std::set<std::string> protected_xattrs;
+  std::set<gid_t> protected_xattr_gids;
   MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
+                        protected_xattrs, protected_xattr_gids);
 
   catalog::DirectoryEntry dirent =
     catalog::DirectoryEntryTestFactory::ExternalFile();
@@ -75,22 +78,49 @@ TEST_F(T_MagicXattr, TestFqrn) {
 }
 
 TEST_F(T_MagicXattr, HideAttributes) {
+  std::set<std::string> protected_xattrs;
+  std::set<gid_t> protected_xattr_gids;
   catalog::DirectoryEntry dirent_name =
     catalog::DirectoryEntryTestFactory::RegularFile("name", 42, shash::Any());
   catalog::DirectoryEntry dirent_root =
     catalog::DirectoryEntryTestFactory::Directory();
 
   MagicXattrManager *mgr_never =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityNever);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityNever,
+    protected_xattrs, protected_xattr_gids);
   std::string list = mgr_never->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_never->GetListString(&dirent_root);
   EXPECT_EQ(0U, list.length());
 
   MagicXattrManager *mgr_rootonly =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityRootOnly);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityRootOnly,
+                          protected_xattrs, protected_xattr_gids);
   list = mgr_rootonly->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_rootonly->GetListString(&dirent_root);
   EXPECT_LT(0U, list.length());
+}
+
+TEST_F(T_MagicXattr, ProtectedXattr) {
+  std::set<std::string> protected_xattrs;
+  protected_xattrs.insert("user.fqrn");
+
+  std::set<gid_t> protected_xattr_gids;
+  protected_xattr_gids.insert(1);
+
+  MagicXattrManager *mgr =
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
+                        protected_xattrs, protected_xattr_gids);
+  mgr->Freeze();
+
+  catalog::DirectoryEntry dirent =
+    catalog::DirectoryEntryTestFactory::ExternalFile();
+  PathString path("/asdf");
+  MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
+
+  ASSERT_FALSE(attr.IsNull());
+  ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
+  ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
+  EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());
 }
