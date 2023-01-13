@@ -136,6 +136,8 @@ class S3Uploader : public AbstractUploader {
   const std::string temporary_path_;
   mutable atomic_int32 io_errors_;
   pthread_t thread_collect_results_;
+
+  std::string x_amz_acl_;
 };  // S3Uploader
 
 }  // namespace upload
