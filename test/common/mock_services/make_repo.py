@@ -11,7 +11,7 @@ hardlink_ratio = 0.005
 
 
 def PrintError(msg):
-  print >> sys.stderr, "[ERROR] " + msg
+  print("[ERROR] " + msg, file=sys.stderr)
   sys.exit(1)
 
 
@@ -44,25 +44,25 @@ class RepoFactory:
       directories += self.num_subdirs ** (i + 1)
     files = (directories + 1) * self.num_files_per_dir
     bytes = files * (max_file_size - min_file_size) / 2
-    print "Prediction:"
-    print "   directories to be produced:  " , directories
-    print "   files to be produced:        " , files
-    print "   bytes to be written (aprox): " , bytes
+    print("Prediction:")
+    print("   directories to be produced:  " , directories)
+    print("   files to be produced:        " , files)
+    print("   bytes to be written (aprox): " , bytes)
 
   def PrintReport(self):
-    print "Results:"
-    print "   directories produced:" , self.dirs_produced
-    print "   files produced:      " , self.files_produced
-    print "   symlinks produced:   " , self.symlinks_produced
-    print "   hardlinks produced:  " , self.hardlinks_produced
-    print "   ------------------------------------------------"
-    print "   sum of dirents:      " , (self.dirs_produced + \
+    print("Results:")
+    print("   directories produced:" , self.dirs_produced)
+    print("   files produced:      " , self.files_produced)
+    print("   symlinks produced:   " , self.symlinks_produced)
+    print("   hardlinks produced:  " , self.hardlinks_produced)
+    print("   ------------------------------------------------")
+    print("   sum of dirents:      " , (self.dirs_produced + \
                                         self.files_produced + \
                                         self.symlinks_produced + \
-                                        self.hardlinks_produced)
-    print
-    print "overall produced" , self.bytes_produced , "bytes --> avg." , \
-          (self.bytes_produced / self.files_produced) , "bytes/file"
+                                        self.hardlinks_produced))
+    print()
+    print("overall produced" , self.bytes_produced , "bytes --> avg." , \
+          (self.bytes_produced / self.files_produced) , "bytes/file")
 
   def _Recurse(self, path, dir_level):
     self._ProduceFilesHardlinksAndSymlinks(path)
@@ -155,6 +155,6 @@ repo_factory = RepoFactory(max_dir_depth,     \
                            min_file_size,     \
                            max_file_size)
 repo_factory.PredictResults()
-print
+print()
 repo_factory.Produce()
 repo_factory.PrintReport()
