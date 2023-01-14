@@ -1293,7 +1293,7 @@ cvmfs_config_fuser() {
   [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
 
   local skip_afs_opt=
-  if [ -d /afs ]; then
+  if mountpoint /afs >/dev/null 2>&1; then
     skip_afs_opt="-e /afs"
   fi
   lsof $skip_afs_opt | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '

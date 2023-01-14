@@ -108,5 +108,8 @@ echo "done"
 
 disable_systemd_rate_limit
 
+# Needed so that a mod_proxy can connect to the MinIO S3 service
+sudo /usr/sbin/setsebool -P httpd_can_network_connect 1
+
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"
