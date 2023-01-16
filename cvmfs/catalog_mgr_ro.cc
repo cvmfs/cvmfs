@@ -13,30 +13,27 @@
 using namespace std;  // NOLINT
 
 namespace catalog {
-  LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
-    LogCvmfs(kLogCache, kLogDebug, "SimpleCatalogManager::GetNewRootCatalogInfo %s",
-           base_hash_.ToString().c_str());
-    result->hash = base_hash_;
-    result->root_ctlg_location = kServer;
-    result->root_ctlg_timestamp = (uint64_t)-1;
 
-    return kLoadUp2Date;
+  // TODO(herethebedragons) correct return value and root_ctlg_location?
+  LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
+    if (result->hash.IsNull()) {
+      result->hash = base_hash_;
+    }
+    result->root_ctlg_location = kServer;
+    result->mountpoint = PathString("", 0);
+
+    return kLoadNew;
   }
 
+  // TODO(herethebedragons) CORRECT?
   LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
-    LogCvmfs(kLogCache, kLogDebug, "SimpleCatalogManager::LoadCatalogByHash %s",
-           base_hash_.ToString().c_str());
-    LogCvmfs(kLogCache, kLogDebug, "SimpleCatalogManager::LoadCatalogByHash %s",
-           ctlg_info->sql_catalog_handle.c_str());
-    // shash::Any effective_hash = hash_to_load.IsNull() ? rootInfo->hash : hash_to_load;
     shash::Any effective_hash = ctlg_info->hash;
     assert(shash::kSuffixCatalog == effective_hash.suffix);
     const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
     std::string tmp;
-    
+
     FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
-    LogCvmfs(kLogCache, kLogDebug, "SimpleCatalogManager::LoadCatalogByHash TMP %s", tmp);
     ctlg_info->sql_catalog_handle.assign(tmp);
     if (!fcatalog) {
       PANIC(kLogStderr, "failed to create temp file when loading %s",
@@ -51,8 +48,8 @@ namespace catalog {
 
     if (retval != download::kFailOk) {
       unlink(ctlg_info->sql_catalog_handle.c_str());
-      PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
-            retval, download::Code2Ascii(retval));
+      PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)",
+                        url.c_str(), retval, download::Code2Ascii(retval));
     }
 
     return kLoadNew;

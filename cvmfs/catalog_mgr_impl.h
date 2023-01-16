@@ -115,19 +115,27 @@ bool AbstractCatalogManager<CatalogT>::Init() {
  * are detached)
  */
 template <class CatalogT>
-LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
+LoadReturn AbstractCatalogManager<CatalogT>::RemountDryrun() {
   LogCvmfs(kLogCatalog, kLogDebug,
-           "remounting repositories (dry run %d)", dry_run);
+           "dryrun remounting repositories");
   CatalogInfo ctlg_info;
-  const LoadReturn ret = GetNewRootCatalogInfo(&ctlg_info);
+  return GetNewRootCatalogInfo(&ctlg_info);
+}
 
-  if (dry_run) {
-    return ret;
-  }
-    
+template <class CatalogT>
+LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
+  LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
+  CatalogInfo ctlg_info;
+
+  // TODO(heretherebedragons) Is this necessary or can we move it outside?
+  // allow ctlg_info from dryrun as input parameter? (= +1 IF statement but
+  // overall less compute? (depending which remount is called how often))
+  // alternatively: expose GetNewRootCatalogInfo to public
+  GetNewRootCatalogInfo(&ctlg_info);
+
   WriteLock();
 
-  const LoadError load_error = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
 
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
@@ -136,10 +144,6 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
 
     CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_info.hash, NULL);
     assert(new_root);
-    LogCvmfs(kLogCatalog, kLogDebug,
-           "AbstractCatalogManager<CatalogT>::Remount sql_catalog_handle %s", ctlg_info.sql_catalog_handle.c_str());
-    LogCvmfs(kLogCatalog, kLogDebug,
-           "AbstractCatalogManager<CatalogT>::Remount inode_gauge_ %d", inode_gauge_);
     bool retval = AttachCatalog(ctlg_info.sql_catalog_handle, new_root);
     assert(retval);
 
@@ -157,7 +161,7 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
  * Remounts to the given hash
  */
 template <class CatalogT>
-LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
+LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   const shash::Any &root_hash)
 {
   LogCvmfs(kLogCatalog, kLogDebug,
@@ -169,9 +173,10 @@ LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
   ctlg_info.mountpoint = PathString("", 0);
   ctlg_info.hash = root_hash;
   ctlg_info.root_ctlg_location = kMounted;
-  ctlg_info.root_ctlg_timestamp = platform_monotonic_time();
+  // we do not need to set revision as LoadCatalogByHash
+  // needs only mountpoint, hash and root_ctlg_location
 
-  const LoadError load_error = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
   if (load_error == kLoadNew || load_error == kLoadUp2Date) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
@@ -734,14 +739,9 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
  */
 template <class CatalogT>
 InodeRange AbstractCatalogManager<CatalogT>::AcquireInodes(uint64_t size) {
-  LogCvmfs(kLogCatalog, kLogDebug,
-           "AbstractCatalogManager<CatalogT>::AcquireInodes size %d", size);
   InodeRange result;
   result.offset = inode_gauge_;
   result.size = size;
-
-  LogCvmfs(kLogCatalog, kLogDebug,
-           "AbstractCatalogManager<CatalogT>::AcquireInodes inode_gauge_ %d", inode_gauge_);
 
   inode_gauge_ += size;
   LogCvmfs(kLogCatalog, kLogDebug, "allocating inodes from %d to %d.",
@@ -897,18 +897,11 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   ctlg_info.mountpoint = mountpoint;
   ctlg_info.root_ctlg_location = RootCatalogLocation::kMounted;
 
-  // // TODO CLEANUP WITH NEW CATALOG INFO STRUCT
+  // TODO(heretherebedragons) necessary? is mountcatalog ever called without
+  // a given mountpoint and hash?
   if (ctlg_info.mountpoint.IsEmpty() && hash.IsNull()) {
     GetNewRootCatalogInfo(&ctlg_info);
   }
-
-  // TODO
-  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' hash %s",
-             mountpoint.c_str(), hash.ToString().c_str());
-  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' rootInfo hash %s",
-             mountpoint.c_str(), ctlg_info.hash.ToString().c_str());
-  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' rootInfo location %d",
-             mountpoint.c_str(), ctlg_info.root_ctlg_location);
 
   const LoadReturn retval = LoadCatalogByHash(&ctlg_info);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
@@ -917,11 +910,9 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return NULL;
   }
 
-  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' after LoadCatalogByHash", mountpoint.c_str());
-  LogCvmfs(kLogCatalog, kLogDebug, "MountCatalog '%s' after LoadCatalogByHash hash %s",
-            mountpoint.c_str(), ctlg_info.hash .ToString().c_str());
-
-  attached_catalog = CreateCatalog(ctlg_info.mountpoint, ctlg_info.hash, parent_catalog);
+  attached_catalog = CreateCatalog(ctlg_info.mountpoint,
+                                   ctlg_info.hash,
+                                   parent_catalog);
 
   // Attach loaded catalog
   if (!AttachCatalog(ctlg_info.sql_catalog_handle, attached_catalog)) {
@@ -960,12 +951,12 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
 
   const LoadReturn load_ret = LoadCatalogByHash(&ctlg_info);
 
-  // TODO: correct if statement?
+  // TODO(heretherebedragons) correct if statement?
   if (load_ret != kLoadNew && load_ret != kLoadUp2Date) {
     return NULL;
   }
 
-  assert(hash == ctlg_info.hash); // why? 
+  assert(hash == ctlg_info.hash);  // TODO(heretherebedragons) why?
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
                                              ctlg_info.sql_catalog_handle,
                                              ctlg_info.hash);

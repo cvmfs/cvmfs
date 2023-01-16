@@ -721,15 +721,16 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadError retval =
-    mount_point_->catalog_mgr()->Remount(true /* dry_run */);
+  catalog::CatalogInfo ctlg_info;
+  catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
+
   switch (retval) {
     case catalog::kLoadUp2Date:
       LogCvmfs(kLogCvmfs, kLogDebug, "catalog up to date");
       return 0;
 
     case catalog::kLoadNew:
-      retval = mount_point_->catalog_mgr()->Remount(false /* dry_run */);
+      retval = mount_point_->catalog_mgr()->Remount();
       if (retval != catalog::kLoadNew)
         return -1;
       mount_point_->ReEvaluateAuthz();

@@ -109,6 +109,7 @@ struct cvmcache_session {
 struct cvmcache_breadcrumb {
   struct cvmcache_hash catalog_hash;
   uint64_t timestamp;
+  uint64_t revision;
 };
 
 /**

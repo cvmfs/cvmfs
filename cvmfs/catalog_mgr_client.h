@@ -83,7 +83,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   void ActivateCatalog(catalog::Catalog *catalog);
 
  private:
-  LoadError FetchCatalogByHash(const shash::Any &hash,
+  LoadReturn FetchCatalogByHash(const shash::Any &hash,
                            const std::string &name,
                            const std::string &alt_catalog_path,
                            std::string *catalog_path);
@@ -93,7 +93,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
    */
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
-  uint64_t last_root_catalog_timestamp_;
+  uint64_t mounted_root_ctlg_revision_; /**< invalid value: -1ul */
 
   UniquePtr<manifest::Manifest> manifest_;
 
@@ -104,6 +104,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool offline_mode_;  /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
+  bool fixed_root_catalog_; /**< fixed root hash */
   bool fixed_alt_root_catalog_;  /**< fixed root hash but alternative url */
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;

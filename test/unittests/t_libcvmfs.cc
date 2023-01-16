@@ -20,8 +20,9 @@
 using namespace std;  // NOLINT
 
 static void cvmfs_log_ignore(const char *msg) {
-  // Remove comment to debug test failures
-  // fprintf(stderr, "%s\n", msg);
+#ifdef DEBUGMSG
+  printf("(t_libcvmfs) %s\n", msg);
+#endif
 }
 
 class T_Libcvmfs : public ::testing::Test {

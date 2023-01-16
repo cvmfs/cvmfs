@@ -53,30 +53,30 @@ enum LoadReturn {
   kLoadNumEntries
 };
 
-typedef LoadReturn LoadError;
-
 /**
  * Location of the most recent root catalog.
  * Used as part of loading the catalog.
  */
 enum RootCatalogLocation {
-  kDefault = 0, // unknown
-  kMounted, // already loaded in mounted_catalogs_
+  kDefault = 0,  // unknown
+  kMounted,      // already loaded in mounted_catalogs_
   kServer,
   kBreadcrumb
 };
 
-
-// TODO catalog INFO
+/**
+ * Struct to contain all necessary parameters for nested and root catalogs
+ * to load them.
+ */
 struct CatalogInfo {
-  shash::Any hash;
-  PathString mountpoint;
-  std::string sql_catalog_handle; // out parameter
-  uint64_t root_ctlg_timestamp; // root catalog specific elements
-  enum RootCatalogLocation root_ctlg_location; // root catalog specific elements
+  shash::Any hash;                              // mandatory
+  PathString mountpoint;                        // mandatory
+  std::string sql_catalog_handle;               // out parameter
+  uint64_t root_ctlg_revision;                  // root catalog revision
+  enum RootCatalogLocation root_ctlg_location;  // root catalog location
 };
 
-inline const char *Code2Ascii(const LoadError error) {
+inline const char *Code2Ascii(const LoadReturn error) {
   const char *texts[kLoadNumEntries + 1];
   texts[0] = "loaded new catalog";
   texts[1] = "catalog was up to date";
@@ -151,8 +151,9 @@ class AbstractCatalogManager : public SingleCopy {
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
-  LoadError Remount(const bool dry_run);
-  LoadError ChangeRoot(const shash::Any &root_hash);
+  LoadReturn RemountDryrun();
+  LoadReturn Remount();
+  LoadReturn ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
   bool LookupPath(const PathString &path, const LookupOptions options,

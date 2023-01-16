@@ -27,9 +27,26 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
     shash::MkFromHexPtr(shash::HexPtr(from_string.substr(0, separator_pos)),
                                       shash::kSuffixCatalog);
 
-  // Get local last modified time
-  if ((from_string[separator_pos] == 'T') && (len > (separator_pos + 1))) {
-    timestamp = String2Uint64(from_string.substr(separator_pos + 1));
+  // check if revision number is included
+  int separator_pos_revision_start = separator_pos;
+  for (; (separator_pos_revision_start < len)
+            && (from_string[separator_pos_revision_start] != 'R');
+        ++separator_pos_revision_start)
+  { }
+
+  // Get local last modified time and revision
+  if (separator_pos < len - 1) {
+    if (separator_pos_revision_start + 1 >= len) {
+      timestamp = String2Uint64(from_string.substr(separator_pos + 1));
+      // TODO(heretherebedragons) old format that does not include
+      // the revision number- IS THIS THE BEST SOLUTION???
+      revision = 0;
+    } else {
+      timestamp = String2Uint64(from_string.substr(separator_pos + 1,
+                                  separator_pos_revision_start));
+      revision = String2Uint64(from_string.substr(
+                                separator_pos_revision_start + 1));
+    }
   }
 }
 
@@ -58,7 +75,8 @@ bool Breadcrumb::Export(const string &fqrn, const string &directory,
 }
 
 std::string Breadcrumb::ToString() const {
-  return catalog_hash.ToString() + "T" + StringifyInt(timestamp);
+  return catalog_hash.ToString() + "T" + StringifyInt(timestamp)
+                                 + "R" + StringifyInt(revision);
 }
 
 
@@ -230,8 +248,8 @@ bool Manifest::Export(const std::string &path) const {
  * Writes the cvmfschecksum.$repository file.  Atomic store.
  */
 bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
-  return Breadcrumb(catalog_hash_, publish_timestamp_).Export(repository_name_,
-                                                              directory, mode);
+  return Breadcrumb(catalog_hash_, publish_timestamp_, revision_).
+                      Export(repository_name_, directory, mode);
 }
 
 
@@ -250,9 +268,9 @@ Breadcrumb Manifest::ReadBreadcrumb(
     // Return invalid breadcrumb if not found
     return breadcrumb;
   }
-  char tmp[128];
+  char tmp[164];
   int read_bytes;
-  if ((read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
+  if ((read_bytes = fread(tmp, 1, 164, fbreadcrumb)) > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
   fclose(fbreadcrumb);
