@@ -1,4 +1,5 @@
 2.10.1:
+  * Fix SQlite NFS maps initialization (#3150)
   * Restore ability of cvmfs_server abort -f to survive invalid lease (#3088)
   * Ignore /afs in cvmfs_config fuser (#3090)
   * Fix building leveldb external with non-GNU patch (#3110)
