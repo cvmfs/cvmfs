@@ -1816,10 +1816,10 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   ASSERT_TRUE(retval);
   EXPECT_EQ(0, kill(child_pid, 0));
 
-  // Orphaned process are attached to some system process if their parent 
+  // Orphaned process are attached to some system process if their parent
   // process dies before them.
   // Traditionally this is "init" with pid 1.
-  // However, POSIX leaves this implementation-defined and e.g. 
+  // However, POSIX leaves this implementation-defined and e.g.
   // Ubuntu uses "systemd" - which pid changes per session
 
   // check that the PPID of the process is 1 (belongs to init)
@@ -1829,8 +1829,8 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
     EXPECT_EQ(1, child_parent_pid);
   } else {
     std::string name = GetProcessname(child_parent_pid);
-    EXPECT_TRUE(name.compare("systemd") == 0);
-  } 
+    EXPECT_STREQ(name.c_str(), "systemd");
+  }
 
   // tell the process to terminate
   Pipe shell_pipe(fd_stdout, fd_stdin);
