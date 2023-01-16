@@ -78,7 +78,7 @@ pid_t GetParentPid(const pid_t pid) {
 
 std::string GetProcessname(const pid_t pid) {
 #ifdef __APPLE__
-  std::err << "Implementation missing to get process name by pid on MAC\n";
+  std::cerr << "Implementation missing to get process name by pid on MAC\n";
   return "NO VALID PROCESSNAME";
 #else
   static const std::string label = "Name:";
