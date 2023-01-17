@@ -265,10 +265,12 @@ void FileSystem::CreateStatistics() {
      "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
+
+  TimerTree::getInstance();
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
       options_mgr_->IsOn(optarg))
   {
-    HighPrecisionTimer::g_is_enabled = true;
+    TimerTree::getInstance()->g_is_enabled = true;
   }
 
   hist_fs_lookup_ = new Log2Histogram(30);

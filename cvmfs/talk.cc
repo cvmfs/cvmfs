@@ -53,6 +53,7 @@
 #include "shortstring.h"
 #include "statistics.h"
 #include "tracer.h"
+#include "util/algorithm.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
@@ -637,7 +638,9 @@ void *TalkManager::MainResponder(void *data) {
       result += "Read\n" + file_system->hist_fs_read()->ToString();
       result += "Release\n" + file_system->hist_fs_release()->ToString();
 
-      result += "\nRaw Counters:\n" +
+      result += "\n\n" + TimerTree::getInstance()->printTimers();
+
+      result += "\n\nRaw Counters:\n" +
         mount_point->statistics()->PrintList(perf::Statistics::kPrintHeader);
 
       talk_mgr->Answer(con_fd, result);
@@ -801,6 +804,7 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
     memset(buffer, 0, sizeof(buffer));
     format_index = 0;
   }
+
   return result;
 }
 

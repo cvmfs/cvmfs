@@ -8,20 +8,21 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
-
 #include "util/atomic.h"
 #include "util/export.h"
+#include "util/logging.h"
 #include "util/murmur.hxx"
 #include "util/platform.h"
 #include "util/prng.h"
 #include "util/single_copy.h"
+#include "util/string.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
-
 
 CVMFS_EXPORT double DiffTimeSeconds(struct timeval start, struct timeval end);
 
@@ -195,24 +196,58 @@ class CVMFS_EXPORT UTLog2Histogram {
 };
 
 
-class CVMFS_EXPORT HighPrecisionTimer : SingleCopy {
+class Timer : SingleCopy {
  public:
-  static bool g_is_enabled;  // false by default
+  std::vector<Timer*> children_timers;
+  std::string name;
+  uint64_t timer_path;
+  Log2Histogram *hist;
+  atomic_int64 total_time;
+  Timer *parent;
 
-  explicit HighPrecisionTimer(Log2Histogram *recorder)
-    : timestamp_start_(g_is_enabled ? platform_monotonic_time_ns() : 0)
-    , recorder_(recorder)
-  { }
+  Timer(std::string name, uint64_t timer_path, Log2Histogram *hist,
+    Timer *parent);
+};
 
-  ~HighPrecisionTimer() {
-    if (g_is_enabled)
-      recorder_->Add(platform_monotonic_time_ns() - timestamp_start_);
-  }
+
+class TimerTree {
+ public:
+  static TimerTree *instance;
+  pthread_mutex_t timers_lock;
+  std::map<uint64_t, Timer*> timers;
+  std::vector<Timer*> root_timers;
+  bool g_is_enabled;
+
+  static TimerTree *getInstance();
+  void startTimer(std::string const name, uint8_t timer_id,
+    Log2Histogram *hist);
+  void stopTimer(bool ignore_result, uint64_t t0);
+  std::string printTimerTree(Timer *root, int level);
+  std::string printTimers();
 
  private:
-  uint64_t timestamp_start_;
-  Log2Histogram *recorder_;
+  TimerTree();
+  struct ThreadLocalStorage {
+    Timer *last_started_timer;
+
+    ThreadLocalStorage() {
+      last_started_timer = NULL;
+    }
+  };
+  pthread_key_t thread_local_storage_;
+  ThreadLocalStorage *GetTls();
 };
+
+
+class CVMFS_EXPORT TimerGuard {
+ public:
+  bool ignore_result;
+  uint64_t t0;
+
+  TimerGuard(std::string name, uint8_t timer_id, Log2Histogram *hist);
+  ~TimerGuard();
+};
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

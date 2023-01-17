@@ -15,18 +15,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <string>
+#include <utility>
 
 #include "cvmfs_config.h"
 #include "util/algorithm.h"
 #include "util/string.h"
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-bool HighPrecisionTimer::g_is_enabled = false;
-
+TimerTree* TimerTree::instance = NULL;
 
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
   // Time substraction, from GCC documentation
@@ -276,6 +277,153 @@ std::string Log2Histogram::ToString() {
 
 void Log2Histogram::PrintLog2Histogram() {
   printf("%s", this->ToString().c_str());
+}
+
+Timer::Timer(std::string name, uint64_t timer_path, Log2Histogram *hist,
+  Timer *parent) : name(name), timer_path(timer_path), hist(hist), // NOLINT
+  parent(parent) { // NOLINT
+  atomic_init64(&total_time);
+
+  if (parent != NULL) {
+    parent->children_timers.push_back(this);
+  }
+}
+
+TimerGuard::TimerGuard(std::string name, uint8_t timer_id,
+  Log2Histogram *hist) { // NOLINT
+  TimerTree *timer_tree;
+
+  timer_tree = TimerTree::getInstance();
+  if (timer_tree->g_is_enabled) {
+    ignore_result = false;
+    timer_tree->startTimer(name, timer_id, hist);
+    t0 = platform_monotonic_time_ns();
+  }
+}
+
+TimerGuard::~TimerGuard() {
+  TimerTree *timer_tree;
+
+  timer_tree = TimerTree::getInstance();
+  if (timer_tree->g_is_enabled) {
+    timer_tree->stopTimer(ignore_result, t0);
+  }
+}
+
+TimerTree::TimerTree() {
+  g_is_enabled = false;
+  pthread_mutex_init(&timers_lock, NULL);
+  pthread_key_create(&thread_local_storage_, NULL);
+}
+
+TimerTree* TimerTree::getInstance() {
+  if (instance == NULL) {
+    instance = new TimerTree();
+  }
+
+  return instance;
+}
+
+TimerTree::ThreadLocalStorage *TimerTree::GetTls() {
+  ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
+    pthread_getspecific(thread_local_storage_));
+
+  if (tls != NULL) {
+    return tls;
+  }
+
+  tls = new ThreadLocalStorage();
+  int retval = pthread_setspecific(thread_local_storage_, tls);
+  assert(retval == 0);
+
+  return tls;
+}
+
+void TimerTree::startTimer(std::string const name, uint8_t timer_id,
+  Log2Histogram *hist) {
+  Timer *this_timer;
+  uint64_t timer_path;
+
+  if (GetTls()->last_started_timer == NULL) {
+    timer_path = timer_id;
+  } else {
+    timer_path = (GetTls()->last_started_timer->timer_path << 8) + timer_id;
+  }
+
+  pthread_mutex_lock(&timers_lock);
+  if (timers.count(timer_path) == 0) {
+    Timer *newTimer = new Timer(name, timer_path, hist,
+      GetTls()->last_started_timer);
+    timers.insert(std::pair<uint64_t, Timer*>(timer_path, newTimer));
+    if (GetTls()->last_started_timer == NULL) {
+      root_timers.push_back(newTimer);
+    }
+  }
+  pthread_mutex_unlock(&timers_lock);
+
+  this_timer = timers.find(timer_path)->second;
+  GetTls()->last_started_timer = this_timer;
+}
+
+void TimerTree::stopTimer(bool ignore_result, uint64_t t0) {
+  uint64_t dt = platform_monotonic_time_ns() - t0;
+
+  if (!ignore_result) {
+    atomic_xadd64(&(GetTls()->last_started_timer->total_time),
+      static_cast<int64_t>(dt));
+  }
+
+  if (GetTls()->last_started_timer->hist != NULL) {
+    GetTls()->last_started_timer->hist->Add(dt);
+  }
+
+  GetTls()->last_started_timer = GetTls()->last_started_timer->parent;
+}
+
+std::string TimerTree::printTimerTree(Timer *root,
+  int level) {
+  std::string result;
+
+  if (g_is_enabled) {
+    for (int i = 0; i < 4 * level; i++) {
+      result += "-";
+    }
+
+    result += root->name + " ";
+    if (atomic_read64(&root->total_time) == 0) {
+      result += "Running on a thread";
+    } else {
+      result += StringifyUint(
+        (uint64_t) (atomic_read64(&root->total_time)) / 1000000) + "ms";
+    }
+
+    for (std::vector<Timer*>::iterator it =
+      root->children_timers.begin(); it != root->children_timers.end(); ++it) {
+        result += "\n" + printTimerTree(static_cast<Timer*>(*it),
+          level + 1);
+    }
+  } else {
+    result = "";
+  }
+
+  return result;
+}
+
+std::string TimerTree::printTimers()
+{
+  std::string result;
+  int64_t total_callbacks = 0;
+
+  for (std::vector<Timer*>::iterator it = root_timers.begin();
+    it != root_timers.end(); ++it) {
+    result += printTimerTree(*it, 0);
+    result += "\n\n";
+    total_callbacks += atomic_read64(&(*it)->total_time);
+  }
+  result += "Total Time Spent in Callbacks = ";
+  result += StringifyInt(total_callbacks / 1000000) + "ms";
+
+  return result;
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

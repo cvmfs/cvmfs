@@ -14,6 +14,8 @@
 #include "interrupt.h"
 #include "quota.h"
 #include "statistics.h"
+#include "timers.h"
+#include "util/algorithm.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -88,6 +90,7 @@ int Fetcher::Fetch(
   const std::string &alt_url,
   off_t range_offset)
 {
+  TimerGuard timer_guard("fetch()", FETCH_TIMER, NULL);
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
