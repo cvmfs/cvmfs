@@ -4,7 +4,6 @@
 
 #include "telemetry_aggregator_influx.h"
 
-#include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -23,14 +22,15 @@
 namespace perf {
 
 TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
-  is_zombie_ = true;
+    close(socket_fd_);
+    freeaddrinfo(res_);
 }
 
 TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
-                                                    int maximum_send_rate,
+                                                    int send_rate_sec,
                                                     OptionsManager *options_mgr,
                                                     const std::string &fqrn) :
-                      TelemetryAggregator(statistics, maximum_send_rate, fqrn) {
+                      TelemetryAggregator(statistics, send_rate_sec, fqrn) {
   int params = 0;
 
   if (options_mgr->GetValue("CVMFS_INFLUX_HOST", &influx_host_)) {
@@ -77,6 +77,12 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
                                     influx_metric_name_.c_str(),
                                     influx_extra_tags_.c_str(),
                                     influx_extra_fields_.c_str());
+    TelemetryReturn ret = OpenSocket();
+    if (ret != kTelemetrySuccess) {
+      is_zombie_ = true;
+      LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogWarn,
+               "Not enabling influx metrics. Error while open socket. %d", ret);
+    }
   } else {
     is_zombie_ = true;
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogWarn,
@@ -96,7 +102,7 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
 */
 std::string TelemetryAggregatorInflux::MakePayload() {
   // measurement and tags
-  std::string ret = "" + influx_metric_name_ + "_absolute,repo=" + fqrn_;
+  std::string ret = influx_metric_name_ + "_absolute,repo=" + fqrn_;
 
   if (influx_extra_tags_ != "") {
     ret += "," + influx_extra_tags_;
@@ -107,17 +113,14 @@ std::string TelemetryAggregatorInflux::MakePayload() {
   const int64_t revision = counters_["catalog_revision"];
   ret += "catalog_revision=" + StringifyUint(revision);
 
-  std::string tok = ",";
   for (std::map<std::string, int64_t>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     if (it->second != 0) {
-      ret += tok + it->first + "=" + StringifyInt(it->second);
-
-      tok = ",";
+      ret += "," + it->first + "=" + StringifyInt(it->second);
     }
   }
   if (influx_extra_fields_ != "") {
-    ret += tok + influx_extra_fields_;
+    ret += "," + influx_extra_fields_;
   }
 
   // timestamp
@@ -148,18 +151,17 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
   const uint64_t revision = counters_["catalog_revision"];
   ret += "catalog_revision=" + StringifyUint(revision);
 
-  std::string tok = ",";
   for (std::map<std::string, int64_t>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     int64_t value = it->second;
     int64_t old_value = old_counters_.at(it->first);
     if (value != 0) {
-      ret += tok + it->first + "=" + StringifyInt(value - old_value);
+      ret += "," + it->first + "=" + StringifyInt(value - old_value);
     }
   }
 
   if (influx_extra_fields_ != "") {
-    ret += tok + influx_extra_fields_;
+    ret += "," + influx_extra_fields_;
   }
 
   // timestamp
@@ -168,57 +170,56 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
   return ret;
 }
 
-TelemetryError TelemetryAggregatorInflux::SendToInflux(
-                                            const std::string &payload) {
+TelemetryReturn TelemetryAggregatorInflux::OpenSocket() {
     const char *hostname = influx_host_.c_str();
-    int port = influx_port_;
-
-    struct addrinfo hints, *res;
-    struct sockaddr_in *dest_addr = NULL;
+    struct addrinfo hints;
     int err;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    err = getaddrinfo(influx_host_.c_str(), NULL, &hints, &res);
-    if (err != 0 || res == NULL) {
+    err = getaddrinfo(influx_host_.c_str(), NULL, &hints, &res_);
+    if (err != 0 || res_ == NULL) {
        LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                 "Failed to resolve influx server [%s]. errno=%d",
                 hostname, errno);
-       return kTelemetryHostAddress;
+       return kTelemetryFailHostAddress;
     }
 
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)  {
+    socket_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_fd_ < 0)  {
        LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                                               "Failed to open socket");
-       freeaddrinfo(res);
-       return kTelemetrySocket;
+       freeaddrinfo(res_);
+       return kTelemetryFailSocket;
     }
 
-    dest_addr = reinterpret_cast<sockaddr_in*>(res->ai_addr);
-    dest_addr->sin_port = htons(port);
+    return kTelemetrySuccess;
+}
 
-    ssize_t num_bytes_sent = sendto(sockfd,
+TelemetryReturn TelemetryAggregatorInflux::SendToInflux(
+                                            const std::string &payload) {
+    struct sockaddr_in *dest_addr = NULL;
+    dest_addr = reinterpret_cast<sockaddr_in*>(res_->ai_addr);
+    dest_addr->sin_port = htons(influx_port_);
+
+    ssize_t num_bytes_sent = sendto(socket_fd_,
                                   payload.data(),
                                   payload.size(),
                                   0,
                                   reinterpret_cast<struct sockaddr*>(dest_addr),
                                   sizeof(struct sockaddr_in));
 
-    close(sockfd);
-    freeaddrinfo(res);
-
     if (num_bytes_sent < 0)  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                                 "Failed to send to influx. errno=%d", errno);
-      return kTelemetrySend;
+      return kTelemetryFailSend;
     } else if (static_cast<size_t>(num_bytes_sent) != payload.size())  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
                     "Incomplete send. Bytes transferred: %d. Bytes expected %d",
                     num_bytes_sent, payload.size());
-      return kTelemetrySend;
+      return kTelemetryFailSend;
     }
 
     LogCvmfs(kLogTelemetry, kLogDebug, "INFLUX: POSTING [%s]", payload.c_str());

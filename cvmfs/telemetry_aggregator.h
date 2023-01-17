@@ -1,9 +1,9 @@
 /**
  * This file is part of the CernVM File System.
  *
- * TelemetryAggregator class is a thread that snapshots the internal counters
- * of cvmfs statistic object. A custom telemetry class is needed to perform
- * the step of manipulating and sending/storing the counters.
+ * TelemetryAggregator class manages a thread that snapshots the internal
+ * counters of cvmfs statistic object. A custom telemetry class is needed to
+ * perform the step of manipulating and sending/storing the counters.
  */
 
 #ifndef CVMFS_TELEMETRY_AGGREGATOR_H_
@@ -23,13 +23,13 @@
 
 namespace perf {
 
-// Errors of telemetry classes (including custom classes)
-enum TelemetryError {
+// Return values of telemetry classes (including custom classes)
+enum TelemetryReturn {
   kTelemetrySuccess = 0,
-  kTelemetryHostAddress,
-  kTelemetryPort,
-  kTelemetrySocket,
-  kTelemetrySend
+  kTelemetryFailHostAddress,
+  kTelemetryFailPort,
+  kTelemetryFailSocket,
+  kTelemetryFailSend
 };
 
 // List of available custom telemetry classes
@@ -60,7 +60,7 @@ class TelemetryAggregator : SingleCopy {
 
  protected:
   Statistics* statistics_;
-  const int maximum_send_rate_;
+  const int send_rate_sec_;
   int pipe_terminate_[2];
   pthread_t thread_telemetry_;
   std::string fqrn_;
@@ -87,10 +87,10 @@ class TelemetryAggregator : SingleCopy {
    * Base constructor taking care of threading infrastructure.
    * Must always be called in the constructor of the custom telemetry classes.
   */
-  TelemetryAggregator(Statistics* statistics, int maximum_send_rate,
+  TelemetryAggregator(Statistics* statistics, int send_rate_sec,
                       const std::string &fqrn) :
                       statistics_(statistics),
-                      maximum_send_rate_(maximum_send_rate),
+                      send_rate_sec_(send_rate_sec),
                       fqrn_(fqrn),
                       is_zombie_(true),
                       timestamp_(0) {

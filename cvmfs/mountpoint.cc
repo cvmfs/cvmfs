@@ -1955,23 +1955,23 @@ bool MountPoint::SetupBehavior() {
   // telemetryAggregators
   if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
       && options_mgr_->IsOn(optarg)) {
-    int telemetry_send_rate = 5 * 60;  // default send rate: 5min
+    int telemetry_send_rate_sec = kDefaultTelemetrySendRateSec;
     if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
-      telemetry_send_rate = static_cast<int>(String2Uint64(optarg));
+      telemetry_send_rate_sec = static_cast<int>(String2Uint64(optarg));
 
       // minimum send rate: 5sec
-      if (telemetry_send_rate < 5) {
-        telemetry_send_rate = 5;
+      if (telemetry_send_rate_sec < kMinimumTelemetrySendRateSec) {
+        telemetry_send_rate_sec = kMinimumTelemetrySendRateSec;
       }
 
       telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
-                                    telemetry_send_rate,
-                                    options_mgr_,
+                                    telemetry_send_rate_sec,
+                                  options_mgr_,
                                     fqrn_,
                                     perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
                "Enable telemetry to report every %d seconds",
-               telemetry_send_rate);
+               telemetry_send_rate_sec);
     }
   }
 

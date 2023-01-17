@@ -578,6 +578,11 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
   static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
+  /**
+   * Default values for telemetry aggregator
+  */
+  static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
+  static const int kMinimumTelemetrySendRateSec = 5;  // 5sec
 
   MountPoint(const std::string &fqrn,
              FileSystem *file_system,

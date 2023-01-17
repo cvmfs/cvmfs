@@ -61,7 +61,7 @@ TelemetryAggregator::~TelemetryAggregator() {
 
 void TelemetryAggregator::Spawn() {
   assert(pipe_terminate_[0] == -1);
-  assert(maximum_send_rate_ > 0);
+  assert(send_rate_sec_ > 0);
   MakePipe(pipe_terminate_);
   int retval = pthread_create(&thread_telemetry_, NULL, MainTelemetry, this);
   assert(retval == 0);
@@ -75,24 +75,29 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
   struct pollfd watch_term;
   watch_term.fd = telemetry->pipe_terminate_[0];
   watch_term.events = POLLIN | POLLPRI;
-  int timeout_ms = telemetry->maximum_send_rate_ * 1000;
-  uint64_t deadline = platform_monotonic_time() + telemetry->maximum_send_rate_;
+  int timeout_ms = telemetry->send_rate_sec_ * 1000;
+  uint64_t deadline_sec = platform_monotonic_time()
+                          + telemetry->send_rate_sec_;
   while (true) {
-    // sleep and check if end - blocking wait for "maximum_send_rate_" seconds
+    // sleep and check if end - blocking wait for "send_rate_sec_" seconds
     watch_term.revents = 0;
     int retval = poll(&watch_term, 1, timeout_ms);
     if (retval < 0) {
       if (errno == EINTR) {  // external interrupt occured - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
-          timeout_ms = (now > deadline) ? 0 :
-                                      static_cast<int>((deadline - now) * 1000);
+          timeout_ms = (now > deadline_sec) ? 0 :
+                                  static_cast<int>((deadline_sec - now) * 1000);
         }
         continue;
       }
       PANIC(kLogSyslogErr | kLogDebug, "Error in telemetry thread. "
-            "Poll returned %d", retval);
+                                       "Poll returned %d", retval);
     }
+
+    // reset timeout and deadline of poll
+    timeout_ms = telemetry->send_rate_sec_ * 1000;
+    deadline_sec = platform_monotonic_time() + telemetry->send_rate_sec_;
 
     // aggregate + send stuff
     if (retval == 0) {

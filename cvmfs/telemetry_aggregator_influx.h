@@ -5,6 +5,7 @@
 #ifndef CVMFS_TELEMETRY_AGGREGATOR_INFLUX_H_
 #define CVMFS_TELEMETRY_AGGREGATOR_INFLUX_H_
 
+#include <netdb.h>
 #include <pthread.h>
 #include <stdint.h>
 
@@ -23,7 +24,7 @@ namespace perf {
 class TelemetryAggregatorInflux : TelemetryAggregator {
  public:
   TelemetryAggregatorInflux(Statistics* statistics,
-                            int maximum_send_rate,
+                            int send_rate_sec,
                             OptionsManager *options_mgr,
                             const std::string &fqrn);
   virtual ~TelemetryAggregatorInflux();
@@ -35,10 +36,13 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
   std::string influx_metric_name_;
   std::string influx_extra_fields_;
   std::string influx_extra_tags_;
+  int socket_fd_;
+  struct addrinfo *res_;
 
   std::string MakePayload();
   std::string MakeDeltaPayload();
-  TelemetryError SendToInflux(const std::string &payload);
+  TelemetryReturn OpenSocket();
+  TelemetryReturn SendToInflux(const std::string &payload);
 
   virtual void PushMetrics();
 };
