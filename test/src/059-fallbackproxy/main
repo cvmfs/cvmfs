@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Setting CVMFS_FALLBACK_PROXY"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
