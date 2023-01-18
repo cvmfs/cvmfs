@@ -148,7 +148,7 @@ __check_repair_reflog() {
   # Remaining case: a reflog is registered in the manifest but the
   # .cvmfsreflog file is missing.  In this case, we recreate the reflog.
 
-  if get_repo_info -R | grep -q ^Y; then
+  if [ $has_reflog -eq 0 ] && get_repo_info -R | grep -q ^Y; then
     echo "Warning: a reflog hash is registered in the manifest, re-creating missing reflog"
     to_syslog_for_repo $name "reference log reconstruction started"
     local repository_url
@@ -176,7 +176,7 @@ __get_checks_repo_times() {
   names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
-  for name in $names; do 
+  for name in $names; do
     # note that is_inactive_replica also does load_repo_config
     if is_inactive_replica $name; then
       continue
