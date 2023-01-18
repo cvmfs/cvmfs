@@ -92,6 +92,9 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
 }
 
 /**
+ * Creates a string in the influx data format containing the absolut values
+ * of the counters. Counters are only included if their absolut value is > 0.
+ * 
  * Influx dataformat
  * ( https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/ )
  * Syntax
@@ -110,26 +113,42 @@ std::string TelemetryAggregatorInflux::MakePayload() {
 
   // fields
   ret += " ";
-  const int64_t revision = counters_["catalog_revision"];
-  ret += "catalog_revision=" + StringifyUint(revision);
-
+  bool add_token = false;
   for (std::map<std::string, int64_t>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     if (it->second != 0) {
-      ret += "," + it->first + "=" + StringifyInt(it->second);
+      if (add_token) {
+        ret += ",";
+      }
+      ret += it->first + "=" + StringifyInt(it->second);
+      add_token = true;
     }
   }
   if (influx_extra_fields_ != "") {
-    ret += "," + influx_extra_fields_;
+    if (add_token) {
+      ret += ",";
+    }
+    ret += influx_extra_fields_;
+    add_token = true;
   }
 
   // timestamp
-  ret += " " + StringifyUint(timestamp_);
+  if (add_token) {
+    ret += " ";
+  }
+  ret += StringifyUint(timestamp_);
 
   return ret;
 }
 
 /**
+ * Creates a string in the influx data format containing the delta between
+ * 2 measurements of the same counter. Counters are only included if their 
+ * absolut value is > 0 (delta can be 0).
+ * 
+ * NOTE: As influx_extra_fields_ are static, they are excluded of this 
+ *       delta format
+ * 
  * Influx dataformat
  * ( https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/ )
  * Syntax
@@ -148,24 +167,25 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
 
   // fields
   ret += " ";
-  const uint64_t revision = counters_["catalog_revision"];
-  ret += "catalog_revision=" + StringifyUint(revision);
-
+  bool add_token = false;
   for (std::map<std::string, int64_t>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     int64_t value = it->second;
     int64_t old_value = old_counters_.at(it->first);
     if (value != 0) {
-      ret += "," + it->first + "=" + StringifyInt(value - old_value);
+      if (add_token) {
+        ret += ",";
+      }
+      ret += it->first + "=" + StringifyInt(value - old_value);
+      add_token = true;
     }
   }
 
-  if (influx_extra_fields_ != "") {
-    ret += "," + influx_extra_fields_;
-  }
-
   // timestamp
-  ret += " " + StringifyUint(timestamp_);
+  if (add_token) {
+    ret += " ";
+  }
+  ret += StringifyUint(timestamp_);
 
   return ret;
 }

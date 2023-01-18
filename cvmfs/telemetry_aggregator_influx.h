@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "gtest/gtest_prod.h"
 #include "options.h"
 #include "statistics.h"
 #include "telemetry_aggregator.h"
@@ -22,6 +23,10 @@
 namespace perf {
 
 class TelemetryAggregatorInflux : TelemetryAggregator {
+  FRIEND_TEST(T_TelemetryAggregator, EmptyCounters);
+  FRIEND_TEST(T_TelemetryAggregator, FailCreate);
+  FRIEND_TEST(T_TelemetryAggregator, ExtraFields_Tags);
+  FRIEND_TEST(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags);
  public:
   TelemetryAggregatorInflux(Statistics* statistics,
                             int send_rate_sec,

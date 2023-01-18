@@ -1965,10 +1965,10 @@ bool MountPoint::SetupBehavior() {
       }
 
       telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
-                                    telemetry_send_rate_sec,
-                                  options_mgr_,
-                                    fqrn_,
-                                    perf::kTelemetryInflux);
+                                                        telemetry_send_rate_sec,
+                                                        options_mgr_,
+                                                        fqrn_,
+                                                        perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
                "Enable telemetry to report every %d seconds",
                telemetry_send_rate_sec);

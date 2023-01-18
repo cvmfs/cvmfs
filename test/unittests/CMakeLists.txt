@@ -345,6 +345,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_swissknife_lease.cc
   t_sync_union_tarball.cc
   t_synchronizing_counter.cc
+  t_telemetry_aggregator.cc
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
