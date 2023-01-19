@@ -151,7 +151,7 @@ check_libfuse3() {
   replace_short_symlink_with_long $short_name $long_name $symlink_name
   local new_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
   # res_switch must be 0
-  if [ "$new_symlink_pointer" = "$long_name" ] && [ "$new_symlink_pointer" != "$short_name" ]; then
+  if [ "$new_symlink_pointer" = "$long_name" ] && [ "$old_symlink_pointer" = "$short_name" ]; then
     local res_switch="0"
   else
     local res_switch="1"

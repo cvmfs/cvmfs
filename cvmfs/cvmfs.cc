@@ -1649,15 +1649,20 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
       conn->want |= FUSE_CAP_CACHE_SYMLINKS;
       LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
                                     "Enable symlink caching");
+      #ifndef FUSE_CAP_EXPIRE_ONLY
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+          "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+          "mountpoints on top of symlinks will break!");
+      #endif
     } else {
       mount_point_->DisableCacheSymlinks();
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
            "FUSE: Symlink caching requested but missing fuse kernel support, "
            "falling back to no caching");
     }
 #else
     mount_point_->DisableCacheSymlinks();
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
           "FUSE: Symlink caching requested but missing libfuse support, "
           "falling back to no caching");
 #endif
@@ -1668,6 +1673,10 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     mount_point_->EnableFuseExpireEntry();
     LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
                                    "Enable fuse_expire_entry");
+  } else if (mount_point_->cache_symlinks()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+      "mountpoints on top of symlinks will break!");
   }
 #endif
 }

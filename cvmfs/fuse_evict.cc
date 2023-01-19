@@ -213,7 +213,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 #ifdef FUSE_CAP_EXPIRE_ONLY
       fuse_lowlevel_notify_expire_entry(channel_or_session,
         entry_parent, entry_name.GetChars(), entry_name.GetLength(),
-        fuse_expire_flags::FUSE_LL_EXPIRE_ONLY);
+        FUSE_LL_EXPIRE_ONLY);
 #else
       fuse_lowlevel_notify_inval_entry(channel_or_session,
         entry_parent, entry_name.GetChars(), entry_name.GetLength());
