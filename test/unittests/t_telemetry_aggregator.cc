@@ -22,7 +22,7 @@ namespace perf {
 class T_TelemetryAggregator : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    FILE *temp_file = CreateTempFile("./cvmfs_ut_TelemetryAggregator", 0600, 
+    FILE *temp_file = CreateTempFile("./cvmfs_ut_TelemetryAggregator", 0600,
                                      "w", &config_file_);
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
@@ -60,7 +60,7 @@ class T_TelemetryAggregator : public ::testing::Test {
 
 TEST_F(T_TelemetryAggregator, EmptyCounters) {
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx = 
+  perf::TelemetryAggregatorInflux telemetry_influx =
                       perf::TelemetryAggregatorInflux(&statistics_,
                                                       telemetry_send_rate_sec,
                                                       &options_manager_,
@@ -78,7 +78,7 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  for(std::vector<std::string>::iterator itr = payload_split.begin();
+  for (std::vector<std::string>::iterator itr = payload_split.begin();
                                          itr != payload_split.end();
                                          itr++) {
     if (Trim(*itr).size() < 1) {
@@ -96,11 +96,11 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
 TEST_F(T_TelemetryAggregator, FailCreate) {
   int telemetry_send_rate_sec = 10;
   options_manager_.UnsetValue("CVMFS_INFLUX_HOST");
-  perf::TelemetryAggregatorInflux telemetry_influx = 
+  perf::TelemetryAggregatorInflux telemetry_influx =
                       perf::TelemetryAggregatorInflux(&statistics_,
                                                       telemetry_send_rate_sec,
                                                       &options_manager_,
-                                                      fqrn_);  
+                                                      fqrn_);
   EXPECT_TRUE(telemetry_influx.is_zombie_);
 }
 
@@ -109,7 +109,7 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx = 
+  perf::TelemetryAggregatorInflux telemetry_influx =
                       perf::TelemetryAggregatorInflux(&statistics_,
                                                       telemetry_send_rate_sec,
                                                       &options_manager_,
@@ -128,7 +128,7 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  for(std::vector<std::string>::iterator itr = payload_split.begin();
+  for (std::vector<std::string>::iterator itr = payload_split.begin();
                                          itr != payload_split.end();
                                          itr++) {
     if (Trim(*itr).size() < 1) {
@@ -149,7 +149,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx = 
+  perf::TelemetryAggregatorInflux telemetry_influx =
                       perf::TelemetryAggregatorInflux(&statistics_,
                                                       telemetry_send_rate_sec,
                                                       &options_manager_,
@@ -168,7 +168,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  for(std::vector<std::string>::iterator itr = payload_split.begin();
+  for (std::vector<std::string>::iterator itr = payload_split.begin();
                                          itr != payload_split.end();
                                          itr++) {
     if (Trim(*itr).size() < 1) {
@@ -198,7 +198,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   payload = telemetry_influx.MakePayload();
   payload_split = SplitString(payload, ' ');
   // remove whitespace-only strings from the vector
-  for(std::vector<std::string>::iterator itr = payload_split.begin();
+  for (std::vector<std::string>::iterator itr = payload_split.begin();
                                          itr != payload_split.end();
                                          itr++) {
     if (Trim(*itr).size() < 1) {
@@ -212,11 +212,13 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   EXPECT_NO_FATAL_FAILURE(String2Uint64(payload_split[2]));
 
   // DELTA VALUES
-  string delta_payload_header = "influx_test_delta,repo=" + fqrn_+ ",test_tag=1";
+  string delta_payload_header = "influx_test_delta,repo=" + fqrn_
+                                + ",test_tag=1";
   string delta_payload_fields ="test.c1=1,test.c3=10";
 
   string delta_payload = telemetry_influx.MakeDeltaPayload();
-  std::vector<std::string> delta_payload_split = SplitString(delta_payload, ' ');
+  std::vector<std::string> delta_payload_split
+                                              = SplitString(delta_payload, ' ');
 
   EXPECT_EQ(delta_payload_split.size(), 3u);
   EXPECT_STREQ(delta_payload_header.c_str(), delta_payload_split[0].c_str());
@@ -237,7 +239,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   payload = telemetry_influx.MakePayload();
   payload_split = SplitString(payload, ' ');
   // remove whitespace-only strings from the vector
-  for(std::vector<std::string>::iterator itr = payload_split.begin();
+  for (std::vector<std::string>::iterator itr = payload_split.begin();
                                          itr != payload_split.end();
                                          itr++) {
     if (Trim(*itr).size() < 1) {
@@ -263,4 +265,4 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   EXPECT_NO_FATAL_FAILURE(String2Uint64(delta_payload_split[2]));
 }
 
-} // END namespace perf
+}  // END namespace perf

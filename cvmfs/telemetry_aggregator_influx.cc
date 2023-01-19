@@ -255,6 +255,7 @@ void TelemetryAggregatorInflux::PushMetrics() {
     delta_payload = MakeDeltaPayload();
     payload = payload + "\n" + delta_payload;
   }
+  payload += "\n";
 
   // send to influx
   SendToInflux(payload);

@@ -43,6 +43,7 @@ class TelemetryAggregator : SingleCopy {
   FRIEND_TEST(T_TelemetryAggregator, FailCreate);
   FRIEND_TEST(T_TelemetryAggregator, ExtraFields_Tags);
   FRIEND_TEST(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags);
+
  public:
   /**
    * Creates the requested telemetry aggregator. This function is also used to
