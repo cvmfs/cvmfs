@@ -1,4 +1,5 @@
 2.10.1:
+  * Improve "mount transfer" syslog message (#2956)
   * Fix false recreation of the reflog in cvmfs_server check (#3123)
   * Fix SQlite NFS maps initialization (#3150)
   * Restore ability of cvmfs_server abort -f to survive invalid lease (#3088)
