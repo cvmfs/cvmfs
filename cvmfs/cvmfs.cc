@@ -471,7 +471,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   if (mount_point_->fuse_expire_entry()
       || (mount_point_->cache_symlinks() && dirent.IsLink())) {
     LogCvmfs(kLogCache, kLogDebug, "Dentry to evict: %s", name);
-    mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
+    mount_point_->dentry_tracker()->Add(parent_fuse, name,
+                                        static_cast<uint64_t>(timeout));
   }
 
   fuse_remounter_->fence()->Leave();
