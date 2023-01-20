@@ -306,8 +306,8 @@ void *TalkManager::MainResponder(void *data) {
         bool retval = cvmfs::SendFuseFd(socket_path);
         talk_mgr->Answer(con_fd, retval ? "OK\n" : "Failed\n");
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-                 "Transfer fuse connection to new mount (via %s): %s",
-                 socket_path.c_str(), retval ? "success" : "failure");
+                 "Attempt to send fuse connection info to new mount (via %s)%s",
+                 socket_path.c_str(), retval ? "" : " -- failed!");
       }
     } else if (line.substr(0, 7) == "remount") {
       FuseRemounter::Status status;
