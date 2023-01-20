@@ -60,11 +60,10 @@ class T_TelemetryAggregator : public ::testing::Test {
 
 TEST_F(T_TelemetryAggregator, EmptyCounters) {
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx =
-                      perf::TelemetryAggregatorInflux(&statistics_,
-                                                      telemetry_send_rate_sec,
-                                                      &options_manager_,
-                                                      fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
+                                                   telemetry_send_rate_sec,
+                                                   &options_manager_,
+                                                   fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
@@ -96,11 +95,10 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
 TEST_F(T_TelemetryAggregator, FailCreate) {
   int telemetry_send_rate_sec = 10;
   options_manager_.UnsetValue("CVMFS_INFLUX_HOST");
-  perf::TelemetryAggregatorInflux telemetry_influx =
-                      perf::TelemetryAggregatorInflux(&statistics_,
-                                                      telemetry_send_rate_sec,
-                                                      &options_manager_,
-                                                      fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
+                                                   telemetry_send_rate_sec,
+                                                   &options_manager_,
+                                                   fqrn_);
   EXPECT_TRUE(telemetry_influx.is_zombie_);
 }
 
@@ -109,11 +107,10 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx =
-                      perf::TelemetryAggregatorInflux(&statistics_,
-                                                      telemetry_send_rate_sec,
-                                                      &options_manager_,
-                                                      fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
+                                                   telemetry_send_rate_sec,
+                                                   &options_manager_,
+                                                   fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
@@ -149,11 +146,10 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx =
-                      perf::TelemetryAggregatorInflux(&statistics_,
-                                                      telemetry_send_rate_sec,
-                                                      &options_manager_,
-                                                      fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
+                                                   telemetry_send_rate_sec,
+                                                   &options_manager_,
+                                                   fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
