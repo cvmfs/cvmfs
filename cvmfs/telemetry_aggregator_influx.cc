@@ -21,16 +21,13 @@
 
 namespace perf {
 
-TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
-    close(socket_fd_);
-    freeaddrinfo(res_);
-}
-
 TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
                                                     int send_rate_sec,
                                                     OptionsManager *options_mgr,
                                                     const std::string &fqrn) :
-                      TelemetryAggregator(statistics, send_rate_sec, fqrn) {
+                      TelemetryAggregator(statistics, send_rate_sec, fqrn),
+                      influx_extra_fields_(""), influx_extra_tags_(""),
+                      socket_fd_(-1), res_(NULL) {
   int params = 0;
 
   if (options_mgr->GetValue("CVMFS_INFLUX_HOST", &influx_host_)) {
@@ -88,6 +85,15 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogWarn,
              "Not enabling influx metrics. Not all mandatory variables set: "
              "CVMFS_INFLUX_METRIC_NAME, CVMFS_INFLUX_HOST, CVMFS_INFLUX_PORT");
+  }
+}
+
+TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
+  if (socket_fd_ >= 0) {
+      close(socket_fd_);
+  }
+  if (res_) {
+    freeaddrinfo(res_);
   }
 }
 
