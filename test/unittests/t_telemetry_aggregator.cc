@@ -27,7 +27,7 @@ class T_TelemetryAggregator : public ::testing::Test {
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
 
-    fprintf(temp_file,
+    (void*) fprintf(temp_file,
             "CVMFS_TELEMETRY_SEND=ON\n"
             "CVMFS_TELEMETRY_RATE=5\n"
             "CVMFS_INFLUX_HOST=localhost\n"

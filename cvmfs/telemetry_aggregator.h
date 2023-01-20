@@ -106,7 +106,7 @@ class TelemetryAggregator : SingleCopy {
 
   /**
    * PushMetrics is called after the snapshot of the counters.
-   * It should perform all manipulation needed for the counters and the
+   * It should perform all manipulations needed for the counters and the
    * sending/storing of the counters.
    *
    * Needs to be implemented in the custom telemetry class.
