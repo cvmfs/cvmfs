@@ -26,6 +26,7 @@ import sys
 import os
 import math
 import random
+import shutil
 from optparse import OptionParser
 
 # for python 2/3 compatibility:
@@ -47,7 +48,7 @@ def PrintError(msg):
 class RepoFactory:
   def __init__(self, max_dir_depth, num_subdirs, num_files_per_dir,    \
                symlink_ratio, hardlink_ratio, repo_dir, min_file_size, \
-               max_file_size):
+               max_file_size, duplicate_ratio=0.0):
     self.max_dir_depth      = max_dir_depth
     self.num_subdirs        = num_subdirs
     self.num_files_per_dir  = num_files_per_dir
@@ -56,6 +57,7 @@ class RepoFactory:
     self.repo_dir           = repo_dir
     self.min_file_size      = min_file_size
     self.max_file_size      = max_file_size
+    self.duplicate_ratio    = duplicate_ratio
     self.dirs_produced      = 0
     self.files_produced     = 0
     self.symlinks_produced  = 0
@@ -106,6 +108,8 @@ class RepoFactory:
         self._ProduceSymlink(''.join([path, "/symlink", str(i)]), master_file)
       elif random_val < self.symlink_ratio + self.hardlink_ratio:
         self._ProduceHardlink(''.join([path, "/hardlink", str(i)]), master_file)
+      elif random.random() < self.duplicate_ratio:
+        shutil.copyfile(master_file, ''.join([path, "/file", str(i)]))
       else:
         self._ProduceFile(''.join([path, "/file", str(i)]))
 

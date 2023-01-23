@@ -33,7 +33,12 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 
+
+
 using namespace std;  // NOLINT
+
+map<std::string, int> _dev_chunk_map;
+int _dev_duplicate_chunk_counter = 0;
 
 namespace swissknife {
 
@@ -149,8 +154,10 @@ bool CommandCheck::Exists(const string &file)
 {
   if (!is_remote_) {
     return FileExists(file) || SymlinkExists(file);
+
   } else {
     const string url = repo_base_path_ + "/" + file;
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[Exists::url] %s", url.c_str());
     download::JobInfo head(&url, false);
     return download_manager()->Fetch(&head) == download::kFailOk;
   }
@@ -313,6 +320,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                         catalog::DeltaCounters *computed_counters,
                         set<PathString> *bind_mountpoints)
 {
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[check_chunks_] %i",
+             check_chunks_);
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
@@ -375,6 +384,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
         chunk_path += shash::kSuffixMicroCatalog;
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[chunkpath] %s",
+             chunk_path.c_str());
       if (!Exists(chunk_path)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
@@ -567,6 +578,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
           const string chunk_path = "data/" + chunk_hash.MakePath();
+          if (_dev_chunk_map.find(chunk_path) == _dev_chunk_map.end()) {
+              _dev_chunk_map[chunk_path] = 1;
+          } else {
+              _dev_duplicate_chunk_counter +=1;
+          }
           if (!Exists(chunk_path)) {
             LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
                                             "offset: %d | size: %d) missing",
@@ -591,6 +607,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
     }
   }  // Loop through entries
+
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[_dev_duplicate_chunk_counter] %i", _dev_duplicate_chunk_counter);
 
   // Check if nested catalog marker has been found
   if (!path.IsEmpty() && (path == catalog->mountpoint()) &&
