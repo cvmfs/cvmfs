@@ -27,13 +27,13 @@ class T_TelemetryAggregator : public ::testing::Test {
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
 
-    (void*) fprintf(temp_file,
+    int result = fprintf(temp_file,
             "CVMFS_TELEMETRY_SEND=ON\n"
             "CVMFS_TELEMETRY_RATE=5\n"
             "CVMFS_INFLUX_HOST=localhost\n"
             "CVMFS_INFLUX_PORT=8092\n"
             "CVMFS_INFLUX_METRIC_NAME=influx_test");
-    int result = fclose(temp_file);
+    result = fclose(temp_file);
     ASSERT_EQ(0, result);
 
     c1_ = statistics_.Register("test.c1", "test counter 1");
