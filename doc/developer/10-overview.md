@@ -14,4 +14,6 @@ While most of it is explained in detail in the [documentation](https://cvmfs.rea
   - [Setup CVMFS Server with S3 Storage](42-setup-s3storage.md)
   - [Setup CVMFS Client](50-setup-cvmfs-client.md)
 - [Debugging and Testing](60-debugging-and-testing.md)
+- Coding Templates
+  - [Execute Work Every X Sec (in Separate Thread)](70-coding_template_timed-loop-thread.md)
 
