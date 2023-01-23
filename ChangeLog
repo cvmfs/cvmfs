@@ -19,6 +19,7 @@
   * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
 2.10.1:
+  * Improve file reset logic on download retries (#3085)
   * Improve "mount transfer" syslog message (#2956)
   * Fix false recreation of the reflog in cvmfs_server check (#3123)
   * Fix SQlite NFS maps initialization (#3150)
