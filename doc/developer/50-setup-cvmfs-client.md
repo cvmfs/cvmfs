@@ -54,7 +54,7 @@ The recommended setup for regular users:
 
 For any other repository `CVMFS_HTTP_PROXY` must be set manually.
 
-**Inside CERN: Mounting Repositories of Experiments**
+<u>**Inside CERN: Mounting Repositories of Experiments**</u>
 
 Example: Mount repository `sft.cern.ch`
 

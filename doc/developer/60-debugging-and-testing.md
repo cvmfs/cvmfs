@@ -8,7 +8,7 @@ The easiest way of live debugging is to mount the client in debug (`-d`) and for
 Mounting with `cvmfs2` allows also to set a few parameters, e.g. `libfuse=` to select `Fuse2` or 
 `Fuse3`.
 
-Example mounting with `Fuse3`
+Example mounting with `Fuse3` on mount point `/mnt/test`
 ```bash
   export CVMFS_REPO=symlink.test.repo
   sudo /usr/bin/cvmfs2  -d -f \
@@ -17,9 +17,9 @@ Example mounting with `Fuse3`
                         /mnt/test
 ```
 
-**Note**:
-The `uid` and `gid` are the `user id` and `group id` of the `cvmfs` user.
-They will be different on every system but the here provided code discovers them automatically.
+> **_NOTE_** &nbsp;
+> The `uid` and `gid` are the `user id` and `group id` of the `cvmfs` user.
+> They will be different on every system but the here provided code discovers them automatically.
 ### Useful commands
 
 All commands require `sudo`
@@ -77,14 +77,14 @@ Writing your own integration tests is done the following way:
 - Your test can be executed like all the other tests. No compilation of the `cvmfs` source code needed.
 
 
-**Tips**
-- `return` values must be handed up to the parent function `my_sub_func || return $?`
-- For readability it might be nice to split the test routines in multiple files
-    - Use the line `source ./src/701-xattr-catalog_counters/setup_teardown` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
-- For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
-  ```bash
-  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
-  ```        
+> **_Tips_** &nbsp;
+> - `return` values must be handed up to the parent function `my_sub_func || return $?`
+> - For readability it might be nice to split the test routines in multiple files
+>     - Use the line `source ./src/701-xattr-catalog_counters/<filename>` to include another file in the file `main`. It should be positioned after the `cvmfs_test_suites` parameter
+> - For `cvmfs_talk` when interacting with locally mounted repository (= *server test*) you have to use the socket of the repository and not the repository name
+>   ```bash
+>   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs
+>   ```        
 
 ## Unit Tests
 

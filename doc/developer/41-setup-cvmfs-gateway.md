@@ -3,9 +3,9 @@
 The idea behind the gateway is that only the gateway has access to CernVM-FS storage and that it coordinates all concurrent transactions via leases.
 This allows multiple publishers to modify data in the same repository but at different data locations within the repository.
 
-**Note**: 
-- At the moment, the gateway does not support container publishing via *remote publishers*.
-- Transaction executed directly on the gateway are NOT protected by leases. **DO NOT DO THIS** unless you manually took a lease to protect the integrity of the gateway and prevent access from the publisher nodes (e.g. useful for garbage collection).
+> **_WARNING_** &nbsp;
+> - At the moment, the gateway does not support container publishing via *remote publishers*.
+> - Transaction executed directly on the gateway are NOT protected by leases. **DO NOT DO THIS** unless you manually took a lease to protect the integrity of the gateway and prevent access from the publisher nodes (e.g. useful for garbage collection).
 
 ## Setup Gateway
 
