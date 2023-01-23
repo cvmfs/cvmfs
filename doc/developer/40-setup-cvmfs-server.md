@@ -7,7 +7,14 @@
 ### Goal
  - Create, modify and delete CernVM-FS repository called `local.test.repo` 
 
-**NOTE**: If you do not disable `autofs` before any of the CernVM-FS server manipulation commands you can get in a broken state which can only be resolved by restarting the entire machine! (Independent of if you later on disable `autofs`)
+> **_WARNING_** &nbsp;
+>  If you do not disable `autofs` before any of the CernVM-FS server manipulation commands you can get in a broken state which can only be resolved by restarting the entire machine! (Independent of if you later on disable `autofs`)
+> 
+> In case `autofs` ends up in the broken state, try the following first before restarting:
+> - `sudo cvmfs_config killall`
+> - `sudo cvmfs_wipecache`
+> - `sudo systemctl restart autofs`
+> - If any of those commands hang, try to manually `umount` all `/cvmfs` repos and try again. If nothing helps: restart
 
 ```bash
     ####################################################
