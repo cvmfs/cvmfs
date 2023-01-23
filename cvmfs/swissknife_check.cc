@@ -33,12 +33,15 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 
-
-
 using namespace std;  // NOLINT
 
-map<std::string, int> _dev_chunk_map;
-int _dev_duplicate_chunk_counter = 0;
+// for map of duplicate entries; as in kvstore.cc
+static inline uint32_t hasher_any(const shash::Any &key) {
+  // We'll just do the same thing as hasher_md5, since every hash is at
+  // least as large.
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+}
+
 
 namespace swissknife {
 
@@ -154,7 +157,6 @@ bool CommandCheck::Exists(const string &file)
 {
   if (!is_remote_) {
     return FileExists(file) || SymlinkExists(file);
-
   } else {
     const string url = repo_base_path_ + "/" + file;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[Exists::url] %s", url.c_str());
@@ -320,8 +322,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                         catalog::DeltaCounters *computed_counters,
                         set<PathString> *bind_mountpoints)
 {
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[check_chunks_] %i",
-             check_chunks_);
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
@@ -341,14 +341,24 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   typedef map< uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
   HardlinkMap hardlinks;
   bool found_nested_marker = false;
+  char duplicate_lookup_result = 0;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
+    entry_needs_check_ = 1;
     PathString full_path(path);
     full_path.Append("/", 1);
     full_path.Append(entries[i].name().GetChars(),
                      entries[i].name().GetLength());
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s",
              full_path.c_str());
+
+     if (!duplicates_map_.Lookup(entries[i].checksum(),
+                                 &duplicate_lookup_result))
+     {
+         duplicates_map_.Insert(entries[i].checksum(), 1);
+     } else {
+         entry_needs_check_ = 0;
+     }
 
     // Name must not be empty
     if (entries[i].name().IsEmpty()) {
@@ -378,7 +388,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (check_chunks_ &&
+    if (check_chunks_ && entry_needs_check_ &&
         !entries[i].checksum().IsNull() && !entries[i].IsExternalFile())
     {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
@@ -578,11 +588,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
           const string chunk_path = "data/" + chunk_hash.MakePath();
-          if (_dev_chunk_map.find(chunk_path) == _dev_chunk_map.end()) {
-              _dev_chunk_map[chunk_path] = 1;
-          } else {
-              _dev_duplicate_chunk_counter +=1;
-          }
           if (!Exists(chunk_path)) {
             LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
                                             "offset: %d | size: %d) missing",
@@ -607,8 +612,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
     }
   }  // Loop through entries
-
-  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[_dev_duplicate_chunk_counter] %i", _dev_duplicate_chunk_counter);
 
   // Check if nested catalog marker has been found
   if (!path.IsEmpty() && (path == catalog->mountpoint()) &&
@@ -1082,6 +1085,9 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              subtree_path.c_str());
     return 1;
   }
+
+  const shash::Any hash_zero(shash::kMd5);
+  duplicates_map_.Init(16, hash_zero, hasher_any);
 
   catalog::DeltaCounters computed_counters;
   successful = InspectTree(subtree_path,

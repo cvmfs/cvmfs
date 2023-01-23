@@ -10,6 +10,7 @@
 
 #include "catalog.h"
 #include "crypto/hash.h"
+#include "smallhash.h"
 #include "swissknife.h"
 
 namespace download {
@@ -91,6 +92,8 @@ class CommandCheck : public Command {
   std::string repo_base_path_;
   bool        check_chunks_;
   bool        is_remote_;
+  bool        entry_needs_check_;
+  SmallHashDynamic<shash::Any, char> duplicates_map_;
 };
 
 }  // namespace swissknife
