@@ -22,7 +22,7 @@ search paths are examined.
 
 Content is published into `/cvmfs` by means of dedicated "release manager
 machines". The release manager machines provide a writeable CernVM-FS instance
-by means of a union file system (`aufs` or `overlayfs`) on top of the read-only
+by means of a union file system (e.g., `overlayfs`) on top of the read-only
 client. When publishing, the CernVM-FS server tools process new and modified
 data from the union file system's writable branch and transform the data into
 the CernVM-FS storage format.
