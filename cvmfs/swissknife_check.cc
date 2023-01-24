@@ -345,7 +345,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
   for (unsigned i = 0; i < entries.size(); ++i) {
     const bool entry_needs_check = 
-          !entries[i].checksum().IsNull() && duplicates_map_.Contains(entries[i].checksum());
+          !entries[i].checksum().IsNull() && !duplicates_map_.Contains(entries[i].checksum());
     if (entry_needs_check) 
         duplicates_map_.Insert(entries[i].checksum(), 1);
     PathString full_path(path);
@@ -583,15 +583,21 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         // are all data chunks in the data store?
         if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
-          const string chunk_path = "data/" + chunk_hash.MakePath();
-          if (!Exists(chunk_path)) {
-            LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                            "offset: %d | size: %d) missing",
-                     this_chunk.content_hash().ToStringWithSuffix().c_str(),
-                     full_path.c_str(),
-                     this_chunk.offset(),
-                     this_chunk.size());
-            retval = false;
+          // for performance reasons, only perform the check once
+          // and skip if the hash has been checked before
+          if (duplicates_map_.Contains(chunk_hash)) {
+            const string chunk_path = "data/" + chunk_hash.MakePath();
+            if (!Exists(chunk_path)) {
+              LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
+                                              "offset: %d | size: %d) missing",
+                       this_chunk.content_hash().ToStringWithSuffix().c_str(),
+                       full_path.c_str(),
+                       this_chunk.offset(),
+                       this_chunk.size());
+              retval = false;
+            }
+          } else { // now hash is checked - add it to map
+            duplicates_map_.Insert(chunk_hash, 1);
           }
         }
       }
