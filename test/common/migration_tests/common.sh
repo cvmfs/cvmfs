@@ -31,18 +31,7 @@ guess_package_url() {
     local flavor="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
     package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
 
-  # SLC 5 and 6
-  elif [ x$(lsb_release --id --short 2>/dev/null) = x"ScientificCERNSLC" ]; then
-    local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9][0-9]* .*$/\1/')
-    local architecture=$(uname -m)
-    if [ x"$slc_major_version" = x"5" ] || [ x"$slc_major_version" = x"6" ]; then
-      if [ x"$slc_major_version" = x"5" ] && [ x"$architecture" = x"i686" ]; then
-        architecture="i386"
-      fi
-      package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
-    fi
-
-  # CentOS 7
+  # CentOS 7, 8
   elif [ x$(lsb_release --id --short 2>/dev/null) = x"CentOS" ]; then
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
@@ -53,6 +42,14 @@ guess_package_url() {
     local fedora_version=$(cat /etc/fedora-release | tr -Cd 0-9)
     local architecture=$(uname -m)
     package_file_name="${package_name}-${cvmfs_version_string}.fc${fedora_version}.${architecture}.rpm"
+
+  # CentOS 9
+  elif [ -f /etc/os-release ]; then
+    local platform="$(. /etc/os-release; echo $PLATFORM_ID)"
+    if [ x"$platform" -eq "xplatform:el9" ]; then
+      local architecture=$(uname -m)
+      package_file_name="${package_name}-${cvmfs_version_string}.el9.${architecture}.rpm"
+    fi
 
   # to be extended
   else
