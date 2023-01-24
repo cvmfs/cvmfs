@@ -92,7 +92,6 @@ class CommandCheck : public Command {
   std::string repo_base_path_;
   bool        check_chunks_;
   bool        is_remote_;
-  bool        entry_needs_check_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
 };
 

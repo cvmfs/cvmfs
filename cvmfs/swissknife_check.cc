@@ -342,10 +342,12 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   typedef map< uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
   HardlinkMap hardlinks;
   bool found_nested_marker = false;
-  char duplicate_lookup_result = 0;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
-    entry_needs_check_ = 1;
+    const bool entry_needs_check = 
+          !entries[i].checksum().IsNull() && duplicates_map_.Contains(entries[i].checksum());
+    if (entry_needs_check) 
+        duplicates_map_.Insert(entries[i].checksum(), 1);
     PathString full_path(path);
     full_path.Append("/", 1);
     full_path.Append(entries[i].name().GetChars(),
@@ -353,13 +355,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s",
              full_path.c_str());
 
-     if (!duplicates_map_.Lookup(entries[i].checksum(),
-                                 &duplicate_lookup_result))
-     {
-         duplicates_map_.Insert(entries[i].checksum(), 1);
-     } else {
-         entry_needs_check_ = 0;
-     }
 
     // Name must not be empty
     if (entries[i].name().IsEmpty()) {
@@ -389,7 +384,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (check_chunks_ && entry_needs_check_ &&
+    if (check_chunks_ && entry_needs_check &&
         !entries[i].checksum().IsNull() && !entries[i].IsExternalFile())
     {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
