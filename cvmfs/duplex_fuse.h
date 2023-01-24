@@ -15,6 +15,11 @@
     // Empty structs have different sizes in C and C++, hence the dummy int
     struct fuse_chan { int dummy; };
     struct fuse_lowlevel_ops { int dummy; };  // for loader.h
+    enum fuse_expire_flags {
+        FUSE_LL_EXPIRE_ONLY     = (1 << 0),
+    };
+
+
     // Defined in t_fuse_evict.cc
     extern unsigned fuse_lowlevel_notify_inval_inode_cnt;
     extern unsigned fuse_lowlevel_notify_inval_entry_cnt;
@@ -26,6 +31,12 @@
     }
     static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
       void *, unsigned /*fuse_ino_t*/, const char *, size_t)  // NOLINT
+    {
+      fuse_lowlevel_notify_inval_entry_cnt++;
+      return -1;
+    }
+    static int __attribute__((used)) fuse_lowlevel_notify_expire_entry(
+      void *, unsigned /*fuse_ino_t*/, const char *, size_t, enum fuse_expire_flags)  // NOLINT
     {
       fuse_lowlevel_notify_inval_entry_cnt++;
       return -1;

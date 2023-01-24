@@ -1205,6 +1205,26 @@ bool MountPoint::ReloadBlacklists() {
   return result;
 }
 
+/**
+ * Disables kernel caching of symlinks. 
+ * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
+ * linux kernel >= 4.2. Some OS might backport it.
+ * 
+ * NOTE: This function should only be called before or within cvmfs_init().
+ * 
+ */
+void MountPoint::DisableCacheSymlinks() {
+  cache_symlinks_ = false;
+}
+
+/**
+ * Instead of invalidate dentries, they should be expired. 
+ * Fixes issues with mount-on-top mounts and symlink caching.
+ */
+void MountPoint::EnableFuseExpireEntry() {
+  fuse_expire_entry_ = true;
+}
+
 
 /**
  * The option_mgr parameter can be NULL, in which case the global option manager
@@ -1752,6 +1772,8 @@ MountPoint::MountPoint(
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
   , enforce_acls_(false)
+  , cache_symlinks_(false)
+  , fuse_expire_entry_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
@@ -1822,7 +1844,6 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
 }
-
 
 bool MountPoint::SetupBehavior() {
   string optarg;
@@ -1906,6 +1927,14 @@ bool MountPoint::SetupBehavior() {
   {
     enforce_acls_ = true;
   }
+
+  if (options_mgr_->GetValue("CVMFS_CACHE_SYMLINKS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    cache_symlinks_ = true;
+  }
+
+
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
     talk_socket_path_ = optarg;

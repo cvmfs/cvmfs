@@ -90,6 +90,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               src/702-symlink_caching                      \
                                $CVMFS_EXCLUDE                               \
                                --                                           \
                                src/5*                                       \

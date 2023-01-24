@@ -550,7 +550,17 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
   // We do _not_ track (and evict) positive replies; among other things, test
   // 076 fails with the following line uncommented
-  // mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
+  //
+  // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
+  //
+  // only safe if fuse_expire_entry is available
+  if (mount_point_->fuse_expire_entry()
+      || (mount_point_->cache_symlinks() && dirent.IsLink())) {
+    LogCvmfs(kLogCache, kLogDebug, "Dentry to evict: %s", name);
+    mount_point_->dentry_tracker()->Add(parent_fuse, name,
+                                        static_cast<uint64_t>(timeout));
+  }
+
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -1830,6 +1840,43 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
           "libfuse, aborting");
 #endif
   }
+
+  if ( mount_point_->cache_symlinks() ) {
+#ifdef FUSE_CAP_CACHE_SYMLINKS
+    if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == FUSE_CAP_CACHE_SYMLINKS) {
+      conn->want |= FUSE_CAP_CACHE_SYMLINKS;
+      LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                    "Enable symlink caching");
+      #ifndef FUSE_CAP_EXPIRE_ONLY
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+          "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+          "mountpoints on top of symlinks will break!");
+      #endif
+    } else {
+      mount_point_->DisableCacheSymlinks();
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "FUSE: Symlink caching requested but missing fuse kernel support, "
+           "falling back to no caching");
+    }
+#else
+    mount_point_->DisableCacheSymlinks();
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+          "FUSE: Symlink caching requested but missing libfuse support, "
+          "falling back to no caching");
+#endif
+  }
+
+#ifdef FUSE_CAP_EXPIRE_ONLY
+  if ((conn->capable & FUSE_CAP_EXPIRE_ONLY) == FUSE_CAP_EXPIRE_ONLY) {
+    mount_point_->EnableFuseExpireEntry();
+    LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                   "Enable fuse_expire_entry");
+  } else if (mount_point_->cache_symlinks()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+      "mountpoints on top of symlinks will break!");
+  }
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
