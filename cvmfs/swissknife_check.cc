@@ -345,7 +345,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
   for (unsigned i = 0; i < entries.size(); ++i) {
     const bool entry_needs_check = 
-          !entries[i].checksum().IsNull() && !duplicates_map_.Contains(entries[i].checksum());
+          !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
+          !duplicates_map_.Contains(entries[i].checksum());
     if (entry_needs_check) 
         duplicates_map_.Insert(entries[i].checksum(), 1);
     PathString full_path(path);
@@ -384,8 +385,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (check_chunks_ && entry_needs_check &&
-        !entries[i].checksum().IsNull() && !entries[i].IsExternalFile())
+    if (check_chunks_ && entry_needs_check)
     {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
