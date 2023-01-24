@@ -344,10 +344,10 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   bool found_nested_marker = false;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
-    const bool entry_needs_check = 
+    const bool entry_needs_check =
           !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
           !duplicates_map_.Contains(entries[i].checksum());
-    if (entry_needs_check) 
+    if (entry_needs_check)
         duplicates_map_.Insert(entries[i].checksum(), 1);
     PathString full_path(path);
     full_path.Append("/", 1);
@@ -596,7 +596,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                        this_chunk.size());
               retval = false;
             }
-          } else { // now hash is checked - add it to map
+          } else {
+            // now hash is checked - add it to map
             duplicates_map_.Insert(chunk_hash, 1);
           }
         }
