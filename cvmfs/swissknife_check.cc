@@ -39,7 +39,7 @@ using namespace std;  // NOLINT
 static inline uint32_t hasher_any(const shash::Any &key) {
   // We'll just do the same thing as hasher_md5, since every hash is at
   // least as large.
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *const_cast<uint32_t *>((reinterpret_cast<const uint32_t *>(key.digest) + 1));
 }
 
 
