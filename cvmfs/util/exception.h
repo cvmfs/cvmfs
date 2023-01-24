@@ -36,6 +36,25 @@ CVMFS_EXPORT
 __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const char *nul);
 
+#define CVMFS_SUPPRESS_ASSERTS
+#ifdef CVMFS_SUPPRESS_ASSERTS
+static inline void assert_or_log_error(int t,
+                                 const LogSource log_source,
+                                 const int log_mask,
+                                 const char *log_error_msg) {
+  if (!t) {
+    LogCvmfs(log_source, log_mask, log_error_msg);
+  }
+}
+#else
+static inline void assert_or_log_error(int t,
+                                       const LogSource log_source,
+                                       const int log_mask,
+                                       const char *log_error_msg) {
+  assert(t);
+}
+#endif
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
