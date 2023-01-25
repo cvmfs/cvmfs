@@ -317,6 +317,10 @@ bool CommandCheck::InspectHistory(history::History *history) {
 
 /**
  * Recursive catalog walk-through
+ *
+ * TODO(vavolkl): This method is large and does a lot of checks
+ * that could be split into smaller ones.
+ * 
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
@@ -390,8 +394,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
         chunk_path += shash::kSuffixMicroCatalog;
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[chunkpath] %s",
-             chunk_path.c_str());
       if (!Exists(chunk_path)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
