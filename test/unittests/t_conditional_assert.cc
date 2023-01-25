@@ -15,7 +15,7 @@ using namespace std;  // NOLINT
 
 class T_Conditional_Assert : public ::testing::Test {};
 
-#ifdef CVMFS_SUPPRESS_ASSERTS 
+#ifdef CVMFS_SUPPRESS_ASSERTS
 TEST_F(T_Conditional_Assert, LogError) {
   EXPECT_TRUE(assert_or_log_error(1, kLogCvmfs, kLogDebug, ""));
   EXPECT_TRUE(assert_or_log_error(2, kLogCvmfs, kLogDebug, ""));
@@ -23,7 +23,7 @@ TEST_F(T_Conditional_Assert, LogError) {
 }
 #endif
 
-#ifndef CVMFS_SUPPRESS_ASSERTS 
+#ifndef CVMFS_SUPPRESS_ASSERTS
 TEST_F(T_Conditional_Assert, Assert) {
   EXPECT_TRUE(assert_or_log_error(1, kLogCvmfs, kLogDebug, ""));
   EXPECT_TRUE(assert_or_log_error(2, kLogCvmfs, kLogDebug, ""));
