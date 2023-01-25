@@ -23,6 +23,9 @@ echo "OK"
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
 
+# Test exclusions
+# 095: not needed on EL9 as attach mounts are supported
+
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
@@ -37,6 +40,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/056-lowspeedlimit                        \
                                  src/065-http-400                             \
                                  src/084-premounted                           \
+                                 src/095-fuser                                \
                                  src/096-cancelreq                            \
                                  --                                           \
                                  src/0*                                       \
