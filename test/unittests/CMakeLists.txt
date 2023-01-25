@@ -277,6 +277,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_clientctx.cc
   t_compression.cc
   t_compressor.cc
+  t_conditional_assert.cc
   t_dirtab.cc
   t_dns.cc
   t_download.cc

@@ -311,7 +311,15 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (ino == catalog_mgr->GetRootInode()) {
     bool retval =
       catalog_mgr->LookupPath(PathString(), catalog::kLookupDefault, dirent);
-    assert(retval);
+
+    std::string errormsg = "GetDirentForInode: Race condition? "
+                           "Not found dirent ";
+    errormsg.append(dirent->name().c_str());
+    if (!assert_or_log_error(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                             errormsg.c_str())) {
+      return false;
+    }
+
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
     return true;
@@ -430,7 +438,17 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
   bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
-  assert(retval);
+  
+  std::string errormsg = 
+                    "GetPathForInode: Race condition? "
+                    "Inode not found in inode tracker at path";
+  errormsg.append(path->c_str());
+  if (!assert_or_log_error(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                            errormsg.c_str())) {
+    return false;
+  }
+
+
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
 }
@@ -1630,7 +1648,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   if (d.HasXattrs()) {
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+
+    std::string errormsg = 
+         "cvmfs_statfs: Race condition? LookupXattrs did not succeed for path ";
+    errormsg.append(path.c_str());
+    if (!assert_or_log_error(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                              errormsg.c_str())) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+    }
   }
 
   bool magic_xattr_success = true;
@@ -1694,9 +1720,27 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   if (d.HasXattrs()) {
     PathString path;
     bool retval = GetPathForInode(ino, &path);
-    assert(retval);
+    std::string errormsg = 
+    "cvmfs_listxattr: Race condition? GetPathForInode did not succeed for ino ";
+    errormsg.append(StringifyUint(ino));
+    if (!assert_or_log_error(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                              errormsg.c_str())) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+      return;
+    }
+
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+    errormsg = 
+       "cvmfs_listxattr: Race condition? LookupXattrs did not succeed for ino ";
+    errormsg.append(StringifyUint(ino));
+    if (!assert_or_log_error(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                              errormsg.c_str())) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+      return;
+    }
+
   }
   fuse_remounter_->fence()->Leave();
 
