@@ -1717,7 +1717,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
   string attribute_list;
   attribute_list = mount_point_->magic_xattr_mgr()->GetListString(&d);
-  attribute_list = xattrs.ListKeysPosix(attribute_list);
+  attribute_list += xattrs.ListKeysPosix(attribute_list);
 
   if (size == 0) {
     fuse_reply_xattr(req, attribute_list.length());

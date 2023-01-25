@@ -22,6 +22,7 @@ enum MagicXattrFlavor {
   kXattrBase = 0,
   kXattrWithHash,
   kXattrRegular,
+  kXattrExternal,
   kXattrSymlink,
   kXattrAuthz
 };
@@ -142,6 +143,10 @@ class WithHashMagicXattr : public BaseMagicXattr {
 
 class RegularMagicXattr : public BaseMagicXattr {
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrRegular; }
+};
+
+class ExternalMagicXattr : public BaseMagicXattr {
+  virtual MagicXattrFlavor GetXattrFlavor() { return kXattrExternal; }
 };
 
 class SymlinkMagicXattr : public BaseMagicXattr {
@@ -415,7 +420,7 @@ class VersionMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
-class ExternalURLMagicXattr : public BaseMagicXattr {
+class ExternalURLMagicXattr : public ExternalMagicXattr {
   virtual bool PrepareValueFenced();
   virtual std::string GetValue();
 };
