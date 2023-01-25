@@ -587,7 +587,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           const shash::Any &chunk_hash = this_chunk.content_hash();
           // for performance reasons, only perform the check once
           // and skip if the hash has been checked before
-          if (duplicates_map_.Contains(chunk_hash)) {
+          if (!duplicates_map_.Contains(chunk_hash)) {
+            duplicates_map_.Insert(chunk_hash, 1);
             const string chunk_path = "data/" + chunk_hash.MakePath();
             if (!Exists(chunk_path)) {
               LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
@@ -598,9 +599,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                        this_chunk.size());
               retval = false;
             }
-          } else {
-            // now hash is checked - add it to map
-            duplicates_map_.Insert(chunk_hash, 1);
           }
         }
       }
