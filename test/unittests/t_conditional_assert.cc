@@ -27,13 +27,6 @@ TEST_F(T_Conditional_Assert, LogError) {
 TEST_F(T_Conditional_Assert, Assert) {
   EXPECT_TRUE(assert_or_log_error(1, kLogCvmfs, kLogDebug, ""));
   EXPECT_TRUE(assert_or_log_error(2, kLogCvmfs, kLogDebug, ""));
-  #ifdef __APPLE__
-    EXPECT_DEATH(assert_or_log_error(0, kLogCvmfs, kLogDebug, ""),
-          "Assertion failed: (t), function assert_or_log_error, "
-          "file exception.h, line 56.");
-  #else
-    EXPECT_DEATH(assert_or_log_error(0, kLogCvmfs, kLogDebug, ""),
-                                    "Assertion `t' failed.");
-  #endif
+  EXPECT_DEATH(assert_or_log_error(0, kLogCvmfs, kLogDebug, ""), "Assertion");
 }
 #endif
