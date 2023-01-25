@@ -348,11 +348,14 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   bool found_nested_marker = false;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
+    // for performance reasons, keep track of files already checked
+    // and only run requests once per hash
     const bool entry_needs_check =
           !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
           !duplicates_map_.Contains(entries[i].checksum());
     if (entry_needs_check)
         duplicates_map_.Insert(entries[i].checksum(), 1);
+
     PathString full_path(path);
     full_path.Append("/", 1);
     full_path.Append(entries[i].name().GetChars(),
