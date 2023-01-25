@@ -1089,8 +1089,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  const shash::Any hash_zero(shash::kMd5);
-  duplicates_map_.Init(16, hash_zero, hasher_any);
+  const shash::Any hash_null(shash::kMd5);
+  duplicates_map_.Init(16, hash_null, hasher_any);
 
   catalog::DeltaCounters computed_counters;
   successful = InspectTree(subtree_path,
