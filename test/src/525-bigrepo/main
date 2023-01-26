@@ -1,6 +1,7 @@
 cvmfs_test_name="Split a Huge Repository into Nested Catalogs"
 cvmfs_test_autofs_on_startup=false
 
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
