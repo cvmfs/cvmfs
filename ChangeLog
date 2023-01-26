@@ -1,4 +1,5 @@
 2.11.0:
+  * Add support for evicting chunked files through cvmfs_talk (#3122)
   * Add support for symlink kernel cache through CVMFS_CACHE_SYMLINKS (#2949)
   * Bump base for service container to EL9
   * Add support for CVMFS_S3_X_AMZ_ACL server parameter (#2970)
