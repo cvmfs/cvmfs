@@ -1050,6 +1050,13 @@ static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
 }
 
 
+#ifdef __APPLE__
+// On macOS, xattr on a symlink opens and closes the file (with O_SYMLINK)
+// around the actual getxattr call. In order to not run into an I/O error
+// we use a special file handle for symlinks, from which one cannot read.
+static const uint64_t kFileHandleIgnore = static_cast<uint64_t>(2) << 60;
+#endif
+
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
  *
@@ -1104,6 +1111,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EOPNOTSUPP);
+    return;
+  }
+  if (fi->flags & O_SYMLINK) {
+    fuse_remounter_->fence()->Leave();
+    fi->fh = kFileHandleIgnore;
+    fuse_reply_open(req, fi);
     return;
   }
 #endif
@@ -1299,6 +1312,13 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
            size, off, fi->fh);
   perf::Inc(file_system_->n_fs_read());
 
+#ifdef __APPLE__
+  if (fi->fh == kFileHandleIgnore) {
+    fuse_reply_err(req, EBADF);
+    return;
+  }
+#endif
+
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
@@ -1468,6 +1488,14 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
            uint64_t(ino));
+
+#ifdef __APPLE__
+  if (fi->fh == kFileHandleIgnore) {
+    fuse_reply_err(req, 0);
+    return;
+  }
+#endif
+
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
