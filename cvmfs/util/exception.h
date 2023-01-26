@@ -38,10 +38,10 @@ __attribute__((noreturn))
 void Panic(const char *coordinates, const LogSource source, const char *nul);
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
-static inline bool assert_or_log_error(int t,
-                                 const LogSource log_source,
-                                 const int log_mask,
-                                 const char *log_error_msg) {
+static inline bool AssertOrLog(int t,
+                               const LogSource log_source,
+                               const int log_mask,
+                               const char *log_error_msg) {
   if (!t) {
     LogCvmfs(log_source, log_mask, log_error_msg);
     return false;
@@ -49,10 +49,10 @@ static inline bool assert_or_log_error(int t,
   return true;
 }
 #else
-static inline bool assert_or_log_error(int t,
-                                       const LogSource log_source,
-                                       const int log_mask,
-                                       const char *log_error_msg) {
+static inline bool AssertOrLog(int t,
+                               const LogSource /*log_source*/,
+                               const int /*log_mask*/,
+                               const char */*log_error_msg*/) {
   assert(t);
   return true;
 }

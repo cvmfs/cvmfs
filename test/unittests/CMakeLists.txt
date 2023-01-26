@@ -252,6 +252,7 @@ set(CVMFS_UNITTEST_SOURCES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  t_assert_or_log.cc
   t_atomic.cc
   t_authz_fetch.cc
   t_authz_session.cc
@@ -277,7 +278,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_clientctx.cc
   t_compression.cc
   t_compressor.cc
-  t_conditional_assert.cc
   t_dirtab.cc
   t_dns.cc
   t_download.cc
