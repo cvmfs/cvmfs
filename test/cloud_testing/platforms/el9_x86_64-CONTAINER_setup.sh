@@ -20,7 +20,7 @@ echo "enabling epel yum repository..."
 install_from_repo epel-release    || die "fail (install epel-release)"
 
 # Container runtimes and tools
-install_from_repo singularity     || die "fail (install singularity)"
+install_from_repo apptainer       || die "fail (install singularity)"
 install_from_repo runc            || die "fail (install runc)"
 install_from_repo fuse-overlayfs  || die "fail (install fuse-overlayfs)"
 install_from_repo podman          || die "fail (install podman)"
