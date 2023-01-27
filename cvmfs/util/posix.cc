@@ -1603,7 +1603,8 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     if (retval == -1) {
       if (errno == EINTR)
         continue;
-      PANIC(NULL);
+      PANIC(kLogSyslogErr | kLogDebug,
+            "waitpid failed with errno %d", errno);
     }
     assert(retval == pid);
     break;
