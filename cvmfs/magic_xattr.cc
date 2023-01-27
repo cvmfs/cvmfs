@@ -95,6 +95,9 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
       case kXattrRegular:
         if (!dirent->IsRegular()) continue;
         break;
+      case kXattrExternal:
+        if (!(dirent->IsRegular() && dirent->IsExternalFile())) continue;
+        break;
       case kXattrSymlink:
         if (!dirent->IsLink()) continue;
         break;
@@ -636,5 +639,3 @@ std::string ExternalURLMagicXattr::GetValue() {
 bool ExternalURLMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular() && dirent_->IsExternalFile();
 }
-
-
