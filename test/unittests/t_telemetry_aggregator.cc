@@ -42,11 +42,11 @@ class T_TelemetryAggregator : public ::testing::Test {
   /**
    * Remove elements from vector that just consist of whitespace
   */
-  void RemoveWhitespace(std::vector<std::string> &vec) {
-    for (std::vector<std::string>::iterator itr = vec.begin();
-                                          itr != vec.end();) {
+  void RemoveWhitespace(std::vector<std::string> *vec) {
+    for (std::vector<std::string>::iterator itr = vec->begin();
+                                          itr != vec->end();) {
       if (Trim(*itr).size() < 1) {
-        itr = vec.erase(itr);
+        itr = vec->erase(itr);
       } else {
         itr++;
       }
@@ -80,7 +80,7 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  RemoveWhitespace(payload_split);
+  RemoveWhitespace(&payload_split);
 
   EXPECT_EQ(payload_split.size(), 2u);
   EXPECT_STREQ(payload_header.c_str(), payload_split[0].c_str());
@@ -122,7 +122,7 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  RemoveWhitespace(payload_split);
+  RemoveWhitespace(&payload_split);
 
   EXPECT_EQ(payload_split.size(), 3u);
   EXPECT_STREQ(payload_header.c_str(), payload_split[0].c_str());
@@ -155,7 +155,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   std::vector<std::string> payload_split = SplitString(payload, ' ');
 
   // remove whitespace-only strings from the vector
-  RemoveWhitespace(payload_split);
+  RemoveWhitespace(&payload_split);
 
   EXPECT_EQ(payload_split.size(), 3u);
   EXPECT_STREQ(payload_header.c_str(), payload_split[0].c_str());
@@ -179,7 +179,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   payload = telemetry_influx.MakePayload();
   payload_split = SplitString(payload, ' ');
   // remove whitespace-only strings from the vector
-  RemoveWhitespace(payload_split);
+  RemoveWhitespace(&payload_split);
 
   EXPECT_EQ(payload_split.size(), 3u);
   EXPECT_STREQ(payload_header.c_str(), payload_split[0].c_str());
@@ -214,7 +214,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   payload = telemetry_influx.MakePayload();
   payload_split = SplitString(payload, ' ');
   // remove whitespace-only strings from the vector
-  RemoveWhitespace(payload_split);
+  RemoveWhitespace(&payload_split);
 
   EXPECT_EQ(payload_split.size(), 3u);
   EXPECT_STREQ(payload_header.c_str(), payload_split[0].c_str());
