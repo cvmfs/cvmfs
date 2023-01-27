@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
 #include "util/platform.h"
@@ -402,8 +403,17 @@ void PageCacheTracker::Close(uint64_t inode) {
   MutexLockGuard guard(lock_);
   Entry entry;
   bool retval = map_.Lookup(inode, &entry);
-  assert(retval);
-  assert(entry.nopen != 0);
+
+  std::string errormsg = "PageCacheTracker::Close Race condition? "
+                         "Did not find inode ";
+  errormsg.append(StringifyUint(inode));
+  if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                    errormsg.c_str())
+      || !AssertOrLog(entry.nopen != 0, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                    errormsg.c_str())) {
+    return;
+  }
+
   if (entry.nopen < 0) {
     // At this point we know that any stale data has been flushed from the
     // cache and only data related to the currently booked content hash
