@@ -312,7 +312,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
         "gc.sz_condemned_bytes", "number of deleted bytes");
     perf::Counter *ctr_duplicate_delete_requests =
       configuration_.statistics->Register(
-        "gc.n_duplicate_delete_requests", "number of duplicated delete requests");
+      "gc.n_duplicate_delete_requests", "number of duplicated delete requests");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());

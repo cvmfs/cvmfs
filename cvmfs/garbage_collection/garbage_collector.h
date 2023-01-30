@@ -96,7 +96,7 @@ class GarbageCollector {
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
   unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
   unsigned int condemned_objects_count() const { return condemned_objects_;  }
-  unsigned int duplicate_delete_requests() const { 
+  unsigned int duplicate_delete_requests() const {
                                            return duplicate_delete_requests_;  }
   uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
