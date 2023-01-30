@@ -23,13 +23,14 @@ namespace manifest {
 class Manifest;
 }
 
+
+
+
 namespace swissknife {
 
 class CommandCheck : public Command {
  public:
-  CommandCheck()
-    : check_chunks_(false)
-    , is_remote_(false) {}
+  CommandCheck();
   ~CommandCheck() { }
   virtual std::string GetName() const { return "check"; }
   virtual std::string GetDescription() const {

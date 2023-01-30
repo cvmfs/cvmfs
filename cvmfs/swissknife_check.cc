@@ -46,6 +46,13 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 
 namespace swissknife {
 
+CommandCheck::CommandCheck()
+    : check_chunks_(false)
+    , is_remote_(false) {
+    const shash::Any hash_null(shash::kMd5);
+    duplicates_map_.Init(16, hash_null, hasher_any);
+}
+
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
                                   const bool compare_names,
@@ -1092,8 +1099,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  const shash::Any hash_null(shash::kMd5);
-  duplicates_map_.Init(16, hash_null, hasher_any);
 
   catalog::DeltaCounters computed_counters;
   successful = InspectTree(subtree_path,
