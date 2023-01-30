@@ -99,7 +99,7 @@ struct GcStats {
   std::string n_condemned_catalogs;
   std::string n_condemned_objects;
   std::string sz_condemned_bytes;
-  std::string duplicate_delete_requests;
+  std::string n_duplicate_delete_requests;
 
   explicit GcStats(const perf::Statistics *statistics) {
     perf::Counter *c = NULL;
@@ -111,8 +111,8 @@ struct GcStats {
     n_condemned_objects = c ? c->ToString() : "0";
     c = statistics->Lookup("gc.sz_condemned_bytes");
     sz_condemned_bytes = c ? c->ToString() : "0";
-    c = statistics->Lookup("gc.duplicate_delete_requests");
-    duplicate_delete_requests = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_duplicate_delete_requests");
+    n_duplicate_delete_requests = c ? c->ToString() : "0";
   }
 };
 
@@ -200,7 +200,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "n_condemned_catalogs,"
       "n_condemned_objects,"
       "sz_condemned_bytes,"
-      "duplicate_delete_requests,"
+      "n_duplicate_delete_requests,"
       "success)"
       " VALUES("
       "'" + start_time + "'," +
@@ -209,7 +209,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       stats.n_condemned_catalogs + ","+
       stats.n_condemned_objects + "," +
       stats.sz_condemned_bytes + "," +
-      stats.duplicate_delete_requests + "," +
+      stats.n_duplicate_delete_requests + "," +
       (success ? "1" : "0") + ");";
   } else {
     // insert values except sz_condemned_bytes
@@ -220,7 +220,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "n_preserved_catalogs,"
       "n_condemned_catalogs,"
       "n_condemned_objects,"
-      "duplicate_delete_requests,"
+      "n_duplicate_delete_requests,"
       "success)"
       " VALUES("
       "'" + start_time + "'," +
@@ -228,7 +228,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       stats.n_preserved_catalogs + "," +
       stats.n_condemned_catalogs + "," +
       stats.n_condemned_objects + "," +
-      stats.duplicate_delete_requests + "," +
+      stats.n_duplicate_delete_requests + "," +
       (success ? "1" : "0") + ");";
   }
   return insert_statement;
@@ -271,7 +271,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
     "sz_condemned_bytes INTEGER,"
-    "duplicate_delete_requests INTEGER,"
+    "n_duplicate_delete_requests INTEGER,"
     "success INTEGER);").Execute();
   return ret1 & ret2;
 }
