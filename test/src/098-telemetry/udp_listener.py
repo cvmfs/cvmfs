@@ -70,5 +70,5 @@ if __name__ == "__main__":
   #Now receive data
     reply = s.recv(8192)
     if must_include in reply.decode():
-      print(reply)
+      print(reply.decode())
       received_packages += 1
