@@ -175,7 +175,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
     } else {
       ++duplicate_delete_requests_;
       LogCvmfs(kLogGc, kLogDebug, "Hash %s already marked as to delete",
-               hash.ToString());
+               hash.ToString().c_str());
     }
   }
 }
