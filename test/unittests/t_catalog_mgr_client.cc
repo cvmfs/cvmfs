@@ -95,13 +95,13 @@ struct fileSpec {
 };
 
 fileSpec fileSpecs[] = {
-  {.hash = "b026324c6904b2a9cb4b88d6d61c81d100000000", .file_size = 4096*20},
-  {.hash = "26ab0db90d72e28ad0ba1e22ee51051000000000", .file_size = 4096*10},
-  {.hash = "6d7fce9fee471194aa8b5b6e47267f0300000000", .file_size = 4096*10},
-  {.hash = "48a24b70a0b376535542b996af51739800000000", .file_size = 4096*10},
-  {.hash = "1dcca23355272056f04fe8bf20edfce000000000", .file_size = 4096*10},
-  {.hash = "1111111111111111111111111111111111111111", .file_size = 4096*10},
-  {.hash = "2222222222222222222222222222222222222222", .file_size = 4096*10},
+  {.hash = "b026324c6904b2a9cb4b88d6d61c81d100000000", .file_size = 4096ul*20},
+  {.hash = "26ab0db90d72e28ad0ba1e22ee51051000000000", .file_size = 4096ul*10},
+  {.hash = "6d7fce9fee471194aa8b5b6e47267f0300000000", .file_size = 4096ul*10},
+  {.hash = "48a24b70a0b376535542b996af51739800000000", .file_size = 4096ul*10},
+  {.hash = "1dcca23355272056f04fe8bf20edfce000000000", .file_size = 4096ul*10},
+  {.hash = "1111111111111111111111111111111111111111", .file_size = 4096ul*10},
+  {.hash = "2222222222222222222222222222222222222222", .file_size = 4096ul*10},
 };
 
 const size_t g_file_size = 4096;
