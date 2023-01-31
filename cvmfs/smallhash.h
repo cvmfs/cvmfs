@@ -186,8 +186,10 @@ class SmallHashBase {
     for (uint32_t i = 0; i < c; ++i) {
       v[i].~Value();
     }
-    smunmap(k);
-    smunmap(v);
+    if (k)
+      smunmap(k);
+    if (v)
+      smunmap(v);
     k = NULL;
     v = NULL;
   }
