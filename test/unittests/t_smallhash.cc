@@ -232,7 +232,8 @@ TEST_F(T_Smallhash, MultihashMultithread) {
 }
 
 TEST_F(T_Smallhash, CanDestructUninitialized) {
-  SmallHashDynamic<int, int>*  smallhash_uninit = new SmallHashDynamic<int, int>();
+  SmallHashDynamic<int, int>*  smallhash_uninit =
+      new SmallHashDynamic<int, int>();
   // No Init()
   delete smallhash_uninit;
 }
