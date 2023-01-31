@@ -1,9 +1,11 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.10, last modified: 19.06.2017
+# Version 1.12a, last modified: 31.01.2023
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
+# 1.12a - 31.01.2023
+#    - Add -c option to skip cache checks (for osgstorage.org)
 # 1.12 - 05.11.2021
 #    - Add -p parameter for I/O error retention period
 # 1.11 - 16.03.2021
@@ -55,6 +57,7 @@ usage() {
    /bin/echo "  -p  ignore I/O errors older than the given number of minutes"
    /bin/echo "       (default: $IO_ERROR_PERIOD, set to zero to always report I/O errors)"
    /bin/echo "       the parameter has no effect on CernVM-FS < 2.9"
+   /bin/echo "  -c  ignore cache issues (for repositories that are known to have few cache hits)"
 }
 
 version() {
@@ -118,7 +121,8 @@ try_get_xattr() {
 OPT_NETWORK_CHECK=0
 OPT_MEMORY_CHECK=0
 OPT_INODE_CHECK=0
-while getopts "hVvt:nmf:ip:" opt; do
+OPT_IGNORE_CACHE=0
+while getopts "hVvt:nmf:ip:c" opt; do
   case $opt in
     h)
       help
@@ -152,6 +156,9 @@ while getopts "hVvt:nmf:ip:" opt; do
     ;;
     p)
        IO_ERROR_PERIOD="$OPTARG"
+    ;;
+    c)
+      OPT_IGNORE_CACHE=1
     ;;
     *)
       /bin/echo "SERVICE STATUS: Invalid option: $1"
@@ -309,17 +316,19 @@ do_check() {
     RETURN_STATUS=$STATUS_WARNING
   fi
 
-  # Check for free space on cache partition
-  DF_CACHE=`/bin/df -P "$CVMFS_CACHE_BASE"`
-  if [ $? -ne 0 ]; then
-    append_info "failed to run /bin/df -P $CVMFS_CACHE_BASE"
-    RETURN_STATUS=$STATUS_CRITICAL
-  else
-    FILL_RATIO=`/bin/echo "$DF_CACHE" | /usr/bin/tail -n1 | \
-                /bin/awk '{print $5}' | /usr/bin/tr -Cd [:digit:]`
-    if [ $FILL_RATIO -gt $MAX_FILL_RATIO ]; then
-      append_info "space on cache partition low"
-      RETURN_STATUS=$STATUS_WARNING
+  if [ $OPT_IGNORE_CACHE = 0 ]; then
+    # Check for free space on cache partition
+    DF_CACHE=`/bin/df -P "$CVMFS_CACHE_BASE"`
+    if [ $? -ne 0 ]; then
+      append_info "failed to run /bin/df -P $CVMFS_CACHE_BASE"
+      RETURN_STATUS=$STATUS_CRITICAL
+    else
+      FILL_RATIO=`/bin/echo "$DF_CACHE" | /usr/bin/tail -n1 | \
+                  /bin/awk '{print $5}' | /usr/bin/tr -Cd [:digit:]`
+      if [ $FILL_RATIO -gt $MAX_FILL_RATIO ]; then
+        append_info "space on cache partition low"
+        RETURN_STATUS=$STATUS_WARNING
+      fi
     fi
   fi
 
@@ -358,10 +367,12 @@ do_check() {
     fi
   fi
 
-  # Check for number of cache cleanups within the last 24 hours
-  if [ $NCLEANUP24 -gt 24 ]; then
-    append_info "frequent cache cleanups, cache might be undersized"
-    RETURN_STATUS=$STATUS_WARNING
+  if [ $OPT_IGNORE_CACHE = 0 ]; then
+    # Check for number of cache cleanups within the last 24 hours
+    if [ $NCLEANUP24 -gt 24 ]; then
+      append_info "frequent cache cleanups, cache might be undersized"
+      RETURN_STATUS=$STATUS_WARNING
+    fi
   fi
 
   if [ -f "/cvmfs/${REPOSITORY}/.cvmfsdirtab" ]; then
