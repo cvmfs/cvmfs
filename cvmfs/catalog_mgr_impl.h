@@ -172,7 +172,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   CatalogInfo ctlg_info;
   ctlg_info.mountpoint = PathString("", 0);
   ctlg_info.hash = root_hash;
-  ctlg_info.root_ctlg_location = kMounted;
+  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
@@ -895,7 +895,7 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   CatalogInfo ctlg_info;
   ctlg_info.hash = hash;
   ctlg_info.mountpoint = mountpoint;
-  ctlg_info.root_ctlg_location = RootCatalogLocation::kMounted;
+  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
 
   // TODO(heretherebedragons) necessary? is mountcatalog ever called without
   // a given mountpoint and hash?
@@ -942,7 +942,7 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
   CatalogInfo ctlg_info;
   ctlg_info.hash = hash;
   ctlg_info.mountpoint = mountpoint;
-  ctlg_info.root_ctlg_location = kMounted;
+  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
 
   // do i need this here?
   if (mountpoint.IsEmpty()) {

@@ -19,7 +19,7 @@ namespace catalog {
     if (result->hash.IsNull()) {
       result->hash = base_hash_;
     }
-    result->root_ctlg_location = kServer;
+    result->root_ctlg_location = kCtlgLocationServer;
     result->mountpoint = PathString("", 0);
 
     return kLoadNew;

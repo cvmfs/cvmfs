@@ -156,7 +156,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
 
   shash::Any local_newest_hash = breadcrumb_hash;
   uint64_t local_newest_revision = breadcrumb_revision;
-  result->root_ctlg_location = RootCatalogLocation::kBreadcrumb;
+  result->root_ctlg_location = kCtlgLocationBreadcrumb;
   LoadReturn success_code = catalog::kLoadNew;
 
   // We only look for currently loaded catalog if the revision is newer than
@@ -167,7 +167,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
     auto curr_hash_itr = mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = mounted_root_ctlg_revision_;
-    result->root_ctlg_location = RootCatalogLocation::kMounted;
+    result->root_ctlg_location = kCtlgLocationMounted;
     success_code = catalog::kLoadUp2Date;
   }
 
@@ -196,7 +196,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
           || local_newest_revision == -1ul) {
     result->hash = ensemble.manifest->catalog_hash();
     result->root_ctlg_revision = ensemble.manifest->revision();
-    result->root_ctlg_location = RootCatalogLocation::kServer;
+    result->root_ctlg_location = kCtlgLocationServer;
     offline_mode_ = false;
 
     return catalog::kLoadNew;
@@ -218,7 +218,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
  * Loads (and fetches) a catalog by hash for a given mountpoint.
  *
  * Special case for root catalog: ctlg_info->root_ctlg_location must be given.
- * If it is kServer than another check for the most recent manifest is done.
+ * If it is kCtlgLocationServer than another check for the most recent 
+ * manifest is done.
  *
  * @param [in, out] ctlg_info mandatory fields (input): mountpoint, hash
  *         additional mandatory fields for root catalog: root_ctlg_location
@@ -245,7 +246,7 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
 
     // TODO(heretherebedragons) is this test necessary??
     // get manifest from server and double check if we have newest hash
-    if (ctlg_info->root_ctlg_location == RootCatalogLocation::kServer) {
+    if (ctlg_info->root_ctlg_location == kCtlgLocationServer) {
       manifest::Failures manifest_failure;
       manifest_failure = manifest::Fetch("", repo_name_,
                                         0,
@@ -274,14 +275,14 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
     loaded_catalogs_[ctlg_info->mountpoint] = ctlg_info->hash;
 
     if (ctlg_info->mountpoint.IsEmpty()) {  // root catalog
-      if (ctlg_info->root_ctlg_location == RootCatalogLocation::kMounted) {
+      if (ctlg_info->root_ctlg_location == kCtlgLocationMounted) {
         return LoadReturn::kLoadUp2Date;
       }
 
       mounted_root_ctlg_revision_ = ctlg_info->root_ctlg_revision;
 
       // if coming from server: update breadcrumb
-      if (ctlg_info->root_ctlg_location == RootCatalogLocation::kServer) {
+      if (ctlg_info->root_ctlg_location == kCtlgLocationServer) {
           // Store new manifest and certificate
           LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash write manifest");
           CacheManager::Label label;

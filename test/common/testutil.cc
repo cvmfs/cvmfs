@@ -515,7 +515,7 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
     MockCatalog *catalog = it->second;
     result->hash = catalog->hash();
     result->root_ctlg_revision = GetRevision(); // TODO(heretherebedragons) is this the correct choice?
-    result->root_ctlg_location = kServer;
+    result->root_ctlg_location = kCtlgLocationServer;
     result->mountpoint = PathString("", 0);
     result->sql_catalog_handle = "";
     return kLoadUp2Date; 

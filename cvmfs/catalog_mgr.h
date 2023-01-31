@@ -58,10 +58,9 @@ enum LoadReturn {
  * Used as part of loading the catalog.
  */
 enum RootCatalogLocation {
-  kDefault = 0,  // unknown
-  kMounted,      // already loaded in mounted_catalogs_
-  kServer,
-  kBreadcrumb
+  kCtlgLocationMounted = 0,      // already loaded in mounted_catalogs_
+  kCtlgLocationServer,
+  kCtlgLocationBreadcrumb
 };
 
 /**
