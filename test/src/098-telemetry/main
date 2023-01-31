@@ -8,6 +8,7 @@ TEST098_REPO=lhcb.cern.ch
 TEST098_MOUNTPOINT=/cvmfs/lhcb.cern.ch
 
 CVMFS_TEST_098_TMPFILE=
+CVMFS_TEST_098_PYTHON_SCRIPT=
 
 check_counter_increase() {
   echo "Check detection of counter change"
@@ -20,15 +21,15 @@ CVMFS_INFLUX_PORT=8092
 CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
 
 
-  echo "   Netcat: wait for 1 package"
+  echo "   UDP Listener: wait for 1 package from $TEST098_REPO"
   # -W 1 ends the command after receiving 1 package
-  nc -l -u -W 2 8092 > $CVMFS_TEST_098_TMPFILE
+  python3 $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb > $CVMFS_TEST_098_TMPFILE
 
   echo "   Do something to change counters"
   cat /cvmfs/$TEST098_REPO/*.sh > /dev/null
 
-  echo "   Netcat: Wait for another package"
-  nc -l -u -W 2 8092 >> $CVMFS_TEST_098_TMPFILE
+  echo "   UDP Listener: Wait for another package from $TEST098_REPO"
+  python3 $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb >> $CVMFS_TEST_098_TMPFILE
 
   echo "   Umount $TEST098_REPO"
   test098_unmount $TEST098_REPO
@@ -38,7 +39,7 @@ CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
   local found=$(grep $CVMFS_TEST_098_TMPFILE -e "catalog_revision" | wc -l)
 
   echo "      Right number of lines?"
-  [ "$found" -eq "7" ] || return 10
+  [ "$found" -eq "2" ] || return 10
   
   echo "      Changes registered?"
   # gets for 1 field all the values, sorts them and extracts the unique values
@@ -51,20 +52,23 @@ CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
   local count_changing=$(grep $CVMFS_TEST_098_TMPFILE -e $TEST098_REPO\
                        | awk '{split($0,a,"md5_path_cache.n_miss="); split(a[2],b,","); print b[1]}'\
                        | sort | uniq | wc -l)
-  [ "$count_static" -eq "2" ] || return 11
-  [ "$count_changing" -gt "2" ] || return 12
+  [ "$count_static" -eq "1" ] || return 11
+  [ "$count_changing" -eq "2" ] || return 12
 
   echo "   ... Success"
 }
 
 cvmfs_run_test() {
   logfile=$1
-
+  local_script_dir=$2
   trap cleanup HUP INT TERM EXIT || return $?
 
   echo "create temporary directory"
   CVMFS_TEST_098_TMPFILE=$(mktemp ./test098.log.XXXXXXXX)
   echo "tmpfile is $CVMFS_TEST_098_TMPFILE"
+
+
+  CVMFS_TEST_098_PYTHON_SCRIPT=$local_script_dir/udp_listener.py
 
   check_counter_increase || return $?
   
