@@ -4,30 +4,24 @@
 
 #include <gtest/gtest.h>
 
+#include <alloca.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <string>
 #include <vector>
 
-#include <alloca.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <map>
-#include <string>
-#include <vector>
 
-#include "quota.h"
 #include "cache_posix.h"
 #include "cache_tiered.h"
 #include "catalog_mgr_client.h"
@@ -38,6 +32,7 @@
 #include "manifest.h"
 #include "mountpoint.h"
 #include "options.h"
+#include "quota.h"
 #include "testutil.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
@@ -90,7 +85,6 @@ class T_CatalogManagerClient : public ::testing::Test {
   string repo_path_;
   int fd_cwd_;
   unsigned used_fds_;
-
 };
 
 namespace {
@@ -121,7 +115,8 @@ DirSpec MakeCMCBaseSpec() {
   EXPECT_TRUE(spec.AddDirectory("dir", "", g_file_size));
 
   // adding "/dir/file1"
-  EXPECT_TRUE(spec.AddFile("file1", "dir", fileSpecs[0].hash, fileSpecs[0].file_size));
+  EXPECT_TRUE(spec.AddFile("file1", "dir", fileSpecs[0].hash,
+                                           fileSpecs[0].file_size));
 
   // adding "/dir/dir"
   EXPECT_TRUE(spec.AddDirectory("dir",  "dir", g_file_size));
@@ -131,25 +126,32 @@ DirSpec MakeCMCBaseSpec() {
   EXPECT_TRUE(spec.AddNestedCatalog("dir/dir3"));
 
   // adding "/file3"
-  EXPECT_TRUE(spec.AddFile("file3", "", fileSpecs[2].hash, fileSpecs[2].file_size));
+  EXPECT_TRUE(spec.AddFile("file3", "", fileSpecs[2].hash,
+                                        fileSpecs[2].file_size));
 
   // adding "/dir/dir/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", fileSpecs[1].hash, fileSpecs[1].file_size));
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir", fileSpecs[1].hash,
+                                               fileSpecs[1].file_size));
 
   // adding "/dir/dir2/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", fileSpecs[3].hash, fileSpecs[3].file_size));
-  
-  
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir2", fileSpecs[3].hash,
+                                                fileSpecs[3].file_size));
+
+
 
   // adding "/dir/dir3/file2"
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", fileSpecs[4].hash, fileSpecs[4].file_size));
-  EXPECT_TRUE(spec.AddFile("file3", "dir/dir3", fileSpecs[5].hash, fileSpecs[5].file_size));
-  EXPECT_TRUE(spec.AddFile("file4", "dir/dir3", fileSpecs[6].hash, fileSpecs[6].file_size));
+  EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", fileSpecs[4].hash,
+                                                fileSpecs[4].file_size));
+  EXPECT_TRUE(spec.AddFile("file3", "dir/dir3", fileSpecs[5].hash,
+                                                fileSpecs[5].file_size));
+  EXPECT_TRUE(spec.AddFile("file4", "dir/dir3", fileSpecs[6].hash,
+                                                fileSpecs[6].file_size));
 
   // Adding Deeply nested catalog
   EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir", g_file_size));
   EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir/dir", g_file_size));
-  EXPECT_TRUE(spec.AddFile("file1",  "dir/dir/dir/dir", fileSpecs[0].hash, fileSpecs[0].file_size));
+  EXPECT_TRUE(spec.AddFile("file1",  "dir/dir/dir/dir", fileSpecs[0].hash,
+                                                       fileSpecs[0].file_size));
 
   return spec;
 }
@@ -172,38 +174,39 @@ void CreateCMCMiniRepository(
   options_mgr_->SetValue("CVMFS_SERVER_URL", "file://" + *repo_path_);
   options_mgr_->SetValue("CVMFS_HTTP_PROXY", "DIRECT");
   options_mgr_->SetValue("CVMFS_PUBLIC_KEY", tester.public_key());
-  options_mgr_->SetValue("TEST_REPO_NAME", tester.manifest()->repository_name());
+  options_mgr_->SetValue("TEST_REPO_NAME",
+                                          tester.manifest()->repository_name());
 }
 
 /**
  * Tests provided
- *  - LoadByHash 
+ *  - LoadByHash
  *      - Load catalogs by hash (root, nested, and the same cached nested)
- *  - LoadByHashNetworkFailure 
+ *  - LoadByHashNetworkFailure
  *      - Simulate network failure when trying to load a not-yet-loaded catalog
  *  - LoadRootCatalog
  *      - Load root catalog after mount
  *      - This will check all storage loactions (local, alien, remote) which
  *        has the newest version
  *      - As it is unchanged, it will return local has already the newest one
- * 
+ *
  * The following tests are only provided as integration tests. Would be nice
  * to have them also tested here, but the test suite does not provide
  * the required functionality
- * 
+ *
  * Tests only provided by integration test:
  *  - LoadNewRootCatalog
  *      - Have current root catalog, server gets update, load new root catalog
  *  - LoadNewRootCatalogAlienCache
  *      - Have current root catalog with attached alien cache
  *      - Alien cache gets new update
- *      - LoadCatalog should select the newer alien cache (and not server 
+ *      - LoadCatalog should select the newer alien cache (and not server
  *        or local)
  *  - CacheEvictFilesForCatalog
  *      - Cache full with catalogs and files
- *      - Even though cache is full, the loading of a new catalog must be 
- *        successful because 
- * 
+ *      - Even though cache is full, the loading of a new catalog must be
+ *        successful because
+ *
  * No implementation provided
  *  - LoadByHash_CacheTooSmall
  *      - Idea: Loading catalogs fails because entire cache is too small for it
@@ -221,7 +224,10 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
+  UniquePtr<MountPoint> mp(MountPoint::Create(
+                                   options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
+                                   fs.weak_ref(),
+                                   &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
@@ -269,7 +275,10 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
+  UniquePtr<MountPoint> mp(MountPoint::Create(
+                                   options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
+                                   fs.weak_ref(),
+                                   &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
@@ -278,21 +287,22 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
   // load nested catalog
   const PathString nestedMntpnt("/dir/dir2");
-  const auto& ncatalogHash = mp->catalog_mgr()->GetNestedCatalogHash(nestedMntpnt);
+  const auto& ncatalogHash = mp->catalog_mgr()->
+                                             GetNestedCatalogHash(nestedMntpnt);
 
   ctlg_info.hash = ncatalogHash;
   ctlg_info.mountpoint = nestedMntpnt;
 
-  EXPECT_EQ(catalog::kLoadNew, 
+  EXPECT_EQ(catalog::kLoadNew,
             mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
 
   // also chached should return the same answer
-  EXPECT_EQ(catalog::kLoadNew, 
-            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info)); 
+  EXPECT_EQ(catalog::kLoadNew,
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
 
   // break URL to repo
   mp->download_mgr()->SetProxyChain("file://noValidURL", "",
-   download::DownloadManager::ProxySetModes::kSetProxyBoth);
+                       download::DownloadManager::ProxySetModes::kSetProxyBoth);
   mp->download_mgr()->RebalanceProxies();
   mp->download_mgr()->SetHostChain("file://noValidURL");
   mp->download_mgr()->SwitchHost();
@@ -332,7 +342,10 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   EXPECT_TRUE(options_mgr_.GetValue("CVMFS_ROOT_HASH", &root_hash_str));
   options_mgr_.UnsetValue("CVMFS_ROOT_HASH");
 
-  UniquePtr<MountPoint> mp(MountPoint::Create(options_mgr_.GetValueOrDie("TEST_REPO_NAME"), fs.weak_ref(), &options_mgr_));
+  UniquePtr<MountPoint> mp(MountPoint::Create(
+                                   options_mgr_.GetValueOrDie("TEST_REPO_NAME"),
+                                   fs.weak_ref(),
+                                   &options_mgr_));
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
@@ -347,4 +360,4 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   EXPECT_EQ(root_hash_str, root_info.hash.ToString());
 }
 
-}
+}  // namespace catalog
