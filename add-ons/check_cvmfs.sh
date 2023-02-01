@@ -6,6 +6,7 @@
 # ChangeLog
 # 1.12a - 31.01.2023
 #    - Add -c option to skip cache checks (for osgstorage.org)
+#    - Add -M option to Customize the memory check threshold
 # 1.12 - 05.11.2021
 #    - Add -p parameter for I/O error retention period
 # 1.11 - 16.03.2021
@@ -28,7 +29,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.12
+VERSION=1.12a
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
@@ -42,6 +43,7 @@ RETURN_STATUS=$STATUS_OK
 MAX_FILL_RATIO=95
 TIMEOUT_SECONDS=120
 IO_ERROR_PERIOD=180 # By default, ignore I/O errors older than 3 hours
+MEM_THRESHOLD=50
 
 usage() {
    /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-f fill_ratio] [-i] [-p minutes] <repository name> [expected cvmfs version]"
@@ -51,6 +53,7 @@ usage() {
    /bin/echo "  -n  run extended network checks"
    /bin/echo "  -m  check memory consumption of the cvmfs2 process"
    /bin/echo "      (less than 50M or 1% of available memory)"
+   /bin/echo "  -M <threshold MB> set the threshold for memory consumption"
    /bin/echo "  -f  set max fill ratio warning level (default 95)"
    /bin/echo "  -i  check if inodes exceed 32bit which can break 32bit programs"
    /bin/echo "      that use the non-64bit glibc file system interface"
@@ -122,7 +125,7 @@ OPT_NETWORK_CHECK=0
 OPT_MEMORY_CHECK=0
 OPT_INODE_CHECK=0
 OPT_IGNORE_CACHE=0
-while getopts "hVvt:nmf:ip:c" opt; do
+while getopts "hVvt:nmM:f:ip:c" opt; do
   case $opt in
     h)
       help
@@ -147,6 +150,9 @@ while getopts "hVvt:nmf:ip:c" opt; do
     ;;
     m)
       OPT_MEMORY_CHECK=1
+    ;;
+    M)
+      MEM_THRESHOLD="$OPTARG"
     ;;
     f)
       MAX_FILL_RATIO="$OPTARG"
@@ -300,7 +306,7 @@ do_check() {
   # Check for memory footprint (< 50M or < 1% of available memory?)
   if [ $OPT_MEMORY_CHECK -eq 1 ]; then
     MEM=$[$MEMKB/1024]
-    if [ $MEM -gt 50 ]; then
+    if [ $MEM -gt "$MEM_THRESHOLD" ]; then
       MEMTOTAL=`/bin/grep MemTotal /proc/meminfo | /bin/awk '{print $2}'`
       # More than 1% of total memory?
       if [ $[$MEMKB*100] -gt $MEMTOTAL ]; then
