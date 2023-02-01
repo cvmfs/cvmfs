@@ -250,7 +250,7 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
 
   // load nested catalog
   const PathString nestedMntpnt("/dir/dir2");
-  const auto& ncatalogHash = mp->catalog_mgr()->
+  const shash::Any& ncatalogHash = mp->catalog_mgr()->
                               GetNestedCatalogHash(nestedMntpnt);
   CatalogInfo nctlg_info;
   nctlg_info.hash = ncatalogHash;
@@ -287,7 +287,7 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
   // load nested catalog
   const PathString nestedMntpnt("/dir/dir2");
-  const auto& ncatalogHash = mp->catalog_mgr()->
+  const shash::Any& ncatalogHash = mp->catalog_mgr()->
                                              GetNestedCatalogHash(nestedMntpnt);
 
   ctlg_info.hash = ncatalogHash;
@@ -310,7 +310,7 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
   // fetch hash but do not load catalog
   const PathString nestedMntpntNoDwnld("/dir/dir3");
-  const auto& ncatalogHashNoDwnld = mp->catalog_mgr()->
+  const shash::Any& ncatalogHashNoDwnld = mp->catalog_mgr()->
                                       GetNestedCatalogHash(nestedMntpntNoDwnld);
 
   // try to load from cache
