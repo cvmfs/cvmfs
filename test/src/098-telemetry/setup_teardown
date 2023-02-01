@@ -1,0 +1,20 @@
+test098_mount() {
+  local repo=$1
+  local params=$2
+
+  cvmfs_mount $repo $params
+}
+
+test098_unmount() {
+  local repo=$1
+
+  cvmfs_umount $repo
+}
+
+cleanup() {
+  echo "cleanup $cvmfs_test_name"
+  if [ "x$CVMFS_TEST_098_TMPFILE" != "x" ]; then
+    rm $CVMFS_TEST_098_TMPFILE
+  fi
+}
+

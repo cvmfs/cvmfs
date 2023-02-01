@@ -57,6 +57,7 @@ class OptionsManager;
 namespace perf {
 class Counter;
 class Statistics;
+class TelemetryAggregator;
 }
 namespace signature {
 class SignatureManager;
@@ -521,6 +522,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
+  perf::TelemetryAggregator *telemetry_aggr() { return telemetry_aggr_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
   uid_t talk_socket_uid() { return talk_socket_uid_; }
   gid_t talk_socket_gid() { return talk_socket_gid_; }
@@ -576,6 +578,11 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
   static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
+  /**
+   * Default values for telemetry aggregator
+  */
+  static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
+  static const int kMinimumTelemetrySendRateSec = 5;  // 5sec
 
   MountPoint(const std::string &fqrn,
              FileSystem *file_system,
@@ -614,6 +621,7 @@ class MountPoint : SingleCopy, public BootFactory {
   OptionsManager *options_mgr_;
 
   perf::Statistics *statistics_;
+  perf::TelemetryAggregator *telemetry_aggr_;
   AuthzFetcher *authz_fetcher_;
   AuthzSessionManager *authz_session_mgr_;
   AuthzAttachment *authz_attachment_;

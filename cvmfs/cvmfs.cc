@@ -103,6 +103,7 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
+#include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
@@ -2252,13 +2253,15 @@ static void Spawn() {
   cvmfs::fuse_remounter_->Spawn();
   if (cvmfs::mount_point_->dentry_tracker()->is_active()) {
     cvmfs::mount_point_->dentry_tracker()->SpawnCleaner(
-      cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
+        // Usually every minute
+        static_cast<unsigned int>(cvmfs::mount_point_->kcache_timeout_sec()));
   }
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
-  if (cvmfs::mount_point_->resolv_conf_watcher() != NULL)
+  if (cvmfs::mount_point_->resolv_conf_watcher() != NULL) {
     cvmfs::mount_point_->resolv_conf_watcher()->Spawn();
+  }
   QuotaManager *quota_mgr = cvmfs::file_system_->cache_mgr()->quota_mgr();
   quota_mgr->Spawn();
   if (quota_mgr->HasCapability(QuotaManager::kCapListeners)) {
@@ -2277,10 +2280,15 @@ static void Spawn() {
     cvmfs::notification_client_->Spawn();
   }
 
-  if (cvmfs::file_system_->nfs_maps() != NULL)
+  if (cvmfs::file_system_->nfs_maps() != NULL) {
     cvmfs::file_system_->nfs_maps()->Spawn();
+  }
 
   cvmfs::file_system_->cache_mgr()->Spawn();
+
+  if (cvmfs::mount_point_->telemetry_aggr() != NULL) {
+    cvmfs::mount_point_->telemetry_aggr()->Spawn();
+  }
 }
 
 

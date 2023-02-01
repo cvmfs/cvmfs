@@ -72,6 +72,8 @@ class Statistics {
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
   std::string PrintJSON();
+  void SnapshotCounters(std::map<std::string, int64_t> *counters,
+                        uint64_t *timestamp_ns);
 
  private:
   Statistics(const Statistics &other);

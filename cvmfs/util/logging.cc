@@ -70,7 +70,7 @@ const char *module_names[] = {
     "utility",   "glue buffer", "history",      "unionfs",
     "pathspec",  "receiver",    "upload s3",    "upload http",
     "s3fanout",  "gc",          "dns",          "authz",
-    "reflog",    "kvstore"};
+    "reflog",    "kvstore", "telemetry"};
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
