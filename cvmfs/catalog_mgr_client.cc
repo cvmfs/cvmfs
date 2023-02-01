@@ -164,7 +164,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
   if (mounted_root_ctlg_revision_ != -1ul &&
       (breadcrumb_revision <= mounted_root_ctlg_revision_
         || breadcrumb_revision == -1ul)) {
-    auto curr_hash_itr = mounted_catalogs_.find(PathString("", 0));
+    std::map<PathString, shash::Any>::iterator curr_hash_itr = 
+                                      mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = mounted_root_ctlg_revision_;
     result->root_ctlg_location = kCtlgLocationMounted;
@@ -276,7 +277,7 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
 
     if (ctlg_info->mountpoint.IsEmpty()) {  // root catalog
       if (ctlg_info->root_ctlg_location == kCtlgLocationMounted) {
-        return LoadReturn::kLoadUp2Date;
+        return kLoadUp2Date;
       }
 
       mounted_root_ctlg_revision_ = ctlg_info->root_ctlg_revision;

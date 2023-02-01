@@ -46,8 +46,8 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
   download::Failures retval = download_manager_->Fetch(&download_catalog);
   if (fclose(fcatalog) != 0) {
       PANIC(kLogStderr, "could not close temporary file %s: error %d",
-                  file_path_.c_str(), retval);
-  }
+                  tmp.c_str(), retval);
+    }
 
   if (retval != download::kFailOk) {
     unlink(ctlg_info->sql_catalog_handle.c_str());
