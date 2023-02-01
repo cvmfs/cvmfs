@@ -420,9 +420,9 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
  * @param[in] format Format string followed by arguments like printf
  */
 CVMFS_EXPORT
-void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
+void vLogCvmfs(const LogSource source, const int mask,
+               const char *format, va_list variadic_list) {
   char *msg = NULL;
-  va_list variadic_list;
 
 // Log level check, no flag set in mask means kLogNormal
 #ifndef DEBUGMSG
@@ -433,10 +433,8 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
 #endif
 
   // Format the message string
-  va_start(variadic_list, format);
   int retval = vasprintf(&msg, format, variadic_list);
   assert(retval != -1);  // else: out of memory
-  va_end(variadic_list);
 
   if (alt_log_func) {
     (*alt_log_func)(source, mask, msg);
@@ -525,6 +523,13 @@ void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
     g_log_buffer.Append(LogBufferEntry(source, mask, msg));
 
   free(msg);
+}
+CVMFS_EXPORT
+void LogCvmfs(const LogSource source, const int mask, const char *format, ...) {
+  va_list variadic_list;
+  va_start(variadic_list, format);
+  vLogCvmfs(source, mask, format, variadic_list);
+  va_end(variadic_list);
 }
 
 std::vector<LogBufferEntry> GetLogBuffer() {

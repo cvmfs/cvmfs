@@ -404,13 +404,14 @@ void PageCacheTracker::Close(uint64_t inode) {
   Entry entry;
   bool retval = map_.Lookup(inode, &entry);
 
-  std::string errormsg = "PageCacheTracker::Close Race condition? "
-                         "Did not find inode ";
-  errormsg.append(StringifyUint(inode));
   if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
-                    errormsg.c_str())
+                   "PageCacheTracker::Close Race condition? "
+                   "Did not find inode %lu",
+                   inode)
       || !AssertOrLog(entry.nopen != 0, kLogCvmfs, kLogSyslogWarn | kLogDebug,
-                    errormsg.c_str())) {
+                      "PageCacheTracker::Close Race condition? "
+                      "Inode %lu has no open entries",
+                      inode)) {
     return;
   }
 
