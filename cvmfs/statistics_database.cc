@@ -374,7 +374,7 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
     }
   }
 
-  if (IsEqualSchema(schema_version(), kLatestSchema) && 
+  if (IsEqualSchema(schema_version(), kLatestSchema) &&
       (schema_revision() == 3)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (3 --> 4) of "
                                    "statistics database");
