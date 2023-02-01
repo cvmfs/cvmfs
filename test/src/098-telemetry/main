@@ -23,13 +23,13 @@ CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
 
   echo "   UDP Listener: wait for 1 package from $TEST098_REPO"
   # -W 1 ends the command after receiving 1 package
-  python3 $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb > $CVMFS_TEST_098_TMPFILE
+  $CVMFS_SYS_PYTHON $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb > $CVMFS_TEST_098_TMPFILE
 
   echo "   Do something to change counters"
   cat /cvmfs/$TEST098_REPO/*.sh > /dev/null
 
   echo "   UDP Listener: Wait for another package from $TEST098_REPO"
-  python3 $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb >> $CVMFS_TEST_098_TMPFILE
+  $CVMFS_SYS_PYTHON $CVMFS_TEST_098_PYTHON_SCRIPT -d localhost -p 8092 -m 1 -i lhcb >> $CVMFS_TEST_098_TMPFILE
 
   echo "   Umount $TEST098_REPO"
   test098_unmount $TEST098_REPO
