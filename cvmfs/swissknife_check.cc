@@ -49,7 +49,7 @@ namespace swissknife {
 CommandCheck::CommandCheck()
     : check_chunks_(false)
     , is_remote_(false) {
-    const shash::Any hash_null(shash::kMd5);
+    const shash::Any hash_null;
     duplicates_map_.Init(16, hash_null, hasher_any);
 }
 
