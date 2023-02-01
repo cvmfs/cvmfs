@@ -836,7 +836,7 @@ create_filled_repo() {
 # @param  repo_dir   where to put the dummy dirents
 make_huge_repo() {
   local repo_dir=$1
-  $CVMFS_PYTHON2 ${TEST_ROOT}/common/mock_services/make_repo.py \
+  ${TEST_ROOT}/common/mock_services/make_repo.py                \
     --max-dir-depth        7                                    \
     --num-subdirs          5                                    \
     --num-files-per-dir    5                                    \
