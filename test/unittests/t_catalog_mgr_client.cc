@@ -234,7 +234,7 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
 
   // load root catalog by its hash
   const PathString rootMntpnt("");
-  const auto& rootHash = mp->catalog_mgr()->GetRootHash();
+  const shash::Any& rootHash = mp->catalog_mgr()->GetRootHash();
 
   CatalogInfo root_info;
   // mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info); << this we dont do
