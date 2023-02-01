@@ -302,7 +302,7 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
   // break URL to repo
   mp->download_mgr()->SetProxyChain("file://noValidURL", "",
-                       download::DownloadManager::ProxySetModes::kSetProxyBoth);
+                       download::DownloadManager::kSetProxyBoth);
   mp->download_mgr()->RebalanceProxies();
   mp->download_mgr()->SetHostChain("file://noValidURL");
   mp->download_mgr()->SwitchHost();
