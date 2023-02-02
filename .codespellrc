@@ -1,0 +1,4 @@
+[codespell]
+skip = .git
+# gir -- codespell wants it to be git
+ignore-words-list = gir
