@@ -1751,6 +1751,45 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
 };
 
 /**
+ * Closes all file descriptors except the ones in preserve_fildes.
+ * To be used after fork but before exec.
+ */
+static bool CloseAllFildes(const std::set<int> &preserve_fildes)
+{
+#ifdef __APPLE__
+  const char *fds_dir = "/dev/fd";
+#else // ifdef __APPLE__
+  const char *fds_dir = "/proc/self/fd";
+#endif // #ifdef __APPLE__
+
+  DIR *dirp = opendir(fds_dir);
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    uint64_t name_uint64;
+
+    if (!String2Uint64Parse(name, &name_uint64)) {
+      continue;
+    }
+
+    int fd = static_cast<int>(name_uint64);
+    if (preserve_fildes.count(fd)) {
+      continue;
+    }
+
+    close(fd);
+  }
+
+  closedir(dirp);
+
+  return true;
+}
+
+/**
  * Execve to the given command line, preserving the given file descriptors.
  * If stdin, stdout, stderr should be preserved, add 0, 1, 2.
  * File descriptors from the parent process can also be mapped to the new
@@ -1778,9 +1817,11 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   assert(pid >= 0);
   if (pid == 0) {
     pid_t pid_grand_child;
-    int max_fd;
     int fd_flags;
     ForkFailures::Names failed = ForkFailures::kUnknown;
+
+    std::set<int> skip_fds = preserve_fildes;
+    skip_fds.insert(pipe_fork.write_end);
 
     if (clear_env) {
 #ifdef __APPLE__
@@ -1808,15 +1849,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     }
 
     // Child, close file descriptors
-    max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
-    if (max_fd < 0) {
-      failed = ForkFailures::kFailGetMaxFd;
-      goto fork_failure;
-    }
-    for (int fd = 0; fd < max_fd; fd++) {
-      if ((fd != pipe_fork.write_end) && (preserve_fildes.count(fd) == 0)) {
-        close(fd);
-      }
+    if (!CloseAllFildes(skip_fds)) {
+      failed = ForkFailures::kUnknown;
     }
 
     // Double fork to disconnect from parent
