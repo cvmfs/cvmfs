@@ -458,7 +458,7 @@ class CatalogTraversalBase
  *
  * Breadth First Traversal Strategy
  *   Catalogs are handed out to the user identical as they are traversed.
- *   Say: From top to buttom. When you would simply print each received catalog
+ *   Say: From top to bottom. When you would simply print each received catalog
  *        the result would be a nice representation of the catalog tree.
  *   This method is more efficient, because catalogs are opened, processed and
  *   thrown away directly afterwards.

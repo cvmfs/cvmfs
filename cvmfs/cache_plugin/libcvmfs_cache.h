@@ -19,7 +19,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-// Map C++ clases to their C interface names
+// Map C++ classes to their C interface names
 typedef class SimpleOptionsParser cvmcache_option_map;
 #else
 typedef struct OptionsManager cvmcache_option_map;

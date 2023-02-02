@@ -121,7 +121,7 @@ class MagicXattrRAIIWrapper: public SingleCopy {
   {
     if (ptr_ != NULL) ptr_->Lock(path, d);
   }
-  /// Wraps around a BaseMagicXattr* tha is already locked (or NULL)
+  /// Wraps around a BaseMagicXattr* that is already locked (or NULL)
   inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ptr) : ptr_(ptr) { }
 
   inline ~MagicXattrRAIIWrapper() { if (ptr_ != NULL) ptr_->Release(); }

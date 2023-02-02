@@ -590,7 +590,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
 
 
 /**
- * Unregisteres a snapshot from /.cvmfs/snapshots. Note that bind mountpoints
+ * Unregisters a snapshot from /.cvmfs/snapshots. Note that bind mountpoints
  * are not universally handled: in Partition and MergeIntoParent, bind
  * mountpoint handling is missing!
  */

@@ -1244,7 +1244,7 @@ is_stratum0_garbage_collectable() {
 }
 
 
-# checks if a manifest ist present
+# checks if a manifest is present
 #
 # @param name  the name of the repository to be checked
 # @return      0 if it is empty

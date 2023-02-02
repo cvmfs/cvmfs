@@ -107,7 +107,7 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   void List();
 
   /**
-   * From and to are either tag names or catalog root hashes preceeded by
+   * From and to are either tag names or catalog root hashes preceded by
    * a '@'.
    */
   void Diff(const std::string &from, const std::string &to,

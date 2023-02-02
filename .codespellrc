@@ -1,4 +1,6 @@
 [codespell]
 skip = .git
 # gir -- codespell wants it to be git
-ignore-words-list = gir
+# ative -- used in 3 lines, not really sure if there is no ad-hoc semantic
+# parm -- used in cvmfs/authz/authz_curl.cc
+ignore-words-list = gir,ative,parm

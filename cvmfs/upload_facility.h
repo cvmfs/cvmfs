@@ -320,7 +320,7 @@ class AbstractUploader
   /**
    * Waits until the current upload queue is empty.
    *
-   * Note: This does NOT necessarily mean, that all files are actuall uploaded.
+   * Note: This does NOT necessarily mean, that all files are actually uploaded.
    *       If new jobs are concurrently scheduled the behavior of this method is
    *       not defined (it returns also on intermediately empty queues)
    */
