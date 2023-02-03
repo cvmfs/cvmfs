@@ -354,9 +354,10 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   CatalogInfo root_info;
 
   // TODO(heretherebedragons) is it true that MountPoint::Create does NOT load the root catalog???
-  EXPECT_EQ(catalog::kLoadNew,
+  // apparently it does.. loadcatalogbyhash had a small bug with offline_mode_
+  EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info));
-  EXPECT_EQ(catalog::kCtlgLocationServer, root_info.root_ctlg_location);
+  EXPECT_EQ(catalog::kCtlgLocationMounted, root_info.root_ctlg_location);
   EXPECT_EQ(root_hash_str, root_info.hash.ToString());
 }
 

@@ -193,7 +193,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
       return success_code;
     }
     // server has newest revision or no valid local revision
-    if (ensemble.manifest->revision() >= local_newest_revision
+    if (ensemble.manifest->revision() > local_newest_revision
           || local_newest_revision == -1ul) {
     result->hash = ensemble.manifest->catalog_hash();
     result->root_ctlg_revision = ensemble.manifest->revision();
@@ -208,7 +208,12 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
             "manifest too old or server unreachable (%d - %s)",
             manifest_failure, manifest::Code2Ascii(manifest_failure));
 
-  offline_mode_ = true;
+  if (manifest_failure == manifest::kFailOk
+      && ensemble.manifest->revision() == local_newest_revision) {
+      offline_mode_ = false;
+  } else {
+    offline_mode_ = true;
+  }
   result->hash = local_newest_hash;
   result->root_ctlg_revision = local_newest_revision;
 
