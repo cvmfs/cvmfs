@@ -373,7 +373,7 @@ do_check() {
     fi
   fi
 
-  if [ $OPT_IGNORE_CACHE = 0 ]; then
+  if [ $OPT_IGNORE_CACHE -eq 0 ]; then
     # Check for number of cache cleanups within the last 24 hours
     if [ $NCLEANUP24 -gt 24 ]; then
       append_info "frequent cache cleanups, cache might be undersized"
