@@ -4,7 +4,7 @@
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
-# 1.12a - 31.01.2023
+# 1.13 - 31.01.2023
 #    - Add -c option to skip cache checks (for osgstorage.org)
 #    - Add -M option to Customize the memory check threshold
 # 1.12 - 05.11.2021
