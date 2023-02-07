@@ -1,6 +1,6 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.12a, last modified: 31.01.2023
+# Version 1.13, last modified: 31.01.2023
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
