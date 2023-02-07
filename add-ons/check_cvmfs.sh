@@ -322,7 +322,7 @@ do_check() {
     RETURN_STATUS=$STATUS_WARNING
   fi
 
-  if [ $OPT_IGNORE_CACHE = 0 ]; then
+  if [ $OPT_IGNORE_CACHE -eq 0 ]; then
     # Check for free space on cache partition
     DF_CACHE=`/bin/df -P "$CVMFS_CACHE_BASE"`
     if [ $? -ne 0 ]; then
