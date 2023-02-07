@@ -179,7 +179,8 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
   // TODO(herethebedragons load_error == kLoadUp2Date might need to be removed)!
   // SEE REMOUNT
-  if (load_error == kLoadNew || load_error == kLoadUp2Date) {
+  // I removed it from now.. lets see what breaks
+  if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
@@ -891,8 +892,9 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
                                               CatalogT *parent_catalog)
 {
   CatalogT *attached_catalog = NULL;
-  if (IsAttached(mountpoint, &attached_catalog))
+  if (IsAttached(mountpoint, &attached_catalog)) {
     return attached_catalog;
+  }
 
   CatalogInfo ctlg_info;
   ctlg_info.hash = hash;
