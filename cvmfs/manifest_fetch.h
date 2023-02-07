@@ -36,6 +36,7 @@ enum Failures {
   kFailBadWhitelist,
   kFailInvalidCertificate,
   kFailUnknown,
+  // kFailUp2Date,  TODO(heretherebedragons) maybe needed for manifest fetch
 
   kFailNumEntries
 };

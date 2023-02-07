@@ -80,6 +80,7 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   //   LogCvmfs(kLogCvmfs, kLogDebug,
   //            "OOOOOOOOOOO DoVerify Quick way out: hash matches base catalog");
   //   return kFailOk;
+  //   return kFailUp2Date;
   // }
     
 
@@ -205,6 +206,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
       DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
               signature_manager, download_manager, ensemble);
   if ((result != kFailOk) &&
+      (result != kFailUp2Date) &&
       (result != kFailLoad) &&
       (result != kFailInvalidCertificate) &&
       (download_manager->num_hosts() > 1))

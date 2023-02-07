@@ -268,6 +268,11 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
 
       ctlg_info->hash = ensemble.manifest->catalog_hash();
       ctlg_info->root_ctlg_revision = ensemble.manifest->revision();
+
+      // TODO(heretherebedragons) CURRENTLY NOT POSSIBLE TO CACHE MANIFEST
+      // if (manifest_failure != manifest::kFailUp2Date) {
+      //   // find manifest  + certificate
+      // }
     }
   }
 

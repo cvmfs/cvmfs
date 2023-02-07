@@ -176,11 +176,11 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
+  // TODO(heretherebedragons) HERE IS A PROBLEM: THE CATALOG REVISION IS NOT
+  // SET CORRECTLY. WOULD NEED SPECIAL TREATEMENT
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
-  // TODO(herethebedragons load_error == kLoadUp2Date might need to be removed)!
-  // SEE REMOUNT
-  // I removed it from now.. lets see what breaks
-  if (load_error == kLoadNew) {
+
+  if (load_error == kLoadNew || load_error == kLoadUp2Date) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
