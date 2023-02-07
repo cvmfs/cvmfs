@@ -13,9 +13,9 @@
 
 #include "cache.h"
 #include "crypto/hash.h"
-#include "download.h"
 #include "gtest/gtest_prod.h"
-#include "sink.h"
+#include "network/download.h"
+#include "network/sink.h"
 
 class BackoffThrottle;
 

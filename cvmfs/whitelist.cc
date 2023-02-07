@@ -11,7 +11,7 @@
 #include <ctime>
 
 #include "crypto/signature.h"
-#include "download.h"
+#include "network/download.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 #include "util/string.h"

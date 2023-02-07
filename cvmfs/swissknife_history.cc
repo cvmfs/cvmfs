@@ -12,8 +12,8 @@
 #include "catalog_rw.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "upload.h"
 
 using namespace std;         // NOLINT

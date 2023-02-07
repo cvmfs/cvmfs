@@ -12,7 +12,7 @@
 #include <string>
 
 #include "duplex_zlib.h"
-#include "sink.h"
+#include "network/sink.h"
 #include "util/plugin.h"
 
 namespace shash {

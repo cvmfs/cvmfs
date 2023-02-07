@@ -6,7 +6,7 @@
 
 #include "catalog_mgr_rw.h"
 #include "catalog_test_tools.h"
-#include "download.h"
+#include "network/download.h"
 #include "statistics.h"
 #include "upload.h"
 

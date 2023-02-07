@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_SINK_H_
-#define CVMFS_SINK_H_
+#ifndef CVMFS_NETWORK_SINK_H_
+#define CVMFS_NETWORK_SINK_H_
 
 #include <stdint.h>
 
@@ -33,4 +33,4 @@ class Sink {
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_SINK_H_
+#endif  // CVMFS_NETWORK_SINK_H_

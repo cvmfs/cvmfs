@@ -39,7 +39,6 @@
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -51,6 +50,7 @@
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"

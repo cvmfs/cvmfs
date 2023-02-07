@@ -13,8 +13,8 @@
 #include <string>
 
 #include "crypto/hash.h"
-#include "download.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
