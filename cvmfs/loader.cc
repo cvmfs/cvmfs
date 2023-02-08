@@ -1038,7 +1038,24 @@ int FuseMain(int argc, char *argv[]) {
 #if CVMFS_USE_LIBFUSE == 2
     retval = fuse_session_loop_mt(session);
 #else
-    retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
+  struct fuse_loop_config *fuse_loop_cfg =  fuse_loop_cfg_create();
+    fuse_loop_cfg_set_clone_fd( fuse_loop_cfg, 1 ); //the default as of 3.13.1 is 0
+  if (options_manager->GetValue("CVMFS_FUSE3_DISABLE_CLONE_FD", &parameter) &&
+    options_manager->IsOn(parameter)) {
+    fuse_loop_cfg_set_clone_fd( fuse_loop_cfg, 0 );
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: Loop config: Disabling Clone FD");
+  }
+  if (options_manager->GetValue("CVMFS_FUSE3_MAX_THREADS", &parameter) ) {
+    int val = String2Int64(parameter);
+    fuse_loop_cfg_set_max_threads( fuse_loop_cfg, val );
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: Loop config: max_threads=%d", val );
+  }
+  if (options_manager->GetValue("CVMFS_FUSE3_IDLE_THREADS", &parameter) ) {
+    int val = String2Int64(parameter);
+    fuse_loop_cfg_set_idle_threads( fuse_loop_cfg, val );
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: Loop config: min_threads=%d", val );
+  }
+  retval = fuse_session_loop_mt(session, fuse_loop_cfg );
 #endif
   }
   SetLogMicroSyslog(*usyslog_path_);
