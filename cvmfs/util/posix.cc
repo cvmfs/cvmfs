@@ -1756,37 +1756,62 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
  */
 static bool CloseAllFildes(const std::set<int> &preserve_fildes)
 {
-#ifdef __APPLE__
-  const char *fds_dir = "/dev/fd";
-#else // ifdef __APPLE__
-  const char *fds_dir = "/proc/self/fd";
-#endif // #ifdef __APPLE__
-
-  DIR *dirp = opendir(fds_dir);
-  if (!dirp)
+  int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  if (max_fd < 0) {
     return false;
-
-  platform_dirent64 *dirent;
-
-  while ((dirent = platform_readdir(dirp))) {
-    const std::string name(dirent->d_name);
-    uint64_t name_uint64;
-
-    if (!String2Uint64Parse(name, &name_uint64)) {
-      continue;
-    }
-
-    int fd = static_cast<int>(name_uint64);
-    if (preserve_fildes.count(fd)) {
-      continue;
-    }
-
-    close(fd);
   }
 
-  closedir(dirp);
+  auto close_all_until_maxfd = [&preserve_fildes](int max_fd){
+    // Loop through all possible FDs and close them.
+    for (int fd = 0; fd < max_fd; fd++) {
+      if (preserve_fildes.count(fd) == 0) {
+        close(fd);
+      }
+    }
 
-  return true;
+    return true;
+  };
+
+  auto close_all_procfds = [&preserve_fildes](){
+    // Loop through /proc/self/fd and close the listed FDs.
+    DIR *dirp = opendir("/proc/self/fd");
+    if (!dirp)
+      return false;
+
+    platform_dirent64 *dirent;
+
+    while ((dirent = platform_readdir(dirp))) {
+      const std::string name(dirent->d_name);
+      uint64_t name_uint64;
+
+      // Make sure the dir name is digits only (skips ".", ".." and similar).
+      if (!String2Uint64Parse(name, &name_uint64)) {
+        continue;
+      }
+
+      int fd = static_cast<int>(name_uint64);
+      if (preserve_fildes.count(fd)) {
+        continue;
+      }
+
+      close(fd);
+    }
+
+    closedir(dirp);
+
+    return true;
+  };
+
+  // Based on compile-time and run-time conditions we'll go with either
+  // close_all_until_maxfd or close_all_procfds.
+
+#ifdef __APPLE__
+  return close_all_until_maxfd(max_fd);
+#else   // ifdef __APPLE__
+  // close_all_until_maxfd is inefficient with very large max_fd.
+  // Looping through /proc/self/fd performs better.
+  return (max_fd < 100000) ? close_all_until_maxfd(max_fd) : close_all_procfds();
+#endif  // #ifdef __APPLE__
 }
 
 /**
