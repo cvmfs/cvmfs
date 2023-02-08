@@ -1039,7 +1039,7 @@ int FuseMain(int argc, char *argv[]) {
     retval = fuse_session_loop_mt(session);
 #else
   struct fuse_loop_config *fuse_loop_cfg =  fuse_loop_cfg_create();
-    fuse_loop_cfg_set_clone_fd( fuse_loop_cfg, 1 ); //the default as of 3.13.1 is 0
+  fuse_loop_cfg_set_clone_fd( fuse_loop_cfg, 1 ); //the default as of 3.13.1 is 0
   if (options_manager->GetValue("CVMFS_FUSE3_DISABLE_CLONE_FD", &parameter) &&
     options_manager->IsOn(parameter)) {
     fuse_loop_cfg_set_clone_fd( fuse_loop_cfg, 0 );
