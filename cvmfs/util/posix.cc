@@ -1751,6 +1751,55 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
 };
 
 /**
+ *  Loop through all possible FDs and close them.
+ */
+static bool CloseAllFildesUntilMaxFD(
+  const std::set<int> &preserve_fildes,
+  int max_fd
+) {
+  for (int fd = 0; fd < max_fd; fd++) {
+    if (preserve_fildes.count(fd) == 0) {
+      close(fd);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Loop through /proc/self/fd and close the listed FDs.
+ */
+static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
+{
+  DIR *dirp = opendir("/proc/self/fd");
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    uint64_t name_uint64;
+
+    // Make sure the dir name is digits only (skips ".", ".." and similar).
+    if (!String2Uint64Parse(name, &name_uint64)) {
+      continue;
+    }
+
+    int fd = static_cast<int>(name_uint64);
+    if (preserve_fildes.count(fd)) {
+      continue;
+    }
+
+    close(fd);
+  }
+
+  closedir(dirp);
+
+  return true;
+}
+
+/**
  * Closes all file descriptors except the ones in preserve_fildes.
  * To be used after fork but before exec.
  */
@@ -1761,56 +1810,16 @@ static bool CloseAllFildes(const std::set<int> &preserve_fildes)
     return false;
   }
 
-  auto close_all_until_maxfd = [&preserve_fildes](int max_fd){
-    // Loop through all possible FDs and close them.
-    for (int fd = 0; fd < max_fd; fd++) {
-      if (preserve_fildes.count(fd) == 0) {
-        close(fd);
-      }
-    }
-
-    return true;
-  };
-
-  auto close_all_procfds = [&preserve_fildes](){
-    // Loop through /proc/self/fd and close the listed FDs.
-    DIR *dirp = opendir("/proc/self/fd");
-    if (!dirp)
-      return false;
-
-    platform_dirent64 *dirent;
-
-    while ((dirent = platform_readdir(dirp))) {
-      const std::string name(dirent->d_name);
-      uint64_t name_uint64;
-
-      // Make sure the dir name is digits only (skips ".", ".." and similar).
-      if (!String2Uint64Parse(name, &name_uint64)) {
-        continue;
-      }
-
-      int fd = static_cast<int>(name_uint64);
-      if (preserve_fildes.count(fd)) {
-        continue;
-      }
-
-      close(fd);
-    }
-
-    closedir(dirp);
-
-    return true;
-  };
-
-  // Based on compile-time and run-time conditions we'll go with either
-  // close_all_until_maxfd or close_all_procfds.
-
 #ifdef __APPLE__
-  return close_all_until_maxfd(max_fd);
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
 #else   // ifdef __APPLE__
-  // close_all_until_maxfd is inefficient with very large max_fd.
-  // Looping through /proc/self/fd performs better.
-  return (max_fd < 100000) ? close_all_until_maxfd(max_fd) : close_all_procfds();
+  if (max_fd > 100000) {
+    // CloseAllFildesUntilMaxFD is inefficient with very large max_fd.
+    // Looping through /proc/self/fd performs better.
+    return CloseAllFildesInProcSelfFd(preserve_fildes);
+  }
+
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
 #endif  // #ifdef __APPLE__
 }
 
