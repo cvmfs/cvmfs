@@ -1,6 +1,6 @@
 
-#ifndef CVMFS_NETWORK_SINK_PATH_H_
-#define CVMFS_NETWORK_SINK_PATH_H_
+#ifndef CVMFS_NETWORK_SINK_MEM_H_
+#define CVMFS_NETWORK_SINK_MEM_H_
 
 #include <cstring>
 
@@ -44,6 +44,11 @@ class MemSink : public Sink {
     return ret;
   }
 
+  virtual bool IsValid() {
+    return (size_ == 0 && pos_ == 0 && data_ == NULL) ||
+           (size_ > 0 && pos_ >= 0 && data_ != NULL);
+  }
+
   void AllocData(size_t size) {
     if (is_owner_ && data_) {
       free(data_);
@@ -85,4 +90,4 @@ class MemSink : public Sink {
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_NETWORK_SINK_PATH_H_
+#endif  // CVMFS_NETWORK_SINK_MEM_H_

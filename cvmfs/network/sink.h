@@ -29,6 +29,14 @@ class Sink {
    * Truncate all written data and start over at position zero.
    */
   virtual int Reset() = 0;
+  // /**
+  //  * 
+  // */
+  // virtual void Finalize() = 0;
+  /**
+    * Returns true if the object is correctly initialized.
+  */
+  virtual bool IsValid() = 0;
 };
 
 }  // namespace cvmfs

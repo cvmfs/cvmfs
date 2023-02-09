@@ -87,6 +87,10 @@ class TestSink : public cvmfs::Sink {
     return 0;
   }
 
+  virtual bool IsValid() {
+    return fd >= 0;
+  }
+
   ~TestSink() {
     close(fd);
     unlink(path.c_str());
@@ -109,8 +113,9 @@ TEST_F(T_Download, LocalFile) {
   string src_path = GetAbsolutePath(GetSmallFile());
   string src_url = "file://" + src_path;
 
+  cvmfs::FileSink filesink(fdest);
   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               fdest,  NULL);
+               NULL, &filesink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code, kFailOk);
   fclose(fdest);
@@ -127,8 +132,9 @@ TEST_F(T_Download, RemoteFile) {
   string src_path = GetSmallFile();
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
 
+  cvmfs::FileSink filesink(fdest);
   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               fdest,  NULL);
+               NULL, &filesink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(file_server.num_processed_requests(), 1);
   EXPECT_EQ(info.error_code, kFailOk);
@@ -178,10 +184,11 @@ TEST_F(T_Download, Multiple) {
   second_mgr.Init(8,
     perf::StatisticsTemplate("second", &statistics));
 
+  cvmfs::FileSink filesink(fdest);
   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               fdest,  NULL);
+               NULL, &filesink);
   JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
-                fdest,  NULL);
+                NULL, &filesink);
   download_mgr.Fetch(&info);
   second_mgr.Fetch(&info2);
   EXPECT_EQ(info.error_code, kFailOk);

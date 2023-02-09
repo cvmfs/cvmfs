@@ -160,12 +160,13 @@ void Repository::DownloadRootObjects(
   std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
+  cvmfs::FileSink filesink(reflog_fd);
   download::JobInfo download_reflog(
        &reflog_url,
        false /* compressed */,
        false /* probe hosts */,
-       reflog_fd,
-       NULL);
+       NULL,
+       &filesink);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
@@ -187,12 +188,13 @@ void Repository::DownloadRootObjects(
   if (!manifest_->history().IsNull()) {
     std::string tags_url = url + "/data/" + manifest_->history().MakePath();
     shash::Any tags_hash(manifest_->history());
+    cvmfs::FileSink filesink(tags_fd);
     download::JobInfo download_tags(
          &tags_url,
          true /* compressed */,
          true /* probe hosts */,
-         tags_fd,
-         &tags_hash);
+         &tags_hash,
+         &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");

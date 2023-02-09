@@ -66,7 +66,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   tls = new ThreadLocalStorage();
   tls->fetcher = this;
   MakePipe(tls->pipe_wait);
-  tls->download_job.destination = download::kDestinationSink;
+  tls->download_job.destination = download::kDestinationTransaction;
   tls->download_job.compressed = true;
   tls->download_job.probe_hosts = true;
   int retval = pthread_setspecific(thread_local_storage_, tls);

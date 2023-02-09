@@ -274,10 +274,10 @@ static void *MainWorker(void *data) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
-      assert(fchunk);
       string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
-      download::JobInfo download_chunk(&url_chunk, false, false, fchunk,
-                                       &chunk_hash);
+      cvmfs::FileSink filesink(fchunk);
+      download::JobInfo download_chunk(&url_chunk, false, false,
+                                       &chunk_hash, &filesink);
 
       const download::Failures download_result =
                                        download_manager->Fetch(&download_chunk);
@@ -397,8 +397,9 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
     return false;
   }
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
+  cvmfs::FileSink filesink(fcatalog_vanilla);
   download::JobInfo download_catalog(&url_catalog, false, false,
-                                     fcatalog_vanilla, &catalog_hash);
+                                     &catalog_hash, &filesink);
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
@@ -736,9 +737,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string history_url = *stratum0_url + "/data/"
                                              + history_hash.MakePath();
     const string history_path = *temp_dir + "/" + history_hash.ToString();
+
+    cvmfs::PathSink pathsink(history_path);
     download::JobInfo download_history(&history_url, false, false,
-                                       &history_path,
-                                       &history_hash);
+                                       &history_hash,
+                                       &pathsink);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(download_history);

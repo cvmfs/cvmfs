@@ -30,6 +30,8 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
   shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
+
+  // TODO change this to a pathsink???
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
   if (!fcatalog) {
@@ -37,8 +39,9 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
           url.c_str());
   }
 
-  download::JobInfo download_catalog(&url, true, false, fcatalog,
-                                     &effective_hash);
+  cvmfs::FileSink filesink(fcatalog);
+  download::JobInfo download_catalog(&url, true, false,
+                                     &effective_hash, &filesink);
   download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);
 

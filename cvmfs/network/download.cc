@@ -156,20 +156,19 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
   }
 
   if (info->destination == kDestinationFile)
-    assert(info->destination_file != NULL);
+    assert(info->destination_filesink != NULL);
 
   if (info->destination == kDestinationPath) {
-    assert(info->destination_path != NULL);
-    info->destination_file = fopen(info->destination_path->c_str(), "w");
-    if (info->destination_file == NULL) {
+    assert(info->destination_pathsink != NULL);
+    if (info->destination_pathsink->IsValid()) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
                " (errno=%d).",
-               info->destination_path->c_str(), strerror(errno), errno);
+               info->destination_pathsink->path_.c_str(), strerror(errno), errno);
       return kFailLocalIO;
     }
   }
 
-  if (info->destination == kDestinationSink)
+  if (info->destination == kDestinationTransaction)
     assert(info->destination_sink != NULL);
 
   return kFailOk;
@@ -299,7 +298,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                   num_bytes, info->hash_context);
   }
 
-  if (info->destination == kDestinationSink) {
+  if (info->destination == kDestinationTransaction) {
     if (info->compressed) {
       zlib::StreamStates retval =
         zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
@@ -341,14 +340,14 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       info->error_code = kFailBadData;
       return 0;
     }
-  } else {
-    // Write to file
+  } else if (info->destination == kDestinationFile) {
+    // Write to fileunlink
     if (info->compressed) {
       // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
       //          num_bytes, info->url->c_str());
       zlib::StreamStates retval =
         zlib::DecompressZStream2File(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->destination_file);
+                                     &info->zstream, info->destination_filesink->file_);
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
                  info->url->c_str());
@@ -361,7 +360,35 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
-      if (fwrite(ptr, 1, num_bytes, info->destination_file) != num_bytes) {
+      if (info->destination_filesink->Write(ptr, num_bytes) != static_cast<int64_t>(num_bytes)) {
+       LogCvmfs(kLogDownload, kLogSyslogErr,
+                 "downloading %s, IO failure: %s (errno=%d)",
+                 info->url->c_str(), strerror(errno), errno);
+        info->error_code = kFailLocalIO;
+        return 0;
+      }
+    }
+  } else {
+    // Write to file
+    if (info->compressed) {
+      // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
+      //          num_bytes, info->url->c_str());
+      zlib::StreamStates retval =
+        zlib::DecompressZStream2File(ptr, static_cast<int64_t>(num_bytes),
+                                     &info->zstream, info->destination_pathsink->file_);
+      if (retval == zlib::kStreamDataError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
+                 info->url->c_str());
+        info->error_code = kFailBadData;
+        return 0;
+      } else if (retval == zlib::kStreamIOError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr,
+                 "decompressing %s, local IO error", info->url->c_str());
+        info->error_code = kFailLocalIO;
+        return 0;
+      }
+    } else {
+      if (info->destination_pathsink->Write(ptr, num_bytes) != static_cast<int64_t>(num_bytes)) {
        LogCvmfs(kLogDownload, kLogSyslogErr,
                  "downloading %s, IO failure: %s (errno=%d)",
                  info->url->c_str(), strerror(errno), errno);
@@ -1402,19 +1429,19 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailCanceled;
       goto verify_and_finalize_stop;
     }
-    if ((info->destination == kDestinationFile) ||
-        (info->destination == kDestinationPath))
-    {
-      if ((fflush(info->destination_file) != 0) ||
-          (ftruncate(fileno(info->destination_file), 0) != 0) ||
-          (freopen(NULL, "w", info->destination_file) != info->destination_file)
-         )
-      {
+    if (info->destination == kDestinationFile) {
+      if (!info->destination_filesink->Reset()) {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
       }
     }
-    if (info->destination == kDestinationSink) {
+    if (info->destination == kDestinationPath) {
+      if (!info->destination_pathsink->Reset()) {
+        info->error_code = kFailLocalIO;
+        goto verify_and_finalize_stop;
+      }
+    }
+    if (info->destination == kDestinationTransaction) {
       if (info->destination_sink->Reset() != 0) {
         info->error_code = kFailLocalIO;
         goto verify_and_finalize_stop;
@@ -1480,13 +1507,11 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Finalize, flush destination file
   ReleaseCredential(info);
   if ((info->destination == kDestinationFile) &&
-      fflush(info->destination_file) != 0)
-  {
+      info->destination_filesink->Flush() != 0) {
     info->error_code = kFailLocalIO;
   } else if (info->destination == kDestinationPath) {
-    if (fclose(info->destination_file) != 0)
+    if (info->destination_pathsink->Close() != 0)
       info->error_code = kFailLocalIO;
-    info->destination_file = NULL;
   }
 
   if (info->compressed)
@@ -1775,9 +1800,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   if (result != kFailOk) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
-
-    if (info->destination == kDestinationPath)
-      unlink(info->destination_path->c_str());
 
     if (info->destination == kDestinationMem) {
       info->destination_memsink->Reset();

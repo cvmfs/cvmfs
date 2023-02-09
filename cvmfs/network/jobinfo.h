@@ -22,6 +22,8 @@
 #include "network_errors.h"
 #include "sink.h"
 #include "sink_mem.h"
+#include "sink_file.h"
+#include "sink_path.h"
 
 class InterruptCue;
 
@@ -34,7 +36,7 @@ enum Destination {
   kDestinationMem = 1,
   kDestinationFile,
   kDestinationPath,
-  kDestinationSink,
+  kDestinationTransaction,
   kDestinationNone
 };  // Destination
 
@@ -55,8 +57,8 @@ struct JobInfo {
   InterruptCue *interrupt_cue;
   Destination destination;
   cvmfs::MemSink *destination_memsink;
-  FILE *destination_file;
-  const std::string *destination_path;
+  cvmfs::FileSink *destination_filesink;
+  cvmfs::PathSink *destination_pathsink;
   cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
@@ -80,8 +82,8 @@ struct JobInfo {
     interrupt_cue = NULL;
     destination = kDestinationNone;
     destination_memsink = NULL;
-    destination_file = NULL;
-    destination_path = NULL;
+    destination_filesink = NULL;
+    destination_pathsink = NULL;
     destination_sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
@@ -104,26 +106,30 @@ struct JobInfo {
 
   // One constructor per destination + head request
   JobInfo() { Init(); }
+  // JobInfo(const std::string *u, const bool c, const bool ph,
+  //         const shash::Any *h, cvmfs::Sink *s, enum ) {
+
+  // } 
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const std::string *p, const shash::Any *h)
+          const shash::Any *h, cvmfs::PathSink *s)
   {
     Init();
     url = u;
     compressed = c;
     probe_hosts = ph;
     destination = kDestinationPath;
-    destination_path = p;
+    destination_pathsink = s;
     expected_hash = h;
   }
-  JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
-          const shash::Any *h)
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          const shash::Any *h, cvmfs::FileSink *s)
   {
     Init();
     url = u;
     compressed = c;
     probe_hosts = ph;
     destination = kDestinationFile;
-    destination_file = f;
+    destination_filesink = s;
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool c, const bool ph,
@@ -144,7 +150,7 @@ struct JobInfo {
     url = u;
     compressed = c;
     probe_hosts = ph;
-    destination = kDestinationSink;
+    destination = kDestinationTransaction;
     destination_sink = s;
     expected_hash = h;
   }
