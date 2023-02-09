@@ -210,18 +210,20 @@ void Repository::DownloadRootObjects(
   if (!manifest_->meta_info().IsNull()) {
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
+    cvmfs::MemSink memsink;
     download::JobInfo download_info(
       &info_url,
       true /* compressed */,
       true /* probe_hosts */,
-      &info_hash);
+      &info_hash,
+      &memsink);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
     }
-    meta_info_ = std::string(download_info.destination_mem.data,
-                             download_info.destination_mem.pos);
+    meta_info_ = std::string(download_info.destination_memsink->data_,
+                             download_info.destination_memsink->pos_);
   } else {
     meta_info_ = "n/a";
   }

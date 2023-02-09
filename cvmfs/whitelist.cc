@@ -221,16 +221,18 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
   Reset();
 
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
+  cvmfs::MemSink memsink1;
   download::JobInfo download_whitelist(&whitelist_url,
-                                       false, probe_hosts, NULL);
+                                       false, probe_hosts, NULL, &memsink1);
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
-  plain_size_ = download_whitelist.destination_mem.pos;
+  plain_size_ = download_whitelist.destination_memsink->pos_;
   if (plain_size_ == 0)
     return kFailEmpty;
+  download_whitelist.destination_memsink->Release();
   plain_buf_ =
-    reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
+    reinterpret_cast<unsigned char *>(download_whitelist.destination_memsink->data_);
 
   retval_wl = ParseWhitelist(plain_buf_, plain_size_);
   if (retval_wl != kFailOk)
@@ -240,16 +242,18 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     // Load the separate whitelist pkcs7 structure
     const string whitelist_pkcs7_url =
       base_url + string("cvmfswhitelist.pkcs7");
+    cvmfs::MemSink memsink2;
     download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
-                                               probe_hosts, NULL);
+                                               probe_hosts, NULL, &memsink2);
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
-    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
+    pkcs7_size_ = download_whitelist_pkcs7.destination_memsink->pos_;
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
+    download_whitelist_pkcs7.destination_memsink->Release();
     pkcs7_buf_ = reinterpret_cast<unsigned char *>
-      (download_whitelist_pkcs7.destination_mem.data);
+      (download_whitelist_pkcs7.destination_memsink->data_);
   }
 
   return VerifyWhitelist();

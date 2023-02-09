@@ -173,15 +173,16 @@ string AutoProxy(DownloadManager *download_manager) {
     }
     LogCvmfs(kLogDownload, kLogDebug, "looking for proxy config at %s",
              pac_paths[i].c_str());
-    download::JobInfo download_pac(&pac_paths[i], false, false, NULL);
+    cvmfs::MemSink memsink;
+    download::JobInfo download_pac(&pac_paths[i], false, false, NULL, &memsink);
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
-      retval = ParsePac(download_pac.destination_mem.data,
-                        download_pac.destination_mem.pos,
+      retval = ParsePac(download_pac.destination_memsink->data_,
+                        download_pac.destination_memsink->pos_,
                         download_manager,
                         &proxies);
-      free(download_pac.destination_mem.data);
+      download_pac.destination_memsink->Reset();
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "failed to parse pac file %s",  pac_paths[i].c_str());

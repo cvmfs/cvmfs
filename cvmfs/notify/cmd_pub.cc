@@ -56,7 +56,8 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     download_manager->SetTimeout(kDownloadTimeout, kDownloadTimeout);
     download_manager->SetRetryParameters(kDownloadRetries, 500, 2000);
 
-    download::JobInfo download_manifest(&manifest_url, false, false, NULL);
+    cvmfs::MemSink memsink;
+    download::JobInfo download_manifest(&manifest_url, false, false, NULL, &memsink);
     download::Failures retval = download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
@@ -64,9 +65,9 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
       download_manager->Fini();
       return 6;
     }
-    manifest_contents = std::string(download_manifest.destination_mem.data,
-                                    download_manifest.destination_mem.pos);
-    free(download_manifest.destination_mem.data);
+    manifest_contents = std::string(download_manifest.destination_memsink->data_,
+                                    download_manifest.destination_memsink->pos_);
+    download_manifest.destination_memsink->Reset();
     download_manager->Fini();
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);

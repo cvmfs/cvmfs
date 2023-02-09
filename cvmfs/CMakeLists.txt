@@ -77,6 +77,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        mountpoint.cc
        network/dns.cc
        network/download.cc
+       network/jobinfo.cc
        options.cc
        quota.cc
        quota_posix.cc
@@ -587,6 +588,7 @@ if (BUILD_SERVER)
        monitor.cc
        network/dns.cc
        network/download.cc
+       network/jobinfo.cc
        network/s3fanout.cc
        notify/cmd_pub.cc
        notify/cmd_sub.cc
@@ -724,6 +726,7 @@ if (BUILD_SERVER)
        malloc_arena.cc
        network/dns.cc
        network/download.cc
+       network/jobinfo.cc
        network/s3fanout.cc
        options.cc
        pack.cc
@@ -813,6 +816,7 @@ if (BUILD_SERVER)
        manifest.cc
        network/dns.cc
        network/download.cc
+       network/jobinfo.cc
        options.cc
        publish/cmd_abort.cc
        publish/cmd_commit.cc
@@ -1014,6 +1018,7 @@ if(BUILD_RECEIVER)
        monitor.cc
        network/dns.cc
        network/download.cc
+       network/jobinfo.cc
        network/s3fanout.cc
        options.cc
        pack.cc
@@ -1170,6 +1175,7 @@ if (BUILD_PRELOADER)
                   manifest_fetch.cc
                   network/dns.cc
                   network/download.cc
+                  network/jobinfo.cc
                   network/s3fanout.cc
                   options.cc
                   pack.cc

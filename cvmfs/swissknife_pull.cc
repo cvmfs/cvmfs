@@ -664,15 +664,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!meta_info_hash.IsNull()) {
     meta_info_hash = ensemble.manifest->meta_info();
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
+    cvmfs::MemSink memsink;
+    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash, &memsink);
     dl_retval = download_manager()->Fetch(&download_metainfo);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
                dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
-    meta_info = string(download_metainfo.destination_mem.data,
-                       download_metainfo.destination_mem.pos);
+    meta_info = string(download_metainfo.destination_memsink->data_,
+                       download_metainfo.destination_memsink->pos_);
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();
