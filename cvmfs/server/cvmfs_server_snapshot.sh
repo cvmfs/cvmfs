@@ -234,13 +234,36 @@ EOF
     exit 1
   fi
 
+  local maxparallel="${CVMFS_MAX_PARALLEL_SNAPSHOTS:-`nproc`}"
+
+  # make locks in a tmpfs directory so they will go away after system crash
+  local tmpdir=/dev/shm/cvmfs_snapshot_all
+  if [ ! -d $tmpdir ]; then
+    mkdir -m 1777 $tmpdir
+  fi
+  local locknum=0
+  local lockfile=""
+  while [ "$locknum" -lt "$maxparallel" ]; do
+    lockfile=$tmpdir/$locknum
+    if acquire_lock $lockfile; then
+      break
+    fi
+    let locknum+=1
+  done
+  if [ "$locknum" -ge "$maxparallel" ]; then
+    # reached the maximum, silently exit
+    exit
+  fi
+
   if [ $separate_logs -eq 0 ]; then
     # write into a temporary file in case more than one is active at the
     #  same time
     fulllog=/var/log/cvmfs/snapshots.log
-    log=/tmp/cvmfs_snapshots.$$.log
-    trap "rm -f $log" EXIT HUP INT TERM
+    log=$tmpdir/$locknum.log
+    trap "release_lock $lockfile; rm -f $log" EXIT HUP INT TERM
     (echo; echo "Logging in $log at `date`") >>$fulllog
+  else
+    trap "release_lock $lockfile" EXIT HUP INT TERM
   fi
 
   # Sort the active repositories by last snapshot time when on local storage.
