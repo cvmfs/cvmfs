@@ -170,7 +170,10 @@ def name_geoinfo(now, name):
                 gir = lookup_geoinfo(now, info[4][0])
                 break
     if gir != None:
-        gir = gir['location']
+        if 'location' in gir:
+            gir = gir['location']
+        else:
+            gir = None
 
     namelock.acquire()
     if gir == None and name in geo_cache:
