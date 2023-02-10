@@ -1,3 +1,6 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #ifndef CVMFS_NETWORK_SINK_FILE_H_
 #define CVMFS_NETWORK_SINK_FILE_H_
@@ -9,7 +12,7 @@ namespace cvmfs {
 
 class FileSink : public Sink {
  public:
-  FileSink(FILE *destination_file) : file_(destination_file) {
+  explicit FileSink(FILE *destination_file) : file_(destination_file) {
     assert(file_ != NULL);
   }
 

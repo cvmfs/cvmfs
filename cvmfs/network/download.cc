@@ -323,7 +323,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       if (static_cast<cvmfs::MemSink*>(info->destination_sink)->size_) {
         LogCvmfs(kLogDownload, kLogDebug,
                  "Content-Length was missing or zero, but %zu bytes received",
-                 static_cast<cvmfs::MemSink*>(info->destination_sink)->pos_ + num_bytes);
+                 static_cast<cvmfs::MemSink*>(info->destination_sink)->pos_
+                 + num_bytes);
       } else {
         LogCvmfs(kLogDownload, kLogDebug, "Callback had too much data: "
                  "start %zu, bytes %zu, expected %zu",
@@ -1276,7 +1277,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         if (retval) {
           static_cast<cvmfs::MemSink*>(info->destination_sink)->
             Set(size, size, static_cast<char *>(buf));
-          // TODO(heretherebedragons) info->destination_mem.pos = info->destination_mem.size = size; WHY THIS SHOULD NOT BE OK
+          // TODO(heretherebedragons) info->destination_mem.pos =
+          // info->destination_mem.size = size; WHY? THIS SHOULD NOT BE OK
         } else {
           LogCvmfs(kLogDownload, kLogDebug,
                    "decompression (memory) of url %s failed",

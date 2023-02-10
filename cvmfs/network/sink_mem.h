@@ -1,3 +1,6 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #ifndef CVMFS_NETWORK_SINK_MEM_H_
 #define CVMFS_NETWORK_SINK_MEM_H_
@@ -12,8 +15,8 @@ namespace cvmfs {
 
 class MemSink : public Sink {
  public:
-  MemSink() : size_(0), pos_(0), data_(NULL), is_owner_(true) {};
-  MemSink(size_t size) : size_(size), pos_(0) {
+  MemSink() : size_(0), pos_(0), data_(NULL), is_owner_(true) {}
+  explicit MemSink(size_t size) : size_(size), pos_(0) {
     data_ = static_cast<char *>(smalloc(size));
     is_owner_ = true;
   }
@@ -40,7 +43,7 @@ class MemSink : public Sink {
     data_ = NULL;
     size_ = 0;
     pos_ = 0;
-    
+
     return ret;
   }
 
@@ -68,7 +71,7 @@ class MemSink : public Sink {
     is_owner_ = false;
   }
 
-  void Set(size_t size, size_t pos, char *data, bool is_owner=true) {
+  void Set(size_t size, size_t pos, char *data, bool is_owner = true) {
     assert(size >= pos);
 
     if (is_owner_ && data_) {

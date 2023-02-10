@@ -21,8 +21,8 @@
 #include "duplex_curl.h"
 #include "network_errors.h"
 #include "sink.h"
-#include "sink_mem.h"
 #include "sink_file.h"
+#include "sink_mem.h"
 #include "sink_path.h"
 
 class InterruptCue;

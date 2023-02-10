@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_NETWORK_ERRORS_H_
-#define CVMFS_NETWORK_ERRORS_H_
+#ifndef CVMFS_NETWORK_NETWORK_ERRORS_H_
+#define CVMFS_NETWORK_NETWORK_ERRORS_H_
 
 namespace download {
 
@@ -89,4 +89,4 @@ inline const char *Code2Ascii(const Failures error) {
 
 }  // namespace download
 
-#endif  // CVMFS_NETWORK_ERRORS_H_
+#endif  // CVMFS_NETWORK_NETWORK_ERRORS_H_
