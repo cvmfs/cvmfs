@@ -41,7 +41,8 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   cvmfs::FileSink filesink(fcatalog);
   download::JobInfo download_catalog(&url, true, false,
-                                     &effective_hash, &filesink);
+                                     &effective_hash, &filesink,
+                                     download::kDestinationFile);
   download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);
 

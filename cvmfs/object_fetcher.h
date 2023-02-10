@@ -584,10 +584,11 @@ class HttpObjectFetcher :
     const bool probe_hosts = false;
     cvmfs::FileSink filesink(f);
     download::JobInfo download_job(&url,
-                                        decompress,
-                                        probe_hosts,
-                                        expected_hash,
-                                        &filesink);
+                                   decompress,
+                                   probe_hosts,
+                                   expected_hash,
+                                   &filesink,
+                                   download::kDestinationFile);
     download_job.force_nocache = nocache;
     download::Failures retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);

@@ -166,7 +166,8 @@ void Repository::DownloadRootObjects(
        false /* compressed */,
        false /* probe hosts */,
        NULL,
-       &filesink);
+       &filesink,
+       download::kDestinationFile);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
@@ -194,7 +195,8 @@ void Repository::DownloadRootObjects(
          true /* compressed */,
          true /* probe hosts */,
          &tags_hash,
-         &filesink);
+         &filesink,
+         download::kDestinationFile);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
@@ -212,20 +214,21 @@ void Repository::DownloadRootObjects(
   if (!manifest_->meta_info().IsNull()) {
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
-    cvmfs::MemSink memsink;
+    cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_info(
       &info_url,
       true /* compressed */,
       true /* probe_hosts */,
       &info_hash,
-      &memsink);
+      &metainfo_memsink,
+      download::kDestinationMem);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
     }
-    meta_info_ = std::string(download_info.destination_memsink->data_,
-                             download_info.destination_memsink->pos_);
+    meta_info_ = std::string(metainfo_memsink.data_,
+                             metainfo_memsink.pos_);
   } else {
     meta_info_ = "n/a";
   }

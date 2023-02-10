@@ -56,9 +56,6 @@ struct JobInfo {
   void *cred_data;  // Per-transfer credential data
   InterruptCue *interrupt_cue;
   Destination destination;
-  cvmfs::MemSink *destination_memsink;
-  cvmfs::FileSink *destination_filesink;
-  cvmfs::PathSink *destination_pathsink;
   cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
@@ -81,9 +78,6 @@ struct JobInfo {
     cred_data = NULL;
     interrupt_cue = NULL;
     destination = kDestinationNone;
-    destination_memsink = NULL;
-    destination_filesink = NULL;
-    destination_pathsink = NULL;
     destination_sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
@@ -106,54 +100,17 @@ struct JobInfo {
 
   // One constructor per destination + head request
   JobInfo() { Init(); }
-  // JobInfo(const std::string *u, const bool c, const bool ph,
-  //         const shash::Any *h, cvmfs::Sink *s, enum ) {
-
-  // } 
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h, cvmfs::PathSink *s)
-  {
+          const shash::Any *h, cvmfs::Sink *s, enum Destination dest) {
     Init();
     url = u;
     compressed = c;
     probe_hosts = ph;
-    destination = kDestinationPath;
-    destination_pathsink = s;
+    destination = dest;
     expected_hash = h;
-  }
-  JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h, cvmfs::FileSink *s)
-  {
-    Init();
-    url = u;
-    compressed = c;
-    probe_hosts = ph;
-    destination = kDestinationFile;
-    destination_filesink = s;
-    expected_hash = h;
-  }
-  JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h, cvmfs::MemSink *s)
-  {
-    Init();
-    url = u;
-    compressed = c;
-    probe_hosts = ph;
-    destination = kDestinationMem;
-    destination_memsink = s;
-    expected_hash = h;
-  }
-  JobInfo(const std::string *u, const bool c, const bool ph,
-          cvmfs::Sink *s, const shash::Any *h)
-  {
-    Init();
-    url = u;
-    compressed = c;
-    probe_hosts = ph;
-    destination = kDestinationTransaction;
     destination_sink = s;
-    expected_hash = h;
   }
+
   JobInfo(const std::string *u, const bool ph) {
     Init();
     url = u;

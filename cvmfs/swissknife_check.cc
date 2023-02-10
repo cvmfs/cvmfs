@@ -187,7 +187,8 @@ string CommandCheck::FetchPath(const string &path) {
   const string url = repo_base_path_ + "/" + path;
   if (is_remote_) {
     cvmfs::FileSink filesink(f);
-    download::JobInfo download_job(&url, false, false, NULL, &filesink);
+    download::JobInfo download_job(&url, false, false, NULL, &filesink,
+                                   download::kDestinationFile);
     download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
@@ -675,7 +676,8 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
   const string url = repo_base_path_ + "/" + source;
 
   cvmfs::PathSink pathsink(dest);
-  download::JobInfo download_catalog(&url, true, false, &catalog_hash, &pathsink);
+  download::JobInfo download_catalog(&url, true, false, &catalog_hash,
+                                     &pathsink, download::kDestinationPath);
   download::Failures retval = download_manager()->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",

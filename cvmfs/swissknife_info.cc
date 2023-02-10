@@ -127,19 +127,21 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   UniquePtr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
-    cvmfs::MemSink memsink;
-    download::JobInfo download_manifest(&url, false, false, NULL, &memsink);
+    cvmfs::MemSink manifest_memsink;
+    download::JobInfo download_manifest(&url, false, false, NULL,
+                                        &manifest_memsink,
+                                        download::kDestinationMem);
     download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
       return 1;
     }
-    char *buffer = download_manifest.destination_memsink->data_;
-    const unsigned length = download_manifest.destination_memsink->pos_;
+
     manifest = manifest::Manifest::LoadMem(
-        reinterpret_cast<const unsigned char *>(buffer), length);
-    download_manifest.destination_memsink->Reset();
+                reinterpret_cast<const unsigned char *>(manifest_memsink.data_),
+                manifest_memsink.pos_);
+    manifest_memsink.Reset();
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
@@ -251,8 +253,10 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 0;
     }
     const string url = repository + "/data/" + meta_info.MakePath();
-    cvmfs::MemSink memsink;
-    download::JobInfo download_metainfo(&url, true, false, &meta_info, &memsink);
+    cvmfs::MemSink metainfo_memsink;
+    download::JobInfo download_metainfo(&url, true, false, &meta_info,
+                                        &metainfo_memsink,
+                                        download::kDestinationMem);
     download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
@@ -261,8 +265,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(download_metainfo.destination_memsink->data_,
-                download_metainfo.destination_memsink->pos_);
+    string info(metainfo_memsink.data_, metainfo_memsink.pos_);
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 
