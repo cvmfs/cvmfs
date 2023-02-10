@@ -151,7 +151,8 @@ static unsigned EscapeHeader(const string &header,
 
 
 static Failures PrepareDownloadDestination(JobInfo *info) {
-  if (!info->destination_sink->IsValid()) {
+  if (info->destination != kDestinationNone &&
+      !info->destination_sink->IsValid()) {
     if (info->destination == kDestinationPath) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
                         " (errno=%d).",
