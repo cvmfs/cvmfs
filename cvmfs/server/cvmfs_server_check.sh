@@ -317,6 +317,18 @@ cvmfs_server_check() {
       __do_check "$@"
     fi
     retcode=$?
+    if [ $retcode = 0 ]; then
+      # Intentionally do not store the status for a failure when a check
+      # is individually run, but do store the status for a success if the
+      # status was previously saved.
+      local name=$(get_or_guess_repository_name $1)
+      local check_status="$(read_repo_item "$name" .cvmfs_status.json)"
+      local last_check="$(get_json_field "$check_status" last_check)"
+      if [ -n "$last_check" ]; then
+        update_repo_status $name last_check "`date --utc`"
+        update_repo_status $name check_status succeeded
+      fi
+    fi
   fi
 
   return $retcode
