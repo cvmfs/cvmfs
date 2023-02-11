@@ -1,4 +1,5 @@
 2.11.0:
+  * Add AssertOrLog to conditionally continue on certain fatal errors (#3157)
   * Add telemetry framework to send performance counters to influx (#3096)
   * [macOS] Fix xattr on symlinks
   * Add support for evicting chunked files through cvmfs_talk (#3122)
