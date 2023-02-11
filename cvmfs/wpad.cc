@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "download.h"
+#include "network/download.h"
 #include "pacparser.h"
 #include "statistics.h"
 #include "util/logging.h"

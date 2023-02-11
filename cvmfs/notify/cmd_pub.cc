@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "download.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "notify/messages.h"
 #include "notify/publisher_http.h"
 #include "util/pointer.h"

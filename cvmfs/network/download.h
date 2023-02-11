@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_DOWNLOAD_H_
-#define CVMFS_DOWNLOAD_H_
+#ifndef CVMFS_NETWORK_DOWNLOAD_H_
+#define CVMFS_NETWORK_DOWNLOAD_H_
 
 #include <poll.h>
 #include <pthread.h>
@@ -637,4 +637,4 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
 }  // namespace download
 
-#endif  // CVMFS_DOWNLOAD_H_
+#endif  // CVMFS_NETWORK_DOWNLOAD_H_

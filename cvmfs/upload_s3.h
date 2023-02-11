@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "s3fanout.h"
+#include "network/s3fanout.h"
 #include "upload_facility.h"
 #include "util/atomic.h"
 #include "util/file_backed_buffer.h"

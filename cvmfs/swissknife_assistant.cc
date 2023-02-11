@@ -11,10 +11,10 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
-#include "download.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "util/logging.h"
 #include "util/posix.h"
 

@@ -21,10 +21,10 @@
 
 #include "catalog_sql.h"
 #include "compression.h"
-#include "download.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"

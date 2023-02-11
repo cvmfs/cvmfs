@@ -12,8 +12,8 @@
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
 

@@ -159,8 +159,6 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
                   ${CVMFS_SOURCE_DIR}/compression.cc
                   ${CVMFS_SOURCE_DIR}/directory_entry.cc
-                  ${CVMFS_SOURCE_DIR}/dns.cc
-                  ${CVMFS_SOURCE_DIR}/download.cc
                   ${CVMFS_SOURCE_DIR}/gateway_util.cc
                   ${CVMFS_SOURCE_DIR}/globals.cc
                   ${CVMFS_SOURCE_DIR}/history_sql.cc
@@ -179,11 +177,13 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
                   ${CVMFS_SOURCE_DIR}/manifest.cc
                   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+                  ${CVMFS_SOURCE_DIR}/network/dns.cc
+                  ${CVMFS_SOURCE_DIR}/network/download.cc
+                  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
                   ${CVMFS_SOURCE_DIR}/options.cc
                   ${CVMFS_SOURCE_DIR}/pack.cc
                   ${CVMFS_SOURCE_DIR}/reflog.cc
                   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
-                  ${CVMFS_SOURCE_DIR}/s3fanout.cc
                   ${CVMFS_SOURCE_DIR}/sanitizer.cc
                   ${CVMFS_SOURCE_DIR}/session_context.cc
                   ${CVMFS_SOURCE_DIR}/shortstring.cc
@@ -388,8 +388,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
-  ${CVMFS_SOURCE_DIR}/dns.cc
-  ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
@@ -423,6 +421,9 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/network/dns.cc
+  ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/notify/messages.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
@@ -442,7 +443,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/repository_tag.cc
   ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
-  ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc

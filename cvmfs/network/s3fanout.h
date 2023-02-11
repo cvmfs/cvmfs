@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_S3FANOUT_H_
-#define CVMFS_S3FANOUT_H_
+#ifndef CVMFS_NETWORK_S3FANOUT_H_
+#define CVMFS_NETWORK_S3FANOUT_H_
 
 #include <poll.h>
 #include <semaphore.h>
@@ -343,4 +343,4 @@ class S3FanoutManager : SingleCopy {
 
 }  // namespace s3fanout
 
-#endif  // CVMFS_S3FANOUT_H_
+#endif  // CVMFS_NETWORK_S3FANOUT_H_

@@ -6,7 +6,7 @@
 #include "catalog_mgr_ro.h"
 
 #include "compression.h"
-#include "download.h"
+#include "network/download.h"
 #include "util/exception.h"
 #include "util/posix.h"
 

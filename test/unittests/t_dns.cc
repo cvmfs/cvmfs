@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "dns.h"
+#include "network/dns.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
