@@ -23,6 +23,7 @@
   * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
 2.10.1:
+  * Update individual cvmfs_server check status when successful (#3147)
   * [geo] Allow for missing location info in geo record (#3186)
   * [container] Fix importing of images with OCI manifest list (#3164)
   * Improve file reset logic on download retries (#3085)
