@@ -232,7 +232,7 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
 void GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
                                            std::string* token) {
   assert(token);
-  *token = "INVALIDTOKEN"; // overwritten if reading from file works
+  *token = "INVALIDTOKEN";  // overwritten if reading from file works
 
   FILE* token_file = std::fopen(token_file_name.c_str(), "r");
   if (!token_file) {
