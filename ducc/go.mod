@@ -22,9 +22,8 @@ require (
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.0.8 // indirect
 	github.com/opencontainers/runtime-spec v1.0.1 // indirect
-	github.com/opencontainers/selinux v1.0.0 // indirect
+	github.com/opencontainers/selinux v1.3.1 // indirect
 	github.com/otiai10/copy v1.3.0
-	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pkg/xattr v0.4.3
 	github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
 	github.com/sirupsen/logrus v1.3.0
