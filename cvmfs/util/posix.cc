@@ -1719,7 +1719,7 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
     kSendPid,
     kUnknown,
     kFailDupFd,
-    kFailGetMaxFd,
+    kFailCloseFds,
     kFailGetFdFlags,
     kFailSetFdFlags,
     kFailDropCredentials,
@@ -1736,8 +1736,8 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
         return "Unknown Status";
       case kFailDupFd:
         return "Duplicate File Descriptor";
-      case kFailGetMaxFd:
-        return "Read maximal File Descriptor";
+      case kFailCloseFds:
+        return "Close File Descriptors";
       case kFailGetFdFlags:
         return "Read File Descriptor Flags";
       case kFailSetFdFlags:
@@ -1884,7 +1884,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
     // Child, close file descriptors
     if (!CloseAllFildes(skip_fds)) {
-      failed = ForkFailures::kUnknown;
+      failed = ForkFailures::kFailCloseFds;
+      goto fork_failure;
     }
 
     // Double fork to disconnect from parent
