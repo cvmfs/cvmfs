@@ -48,6 +48,7 @@ namespace swissknife {
 
 CommandCheck::CommandCheck()
     : check_chunks_(false)
+    , no_duplicates_map_(false)
     , is_remote_(false) {
     const shash::Any hash_null;
     duplicates_map_.Init(16, hash_null, hasher_any);
@@ -359,16 +360,18 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     // and only run requests once per hash
     const bool entry_needs_check =
           !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
-          !duplicates_map_.Contains(entries[i].checksum());
-    if (entry_needs_check)
+         // fallback cli option can force the entry to be checked
+          (no_duplicates_map_ ||
+             !duplicates_map_.Contains(entries[i].checksum()));
+    if (entry_needs_check && !no_duplicates_map_)
         duplicates_map_.Insert(entries[i].checksum(), 1);
 
     PathString full_path(path);
     full_path.Append("/", 1);
     full_path.Append(entries[i].name().GetChars(),
                      entries[i].name().GetLength());
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s",
-             full_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s [needs check] %i",
+             full_path.c_str(), entry_needs_check);
 
 
     // Name must not be empty
@@ -597,8 +600,12 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           const shash::Any &chunk_hash = this_chunk.content_hash();
           // for performance reasons, only perform the check once
           // and skip if the hash has been checked before
-          if (!duplicates_map_.Contains(chunk_hash)) {
+         bool chunk_needs_check = true;
+          if (!no_duplicates_map_ && duplicates_map_.Contains(chunk_hash)) {
             duplicates_map_.Insert(chunk_hash, 1);
+           chunk_needs_check = false;
+         }
+          if (chunk_needs_check) {
             const string chunk_path = "data/" + chunk_hash.MakePath();
             if (!Exists(chunk_path)) {
               LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
@@ -932,6 +939,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     tag_name = *args.find('n')->second;
   if (args.find('c') != args.end())
     check_chunks_ = true;
+  if (args.find('d') != args.end())
+    no_duplicates_map_ = true;
   if (args.find('l') != args.end()) {
     unsigned log_level =
       kLogLevel0 << String2Uint64(*args.find('l')->second);

@@ -35,7 +35,7 @@ class CommandCheck : public Command {
   virtual std::string GetName() const { return "check"; }
   virtual std::string GetDescription() const {
     return "CernVM File System repository sanity checker\n"
-      "This command checks the consisteny of the file catalogs of a "
+      "This command checks the consistency of the file catalogs of a "
         "cvmfs repository.";
   }
   virtual ParameterList GetParams() const {
@@ -51,6 +51,9 @@ class CommandCheck : public Command {
     r.push_back(Parameter::Optional('R', "path to reflog.chksum file"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('c', "check availability of data chunks"));
+    r.push_back(Parameter::Switch('d', "don't use hashmap to avoid duplicated"
+                                      " lookups. Note that this is a fallback"
+                                      " option that may be removed."));
     r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
     return r;
   }
@@ -92,6 +95,7 @@ class CommandCheck : public Command {
   std::string temp_directory_;
   std::string repo_base_path_;
   bool        check_chunks_;
+  bool        no_duplicates_map_;
   bool        is_remote_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
 };
