@@ -37,7 +37,7 @@ class PathSink : public Sink {
     if (!is_owner_) {
       return 0;
     }
-    
+
     int ret = fclose(file_);
     file_ = NULL;
 

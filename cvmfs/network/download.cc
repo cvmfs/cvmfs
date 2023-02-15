@@ -1277,9 +1277,11 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
           &buf, &size);
         if (retval) {
           static_cast<cvmfs::MemSink*>(info->destination_sink)->
-            Set(size, size - 1, static_cast<char *>(buf));
+            Set(size, size, static_cast<char *>(buf));
           // TODO(heretherebedragons) info->destination_mem.pos =
           // info->destination_mem.size = size; WHY? THIS SHOULD NOT BE OK
+          // apparently setting it to "size - 1" which is the last valid
+          // position place, it results in failing of fsck
         } else {
           LogCvmfs(kLogDownload, kLogDebug,
                    "decompression (memory) of url %s failed",
@@ -1802,7 +1804,8 @@ Failures DownloadManager::Fetch(JobInfo *info) {
              Code2Ascii(result));
 
     if (info->destination == kDestinationPath) {
-      unlink(static_cast<cvmfs::PathSink*>(info->destination_sink)->path_.c_str());
+      unlink(static_cast<cvmfs::PathSink*>(info->destination_sink)->
+                                                                 path_.c_str());
     }
 
     if (info->destination == kDestinationMem) {
