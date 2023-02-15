@@ -1277,7 +1277,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
           &buf, &size);
         if (retval) {
           static_cast<cvmfs::MemSink*>(info->destination_sink)->
-            Set(size, size, static_cast<char *>(buf));
+            Set(size, size - 1, static_cast<char *>(buf));
           // TODO(heretherebedragons) info->destination_mem.pos =
           // info->destination_mem.size = size; WHY? THIS SHOULD NOT BE OK
         } else {
@@ -1440,6 +1440,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         goto verify_and_finalize_stop;
       }
     }
+    if (info->destination == kDestinationTransaction) {
+      if (info->destination_sink->Reset() != 0) {
+        info->error_code = kFailLocalIO;
+        goto verify_and_finalize_stop;
+      }
+    }
     if (info->expected_hash)
       shash::Init(info->hash_context);
     if (info->compressed)
@@ -1503,8 +1509,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       static_cast<cvmfs::FileSink*>(info->destination_sink)->Flush() != 0) {
     info->error_code = kFailLocalIO;
   } else if (info->destination == kDestinationPath) {
-    if (static_cast<cvmfs::PathSink*>(info->destination_sink)->Close() != 0)
+    if (static_cast<cvmfs::PathSink*>(info->destination_sink)->Close() != 0) {
       info->error_code = kFailLocalIO;
+    }
   }
 
   if (info->compressed)
@@ -1793,6 +1800,10 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   if (result != kFailOk) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
+
+    if (info->destination == kDestinationPath) {
+      unlink(static_cast<cvmfs::PathSink*>(info->destination_sink)->path_.c_str());
+    }
 
     if (info->destination == kDestinationMem) {
       // This IF could be removed? just always reset the sink?

@@ -16,7 +16,7 @@ class FileSink : public Sink {
     assert(file_ != NULL);
   }
 
-  virtual ~FileSink() { fflush(file_); }
+  virtual ~FileSink() { if (file_) { fflush(file_); } }
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
     return fwrite(buf, 1, sz, file_);
