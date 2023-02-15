@@ -1,4 +1,5 @@
 2.11.0:
+  * Fix closing of file descriptors for very large nfiles limit (#3158)
   * Add AssertOrLog to conditionally continue on certain fatal errors (#3157)
   * Add telemetry framework to send performance counters to influx (#3096)
   * [macOS] Fix xattr on symlinks
