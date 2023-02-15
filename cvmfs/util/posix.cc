@@ -1719,7 +1719,7 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
     kSendPid,
     kUnknown,
     kFailDupFd,
-    kFailGetMaxFd,
+    kFailCloseFds,
     kFailGetFdFlags,
     kFailSetFdFlags,
     kFailDropCredentials,
@@ -1736,8 +1736,8 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
         return "Unknown Status";
       case kFailDupFd:
         return "Duplicate File Descriptor";
-      case kFailGetMaxFd:
-        return "Read maximal File Descriptor";
+      case kFailCloseFds:
+        return "Close File Descriptors";
       case kFailGetFdFlags:
         return "Read File Descriptor Flags";
       case kFailSetFdFlags:
@@ -1749,6 +1749,79 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
     }
   }
 };
+
+/**
+ *  Loop through all possible FDs and close them.
+ */
+static bool CloseAllFildesUntilMaxFD(
+  const std::set<int> &preserve_fildes,
+  int max_fd
+) {
+  for (int fd = 0; fd < max_fd; fd++) {
+    if (preserve_fildes.count(fd) == 0) {
+      close(fd);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Loop through /proc/self/fd and close the listed FDs.
+ */
+static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
+{
+  DIR *dirp = opendir("/proc/self/fd");
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    uint64_t name_uint64;
+
+    // Make sure the dir name is digits only (skips ".", ".." and similar).
+    if (!String2Uint64Parse(name, &name_uint64)) {
+      continue;
+    }
+
+    int fd = static_cast<int>(name_uint64);
+    if (preserve_fildes.count(fd)) {
+      continue;
+    }
+
+    close(fd);
+  }
+
+  closedir(dirp);
+
+  return true;
+}
+
+/**
+ * Closes all file descriptors except the ones in preserve_fildes.
+ * To be used after fork but before exec.
+ */
+static bool CloseAllFildes(const std::set<int> &preserve_fildes)
+{
+  int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  if (max_fd < 0) {
+    return false;
+  }
+
+#ifdef __APPLE__
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
+#else   // ifdef __APPLE__
+  if (max_fd > 100000) {
+    // CloseAllFildesUntilMaxFD is inefficient with very large max_fd.
+    // Looping through /proc/self/fd performs better.
+    return CloseAllFildesInProcSelfFd(preserve_fildes);
+  }
+
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
+#endif  // #ifdef __APPLE__
+}
 
 /**
  * Execve to the given command line, preserving the given file descriptors.
@@ -1778,9 +1851,11 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   assert(pid >= 0);
   if (pid == 0) {
     pid_t pid_grand_child;
-    int max_fd;
     int fd_flags;
     ForkFailures::Names failed = ForkFailures::kUnknown;
+
+    std::set<int> skip_fds = preserve_fildes;
+    skip_fds.insert(pipe_fork.write_end);
 
     if (clear_env) {
 #ifdef __APPLE__
@@ -1808,15 +1883,9 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     }
 
     // Child, close file descriptors
-    max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
-    if (max_fd < 0) {
-      failed = ForkFailures::kFailGetMaxFd;
+    if (!CloseAllFildes(skip_fds)) {
+      failed = ForkFailures::kFailCloseFds;
       goto fork_failure;
-    }
-    for (int fd = 0; fd < max_fd; fd++) {
-      if ((fd != pipe_fork.write_end) && (preserve_fildes.count(fd) == 0)) {
-        close(fd);
-      }
     }
 
     // Double fork to disconnect from parent
