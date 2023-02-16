@@ -7,7 +7,7 @@ github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.9.5
+# github.com/Microsoft/hcsshim v0.9.6
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/computestorage
 github.com/Microsoft/hcsshim/internal/cow
@@ -30,9 +30,9 @@ github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
-# github.com/containerd/cgroups v1.0.3
+# github.com/containerd/cgroups v1.0.4
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/containerd v1.6.12
+# github.com/containerd/containerd v1.6.18
 ## explicit
 github.com/containerd/containerd/api/services/snapshots/v1
 github.com/containerd/containerd/api/types
