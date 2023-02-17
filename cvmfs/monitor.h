@@ -15,9 +15,9 @@
 
 #include "util/platform.h"
 #include "util/pointer.h"
+#include "util/pipe.h"
 #include "util/single_copy.h"
 
-struct Pipe;
 
 /**
  * This class can fork a watchdog process that listens on a pipe and prints a
@@ -95,12 +95,11 @@ class Watchdog : SingleCopy {
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
-  /// Communication channel from the supervisee to the watchdog
-  UniquePtr<Pipe> pipe_watchdog_;
+  UniquePtr<Pipe<kPipeWatchdog>> pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
-  UniquePtr<Pipe> pipe_listener_;
+  UniquePtr<Pipe<kPipeWatchdogSupervisor>> pipe_listener_;
   /// Send the terminate signal to the listener
-  UniquePtr<Pipe> pipe_terminate_;
+  UniquePtr<Pipe<kPipeThreadTerminator>> pipe_terminate_;
   pthread_t thread_listener_;
   FnOnCrash on_crash_;
   platform_spinlock lock_handler_;

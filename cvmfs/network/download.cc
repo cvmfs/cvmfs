@@ -432,6 +432,9 @@ int DownloadManager::CallbackCurlSocket(CURL * /* easy */,
 
   // Find s in watch_fds_
   unsigned index;
+
+  // TODO(heretherebedragons) why start at index = 0 and not 2?
+  // fd[0] and fd[1] are fixed?
   for (index = 0; index < download_mgr->watch_fds_inuse_; ++index) {
     if (download_mgr->watch_fds_[index].fd == s)
       break;
@@ -499,15 +502,20 @@ void *DownloadManager::MainDownload(void *data) {
   LogCvmfs(kLogDownload, kLogDebug, "download I/O thread started");
   DownloadManager *download_mgr = static_cast<DownloadManager *>(data);
 
+  const int kIdxPipeTerminate = 0;
+  const int kIdxPipeJobs = 1;
+
   download_mgr->watch_fds_ =
     static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
   download_mgr->watch_fds_size_ = 2;
-  download_mgr->watch_fds_[0].fd = download_mgr->pipe_terminate_[0];
-  download_mgr->watch_fds_[0].events = POLLIN | POLLPRI;
-  download_mgr->watch_fds_[0].revents = 0;
-  download_mgr->watch_fds_[1].fd = download_mgr->pipe_jobs_[0];
-  download_mgr->watch_fds_[1].events = POLLIN | POLLPRI;
-  download_mgr->watch_fds_[1].revents = 0;
+  download_mgr->watch_fds_[kIdxPipeTerminate].fd =
+                                     download_mgr->pipe_terminate_->GetReadFd();
+ download_mgr->watch_fds_[kIdxPipeTerminate].events = POLLIN | POLLPRI;
+  download_mgr->watch_fds_[kIdxPipeTerminate].revents = 0;
+  download_mgr->watch_fds_[kIdxPipeJobs].fd =
+                                          download_mgr->pipe_jobs_->GetReadFd();
+  download_mgr->watch_fds_[kIdxPipeJobs].events = POLLIN | POLLPRI;
+  download_mgr->watch_fds_[kIdxPipeJobs].revents = 0;
   download_mgr->watch_fds_inuse_ = 2;
 
   int still_running = 0;
@@ -548,17 +556,17 @@ void *DownloadManager::MainDownload(void *data) {
     }
 
     // Terminate I/O thread
-    if (download_mgr->watch_fds_[0].revents)
+    if (download_mgr->watch_fds_[kIdxPipeTerminate].revents)
       break;
 
     // New job arrives
-    if (download_mgr->watch_fds_[1].revents) {
-      download_mgr->watch_fds_[1].revents = 0;
+    if (download_mgr->watch_fds_[kIdxPipeJobs].revents) {
+      download_mgr->watch_fds_[kIdxPipeJobs].revents = 0;
       JobInfo *info;
-      // NOLINTNEXTLINE(bugprone-sizeof-expression)
-      ReadPipe(download_mgr->pipe_jobs_[0], &info, sizeof(info));
-      if (!still_running)
+      download_mgr->pipe_jobs_->Read<JobInfo*>(&info);
+      if (!still_running) {
         gettimeofday(&timeval_start, NULL);
+      }
       CURL *handle = download_mgr->AcquireCurlHandle();
       download_mgr->InitializeRequest(info, handle);
       download_mgr->SetUrlOptions(info);
@@ -622,8 +630,7 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          WritePipe(info->wait_at[1], &info->error_code,
-                    sizeof(info->error_code));
+          info->pipe_job_results->Write<download::Failures>(info->error_code);
         }
       }
     }
@@ -1523,9 +1530,9 @@ DownloadManager::DownloadManager() {
   default_headers_ = NULL;
 
   atomic_init32(&multi_threaded_);
-  pipe_terminate_[0] = pipe_terminate_[1] = -1;
+  pipe_terminate_ = NULL;
 
-  pipe_jobs_[0] = pipe_jobs_[1] = -1;
+  pipe_jobs_ = NULL;
   watch_fds_ = NULL;
   watch_fds_size_ = 0;
   watch_fds_inuse_ = 0;
@@ -1663,14 +1670,11 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 void DownloadManager::Fini() {
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
-    char buf = 'T';
-    WritePipe(pipe_terminate_[1], &buf, 1);
+    pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_download_, NULL);
     // All handles are removed from the multi stack
-    close(pipe_terminate_[1]);
-    close(pipe_terminate_[0]);
-    close(pipe_jobs_[1]);
-    close(pipe_jobs_[0]);
+    pipe_terminate_.Destroy();
+    pipe_jobs_.Destroy();
   }
 
   for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
@@ -1713,8 +1717,8 @@ void DownloadManager::Fini() {
  * No way back except Fini(); Init();
  */
 void DownloadManager::Spawn() {
-  MakePipe(pipe_terminate_);
-  MakePipe(pipe_jobs_);
+  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
+  pipe_jobs_ = new Pipe<kPipeDownloadJobs>();
 
   int retval = pthread_create(&thread_download_, NULL, MainDownload,
                               static_cast<void *>(this));
@@ -1758,15 +1762,15 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    if (info->wait_at[0] == -1) {
-      MakePipe(info->wait_at);
+    if (!info->pipe_job_results.IsValid()) {
+      info->pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
     // NOLINTNEXTLINE(bugprone-sizeof-expression)
-    WritePipe(pipe_jobs_[1], &info, sizeof(info));
-    ReadPipe(info->wait_at[0], &result, sizeof(result));
+    pipe_jobs_->Write<JobInfo*>(info);
+    info->pipe_job_results->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     MutexLockGuard l(lock_synchronous_mode_);

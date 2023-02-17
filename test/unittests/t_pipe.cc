@@ -7,12 +7,13 @@
 #include <fcntl.h>
 
 #include "util/posix.h"
+#include "util/pipe.h"
 
 class T_Pipe : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    const int fd_read_flags  = fcntl(pipe.read_end,  F_GETFD);
-    const int fd_write_flags = fcntl(pipe.write_end, F_GETFD);
+    const int fd_read_flags  = fcntl(pipe.GetReadFd(),  F_GETFD);
+    const int fd_write_flags = fcntl(pipe.GetWriteFd(), F_GETFD);
 
     ASSERT_GE(fd_read_flags,  0) << "Failed to create pipe (read end)";
     ASSERT_GE(fd_write_flags, 0) << "Failed to create pipe (write end)";
@@ -53,7 +54,7 @@ class T_Pipe : public ::testing::Test {
   };
 
  protected:
-  Pipe pipe;
+  Pipe<kPipeTest> pipe;
 };
 
 
@@ -70,7 +71,7 @@ TEST_F(T_Pipe, WriteTemplate) {
   retval = pipe.Write(integer);   EXPECT_TRUE(retval);
   retval = pipe.Write(character); EXPECT_TRUE(retval);
   retval = pipe.Write(foobar);    EXPECT_TRUE(retval);
-  EXPECT_DEATH(pipe.Write(&foobar), "");
+  retval = pipe.Write(&foobar);    EXPECT_TRUE(retval);
 }
 
 
