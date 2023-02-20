@@ -338,9 +338,15 @@ std::string LogBufferXattr::GetValue() {
   throttle_.Throttle();
   std::vector<LogBufferEntry> buffer = GetLogBuffer();
   std::string result;
-  for (unsigned i = 0; i < buffer.size(); ++i) {
-    result += "[" + StringifyTime(buffer[i].timestamp, true /* UTC */) +
-              " UTC] " + buffer[i].message + "\n";
+  for (std::vector<LogBufferEntry>::reverse_iterator itr = buffer.rbegin();
+       itr != buffer.rend(); ++itr)
+  {
+    if (itr->message.size() > kMaxLogLine) {
+      itr->message.resize(kMaxLogLine);
+      itr->message += " <snip>";
+    }
+    result += "[" + StringifyTime(itr->timestamp, true /* UTC */) + " UTC] " +
+              itr->message + "\n";
   }
   return result;
 }
