@@ -79,8 +79,11 @@ TEST_F(T_MagicXattr, TestFqrn) {
 }
 
 TEST_F(T_MagicXattr, TestLogBuffer) {
+  std::set<std::string> protected_xattrs;
+  std::set<gid_t> protected_xattr_gids;
   MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways);
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
+                          protected_xattrs, protected_xattr_gids);
 
 
   catalog::DirectoryEntry dirent;

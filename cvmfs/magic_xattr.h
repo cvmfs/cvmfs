@@ -44,6 +44,7 @@ class BaseMagicXattr {
   friend class MagicXattrManager;
   FRIEND_TEST(T_MagicXattr, ProtectedXattr);
   FRIEND_TEST(T_MagicXattr, TestFqrn);
+  FRIEND_TEST(T_MagicXattr, TestLogBuffer);
 
  public:
   BaseMagicXattr() : is_protected_(false) {
