@@ -6,8 +6,8 @@
 
 #include <fcntl.h>
 
-#include "util/posix.h"
 #include "util/pipe.h"
+#include "util/posix.h"
 
 class T_Pipe : public ::testing::Test {
  protected:

@@ -18,7 +18,6 @@
 #include "util/pipe.h"
 #include "util/single_copy.h"
 
-
 /**
  * This class can fork a watchdog process that listens on a pipe and prints a
  * stackstrace into syslog, when cvmfs fails.  The crash dump is also appended

@@ -24,7 +24,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Describes the functionality of a pipe
  */
 enum PipeType {
-  kPipeThreadTerminator = 0, // pipe only used to signal a thread to stop
+  kPipeThreadTerminator = 0,  // pipe only used to signal a thread to stop
   kPipeWatchdog,
   kPipeWatchdogSupervisor,
   kPipeWatchdogPid,
@@ -35,10 +35,10 @@ enum PipeType {
 };
 
 /**
- * Common signals used by pipes 
+ * Common signals used by pipes
  */
 enum PipeSignals {
-  kPipeTerminateSignal = 1 
+  kPipeTerminateSignal = 1
 };
 
 template <PipeType pipeType>
@@ -52,10 +52,10 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * A pipe is a simple asynchronous communication mechanism. It establishes
    * a unidirectional communication link between two file descriptors. One of
    * them is used to only write to the pipe, the other one only to read from it.
-   * 
+   *
    * This class is a simple wrapper around the handling of a "standard" pipe
    * that uses system calls.
-   * 
+   *
    * @note PipeType as class template parameter should symbolize the
    *       functionality of the specific type, independent of what variable
    *       name it has
@@ -113,9 +113,9 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
 
   /**
    * Tries to write an object to the pipe
-   * 
+   *
    * @returns true if the entire object was written
-   *          false otherwise 
+   *          false otherwise
    */
   template<typename T>
   bool TryWrite(const T &data) {
@@ -125,10 +125,10 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
 
   /**
    * Writes an object to the pipe
-   * 
+   *
    * @returns true on success
    *          otherwise kills the program with an assert
-   * 
+   *
    */
   template<typename T>
   bool Write(const T &data) {
@@ -139,10 +139,10 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   /**
    * Writes an object to the pipe
    * If possible, it is recommended to use "bool Write(const T &data)"
-   * 
+   *
    * @returns true on success
    *          otherwise kills the program with an assert
-   * 
+   *
    */
   bool Write(const void *buf, size_t nbyte) {
     WritePipe(fd_write_, buf, nbyte);
@@ -152,7 +152,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   /**
    * Tries to read from the pipe until it receives data or it is interrupted
    * by a system call
-   * 
+   *
    * @returns true if sizeof(data) bytes were received
    *          false otherwise
    */

@@ -510,7 +510,7 @@ void *DownloadManager::MainDownload(void *data) {
   download_mgr->watch_fds_size_ = 2;
   download_mgr->watch_fds_[kIdxPipeTerminate].fd =
                                      download_mgr->pipe_terminate_->GetReadFd();
- download_mgr->watch_fds_[kIdxPipeTerminate].events = POLLIN | POLLPRI;
+  download_mgr->watch_fds_[kIdxPipeTerminate].events = POLLIN | POLLPRI;
   download_mgr->watch_fds_[kIdxPipeTerminate].revents = 0;
   download_mgr->watch_fds_[kIdxPipeJobs].fd =
                                           download_mgr->pipe_jobs_->GetReadFd();

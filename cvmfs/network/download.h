@@ -288,7 +288,10 @@ struct JobInfo {
   char *info_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;  /**< Pipe used for the return value */
+
+  /**< Pipe used for the return value */
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+
   std::string proxy;
   bool nocache;
   Failures error_code;
