@@ -11,6 +11,7 @@
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "util/uuid.h"
 
 class T_MagicXattr : public ::testing::Test {
@@ -75,6 +76,31 @@ TEST_F(T_MagicXattr, TestFqrn) {
   ASSERT_FALSE(attr.IsNull());
   ASSERT_TRUE(attr->PrepareValueFenced());
   EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());
+}
+
+TEST_F(T_MagicXattr, TestLogBuffer) {
+  MagicXattrManager *mgr =
+    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways);
+
+
+  catalog::DirectoryEntry dirent;
+  PathString path("/");
+
+  LogCvmfs(kLogCvmfs, 0, "test");
+  {
+    MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
+    ASSERT_FALSE(attr.IsNull());
+    ASSERT_TRUE(attr->PrepareValueFenced());
+    EXPECT_TRUE(HasSuffix(attr->GetValue(), "test\n", false /* ign_case */));
+  }
+
+  LogCvmfs(kLogCvmfs, 0, "%s", std::string(6000, 'x').c_str());
+  {
+    MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
+    ASSERT_FALSE(attr.IsNull());
+    ASSERT_TRUE(attr->PrepareValueFenced());
+    EXPECT_TRUE(HasSuffix(attr->GetValue(), "<snip>\n", false /* ign_case */));
+  }
 }
 
 TEST_F(T_MagicXattr, HideAttributes) {
