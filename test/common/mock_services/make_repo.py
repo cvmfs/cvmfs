@@ -1,5 +1,27 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+""" CVMFS testing helper script to generate a populated nested directory.
 
+Example usage:
+python3 make_repo.py -f 11 -d 2 -n 2 /tmp/testfs
+Example output in /tmp/testfs:
+  1 drwxrwxr-x  4 user user 4.0K Jan 12 09:59 .
+  2 drwxrwxrwt 20 root    root     20K Jan 12 09:17 ..
+  3 drwxrwxr-x  4 user user 4.0K Jan 12 09:59 dir0
+  4 drwxrwxr-x  4 user user 4.0K Jan 12 09:59 dir1
+  5 -rw-rw-r--  1 user user  25K Jan 12 09:59 file0
+  6 -rw-rw-r--  1 user user  34K Jan 12 09:59 file1
+  7 -rw-rw-r--  1 user user  56K Jan 12 09:59 file2
+  8 -rw-rw-r--  1 user user  68K Jan 12 09:59 file4
+  9 -rw-rw-r--  1 user user  19K Jan 12 09:59 file5
+ 10 -rw-rw-r--  1 user user  35K Jan 12 09:59 file6
+ 11 -rw-rw-r--  1 user user  17K Jan 12 09:59 file7
+ 12 -rw-rw-r--  1 user user  97K Jan 12 09:59 file8
+ 13 -rw-rw-r--  1 user user  11K Jan 12 09:59 file9
+ 14 -rw-rw-r--  1 user user  60K Jan 12 09:59 master
+ 15 lrwxrwxrwx  1 user user   18 Jan 12 09:59 symlink3 -> /tmp/testfs/master
+"""
+
+from __future__ import print_function
 import sys
 import os
 import math
@@ -7,17 +29,24 @@ import random
 import shutil
 from optparse import OptionParser
 
+# for python 2/3 compatibility:
+# store the python version information in some global flags
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+PY39 = sys.version_info[0:2] >= (3, 9)
+
+
 symlink_ratio  = 0.01
 hardlink_ratio = 0.005
 
 
 def PrintError(msg):
-	print >> sys.stderr, "[ERROR] " + msg
-	sys.exit(1)
+  print("[ERROR] " + msg, file=sys.stderr)
+  sys.exit(1)
 
 
 class RepoFactory:
-	def __init__(self, max_dir_depth, num_subdirs, num_files_per_dir,    \
+  def __init__(self, max_dir_depth, num_subdirs, num_files_per_dir,    \
                symlink_ratio, hardlink_ratio, repo_dir, min_file_size, \
                max_file_size, duplicate_ratio=0.0):
     self.max_dir_depth      = max_dir_depth
@@ -35,36 +64,36 @@ class RepoFactory:
     self.hardlinks_produced = 0
     self.bytes_produced     = 0
 
-	def Produce(self):
-		self._Recurse(self.repo_dir, 1)
+  def Produce(self):
+    self._Recurse(self.repo_dir, 1)
 
-	def PredictResults(self):
-		directories = 0
-		files       = 0
-		bytes       = 0
-		for i in range(self.max_dir_depth):
-			directories += self.num_subdirs ** (i + 1)
-		files = (directories + 1) * self.num_files_per_dir
-		bytes = files * (max_file_size - min_file_size) / 2
-		print "Prediction:"
-		print "   directories to be produced:  " , directories
-		print "   files to be produced:        " , files
-		print "   bytes to be written (aprox): " , bytes
+  def PredictResults(self):
+    directories = 0
+    files       = 0
+    bytes       = 0
+    for i in range(self.max_dir_depth):
+      directories += self.num_subdirs ** (i + 1)
+    files = (directories + 1) * self.num_files_per_dir
+    bytes = files * (max_file_size - min_file_size) / 2
+    print("Prediction:")
+    print("   directories to be produced:  " , directories)
+    print("   files to be produced:        " , files)
+    print("   bytes to be written (aprox): " , bytes)
 
-	def PrintReport(self):
-		print "Results:"
-		print "   directories produced:" , self.dirs_produced
-		print "   files produced:      " , self.files_produced
-		print "   symlinks produced:   " , self.symlinks_produced
-		print "   hardlinks produced:  " , self.hardlinks_produced
-		print "   ------------------------------------------------"
-		print "   sum of dirents:      " , (self.dirs_produced + \
+  def PrintReport(self):
+    print("Results:")
+    print("   directories produced:" , self.dirs_produced)
+    print("   files produced:      " , self.files_produced)
+    print("   symlinks produced:   " , self.symlinks_produced)
+    print("   hardlinks produced:  " , self.hardlinks_produced)
+    print("   ------------------------------------------------")
+    print("   sum of dirents:      " , (self.dirs_produced + \
                                         self.files_produced + \
                                         self.symlinks_produced + \
-                                        self.hardlinks_produced)
-		print
-		print "overall produced" , self.bytes_produced , "bytes --> avg." , \
-          (self.bytes_produced / self.files_produced) , "bytes/file"
+                                        self.hardlinks_produced))
+    print()
+    print("overall produced" , self.bytes_produced , "bytes --> avg." , \
+          (int(self.bytes_produced / self.files_produced)) , "bytes/file")
 
   def _Recurse(self, path, dir_level):
     self._ProduceFilesHardlinksAndSymlinks(path)
@@ -149,9 +178,15 @@ if __name__ == "__main__":
     PrintError("Cannot parse numerical options and/or parameters")
   repo_dir = args[0]
 
-	def _ProduceSymlink(self, path, dest):
-		os.symlink(dest, path)
-		self.symlinks_produced += 1
+  # check option consistency
+  if not os.path.isdir(repo_dir):
+    PrintError(repo_dir + " does not exist")
+  if os.listdir(repo_dir):
+    PrintError(repo_dir + " is not empty")
+  if max_dir_depth < 1:
+    PrintError("maximal directory depth is too small")
+  if min_file_size < 0 or max_file_size < 0 or min_file_size > max_file_size:
+    PrintError("file size restrictions do not make sense.")
 
   repo_factory = RepoFactory(max_dir_depth,     \
                              num_subdirs,       \
