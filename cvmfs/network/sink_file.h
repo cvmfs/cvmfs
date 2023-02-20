@@ -16,10 +16,10 @@ class FileSink : public Sink {
     assert(file_ != NULL);
   }
 
-  virtual ~FileSink() { if (file_) { fflush(file_); } }
+  virtual ~FileSink() { }
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
-    return fwrite(buf, 1, sz, file_);
+    return fwrite(buf, 1ul, sz, file_);
   }
 
   virtual int Reset() {

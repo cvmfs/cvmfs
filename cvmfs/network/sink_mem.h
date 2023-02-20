@@ -25,7 +25,7 @@ class MemSink : public Sink {
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
     if (pos_ + sz > size_) {
-      return pos_ + sz - size_;
+      return static_cast<int64_t>(pos_ + sz - size_);
     }
 
     memcpy(data_ + pos_, buf, sz);

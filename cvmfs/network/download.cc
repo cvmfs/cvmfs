@@ -1064,7 +1064,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if ((info->destination == kDestinationMem) &&
       (static_cast<cvmfs::MemSink*>(info->destination_sink)->size_ == 0) &&
       HasPrefix(url, "file://", false)) {
-    static_cast<cvmfs::MemSink*>(info->destination_sink)->AllocData(64 * 1024);
+    static_cast<cvmfs::MemSink*>(info->destination_sink)->
+                                                       AllocData(64ul * 1024ul);
   }
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());

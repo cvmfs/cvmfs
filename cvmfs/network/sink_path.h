@@ -24,7 +24,7 @@ class PathSink : public Sink {
   virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
-    return fwrite(buf, 1, sz, file_);
+    return fwrite(buf, 1ul, sz, file_);
   }
 
   virtual int Reset() {
