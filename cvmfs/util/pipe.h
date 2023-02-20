@@ -5,13 +5,14 @@
 #ifndef CVMFS_UTIL_PIPE_H_
 #define CVMFS_UTIL_PIPE_H_
 
-#include <cassert>
-#include <cerrno>
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+
+#include <cassert>
+#include <cerrno>
 
 #include "gtest/gtest_prod.h"
 #include "util/export.h"
