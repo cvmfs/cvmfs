@@ -5,6 +5,8 @@
 #ifndef CVMFS_UTIL_PIPE_H_
 #define CVMFS_UTIL_PIPE_H_
 
+#include <cassert>
+#include <cerrno>
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
