@@ -603,7 +603,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           bool chunk_needs_check = true;
           if (!no_duplicates_map_ && !duplicates_map_.Contains(chunk_hash)) {
             duplicates_map_.Insert(chunk_hash, 1);
-          } else if (!no_duplicates_map) {
+          } else if (!no_duplicates_map_) {
             chunk_needs_check = false;
           }
           if (chunk_needs_check) {
