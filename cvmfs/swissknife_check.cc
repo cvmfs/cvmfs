@@ -35,7 +35,24 @@
 
 using namespace std;  // NOLINT
 
+// for map of duplicate entries; as in kvstore.cc
+static inline uint32_t hasher_any(const shash::Any &key) {
+  // We'll just do the same thing as hasher_md5, since every hash is at
+  // least as large.
+  return *const_cast<uint32_t *>(
+             reinterpret_cast<const uint32_t *>(key.digest) + 1);
+}
+
+
 namespace swissknife {
+
+CommandCheck::CommandCheck()
+    : check_chunks_(false)
+    , no_duplicates_map_(false)
+    , is_remote_(false) {
+    const shash::Any hash_null;
+    duplicates_map_.Init(16, hash_null, hasher_any);
+}
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
@@ -151,6 +168,7 @@ bool CommandCheck::Exists(const string &file)
     return FileExists(file) || SymlinkExists(file);
   } else {
     const string url = repo_base_path_ + "/" + file;
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[Exists::url] %s", url.c_str());
     download::JobInfo head(&url, false);
     return download_manager()->Fetch(&head) == download::kFailOk;
   }
@@ -307,6 +325,10 @@ bool CommandCheck::InspectHistory(history::History *history) {
 
 /**
  * Recursive catalog walk-through
+ *
+ * TODO(vavolkl): This method is large and does a lot of checks
+ * that could be split into smaller ones.
+ * 
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
@@ -334,12 +356,23 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   bool found_nested_marker = false;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
+    // for performance reasons, keep track of files already checked
+    // and only run requests once per hash
+    const bool entry_needs_check =
+          !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
+         // fallback cli option can force the entry to be checked
+          (no_duplicates_map_ ||
+             !duplicates_map_.Contains(entries[i].checksum()));
+    if (entry_needs_check && !no_duplicates_map_)
+        duplicates_map_.Insert(entries[i].checksum(), 1);
+
     PathString full_path(path);
     full_path.Append("/", 1);
     full_path.Append(entries[i].name().GetChars(),
                      entries[i].name().GetLength());
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s",
-             full_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[path] %s [needs check] %i",
+             full_path.c_str(), entry_needs_check);
+
 
     // Name must not be empty
     if (entries[i].name().IsEmpty()) {
@@ -369,8 +402,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (check_chunks_ &&
-        !entries[i].checksum().IsNull() && !entries[i].IsExternalFile())
+    if (check_chunks_ && entry_needs_check)
     {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
@@ -566,15 +598,25 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         // are all data chunks in the data store?
         if (check_chunks_ && !entries[i].IsExternalFile()) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
-          const string chunk_path = "data/" + chunk_hash.MakePath();
-          if (!Exists(chunk_path)) {
-            LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                            "offset: %d | size: %d) missing",
-                     this_chunk.content_hash().ToStringWithSuffix().c_str(),
-                     full_path.c_str(),
-                     this_chunk.offset(),
-                     this_chunk.size());
-            retval = false;
+          // for performance reasons, only perform the check once
+          // and skip if the hash has been checked before
+          bool chunk_needs_check = true;
+          if (!no_duplicates_map_ && !duplicates_map_.Contains(chunk_hash)) {
+            duplicates_map_.Insert(chunk_hash, 1);
+          } else if (!no_duplicates_map_) {
+            chunk_needs_check = false;
+          }
+          if (chunk_needs_check) {
+           const string chunk_path = "data/" + chunk_hash.MakePath();
+           if (!Exists(chunk_path)) {
+              LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
+                                              "offset: %d | size: %d) missing",
+                       this_chunk.content_hash().ToStringWithSuffix().c_str(),
+                       full_path.c_str(),
+                       this_chunk.offset(),
+                       this_chunk.size());
+              retval = false;
+            }
           }
         }
       }
@@ -898,6 +940,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     tag_name = *args.find('n')->second;
   if (args.find('c') != args.end())
     check_chunks_ = true;
+  if (args.find('d') != args.end())
+    no_duplicates_map_ = true;
   if (args.find('l') != args.end()) {
     unsigned log_level =
       kLogLevel0 << String2Uint64(*args.find('l')->second);
@@ -1064,6 +1108,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              subtree_path.c_str());
     return 1;
   }
+
 
   catalog::DeltaCounters computed_counters;
   successful = InspectTree(subtree_path,
