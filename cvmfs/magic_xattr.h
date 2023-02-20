@@ -238,6 +238,7 @@ class LogBufferXattr : public BaseMagicXattr {
   LogBufferXattr();
 
  private:
+  const unsigned int kMaxLogLine = 4096;  // longer log lines are trimmed
   // Generating the log buffer report involves 64 string copies. To mitigate
   // memory fragmentation and performance loss, throttle the use of this
   // attribute a little.
