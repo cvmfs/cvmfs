@@ -170,7 +170,7 @@ void AuthzExternalFetcher::ExecHelper() {
       continue;
     if (name_uint64 < 2)
       continue;
-    open_fds.push_back(name_uint64);
+    open_fds.push_back(static_cast<int>(name_uint64));
   }
   closedir(dirp);
 #endif
