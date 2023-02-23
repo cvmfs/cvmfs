@@ -192,10 +192,12 @@ void AuthzExternalFetcher::ExecHelper() {
       close(open_fds[i]);
 #endif
 
+    // TODO(heretherebdragons) RESET SIGNAL HANDLERS
+
     execve(argv0, argv, &envp[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
            argv0, errno);
-    abort();
+    _exit(1);
   }
   assert(pid > 0);
   close(pipe_send[0]);
