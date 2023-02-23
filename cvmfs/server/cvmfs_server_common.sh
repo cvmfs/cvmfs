@@ -592,7 +592,7 @@ get_expiry_from_string() {
 # figures out the time to expiry of the repository's whitelist
 #
 # @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
+# @return          number of seconds until expiry (negative if already expired)
 get_expiry() {
   local name=$1
   local stratum0=$2

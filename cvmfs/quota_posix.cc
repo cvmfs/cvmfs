@@ -1791,7 +1791,7 @@ bool PosixQuotaManager::RebuildDatabase() {
   seq_ = seq;
   result = true;
   LogCvmfs(kLogQuota, kLogDebug,
-           "rebuilding finished, seqence %" PRIu64 ", gauge %" PRIu64,
+           "rebuilding finished, sequence %" PRIu64 ", gauge %" PRIu64,
            seq_, gauge_);
 
  build_return:

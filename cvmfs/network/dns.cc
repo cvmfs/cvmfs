@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * The CernVM-FS name resolving uses objects that inherit from the Resolver
- * interface.  Resolvers implement a vector interface that resolves mutliple
+ * interface.  Resolvers implement a vector interface that resolves multiple
  * names in parallel.  Common cases such as IP addresses as names are handled
  * by the base class -- Resolver implementations only have to resolve real host
  * names to IPv4/6 addresses, using given search domains if necessary.

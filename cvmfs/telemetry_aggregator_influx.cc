@@ -98,8 +98,8 @@ TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
 }
 
 /**
- * Creates a string in the influx data format containing the absolut values
- * of the counters. Counters are only included if their absolut value is > 0.
+ * Creates a string in the influx data format containing the absolute values
+ * of the counters. Counters are only included if their absolute value is > 0.
  * 
  * Influx dataformat
  * ( https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/ )
@@ -150,7 +150,7 @@ std::string TelemetryAggregatorInflux::MakePayload() {
 /**
  * Creates a string in the influx data format containing the delta between
  * 2 measurements of the same counter. Counters are only included if their 
- * absolut value is > 0 (delta can be 0).
+ * absolute value is > 0 (delta can be 0).
  * 
  * NOTE: As influx_extra_fields_ are static, they are excluded of this 
  *       delta format

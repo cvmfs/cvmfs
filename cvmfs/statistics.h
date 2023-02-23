@@ -94,7 +94,7 @@ class Statistics {
 
 /**
  * Allows multiple instance of the same class to use the same Statistics
- * instance.  The "name_major" part is used to contruct counter names in the
+ * instance.  The "name_major" part is used to construct counter names in the
  * form name_major.<provided name>
  */
 class StatisticsTemplate {
@@ -198,7 +198,7 @@ class Recorder {
   std::vector<uint32_t> bins_;
 
   /**
-   * When the most recent tick occured.
+   * When the most recent tick occurred.
    */
   uint64_t last_timestamp_;
 

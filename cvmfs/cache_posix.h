@@ -33,7 +33,7 @@ class DownloadManager;
 }
 
 /**
- * Cache manger implementation using a file system (cache directory) as a
+ * Cache manager implementation using a file system (cache directory) as a
  * backing storage.
  */
 class PosixCacheManager : public CacheManager {

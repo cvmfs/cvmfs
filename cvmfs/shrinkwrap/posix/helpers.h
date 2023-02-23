@@ -27,7 +27,7 @@ struct fs_traversal_posix_context {
 };
 
 /**
- * INTIALIZATION FUNCTIONS
+ * INITIALIZATION FUNCTIONS
  */
 void InitialFsOperations(struct fs_traversal_context *ctx);
 void FinalizeFsOperations(struct fs_traversal_context *ctx);

@@ -54,7 +54,7 @@ enum Algorithms {
  * which is a sub-class of the Compressor.  The subclass needs to implement the
  * Deflate, DeflateBound, Clone, and WillHandle functions.  For information on
  * the WillHandle function, read up on the PolymorphicConstruction class.
- * The new sub-class must be listed in the implemention of the
+ * The new sub-class must be listed in the implementation of the
  * Compressor::RegisterPlugins function.
  *
  */
@@ -66,7 +66,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    * Deflate function.  The arguments and returns closely match the input and
    * output of the zlib deflate function.
    * Input:
-   *   - outbuf - Ouput buffer to write the compressed data.
+   *   - outbuf - Output buffer to write the compressed data.
    *   - outbufsize - Size of the output buffer
    *   - inbuf - Input data to be compressed
    *   - inbufsize - Size of the input buffer

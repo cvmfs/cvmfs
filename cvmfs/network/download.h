@@ -126,7 +126,7 @@ enum Destination {
 
 struct Counters {
   perf::Counter *sz_transferred_bytes;
-  perf::Counter *sz_transfer_time;  // measured in miliseconds
+  perf::Counter *sz_transfer_time;  // measured in milliseconds
   perf::Counter *n_requests;
   perf::Counter *n_retries;
   perf::Counter *n_proxy_failover;
@@ -136,7 +136,7 @@ struct Counters {
     sz_transferred_bytes = statistics.RegisterTemplated("sz_transferred_bytes",
         "Number of transferred bytes");
     sz_transfer_time = statistics.RegisterTemplated("sz_transfer_time",
-        "Transfer time (miliseconds)");
+        "Transfer time (milliseconds)");
     n_requests = statistics.RegisterTemplated("n_requests",
         "Number of requests");
     n_retries = statistics.RegisterTemplated("n_retries", "Number of retries");

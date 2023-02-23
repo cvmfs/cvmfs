@@ -213,7 +213,7 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
   int           chars_io;
   unsigned int  ring_buffer_pos = 0;
 
-  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  // read from stdout of gdb until gdb prompt occurs --> (gdb)
   while (1) {
     chars_io = read(fd_pipe, &mini_buffer, 1);
 

@@ -1725,7 +1725,7 @@ void DownloadManager::Spawn() {
 
 
 /**
- * Downloads data from an unsecure outside channel (currently HTTP or file).
+ * Downloads data from an insecure outside channel (currently HTTP or file).
  */
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
@@ -1880,7 +1880,7 @@ void DownloadManager::SetIpPreference(dns::IpPreference preference) {
 
 
 /**
- * Sets two timeout values for proxied and for direct conections, respectively.
+ * Sets two timeout values for proxied and for direct connections, respectively.
  * The timeout counts for all sorts of connection phases,
  * DNS, HTTP connect, etc.
  */
@@ -2004,7 +2004,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     if (opt_proxy_groups_->size() > 1) {
       opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
       opt_proxy_groups_->size();
-      // Remeber the timestamp of switching to backup proxies
+      // Remember the timestamp of switching to backup proxies
       if (opt_proxy_groups_reset_after_ > 0) {
         if (opt_proxy_groups_current_ > 0) {
           if (opt_timestamp_backup_proxies_ == 0)

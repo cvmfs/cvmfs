@@ -5,12 +5,12 @@
 #
 # Implementation of the "cvmfs_server ingest-tarball" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
 
-# TODO Most of this code is replicated and shared between different scrips,
+# TODO Most of this code is replicated and shared between different scripts,
 # it would be a good idea to refactor common patterns into coherent functions.
 
 cvmfs_server_ingest() {
@@ -79,7 +79,7 @@ cvmfs_server_ingest() {
     if [ ! x"$tar_file" = "x" ] && [ ! x"$to_delete" = "x" ]; then
       die "Could not delete and add a file in the same transaction while using gateway."
     fi
-    # by the chek above we are sure that there is only a tar_file to ingest or a directory to_delete
+    # by the check above we are sure that there is only a tar_file to ingest or a directory to_delete
     # hence we just concatenate them with the name for the transaction
     cvmfs_server_transaction "$name/$base_dir$to_delete" || die "Impossible to start a transaction"
   else
