@@ -223,7 +223,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    */
   void MakePipe(int pipe_fd[2]) {
     int retval = pipe(pipe_fd);
-    if (retval == 0) {
+    if (!(retval == 0)) {
       PANIC(kLogSyslogErr | kLogDebug,
                       "MakePipe failed with retval %d errno %d", retval, errno);
     }
@@ -238,7 +238,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     do {
       num_bytes = write(fd, buf, nbyte);
     } while ((num_bytes < 0) && (errno == EINTR));
-    if ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte)) {
+    if (!((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte))) {
       PANIC(kLogSyslogErr | kLogDebug,
                                    "WritePipe failed: expected write size %lu, "
                                    "actually written %lu, errno %d, fd %d",
@@ -255,7 +255,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     do {
       num_bytes = read(fd, buf, nbyte);
     } while ((num_bytes < 0) && (errno == EINTR));
-    if ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte)) {
+    if (!((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte))) {
       PANIC(kLogSyslogErr | kLogDebug,
                                      "ReadPipe failed: expected read size %lu, "
                                      "actually read %lu, errno %d, fd %d",
