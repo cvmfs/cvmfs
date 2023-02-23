@@ -7,4 +7,5 @@ skip = .git
 # quarantaine -- type cripped into a folder name, change is undesired so far into
 #                the project, makes it tricky/impossible to distinguish
 #                folder name for a generally mistyped word, so ignored altogether
-ignore-words-list = gir,ative,parm,numer,quarantaine
+# MSDOS -- used in C-preprocessor directives
+ignore-words-list = gir,ative,parm,numer,quarantaine,msdos
