@@ -431,7 +431,7 @@ void Watchdog::Spawn() {
           exit(0);
         }
         default:
-          exit(0);
+          _exit(0);
       }
     default:
       close(pipe_watchdog_->read_end);
