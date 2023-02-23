@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cerrno>
 
+#include "exception.h"
 #include "gtest/gtest_prod.h"
 #include "util/export.h"
 #include "util/pointer.h"
@@ -222,7 +223,10 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    */
   void MakePipe(int pipe_fd[2]) {
     int retval = pipe(pipe_fd);
-    assert(retval == 0);
+    if (retval == 0) {
+      PANIC(kLogSyslogErr | kLogDebug,
+                      "MakePipe failed with retval %d errno %d", retval, errno);
+    }
   }
 
 
@@ -234,7 +238,12 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     do {
       num_bytes = write(fd, buf, nbyte);
     } while ((num_bytes < 0) && (errno == EINTR));
-    assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+    if ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte)) {
+      PANIC(kLogSyslogErr | kLogDebug,
+                                   "WritePipe failed: expected write size %lu, "
+                                   "actually written %lu, errno %d, fd %d",
+                                   nbyte, num_bytes, errno, fd);
+    }
   }
 
 
@@ -246,7 +255,12 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     do {
       num_bytes = read(fd, buf, nbyte);
     } while ((num_bytes < 0) && (errno == EINTR));
-    assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+    if ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte)) {
+      PANIC(kLogSyslogErr | kLogDebug,
+                                     "ReadPipe failed: expected read size %lu, "
+                                     "actually read %lu, errno %d, fd %d",
+                                     nbyte, num_bytes, errno, fd);
+    }
   }
 };
 
