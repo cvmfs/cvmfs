@@ -34,7 +34,7 @@ cvmfs_run_test() {
 
   cvmfs_disable_config_repository
 
-  echo "install a desaster cleanup"
+  echo "install a disaster cleanup"
   trap cleanup EXIT HUP INT TERM || return $?
 
   echo "run a silent HTTP server"

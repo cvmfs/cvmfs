@@ -30,7 +30,7 @@ evict_file() {
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO evict "/$filename"
 
   local lc_newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
-  # make sure file is completly evicted from cache
+  # make sure file is completely evicted from cache
   [ $lc_newCache -eq 0 ] || return 11 
 
 
@@ -80,7 +80,7 @@ evict_and_readd() {
   cat $mntpnt/small > /dev/null
 
   local lc_newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
-  # make sure file is completly evicted from cache
+  # make sure file is completely evicted from cache
   [ $lc_newCache -eq $lc_oldCache ] || return 21 
 
   echo "   ...Success"
