@@ -1803,7 +1803,7 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
  * Closes all file descriptors except the ones in preserve_fildes.
  * To be used after fork but before exec.
  */
-static bool CloseAllFildes(const std::set<int> &preserve_fildes)
+bool CloseAllFildes(const std::set<int> &preserve_fildes)
 {
   int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
   if (max_fd < 0) {

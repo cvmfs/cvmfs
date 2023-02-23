@@ -391,8 +391,6 @@ void Watchdog::Spawn() {
 
   pid_t pid;
   int statloc;
-  int max_fd = sysconf(_SC_OPEN_MAX);
-  assert(max_fd >= 0);
   switch (pid = fork()) {
     case -1: PANIC(NULL);
     case 0:
@@ -418,13 +416,13 @@ void Watchdog::Spawn() {
           // Let's keep stdin, stdout, stderr open at /dev/null (daemonized)
           // in order to prevent accidental outputs from messing with another
           // file descriptor
-          for (int fd = 3; fd < max_fd; fd++) {
-            if (fd == pipe_watchdog_->read_end)
-              continue;
-            if (fd == pipe_listener_->write_end)
-              continue;
-            close(fd);
-          }
+          std::set<int> preserve_fds;
+          preserve_fds.insert(0);
+          preserve_fds.insert(1);
+          preserve_fds.insert(2);
+          preserve_fds.insert(pipe_watchdog_->read_end);
+          preserve_fds.insert(pipe_listener_->write_end);
+          CloseAllFildes(preserve_fds);
           // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
           Supervise();
