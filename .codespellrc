@@ -1,5 +1,5 @@
 [codespell]
-skip = .git,*.rtf
+skip = .git,*.rtf,cvmfs-universal.spec
 # gir -- codespell wants it to be git
 # ative -- used in 3 lines, not really sure if there is no ad-hoc semantic
 # parm -- used in cvmfs/authz/authz_curl.cc
