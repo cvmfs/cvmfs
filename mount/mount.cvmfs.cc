@@ -680,18 +680,11 @@ int main(int argc, char **argv) {
           return 32;
       }
     }
-    ended = (waitpid(pid_cvmfs, &status, 0) == pid_cvmfs);
+    ended = (waitpid(pid_cvmfs, &status, WNOHANG) == pid_cvmfs);
   } while ((stdout_open || stderr_open) && !ended);
   close(fd_stdout);
   close(fd_stderr);
 
-  if (!ended) {
-    retval = waitpid(pid_cvmfs, &status, 0);
-    if (retval == -1) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code");
-      return 32;
-    }
-  }
   if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
     return 0;
 
