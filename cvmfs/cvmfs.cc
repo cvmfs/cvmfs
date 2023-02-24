@@ -163,6 +163,10 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
  * Number of reserved file descriptors for internal use
  */
 const int kNumReservedFd = 512;
+/**
+ * Warn if the process has a lower limit for the number of open file descriptors
+ */
+const unsigned int kMinOpenFiles = 8192;
 
 
 class FuseInterruptCue : public InterruptCue {
@@ -2154,6 +2158,32 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 }
 
 
+static unsigned CheckMaxOpenFiles() {
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  // check number of open files (lazy evaluation)
+  if (!already_done) {
+    unsigned soft_limit = 0;
+    unsigned hard_limit = 0;
+    GetLimitNoFile(&soft_limit, &hard_limit);
+
+    if (soft_limit < cvmfs::kMinOpenFiles) {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, cvmfs::kMinOpenFiles);
+    }
+    max_open_files = soft_limit;
+    already_done   = true;
+  }
+
+  return max_open_files;
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
@@ -2227,7 +2257,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailMonitor;
     }
   }
-  cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
+  cvmfs::max_open_files_ = CheckMaxOpenFiles();
 
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(

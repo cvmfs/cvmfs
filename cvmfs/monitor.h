@@ -91,9 +91,4 @@ class Watchdog {
   SigactionMap old_signal_handlers_;
 };
 
-namespace monitor {
-// TODO(jblomer): move me
-unsigned GetMaxOpenFiles();
-}  // namespace monitor
-
 #endif  // CVMFS_MONITOR_H_

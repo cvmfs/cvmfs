@@ -635,36 +635,3 @@ Watchdog::~Watchdog() {
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
   instance_ = NULL;
 }
-
-
-
-namespace monitor {
-
-const unsigned kMinOpenFiles = 8192;
-
-unsigned GetMaxOpenFiles() {
-  static unsigned max_open_files;
-  static bool     already_done = false;
-
-  /* check number of open files (lazy evaluation) */
-  if (!already_done) {
-    unsigned soft_limit = 0;
-    unsigned hard_limit = 0;
-    GetLimitNoFile(&soft_limit, &hard_limit);
-
-    if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslogWarn | kLogDebug,
-               "Warning: current limits for number of open files are "
-               "(%lu/%lu)\n"
-               "CernVM-FS is likely to run out of file descriptors, "
-               "set ulimit -n to at least %lu",
-               soft_limit, hard_limit, kMinOpenFiles);
-    }
-    max_open_files = soft_limit;
-    already_done   = true;
-  }
-
-  return max_open_files;
-}
-
-}  // namespace monitor
