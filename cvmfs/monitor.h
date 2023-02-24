@@ -26,6 +26,8 @@ struct Pipe;
  * the supervisee pid and the crash dump path to the watchdog and trigger
  * supervision.  Note that we cannot use the parent pid from Create() because
  * the supervisee may fork() / daemonize between Create() and Spawn().
+ *
+ * Note: logging should be set up before calling Create()
  */
 class Watchdog {
  public:
@@ -78,6 +80,8 @@ class Watchdog {
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
   explicit Watchdog(const std::string &crash_dump_path, FnOnCrash on_crash);
+  void Fork();
+  void WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
   void LogEmergency(std::string msg);
@@ -89,6 +93,7 @@ class Watchdog {
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
+  /// Communication channel from the supervisee to the watchdog
   Pipe *pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
   Pipe *pipe_listener_;

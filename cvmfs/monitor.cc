@@ -378,6 +378,75 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 
 
 /**
+ * Fork the watchdog process and put it on hold until Spawn() is called.
+ */
+void Watchdog::Fork() {
+  Pipe pipe_pid;
+  pipe_watchdog_ = new Pipe();
+  pipe_listener_ = new Pipe();
+
+  pid_t pid;
+  int statloc;
+  switch (pid = fork()) {
+    case -1: PANIC(NULL);
+    case 0:
+      // Double fork to avoid zombie
+      switch (fork()) {
+        case -1: _exit(1);
+        case 0: {
+          close(pipe_watchdog_->write_end);
+          Daemonize();
+          // send the watchdog PID to the supervisee
+          pid_t watchdog_pid = getpid();
+          pipe_pid.Write(watchdog_pid);
+          close(pipe_pid.write_end);
+          // Close all unused file descriptors
+          // close also usyslog, only get it back if necessary
+          // string usyslog_save = GetLogMicroSyslog();
+          string debuglog_save = GetLogDebugFile();
+          SetLogDebugFile("");
+          string usyslog_save = GetLogMicroSyslog();
+          SetLogMicroSyslog("");
+          // Gracefully close the syslog before closing all fds. The next call
+          // to syslog will reopen it.
+          closelog();
+          // Let's keep stdin, stdout, stderr open at /dev/null (daemonized)
+          // in order to prevent accidental outputs from messing with another
+          // file descriptor
+          std::set<int> preserve_fds;
+          preserve_fds.insert(0);
+          preserve_fds.insert(1);
+          preserve_fds.insert(2);
+          preserve_fds.insert(pipe_watchdog_->read_end);
+          preserve_fds.insert(pipe_listener_->write_end);
+          CloseAllFildes(preserve_fds);
+          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          SetLogDebugFile(debuglog_save);  // no-op if debug log not used
+          WaitForSupervisee();
+          Supervise();
+          exit(0);
+        }
+        default:
+          _exit(0);
+      }
+    default:
+      close(pipe_watchdog_->read_end);
+      close(pipe_listener_->write_end);
+      close(pipe_pid.write_end);
+      if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
+  }
+
+  // retrieve the watchdog PID from the pipe
+  pipe_pid.Read(&watchdog_pid_);
+  close(pipe_pid.read_end);
+}
+
+void Watchdog::WaitForSupervisee() {
+
+}
+
+/**
  * Fork the watchdog process.
  */
 void Watchdog::Spawn() {
