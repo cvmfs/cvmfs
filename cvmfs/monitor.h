@@ -14,6 +14,7 @@
 #include <string>
 
 #include "util/platform.h"
+#include "util/pointer.h"
 #include "util/single_copy.h"
 
 struct Pipe;
@@ -95,11 +96,11 @@ class Watchdog : SingleCopy {
   std::string exe_path_;
   pid_t watchdog_pid_;
   /// Communication channel from the supervisee to the watchdog
-  Pipe *pipe_watchdog_;
+  UniquePtr<Pipe> pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
-  Pipe *pipe_listener_;
+  UniquePtr<Pipe> pipe_listener_;
   /// Send the terminate signal to the listener
-  Pipe *pipe_terminate_;
+  UniquePtr<Pipe> pipe_terminate_;
   pthread_t thread_listener_;
   FnOnCrash on_crash_;
   platform_spinlock lock_handler_;

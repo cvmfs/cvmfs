@@ -658,9 +658,6 @@ Watchdog::Watchdog(const string &crash_dump_path, FnOnCrash on_crash)
   , crash_dump_path_(crash_dump_path)
   , exe_path_(string(platform_getexepath()))
   , watchdog_pid_(0)
-  , pipe_watchdog_(NULL)
-  , pipe_listener_(NULL)
-  , pipe_terminate_(NULL)
   , on_crash_(on_crash)
 {
   int retval = platform_spinlock_init(&lock_handler_, 0);
@@ -690,10 +687,6 @@ Watchdog::~Watchdog() {
     pipe_watchdog_->Write(ControlFlow::kQuit);
     close(pipe_watchdog_->write_end);
   }
-
-  delete pipe_watchdog_;
-  delete pipe_listener_;
-  delete pipe_terminate_;
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
