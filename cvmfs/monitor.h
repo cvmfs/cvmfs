@@ -21,6 +21,11 @@ struct Pipe;
  * This class can fork a watchdog process that listens on a pipe and prints a
  * stackstrace into syslog, when cvmfs fails.  The crash dump is also appended
  * to the crash dump file, if the path is not empty.  Singleton.
+ *
+ * The watchdog process if forked on Create and put on hold.  Spawn() will send
+ * the supervisee pid and the crash dump path to the watchdog and trigger
+ * supervision.  Note that we cannot use the parent pid from Create() because
+ * the supervisee may fork() / daemonize between Create() and Spawn().
  */
 class Watchdog {
  public:
@@ -29,8 +34,6 @@ class Watchdog {
   ~Watchdog();
   void Spawn();
   void RegisterOnCrash(void (*CleanupOnCrash)(void));
-
-  static void *MainWatchdogListener(void *data);
 
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
@@ -62,6 +65,8 @@ class Watchdog {
 
   static Watchdog *instance_;
   static Watchdog *Me() { return instance_; }
+
+  static void *MainWatchdogListener(void *data);
 
   static void ReportSignalAndTerminate(int sig, siginfo_t *siginfo,
                                        void *context);
