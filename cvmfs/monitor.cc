@@ -445,7 +445,7 @@ void Watchdog::Fork() {
 bool Watchdog::WaitForSupervisee() {
   // We want broken pipes not to raise a signal but handle the error in the
   // read/write code
-  sighandler_t rv_sig = signal(SIGPIPE, SIG_IGN);
+  platform_sighandler_t rv_sig = signal(SIGPIPE, SIG_IGN);
   assert(rv_sig != SIG_ERR);
 
   // The watchdog is not supposed to receive signals. If it does, report it.
