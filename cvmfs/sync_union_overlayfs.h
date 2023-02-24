@@ -19,7 +19,7 @@
 namespace publish {
 
 /**
- * Syncing a cvmfs repository by the help of an overlayed overlayfs
+ * Syncing a cvmfs repository by the help of an overlaid overlayfs
  * read-write volume.
  */
 class SyncUnionOverlayfs : public SyncUnion {

@@ -32,7 +32,7 @@ static bool IsRemote(const string &repository) {
 }
 
 /**
- * Checks for existance of a file either locally or via HTTP head
+ * Checks for existence of a file either locally or via HTTP head
  */
 bool CommandInfo::Exists(const string &repository, const string &file) const {
   if (IsRemote(repository)) {

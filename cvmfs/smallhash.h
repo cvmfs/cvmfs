@@ -82,7 +82,7 @@ class SmallHashBase {
   /**
    * Returns both the key and the value. That is useful if Key's equality
    * operator implements an equivalence relation on Key. In this case, LookupEx
-   * returns the key representing the equivalance class that has been used
+   * returns the key representing the equivalence class that has been used
    * during Insert().
    * Used to return a glue::InodeEx element when looking for an inode.
    */

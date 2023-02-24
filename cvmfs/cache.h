@@ -205,7 +205,7 @@ class CacheManager : SingleCopy {
    * When RestoreState is called, the cache has already exactly one file
    * descriptor open: the root file catalog. This file descriptor might be
    * remapped to another number. A return value of -1 means no action needs
-   * to take place. A smaller value inidicates an error.
+   * to take place. A smaller value indicates an error.
    */
   int RestoreState(const int fd_progress, void *state);
   void FreeState(const int fd_progress, void *state);

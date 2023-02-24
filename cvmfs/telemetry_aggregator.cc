@@ -83,7 +83,7 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
     watch_term.revents = 0;
     int retval = poll(&watch_term, 1, timeout_ms);
     if (retval < 0) {
-      if (errno == EINTR) {  // external interrupt occured - no error for us
+      if (errno == EINTR) {  // external interrupt occurred - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
           timeout_ms = (now > deadline_sec) ? 0 :

@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     return 2;
   } catch (...) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Unknow error during CVMFS Receiver event loop.\n");
+             "Unknown error during CVMFS Receiver event loop.\n");
       return 3;
   }
 

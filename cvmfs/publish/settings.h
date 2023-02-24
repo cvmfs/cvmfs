@@ -21,7 +21,7 @@ class OptionsManager;
 namespace publish {
 
 /**
- * Allows for settings that remember whether they have been explictily
+ * Allows for settings that remember whether they have been explicitly
  * overwritten.  Otherwise, default values can be changed to upstream repository
  * settings.
  */
@@ -124,7 +124,7 @@ class SettingsSpoolArea {
   Setting<std::string> tmp_dir_;
   Setting<std::string> union_mnt_;
   /**
-   * How aggresively should the mount point stack be repaired
+   * How aggressively should the mount point stack be repaired
    */
   Setting<EUnionMountRepairMode> repair_mode_;
 };  // SettingsSpoolArea
@@ -451,7 +451,7 @@ class SettingsPublisher {
   Setting<bool> is_silent_;
   Setting<bool> is_managed_;
   // When trying to drop the session, ignore an invalid lease failure. Useful
-  // to recover a pulisher with abort -f.
+  // to recover a publisher with abort -f.
   Setting<bool> ignore_invalid_lease_;
 
   SettingsStorage storage_;
@@ -501,7 +501,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
@@ -510,7 +510,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
    * In an "enter environment" (see cmd_enter), the spool area of the enter

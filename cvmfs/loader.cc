@@ -773,7 +773,7 @@ int FuseMain(int argc, char *argv[]) {
 
   if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Moint point %s does not exist", mount_point_->c_str());
+             "Mount point %s does not exist", mount_point_->c_str());
     return kFailPermission;
   }
 

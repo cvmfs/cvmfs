@@ -1,0 +1,11 @@
+[codespell]
+skip = .git,*.rtf,cvmfs-universal.spec
+# gir -- codespell wants it to be git
+# ative -- used in 3 lines, not really sure if there is no ad-hoc semantic
+# parm -- used in cvmfs/authz/authz_curl.cc
+# numer -- numerator abbreviated in cvmfs/util/platform_osx.h
+# quarantaine -- type cripped into a folder name, change is undesired so far into
+#                the project, makes it tricky/impossible to distinguish
+#                folder name for a generally mistyped word, so ignored altogether
+# MSDOS -- used in C-preprocessor directives
+ignore-words-list = gir,ative,parm,numer,quarantaine,msdos

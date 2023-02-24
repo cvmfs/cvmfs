@@ -49,9 +49,9 @@ class CmdTransaction : public Command {
       "Clone directory 'from-dir' to 'to-dir' as part of opening the "
       "transaction"));
     p.push_back(Parameter::Optional("template-from", 'U', "from-dir",
-      "Use -U and -V as an alternative to the -T parmeter"));
+      "Use -U and -V as an alternative to the -T parameter"));
     p.push_back(Parameter::Optional("template-to", 'V', "to-dir",
-      "Use -U and -V as an alternative to the -T parmeter"));
+      "Use -U and -V as an alternative to the -T parameter"));
     return p;
   }
 

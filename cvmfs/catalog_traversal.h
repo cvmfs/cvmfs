@@ -404,7 +404,7 @@ class CatalogTraversalBase
 
   /**
    * Checks if a root catalog is below one of the pruning thresholds.
-   * Pruning thesholds can be either the catalog's history depth or a timestamp
+   * Pruning thresholds can be either the catalog's history depth or a timestamp
    * threshold applied to the last modified timestamp of the catalog.
    *
    * @param ctx  traversal context for traversal-specific state
@@ -458,7 +458,7 @@ class CatalogTraversalBase
  *
  * Breadth First Traversal Strategy
  *   Catalogs are handed out to the user identical as they are traversed.
- *   Say: From top to buttom. When you would simply print each received catalog
+ *   Say: From top to bottom. When you would simply print each received catalog
  *        the result would be a nice representation of the catalog tree.
  *   This method is more efficient, because catalogs are opened, processed and
  *   thrown away directly afterwards.
@@ -655,7 +655,7 @@ class CatalogTraversal
       }
     }
 
-    // invariant: after the traversal finshed, there should be no more catalogs
+    // invariant: after the traversal finished, there should be no more catalogs
     //            to traverse or to yield!
     assert(ctx->catalog_stack.empty());
     assert(ctx->callback_stack.empty());

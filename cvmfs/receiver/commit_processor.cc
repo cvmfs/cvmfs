@@ -95,7 +95,7 @@ CommitProcessor::~CommitProcessor() {}
  *
  * This method applies all the changes from C_N, with respect to C_O, onto C_G.
  * The resulting catalog on the gateway machine (C_GN) is then set as root
- * catalog in the repository manifest. The method also signes the updated
+ * catalog in the repository manifest. The method also signs the updated
  * repository manifest.
  */
 CommitProcessor::Result CommitProcessor::Process(

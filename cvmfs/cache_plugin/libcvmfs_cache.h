@@ -19,7 +19,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-// Map C++ clases to their C interface names
+// Map C++ classes to their C interface names
 typedef class SimpleOptionsParser cvmcache_option_map;
 #else
 typedef struct OptionsManager cvmcache_option_map;
@@ -163,7 +163,7 @@ struct cvmcache_callbacks {
   int (*cvmcache_info)(struct cvmcache_info *info);
   int (*cvmcache_shrink)(uint64_t shrink_to, uint64_t *used);
   /**
-   * Listing can be "approximate", e.g. if files are removed and/or addded in
+   * Listing can be "approximate", e.g. if files are removed and/or added in
    * the meantime, this may or may not be reflected.
    */
   int (*cvmcache_listing_begin)(uint64_t lst_id,

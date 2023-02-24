@@ -1,7 +1,7 @@
 
 CVMFS_EC_BASE_URL="https://ecsft.cern.ch/dist/cvmfs"
 
-# tries to guess the pacakge download URLs for a provided package name and cvmfs
+# tries to guess the package download URLs for a provided package name and cvmfs
 # version. This relies on the Electric Commander installation of SFT.
 #
 # Note: CVMFS_EC_BASE_URL needs to point to the cvmfs download location

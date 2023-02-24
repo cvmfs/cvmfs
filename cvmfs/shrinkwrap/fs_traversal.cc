@@ -371,7 +371,7 @@ bool handle_file(
     pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED)->Xadd(src_st->st_size);
   }
 
-  // The target alway exists (either previously existed or just created).
+  // The target always exists (either previously existed or just created).
   // This is not done in parallel like copyFile
   if (result && dest->do_link(dest->context_, entry, dest_data)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -654,9 +654,9 @@ perf::Statistics *GetSyncStatTemplate() {
   result->Register(SHRINKWRAP_STAT_ENTRIES_DEST,
     "Number of file system entries processed in the destination");
   result->Register(SHRINKWRAP_STAT_DATA_FILES,
-    "Number of data files transfered from source to destination");
+    "Number of data files transferred from source to destination");
   result->Register(SHRINKWRAP_STAT_DATA_BYTES,
-    "Bytes transfered from source to destination");
+    "Bytes transferred from source to destination");
   result->Register(SHRINKWRAP_STAT_DATA_FILES_DEDUPED,
     "Number of files not copied due to deduplication");
   result->Register(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED,

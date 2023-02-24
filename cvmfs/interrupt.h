@@ -7,7 +7,7 @@
 
 /**
  * Allows to query for interrupts of active file system requests.  Used
- * to hande canceled fuse requests with the inherited class FuseInterruptCue.
+ * to handle canceled fuse requests with the inherited class FuseInterruptCue.
  */
 class InterruptCue {
  public:
