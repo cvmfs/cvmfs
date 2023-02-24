@@ -112,14 +112,13 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-    watchdog = Watchdog::Create(
-      watchdog_out_dir + "/stacktrace." + timestamp, NULL);
+    watchdog = Watchdog::Create(NULL);
     if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");
       return 1;
     }
-    watchdog->Spawn();
+    watchdog->Spawn(watchdog_out_dir + "/stacktrace." + timestamp);
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver started");

@@ -24,10 +24,10 @@ struct Pipe;
  * stackstrace into syslog, when cvmfs fails.  The crash dump is also appended
  * to the crash dump file, if the path is not empty.  Singleton.
  *
- * The watchdog process if forked on Create and put on hold.  Spawn() will send
- * the supervisee pid and the crash dump path to the watchdog and trigger
- * supervision.  Note that we cannot use the parent pid from Create() because
- * the supervisee may fork() / daemonize between Create() and Spawn().
+ * The watchdog process if forked on Create and put on hold.  Spawn() will start
+ * the supervision and set the crash dump path. It should be called from the
+ * final supervisee pid (after daemon etc.) but preferably before any threads
+ * are started.
  *
  * Note: logging should be set up before calling Create()
  */
@@ -38,11 +38,10 @@ class Watchdog : SingleCopy {
    */
   typedef void (*FnOnCrash)(void);
 
-  static Watchdog *Create(const std::string &crash_dump_path,
-                          FnOnCrash on_crash);
+  static Watchdog *Create(FnOnCrash on_crash);
   static pid_t GetPid();
   ~Watchdog();
-  void Spawn();
+  void Spawn(const std::string &crash_dump_path);
 
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
@@ -57,6 +56,7 @@ class Watchdog : SingleCopy {
     enum Flags {
       kProduceStacktrace = 0,
       kQuit,
+      kSupervise,
       kUnknown,
     };
   };
@@ -81,9 +81,9 @@ class Watchdog : SingleCopy {
                                        void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(const std::string &crash_dump_path, FnOnCrash on_crash);
+  explicit Watchdog(FnOnCrash on_crash);
   void Fork();
-  void WaitForSupervisee();
+  bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
   void LogEmergency(std::string msg);

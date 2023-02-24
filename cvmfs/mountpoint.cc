@@ -858,21 +858,30 @@ void FileSystem::SetupGlobalEnvironmentParams() {
 }
 
 
-void FileSystem::SetupLogging() {
+void FileSystem::SetupLoggingStandalone(
+  const OptionsManager &options_mgr, const std::string &prefix)
+{
+  SetupGlobalEnvironmentParams();
+
   string optarg;
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
     SetLogSyslogLevel(String2Uint64(optarg));
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
     SetLogSyslogFacility(String2Int64(optarg));
-  if (options_mgr_->GetValue("CVMFS_USYSLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_USYSLOG", &optarg))
     SetLogMicroSyslog(optarg);
-  if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
+  if (options_mgr.GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
     SetLogSyslogPrefix(optarg);
   } else {
-    SetLogSyslogPrefix(name_);
+    SetLogSyslogPrefix(prefix);
   }
+}
+
+
+void FileSystem::SetupLogging() {
+  SetupLoggingStandalone(*options_mgr_, name_);
 }
 
 
@@ -1207,19 +1216,19 @@ bool MountPoint::ReloadBlacklists() {
 }
 
 /**
- * Disables kernel caching of symlinks. 
+ * Disables kernel caching of symlinks.
  * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
  * linux kernel >= 4.2. Some OS might backport it.
- * 
+ *
  * NOTE: This function should only be called before or within cvmfs_init().
- * 
+ *
  */
 void MountPoint::DisableCacheSymlinks() {
   cache_symlinks_ = false;
 }
 
 /**
- * Instead of invalidate dentries, they should be expired. 
+ * Instead of invalidate dentries, they should be expired.
  * Fixes issues with mount-on-top mounts and symlink caching.
  */
 void MountPoint::EnableFuseExpireEntry() {

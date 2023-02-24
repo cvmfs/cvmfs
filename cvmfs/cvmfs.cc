@@ -2192,6 +2192,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   InitOptionsMgr(loader_exports);
 
+  // We need logging set up before forking the watchdog
+  FileSystem::SetupLoggingStandalone(
+    *cvmfs::options_mgr_, loader_exports->repository_name);
+
+  // Monitor, check for maximum number of open files
+  if (cvmfs::UseWatchdog()) {
+    auto_umount::SetMountpoint(loader_exports->mount_point);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    if (cvmfs::watchdog_ == NULL) {
+      *g_boot_error = "failed to initialize watchdog.";
+      return loader::kFailMonitor;
+    }
+  }
+  cvmfs::max_open_files_ = CheckMaxOpenFiles();
+
   FileSystem::FileSystemInfo fs_info;
   fs_info.type = FileSystem::kFsFuse;
   fs_info.name = loader_exports->repository_name;
@@ -2248,18 +2263,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
       new FuseRemounter(cvmfs::mount_point_, &cvmfs::inode_generation_info_,
                         channel_or_session, fuse_notify_invalidation);
 
-  // Monitor, check for maximum number of open files
-  if (cvmfs::UseWatchdog()) {
-    cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
-                                        loader_exports->repository_name,
-                                        auto_umount::UmountOnCrash);
-    if (cvmfs::watchdog_ == NULL) {
-      *g_boot_error = "failed to initialize watchdog.";
-      return loader::kFailMonitor;
-    }
-  }
-  cvmfs::max_open_files_ = CheckMaxOpenFiles();
-
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(
     cvmfs::mount_point_->talk_socket_path(),
@@ -2299,9 +2302,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
 
-
-  auto_umount::SetMountpoint(loader_exports->mount_point);
-
   return loader::kFailOk;
 }
 
@@ -2310,11 +2310,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
  * Things that have to be executed after fork() / daemon()
  */
 static void Spawn() {
-  // First thing: fork off the watchdog while we still have a single-threaded
+  // First thing: kick off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
-    cvmfs::watchdog_->Spawn();
+    cvmfs::watchdog_->Spawn(GetCurrentWorkingDirectory() + "/stacktrace." +
+                            cvmfs::mount_point_->fqrn());
   }
 
   cvmfs::fuse_remounter_->Spawn();
