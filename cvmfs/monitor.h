@@ -14,6 +14,7 @@
 #include <string>
 
 #include "util/platform.h"
+#include "util/single_copy.h"
 
 struct Pipe;
 
@@ -29,7 +30,7 @@ struct Pipe;
  *
  * Note: logging should be set up before calling Create()
  */
-class Watchdog {
+class Watchdog : SingleCopy {
  public:
   /**
    * Crash cleanup handler signature.
