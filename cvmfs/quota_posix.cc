@@ -979,7 +979,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   if (!foreground)
     Daemonize();
 
-  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr", NULL));
   assert(watchdog.IsValid());
   watchdog->Spawn();
 

@@ -361,7 +361,7 @@ void cvmcache_spawn_watchdog(const char *crash_dump_file) {
     return;
   g_watchdog = Watchdog::Create((crash_dump_file != NULL)
                                 ? string(crash_dump_file)
-                                : "");
+                                : "", NULL);
   assert(g_watchdog != NULL);
   g_watchdog->Spawn();
 }

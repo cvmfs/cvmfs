@@ -2251,7 +2251,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
     cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
-                                        loader_exports->repository_name);
+                                        loader_exports->repository_name,
+                                        auto_umount::UmountOnCrash);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
@@ -2313,7 +2314,6 @@ static void Spawn() {
   // well-defined state
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
-    cvmfs::watchdog_->RegisterOnCrash(auto_umount::UmountOnCrash);
     cvmfs::watchdog_->Spawn();
   }
 

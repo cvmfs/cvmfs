@@ -58,9 +58,9 @@ using namespace std;  // NOLINT
 Watchdog *Watchdog::instance_ = NULL;
 
 
-Watchdog *Watchdog::Create(const string &crash_dump_path) {
+Watchdog *Watchdog::Create(const string &crash_dump_path, FnOnCrash on_crash) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(crash_dump_path);
+  instance_ = new Watchdog(crash_dump_path, on_crash);
   return instance_;
 }
 
@@ -235,11 +235,6 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
   }
 
   return result;
-}
-
-
-void Watchdog::RegisterOnCrash(void (*CleanupOnCrash)(void)) {
-  on_crash_ = CleanupOnCrash;
 }
 
 
@@ -589,7 +584,7 @@ void Watchdog::Supervise() {
 }
 
 
-Watchdog::Watchdog(const string &crash_dump_path)
+Watchdog::Watchdog(const string &crash_dump_path, FnOnCrash on_crash)
   : spawned_(false)
   , crash_dump_path_(crash_dump_path)
   , exe_path_(string(platform_getexepath()))
@@ -597,7 +592,7 @@ Watchdog::Watchdog(const string &crash_dump_path)
   , pipe_watchdog_(NULL)
   , pipe_listener_(NULL)
   , pipe_terminate_(NULL)
-  , on_crash_(NULL)
+  , on_crash_(on_crash)
 {
   int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);

@@ -29,11 +29,16 @@ struct Pipe;
  */
 class Watchdog {
  public:
-  static Watchdog *Create(const std::string &crash_dump_path);
+  /**
+   * Crash cleanup handler signature.
+   */
+  typedef void (*FnOnCrash)(void);
+
+  static Watchdog *Create(const std::string &crash_dump_path,
+                          FnOnCrash on_crash);
   static pid_t GetPid();
   ~Watchdog();
   void Spawn();
-  void RegisterOnCrash(void (*CleanupOnCrash)(void));
 
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
@@ -72,7 +77,7 @@ class Watchdog {
                                        void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(const std::string &crash_dump_path);
+  explicit Watchdog(const std::string &crash_dump_path, FnOnCrash on_crash);
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
   void LogEmergency(std::string msg);
@@ -90,7 +95,7 @@ class Watchdog {
   /// Send the terminate signal to the listener
   Pipe *pipe_terminate_;
   pthread_t thread_listener_;
-  void (*on_crash_)(void);
+  FnOnCrash on_crash_;
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
   SigactionMap old_signal_handlers_;
