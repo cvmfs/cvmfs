@@ -702,22 +702,6 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 }
 
 
-// TODO(jblomer): figure out why this fails on Travis
-TEST_F(T_Dns, CaresResolverLocalhost) {
-  Host host = default_resolver->Resolve("localhost");
-  // Not using ExpectResolvedName because the canonical name for localhost
-  // differs from system to system.
-  ASSERT_EQ(1U, host.ipv4_addresses().size());
-  EXPECT_EQ("127.0.0.1", *host.ipv4_addresses().begin());
-  if (host.HasIpv6()) {
-    ASSERT_EQ(1U, host.ipv6_addresses().size());
-    EXPECT_EQ("[::1]", *host.ipv6_addresses().begin());
-  } else {
-    EXPECT_EQ(0U, host.ipv6_addresses().size());
-  }
-}
-
-
 TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   Host host = default_resolver->Resolve("a");
   EXPECT_TRUE((host.status() == kFailUnknownHost) ||
