@@ -36,6 +36,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
       GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
                                                                 configuration))
   , hash_filter_()
+  , hash_map_delete_requests_()
   , use_reflog_timestamps_(false)
   , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
   , oldest_trunk_catalog_found_(false)
@@ -46,6 +47,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , last_reported_status_(0.0)
   , condemned_objects_(0)
   , condemned_bytes_(0)
+  , duplicate_delete_requests_(0)
 {
   assert(configuration_.uploader != NULL);
 }
@@ -166,8 +168,16 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
   const shash::Any &hash)
 {
-  if (!hash_filter_.Contains(hash))
-    Sweep(hash);
+  if (!hash_filter_.Contains(hash)) {
+    if (!hash_map_delete_requests_.Contains(hash)) {
+      hash_map_delete_requests_.Fill(hash);
+      Sweep(hash);
+    } else {
+      ++duplicate_delete_requests_;
+      LogCvmfs(kLogGc, kLogDebug, "Hash %s already marked as to delete",
+               hash.ToString().c_str());
+    }
+  }
 }
 
 
@@ -300,10 +310,14 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     perf::Counter *ctr_condemned_bytes =
       configuration_.statistics->Register(
         "gc.sz_condemned_bytes", "number of deleted bytes");
+    perf::Counter *ctr_duplicate_delete_requests =
+      configuration_.statistics->Register(
+      "gc.n_duplicate_delete_requests", "number of duplicated delete requests");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());
     ctr_condemned_bytes->Set(condemned_bytes_count());
+    ctr_duplicate_delete_requests->Set(duplicate_delete_requests());
   }
 
   configuration_.uploader->WaitForUpload();
