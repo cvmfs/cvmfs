@@ -26,6 +26,7 @@ enum CacheManagerIds {
   kRamCacheManager,
   kTieredCacheManager,
   kExternalCacheManager,
+  kStreamingCacheManager,
 };
 
 enum CacheModes {
