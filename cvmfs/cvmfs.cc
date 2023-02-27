@@ -163,6 +163,10 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
  * Number of reserved file descriptors for internal use
  */
 const int kNumReservedFd = 512;
+/**
+ * Warn if the process has a lower limit for the number of open file descriptors
+ */
+const unsigned int kMinOpenFiles = 8192;
 
 
 class FuseInterruptCue : public InterruptCue {
@@ -2154,6 +2158,32 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 }
 
 
+static unsigned CheckMaxOpenFiles() {
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  // check number of open files (lazy evaluation)
+  if (!already_done) {
+    unsigned soft_limit = 0;
+    unsigned hard_limit = 0;
+    GetLimitNoFile(&soft_limit, &hard_limit);
+
+    if (soft_limit < cvmfs::kMinOpenFiles) {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, cvmfs::kMinOpenFiles);
+    }
+    max_open_files = soft_limit;
+    already_done   = true;
+  }
+
+  return max_open_files;
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
@@ -2161,6 +2191,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
   crypto::SetupLibcryptoMt();
 
   InitOptionsMgr(loader_exports);
+
+  // We need logging set up before forking the watchdog
+  FileSystem::SetupLoggingStandalone(
+    *cvmfs::options_mgr_, loader_exports->repository_name);
+
+  // Monitor, check for maximum number of open files
+  if (cvmfs::UseWatchdog()) {
+    auto_umount::SetMountpoint(loader_exports->mount_point);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    if (cvmfs::watchdog_ == NULL) {
+      *g_boot_error = "failed to initialize watchdog.";
+      return loader::kFailMonitor;
+    }
+  }
+  cvmfs::max_open_files_ = CheckMaxOpenFiles();
 
   FileSystem::FileSystemInfo fs_info;
   fs_info.type = FileSystem::kFsFuse;
@@ -2218,17 +2263,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
       new FuseRemounter(cvmfs::mount_point_, &cvmfs::inode_generation_info_,
                         channel_or_session, fuse_notify_invalidation);
 
-  // Monitor, check for maximum number of open files
-  if (cvmfs::UseWatchdog()) {
-    cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
-                                        loader_exports->repository_name);
-    if (cvmfs::watchdog_ == NULL) {
-      *g_boot_error = "failed to initialize watchdog.";
-      return loader::kFailMonitor;
-    }
-  }
-  cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
-
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(
     cvmfs::mount_point_->talk_socket_path(),
@@ -2268,9 +2302,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
 
-
-  auto_umount::SetMountpoint(loader_exports->mount_point);
-
   return loader::kFailOk;
 }
 
@@ -2279,12 +2310,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
  * Things that have to be executed after fork() / daemon()
  */
 static void Spawn() {
-  // First thing: fork off the watchdog while we still have a single-threaded
+  // First thing: kick off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
-    cvmfs::watchdog_->RegisterOnCrash(auto_umount::UmountOnCrash);
-    cvmfs::watchdog_->Spawn();
+    cvmfs::watchdog_->Spawn(GetCurrentWorkingDirectory() + "/stacktrace." +
+                            cvmfs::mount_point_->fqrn());
   }
 
   cvmfs::fuse_remounter_->Spawn();

@@ -188,6 +188,10 @@ class FileSystem : SingleCopy, public BootFactory {
   static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
+  // Used to setup logging before the file system object is created
+  static void SetupLoggingStandalone(
+    const OptionsManager &options_mgr, const std::string &prefix);
+
   bool IsNfsSource() { return nfs_mode_ & kNfsMaps; }
   bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
   void ResetErrorCounters();
@@ -283,7 +287,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
-  void SetupGlobalEnvironmentParams();
+  static void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();

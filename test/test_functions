@@ -320,7 +320,7 @@ autofs_check() {
   if running_on_osx; then
     return 0
   else
-    cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+    cat /proc/mounts | grep -q "^/etc/\(autofs/\)\?auto.cvmfs /cvmfs "
   fi
 }
 
