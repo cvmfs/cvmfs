@@ -161,9 +161,11 @@ void Repository::DownloadRootObjects(
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   cvmfs::FileSink filesink(reflog_fd);
-  download::JobInfo download_reflog(&reflog_url, false /* compressed */,
-                                    false /* probe hosts */, NULL, &filesink);
-  download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
+  UniquePtr<download::JobInfo> download_reflog(
+                download::JobInfo::CreateWithSink(
+                                     &reflog_url, false /* compressed */,
+                                     false /* probe hosts */, NULL, &filesink));
+  download::Failures rv_dl = download_mgr_->Fetch(download_reflog.weak_ref());
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
     delete reflog_;
@@ -171,7 +173,7 @@ void Repository::DownloadRootObjects(
     if (reflog_ == NULL) throw EPublish("cannot open reflog");
     reflog_->TakeDatabaseFileOwnership();
   } else {
-    if (!download_reflog.IsFileNotFound()) {
+    if (!download_reflog->IsFileNotFound()) {
       throw EPublish(std::string("cannot load reflog [") +
                      download::Code2Ascii(rv_dl) + "]");
     }
@@ -185,10 +187,11 @@ void Repository::DownloadRootObjects(
     std::string tags_url = url + "/data/" + manifest_->history().MakePath();
     shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
-    download::JobInfo download_tags(&tags_url, true /* compressed */,
-                                    true /* probe hosts */, &tags_hash,
-                                    &filesink);
-    rv_dl = download_mgr_->Fetch(&download_tags);
+    UniquePtr<download::JobInfo> download_tags(
+                download::JobInfo::CreateWithSink(
+                                &tags_url, true /* compressed */,
+                                true /* probe hosts */, &tags_hash, &filesink));
+    rv_dl = download_mgr_->Fetch(download_tags.weak_ref());
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
     delete history_;
@@ -206,9 +209,12 @@ void Repository::DownloadRootObjects(
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_info(&info_url, true /* compressed */,
-                         true /* probe_hosts */, &info_hash, &metainfo_memsink);
-    download::Failures rv_info = download_mgr_->Fetch(&download_info);
+    UniquePtr<download::JobInfo> download_info(
+                  download::JobInfo::CreateWithSink(
+                                             &info_url, true /* compressed */,
+                                             true /* probe_hosts */, &info_hash,
+                                             &metainfo_memsink));
+    download::Failures rv_info = download_mgr_->Fetch(download_info.weak_ref());
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
@@ -228,10 +234,11 @@ std::string Repository::GetFqrnFromUrl(const std::string &url) {
 
 bool Repository::IsMasterReplica() {
   std::string url = settings_.url() + "/.cvmfs_master_replica";
-  download::JobInfo head(&url, false /* probe_hosts */);
-  download::Failures retval = download_mgr_->Fetch(&head);
+  UniquePtr<download::JobInfo> head(download::JobInfo::CreateWithoutSink(
+                                                &url, false /* probe_hosts */));
+  download::Failures retval = download_mgr_->Fetch(head.weak_ref());
   if (retval == download::kFailOk) return true;
-  if (head.IsFileNotFound()) return false;
+  if (head->IsFileNotFound()) return false;
 
   throw EPublish(std::string("error looking for .cvmfs_master_replica [") +
                  download::Code2Ascii(retval) + "]");

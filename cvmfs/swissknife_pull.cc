@@ -139,9 +139,9 @@ static bool Peek(const shash::Any &remote_hash) {
 }
 
 static void ReportDownloadError(const download::JobInfo &download_job) {
-  const download::Failures error_code = download_job.error_code;
-  const int http_code = download_job.http_code;
-  const std::string url = *download_job.url;
+  const download::Failures error_code = download_job.error_code();
+  const int http_code = download_job.http_code();
+  const std::string url = *download_job.url();
 
   LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
            url.c_str(), error_code, download::Code2Ascii(error_code));
@@ -276,13 +276,14 @@ static void *MainWorker(void *data) {
                                     &tmp_file);
       string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
       cvmfs::FileSink filesink(fchunk);
-      download::JobInfo download_chunk(&url_chunk, false, false,
-                                       &chunk_hash, &filesink);
+      UniquePtr<download::JobInfo> download_chunk(
+                     download::JobInfo::CreateWithSink(&url_chunk, false, false,
+                                                       &chunk_hash, &filesink));
 
-      const download::Failures download_result =
-                                       download_manager->Fetch(&download_chunk);
+      const download::Failures download_result = download_manager->
+                                               Fetch(download_chunk.weak_ref());
       if (download_result != download::kFailOk) {
-        ReportDownloadError(download_chunk);
+        ReportDownloadError(*download_chunk);
         PANIC(kLogStderr, "Download error");
       }
       fclose(fchunk);
@@ -398,9 +399,10 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   }
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
-  download::JobInfo download_catalog(&url_catalog, false, false,
-                                     &catalog_hash, &filesink);
-  dl_retval = download_manager()->Fetch(&download_catalog);
+  UniquePtr<download::JobInfo> download_catalog(
+                   download::JobInfo::CreateWithSink(&url_catalog, false, false,
+                                                     &catalog_hash, &filesink));
+  dl_retval = download_manager()->Fetch(download_catalog.weak_ref());
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
     if (path == "" && is_garbage_collectable) {
@@ -409,7 +411,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
-      ReportDownloadError(download_catalog);
+      ReportDownloadError(*download_catalog);
       goto pull_cleanup;
     }
   }
@@ -637,16 +639,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
   // Check if we have a replica-ready server
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
-  download::JobInfo download_sentinel(&url_sentinel, false);
-  retval = download_manager()->Fetch(&download_sentinel);
+  UniquePtr<download::JobInfo> download_sentinel(
+                    download::JobInfo::CreateWithoutSink(&url_sentinel, false));
+  retval = download_manager()->Fetch(download_sentinel.weak_ref());
   if (retval != download::kFailOk) {
-    if (download_sentinel.http_code == 404) {
+    if (download_sentinel->http_code() == 404) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "This is not a CernVM-FS server for replication");
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to contact stratum 0 server (%d - %s)",
-               retval, download::Code2Ascii(download_sentinel.error_code));
+               retval, download::Code2Ascii(download_sentinel->error_code()));
     }
     goto fini;
   }
@@ -666,9 +669,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     meta_info_hash = ensemble.manifest->meta_info();
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash,
-                                        &metainfo_memsink);
-    dl_retval = download_manager()->Fetch(&download_metainfo);
+    UniquePtr<download::JobInfo> download_metainfo(
+         download::JobInfo::CreateWithSink(&url, true, false,
+                                           &meta_info_hash, &metainfo_memsink));
+    dl_retval = download_manager()->Fetch(download_metainfo.weak_ref());
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
                dl_retval, download::Code2Ascii(dl_retval));
@@ -740,11 +744,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string history_path = *temp_dir + "/" + history_hash.ToString();
 
     cvmfs::PathSink pathsink(history_path);
-    download::JobInfo download_history(&history_url, false, false,
-                                       &history_hash, &pathsink);
-    dl_retval = download_manager()->Fetch(&download_history);
+    UniquePtr<download::JobInfo> download_history(
+                   download::JobInfo::CreateWithSink(&history_url, false, false,
+                                                     &history_hash, &pathsink));
+    dl_retval = download_manager()->Fetch(download_history.weak_ref());
     if (dl_retval != download::kFailOk) {
-      ReportDownloadError(download_history);
+      ReportDownloadError(*download_history);
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";
