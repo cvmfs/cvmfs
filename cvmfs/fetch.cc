@@ -66,8 +66,8 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   tls = new ThreadLocalStorage();
   tls->fetcher = this;
   MakePipe(tls->pipe_wait);
-  tls->download_job.compressed = true;
-  tls->download_job.probe_hosts = true;
+  tls->download_job->SetCompressed(true);
+  tls->download_job->SetProbeHosts(true);
   int retval = pthread_setspecific(thread_local_storage_, tls);
   assert(retval == 0);
 
@@ -157,23 +157,23 @@ int Fetcher::Fetch(
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
   TransactionSink sink(cache_mgr_, txn);
-  tls->download_job.url = &url;
-  tls->download_job.sink = &sink;
-  tls->download_job.expected_hash = &id;
-  tls->download_job.extra_info = &name;
+  tls->download_job->SetUrl(&url);
+  tls->download_job->SetSink(&sink);
+  tls->download_job->SetExpectedHash(&id);
+  tls->download_job->SetExtraInfo(&name);
   ClientCtx *ctx = ClientCtx::GetInstance();
   if (ctx->IsSet()) {
-    ctx->Get(&tls->download_job.uid,
-             &tls->download_job.gid,
-             &tls->download_job.pid,
-             &tls->download_job.interrupt_cue);
+    ctx->Get(tls->download_job->GetUidPtr(),
+             tls->download_job->GetGidPtr(),
+             tls->download_job->GetPidPtr(),
+             tls->download_job->GetInterruptCuePtr());
   }
-  tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
-  tls->download_job.range_offset = range_offset;
-  tls->download_job.range_size = size;
-  download_mgr_->Fetch(&tls->download_job);
+  tls->download_job->SetCompressed(compression_algorithm == zlib::kZlibDefault);
+  tls->download_job->SetRangeOffset(range_offset);
+  tls->download_job->SetRangeSize(size);
+  download_mgr_->Fetch(tls->download_job.weak_ref());
 
-  if (tls->download_job.error_code == download::kFailOk) {
+  if (tls->download_job->error_code() == download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());
 
     fd_return = cache_mgr_->OpenFromTxn(txn);
@@ -196,8 +196,8 @@ int Fetcher::Fetch(
   // Download failed
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
            "failed to fetch %s (hash: %s, error %d [%s])", name.c_str(),
-           id.ToString().c_str(), tls->download_job.error_code,
-           download::Code2Ascii(tls->download_job.error_code));
+           id.ToString().c_str(), tls->download_job->error_code(),
+           download::Code2Ascii(tls->download_job->error_code()));
   cache_mgr_->AbortTxn(txn);
   backoff_throttle_->Throttle();
   SignalWaitingThreads(-EIO, id, tls);

@@ -33,25 +33,67 @@ namespace download {
 /**
  * Contains all the information to specify a download job.
  */
-struct JobInfo {
-  const std::string *url;
-  bool compressed;
-  bool probe_hosts;
-  bool head_request;
-  bool follow_redirects;
-  bool force_nocache;
-  pid_t pid;
-  uid_t uid;
-  gid_t gid;
-  void *cred_data;  // Per-transfer credential data
-  InterruptCue *interrupt_cue;
-  cvmfs::Sink *sink;
-  const shash::Any *expected_hash;
-  const std::string *extra_info;
+class JobInfo {
+ public:
+  /// Pipe used for the return value
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+
+ private:
+  const std::string *url_;
+  bool compressed_;
+  bool probe_hosts_;
+  bool head_request_;
+  bool follow_redirects_;
+  bool force_nocache_;
+  pid_t pid_;
+  uid_t uid_;
+  gid_t gid_;
+  void *cred_data_;  // Per-transfer credential data
+  InterruptCue *interrupt_cue_;
+  cvmfs::Sink *sink_;
+  const shash::Any *expected_hash_;
+  const std::string *extra_info_;
 
   // Allow byte ranges to be specified.
-  off_t range_offset;
-  off_t range_size;
+  off_t range_offset_;
+  off_t range_size_;
+
+  // Internal state, don't touch
+  CURL *curl_handle_;
+  curl_slist *headers_;
+  char *info_header_;
+  z_stream zstream_;
+  shash::ContextPtr hash_context_;
+  std::string proxy_;
+  bool nocache_;
+  Failures error_code_;
+  int http_code_;
+  unsigned char num_used_proxies_;
+  unsigned char num_used_hosts_;
+  unsigned char num_retries_;
+  unsigned backoff_ms_;
+  unsigned int current_host_chain_index_;
+
+ public:
+  static JobInfo* CreateWithSink(const std::string *u, const bool c,
+                                 const bool ph, const shash::Any *h,
+                                 cvmfs::Sink *s);
+
+  static JobInfo* CreateWithoutSink(const std::string *u, const bool ph);
+
+  ~JobInfo() {
+    if (pipe_job_results.IsValid()) {
+      pipe_job_results.Destroy();
+    }
+  }
+
+  void CreatePipeJobResults() {
+    pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
+  }
+
+  bool IsValidPipeJobResults() {
+    return pipe_job_results.IsValid();
+  }
 
   /**
    * Tells whether the error is because of a non-existing file. Should only
@@ -59,80 +101,130 @@ struct JobInfo {
    */
   bool IsFileNotFound();
 
-  // Internal state, don't touch
-  CURL *curl_handle;
-  curl_slist *headers;
-  char *info_header;
-  z_stream zstream;
-  shash::ContextPtr hash_context;
-  /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
-  std::string proxy;
-  bool nocache;
-  Failures error_code;
-  int http_code;
-  unsigned char num_used_proxies;
-  unsigned char num_used_hosts;
-  unsigned char num_retries;
-  unsigned backoff_ms;
-  unsigned int current_host_chain_index;
+  // Getter Pointer
+  pid_t *GetPidPtr() { return &pid_; }
+  uid_t *GetUidPtr() { return &uid_; }
+  gid_t *GetGidPtr() { return &gid_; }
+  InterruptCue **GetInterruptCuePtr() { return &interrupt_cue_; }
+  z_stream *GetZstreamPtr() { return &zstream_; }
+  Failures *GetErrorCodePtr() { return &error_code_; }
+  void **GetCredDataPtr() { return &cred_data_; }
+  curl_slist **GetHeadersPtr() { return &headers_; }
+  shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
+  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
+                                           return pipe_job_results.weak_ref(); }
 
-  // Default initialization of fields
-  void Init() {
-    url = NULL;
-    compressed = false;
-    probe_hosts = false;
-    head_request = false;
-    follow_redirects = false;
-    force_nocache = false;
-    pid = -1;
-    uid = -1;
-    gid = -1;
-    cred_data = NULL;
-    interrupt_cue = NULL;
-    sink = NULL;
-    expected_hash = NULL;
-    extra_info = NULL;
+  // Getter
+  const std::string* url() const { return url_; }
+  bool compressed() const { return compressed_; }
+  bool probe_hosts() const { return probe_hosts_; }
+  bool head_request() const { return head_request_; }
+  bool follow_redirects() const { return follow_redirects_; }
+  bool force_nocache() const { return force_nocache_; }
+  pid_t pid() const { return pid_; }
+  uid_t uid() const { return uid_; }
+  gid_t gid() const { return gid_; }
+  void *cred_data() const { return cred_data_; }
+  InterruptCue *interrupt_cue() const { return interrupt_cue_; }
+  cvmfs::Sink *sink() const { return sink_; }
+  const shash::Any *expected_hash() const { return expected_hash_; }
+  const std::string *extra_info() const { return extra_info_; }
 
-    curl_handle = NULL;
-    headers = NULL;
-    memset(&zstream, 0, sizeof(zstream));
-    info_header = NULL;
-    pipe_job_results = NULL;
-    nocache = false;
-    error_code = kFailOther;
-    num_used_proxies = num_used_hosts = num_retries = 0;
-    backoff_ms = 0;
-    current_host_chain_index = 0;
+  off_t range_offset() const { return range_offset_; }
+  off_t range_size() const { return range_size_; }
 
-    range_offset = -1;
-    range_size = -1;
-    http_code = -1;
-  }
+  CURL *curl_handle() const { return curl_handle_; }
+  curl_slist *headers() const { return headers_; }
+  char *info_header() const { return info_header_; }
+  z_stream zstream() const { return zstream_; }
+  shash::ContextPtr hash_context() const { return hash_context_; }
+  std::string proxy() const { return proxy_; }
+  bool nocache() const { return nocache_; }
+  Failures error_code() const { return error_code_; }
+  int http_code() const { return http_code_; }
+  unsigned char num_used_proxies() const { return num_used_proxies_; }
+  unsigned char num_used_hosts() const { return num_used_hosts_; }
+  unsigned char num_retries() const { return num_retries_; }
+  unsigned backoff_ms() const { return backoff_ms_; }
+  unsigned int current_host_chain_index() const {
+                                             return current_host_chain_index_; }
 
-  // One constructor per destination + head request
-  JobInfo() { Init(); }
-  JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h, cvmfs::Sink *s) {
-    Init();
-    url = u;
-    compressed = c;
-    probe_hosts = ph;
-    expected_hash = h;
-    sink = s;
-  }
+  // Setter
+  void SetUrl(const std::string *url) { url_ = url; }
+  void SetCompressed(bool compressed) { compressed_ = compressed; }
+  void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
+  void SetHeadRequest(bool head_request) { head_request_ = head_request; }
+  void SetFollowRedirects(bool follow_redirects)
+                                      { follow_redirects_ = follow_redirects; }
+  void SetForceNocache(bool force_nocache) { force_nocache_ = force_nocache; }
+  void SetPid(pid_t pid) { pid_ = pid; }
+  void SetUid(uid_t uid) { uid_ = uid; }
+  void SetGid(gid_t gid) { gid_ = gid; }
+  void SetCredData(void *cred_data) { cred_data_ = cred_data; }
+  void SetInterruptCue(InterruptCue *interrupt_cue)
+                                             { interrupt_cue_ = interrupt_cue; }
+  void SetSink(cvmfs::Sink *sink)
+                                       { sink_ = sink; }
+  void SetExpectedHash(const shash::Any *expected_hash)
+                                             { expected_hash_ = expected_hash; }
+  void SetExtraInfo(const std::string *extra_info)
+                                                   { extra_info_ = extra_info; }
 
-  JobInfo(const std::string *u, const bool ph) {
-    Init();
-    url = u;
-    probe_hosts = ph;
-    head_request = true;
-  }
+  void SetRangeOffset(off_t range_offset) { range_offset_ = range_offset; }
+  void SetRangeSize(off_t range_size) { range_size_ = range_size; }
 
-  ~JobInfo() {
-    if (pipe_job_results.IsValid()) {
-      pipe_job_results.Destroy();
-    }
+  void SetCurlHandle(CURL *curl_handle) { curl_handle_ = curl_handle; }
+  void SetHeaders(curl_slist *headers) { headers_ = headers; }
+  void SetInfoHeader(char *info_header) { info_header_ = info_header; }
+  void SetZstream(z_stream zstream) { zstream_ = zstream; }
+  void SetHashContext(shash::ContextPtr hash_context)
+                                               { hash_context_ = hash_context; }
+  void SetProxy(std::string proxy) { proxy_ = proxy; }
+  void SetNocache(bool nocache) { nocache_ = nocache; }
+  void SetErrorCode(Failures error_code) { error_code_ = error_code; }
+  void SetHttpCode(int http_code) { http_code_ = http_code; }
+  void SetNumUsedProxies(unsigned char num_used_proxies)
+                                       { num_used_proxies_ = num_used_proxies; }
+  void SetNumUsedHosts(unsigned char num_used_hosts)
+                                           { num_used_hosts_ = num_used_hosts; }
+  void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
+  void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
+  void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
+                       { current_host_chain_index_ = current_host_chain_index; }
+
+  JobInfo() :
+    pipe_job_results(NULL),
+    url_(NULL),
+    compressed_(false),
+    probe_hosts_(false),
+    head_request_(false),
+    follow_redirects_(false),
+    force_nocache_(false),
+    pid_(1),
+    uid_(1),
+    gid_(1),
+    cred_data_(NULL),
+    interrupt_cue_(NULL),
+    sink_(NULL),
+    expected_hash_(NULL),
+    extra_info_(NULL),
+    //
+    range_offset_(-1),
+    range_size_(-1),
+    //
+    curl_handle_(NULL),
+    headers_(NULL),
+    info_header_(NULL),
+    nocache_(false),
+    error_code_(kFailOther),
+    http_code_(-1),
+    num_used_proxies_(0),
+    num_used_hosts_(0),
+    num_retries_(0),
+    backoff_ms_(0),
+    current_host_chain_index_(0)
+  {
+    memset(&zstream_, 0, sizeof(zstream_));
   }
 };  // JobInfo
 
