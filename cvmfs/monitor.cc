@@ -491,16 +491,17 @@ bool Watchdog::WaitForSupervisee() {
   size_t size;
   pipe_watchdog_->Read(&size);
   crash_dump_path_.resize(size);
-  if (size > 0)
+  if (size > 0) {
     ReadPipe(pipe_watchdog_->read_end, &crash_dump_path_[0], size);
 
-  int retval = chdir(GetParentPath(crash_dump_path_).c_str());
-  if (retval != 0) {
-    LogEmergency(std::string("Cannot change to crash dump directory: ") +
-                 crash_dump_path_);
-    return false;
+    int retval = chdir(GetParentPath(crash_dump_path_).c_str());
+    if (retval != 0) {
+      LogEmergency(std::string("Cannot change to crash dump directory: ") +
+                   crash_dump_path_);
+      return false;
+    }
+    crash_dump_path_ = GetFileName(crash_dump_path_);
   }
-  crash_dump_path_ = GetFileName(crash_dump_path_);
   return true;
 }
 
