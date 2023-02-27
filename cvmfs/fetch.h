@@ -135,6 +135,8 @@ class Fetcher : SingleCopy {
       pipe_wait[0] = -1;
       pipe_wait[1] = -1;
       fetcher = NULL;
+
+      download_job = new download::JobInfo();
     }
 
     /**
@@ -155,7 +157,7 @@ class Fetcher : SingleCopy {
      * It is sufficient to construct the JobInfo object once per thread, not
      * on every call to Fetch().
      */
-    download::JobInfo download_job;
+    UniquePtr<download::JobInfo> download_job;
   };
 
   /**

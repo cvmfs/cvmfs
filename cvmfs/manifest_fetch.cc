@@ -46,8 +46,10 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   string certificate_url = base_url + "/";  // rest is in manifest
   shash::Any certificate_hash;
   cvmfs::MemSink certificate_memsink;
-  download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                       &certificate_hash, &certificate_memsink);
+  UniquePtr<download::JobInfo> download_certificate(
+                 download::JobInfo::CreateWithSink(
+                                      &certificate_url, true, probe_hosts,
+                                      &certificate_hash, &certificate_memsink));
 
   // Load Manifest
   ensemble->raw_manifest_buf = manifest_data;
@@ -83,7 +85,7 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
     certificate_url += ensemble->manifest->MakeCertificatePath();
-    retval_dl = download_manager->Fetch(&download_certificate);
+    retval_dl = download_manager->Fetch(download_certificate.weak_ref());
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;
       goto cleanup;
@@ -170,10 +172,12 @@ static Failures DoFetch(const std::string &base_url,
   download::Failures retval_dl;
   const string manifest_url = base_url + string("/.cvmfspublished");
   cvmfs::MemSink manifest_memsink;
-  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL,
-                                      &manifest_memsink);
+  UniquePtr<download::JobInfo> download_manifest(
+                    download::JobInfo::CreateWithSink(
+                                 &manifest_url, false, probe_hosts, NULL,
+                                 &manifest_memsink));
 
-  retval_dl = download_manager->Fetch(&download_manifest);
+  retval_dl = download_manager->Fetch(download_manifest.weak_ref());
   if (retval_dl != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to download repository manifest (%d - %s)", retval_dl,

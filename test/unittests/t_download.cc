@@ -130,10 +130,11 @@ TEST_F(T_Download, LocalFile) {
   string src_url = "file://" + src_path;
 
   cvmfs::FileSink filesink(fdest);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
-  download_mgr.Fetch(&info);
-  EXPECT_EQ(info.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                      &src_url, false /* compressed */, false /* probe hosts */,
+                      NULL, &filesink));
+  download_mgr.Fetch(info.weak_ref());
+  EXPECT_EQ(info->error_code(), kFailOk);
   fclose(fdest);
 }
 
@@ -149,11 +150,12 @@ TEST_F(T_Download, RemoteFile) {
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
 
   cvmfs::FileSink filesink(fdest);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                      &src_url, false /* compressed */, false /* probe hosts */,
+                      NULL, &filesink));
+  download_mgr.Fetch(info.weak_ref());
   EXPECT_EQ(file_server.num_processed_requests(), 1);
-  EXPECT_EQ(info.error_code, kFailOk);
+  EXPECT_EQ(info->error_code(), kFailOk);
   fclose(fdest);
 }
 
@@ -171,10 +173,11 @@ TEST_F(T_Download, Clone) {
 
   string url = "file://" + dest_path;
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr_cloned->Fetch(&info);
-  ASSERT_EQ(info.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                          &url, false /* compressed */, false /* probe hosts */,
+                          NULL, &memsink));
+  download_mgr_cloned->Fetch(info.weak_ref());
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), 1U);
   EXPECT_EQ(memsink.data()[0], '1');
   download_mgr_cloned->Fini();
@@ -202,14 +205,16 @@ TEST_F(T_Download, Multiple) {
     perf::StatisticsTemplate("second", &statistics));
 
   cvmfs::FileSink filesink(fdest);
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-               NULL, &filesink);
-  JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
-                NULL, &filesink);
-  download_mgr.Fetch(&info);
-  second_mgr.Fetch(&info2);
-  EXPECT_EQ(info.error_code, kFailOk);
-  EXPECT_EQ(info2.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                      &src_url, false /* compressed */, false /* probe hosts */,
+                      NULL, &filesink));
+  UniquePtr<JobInfo> info2(download::JobInfo::CreateWithSink(
+                      &src_url, false /* compressed */, false /* probe hosts */,
+                      NULL, &filesink));
+  download_mgr.Fetch(info.weak_ref());
+  second_mgr.Fetch(info2.weak_ref());
+  EXPECT_EQ(info->error_code(), kFailOk);
+  EXPECT_EQ(info2->error_code(), kFailOk);
   fclose(fdest);
   second_mgr.Fini();
 }
@@ -223,11 +228,12 @@ TEST_F(T_Download, RemoteFile2Mem) {
 
   string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(file_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -244,12 +250,13 @@ TEST_F(T_Download, RemoteFileRedirect) {
 
   download_mgr.EnableRedirects();
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(redirect_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -265,12 +272,13 @@ TEST_F(T_Download, RemoteFileSimpleProxy) {
                              DownloadManager::kSetProxyRegular);
   string url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -288,14 +296,15 @@ TEST_F(T_Download, RemoteFileProxyRedirect) {
   download_mgr.EnableRedirects();
   string url = "http://127.0.0.1:8083/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(proxy_server.num_processed_requests(), 2);
   ASSERT_EQ(redirect_server.num_processed_requests(), 1);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.num_used_hosts, 1);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->num_used_hosts(), 1);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -306,10 +315,11 @@ TEST_F(T_Download, LocalFile2Mem) {
 
   string url = "file://" + GetAbsolutePath(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
-  ASSERT_EQ(info.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -322,12 +332,13 @@ TEST_F(T_Download, RemoteFileSwitchHosts) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, true /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(file_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.num_used_hosts, 2);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->num_used_hosts(), 2);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -340,13 +351,14 @@ TEST_F(T_Download, CancelRequest) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, true /* probe hosts */, NULL,
+                    &memsink));
   TestInterruptCue tci;
-  info.interrupt_cue = &tci;
-  download_mgr.Fetch(&info);
-  ASSERT_EQ(info.num_used_hosts, 1);
-  ASSERT_EQ(info.error_code, kFailCanceled);
+  info->SetInterruptCue(&tci);
+  download_mgr.Fetch(info.weak_ref());
+  ASSERT_EQ(info->num_used_hosts(), 1);
+  ASSERT_EQ(info->error_code(), kFailCanceled);
   EXPECT_EQ(NULL, memsink.data());
 }
 
@@ -361,11 +373,12 @@ TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
   download_mgr.SetHostChain("http://127.0.0.1:8083;http://127.0.0.1:8082");
   string url = "/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false /* compressed */, true /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
-  ASSERT_EQ(info.num_used_hosts, 2);
-  ASSERT_EQ(info.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, true /* probe hosts */, NULL,
+                    &memsink));
+  download_mgr.Fetch(info.weak_ref());
+  ASSERT_EQ(info->num_used_hosts(), 2);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -384,13 +397,14 @@ TEST_F(T_Download, RemoteFileSwitchProxies) {
 
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                &src_url, false /* compressed */, false /* probe hosts */, NULL,
+                &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.num_used_proxies, 2);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->num_used_proxies(), 2);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
@@ -402,11 +416,12 @@ TEST_F(T_Download, RemoteFileEmpty) {
 
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
   cvmfs::MemSink memsink;
-  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */, NULL,
-               &memsink);
-  download_mgr.Fetch(&info);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                &src_url, false /* compressed */, false /* probe hosts */, NULL,
+                &memsink));
+  download_mgr.Fetch(info.weak_ref());
   ASSERT_EQ(file_server.num_processed_requests(), 1);
-  ASSERT_EQ(info.error_code, kFailOk);
+  ASSERT_EQ(info->error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), 0U);
 }
 
@@ -421,10 +436,11 @@ TEST_F(T_Download, LocalFile2Sink) {
 
   TestSink test_sink;
   string url = "file://" + dest_path;
-  JobInfo info(&url, false /* compressed */, false /* probe hosts */,
-               NULL /* expected hash */, &test_sink);
-  download_mgr.Fetch(&info);
-  EXPECT_EQ(info.error_code, kFailOk);
+  UniquePtr<JobInfo> info(download::JobInfo::CreateWithSink(
+                    &url, false /* compressed */, false /* probe hosts */,
+                    NULL /* expected hash */, &test_sink));
+  download_mgr.Fetch(info.weak_ref());
+  EXPECT_EQ(info->error_code(), kFailOk);
   EXPECT_EQ(1, pread(test_sink.fd, &buf, 1, 0));
   EXPECT_EQ('1', buf);
 
@@ -443,10 +459,11 @@ TEST_F(T_Download, LocalFile2Sink) {
   fclose(fdest);
 
   TestSink test_sink2;
-  JobInfo info2(&url, true /* compressed */, false /* probe hosts */,
-                &checksum /* expected hash */, &test_sink2);
-  download_mgr.Fetch(&info2);
-  EXPECT_EQ(info2.error_code, kFailOk);
+  UniquePtr<JobInfo> info2(download::JobInfo::CreateWithSink(
+                          &url, true /* compressed */, false /* probe hosts */,
+                          &checksum /* expected hash */, &test_sink2));
+  download_mgr.Fetch(info2.weak_ref());
+  EXPECT_EQ(info2->error_code(), kFailOk);
   EXPECT_EQ(size, GetFileSize(test_sink2.path));
 
   uint32_t validation[N];
