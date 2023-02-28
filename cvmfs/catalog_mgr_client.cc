@@ -121,13 +121,13 @@ bool ClientCatalogManager::InitFixed(
  * fields of variable "result". For the most recent catalog the location, hash
  * and revision number are set.
  *
- * @param [out] result All fields but sql_catalog_handle will be set:
+ * @param [out] result All fields but sqlite_path will be set:
  *                     mountpoint, root_ctl_location, root_ctlg_revision, hash
  * @return kLoadUp2Date - if most recent root catalog is already mounted
- *          kLoadNew - otherwise
+ *         kLoadNew     - otherwise
  */
 LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
-  result->mountpoint = PathString("", 0);
+  result->SetMountpoint(PathString("", 0));
 
   // 1) Get alien cache root catalog (local)
 
@@ -156,7 +156,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
 
   shash::Any local_newest_hash = breadcrumb_hash;
   uint64_t local_newest_revision = breadcrumb_revision;
-  result->root_ctlg_location = kCtlgLocationBreadcrumb;
+  result->SetRootCtlgLocation(kCtlgLocationBreadcrumb);
   LoadReturn success_code = catalog::kLoadNew;
 
   // We only look for currently loaded catalog if the revision is newer than
@@ -168,7 +168,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = mounted_root_ctlg_revision_;
-    result->root_ctlg_location = kCtlgLocationMounted;
+    result->SetRootCtlgLocation(kCtlgLocationMounted);
     success_code = catalog::kLoadUp2Date;
   }
 
@@ -188,16 +188,16 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
     // TODO(heretherebedragons) OK that this could be in theory the breadcrumb?
     if (fixed_root_catalog_) {
       offline_mode_ = false;
-      result->hash = local_newest_hash;
-      result->root_ctlg_revision = local_newest_revision;
+      result->SetHash(local_newest_hash);
+      result->SetRootCtlgRevision(local_newest_revision);
       return success_code;
     }
     // server has newest revision or no valid local revision
     if (ensemble.manifest->revision() > local_newest_revision
           || local_newest_revision == -1ul) {
-    result->hash = ensemble.manifest->catalog_hash();
-    result->root_ctlg_revision = ensemble.manifest->revision();
-    result->root_ctlg_location = kCtlgLocationServer;
+    result->SetHash(ensemble.manifest->catalog_hash());
+    result->SetRootCtlgRevision(ensemble.manifest->revision());
+    result->SetRootCtlgLocation(kCtlgLocationServer);
     offline_mode_ = false;
 
     return catalog::kLoadNew;
@@ -214,8 +214,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
   } else {
     offline_mode_ = true;
   }
-  result->hash = local_newest_hash;
-  result->root_ctlg_revision = local_newest_revision;
+  result->SetHash(local_newest_hash);
+  result->SetRootCtlgRevision(local_newest_revision);
 
   return success_code;
 }
@@ -229,34 +229,34 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
  *
  * @param [in, out] ctlg_info mandatory fields (input): mountpoint, hash
  *         additional mandatory fields for root catalog: root_ctlg_location
- *         output: sql_catalog_handle is set if catalog fetch successful
+ *         output: sqlite_path is set if catalog fetch successful
  * @return kLoadUp2Date for root catalog that is already mounted
  *         kLoadNew for any other successful load
  *         kLoadFail on failure
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
   string catalog_descr = "file catalog at " + repo_name_ + ":" +
-    (ctlg_info->mountpoint.IsEmpty() ?
-      "/" : string(ctlg_info->mountpoint.GetChars(),
-                   ctlg_info->mountpoint.GetLength()));
+    (ctlg_info->IsRootCatalog() ?
+      "/" : string(ctlg_info->mountpoint().GetChars(),
+                   ctlg_info->mountpoint().GetLength()));
 
-  catalog_descr += " (" + ctlg_info->hash.ToString() + ")";
+  catalog_descr += " (" + ctlg_info->hash().ToString() + ")";
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
   CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
-  if (ctlg_info->mountpoint.IsEmpty()) {
+  if (ctlg_info->IsRootCatalog()) {
     if (fixed_alt_root_catalog_) {
-      alt_root_catalog_path = ctlg_info->hash.MakeAlternativePath();
+      alt_root_catalog_path = ctlg_info->hash().MakeAlternativePath();
     }
 
     // TODO(heretherebedragons) is this test necessary??
     // get manifest from server and double check if we have newest hash
-    if (ctlg_info->root_ctlg_location == kCtlgLocationServer) {
+    if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {
       manifest::Failures manifest_failure;
       manifest_failure = manifest::Fetch("", repo_name_,
                                         0,
-                                        &ctlg_info->hash,
+                                        ctlg_info->GetHashPtr(),
                                         signature_mgr_,
                                         fetcher_->download_mgr(),
                                         &ensemble);
@@ -266,8 +266,8 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
         return kLoadFail;
       }
 
-      ctlg_info->hash = ensemble.manifest->catalog_hash();
-      ctlg_info->root_ctlg_revision = ensemble.manifest->revision();
+      ctlg_info->SetHash(ensemble.manifest->catalog_hash());
+      ctlg_info->SetRootCtlgRevision(ensemble.manifest->revision());
 
       // TODO(heretherebedragons) CURRENTLY NOT POSSIBLE TO CACHE MANIFEST
       // if (manifest_failure != manifest::kFailUp2Date) {
@@ -278,22 +278,21 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
 
   // TODO(heretherebedragons) could help: fetch should return if fetch from
   // cache or from remote would save us the if in L283
-  LoadReturn load_ret = FetchCatalogByHash(ctlg_info->hash, catalog_descr,
+  LoadReturn load_ret = FetchCatalogByHash(ctlg_info->hash(), catalog_descr,
                                            alt_root_catalog_path,
-                                           &ctlg_info->sql_catalog_handle);
-  // *catalog_hash = ctlg_info->hash;
+                                           ctlg_info->GetSqlitePathPtr());
   if (load_ret == catalog::kLoadNew) {
-    loaded_catalogs_[ctlg_info->mountpoint] = ctlg_info->hash;
+    loaded_catalogs_[ctlg_info->mountpoint()] = ctlg_info->hash();
 
-    if (ctlg_info->mountpoint.IsEmpty()) {  // root catalog
-      if (ctlg_info->root_ctlg_location == kCtlgLocationMounted) {
+    if (ctlg_info->IsRootCatalog()) {  // root catalog
+      if (ctlg_info->root_ctlg_location() == kCtlgLocationMounted) {
         return kLoadUp2Date;
       }
 
-      mounted_root_ctlg_revision_ = ctlg_info->root_ctlg_revision;
+      mounted_root_ctlg_revision_ = ctlg_info->root_ctlg_revision();
 
       // if coming from server: update breadcrumb
-      if (ctlg_info->root_ctlg_location == kCtlgLocationServer) {
+      if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {
           // Store new manifest and certificate
           LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash write manifest");
           CacheManager::Label label;
@@ -314,9 +313,9 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
 /**
  * Fetch a catalog by hash either from cache or from remote.
  * Successful load always returns kLoadNew (independent of the location) and
- * sets the sql_catalog_handle variable.
+ * sets the sqlite_path variable.
  *
- * @param [out] sql_catalog_handle of the catalog if succcessfully fetched
+ * @param [out] sqlite_path of the catalog if succcessfully fetched
  * @return kLoadNew on success
  *         kLoadNoSpace out of space, no room on the device to open the catalog
  *         kLoadFail on all other failures
@@ -325,7 +324,7 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   const shash::Any &hash,
   const string &name,
   const std::string &alt_root_catalog_path,
-  std::string *sql_catalog_handle)
+  std::string *sqlite_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   CacheManager::Label label;
@@ -340,7 +339,7 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
 
     LogCvmfs(kLogCatalog, kLogDebug,
                                     "FetchCatalogByHash filedescriptor %d", fd);
-    *sql_catalog_handle = "@" + StringifyInt(fd);
+    *sqlite_path = "@" + StringifyInt(fd);
     return kLoadNew;
   }
 

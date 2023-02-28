@@ -721,7 +721,6 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::CatalogInfo ctlg_info;
   catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
 
   switch (retval) {

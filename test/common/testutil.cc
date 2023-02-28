@@ -513,11 +513,11 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
   map<PathString, MockCatalog*>::iterator it = catalog_map_.find(PathString("",0));
   if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
-    result->hash = catalog->hash();
-    result->root_ctlg_revision = GetRevision(); // TODO(heretherebedragons) is this the correct choice?
-    result->root_ctlg_location = kCtlgLocationServer;
-    result->mountpoint = PathString("", 0);
-    result->sql_catalog_handle = "";
+    result->SetHash(catalog->hash());
+    result->SetRootCtlgRevision(GetRevision()); // TODO(heretherebedragons) is this the correct choice?
+    result->SetRootCtlgLocation(kCtlgLocationServer);
+    result->SetMountpoint(PathString("", 0));
+    result->SetSqlitePath("");
     return kLoadUp2Date; 
   }
   return kLoadFail;
@@ -527,14 +527,14 @@ catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
                             CatalogInfo *ctlg_info) {
   LogCvmfs(kLogCache, kLogDebug, "catalog::MockCatalogManager::LoadCatalogByHash");
   map<PathString, MockCatalog*>::iterator it = 
-                                      catalog_map_.find(ctlg_info->mountpoint);
-  if (it != catalog_map_.end() && !ctlg_info->hash.IsNull()) {
+                                     catalog_map_.find(ctlg_info->mountpoint());
+  if (it != catalog_map_.end() && !ctlg_info->hash().IsNull()) {
     return kLoadUp2Date;
   } else {
-    MockCatalog *catalog = new MockCatalog(ctlg_info->mountpoint.ToString(),
-                                           ctlg_info->hash, 4096, 1, 0,
+    MockCatalog *catalog = new MockCatalog(ctlg_info->mountpoint().ToString(),
+                                           ctlg_info->hash(), 4096, 1, 0,
                                            true, NULL, NULL);
-    catalog_map_[ctlg_info->mountpoint] = catalog;
+    catalog_map_[ctlg_info->mountpoint()] = catalog;
   }
   return kLoadNew;
 }

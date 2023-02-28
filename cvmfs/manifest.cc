@@ -9,6 +9,7 @@
 
 #include "catalog.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -16,36 +17,30 @@ namespace manifest {
 
 Breadcrumb::Breadcrumb(const std::string &from_string) {
   timestamp = 0;
-  int len = from_string.length();
 
-  // Separate hash from timestamp
-  int separator_pos = 0;
-  for (; (separator_pos < len) && (from_string[separator_pos] != 'T');
-       ++separator_pos)
-  { }
-  catalog_hash =
-    shash::MkFromHexPtr(shash::HexPtr(from_string.substr(0, separator_pos)),
-                                      shash::kSuffixCatalog);
+  if(from_string.size() > 0 ) {
+    // Separate hash from timestamp
+    std::vector<std::string> vec_split_timestamp = SplitString(from_string, 'T');
 
-  // check if revision number is included
-  int separator_pos_revision_start = separator_pos;
-  for (; (separator_pos_revision_start < len)
-            && (from_string[separator_pos_revision_start] != 'R');
-        ++separator_pos_revision_start)
-  { }
+    catalog_hash =
+      shash::MkFromHexPtr(shash::HexPtr(vec_split_timestamp[0]),
+                                        shash::kSuffixCatalog);
 
-  // Get local last modified time and revision
-  if (separator_pos < len - 1) {
-    if (separator_pos_revision_start + 1 >= len) {
-      timestamp = String2Uint64(from_string.substr(separator_pos + 1));
-      // TODO(heretherebedragons) old format that does not include
-      // the revision number- IS THIS THE BEST SOLUTION???
-      revision = 0;
-    } else {
-      timestamp = String2Uint64(from_string.substr(separator_pos + 1,
-                                  separator_pos_revision_start));
-      revision = String2Uint64(from_string.substr(
-                                separator_pos_revision_start + 1));
+    if(vec_split_timestamp.size() > 1) {
+      // check if revision number is included
+      std::vector<std::string> vec_split_revision =
+                                          SplitString(vec_split_timestamp[1], 'R');
+      
+      // Get local last modified time and revision
+      if (vec_split_revision.size() == 1) {
+          timestamp = String2Uint64(vec_split_revision[0]);
+          // TODO(heretherebedragons) old format that does not include
+          // the revision number- IS THIS THE BEST SOLUTION???
+          revision = 0;
+      } else {
+          timestamp = String2Uint64(vec_split_revision[0]);
+          revision = String2Uint64(vec_split_revision[1]);
+      }
     }
   }
 }

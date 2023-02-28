@@ -55,24 +55,95 @@ enum LoadReturn {
 
 /**
  * Location of the most recent root catalog.
- * Used as part of loading the catalog.
+ * Used as part of the process of loading a catalog.
+ * - GetNewRootCatalogInfo() sets the location within the CatalogInfo object
+ * - LoadCatalogByHash(): when loading a root catalog it uses the location
+ *                        stored withing the CatalogInfo object to retrieve
+ *                        the root catalog from the right location
  */
 enum RootCatalogLocation {
-  kCtlgLocationMounted = 0,      // already loaded in mounted_catalogs_
+  kCtlogLocationUnknown = 0,
+  kCtlgLocationMounted,      // already loaded in mounted_catalogs_
   kCtlgLocationServer,
   kCtlgLocationBreadcrumb
 };
 
 /**
- * Struct to contain all necessary parameters for nested and root catalogs
- * to load them.
+ * CatalogInfo class contains all necessary information to load a catalog and
+ * also keeps track of the resulting output.
+ * It works the following:
+ * 1) Load a new root catalog:
+ *  - Use empty constructor CatalogInfo()
+ *  - Let the CatalogInfo object be populated by GetNewRootCatalogInfo()
+ *    - This will set: hash, mountpoint, root_ctlg_revision, root_ctlg_location
+ *  - Call LoadCatalogByHash()
+ *    - This will set: sqlite_path
+ * 2) Load a catalog based on a given hash
+ *  - Populate CatalogInfo object, used constructor depending on catalog type
+ *    - Root catalog: CatalogInfo(shash::Any hash, PathString mountpoint,
+              RootCatalogLocation location)
+      - Nested catalog: CatalogInfo(shash::Any hash, PathString mountpoint)
+      - Note: in this case root_ctlg_revision is not used
+ *  - Call LoadCatalogByHash()
+      - This will set: sqlite_path
  */
 struct CatalogInfo {
-  shash::Any hash;                              // mandatory
-  PathString mountpoint;                        // mandatory
-  std::string sql_catalog_handle;               // out parameter
-  uint64_t root_ctlg_revision;                  // root catalog revision
-  enum RootCatalogLocation root_ctlg_location;  // root catalog location
+ public:
+  CatalogInfo() :
+              hash_(shash::Any()),
+              mountpoint_(PathString("invalid", 7)),
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(kCtlogLocationUnknown) { }
+  CatalogInfo(shash::Any hash, PathString mountpoint) :
+              hash_(hash),
+              mountpoint_(mountpoint),
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(kCtlogLocationUnknown) { }
+
+  CatalogInfo(shash::Any hash, PathString mountpoint,
+              RootCatalogLocation location) :
+              hash_(hash),
+              mountpoint_(mountpoint),
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(location)  { }
+
+  bool IsRootCatalog() {
+    return mountpoint_.IsEmpty();
+  }
+
+  std::string *GetSqlitePathPtr() { return &sqlite_path_; }
+  shash::Any *GetHashPtr() { return &hash_; }
+
+  shash::Any hash() const { return hash_; }
+  PathString mountpoint() const { return mountpoint_; }
+  std::string sqlite_path() const { return sqlite_path_; }
+  uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
+  RootCatalogLocation root_ctlg_location() const
+                                                 { return root_ctlg_location_; }
+
+  void SetHash(shash::Any hash) { hash_ = hash; }
+  void SetMountpoint(PathString mountpoint) { mountpoint_ = mountpoint; }
+  void SetSqlitePath(std::string sqlite_path) { sqlite_path_ = sqlite_path; }
+  void SetRootCtlgRevision(uint64_t root_ctlg_revision)
+                                   { root_ctlg_revision_ = root_ctlg_revision; }
+  void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)
+                                   { root_ctlg_location_ = root_ctlg_location; }
+
+
+ private:
+  // mandatory for LoadCatalogByHash()
+  shash::Any hash_;
+  // mandatory for LoadCatalogByHash()
+  PathString mountpoint_;
+  // out parameter, path name of the sqlite catalog
+  std::string sqlite_path_;
+  // root catalog: revision is needed for GetNewRootCatalogInfo()
+  uint64_t root_ctlg_revision_;
+  // root catalog: location is mandatory for LoadCatalogByHash()
+  RootCatalogLocation root_ctlg_location_;
 };
 
 inline const char *Code2Ascii(const LoadReturn error) {
@@ -232,9 +303,15 @@ class AbstractCatalogManager : public SingleCopy {
 
  protected:
   /**
-   * Load the catalog and return a file name and the catalog hash. Derived
-   * class can decide if it wants to use the hash or the path.
-   * Both the input as well as the output hash can be 0.
+   * Load the catalog and return a file name and the catalog hash.
+   * 
+   * GetNewRootCatalogInfo() populates CatalogInfo object with the information
+   * needed to retrieve the most recent root catalog independent of its 
+   * location.
+   * CatalogInfo object must be populated with at least hash and mountpoint to 
+   * call LoadCatalogByHash().
+   * 
+   * See class description of CatalogInfo for more information.
    */
   virtual LoadReturn GetNewRootCatalogInfo(CatalogInfo *catalog_info) = 0;
   virtual LoadReturn LoadCatalogByHash(CatalogInfo *catalog_info) = 0;

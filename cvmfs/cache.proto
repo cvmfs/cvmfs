@@ -104,7 +104,7 @@ message MsgBreadcrumb {
   required string fqrn      = 1;
   required MsgHash hash     = 2;
   required uint64 timestamp = 3;
-  required uint64 revision  = 4;
+  optional uint64 revision  = 4;
 }
 
 

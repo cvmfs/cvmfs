@@ -142,9 +142,10 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_info.hash, NULL);
+    CatalogT *new_root =
+                  CreateCatalog(ctlg_info.mountpoint(), ctlg_info.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_info.sql_catalog_handle, new_root);
+    bool retval = AttachCatalog(ctlg_info.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -169,10 +170,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
 
   WriteLock();
 
-  CatalogInfo ctlg_info;
-  ctlg_info.mountpoint = PathString("", 0);
-  ctlg_info.hash = root_hash;
-  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
+  CatalogInfo ctlg_info(root_hash, PathString("", 0), kCtlgLocationMounted);
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
@@ -185,9 +183,10 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), ctlg_info.hash, NULL);
+    CatalogT *new_root =
+                       CreateCatalog(PathString("", 0), ctlg_info.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_info.sql_catalog_handle, new_root);
+    bool retval = AttachCatalog(ctlg_info.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -896,14 +895,11 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return attached_catalog;
   }
 
-  CatalogInfo ctlg_info;
-  ctlg_info.hash = hash;
-  ctlg_info.mountpoint = mountpoint;
-  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
+  CatalogInfo ctlg_info(hash, mountpoint, kCtlgLocationMounted);
 
   // TODO(heretherebedragons) necessary? is mountcatalog ever called without
   // a given mountpoint and hash?
-  if (ctlg_info.mountpoint.IsEmpty() && hash.IsNull()) {
+  if (ctlg_info.IsRootCatalog() && hash.IsNull()) {
     GetNewRootCatalogInfo(&ctlg_info);
   }
 
@@ -914,12 +910,12 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(ctlg_info.mountpoint,
-                                   ctlg_info.hash,
+  attached_catalog = CreateCatalog(ctlg_info.mountpoint(),
+                                   ctlg_info.hash(),
                                    parent_catalog);
 
   // Attach loaded catalog
-  if (!AttachCatalog(ctlg_info.sql_catalog_handle, attached_catalog)) {
+  if (!AttachCatalog(ctlg_info.sqlite_path(), attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
     UnloadCatalog(attached_catalog);
@@ -943,13 +939,10 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  CatalogInfo ctlg_info;
-  ctlg_info.hash = hash;
-  ctlg_info.mountpoint = mountpoint;
-  ctlg_info.root_ctlg_location = kCtlgLocationMounted;
+  CatalogInfo ctlg_info(hash, mountpoint, kCtlgLocationMounted);
 
   // do i need this here?
-  if (mountpoint.IsEmpty()) {
+  if (ctlg_info.IsRootCatalog()) {
     GetNewRootCatalogInfo(&ctlg_info);
   }
 
@@ -960,10 +953,10 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
     return NULL;
   }
 
-  assert(hash == ctlg_info.hash);  // TODO(heretherebedragons) why?
+  assert(hash == ctlg_info.hash());  // TODO(heretherebedragons) why?
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
-                                             ctlg_info.sql_catalog_handle,
-                                             ctlg_info.hash);
+                                             ctlg_info.sqlite_path(),
+                                             ctlg_info.hash());
   catalog->TakeDatabaseFileOwnership();
   return catalog;
 }

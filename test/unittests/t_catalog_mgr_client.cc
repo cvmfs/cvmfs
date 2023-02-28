@@ -236,25 +236,18 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   const PathString rootMntpnt("");
   const shash::Any& rootHash = mp->catalog_mgr()->GetRootHash();
 
-  CatalogInfo root_info;
-  // mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info); << this we dont do
-
   // root catalog is already mounted
-  root_info.hash = rootHash;
-  root_info.mountpoint = rootMntpnt;
-  root_info.root_ctlg_location = kCtlgLocationMounted;
+  CatalogInfo root_info(rootHash, rootMntpnt, kCtlgLocationMounted);
 
   EXPECT_EQ(catalog::kLoadUp2Date,
             mp->catalog_mgr()->LoadCatalogByHash(&root_info));
-  EXPECT_EQ(root_hash_str, root_info.hash.ToString());
+  EXPECT_EQ(root_hash_str, root_info.hash().ToString());
 
   // load nested catalog
   const PathString nestedMntpnt("/dir/dir2");
   const shash::Any& ncatalogHash = mp->catalog_mgr()->
                               GetNestedCatalogHash(nestedMntpnt);
-  CatalogInfo nctlg_info;
-  nctlg_info.hash = ncatalogHash;
-  nctlg_info.mountpoint = nestedMntpnt;
+  CatalogInfo nctlg_info(ncatalogHash, nestedMntpnt);
 
   EXPECT_EQ(catalog::kLoadNew,
     mp->catalog_mgr()->LoadCatalogByHash(&nctlg_info));
@@ -282,16 +275,11 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
-
-  CatalogInfo ctlg_info;
-
   // load nested catalog
   const PathString nestedMntpnt("/dir/dir2");
   const shash::Any& ncatalogHash = mp->catalog_mgr()->
                                              GetNestedCatalogHash(nestedMntpnt);
-
-  ctlg_info.hash = ncatalogHash;
-  ctlg_info.mountpoint = nestedMntpnt;
+  CatalogInfo ctlg_info(ncatalogHash, nestedMntpnt);
 
   EXPECT_EQ(catalog::kLoadNew,
             mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
@@ -319,15 +307,13 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
   EXPECT_EQ(catalog::kLoadUp2Date,
             mp->catalog_mgr()->LoadCatalogByHash(&root_info));
-  EXPECT_EQ(root_info.hash.ToString(), root_hash_str);
+  EXPECT_EQ(root_info.hash().ToString(), root_hash_str);
 
   EXPECT_EQ(catalog::kLoadNew,
             mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
 
   // fail to load new unloaded nested catalog
-  CatalogInfo ctlg_info_failed;
-  ctlg_info_failed.hash = ncatalogHashNoDwnld;
-  ctlg_info_failed.mountpoint = nestedMntpntNoDwnld;
+  CatalogInfo ctlg_info_failed(ncatalogHashNoDwnld, nestedMntpntNoDwnld);
   EXPECT_EQ(catalog::kLoadFail,
             mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info_failed));
 }
@@ -357,8 +343,8 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   // apparently it does.. loadcatalogbyhash had a small bug with offline_mode_
   EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->GetNewRootCatalogInfo(&root_info));
-  EXPECT_EQ(catalog::kCtlgLocationMounted, root_info.root_ctlg_location);
-  EXPECT_EQ(root_hash_str, root_info.hash.ToString());
+  EXPECT_EQ(catalog::kCtlgLocationMounted, root_info.root_ctlg_location());
+  EXPECT_EQ(root_hash_str, root_info.hash().ToString());
 }
 
 }  // namespace catalog

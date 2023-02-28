@@ -14,31 +14,31 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-// TODO(herethebedragons) correct return value and root_ctlg_location?
-LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
-  if (result->hash.IsNull()) {
-    result->hash = base_hash_;
-  }
-  result->root_ctlg_location = kCtlgLocationServer;
-  result->mountpoint = PathString("", 0);
+  // TODO(herethebedragons) correct return value and root_ctlg_location?
+  LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
+    if (result->hash().IsNull()) {
+      result->SetHash(base_hash_);
+    }
+    result->SetRootCtlgLocation(kCtlgLocationServer);
+    result->SetMountpoint(PathString("", 0));
 
   return kLoadNew;
 }
 
-// TODO(herethebedragons) CORRECT?
-LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
-  shash::Any effective_hash = ctlg_info->hash;
-  assert(shash::kSuffixCatalog == effective_hash.suffix);
-  const string url = stratum0_ + "/data/" + effective_hash.MakePath();
+  // TODO(herethebedragons) CORRECT?
+  LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
+    shash::Any effective_hash = ctlg_info->hash();
+    assert(shash::kSuffixCatalog == effective_hash.suffix);
+    const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
   std::string tmp;
 
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
-  ctlg_info->sql_catalog_handle.assign(tmp);
-  if (!fcatalog) {
-    PANIC(kLogStderr, "failed to create temp file when loading %s",
-          url.c_str());
-  }
+    FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
+    ctlg_info->GetSqlitePathPtr()->assign(tmp);
+    if (!fcatalog) {
+      PANIC(kLogStderr, "failed to create temp file when loading %s",
+            url.c_str());
+    }
 
   cvmfs::FileSink filesink(fcatalog);
   download::JobInfo download_catalog(&url, true, false,
@@ -49,11 +49,11 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
                   tmp.c_str(), retval);
     }
 
-  if (retval != download::kFailOk) {
-    unlink(ctlg_info->sql_catalog_handle.c_str());
-    PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)",
-                      url.c_str(), retval, download::Code2Ascii(retval));
-  }
+    if (retval != download::kFailOk) {
+      unlink(ctlg_info->GetSqlitePathPtr()->c_str());
+      PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)",
+                        url.c_str(), retval, download::Code2Ascii(retval));
+    }
 
   return kLoadNew;
 }
