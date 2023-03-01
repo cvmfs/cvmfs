@@ -21,12 +21,12 @@
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
+#include "manifest_fetch.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/logging.h"
 
 class XattrList;
-
 namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
@@ -94,13 +94,15 @@ struct CatalogInfo {
               mountpoint_(PathString("invalid", 7)),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlogLocationUnknown) { }
+              root_ctlg_location_(kCtlogLocationUnknown),
+              manifest_ensemble_(NULL) { }
   CatalogInfo(shash::Any hash, PathString mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlogLocationUnknown) { }
+              root_ctlg_location_(kCtlogLocationUnknown),
+              manifest_ensemble_(NULL) { }
 
   CatalogInfo(shash::Any hash, PathString mountpoint,
               RootCatalogLocation location) :
@@ -108,7 +110,8 @@ struct CatalogInfo {
               mountpoint_(mountpoint),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
-              root_ctlg_location_(location)  { }
+              root_ctlg_location_(location),
+              manifest_ensemble_(NULL)  { }
 
   bool IsRootCatalog() {
     return mountpoint_.IsEmpty();
@@ -123,6 +126,8 @@ struct CatalogInfo {
   uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
   RootCatalogLocation root_ctlg_location() const
                                                  { return root_ctlg_location_; }
+  manifest::ManifestEnsemble *manifest_ensemble() const
+                                       { return manifest_ensemble_.weak_ref(); }
 
   void SetHash(shash::Any hash) { hash_ = hash; }
   void SetMountpoint(PathString mountpoint) { mountpoint_ = mountpoint; }
@@ -131,6 +136,11 @@ struct CatalogInfo {
                                    { root_ctlg_revision_ = root_ctlg_revision; }
   void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)
                                    { root_ctlg_location_ = root_ctlg_location; }
+  /**
+   * Gives ownership to CatalogInfo
+  */
+  void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
+                                     { manifest_ensemble_ = manifest_ensemble; } 
 
 
  private:
@@ -144,6 +154,8 @@ struct CatalogInfo {
   uint64_t root_ctlg_revision_;
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
+  // root catalog: for location = server mandatory for LoadCatalogByHash()
+  UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
 };
 
 inline const char *Code2Ascii(const LoadReturn error) {

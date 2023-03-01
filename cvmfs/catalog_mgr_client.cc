@@ -174,14 +174,15 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
 
   // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
-  CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
+  UniquePtr<CachedManifestEnsemble> ensemble(
+                       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
   // TODO(heretherebedragons)
   // breadcrumb_timestamp: does breadcrumb timestamp and revision always go hand in hand?
   // can it be that the timestamp is older on the server but the revision higher than the breadcrumb?
   manifest_failure = manifest::Fetch("", repo_name_, breadcrumb_timestamp,
                                      &local_newest_hash, signature_mgr_,
                                      fetcher_->download_mgr(),
-                                     &ensemble);
+                                     ensemble.weak_ref());
 
   if (manifest_failure == manifest::kFailOk) {
     // fixed catalog: just check if server is reachable but use local version
@@ -193,11 +194,13 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
       return success_code;
     }
     // server has newest revision or no valid local revision
-    if (ensemble.manifest->revision() > local_newest_revision
+    if (ensemble->manifest->revision() > local_newest_revision
           || local_newest_revision == -1ul) {
-    result->SetHash(ensemble.manifest->catalog_hash());
-    result->SetRootCtlgRevision(ensemble.manifest->revision());
+    result->SetHash(ensemble->manifest->catalog_hash());
+    result->SetRootCtlgRevision(ensemble->manifest->revision());
     result->SetRootCtlgLocation(kCtlgLocationServer);
+    result->TakeManifestEnsemble(
+                  static_cast<manifest::ManifestEnsemble*>(ensemble.Release()));
     offline_mode_ = false;
 
     return catalog::kLoadNew;
@@ -209,7 +212,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
             manifest_failure, manifest::Code2Ascii(manifest_failure));
 
   if (manifest_failure == manifest::kFailOk
-      && ensemble.manifest->revision() == local_newest_revision) {
+      && ensemble->manifest->revision() == local_newest_revision) {
       offline_mode_ = false;
   } else {
     offline_mode_ = true;
@@ -244,36 +247,8 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
-  CachedManifestEnsemble ensemble(fetcher_->cache_mgr(), this);
-  if (ctlg_info->IsRootCatalog()) {
-    if (fixed_alt_root_catalog_) {
-      alt_root_catalog_path = ctlg_info->hash().MakeAlternativePath();
-    }
-
-    // TODO(heretherebedragons) is this test necessary??
-    // get manifest from server and double check if we have newest hash
-    if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {
-      manifest::Failures manifest_failure;
-      manifest_failure = manifest::Fetch("", repo_name_,
-                                        0,
-                                        ctlg_info->GetHashPtr(),
-                                        signature_mgr_,
-                                        fetcher_->download_mgr(),
-                                        &ensemble);
-      if (manifest_failure != manifest::kFailOk) {
-        LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
-                manifest_failure, manifest::Code2Ascii(manifest_failure));
-        return kLoadFail;
-      }
-
-      ctlg_info->SetHash(ensemble.manifest->catalog_hash());
-      ctlg_info->SetRootCtlgRevision(ensemble.manifest->revision());
-
-      // TODO(heretherebedragons) CURRENTLY NOT POSSIBLE TO CACHE MANIFEST
-      // if (manifest_failure != manifest::kFailUp2Date) {
-      //   // find manifest  + certificate
-      // }
-    }
+  if (ctlg_info->IsRootCatalog() && fixed_alt_root_catalog_) {
+    alt_root_catalog_path = ctlg_info->hash().MakeAlternativePath();
   }
 
   // TODO(heretherebedragons) could help: fetch should return if fetch from
@@ -294,15 +269,13 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
       // if coming from server: update breadcrumb
       if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {
           // Store new manifest and certificate
-          LogCvmfs(kLogCache, kLogDebug, "LoadCatalogByHash write manifest");
-          CacheManager::Label label;
-          label.path = repo_name_;
-          label.flags |= CacheManager::kLabelCertificate;
           fetcher_->cache_mgr()->CommitFromMem(
-                  CacheManager::LabeledObject(ensemble.manifest->certificate(),
-                                              label),
-                  ensemble.cert_buf, ensemble.cert_size);
-          fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
+                                  ctlg_info->manifest_ensemble()->certificate(),
+                                  ctlg_info->manifest_ensemble()->cert_buf,
+                                  ctlg_info->manifest_ensemble()->cert_size,
+                                  "certificate for " + repo_name_);
+          fetcher_->cache_mgr()->StoreBreadcrumb(
+                                     *ctlg_info->manifest_ensemble()->manifest);
       }
     }
   }
