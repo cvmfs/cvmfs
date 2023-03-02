@@ -35,5 +35,5 @@ const std::string &CustomSharding::GetNextProxy(const std::string *url,
      url->c_str(),
      current_proxy.c_str(),
      off);
-  return current_proxy; 
+  return current_proxy;
 }
