@@ -74,14 +74,10 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
     goto cleanup;
   }
 
-  // TODO(heretherebedragons) NEEDS TO BE CLEANED UP - just a quick and dirty for running cloud test
-  // // Quick way out: hash matches base catalog
-  // if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog)) {
-  //   LogCvmfs(kLogCvmfs, kLogDebug,
-  //            "OOOOOOOOOOO DoVerify Quick way out: hash matches base catalog");
-  //   return kFailOk;
-  //   return kFailUp2Date;
-  // }
+  // Quick way out: hash matches base catalog
+  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog)) {
+    return kFailOk;
+  }
     
 
   // Load certificate
