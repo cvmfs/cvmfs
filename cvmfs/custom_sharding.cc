@@ -29,7 +29,7 @@ void CustomSharding::AddProxy(std::string proxy) {
   PANIC(kLogStderr, "Unimplemented: proxy %s", proxy.c_str());
 }
 std::string CustomSharding::GetNextProxy(const std::string *url,
-                                         const std::string current_proxy,
+                                         const std::string &current_proxy,
                                          off_t off) {
   PANIC(kLogStderr, "Unimplemented %s %s %ld",
      url->c_str(),

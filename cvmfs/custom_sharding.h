@@ -20,7 +20,7 @@ class CustomSharding {
   void StopHealthCheck();
   void AddProxy(std::string proxy);
   std::string GetNextProxy(const std::string *url,
-                           const std::string current_proxy, off_t off);
+                           const std::string &current_proxy, off_t off);
 };
 
 #endif  // CVMFS_CUSTOM_SHARDING_H_
