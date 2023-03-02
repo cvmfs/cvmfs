@@ -1687,9 +1687,8 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   // It requires compile-time replacement
   // custom_sharding.cc
   // By default, setting this option will cause a runtime PANIC
-  if ((getenv("CVMFS_CUSTOM_SHARDING") != NULL) &&
-      (strlen(getenv("CVMFS_CUSTOM_SHARDING")) > 0))
-  {
+  char *pp = getenv("CVMFS_CUSTOM_SHARDING");
+  if (pp && strlen(pp) > 0) {
     use_custom_sharding_ = true;
     custom_sharding_ = new CustomSharding();
   }
