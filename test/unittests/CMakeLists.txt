@@ -158,6 +158,7 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
                   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
                   ${CVMFS_SOURCE_DIR}/compression.cc
+                  ${CVMFS_SOURCE_DIR}/custom_sharding.cc
                   ${CVMFS_SOURCE_DIR}/directory_entry.cc
                   ${CVMFS_SOURCE_DIR}/gateway_util.cc
                   ${CVMFS_SOURCE_DIR}/globals.cc
@@ -387,6 +388,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/custom_sharding.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
