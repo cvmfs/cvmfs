@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  *
  * This is a wrapper around OpenSSL's libcrypto.  It supports
- * signing of data with an X.509 certificate and verifiying
+ * signing of data with an X.509 certificate and verifying
  * a signature against a certificate.  The certificates can act only as key
  * store, in which case there is no verification against the CA chain.
  *
@@ -74,14 +74,6 @@ SignatureManager::SignatureManager() {
   x509_lookup_ = NULL;
   int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
-
-  /*
-    Note: OpenSSL 3.0 deprecated SHA1 signatures. This env override is needed
-    on CentOS Stream 9. OpenSSL uses secure_getenv to read the environment. This
-    variable will not be read if the executable has setuid.
-    TODO(jblomer): remove me when unit tests link against libcvmfs_crypto
-   */
-  setenv("OPENSSL_ENABLE_SHA1_SIGNATURES", "1", 1);
 }
 
 
@@ -761,7 +753,7 @@ bool SignatureManager::VerifyCaChain() {
 /**
  * Signs a data block using the loaded private key.
  *
- * \return True on sucess, false otherwise
+ * \return True on success, false otherwise
  */
 bool SignatureManager::Sign(const unsigned char *buffer,
                             const unsigned buffer_size,
@@ -809,7 +801,7 @@ bool SignatureManager::Sign(const unsigned char *buffer,
 /**
  * Signs a data block using the loaded private master key.
  *
- * \return True on sucess, false otherwise
+ * \return True on success, false otherwise
  */
 bool SignatureManager::SignRsa(const unsigned char *buffer,
                                const unsigned buffer_size,

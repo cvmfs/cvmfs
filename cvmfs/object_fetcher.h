@@ -11,10 +11,10 @@
 
 #include "catalog.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "reflog.h"
 #include "util/posix.h"
 

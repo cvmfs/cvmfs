@@ -13,14 +13,28 @@
 #include <vector>
 
 #include "compression.h"
+#include "network/s3fanout.h"
 #include "options.h"
-#include "s3fanout.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 namespace upload {
+
+/*
+ * Allowed values of x-amz-acl according to S3 API
+ */
+static const char* x_amz_acl_allowed_values_[8] = {
+    "private",
+    "public-read",
+    "public-write",
+    "authenticated-read",
+    "aws-exec-read",
+    "bucket-owner-read",
+    "bucket-owner-full-control",
+    ""
+};
 
 void S3Uploader::RequestCtrl::WaitFor() {
   char c;

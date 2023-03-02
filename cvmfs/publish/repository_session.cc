@@ -77,7 +77,8 @@ static void MakeAcquireRequest(
 
   const std::string payload = "{\"path\" : \"" + repo_path +
                               "\", \"api_version\" : \"" +
-                              StringifyInt(gateway::APIVersion()) + "\"}";
+                              StringifyInt(gateway::APIVersion()) + "\", " +
+                              "\"hostname\" : \"" + GetHostname() + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), payload, &hmac);
@@ -228,7 +229,7 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     } else if (status == "error") {
       const JSON *reason =
           JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
-      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
+      LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error from gateway: '%s'",
                (reason != NULL) ? reason->string_value : "");
     } else {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Unknown reply. Status: %s",
@@ -355,7 +356,8 @@ void Publisher::Session::Drop() {
       break;
     case kLeaseReplyFailure:
     default:
-      throw EPublish("cannot drop request reply", EPublish::kFailLeaseBody);
+      throw EPublish("gateway doesn't recognize the lease or cannot drop it",
+                     EPublish::kFailLeaseBody);
   }
 }
 

@@ -23,7 +23,7 @@ cvmfs_run_test() {
   echo "Version of testee:        $current_version"
   # FIX ME: We want to test upgrading from more than just one base version
   # previous_version=$(decrement_version $current_version)
-  previous_version="2.5.2"
+  previous_version="2.10.0"
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs-server" ${previous_version}-1)
   echo "Download URL:             $upstream_package_url"
@@ -94,7 +94,7 @@ cvmfs_run_test() {
   testfile2_object="c8e126bfcef0d8b8dce3daf99cf0219c8ba3011a"
   testfile3_object="903122d5ce97886bb5331af7d0a615a0720dafd0"
   peek_backend $MIGRATIONTEST_500_REPLICA $testfile2_object || return 22
-  peek_backend $MIGRATIONTEST_500_REPLICA $testfile3_object || return 23 
+  peek_backend $MIGRATIONTEST_500_REPLICA $testfile3_object || return 23
 
   # check repositories integrity
   check_repository $MIGRATIONTEST_500_REPO || return 24

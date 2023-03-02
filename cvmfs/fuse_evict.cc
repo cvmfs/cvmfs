@@ -196,14 +196,23 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       if (inode == 0)
         inode = FUSE_ROOT_ID;
       // Can fail, e.g. the inode might be already evicted
+
+      int dbg_retval;
+
 #if CVMFS_USE_LIBFUSE == 2
-      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_chan**>(
-        invalidator->fuse_channel_or_session_), inode, 0, 0);
+      dbg_retval = fuse_lowlevel_notify_inval_inode(
+                    *reinterpret_cast<struct fuse_chan**>(
+                    invalidator->fuse_channel_or_session_), inode, 0, 0);
 #else
-      fuse_lowlevel_notify_inval_inode(*reinterpret_cast<struct fuse_session**>(
-        invalidator->fuse_channel_or_session_), inode, 0, 0);
+      dbg_retval = fuse_lowlevel_notify_inval_inode(
+                    *reinterpret_cast<struct fuse_session**>(
+                    invalidator->fuse_channel_or_session_), inode, 0, 0);
 #endif
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting inode %" PRIu64, inode);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+                "evicting inode %" PRIu64 " with retval: %d",
+                inode, dbg_retval);
+
+      (void) dbg_retval;  // prevent compiler complaining
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (platform_monotonic_time() >= deadline) {
@@ -233,14 +242,26 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                entry_parent, entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
 #if CVMFS_USE_LIBFUSE == 2
-      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
-        invalidator->fuse_channel_or_session_),
-        entry_parent, entry_name.GetChars(), entry_name.GetLength());
+      struct fuse_chan* channel_or_session =
+                                    *reinterpret_cast<struct fuse_chan**>(
+                                     invalidator->fuse_channel_or_session_);
 #else
-      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
-        invalidator->fuse_channel_or_session_),
+      struct fuse_session* channel_or_session =
+                                  *reinterpret_cast<struct fuse_session**>(
+                                  invalidator->fuse_channel_or_session_);
+#endif
+
+// we do not care if fuse kernel supports expire_entry as if it is
+// not support it will just be handled like a fuse_inval
+#ifdef FUSE_CAP_EXPIRE_ONLY
+      fuse_lowlevel_notify_expire_entry(channel_or_session,
+        entry_parent, entry_name.GetChars(), entry_name.GetLength(),
+        FUSE_LL_EXPIRE_ONLY);
+#else
+      fuse_lowlevel_notify_inval_entry(channel_or_session,
         entry_parent, entry_name.GetChars(), entry_name.GetLength());
 #endif
+
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (atomic_read32(&invalidator->terminated_) == 1) {
           LogCvmfs(kLogCvmfs, kLogDebug,

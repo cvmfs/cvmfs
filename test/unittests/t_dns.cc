@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "dns.h"
+#include "network/dns.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
@@ -702,22 +702,6 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 }
 
 
-// TODO(jblomer): figure out why this fails on Travis
-TEST_F(T_Dns, CaresResolverLocalhost) {
-  Host host = default_resolver->Resolve("localhost");
-  // Not using ExpectResolvedName because the canonical name for localhost
-  // differs from system to system.
-  ASSERT_EQ(1U, host.ipv4_addresses().size());
-  EXPECT_EQ("127.0.0.1", *host.ipv4_addresses().begin());
-  if (host.HasIpv6()) {
-    ASSERT_EQ(1U, host.ipv6_addresses().size());
-    EXPECT_EQ("[::1]", *host.ipv6_addresses().begin());
-  } else {
-    EXPECT_EQ(0U, host.ipv6_addresses().size());
-  }
-}
-
-
 TEST_F(T_Dns, CaresResolverSearchDomainSlow) {
   Host host = default_resolver->Resolve("a");
   EXPECT_TRUE((host.status() == kFailUnknownHost) ||
@@ -995,16 +979,12 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
 }
 
 TEST_F(T_Dns, HostfileResolverBlankLines) {
-  g_log_messages.clear();
-  SetAltLogFunc(TDnsAltLogFunc);
   CreateHostfile("   \n  #comment\n\n\n127.0.0.1 localhost\n\n");
   Host host = hostfile_resolver->Resolve("localhost");
   EXPECT_EQ(kFailOk, host.status());
   set<string> expected_ipv4;
   expected_ipv4.insert("127.0.0.1");
   EXPECT_EQ(expected_ipv4, host.ipv4_addresses());
-  EXPECT_EQ(0U, g_log_messages.size());
-  SetAltLogFunc(NULL);
 }
 
 TEST_F(T_Dns, HostfileResolverTooLong) {

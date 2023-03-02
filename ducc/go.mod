@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v0.0.0-20190123164140-de86ba27fbea
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.3.3 // indirect
-	github.com/gogo/protobuf v1.2.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/context v1.1.1 // indirect
@@ -22,9 +22,8 @@ require (
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.0.8 // indirect
 	github.com/opencontainers/runtime-spec v1.0.1 // indirect
-	github.com/opencontainers/selinux v1.0.0 // indirect
+	github.com/opencontainers/selinux v1.3.1 // indirect
 	github.com/otiai10/copy v1.3.0
-	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pkg/xattr v0.4.3
 	github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
 	github.com/sirupsen/logrus v1.3.0
@@ -32,9 +31,6 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/vbatts/tar-split v0.11.1 // indirect
-	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b // indirect
-	golang.org/x/net v0.0.0-20190119204137-ed066c81e75e // indirect
-	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
 	golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/grpc v1.18.0 // indirect

@@ -5,7 +5,7 @@
  * issued once by an NFS exported file system might be asked for
  * any time later by clients.
  *
- * In "NFS mode", cvmfs will issue inodes consequtively and reuse inodes
+ * In "NFS mode", cvmfs will issue inodes consecutively and reuse inodes
  * based on path name.  The inode --> path and path --> inode maps are
  * handled by sqlite.  This workaround is comparable to the Fuse "noforget"
  * option, except that the mappings are persistent and thus consistent during
@@ -38,7 +38,7 @@ using namespace std;  // NOLINT
 const char *NfsMapsSqlite::kSqlCreateTable =
   "CREATE TABLE IF NOT EXISTS inodes (path TEXT PRIMARY KEY);";
 const char *NfsMapsSqlite::kSqlAddRoot =
-  "INSERT INTO inodes (rowid, path) VALUES (?, \"\");";
+  "INSERT INTO inodes (oid, path) VALUES (?, ?);";
 const char *NfsMapsSqlite::kSqlAddInode =
   "INSERT INTO inodes VALUES (?);";
 const char *NfsMapsSqlite::kSqlGetInode =
@@ -119,7 +119,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(
 
   // Set-up the main inode table if it doesn't exist
   retval = sqlite3_prepare_v2(
-    maps->db_, kSqlCreateTable, kMaxDBSqlLen, &stmt, NULL);
+    maps->db_, kSqlCreateTable, -1, &stmt, NULL);
   if (retval != SQLITE_OK) {
     LogCvmfs(kLogNfsMaps, kLogDebug | kLogSyslogErr,
              "Failed to prepare create table statement: %s",
@@ -137,22 +137,23 @@ NfsMapsSqlite *NfsMapsSqlite::Create(
 
   // Prepare lookup and add-inode statements
   retval = sqlite3_prepare_v2(
-    maps->db_, kSqlGetPath, kMaxDBSqlLen, &maps->stmt_get_path_, NULL);
+    maps->db_, kSqlGetPath, -1, &maps->stmt_get_path_, NULL);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_prepare_v2(maps->db_, kSqlGetInode, kMaxDBSqlLen,
+  retval = sqlite3_prepare_v2(maps->db_, kSqlGetInode, -1,
                               &maps->stmt_get_inode_, NULL);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_prepare_v2(maps->db_, kSqlAddInode, kMaxDBSqlLen,
+  retval = sqlite3_prepare_v2(maps->db_, kSqlAddInode, -1,
                               &maps->stmt_add_, NULL);
   assert(retval == SQLITE_OK);
 
   // Check the root inode exists, if not create it
   PathString rootpath("", 0);
   if (!maps->FindInode(rootpath)) {
-    retval = sqlite3_prepare_v2(
-      maps->db_, kSqlAddRoot, kMaxDBSqlLen, &stmt, NULL);
+    retval = sqlite3_prepare_v2(maps->db_, kSqlAddRoot, -1, &stmt, NULL);
     assert(retval == SQLITE_OK);
-    sqlite3_bind_int64(stmt, 1, root_inode);
+    retval = sqlite3_bind_int64(stmt, 1, root_inode);
+    assert(retval == SQLITE_OK);
+    retval = sqlite3_bind_text(stmt, 2, "", 0, SQLITE_TRANSIENT);
     assert(retval == SQLITE_OK);
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       PANIC(kLogDebug | kLogSyslogErr, "Failed to execute CreateRoot: %s",
@@ -200,8 +201,7 @@ uint64_t NfsMapsSqlite::FindInode(const PathString &path) {
 uint64_t NfsMapsSqlite::IssueInode(const PathString &path) {
   int sqlite_state;
   uint64_t inode;
-  sqlite_state = sqlite3_prepare_v2(db_, kSqlAddInode, kMaxDBSqlLen,
-                                    &stmt_add_, NULL);
+  sqlite_state = sqlite3_prepare_v2(db_, kSqlAddInode, -1, &stmt_add_, NULL);
   assert(sqlite_state == SQLITE_OK);
   sqlite_state = sqlite3_bind_text(stmt_add_, 1, path.GetChars(),
                                    path.GetLength(), SQLITE_TRANSIENT);

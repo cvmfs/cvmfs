@@ -10,8 +10,8 @@
 #include "backoff.h"
 #include "cache_posix.h"
 #include "crypto/hash.h"
-#include "download.h"
 #include "fetch.h"
+#include "network/download.h"
 #include "statistics.h"
 #include "testutil.h"
 #include "util/atomic.h"
@@ -386,7 +386,7 @@ void *TestFetchCollapse2(void *data) {
 }
 
 TEST_F(T_Fetcher, FetchCollapse) {
-  // Test race condition: first open fails, second one succeds
+  // Test race condition: first open fails, second one succeeds
   perf::Statistics statistics;
   BuggyCacheManager bcm;
   bcm.open_2nd_try = true;

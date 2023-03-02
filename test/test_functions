@@ -145,11 +145,8 @@ stat_wrapper() {
 }
 
 # Find the service binary (or detect systemd)
-minpidof() {
-  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
-}
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
+if ! pidof systemd > /dev/null 2>&1 || ! [ -d /run/systemd/system ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -323,7 +320,7 @@ autofs_check() {
   if running_on_osx; then
     return 0
   else
-    cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+    cat /proc/mounts | grep -q "^/etc/\(autofs/\)\?auto.cvmfs /cvmfs "
   fi
 }
 
@@ -2353,8 +2350,10 @@ __do_local_mount() {
   local mountpoint="$2"
   local repo_name="$3"
   local repo_url="$4"
-  local config_file="$5"
-  local extra_option="$6"
+  local config_file="$5"   # config file containing CVMFS client options,
+                           # if used the options listed below are not added
+  local extra_option="$6"  # CVMFS client options as str
+  local mount_options="$7" # comma separated mount options
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
@@ -2380,10 +2379,14 @@ EOF
   echo "  *** local mount config:"
   cat "$config"
 
+  if [ ! -z $mount_options ]; then
+    mount_options="${$mount_options},"
+  fi
+
   if [ x"$as_root" != x"" ]; then
-    sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+    sudo cvmfs2 -d -o allow_other,${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o ${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 
@@ -2529,8 +2532,13 @@ find_or_build_cvmfs_preload() {
 set_up_repository_gateway() {
     echo "Setting up repository gateway"
 
+    gateway_script=/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    if [ -f /usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
+      gateway_script=/usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    fi
+
     echo "  Stopping repository gateway"
-    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh stop
+    sudo $gateway_script stop
 
     echo "  Cleaning up the repository gateway db"
     sudo rm -rf /var/lib/cvmfs-gateway/*
@@ -2570,12 +2578,12 @@ EOF'
     sudo sed -i -e "s/CVMFS_ROOT_HASH=.*//" /var/spool/cvmfs/test.repo.org/client.local
 
     echo "  Starting repository gateway"
-    sudo /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh start
+    sudo $gateway_script start
     # Let the service boot up
     sleep 1
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
-    /usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh status
+    $gateway_script status
+    $gateway_script status
+    $gateway_script status
 }
 
 lockfile() {

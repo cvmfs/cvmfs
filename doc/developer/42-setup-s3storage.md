@@ -18,6 +18,11 @@ If not done so far, install `s3cmd`
     DNS-style bucket+hostname:port template for accessing a bucket [my-test-bucket]: my-test-bucket.cern.ch 
 ```
 
+- In case there are problems with the location
+  ```bash
+    s3cmd --bucket-location=":default-placement" mb s3://my-test-bucket
+  ```
+
 - Try access the s3 bucket: `s3cmd ls s3://my-test-bucket`
 - Config is saved in `/<user>/.s3cfg`
 

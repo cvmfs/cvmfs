@@ -18,7 +18,7 @@
  * catalog do not change (expect on reload). As we do exactly that with the
  * WritableCatalogManager here, inode numbers derived from WritableCatalogs
  * and the WritableCatalogManager may (and will) be screwed.  This is not an
- * issue in the current implementation, as they are not used in the synching
+ * issue in the current implementation, as they are not used in the syncing
  * process.  Just keep in mind.
  *
  * The WritableCatalogManager starts with a base repository (given by the

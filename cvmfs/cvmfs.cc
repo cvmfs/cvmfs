@@ -76,7 +76,6 @@
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
-#include "download.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fetch.h"
@@ -93,6 +92,7 @@
 #include "manifest_fetch.h"
 #include "monitor.h"
 #include "mountpoint.h"
+#include "network/download.h"
 #include "nfs_maps.h"
 #include "notification_client.h"
 #include "options.h"
@@ -103,6 +103,7 @@
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
+#include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
 #include "util/atomic.h"
@@ -145,7 +146,7 @@ struct DirectoryListing {
 
 const loader::LoaderExports *loader_exports_ = NULL;
 OptionsManager *options_mgr_ = NULL;
-pid_t pid_ = 0;  /**< will be set after deamon() */
+pid_t pid_ = 0;  /**< will be set after daemon() */
 quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 
@@ -162,6 +163,10 @@ unsigned max_open_files_; /**< maximum allowed number of open files */
  * Number of reserved file descriptors for internal use
  */
 const int kNumReservedFd = 512;
+/**
+ * Warn if the process has a lower limit for the number of open file descriptors
+ */
+const unsigned int kMinOpenFiles = 8192;
 
 
 class FuseInterruptCue : public InterruptCue {
@@ -311,7 +316,13 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (ino == catalog_mgr->GetRootInode()) {
     bool retval =
       catalog_mgr->LookupPath(PathString(), catalog::kLookupDefault, dirent);
-    assert(retval);
+
+    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                     "GetDirentForInode: Race condition? Not found dirent %s",
+                     dirent->name().c_str())) {
+      return false;
+    }
+
     dirent->set_inode(ino);
     mount_point_->inode_cache()->Insert(ino, *dirent);
     return true;
@@ -430,7 +441,15 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
   bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
-  assert(retval);
+
+  if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                   "GetPathForInode: Race condition? "
+                   "Inode not found in inode tracker at path %s",
+                   path->c_str())) {
+    return false;
+  }
+
+
   mount_point_->path_cache()->Insert(ino, *path);
   return true;
 }
@@ -459,7 +478,7 @@ static void inline TraceInode(const int event,
 
 /**
  * Find the inode number of a file name in a directory given by inode.
- * This or getattr is called as kind of prerequisit to every operation.
+ * This or getattr is called as kind of prerequisite to every operation.
  * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
@@ -550,7 +569,17 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
   // We do _not_ track (and evict) positive replies; among other things, test
   // 076 fails with the following line uncommented
-  // mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
+  //
+  // WARNING! ENABLING THIS BREAKS ANY TYPE OF MOUNTPOINT POINTING TO THIS INODE
+  //
+  // only safe if fuse_expire_entry is available
+  if (mount_point_->fuse_expire_entry()
+      || (mount_point_->cache_symlinks() && dirent.IsLink())) {
+    LogCvmfs(kLogCache, kLogDebug, "Dentry to evict: %s", name);
+    mount_point_->dentry_tracker()->Add(parent_fuse, name,
+                                        static_cast<uint64_t>(timeout));
+  }
+
   fuse_remounter_->fence()->Leave();
   result.ino = dirent.inode();
   result.attr = dirent.GetStatStructure();
@@ -568,6 +597,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_error:
   fuse_remounter_->fence()->Leave();
+
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (01) on %s", name);
+  perf::Inc(file_system_->n_eio_total());
+  perf::Inc(file_system_->n_eio_01());
+
   fuse_reply_err(req, EIO);
 }
 
@@ -666,10 +700,21 @@ static void cvmfs_forget_multi(
 static void ReplyNegative(const catalog::DirectoryEntry &dirent,
                           fuse_req_t req)
 {
-  if (dirent.GetSpecial() == catalog::kDirentNegative)
+  if (dirent.GetSpecial() == catalog::kDirentNegative) {
     fuse_reply_err(req, ENOENT);
-  else
+  } else {
+    const char * name = dirent.name().c_str();
+    const char * link = dirent.symlink().c_str();
+
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+       "EIO (02) name=%s symlink=%s",
+       name ? name: "<unset>",
+       link ? link: "<unset>");
+
+    perf::Inc(file_system_->n_eio_total());
+    perf::Inc(file_system_->n_eio_02());
     fuse_reply_err(req, EIO);
+  }
 }
 
 
@@ -874,6 +919,11 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   if (!retval) {
     fuse_remounter_->fence()->Leave();
     fuse_listing.Clear();  // Buffer is shared, empty manually
+
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+         "EIO (03) on %s", path.c_str());
+    perf::Inc(file_system_->n_eio_total());
+    perf::Inc(file_system_->n_eio_03());
     fuse_reply_err(req, EIO);
     return;
   }
@@ -1019,6 +1069,13 @@ static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
 }
 
 
+#ifdef __APPLE__
+// On macOS, xattr on a symlink opens and closes the file (with O_SYMLINK)
+// around the actual getxattr call. In order to not run into an I/O error
+// we use a special file handle for symlinks, from which one cannot read.
+static const uint64_t kFileHandleIgnore = static_cast<uint64_t>(2) << 60;
+#endif
+
 /**
  * Open a file from cache.  If necessary, file is downloaded first.
  *
@@ -1073,6 +1130,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EOPNOTSUPP);
+    return;
+  }
+  if (fi->flags & O_SYMLINK) {
+    fuse_remounter_->fence()->Leave();
+    fi->fh = kFileHandleIgnore;
+    fuse_reply_open(req, fi);
     return;
   }
 #endif
@@ -1135,8 +1198,11 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           chunks->IsEmpty())
       {
         fuse_remounter_->fence()->Leave();
-        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
-                 "'chunked', but no chunks found.", path.c_str());
+        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr,
+           "EIO (04) file %s is marked as 'chunked', but no chunks found.",
+           path.c_str());
+        perf::Inc(file_system_->n_eio_total());
+        perf::Inc(file_system_->n_eio_04());
         fuse_reply_err(req, EIO);
         return;
       }
@@ -1240,6 +1306,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   mount_point_->backoff_throttle()->Throttle();
 
   mount_point_->file_system()->io_error_info()->AddIoError();
+  if (EIO == errno  || EIO == -fd) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+        "EIO (06) on %s", path.c_str() );
+    perf::Inc(file_system_->n_eio_total());
+    perf::Inc(file_system_->n_eio_06());
+  }
+
   fuse_reply_err(req, -fd);
 }
 
@@ -1257,6 +1330,13 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
            "fd %d", uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)),
            size, off, fi->fh);
   perf::Inc(file_system_->n_fs_read());
+
+#ifdef __APPLE__
+  if (fi->fh == kFileHandleIgnore) {
+    fuse_reply_err(req, EBADF);
+    return;
+  }
+#endif
 
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
@@ -1333,6 +1413,11 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           chunk_tables->Lock();
           chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
           chunk_tables->Unlock();
+
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+              "EIO (05) on %s", chunks.path.ToString().c_str() );
+          perf::Inc(file_system_->n_eio_total());
+          perf::Inc(file_system_->n_eio_05());
           fuse_reply_err(req, EIO);
           return;
         }
@@ -1359,6 +1444,12 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunk_tables->Lock();
         chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
         chunk_tables->Unlock();
+        if ( EIO == errno || EIO == -bytes_fetched ) {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "EIO (07) on %s", chunks.path.ToString().c_str() );
+          perf::Inc(file_system_->n_eio_total());
+          perf::Inc(file_system_->n_eio_07());
+        }
         fuse_reply_err(req, -bytes_fetched);
         return;
       }
@@ -1379,6 +1470,19 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   } else {
     int64_t nbytes = file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
     if (nbytes < 0) {
+      if ( EIO == errno || EIO == -nbytes ) {
+        PathString path;
+        bool found = GetPathForInode(ino, &path);
+        if ( found ) {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "EIO (08) on %s", path.ToString().c_str() );
+        } else {
+          LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "EIO (08) on <unknown inode>");
+        }
+        perf::Inc(file_system_->n_eio_total());
+        perf::Inc(file_system_->n_eio_08());
+      }
       fuse_reply_err(req, -nbytes);
       return;
     }
@@ -1403,6 +1507,14 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
            uint64_t(ino));
+
+#ifdef __APPLE__
+  if (fi->fh == kFileHandleIgnore) {
+    fuse_reply_err(req, 0);
+    return;
+  }
+#endif
+
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
@@ -1575,14 +1687,22 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   if (d.HasXattrs()) {
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+
+    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                     "cvmfs_statfs: Race condition? "
+                     "LookupXattrs did not succeed for path %s",
+                     path.c_str())) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+    }
   }
 
   bool magic_xattr_success = true;
   MagicXattrRAIIWrapper magic_xattr(mount_point_->magic_xattr_mgr()->GetLocked(
     attr, path, &d));
   if (!magic_xattr.IsNull()) {
-    magic_xattr_success = magic_xattr->PrepareValueFenced();
+    magic_xattr_success = magic_xattr->
+                              PrepareValueFencedProtected(fuse_ctx->gid);
   }
 
   fuse_remounter_->fence()->Leave();
@@ -1638,9 +1758,25 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   if (d.HasXattrs()) {
     PathString path;
     bool retval = GetPathForInode(ino, &path);
-    assert(retval);
+
+    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                     "cvmfs_listxattr: Race condition? "
+                     "GetPathForInode did not succeed for ino %lu",
+                     ino)) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+      return;
+    }
+
     retval = catalog_mgr->LookupXattrs(path, &xattrs);
-    assert(retval);
+    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                     "cvmfs_listxattr: Race condition? "
+                     "LookupXattrs did not succeed for ino %lu",
+                     ino)) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+      return;
+    }
   }
   fuse_remounter_->fence()->Leave();
 
@@ -1651,7 +1787,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
   string attribute_list;
   attribute_list = mount_point_->magic_xattr_mgr()->GetListString(&d);
-  attribute_list = xattrs.ListKeysPosix(attribute_list);
+  attribute_list += xattrs.ListKeysPosix(attribute_list);
 
   if (size == 0) {
     fuse_reply_xattr(req, attribute_list.length());
@@ -1665,15 +1801,28 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   }
 }
 
-
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
   fuse_remounter_->fence()->Enter();
   const bool found = (GetDirentForPath(PathString(path), &dirent) > 0);
-  fuse_remounter_->fence()->Leave();
 
-  if (!found || !dirent.IsRegular())
+  if (!found || !dirent.IsRegular()) {
+    fuse_remounter_->fence()->Leave();
     return false;
+  }
+
+  if (!dirent.IsChunkedFile()) {
+    fuse_remounter_->fence()->Leave();
+  } else {
+    FileChunkList chunks;
+    mount_point_->catalog_mgr()->ListFileChunks(
+      PathString(path), dirent.hash_algorithm(), &chunks);
+    fuse_remounter_->fence()->Leave();
+    for (unsigned i = 0; i < chunks.size(); ++i) {
+        file_system_->cache_mgr()->quota_mgr()
+           ->Remove(chunks.AtPtr(i)->content_hash());
+    }
+  }
   file_system_->cache_mgr()->quota_mgr()->Remove(dirent.checksum());
   return true;
 }
@@ -1774,6 +1923,43 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
           "libfuse, aborting");
 #endif
   }
+
+  if ( mount_point_->cache_symlinks() ) {
+#ifdef FUSE_CAP_CACHE_SYMLINKS
+    if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == FUSE_CAP_CACHE_SYMLINKS) {
+      conn->want |= FUSE_CAP_CACHE_SYMLINKS;
+      LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                    "Enable symlink caching");
+      #ifndef FUSE_CAP_EXPIRE_ONLY
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+          "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+          "mountpoints on top of symlinks will break!");
+      #endif
+    } else {
+      mount_point_->DisableCacheSymlinks();
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "FUSE: Symlink caching requested but missing fuse kernel support, "
+           "falling back to no caching");
+    }
+#else
+    mount_point_->DisableCacheSymlinks();
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+          "FUSE: Symlink caching requested but missing libfuse support, "
+          "falling back to no caching");
+#endif
+  }
+
+#ifdef FUSE_CAP_EXPIRE_ONLY
+  if ((conn->capable & FUSE_CAP_EXPIRE_ONLY) == FUSE_CAP_EXPIRE_ONLY) {
+    mount_point_->EnableFuseExpireEntry();
+    LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
+                                   "Enable fuse_expire_entry");
+  } else if (mount_point_->cache_symlinks()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+      "mountpoints on top of symlinks will break!");
+  }
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
@@ -1876,7 +2062,7 @@ class InodeMaxMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue() {
     return StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
-      mount_point_->catalog_mgr()->inode_gauge());
+      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge());
   }
 };
 
@@ -1909,6 +2095,8 @@ static void RegisterMagicXattrs() {
   mgr->Register("user.pid", new PidMagicXattr());
   mgr->Register("user.maxfd", new MaxFdMagicXattr());
   mgr->Register("user.uptime", new UptimeMagicXattr());
+
+  mgr->Freeze();
 }
 
 /**
@@ -1970,6 +2158,32 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 }
 
 
+static unsigned CheckMaxOpenFiles() {
+  static unsigned max_open_files;
+  static bool     already_done = false;
+
+  // check number of open files (lazy evaluation)
+  if (!already_done) {
+    unsigned soft_limit = 0;
+    unsigned hard_limit = 0;
+    GetLimitNoFile(&soft_limit, &hard_limit);
+
+    if (soft_limit < cvmfs::kMinOpenFiles) {
+      LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
+               "Warning: current limits for number of open files are "
+               "(%lu/%lu)\n"
+               "CernVM-FS is likely to run out of file descriptors, "
+               "set ulimit -n to at least %lu",
+               soft_limit, hard_limit, cvmfs::kMinOpenFiles);
+    }
+    max_open_files = soft_limit;
+    already_done   = true;
+  }
+
+  return max_open_files;
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
@@ -1977,6 +2191,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
   crypto::SetupLibcryptoMt();
 
   InitOptionsMgr(loader_exports);
+
+  // We need logging set up before forking the watchdog
+  FileSystem::SetupLoggingStandalone(
+    *cvmfs::options_mgr_, loader_exports->repository_name);
+
+  // Monitor, check for maximum number of open files
+  if (cvmfs::UseWatchdog()) {
+    auto_umount::SetMountpoint(loader_exports->mount_point);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    if (cvmfs::watchdog_ == NULL) {
+      *g_boot_error = "failed to initialize watchdog.";
+      return loader::kFailMonitor;
+    }
+  }
+  cvmfs::max_open_files_ = CheckMaxOpenFiles();
 
   FileSystem::FileSystemInfo fs_info;
   fs_info.type = FileSystem::kFsFuse;
@@ -2034,17 +2263,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
       new FuseRemounter(cvmfs::mount_point_, &cvmfs::inode_generation_info_,
                         channel_or_session, fuse_notify_invalidation);
 
-  // Monitor, check for maximum number of open files
-  if (cvmfs::UseWatchdog()) {
-    cvmfs::watchdog_ = Watchdog::Create("./stacktrace." +
-                                        loader_exports->repository_name);
-    if (cvmfs::watchdog_ == NULL) {
-      *g_boot_error = "failed to initialize watchdog.";
-      return loader::kFailMonitor;
-    }
-  }
-  cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
-
   // Control & command interface
   cvmfs::talk_mgr_ = TalkManager::Create(
     cvmfs::mount_point_->talk_socket_path(),
@@ -2084,9 +2302,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
 
-
-  auto_umount::SetMountpoint(loader_exports->mount_point);
-
   return loader::kFailOk;
 }
 
@@ -2095,24 +2310,26 @@ static int Init(const loader::LoaderExports *loader_exports) {
  * Things that have to be executed after fork() / daemon()
  */
 static void Spawn() {
-  // First thing: fork off the watchdog while we still have a single-threaded
+  // First thing: kick off the watchdog while we still have a single-threaded
   // well-defined state
   cvmfs::pid_ = getpid();
   if (cvmfs::watchdog_) {
-    cvmfs::watchdog_->RegisterOnCrash(auto_umount::UmountOnCrash);
-    cvmfs::watchdog_->Spawn();
+    cvmfs::watchdog_->Spawn(GetCurrentWorkingDirectory() + "/stacktrace." +
+                            cvmfs::mount_point_->fqrn());
   }
 
   cvmfs::fuse_remounter_->Spawn();
   if (cvmfs::mount_point_->dentry_tracker()->is_active()) {
     cvmfs::mount_point_->dentry_tracker()->SpawnCleaner(
-      cvmfs::mount_point_->kcache_timeout_sec());  // Usually every minute
+        // Usually every minute
+        static_cast<unsigned int>(cvmfs::mount_point_->kcache_timeout_sec()));
   }
 
   cvmfs::mount_point_->download_mgr()->Spawn();
   cvmfs::mount_point_->external_download_mgr()->Spawn();
-  if (cvmfs::mount_point_->resolv_conf_watcher() != NULL)
+  if (cvmfs::mount_point_->resolv_conf_watcher() != NULL) {
     cvmfs::mount_point_->resolv_conf_watcher()->Spawn();
+  }
   QuotaManager *quota_mgr = cvmfs::file_system_->cache_mgr()->quota_mgr();
   quota_mgr->Spawn();
   if (quota_mgr->HasCapability(QuotaManager::kCapListeners)) {
@@ -2131,10 +2348,15 @@ static void Spawn() {
     cvmfs::notification_client_->Spawn();
   }
 
-  if (cvmfs::file_system_->nfs_maps() != NULL)
+  if (cvmfs::file_system_->nfs_maps() != NULL) {
     cvmfs::file_system_->nfs_maps()->Spawn();
+  }
 
   cvmfs::file_system_->cache_mgr()->Spawn();
+
+  if (cvmfs::mount_point_->telemetry_aggr() != NULL) {
+    cvmfs::mount_point_->telemetry_aggr()->Spawn();
+  }
 }
 
 

@@ -72,7 +72,7 @@ class FdTable : SingleCopy {
 
 
   /**
-   * Registeres fd with a currently unused number.  If the table is full,
+   * Registers fd with a currently unused number.  If the table is full,
    * returns -ENFILE;
    */
   int OpenFd(const HandleT &handle) {

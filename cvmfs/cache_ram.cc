@@ -293,7 +293,7 @@ int RamCacheManager::OpenFromTxn(void *txn) {
   int64_t retval = CommitToKvStore(transaction);
   if (retval < 0) {
     LogCvmfs(kLogCache, kLogDebug,
-             "error while commiting transaction on %s: %s",
+             "error while committing transaction on %s: %s",
              transaction->buffer.id.ToString().c_str(), strerror(-retval));
     return retval;
   }

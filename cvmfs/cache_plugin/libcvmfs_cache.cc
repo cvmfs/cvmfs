@@ -359,11 +359,9 @@ void cvmcache_get_session(cvmcache_session *session) {
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {
   if (g_watchdog != NULL)
     return;
-  g_watchdog = Watchdog::Create((crash_dump_file != NULL)
-                                ? string(crash_dump_file)
-                                : "");
+  g_watchdog = Watchdog::Create(NULL);
   assert(g_watchdog != NULL);
-  g_watchdog->Spawn();
+  g_watchdog->Spawn((crash_dump_file != NULL) ? string(crash_dump_file) : "");
 }
 
 void cvmcache_terminate_watchdog() {

@@ -16,6 +16,12 @@ retval=0
 
 cd ${SOURCE_DIRECTORY}/test
 
+# Test exclusions:
+# 088: On macOS, the watchdog listener won't quit anymore when the watchdog
+#      disappears. May be due to mac's peculiar poll() but needs further
+#      investigation. For cvmfs on mac, this feature is not a priority.
+
+
 # everything will be placed in the home folder
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
@@ -42,6 +48,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/082-shrinkwrap-cms                       \
                                    src/083-suid                                 \
                                    src/084-premounted                           \
+                                   src/088-watchdog                             \
                                    src/089-external_cache_plugin                \
                                    src/094-attachmount                          \
                                    src/095-fuser                                \

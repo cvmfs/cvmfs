@@ -57,6 +57,29 @@ cvmfs_run_test() {
     cvmfs_server transaction test.repo.org/new/c || return 70
     cvmfs_server abort -f test.repo.org || return 71
 
+    echo "  *** Force abort with invalid lease"
+    cvmfs_server transaction test.repo.org/ || return 80
+    cp /var/spool/cvmfs/test.repo.org/session_token \
+       /var/spool/cvmfs/test.repo.org/session_token.save || return 81
+    cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a drop \
+      -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/new/c || return 82
+    mv /var/spool/cvmfs/test.repo.org/session_token.save \
+       /var/spool/cvmfs/test.repo.org/session_token || return 83
+    cvmfs_server abort -f test.repo.org || return 84
+
+    echo "  *** Force abort with missing session token"
+    cvmfs_server transaction test.repo.org/ || return 90
+    mv /var/spool/cvmfs/test.repo.org/session_token \
+      /var/spool/cvmfs/test.repo.org/session_token.save || return 91
+    cvmfs_server abort -f test.repo.org || return 92
+    mv /var/spool/cvmfs/test.repo.org/session_token.save \
+      /var/spool/cvmfs/test.repo.org/session_token || return 93
+    cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a drop \
+      -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/ || return 94
+
+    cvmfs_server transaction test.repo.org/ || return 85
+    cvmfs_server abort -f test.repo.org || return 86
+
     return 0
 }
 

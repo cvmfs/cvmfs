@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "cmd_abort.h"
 
+#include <unistd.h>
+
 #include <cstdio>
 #include <string>
 
@@ -85,6 +87,11 @@ int CmdAbort::Main(const Options &options) {
     char *rv_charp = fgets(answer, 3, stdin);
     if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y'))
       return EINTR;
+  } else {
+    // We may have an expired/invalid lease token in the spool area, in which
+    // case dropping the session fails but we still want to continue the
+    // local transaction abort.
+    settings->SetIgnoreInvalidLease(true);
   }
 
   std::vector<LsofEntry> lsof_entries =
@@ -147,9 +154,11 @@ int CmdAbort::Main(const Options &options) {
     publisher->Abort();
   } catch (const EPublish &e) {
     if (e.failure() == EPublish::kFailTransactionState) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "%s", e.msg().c_str());
       return EINVAL;
     }
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
+    return EIO;
   }
 
   rvi = CallServerHook("abort_after_hook", settings->fqrn());

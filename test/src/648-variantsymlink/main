@@ -2,6 +2,16 @@ cvmfs_test_name="Variant symlinks"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
+TEST648_PRIVATE_MOUNT=
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST648_PRIVATE_MOUNT" != "x" ]; then
+    sudo umount $TEST648_PRIVATE_MOUNT
+    TEST648_PRIVATE_MOUNT=
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -12,6 +22,8 @@ cvmfs_run_test() {
   echo "*** create variant symlink"
   start_transaction $CVMFS_TEST_REPO || return $?
   ln -s '$(CVMFS_VAR_LINK)' /cvmfs/$CVMFS_TEST_REPO/varlink || return 10
+  ln -s '$(CVMFS_ARCH)' /cvmfs/$CVMFS_TEST_REPO/arch || return 10
+  mkdir /cvmfs/$CVMFS_TEST_REPO/$(uname -m) || return 10
   publish_repo $CVMFS_TEST_REPO || return 11
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
@@ -19,6 +31,14 @@ cvmfs_run_test() {
   echo '$(CVMFS_VAR_LINK)' > varlink.reference
   readlink /cvmfs/$CVMFS_TEST_REPO/varlink > varlink.published
   diff varlink.reference varlink.published || return 20
+
+  TEST648_PRIVATE_MOUNT="$(pwd)/mntpnt"
+  do_local_mount "$TEST648_PRIVATE_MOUNT"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 30
+  trap cleanup EXIT HUP INT TERM
+
+  ls $TEST648_PRIVATE_MOUNT/arch/ || return 31
 
   return 0
 }

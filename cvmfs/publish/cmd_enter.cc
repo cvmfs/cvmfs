@@ -646,7 +646,7 @@ int CmdEnter::Main(const Options &options) {
     preserved_fds.insert(0);
     preserved_fds.insert(1);
     preserved_fds.insert(2);
-    pid_t pid_child;
+    pid_t pid_child = 0;
     rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */,
@@ -658,6 +658,7 @@ int CmdEnter::Main(const Options &options) {
     sigs.push_back(SIGUSR1);
     exit_code = WaitForChild(pid_child, sigs);
 
+    LogCvmfs(kLogCvmfs, kLogStdout, "Closing CernVM-FS shell...");
     if (options.Has("transaction") &&
         !FileExists(session_dir_ + "/shellaction.marker")) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");

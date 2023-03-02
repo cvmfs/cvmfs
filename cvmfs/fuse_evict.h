@@ -27,7 +27,7 @@ class DentryTracker;
  * fuse_lowlevel_notify_inval_entry, it falls back to waiting for drainout.
  *
  * Evicting entries from the cache must be done from a separate thread to
- * avoid a deadlock in the fuse callbacks (see Fuse documenatation).
+ * avoid a deadlock in the fuse callbacks (see Fuse documentation).
  */
 class FuseInvalidator : SingleCopy {
   FRIEND_TEST(T_FuseInvalidator, StartStop);
@@ -98,7 +98,7 @@ class FuseInvalidator : SingleCopy {
   int pipe_ctrl_[2];
   pthread_t thread_invalidator_;
   /**
-   * An invalidation run can take some time.  Allow for early cancelation if
+   * An invalidation run can take some time.  Allow for early cancellation if
    * thread should be shut down.
    */
   atomic_int32 terminated_;

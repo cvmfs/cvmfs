@@ -4,7 +4,7 @@
 
 #include "gtest/gtest.h"
 
-#include "download.h"
+#include "network/download.h"
 
 namespace download {
 

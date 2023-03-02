@@ -373,6 +373,10 @@ void SettingsPublisher::SetIsManaged(bool value) {
   is_managed_ = value;
 }
 
+void SettingsPublisher::SetIgnoreInvalidLease(bool value) {
+  ignore_invalid_lease_ = value;
+}
+
 
 //------------------------------------------------------------------------------
 

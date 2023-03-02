@@ -16,12 +16,15 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 CVMFS_EXPORT
+void vLogCvmfs(const LogSource source, const int mask,
+               const char *format, va_list variadic_list);
+CVMFS_EXPORT
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 // Ensure that pure debug messages are not compiled except in DEBUGMSG mode
 #ifndef DEBUGMSG
 #define LogCvmfs(source, mask, ...) \
   (((mask) == static_cast<int>(kLogDebug)) ? \
-    ((void)0) : LogCvmfs(source, mask, __VA_ARGS__))
+    ((void)0) : LogCvmfs(source, mask, __VA_ARGS__));  // NOLINT
 #endif
 
 #ifdef CVMFS_NAMESPACE_GUARD

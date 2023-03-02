@@ -57,6 +57,7 @@ class OptionsManager;
 namespace perf {
 class Counter;
 class Statistics;
+class TelemetryAggregator;
 }
 namespace signature {
 class SignatureManager;
@@ -187,6 +188,10 @@ class FileSystem : SingleCopy, public BootFactory {
   static FileSystem *Create(const FileSystemInfo &fs_info);
   ~FileSystem();
 
+  // Used to setup logging before the file system object is created
+  static void SetupLoggingStandalone(
+    const OptionsManager &options_mgr, const std::string &prefix);
+
   bool IsNfsSource() { return nfs_mode_ & kNfsMaps; }
   bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
   void ResetErrorCounters();
@@ -226,6 +231,15 @@ class FileSystem : SingleCopy, public BootFactory {
   NfsMaps *nfs_maps() { return nfs_maps_; }
   perf::Counter *no_open_dirs() { return no_open_dirs_; }
   perf::Counter *no_open_files() { return no_open_files_; }
+  perf::Counter *n_eio_total() { return n_eio_total_; }
+  perf::Counter *n_eio_01() { return n_eio_01_; }
+  perf::Counter *n_eio_02() { return n_eio_02_; }
+  perf::Counter *n_eio_03() { return n_eio_03_; }
+  perf::Counter *n_eio_04() { return n_eio_04_; }
+  perf::Counter *n_eio_05() { return n_eio_05_; }
+  perf::Counter *n_eio_06() { return n_eio_06_; }
+  perf::Counter *n_eio_07() { return n_eio_07_; }
+  perf::Counter *n_eio_08() { return n_eio_08_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -273,6 +287,7 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
+  static void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -323,6 +338,15 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_fs_inode_replace_;
   perf::Counter *no_open_files_;
   perf::Counter *no_open_dirs_;
+  perf::Counter *n_eio_total_;
+  perf::Counter *n_eio_01_;
+  perf::Counter *n_eio_02_;
+  perf::Counter *n_eio_03_;
+  perf::Counter *n_eio_04_;
+  perf::Counter *n_eio_05_;
+  perf::Counter *n_eio_06_;
+  perf::Counter *n_eio_07_;
+  perf::Counter *n_eio_08_;
   IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 
@@ -406,8 +430,8 @@ class FileSystem : SingleCopy, public BootFactory {
 
 /**
  * The StatfsCache class is a class purely designed as "struct" (= holding
- * object for all its parameters). 
- * All its logic, including the locking mechanism, is implemented in the 
+ * object for all its parameters).
+ * All its logic, including the locking mechanism, is implemented in the
  * function cvmfs_statfs in cvmfs.cc
  */
 class StatfsCache : SingleCopy {
@@ -486,6 +510,8 @@ class MountPoint : SingleCopy, public BootFactory {
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }
   bool enforce_acls() { return enforce_acls_; }
+  bool cache_symlinks() { return cache_symlinks_; }
+  bool fuse_expire_entry() { return fuse_expire_entry_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -500,6 +526,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string repository_tag() { return repository_tag_; }
   SimpleChunkTables *simple_chunk_tables() { return simple_chunk_tables_; }
   perf::Statistics *statistics() { return statistics_; }
+  perf::TelemetryAggregator *telemetry_aggr() { return telemetry_aggr_; }
   signature::SignatureManager *signature_mgr() { return signature_mgr_; }
   uid_t talk_socket_uid() { return talk_socket_uid_; }
   gid_t talk_socket_gid() { return talk_socket_gid_; }
@@ -509,6 +536,8 @@ class MountPoint : SingleCopy, public BootFactory {
   StatfsCache *statfs_cache() { return statfs_cache_; }
 
   bool ReloadBlacklists();
+  void DisableCacheSymlinks();
+  void EnableFuseExpireEntry();
 
  private:
   /**
@@ -553,6 +582,11 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kTracerBufferSize = 8192;
   static const unsigned kTracerFlushThreshold = 7000;
   static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
+  /**
+   * Default values for telemetry aggregator
+  */
+  static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
+  static const int kMinimumTelemetrySendRateSec = 5;  // 5sec
 
   MountPoint(const std::string &fqrn,
              FileSystem *file_system,
@@ -591,6 +625,7 @@ class MountPoint : SingleCopy, public BootFactory {
   OptionsManager *options_mgr_;
 
   perf::Statistics *statistics_;
+  perf::TelemetryAggregator *telemetry_aggr_;
   AuthzFetcher *authz_fetcher_;
   AuthzSessionManager *authz_session_mgr_;
   AuthzAttachment *authz_attachment_;
@@ -621,6 +656,8 @@ class MountPoint : SingleCopy, public BootFactory {
   double kcache_timeout_sec_;
   bool fixed_catalog_;
   bool enforce_acls_;
+  bool cache_symlinks_;
+  bool fuse_expire_entry_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 

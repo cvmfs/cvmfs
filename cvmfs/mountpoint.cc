@@ -39,7 +39,6 @@
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -51,6 +50,7 @@
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"
@@ -62,6 +62,7 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
+#include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -165,6 +166,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
     file_system(new FileSystem(fs_info));
 
+  file_system->SetupGlobalEnvironmentParams();
+
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
            file_system->options_mgr()->Dump().c_str());
@@ -243,6 +246,24 @@ void FileSystem::CreateStatistics() {
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
+  n_eio_total_ =  statistics_->Register("eio.total",
+     "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ =  statistics_->Register("eio.01",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ =  statistics_->Register("eio.02",
+     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ =  statistics_->Register("eio.03",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ =  statistics_->Register("eio.04",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ =  statistics_->Register("eio.05",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ =  statistics_->Register("eio.06",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ =  statistics_->Register("eio.07",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ =  statistics_->Register("eio.08",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -389,6 +410,15 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_inode_replace_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
+  , n_eio_total_(NULL)
+  , n_eio_01_(NULL)
+  , n_eio_02_(NULL)
+  , n_eio_03_(NULL)
+  , n_eio_04_(NULL)
+  , n_eio_05_(NULL)
+  , n_eio_06_(NULL)
+  , n_eio_07_(NULL)
+  , n_eio_08_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -563,6 +593,15 @@ string FileSystem::MkCacheParm(
 
 void FileSystem::ResetErrorCounters() {
   io_error_info_.Reset();
+  n_eio_total_->Set(0);
+  n_eio_01_->Set(0);
+  n_eio_02_->Set(0);
+  n_eio_03_->Set(0);
+  n_eio_04_->Set(0);
+  n_eio_05_->Set(0);
+  n_eio_06_->Set(0);
+  n_eio_07_->Set(0);
+  n_eio_08_->Set(0);
 }
 
 
@@ -811,21 +850,38 @@ bool FileSystem::SetupCwd() {
 }
 
 
-void FileSystem::SetupLogging() {
+/**
+ * Environment variables useful, e.g., for variant symlinks
+ */
+void FileSystem::SetupGlobalEnvironmentParams() {
+  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
+}
+
+
+void FileSystem::SetupLoggingStandalone(
+  const OptionsManager &options_mgr, const std::string &prefix)
+{
+  SetupGlobalEnvironmentParams();
+
   string optarg;
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
     SetLogSyslogLevel(String2Uint64(optarg));
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
     SetLogSyslogFacility(String2Int64(optarg));
-  if (options_mgr_->GetValue("CVMFS_USYSLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_USYSLOG", &optarg))
     SetLogMicroSyslog(optarg);
-  if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
+  if (options_mgr.GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
     SetLogSyslogPrefix(optarg);
   } else {
-    SetLogSyslogPrefix(name_);
+    SetLogSyslogPrefix(prefix);
   }
+}
+
+
+void FileSystem::SetupLogging() {
+  SetupLoggingStandalone(*options_mgr_, name_);
 }
 
 
@@ -1157,6 +1213,26 @@ bool MountPoint::ReloadBlacklists() {
     }
   }
   return result;
+}
+
+/**
+ * Disables kernel caching of symlinks.
+ * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
+ * linux kernel >= 4.2. Some OS might backport it.
+ *
+ * NOTE: This function should only be called before or within cvmfs_init().
+ *
+ */
+void MountPoint::DisableCacheSymlinks() {
+  cache_symlinks_ = false;
+}
+
+/**
+ * Instead of invalidate dentries, they should be expired.
+ * Fixes issues with mount-on-top mounts and symlink caching.
+ */
+void MountPoint::EnableFuseExpireEntry() {
+  fuse_expire_entry_ = true;
 }
 
 
@@ -1680,6 +1756,7 @@ MountPoint::MountPoint(
   , file_system_(file_system)
   , options_mgr_(options_mgr)
   , statistics_(NULL)
+  , telemetry_aggr_(NULL)
   , authz_fetcher_(NULL)
   , authz_session_mgr_(NULL)
   , authz_attachment_(NULL)
@@ -1706,6 +1783,8 @@ MountPoint::MountPoint(
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
   , enforce_acls_(false)
+  , cache_symlinks_(false)
+  , fuse_expire_entry_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
@@ -1755,6 +1834,7 @@ MountPoint::~MountPoint() {
   delete authz_attachment_;
   delete authz_session_mgr_;
   delete authz_fetcher_;
+  delete telemetry_aggr_;
   delete statistics_;
   delete uuid_;
 
@@ -1776,7 +1856,6 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
 }
-
 
 bool MountPoint::SetupBehavior() {
   string optarg;
@@ -1821,7 +1900,38 @@ bool MountPoint::SetupBehavior() {
                optarg.c_str());
     }
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
+
+  std::set<gid_t> protected_xattr_gids;
+  if (options_mgr_->GetValue("CVMFS_XATTR_PRIVILEGED_GIDS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      std::string trimmed = Trim(tmp[i]);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Privileged gid for xattr added: %s", trimmed.c_str());
+      protected_xattr_gids.insert(static_cast<gid_t>(String2Uint64(trimmed)));
+    }
+  }
+  std::set<std::string> protected_xattrs;
+  if (options_mgr_->GetValue("CVMFS_XATTR_PROTECTED_XATTRS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      std::string trimmed = Trim(tmp[i]);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Protected xattr added: %s", trimmed.c_str());
+      protected_xattrs.insert(trimmed);
+    }
+
+    // root has always access to xattr
+    if (protected_xattr_gids.count(0) < 1) {
+      protected_xattr_gids.insert(0);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+              "Automatically added root to have access to protected xattrs.");
+    }
+  }
+  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility,
+                                    protected_xattrs, protected_xattr_gids);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
@@ -1829,6 +1939,14 @@ bool MountPoint::SetupBehavior() {
   {
     enforce_acls_ = true;
   }
+
+  if (options_mgr_->GetValue("CVMFS_CACHE_SYMLINKS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    cache_symlinks_ = true;
+  }
+
+
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
     talk_socket_path_ = optarg;
@@ -1839,6 +1957,30 @@ bool MountPoint::SetupBehavior() {
       boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
+    }
+  }
+
+  // this can be later be changed to switch through different
+  // telemetryAggregators
+  if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    int telemetry_send_rate_sec = kDefaultTelemetrySendRateSec;
+    if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
+      telemetry_send_rate_sec = static_cast<int>(String2Uint64(optarg));
+
+      // minimum send rate: 5sec
+      if (telemetry_send_rate_sec < kMinimumTelemetrySendRateSec) {
+        telemetry_send_rate_sec = kMinimumTelemetrySendRateSec;
+      }
+
+      telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
+                                                        telemetry_send_rate_sec,
+                                                        options_mgr_,
+                                                        fqrn_,
+                                                        perf::kTelemetryInflux);
+      LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
+               "Enable telemetry to report every %d seconds",
+               telemetry_send_rate_sec);
     }
   }
 

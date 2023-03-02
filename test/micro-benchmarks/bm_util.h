@@ -12,7 +12,7 @@ inline static void Escape(void *p) {
 }
 
 /**
- * Tell the optimizier that after this command, everything in the memory could
+ * Tell the optimizer that after this command, everything in the memory could
  * have changed.
  */
 inline static void ClobberMemory() {

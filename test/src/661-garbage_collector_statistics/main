@@ -80,6 +80,12 @@ cvmfs_run_test() {
   cvmfs_server gc -r1 -f $CVMFS_TEST_REPO || return 4
 
   # ====================== Test gc stats ======================
+  
+  # just check that we have 2 different values (start value = 0 and 7?) 
+  # for n_duplicate_delete_requests
+  local diff_values_duplicates=$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT n_duplicate_delete_requests FROM gc_statistics" | sort | uniq | wc -l)
+  [ $diff_values_duplicates -eq "2" ] || return 5
+ 
   local sz_condemned_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_condemned_bytes) FROM gc_statistics")"
   local uploaded_bytes="$(sqlite3 $CVMFS_TEST_661_DB_PATH "SELECT SUM(sz_bytes_uploaded) FROM publish_statistics")"
 
