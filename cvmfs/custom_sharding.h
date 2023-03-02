@@ -18,7 +18,7 @@ class CustomSharding {
   ~CustomSharding();
   void StartHealthCheck();
   void StopHealthCheck();
-  void AddProxy(std::string proxy);
+  void AddProxy(std::string &proxy);
   std::string GetNextProxy(const std::string *url,
                            const std::string &current_proxy, off_t off);
 };
