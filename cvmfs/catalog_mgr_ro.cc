@@ -15,7 +15,8 @@ using namespace std;  // NOLINT
 namespace catalog {
 
   // TODO(herethebedragons) correct return value and root_ctlg_location?
-  LoadReturn SimpleCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
+  LoadReturn SimpleCatalogManager::GetNewRootCatalogContext(
+                                                       CatalogContext *result) {
     if (result->hash().IsNull()) {
       result->SetHash(base_hash_);
     }
@@ -26,7 +27,8 @@ namespace catalog {
 }
 
   // TODO(herethebedragons) CORRECT?
-  LoadReturn SimpleCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
+  LoadReturn SimpleCatalogManager::LoadCatalogByHash(
+                                                    CatalogContext *ctlg_info) {
     shash::Any effective_hash = ctlg_info->hash();
     assert(shash::kSuffixCatalog == effective_hash.suffix);
     const string url = stratum0_ + "/data/" + effective_hash.MakePath();

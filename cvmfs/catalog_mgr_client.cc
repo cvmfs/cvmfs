@@ -123,7 +123,8 @@ bool ClientCatalogManager::InitFixed(
  * @return kLoadUp2Date - if most recent root catalog is already mounted
  *         kLoadNew     - otherwise
  */
-LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
+LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
+                                                       CatalogContext *result) {
   result->SetMountpoint(PathString("", 0));
 
   // 1) Get alien cache root catalog (local)
@@ -244,7 +245,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
  *         kLoadNew for any other successful load
  *         kLoadFail on failure
  */
-LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
+LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogContext *ctlg_info) {
   string catalog_descr = "file catalog at " + repo_name_ + ":" +
     (ctlg_info->IsRootCatalog() ?
       "/" : string(ctlg_info->mountpoint().GetChars(),

@@ -56,9 +56,9 @@ enum LoadReturn {
 /**
  * Location of the most recent root catalog.
  * Used as part of the process of loading a catalog.
- * - GetNewRootCatalogInfo() sets the location within the CatalogInfo object
+ * - GetNewRootCatalogContext() sets the location within the CatalogContext obj
  * - LoadCatalogByHash(): when loading a root catalog it uses the location
- *                        stored withing the CatalogInfo object to retrieve
+ *                        stored withing the CatalogContext object to retrieve
  *                        the root catalog from the right location
  */
 enum RootCatalogLocation {
@@ -69,34 +69,34 @@ enum RootCatalogLocation {
 };
 
 /**
- * CatalogInfo class contains all necessary information to load a catalog and
+ * CatalogContext class contains all necessary information to load a catalog and
  * also keeps track of the resulting output.
  * It works the following:
  * 1) Load a new root catalog:
- *  - Use empty constructor CatalogInfo()
- *  - Let the CatalogInfo object be populated by GetNewRootCatalogInfo()
+ *  - Use empty constructor CatalogContext()
+ *  - Let the CatalogContext object be populated by GetNewRootCatalogContext()
  *    - This will set: hash, mountpoint, root_ctlg_revision, root_ctlg_location
  *  - Call LoadCatalogByHash()
  *    - This will set: sqlite_path
  * 2) Load a catalog based on a given hash
- *  - Populate CatalogInfo object, used constructor depending on catalog type
- *    - Root catalog: CatalogInfo(shash::Any hash, PathString mountpoint,
+ *  - Populate CatalogContext object, used constructor depending on catalog type
+ *    - Root catalog: CatalogContext(shash::Any hash, PathString mountpoint,
               RootCatalogLocation location)
-      - Nested catalog: CatalogInfo(shash::Any hash, PathString mountpoint)
+      - Nested catalog: CatalogContext(shash::Any hash, PathString mountpoint)
       - Note: in this case root_ctlg_revision is not used
  *  - Call LoadCatalogByHash()
       - This will set: sqlite_path
  */
-struct CatalogInfo {
+struct CatalogContext {
  public:
-  CatalogInfo() :
+  CatalogContext() :
               hash_(shash::Any()),
               mountpoint_(PathString("invalid", 7)),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
-  CatalogInfo(shash::Any hash, PathString mountpoint) :
+  CatalogContext(shash::Any hash, PathString mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
@@ -104,7 +104,7 @@ struct CatalogInfo {
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
 
-  CatalogInfo(shash::Any hash, PathString mountpoint,
+  CatalogContext(shash::Any hash, PathString mountpoint,
               RootCatalogLocation location) :
               hash_(hash),
               mountpoint_(mountpoint),
@@ -137,7 +137,7 @@ struct CatalogInfo {
   void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)
                                    { root_ctlg_location_ = root_ctlg_location; }
   /**
-   * Gives ownership to CatalogInfo
+   * Gives ownership to CatalogContext
   */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
                                      { manifest_ensemble_ = manifest_ensemble; }
@@ -150,7 +150,7 @@ struct CatalogInfo {
   PathString mountpoint_;
   // out parameter, path name of the sqlite catalog
   std::string sqlite_path_;
-  // root catalog: revision is needed for GetNewRootCatalogInfo()
+  // root catalog: revision is needed for GetNewRootCatalogContext()
   uint64_t root_ctlg_revision_;
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
@@ -318,16 +318,16 @@ class AbstractCatalogManager : public SingleCopy {
   /**
    * Load the catalog and return a file name and the catalog hash.
    *
-   * GetNewRootCatalogInfo() populates CatalogInfo object with the information
-   * needed to retrieve the most recent root catalog independent of its
-   * location.
-   * CatalogInfo object must be populated with at least hash and mountpoint to
-   * call LoadCatalogByHash().
+   * GetNewRootCatalogContext() populates CatalogContext object with the
+   * information needed to retrieve the most recent root catalog independent of
+   * its location.
+   * CatalogContext object must be populated with at least hash and mountpoint
+   * to call LoadCatalogByHash().
    *
-   * See class description of CatalogInfo for more information.
+   * See class description of CatalogContext for more information.
    */
-  virtual LoadReturn GetNewRootCatalogInfo(CatalogInfo *catalog_info) = 0;
-  virtual LoadReturn LoadCatalogByHash(CatalogInfo *catalog_info) = 0;
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *catalog_info) = 0;
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *catalog_info) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }

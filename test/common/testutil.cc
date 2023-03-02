@@ -506,10 +506,10 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                          0, is_root, parent_catalog, NULL);
 }
 
-catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
-                                          CatalogInfo *result) {
+catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
+                                          CatalogContext *result) {
   LogCvmfs(kLogCache, kLogDebug,
-                          "catalog::MockCatalogManager::GetNewRootCatalogInfo");
+                       "catalog::MockCatalogManager::GetNewRootCatalogContext");
   map<PathString, MockCatalog*>::iterator it =
                                            catalog_map_.find(PathString("", 0));
   if (it != catalog_map_.end()) {
@@ -529,7 +529,7 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
 }
 
 catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
-                            CatalogInfo *ctlg_info) {
+                            CatalogContext *ctlg_info) {
   LogCvmfs(kLogCache, kLogDebug,
                               "catalog::MockCatalogManager::LoadCatalogByHash");
   map<PathString, MockCatalog*>::iterator it =

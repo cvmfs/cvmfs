@@ -118,20 +118,20 @@ template <class CatalogT>
 LoadReturn AbstractCatalogManager<CatalogT>::RemountDryrun() {
   LogCvmfs(kLogCatalog, kLogDebug,
            "dryrun remounting repositories");
-  CatalogInfo ctlg_info;
-  return GetNewRootCatalogInfo(&ctlg_info);
+  CatalogContext ctlg_info;
+  return GetNewRootCatalogContext(&ctlg_info);
 }
 
 template <class CatalogT>
 LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
-  CatalogInfo ctlg_info;
+  CatalogContext ctlg_info;
 
   // TODO(heretherebedragons) Is this necessary or can we move it outside?
   // allow ctlg_info from dryrun as input parameter? (= +1 IF statement but
   // overall less compute? (depending which remount is called how often))
-  // alternatively: expose GetNewRootCatalogInfo to public
-  if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+  // alternatively: expose GetNewRootCatalogContext to public
+  if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
     LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
                                 "Did not find any valid root catalog to mount");
     return kLoadFail;
@@ -174,7 +174,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
 
   WriteLock();
 
-  CatalogInfo ctlg_info(root_hash, PathString("", 0), kCtlgLocationMounted);
+  CatalogContext ctlg_info(root_hash, PathString("", 0), kCtlgLocationMounted);
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
@@ -908,10 +908,10 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return attached_catalog;
   }
 
-  CatalogInfo ctlg_info(hash, mountpoint, kCtlgLocationMounted);
+  CatalogContext ctlg_info(hash, mountpoint, kCtlgLocationMounted);
 
   if (ctlg_info.IsRootCatalog() && hash.IsNull()) {
-    if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+    if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
       LogCvmfs(kLogCatalog, kLogDebug,
                                    "failed to retrieve valid root catalog '%s'",
                                    mountpoint.c_str());
@@ -955,11 +955,11 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  CatalogInfo ctlg_info(hash, mountpoint, kCtlgLocationMounted);
+  CatalogContext ctlg_info(hash, mountpoint, kCtlgLocationMounted);
 
   // do i need this here?
   if (ctlg_info.IsRootCatalog()) {
-    if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+    if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
       return NULL;
     }
   }

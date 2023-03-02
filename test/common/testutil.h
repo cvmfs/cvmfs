@@ -569,8 +569,8 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
 
   virtual ~MockCatalogManager() { delete spooler_; }
 
-  virtual LoadReturn GetNewRootCatalogInfo(CatalogInfo *result);
-  virtual LoadReturn LoadCatalogByHash(CatalogInfo *ctlg_info);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_info);
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
