@@ -1461,12 +1461,27 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     } while ((overall_bytes_fetched < size) &&
              (chunk_idx < chunks.list->size()));
 
-    // Update chunk file descriptor
-    chunk_tables->Lock();
-    chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
-    chunk_tables->Unlock();
-    LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
+    // If it's an external file, immediately close
+    // the fd so the cached chunk file
+    // is immediately released on cache cleanup
+
+    catalog::DirectoryEntry dirent;
+    bool found = GetDirentForInode(ino, &dirent);
+    if (found && dirent.IsExternalFile()
+        && chunk_fd.fd != -1) {
+      int tmpfd = chunk_fd.fd;
+      chunk_fd.fd = -1;
+      chunk_tables->Lock();
+      chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
+      chunk_tables->Unlock();
+      file_system_->cache_mgr()->Close(tmpfd);
+    } else {
+      chunk_tables->Lock();
+      chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
+      chunk_tables->Unlock();
+      LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
+    }
   } else {
     int64_t nbytes = file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
     if (nbytes < 0) {
