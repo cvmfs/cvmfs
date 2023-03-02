@@ -31,6 +31,7 @@
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "mountpoint.h"
+#include "network/download.h"
 #include "options.h"
 #include "quota.h"
 #include "testutil.h"
@@ -41,7 +42,6 @@
 #include "util/uuid.h"
 
 #include "c_file_sandbox.h"
-#include "download.h"
 
 using namespace std;  // NOLINT
 
