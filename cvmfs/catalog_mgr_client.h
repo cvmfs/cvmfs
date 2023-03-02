@@ -93,7 +93,6 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
    */
   std::map<PathString, shash::Any> loaded_catalogs_;
   std::map<PathString, shash::Any> mounted_catalogs_;
-  uint64_t mounted_root_ctlg_revision_; /**< invalid value: -1ul */
 
   UniquePtr<manifest::Manifest> manifest_;
 

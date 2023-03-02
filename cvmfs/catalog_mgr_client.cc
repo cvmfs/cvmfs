@@ -37,7 +37,6 @@ void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
 
 ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   : AbstractCatalogManager<Catalog>(mountpoint->statistics())
-  , mounted_root_ctlg_revision_(-1ul)
   , repo_name_(mountpoint->fqrn())
   , fetcher_(mountpoint->fetcher())
   , signature_mgr_(mountpoint->signature_mgr())
@@ -105,9 +104,7 @@ bool ClientCatalogManager::InitFixed(
   bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
-  if (attached) {
-    mounted_root_ctlg_revision_ = FindCatalog(PathString("", 0))->GetRevision();
-  } else {
+  if (!attached) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to initialize fixed root catalog");
   }
 
@@ -161,13 +158,12 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
 
   // We only look for currently loaded catalog if the revision is newer than
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
-  if (mounted_root_ctlg_revision_ != -1ul &&
-      (breadcrumb_revision <= mounted_root_ctlg_revision_
-        || breadcrumb_revision == -1ul)) {
+  if (breadcrumb_revision <= GetRevisionNoLock()
+     || breadcrumb_revision == -1ul) {
     std::map<PathString, shash::Any>::iterator curr_hash_itr = 
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
-    local_newest_revision = mounted_root_ctlg_revision_;
+    local_newest_revision = GetRevisionNoLock();
     result->SetRootCtlgLocation(kCtlgLocationMounted);
     success_code = catalog::kLoadUp2Date;
   }
@@ -195,7 +191,11 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
     }
     // server has newest revision or no valid local revision
     if (ensemble->manifest->revision() > local_newest_revision
-          || local_newest_revision == -1ul) {
+          || local_newest_revision == -1ul
+          // if revision is 0 both local and server, load catalog from server
+          // as local is most likely just "initialized" without valid value
+          || (ensemble->manifest->revision() == 0 &&
+              local_newest_revision == 0)) {
     result->SetHash(ensemble->manifest->catalog_hash());
     result->SetRootCtlgRevision(ensemble->manifest->revision());
     result->SetRootCtlgLocation(kCtlgLocationServer);
@@ -210,6 +210,13 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogInfo(CatalogInfo *result) {
             "failed fetch manifest from server: "
             "manifest too old or server unreachable (%d - %s)",
             manifest_failure, manifest::Code2Ascii(manifest_failure));
+  
+  // corner case: server not reachable, local revision is 0. We can not
+  // distinguish if local revision number is valid or invalid. Most likely
+  // it is invalid - so fail
+  if (local_newest_revision == 0 && !manifest_failure == manifest::kFailOk) {
+    return catalog::kLoadFail;
+  }
 
   if (manifest_failure == manifest::kFailOk
       && ensemble->manifest->revision() == local_newest_revision) {
@@ -263,8 +270,6 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogInfo *ctlg_info) {
       if (ctlg_info->root_ctlg_location() == kCtlgLocationMounted) {
         return kLoadUp2Date;
       }
-
-      mounted_root_ctlg_revision_ = ctlg_info->root_ctlg_revision();
 
       // if coming from server: update breadcrumb
       if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {

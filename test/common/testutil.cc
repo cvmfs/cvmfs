@@ -506,27 +506,33 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                          0, is_root, parent_catalog, NULL);
 }
 
-  // TODO 
 catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogInfo(
                                           CatalogInfo *result) {
-  LogCvmfs(kLogCache, kLogDebug, "catalog::MockCatalogManager::GetNewRootCatalogInfo");
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(PathString("",0));
+  LogCvmfs(kLogCache, kLogDebug,
+                          "catalog::MockCatalogManager::GetNewRootCatalogInfo");
+  map<PathString, MockCatalog*>::iterator it =
+                                           catalog_map_.find(PathString("", 0));
   if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
     result->SetHash(catalog->hash());
-    result->SetRootCtlgRevision(GetRevision()); // TODO(heretherebedragons) is this the correct choice?
+    // TODO(heretherebedragons) is this the correct choice?
+    result->SetRootCtlgRevision(GetRevision());
     result->SetRootCtlgLocation(kCtlgLocationServer);
     result->SetMountpoint(PathString("", 0));
     result->SetSqlitePath("");
-    return kLoadUp2Date; 
+    return kLoadUp2Date;
   }
-  return kLoadFail;
+  // This is an ugly workaround needed, otherwise Init() within
+  // t_catalog_mgr.cc fails as it calls the non-mocked MountCatalog() function
+  // which fails if no valid root catalog is found
+  return kLoadNew;
 }
-// TODO
+
 catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
                             CatalogInfo *ctlg_info) {
-  LogCvmfs(kLogCache, kLogDebug, "catalog::MockCatalogManager::LoadCatalogByHash");
-  map<PathString, MockCatalog*>::iterator it = 
+  LogCvmfs(kLogCache, kLogDebug,
+                              "catalog::MockCatalogManager::LoadCatalogByHash");
+  map<PathString, MockCatalog*>::iterator it =
                                      catalog_map_.find(ctlg_info->mountpoint());
   if (it != catalog_map_.end() && !ctlg_info->hash().IsNull()) {
     return kLoadUp2Date;

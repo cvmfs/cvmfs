@@ -131,7 +131,11 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   // allow ctlg_info from dryrun as input parameter? (= +1 IF statement but
   // overall less compute? (depending which remount is called how often))
   // alternatively: expose GetNewRootCatalogInfo to public
-  GetNewRootCatalogInfo(&ctlg_info);
+  if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+    LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
+                                "Did not find any valid root catalog to mount");
+    return kLoadFail;
+  }
 
   WriteLock();
 
@@ -685,6 +689,15 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   return revision;
 }
 
+/**
+ * Like GetRevision() only without any locking mechanism.
+ * As such should only be used in conditions where a lock was already taken
+ * and calling GetRevision() would otherwise result in a deadlock.
+ */
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetRevisionNoLock() const {
+  return revision_cache_;
+}
 
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
@@ -897,10 +910,13 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
 
   CatalogInfo ctlg_info(hash, mountpoint, kCtlgLocationMounted);
 
-  // TODO(heretherebedragons) necessary? is mountcatalog ever called without
-  // a given mountpoint and hash?
   if (ctlg_info.IsRootCatalog() && hash.IsNull()) {
-    GetNewRootCatalogInfo(&ctlg_info);
+    if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+      LogCvmfs(kLogCatalog, kLogDebug,
+                                   "failed to retrieve valid root catalog '%s'",
+                                   mountpoint.c_str());
+      return NULL;
+    }
   }
 
   const LoadReturn retval = LoadCatalogByHash(&ctlg_info);
@@ -943,7 +959,9 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
 
   // do i need this here?
   if (ctlg_info.IsRootCatalog()) {
-    GetNewRootCatalogInfo(&ctlg_info);
+    if (GetNewRootCatalogInfo(&ctlg_info) == kLoadFail) {
+      return NULL;
+    }
   }
 
   const LoadReturn load_ret = LoadCatalogByHash(&ctlg_info);

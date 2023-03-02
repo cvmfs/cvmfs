@@ -140,7 +140,7 @@ struct CatalogInfo {
    * Gives ownership to CatalogInfo
   */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
-                                     { manifest_ensemble_ = manifest_ensemble; } 
+                                     { manifest_ensemble_ = manifest_ensemble; }
 
 
  private:
@@ -282,6 +282,7 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
+  uint64_t GetRevisionNoLock() const;
   uint64_t GetTTL() const;
   bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
@@ -316,13 +317,13 @@ class AbstractCatalogManager : public SingleCopy {
  protected:
   /**
    * Load the catalog and return a file name and the catalog hash.
-   * 
+   *
    * GetNewRootCatalogInfo() populates CatalogInfo object with the information
-   * needed to retrieve the most recent root catalog independent of its 
+   * needed to retrieve the most recent root catalog independent of its
    * location.
-   * CatalogInfo object must be populated with at least hash and mountpoint to 
+   * CatalogInfo object must be populated with at least hash and mountpoint to
    * call LoadCatalogByHash().
-   * 
+   *
    * See class description of CatalogInfo for more information.
    */
   virtual LoadReturn GetNewRootCatalogInfo(CatalogInfo *catalog_info) = 0;
