@@ -25,10 +25,10 @@ CustomSharding::~CustomSharding() {}
 
 void CustomSharding::StartHealthCheck() {}
 void CustomSharding::StopHealthCheck() {}
-void CustomSharding::AddProxy(std::string &proxy) {
+void CustomSharding::AddProxy(const std::string &proxy) {
   PANIC(kLogStderr, "Unimplemented: proxy %s", proxy.c_str());
 }
-std::string CustomSharding::GetNextProxy(const std::string *url,
+const std::string &CustomSharding::GetNextProxy(const std::string *url,
                                          const std::string &current_proxy,
                                          off_t off) {
   PANIC(kLogStderr, "Unimplemented %s %s %ld",
