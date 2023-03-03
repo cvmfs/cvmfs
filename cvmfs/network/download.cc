@@ -1596,7 +1596,6 @@ DownloadManager::DownloadManager() {
   custom_sharding_ = NULL;  
 
   counters_ = NULL;
-
 }
 
 
