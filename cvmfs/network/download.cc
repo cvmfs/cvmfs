@@ -1592,10 +1592,11 @@ DownloadManager::DownloadManager() {
 
   credentials_attachment_ = NULL;
 
-  counters_ = NULL;
-
   use_custom_sharding_ = false;
   custom_sharding_ = NULL;  
+
+  counters_ = NULL;
+
 }
 
 
