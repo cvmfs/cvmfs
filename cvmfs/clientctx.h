@@ -81,8 +81,6 @@ class ClientCtxGuard {
     , old_interrupt_cue_(NULL)
     , old_http_txn_id_(0)
     , old_http_txn_seq_(0)
-    , old_http_txn_id_(0)
-    , old_http_txn_seq_(0)
   {
     // Implementation guarantees old_ctx is not null.
     ClientCtx *old_ctx = ClientCtx::GetInstance();
