@@ -10,7 +10,7 @@ require (
 	github.com/rubyist/lockfile v0.0.0-20140818014254-a66de41d77a7
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/cobra v0.0.3
-	golang.org/x/sys v0.0.0-20201101102859-da207088b7d1
+	golang.org/x/sys v0.1.0
 	gopkg.in/yaml.v2 v2.2.8
 )
 
