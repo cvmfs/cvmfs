@@ -271,7 +271,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive go"
+missing_libs="libcurl libcrypto pacparser sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive"
 
 if [ "$BUILD_ZLIB_NG" == "ON" ]; then
   missing_libs="zlib-ng $missing_libs"
@@ -281,6 +281,9 @@ fi
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
+fi
+if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+    missing_libs="$missing_libs go"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
