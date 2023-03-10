@@ -258,9 +258,9 @@ cvmfs_run_test() {
   cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 68
   cvmfs_suid_helper rw_umount $repo2           || return 69
 
-  echo "remove ${repo_dir} to provoke failed mount call"
-  sudo rm -fR $repo_dir || return 70
-  sudo touch $repo_dir || return 70
+  echo "remove ${repo2_repo_dir} to provoke failed mount call"
+  sudo rm -fR $repo2_repo_dir || return 70
+  sudo touch $repo2_repo_dir || return 70
 
   echo "check that both $repo_dir and $repo2_repo_dir are not mounted"
   cat /proc/mounts | grep -e " $repo_dir "         && return 71
@@ -273,13 +273,13 @@ cvmfs_run_test() {
   echo "check that an error message was printed"
   cat $mount_log_2 | grep 'Trying to mount.*fail' || return 74
 
-  echo "check that $repo_dir is still not mounted but $repo2_repo_dir is"
-  cat /proc/mounts | grep -e " $repo_dir "         && return 75
-  cat /proc/mounts | grep -e " $repo2_repo_dir "   || return 76
+  echo "check that $repo_dir is mounted but $repo2_repo_dir is still not"
+  cat /proc/mounts | grep -e " $repo_dir "         || return 75
+  cat /proc/mounts | grep -e " $repo2_repo_dir "   && return 76
 
   echo "repair the mount point"
-  sudo rm $repo_dir || return 77
-  sudo mkdir -p $repo_dir || return 77
+  sudo rm $repo2_repo_dir || return 77
+  sudo mkdir -p $repo2_repo_dir || return 77
 
   echo "try to mount again (should work now)"
   cvmfs_server mount $CVMFS_TEST_REPO || return 78
