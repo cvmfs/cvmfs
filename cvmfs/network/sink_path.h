@@ -15,47 +15,95 @@ namespace cvmfs {
 class PathSink : public Sink {
  public:
   explicit PathSink(const std::string &destination_path) :
-                                                       path_(destination_path),
-                                                       is_owner_(true) {
+                                                       path_(destination_path) {
+    is_owner_ = true;
     file_ = fopen(destination_path.c_str(), "w");
     assert(file_ != NULL);
   }
 
   virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
 
+  /**
+   * Appends data to the sink
+   * 
+   * @returns on success: number of bytes written 
+   *          on failure: -errno.
+   */
   virtual int64_t Write(const void *buf, uint64_t sz) {
-    return fwrite(buf, 1ul, sz, file_);
-  }
+    fwrite(buf, 1ul, sz, file_);
 
-  virtual int Reset() {
-    return !((fflush(file_) != 0) ||
-           (ftruncate(fileno(file_), 0) != 0) ||
-           (freopen(NULL, "w", file_) != file_));
-  }
-
-  int Close() {
-    if (!is_owner_) {
-      return 0;
+    if (ferror(file_) != 0) {
+      // ferror does not tell us what exactly the error is
+      // and errno is also not set
+      // so just return generic I/O error flag
+      return -EIO;
     }
 
-    int ret = fclose(file_);
-    file_ = NULL;
-
-    return ret;
+    return sz;
   }
 
-  void Release() {
-    is_owner_ = false;
+  /**
+   * Truncate all written data and start over at position zero.
+   * 
+   * @returns Success = 0
+   *          Failure = -1
+   */
+  virtual int Reset() {
+    return ((fflush(file_) == 0) &&
+           (ftruncate(fileno(file_), 0) == 0) &&
+           (freopen(NULL, "w", file_) == file_)) ? 0 : -1;
   }
 
+  /**
+   * @returns true if the object is correctly initialized.
+   */
   bool IsValid() {
     return file_ != NULL;
+  }
+
+  /**
+   * Commit data to the sink
+   * @returns success 0
+   *          otherwise failure
+   */
+  int Flush() {
+    // A zero value indicates success.
+    // If an error occurs, EOF is returned and the error indicator is set (see ferror).
+    return fflush(file_) * -1;
+  }
+
+  /**
+   * Allocate space in the sink
+   * 
+   * @returns success 0
+   */
+  int Reserve(size_t size) {
+    return 0;
+  }
+
+  /**
+   * Returns if the specific sink type needs reservation of (data) space
+   * 
+   * @returns true  - reservation is needed
+   *          false - no reservation is needed
+   */
+  bool RequiresReserve() {
+    return false;
+  }
+
+  /**
+   * Return a string representation of the sink
+  */
+  std::string ToString() {
+    std::string result = "Path sink for ";
+    result += "path " + path_ + " and ";
+    result += IsValid() ? " valid file pointer" : " invalid file pointer";
+    return result;
   }
 
  public:
   FILE *file_;
   const std::string &path_;
-  bool is_owner_;
 };
 
 }  // namespace cvmfs

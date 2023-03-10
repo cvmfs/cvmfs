@@ -22,18 +22,60 @@ class Sink {
  public:
   virtual ~Sink() { }
   /**
-   * Appends data to the sink, returns the number of bytes written or -errno.
+   * Appends data to the sink
+   * 
+   * @returns on success: number of bytes written 
+   *          on failure: -errno.
    */
   virtual int64_t Write(const void *buf, uint64_t sz) = 0;
+
   /**
    * Truncate all written data and start over at position zero.
+   * 
+   * @returns Success = 0
+   *          Failure = -1
    */
   virtual int Reset() = 0;
-  // virtual void Finalize() = 0;
+
   /**
-    * Returns true if the object is correctly initialized.
-  */
+    * @returns true if the object is correctly initialized.
+   */
   virtual bool IsValid() = 0;
+
+  /**
+   * Release ownership of the sink's resource
+   */
+  void Release() { is_owner_ = false; }
+
+  /**
+   * Commit data to the sink
+   * @returns success 0
+   *          otherwise failure
+   */
+  virtual int Flush() = 0;
+
+  /**
+   * Allocate space in the sink
+   * 
+   * @returns success 0
+   */
+  virtual int Reserve(size_t size) = 0;
+
+  /**
+   * Returns if the specific sink type needs reservation of (data) space
+   * 
+   * @returns true  - reservation is needed
+   *          false - no reservation is needed
+   */
+  virtual bool RequiresReserve() = 0;
+
+  /**
+   * Return a string representation of the sink
+  */
+  virtual std::string ToString() = 0;
+
+  protected:
+    bool is_owner_;
 };
 
 }  // namespace cvmfs

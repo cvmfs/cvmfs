@@ -35,16 +35,32 @@ class TransactionSink : public Sink {
   TransactionSink(CacheManager *cache_mgr, void *open_txn)
     : cache_mgr_(cache_mgr)
     , open_txn_(open_txn)
-  { }
-  virtual ~TransactionSink() { }
-  virtual int64_t Write(const void *buf, uint64_t sz) {
+  { is_owner_ = false; }
+  ~TransactionSink() { }
+  int64_t Write(const void *buf, uint64_t sz) {
     return cache_mgr_->Write(buf, sz, open_txn_);
   }
+  // TODO(heretherebedragons) does this always return 0 if successful? (also for tiered cache)
   virtual int Reset() {
     return cache_mgr_->Reset(open_txn_);
   }
-  virtual bool IsValid() {
+  bool IsValid() {
     return cache_mgr_ != NULL && open_txn_ != NULL;
+  }
+
+  int Flush() { return 0; }
+
+  int Reserve(size_t size) { return 0; }
+
+  bool RequiresReserve() { return false; }
+
+  /**
+   * Return a string representation of the sink
+  */
+  std::string ToString() {
+    std::string result = "Transaction sink that is ";
+    result += IsValid() ? "valid"  : "invalid";
+    return result;
   }
 
  private:

@@ -54,7 +54,7 @@ static Failures DoVerify(cvmfs::MemSink *manifest_sink,
   manifest_sink->Release();
   ensemble->raw_manifest_buf =
                         reinterpret_cast<unsigned char *>(manifest_sink->data_);
-  ensemble->raw_manifest_size = manifest_sink->size_;
+  ensemble->raw_manifest_size = manifest_sink->pos_;
   ensemble->manifest = manifest::Manifest::LoadMem(
     ensemble->raw_manifest_buf, ensemble->raw_manifest_size);
   if (!ensemble->manifest) return kFailIncomplete;

@@ -70,6 +70,7 @@ const char T_Download::tmp_path[] = "./cvmfs_ut_download";
 class TestSink : public cvmfs::Sink {
  public:
   TestSink() {
+    is_owner_ = true;
     FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &path);
     assert(f);
     fd = dup(fileno(f));
@@ -89,6 +90,18 @@ class TestSink : public cvmfs::Sink {
 
   virtual bool IsValid() {
     return fd >= 0;
+  }
+
+  int Flush() { return 0; }
+
+  int Reserve(size_t size) { return 0; }
+
+  bool RequiresReserve() { return false; }
+
+  std::string ToString() {
+    std::string result = "Test Sink for path " + path;
+    result += " and " + StringifyInt(fd);
+    return result;
   }
 
   ~TestSink() {
