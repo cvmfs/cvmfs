@@ -227,6 +227,7 @@ Failures Verify(char *manifest_data, size_t manifest_size,
                 ManifestEnsemble *ensemble) {
   cvmfs::MemSink sink(manifest_size);
   memcpy(sink.data_, manifest_data, manifest_size);
+  sink.pos_ = manifest_size;
   return DoVerify(&sink, base_url, repository_name,
                   minimum_timestamp, base_catalog, signature_manager,
                   download_manager, ensemble);
