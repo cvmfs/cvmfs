@@ -10,4 +10,4 @@ die() {
 }
 
 # set default locale
-export LANG=C
+export LC_ALL=C
