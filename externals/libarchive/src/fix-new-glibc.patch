@@ -14,7 +14,7 @@
  #endif
  #ifdef HAVE_LINUX_FS_H
  #include <linux/fs.h>
-+#elif HAVE_SYS_MOUNT_H
++#elifdef HAVE_SYS_MOUNT_H
 +#include <sys/mount.h>
  #endif
  /*
