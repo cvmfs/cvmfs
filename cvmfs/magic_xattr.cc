@@ -485,14 +485,11 @@ std::string ProxyMagicXattr::GetValue() {
 static std::string ListProxy(download::DownloadManager *dm) {
   vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
-  dm->GetProxyInfo(
-    &proxy_chain, &current_group, NULL);
+  dm->GetProxyInfo(&proxy_chain, &current_group, NULL);
   std::string buf = "";
-  for (std::vector<vector<download::DownloadManager::ProxyInfo>>::iterator
-       i=proxy_chain.begin(); i != proxy_chain.end(); ++i) {
-    for (std::vector<download::DownloadManager::ProxyInfo>::iterator
-       j=i->begin(); j != i->end(); ++j) {
-      buf += j->url;
+  for (unsigned int i = 0; i < proxy_chain.size(); i++) {
+    for (unsigned int j = 0; j < proxy_chain[i].size(); j++) {
+      buf += proxy_chain[i][j].url;
       buf += "\n";
     }
   }
