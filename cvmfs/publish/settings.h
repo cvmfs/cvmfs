@@ -101,7 +101,7 @@ class SettingsSpoolArea {
   std::string scratch_dir() const { return scratch_base() + "/current"; }
   std::string scratch_wastebin() const { return scratch_base() + "/wastebin"; }
   std::string log_dir() const { return workspace() + "/logs"; }
-  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
+  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repository.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_lconfig() const { return workspace_() + "/client.local"; }
   std::string client_log() const { return log_dir() + "/cvmfs.log"; }
