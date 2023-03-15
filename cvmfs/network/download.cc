@@ -184,8 +184,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/1.", false)) {
-    if (header_line.length() < 10)
+    if (header_line.length() < 10) {
       return 0;
+    }
 
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
@@ -896,8 +897,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     dns::Host phost = proxy->host;
     const bool changed = ValidateProxyIpsUnlocked(purl, phost);
     // Current proxy may have changed
-    if (changed)
+    if (changed) {
       proxy = ChooseProxyUnlocked(info->expected_hash());
+    }
     info->SetProxy(proxy->url);
     if (proxy->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,

@@ -237,8 +237,8 @@ bool Repository::IsMasterReplica() {
   UniquePtr<download::JobInfo> head(download::JobInfo::CreateWithoutSink(
                                                 &url, false /* probe_hosts */));
   download::Failures retval = download_mgr_->Fetch(head.weak_ref());
-  if (retval == download::kFailOk) return true;
-  if (head->IsFileNotFound()) return false;
+  if (retval == download::kFailOk) { return true; }
+  if (head->IsFileNotFound()) { return false; }
 
   throw EPublish(std::string("error looking for .cvmfs_master_replica [") +
                  download::Code2Ascii(retval) + "]");
