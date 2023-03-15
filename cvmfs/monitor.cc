@@ -375,7 +375,7 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 /**
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Spawn() {
+void Watchdog::Fork() {
   Pipe<kPipeWatchdogPid> pipe_pid;
   pipe_watchdog_ = new Pipe<kPipeWatchdog>();
   pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
@@ -393,7 +393,7 @@ void Watchdog::Spawn() {
           Daemonize();
           // send the watchdog PID to the supervisee
           pid_t watchdog_pid = getpid();
-          pipe_pid.Write<pid_t>(watchdog_pid);
+          pipe_pid.Write(watchdog_pid);
           pipe_pid.CloseWriteFd();
           // Close all unused file descriptors
           // close also usyslog, only get it back if necessary
@@ -418,9 +418,8 @@ void Watchdog::Spawn() {
           SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
 
-          if (WaitForSupervisee()) {
+          if (WaitForSupervisee())
             Supervise();
-          }
 
           pipe_watchdog_->CloseReadFd();
           pipe_listener_->CloseWriteFd();
@@ -552,8 +551,9 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   pipe_watchdog_->Write(ControlFlow::kSupervise);
   size_t path_size = crash_dump_path.size();
   pipe_watchdog_->Write(path_size);
-  if (path_size > 0)
-    WritePipe(pipe_watchdog_->write_end, crash_dump_path.data(), path_size);
+  if (path_size > 0) {
+    pipe_watchdog_->Write(crash_dump_path.data(), path_size);
+  }
 
   spawned_ = true;
 }
