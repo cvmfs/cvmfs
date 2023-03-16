@@ -13,8 +13,8 @@
 #include <map>
 #include <string>
 
-#include "util/platform.h"
 #include "util/pipe.h"
+#include "util/platform.h"
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
