@@ -5,7 +5,6 @@
 #ifndef CVMFS_CLIENTCTX_H_
 #define CVMFS_CLIENTCTX_H_
 
-#include <inttypes.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -32,16 +31,12 @@ class InterruptCue;
 class ClientCtx {
  public:
   struct ThreadLocalStorage {
-    ThreadLocalStorage(uid_t u, gid_t g, pid_t p, InterruptCue *ic,
-      uint64_t http_txn_id, uint32_t http_txn_seq)
-      : uid(u), gid(g), pid(p), interrupt_cue(ic),
-        http_txn_id(http_txn_id), http_txn_seq(http_txn_seq), is_set(true) {}
+    ThreadLocalStorage(uid_t u, gid_t g, pid_t p, InterruptCue *ic)
+      : uid(u), gid(g), pid(p), interrupt_cue(ic), is_set(true) { }
     uid_t uid;
     gid_t gid;
     pid_t pid;
     InterruptCue *interrupt_cue;  ///< A non-owning pointer
-    uint64_t http_txn_id;
-    uint32_t http_txn_seq;
     bool is_set;  ///< either not yet set or deliberately unset
   };
 
@@ -49,13 +44,10 @@ class ClientCtx {
   static void CleanupInstance();
   ~ClientCtx();
 
-  void Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic,
-           uint64_t http_txn_id, uint32_t http_txn_seq);
+  void Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic);
   void Unset();
-  void Get(uid_t *uid, gid_t *gid, pid_t *pid, InterruptCue **ic,
-           uint64_t *http_txn_id, uint32_t *http_txn_seq);
+  void Get(uid_t *uid, gid_t *gid, pid_t *pid, InterruptCue **ic);
   bool IsSet();
-  void IncrementTxnStep();
 
  private:
   static ClientCtx *instance_;
@@ -76,40 +68,30 @@ class ClientCtx {
  */
 class ClientCtxGuard {
  public:
-    ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid,
-          InterruptCue *ic, uint64_t http_txn_id = 0, uint32_t http_txn_seq = 0)
+    ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic)
     : set_on_construction_(false)
     , old_uid_(-1)
     , old_gid_(-1)
     , old_pid_(-1)
     , old_interrupt_cue_(NULL)
-    , old_http_txn_id_(0)
-    , old_http_txn_seq_(0)
   {
     // Implementation guarantees old_ctx is not null.
     ClientCtx *old_ctx = ClientCtx::GetInstance();
     assert(old_ctx);
     if (old_ctx->IsSet()) {
       set_on_construction_ = true;
-      old_ctx->Get(&old_uid_, &old_gid_, &old_pid_,
-                   &old_interrupt_cue_, &old_http_txn_id_, &old_http_txn_seq_);
+      old_ctx->Get(&old_uid_, &old_gid_, &old_pid_, &old_interrupt_cue_);
     }
-    old_ctx->Set(uid, gid, pid, ic, http_txn_id, http_txn_seq);
+    old_ctx->Set(uid, gid, pid, ic);
   }
 
   ~ClientCtxGuard() {
     ClientCtx *ctx = ClientCtx::GetInstance();
     if (set_on_construction_) {
-      ctx->Set(old_uid_, old_gid_, old_pid_, old_interrupt_cue_,
-               old_http_txn_id_, old_http_txn_seq_);
+      ctx->Set(old_uid_, old_gid_, old_pid_, old_interrupt_cue_);
     } else {
       ctx->Unset();
     }
-  }
-
-  void IncrementTxnStep() {
-    ClientCtx *ctx = ClientCtx::GetInstance();
-    ctx->IncrementTxnStep();
   }
 
  private:
@@ -118,8 +100,6 @@ class ClientCtxGuard {
   gid_t old_gid_;
   pid_t old_pid_;
   InterruptCue *old_interrupt_cue_;
-  uint64_t old_http_txn_id_;
-  uint32_t old_http_txn_seq_;
 };
 
 #endif  // CVMFS_CLIENTCTX_H_

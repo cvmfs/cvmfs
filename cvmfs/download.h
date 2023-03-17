@@ -179,8 +179,6 @@ struct JobInfo {
   off_t range_offset;
   off_t range_size;
   std::vector<std::string> http_tracing_headers;
-  uint64_t http_txn_id;
-  uint32_t http_txn_step;
 
   // Default initialization of fields
   void Init() {
@@ -220,8 +218,6 @@ struct JobInfo {
     http_code = -1;
 
     std::vector<std::string> http_tracing_headers;
-    http_txn_id = 0;
-    http_txn_step = 0;
   }
 
   // One constructor per destination + head request

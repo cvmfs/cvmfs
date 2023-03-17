@@ -1768,14 +1768,12 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   info->http_tracing_headers = http_tracing_headers_;
   if (enable_http_tracing_) {
     char buf[100];
-    snprintf(buf, sizeof(buf), "X-CVMFS-PID: %u", info->pid);
+    snprintf(buf, sizeof(buf), "X-CVMFS-PID: %d", info->pid);
     info->http_tracing_headers.push_back(std::string(buf));
-    snprintf(buf, sizeof(buf), "X-CVMFS-GID: %u", info->gid);
+    snprintf(buf, sizeof(buf), "X-CVMFS-GID: %d", info->gid);
     info->http_tracing_headers.push_back(std::string(buf));
-    snprintf(buf, sizeof(buf), "X-CVMFS-UID: %u", info->uid);
+    snprintf(buf, sizeof(buf), "X-CVMFS-UID: %d", info->uid);
     info->http_tracing_headers.push_back(std::string(buf));
-    snprintf(buf, sizeof(buf), "X-CVMFS-ID: %lu.%06u",
-                   info->http_txn_id, info->http_txn_step);
     info->http_tracing_headers.push_back(std::string(buf));
   }
 
