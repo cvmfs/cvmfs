@@ -68,7 +68,7 @@ class ClientCtx {
  */
 class ClientCtxGuard {
  public:
-    ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic)
+  ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic)
     : set_on_construction_(false)
     , old_uid_(-1)
     , old_gid_(-1)
