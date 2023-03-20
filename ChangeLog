@@ -28,7 +28,11 @@
   * Restrict ShortString overflow counters to debug mode (#3081)
   * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
+2.10.2:
+  * Fix locale setting in cvmfs_server (#3237)
+
 2.10.1:
+  * Check object existance only once in cvmfs_server check (#3138)
   * Fix overflow of logbuffer xattr with very long log lines (#2979)
   * Limit parallel cvmfs_server snapshot -a commands (#3064)
   * Let cvmfs_server abort -f succeed even if session token is missing (#3159)
