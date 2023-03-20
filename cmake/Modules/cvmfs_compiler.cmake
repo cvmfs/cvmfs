@@ -9,6 +9,8 @@ set (CFLAGS        "") # this should better be `unset()` but CMake 2.6.2 doesn't
 set (ENV{CFLAGS}   "") # support it. Should be changed as soon as SLES 11 brings
 set (CMAKE_C_FLAGS "") # an update for CMake or we drop support for the platform
 set (LDFLAGS $ENV{LDFLAGS})
+set (AVXFLAGS      "") # support explicit disablement of avx
+
 separate_arguments (TMP_C_FLAGS)
 foreach (CMPLR_FLAG ${TMP_C_FLAGS})
   if (${CMPLR_FLAG} MATCHES ^-[DIU].*)
@@ -18,6 +20,8 @@ foreach (CMPLR_FLAG ${TMP_C_FLAGS})
     message ("Moving ${CMPLR_FLAG} from CFLAGS into LDFLAGS")
     set (LDFLAGS "${LDFLAGS} ${CMPLR_FLAG}")
     set (CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} ${CMPLR_FLAG}")
+  elseif (${CMPLR_FLAG} MATCHES ^-mno-avx.*)
+    set (AVX_FLAGS "${AVX_FLAGS} ${CMPLR_FLAG}")
   else (${CMPLR_FLAG} MATCHES ^-[DUILl].*)
     set (CFLAGS "${CFLAGS} ${CMPLR_FLAG}")
   endif (${CMPLR_FLAG} MATCHES ^-[DIU].*)
@@ -34,7 +38,7 @@ set (ENV{LDFLAGS}    "${LDFLAGS}")
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
 #
 set (CVMFS_FIX_FLAGS "")
-set (CVMFS_OPT_FLAGS "-Os")
+set (CVMFS_OPT_FLAGS "-Os ${AVX_FLAGS}")
 if (CMAKE_COMPILER_IS_GNUCC)
   message (STATUS "checking gcc version...")
   execute_process (
