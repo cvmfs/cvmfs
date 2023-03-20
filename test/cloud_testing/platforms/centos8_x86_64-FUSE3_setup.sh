@@ -31,7 +31,6 @@ install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo wget
 
-install_from_repo python2
 
 # For 006 kernel compile
 install_from_repo openssl-devel
@@ -44,6 +43,9 @@ install_from_repo openssl-devel
 # Migration test needs lsb_release
 echo "install lsb_release..."
 install_from_repo redhat-lsb-core
+
+install_from_repo python3
+sudo ln -s /usr/bin/python3 /usr/bin/python || true
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
