@@ -96,7 +96,7 @@ get_or_guess_multiple_repository_names() {
     else
       for name in $names; do
         if ! contains "$repo_names" $(basename $name); then
-          repo_names="$(basename $name) $repo_names"
+          repo_names="$repo_names $(basename $name)"
         fi
       done
     fi

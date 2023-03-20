@@ -99,6 +99,14 @@ int Fetcher::Fetch(
     return fd_return;
   }
 
+  if (id.IsNull()) {
+    // This has been seen when trying to load the root catalog signed by an
+    // invalid certificate on an empty cache
+    // TODO(jblomer): check if still necessary after the catalog reload refactor
+    LogCvmfs(kLogCache, kLogDebug, "cancel attempt to download null hash");
+    return -EIO;
+  }
+
   ThreadLocalStorage *tls = GetTls();
 
   // Synchronization point: either act as a master thread for this object or

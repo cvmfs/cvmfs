@@ -1,4 +1,5 @@
 2.11.0:
+  * Error out early if certificate is invalid (#3238)
   * Improve watchdog startup procedure (#3089)
   * [gc] Avoid duplicate delete requests (#3117)
   * Fix mount helper so that it works with libfuse3 auto_unmount (#3143)

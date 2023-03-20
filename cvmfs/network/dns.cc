@@ -1014,7 +1014,7 @@ void CaresResolver::WaitOnCares() {
   }
 
   if (nfds == 0) {
-    // Call ares_process() unconditonally here, even if we simply timed out
+    // Call ares_process() unconditionally here, even if we simply timed out
     // above, as otherwise the ares name resolve won't timeout.
     ares_process_fd(*channel_, ARES_SOCKET_BAD, ARES_SOCKET_BAD);
   } else {
