@@ -749,7 +749,7 @@ int FuseMain(int argc, char *argv[]) {
                  "Setting CPU Affinity failed with error %d", err);
      }
 #else
-     LogCvmfs(kLogCvmfs, kLogStdout | kLogsyslogErr,
+     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
               "CPU affinity setting not supported on macOS");
 #endif
   }
