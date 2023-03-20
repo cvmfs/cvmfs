@@ -686,7 +686,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  *     as its only parameter:
  *        AwesomeWorker(const AwesomeWorker::worker_context*)
  *     Note: do not rely on the context object to be available after the
- *           consturctor has returned!
+ *           constructor has returned!
  *
  *  -> needs to define the calling-operator expecting one parameter of type:
  *     const expected_data& and returning void

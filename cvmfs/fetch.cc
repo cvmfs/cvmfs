@@ -10,8 +10,8 @@
 #include "backoff.h"
 #include "cache.h"
 #include "clientctx.h"
-#include "download.h"
 #include "interrupt.h"
+#include "network/download.h"
 #include "quota.h"
 #include "statistics.h"
 #include "util/concurrency.h"
@@ -97,6 +97,14 @@ int Fetcher::Fetch(
   if ((fd_return = OpenSelect(id, name, object_type)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", name.c_str());
     return fd_return;
+  }
+
+  if (id.IsNull()) {
+    // This has been seen when trying to load the root catalog signed by an
+    // invalid certificate on an empty cache
+    // TODO(jblomer): check if still necessary after the catalog reload refactor
+    LogCvmfs(kLogCache, kLogDebug, "cancel attempt to download null hash");
+    return -EIO;
   }
 
   ThreadLocalStorage *tls = GetTls();

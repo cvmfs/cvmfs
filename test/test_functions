@@ -320,7 +320,7 @@ autofs_check() {
   if running_on_osx; then
     return 0
   else
-    cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
+    cat /proc/mounts | grep -q "^/etc/\(autofs/\)\?auto.cvmfs /cvmfs "
   fi
 }
 
@@ -2350,8 +2350,10 @@ __do_local_mount() {
   local mountpoint="$2"
   local repo_name="$3"
   local repo_url="$4"
-  local config_file="$5"
-  local extra_option="$6"
+  local config_file="$5"   # config file containing CVMFS client options,
+                           # if used the options listed below are not added
+  local extra_option="$6"  # CVMFS client options as str
+  local mount_options="$7" # comma separated mount options
 
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
@@ -2377,10 +2379,14 @@ EOF
   echo "  *** local mount config:"
   cat "$config"
 
+  if [ ! -z $mount_options ]; then
+    mount_options="${$mount_options},"
+  fi
+
   if [ x"$as_root" != x"" ]; then
-    sudo cvmfs2 -d -o allow_other,config=$config $repo_name $mountpoint >> $output 2>&1
+    sudo cvmfs2 -d -o allow_other,${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   else
-    cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+    cvmfs2 -d -o ${mount_options}config=$config $repo_name $mountpoint >> $output 2>&1
   fi
 }
 

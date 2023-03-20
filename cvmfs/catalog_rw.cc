@@ -528,7 +528,7 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 
 
 /**
- * Registeres a snapshot in /.cvmfs/snapshots. Note that bind mountpoints are
+ * Registers a snapshot in /.cvmfs/snapshots. Note that bind mountpoints are
  * not universally handled: in Partition and MergeIntoParent, bind mountpoint
  * handling is missing!
  */
@@ -590,7 +590,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
 
 
 /**
- * Unregisteres a snapshot from /.cvmfs/snapshots. Note that bind mountpoints
+ * Unregisters a snapshot from /.cvmfs/snapshots. Note that bind mountpoints
  * are not universally handled: in Partition and MergeIntoParent, bind
  * mountpoint handling is missing!
  */
@@ -698,7 +698,7 @@ void WritableCatalog::CopyCatalogsToParent() {
 void WritableCatalog::CopyToParent() {
   // We could simply copy all entries from this database to the 'other' database
   // BUT: 1. this would create collisions in hardlink group IDs.
-  //         therefor we first update all hardlink group IDs to fit behind the
+  //         therefore we first update all hardlink group IDs to fit behind the
   //         ones in the 'other' database
   //      2. the root entry of the nested catalog is present twice:
   //         1. in the parent directory (as mount point) and

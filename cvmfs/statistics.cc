@@ -40,7 +40,7 @@ std::string Counter::PrintRatio(Counter divider) {
 /**
  * Creates a new Statistics binder which maintains the same Counters as the
  * existing one.  Changes to those counters are visible in both Statistics
- * objects.  The child can then independently add more counters.  CounterInfo
+ * objects. The child can then independently add more counters. CounterInfo
  * objects are reference counted and deleted when all the statistics objects
  * dealing with it are destroyed.
  */
@@ -134,6 +134,27 @@ string Statistics::PrintJSON() {
   }
 
   return json_statistics.GenerateString();
+}
+
+/**
+ * Snapshot current state of the counters.
+ * Elements will either be updated or inserted into the map.
+ * 
+ * Note: This function does NOT clear previous elements part of the map.
+ * 
+ * Returns map of the updated counters and the timestamp of the snapshot.
+*/
+void Statistics::SnapshotCounters(
+                        std::map<std::string, int64_t> *counters,
+                        uint64_t *timestamp_ns) {
+  MutexLockGuard lock_guard(lock_);
+  *timestamp_ns = platform_realtime_ns();
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
+       iEnd = counters_.end(); i != iEnd; ++i)
+  {
+    // modify or insert
+    (*counters)[i->first] = (*i->second).counter.Get();
+  }
 }
 
 Counter *Statistics::Register(const string &name, const string &desc) {

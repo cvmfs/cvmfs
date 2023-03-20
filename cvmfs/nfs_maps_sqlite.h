@@ -34,10 +34,6 @@ class NfsMapsSqlite : public NfsMaps {
     perf::Statistics *statistics_);
 
  private:
-  /**
-   * Max length of the sql statements
-   */
-  static const unsigned  kMaxDBSqlLen = 128;
   static const char *kSqlCreateTable;
   static const char *kSqlAddRoot;
   static const char *kSqlAddInode;

@@ -10,10 +10,10 @@
 
 #include "cache_posix.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "fetch.h"
 #include "manifest.h"
 #include "mountpoint.h"
+#include "network/download.h"
 #include "quota.h"
 #include "statistics.h"
 #include "util/posix.h"

@@ -60,7 +60,7 @@ fi
 
 # TODO(jblomer): add all CVMFS_* environment variables to $CONFIG
 
-# Gracefully unmount on container exit to avoid the error messge
+# Gracefully unmount on container exit to avoid the error message
 # "transport endpoint not connected" on /cvmfs/* directories
 trap cleanup SIGTERM SIGINT SIGQUIT SIGHUP
 

@@ -1,8 +1,22 @@
 2.11.0:
+  * Error out early if certificate is invalid (#3238)
+  * Improve watchdog startup procedure (#3089)
+  * [gc] Avoid duplicate delete requests (#3117)
+  * Fix mount helper so that it works with libfuse3 auto_unmount (#3143)
+  * Enable core file generation if watchdog is disabled (#3142)
+  * Fix closing of file descriptors for very large nfiles limit (#3158)
+  * Add AssertOrLog to conditionally continue on certain fatal errors (#3157)
+  * Add telemetry framework to send performance counters to influx (#3096)
+  * [macOS] Fix xattr on symlinks
+  * Add support for evicting chunked files through cvmfs_talk (#3122)
+  * Add support for symlink kernel cache through CVMFS_CACHE_SYMLINKS (#2949)
+  * Bump base for service container to EL9
+  * Add support for CVMFS_S3_X_AMZ_ACL server parameter (#2970)
+  * Add support for protected xattrs, new client parameters
+    CVMFS_XATTR_[PRIVILEGED_GIDS,PROTECTED_XATTRS] (#3103)
   * Improve logging of I/O errors (#2941)
   * [gw] Store publisher hostname in lease (#3130)
   * Make CVMFS_ARCH env available for variant symlinks (#3127, CVM-910)
-  * Improve file reset logic on download retries (#3085)
   * Add user.external_url extended attribute (#3101)
   * Change libcvmfs static library to libcvmfs_client shared library (#3113)
   * Add HTTPS support for connecting to gateway (#3060)
@@ -15,6 +29,16 @@
   * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
 
 2.10.1:
+  * Fix overflow of logbuffer xattr with very long log lines (#2979)
+  * Limit parallel cvmfs_server snapshot -a commands (#3064)
+  * Let cvmfs_server abort -f succeed even if session token is missing (#3159)
+  * Update individual cvmfs_server check status when successful (#3147)
+  * [geo] Allow for missing location info in geo record (#3186)
+  * [container] Fix importing of images with OCI manifest list (#3164)
+  * Improve file reset logic on download retries (#3085)
+  * Improve "mount transfer" syslog message (#2956)
+  * Fix false recreation of the reflog in cvmfs_server check (#3123)
+  * Fix SQlite NFS maps initialization (#3150)
   * Restore ability of cvmfs_server abort -f to survive invalid lease (#3088)
   * Ignore /afs in cvmfs_config fuser (#3090)
   * Fix building leveldb external with non-GNU patch (#3110)

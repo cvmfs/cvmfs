@@ -14,6 +14,8 @@
 #include <string>
 
 #include "util/platform.h"
+#include "util/pointer.h"
+#include "util/single_copy.h"
 
 struct Pipe;
 
@@ -21,16 +23,25 @@ struct Pipe;
  * This class can fork a watchdog process that listens on a pipe and prints a
  * stackstrace into syslog, when cvmfs fails.  The crash dump is also appended
  * to the crash dump file, if the path is not empty.  Singleton.
+ *
+ * The watchdog process if forked on Create and put on hold.  Spawn() will start
+ * the supervision and set the crash dump path. It should be called from the
+ * final supervisee pid (after daemon etc.) but preferably before any threads
+ * are started.
+ *
+ * Note: logging should be set up before calling Create()
  */
-class Watchdog {
+class Watchdog : SingleCopy {
  public:
-  static Watchdog *Create(const std::string &crash_dump_path);
+  /**
+   * Crash cleanup handler signature.
+   */
+  typedef void (*FnOnCrash)(void);
+
+  static Watchdog *Create(FnOnCrash on_crash);
   static pid_t GetPid();
   ~Watchdog();
-  void Spawn();
-  void RegisterOnCrash(void (*CleanupOnCrash)(void));
-
-  static void *MainWatchdogListener(void *data);
+  void Spawn(const std::string &crash_dump_path);
 
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
@@ -45,6 +56,7 @@ class Watchdog {
     enum Flags {
       kProduceStacktrace = 0,
       kQuit,
+      kSupervise,
       kUnknown,
     };
   };
@@ -63,11 +75,15 @@ class Watchdog {
   static Watchdog *instance_;
   static Watchdog *Me() { return instance_; }
 
+  static void *MainWatchdogListener(void *data);
+
   static void ReportSignalAndTerminate(int sig, siginfo_t *siginfo,
                                        void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(const std::string &crash_dump_path);
+  explicit Watchdog(FnOnCrash on_crash);
+  void Fork();
+  bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
   void Supervise();
   void LogEmergency(std::string msg);
@@ -79,21 +95,17 @@ class Watchdog {
   std::string crash_dump_path_;
   std::string exe_path_;
   pid_t watchdog_pid_;
-  Pipe *pipe_watchdog_;
+  /// Communication channel from the supervisee to the watchdog
+  UniquePtr<Pipe> pipe_watchdog_;
   /// The supervisee makes sure its watchdog does not die
-  Pipe *pipe_listener_;
+  UniquePtr<Pipe> pipe_listener_;
   /// Send the terminate signal to the listener
-  Pipe *pipe_terminate_;
+  UniquePtr<Pipe> pipe_terminate_;
   pthread_t thread_listener_;
-  void (*on_crash_)(void);
+  FnOnCrash on_crash_;
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
   SigactionMap old_signal_handlers_;
 };
-
-namespace monitor {
-// TODO(jblomer): move me
-unsigned GetMaxOpenFiles();
-}  // namespace monitor
 
 #endif  // CVMFS_MONITOR_H_

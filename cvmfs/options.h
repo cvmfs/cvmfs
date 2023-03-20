@@ -262,7 +262,7 @@ class SimpleOptionsParser : public OptionsManager {
  * Derived class from OptionsManager. This class provides the
  * complete parsing of the configuration files. In order to parse the
  * configuration files it retrieves the "KEY=VALUE" pairs and uses bash for
- * the rest, so that you can execute sightly complex scripts
+ * the rest, so that you can execute slightly complex scripts
  */
 class BashOptionsManager : public OptionsManager {
  public:

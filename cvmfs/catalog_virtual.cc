@@ -140,7 +140,7 @@ void VirtualCatalog::GenerateSnapshots() {
   vector<TagId> tags_catalog;
   GetSortedTagsFromHistory(&tags_history);
   GetSortedTagsFromCatalog(&tags_catalog);
-  // Add artifical end markers to both lists
+  // Add artificial end markers to both lists
   string tag_name_end = "";
   if (!tags_history.empty())
     tag_name_end = std::max(tag_name_end, tags_history.rbegin()->name);

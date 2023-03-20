@@ -29,7 +29,7 @@ bool HighPrecisionTimer::g_is_enabled = false;
 
 
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
-  // Time substraction, from GCC documentation
+  // Time subtraction, from GCC documentation
   if (end.tv_usec < start.tv_usec) {
     int64_t nsec = (end.tv_usec - start.tv_usec) / 1000000 + 1;
     start.tv_usec -= 1000000 * nsec;

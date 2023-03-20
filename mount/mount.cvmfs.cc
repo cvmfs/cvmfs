@@ -633,19 +633,23 @@ int main(int argc, char **argv) {
   fd_set readfds;
   bool stdout_open = true;
   bool stderr_open = true;
+  int status = 0;
+  int ended = false;
+
   do {
     FD_ZERO(&readfds);
     if (stdout_open) FD_SET(fd_stdout, &readfds);
     if (stderr_open) FD_SET(fd_stderr, &readfds);
-    do {
-      retval = select(nfds, &readfds, NULL, NULL, NULL);
-      if ((retval == -1) && (errno != EINTR)) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to pipe stdout/stderr");
-        return 32;
-      }
-      if (retval > 0)
-        break;
-    } while (true);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100;
+    retval = select(nfds, &readfds, NULL, NULL, &timeout);
+    if ((retval == -1) && (errno != EINTR)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to pipe stdout/stderr");
+      return 32;
+    }
+
     char buf;
     ssize_t num_bytes;
     if (FD_ISSET(fd_stdout, &readfds)) {
@@ -676,16 +680,11 @@ int main(int argc, char **argv) {
           return 32;
       }
     }
-  } while (stdout_open || stderr_open);
+    ended = (waitpid(pid_cvmfs, &status, WNOHANG) == pid_cvmfs);
+  } while ((stdout_open || stderr_open) && !ended);
   close(fd_stdout);
   close(fd_stderr);
 
-  int status;
-  retval = waitpid(pid_cvmfs, &status, 0);
-  if (retval == -1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code");
-    return 32;
-  }
   if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
     return 0;
 

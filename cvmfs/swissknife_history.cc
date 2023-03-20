@@ -12,8 +12,8 @@
 #include "catalog_rw.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "upload.h"
 
 using namespace std;         // NOLINT
@@ -514,7 +514,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     return 1;
   }
 
-  // open the catalog to be tagged (to check for existance and for meta info)
+  // open the catalog to be tagged (to check for existence and for meta info)
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;

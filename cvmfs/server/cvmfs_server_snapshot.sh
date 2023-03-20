@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server snapshot" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -234,13 +234,40 @@ EOF
     exit 1
   fi
 
+  local maxparallel="${CVMFS_MAX_PARALLEL_SNAPSHOTS:-`nproc`}"
+  local fulllog=/var/log/cvmfs/snapshots.log
+
+  # make locks in a tmpfs directory so they will go away after system crash
+  local tmpdir=/dev/shm/cvmfs_snapshot_all
+  if [ ! -d $tmpdir ]; then
+    # This assumes that snapshot -a will only be run by a single user id
+    # on a given machine.
+    mkdir $tmpdir
+  fi
+  local locknum=0
+  local lockfile=""
+  while [ "$locknum" -lt "$maxparallel" ]; do
+    lockfile=$tmpdir/$locknum
+    if acquire_lock $lockfile; then
+      break
+    fi
+    let locknum+=1
+  done
+  if [ "$locknum" -ge "$maxparallel" ]; then
+    # Note that these messages will be the only things in $fullog if 
+    # separate logs are being used.
+    (echo; echo "Hit limit of $maxparallel parallel 'snapshot -a's at `date`, exiting") >>$fulllog
+    exit
+  fi
+
   if [ $separate_logs -eq 0 ]; then
     # write into a temporary file in case more than one is active at the
     #  same time
-    fulllog=/var/log/cvmfs/snapshots.log
-    log=/tmp/cvmfs_snapshots.$$.log
-    trap "rm -f $log" EXIT HUP INT TERM
+    log=$tmpdir/$locknum.log
+    trap "release_lock $lockfile; rm -f $log" EXIT HUP INT TERM
     (echo; echo "Logging in $log at `date`") >>$fulllog
+  else
+    trap "release_lock $lockfile" EXIT HUP INT TERM
   fi
 
   # Sort the active repositories by last snapshot time when on local storage.

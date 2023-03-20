@@ -8,8 +8,8 @@
 #include <string>
 
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "reflog.h"
 #include "statistics.h"
 #include "util/pointer.h"

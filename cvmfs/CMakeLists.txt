@@ -59,8 +59,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        compression.cc
        directory_entry.cc
        duplex_fuse.cc
-       dns.cc
-       download.cc
        fetch.cc
        file_chunk.cc
        file_watcher.cc
@@ -77,6 +75,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        manifest_fetch.cc
        monitor.cc
        mountpoint.cc
+       network/dns.cc
+       network/download.cc
        options.cc
        quota.cc
        quota_posix.cc
@@ -87,6 +87,8 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        sqlitevfs.cc
        ssl.cc
        statistics.cc
+       telemetry_aggregator.cc
+       telemetry_aggregator_influx.cc
        tracer.cc
        whitelist.cc
        wpad.cc
@@ -562,8 +564,6 @@ if (BUILD_SERVER)
        clientctx.cc
        compression.cc
        directory_entry.cc
-       dns.cc
-       download.cc
        file_chunk.cc
        gateway_util.cc
        globals.cc
@@ -585,6 +585,9 @@ if (BUILD_SERVER)
        manifest.cc
        manifest_fetch.cc
        monitor.cc
+       network/dns.cc
+       network/download.cc
+       network/s3fanout.cc
        notify/cmd_pub.cc
        notify/cmd_sub.cc
        notify/messages.cc
@@ -601,7 +604,6 @@ if (BUILD_SERVER)
        reflog.cc
        reflog_sql.cc
        repository_tag.cc
-       s3fanout.cc
        sanitizer.cc
        server_tool.cc
        session_context.cc
@@ -702,8 +704,6 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        compression.cc
        directory_entry.cc
-       dns.cc
-       download.cc
        gateway_util.cc
        globals.cc
        history_sql.cc
@@ -722,6 +722,9 @@ if (BUILD_SERVER)
        manifest.cc
        manifest_fetch.cc
        malloc_arena.cc
+       network/dns.cc
+       network/download.cc
+       network/s3fanout.cc
        options.cc
        pack.cc
        publish/except.cc
@@ -737,7 +740,6 @@ if (BUILD_SERVER)
        publish/settings.cc
        reflog.cc
        reflog_sql.cc
-       s3fanout.cc
        sanitizer.cc
        session_context.cc
        shortstring.cc
@@ -808,9 +810,9 @@ if (BUILD_SERVER)
        backoff.cc
        compression.cc
        directory_entry.cc
-       dns.cc
-       download.cc
        manifest.cc
+       network/dns.cc
+       network/download.cc
        options.cc
        publish/cmd_abort.cc
        publish/cmd_commit.cc
@@ -991,8 +993,6 @@ if(BUILD_RECEIVER)
        catalog_mgr_rw.cc
        compression.cc
        directory_entry.cc
-       dns.cc
-       download.cc
        gateway_util.cc
        globals.cc
        history_sql.cc
@@ -1012,12 +1012,14 @@ if(BUILD_RECEIVER)
        manifest.cc
        manifest_fetch.cc
        monitor.cc
+       network/dns.cc
+       network/download.cc
+       network/s3fanout.cc
        options.cc
        pack.cc
        reflog.cc
        reflog_sql.cc
        repository_tag.cc
-       s3fanout.cc
        sanitizer.cc
        server_tool.cc
        session_context.cc
@@ -1148,8 +1150,6 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression.cc
-                  dns.cc
-                  download.cc
                   gateway_util.cc
                   globals.cc
                   history_sql.cc
@@ -1168,6 +1168,9 @@ if (BUILD_PRELOADER)
                   malloc_arena.cc
                   manifest.cc
                   manifest_fetch.cc
+                  network/dns.cc
+                  network/download.cc
+                  network/s3fanout.cc
                   options.cc
                   pack.cc
                   path_filters/dirtab.cc
@@ -1177,7 +1180,6 @@ if (BUILD_PRELOADER)
                   preload.cc
                   reflog.cc
                   reflog_sql.cc
-                  s3fanout.cc
                   sanitizer.cc
                   server_tool.cc
                   session_context.cc

@@ -26,6 +26,7 @@
 #include "util/atomic.h"
 
 pid_t GetParentPid(const pid_t pid);
+std::string GetProcessname(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
 unsigned GetNoUsedFds();
