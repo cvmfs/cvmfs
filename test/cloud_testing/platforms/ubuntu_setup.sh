@@ -113,7 +113,7 @@ install_from_repo libz-dev     || die "fail (installing libz-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 # make sure the python command is available
 if [ "x$ubuntu_release" = "xfocal" ]; then
-install_from_repo python-is-python3 || "fail (installing python-is-python3)"
+install_from_repo python-is-python2 || "fail (installing python-is-python2)"
 fi
 
 install_from_repo acl || die "fail (installing acl)"
