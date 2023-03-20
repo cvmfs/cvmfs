@@ -669,6 +669,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
+
   return revision;
 }
 
@@ -805,7 +806,7 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
  * The final leaf nested catalog is returned.
  * The is_listable parameter is relevant if path is a nested catalog.  Only
  * if is_listable is true, the nested catalog will be used; otherwise the parent
- * with the transation point is sufficient.
+ * with the transaction point is sufficient.
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::MountSubtree(
@@ -819,9 +820,9 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
                      GetRootCatalog() : const_cast<CatalogT *>(entry_point);
   assert(path.StartsWith(parent->mountpoint()));
 
+  unsigned path_len = path.GetLength();
+
   // Try to find path as a super string of nested catalog mount points
-  PathString path_slash(path);
-  path_slash.Append("/", 1);
   perf::Inc(statistics_.n_nested_listing);
   typedef typename CatalogT::NestedCatalogList NestedCatalogList;
   const NestedCatalogList& nested_catalogs =
@@ -830,11 +831,16 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
-    PathString nested_path_slash(i->mountpoint);
-    nested_path_slash.Append("/", 1);
-    if (path_slash.StartsWith(nested_path_slash)) {
+    if (path.StartsWith(i->mountpoint)) {
+      // in this case the path doesn't start with
+      // the mountpoint in a file path sense
+      // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
+      unsigned mountpoint_len = i->mountpoint.GetLength();
+      if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
+        continue;
+
       // Found a nested catalog transition point
-      if (!is_listable && (path_slash == nested_path_slash))
+      if (!is_listable && (path_len == mountpoint_len))
         break;
 
       if (leaf_catalog == NULL)
@@ -966,6 +972,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    statistics_.catalog_revision->Set(revision_cache_);
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();
   }

@@ -37,7 +37,6 @@
 #include <sstream>
 #include <vector>
 
-#include "crypto/crypto_util.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_main.h"
@@ -691,8 +690,6 @@ int FuseMain(int argc, char *argv[]) {
     return cvmfs_exports_->fnAltProcessFlavor(argc, argv);
   }
 
-  crypto::SetupLibcryptoMt();
-
   // Option parsing
   struct fuse_args *mount_options;
   mount_options = ParseCmdLine(argc, argv);
@@ -804,7 +801,7 @@ int FuseMain(int argc, char *argv[]) {
 
   if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Moint point %s does not exist", mount_point_->c_str());
+             "Mount point %s does not exist", mount_point_->c_str());
     return kFailPermission;
   }
 
@@ -877,6 +874,10 @@ int FuseMain(int argc, char *argv[]) {
                "Failed to drop credentials");
       return kFailPermission;
     }
+  }
+  if (disable_watchdog_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
   }
 
   // Only set usyslog now, otherwise file permissions are wrong
@@ -1099,8 +1100,6 @@ int FuseMain(int argc, char *argv[]) {
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
-
-  crypto::CleanupLibcryptoMt();
 
   delete fence_reload_;
   delete loader_exports_;

@@ -1,11 +1,23 @@
 
 cvmfs_test_name="External data"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 is_external_file() {
   local full_file_path="$1"
   [ x"$(attr -qg external_file "$full_file_path")" = x"1" ]
 }
+
+has_correct_external_url() {
+  cvmfs_mntpnt=${1}
+  external_base=${2}
+  filename=${3}
+
+  local cvmfs_fullpath=$cvmfs_mntpnt/$filename
+  local external_fullpath=$external_base/$filename
+
+  [ x"$(attr -qg external_url "$cvmfs_fullpath")" = x"$external_fullpath" ]
+} 
 
 get_content_hash() {
   local full_file_path="$1"
@@ -159,6 +171,10 @@ cvmfs_run_test() {
     echo "Chunk count is $chunk_count"
     return 28
   fi
+  if ! has_correct_external_url ${cvmfs_mnt} $external_http_base chunked_file ; then
+    echo "External URL of chunked file points to the wrong place."
+    return 29
+  fi
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -221,7 +237,8 @@ cvmfs_run_test() {
   ##############################################################################
 
   # This part has to be second last
-
+  
+  echo "*** Cleanup: Remove files"
   start_transaction $CVMFS_TEST_REPO || return $?
   is_external_file ${cvmfs_mnt}/external/file || return 90
   is_external_file ${cvmfs_mnt}/chunked_file || return 90

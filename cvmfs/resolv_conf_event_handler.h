@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
-#include "download.h"
 #include "file_watcher.h"
+#include "network/download.h"
 
 namespace download {
 

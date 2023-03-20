@@ -531,7 +531,7 @@ cvmfs_chksetup() {
     fi
   done
 
-  # Check repository specfic settings
+  # Check repository specific settings
   local repo_list="$(list_repos)"
   local repo
   for repo in $repo_list
@@ -642,7 +642,7 @@ cvmfs_chksetup() {
       fi
       if [ ! -z $CVMFS_SYSLOG_FACILITY ]; then
         if ! expr "$CVMFS_SYSLOG_FACILITY" : '[0,1,2,3,4,5,6,7]' > /dev/null; then
-          echo -n "Error: invalud value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
+          echo -n "Error: invalid value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
           echo "Valid entries: 0..7"
           num_errors=$(($num_errors+1))
         fi
@@ -1292,7 +1292,11 @@ cvmfs_config_fuser() {
   fi
   [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
 
-  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
+  local skip_afs_opt=
+  if mountpoint /afs >/dev/null 2>&1; then
+    skip_afs_opt="-e /afs"
+  fi
+  lsof $skip_afs_opt | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
 }
 
 cvmfs_umount() {
@@ -1316,7 +1320,11 @@ cvmfs_umount() {
       RETVAL=1
       if [ "x$silent" = "x" ]; then
         echo "Failed!"
-        $fuser -m -a -v $m
+        if [ "$sys_arch" = "Linux" ]; then
+          $fuser -m -a -v $m
+        else
+          $fuser -u -c $m
+        fi
       fi
     else
       [ "x$silent" != "x" ] || echo "OK"

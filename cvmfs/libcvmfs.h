@@ -17,7 +17,7 @@
 
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
-#define LIBCVMFS_VERSION_MINOR 10
+#define LIBCVMFS_VERSION_MINOR 11
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
@@ -42,7 +42,9 @@
 // 30: CernVM-FS 2.8
 //     * Implement cvmfs_remount()
 //     * Add cvmfs_get_revision()
-#define LIBCVMFS_REVISION 30
+// 31: CernVM-FS 2.11
+//     * Move from static libcvmfs.a to shared libcvmfs_client.so
+#define LIBCVMFS_REVISION 31
 
 #include <stdint.h>
 #include <sys/stat.h>
@@ -61,7 +63,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-// Map C++ clases to their C interface names
+// Map C++ classes to their C interface names
 typedef class LibContext cvmfs_context;
 typedef class SimpleOptionsParser cvmfs_option_map;
 #else

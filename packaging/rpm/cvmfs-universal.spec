@@ -43,19 +43,12 @@
 %define build_fuse3 1
 %endif
 
-%define cvmfs_python python
-%define cvmfs_python_devel python-devel
-%define cvmfs_python_setuptools python-setuptools
-%if 0%{?el8} || 0%{?fedora} >= 31
-%define cvmfs_python python2
-%define cvmfs_python_devel python2-devel
-%define cvmfs_python_setuptools python2-setuptools
-%endif
-# On SLES15, we need the python2 interpreter but python3 devel and setuptools
-# TODO(jblomer): upgrade all python components to Python3
-%if 0%{?sle15}
+%if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
 %define cvmfs_python_setuptools python3-setuptools
+%else
+%define cvmfs_python_devel python-devel
+%define cvmfs_python_setuptools python-setuptools
 %endif
 
 %define cvmfs_go golang
@@ -76,7 +69,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.10.0
+Version: 2.11.0
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
@@ -172,6 +165,7 @@ Requires: util-linux
   %endif
 %endif
 Requires: cvmfs-config
+Requires: cvmfs-libs = %{version}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -210,7 +204,7 @@ Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
-Requires: openssl
+Requires: cvmfs-libs = %{version}
 %description devel
 CernVM-FS static client library for pure user-space use
 
@@ -266,6 +260,7 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package shrinkwrap
 Summary: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
 Group: Application/System
+Requires: cvmfs-libs = %{version}
 %description shrinkwrap
 CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
 images.
@@ -273,6 +268,7 @@ images.
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
+Requires: cvmfs-libs = %{version}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
@@ -621,6 +617,10 @@ systemctl daemon-reload
 
 %files libs
 %defattr(-,root,root)
+%{_libdir}/libcvmfs_cache.so
+%{_libdir}/libcvmfs_cache.so.%{version}
+%{_libdir}/libcvmfs_client.so
+%{_libdir}/libcvmfs_client.so.%{version}
 %{_libdir}/libcvmfs_crypto.so
 %{_libdir}/libcvmfs_crypto.so.%{version}
 %{_libdir}/libcvmfs_crypto_debug.so
@@ -645,8 +645,6 @@ systemctl daemon-reload
 
 %files devel
 %defattr(-,root,root)
-%{_libdir}/libcvmfs.a
-%{_libdir}/libcvmfs_cache.a
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h
 %doc COPYING AUTHORS README.md ChangeLog
@@ -708,6 +706,8 @@ systemctl daemon-reload
 %endif
 
 %changelog
+* Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
+- Make cvmfs-libs a dependency of the cvmfs package
 * Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0
 - Add /var/log/cvmfs to cvmfs-server package, set its SElinux label
 * Thu Sep 30 2021 Jakob Blomer <jblomer@cern.ch> - 2.9.0

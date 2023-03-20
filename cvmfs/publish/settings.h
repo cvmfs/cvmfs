@@ -21,7 +21,7 @@ class OptionsManager;
 namespace publish {
 
 /**
- * Allows for settings that remember whether they have been explictily
+ * Allows for settings that remember whether they have been explicitly
  * overwritten.  Otherwise, default values can be changed to upstream repository
  * settings.
  */
@@ -101,7 +101,7 @@ class SettingsSpoolArea {
   std::string scratch_dir() const { return scratch_base() + "/current"; }
   std::string scratch_wastebin() const { return scratch_base() + "/wastebin"; }
   std::string log_dir() const { return workspace() + "/logs"; }
-  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repositor.../client.conf
+  // TODO(jblomer): shouldn't this be in /etc/cvmfs/repository.../client.conf
   std::string client_config() const { return workspace_() + "/client.config"; }
   std::string client_lconfig() const { return workspace_() + "/client.local"; }
   std::string client_log() const { return log_dir() + "/cvmfs.log"; }
@@ -124,7 +124,7 @@ class SettingsSpoolArea {
   Setting<std::string> tmp_dir_;
   Setting<std::string> union_mnt_;
   /**
-   * How aggresively should the mount point stack be repaired
+   * How aggressively should the mount point stack be repaired
    */
   Setting<EUnionMountRepairMode> repair_mode_;
 };  // SettingsSpoolArea
@@ -405,6 +405,7 @@ class SettingsPublisher {
     , whitelist_validity_days_(kDefaultWhitelistValidity)
     , is_silent_(false)
     , is_managed_(false)
+    , ignore_invalid_lease_(false)
     , storage_(fqrn_())
     , transaction_(fqrn_())
     , keychain_(fqrn_())
@@ -417,6 +418,7 @@ class SettingsPublisher {
   void SetOwner(uid_t uid, gid_t gid);
   void SetIsSilent(bool value);
   void SetIsManaged(bool value);
+  void SetIgnoreInvalidLease(bool value);
 
   std::string GetReadOnlyXAttr(const std::string &attr);
 
@@ -430,6 +432,7 @@ class SettingsPublisher {
   uid_t owner_gid() const { return owner_gid_(); }
   bool is_silent() const { return is_silent_(); }
   bool is_managed() const { return is_managed_(); }
+  bool ignore_invalid_lease() const { return ignore_invalid_lease_(); }
 
   const SettingsStorage &storage() const { return storage_; }
   const SettingsTransaction &transaction() const { return transaction_; }
@@ -447,6 +450,9 @@ class SettingsPublisher {
   Setting<unsigned> whitelist_validity_days_;
   Setting<bool> is_silent_;
   Setting<bool> is_managed_;
+  // When trying to drop the session, ignore an invalid lease failure. Useful
+  // to recover a publisher with abort -f.
+  Setting<bool> ignore_invalid_lease_;
 
   SettingsStorage storage_;
   SettingsTransaction transaction_;
@@ -495,7 +501,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    */
   SettingsRepository CreateSettingsRepository(const std::string &ident);
@@ -504,7 +510,7 @@ class SettingsBuilder : SingleCopy {
    * If ident is a url, creates a generic settings object inferring the fqrn
    * from the url.
    * Otherwise, looks in the config files in /etc/cvmfs/repositories.d/<alias>/
-   * If alias is an empty string, the command still succeds iff there is a
+   * If alias is an empty string, the command still succeeds iff there is a
    * single repository under /etc/cvmfs/repositories.d
    * If needs_managed is true, remote repositories are rejected
    * In an "enter environment" (see cmd_enter), the spool area of the enter

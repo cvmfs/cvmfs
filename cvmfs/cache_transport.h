@@ -67,7 +67,7 @@ class CacheTransport {
    */
   static const uint32_t kMaxMsgSize = (2 << 24) - 1;  // 24MB (3 bytes)
   /**
-   * The first byte has the wire protocol version, optinally or-ed with the
+   * The first byte has the wire protocol version, optionally or-ed with the
    * "has attachment" flag.  The other three bytes encode the overall message
    * size in little-endian.
    */

@@ -19,14 +19,9 @@ class GatewayUploaderMocked : public upload::GatewayUploader {
       : upload::GatewayUploader(definition) {}
 
  protected:
-  virtual bool ReadSessionTokenFile(const std::string& /*token_file_name*/,
+  virtual void ReadSessionTokenFile(const std::string& /*token_file_name*/,
                                     std::string* token) {
-    if (!token) {
-      return false;
-    }
-
     *token = "ThisIsAFakeToken";
-    return true;
   }
   virtual bool ReadKey(const std::string& /*key_file_name*/,
                        std::string* key_id, std::string* secret) {

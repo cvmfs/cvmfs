@@ -23,12 +23,12 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
 		defer backend.CancelLease(context.TODO(), token1)
-		token2, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token2, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err == nil {
 			backend.CancelLease(context.TODO(), token2)
 			t.Fatalf("new lease should not have been granted for busy path")
@@ -38,13 +38,13 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Microsecond
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
 		defer backend.CancelLease(context.TODO(), token1)
 		time.Sleep(backend.Config.MaxLeaseTime)
-		if _, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion); err != nil {
+		if _, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion); err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
 	})
@@ -52,12 +52,12 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
 		defer backend.CancelLease(context.TODO(), token1)
-		token2, err := backend.NewLease(context.TODO(), keyID, leasePath+"/below", lastProtocolVersion)
+		token2, err := backend.NewLease(context.TODO(), keyID, leasePath+"/below", "host", lastProtocolVersion)
 		if err == nil {
 			backend.CancelLease(context.TODO(), token2)
 			t.Fatalf("new lease should not have been granted for conflicting path")
@@ -67,7 +67,7 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyidNO"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err == nil {
 			backend.CancelLease(context.TODO(), token1)
 			t.Fatalf("invalid key was accepted")
@@ -77,7 +77,7 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "testNO.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err == nil {
 			backend.CancelLease(context.TODO(), token1)
 			t.Fatalf("invalid repo for key was accepted")
@@ -87,7 +87,7 @@ func TestLeaseServiceNewLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid2"
 		leasePath := "test2.repo.org/NO"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err == nil {
 			backend.CancelLease(context.TODO(), token1)
 			t.Fatalf("invalid path for key was accepted")
@@ -107,7 +107,7 @@ func TestLeaseServiceCancelLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -119,7 +119,7 @@ func TestLeaseServiceCancelLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -145,10 +145,10 @@ func TestLeaseServiceCancelLeaseByPath(t *testing.T) {
 	prefix := "test2.repo.org/some"
 	leasePath1 := path.Join(prefix, "path")
 	leasePath2 := "test2.repo.org/another"
-	if _, err := backend.NewLease(context.TODO(), keyID, leasePath1, lastProtocolVersion); err != nil {
+	if _, err := backend.NewLease(context.TODO(), keyID, leasePath1, "host", lastProtocolVersion); err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
-	if _, err := backend.NewLease(context.TODO(), keyID, leasePath2, lastProtocolVersion); err != nil {
+	if _, err := backend.NewLease(context.TODO(), keyID, leasePath2, "host", lastProtocolVersion); err != nil {
 		t.Fatalf("could not obtain new lease: %v", err)
 	}
 	if err := backend.CancelLeases(context.TODO(), prefix); err != nil {
@@ -172,7 +172,7 @@ func TestLeaseServiceGetLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestLeaseServiceGetLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Microsecond
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token1, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -206,7 +206,7 @@ func TestLeaseServiceGetLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		_, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		_, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -236,7 +236,7 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Second
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}
@@ -266,7 +266,7 @@ func TestLeaseServiceCommitLease(t *testing.T) {
 		backend.Config.MaxLeaseTime = 1 * time.Millisecond
 		keyID := "keyid1"
 		leasePath := "test2.repo.org/some/path"
-		token, err := backend.NewLease(context.TODO(), keyID, leasePath, lastProtocolVersion)
+		token, err := backend.NewLease(context.TODO(), keyID, leasePath, "host", lastProtocolVersion)
 		if err != nil {
 			t.Fatalf("could not obtain new lease: %v", err)
 		}

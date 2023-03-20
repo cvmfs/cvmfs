@@ -29,12 +29,13 @@ const mode_t kModeBitmask = (S_IRWXO | S_IRWXG | S_IRWXU);
 using namespace std;  // NOLINT
 
 struct FsTest {
+  FsTest() : interface(posix_get_interface()), repo("."), data("./data") {}
   struct fs_traversal *interface;
   const char *repo;
   const char *data;
 };
 
-class T_FsInterface : public ::testing::TestWithParam<struct FsTest *> {
+class T_FsInterface : public ::testing::Test {
  protected:
   virtual void SetUp() {
     Init();
@@ -47,7 +48,7 @@ class T_FsInterface : public ::testing::TestWithParam<struct FsTest *> {
   }
 
   void Init() {
-    fs_instance_ = GetParam();
+    fs_instance_ = new FsTest();
     const char *repo = fs_instance_->repo;
     if (repo == NULL) {
       // Current working directory setup from testing environment
@@ -248,7 +249,7 @@ class T_FsInterface : public ::testing::TestWithParam<struct FsTest *> {
 };
 
 
-TEST_P(T_FsInterface, Stat) {
+TEST_F(T_FsInterface, Stat) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("Stat", &ident1, &ident2);
@@ -297,7 +298,7 @@ TEST_P(T_FsInterface, Stat) {
 }
 
 
-TEST_P(T_FsInterface, Touch) {
+TEST_F(T_FsInterface, Touch) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("Touch", &ident1, &ident2);
@@ -390,7 +391,7 @@ TEST_P(T_FsInterface, Touch) {
 }
 
 
-TEST_P(T_FsInterface, MkRmDir) {
+TEST_F(T_FsInterface, MkRmDir) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("MkRmDir", &ident1, &ident2);
@@ -446,7 +447,7 @@ TEST_P(T_FsInterface, MkRmDir) {
 }
 
 
-TEST_P(T_FsInterface, ListDir) {
+TEST_F(T_FsInterface, ListDir) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("ListDir", &ident1, &ident2);
@@ -506,7 +507,7 @@ TEST_P(T_FsInterface, ListDir) {
 }
 
 
-TEST_P(T_FsInterface, ReadWrite) {
+TEST_F(T_FsInterface, ReadWrite) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("ReadWrite", &ident1, &ident2);
@@ -534,7 +535,7 @@ TEST_P(T_FsInterface, ReadWrite) {
 }
 
 
-TEST_P(T_FsInterface, LinkUnlink) {
+TEST_F(T_FsInterface, LinkUnlink) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("LinkUnlink", &ident1, &ident2);
@@ -590,7 +591,7 @@ TEST_P(T_FsInterface, LinkUnlink) {
 }
 
 
-TEST_P(T_FsInterface, Symlink) {
+TEST_F(T_FsInterface, Symlink) {
   std::string ident1;
   std::string ident2;
   MakeTestFiles("Symlink", &ident1, &ident2);
@@ -607,7 +608,7 @@ TEST_P(T_FsInterface, Symlink) {
 }
 
 
-TEST_P(T_FsInterface, TransferPosixToPosix) {
+TEST_F(T_FsInterface, TransferPosixToPosix) {
   std::string ident1;
   std::string ident2;
   std::string prefix = "SRC";
@@ -650,13 +651,3 @@ TEST_P(T_FsInterface, TransferPosixToPosix) {
   delete src;
   delete dest;
 }
-
-struct FsTest g_fs_posix = {
-  posix_get_interface(),
-  "./",
-  "./.data"
-};
-
-INSTANTIATE_TEST_CASE_P(T_FsInterfacePosix,
-                        T_FsInterface,
-                        ::testing::Values(&g_fs_posix));

@@ -52,7 +52,7 @@ namespace catalog {
 //
 // 1.x (earlier - code base still in SVN)
 //     * pre-historic times
-// 0.9 (some time 2011, artifical version)
+// 0.9 (some time 2011, artificial version)
 //     * 1.0 catalogs that lack the SHA-1 value for nested catalogs
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
@@ -748,6 +748,14 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.symlink_.Assign(symlink, strlen(symlink));
   if (expand_symlink && !g_raw_symlinks)
     ExpandSymlink(&result.symlink_);
+
+  if (g_world_readable) {
+    if (S_ISDIR(result.mode_)) {
+       result.mode_ |= 0555;
+    } else {
+       result.mode_ |= 0444;
+    }
+  }
 
   return result;
 }

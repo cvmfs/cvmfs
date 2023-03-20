@@ -404,7 +404,7 @@ bool CatalogTestTool::LookupNestedCatalogHash(
 
   catalog::DirectoryEntry entry;
   // This lookup is used to ensure the needed catalogs are mounted
-  catalog_mgr->LookupPath(path, catalog::kLookupSole, &entry);
+  catalog_mgr->LookupPath(path, catalog::kLookupDefault, &entry);
 
   p.Assign(&path[0], path.length());
   shash::Any hash = catalog_mgr->GetNestedCatalogHash(p);
@@ -436,7 +436,7 @@ bool CatalogTestTool::FindEntry(
     return false;
   }
 
-  if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, entry)) {
+  if (!catalog_mgr->LookupPath(path, catalog::kLookupDefault, entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
              path.c_str());

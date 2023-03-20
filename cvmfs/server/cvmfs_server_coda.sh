@@ -35,7 +35,7 @@ if [ -f /etc/cvmfs/server.local ]; then
   fi
 fi
 
-# setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
+# setup server hooks: no-ops (overridable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
 transaction_after_hook() { :; }
 abort_before_hook() { :; }

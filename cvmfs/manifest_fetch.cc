@@ -12,8 +12,8 @@
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
 
@@ -195,8 +195,11 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   Failures result =
       DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
               signature_manager, download_manager, ensemble);
-  if ((result != kFailOk) && (result != kFailLoad) &&
-      (download_manager->num_hosts() > 1)) {
+  if ((result != kFailOk) &&
+      (result != kFailLoad) &&
+      (result != kFailInvalidCertificate) &&
+      (download_manager->num_hosts() > 1))
+  {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
              "failed to fetch manifest (%d - %s), trying another stratum 1",
              result, Code2Ascii(result));

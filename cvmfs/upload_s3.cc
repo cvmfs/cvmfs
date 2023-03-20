@@ -13,14 +13,28 @@
 #include <vector>
 
 #include "compression.h"
+#include "network/s3fanout.h"
 #include "options.h"
-#include "s3fanout.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 namespace upload {
+
+/*
+ * Allowed values of x-amz-acl according to S3 API
+ */
+static const char* x_amz_acl_allowed_values_[8] = {
+    "private",
+    "public-read",
+    "public-write",
+    "authenticated-read",
+    "aws-exec-read",
+    "bucket-owner-read",
+    "bucket-owner-full-control",
+    ""
+};
 
 void S3Uploader::RequestCtrl::WaitFor() {
   char c;
@@ -41,6 +55,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   , use_https_(false)
   , proxy_("")
   , temporary_path_(spooler_definition.temporary_path)
+  , x_amz_acl_("public-read")
 {
   assert(spooler_definition.IsValid() &&
          spooler_definition.driver_type == SpoolerDefinition::S3);
@@ -65,6 +80,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3config.opt_max_retries = num_retries_;
   s3config.opt_backoff_init_ms = kDefaultBackoffInitMs;
   s3config.opt_backoff_max_ms = kDefaultBackoffMaxMs;
+  s3config.x_amz_acl = x_amz_acl_;
+
   if (use_https_) {
     s3config.protocol = "https";
   } else {
@@ -177,6 +194,25 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
     peek_before_put_ = options_manager.IsOn(parameter);
   }
+  if (options_manager.GetValue("CVMFS_S3_X_AMZ_ACL", &parameter)) {
+    bool isAllowed = false;
+    size_t const len = sizeof(x_amz_acl_allowed_values_) /
+                       sizeof(x_amz_acl_allowed_values_[0]);
+    for (size_t i = 0; i < len; i++) {
+      if (x_amz_acl_allowed_values_[i] == parameter) {
+        isAllowed = true;
+        break;
+      }
+    }
+    if (!isAllowed) {
+      LogCvmfs(kLogUploadS3, kLogStderr,
+               "%s is not an allowed value for CVMFS_S3_X_AMZ_ACL",
+                    parameter.c_str());
+      return false;
+    }
+    x_amz_acl_ = parameter;
+  }
+
   if (options_manager.GetValue("CVMFS_S3_USE_HTTPS", &parameter)) {
     use_https_ = options_manager.IsOn(parameter);
   }

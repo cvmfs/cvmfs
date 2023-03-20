@@ -253,7 +253,7 @@ bool AuthzAttachment::ConfigureCurlHandle(
 
   if (parm->pkey == NULL) {
     // Sigh - PEM_X509_INFO_read doesn't understand old key encodings.
-    // Try a more general-purpose funciton.
+    // Try a more general-purpose function.
     BIO *bio_token = BIO_new_mem_buf(token->data, token->size);
     assert(bio_token != NULL);
     EVP_PKEY *old_pkey = PEM_read_bio_PrivateKey(bio_token, NULL, NULL, NULL);

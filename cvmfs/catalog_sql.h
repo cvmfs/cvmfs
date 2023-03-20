@@ -73,7 +73,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
 
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
- * and all neccessary calls of the sqlite3 API to deal with this statement.
+ * and all necessary calls of the sqlite3 API to deal with this statement.
  */
 class SqlCatalog : public sqlite::Sql {
  public:
@@ -169,7 +169,7 @@ class SqlCatalog : public sqlite::Sql {
 
 
 /**
- * Common ancestor of SQL statemnts that deal with directory entries.
+ * Common ancestor of SQL statements that deal with directory entries.
  */
 class SqlDirent : public SqlCatalog {
  public:

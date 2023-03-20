@@ -33,15 +33,19 @@ cvmfs_run_test() {
 
   cvmfs_swissknife filestats -r $repo_path -n $CVMFS_TEST_REPO -k /etc/cvmfs/keys -o filestats.db
 
+  sqlite3 filestats.db "select count(*) from catalogs;"
   num_catalogs=$(sqlite3 filestats.db "select count(*) from catalogs;")
   [ $num_catalogs -eq 1 ] || return 2
 
+  sqlite3 filestats.db "select count(*) from files;"
   num_files=$(sqlite3 filestats.db "select count(*) from files;")
   [ $num_files -eq 4 ] || return 3
 
+  sqlite3 filestats.db "select count(*) from objects;"
   num_objects=$(sqlite3 filestats.db "select count(*) from objects;")
   [ $num_objects -eq 3 ] || return 4
 
+  sqlite3 filestats.db "select size from objects;" | sort
   object_sizes=$(sqlite3 filestats.db "select size from objects;" | sort)
   object_sizes_formatted=$(echo $object_sizes)
   [ "x$object_sizes_formatted" == x"10 11 11" ] || return 5

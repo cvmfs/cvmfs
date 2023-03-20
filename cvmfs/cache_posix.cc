@@ -52,9 +52,9 @@
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
-#include "download.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -409,10 +409,11 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 
   result = link(oldpath, newpath);
   if (result < 0) {
-    if (errno == EEXIST)
+    if (errno == EEXIST) {
       LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
-    else
+    } else {
       return -errno;
+    }
   }
   result = unlink(oldpath);
   if (result < 0)

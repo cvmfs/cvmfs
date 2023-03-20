@@ -11,7 +11,7 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 Package: cvmfs
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-config-default | cvmfs-config, gawk, psmisc, lsof, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, ${misc:Depends}
+Depends: cvmfs-config-default | cvmfs-config, gawk, psmisc, lsof, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 Recommends: autofs (>= 5.1.2)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
@@ -50,7 +50,7 @@ Description: CernVM-FS client library
 Package: cvmfs-shrinkwrap
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: openssl, python, ${misc:Depends}
+Depends: openssl, python, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
@@ -59,7 +59,7 @@ Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
 Package: cvmfs-unittests
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libssl-dev, uuid-dev, ${misc:Depends}
+Depends: libssl-dev, uuid-dev, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests

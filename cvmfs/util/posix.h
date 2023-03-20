@@ -98,6 +98,7 @@ CVMFS_EXPORT void Block2Nonblock(int filedes);
 CVMFS_EXPORT void SendMsg2Socket(const int fd, const std::string &msg);
 CVMFS_EXPORT bool SendFd2Socket(int socket_fd, int passing_fd);
 CVMFS_EXPORT int RecvFdFromSocket(int msg_fd);
+CVMFS_EXPORT std::string GetHostname();
 
 CVMFS_EXPORT bool SwitchCredentials(const uid_t uid, const gid_t gid,
                                     const bool temporarily);
@@ -149,6 +150,8 @@ CVMFS_EXPORT mode_t GetUmask();
 CVMFS_EXPORT bool AddGroup2Persona(const gid_t gid);
 CVMFS_EXPORT std::string GetHomeDirectory();
 
+CVMFS_EXPORT std::string GetArch();
+
 CVMFS_EXPORT int SetLimitNoFile(unsigned limit_nofile);
 CVMFS_EXPORT void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
 
@@ -180,6 +183,7 @@ CVMFS_EXPORT bool ManagedExec(const std::vector<std::string> &command_line,
                               const bool clear_env = false,
                               const bool double_fork = true,
                               pid_t *child_pid = NULL);
+CVMFS_EXPORT bool CloseAllFildes(const std::set<int> &preserve_fildes);
 
 CVMFS_EXPORT void SafeSleepMs(const unsigned ms);
 // Note that SafeWrite cannot return partial results but

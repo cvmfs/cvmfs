@@ -5,7 +5,7 @@
 #
 # Functionality related to the Apache web server
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 
 
@@ -42,7 +42,7 @@ reload_apache() {
 }
 
 
-# An Apache reload is asynchronous, the new configration is not immediately
+# An Apache reload is asynchronous, the new configuration is not immediately
 # accessible.  Wait up to 1 minute until a test url can be fetched
 wait_for_apache() {
   local url="$1"
@@ -204,7 +204,7 @@ get_compatible_apache_allow_from_all_config() {
 # Note: Configuration file content is expected to come through stdin
 #
 # @param   file_name  the name of the apache config file (no path!)
-# @return             0 on succes
+# @return             0 on success
 create_apache_config_file() {
   local file_name=$1
   local conf_path

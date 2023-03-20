@@ -23,6 +23,11 @@ echo "OK"
 run_unittests --gtest_shuffle \
               --gtest_death_test_use_fork || retval=1
 
+# Test exclusions
+# 095: not needed on EL9 as attach mounts are supported
+# 066: temporarily until automounter reload bug is fixed
+# 647: authz helper python script needs to be ported to python 3
+
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
@@ -30,9 +35,16 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               -x src/005-asetup                               \
                                  src/004-davinci                              \
                                  src/007-testjobs                             \
+                                 src/017-dnstimeout                           \
+                                 src/019-httptimeout                          \
+                                 src/020-emptyrepofailover                    \
+                                 src/030-missingrootcatalog                   \
                                  src/056-lowspeedlimit                        \
+                                 src/065-http-400                             \
+                                 src/066-killall                              \
                                  src/084-premounted                           \
-                                 src/094-attachmount                          \
+                                 src/095-fuser                                \
+                                 src/096-cancelreq                            \
                                  --                                           \
                                  src/0*                                       \
                               || retval=1
@@ -43,13 +55,21 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 CVMFS_TEST_UNIONFS=overlayfs                                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
+                                 src/525-bigrepo                              \
+                                 src/572-proxyfailover                        \
                                  src/600-securecvmfs                          \
+                                 src/607-noapache                             \
+                                 src/615-externaldata                         \
+                                 src/620-pullmixedrepo                        \
+                                 src/624-chunkedexternalgraft                 \
                                  src/628-pythonwrappedcvmfsserver             \
+                                 src/647-bearercvmfs                          \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  src/684-https_s3                             \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
+                                 src/702-symlink_caching                      \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
@@ -59,20 +79,19 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                               || retval=1
 
 
-# TODO(jblomer): re-enable once there is a cvmfs package history for EL9
-#echo "running CernVM-FS client migration test cases..."
-#CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
-#./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
-#         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#            migration_tests/0*                                    \
-#         || retval=1
-#
-#
-#echo "running CernVM-FS server migration test cases..."
-#CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
-#./run.sh $MIGRATIONTEST_SERVER_LOGFILE                            \
-#         -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-#            migration_tests/5*                                    \
-#         || retval=1
+echo "running CernVM-FS client migration test cases..."
+CVMFS_TEST_CLASS_NAME=ClientMigrationTests                        \
+./run.sh $MIGRATIONTEST_CLIENT_LOGFILE                            \
+         -o ${MIGRATIONTEST_CLIENT_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/0*                                    \
+         || retval=1
+
+
+echo "running CernVM-FS server migration test cases..."
+CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
+./run.sh $MIGRATIONTEST_SERVER_LOGFILE                            \
+         -o ${MIGRATIONTEST_SERVER_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+            migration_tests/5*                                    \
+         || retval=1
 
 exit $retval

@@ -14,8 +14,8 @@
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "letter.h"
+#include "network/download.h"
 #include "util/string.h"
 #include "whitelist.h"
 

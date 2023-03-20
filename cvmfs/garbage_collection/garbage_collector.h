@@ -96,6 +96,8 @@ class GarbageCollector {
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
   unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
   unsigned int condemned_objects_count() const { return condemned_objects_;  }
+  unsigned int duplicate_delete_requests() const {
+                                           return duplicate_delete_requests_;  }
   uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
@@ -144,6 +146,8 @@ class GarbageCollector {
   ReflogBasedInfoShim  catalog_info_shim_;
   CatalogTraversalT    traversal_;
   HashFilterT          hash_filter_;
+  HashFilterT          hash_map_delete_requests_;
+
 
   bool use_reflog_timestamps_;
   /**
@@ -175,6 +179,7 @@ class GarbageCollector {
 
   unsigned int          condemned_objects_;
   uint64_t              condemned_bytes_;
+  unsigned int          duplicate_delete_requests_;
 };
 
 #include "garbage_collector_impl.h"

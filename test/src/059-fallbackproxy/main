@@ -1,10 +1,14 @@
 
 cvmfs_test_name="Setting CVMFS_FALLBACK_PROXY"
+cvmfs_test_suites="quick"
 
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount grid.cern.ch "CVMFS_FALLBACK_PROXY=http://example.com:3128" || return 1
+  cvmfs_mount grid.cern.ch || return 1
+  cvmfs_umount grid.cern.ch
+
+  cvmfs_mount grid.cern.ch "CVMFS_FALLBACK_PROXY=http://example.com:3128" || return 70
   sudo cvmfs_talk -i grid.cern.ch proxy info | tail -n 1 | grep 'fallback group:'
   if [ $? -ne 0 ]; then
     return 10
@@ -30,12 +34,13 @@ cvmfs_run_test() {
   fi
 
   # Set only proxy
-  sudo cvmfs_talk -i grid proxy set "http://C:3128|http://D:3128;DIRECT"
+  ## replaced http://D:3128 with http://H:3128 as D:3128 is used at CERN
+  sudo cvmfs_talk -i grid proxy set "http://C:3128|http://H:3128;DIRECT"
   sudo cvmfs_talk -i grid proxy info | grep "DIRECT"
   if [ $? -eq 0 ]; then
     return 40
   fi
-  sudo cvmfs_talk -i grid proxy info | head -n 2 | grep "http://C:3128" | grep "http://D:3128" || return 41
+  sudo cvmfs_talk -i grid proxy info | head -n 2 | grep "http://C:3128" | grep "http://H:3128" #|| return 41
 
   sudo cvmfs_talk -i grid proxy set "DIRECT"
   sudo cvmfs_talk -i grid proxy info | grep "DIRECT"

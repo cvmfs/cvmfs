@@ -54,13 +54,13 @@
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "globals.h"
 #include "interrupt.h"
 #include "libcvmfs.h"
 #include "lru_md.h"
+#include "network/download.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "sqlitemem.h"
@@ -195,7 +195,7 @@ bool LibContext::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // TODO(jblomer): not twice md5 calculation
-  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupSole,
+  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupDefault,
                                               dirent))
   {
     mount_point_->md5path_cache()->Insert(md5path, *dirent);

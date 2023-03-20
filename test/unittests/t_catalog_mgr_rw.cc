@@ -6,7 +6,7 @@
 
 #include "catalog_mgr_rw.h"
 #include "catalog_test_tools.h"
-#include "download.h"
+#include "network/download.h"
 #include "statistics.h"
 #include "upload.h"
 
@@ -98,15 +98,15 @@ TEST_F(T_CatalogMgrRw, CloneTreeFailSlow) {
   EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
 
   catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
-  EXPECT_DEATH(catalog_mgr->CloneTree("", ""), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("", "clone"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir", ""), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir", "dir"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir", "dir/clone"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("void", "clone"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir/file1", "clone"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir", "void/clone"), ".*");
-  EXPECT_DEATH(catalog_mgr->CloneTree("dir/dir", "dir/dir2"), ".*");
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("", ""));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("", "clone"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir", ""));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir", "dir"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir", "dir/clone"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("void", "clone"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir/file1", "clone"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir", "void/clone"));
+  EXPECT_ANY_THROW(catalog_mgr->CloneTree("dir/dir", "dir/dir2"));
 }
 
 
@@ -122,12 +122,12 @@ TEST_F(T_CatalogMgrRw, CloneTree) {
 
   DirectoryEntry dirent;
   EXPECT_TRUE(catalog_mgr->LookupPath("/clone/dir/dir/dir/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[0], dirent.checksum().ToString().c_str());
   EXPECT_EQ(g_file_size, dirent.size());
 
   EXPECT_TRUE(catalog_mgr->LookupPath("/clone/dir/dir",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsNestedCatalogRoot());
 }
 
@@ -157,7 +157,7 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalog) {
   catalog_mgr->DetachNested();
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size);
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 
   // Swap sub1 and sub2
@@ -165,10 +165,10 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalog) {
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub2_hash, sub2_size);
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub2", sub1_hash, sub1_size);
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file2",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[7], dirent.checksum().ToString().c_str());
   EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub2/file1",
-                                      kLookupSole, &dirent));
+                                      kLookupDefault, &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 }
 
@@ -201,29 +201,25 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
 
   // Fail if parent catalog does not exist
   catalog_mgr->DetachNested();
-  EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("no/such/dir/sub1",
-                                              sub1_hash, sub1_size),
-               "could not find parent");
+  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("no/such/dir/sub1",
+                                              sub1_hash, sub1_size));
 
   // Fail for directory that is not a nested catalog
   catalog_mgr->DetachNested();
-  EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("dir/dir",
-                                              sub1_hash, sub1_size),
-               "not found in parent");
+  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir",
+                                              sub1_hash, sub1_size));
 
   // Fail for nested catalog that is already attached and modified
   EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
                                         &path, &sub1_hash, &sub1_size));
   catalog_mgr->RemoveFile("dir/dir/dir/sub1/file1");
-  EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
-                                              sub1_hash, sub1_size),
-               "already modified");
+  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
+                                              sub1_hash, sub1_size));
 
   // Fail for non-existent catalog
   catalog_mgr->DetachNested();
-  EXPECT_DEATH(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
-                                              subX_hash, subX_size),
-               "failed to load");
+  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
+                                              subX_hash, subX_size));
 }
 
 }  // namespace catalog

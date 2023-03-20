@@ -12,7 +12,7 @@
 
 #include "compression.h"
 #include "crypto/signature.h"
-#include "download.h"
+#include "network/download.h"
 #include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"

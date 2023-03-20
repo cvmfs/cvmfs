@@ -13,7 +13,7 @@ import (
 const (
 	// latestSchemaVersion represents the most recent lease DB schema version
 	// known to the application
-	latestSchemaVersion = 2
+	latestSchemaVersion = 3
 )
 
 // DB stores active leases
@@ -91,7 +91,8 @@ create table if not exists Lease (
 	Path string not null,
 	KeyID string not null,
 	Expiration integer not null,
-	ProtocolVersion integer not null
+	ProtocolVersion integer not null,
+	Hostname string
 );
 create index lease_repository_path_idx ON Lease(Repository,Path);
 create table if not exists Repository (
@@ -118,6 +119,18 @@ func checkSchemaVersion(db *sql.DB) (int, error) {
 		return 0, fmt.Errorf(
 			"unknown schema version: %v, latest known %v",
 			version, latestSchemaVersion)
+	}
+
+	if version == 2 {
+		statement := `
+alter table lease add column hostname string;
+update SchemaVersion set VersionNumber=3, ValidFrom=datetime('now');
+`
+		if _, err := db.Exec(statement); err != nil {
+			return 2, fmt.Errorf("could not migrate table schema (2->3): %w", err)
+		}
+
+		version = 3
 	}
 
 	return version, nil

@@ -5,9 +5,9 @@
 #include "cmd_sub.h"
 
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "notify/messages.h"
 #include "options.h"
 #include "subscriber_sse.h"

@@ -31,15 +31,15 @@ namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
 
-/**
- * Lookup a directory entry including its parent entry or not.
- */
-enum LookupOptions {
-  kLookupSole        = 0x01,
-  // kLookupFull        = 0x02  not used anymore
-  kLookupRawSymlink  = 0x10,
-};
 
+/**
+ * LookupOption for a directory entry (bitmask).
+ * kLookupDefault = Look solely at the given directory entry (parent is ignored)
+ * kLookupRawSymlink = Don't resolve environment variables in symlink targets
+ */
+typedef unsigned LookupOptions;
+const unsigned kLookupDefault = 0b1;
+const unsigned kLookupRawSymlink = 0b10;
 
 /**
  * Results upon loading a catalog file.
@@ -72,6 +72,7 @@ struct Statistics {
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
   perf::Counter *n_detach_siblings;
+  perf::Counter *catalog_revision;
 
   explicit Statistics(perf::Statistics *statistics) {
     n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
@@ -89,6 +90,8 @@ struct Statistics {
         "Number of listings of nested catalogs");
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
+    catalog_revision = statistics->Register("catalog_revision",
+                                    "Revision number of the root file catalog");
   }
 };
 

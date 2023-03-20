@@ -30,6 +30,12 @@ cvmfs_run_test() {
   [ $? -eq 0 ] || return 3
   echo "silent server started with PID $CVMFS_TEST_096_SILENT_PID"
 
+  # Note that on macOS, xattr involved opening the file
+  local afile=$(find /cvmfs/cvmfs-config.cern.ch -type f | head -n1)
+  local nchunks=$(get_xattr chunks $afile)
+  [ $nchunks -eq 1 ] || return 5
+  sudo cvmfs_talk -i cvmfs-config.cern.ch cleanup 0
+
   echo "*** prefix host list with unresponsive server"
   sudo cvmfs_talk -i cvmfs-config.cern.ch proxy set DIRECT
   sudo cvmfs_talk -i cvmfs-config.cern.ch host set \
@@ -37,10 +43,7 @@ cvmfs_run_test() {
   sudo cvmfs_talk -i cvmfs-config.cern.ch proxy info
   sudo cvmfs_talk -i cvmfs-config.cern.ch host info
 
-  local afile=$(find /cvmfs/cvmfs-config.cern.ch -type f | head -n1)
   echo "*** read $afile, should block"
-  local nchunks=$(get_xattr chunks $afile)
-  [ $nchunks -eq 1 ] || return 5
   local nfsopen_before=$(sudo cvmfs_talk -i cvmfs-config.cern.ch internal affairs \
     | grep "^cvmfs.n_fs_open" | cut -d\| -f2)
   echo "*** Number of file system open calls before opening $afile: $nfsopen_before"
@@ -56,7 +59,7 @@ cvmfs_run_test() {
     | grep "^cvmfs.n_fs_open" | cut -d\| -f2)
     sleep 1
   done
-  echo "*** Number of file system open calls before opening $afile: $nfsopen_after"
+  echo "*** Number of file system open calls after opening $afile: $nfsopen_after"
 
   echo "*** Killing $pid"
   kill $pid

@@ -25,7 +25,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * @param AbstractProductT  the abstract base class of all classes that could be
  *                          polymorphically constructed by this factory
  * @param ParameterT        the type of the parameter that is used to figure out
- *                          which class should be instanciated at runtime
+ *                          which class should be instantiated at runtime
  * @param InfoT             wrapper type for introspection data of registered
  *                          plugins
  */
@@ -46,7 +46,7 @@ class AbstractFactory {
  * specific class instance. Namely ConcreteProductT. (Note: still abstract)
  * See the description of PolymorphicCreation for more details
  *
- * @param ConcreteProductT  the class that will be instanciated by this factory
+ * @param ConcreteProductT  the class that will be instantiated by this factory
  *                          class (must be derived from AbstractProductT)
  * @param AbstractProductT  the base class of all used ConcreteProductT classes
  * @param ParameterT        the type of the parameter that is used to poly-

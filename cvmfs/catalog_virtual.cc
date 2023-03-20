@@ -111,7 +111,7 @@ void VirtualCatalog::CreateSnapshotDirectory() {
 void VirtualCatalog::EnsurePresence() {
   DirectoryEntry e;
   bool retval = catalog_mgr_->LookupPath("/" + string(kVirtualPath),
-                                        kLookupSole, &e);
+                                        kLookupDefault, &e);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogDebug, "creating new virtual catalog");
     CreateBaseDirectory();
@@ -140,7 +140,7 @@ void VirtualCatalog::GenerateSnapshots() {
   vector<TagId> tags_catalog;
   GetSortedTagsFromHistory(&tags_history);
   GetSortedTagsFromCatalog(&tags_catalog);
-  // Add artifical end markers to both lists
+  // Add artificial end markers to both lists
   string tag_name_end = "";
   if (!tags_history.empty())
     tag_name_end = std::max(tag_name_end, tags_history.rbegin()->name);
@@ -287,7 +287,7 @@ void VirtualCatalog::Remove() {
   assert(!virtual_catalog->IsRoot());
   DirectoryEntry entry_virtual;
   bool retval = catalog_mgr_->LookupPath(
-    PathString("/" + string(kVirtualPath)), kLookupSole, &entry_virtual);
+    PathString("/" + string(kVirtualPath)), kLookupDefault, &entry_virtual);
   assert(retval);
   assert(entry_virtual.IsHidden());
 

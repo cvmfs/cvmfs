@@ -459,7 +459,7 @@ bool posix_is_hash_consistent(struct fs_traversal_context *ctx,
   struct stat hidden_path_stat;
   int res2 = stat(hidden_datapath.c_str(), &hidden_path_stat);
   if (res2 == -1) {
-    // If hidden path doesn't exist although apprently existing => error
+    // If hidden path doesn't exist although apparently existing => error
     return false;
   }
   return display_path_stat.st_ino == hidden_path_stat.st_ino;

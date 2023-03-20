@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -57,9 +58,10 @@ using namespace std;  // NOLINT
 Watchdog *Watchdog::instance_ = NULL;
 
 
-Watchdog *Watchdog::Create(const string &crash_dump_path) {
+Watchdog *Watchdog::Create(FnOnCrash on_crash) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(crash_dump_path);
+  instance_ = new Watchdog(on_crash);
+  instance_->Fork();
   return instance_;
 }
 
@@ -160,10 +162,7 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
 
 pid_t Watchdog::GetPid() {
   if (instance_ != NULL) {
-    if (!instance_->spawned_)
-      return getpid();
-    else
-      return instance_->watchdog_pid_;
+    return instance_->watchdog_pid_;
   }
   return getpid();
 }
@@ -213,7 +212,7 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
   int           chars_io;
   unsigned int  ring_buffer_pos = 0;
 
-  // read from stdout of gdb until gdb prompt occures --> (gdb)
+  // read from stdout of gdb until gdb prompt occurs --> (gdb)
   while (1) {
     chars_io = read(fd_pipe, &mini_buffer, 1);
 
@@ -237,18 +236,10 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
 }
 
 
-void Watchdog::RegisterOnCrash(void (*CleanupOnCrash)(void)) {
-  on_crash_ = CleanupOnCrash;
-}
-
-
 /**
  * Generates useful information from the backtrace log in the pipe.
  */
 string Watchdog::ReportStacktrace() {
-  // Re-activate µSyslog, if necessary
-  SetLogMicroSyslog(GetLogMicroSyslog());
-
   CrashData crash_data;
   if (!pipe_watchdog_->TryRead(&crash_data)) {
     return "failed to read crash data (" + StringifyInt(errno) + ")";
@@ -382,27 +373,25 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
 
 
 /**
- * Fork the watchdog process.
+ * Fork the watchdog process and put it on hold until Spawn() is called.
  */
-void Watchdog::Spawn() {
+void Watchdog::Fork() {
   Pipe pipe_pid;
   pipe_watchdog_ = new Pipe();
   pipe_listener_ = new Pipe();
 
   pid_t pid;
   int statloc;
-  int max_fd = sysconf(_SC_OPEN_MAX);
-  assert(max_fd >= 0);
   switch (pid = fork()) {
     case -1: PANIC(NULL);
     case 0:
       // Double fork to avoid zombie
       switch (fork()) {
-        case -1: exit(1);
+        case -1: _exit(1);
         case 0: {
           close(pipe_watchdog_->write_end);
           Daemonize();
-          // send the watchdog PID to cvmfs
+          // send the watchdog PID to the supervisee
           pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
           close(pipe_pid.write_end);
@@ -410,41 +399,116 @@ void Watchdog::Spawn() {
           // close also usyslog, only get it back if necessary
           // string usyslog_save = GetLogMicroSyslog();
           string debuglog_save = GetLogDebugFile();
-          // SetLogMicroSyslog("");
           SetLogDebugFile("");
+          string usyslog_save = GetLogMicroSyslog();
+          SetLogMicroSyslog("");
           // Gracefully close the syslog before closing all fds. The next call
           // to syslog will reopen it.
           closelog();
           // Let's keep stdin, stdout, stderr open at /dev/null (daemonized)
           // in order to prevent accidental outputs from messing with another
           // file descriptor
-          for (int fd = 3; fd < max_fd; fd++) {
-            if (fd == pipe_watchdog_->read_end)
-              continue;
-            if (fd == pipe_listener_->write_end)
-              continue;
-            close(fd);
-          }
-          // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          std::set<int> preserve_fds;
+          preserve_fds.insert(0);
+          preserve_fds.insert(1);
+          preserve_fds.insert(2);
+          preserve_fds.insert(pipe_watchdog_->read_end);
+          preserve_fds.insert(pipe_listener_->write_end);
+          CloseAllFildes(preserve_fds);
+          SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
-          Supervise();
+
+          if (WaitForSupervisee())
+            Supervise();
+
+          close(pipe_watchdog_->read_end);
+          close(pipe_listener_->write_end);
           exit(0);
         }
         default:
-          exit(0);
+          _exit(0);
       }
     default:
       close(pipe_watchdog_->read_end);
       close(pipe_listener_->write_end);
+      close(pipe_pid.write_end);
       if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
   }
 
   // retrieve the watchdog PID from the pipe
-  close(pipe_pid.write_end);
   pipe_pid.Read(&watchdog_pid_);
   close(pipe_pid.read_end);
+}
 
+
+bool Watchdog::WaitForSupervisee() {
+  // We want broken pipes not to raise a signal but handle the error in the
+  // read/write code
+  platform_sighandler_t rv_sig = signal(SIGPIPE, SIG_IGN);
+  assert(rv_sig != SIG_ERR);
+
+  // The watchdog is not supposed to receive signals. If it does, report it.
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = ReportSignalAndTerminate;
+  sa.sa_flags = SA_SIGINFO;
+  sigfillset(&sa.sa_mask);
+
+  SigactionMap signal_handlers;
+  signal_handlers[SIGHUP]  = sa;
+  signal_handlers[SIGINT]  = sa;
+  signal_handlers[SIGQUIT] = sa;
+  signal_handlers[SIGILL]  = sa;
+  signal_handlers[SIGABRT] = sa;
+  signal_handlers[SIGBUS]  = sa;
+  signal_handlers[SIGFPE]  = sa;
+  signal_handlers[SIGUSR1] = sa;
+  signal_handlers[SIGSEGV] = sa;
+  signal_handlers[SIGUSR2] = sa;
+  signal_handlers[SIGTERM] = sa;
+  signal_handlers[SIGXCPU] = sa;
+  signal_handlers[SIGXFSZ] = sa;
+  SetSignalHandlers(signal_handlers);
+
+  ControlFlow::Flags control_flow = ControlFlow::kUnknown;
+
+  if (!pipe_watchdog_->TryRead(&control_flow)) {
+    LogCvmfs(kLogMonitor, kLogDebug, "supervisee canceled watchdog");
+    return false;
+  }
+
+  switch (control_flow) {
+    case ControlFlow::kQuit:
+      return false;
+    case ControlFlow::kSupervise:
+      break;
+    default:
+      LogEmergency("Internal error: invalid control flow");
+      return false;
+  }
+
+  size_t size;
+  pipe_watchdog_->Read(&size);
+  crash_dump_path_.resize(size);
+  if (size > 0) {
+    ReadPipe(pipe_watchdog_->read_end, &crash_dump_path_[0], size);
+
+    int retval = chdir(GetParentPath(crash_dump_path_).c_str());
+    if (retval != 0) {
+      LogEmergency(std::string("Cannot change to crash dump directory: ") +
+                   crash_dump_path_);
+      return false;
+    }
+    crash_dump_path_ = GetFileName(crash_dump_path_);
+  }
+  return true;
+}
+
+/**
+ * Set up the signal handling and kick off the supervision.
+ */
+void Watchdog::Spawn(const std::string &crash_dump_path) {
   // lower restrictions for ptrace
   if (!platform_allow_ptrace(watchdog_pid_)) {
     LogCvmfs(kLogMonitor, kLogSyslogWarn,
@@ -483,6 +547,12 @@ void Watchdog::Spawn() {
   int retval =
     pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
   assert(retval == 0);
+
+  pipe_watchdog_->Write(ControlFlow::kSupervise);
+  size_t path_size = crash_dump_path.size();
+  pipe_watchdog_->Write(path_size);
+  if (path_size > 0)
+    WritePipe(pipe_watchdog_->write_end, crash_dump_path.data(), path_size);
 
   spawned_ = true;
 }
@@ -524,7 +594,6 @@ void *Watchdog::MainWatchdogListener(void *data) {
       PANIC(NULL);
     }
   }
-  close(watchdog->pipe_listener_->read_end);
 
   LogCvmfs(kLogMonitor, kLogDebug, "stopping watchdog listener");
   return NULL;
@@ -532,38 +601,9 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
 
 void Watchdog::Supervise() {
-  // We want that the reading from the pipe fd fails if the pipe breaks,
-  // instead of receiving a signal
-  signal(SIGPIPE, SIG_IGN);
-
-  // The watchdog is not supposed to receive signals. If it does, report it.
-  struct sigaction sa;
-  memset(&sa, 0, sizeof(sa));
-  sa.sa_sigaction = ReportSignalAndTerminate;
-  sa.sa_flags = SA_SIGINFO;
-  sigfillset(&sa.sa_mask);
-
-  SigactionMap signal_handlers;
-  signal_handlers[SIGHUP]  = sa;
-  signal_handlers[SIGINT]  = sa;
-  signal_handlers[SIGQUIT] = sa;
-  signal_handlers[SIGILL]  = sa;
-  signal_handlers[SIGABRT] = sa;
-  signal_handlers[SIGBUS]  = sa;
-  signal_handlers[SIGFPE]  = sa;
-  signal_handlers[SIGUSR1] = sa;
-  signal_handlers[SIGSEGV] = sa;
-  signal_handlers[SIGUSR2] = sa;
-  signal_handlers[SIGTERM] = sa;
-  signal_handlers[SIGXCPU] = sa;
-  signal_handlers[SIGXFSZ] = sa;
-  SetSignalHandlers(signal_handlers);
-
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
   if (!pipe_watchdog_->TryRead(&control_flow)) {
-    // Re-activate µSyslog, if necessary
-    SetLogMicroSyslog(GetLogMicroSyslog());
     LogEmergency("watchdog: unexpected termination (" +
                  StringifyInt(control_flow) + ")");
     if (on_crash_) on_crash_();
@@ -578,27 +618,18 @@ void Watchdog::Supervise() {
         break;
 
       default:
-        // Re-activate µSyslog, if necessary
-        SetLogMicroSyslog(GetLogMicroSyslog());
         LogEmergency("watchdog: unexpected error");
         break;
     }
   }
-
-  close(pipe_watchdog_->read_end);
-  close(pipe_listener_->write_end);
 }
 
 
-Watchdog::Watchdog(const string &crash_dump_path)
+Watchdog::Watchdog(FnOnCrash on_crash)
   : spawned_(false)
-  , crash_dump_path_(crash_dump_path)
   , exe_path_(string(platform_getexepath()))
   , watchdog_pid_(0)
-  , pipe_watchdog_(NULL)
-  , pipe_listener_(NULL)
-  , pipe_terminate_(NULL)
-  , on_crash_(NULL)
+  , on_crash_(on_crash)
 {
   int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
@@ -623,49 +654,13 @@ Watchdog::~Watchdog() {
     pipe_terminate_->Write(ControlFlow::kQuit);
     pthread_join(thread_listener_, NULL);
     pipe_terminate_->Close();
-
-    pipe_watchdog_->Write(ControlFlow::kQuit);
-    close(pipe_watchdog_->write_end);
   }
 
-  delete pipe_watchdog_;
-  delete pipe_listener_;
-  delete pipe_terminate_;
+  pipe_watchdog_->Write(ControlFlow::kQuit);
+  close(pipe_watchdog_->write_end);
+  close(pipe_listener_->read_end);
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");
   instance_ = NULL;
 }
-
-
-
-namespace monitor {
-
-const unsigned kMinOpenFiles = 8192;
-
-unsigned GetMaxOpenFiles() {
-  static unsigned max_open_files;
-  static bool     already_done = false;
-
-  /* check number of open files (lazy evaluation) */
-  if (!already_done) {
-    unsigned soft_limit = 0;
-    unsigned hard_limit = 0;
-    GetLimitNoFile(&soft_limit, &hard_limit);
-
-    if (soft_limit < kMinOpenFiles) {
-      LogCvmfs(kLogMonitor, kLogSyslogWarn | kLogDebug,
-               "Warning: current limits for number of open files are "
-               "(%lu/%lu)\n"
-               "CernVM-FS is likely to run out of file descriptors, "
-               "set ulimit -n to at least %lu",
-               soft_limit, hard_limit, kMinOpenFiles);
-    }
-    max_open_files = soft_limit;
-    already_done   = true;
-  }
-
-  return max_open_files;
-}
-
-}  // namespace monitor

@@ -215,7 +215,7 @@ struct CVMFS_EXPORT Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    *
-   * @param seed  random number generator seed (for reproducability)
+   * @param seed  random number generator seed (for reproducibility)
    */
   void Randomize(const uint64_t seed) {
     Prng prng;
@@ -227,7 +227,7 @@ struct CVMFS_EXPORT Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    *
-   * @param prng  random number generator object (for external reproducability)
+   * @param prng  random number generator object (for external reproducibility)
    */
   void Randomize(Prng *prng) {
     const unsigned bytes = GetDigestSize();
@@ -240,7 +240,7 @@ struct CVMFS_EXPORT Digest {
   void set_suffix(const Suffix s) { suffix = s; }
 
   /**
-   * Generates a hexified repesentation of the digest including the identifier
+   * Generates a hexified representation of the digest including the identifier
    * string for newly added hashes.
    *
    * @param with_suffix  append the hash suffix (C,H,X, ...) to the result
@@ -265,7 +265,7 @@ struct CVMFS_EXPORT Digest {
   }
 
   /**
-   * Generates a hexified repesentation of the digest including the identifier
+   * Generates a hexified representation of the digest including the identifier
    * string for newly added hashes.  Output is in the form of
    * 'openssl x509 fingerprint', e.g. 00:AA:BB:...-SHAKE128
    *
