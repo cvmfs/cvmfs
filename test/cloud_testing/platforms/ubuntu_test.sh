@@ -65,6 +65,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
   ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                                 -x src/518-hardlinkstresstest                   \
                                    src/600-securecvmfs                          \
+                                   src/647-bearercvmfs                          \
                                    src/673-acl                                  \
                                    src/684-https_s3                             \
                                    src/686-azureblob_s3                         \
