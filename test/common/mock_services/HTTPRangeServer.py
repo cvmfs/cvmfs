@@ -27,8 +27,13 @@ __version__ = "0.2"
 __author__ = "John Smith <code@john-smith.me>"
 
 import os
-import BaseHTTPServer
-import SimpleHTTPServer
+try:
+  import http.server as BaseHTTPServer
+  import http.server as SimpleHTTPServer
+except ImportError:
+  import BaseHTTPServer
+  import SimpleHTTPServer
+
 
 # Additions for handling Range: header
 import logging
@@ -184,7 +189,7 @@ class HTTPRangeRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         try:
             self.range_from, self.range_to = parse_range_header(
                 self.headers.getheader("Range"), total_length)
-        except InvalidRangeHeader, e:
+        except InvalidRangeHeader as e:
             # Just serve them the whole file, although it's possibly
             # more correct to return a 4xx error?
             logging.warning("Range header parsing failed, "

@@ -1,11 +1,16 @@
-#!/usr/bin/env python2
-
-import BaseHTTPServer
-import SimpleHTTPServer
-import SocketServer
+#!/usr/bin/env python
+try:
+  import http.server as BaseHTTPServer
+  import socketserver as SocketServer
+except ImportError:
+  import BaseHTTPServer
+  import SimpleHTTPServer
+  import SocketServer
 import sys
 import os
 from optparse import OptionParser
+
+
 
 class FaultyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -28,7 +33,7 @@ if not options.http_port:
     parser.print_help()
     sys.exit(1)
 
-print "start serving..."
+print("start serving...")
 handler = FaultyHTTPRequestHandler
 httpd = SocketServer.TCPServer(("", options.http_port), handler)
 httpd.serve_forever()
