@@ -1,7 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
+from __future__ import print_function
 import socket
-import SocketServer
+try:
+  import SocketServer as socketserver
+except ImportError:
+  import socketserver
 import sys
 import time
 import threading
@@ -9,9 +13,9 @@ import os
 import datetime
 
 def usage():
-	print >> sys.stderr, "This opens a socket on a given port number and waits for connection."
-	print >> sys.stderr, "Connecting programs can send but will not receive anything."
-	print >> sys.stderr, "Usage:" , sys.argv[0] , "<protocol: TCP|UDP> <port number>"
+	print("This opens a socket on a given port number and waits for connection.", file=sys.stderr)
+	print("Connecting programs can send but will not receive anything.", file=sys.stderr)
+	print("Usage:" , sys.argv[0] , "<protocol: TCP|UDP> <port number>", file=sys.stderr)
 	sys.stderr.flush()
 	sys.exit(1)
 
@@ -19,20 +23,20 @@ print_lock = threading.Lock()
 def print_msg(msg):
 	global print_lock
 	print_lock.acquire()
-	print "[Silent Socket]" , msg
+	print("[Silent Socket]" , msg)
 	print_lock.release()
 	sys.stdout.flush()
 
 
-class SilentHandler(SocketServer.BaseRequestHandler):
+class SilentHandler(socketserver.BaseRequestHandler):
 	def handle(self):
 		print_msg("(" + str(datetime.datetime.now()) + ") incoming connection: " + str(self.client_address))
 		time.sleep(100000000)
 
-class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 	pass
 
-class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
+class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
 	pass
 
 
@@ -59,6 +63,6 @@ try:
 
 	print_msg("starting a " + server_protocol + " server on port " + str(server_port))
 	server.serve_forever()
-except socket.error, msg:
+except socket.error as msg:
 	print_msg("Failed to open port")
-	print msg
+	print(msg)

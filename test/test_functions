@@ -836,7 +836,7 @@ create_filled_repo() {
 # @param  repo_dir   where to put the dummy dirents
 make_huge_repo() {
   local repo_dir=$1
-  $CVMFS_PYTHON2 ${TEST_ROOT}/common/mock_services/make_repo.py \
+  ${TEST_ROOT}/common/mock_services/make_repo.py                \
     --max-dir-depth        7                                    \
     --num-subdirs          5                                    \
     --num-files-per-dir    5                                    \
@@ -1090,7 +1090,7 @@ open_silent_port() {
   local cmd
   local mock
 
-  mock="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
+  mock="${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
   echo "Calling $mock" >> $logfile
 
   # Do similar fifo-trick as in run_background_service() to get the PID of the
@@ -1115,7 +1115,7 @@ open_http_server() {
   local port="$2"
   local logfile="${3:=/dev/null}"
 
-  local http_server="${CVMFS_PYTHON2} ${TEST_ROOT}/common/mock_services/http_server.py"
+  local http_server="${TEST_ROOT}/common/mock_services/http_server.py"
   local http_pid=
   local http_sentinel="http://localhost:${port}/http_sentinel"
 
