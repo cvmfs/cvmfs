@@ -117,7 +117,7 @@ class RepoFactory:
     """Create a file and fill it with some random binary data."""
     f = open(path, "wb+")
     desired_size = random.randint(self.min_file_size, self.max_file_size)
-    if desired_size > 0: 
+    if desired_size > 0:
       # generate pseudo-random bytes and write to file
       # (while trying to keep python 2/3 compatibility)
       if PY39: # if python > 3.9, getrandbytes is available and the best choice
