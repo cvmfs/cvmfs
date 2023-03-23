@@ -115,6 +115,8 @@ cvmfs_run_test() {
   proxy_list=$(get_xattr proxy_list /cvmfs/grid.cern.ch/README)
   proxy_list_external=$(get_xattr proxy_list_external /cvmfs/grid.cern.ch/README)
   [ "x$proxy_list" != "x" ] || return 21
+  echo "*** proxy_list         =[$proxy_list]"
+  echo "*** proxy_list_external=[$proxy_list_external]"
   [ "x$proxy_list" = "x$proxy_list_external" ] || return 22
 
   cvmfs_umount grid.cern.ch || return 2
