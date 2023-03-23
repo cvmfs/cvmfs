@@ -167,7 +167,9 @@ int Fetcher::Fetch(
     ctx->Get(&tls->download_job.uid,
              &tls->download_job.gid,
              &tls->download_job.pid,
-             &tls->download_job.interrupt_cue);
+             &tls->download_job.interrupt_cue,
+             &tls->download_job.http_txn_id,
+             &tls->download_job.http_txn_step);
   }
   tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
   tls->download_job.range_offset = range_offset;

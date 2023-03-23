@@ -1276,6 +1276,9 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
 
   mountpoint->boot_status_ = loader::kFailOk;
+
+  mountpoint->ConfigureHTTPTracing();
+
   return mountpoint.Release();
 }
 
@@ -2188,7 +2191,22 @@ bool MountPoint::SetupOwnerMaps() {
     g_world_readable = true;
   }
 
-
-
   return true;
+}
+
+void MountPoint::ConfigureHTTPTracing() {
+  std::string optarg;
+  if (options_mgr_->GetValue("CVMFS_HTTP_TRACING", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    external_download_mgr_->SetHTTPTracing(true);
+    download_mgr_->SetHTTPTracing(true);
+    if (options_mgr_->GetValue("CVMFS_HTTP_TRACING_HEADERS", &optarg)) {
+       std::vector<std::string> tokens = SplitString(optarg, '|');
+       vector<string>::iterator it;
+       for (it=tokens.begin(); it != tokens.end(); it++) {
+         external_download_mgr_->AddHTTPTracingHeader(*it);
+         download_mgr_->AddHTTPTracingHeader(*it);
+       }
+    }
+  }
 }
