@@ -26,7 +26,6 @@ run_unittests --gtest_shuffle \
 # Test exclusions
 # 095: not needed on EL9 as attach mounts are supported
 # 066: temporarily until automounter reload bug is fixed
-# 647: authz helper python script needs to be ported to python 3
 
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
@@ -63,7 +62,6 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/620-pullmixedrepo                        \
                                  src/624-chunkedexternalgraft                 \
                                  src/628-pythonwrappedcvmfsserver             \
-                                 src/647-bearercvmfs                          \
                                  src/672-publish_stats_hardlinks              \
                                  src/673-acl                                  \
                                  src/684-https_s3                             \
