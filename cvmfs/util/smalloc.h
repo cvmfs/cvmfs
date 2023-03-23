@@ -39,19 +39,42 @@ static inline uint64_t RoundUp8(const uint64_t size) {
 }
 
 static inline void * __attribute__((used)) smalloc(size_t size) {
-  void *mem = malloc(size);
+  void *mem = NULL;
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = malloc(size);
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == NULL);
+#endif
   assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
 }
 
 static inline void * __attribute__((used)) srealloc(void *ptr, size_t size) {
-  void *mem = realloc(ptr, size);
+  void *mem = NULL;
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = realloc(ptr, size);
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == NULL);
+#endif
   assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
 }
 
 static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
-  void *mem = calloc(count, size);
+  void *mem = NULL;
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = calloc(count, size);
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == NULL);
+#endif
   assert((mem || ((count * size) == 0)) && "Out Of Memory");
   return mem;
 }
@@ -64,13 +87,22 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   const int anonymous_fd = -1;
   const off_t offset = 0;
   size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
-  unsigned char *mem = static_cast<unsigned char *>(
+  unsigned char *mem = NULL;
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = static_cast<unsigned char *>(
     mmap(NULL,
          pages*4096,
          PROT_READ | PROT_WRITE,
          MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
          anonymous_fd,
          offset));
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == MAP_FAILED);
+#endif
   // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   // NOLINTNEXTLINE(performance-no-int-to-ptr)
   assert((mem != MAP_FAILED) && "Out Of Memory");
@@ -95,12 +127,21 @@ static inline void __attribute__((used)) smunmap(void *mem) {
 static inline void * __attribute__((used)) sxmmap(size_t size) {
   const int anonymous_fd = -1;
   const off_t offset = 0;
-  void *mem = mmap(NULL,
+  void *mem = NULL;
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = mmap(NULL,
                    size,
                    PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
                    anonymous_fd,
                    offset);
+
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == MAP_FAILED);
+#endif
   // NOLINTNEXTLINE(performance-no-int-to-ptr)
   assert((mem != MAP_FAILED) && "Out Of Memory");
   return mem;
@@ -122,7 +163,15 @@ static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
  */
 static inline void * __attribute__((used)) sxmmap_align(size_t size) {
   assert((size % (2 * 1024 * 1024)) == 0);
-  char *mem = reinterpret_cast<char *>(sxmmap(2 * size));
+  char *mem = NULL;
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  do {
+#endif
+    mem = reinterpret_cast<char *>(sxmmap(2 * size));
+#ifdef CVMFS_SUPPRESS_ASSERTS
+  } while (mem == MAP_FAILED);
+#endif
+
   uintptr_t head = size - (uintptr_t(mem) % size);
   sxunmap(mem, head);
   mem += head;
