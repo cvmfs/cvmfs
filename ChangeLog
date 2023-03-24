@@ -1,4 +1,5 @@
 2.11.0:
+  * Add proxy_list and proxy_list_external magic xattrs (#3233)
   * Error out early if certificate is invalid (#3238)
   * Improve watchdog startup procedure (#3089)
   * [gc] Avoid duplicate delete requests (#3117)
