@@ -111,6 +111,12 @@ cvmfs_run_test() {
   get_xattr logbuffer /cvmfs/grid.cern.ch/
   [ "x$logbuffer" != "x" ] || return 20
 
+  echo "*** Check existence of proxy_list and proxy_list_external "
+  proxy_list=$(get_xattr proxy_list /cvmfs/grid.cern.ch/README)
+  proxy_list_external=$(get_xattr proxy_list_external /cvmfs/grid.cern.ch/README)
+  [ "x$proxy_list" != "x" ] || return 21
+  [ "x$proxy_list_external" != "x" ] || return 22
+
   cvmfs_umount grid.cern.ch || return 2
 
   check_protected_xattr || return $?

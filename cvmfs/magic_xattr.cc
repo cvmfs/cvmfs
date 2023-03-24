@@ -41,6 +41,8 @@ MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
   Register("user.hitrate", new HitrateMagicXattr());
   Register("user.logbuffer", new LogBufferXattr());
   Register("user.proxy", new ProxyMagicXattr());
+  Register("user.proxy_list", new ProxyListMagicXattr());
+  Register("user.proxy_list_external", new ProxyListExternalMagicXattr());
   Register("user.pubkeys", new PubkeysMagicXattr());
   Register("user.repo_counters", new RepoCountersMagicXattr());
   Register("user.repo_metainfo", new RepoMetainfoMagicXattr());
@@ -478,6 +480,28 @@ std::string ProxyMagicXattr::GetValue() {
   } else {
     return "DIRECT";
   }
+}
+
+static std::string ListProxy(download::DownloadManager *dm) {
+  vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+  unsigned current_group;
+  dm->GetProxyInfo(&proxy_chain, &current_group, NULL);
+  std::string buf = "";
+  for (unsigned int i = 0; i < proxy_chain.size(); i++) {
+    for (unsigned int j = 0; j < proxy_chain[i].size(); j++) {
+      buf += proxy_chain[i][j].url;
+      buf += "\n";
+    }
+  }
+  return buf;
+}
+
+std::string ProxyListMagicXattr::GetValue() {
+  return ListProxy(xattr_mgr_->mount_point()->download_mgr());
+}
+
+std::string ProxyListExternalMagicXattr::GetValue() {
+  return ListProxy(xattr_mgr_->mount_point()->external_download_mgr());
 }
 
 bool PubkeysMagicXattr::PrepareValueFenced() {
