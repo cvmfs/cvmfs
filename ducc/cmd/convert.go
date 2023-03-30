@@ -3,6 +3,8 @@ package cmd
 import (
 	"io/ioutil"
 	"os"
+	"time"
+	"math/rand"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -22,7 +24,8 @@ var (
 )
 
 var (
-	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman bool
+	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman, skipSleepBetweenWishes bool
+
 )
 
 func init() {
@@ -32,6 +35,7 @@ func init() {
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
+	convertCmd.Flags().BoolVarP(&skipSleepBetweenWishes, "no-sleep", "c", false, " do not sleep between conversions to avoid load spikes on registries")
 	rootCmd.AddCommand(convertCmd)
 }
 
@@ -67,6 +71,11 @@ var convertCmd = &cobra.Command{
 			os.Exit(RepoNotExistsError)
 		}
 		for wish := range recipe.Wishes {
+			l.Log().Info("Sleep briefly to avoid overloading registries...")
+			if !skipSleepBetweenWishes {
+				time.Sleep(1000 * time.Millisecond + time.Duration(rand.Intn(1000)) * time.Millisecond)
+			}
+
 			fields := log.Fields{"input image": wish.InputName,
 				"repository":   wish.CvmfsRepo,
 				"output image": wish.OutputName}
