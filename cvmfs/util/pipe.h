@@ -5,19 +5,14 @@
 #ifndef CVMFS_UTIL_PIPE_H_
 #define CVMFS_UTIL_PIPE_H_
 
-#include <pthread.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/uio.h>
 #include <unistd.h>
 
-#include <cassert>
 #include <cerrno>
 
 #include "exception.h"
 #include "gtest/gtest_prod.h"
 #include "util/export.h"
-#include "util/pointer.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -25,7 +20,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 /**
- * Describes the functionality of a pipe
+ * Describes the functionality of a pipe used as a template parameter to
+ * the Pipe class. This makes it clear in stack traces which pipe is blocking.
  */
 enum PipeType {
   kPipeThreadTerminator = 0,  // pipe only used to signal a thread to stop
@@ -75,44 +71,35 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * Destructor closes all valid file descriptors of the pipe
    */
   ~Pipe() {
-    if (fd_read_ != -1) {
-      close(fd_read_);
-    }
-
-    if (fd_write_ != -1) {
-      close(fd_write_);
-    }
+    Close();
   }
 
   /**
    * Closes all open file descriptors of the pipe and marks them as invalid
    */
   void Close() {
-    if (fd_read_ != -1) {
-      close(fd_read_);
-      fd_read_ = -1;
-    }
-
-    if (fd_write_ != -1) {
-      close(fd_write_);
-      fd_write_ = -1;
-    }
+    CloseReadFd();
+    CloseWriteFd();
   }
 
   /**
    * Closes file descriptor that reads from the pipe and marks it as invalid.
    */
   void CloseReadFd() {
-    close(fd_read_);
-    fd_read_ = -1;
+    if (fd_read_ >= 0) {
+      close(fd_read_);
+      fd_read_ = -1;
+    }
   }
 
   /**
    * Closes file descriptor that writes to the pipe and marks it as invalid.
    */
   void CloseWriteFd() {
-    close(fd_write_);
-    fd_write_ = -1;
+    if (fd_write_  >= 0) {
+      close(fd_write_);
+      fd_write_ = -1;
+    }
   }
 
   /**
@@ -154,8 +141,8 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   }
 
   /**
-   * Tries to read from the pipe until it receives data or it is interrupted
-   * by a system call
+   * (Re)tries to read from the pipe until it receives data or returned error
+   * is NOT a system interrupt
    *
    * @returns true if sizeof(data) bytes were received
    *          false otherwise
@@ -196,14 +183,14 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   /**
    * Returns the file descriptor that reads from the pipe
    */
-  int GetReadFd() {
+  int GetReadFd() const {
     return fd_read_;
   }
 
   /**
    * Returns the file descriptor that writes to the pipe
    */
-  int GetWriteFd() {
+  int GetWriteFd() const {
     return fd_write_;
   }
 

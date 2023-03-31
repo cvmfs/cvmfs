@@ -27,6 +27,7 @@
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/pipe.h"
+#include "util/pointer.h"
 #include "util/prng.h"
 
 class InterruptCue;
@@ -289,7 +290,7 @@ struct JobInfo {
   z_stream zstream;
   shash::ContextPtr hash_context;
 
-  /**< Pipe used for the return value */
+  /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
 
   std::string proxy;
