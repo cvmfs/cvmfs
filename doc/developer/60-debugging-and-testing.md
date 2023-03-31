@@ -3,7 +3,7 @@
 
 ## Live Debugging
 
-
+### Client
 The easiest way of live debugging is to mount the client in debug (`-d`) and foreground (`-f`) using `cvmfs2`.
 Mounting with `cvmfs2` allows also to set a few parameters, e.g. `libfuse=` to select `Fuse2` or 
 `Fuse3`.
@@ -20,6 +20,33 @@ Example mounting with `Fuse3` on mount point `/mnt/test`
 > **_NOTE_** &nbsp;
 > The `uid` and `gid` are the `user id` and `group id` of the `cvmfs` user.
 > They will be different on every system but the here provided code discovers them automatically.
+> 
+> A debug version of the client is automatically built. No special build parameters are needed.
+
+### Server
+Live debugging of the server is more complicated. For server and server unit tests a special debug build must be created using `BUILD_SERVER_DEBUG=ON`.
+
+To run the server in debug mode, the environment variable `CVMFS_SERVER_DEBUG` must be set. It allows switching between 3 different debug modes 
+- `CVMFS_SERVER_DEBUG=1`
+  - In case something breaks, provide a GDB prompt
+  - Underlying command: `gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug`
+- `CVMFS_SERVER_DEBUG=2`
+  - Attach GDB and provide a prompt WITHOUT actual running the program (the user starts the run, allows setting breakpoints first)
+  - Underlying command: `gdb --quiet --args cvmfs_swissknife_debug`
+- `CVMFS_SERVER_DEBUG=3`
+  - Run debug version of the server (without GDB)
+  - Underlying command: `cvmfs_swissknife_debug`
+
+For serious debugging `CVMFS_SERVER_DEBUG=2` is the preferred choice. `CVMFS_SERVER_DEBUG=1` only opens GDB prompt when exiting the program but in many cases `cvmfs` has proper error handling, exiting gracefully and as such finding the code section responsible for the error is not obvious.
+
+Example command: `CVMFS_SERVER_DEBUG=2 cvmfs_server mkfs my.test.repo`
+
+> **_NOTE_** &nbsp;
+> `cvmfs_server mkfs` is a more complicated command than `cvmfs_server transaction`. If the error is not part of the `mkfs`-process we suggest that you create first a repository using a healthy `cvmfs`-version and afterwards debug the faulty version on `cvmfs_server transaction`.
+> 
+> Server must be built with `BUILD_SERVER_DEBUG=ON`. For unit tests it also helps to build with `BUILD_UNITTESTS_DEBUG=ON`
+
+
 ### Useful commands
 
 All commands require `sudo`
