@@ -1,10 +1,10 @@
 package lib
 
 import (
+	"math/rand"
 	"strings"
 	"sync"
-  "time"
-  "math/rand"
+	"time"
 
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
@@ -42,35 +42,35 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 		return recipe, err
 	}
 
-  registryMap := make(map[string][]Image)
+	registryMap := make(map[string][]Image)
 	for _, inputImage := range recipeYamlV1.Input {
-			input, err := ParseImage(inputImage)
-			if err != nil {
-				l.LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
-			}
-      registryMap[input.Registry] = append(registryMap[input.Registry], input)
-  }
-  for reg, inputImages := range registryMap {
+		input, err := ParseImage(inputImage)
+		if err != nil {
+			l.LogE(err).WithFields(log.Fields{"image": inputImage}).Warning("Impossible to parse the image")
+		}
+		registryMap[input.Registry] = append(registryMap[input.Registry], input)
+	}
+	for reg, inputImages := range registryMap {
 		wg.Add(1)
 		go func(inputImages []Image, reg string) {
-		  l.Log().Info("Starting with", inputImages[0])
+			l.Log().Info("Starting with", inputImages[0])
 			defer wg.Done()
-      for _, input := range inputImages {
-        if reg == "gitlab-registry.cern.ch" {
-            time.Sleep(500 * time.Millisecond + time.Duration(rand.Intn(500)) * time.Millisecond)
-        }
+			for _, input := range inputImages {
+				if reg == "gitlab-registry.cern.ch" {
+					time.Sleep(500*time.Millisecond + time.Duration(rand.Intn(500))*time.Millisecond)
+				}
 
-        l.Log().Info(reg)
-        l.Log().Info(input)
+				l.Log().Info(reg)
+				l.Log().Info(input)
 
-        output := formatOutputImage(recipeYamlV1.OutputFormat, input)
-        wish, err := CreateWish(input, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
-        if err != nil {
-          l.LogE(err).Warning("Error in creating the wish")
-        } else {
-          recipe.Wishes <- wish
-        }
-    }
+				output := formatOutputImage(recipeYamlV1.OutputFormat, input)
+				wish, err := CreateWish(input, output, recipeYamlV1.CVMFSRepo, recipeYamlV1.User, recipeYamlV1.User)
+				if err != nil {
+					l.LogE(err).Warning("Error in creating the wish")
+				} else {
+					recipe.Wishes <- wish
+				}
+			}
 		}(inputImages, reg)
 	}
 	return recipe, nil
@@ -78,7 +78,7 @@ func ParseYamlRecipeV1(data []byte) (Recipe, error) {
 
 func formatOutputImage(OutputFormat string, inputImage Image) string {
 
-	if (OutputFormat == "") {
+	if OutputFormat == "" {
 		OutputFormat = "$(scheme)://$(registry)/$(repository)_thin:$(tag)"
 		l.Log().Info("Using default output image name ", OutputFormat)
 	}
