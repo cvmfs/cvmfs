@@ -60,7 +60,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
 
   /**
    * Makes the given path relative to the catalog structure
-   * Pathes coming out here can be used for lookups in catalogs
+   * Paths coming out here can be used for lookups in catalogs
    * @param relativePath the path to be mangled
    * @return the mangled path
    */

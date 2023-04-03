@@ -96,7 +96,7 @@ get_or_guess_multiple_repository_names() {
     else
       for name in $names; do
         if ! contains "$repo_names" $(basename $name); then
-          repo_names="$(basename $name) $repo_names"
+          repo_names="$repo_names $(basename $name)"
         fi
       done
     fi
@@ -592,7 +592,7 @@ get_expiry_from_string() {
 # figures out the time to expiry of the repository's whitelist
 #
 # @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
+# @return          number of seconds until expiry (negative if already expired)
 get_expiry() {
   local name=$1
   local stratum0=$2
@@ -1244,7 +1244,7 @@ is_stratum0_garbage_collectable() {
 }
 
 
-# checks if a manifest ist present
+# checks if a manifest is present
 #
 # @param name  the name of the repository to be checked
 # @return      0 if it is empty

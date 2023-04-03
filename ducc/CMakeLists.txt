@@ -29,7 +29,7 @@ configure_file (
 # and then we install the generated file
 install (
   FILES ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
-  DESTINATION /usr/lib/systemd/system
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system
 )
 
 install(

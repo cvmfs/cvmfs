@@ -126,7 +126,7 @@ FuseRemounter::Status FuseRemounter::Check() {
 
 
 /**
- * Used from the TalkManager.  Continously calls 'check' until it returns with
+ * Used from the TalkManager.  Continuously calls 'check' until it returns with
  * "up to date" or a failure.
  */
 FuseRemounter::Status FuseRemounter::CheckSynchronously() {

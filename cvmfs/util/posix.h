@@ -183,6 +183,7 @@ CVMFS_EXPORT bool ManagedExec(const std::vector<std::string> &command_line,
                               const bool clear_env = false,
                               const bool double_fork = true,
                               pid_t *child_pid = NULL);
+CVMFS_EXPORT bool CloseAllFildes(const std::set<int> &preserve_fildes);
 
 CVMFS_EXPORT void SafeSleepMs(const unsigned ms);
 // Note that SafeWrite cannot return partial results but
@@ -195,60 +196,6 @@ CVMFS_EXPORT bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt);
 CVMFS_EXPORT bool SafeReadToString(int fd, std::string *final_result);
 CVMFS_EXPORT bool SafeWriteToFile(const std::string &content,
                                   const std::string &path, int mode);
-
-struct CVMFS_EXPORT Pipe : public SingleCopy {
-  Pipe() {
-    int pipe_fd[2];
-    MakePipe(pipe_fd);
-    read_end = pipe_fd[0];
-    write_end = pipe_fd[1];
-  }
-
-  Pipe(const int fd_read, const int fd_write) :
-    read_end(fd_read), write_end(fd_write) {}
-
-  void Close() {
-    close(read_end);
-    close(write_end);
-  }
-
-  template<typename T>
-  bool Write(const T &data) {
-    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    const int num_bytes = write(write_end, &data, sizeof(T));
-    return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
-  }
-
-  template<typename T>
-  bool TryRead(T *data) {
-    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    ssize_t num_bytes;
-    do {
-      num_bytes = read(read_end, data, sizeof(T));
-    } while ((num_bytes < 0) && (errno == EINTR));
-    return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
-  }
-
-  template<typename T>
-  void Read(T *data) {
-    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
-    ReadPipe(read_end, data, sizeof(T));
-  }
-
-  bool Write(const void *buf, size_t nbyte) {
-    WritePipe(write_end, buf, nbyte);
-    return true;
-  }
-
-  bool Read(void *buf, size_t nbyte) {
-    ReadPipe(read_end, buf, nbyte);
-    return true;
-  }
-
-  int read_end;
-  int write_end;
-};
-
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

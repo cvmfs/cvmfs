@@ -159,8 +159,6 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
                   ${CVMFS_SOURCE_DIR}/compression.cc
                   ${CVMFS_SOURCE_DIR}/directory_entry.cc
-                  ${CVMFS_SOURCE_DIR}/dns.cc
-                  ${CVMFS_SOURCE_DIR}/download.cc
                   ${CVMFS_SOURCE_DIR}/gateway_util.cc
                   ${CVMFS_SOURCE_DIR}/globals.cc
                   ${CVMFS_SOURCE_DIR}/history_sql.cc
@@ -179,11 +177,13 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
                   ${CVMFS_SOURCE_DIR}/manifest.cc
                   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+                  ${CVMFS_SOURCE_DIR}/network/dns.cc
+                  ${CVMFS_SOURCE_DIR}/network/download.cc
+                  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
                   ${CVMFS_SOURCE_DIR}/options.cc
                   ${CVMFS_SOURCE_DIR}/pack.cc
                   ${CVMFS_SOURCE_DIR}/reflog.cc
                   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
-                  ${CVMFS_SOURCE_DIR}/s3fanout.cc
                   ${CVMFS_SOURCE_DIR}/sanitizer.cc
                   ${CVMFS_SOURCE_DIR}/session_context.cc
                   ${CVMFS_SOURCE_DIR}/shortstring.cc
@@ -252,6 +252,7 @@ set(CVMFS_UNITTEST_SOURCES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  t_assert_or_log.cc
   t_atomic.cc
   t_authz_fetch.cc
   t_authz_session.cc
@@ -345,6 +346,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_swissknife_lease.cc
   t_sync_union_tarball.cc
   t_synchronizing_counter.cc
+  t_telemetry_aggregator.cc
   t_raii_temp_dir.cc
   t_test_utils.cc
   t_tracer.cc
@@ -387,8 +389,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
-  ${CVMFS_SOURCE_DIR}/dns.cc
-  ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
@@ -422,6 +422,9 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/network/dns.cc
+  ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/notify/messages.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
@@ -441,7 +444,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/repository_tag.cc
   ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
-  ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
@@ -464,6 +466,8 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sync_mediator.cc
   ${CVMFS_SOURCE_DIR}/sync_union.cc
   ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator.cc
+  ${CVMFS_SOURCE_DIR}/telemetry_aggregator_influx.cc
   ${CVMFS_SOURCE_DIR}/tracer.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/upload_facility.cc

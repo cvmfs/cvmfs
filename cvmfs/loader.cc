@@ -773,7 +773,7 @@ int FuseMain(int argc, char *argv[]) {
 
   if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Moint point %s does not exist", mount_point_->c_str());
+             "Mount point %s does not exist", mount_point_->c_str());
     return kFailPermission;
   }
 
@@ -846,6 +846,10 @@ int FuseMain(int argc, char *argv[]) {
                "Failed to drop credentials");
       return kFailPermission;
     }
+  }
+  if (disable_watchdog_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
   }
 
   // Only set usyslog now, otherwise file permissions are wrong

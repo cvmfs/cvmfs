@@ -131,7 +131,7 @@ class SyncUnion {
    * Note: This needs to be up-called!
    * @param parent directory in which file resides
    * @param filename to decide whether to ignore or not
-   * @return true if file should be ignored, othewise false
+   * @return true if file should be ignored, otherwise false
    */
   virtual bool IgnoreFilePredicate(const std::string &parent_dir,
                                    const std::string &filename);
@@ -147,7 +147,7 @@ class SyncUnion {
   AbstractSyncMediator *mediator_;
 
   /**
-   * Allow for preprocessing steps before emiting any SyncItems from SyncUnion.
+   * Allow for preprocessing steps before emitting any SyncItems from SyncUnion.
    * This can be overridden by sub-classes but should always be up-called. Typi-
    * cally this sets whiteout and opaque-directory flags or handles hardlinks.
    * @param entry  the SyncItem to be pre-processed

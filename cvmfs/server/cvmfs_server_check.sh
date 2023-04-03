@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server check" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -148,7 +148,7 @@ __check_repair_reflog() {
   # Remaining case: a reflog is registered in the manifest but the
   # .cvmfsreflog file is missing.  In this case, we recreate the reflog.
 
-  if get_repo_info -R | grep -q ^Y; then
+  if [ $has_reflog -eq 0 ] && get_repo_info -R | grep -q ^Y; then
     echo "Warning: a reflog hash is registered in the manifest, re-creating missing reflog"
     to_syslog_for_repo $name "reference log reconstruction started"
     local repository_url
@@ -176,7 +176,7 @@ __get_checks_repo_times() {
   names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
-  for name in $names; do 
+  for name in $names; do
     # note that is_inactive_replica also does load_repo_config
     if is_inactive_replica $name; then
       continue
@@ -249,7 +249,7 @@ __do_all_checks() {
       echo "ERROR from cvmfs_server check!" >&2
     else
       check_status=succeeded
-      to_syslog_for_repo $repo "sucessfully completed check"
+      to_syslog_for_repo $repo "successfully completed check"
     fi
     update_repo_status $repo check_status $check_status
     echo "Finished $repo at `date`"
@@ -317,6 +317,18 @@ cvmfs_server_check() {
       __do_check "$@"
     fi
     retcode=$?
+    if [ $retcode = 0 ]; then
+      # Intentionally do not store the status for a failure when a check
+      # is individually run, but do store the status for a success if the
+      # status was previously saved.
+      local name=$(get_or_guess_repository_name $1)
+      local check_status="$(read_repo_item "$name" .cvmfs_status.json)"
+      local last_check="$(get_json_field "$check_status" last_check)"
+      if [ -n "$last_check" ]; then
+        update_repo_status $name last_check "`date --utc`"
+        update_repo_status $name check_status succeeded
+      fi
+    fi
   fi
 
   return $retcode

@@ -1,5 +1,6 @@
 cvmfs_test_name="masterkeycard"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 cleanup() {
   # leave the card empty so it won't affect other tests

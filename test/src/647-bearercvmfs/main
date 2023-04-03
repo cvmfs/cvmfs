@@ -6,6 +6,7 @@ cvmfs_test_suites="quick"
 
 
 # TODO(rmeusel): make this multi-platform
+TEST647_HTTPS_CONFIG_UBUNTU=/etc/apache2/conf-available/test647.cvmfs.secure.conf
 TEST647_HTTPS_CONFIG=/etc/httpd/conf.d/test647.cvmfs.secure.conf
 # Set later to the scratch dir
 TEST647_HOSTCERT=
@@ -225,7 +226,12 @@ cvmfs_run_test() {
 
   # requires mod_gridsite from the gridsite package
   echo "*** Setting up apache configuration"
-  sudo cp $script_location/test647.cvmfs.secure.conf $TEST647_HTTPS_CONFIG             || return 60
+  if [ -d $(dirname "$TEST647_HTTPS_CONFIG") ]; then
+    sudo cp $script_location/test647.cvmfs.secure.conf $TEST647_HTTPS_CONFIG             || return 60
+  elif [ -d $(dirname "$TEST647_HTTPS_CONFIG_UBUNTU") ]; then
+    TEST647_HTTPS_CONFIG="$TEST647_HTTPS_CONFIG_UBUNTU"
+    sudo cp $script_location/test647.cvmfs.secure.conf $TEST647_HTTPS_CONFIG             || return 60
+  fi
   sudo sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST647_HTTPS_CONFIG                   || return 61
   sudo sed -i "s,@GRIDSECURITYDIR@,$TEST647_GRID_SECURITY_DIR," $TEST647_HTTPS_CONFIG  || return 62
   #cp $script_location/gacl $(get_local_repo_storage $CVMFS_TEST_REPO)/data/.gacl       || return 63
@@ -263,7 +269,8 @@ cvmfs_run_test() {
   # Create a stupid simple bearer token
   # Naming conventions copied from the condor implementation
   TEST647_CRED_DIR="/tmp/condor_creds"
-  mkdir $TEST647_CRED_DIR
+
+  mkdir -p $TEST647_CRED_DIR
   echo "abcd1234" > $TEST647_CRED_DIR/scitoken.use
 
   echo "*** This should work"

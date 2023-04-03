@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -24,6 +25,7 @@
 #include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"
+#include "util/pipe.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -1744,8 +1746,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(
-    scalloc(100, 1)));
+  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   vector<string> command_line;
@@ -1764,7 +1765,12 @@ TEST_F(T_Util, ManagedExecClearEnv) {
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
   ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
-  EXPECT_EQ(bytes_read, 0);
+
+  // env will be cleared (normally it is way larger than 64 bytes)
+  // debug mode: there will be a log message in similar to 25-byte long:
+  // (cvmfs) execve'd /usr/bin/env (PID: 335527)    [12-15-2022 14:09:11 CET]
+  // thats way checking if bytes_read < 30 bytes
+  EXPECT_LE(bytes_read, 30);
   close(fd_stdout[0]);
 }
 
@@ -1776,7 +1782,7 @@ TEST_F(T_Util, ManagedExecRunShell) {
   bool retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
   EXPECT_TRUE(retval);
 
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *command = "echo \"Hello World\"\n";
   retval = shell_pipe.Write(command, strlen(command));
   EXPECT_TRUE(retval);
@@ -1811,12 +1817,24 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   ASSERT_TRUE(retval);
   EXPECT_EQ(0, kill(child_pid, 0));
 
+  // Orphaned process are attached to some system process if their parent
+  // process dies before them.
+  // Traditionally this is "init" with pid 1.
+  // However, POSIX leaves this implementation-defined and e.g.
+  // Ubuntu uses "systemd" - which pid changes per session
+
   // check that the PPID of the process is 1 (belongs to init)
   pid_t child_parent_pid = GetParentPid(child_pid);
-  EXPECT_EQ(1, child_parent_pid);
+
+  if (child_parent_pid == 1) {
+    EXPECT_EQ(1, child_parent_pid);
+  } else {
+    std::string name = GetProcessname(child_parent_pid);
+    EXPECT_STREQ(name.c_str(), "systemd");
+  }
 
   // tell the process to terminate
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);
@@ -1862,7 +1880,7 @@ TEST_F(T_Util, ManagedExecExecuteBinaryAsChild) {
   EXPECT_EQ(my_pid, child_parent_pid);
 
   // tell the process to terminate
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);

@@ -181,7 +181,7 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
     // Replace calls Remove; cancel Remove's actions:
     perf::Xadd(counters_->sz_removed_bytes, -entry->GetRdOnlySize());
 
-    // Count only the diference between the old and new file
+    // Count only the difference between the old and new file
     // Symlinks do not count into added or removed bytes
     int64_t dif = 0;
 

@@ -1,13 +1,15 @@
 # github.com/BurntSushi/toml v1.1.0
-## explicit
+## explicit; go 1.16
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
 # github.com/Microsoft/go-winio v0.5.2
+## explicit; go 1.13
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.9.5
+# github.com/Microsoft/hcsshim v0.9.6
+## explicit; go 1.13
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/computestorage
 github.com/Microsoft/hcsshim/internal/cow
@@ -30,10 +32,11 @@ github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
-# github.com/containerd/cgroups v1.0.3
+# github.com/containerd/cgroups v1.0.4
+## explicit; go 1.17
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/containerd v1.6.12
-## explicit
+# github.com/containerd/containerd v1.6.18
+## explicit; go 1.17
 github.com/containerd/containerd/api/services/snapshots/v1
 github.com/containerd/containerd/api/types
 github.com/containerd/containerd/contrib/seccomp/kernelversion
@@ -48,20 +51,24 @@ github.com/containerd/containerd/snapshots
 github.com/containerd/containerd/snapshots/overlay/overlayutils
 github.com/containerd/containerd/snapshots/storage
 # github.com/containerd/continuity v0.3.0
+## explicit; go 1.17
 github.com/containerd/continuity/fs
 github.com/containerd/continuity/sysx
 # github.com/containerd/stargz-snapshotter v0.12.0
-## explicit
+## explicit; go 1.16
 github.com/containerd/stargz-snapshotter/snapshot
 # github.com/gogo/protobuf v1.3.2
+## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
+## explicit
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.2
+## explicit; go 1.9
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
@@ -69,31 +76,33 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/go-cmp v0.5.8
-## explicit
-# github.com/kr/pretty v0.3.0
-## explicit
+## explicit; go 1.13
 # github.com/moby/sys/mountinfo v0.6.2
+## explicit; go 1.16
 github.com/moby/sys/mountinfo
 # github.com/opencontainers/go-digest v1.0.0
+## explicit; go 1.13
 github.com/opencontainers/go-digest
 # github.com/pkg/errors v0.9.1
+## explicit
 github.com/pkg/errors
-# github.com/rogpeppe/go-internal v1.8.1
-## explicit
 # github.com/sirupsen/logrus v1.8.1
-## explicit
+## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/stretchr/testify v1.8.0
-## explicit
+## explicit; go 1.13
 # go.etcd.io/bbolt v1.3.6
+## explicit; go 1.12
 go.etcd.io/bbolt
 # go.opencensus.io v0.23.0
+## explicit; go 1.13
 go.opencensus.io
 go.opencensus.io/internal
 go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/tracestate
 # golang.org/x/net v0.0.0-20220722155237-a158d28d115b
+## explicit; go 1.17
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -104,19 +113,22 @@ golang.org/x/net/trace
 ## explicit
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
+## explicit; go 1.17
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.7
+## explicit; go 1.17
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
+## explicit; go 1.15
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.47.0
-## explicit
+## explicit; go 1.14
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -166,6 +178,7 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # google.golang.org/protobuf v1.28.0
+## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire

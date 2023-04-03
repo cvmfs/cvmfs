@@ -492,9 +492,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
         // thread.  This would also allow to block the chunks and prevent the
         // race with re-insertion.  Then again, a thread can block umount.
 #ifndef DEBUGMSG
-        int max_fd = sysconf(_SC_OPEN_MAX);
-        for (int i = 0; i < max_fd; ++i)
-          close(i);
+        CloseAllFildes(std::set<int>());
 #endif
         if (fork() == 0) {
           for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
@@ -981,9 +979,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   if (!foreground)
     Daemonize();
 
-  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
   assert(watchdog.IsValid());
-  watchdog->Spawn();
+  watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =
@@ -1791,7 +1789,7 @@ bool PosixQuotaManager::RebuildDatabase() {
   seq_ = seq;
   result = true;
   LogCvmfs(kLogQuota, kLogDebug,
-           "rebuilding finished, seqence %" PRIu64 ", gauge %" PRIu64,
+           "rebuilding finished, sequence %" PRIu64 ", gauge %" PRIu64,
            seq_, gauge_);
 
  build_return:

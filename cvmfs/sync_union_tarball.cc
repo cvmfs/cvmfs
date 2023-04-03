@@ -180,7 +180,7 @@ void SyncUnionTarball::Traverse() {
       default: {
         // We should never enter in this branch, but just for safeness we prefer
         // to abort in case we hit a case we don't how to manage.
-        PANIC(kLogStderr, "Enter in unknow state. Aborting.\nError: %s\n",
+        PANIC(kLogStderr, "Enter in unknown state. Aborting.\nError: %s\n",
               result, archive_error_string(src));
       }
     }
@@ -313,7 +313,7 @@ bool SyncUnionTarball::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   return false;
 }
 
-/* Tar files are not necessarly traversed in order from root to leave.
+/* Tar files are not necessarily traversed in order from root to leave.
  * So it may happens that we are expanding the file `/a/b/c.txt` without
  * having created yet the directory `/a/b/`.
  * In order to overcome this limitation the following function create dummy

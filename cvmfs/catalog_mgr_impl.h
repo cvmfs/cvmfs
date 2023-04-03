@@ -669,6 +669,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
+
   return revision;
 }
 
@@ -805,7 +806,7 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
  * The final leaf nested catalog is returned.
  * The is_listable parameter is relevant if path is a nested catalog.  Only
  * if is_listable is true, the nested catalog will be used; otherwise the parent
- * with the transation point is sufficient.
+ * with the transaction point is sufficient.
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::MountSubtree(
@@ -971,6 +972,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    statistics_.catalog_revision->Set(revision_cache_);
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();
   }

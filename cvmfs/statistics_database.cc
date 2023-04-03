@@ -28,8 +28,10 @@ float          StatisticsDatabase::kLatestSchema           = 1.0f;
 //            0 for fail)
 //          * add `success` column to gc_statistics table (1 for success
 //            0 for fail)
+// 3 --> 4: (Feb 1 2022)
+//          * add column `n_duplicate_delete_requests` to gc_statistics table
 
-unsigned       StatisticsDatabase::kLatestSchemaRevision   = 3;
+unsigned       StatisticsDatabase::kLatestSchemaRevision   = 4;
 unsigned int   StatisticsDatabase::instances               = 0;
 bool           StatisticsDatabase::compacting_fails        = false;
 
@@ -99,6 +101,7 @@ struct GcStats {
   std::string n_condemned_catalogs;
   std::string n_condemned_objects;
   std::string sz_condemned_bytes;
+  std::string n_duplicate_delete_requests;
 
   explicit GcStats(const perf::Statistics *statistics) {
     perf::Counter *c = NULL;
@@ -110,6 +113,8 @@ struct GcStats {
     n_condemned_objects = c ? c->ToString() : "0";
     c = statistics->Lookup("gc.sz_condemned_bytes");
     sz_condemned_bytes = c ? c->ToString() : "0";
+    c = statistics->Lookup("gc.n_duplicate_delete_requests");
+    n_duplicate_delete_requests = c ? c->ToString() : "0";
   }
 };
 
@@ -197,6 +202,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "n_condemned_catalogs,"
       "n_condemned_objects,"
       "sz_condemned_bytes,"
+      "n_duplicate_delete_requests,"
       "success)"
       " VALUES("
       "'" + start_time + "'," +
@@ -205,6 +211,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       stats.n_condemned_catalogs + ","+
       stats.n_condemned_objects + "," +
       stats.sz_condemned_bytes + "," +
+      stats.n_duplicate_delete_requests + "," +
       (success ? "1" : "0") + ");";
   } else {
     // insert values except sz_condemned_bytes
@@ -215,6 +222,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       "n_preserved_catalogs,"
       "n_condemned_catalogs,"
       "n_condemned_objects,"
+      "n_duplicate_delete_requests,"
       "success)"
       " VALUES("
       "'" + start_time + "'," +
@@ -222,6 +230,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
       stats.n_preserved_catalogs + "," +
       stats.n_condemned_catalogs + "," +
       stats.n_condemned_objects + "," +
+      stats.n_duplicate_delete_requests + "," +
       (success ? "1" : "0") + ");";
   }
   return insert_statement;
@@ -264,6 +273,7 @@ bool StatisticsDatabase::CreateEmptyDatabase() {
     "n_condemned_catalogs INTEGER,"
     "n_condemned_objects INTEGER,"
     "sz_condemned_bytes INTEGER,"
+    "n_duplicate_delete_requests INTEGER,"
     "success INTEGER);").Execute();
   return ret1 & ret2;
 }
@@ -279,7 +289,7 @@ bool StatisticsDatabase::CheckSchemaCompatibility() {
 bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
   ++live_upgrade_calls;
   if (IsEqualSchema(schema_version(), kLatestSchema) &&
-    (schema_revision() == 1)) {
+      (schema_revision() == 1)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (1 --> 2) of "
       "statistics database");
 
@@ -332,8 +342,9 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
       return false;
     }
   }
+
   if (IsEqualSchema(schema_version(), kLatestSchema) &&
-    (schema_revision() == 2)) {
+      (schema_revision() == 2)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (2 --> 3) of "
       "statistics database");
 
@@ -359,6 +370,28 @@ bool StatisticsDatabase::LiveSchemaUpgradeIfNecessary() {
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade schema revision"
                " of statistics database");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), kLatestSchema) &&
+      (schema_revision() == 3)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "upgrading schema revision (3 --> 4) of "
+                                   "statistics database");
+
+    sqlite::Sql gc_upgrade4_1(this->sqlite_db(), "ALTER TABLE gc_statistics"
+                                   " ADD n_duplicate_delete_requests INTEGER;");
+
+    if (!gc_upgrade4_1.Execute()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade gc_statistics "
+                                         "table of statistics database");
+      return false;
+    }
+
+    set_schema_revision(4);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "failed to upgrade schema revision "
+                                         "of statistics database");
       return false;
     }
   }

@@ -42,8 +42,6 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
-  ${CVMFS_SOURCE_DIR}/dns.cc
-  ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
   ${CVMFS_SOURCE_DIR}/ingestion/item.cc
   ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
@@ -64,6 +62,9 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
+  ${CVMFS_SOURCE_DIR}/network/dns.cc
+  ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc
   ${CVMFS_SOURCE_DIR}/receiver/lease_path_util.cc
@@ -82,7 +83,6 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_json.cc
   ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
-  ${CVMFS_SOURCE_DIR}/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/upload.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/concurrency.cc

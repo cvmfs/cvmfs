@@ -49,7 +49,9 @@ namespace CVMFS_NAMESPACE_GUARD {
  * and EPIPE is return instead, where supported.
  * MSG_NOSIGNAL is Linux specific, SO_NOSIGPIPE is the Mac OS X equivalent.
  */
+#ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL SO_NOSIGPIPE
+#endif
 
 /**
  * HOST_NAME_MAX does on exist on OS X
@@ -311,5 +313,9 @@ inline uint64_t platform_memsize() {
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
+
+static int prctl(int option, uint64_t arg2, uint64_t arg3,
+                uint64_t arg4, uint64_t arg5) { return 0; }
+#define PR_SET_DUMPABLE 0
 
 #endif  // CVMFS_UTIL_PLATFORM_OSX_H_

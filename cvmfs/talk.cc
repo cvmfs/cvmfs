@@ -40,13 +40,13 @@
 #include "cache_posix.h"
 #include "catalog_mgr_client.h"
 #include "cvmfs.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
 #include "monitor.h"
 #include "mountpoint.h"
+#include "network/download.h"
 #include "nfs_maps.h"
 #include "options.h"
 #include "quota.h"
@@ -306,8 +306,8 @@ void *TalkManager::MainResponder(void *data) {
         bool retval = cvmfs::SendFuseFd(socket_path);
         talk_mgr->Answer(con_fd, retval ? "OK\n" : "Failed\n");
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-                 "Transfer fuse connection to new mount (via %s): %s",
-                 socket_path.c_str(), retval ? "success" : "failure");
+                 "Attempt to send fuse connection info to new mount (via %s)%s",
+                 socket_path.c_str(), retval ? "" : " -- failed!");
       }
     } else if (line.substr(0, 7) == "remount") {
       FuseRemounter::Status status;

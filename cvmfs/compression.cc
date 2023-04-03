@@ -3,7 +3,7 @@
  *
  * This is a wrapper around zlib.  It provides
  * a set of functions to conveniently compress and decompress stuff.
- * Allmost all of the functions return true on success, otherwise false.
+ * Almost all of the functions return true on success, otherwise false.
  *
  * TODO: think about code deduplication
  */
