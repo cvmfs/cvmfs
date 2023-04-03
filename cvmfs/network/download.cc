@@ -1775,7 +1775,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->http_tracing_headers.push_back(std::string(buf));
     snprintf(buf, sizeof(buf), "X-CVMFS-UID: %d", info->uid);
     info->http_tracing_headers.push_back(std::string(buf));
-    info->http_tracing_headers.push_back(std::string(buf));
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
