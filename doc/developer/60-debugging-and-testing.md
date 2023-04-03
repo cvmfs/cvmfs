@@ -37,6 +37,7 @@ To run the server in debug mode, the environment variable `CVMFS_SERVER_DEBUG` m
   - Run debug version of the server (without GDB)
   - Underlying command: `cvmfs_swissknife_debug`
 
+For a first lightweight debugging `CVMFS_SERVER_DEBUG=3` is useful because it prints all the debug messages that are normally suppressed.
 For serious debugging `CVMFS_SERVER_DEBUG=2` is the preferred choice. `CVMFS_SERVER_DEBUG=1` only opens GDB prompt when exiting the program but in many cases `cvmfs` has proper error handling, exiting gracefully and as such finding the code section responsible for the error is not obvious.
 
 Example command: `CVMFS_SERVER_DEBUG=2 cvmfs_server mkfs my.test.repo`
