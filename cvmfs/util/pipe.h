@@ -210,9 +210,8 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    */
   void MakePipe(int pipe_fd[2]) {
     int retval = pipe(pipe_fd);
-    if (!(retval == 0)) {
-      PANIC(kLogSyslogErr | kLogDebug,
-                      "MakePipe failed with retval %d errno %d", retval, errno);
+    if (retval != 0) {
+      PANIC(kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
     }
   }
 
