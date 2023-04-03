@@ -241,7 +241,7 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
  */
 string Watchdog::ReportStacktrace() {
   CrashData crash_data;
-  if (!pipe_watchdog_->TryRead(&crash_data)) {
+  if (!pipe_watchdog_->TryRead<CrashData>(&crash_data)) {
     return "failed to read crash data (" + StringifyInt(errno) + ")";
   }
 
@@ -308,7 +308,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
   crash_data.signal     = sig;
   crash_data.sys_errno  = send_errno;
   crash_data.pid        = getpid();
-  if (!Me()->pipe_watchdog_->Write(crash_data)) {
+  if (!Me()->pipe_watchdog_->Write<CrashData>(crash_data)) {
     _exit(1);
   }
 
@@ -376,9 +376,9 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
  * Fork the watchdog process and put it on hold until Spawn() is called.
  */
 void Watchdog::Fork() {
-  Pipe pipe_pid;
-  pipe_watchdog_ = new Pipe();
-  pipe_listener_ = new Pipe();
+  Pipe<kPipeWatchdogPid> pipe_pid;
+  pipe_watchdog_ = new Pipe<kPipeWatchdog>();
+  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>();
 
   pid_t pid;
   int statloc;
@@ -389,12 +389,12 @@ void Watchdog::Fork() {
       switch (fork()) {
         case -1: _exit(1);
         case 0: {
-          close(pipe_watchdog_->write_end);
+          pipe_watchdog_->CloseWriteFd();
           Daemonize();
           // send the watchdog PID to the supervisee
           pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
-          close(pipe_pid.write_end);
+          pipe_pid.CloseWriteFd();
           // Close all unused file descriptors
           // close also usyslog, only get it back if necessary
           // string usyslog_save = GetLogMicroSyslog();
@@ -412,8 +412,8 @@ void Watchdog::Fork() {
           preserve_fds.insert(0);
           preserve_fds.insert(1);
           preserve_fds.insert(2);
-          preserve_fds.insert(pipe_watchdog_->read_end);
-          preserve_fds.insert(pipe_listener_->write_end);
+          preserve_fds.insert(pipe_watchdog_->GetReadFd());
+          preserve_fds.insert(pipe_listener_->GetWriteFd());
           CloseAllFildes(preserve_fds);
           SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
@@ -421,24 +421,24 @@ void Watchdog::Fork() {
           if (WaitForSupervisee())
             Supervise();
 
-          close(pipe_watchdog_->read_end);
-          close(pipe_listener_->write_end);
+          pipe_watchdog_->CloseReadFd();
+          pipe_listener_->CloseWriteFd();
           exit(0);
         }
         default:
           _exit(0);
       }
     default:
-      close(pipe_watchdog_->read_end);
-      close(pipe_listener_->write_end);
-      close(pipe_pid.write_end);
+      pipe_watchdog_->CloseReadFd();
+      pipe_listener_->CloseWriteFd();
+      pipe_pid.CloseWriteFd();
       if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
       if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
   }
 
   // retrieve the watchdog PID from the pipe
   pipe_pid.Read(&watchdog_pid_);
-  close(pipe_pid.read_end);
+  pipe_pid.CloseReadFd();
 }
 
 
@@ -492,7 +492,7 @@ bool Watchdog::WaitForSupervisee() {
   pipe_watchdog_->Read(&size);
   crash_dump_path_.resize(size);
   if (size > 0) {
-    ReadPipe(pipe_watchdog_->read_end, &crash_dump_path_[0], size);
+    pipe_watchdog_->Read(&crash_dump_path_[0], size);
 
     int retval = chdir(GetParentPath(crash_dump_path_).c_str());
     if (retval != 0) {
@@ -543,7 +543,7 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   signal_handlers[SIGXFSZ] = sa;
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
-  pipe_terminate_ = new Pipe();
+  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
   int retval =
     pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
   assert(retval == 0);
@@ -551,8 +551,9 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   pipe_watchdog_->Write(ControlFlow::kSupervise);
   size_t path_size = crash_dump_path.size();
   pipe_watchdog_->Write(path_size);
-  if (path_size > 0)
-    WritePipe(pipe_watchdog_->write_end, crash_dump_path.data(), path_size);
+  if (path_size > 0) {
+    pipe_watchdog_->Write(crash_dump_path.data(), path_size);
+  }
 
   spawned_ = true;
 }
@@ -563,10 +564,10 @@ void *Watchdog::MainWatchdogListener(void *data) {
   LogCvmfs(kLogMonitor, kLogDebug, "starting watchdog listener");
 
   struct pollfd watch_fds[2];
-  watch_fds[0].fd = watchdog->pipe_listener_->read_end;
+  watch_fds[0].fd = watchdog->pipe_listener_->GetReadFd();
   watch_fds[0].events = 0;  // Only check for POLL[ERR,HUP,NVAL] in revents
   watch_fds[0].revents = 0;
-  watch_fds[1].fd = watchdog->pipe_terminate_->read_end;
+  watch_fds[1].fd = watchdog->pipe_terminate_->GetReadFd();
   watch_fds[1].events = POLLIN | POLLPRI;
   watch_fds[1].revents = 0;
   while (true) {
@@ -603,7 +604,7 @@ void *Watchdog::MainWatchdogListener(void *data) {
 void Watchdog::Supervise() {
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
-  if (!pipe_watchdog_->TryRead(&control_flow)) {
+  if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
     LogEmergency("watchdog: unexpected termination (" +
                  StringifyInt(control_flow) + ")");
     if (on_crash_) on_crash_();
@@ -657,8 +658,8 @@ Watchdog::~Watchdog() {
   }
 
   pipe_watchdog_->Write(ControlFlow::kQuit);
-  close(pipe_watchdog_->write_end);
-  close(pipe_listener_->read_end);
+  pipe_watchdog_->CloseWriteFd();
+  pipe_listener_->CloseReadFd();
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");

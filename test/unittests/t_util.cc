@@ -25,6 +25,7 @@
 #include "util/atomic.h"
 #include "util/file_guard.h"
 #include "util/mmap_file.h"
+#include "util/pipe.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -1781,7 +1782,7 @@ TEST_F(T_Util, ManagedExecRunShell) {
   bool retval = Shell(&fd_stdin, &fd_stdout, &fd_stderr);
   EXPECT_TRUE(retval);
 
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *command = "echo \"Hello World\"\n";
   retval = shell_pipe.Write(command, strlen(command));
   EXPECT_TRUE(retval);
@@ -1833,7 +1834,7 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   }
 
   // tell the process to terminate
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);
@@ -1879,7 +1880,7 @@ TEST_F(T_Util, ManagedExecExecuteBinaryAsChild) {
   EXPECT_EQ(my_pid, child_parent_pid);
 
   // tell the process to terminate
-  Pipe shell_pipe(fd_stdout, fd_stdin);
+  Pipe<kPipeTest> shell_pipe(fd_stdout, fd_stdin);
   const char *quit = "quit\n";
   retval = shell_pipe.Write(quit, strlen(quit));
   EXPECT_TRUE(retval);

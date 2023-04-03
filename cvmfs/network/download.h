@@ -26,6 +26,8 @@
 #include "ssl.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/pipe.h"
+#include "util/pointer.h"
 #include "util/prng.h"
 
 class InterruptCue;
@@ -205,7 +207,7 @@ struct JobInfo {
     headers = NULL;
     memset(&zstream, 0, sizeof(zstream));
     info_header = NULL;
-    wait_at[0] = wait_at[1] = -1;
+    pipe_job_results = NULL;
     nocache = false;
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
@@ -270,9 +272,8 @@ struct JobInfo {
   }
 
   ~JobInfo() {
-    if (wait_at[0] >= 0) {
-      close(wait_at[0]);
-      close(wait_at[1]);
+    if (pipe_job_results.IsValid()) {
+      pipe_job_results.Destroy();
     }
   }
 
@@ -288,7 +289,10 @@ struct JobInfo {
   char *info_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
-  int wait_at[2];  /**< Pipe used for the return value */
+
+  /// Pipe used for the return value
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+
   std::string proxy;
   bool nocache;
   Failures error_code;
@@ -509,9 +513,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   pthread_t thread_download_;
   atomic_int32 multi_threaded_;
-  int pipe_terminate_[2];
+  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
 
-  int pipe_jobs_[2];
+  UniquePtr<Pipe<kPipeDownloadJobs> > pipe_jobs_;
   struct pollfd *watch_fds_;
   uint32_t watch_fds_size_;
   uint32_t watch_fds_inuse_;

@@ -56,6 +56,7 @@
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
+#include "util/pipe.h"
 #include "util/platform.h"
 #include "util/string.h"
 
@@ -1846,7 +1847,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 {
   assert(command_line.size() >= 1);
 
-  Pipe pipe_fork;
+  Pipe<kPipeDetachedChild> pipe_fork;
   pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
@@ -1855,7 +1856,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     ForkFailures::Names failed = ForkFailures::kUnknown;
 
     std::set<int> skip_fds = preserve_fildes;
-    skip_fds.insert(pipe_fork.write_end);
+    skip_fds.insert(pipe_fork.GetWriteFd());
 
     if (clear_env) {
 #ifdef __APPLE__
@@ -1895,13 +1896,13 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
       if (pid_grand_child != 0) _exit(0);
     }
 
-    fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
+    fd_flags = fcntl(pipe_fork.GetWriteFd(), F_GETFD);
     if (fd_flags < 0) {
       failed = ForkFailures::kFailGetFdFlags;
       goto fork_failure;
     }
     fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork.write_end, F_SETFD, fd_flags) < 0) {
+    if (fcntl(pipe_fork.GetWriteFd(), F_SETFD, fd_flags) < 0) {
       failed = ForkFailures::kFailSetFdFlags;
       goto fork_failure;
     }
@@ -1918,15 +1919,15 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // grand father
     pid_grand_child = getpid();
     failed = ForkFailures::kSendPid;
-    pipe_fork.Write(&failed, sizeof(failed));
-    pipe_fork.Write(pid_grand_child);
+    pipe_fork.Write<ForkFailures::Names>(failed);
+    pipe_fork.Write<pid_t>(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = ForkFailures::kFailExec;
 
    fork_failure:
-    pipe_fork.Write(&failed, sizeof(failed));
+    pipe_fork.Write<ForkFailures::Names>(failed);
     _exit(1);
   }
   if (double_fork) {
@@ -1934,14 +1935,14 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     waitpid(pid, &statloc, 0);
   }
 
-  close(pipe_fork.write_end);
+  pipe_fork.CloseWriteFd();
 
   // Either the PID or a return value is sent
   ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code, sizeof(status_code));
-  assert(retcode);
+  pipe_fork.Read<ForkFailures::Names>(&status_code);
+
   if (status_code != ForkFailures::kSendPid) {
-    close(pipe_fork.read_end);
+    pipe_fork.CloseReadFd();
     LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
@@ -1953,7 +1954,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   pipe_fork.Read(&buf_child_pid);
   if (child_pid != NULL)
     *child_pid = buf_child_pid;
-  close(pipe_fork.read_end);
+  pipe_fork.CloseReadFd();
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
            static_cast<int>(buf_child_pid));
