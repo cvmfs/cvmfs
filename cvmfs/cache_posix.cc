@@ -32,12 +32,16 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifndef __APPLE__
+#include <linux/magic.h>
+#endif
 #include <inttypes.h>
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifndef __APPLE__
 #include <sys/statfs.h>
+#include <sys/vfs.h>
 #endif
 #include <unistd.h>
 
@@ -421,15 +425,28 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
   return 0;
 }
 
+#ifndef __APPLE__
+static bool fdOnTmpfs(int fd) {
+  struct statfs info;
+  info.f_type = 0;
+  fstatfs(fd, &info);
+  return (info.f_type == TMPFS_MAGIC);
+}
+#else
+static bool fdOnTmpfs(int fd) {return false;}
+#endif
+
 
 /**
  * Used by the sqlite vfs in order to preload file catalogs into the file system
  * buffers.
+ * No-op if the fd is to a file that's on a tmpfs, and so already in page cache
  */
 int PosixCacheManager::Readahead(int fd) {
   unsigned char *buf[4096];
   int nbytes;
   uint64_t pos = 0;
+  if (fdOnTmpfs(fd)) {return 0;}
   do {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;
@@ -439,7 +456,6 @@ int PosixCacheManager::Readahead(int fd) {
     return nbytes;
   return 0;
 }
-
 
 int PosixCacheManager::Reset(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
