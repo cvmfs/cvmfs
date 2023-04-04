@@ -45,7 +45,9 @@ inline std::vector<std::string> platform_mountlist() {
   FILE *fmnt = setmntent("/proc/mounts", "r");
   struct mntent *mntbuf;  // Static buffer managed by libc!
   while ((mntbuf = getmntent(fmnt)) != NULL) {
-    result.push_back(mntbuf->mnt_dir);
+    if (!strcmp(mntbuf->mnt_type, "fuse")) {
+       result.push_back(mntbuf->mnt_dir);
+    }
   }
   endmntent(fmnt);
   return result;
