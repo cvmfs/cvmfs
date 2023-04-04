@@ -96,7 +96,20 @@ void Spawn() {
 
 
 void Fini() {
-  unlink(socket_path_->c_str());
+  bool changed = false;
+  struct stat current_stat;
+  struct stat new_stat;
+  int ret1, ret2;
+  ret1 = fstat(socket_fd_, &current_stat);
+  ret2 = stat(socket_path_->c_str(), &new_stat);
+  if (!ret1 && !ret2
+     && (current_stat.st_dev != new_stat.st_dev
+     || current_stat.st_ino != new_stat.st_ino)) {
+     changed = true;
+  }
+  if (!changed) {
+    unlink(socket_path_->c_str());
+  }
   shutdown(socket_fd_, SHUT_RDWR);
   close(socket_fd_);
   if (spawned_) pthread_join(thread_talk_, NULL);

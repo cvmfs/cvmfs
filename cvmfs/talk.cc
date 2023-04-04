@@ -820,11 +820,33 @@ TalkManager::TalkManager(
 
 TalkManager::~TalkManager() {
   if (!socket_path_.empty()) {
-    int retval = unlink(socket_path_.c_str());
-    if ((retval != 0) && (errno != ENOENT)) {
-      LogCvmfs(kLogTalk, kLogSyslogWarn,
+    bool changed = false;
+    if (socket_fd_ >= 0) {
+      // compare the inode of the open file with that of
+      // the current socket_path. If different then
+      // there's been a remount event, and we no longer
+      // own the current socket. In this case, don't delete it
+      struct stat current_stat;
+      struct stat new_stat;
+      int ret1, ret2;
+      ret1 = fstat(socket_fd_, &current_stat);
+      ret2 = stat(socket_path_.c_str(), &new_stat);
+      if (!ret1 && !ret2
+         && (current_stat.st_dev != new_stat.st_dev
+         || current_stat.st_ino != new_stat.st_ino) ) {
+         changed = true;
+      }
+    }
+    if (!changed) {
+      int retval = unlink(socket_path_.c_str());
+      if ((retval != 0) && (errno != ENOENT)) {
+        LogCvmfs(kLogTalk, kLogSyslogWarn,
                "Could not remove cvmfs_io socket from cache directory (%d)",
                errno);
+      }
+    } else {
+        LogCvmfs(kLogTalk, kLogSyslogWarn,
+          "cvmfs_io socket has changed. Not deleting it", socket_path_.c_str());
     }
   }
 
