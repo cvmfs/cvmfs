@@ -8,7 +8,7 @@ Solution: Use a thread with an infinite-loop that uses `poll` to
   - Stop the thread if requested from the outside
 
 Details:
-- `Create()`-Function allows registering subclasses
+- `Create()`-Function allows registering subclasses defined by enum `TypeSelector`
 - `MainMyThread()` contains loop that is started by calling `Spawn()`
 - `DoTheWork()` contains the actual work to be executed in interval
 
@@ -193,7 +193,7 @@ void *MyThread::MainMyThread(void *data) {
     // stop thread due to poll event
     assert(watch_term.revents != 0);
 
-    PipeSignals terminate_signal = 0;
+    PipeSignals terminate_signal = 0; // maybe introduce some "invalidSignal"
     mythread->pipe_terminate_->Read<PipeSignals*>(&terminate_signal);
     assert(terminate_signal == kPipeTerminateSignal);
     break;
