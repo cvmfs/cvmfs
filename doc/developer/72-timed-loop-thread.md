@@ -1,7 +1,5 @@
-# Coding Templates
 
-This section contains coding templates that are commonly used in CVMFS, and
-are easily adaptable to different situations.
+# Coding Template: Timed-loop Thread
 
 ## Execute work every X seconds (in separate thread)
 Idea: Have some work executed every X seconds
@@ -34,6 +32,7 @@ Header `mythread.h`
 #include <string>
 #include <vector>
 
+#include "util/pipe.h"
 #include "util/single_copy.h"
 
 namespace mynamespace {
@@ -58,7 +57,7 @@ class MyThread : SingleCopy {
 
  protected:
   const int send_rate_sec_;
-  int pipe_terminate_[2];
+  UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_telemetry_;
   // State of constructed object. Used in custom myThread subclasses to
   // specify that the object was correctly constructed.
@@ -77,7 +76,7 @@ class MyThread : SingleCopy {
    * Must always be called in the constructor of the custom telemetry classes.
   */
   MyThread(params...) : is_zombie_(true), timestamp_(0) {
-    pipe_terminate_[0] = pipe_terminate_[1] = -1;
+    pipe_terminate_ = NULL;
     memset(&thread_telemetry_, 0, sizeof(thread_telemetry_));
   }
 
@@ -137,18 +136,16 @@ MyThread* MyThread::Create(params..., const TypeSelector type) {
 }
 
 MyThread::~MyThread() {
-  if (pipe_terminate_[1] >= 0) {
-    char t = 'T';
-    WritePipe(pipe_terminate_[1], &t, 1);
+  if (pipe_terminate_.IsValid()) {
+    pipe_terminate_->Write(kPipeTerminateSignal);
     pthread_join(thread_myThread_, NULL);
-    ClosePipe(pipe_terminate_);
+    pipe_terminate_.Destroy();
   }
 }
 
 void MyThread::Spawn() {
-  assert(pipe_terminate_[0] == -1);
   assert(send_rate_sec_ > 0);
-  MakePipe(pipe_terminate_);
+  pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
   int retval = pthread_create(&thread_myThread_, NULL, MainMyThread, this);
   assert(retval == 0);
   LogCvmfs(kLogCvmfs, kLogDebug, "Spawning of myThread thread.");
@@ -158,7 +155,7 @@ void *MyThread::MainMyThread(void *data) {
   MyThread *mythread = reinterpret_cast<MyThread*>(data);
 
   struct pollfd watch_term;
-  watch_term.fd = mythread->pipe_terminate_[0];
+  watch_term.fd = mythread->pipe_terminate_->GetReadFd();
   watch_term.events = POLLIN | POLLPRI;
   int timeout_ms = mythread->send_rate_sec_ * 1000;
   uint64_t deadline_sec = platform_monotonic_time()
@@ -196,9 +193,9 @@ void *MyThread::MainMyThread(void *data) {
     // stop thread due to poll event
     assert(watch_term.revents != 0);
 
-    char c = 0;
-    ReadPipe(mythread->pipe_terminate_[0], &c, 1);
-    assert(c == 'T');
+    PipeSignals terminate_signal = 0;
+    mythread->pipe_terminate_->Read<PipeSignals*>(&terminate_signal);
+    assert(terminate_signal == kPipeTerminateSignal);
     break;
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "Stopping myThread");
