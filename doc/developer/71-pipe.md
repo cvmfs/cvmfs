@@ -1,4 +1,4 @@
-# Coding Templates: `Pipe` Class
+# Coding Template: `Pipe` Class
 
 POSIX pipes are regularly used by CVMFS to communicate between different threads.
 
