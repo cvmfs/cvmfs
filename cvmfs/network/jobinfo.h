@@ -64,6 +64,30 @@ struct JobInfo {
   off_t range_offset;
   off_t range_size;
 
+  /**
+   * Tells whether the error is because of a non-existing file. Should only
+   * be called if error_code is not kFailOk
+   */
+  bool IsFileNotFound();
+
+  // Internal state, don't touch
+  CURL *curl_handle;
+  curl_slist *headers;
+  char *info_header;
+  z_stream zstream;
+  shash::ContextPtr hash_context;
+  /// Pipe used for the return value
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  std::string proxy;
+  bool nocache;
+  Failures error_code;
+  int http_code;
+  unsigned char num_used_proxies;
+  unsigned char num_used_hosts;
+  unsigned char num_retries;
+  unsigned backoff_ms;
+  unsigned int current_host_chain_index;
+
   // Default initialization of fields
   void Init() {
     url = NULL;
@@ -123,30 +147,6 @@ struct JobInfo {
       pipe_job_results.Destroy();
     }
   }
-
-  /**
-   * Tells whether the error is because of a non-existing file. Should only
-   * be called if error_code is not kFailOk
-   */
-  bool IsFileNotFound();
-
-  // Internal state, don't touch
-  CURL *curl_handle;
-  curl_slist *headers;
-  char *info_header;
-  z_stream zstream;
-  shash::ContextPtr hash_context;
-  /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
-  std::string proxy;
-  bool nocache;
-  Failures error_code;
-  int http_code;
-  unsigned char num_used_proxies;
-  unsigned char num_used_hosts;
-  unsigned char num_retries;
-  unsigned backoff_ms;
-  unsigned int current_host_chain_index;
 };  // JobInfo
 
 }  // namespace download

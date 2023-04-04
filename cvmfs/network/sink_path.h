@@ -68,7 +68,7 @@ class PathSink : public Sink {
    */
   int Flush() {
     // A zero value indicates success.
-    // If an error occurs, EOF is returned and the error indicator is set (see ferror).
+    // For error: EOF is returned and the error indicator is set (see ferror)
     return fflush(file_) * -1;
   }
 

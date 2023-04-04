@@ -6,6 +6,7 @@
 #define CVMFS_NETWORK_SINK_H_
 
 #include <stdint.h>
+#include <string>
 
 namespace cvmfs {
 
@@ -74,7 +75,7 @@ class Sink {
   */
   virtual std::string ToString() = 0;
 
-  protected:
+ protected:
     bool is_owner_;
 };
 

@@ -316,8 +316,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       if (static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug,
           "Failed to perform write of %d bytes to sink %s",
-          num_bytes, info->destination_sink->ToString().c_str()
-        );
+          num_bytes, info->destination_sink->ToString().c_str());
       }
     }
   }
@@ -998,7 +997,6 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else {
       info->destination_sink->Reserve(stat_buf.st_size);
     }
-   
   }
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
@@ -1339,7 +1337,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     // Reset internal state and destination
     if (info->destination != kDestinationNone &&
         info->destination_sink->Reset() != 0) {
-      // TODO(heretherebedragons) in theory this is unneccessary to set
+      // TODO(heretherebedragons) in theory this is unnecessary to set
       // the error code because in the goto the flush is checked again
       // and error_code set
       info->error_code = kFailLocalIO;
