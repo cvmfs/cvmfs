@@ -122,6 +122,13 @@ static bool CheckStrictMount(const string &fqrn) {
   return true;
 }
 
+static bool CheckAllowReattach() {
+  string param;
+  if (options_manager_.GetValue("CVMFS_ALLOW_REATTACH_MOUNT", &param)) {
+      return options_manager_.IsOn(param);
+  }
+  return true;
+}
 
 static bool CheckProxy() {
   string param;
@@ -453,13 +460,24 @@ int main(int argc, char **argv) {
   string prev_mountpoint;
   retval = CheckConcurrentMount(fqrn, workspace, &prev_mountpoint);
   if (retval) {
-    if (remount && (mountpoint == prev_mountpoint)) {
-      // Actually remounting is too hard, but pretend that it worked
-      return 0;
+    if (remount) {
+      if (mountpoint == prev_mountpoint) {
+        // Actually remounting is too hard, but pretend that it worked
+        return 0;
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
+               fqrn.c_str(), mountpoint.c_str());
+        return 1;
+      }
+    }
+    if (mountpoint != prev_mountpoint && IsMountPoint(prev_mountpoint)) {
+       LogCvmfs(kLogCvmfs, kLogStderr,
+          "Already mounted at %s", prev_mountpoint.c_str());
+       return 1;
     }
     // Identify zombie fuse processes that are held open by other mount
     // namespaces
-    if ((mountpoint == prev_mountpoint) && !IsMountPoint(mountpoint)) {
+    if (!IsMountPoint(mountpoint)) {
       // Allow for group access to the socket receiving the fuse fd
       umask(007);
       int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
@@ -468,17 +486,13 @@ int main(int argc, char **argv) {
                  "Cannot connect to existing fuse module");
         return 1;
       }
-      return AttachMount(mountpoint, fqrn, fuse_fd);
-    }
-    LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is already mounted on %s",
-             fqrn.c_str(), prev_mountpoint.c_str());
-    return 1;
-  } else {
-    // No double mount
-    if (remount) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
-               fqrn.c_str(), mountpoint.c_str());
-      return 1;
+      if (CheckAllowReattach()) {
+        return AttachMount(mountpoint, fqrn, fuse_fd);
+      }
+      // otherwise fall through and continue to try mounting
+    } else {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Already mounted");
+        return 1;
     }
   }
 
