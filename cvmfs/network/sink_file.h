@@ -6,6 +6,7 @@
 #define CVMFS_NETWORK_SINK_FILE_H_
 
 #include <cstdio>
+#include <string>
 
 #include "sink.h"
 #include "util/posix.h"

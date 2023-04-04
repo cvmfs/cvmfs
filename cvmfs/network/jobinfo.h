@@ -24,6 +24,7 @@
 #include "sink_file.h"
 #include "sink_mem.h"
 #include "sink_path.h"
+#include "util/pipe.h"
 
 class InterruptCue;
 

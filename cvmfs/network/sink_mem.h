@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <string>
 
 #include "sink.h"
 #include "util/posix.h"
