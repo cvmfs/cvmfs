@@ -32,7 +32,7 @@ cases, it replaces package managers and shared software areas on cluster file
 systems as means to distribute the software used to process experiment data.
 
 ## Non-exhaustive List of Resources Related to CernVM-FS
-- [Official Documentation](https://readthedocs.org/projects/cvmfs/badge/?version=latest) 
+- [Official Documentation](https://cvmfs.readthedocs.io/en/stable/) 
   - Aimed at maintainers of CernVM-FS instances, users and developers. Contains
     many in-depth explanations and a complete list of all (client) configuration
     parameters in the appendix.
