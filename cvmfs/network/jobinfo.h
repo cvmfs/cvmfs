@@ -34,11 +34,9 @@ namespace download {
  * Contains all the information to specify a download job.
  */
 class JobInfo {
- public:
-  /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
-
  private:
+   /// Pipe used for the return value
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;

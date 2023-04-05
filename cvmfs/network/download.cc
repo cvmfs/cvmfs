@@ -563,7 +563,7 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           info->GetPipeJobResultWeakRef()->
-                                      Write<Failures*>(info->GetErrorCodePtr());
+                                  Write<download::Failures>(info->error_code());
         }
       }
     }
