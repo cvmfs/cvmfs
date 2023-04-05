@@ -13,7 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <linux/magic.h>  
+#include <linux/magic.h>
 #include <mntent.h>
 #include <pthread.h>
 #include <signal.h>
@@ -283,11 +283,11 @@ inline ssize_t platform_readahead(int filedes) {
  */
 inline bool platform_filedes_on_tmpfs(int filedes) {
   struct statfs info;
-  
+
   info.f_type = 0;
   fstatfs(filedes, &info);
 
-  return (info.f_type == TMPFS_MAGIC);  
+  return (info.f_type == TMPFS_MAGIC);
 }
 
 /**

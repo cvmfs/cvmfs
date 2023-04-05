@@ -243,7 +243,7 @@ inline ssize_t platform_readahead(int filedes) {
  * Returns true if the file descriptor resides on tmpfs and with this is already
  * in the page cache.
  */
-inline bool platform_filedes_on_tmpfs(int filedes) {
+inline bool platform_filedes_on_tmpfs(int /*filedes*/) {
   // NOOP, osx has no tmpfs equivalent
   return false;
 }
