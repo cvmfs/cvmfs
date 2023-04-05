@@ -239,6 +239,15 @@ inline ssize_t platform_readahead(int filedes) {
   return 0;
 }
 
+/**
+ * Returns true if the file descriptor resides on tmpfs and with this is already
+ * in the page cache.
+ */
+inline bool platform_filedes_on_tmpfs(int filedes) {
+  // NOOP, osx has no tmpfs equivalent
+  return false;
+}
+
 inline bool read_line(FILE *f, std::string *line) {
   char *buffer_line = NULL;
   size_t buffer_size = 0;

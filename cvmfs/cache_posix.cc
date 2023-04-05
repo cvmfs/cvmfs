@@ -425,11 +425,19 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 /**
  * Used by the sqlite vfs in order to preload file catalogs into the file system
  * buffers.
+ * 
+ * No-op if the fd is to a file that is on a tmpfs, and so already in page cache
  */
 int PosixCacheManager::Readahead(int fd) {
   unsigned char *buf[4096];
   int nbytes;
   uint64_t pos = 0;
+
+  // no-op if fd is on tmpfs
+  if (platform_filedes_on_tmpfs(fd)) {
+    return 0;
+  }
+
   do {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;

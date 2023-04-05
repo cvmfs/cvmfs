@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <linux/magic.h>  
 #include <mntent.h>
 #include <pthread.h>
 #include <signal.h>
@@ -22,6 +23,7 @@
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -273,6 +275,19 @@ inline void platform_disable_kcache(int filedes) {
 
 inline ssize_t platform_readahead(int filedes) {
   return readahead(filedes, 0, static_cast<size_t>(-1));
+}
+
+/**
+ * Returns true if the file descriptor resides on tmpfs and with this is already
+ * in the page cache.
+ */
+inline bool platform_filedes_on_tmpfs(int filedes) {
+  struct statfs info;
+  
+  info.f_type = 0;
+  fstatfs(filedes, &info);
+
+  return (info.f_type == TMPFS_MAGIC);  
 }
 
 /**
