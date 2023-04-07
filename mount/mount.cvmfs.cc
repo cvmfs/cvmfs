@@ -470,14 +470,14 @@ int main(int argc, char **argv) {
         return 1;
       }
     }
-    if (mountpoint != prev_mountpoint && IsMountPoint(prev_mountpoint)) {
+    if (mountpoint != prev_mountpoint && IsMountPoint(prev_mountpoint, true)) {
        LogCvmfs(kLogCvmfs, kLogStderr,
           "Already mounted at %s", prev_mountpoint.c_str());
        return 1;
     }
     // Identify zombie fuse processes that are held open by other mount
     // namespaces
-    if (!IsMountPoint(mountpoint)) {
+    if (!IsMountPoint(mountpoint, true)) {
       // Allow for group access to the socket receiving the fuse fd
       umask(007);
       int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);

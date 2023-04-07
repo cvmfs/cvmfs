@@ -260,8 +260,8 @@ std::string ResolvePath(const std::string &path) {
 }
 
 
-bool IsMountPoint(const std::string &path) {
-  std::vector<std::string> mount_list = platform_mountlist();
+bool IsMountPoint(const std::string &path, const bool cvmfs_only) {
+  std::vector<std::string> mount_list = platform_mountlist(cvmfs_only);
   std::string resolved_path = ResolvePath(path);
   for (unsigned i = 0; i < mount_list.size(); ++i) {
     if (mount_list[i] == resolved_path)
@@ -269,7 +269,6 @@ bool IsMountPoint(const std::string &path) {
   }
   return false;
 }
-
 
 /**
  * By default PANIC(NULL) on failure

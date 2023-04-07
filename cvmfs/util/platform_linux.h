@@ -40,12 +40,12 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 #define platform_sighandler_t sighandler_t
 
-inline std::vector<std::string> platform_mountlist() {
+inline std::vector<std::string> platform_mountlist(bool cvmfs_only = false) {
   std::vector<std::string> result;
   FILE *fmnt = setmntent("/proc/mounts", "r");
   struct mntent *mntbuf;  // Static buffer managed by libc!
   while ((mntbuf = getmntent(fmnt)) != NULL) {
-    if (!strcmp(mntbuf->mnt_type, "fuse")) {
+    if ( !cvmfs_only || !strcmp(mntbuf->mnt_type, "fuse") ) {
        result.push_back(mntbuf->mnt_dir);
     }
   }
