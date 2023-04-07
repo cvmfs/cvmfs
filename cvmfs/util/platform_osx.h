@@ -60,7 +60,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 #define platform_sighandler_t sig_t
 
-inline std::vector<std::string> platform_mountlist(const bool cvmfs_only) {
+inline std::vector<std::string> platform_mountlist
+                                (const bool cvmfs_only = false) {
   std::vector<std::string> result;
   struct statfs *mntbufp;
   int num_elems = getmntinfo(&mntbufp, MNT_NOWAIT);  // modifies static memory
