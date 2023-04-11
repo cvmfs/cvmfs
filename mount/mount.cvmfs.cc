@@ -494,6 +494,7 @@ int main(int argc, char **argv) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Already mounted");
         return 1;
     }
+  }
   if (remount) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Repository %s is not mounted on %s",
            fqrn.c_str(), mountpoint.c_str());
