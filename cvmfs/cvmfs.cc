@@ -40,6 +40,7 @@
 #include <google/dense_hash_map>
 #include <inttypes.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/errno.h>
@@ -2188,6 +2189,27 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
 
+  // save current signal handlers to reset signals in
+  // mountpoint --> AuthzExternalFetcher::ExecHelper()
+  // Watchdog::SigactionMap Watchdog::SetSignalHandlers(
+  //                         const SigactionMap &signal_handlers)
+  // from monitor.cc
+  // Signals taken from Watchdog::WaitForSupervisee()
+  std::map<int, struct sigaction>  old_signal_handlers_;
+  int signals[] = { SIGHUP, SIGINT, SIGQUIT,
+                    SIGILL, SIGABRT, SIGBUS,
+                    SIGFPE, SIGUSR1, SIGSEGV,
+                    SIGUSR2, SIGTERM, SIGXCPU,
+                    SIGXFSZ };
+  for (size_t i = 0; i < sizeof(signals) / sizeof(int); i++) {
+    struct sigaction old_signal_handler;
+    if (sigaction(signals[i], NULL, &old_signal_handler) != 0) {
+      PANIC(NULL);
+    }
+    old_signal_handlers_[signals[i]] = old_signal_handler;
+  }
+
+
   crypto::SetupLibcryptoMt();
 
   InitOptionsMgr(loader_exports);
@@ -2223,7 +2245,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   cvmfs::mount_point_ = MountPoint::Create(loader_exports->repository_name,
-                                           cvmfs::file_system_);
+                                           cvmfs::file_system_,
+                                           NULL,
+                                           &old_signal_handlers_);
   if (!cvmfs::mount_point_->IsValid()) {
     *g_boot_error = cvmfs::mount_point_->boot_error();
     return cvmfs::mount_point_->boot_status();

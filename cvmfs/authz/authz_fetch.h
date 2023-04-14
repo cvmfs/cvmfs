@@ -7,8 +7,10 @@
 
 #include <inttypes.h>
 #include <pthread.h>
+#include <signal.h>
 #include <unistd.h>
 
+#include <map>
 #include <string>
 
 #include "authz/authz.h"
@@ -114,7 +116,8 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
   AuthzExternalFetcher(const std::string &fqrn,
                        const std::string &progname,
                        const std::string &search_path,
-                       OptionsManager *options_manager);
+                       OptionsManager *options_manager,
+                   const std::map<int, struct sigaction>  *old_signal_handlers);
   AuthzExternalFetcher(const std::string &fqrn, int fd_send, int fd_recv);
   virtual ~AuthzExternalFetcher();
 
@@ -210,6 +213,13 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
    * be restarted.
    */
   uint64_t next_start_;
+
+
+  /**
+   * Original signal handlers before anything is changed (e.g. by watchdog)
+   * Needed to reset the signals within AuthzExternalFetcher::ExecHelper()
+  */
+  const std::map<int, struct sigaction> *old_signal_handlers_;
 };
 
 #endif  // CVMFS_AUTHZ_AUTHZ_FETCH_H_

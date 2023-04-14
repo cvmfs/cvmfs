@@ -19,6 +19,7 @@
 #include "options.h"
 #include "sanitizer.h"
 #include "util/concurrency.h"
+#include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
@@ -37,7 +38,8 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   const string &fqrn,
   const string &progname,
   const string &search_path,
-  OptionsManager *options_manager)
+  OptionsManager *options_manager,
+  const std::map<int, struct sigaction> *old_signal_handlers)
   : fqrn_(fqrn)
   , progname_(progname)
   , search_path_(search_path)
@@ -47,6 +49,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(
   , fail_state_(false)
   , options_manager_(options_manager)
   , next_start_(-1)
+  , old_signal_handlers_(old_signal_handlers)
 {
   InitLock();
 }
@@ -192,7 +195,14 @@ void AuthzExternalFetcher::ExecHelper() {
       close(open_fds[i]);
 #endif
 
-    // TODO(heretherebdragons) RESET SIGNAL HANDLERS
+    // Reset signal handlers
+    std::map<int, struct sigaction>::const_iterator i
+                                                = old_signal_handlers_->begin();
+    for (; i != old_signal_handlers_->end(); ++i) {
+      if (sigaction(i->first, &i->second, NULL) != 0) {
+        PANIC(NULL);
+      }
+    }
 
     execve(argv0, argv, &envp[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",

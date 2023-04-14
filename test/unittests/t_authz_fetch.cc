@@ -10,11 +10,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <map>
 #include <string>
 
 #include "authz/authz.h"
 #include "authz/authz_fetch.h"
 #include "options.h"
+#include "util/exception.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -39,6 +41,29 @@ class T_AuthzFetch : public ::testing::Test {
     int fd_stdin;
     int fd_stdout;
   };
+
+  static void getSignalHandlers(
+                             std::map<int, struct sigaction> *signal_handlers) {
+    // save current signal handlers to reset signals in
+    // mountpoint --> AuthzExternalFetcher::ExecHelper()
+    // Watchdog::SigactionMap Watchdog::SetSignalHandlers(
+    //                         const SigactionMap &signal_handlers)
+    // from monitor.cc
+    // Signals taken from Watchdog::WaitForSupervisee()
+
+    int signals[] = { SIGHUP, SIGINT, SIGQUIT,
+                      SIGILL, SIGABRT, SIGBUS,
+                      SIGFPE, SIGUSR1, SIGSEGV,
+                      SIGUSR2, SIGTERM, SIGXCPU,
+                      SIGXFSZ };
+    for (size_t i = 0; i < sizeof(signals) / sizeof(int); i++) {
+      struct sigaction old_signal_handler;
+      if (sigaction(signals[i], NULL, &old_signal_handler) != 0) {
+        PANIC(NULL);
+      }
+      (*signal_handlers)[signals[i]] = old_signal_handler;
+    }
+  }
 
 
   static void RecvAndFind(int fd_stdin, const string &json_snippet) {
@@ -92,8 +117,12 @@ class T_AuthzFetch : public ::testing::Test {
 
 
 TEST_F(T_AuthzFetch, ExecHelper) {
+    std::map<int, struct sigaction> old_signal_handlers;
+    getSignalHandlers(&old_signal_handlers);
+
   AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_);
+    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_,
+                             &old_signal_handlers);
   authz_fetcher->ExecHelper();
   EXPECT_TRUE(authz_fetcher->Send("\n/bin/echo hello\n"));
   string dummy;
@@ -101,7 +130,8 @@ TEST_F(T_AuthzFetch, ExecHelper) {
   EXPECT_TRUE(authz_fetcher->fail_state_);
   delete authz_fetcher;
 
-  authz_fetcher = new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_);
+  authz_fetcher = new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_,
+                                           &old_signal_handlers);
   authz_fetcher->ExecHelper();
   kill(authz_fetcher->pid_, SIGKILL);
   int statloc;
@@ -112,7 +142,8 @@ TEST_F(T_AuthzFetch, ExecHelper) {
   delete authz_fetcher;
 
   authz_fetcher =
-    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_);
+    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_,
+                             &old_signal_handlers);
   // Execve will fail but that's noted on first communication
   authz_fetcher->ExecHelper();
   // Might fail or not, depending on how fast fork is
@@ -124,8 +155,12 @@ TEST_F(T_AuthzFetch, ExecHelper) {
 
 
 TEST_F(T_AuthzFetch, ExecHelperSlow) {
+  std::map<int, struct sigaction> old_signal_handlers;
+  getSignalHandlers(&old_signal_handlers);
+
   AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_);
+    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_,
+                             &old_signal_handlers);
   authz_fetcher->ExecHelper();
   // Make /bin/sh hang on open stdin/stdout
   int fd_send = authz_fetcher->fd_send_;
@@ -200,6 +235,9 @@ TEST_F(T_AuthzFetch, ParseMsg) {
 
 
 TEST_F(T_AuthzFetch, Handshake) {
+  std::map<int, struct sigaction> old_signal_handlers;
+  getSignalHandlers(&old_signal_handlers);
+
   HelperFds helper_fds;
   helper_fds.fd_stdin = pipe_send_[0];
   helper_fds.fd_stdout = pipe_recv_[1];
@@ -210,7 +248,8 @@ TEST_F(T_AuthzFetch, Handshake) {
   pthread_join(thread_handshake, NULL);
 
   AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_);
+    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_,
+                             &old_signal_handlers);
   EXPECT_FALSE(authz_fetcher->Handshake());
   delete authz_fetcher;
 }

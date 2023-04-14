@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <ctime>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -483,7 +484,8 @@ class MountPoint : SingleCopy, public BootFactory {
 
   static MountPoint *Create(const std::string &fqrn,
                             FileSystem *file_system,
-                            OptionsManager *options_mgr = NULL);
+                            OptionsManager *options_mgr = NULL,
+                   std::map<int, struct sigaction> *old_signal_handlers = NULL);
   ~MountPoint();
 
   unsigned GetMaxTtlMn();
@@ -593,7 +595,7 @@ class MountPoint : SingleCopy, public BootFactory {
              OptionsManager *options_mgr);
 
   void CreateStatistics();
-  void CreateAuthz();
+  void CreateAuthz(std::map<int, struct sigaction> *old_signal_handlers);
   bool CreateSignatureManager();
   bool CheckBlacklists();
   bool CreateDownloadManagers();

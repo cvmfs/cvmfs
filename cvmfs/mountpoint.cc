@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -14,6 +15,7 @@
 #include <cassert>
 #include <climits>
 #include <cstring>
+#include <map>
 #include <vector>
 
 #include "duplex_fuse.h"  // NOLINT
@@ -1243,7 +1245,9 @@ void MountPoint::EnableFuseExpireEntry() {
 MountPoint *MountPoint::Create(
   const string &fqrn,
   FileSystem *file_system,
-  OptionsManager *options_mgr)
+  OptionsManager *options_mgr,
+  std::map<int, struct sigaction> *old_signal_handlers
+  )
 {
   if (options_mgr == NULL)
     options_mgr = file_system->options_mgr();
@@ -1254,7 +1258,7 @@ MountPoint *MountPoint::Create(
   // an options manager (which can be the same than the FileSystem's one).
 
   mountpoint->CreateStatistics();
-  mountpoint->CreateAuthz();
+  mountpoint->CreateAuthz(old_signal_handlers);
   mountpoint->backoff_throttle_ = new BackoffThrottle();
 
   if (!mountpoint->CreateSignatureManager() || !mountpoint->CheckBlacklists())
@@ -1280,7 +1284,8 @@ MountPoint *MountPoint::Create(
 }
 
 
-void MountPoint::CreateAuthz() {
+void MountPoint::CreateAuthz(
+                         std::map<int, struct sigaction> *old_signal_handlers) {
   string optarg;
   string authz_helper;
   if (options_mgr_->GetValue("CVMFS_AUTHZ_HELPER", &optarg))
@@ -1293,7 +1298,8 @@ void MountPoint::CreateAuthz() {
     fqrn_,
     authz_helper,
     authz_search_path,
-    options_mgr_);
+    options_mgr_,
+    old_signal_handlers);
   assert(authz_fetcher_ != NULL);
 
   authz_session_mgr_ = AuthzSessionManager::Create(
