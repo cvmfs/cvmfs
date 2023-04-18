@@ -3,10 +3,13 @@ package backend
 import (
 	"context"
 	"fmt"
+  "sync"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
+
+var leaseMutex sync.Mutex
 
 // LeaseDTO is the lease information returned to the HTTP frontend
 type LeaseDTO struct {
@@ -18,6 +21,9 @@ type LeaseDTO struct {
 
 // NewLease for the specified path, using keyID
 func (s *Services) NewLease(ctx context.Context, keyID, leasePath, hostname string, protocolVersion int) (string, error) {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
+
 	t0 := time.Now()
 
 	outcome := "success"
@@ -112,6 +118,8 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath, hostname stri
 
 // GetLeases returns all active and valid leases
 func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -143,6 +151,8 @@ func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
 
 // GetLease returns the lease associated with a token
 func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error) {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -181,6 +191,8 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 
 // CancelLeases cancels all the active leases below a repository path
 func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -212,6 +224,8 @@ func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
 
 // CancelLease associated with the token
 func (s *Services) CancelLease(ctx context.Context, token string) error {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -254,6 +268,8 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+  leaseMutex.Lock()
+  defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
