@@ -12,7 +12,7 @@
 #include <string>
 
 #include <crypto/hash.h>
-#include <smallhash.h>
+#include <fd_table.h>
 #include <util/pointer.h>
 
 namespace download {
@@ -25,7 +25,8 @@ class DownloadManager;
  */
 class StreamingCacheManager : public CacheManager {
  public:
-  StreamingCacheManager(CacheManager *cache_mgr,
+  StreamingCacheManager(unsigned max_open_fds,
+                        CacheManager *cache_mgr,
                         download::DownloadManager *download_mgr);
   virtual ~StreamingCacheManager();
 
@@ -41,6 +42,27 @@ class StreamingCacheManager : public CacheManager {
   virtual int Dup(int fd);
   virtual int Readahead(int fd);
 
+  // Only pinned objects and catalogs are written to the cache. Transactions
+  // are passed through to the backing cache manager.
+  virtual uint32_t SizeOfTxn() { return cache_mgr_->SizeOfTxn(); }
+  virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) {
+    return cache_mgr_->StartTxn(id, size, txn);
+  }
+  virtual void CtrlTxn(const ObjectInfo &object_info,
+                       const int flags,
+                       void *txn)
+  {
+    cache_mgr_->CtrlTxn(object_info, flags, txn);
+  }
+  virtual int64_t Write(const void *buf, uint64_t size, void *txn)
+  {
+    return cache_mgr_->Write(buf, size, txn);
+  }
+  virtual int Reset(void *txn) { return cache_mgr_->Reset(txn); }
+  virtual int OpenFromTxn(void *txn);
+  virtual int AbortTxn(void *txn) { return cache_mgr_->AbortTxn(txn); }
+  virtual int CommitTxn(void *txn) { return cache_mgr_->CommitTxn(txn); }
+
   virtual void Spawn() { cache_mgr_->Spawn(); }
 
   virtual manifest::Breadcrumb LoadBreadcrumb(const std::string &fqrn) {
@@ -53,7 +75,6 @@ class StreamingCacheManager : public CacheManager {
  protected:
 
  private:
-  static const uint64_t kMinStreamSize = 64 * 1024;
   struct FdInfo {
     int fd_in_cache_mgr;
     shash::Any object_id;
@@ -62,14 +83,30 @@ class StreamingCacheManager : public CacheManager {
     explicit FdInfo(int fd) : fd_in_cache_mgr(fd) {}
     explicit FdInfo(const shash::Any &id)
       : fd_in_cache_mgr(-1), object_id(id) {}
+
+    bool operator ==(const FdInfo &other) const {
+      return this->fd_in_cache_mgr == other.fd_in_cache_mgr &&
+             this->object_id == other.object_id;
+    }
+    bool operator !=(const FdInfo &other) const {
+      return !(*this == other);
+    }
+
+    bool IsValid() const { return fd_in_cache_mgr >= 0 || !object_id.IsNull(); }
   };
+
+  /// Streams an object using the download manager. The complete object is read
+  /// and its size is returned (-errno on error).
+  /// The given section of the object is copied into the provided buffer,
+  /// which may be NULL if only the size of the object is relevant.
+  int64_t Stream(const shash::Any &object_id,
+                 void *buf, uint64_t size, uint64_t offset);
 
   UniquePtr<CacheManager> cache_mgr_;
   download::DownloadManager *download_mgr_;
-  uint64_t min_stream_size_;
 
   pthread_mutex_t *lock_fd_table_;
-  SmallHashDynamic<int, FdInfo> fd_table_;
+  FdTable<FdInfo> fd_table_;
 };  // class StreamingCacheManager
 
 #endif  // CVMFS_CACHE_STREAM_H_
