@@ -30,6 +30,13 @@ class StreamingCacheManager : public CacheManager {
                         download::DownloadManager *download_mgr);
   virtual ~StreamingCacheManager();
 
+  // In the files system / mountpoint initialization, we create the cache
+  // manager before we know about the download manager.  Hence we allow to
+  // patch in the download manager at a later point.
+  void SetDownloadManager(download::DownloadManager *download_mgr) {
+    download_mgr_ = download_mgr;
+  }
+
   virtual CacheManagerIds id() { return kStreamingCacheManager; }
   virtual std::string Describe();
 

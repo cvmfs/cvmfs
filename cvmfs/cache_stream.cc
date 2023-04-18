@@ -12,6 +12,7 @@
 
 #include "network/download.h"
 #include "network/sink.h"
+#include "quota.h"
 #include "util/mutex.h"
 #include "util/smalloc.h"
 
@@ -79,7 +80,7 @@ int64_t StreamingCacheManager::Stream(
   uint64_t offset)
 {
   StreamingSink sink(buf, size, offset);
-  std::string url = "data/" + object_id.MakePath();
+  std::string url = "/data/" + object_id.MakePath();
   download::JobInfo download_job(&url,
                                  true, /* compressed */
                                  true, /* probe_hosts */
@@ -106,6 +107,9 @@ StreamingCacheManager::StreamingCacheManager(
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_fd_table_, NULL);
   assert(retval == 0);
+
+  delete quota_mgr_;
+  quota_mgr_ = cache_mgr_->quota_mgr();
 }
 
 StreamingCacheManager::~StreamingCacheManager() {

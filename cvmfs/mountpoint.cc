@@ -34,6 +34,7 @@
 #include "cache_extern.h"
 #include "cache_posix.h"
 #include "cache_ram.h"
+#include "cache_stream.h"
 #include "cache_tiered.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -1151,7 +1152,20 @@ bool FileSystem::TriageCacheMgr() {
   }
 
   cache_mgr_ = SetupCacheMgr(cache_mgr_instance_);
-  return cache_mgr_ != NULL;
+  if (cache_mgr_ == NULL)
+    return false;
+
+  std::string optarg;
+  if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    unsigned nfiles = kDefaultNfiles;
+    if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
+      nfiles = String2Uint64(optarg);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL);
+  }
+
+  return true;
 }
 
 
@@ -1261,6 +1275,10 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (file_system->cache_mgr()->id() == kStreamingCacheManager) {
+    dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr())->
+      SetDownloadManager(mountpoint->download_mgr());
+  }
   if (!mountpoint->CreateResolvConfWatcher()) {
     return mountpoint.Release();
   }
