@@ -1,4 +1,5 @@
 2.10.2:
+  * [gw] fix for a concurrency issue in the leases db
   * Fix locale setting in cvmfs_server (#3237)
 
 2.10.1:
