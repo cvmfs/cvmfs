@@ -42,6 +42,15 @@ class Watchdog : SingleCopy {
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
 
+  /**
+   * All signals overwritten by the 
+  */
+  static std::vector<int> all_signals;
+  /**
+   * Signals used by crash signal handler
+  */
+  static std::vector<int> crash_signals;
+  
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
 
