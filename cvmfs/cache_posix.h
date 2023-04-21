@@ -103,6 +103,7 @@ class PosixCacheManager : public CacheManager {
   CacheModes cache_mode() { return cache_mode_; }
   bool alien_cache() { return alien_cache_; }
   std::string cache_path() { return cache_path_; }
+  bool is_tmpfs() { return is_tmpfs_; }
 
  protected:
   virtual void *DoSaveState();
@@ -140,6 +141,7 @@ class PosixCacheManager : public CacheManager {
     , rename_workaround_(kRenameNormal)
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
+    , is_tmpfs_(false)
   {
     atomic_init32(&no_inflight_txns_);
   }
@@ -165,6 +167,11 @@ class PosixCacheManager : public CacheManager {
    * Hack for HDFS which writes file sizes asynchronously.
    */
   bool reports_correct_filesize_;
+
+  /**
+   * True if posixcache is on tmpfs (and with this already in RAM)
+   */
+  bool is_tmpfs_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_

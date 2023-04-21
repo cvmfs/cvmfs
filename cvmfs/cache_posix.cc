@@ -255,6 +255,9 @@ PosixCacheManager *PosixCacheManager::Create(
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on BeeGFS.");
         break;
+      case kFsTypeTmpfs:
+        cache_manager->is_tmpfs_ = true;
+      break;
       default:
         break;
     }
@@ -430,6 +433,9 @@ int PosixCacheManager::Readahead(int fd) {
   unsigned char *buf[4096];
   int nbytes;
   uint64_t pos = 0;
+  if (is_tmpfs()) {
+    return 0;
+  }
   do {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;
