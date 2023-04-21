@@ -12,6 +12,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "util/pipe.h"
 #include "util/platform.h"
@@ -43,14 +44,14 @@ class Watchdog : SingleCopy {
   void Spawn(const std::string &crash_dump_path);
 
   /**
-   * All signals overwritten by the 
+   * All signals overwritten by the
   */
-  static std::vector<int> all_signals;
+  static int all_signals[13];
   /**
    * Signals used by crash signal handler
   */
-  static std::vector<int> crash_signals;
-  
+  static int crash_signals[8];
+
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
 
