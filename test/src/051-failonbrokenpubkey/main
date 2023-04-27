@@ -36,8 +36,15 @@ EOF
 
   echo "try to remount the repositories (should fail now)"
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch     && return 6
-  try_automount atlas.cern.ch                && return 7
-  try_automount lhcb.cern.ch                 && return 8
+  if ! running_on_osx; then
+         try_automount atlas.cern.ch        && return 7
+         try_automount lhcb.cern.ch         && return 8
+  else
+  # TODO(vavolkl): this is a workaround for the return code of mount
+  # that can be sometimes incorrect and should be removed when fixed
+         mount | grep "$atlas.cern.ch" || sudo mount -t cvmfs atlas.cern.ch /cvmfs/atlas.cern.ch  | grep "failed to load public key" && return 7
+         mount | grep "$lhcb.cern.ch" || sudo mount -t cvmfs lhcb.cern.ch /cvmfs/lhcb.cern.ch  | grep "failed to load public key" && return 8
+  fi
 
   echo "removing the broken public key"
   cleanup || return 9
