@@ -193,10 +193,11 @@ void AuthzExternalFetcher::ExecHelper() {
       close(open_fds[i]);
 #endif
 
-    for (size_t i = 0; i < sizeof(Watchdog::all_signals)/sizeof(int); i++) {
+    for (size_t i = 0; i < sizeof(Watchdog::g_suppressed_signals)/sizeof(int);
+         i++) {
       struct sigaction signal_handler;
       signal_handler.sa_handler = SIG_DFL;
-      sigaction(Watchdog::all_signals[i], &signal_handler, NULL);
+      sigaction(Watchdog::g_suppressed_signals[i], &signal_handler, NULL);
     }
 
     execve(argv0, argv, &envp[0]);
