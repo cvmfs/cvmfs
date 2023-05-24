@@ -5,6 +5,7 @@
 #ifndef CVMFS_NETWORK_SINK_FILE_H_
 #define CVMFS_NETWORK_SINK_FILE_H_
 
+#include <cerrno>
 #include <cstdio>
 #include <string>
 
@@ -20,7 +21,7 @@ class FileSink : public Sink {
     assert(file_ != NULL);
   }
 
-  ~FileSink() { }
+  virtual ~FileSink() { }
 
   /**
    * Appends data to the sink
@@ -28,7 +29,7 @@ class FileSink : public Sink {
    * @returns on success: number of bytes written 
    *          on failure: -errno.
    */
-  int64_t Write(const void *buf, uint64_t sz) {
+  virtual int64_t Write(const void *buf, uint64_t sz) {
     fwrite(buf, 1ul, sz, file_);
 
     if (ferror(file_) != 0) {
@@ -50,32 +51,34 @@ class FileSink : public Sink {
   virtual int Reset() {
     return ((fflush(file_) == 0) &&
            (ftruncate(fileno(file_), 0) == 0) &&
-           (freopen(NULL, "w", file_) == file_)) ? 0 : -1;
+           (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
   }
 
   /**
     * @returns true if the object is correctly initialized.
    */
-  bool IsValid() {
+  virtual bool IsValid() {
     return file_ != NULL;
   }
 
   /**
    * Commit data to the sink
-   * @returns success 0
-   *          otherwise failure
+   * @returns success = 0
+   *          failure = -errno
    */
-  int Flush() {
+  virtual int Flush() {
     return fflush(file_) == 0 ? 0 : -errno;
   }
 
   /**
-   * Allocate space in the sink
+   * Allocate space in the sink.
+   * Always returns true if the specific sink does not need this.
    * 
-   * @returns success 0
+   * @returns success = true
+   *          failure = false
    */
-  int Reserve(size_t size) {
-    return 0;
+  virtual bool Reserve(size_t size) {
+    return true;
   }
 
   /**
@@ -84,14 +87,14 @@ class FileSink : public Sink {
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
-  bool RequiresReserve() {
+  virtual bool RequiresReserve() {
     return false;
   }
 
   /**
    * Return a string representation of the sink
   */
-  std::string ToString() {
+  virtual std::string Describe() {
     std::string result = "File sink with ";
     result += IsValid() ? " valid file pointer" : " invalid file pointer";
     return result;

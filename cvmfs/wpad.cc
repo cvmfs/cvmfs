@@ -175,11 +175,11 @@ string AutoProxy(DownloadManager *download_manager) {
              pac_paths[i].c_str());
     cvmfs::MemSink pac_memsink;
     download::JobInfo download_pac(&pac_paths[i], false, false, NULL,
-                                   &pac_memsink, download::kDestinationMem);
+                                   &pac_memsink);
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
-      retval = ParsePac(pac_memsink.data_,
+      retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data_),
                         pac_memsink.pos_,
                         download_manager,
                         &proxies);

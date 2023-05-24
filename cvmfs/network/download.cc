@@ -151,17 +151,16 @@ static unsigned EscapeHeader(const string &header,
 
 
 static Failures PrepareDownloadDestination(JobInfo *info) {
-  if (info->destination != kDestinationNone &&
-      !info->destination_sink->IsValid()) {
-    if (info->destination == kDestinationPath) {
+  if (info->sink != NULL && !info->sink->IsValid()) {
+    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
+    if (psink != NULL) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
-                        " (errno=%d).",
-                        static_cast<cvmfs::PathSink*>(info->destination_sink)->
-                        path_.c_str(), strerror(errno), errno);
+                                        " (errno=%d).", psink->path_.c_str(),
+                                        strerror(errno), errno);
       return kFailLocalIO;
     } else {
-      LogCvmfs(kLogDownload, kLogDebug, "Failed to create a valid sink of type "
-                                        "%d", info->destination);
+      LogCvmfs(kLogDownload, kLogDebug, "Failed to create a valid sink: \n %s",
+                                         info->sink->Describe().c_str());
       return kFailOther;
     }
   }
@@ -235,8 +234,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   }
 
   // If needed: allocate space in sink
-  if (info->destination != kDestinationNone &&
-      info->destination_sink->RequiresReserve() &&
+  if (info->sink != NULL && info->sink->RequiresReserve() &&
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
@@ -250,10 +248,10 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         info->error_code = kFailTooBig;
         return 0;
       }
-      info->destination_sink->Reserve(length);
+      info->sink->Reserve(length);
     } else {
       // Empty resource
-      info->destination_sink->Reserve(0);
+      info->sink->Reserve(0);
     }
   } else if (HasPrefix(header_line, "LOCATION:", true)) {
     // This comes along with redirects
@@ -295,11 +293,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   // TODO(heretherebedragons) do we need the check?? info->destination != kDestinationNone
-  if (info->destination != kDestinationNone) {
+  if (info->sink != NULL) {
     if (info->compressed) {
       zlib::StreamStates retval =
         zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->destination_sink);
+                                     &info->zstream, info->sink);
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
                  info->url->c_str());
@@ -312,11 +310,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
-      int64_t written = info->destination_sink->Write(ptr, num_bytes);
+      int64_t written = info->sink->Write(ptr, num_bytes);
       if (static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug,
-          "Failed to perform write of %d bytes to sink %s",
-          num_bytes, info->destination_sink->ToString().c_str());
+          "Failed to perform write of %%zu bytes to sink %s with errno %d",
+          num_bytes, info->sink->Describe().c_str(), written);
       }
     }
   }
@@ -985,17 +983,15 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   // TODO(heretherebedragons) how do we make size_ == 0 generic?
   // MAYBE have an empty non-functional sink, so that you do not have to check
   // for kDestinationNone???
-  if ((info->destination != kDestinationNone) &&
-      info->destination_sink->RequiresReserve() &&
-      (static_cast<cvmfs::MemSink*>(info->destination_sink)->size_ == 0) &&
+  if ((info->sink != NULL) && info->sink->RequiresReserve() &&
+      (static_cast<cvmfs::MemSink*>(info->sink)->size_ == 0) &&
       HasPrefix(url, "file://", false)) {
     platform_stat64 stat_buf;
     int retval = platform_stat(url.c_str(), &stat_buf);
     if (retval != 0) {
-      // TODO(heretherebedragons) WHAT DO WE DO IN AN ERROR CASE?
-      // info->destination_sink->Reserve(64ul * 1024ul);
+      info->sink->Reserve(64ul * 1024ul);
     } else {
-      info->destination_sink->Reserve(stat_buf.st_size);
+      info->sink->Reserve(stat_buf.st_size);
     }
   }
 
@@ -1335,11 +1331,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "Trying again on same curl handle, "
              "same url: %d, error code %d", same_url_retry, info->error_code);
     // Reset internal state and destination
-    if (info->destination != kDestinationNone &&
-        info->destination_sink->Reset() != 0) {
-      // TODO(heretherebedragons) in theory this is unnecessary to set
-      // the error code because in the goto the flush is checked again
-      // and error_code set
+    if (info->sink != NULL && info->sink->Reset() != 0) {
       info->error_code = kFailLocalIO;
       goto verify_and_finalize_stop;
     }
@@ -1409,8 +1401,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
  verify_and_finalize_stop:
   // Finalize, flush destination file
   ReleaseCredential(info);
-  if (info->destination != kDestinationNone &&
-      info->destination_sink->Flush() != 0) {
+  if (info->sink != NULL && info->sink->Flush() != 0) {
     info->error_code = kFailLocalIO;
   }
 
@@ -1702,14 +1693,16 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
 
-    if (info->destination == kDestinationPath) {
-      unlink(static_cast<cvmfs::PathSink*>(info->destination_sink)->
-                                                                 path_.c_str());
+    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
+    if (psink != NULL) {
+      unlink(psink->path_.c_str());
     }
 
-    if (info->destination == kDestinationMem) {
+    cvmfs::MemSink* msink = dynamic_cast<cvmfs::MemSink*>(info->sink);
+
+    if (msink != NULL) {
       // This IF could be removed? just always reset the sink?
-      info->destination_sink->Reset();
+      info->sink->Reset();
     }
   }
 
@@ -2012,7 +2005,7 @@ void DownloadManager::ProbeHosts() {
   string url;
 
   cvmfs::MemSink memsink;
-  JobInfo info(&url, false, false, NULL, &memsink, kDestinationMem);
+  JobInfo info(&url, false, false, NULL, &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -2086,10 +2079,10 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
     LogCvmfs(kLogDownload, kLogDebug,
              "requesting ordered server list from %s", url.c_str());
     cvmfs::MemSink memsink;
-    JobInfo info(&url, false, false, NULL, &memsink, kDestinationMem);
+    JobInfo info(&url, false, false, NULL, &memsink);
     Failures result = Fetch(&info);
     if (result == kFailOk) {
-      string order(memsink.data_, memsink.pos_);
+      string order(reinterpret_cast<char*>(memsink.data_), memsink.pos_);
       memsink.Reset();
       bool retval = ValidateGeoReply(order, servers->size(), &geo_order);
       if (!retval) {

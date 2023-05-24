@@ -277,8 +277,7 @@ static void *MainWorker(void *data) {
       string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
       cvmfs::FileSink filesink(fchunk);
       download::JobInfo download_chunk(&url_chunk, false, false,
-                                       &chunk_hash, &filesink,
-                                       download::kDestinationFile);
+                                       &chunk_hash, &filesink);
 
       const download::Failures download_result =
                                        download_manager->Fetch(&download_chunk);
@@ -400,8 +399,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   cvmfs::FileSink filesink(fcatalog_vanilla);
   download::JobInfo download_catalog(&url_catalog, false, false,
-                                     &catalog_hash, &filesink,
-                                     download::kDestinationFile);
+                                     &catalog_hash, &filesink);
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
@@ -669,15 +667,15 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_metainfo(&url, true, false, &meta_info_hash,
-                                        &metainfo_memsink,
-                                        download::kDestinationMem);
+                                        &metainfo_memsink);
     dl_retval = download_manager()->Fetch(&download_metainfo);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
                dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
-    meta_info = string(metainfo_memsink.data_, metainfo_memsink.pos_);
+    meta_info = string(reinterpret_cast<char*>(metainfo_memsink.data_),
+                       metainfo_memsink.pos_);
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();
@@ -743,9 +741,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
 
     cvmfs::PathSink pathsink(history_path);
     download::JobInfo download_history(&history_url, false, false,
-                                       &history_hash,
-                                       &pathsink,
-                                       download::kDestinationPath);
+                                       &history_hash, &pathsink);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(download_history);

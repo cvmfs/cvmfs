@@ -34,7 +34,7 @@ class Sink {
    * Truncate all written data and start over at position zero.
    * 
    * @returns Success = 0
-   *          Failure = -1
+   *          Failure = -errno
    */
   virtual int Reset() = 0;
 
@@ -50,17 +50,19 @@ class Sink {
 
   /**
    * Commit data to the sink
-   * @returns success 0
-   *          otherwise failure
+   * @returns Success = 0
+   *          Failure = -errno
    */
   virtual int Flush() = 0;
 
   /**
-   * Allocate space in the sink
+   * Allocate space in the sink.
+   * Always returns true if the specific sink does not need this.
    * 
-   * @returns success 0
+   * @returns success = true
+   *          failure = false
    */
-  virtual int Reserve(size_t size) = 0;
+  virtual bool Reserve(size_t size) = 0;
 
   /**
    * Returns if the specific sink type needs reservation of (data) space
@@ -73,7 +75,7 @@ class Sink {
   /**
    * Return a string representation of the sink
   */
-  virtual std::string ToString() = 0;
+  virtual std::string Describe() = 0;
 
  protected:
     bool is_owner_;

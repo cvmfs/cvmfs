@@ -106,8 +106,7 @@ bool Assistant::FetchObject(const shash::Any &id, const string &local_path) {
   const std::string url = repository_url_ + "/data/" + id.MakePath();
 
   cvmfs::PathSink pathsink(local_path);
-  download::JobInfo download_info(&url, true, false, &id, &pathsink,
-                                  download::kDestinationPath);
+  download::JobInfo download_info(&url, true, false, &id, &pathsink);
   dl_retval = download_mgr_->Fetch(&download_info);
 
   if (dl_retval != download::kFailOk) {

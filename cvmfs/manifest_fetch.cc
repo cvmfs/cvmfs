@@ -46,9 +46,7 @@ static Failures DoVerify(cvmfs::MemSink *manifest_sink,
   shash::Any certificate_hash;
   cvmfs::MemSink certificate_memsink;
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                         &certificate_hash,
-                                         &certificate_memsink,
-                                         download::kDestinationMem);
+                                       &certificate_hash, &certificate_memsink);
 
   // Load Manifest
   manifest_sink->Release();
@@ -91,8 +89,7 @@ static Failures DoVerify(cvmfs::MemSink *manifest_sink,
       result = kFailLoad;
       goto cleanup;
     }
-    ensemble->cert_buf = reinterpret_cast<unsigned char *>(
-                                                     certificate_memsink.data_);
+    ensemble->cert_buf = certificate_memsink.data_;
     ensemble->cert_size = certificate_memsink.pos_;
     certificate_memsink.Release();
   }
@@ -175,8 +172,7 @@ static Failures DoFetch(const std::string &base_url,
   const string manifest_url = base_url + string("/.cvmfspublished");
   cvmfs::MemSink manifest_memsink;
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL,
-                                      &manifest_memsink,
-                                      download::kDestinationMem);
+                                      &manifest_memsink);
 
   retval_dl = download_manager->Fetch(&download_manifest);
   if (retval_dl != download::kFailOk) {

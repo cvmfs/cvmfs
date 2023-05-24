@@ -129,8 +129,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     const string url = repository + "/.cvmfspublished";
     cvmfs::MemSink manifest_memsink;
     download::JobInfo download_manifest(&url, false, false, NULL,
-                                        &manifest_memsink,
-                                        download::kDestinationMem);
+                                        &manifest_memsink);
     download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
@@ -138,10 +137,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    manifest = manifest::Manifest::LoadMem(
-                reinterpret_cast<const unsigned char *>(manifest_memsink.data_),
-                manifest_memsink.pos_);
-    manifest_memsink.Reset();
+    manifest = manifest::Manifest::LoadMem(manifest_memsink.data_,
+                                           manifest_memsink.pos_);
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
@@ -255,8 +252,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     const string url = repository + "/data/" + meta_info.MakePath();
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_metainfo(&url, true, false, &meta_info,
-                                        &metainfo_memsink,
-                                        download::kDestinationMem);
+                                        &metainfo_memsink);
     download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
@@ -265,7 +261,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(metainfo_memsink.data_, metainfo_memsink.pos_);
+    string info(reinterpret_cast<char*>(metainfo_memsink.data_),
+                metainfo_memsink.pos_);
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 

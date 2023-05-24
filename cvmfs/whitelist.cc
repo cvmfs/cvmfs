@@ -224,8 +224,7 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
   cvmfs::MemSink whitelist_memsink;
   download::JobInfo download_whitelist(&whitelist_url,
                                        false, probe_hosts, NULL,
-                                       &whitelist_memsink,
-                                       download::kDestinationMem);
+                                       &whitelist_memsink);
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
@@ -233,8 +232,7 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
   if (plain_size_ == 0)
     return kFailEmpty;
   whitelist_memsink.Release();
-  plain_buf_ =
-    reinterpret_cast<unsigned char *>(whitelist_memsink.data_);
+  plain_buf_ = whitelist_memsink.data_;
 
   retval_wl = ParseWhitelist(plain_buf_, plain_size_);
   if (retval_wl != kFailOk)
@@ -247,8 +245,7 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     cvmfs::MemSink pkcs7_memsink;
     download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
                                                probe_hosts, NULL,
-                                               &pkcs7_memsink,
-                                               download::kDestinationMem);
+                                               &pkcs7_memsink);
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
@@ -256,8 +253,7 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
     pkcs7_memsink.Release();
-    pkcs7_buf_ = reinterpret_cast<unsigned char *>
-      (pkcs7_memsink.data_);
+    pkcs7_buf_ = pkcs7_memsink.data_;
   }
 
   return VerifyWhitelist();

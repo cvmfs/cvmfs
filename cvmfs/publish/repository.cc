@@ -161,13 +161,8 @@ void Repository::DownloadRootObjects(
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   cvmfs::FileSink filesink(reflog_fd);
-  download::JobInfo download_reflog(
-       &reflog_url,
-       false /* compressed */,
-       false /* probe hosts */,
-       NULL,
-       &filesink,
-       download::kDestinationFile);
+  download::JobInfo download_reflog(&reflog_url, false /* compressed */,
+                                    false /* probe hosts */, NULL, &filesink);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
@@ -190,13 +185,8 @@ void Repository::DownloadRootObjects(
     std::string tags_url = url + "/data/" + manifest_->history().MakePath();
     shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
-    download::JobInfo download_tags(
-         &tags_url,
-         true /* compressed */,
-         true /* probe hosts */,
-         &tags_hash,
-         &filesink,
-         download::kDestinationFile);
+    download::JobInfo download_tags(&tags_url, true /* compressed */,
+                                  true /* probe hosts */,&tags_hash, &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
@@ -215,19 +205,14 @@ void Repository::DownloadRootObjects(
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    download::JobInfo download_info(
-      &info_url,
-      true /* compressed */,
-      true /* probe_hosts */,
-      &info_hash,
-      &metainfo_memsink,
-      download::kDestinationMem);
+    download::JobInfo download_info(&info_url, true /* compressed */,
+                         true /* probe_hosts */, &info_hash, &metainfo_memsink);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
     }
-    meta_info_ = std::string(metainfo_memsink.data_,
+    meta_info_ = std::string(reinterpret_cast<char*>(metainfo_memsink.data_),
                              metainfo_memsink.pos_);
   } else {
     meta_info_ = "n/a";

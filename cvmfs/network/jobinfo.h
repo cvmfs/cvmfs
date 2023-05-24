@@ -31,17 +31,6 @@ class InterruptCue;
 namespace download {
 
 /**
- * Where to store downloaded data.
- */
-enum Destination {
-  kDestinationMem = 1,
-  kDestinationFile,
-  kDestinationPath,
-  kDestinationTransaction,
-  kDestinationNone
-};  // Destination
-
-/**
  * Contains all the information to specify a download job.
  */
 struct JobInfo {
@@ -56,8 +45,7 @@ struct JobInfo {
   gid_t gid;
   void *cred_data;  // Per-transfer credential data
   InterruptCue *interrupt_cue;
-  Destination destination;
-  cvmfs::Sink *destination_sink;
+  cvmfs::Sink *sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
@@ -102,8 +90,7 @@ struct JobInfo {
     gid = -1;
     cred_data = NULL;
     interrupt_cue = NULL;
-    destination = kDestinationNone;
-    destination_sink = NULL;
+    sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
 
@@ -126,14 +113,13 @@ struct JobInfo {
   // One constructor per destination + head request
   JobInfo() { Init(); }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h, cvmfs::Sink *s, enum Destination dest) {
+          const shash::Any *h, cvmfs::Sink *s) {
     Init();
     url = u;
     compressed = c;
     probe_hosts = ph;
-    destination = dest;
     expected_hash = h;
-    destination_sink = s;
+    sink = s;
   }
 
   JobInfo(const std::string *u, const bool ph) {

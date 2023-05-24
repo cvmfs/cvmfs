@@ -5,6 +5,8 @@
 #ifndef CVMFS_NETWORK_SINK_PATH_H_
 #define CVMFS_NETWORK_SINK_PATH_H_
 
+#include <cerrno>
+#include <cstdio>
 #include <string>
 
 #include "sink.h"
@@ -46,39 +48,41 @@ class PathSink : public Sink {
    * Truncate all written data and start over at position zero.
    * 
    * @returns Success = 0
-   *          Failure = -1
+   *          Failure = -errno
    */
   virtual int Reset() {
     return ((fflush(file_) == 0) &&
            (ftruncate(fileno(file_), 0) == 0) &&
-           (freopen(NULL, "w", file_) == file_)) ? 0 : -1;
+           (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
   }
 
   /**
    * @returns true if the object is correctly initialized.
    */
-  bool IsValid() {
+  virtual bool IsValid() {
     return file_ != NULL;
   }
 
   /**
    * Commit data to the sink
-   * @returns success 0
-   *          otherwise failure
+   * @returns success = 0
+   *          failure = -errno
    */
-  int Flush() {
+  virtual int Flush() {
     // A zero value indicates success.
     // For error: EOF is returned and the error indicator is set (see ferror)
-    return fflush(file_) * -1;
+    return fflush(file_) == 0 ? 0 : -errno;
   }
 
   /**
-   * Allocate space in the sink
+   * Allocate space in the sink.
+   * Always returns true if the specific sink does not need this.
    * 
-   * @returns success 0
+   * @returns success = true
+   *          failure = false
    */
-  int Reserve(size_t size) {
-    return 0;
+  virtual bool Reserve(size_t size) {
+    return true;
   }
 
   /**
@@ -87,14 +91,14 @@ class PathSink : public Sink {
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
-  bool RequiresReserve() {
+  virtual bool RequiresReserve() {
     return false;
   }
 
   /**
    * Return a string representation of the sink
   */
-  std::string ToString() {
+  virtual std::string Describe() {
     std::string result = "Path sink for ";
     result += "path " + path_ + " and ";
     result += IsValid() ? " valid file pointer" : " invalid file pointer";

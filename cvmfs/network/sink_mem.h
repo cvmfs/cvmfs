@@ -18,9 +18,10 @@ namespace cvmfs {
 
 class MemSink : public Sink {
  public:
-  MemSink() : size_(0), pos_(0), data_(NULL) { is_owner_ = true; }
+  MemSink() : size_(0), pos_(0), data_(NULL), max_size_(4 * 1024 * 1024)
+              { is_owner_ = true; }
   explicit MemSink(size_t size) : size_(size), pos_(0) {
-    data_ = static_cast<char *>(smalloc(size));
+    data_ = static_cast<unsigned char *>(smalloc(size));
     is_owner_ = true;
   }
 
@@ -39,7 +40,7 @@ class MemSink : public Sink {
     if (pos_ + sz > size_) {
       if (is_owner_) {
         size_t new_size = pos_ + sz < size_ * 2 ? size_ * 2 : pos_ + sz + 1;
-        data_ = static_cast<char *>(srealloc(data_, new_size));
+        data_ = static_cast<unsigned char *>(srealloc(data_, new_size));
         size_ = new_size;
       } else {
         return -ENOSPC;
@@ -58,17 +59,15 @@ class MemSink : public Sink {
    *          Failure = -1
    */
   virtual int Reset() {
-    int ret = 0;
-    if (is_owner_ && data_) {
+    if (is_owner_) {
       free(data_);
-      ret = 0;
+      data_ = NULL;
+      size_ = 0;
     }
 
-    data_ = NULL;
-    size_ = 0;
     pos_ = 0;
 
-    return ret;
+    return 0;
   }
 
   /**
@@ -81,19 +80,28 @@ class MemSink : public Sink {
 
   /**
    * Commit data to the sink
-   * @returns success 0
-   *          otherwise failure
+   * @returns success = 0
+   *          failure = -errno
    */
   virtual int Flush() {
     return 0;
   }
 
   /**
-   * Allocate space in the sink
+   * Allocate space in the sink.
+   * Always returns true if the specific sink does not need this.
    * 
-   * @returns success 0
+   * For this memSink the maximum supported buffer size is 4 MiB.
+   * Any request to reserve a larger chunk will result in failure
+   * 
+   * @returns success = true
+   *          failure = false
    */
-  virtual int Reserve(size_t size) {
+  virtual bool Reserve(size_t size) {
+    if (size > max_size_) {
+      return false;
+    }
+
     FreeData();
 
     is_owner_ = true;
@@ -101,11 +109,10 @@ class MemSink : public Sink {
     pos_ = 0;
     if (size == 0) {
       data_ = NULL;
-      return 0;
     } else {
-      data_ = static_cast<char *>(smalloc(size));
-      return 0;
+      data_ = static_cast<unsigned char *>(smalloc(size));
     }
+    return true;
   }
 
   /**
@@ -121,7 +128,7 @@ class MemSink : public Sink {
   /**
    * Return a string representation of the sink
   */
-  std::string ToString() {
+  virtual std::string Describe() {
     std::string result = "Memory sink with ";
     result += "size: " + StringifyUint(size_);
     result += " - current pos: " + StringifyUint(pos_);
@@ -129,7 +136,7 @@ class MemSink : public Sink {
   }
 
 
-  void Adopt(size_t size, size_t pos, char *data, bool is_owner = true) {
+  void Adopt(size_t size, size_t pos, unsigned char *data, bool is_owner = true) {
     assert(size >= pos);
 
     FreeData();
@@ -143,14 +150,16 @@ class MemSink : public Sink {
  public:
   size_t size_;
   size_t pos_;
-  char *data_;
+  unsigned char *data_;
 
  private:
   void FreeData() {
-    if (is_owner_ && data_) {
+    if (is_owner_) {
       free(data_);
     }
   }
+
+  size_t max_size_;
 };
 
 }  // namespace cvmfs
