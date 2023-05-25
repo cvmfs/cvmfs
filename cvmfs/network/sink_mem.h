@@ -18,11 +18,11 @@ namespace cvmfs {
 
 class MemSink : public Sink {
  public:
-  MemSink() : size_(0), pos_(0), data_(NULL), max_size_(4 * 1024 * 1024)
-              { is_owner_ = true; }
-  explicit MemSink(size_t size) : size_(size), pos_(0) {
+  MemSink() : Sink(true), size_(0), pos_(0), 
+              data_(NULL), max_size_(kMaxMemSize) { }
+  explicit MemSink(size_t size) : Sink(true), size_(size),
+                                  pos_(0), max_size_(kMaxMemSize) {
     data_ = static_cast<unsigned char *>(smalloc(size));
-    is_owner_ = true;
   }
 
   virtual ~MemSink() { FreeData(); }
@@ -88,23 +88,32 @@ class MemSink : public Sink {
   }
 
   /**
-   * Allocate space in the sink.
-   * Always returns true if the specific sink does not need this.
+   * Reserves new space in sinks that require reservation (see RequiresReserve)
    * 
-   * For this memSink the maximum supported buffer size is 4 MiB.
-   * Any request to reserve a larger chunk will result in failure
+   * Successful if the requested size is smaller than already space reserved, or
+   * if the sink is the owner of the data and can allocate enough new space.
+   * 
+   * @note If successful, always resets the current position to 0.
+   * 
+   * Fails if 
+   *     1) sink is not the owner of the data and more than the current size is
+   *        requested
+   *     2) more space is requested than allowed (max_size_)
    * 
    * @returns success = true
    *          failure = false
    */
   virtual bool Reserve(size_t size) {
-    if (size > max_size_) {
+    if (size <= size_) {
+      pos_ = 0;
+      return true;
+    }
+    if (!is_owner_ || size > max_size_) {
       return false;
     }
 
     FreeData();
 
-    is_owner_ = true;
     size_ = size;
     pos_ = 0;
     if (size == 0) {
@@ -136,7 +145,8 @@ class MemSink : public Sink {
   }
 
 
-  void Adopt(size_t size, size_t pos, unsigned char *data, bool is_owner = true) {
+  void Adopt(size_t size, size_t pos, unsigned char *data,
+             bool is_owner = true) {
     assert(size >= pos);
 
     FreeData();
@@ -147,10 +157,14 @@ class MemSink : public Sink {
     data_ = data;
   }
 
- public:
-  size_t size_;
-  size_t pos_;
-  unsigned char *data_;
+  size_t size() { return size_; }
+  size_t pos() { return pos_; }
+  unsigned char* data() { return data_; }
+
+  /**
+   * Do not download files larger than 1M into memory.
+   */
+  static const size_t kMaxMemSize = 1024*1024;
 
  private:
   void FreeData() {
@@ -159,7 +173,10 @@ class MemSink : public Sink {
     }
   }
 
-  size_t max_size_;
+  size_t size_;
+  size_t pos_;
+  unsigned char *data_;
+  const size_t max_size_;
 };
 
 }  // namespace cvmfs

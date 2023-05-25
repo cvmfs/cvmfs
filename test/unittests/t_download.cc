@@ -69,8 +69,7 @@ const char T_Download::tmp_path[] = "./cvmfs_ut_download";
 
 class TestSink : public cvmfs::Sink {
  public:
-  TestSink() {
-    is_owner_ = true;
+  TestSink() : Sink(true) {
     FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &path);
     assert(f);
     fd = dup(fileno(f));
@@ -172,8 +171,8 @@ TEST_F(T_Download, Clone) {
                &memsink);
   download_mgr_cloned->Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, 1U);
-  EXPECT_EQ(memsink.data_[0], '1');
+  ASSERT_EQ(memsink.pos(), 1U);
+  EXPECT_EQ(memsink.data()[0], '1');
   download_mgr_cloned->Fini();
   delete download_mgr_cloned;
 
@@ -225,8 +224,8 @@ TEST_F(T_Download, RemoteFile2Mem) {
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 
@@ -247,8 +246,8 @@ TEST_F(T_Download, RemoteFileRedirect) {
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(redirect_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, RemoteFileSimpleProxy) {
@@ -268,8 +267,8 @@ TEST_F(T_Download, RemoteFileSimpleProxy) {
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, RemoteFileProxyRedirect) {
@@ -293,8 +292,8 @@ TEST_F(T_Download, RemoteFileProxyRedirect) {
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.num_used_hosts, 1);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, LocalFile2Mem) {
@@ -307,8 +306,8 @@ TEST_F(T_Download, LocalFile2Mem) {
                &memsink);
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, RemoteFileSwitchHosts) {
@@ -325,8 +324,8 @@ TEST_F(T_Download, RemoteFileSwitchHosts) {
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.num_used_hosts, 2);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, CancelRequest) {
@@ -344,7 +343,7 @@ TEST_F(T_Download, CancelRequest) {
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.num_used_hosts, 1);
   ASSERT_EQ(info.error_code, kFailCanceled);
-  EXPECT_EQ(NULL, memsink.data_);
+  EXPECT_EQ(NULL, memsink.data());
 }
 
 TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
@@ -363,8 +362,8 @@ TEST_F(T_Download, RemoteFileSwitchHostsAfterRedirect) {
   download_mgr.Fetch(&info);
   ASSERT_EQ(info.num_used_hosts, 2);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, RemoteFileSwitchProxies) {
@@ -388,8 +387,8 @@ TEST_F(T_Download, RemoteFileSwitchProxies) {
   ASSERT_EQ(proxy_server.num_processed_requests(), 1);
   ASSERT_EQ(info.num_used_proxies, 2);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data_), src_content.c_str());
+  ASSERT_EQ(memsink.pos(), src_content.length());
+  EXPECT_STREQ(reinterpret_cast<char*>(memsink.data()), src_content.c_str());
 }
 
 TEST_F(T_Download, RemoteFileEmpty) {
@@ -404,7 +403,7 @@ TEST_F(T_Download, RemoteFileEmpty) {
   download_mgr.Fetch(&info);
   ASSERT_EQ(file_server.num_processed_requests(), 1);
   ASSERT_EQ(info.error_code, kFailOk);
-  ASSERT_EQ(memsink.pos_, 0U);
+  ASSERT_EQ(memsink.pos(), 0U);
 }
 
 TEST_F(T_Download, LocalFile2Sink) {

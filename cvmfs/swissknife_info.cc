@@ -137,8 +137,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    manifest = manifest::Manifest::LoadMem(manifest_memsink.data_,
-                                           manifest_memsink.pos_);
+    manifest = manifest::Manifest::LoadMem(manifest_memsink.data(),
+                                           manifest_memsink.pos());
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
@@ -261,8 +261,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(reinterpret_cast<char*>(metainfo_memsink.data_),
-                metainfo_memsink.pos_);
+    string info(reinterpret_cast<char*>(metainfo_memsink.data()),
+                metainfo_memsink.pos());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 

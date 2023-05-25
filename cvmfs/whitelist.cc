@@ -228,11 +228,11 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
-  plain_size_ = whitelist_memsink.pos_;
+  plain_size_ = whitelist_memsink.pos();
   if (plain_size_ == 0)
     return kFailEmpty;
   whitelist_memsink.Release();
-  plain_buf_ = whitelist_memsink.data_;
+  plain_buf_ = whitelist_memsink.data();
 
   retval_wl = ParseWhitelist(plain_buf_, plain_size_);
   if (retval_wl != kFailOk)
@@ -249,11 +249,11 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
-    pkcs7_size_ = pkcs7_memsink.pos_;
+    pkcs7_size_ = pkcs7_memsink.pos();
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
     pkcs7_memsink.Release();
-    pkcs7_buf_ = pkcs7_memsink.data_;
+    pkcs7_buf_ = pkcs7_memsink.data();
   }
 
   return VerifyWhitelist();

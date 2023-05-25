@@ -16,10 +16,8 @@ namespace cvmfs {
 
 class FileSink : public Sink {
  public:
-  explicit FileSink(FILE *destination_file) : file_(destination_file) {
-    is_owner_ = false;
-    assert(file_ != NULL);
-  }
+  explicit FileSink(FILE *destination_file) : Sink(true),
+                                              file_(destination_file) { }
 
   virtual ~FileSink() { }
 
@@ -100,9 +98,11 @@ class FileSink : public Sink {
     return result;
   }
 
+  FILE* file() { return file_; }
 
 
- public:
+
+ private:
   FILE *file_;
 };
 

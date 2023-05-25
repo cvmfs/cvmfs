@@ -42,7 +42,8 @@ class ActivitySubscriber : public notify::SubscriberSSE {
 
     manifest::ManifestEnsemble ensemble;
     manifest::Failures res =
-        manifest::Verify(&(msg.manifest_[0]), msg.manifest_.size(), "",
+        manifest::Verify(reinterpret_cast<unsigned char*>(&(msg.manifest_[0])),
+                         msg.manifest_.size(), "",
                          repo_name, 0, NULL, sig_mgr_, dl_mgr_, &ensemble);
 
     if (res != manifest::kFailOk) {

@@ -674,8 +674,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
-    meta_info = string(reinterpret_cast<char*>(metainfo_memsink.data_),
-                       metainfo_memsink.pos_);
+    meta_info = string(reinterpret_cast<char*>(metainfo_memsink.data()),
+                       metainfo_memsink.pos());
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();

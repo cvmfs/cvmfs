@@ -212,8 +212,8 @@ void Repository::DownloadRootObjects(
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
     }
-    meta_info_ = std::string(reinterpret_cast<char*>(metainfo_memsink.data_),
-                             metainfo_memsink.pos_);
+    meta_info_ = std::string(reinterpret_cast<char*>(metainfo_memsink.data()),
+                             metainfo_memsink.pos());
   } else {
     meta_info_ = "n/a";
   }

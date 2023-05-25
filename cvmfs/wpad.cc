@@ -179,8 +179,8 @@ string AutoProxy(DownloadManager *download_manager) {
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
-      retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data_),
-                        pac_memsink.pos_,
+      retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data()),
+                        pac_memsink.pos(),
                         download_manager,
                         &proxies);
       pac_memsink.Reset();

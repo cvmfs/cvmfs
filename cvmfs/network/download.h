@@ -147,11 +147,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    */
   static const int kProbeGeo;
 
-  /**
-   * Do not download files larger than 1M into memory.
-   */
-  static const unsigned kMaxMemSize;
-
   static const unsigned kDnsDefaultRetries = 1;
   static const unsigned kDnsDefaultTimeoutMs = 3000;
   static const unsigned kProxyMapScale = 16;

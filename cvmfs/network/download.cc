@@ -155,7 +155,7 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
     cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
     if (psink != NULL) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
-                                        " (errno=%d).", psink->path_.c_str(),
+                                        " (errno=%d).", psink->path().c_str(),
                                         strerror(errno), errno);
       return kFailLocalIO;
     } else {
@@ -241,14 +241,13 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
-      if (length > DownloadManager::kMaxMemSize) {
+      if (!info->sink->Reserve(length)) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                  "resource %s too large to store in memory (%" PRIu64 ")",
                  info->url->c_str(), length);
         info->error_code = kFailTooBig;
         return 0;
       }
-      info->sink->Reserve(length);
     } else {
       // Empty resource
       info->sink->Reserve(0);
@@ -328,8 +327,6 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
-const unsigned DownloadManager::kMaxMemSize = 1024*1024;
-
 
 /**
  * -1 of digits is not a valid Http return code
@@ -984,7 +981,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   // MAYBE have an empty non-functional sink, so that you do not have to check
   // for kDestinationNone???
   if ((info->sink != NULL) && info->sink->RequiresReserve() &&
-      (static_cast<cvmfs::MemSink*>(info->sink)->size_ == 0) &&
+      (static_cast<cvmfs::MemSink*>(info->sink)->size() == 0) &&
       HasPrefix(url, "file://", false)) {
     platform_stat64 stat_buf;
     int retval = platform_stat(url.c_str(), &stat_buf);
@@ -1695,7 +1692,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
 
     cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
     if (psink != NULL) {
-      unlink(psink->path_.c_str());
+      unlink(psink->path().c_str());
     }
 
     cvmfs::MemSink* msink = dynamic_cast<cvmfs::MemSink*>(info->sink);
@@ -2082,7 +2079,7 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
     JobInfo info(&url, false, false, NULL, &memsink);
     Failures result = Fetch(&info);
     if (result == kFailOk) {
-      string order(reinterpret_cast<char*>(memsink.data_), memsink.pos_);
+      string order(reinterpret_cast<char*>(memsink.data()), memsink.pos());
       memsink.Reset();
       bool retval = ValidateGeoReply(order, servers->size(), &geo_order);
       if (!retval) {

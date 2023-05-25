@@ -20,6 +20,9 @@ namespace cvmfs {
  * from this class?
  */
 class Sink {
+ protected:
+  explicit Sink(bool is_owner) : is_owner_(is_owner) { }
+
  public:
   virtual ~Sink() { }
   /**

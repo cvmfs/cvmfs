@@ -16,11 +16,9 @@ namespace cvmfs {
 
 class PathSink : public Sink {
  public:
-  explicit PathSink(const std::string &destination_path) :
+  explicit PathSink(const std::string &destination_path) : Sink(true),
                                                        path_(destination_path) {
-    is_owner_ = true;
     file_ = fopen(destination_path.c_str(), "w");
-    assert(file_ != NULL);
   }
 
   virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
@@ -105,7 +103,10 @@ class PathSink : public Sink {
     return result;
   }
 
- public:
+  FILE* file() { return file_; }
+  const std::string& path() { return path_; }
+
+ private:
   FILE *file_;
   const std::string &path_;
 };

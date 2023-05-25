@@ -86,7 +86,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
 
     manifest::ManifestEnsemble ensemble;
     manifest::Failures res = manifest::Verify(
-        &(msg.manifest_[0]), msg.manifest_.size(), "", repo, 0, NULL,
+        reinterpret_cast<unsigned char*>(&(msg.manifest_[0])), 
+        msg.manifest_.size(), "", repo, 0, NULL,
         sig_mgr_.weak_ref(), dl_mgr_.weak_ref(), &ensemble);
 
     if (res != manifest::kFailOk) {
