@@ -10,6 +10,8 @@
 #include <string>
 
 #include "sink.h"
+#include "sink_file.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 
 namespace cvmfs {
@@ -19,6 +21,7 @@ class PathSink : public Sink {
   explicit PathSink(const std::string &destination_path) : Sink(true),
                                                        path_(destination_path) {
     file_ = fopen(destination_path.c_str(), "w");
+    sink_ = new FileSink(file_);
   }
 
   virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
@@ -30,16 +33,7 @@ class PathSink : public Sink {
    *          on failure: -errno.
    */
   virtual int64_t Write(const void *buf, uint64_t sz) {
-    fwrite(buf, 1ul, sz, file_);
-
-    if (ferror(file_) != 0) {
-      // ferror does not tell us what exactly the error is
-      // and errno is also not set
-      // so just return generic I/O error flag
-      return -EIO;
-    }
-
-    return sz;
+    return sink_->Write(buf, sz);
   }
 
   /**
@@ -49,16 +43,27 @@ class PathSink : public Sink {
    *          Failure = -errno
    */
   virtual int Reset() {
-    return ((fflush(file_) == 0) &&
-           (ftruncate(fileno(file_), 0) == 0) &&
-           (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
+    return sink_->Reset();
+  }
+
+  virtual int Purge() {
+    int ret = Reset();
+    int ret2 = unlink(path_.c_str());
+
+    if (ret != 0) {
+      return ret;
+    }
+    if (ret2 != 0) {
+      return ret2;
+    }
+    return 0;
   }
 
   /**
    * @returns true if the object is correctly initialized.
    */
   virtual bool IsValid() {
-    return file_ != NULL;
+    return sink_->IsValid();
   }
 
   /**
@@ -67,9 +72,7 @@ class PathSink : public Sink {
    *          failure = -errno
    */
   virtual int Flush() {
-    // A zero value indicates success.
-    // For error: EOF is returned and the error indicator is set (see ferror)
-    return fflush(file_) == 0 ? 0 : -errno;
+    return sink_->Flush();
   }
 
   /**
@@ -80,7 +83,7 @@ class PathSink : public Sink {
    *          failure = false
    */
   virtual bool Reserve(size_t size) {
-    return true;
+    return sink_->Reserve(size);
   }
 
   /**
@@ -90,7 +93,7 @@ class PathSink : public Sink {
    *          false - no reservation is needed
    */
   virtual bool RequiresReserve() {
-    return false;
+    return sink_->RequiresReserve();
   }
 
   /**
@@ -103,11 +106,11 @@ class PathSink : public Sink {
     return result;
   }
 
-  FILE* file() { return file_; }
   const std::string& path() { return path_; }
 
  private:
   FILE *file_;
+  UniquePtr<FileSink> sink_;
   const std::string &path_;
 };
 

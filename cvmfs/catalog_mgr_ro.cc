@@ -31,7 +31,6 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
   assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
-  // TODO(heretherebedragons) change this to a pathsink???
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);
   if (!fcatalog) {

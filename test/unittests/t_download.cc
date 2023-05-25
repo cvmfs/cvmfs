@@ -87,6 +87,10 @@ class TestSink : public cvmfs::Sink {
     return 0;
   }
 
+  virtual int Purge() {
+    return Reset();
+  }
+
   virtual bool IsValid() {
     return fd >= 0;
   }

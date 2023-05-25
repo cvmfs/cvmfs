@@ -52,6 +52,10 @@ class FileSink : public Sink {
            (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
   }
 
+  virtual int Purge() {
+    return Reset();
+  }
+
   /**
     * @returns true if the object is correctly initialized.
    */

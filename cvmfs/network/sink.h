@@ -42,6 +42,16 @@ class Sink {
   virtual int Reset() = 0;
 
   /**
+   * Purges all resources leaving the sink in an invalid state.
+   * More aggressive version of Reset().
+   * For some sinks it might do the same as Reset().
+   * 
+   * @returns Success = 0
+   *          Failure = -errno
+   */
+  virtual int Purge() = 0;
+
+  /**
     * @returns true if the object is correctly initialized.
    */
   virtual bool IsValid() = 0;

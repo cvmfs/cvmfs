@@ -310,7 +310,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       }
     } else {
       int64_t written = info->sink->Write(ptr, num_bytes);
-      if (static_cast<uint64_t>(written) != num_bytes) {
+      if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug,
           "Failed to perform write of %%zu bytes to sink %s with errno %d",
           num_bytes, info->sink->Describe().c_str(), written);
@@ -977,15 +977,18 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url = ReplaceAll(url, "@proxy@", replacement);
   }
 
-  // TODO(heretherebedragons) how do we make size_ == 0 generic?
-  // MAYBE have an empty non-functional sink, so that you do not have to check
-  // for kDestinationNone???
+  // TODO(heretherebedragons) before removing 
+  // static_cast<cvmfs::MemSink*>(info->sink)->size() == 0
+  // and just always call info->sink->Reserve()
+  // we should do a speed check
   if ((info->sink != NULL) && info->sink->RequiresReserve() &&
       (static_cast<cvmfs::MemSink*>(info->sink)->size() == 0) &&
       HasPrefix(url, "file://", false)) {
     platform_stat64 stat_buf;
     int retval = platform_stat(url.c_str(), &stat_buf);
     if (retval != 0) {
+      // this is an error: file does not exist or out of memory
+      // error is catched in other code section.
       info->sink->Reserve(64ul * 1024ul);
     } else {
       info->sink->Reserve(stat_buf.st_size);
@@ -1690,17 +1693,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
 
-    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
-    if (psink != NULL) {
-      unlink(psink->path().c_str());
-    }
-
-    cvmfs::MemSink* msink = dynamic_cast<cvmfs::MemSink*>(info->sink);
-
-    if (msink != NULL) {
-      // This IF could be removed? just always reset the sink?
-      info->sink->Reset();
-    }
+    info->sink->Purge();
   }
 
   return result;

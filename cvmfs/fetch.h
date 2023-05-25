@@ -44,6 +44,9 @@ class TransactionSink : public Sink {
   virtual int Reset() {
     return cache_mgr_->Reset(open_txn_);
   }
+  virtual int Purge() {
+    return Reset();
+  }
   virtual bool IsValid() {
     return cache_mgr_ != NULL && open_txn_ != NULL;
   }

@@ -70,6 +70,10 @@ class MemSink : public Sink {
     return 0;
   }
 
+  virtual int Purge() {
+    return Reset();
+  }
+
   /**
     * @returns true if the object is correctly initialized.
    */
