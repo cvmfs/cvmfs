@@ -48,7 +48,6 @@ class TransactionSink : public Sink {
     return cache_mgr_->Write(buf, sz, open_txn_);
   }
 
-  // TODO(heretherebedragons) does this always return 0 if successful? (also for tiered cache)
   /**
    * Truncate all written data and start over at position zero.
    * 
