@@ -66,9 +66,9 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
       download_manager->Fini();
       return 6;
     }
-    manifest_contents = std::string(reinterpret_cast<char*>
-                                                       (manifest_memsink.data()),
-                                    manifest_memsink.pos());
+    manifest_contents = std::string(
+                               reinterpret_cast<char*>(manifest_memsink.data()),
+                               manifest_memsink.pos());
     manifest_memsink.Reset();
     download_manager->Fini();
   } else {

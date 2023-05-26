@@ -40,14 +40,14 @@ int64_t MemSink::Write(const void *buf, uint64_t sz) {
 
   memcpy(data_ + pos_, buf, sz);
   pos_ += sz;
-  return sz;
+  return static_cast<int64_t>(sz);
 }
 
 /**
  * Truncate all written data and start over at position zero.
  * 
  * @returns Success = 0
- *          Failure = -1
+ *          Failure = -errno
  */
 int MemSink::Reset() {
   if (is_owner_) {
@@ -107,8 +107,8 @@ bool MemSink::Reserve(size_t size) {
 }
 
 /**
- * Return a string representation of the sink
-*/
+ * Return a string representation describing the type of sink and its status
+ */
 std::string MemSink::Describe() {
   std::string result = "Memory sink with ";
   result += "size: " + StringifyUint(size_);
@@ -116,7 +116,10 @@ std::string MemSink::Describe() {
   return result;
 }
 
-
+/**
+ * Allows the sink to adopt data that was intialized outside this class.
+ * The sink can become the new owner of the data, or not.
+ */
 void MemSink::Adopt(size_t size, size_t pos, unsigned char *data,
                     bool is_owner) {
   assert(size >= pos);

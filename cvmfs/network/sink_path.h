@@ -20,12 +20,12 @@ class PathSink : public Sink {
  public:
   explicit PathSink(const std::string &destination_path);
 
-  virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
+  virtual ~PathSink() { if (is_owner_ && file_) { (void) fclose(file_); } }
 
   /**
    * Appends data to the sink
    * 
-   * @returns on success: number of bytes written 
+   * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
   virtual int64_t Write(const void *buf, uint64_t sz) {
@@ -61,9 +61,18 @@ class PathSink : public Sink {
   }
 
   /**
-   * Allocate space in the sink.
-   * Always returns true if the specific sink does not need this.
-   * 
+   * Reserves new space in sinks that require reservation (see RequiresReserve)
+   *
+   * Successful if the requested size is smaller than already space reserved, or
+   * if the sink is the owner of the data and can allocate enough new space.
+   *
+   * @note If successful, always resets the current position to 0.
+   *
+   * Fails if
+   *     1) sink is not the owner of the data and more than the current size is
+   *        requested
+   *     2) more space is requested than allowed (max_size_)
+   *
    * @returns success = true
    *          failure = false
    */
@@ -82,8 +91,8 @@ class PathSink : public Sink {
   }
 
   /**
-   * Return a string representation of the sink
-  */
+   * Return a string representation describing the type of sink and its status
+   */
   virtual std::string Describe();
 
   const std::string path() { return path_; }

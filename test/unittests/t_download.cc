@@ -97,7 +97,7 @@ class TestSink : public cvmfs::Sink {
 
   int Flush() { return 0; }
 
-  bool Reserve(size_t size) { return 0; }
+  bool Reserve(size_t /*size*/) { return true; }
 
   bool RequiresReserve() { return false; }
 

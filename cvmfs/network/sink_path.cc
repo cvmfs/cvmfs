@@ -6,9 +6,9 @@
 #include <cstdio>
 #include <string>
 
-
-#include "util/posix.h"
 #include "sink_path.h"
+#include "util/posix.h"
+
 
 namespace cvmfs {
 
@@ -18,6 +18,14 @@ PathSink::PathSink(const std::string &destination_path) : Sink(true),
   sink_ = new FileSink(file_);
 }
 
+/**
+ * Purges all resources leaving the sink in an invalid state.
+ * More aggressive version of Reset().
+ * For some sinks it might do the same as Reset().
+ * 
+ * @returns Success = 0
+ *          Failure = -errno
+ */
 int PathSink::Purge() {
   int ret = Reset();
   int ret2 = unlink(path_.c_str());
@@ -32,8 +40,8 @@ int PathSink::Purge() {
 }
 
 /**
- * Return a string representation of the sink
-*/
+ * Return a string representation describing the type of sink and its status
+ */
 std::string PathSink::Describe() {
   std::string result = "Path sink for ";
   result += "path " + path_ + " and ";

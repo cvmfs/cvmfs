@@ -186,7 +186,8 @@ void Repository::DownloadRootObjects(
     shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
     download::JobInfo download_tags(&tags_url, true /* compressed */,
-                                  true /* probe hosts */,&tags_hash, &filesink);
+                                    true /* probe hosts */, &tags_hash,
+                                    &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");

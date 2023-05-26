@@ -37,28 +37,52 @@ class TransactionSink : public Sink {
       cache_mgr_(cache_mgr),
       open_txn_(open_txn) { }
   virtual ~TransactionSink() { }
+
+  /**
+   * Appends data to the sink
+   * 
+   * @returns on success: number of bytes written (can be less than requested)
+   *          on failure: -errno.
+   */
   virtual int64_t Write(const void *buf, uint64_t sz) {
     return cache_mgr_->Write(buf, sz, open_txn_);
   }
+
   // TODO(heretherebedragons) does this always return 0 if successful? (also for tiered cache)
+  /**
+   * Truncate all written data and start over at position zero.
+   * 
+   * @returns Success = 0
+   *          Failure = -errno
+   */
   virtual int Reset() {
     return cache_mgr_->Reset(open_txn_);
   }
+
+  /**
+   * Purges all resources leaving the sink in an invalid state.
+   * More aggressive version of Reset().
+   * For some sinks it might do the same as Reset().
+   * 
+   * @returns Success = 0
+   *          Failure = -errno
+   */
   virtual int Purge() {
     return Reset();
   }
+  /**
+    * @returns true if the object is correctly initialized.
+    */
   virtual bool IsValid() {
     return cache_mgr_ != NULL && open_txn_ != NULL;
   }
 
   virtual int Flush() { return 0; }
-
-  virtual bool Reserve(size_t size) { return true; }
-
+  virtual bool Reserve(size_t /*size*/) { return true; }
   virtual bool RequiresReserve() { return false; }
 
   /**
-   * Return a string representation of the sink
+   * Return a string representation describing the type of sink and its status
   */
   virtual std::string Describe() {
     std::string result = "Transaction sink that is ";

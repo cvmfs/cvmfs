@@ -13,11 +13,6 @@ namespace cvmfs {
 /**
  * A data sink that behaves like a writable file descriptor with a custom
  * implementation.
- *
- * Currently used by the Fetcher class to redirect writing into a cache manager.
- *
- * TODO(jblomer): can all download destinations be implemented by inheriting
- * from this class?
  */
 class Sink {
  protected:
@@ -28,7 +23,7 @@ class Sink {
   /**
    * Appends data to the sink
    * 
-   * @returns on success: number of bytes written 
+   * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
   virtual int64_t Write(const void *buf, uint64_t sz) = 0;
@@ -53,7 +48,7 @@ class Sink {
 
   /**
     * @returns true if the object is correctly initialized.
-   */
+    */
   virtual bool IsValid() = 0;
 
   /**
@@ -69,9 +64,18 @@ class Sink {
   virtual int Flush() = 0;
 
   /**
-   * Allocate space in the sink.
-   * Always returns true if the specific sink does not need this.
-   * 
+   * Reserves new space in sinks that require reservation (see RequiresReserve)
+   *
+   * Successful if the requested size is smaller than already space reserved, or
+   * if the sink is the owner of the data and can allocate enough new space.
+   *
+   * @note If successful, always resets the current position to 0.
+   *
+   * Fails if
+   *     1) sink is not the owner of the data and more than the current size is
+   *        requested
+   *     2) more space is requested than allowed (max_size_)
+   *
    * @returns success = true
    *          failure = false
    */
@@ -86,8 +90,8 @@ class Sink {
   virtual bool RequiresReserve() = 0;
 
   /**
-   * Return a string representation of the sink
-  */
+   * Return a string representation describing the type of sink and its status
+   */
   virtual std::string Describe() = 0;
 
  protected:

@@ -280,7 +280,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 {
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
-  
+
   // TODO(heretherebedragons) remove if no error comes up
   // as this means only jobinfo data request (and not header only)
   // come here
@@ -979,7 +979,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url = ReplaceAll(url, "@proxy@", replacement);
   }
 
-  // TODO(heretherebedragons) before removing 
+  // TODO(heretherebedragons) before removing
   // static_cast<cvmfs::MemSink*>(info->sink)->size() == 0
   // and just always call info->sink->Reserve()
   // we should do a speed check
@@ -990,7 +990,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     int retval = platform_stat(url.c_str(), &stat_buf);
     if (retval != 0) {
       // this is an error: file does not exist or out of memory
-      // error is catched in other code section.
+      // error is caught in other code section.
       info->sink->Reserve(64ul * 1024ul);
     } else {
       info->sink->Reserve(stat_buf.st_size);

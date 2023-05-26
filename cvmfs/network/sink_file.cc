@@ -17,7 +17,7 @@ namespace cvmfs {
  *          on failure: -errno.
  */
 int64_t FileSink::Write(const void *buf, uint64_t sz) {
-  fwrite(buf, 1ul, sz, file_);
+  size_t ret = fwrite(buf, 1ul, sz, file_);
 
   if (ferror(file_) != 0) {
     // ferror does not tell us what exactly the error is
@@ -26,7 +26,7 @@ int64_t FileSink::Write(const void *buf, uint64_t sz) {
     return -EIO;
   }
 
-  return sz;
+  return static_cast<int64_t>(ret);
 }
 
 /**
@@ -42,13 +42,11 @@ int FileSink::Reset() {
 }
 
 /**
- * Return a string representation of the sink
-*/
+ * Return a string representation describing the type of sink and its status
+ */
 std::string FileSink::Describe() {
   std::string result = "File sink with ";
   result += IsValid() ? " valid file pointer" : " invalid file pointer";
   return result;
 }
-
-
 }  // namespace cvmfs

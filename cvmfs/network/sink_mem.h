@@ -26,10 +26,10 @@ class MemSink : public Sink {
   /**
    * Appends data to the sink
    * If the sink is too small and
-   * - the sink is the owner of data_: sink size is doubled
+   * - the sink is the owner of data_: sink size is increased
    * - the sink is NOT the owner of data_: fails with -ENOSPC
    *
-   * @returns on success: number of bytes written
+   * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
   virtual int64_t Write(const void *buf, uint64_t sz);
@@ -38,10 +38,18 @@ class MemSink : public Sink {
    * Truncate all written data and start over at position zero.
    *
    * @returns Success = 0
-   *          Failure = -1
+   *          Failure = -errno
    */
   virtual int Reset();
 
+  /**
+   * Purges all resources leaving the sink in an invalid state.
+   * More aggressive version of Reset().
+   * For some sinks it might do the same as Reset().
+   * 
+   * @returns Success = 0
+   *          Failure = -errno
+   */
   virtual int Purge() {
     return Reset();
   }
@@ -89,11 +97,14 @@ class MemSink : public Sink {
   }
 
   /**
-   * Return a string representation of the sink
-  */
+   * Return a string representation describing the type of sink and its status
+   */
   virtual std::string Describe();
 
-
+  /**
+   * Allows the sink to adopt data that was intialized outside this class.
+   * The sink can become the new owner of the data, or not.
+   */
   void Adopt(size_t size, size_t pos, unsigned char *data,
              bool is_owner = true);
 
@@ -104,7 +115,7 @@ class MemSink : public Sink {
   /**
    * Do not download files larger than 1M into memory.
    */
-  static const size_t kMaxMemSize = 1024*1024;
+  static const size_t kMaxMemSize = 1024ul * 1024ul;
 
  private:
   void FreeData() {
