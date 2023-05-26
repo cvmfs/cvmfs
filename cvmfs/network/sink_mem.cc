@@ -117,7 +117,7 @@ std::string MemSink::Describe() {
 }
 
 /**
- * Allows the sink to adopt data that was intialized outside this class.
+ * Allows the sink to adopt data that was initialized outside this class.
  * The sink can become the new owner of the data, or not.
  */
 void MemSink::Adopt(size_t size, size_t pos, unsigned char *data,
