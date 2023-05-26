@@ -18,13 +18,9 @@ namespace cvmfs {
 
 class MemSink : public Sink {
  public:
-  MemSink() : Sink(true), size_(0), pos_(0), 
+  MemSink() : Sink(true), size_(0), pos_(0),
               data_(NULL), max_size_(kMaxMemSize) { }
-  explicit MemSink(size_t size) : Sink(true), size_(size),
-                                  pos_(0), max_size_(kMaxMemSize) {
-    data_ = static_cast<unsigned char *>(smalloc(size));
-  }
-
+  explicit MemSink(size_t size);
   virtual ~MemSink() { FreeData(); }
 
   /**
@@ -32,43 +28,19 @@ class MemSink : public Sink {
    * If the sink is too small and
    * - the sink is the owner of data_: sink size is doubled
    * - the sink is NOT the owner of data_: fails with -ENOSPC
-   * 
-   * @returns on success: number of bytes written 
+   *
+   * @returns on success: number of bytes written
    *          on failure: -errno.
    */
-  virtual int64_t Write(const void *buf, uint64_t sz) {
-    if (pos_ + sz > size_) {
-      if (is_owner_) {
-        size_t new_size = pos_ + sz < size_ * 2 ? size_ * 2 : pos_ + sz + 1;
-        data_ = static_cast<unsigned char *>(srealloc(data_, new_size));
-        size_ = new_size;
-      } else {
-        return -ENOSPC;
-      }
-    }
-
-    memcpy(data_ + pos_, buf, sz);
-    pos_ += sz;
-    return sz;
-  }
+  virtual int64_t Write(const void *buf, uint64_t sz);
 
   /**
    * Truncate all written data and start over at position zero.
-   * 
+   *
    * @returns Success = 0
    *          Failure = -1
    */
-  virtual int Reset() {
-    if (is_owner_) {
-      free(data_);
-      data_ = NULL;
-      size_ = 0;
-    }
-
-    pos_ = 0;
-
-    return 0;
-  }
+  virtual int Reset();
 
   virtual int Purge() {
     return Reset();
@@ -77,10 +49,7 @@ class MemSink : public Sink {
   /**
     * @returns true if the object is correctly initialized.
    */
-  virtual bool IsValid() {
-    return (size_ == 0 && pos_ == 0 && data_ == NULL) ||
-           (size_ > 0 && pos_ >= 0 && data_ != NULL);
-  }
+  virtual bool IsValid();
 
   /**
    * Commit data to the sink
@@ -93,44 +62,25 @@ class MemSink : public Sink {
 
   /**
    * Reserves new space in sinks that require reservation (see RequiresReserve)
-   * 
+   *
    * Successful if the requested size is smaller than already space reserved, or
    * if the sink is the owner of the data and can allocate enough new space.
-   * 
+   *
    * @note If successful, always resets the current position to 0.
-   * 
-   * Fails if 
+   *
+   * Fails if
    *     1) sink is not the owner of the data and more than the current size is
    *        requested
    *     2) more space is requested than allowed (max_size_)
-   * 
+   *
    * @returns success = true
    *          failure = false
    */
-  virtual bool Reserve(size_t size) {
-    if (size <= size_) {
-      pos_ = 0;
-      return true;
-    }
-    if (!is_owner_ || size > max_size_) {
-      return false;
-    }
-
-    FreeData();
-
-    size_ = size;
-    pos_ = 0;
-    if (size == 0) {
-      data_ = NULL;
-    } else {
-      data_ = static_cast<unsigned char *>(smalloc(size));
-    }
-    return true;
-  }
+  virtual bool Reserve(size_t size);
 
   /**
    * Returns if the specific sink type needs reservation of (data) space
-   * 
+   *
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
@@ -141,25 +91,11 @@ class MemSink : public Sink {
   /**
    * Return a string representation of the sink
   */
-  virtual std::string Describe() {
-    std::string result = "Memory sink with ";
-    result += "size: " + StringifyUint(size_);
-    result += " - current pos: " + StringifyUint(pos_);
-    return result;
-  }
+  virtual std::string Describe();
 
 
   void Adopt(size_t size, size_t pos, unsigned char *data,
-             bool is_owner = true) {
-    assert(size >= pos);
-
-    FreeData();
-
-    is_owner_ = is_owner;
-    size_ = size;
-    pos_ = pos;
-    data_ = data;
-  }
+             bool is_owner = true);
 
   size_t size() { return size_; }
   size_t pos() { return pos_; }

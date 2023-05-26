@@ -27,18 +27,7 @@ class FileSink : public Sink {
    * @returns on success: number of bytes written 
    *          on failure: -errno.
    */
-  virtual int64_t Write(const void *buf, uint64_t sz) {
-    fwrite(buf, 1ul, sz, file_);
-
-    if (ferror(file_) != 0) {
-      // ferror does not tell us what exactly the error is
-      // and errno is also not set
-      // so just return generic I/O error flag
-      return -EIO;
-    }
-
-    return sz;
-  }
+  virtual int64_t Write(const void *buf, uint64_t sz);
 
   /**
    * Truncate all written data and start over at position zero.
@@ -46,11 +35,7 @@ class FileSink : public Sink {
    * @returns Success = 0
    *          Failure = -1
    */
-  virtual int Reset() {
-    return ((fflush(file_) == 0) &&
-           (ftruncate(fileno(file_), 0) == 0) &&
-           (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
-  }
+  virtual int Reset();
 
   virtual int Purge() {
     return Reset();
@@ -96,11 +81,7 @@ class FileSink : public Sink {
   /**
    * Return a string representation of the sink
   */
-  virtual std::string Describe() {
-    std::string result = "File sink with ";
-    result += IsValid() ? " valid file pointer" : " invalid file pointer";
-    return result;
-  }
+  virtual std::string Describe();
 
   FILE* file() { return file_; }
 

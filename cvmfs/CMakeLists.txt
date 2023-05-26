@@ -78,6 +78,9 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/sink_file.cc
+       network/sink_mem.cc
+       network/sink_path.cc
        options.cc
        quota.cc
        quota_posix.cc
@@ -590,6 +593,9 @@ if (BUILD_SERVER)
        network/download.cc
        network/jobinfo.cc
        network/s3fanout.cc
+       network/sink_file.cc
+       network/sink_mem.cc
+       network/sink_path.cc
        notify/cmd_pub.cc
        notify/cmd_sub.cc
        notify/messages.cc
@@ -728,6 +734,9 @@ if (BUILD_SERVER)
        network/download.cc
        network/jobinfo.cc
        network/s3fanout.cc
+       network/sink_file.cc
+       network/sink_mem.cc
+       network/sink_path.cc
        options.cc
        pack.cc
        publish/except.cc
@@ -817,6 +826,9 @@ if (BUILD_SERVER)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/sink_file.cc
+       network/sink_mem.cc
+       network/sink_path.cc
        options.cc
        publish/cmd_abort.cc
        publish/cmd_commit.cc
@@ -1020,6 +1032,9 @@ if(BUILD_RECEIVER)
        network/download.cc
        network/jobinfo.cc
        network/s3fanout.cc
+       network/sink_file.cc
+       network/sink_mem.cc
+       network/sink_path.cc
        options.cc
        pack.cc
        reflog.cc
@@ -1177,6 +1192,9 @@ if (BUILD_PRELOADER)
                   network/download.cc
                   network/jobinfo.cc
                   network/s3fanout.cc
+                  network/sink_file.cc
+                  network/sink_mem.cc
+                  network/sink_path.cc
                   options.cc
                   pack.cc
                   path_filters/dirtab.cc

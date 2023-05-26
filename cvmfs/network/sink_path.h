@@ -18,11 +18,7 @@ namespace cvmfs {
 
 class PathSink : public Sink {
  public:
-  explicit PathSink(const std::string &destination_path) : Sink(true),
-                                                       path_(destination_path) {
-    file_ = fopen(destination_path.c_str(), "w");
-    sink_ = new FileSink(file_);
-  }
+  explicit PathSink(const std::string &destination_path);
 
   virtual ~PathSink() { if (is_owner_ && file_) { fclose(file_); } }
 
@@ -46,18 +42,7 @@ class PathSink : public Sink {
     return sink_->Reset();
   }
 
-  virtual int Purge() {
-    int ret = Reset();
-    int ret2 = unlink(path_.c_str());
-
-    if (ret != 0) {
-      return ret;
-    }
-    if (ret2 != 0) {
-      return ret2;
-    }
-    return 0;
-  }
+  virtual int Purge();
 
   /**
    * @returns true if the object is correctly initialized.
@@ -99,19 +84,14 @@ class PathSink : public Sink {
   /**
    * Return a string representation of the sink
   */
-  virtual std::string Describe() {
-    std::string result = "Path sink for ";
-    result += "path " + path_ + " and ";
-    result += IsValid() ? " valid file pointer" : " invalid file pointer";
-    return result;
-  }
+  virtual std::string Describe();
 
-  const std::string& path() { return path_; }
+  const std::string path() { return path_; }
 
  private:
   FILE *file_;
   UniquePtr<FileSink> sink_;
-  const std::string &path_;
+  const std::string path_;
 };
 
 }  // namespace cvmfs
