@@ -280,6 +280,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 {
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
+  
+  // TODO(heretherebedragons) remove if no error comes up
+  // as this means only jobinfo data request (and not header only)
+  // come here
+  assert(info->sink != NULL);
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
@@ -291,30 +296,27 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                   num_bytes, info->hash_context);
   }
 
-  // TODO(heretherebedragons) do we need the check?? info->destination != kDestinationNone
-  if (info->sink != NULL) {
-    if (info->compressed) {
-      zlib::StreamStates retval =
-        zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->sink);
-      if (retval == zlib::kStreamDataError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
-                 info->url->c_str());
-        info->error_code = kFailBadData;
-        return 0;
-      } else if (retval == zlib::kStreamIOError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr,
-                 "decompressing %s, local IO error", info->url->c_str());
-        info->error_code = kFailLocalIO;
-        return 0;
-      }
-    } else {
-      int64_t written = info->sink->Write(ptr, num_bytes);
-      if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-        LogCvmfs(kLogDownload, kLogDebug,
-          "Failed to perform write of %%zu bytes to sink %s with errno %d",
-          num_bytes, info->sink->Describe().c_str(), written);
-      }
+  if (info->compressed) {
+    zlib::StreamStates retval =
+      zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
+                                    &info->zstream, info->sink);
+    if (retval == zlib::kStreamDataError) {
+      LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
+                info->url->c_str());
+      info->error_code = kFailBadData;
+      return 0;
+    } else if (retval == zlib::kStreamIOError) {
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                "decompressing %s, local IO error", info->url->c_str());
+      info->error_code = kFailLocalIO;
+      return 0;
+    }
+  } else {
+    int64_t written = info->sink->Write(ptr, num_bytes);
+    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "Failed to perform write of %%zu bytes to sink %s with errno %d",
+        num_bytes, info->sink->Describe().c_str(), written);
     }
   }
 
