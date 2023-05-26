@@ -1695,7 +1695,10 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
 
-    info->sink->Purge();
+    if (dynamic_cast<cvmfs::PathSink*>(info->sink) != NULL ||
+        dynamic_cast<cvmfs::MemSink*>(info->sink) != NULL) {
+      info->sink->Purge();
+    }
   }
 
   return result;
