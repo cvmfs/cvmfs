@@ -107,16 +107,22 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
     std::string root_hash_str;
     bool retval = platform_getxattr(rdonly_mnt, root_hash_xattr,
                                     &root_hash_str);
-    if (!retval)
-      throw EPublish("cannot retrieve root hash from read-only mount point");
-    shash::Any root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_str),
+    if (retval) {
+      shash::Any root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_str),
                                                shash::kSuffixCatalog);
-
-    if (expected_hash != root_hash) {
-      if (marker.IsValid()) {
-        result |= kFailRdOnlyWrongRevision;
+      if (expected_hash != root_hash) {
+        if (marker.IsValid()) {
+          result |= kFailRdOnlyWrongRevision;
+        } else {
+          result |= kFailRdOnlyOutdated;
+        }
+      }
+    } else {
+      if (errno == ENOTCONN) {
+        // Fuse module crashed
+        result |= kFailRdOnlyBroken;
       } else {
-        result |= kFailRdOnlyOutdated;
+        throw EPublish("cannot retrieve root hash from read-only mount point");
       }
     }
   }

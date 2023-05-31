@@ -77,6 +77,17 @@ cvmfs_run_test() {
     cvmfs_swissknife lease -u http://localhost:4929/api/v1 -a drop \
       -k /etc/cvmfs/keys/test.repo.org.gw -p test.repo.org/ || return 94
 
+    echo "  *** Force abort after client crash"
+    cvmfs_server transaction test.repo.org/ || return 95
+    ls /var/spool/cvmfs/test.repo.org/rdonly/ || return 96
+    local watchdog_pid=$(cvmfs_talk -p /var/spool/cvmfs/test.repo.org/cvmfs_io pid watchdog)
+    local client_pid=$(get_xattr pid /var/spool/cvmfs/test.repo.org/rdonly)
+    sudo kill -9 $watchdog_pid $client_pid
+    while ls /var/spool/cvmfs/test.repo.org/rdonly/; do
+      sleep 1
+    done
+    cvmfs_server abort -f test.repo.org || return 97
+
     cvmfs_server transaction test.repo.org/ || return 85
     cvmfs_server abort -f test.repo.org || return 86
 
