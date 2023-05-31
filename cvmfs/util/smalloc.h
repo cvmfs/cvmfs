@@ -45,7 +45,7 @@ static inline void * __attribute__((used)) smalloc(size_t size) {
 #endif
     mem = malloc(size);
 #ifdef CVMFS_SUPPRESS_ASSERTS
-  } while (mem == NULL);
+  } while ((size > 0) && (mem == NULL));
 #endif
   assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
@@ -59,7 +59,7 @@ static inline void * __attribute__((used)) srealloc(void *ptr, size_t size) {
 #endif
     mem = realloc(ptr, size);
 #ifdef CVMFS_SUPPRESS_ASSERTS
-  } while (mem == NULL);
+  } while ((size > 0) && (mem == NULL));
 #endif
   assert((mem || (size == 0)) && "Out Of Memory");
   return mem;
@@ -73,7 +73,7 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
 #endif
     mem = calloc(count, size);
 #ifdef CVMFS_SUPPRESS_ASSERTS
-  } while (mem == NULL);
+  } while ((count * size > 0) && (mem == NULL));
 #endif
   assert((mem || ((count * size) == 0)) && "Out Of Memory");
   return mem;
