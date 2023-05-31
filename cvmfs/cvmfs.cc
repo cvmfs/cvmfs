@@ -116,8 +116,6 @@
 #include "wpad.h"
 #include "xattr.h"
 
-#define TXN (true == cvmfs::mount_point_->download_mgr()->GetHTTPTracing() ? platform_monotonic_time_ns() : 0), 0 // NOLINT
-
 using namespace std;  // NOLINT
 
 namespace cvmfs {
@@ -489,7 +487,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   perf::Inc(file_system_->n_fs_lookup());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -731,7 +729,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_stat());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -798,7 +796,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   perf::Inc(file_system_->n_fs_readlink());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
@@ -858,7 +856,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -1091,7 +1089,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
@@ -1352,7 +1350,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   if (fd < 0) {
     const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
     FuseInterruptCue ic(&req);
-    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
     const uint64_t chunk_handle = abs_fd;
     uint64_t unique_inode;
@@ -1463,27 +1461,12 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     } while ((overall_bytes_fetched < size) &&
              (chunk_idx < chunks.list->size()));
 
-    // If it's an external file, immediately close
-    // the fd so the cached chunk file
-    // is immediately released on cache cleanup
-
-    catalog::DirectoryEntry dirent;
-    bool found = GetDirentForInode(ino, &dirent);
-    if (found && dirent.IsExternalFile()
-        && chunk_fd.fd != -1) {
-      int tmpfd = chunk_fd.fd;
-      chunk_fd.fd = -1;
-      chunk_tables->Lock();
-      chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
-      chunk_tables->Unlock();
-      file_system_->cache_mgr()->Close(tmpfd);
-    } else {
-      chunk_tables->Lock();
-      chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
-      chunk_tables->Unlock();
-      LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
+    // Update chunk file descriptor
+    chunk_tables->Lock();
+    chunk_tables->handle2fd.Insert(chunk_handle, chunk_fd);
+    chunk_tables->Unlock();
+    LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
-    }
   } else {
     int64_t nbytes = file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
     if (nbytes < 0) {
@@ -1670,7 +1653,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
@@ -1758,7 +1741,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic, TXN);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();

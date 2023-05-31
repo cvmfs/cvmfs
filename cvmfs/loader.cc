@@ -400,6 +400,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
   }
 }
 
+
 static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   struct fuse_args *mount_options = new fuse_args();
   CvmfsOptions cvmfs_options;
@@ -731,27 +732,6 @@ int FuseMain(int argc, char *argv[]) {
     }
     fuse_opt_add_arg(mount_options, "-osuid");
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
-  }
-
-  if (options_manager->GetValue("CVMFS_CPU_AFFINITY", &parameter)) {
-#ifndef __APPLE__
-     cpu_set_t mask;
-     vector<string> cpus = SplitString(parameter, ',');
-     CPU_ZERO(&mask);
-     for (vector<string>::iterator i = cpus.begin(); i != cpus.end(); i++) {
-        CPU_SET(String2Uint64(*i), &mask);
-     }
-     LogCvmfs(kLogCvmfs, kLogStdout,
-              "Setting CPU Affinity to %s", parameter.c_str());
-     int err = sched_setaffinity(0, sizeof(mask), &mask);
-     if (err != 0) {
-        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
-                 "Setting CPU Affinity failed with error %d", err);
-     }
-#else
-     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
-              "CPU affinity setting not supported on macOS");
-#endif
   }
   loader_exports_ = new LoaderExports();
   loader_exports_->loader_version = PACKAGE_VERSION;

@@ -612,8 +612,6 @@ class MountPoint : SingleCopy, public BootFactory {
   bool FetchHistory(std::string *history_path);
   std::string ReplaceHosts(std::string hosts);
   std::string GetUniqFileSuffix();
-  void ConfigureHTTPTracing();
-
 
   std::string fqrn_;
   cvmfs::Uuid *uuid_;

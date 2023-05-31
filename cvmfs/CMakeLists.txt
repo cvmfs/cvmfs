@@ -57,7 +57,6 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression.cc
-       custom_sharding.cc
        directory_entry.cc
        duplex_fuse.cc
        fetch.cc
@@ -564,7 +563,6 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        clientctx.cc
        compression.cc
-       custom_sharding.cc
        directory_entry.cc
        file_chunk.cc
        gateway_util.cc
@@ -704,7 +702,6 @@ if (BUILD_SERVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_virtual.cc
-       custom_sharding.cc
        compression.cc
        directory_entry.cc
        gateway_util.cc
@@ -812,7 +809,6 @@ if (BUILD_SERVER)
   set (CVMFS_PUBLISH_SOURCES
        backoff.cc
        compression.cc
-       custom_sharding.cc
        directory_entry.cc
        manifest.cc
        network/dns.cc
@@ -996,7 +992,6 @@ if(BUILD_RECEIVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        compression.cc
-       custom_sharding.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc

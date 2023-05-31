@@ -20,7 +20,6 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
-#include "custom_sharding.h"
 #include "dns.h"
 #include "duplex_curl.h"
 #include "sink.h"
@@ -180,10 +179,6 @@ struct JobInfo {
   off_t range_offset;
   off_t range_size;
 
-  std::vector<std::string> http_tracing_headers;
-  uint64_t http_txn_id;
-  uint32_t http_txn_step;
-
   // Default initialization of fields
   void Init() {
     url = NULL;
@@ -220,9 +215,6 @@ struct JobInfo {
     range_offset = -1;
     range_size = -1;
     http_code = -1;
-    std::vector<std::string> http_tracing_headers;
-    http_txn_id = 0;
-    http_txn_step = 0;
   }
 
   // One constructor per destination + head request
@@ -471,11 +463,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     return opt_ip_preference_;
   }
 
-  void SetHTTPTracing(bool on) { enable_http_tracing_ = on; }
-  bool GetHTTPTracing() { return enable_http_tracing_; }
-  void AddHTTPTracingHeader(const std::string &header)
-       { http_tracing_headers_.push_back(header); } 
-
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -542,8 +529,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
-  bool enable_http_tracing_;
-  std::vector<std::string> http_tracing_headers_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
@@ -648,9 +633,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
-
-  bool use_custom_sharding_;
-  CustomSharding *custom_sharding_;
 };  // DownloadManager
 
 }  // namespace download

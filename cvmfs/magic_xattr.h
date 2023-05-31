@@ -340,14 +340,6 @@ class ProxyMagicXattr : public BaseMagicXattr {
   virtual std::string GetValue();
 };
 
-class ProxyListMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
-};
-
-class ProxyListExternalMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
-};
-
 class PubkeysMagicXattr : public BaseMagicXattr {
   std::string pubkeys_;
 
