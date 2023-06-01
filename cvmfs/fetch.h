@@ -33,7 +33,7 @@ namespace cvmfs {
 class TransactionSink : public Sink {
  public:
   TransactionSink(CacheManager *cache_mgr, void *open_txn)
-    : Sink(true),
+    : Sink(false),
       cache_mgr_(cache_mgr),
       open_txn_(open_txn) { }
   virtual ~TransactionSink() { }

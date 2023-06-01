@@ -183,7 +183,6 @@ string AutoProxy(DownloadManager *download_manager) {
                         pac_memsink.pos(),
                         download_manager,
                         &proxies);
-      pac_memsink.Reset();
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "failed to parse pac file %s",  pac_paths[i].c_str());

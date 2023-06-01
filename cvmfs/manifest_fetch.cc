@@ -214,6 +214,11 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   return result;
 }
 
+/**
+ * Verifies the manifest, the certificate, and the whitelist.
+ * If base_url is empty, uses the probe_hosts feature from download manager.
+ * Creates a copy of the manifest to verify.
+ */
 Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 const std::string &base_url, const std::string &repository_name,
                 const uint64_t minimum_timestamp,
@@ -221,7 +226,10 @@ Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 signature::SignatureManager *signature_manager,
                 download::DownloadManager *download_manager,
                 ManifestEnsemble *ensemble) {
-  return DoVerify(manifest_data, manifest_size, base_url, repository_name,
+  unsigned char *manifest_copy = 
+                      reinterpret_cast<unsigned char *>(smalloc(manifest_size));
+  memcpy(manifest_copy, manifest_data, manifest_size);
+  return DoVerify(manifest_copy, manifest_size, base_url, repository_name,
                   minimum_timestamp, base_catalog, signature_manager,
                   download_manager, ensemble);
 }

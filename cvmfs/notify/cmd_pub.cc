@@ -69,7 +69,6 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     manifest_contents = std::string(
                                reinterpret_cast<char*>(manifest_memsink.data()),
                                manifest_memsink.pos());
-    manifest_memsink.Reset();
     download_manager->Fini();
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);
