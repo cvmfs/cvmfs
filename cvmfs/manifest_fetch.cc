@@ -24,7 +24,7 @@ namespace manifest {
 /**
  * Verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
- * 
+ *
  * @note Ownership of manifest_data is transferred to the ensemble.
  */
 static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
@@ -226,7 +226,7 @@ Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 signature::SignatureManager *signature_manager,
                 download::DownloadManager *download_manager,
                 ManifestEnsemble *ensemble) {
-  unsigned char *manifest_copy = 
+  unsigned char *manifest_copy =
                       reinterpret_cast<unsigned char *>(smalloc(manifest_size));
   memcpy(manifest_copy, manifest_data, manifest_size);
   return DoVerify(manifest_copy, manifest_size, base_url, repository_name,
