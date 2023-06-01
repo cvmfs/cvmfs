@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>CernVM-FS repository statistics - $REPO_NAME</title>
-  <script src="https://root.cern/js/latest/scripts/JSRoot.core.min.js" type="text/javascript"></script>
+  <script type="text/javascript" src="https://root.cern/js/latest/scripts/JSRoot.core.min.js" crossorigin="anonymous"></script>
   <script type='text/javascript'>
     var filename = "stats.root";
 
@@ -27,9 +27,13 @@
       let file = await JSROOT.openFile(filename);
 
       for (let i = 0; i < plots.length; i++) {
-        let obj = await file.readObject(plots[i]);
-        await JSROOT.draw(plots[i], obj);
-        console.log("drawing ".concat(plots[i]));
+        let obj = file.readObject(plots[i]);
+        obj.then((value) => {
+          JSROOT.draw(plots[i], value);
+          console.log("drawing ".concat(plots[i]));
+        }).catch((e) => {
+          console.log("cannot read key ".concat(plots[i]).concat(": ").concat(e.message))
+        });
       }
     }
     readAndDrawAsync();
