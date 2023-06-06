@@ -177,6 +177,8 @@ build_lib() {
     pacparser)
       do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
       patch_external "pacparser" "fix_cflags.patch"
+      patch_external "pacparser" "fix_c99.patch"
+      patch_external "pacparser" "fix_python3.6.patch"
       do_build "pacparser"
       ;;
     zlib)
