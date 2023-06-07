@@ -6,7 +6,7 @@ SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
 CARES_VERSION=1.18.1
 CURL_VERSION=7.86.0
-PACPARSER_VERSION=1.3.8
+PACPARSER_VERSION=1.4.2
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -177,6 +177,8 @@ build_lib() {
     pacparser)
       do_extract "pacparser"     "pacparser-${PACPARSER_VERSION}.tar.gz"
       patch_external "pacparser" "fix_cflags.patch"
+      patch_external "pacparser" "fix_c99.patch"
+      patch_external "pacparser" "fix_python3.6.patch"
       do_build "pacparser"
       ;;
     zlib)

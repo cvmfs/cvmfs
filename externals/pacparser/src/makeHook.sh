@@ -17,12 +17,12 @@ fi
 echo "make clean && make for libpacparser (omitting test execution)..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
 make $FIX_PYTHON -C src clean
-make $FIX_PYTHON $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o libjs.a # default target runs tests!
+make $FIX_PYTHON $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o spidermonkey/libjs.a # default target runs tests!
 echo "finished internal build of libpacparser"
 
 echo "creating static link library for libpacparser..."
 mkdir src/static
-cp src/pacparser.o src/libjs.a $static_result_dir
+cp src/pacparser.o src/spidermonkey/libjs.a $static_result_dir
 
 cd $static_result_dir
 ar x libjs.a
