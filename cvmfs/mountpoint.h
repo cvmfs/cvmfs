@@ -305,6 +305,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool TriageCacheMgr();
   CacheManager *SetupCacheMgr(const std::string &instance);
   CacheManager *SetupPosixCacheMgr(const std::string &instance);
+   CacheManager *SetupPosixRefcountCacheMgr(const std::string &instance);
   CacheManager *SetupRamCacheMgr(const std::string &instance);
   CacheManager *SetupTieredCacheMgr(const std::string &instance);
   CacheManager *SetupExternalCacheMgr(const std::string &instance);

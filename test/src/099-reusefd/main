@@ -1,0 +1,37 @@
+#!/bin/bash
+
+cvmfs_test_name="Check that open cache file descriptors from different processes are not duplicated in cvmfs"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount alice.cern.ch CVMFS_DEBUGLOG=/tmp/debug.log CVMFS_CACHE_PRIMARY=posix_refcount || return 10
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+  testfile="/cvmfs/alice.cern.ch/el6-x86_64/Packages/AliDPG/prod-202306-01-1/README.md"
+  # testfile has the following cvmfs hash:
+  testfile_hash="72a19643e2d198ccf96b7eb5f870dd0deaa6ade0"
+
+  for i in {1..10}; do
+    timeout 2s tail -f ${testfile} > /dev/null &
+  done;
+  sleep 1;
+
+  ###########
+  # check the open file descriptors of the cvmfs2 process 
+  alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
+  echo $alice_pid
+  num_open_fds=$(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
+
+
+  echo $(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2})
+  if [ "$num_open_fds" -gt "1" ]; then
+    echo "The cvmfs process has several open file descriptors for the same open test file" && return 20
+  fi
+  sleep 3
+  return 0
+}
+

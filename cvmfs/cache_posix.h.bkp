@@ -72,7 +72,10 @@ class PosixCacheManager : public CacheManager {
     const std::string &cache_path,
     const bool alien_cache,
     const RenameWorkarounds rename_workaround = kRenameNormal);
-  virtual ~PosixCacheManager() { }
+  virtual ~PosixCacheManager() {   
+    pthread_mutex_destroy(lock_cache_refcount_);
+    free(lock_cache_refcount_);
+    }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const LabeledObject &object);
@@ -110,6 +113,7 @@ class PosixCacheManager : public CacheManager {
   virtual int DoRestoreState(void *data);
   virtual bool DoFreeState(void *data);
 
+
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
@@ -143,11 +147,18 @@ class PosixCacheManager : public CacheManager {
     , is_tmpfs_(false)
   {
     atomic_init32(&no_inflight_txns_);
+
+      lock_cache_refcount_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
+  assert(retval == 0);
   }
 
   std::string GetPathInCache(const shash::Any &id);
   int Rename(const char *oldpath, const char *newpath);
   int Flush(Transaction *transaction);
+
+
 
   std::string cache_path_;
   std::string txn_template_path_;
@@ -171,6 +182,10 @@ class PosixCacheManager : public CacheManager {
    * True if posixcache is on tmpfs (and with this already in RAM)
    */
   bool is_tmpfs_;
+  std::map<int, int> map_refcount_;
+  std::map<std::string, int> map_fd_;
+  
+  pthread_mutex_t *lock_cache_refcount_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_

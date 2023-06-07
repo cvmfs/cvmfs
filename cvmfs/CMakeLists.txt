@@ -48,6 +48,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        cache.pb.cc cache.pb.h
        cache_extern.cc
        cache_posix.cc
+       cache_posix_refc.cc
        cache_ram.cc
        cache_stream.cc
        cache_tiered.cc

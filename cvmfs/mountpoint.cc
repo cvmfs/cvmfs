@@ -33,6 +33,7 @@
 #include "cache.h"
 #include "cache_extern.h"
 #include "cache_posix.h"
+#include "cache_posix_refc.h"
 #include "cache_ram.h"
 #include "cache_stream.h"
 #include "cache_tiered.h"
@@ -563,7 +564,7 @@ string FileSystem::MkCacheParm(
 {
   assert(HasPrefix(generic_parameter, "CVMFS_CACHE_", false));
 
-  if (instance == kDefaultCacheMgrInstance) {
+  if (instance == kDefaultCacheMgrInstance || instance == "posix_refcount") {
     // Compatibility parameter names
     if ((generic_parameter == "CVMFS_CACHE_SHARED") &&
         !options_mgr_->IsDefined(generic_parameter))
@@ -622,12 +623,16 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   string instance_type;
   if (instance == kDefaultCacheMgrInstance) {
     instance_type = "posix";
+  } else if (instance == "posix_refcount") {
+    instance_type = "posix_refcount";
   } else {
     options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_TYPE", instance),
                            &instance_type);
   }
   if (instance_type == "posix") {
     return SetupPosixCacheMgr(instance);
+  } else if (instance_type == "posix_refcount") {
+    return SetupPosixRefcountCacheMgr(instance);
   } else if (instance_type == "ram") {
     return SetupRamCacheMgr(instance);
   } else if (instance_type == "tiered") {
@@ -694,6 +699,36 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
                           : PosixCacheManager::kRenameNormal));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
+                  settings.cache_path + ": " + strerror(errno);
+    boot_status_ = loader::kFailCacheDir;
+    return NULL;
+  }
+
+  // Sentinel file for future use
+  // Might be a read-only cache
+  const bool ignore_failure = settings.is_alien;
+  CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
+
+  if (settings.is_managed) {
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
+      return NULL;
+  }
+  return cache_mgr.Release();
+}
+
+CacheManager *FileSystem::SetupPosixRefcountCacheMgr(const string &instance) {
+  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  if (!CheckPosixCacheSettings(settings))
+    return NULL;
+
+  UniquePtr<PosixRefcountCacheManager> cache_mgr(
+    PosixRefcountCacheManager::Create(
+      settings.cache_path,
+      settings.is_alien,
+      settings.avoid_rename ? PosixCacheManager::kRenameLink
+                            : PosixCacheManager::kRenameNormal));
+  if (!cache_mgr.IsValid()) {
+    boot_error_ = "Failed to setup posix refc cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
     return NULL;
