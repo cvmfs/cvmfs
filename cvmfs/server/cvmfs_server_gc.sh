@@ -145,7 +145,7 @@ cvmfs_server_gc() {
       echo "Preserved Legacy Revisions:    $preserve_revisions"
     fi
     if [ $preserve_timestamp -gt 0 ]; then
-      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%Y/%m/%d %H:%M:%S')"
     fi
     if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
       echo "Only the latest revision will be preserved."
