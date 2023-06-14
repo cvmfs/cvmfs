@@ -51,6 +51,10 @@ TEST_F(T_Tube, Fifo) {
   x = tube_.PopFront();
   EXPECT_EQ(&c, x);
   EXPECT_TRUE(tube_.IsEmpty());
+
+  EXPECT_EQ(NULL, tube_.TryPopFront());
+  tube_.EnqueueBack(&a);
+  EXPECT_EQ(&a, tube_.TryPopFront());
 }
 
 
