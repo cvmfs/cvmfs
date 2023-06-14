@@ -128,6 +128,21 @@ class Tube : SingleCopy {
   }
 
   /**
+   * Remove and return the first element from the queue if there is any.
+   * Equivalent to an antomic
+   *   ItemT item = NULL;
+   *   if (!IsEmpty())
+   *     item = PopFront();
+   */
+  ItemT *TryPopFront() {
+    MutexLockGuard lock_guard(&lock_);
+    // Note that we don't need to wait for a signal to arrive
+    if (size_ == 0)
+      return NULL;
+    return SliceUnlocked(head_->prev_);
+  }
+
+  /**
    * Remove and return the last element from the queue.  Block if tube is
    * empty.
    */

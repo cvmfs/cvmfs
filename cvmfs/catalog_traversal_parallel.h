@@ -205,8 +205,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       reinterpret_cast<CatalogTraversalParallel<ObjectFetcherT> *>(data);
     CatalogJob *current_job;
     while (true) {
-      if (!traversal->post_job_queue_.IsEmpty()) {
-        current_job = traversal->post_job_queue_.PopFront();
+      current_job = traversal->post_job_queue_.TryPopFront();
+      if (current_job != NULL) {
         traversal->ProcessJobPost(current_job);
       } else {
         current_job = traversal->pre_job_queue_.PopFront();
