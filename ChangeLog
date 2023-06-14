@@ -1,4 +1,5 @@
 2.11.0:
+  * Fix race in parallel catalog traversal (#3171)
   * If CVMFS_SUPPRESS_ASSERTS is defined, keep retrying memory allocation on failure (#3244)
   * Fix force abort after client crash (#3283)
   * Add proxy_list and proxy_list_external magic xattrs (#3233)
