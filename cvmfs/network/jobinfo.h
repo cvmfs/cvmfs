@@ -35,7 +35,7 @@ namespace download {
  */
 class JobInfo {
  private:
-   /// Pipe used for the return value
+  /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   const std::string *url_;
   bool compressed_;
