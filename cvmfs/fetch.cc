@@ -170,7 +170,7 @@ int Fetcher::Fetch(
   }
   tls->download_job->SetCompressed(compression_algorithm == zlib::kZlibDefault);
   tls->download_job->SetRangeOffset(range_offset);
-  tls->download_job->SetRangeSize(size);
+  tls->download_job->SetRangeSize(static_cast<off_t>(size));
   download_mgr_->Fetch(tls->download_job.weak_ref());
 
   if (tls->download_job->error_code() == download::kFailOk) {
