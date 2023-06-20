@@ -27,14 +27,18 @@ class StreamingCacheManager : public CacheManager {
  public:
   StreamingCacheManager(unsigned max_open_fds,
                         CacheManager *cache_mgr,
-                        download::DownloadManager *download_mgr);
+                        download::DownloadManager *regular_download_mgr,
+                        download::DownloadManager *external_download_mgr);
   virtual ~StreamingCacheManager();
 
   // In the files system / mountpoint initialization, we create the cache
   // manager before we know about the download manager.  Hence we allow to
   // patch in the download manager at a later point.
-  void SetDownloadManager(download::DownloadManager *download_mgr) {
-    download_mgr_ = download_mgr;
+  void SetRegularDownloadManager(download::DownloadManager *download_mgr) {
+    regular_download_mgr_ = download_mgr;
+  }
+  void SetExternalDownloadManager(download::DownloadManager *download_mgr) {
+    external_download_mgr_ = download_mgr;
   }
 
   virtual CacheManagerIds id() { return kStreamingCacheManager; }
@@ -83,13 +87,16 @@ class StreamingCacheManager : public CacheManager {
 
  private:
   struct FdInfo {
+    const static int kFlagExternal = 0x01;  ///< use external download manager
+
     int fd_in_cache_mgr;
+    int flags;
     shash::Any object_id;
 
-    FdInfo() : fd_in_cache_mgr(-1) {}
-    explicit FdInfo(int fd) : fd_in_cache_mgr(fd) {}
-    explicit FdInfo(const shash::Any &id)
-      : fd_in_cache_mgr(-1), object_id(id) {}
+    FdInfo() : fd_in_cache_mgr(-1), flags(0) {}
+    explicit FdInfo(int fd) : fd_in_cache_mgr(fd), flags(0) {}
+    FdInfo(const shash::Any &id, int f)
+      : fd_in_cache_mgr(-1), flags(f), object_id(id) {}
 
     bool operator ==(const FdInfo &other) const {
       return this->fd_in_cache_mgr == other.fd_in_cache_mgr &&
@@ -102,15 +109,19 @@ class StreamingCacheManager : public CacheManager {
     bool IsValid() const { return fd_in_cache_mgr >= 0 || !object_id.IsNull(); }
   };
 
+  /// Depending on info.flags, selects either the regular or the external
+  /// download manager
+  download::DownloadManager *SelectDownloadManager(const FdInfo &info);
+
   /// Streams an object using the download manager. The complete object is read
   /// and its size is returned (-errno on error).
   /// The given section of the object is copied into the provided buffer,
   /// which may be NULL if only the size of the object is relevant.
-  int64_t Stream(const shash::Any &object_id,
-                 void *buf, uint64_t size, uint64_t offset);
+  int64_t Stream(FdInfo &info, void *buf, uint64_t size, uint64_t offset);
 
   UniquePtr<CacheManager> cache_mgr_;
-  download::DownloadManager *download_mgr_;
+  download::DownloadManager *regular_download_mgr_;
+  download::DownloadManager *external_download_mgr_;
 
   pthread_mutex_t *lock_fd_table_;
   FdTable<FdInfo> fd_table_;

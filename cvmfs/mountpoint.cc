@@ -1162,7 +1162,7 @@ bool FileSystem::TriageCacheMgr() {
     unsigned nfiles = kDefaultNfiles;
     if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
       nfiles = String2Uint64(optarg);
-    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL);
   }
 
   return true;
@@ -1276,8 +1276,11 @@ MountPoint *MountPoint::Create(
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
   if (file_system->cache_mgr()->id() == kStreamingCacheManager) {
-    dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr())->
-      SetDownloadManager(mountpoint->download_mgr());
+    StreamingCacheManager *streaming_cachemgr =
+      dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr());
+    streaming_cachemgr->SetRegularDownloadManager(mountpoint->download_mgr());
+    streaming_cachemgr->SetExternalDownloadManager(
+      mountpoint->external_download_mgr());
   }
   if (!mountpoint->CreateResolvConfWatcher()) {
     return mountpoint.Release();

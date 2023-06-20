@@ -73,8 +73,16 @@ class StreamingSink : public cvmfs::Sink {
 }  // anonymous namespace
 
 
+download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
+  const FdInfo &info)
+{
+  if (info.flags & FdInfo::kFlagExternal)
+    return external_download_mgr_;
+  return regular_download_mgr_;
+}
+
 int64_t StreamingCacheManager::Stream(
-  const shash::Any &object_id,
+  (FdInfo &info,
   void *buf,
   uint64_t size,
   uint64_t offset)
@@ -85,8 +93,8 @@ int64_t StreamingCacheManager::Stream(
                                  true, /* compressed */
                                  true, /* probe_hosts */
                                  &sink,
-                                 &object_id);
-  download_mgr_->Fetch(&download_job);
+                                 &info.object_id);
+  SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code != download::kFailOk)
     return -EIO;
@@ -98,9 +106,11 @@ int64_t StreamingCacheManager::Stream(
 StreamingCacheManager::StreamingCacheManager(
   unsigned max_open_fds,
   CacheManager *cache_mgr,
-  download::DownloadManager *download_mgr)
+  download::DownloadManager *regular_download_mgr,
+  download::DownloadManager *external_download_mgr)
   : cache_mgr_(cache_mgr)
-  , download_mgr_(download_mgr)
+  , regular_download_mgr_(regular_download_mgr)
+  , external_download_mgr_(external_download_mgr)
   , fd_table_(max_open_fds, FdInfo())
 {
   lock_fd_table_ =
@@ -143,7 +153,7 @@ int StreamingCacheManager::Open(const BlessedObject &object) {
     return -ENOENT;
 
   MutexLockGuard lock_guard(lock_fd_table_);
-  return fd_table_.OpenFd(FdInfo(object.id));
+  return fd_table_.OpenFd(FdInfo(object.id, 0));
 }
 
 int64_t StreamingCacheManager::GetSize(int fd) {
@@ -159,7 +169,7 @@ int64_t StreamingCacheManager::GetSize(int fd) {
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->GetSize(info.fd_in_cache_mgr);
 
-  return Stream(info.object_id, NULL, 0, 0);
+  return Stream(info, download_mgr, NULL, 0, 0);
 }
 
 int StreamingCacheManager::Dup(int fd) {
@@ -178,7 +188,7 @@ int StreamingCacheManager::Dup(int fd) {
     return fd_table_.OpenFd(FdInfo(dup_fd));
   }
 
-  return fd_table_.OpenFd(FdInfo(info.object_id));
+  return fd_table_.OpenFd(FdInfo(info.object_id, info.flags));
 }
 
 int StreamingCacheManager::Close(int fd) {
@@ -212,7 +222,7 @@ int64_t StreamingCacheManager::Pread(
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->Pread(info.fd_in_cache_mgr, buf, size, offset);
 
-  return Stream(info.object_id, buf, size, offset);
+  return Stream(info, buf, size, offset);
 }
 
 int StreamingCacheManager::Readahead(int fd) {
