@@ -12,8 +12,8 @@ namespace cvmfs {
 
 /**
  * Appends data to the sink
- * 
- * @returns on success: number of bytes written 
+ *
+ * @returns on success: number of bytes written
  *          on failure: -errno.
  */
 int64_t FileSink::Write(const void *buf, uint64_t sz) {
@@ -31,7 +31,7 @@ int64_t FileSink::Write(const void *buf, uint64_t sz) {
 
 /**
  * Truncate all written data and start over at position zero.
- * 
+ *
  * @returns Success = 0
  *          Failure = -1
  */
@@ -44,7 +44,7 @@ int FileSink::Reset() {
 /**
  * Purges all resources leaving the sink in an invalid state.
  * More aggressive version of Reset().
- * For some sinks and depending on owner status it might do 
+ * For some sinks and depending on owner status it might do
  * the same as Reset().
  *
  * @returns Success = 0
@@ -52,7 +52,13 @@ int FileSink::Reset() {
  */
 int FileSink::Purge() {
   if (is_owner_ && file_) {
-    return (-1 * fclose(file_));
+    int ret = fclose(file_);
+    file_ = NULL;
+    if (ret != 0) {
+      return -errno;
+    }
+
+    return 0;
   } else {
     return Reset();
   }
