@@ -341,6 +341,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_smalloc.cc
   t_shared_ptr.cc
   t_signature.cc
+  t_sink.cc
   t_sqlite_database.cc
   t_sqlitemem.cc
   t_statistics.cc
