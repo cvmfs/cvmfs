@@ -22,7 +22,7 @@ namespace cvmfs {
  * It can use Adopt() to write to a different buffer.
  *
  * By default, MemSink is the owner of the buffer and takes care of its
- * creationg and deletion.
+ * creation and deletion.
  */
 class MemSink : public Sink {
  public:
