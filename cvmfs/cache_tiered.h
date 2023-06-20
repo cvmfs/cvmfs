@@ -42,7 +42,7 @@ class TieredCacheManager : public CacheManager {
     return result;
   }
 
-  virtual int Open(const BlessedObject &object);
+  virtual int Open(const LabeledObject &object);
   virtual int64_t GetSize(int fd) {return upper_->GetSize(fd);}
   virtual int Close(int fd) {return upper_->Close(fd);}
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset)

@@ -356,7 +356,7 @@ int64_t PosixCacheManager::GetSize(int fd) {
 }
 
 
-int PosixCacheManager::Open(const BlessedObject &object) {
+int PosixCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
   int result = open(path.c_str(), O_RDONLY);
 

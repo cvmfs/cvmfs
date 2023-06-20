@@ -101,18 +101,18 @@ class CacheManager : SingleCopy {
   /**
    * A content hash together with a (partial) ObjectInfo meta-data.
    */
-  struct BlessedObject {
-    explicit BlessedObject(const shash::Any &id) : id(id), info() { }
-    BlessedObject(const shash::Any &id, const ObjectInfo info)
+  struct LabeledObject {
+    explicit LabeledObject(const shash::Any &id) : id(id), info() { }
+    LabeledObject(const shash::Any &id, const ObjectInfo info)
       : id(id)
       , info(info) { }
-    BlessedObject(const shash::Any &id, ObjectType type)
+    LabeledObject(const shash::Any &id, ObjectType type)
       : id(id)
       , info(type, "") { }
-    BlessedObject(const shash::Any &id, const std::string &description)
+    LabeledObject(const shash::Any &id, const std::string &description)
       : id(id)
       , info(kTypeRegular, description) { }
-    BlessedObject(
+    LabeledObject(
       const shash::Any &id,
       ObjectType type,
       const std::string &description)
@@ -122,31 +122,31 @@ class CacheManager : SingleCopy {
     shash::Any id;
     ObjectInfo info;
   };
-  // Convenience constructors, users can call Open(CacheManager::Bless(my_hash))
-  static inline BlessedObject Bless(const shash::Any &id) {
-    return BlessedObject(id);
+  // Convenience constructors, users can call Open(CacheManager::Label(my_hash))
+  static inline LabeledObject Label(const shash::Any &id) {
+    return LabeledObject(id);
   }
-  static inline BlessedObject Bless(
+  static inline LabeledObject Label(
     const shash::Any &id,
     const ObjectInfo &info)
   {
-    return BlessedObject(id, info);
+    return LabeledObject(id, info);
   }
-  static inline BlessedObject Bless(const shash::Any &id, ObjectType type) {
-    return BlessedObject(id, type);
+  static inline LabeledObject Label(const shash::Any &id, ObjectType type) {
+    return LabeledObject(id, type);
   }
-  static inline BlessedObject Bless(
+  static inline LabeledObject Label(
     const shash::Any &id,
     const std::string &description)
   {
-    return BlessedObject(id, description);
+    return LabeledObject(id, description);
   }
-  static inline BlessedObject Bless(
+  static inline LabeledObject Label(
     const shash::Any &id,
     ObjectType type,
     const std::string &description)
   {
-    return BlessedObject(id, type, description);
+    return LabeledObject(id, type, description);
   }
 
   virtual CacheManagerIds id() = 0;
@@ -165,7 +165,7 @@ class CacheManager : SingleCopy {
    * beneficial to register the object with the accurate meta-data, in the same
    * way it is done during transactions.
    */
-  virtual int Open(const BlessedObject &object) = 0;
+  virtual int Open(const LabeledObject &object) = 0;
   virtual int64_t GetSize(int fd) = 0;
   virtual int Close(int fd) = 0;
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) = 0;

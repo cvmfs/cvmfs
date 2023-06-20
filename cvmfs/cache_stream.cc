@@ -82,13 +82,13 @@ download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
 }
 
 int64_t StreamingCacheManager::Stream(
-  (FdInfo &info,
+  FdInfo &info,
   void *buf,
   uint64_t size,
   uint64_t offset)
 {
   StreamingSink sink(buf, size, offset);
-  std::string url = "/data/" + object_id.MakePath();
+  std::string url = "/data/" + info.object_id.MakePath();
   download::JobInfo download_job(&url,
                                  true, /* compressed */
                                  true, /* probe_hosts */
@@ -139,7 +139,7 @@ bool StreamingCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
   return result;
 }
 
-int StreamingCacheManager::Open(const BlessedObject &object) {
+int StreamingCacheManager::Open(const LabeledObject &object) {
   int fd_in_cache_mgr = cache_mgr_->Open(object);
   if (fd_in_cache_mgr >= 0) {
     MutexLockGuard lock_guard(lock_fd_table_);
@@ -169,7 +169,7 @@ int64_t StreamingCacheManager::GetSize(int fd) {
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->GetSize(info.fd_in_cache_mgr);
 
-  return Stream(info, download_mgr, NULL, 0, 0);
+  return Stream(info, NULL, 0, 0);
 }
 
 int StreamingCacheManager::Dup(int fd) {

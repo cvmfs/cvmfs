@@ -168,8 +168,8 @@ int posix_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
     if (change_by < 0) {
       return CVMCACHE_STATUS_BADCOUNT;
     }
-    CacheManager::BlessedObject blessed_object(Chash2Cpphash(id));
-    int fd = g_cache_mgr->Open(blessed_object);
+    CacheManager::LabeledObject labeled_object(Chash2Cpphash(id));
+    int fd = g_cache_mgr->Open(labeled_object);
     if (fd < 0) {
       return CVMCACHE_STATUS_NOENTRY;
     }

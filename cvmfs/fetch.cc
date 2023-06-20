@@ -271,7 +271,7 @@ int Fetcher::OpenSelect(
   if (is_catalog || (object_type == CacheManager::kTypePinned)) {
     return cache_mgr_->OpenPinned(id, name, is_catalog);
   } else {
-    return cache_mgr_->Open(CacheManager::Bless(id, object_type, name));
+    return cache_mgr_->Open(CacheManager::Label(id, object_type, name));
   }
 }
 

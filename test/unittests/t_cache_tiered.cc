@@ -42,10 +42,10 @@ class T_TieredCacheManager : public ::testing::Test {
 
 
 TEST_F(T_TieredCacheManager, OpenUpper) {
-  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Bless(hash_one_)));
+  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Label(hash_one_)));
 
   EXPECT_TRUE(upper_cache_->CommitFromMem(hash_one_, &buf_, 1, "one"));
-  int fd = tiered_cache_->Open(CacheManager::Bless(hash_one_));
+  int fd = tiered_cache_->Open(CacheManager::Label(hash_one_));
   EXPECT_GE(fd, 0);
 
   EXPECT_EQ(1, tiered_cache_->GetSize(fd));
@@ -58,15 +58,15 @@ TEST_F(T_TieredCacheManager, OpenUpper) {
 
 
 TEST_F(T_TieredCacheManager, CopyUp) {
-  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Bless(hash_one_)));
+  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Label(hash_one_)));
 
   EXPECT_TRUE(lower_cache_->CommitFromMem(hash_one_, &buf_, 1, "one"));
-  int fd = tiered_cache_->Open(CacheManager::Bless(
+  int fd = tiered_cache_->Open(CacheManager::Label(
     hash_one_, CacheManager::kTypeVolatile));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, stats_upper_.Lookup("test.n_openvolatile")->Get());
 
-  int fd_upper = upper_cache_->Open(CacheManager::Bless(hash_one_));
+  int fd_upper = upper_cache_->Open(CacheManager::Label(hash_one_));
   EXPECT_GE(fd_upper, 0);
   EXPECT_EQ(0, upper_cache_->Close(fd_upper));
 
@@ -80,13 +80,13 @@ TEST_F(T_TieredCacheManager, CopyUp) {
 
 
 TEST_F(T_TieredCacheManager, Transaction) {
-  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Bless(hash_one_)));
+  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Label(hash_one_)));
   EXPECT_TRUE(tiered_cache_->CommitFromMem(hash_one_, &buf_, 1, "one"));
 
-  int fd_upper = upper_cache_->Open(CacheManager::Bless(hash_one_));
+  int fd_upper = upper_cache_->Open(CacheManager::Label(hash_one_));
   EXPECT_GE(fd_upper, 0);
   EXPECT_EQ(0, upper_cache_->Close(fd_upper));
-  int fd_lower = lower_cache_->Open(CacheManager::Bless(hash_one_));
+  int fd_lower = lower_cache_->Open(CacheManager::Label(hash_one_));
   EXPECT_GE(fd_lower, 0);
   EXPECT_EQ(0, lower_cache_->Close(fd_lower));
 }
@@ -94,13 +94,13 @@ TEST_F(T_TieredCacheManager, Transaction) {
 
 TEST_F(T_TieredCacheManager, ReadOnly) {
   reinterpret_cast<TieredCacheManager *>(tiered_cache_)->SetLowerReadOnly();
-  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Bless(hash_one_)));
+  EXPECT_EQ(-ENOENT, tiered_cache_->Open(CacheManager::Label(hash_one_)));
   EXPECT_TRUE(tiered_cache_->CommitFromMem(hash_one_, &buf_, 1, "one"));
 
-  int fd_upper = upper_cache_->Open(CacheManager::Bless(hash_one_));
+  int fd_upper = upper_cache_->Open(CacheManager::Label(hash_one_));
   EXPECT_GE(fd_upper, 0);
   EXPECT_EQ(0, upper_cache_->Close(fd_upper));
-  EXPECT_EQ(-ENOENT, lower_cache_->Open(CacheManager::Bless(hash_one_)));
+  EXPECT_EQ(-ENOENT, lower_cache_->Open(CacheManager::Label(hash_one_)));
 
   void *txn = alloca(tiered_cache_->SizeOfTxn());
   EXPECT_EQ(0, tiered_cache_->StartTxn(hash_one_, 1, txn));

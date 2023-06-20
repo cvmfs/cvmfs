@@ -117,12 +117,12 @@ class RamCacheManager : public CacheManager {
    * Open a new file descriptor into the cache. Note that opening entries
    * effectively pins them in the cache, so it may be necessary to close
    * unneeded file descriptors to allow eviction to make room in the cache
-   * @param object The blessed hash key
+   * @param object The tagged hash key
    * @returns A nonnegative integer file descriptor
    * @retval -ENOENT The entry is not in the cache
    * @retval -ENFILE No handles are available
    */
-  virtual int Open(const BlessedObject &object);
+  virtual int Open(const LabeledObject &object);
 
   /**
    * Look up the size in bytes of the open cache entry

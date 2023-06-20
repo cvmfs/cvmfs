@@ -48,7 +48,7 @@ void *TieredCacheManager::DoSaveState() {
 }
 
 
-int TieredCacheManager::Open(const BlessedObject &object) {
+int TieredCacheManager::Open(const LabeledObject &object) {
   int fd = upper_->Open(object);
   if ((fd >= 0) || (fd != -ENOENT)) {return fd;}
 

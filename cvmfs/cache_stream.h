@@ -46,7 +46,7 @@ class StreamingCacheManager : public CacheManager {
 
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
-  virtual int Open(const BlessedObject &object);
+  virtual int Open(const LabeledObject &object);
   virtual int64_t GetSize(int fd);
   virtual int Close(int fd);
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);

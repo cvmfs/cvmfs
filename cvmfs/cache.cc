@@ -133,7 +133,7 @@ bool CacheManager::Open2Mem(
   *size = 0;
   *buffer = NULL;
 
-  int fd = this->Open(Bless(id, kTypeRegular, description));
+  int fd = this->Open(Label(id, kTypeRegular, description));
   if (fd < 0)
     return false;
 
@@ -173,7 +173,7 @@ int CacheManager::OpenPinned(
   bool is_catalog)
 {
   ObjectInfo object_info(is_catalog ? kTypeCatalog : kTypeRegular, description);
-  int fd = this->Open(Bless(id, object_info));
+  int fd = this->Open(Label(id, object_info));
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {

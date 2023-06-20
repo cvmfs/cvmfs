@@ -126,7 +126,7 @@ class BuggyCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
   virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
-  virtual int Open(const BlessedObject &object) {
+  virtual int Open(const LabeledObject &object) {
     if (!allow_open) {
       if (open_2nd_try)
         allow_open = true;
@@ -230,7 +230,7 @@ TEST_F(T_Fetcher, ExternalFetch) {
                                     CacheManager::kTypeRegular);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_regular_));
+  fd = cache_mgr_->Open(CacheManager::Label(hash_regular_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
@@ -263,7 +263,7 @@ TEST_F(T_Fetcher, Fetch) {
                        zlib::kZlibDefault, CacheManager::kTypeRegular);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_regular_));
+  fd = cache_mgr_->Open(CacheManager::Label(hash_regular_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
@@ -279,14 +279,14 @@ TEST_F(T_Fetcher, Fetch) {
                        zlib::kZlibDefault, CacheManager::kTypeCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_catalog_));
+  fd = cache_mgr_->Open(CacheManager::Label(hash_catalog_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 
 TEST_F(T_Fetcher, FetchUncompressed) {
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(hash_uncompressed_)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(hash_uncompressed_)));
 
   // Download and store in cache
   // TODO(jblomer): use CacheManager::kSizeUnknown
@@ -300,7 +300,7 @@ TEST_F(T_Fetcher, FetchUncompressed) {
                     zlib::kNoCompression, CacheManager::kTypeRegular);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_uncompressed_));
+  fd = cache_mgr_->Open(CacheManager::Label(hash_uncompressed_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
@@ -429,7 +429,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
 TEST_F(T_Fetcher, SignalWaitingThreads) {
   unsigned char x = 'x';
   EXPECT_TRUE(cache_mgr_->CommitFromMem(hash_regular_, &x, 1, ""));
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_regular_));
+  int fd = cache_mgr_->Open(CacheManager::Label(hash_regular_));
   EXPECT_GE(fd, 0);
   int tls_pipe[2];
   MakePipe(tls_pipe);

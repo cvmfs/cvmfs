@@ -75,7 +75,7 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
-int RamCacheManager::Open(const BlessedObject &object) {
+int RamCacheManager::Open(const LabeledObject &object) {
   WriteLockGuard guard(rwlock_);
   return DoOpen(object.id);
 }

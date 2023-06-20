@@ -572,7 +572,7 @@ void *ExternalCacheManager::MainRead(void *data) {
 }
 
 
-int ExternalCacheManager::Open(const BlessedObject &object) {
+int ExternalCacheManager::Open(const LabeledObject &object) {
   return DoOpen(object.id);
 }
 
