@@ -42,11 +42,36 @@ int FileSink::Reset() {
 }
 
 /**
+ * Purges all resources leaving the sink in an invalid state.
+ * More aggressive version of Reset().
+ * For some sinks and depending on owner status it might do 
+ * the same as Reset().
+ *
+ * @returns Success = 0
+ *          Failure = -errno
+ */
+int FileSink::Purge() {
+  if (is_owner_ && file_) {
+    return (-1 * fclose(file_));
+  } else {
+    return Reset();
+  }
+}
+
+/**
  * Return a string representation describing the type of sink and its status
  */
 std::string FileSink::Describe() {
   std::string result = "File sink with ";
   result += IsValid() ? " valid file pointer" : " invalid file pointer";
   return result;
+}
+void FileSink::Adopt(FILE *file, bool is_owner) {
+  if (is_owner_ && file_) {
+    (void) fclose(file_);
+  }
+
+  is_owner_ = is_owner;
+  file_ = file;
 }
 }  // namespace cvmfs

@@ -16,11 +16,22 @@
 
 namespace cvmfs {
 
+/**
+ * PathSink is a data sink that writes to a file given by a path.
+ * 
+ * Internally it uses a FileSink that has ownership of the file.
+ * (Though as PathSink is owner of the FileSink, to the outside also PathSink
+ *  is considered to be the owner.)
+ * 
+ * Like FileSink, PathSink does not require to reserve space.
+ * Contrary to FileSink, PathSink does not allow to adopt and write to a
+ * different file path.
+ */
 class PathSink : public Sink {
  public:
   explicit PathSink(const std::string &destination_path);
 
-  virtual ~PathSink() { if (is_owner_ && file_) { (void) fclose(file_); } }
+  virtual ~PathSink() { }  // UniquePtr<FileSink> sink_ takes care of everything
 
   /**
    * Appends data to the sink
@@ -98,7 +109,7 @@ class PathSink : public Sink {
   const std::string path() { return path_; }
 
  private:
-  FILE *file_;
+  FILE *file_;  // owned by sink_
   UniquePtr<FileSink> sink_;
   const std::string path_;
 };

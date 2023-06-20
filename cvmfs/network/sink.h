@@ -39,8 +39,9 @@ class Sink {
   /**
    * Purges all resources leaving the sink in an invalid state.
    * More aggressive version of Reset().
-   * For some sinks it might do the same as Reset().
-   * 
+   * For some sinks and depending on owner status it might do 
+   * the same as Reset().
+   *
    * @returns Success = 0
    *          Failure = -errno
    */

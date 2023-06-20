@@ -315,7 +315,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     int64_t written = info->sink->Write(ptr, num_bytes);
     if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
       LogCvmfs(kLogDownload, kLogDebug,
-        "Failed to perform write of %%zu bytes to sink %s with errno %d",
+        "Failed to perform write of %zu bytes to sink %s with errno %d",
         num_bytes, info->sink->Describe().c_str(), written);
     }
   }

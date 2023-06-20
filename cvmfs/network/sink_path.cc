@@ -15,19 +15,20 @@ namespace cvmfs {
 PathSink::PathSink(const std::string &destination_path) : Sink(true),
                                                       path_(destination_path) {
   file_ = fopen(destination_path.c_str(), "w");
-  sink_ = new FileSink(file_);
+  sink_ = new FileSink(file_, true);
 }
 
 /**
  * Purges all resources leaving the sink in an invalid state.
  * More aggressive version of Reset().
- * For some sinks it might do the same as Reset().
- * 
+ * For some sinks and depending on owner status it might do 
+ * the same as Reset().
+ *
  * @returns Success = 0
  *          Failure = -errno
  */
 int PathSink::Purge() {
-  int ret = Reset();
+  int ret = sink_->Purge();
   int ret2 = unlink(path_.c_str());
 
   if (ret != 0) {

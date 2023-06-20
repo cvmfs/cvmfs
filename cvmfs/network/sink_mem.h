@@ -16,6 +16,14 @@
 
 namespace cvmfs {
 
+/**
+ * MemSink is a data sink that writes to a unsigned char* buffer.
+ * The buffer has a fixed size, as such reservation of space is necessary.
+ * It can use Adopt() to write to a different buffer.
+ *
+ * By default, MemSink is the owner of the buffer and takes care of its
+ * creationg and deletion.
+ */
 class MemSink : public Sink {
  public:
   MemSink() : Sink(true), size_(0), pos_(0),
@@ -45,8 +53,9 @@ class MemSink : public Sink {
   /**
    * Purges all resources leaving the sink in an invalid state.
    * More aggressive version of Reset().
-   * For some sinks it might do the same as Reset().
-   * 
+   * For some sinks and depending on owner status it might do
+   * the same as Reset().
+   *
    * @returns Success = 0
    *          Failure = -errno
    */

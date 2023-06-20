@@ -14,12 +14,22 @@
 
 namespace cvmfs {
 
+/**
+ * FileSink is a data sink that write to a given FILE.
+ * It does not require any space reservation. It can change to which file to
+ * write to using Adopt().
+ *
+ * By default FileSink is not the owner of FILE, so the outside entity has to
+ * take care of opening and closing the FILE.
+ */
 class FileSink : public Sink {
  public:
-  explicit FileSink(FILE *destination_file) : Sink(true),
+  explicit FileSink(FILE *destination_file) : Sink(false),
                                               file_(destination_file) { }
+  FileSink(FILE *destination_file, bool is_owner) : Sink(is_owner),
+                                                    file_(destination_file) { }
 
-  virtual ~FileSink() { }
+  virtual ~FileSink() { if (is_owner_ && file_) { (void) fclose(file_); } }
 
   /**
    * Appends data to the sink
@@ -37,17 +47,7 @@ class FileSink : public Sink {
    */
   virtual int Reset();
 
-  /**
-   * Purges all resources leaving the sink in an invalid state.
-   * More aggressive version of Reset().
-   * For some sinks it might do the same as Reset().
-   *
-   * @returns Success = 0
-   *          Failure = -errno
-   */
-  virtual int Purge() {
-    return Reset();
-  }
+  virtual int Purge();
 
   /**
     * @returns true if the object is correctly initialized.
@@ -99,6 +99,12 @@ class FileSink : public Sink {
    * Return a string representation describing the type of sink and its status
    */
   virtual std::string Describe();
+
+  /**
+   * Allows the sink to adopt data that was initialized outside this class.
+   * The sink can become the new owner of the data, or not.
+   */
+  void Adopt(FILE *file, bool is_owner = true);
 
   FILE* file() { return file_; }
 
