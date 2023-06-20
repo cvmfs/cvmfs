@@ -255,6 +255,9 @@ PosixCacheManager *PosixCacheManager::Create(
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on BeeGFS.");
         break;
+      case kFsTypeTmpfs:
+        cache_manager->is_tmpfs_ = true;
+      break;
       default:
         break;
     }
@@ -425,11 +428,16 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 /**
  * Used by the sqlite vfs in order to preload file catalogs into the file system
  * buffers.
+ *
+ * No-op if the fd is to a file that is on a tmpfs, and so already in page cache
  */
 int PosixCacheManager::Readahead(int fd) {
   unsigned char *buf[4096];
   int nbytes;
   uint64_t pos = 0;
+  if (is_tmpfs()) {
+    return 0;
+  }
   do {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;

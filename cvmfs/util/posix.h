@@ -44,7 +44,10 @@ enum EFileSystemTypes {
   kFsTypeAutofs = 0x0187,
   kFsTypeNFS = 0x6969,
   kFsTypeProc = 0x9fa0,
-  kFsTypeBeeGFS = 0x19830326
+  kFsTypeBeeGFS = 0x19830326,
+  // TMPFS_MAGIC from linux/magic.h; does not exist on mac
+  // TODO(heretherebedragons): Might need some check for apple in the future
+  kFsTypeTmpfs = 0x01021994
 };
 
 struct CVMFS_EXPORT FileSystemInfo {
