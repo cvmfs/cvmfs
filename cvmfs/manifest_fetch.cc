@@ -24,9 +24,10 @@ namespace manifest {
 /**
  * Verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
- * Ownership of manifest_data is transferred to the ensemble.
+ *
+ * @note Ownership of manifest_data is transferred to the ensemble.
  */
-static Failures DoVerify(char *manifest_data, size_t manifest_size,
+static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
                          const std::string &base_url,
                          const std::string &repository_name,
                          const uint64_t minimum_timestamp,
@@ -44,11 +45,12 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
                                  signature_manager);
   string certificate_url = base_url + "/";  // rest is in manifest
   shash::Any certificate_hash;
+  cvmfs::MemSink certificate_memsink;
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                         &certificate_hash);
+                                       &certificate_hash, &certificate_memsink);
 
   // Load Manifest
-  ensemble->raw_manifest_buf = reinterpret_cast<unsigned char *>(manifest_data);
+  ensemble->raw_manifest_buf = manifest_data;
   ensemble->raw_manifest_size = manifest_size;
   ensemble->manifest = manifest::Manifest::LoadMem(
     ensemble->raw_manifest_buf, ensemble->raw_manifest_size);
@@ -86,9 +88,9 @@ static Failures DoVerify(char *manifest_data, size_t manifest_size,
       result = kFailLoad;
       goto cleanup;
     }
-    ensemble->cert_buf = reinterpret_cast<unsigned char *>(
-        download_certificate.destination_mem.data);
-    ensemble->cert_size = download_certificate.destination_mem.pos;
+    ensemble->cert_buf = certificate_memsink.data();
+    ensemble->cert_size = certificate_memsink.pos();
+    certificate_memsink.Release();
   }
   retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,
                                                    ensemble->cert_size);
@@ -167,7 +169,9 @@ static Failures DoFetch(const std::string &base_url,
   const bool probe_hosts = base_url == "";
   download::Failures retval_dl;
   const string manifest_url = base_url + string("/.cvmfspublished");
-  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
+  cvmfs::MemSink manifest_memsink;
+  download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL,
+                                      &manifest_memsink);
 
   retval_dl = download_manager->Fetch(&download_manifest);
   if (retval_dl != download::kFailOk) {
@@ -177,8 +181,8 @@ static Failures DoFetch(const std::string &base_url,
     return kFailLoad;
   }
 
-  return DoVerify(download_manifest.destination_mem.data,
-                  download_manifest.destination_mem.pos, base_url,
+  manifest_memsink.Release();
+  return DoVerify(manifest_memsink.data(), manifest_memsink.pos(), base_url,
                   repository_name, minimum_timestamp, base_catalog,
                   signature_manager, download_manager, ensemble);
 }
@@ -210,14 +214,20 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   return result;
 }
 
-Failures Verify(char *manifest_data, size_t manifest_size,
+/**
+ * Verifies the manifest, the certificate, and the whitelist.
+ * If base_url is empty, uses the probe_hosts feature from download manager.
+ * Creates a copy of the manifest to verify.
+ */
+Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 const std::string &base_url, const std::string &repository_name,
                 const uint64_t minimum_timestamp,
                 const shash::Any *base_catalog,
                 signature::SignatureManager *signature_manager,
                 download::DownloadManager *download_manager,
                 ManifestEnsemble *ensemble) {
-  char *manifest_copy = reinterpret_cast<char *>(smalloc(manifest_size));
+  unsigned char *manifest_copy =
+                      reinterpret_cast<unsigned char *>(smalloc(manifest_size));
   memcpy(manifest_copy, manifest_data, manifest_size);
   return DoVerify(manifest_copy, manifest_size, base_url, repository_name,
                   minimum_timestamp, base_catalog, signature_manager,

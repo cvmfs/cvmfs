@@ -179,7 +179,11 @@ if (BUILD_SERVER)
                   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
                   ${CVMFS_SOURCE_DIR}/network/dns.cc
                   ${CVMFS_SOURCE_DIR}/network/download.cc
+                  ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
                   ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
+                  ${CVMFS_SOURCE_DIR}/network/sink_file.cc
+                  ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
+                  ${CVMFS_SOURCE_DIR}/network/sink_path.cc
                   ${CVMFS_SOURCE_DIR}/options.cc
                   ${CVMFS_SOURCE_DIR}/pack.cc
                   ${CVMFS_SOURCE_DIR}/reflog.cc
@@ -424,7 +428,11 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
   ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_file.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_path.cc
   ${CVMFS_SOURCE_DIR}/notify/messages.cc
   ${CVMFS_SOURCE_DIR}/options.cc
   ${CVMFS_SOURCE_DIR}/pack.cc

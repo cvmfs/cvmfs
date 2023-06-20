@@ -582,11 +582,9 @@ class HttpObjectFetcher :
     // fetch and decompress the requested object
     const std::string url = BuildUrl(relative_path);
     const bool probe_hosts = false;
-    download::JobInfo download_job(&url,
-                                        decompress,
-                                        probe_hosts,
-                                        f,
-                                        expected_hash);
+    cvmfs::FileSink filesink(f);
+    download::JobInfo download_job(&url, decompress, probe_hosts,
+                                   expected_hash, &filesink);
     download_job.force_nocache = nocache;
     download::Failures retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);

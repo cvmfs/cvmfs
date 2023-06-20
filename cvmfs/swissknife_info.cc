@@ -127,18 +127,18 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   UniquePtr<manifest::Manifest> manifest;
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
-    download::JobInfo download_manifest(&url, false, false, NULL);
+    cvmfs::MemSink manifest_memsink;
+    download::JobInfo download_manifest(&url, false, false, NULL,
+                                        &manifest_memsink);
     download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
       return 1;
     }
-    char *buffer = download_manifest.destination_mem.data;
-    const unsigned length = download_manifest.destination_mem.pos;
-    manifest = manifest::Manifest::LoadMem(
-        reinterpret_cast<const unsigned char *>(buffer), length);
-    free(download_manifest.destination_mem.data);
+
+    manifest = manifest::Manifest::LoadMem(manifest_memsink.data(),
+                                           manifest_memsink.pos());
   } else {
     if (chdir(repository.c_str()) != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to switch to directory %s",
@@ -250,7 +250,9 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
       return 0;
     }
     const string url = repository + "/data/" + meta_info.MakePath();
-    download::JobInfo download_metainfo(&url, true, false, &meta_info);
+    cvmfs::MemSink metainfo_memsink;
+    download::JobInfo download_metainfo(&url, true, false, &meta_info,
+                                        &metainfo_memsink);
     download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
@@ -259,8 +261,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(download_metainfo.destination_mem.data,
-                download_metainfo.destination_mem.pos);
+    string info(reinterpret_cast<char*>(metainfo_memsink.data()),
+                metainfo_memsink.pos());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 

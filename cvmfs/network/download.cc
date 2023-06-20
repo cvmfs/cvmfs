@@ -151,26 +151,19 @@ static unsigned EscapeHeader(const string &header,
 
 
 static Failures PrepareDownloadDestination(JobInfo *info) {
-  info->destination_mem.size = 0;
-  info->destination_mem.pos = 0;
-  info->destination_mem.data = NULL;
-
-  if (info->destination == kDestinationFile)
-    assert(info->destination_file != NULL);
-
-  if (info->destination == kDestinationPath) {
-    assert(info->destination_path != NULL);
-    info->destination_file = fopen(info->destination_path->c_str(), "w");
-    if (info->destination_file == NULL) {
+  if (info->sink != NULL && !info->sink->IsValid()) {
+    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
+    if (psink != NULL) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
-               " (errno=%d).",
-               info->destination_path->c_str(), strerror(errno), errno);
+                                        " (errno=%d).", psink->path().c_str(),
+                                        strerror(errno), errno);
       return kFailLocalIO;
+    } else {
+      LogCvmfs(kLogDownload, kLogDebug, "Failed to create a valid sink: \n %s",
+                                         info->sink->Describe().c_str());
+      return kFailOther;
     }
   }
-
-  if (info->destination == kDestinationSink)
-    assert(info->destination_sink != NULL);
 
   return kFailOk;
 }
@@ -240,27 +233,25 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     }
   }
 
-  // Allocate memory for kDestinationMemory
-  if ((info->destination == kDestinationMem) &&
+  // If needed: allocate space in sink
+  if (info->sink != NULL && info->sink->RequiresReserve() &&
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
-      if (length > DownloadManager::kMaxMemSize) {
+      if (!info->sink->Reserve(length)) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                  "resource %s too large to store in memory (%" PRIu64 ")",
                  info->url->c_str(), length);
         info->error_code = kFailTooBig;
         return 0;
       }
-      info->destination_mem.data = static_cast<char *>(smalloc(length));
     } else {
       // Empty resource
-      info->destination_mem.data = NULL;
+      info->sink->Reserve(0);
     }
-    info->destination_mem.size = length;
   } else if (HasPrefix(header_line, "LOCATION:", true)) {
     // This comes along with redirects
     LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
@@ -290,6 +281,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
+  // TODO(heretherebedragons) remove if no error comes up
+  // as this means only jobinfo data request (and not header only)
+  // come here
+  assert(info->sink != NULL);
+
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
   if (num_bytes == 0)
@@ -300,95 +296,32 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                   num_bytes, info->hash_context);
   }
 
-  if (info->destination == kDestinationSink) {
-    if (info->compressed) {
-      zlib::StreamStates retval =
-        zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->destination_sink);
-      if (retval == zlib::kStreamDataError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
-                 info->url->c_str());
-        info->error_code = kFailBadData;
-        return 0;
-      } else if (retval == zlib::kStreamIOError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr,
-                 "decompressing %s, local IO error", info->url->c_str());
-        info->error_code = kFailLocalIO;
-        return 0;
-      }
-    } else {
-      int64_t written = info->destination_sink->Write(ptr, num_bytes);
-      if ((written < 0) || (static_cast<uint64_t>(written) != num_bytes)) {
-        LogCvmfs(kLogDownload, kLogDebug, "Failed to perform write on %s (%"
-                 PRId64 ")", info->url->c_str(), written);
-        info->error_code = kFailLocalIO;
-        return 0;
-      }
-    }
-  } else if (info->destination == kDestinationMem) {
-    // Write to memory
-    if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
-      if (info->destination_mem.size == 0) {
-        LogCvmfs(kLogDownload, kLogDebug,
-                 "Content-Length was missing or zero, but %zu bytes received",
-                 info->destination_mem.pos + num_bytes);
-      } else {
-        LogCvmfs(kLogDownload, kLogDebug, "Callback had too much data: "
-                 "start %zu, bytes %zu, expected %zu",
-                 info->destination_mem.pos,
-                 num_bytes,
-                 info->destination_mem.size);
-      }
+  if (info->compressed) {
+    zlib::StreamStates retval =
+      zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
+                                    &info->zstream, info->sink);
+    if (retval == zlib::kStreamDataError) {
+      LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
+                info->url->c_str());
       info->error_code = kFailBadData;
       return 0;
+    } else if (retval == zlib::kStreamIOError) {
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                "decompressing %s, local IO error", info->url->c_str());
+      info->error_code = kFailLocalIO;
+      return 0;
     }
-    memcpy(info->destination_mem.data + info->destination_mem.pos,
-           ptr, num_bytes);
-    info->destination_mem.pos += num_bytes;
   } else {
-    // Write to file
-    if (info->compressed) {
-      // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
-      //          num_bytes, info->url->c_str());
-      zlib::StreamStates retval =
-        zlib::DecompressZStream2File(ptr, static_cast<int64_t>(num_bytes),
-                                     &info->zstream, info->destination_file);
-      if (retval == zlib::kStreamDataError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
-                 info->url->c_str());
-        info->error_code = kFailBadData;
-        return 0;
-      } else if (retval == zlib::kStreamIOError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr,
-                 "decompressing %s, local IO error", info->url->c_str());
-        info->error_code = kFailLocalIO;
-        return 0;
-      }
-    } else {
-      if (fwrite(ptr, 1, num_bytes, info->destination_file) != num_bytes) {
-       LogCvmfs(kLogDownload, kLogSyslogErr,
-                 "downloading %s, IO failure: %s (errno=%d)",
-                 info->url->c_str(), strerror(errno), errno);
-        info->error_code = kFailLocalIO;
-        return 0;
-      }
+    int64_t written = info->sink->Write(ptr, num_bytes);
+    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "Failed to perform write of %zu bytes to sink %s with errno %d",
+        num_bytes, info->sink->Describe().c_str(), written);
     }
   }
 
   return num_bytes;
 }
-
-
-//------------------------------------------------------------------------------
-
-
-bool JobInfo::IsFileNotFound() {
-  if (HasPrefix(*url, "file://", true /* ignore_case */))
-    return error_code == kFailHostConnection;
-
-  return http_code == 404;
-}
-
 
 //------------------------------------------------------------------------------
 
@@ -396,8 +329,6 @@ bool JobInfo::IsFileNotFound() {
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
-const unsigned DownloadManager::kMaxMemSize = 1024*1024;
-
 
 /**
  * -1 of digits is not a valid Http return code
@@ -1048,12 +979,22 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url = ReplaceAll(url, "@proxy@", replacement);
   }
 
-  if ((info->destination == kDestinationMem) &&
-      (info->destination_mem.size == 0) &&
-      HasPrefix(url, "file://", false))
-  {
-    info->destination_mem.size = 64*1024;
-    info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
+  // TODO(heretherebedragons) before removing
+  // static_cast<cvmfs::MemSink*>(info->sink)->size() == 0
+  // and just always call info->sink->Reserve()
+  // we should do a speed check
+  if ((info->sink != NULL) && info->sink->RequiresReserve() &&
+      (static_cast<cvmfs::MemSink*>(info->sink)->size() == 0) &&
+      HasPrefix(url, "file://", false)) {
+    platform_stat64 stat_buf;
+    int retval = platform_stat(url.c_str(), &stat_buf);
+    if (retval != 0) {
+      // this is an error: file does not exist or out of memory
+      // error is caught in other code section.
+      info->sink->Reserve(64ul * 1024ul);
+    } else {
+      info->sink->Reserve(stat_buf.st_size);
+    }
   }
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
@@ -1255,27 +1196,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         }
       }
 
-      // Decompress memory in a single run
-      if ((info->destination == kDestinationMem) && info->compressed) {
-        void *buf;
-        uint64_t size;
-        bool retval = zlib::DecompressMem2Mem(
-          info->destination_mem.data,
-          static_cast<int64_t>(info->destination_mem.pos),
-          &buf, &size);
-        if (retval) {
-          free(info->destination_mem.data);
-          info->destination_mem.data = static_cast<char *>(buf);
-          info->destination_mem.pos = info->destination_mem.size = size;
-        } else {
-          LogCvmfs(kLogDownload, kLogDebug,
-                   "decompression (memory) of url %s failed",
-                   info->url->c_str());
-          info->error_code = kFailBadData;
-          break;
-        }
-      }
-
       info->error_code = kFailOk;
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
@@ -1413,38 +1333,21 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "Trying again on same curl handle, "
              "same url: %d, error code %d", same_url_retry, info->error_code);
     // Reset internal state and destination
-    if ((info->destination == kDestinationMem) && info->destination_mem.data) {
-      free(info->destination_mem.data);
-      info->destination_mem.data = NULL;
-      info->destination_mem.size = 0;
-      info->destination_mem.pos = 0;
+    if (info->sink != NULL && info->sink->Reset() != 0) {
+      info->error_code = kFailLocalIO;
+      goto verify_and_finalize_stop;
     }
     if (info->interrupt_cue && info->interrupt_cue->IsCanceled()) {
       info->error_code = kFailCanceled;
       goto verify_and_finalize_stop;
     }
-    if ((info->destination == kDestinationFile) ||
-        (info->destination == kDestinationPath))
-    {
-      if ((fflush(info->destination_file) != 0) ||
-          (ftruncate(fileno(info->destination_file), 0) != 0) ||
-          (freopen(NULL, "w", info->destination_file) != info->destination_file)
-         )
-      {
-        info->error_code = kFailLocalIO;
-        goto verify_and_finalize_stop;
-      }
-    }
-    if (info->destination == kDestinationSink) {
-      if (info->destination_sink->Reset() != 0) {
-        info->error_code = kFailLocalIO;
-        goto verify_and_finalize_stop;
-      }
-    }
-    if (info->expected_hash)
+
+    if (info->expected_hash) {
       shash::Init(info->hash_context);
-    if (info->compressed)
+    }
+    if (info->compressed) {
       zlib::DecompressInit(&info->zstream);
+    }
     SetRegularCache(info);
 
     // Failure handling
@@ -1500,18 +1403,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
  verify_and_finalize_stop:
   // Finalize, flush destination file
   ReleaseCredential(info);
-  if ((info->destination == kDestinationFile) &&
-      fflush(info->destination_file) != 0)
-  {
+  if (info->sink != NULL && info->sink->Flush() != 0) {
     info->error_code = kFailLocalIO;
-  } else if (info->destination == kDestinationPath) {
-    if (fclose(info->destination_file) != 0)
-      info->error_code = kFailLocalIO;
-    info->destination_file = NULL;
   }
 
-  if (info->compressed)
+  if (info->compressed) {
     zlib::DecompressFini(&info->zstream);
+  }
 
   if (info->headers) {
     header_lists_->PutList(info->headers);
@@ -1797,13 +1695,8 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
 
-    if (info->destination == kDestinationPath)
-      unlink(info->destination_path->c_str());
-
-    if (info->destination_mem.data) {
-      free(info->destination_mem.data);
-      info->destination_mem.data = NULL;
-      info->destination_mem.size = 0;
+    if (info->sink != NULL) {
+      info->sink->Purge();
     }
   }
 
@@ -2104,7 +1997,9 @@ void DownloadManager::ProbeHosts() {
   // Stopwatch, two times to fill caches first
   unsigned i, retries;
   string url;
-  JobInfo info(&url, false, false, NULL);
+
+  cvmfs::MemSink memsink;
+  JobInfo info(&url, false, false, NULL, &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -2113,8 +2008,7 @@ void DownloadManager::ProbeHosts() {
       gettimeofday(&tv_start, NULL);
       Failures result = Fetch(&info);
       gettimeofday(&tv_end, NULL);
-      if (info.destination_mem.data)
-        free(info.destination_mem.data);
+      memsink.Reset();
       if (result == kFailOk) {
         host_rtt[i] = static_cast<int>(
           DiffTimeSeconds(tv_start, tv_end) * 1000);
@@ -2178,11 +2072,12 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
     LogCvmfs(kLogDownload, kLogDebug,
              "requesting ordered server list from %s", url.c_str());
-    JobInfo info(&url, false, false, NULL);
+    cvmfs::MemSink memsink;
+    JobInfo info(&url, false, false, NULL, &memsink);
     Failures result = Fetch(&info);
     if (result == kFailOk) {
-      string order(info.destination_mem.data, info.destination_mem.size);
-      free(info.destination_mem.data);
+      string order(reinterpret_cast<char*>(memsink.data()), memsink.pos());
+      memsink.Reset();
       bool retval = ValidateGeoReply(order, servers->size(), &geo_order);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
