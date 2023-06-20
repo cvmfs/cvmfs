@@ -79,6 +79,7 @@ TEST_F(T_Sink, MemSinkResetOrPurge) {
 
   ret = sink.Write(src_content.c_str(), src_content.length());
 
+  ASSERT_EQ(ret, static_cast<int64_t>(src_content.length()));
   ASSERT_GT(sink.size(), 0ul);
   ASSERT_EQ(sink.pos(), src_content.length());
   EXPECT_STREQ(reinterpret_cast<char*>(sink.data()), src_content.c_str());
@@ -90,24 +91,27 @@ TEST_F(T_Sink, MemSinkTooSmall) {
 
   cvmfs::MemSink sink;
   sink.Reserve(src_content.length() - 10);
-  int ret = sink.Write(src_content.c_str(), src_content.length());
+  int64_t ret = sink.Write(src_content.c_str(), src_content.length());
+
+  ASSERT_EQ(ret, static_cast<int64_t>(src_content.length()));
   ASSERT_EQ(sink.pos(), src_content.length());
   ASSERT_GT(sink.size(), src_content.length());
 
   sink.Reset();
-  EXPECT_EQ(sink.data(), nullptr);
+  EXPECT_EQ(sink.size(), 0ul);
 
   sink.Release();
   sink.Reserve(src_content.length() - 10);
   ret = sink.Write(src_content.c_str(), src_content.length());
-  ASSERT_LT(ret, 0); // some error occured
+  ASSERT_LT(ret, 0);  // some error occured
 }
 
 TEST_F(T_Sink, MemSinkUnprivAdopt) {
   string src_path = GetSmallFile();
   string src_content = GetFileContents(src_path);
 
-  unsigned char* buf = (unsigned char*) malloc(src_content.length());
+  unsigned char* buf =
+                      static_cast<unsigned char*>(malloc(src_content.length()));
   memcpy(buf, src_content.c_str(), src_content.length());
 
   cvmfs::MemSink sink;
@@ -120,19 +124,18 @@ TEST_F(T_Sink, MemSinkUnprivAdopt) {
 }
 
 TEST_F(T_Sink, MemSinkNotValid) {
-  unsigned char* buf = (unsigned char*) malloc(10);
+  unsigned char* buf = static_cast<unsigned char*>(malloc(10));
   cvmfs::MemSink sink;
-  ASSERT_TRUE(sink.IsValid());
+  EXPECT_TRUE(sink.IsValid());
 
   sink.Adopt(10, 10, buf, false);
-  ASSERT_TRUE(sink.IsValid());
+  EXPECT_TRUE(sink.IsValid());
 
   sink.Adopt(10, 10, NULL, false);
-  ASSERT_FALSE(sink.IsValid());
+  EXPECT_FALSE(sink.IsValid());
 
   sink.Adopt(0, 0, buf, false);
-  ASSERT_FALSE(sink.IsValid());
-
+  EXPECT_FALSE(sink.IsValid());
 
   free(buf);
 }
@@ -157,8 +160,9 @@ TEST_F(T_Sink, FileSinkWrite) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 }
@@ -180,8 +184,9 @@ TEST_F(T_Sink, FileSinkReset) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 
@@ -190,9 +195,11 @@ TEST_F(T_Sink, FileSinkReset) {
   // recheck content
   fcheck = fopen(dest_path.c_str(), "r");
   char dest_content2[ret];
+  memset(dest_content2, 0, ret);
 
-  (void) fread(dest_content2, 1, ret, fcheck);
-  fclose(fcheck);
+  read = fread(dest_content2, 1, ret, fcheck);
+  ASSERT_EQ(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content2, "");
 }
@@ -214,8 +221,9 @@ TEST_F(T_Sink, FileSinkPurge) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 
@@ -242,8 +250,9 @@ TEST_F(T_Sink, FileSinkUnprivPurge) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 
@@ -255,8 +264,9 @@ TEST_F(T_Sink, FileSinkUnprivPurge) {
   char dest_content2[ret];
   memset(dest_content2, 0, ret);
 
-  (void) fread(dest_content2, 1, ret, fcheck);
-  fclose(fcheck);
+  read = fread(dest_content2, 1, ret, fcheck);
+  ASSERT_EQ(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content2, "");
 }
@@ -275,7 +285,7 @@ TEST_F(T_Sink, PathSinkWrite) {
 
   string dest_path;
   FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &dest_path);
-  fclose(f);
+  ASSERT_EQ(fclose(f), 0);
 
   cvmfs::PathSink sink(dest_path);
   ASSERT_TRUE(sink.IsValid());
@@ -287,8 +297,9 @@ TEST_F(T_Sink, PathSinkWrite) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 }
@@ -299,7 +310,7 @@ TEST_F(T_Sink, PathSinkReset) {
 
   string dest_path;
   FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &dest_path);
-  fclose(f);
+  ASSERT_EQ(fclose(f), 0);
 
   cvmfs::PathSink sink(dest_path);
   ASSERT_TRUE(sink.IsValid());
@@ -311,8 +322,9 @@ TEST_F(T_Sink, PathSinkReset) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 
@@ -324,8 +336,9 @@ TEST_F(T_Sink, PathSinkReset) {
 
   memset(dest_content2, 0, ret);
 
-  (void) fread(dest_content2, 1, ret, fcheck);
-  fclose(fcheck);
+  read = fread(dest_content2, 1, ret, fcheck);
+  ASSERT_EQ(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content2, "");
 }
@@ -336,7 +349,7 @@ TEST_F(T_Sink, PathSinkPurge) {
 
   string dest_path;
   FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &dest_path);
-  fclose(f);
+  ASSERT_EQ(fclose(f), 0);
 
   cvmfs::PathSink sink(dest_path);
   ASSERT_TRUE(sink.IsValid());
@@ -348,8 +361,9 @@ TEST_F(T_Sink, PathSinkPurge) {
   FILE *fcheck = fopen(dest_path.c_str(), "r");
   char dest_content[ret];
 
-  (void) fread(dest_content, 1, ret, fcheck);
-  fclose(fcheck);
+  size_t read = fread(dest_content, 1, ret, fcheck);
+  ASSERT_GT(read, static_cast<size_t>(0));
+  ASSERT_EQ(fclose(fcheck), 0);
 
   EXPECT_STREQ(dest_content, src_content.c_str());
 
