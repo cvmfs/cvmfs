@@ -108,6 +108,7 @@ class JobInfo {
   Failures *GetErrorCodePtr() { return &error_code_; }
   void **GetCredDataPtr() { return &cred_data_; }
   curl_slist **GetHeadersPtr() { return &headers_; }
+  CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
                                            return pipe_job_results.weak_ref(); }
