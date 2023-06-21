@@ -1167,8 +1167,8 @@ void DownloadManager::SetRegularCache(JobInfo *info) {
 void DownloadManager::ReleaseCredential(JobInfo *info) {
   if (info->cred_data()) {
     assert(credentials_attachment_ != NULL);  // Someone must have set it
-    credentials_attachment_->ReleaseCurlHandle(info->GetCurlHandle(),
-                                               info->GetCredDataPtr());
+    credentials_attachment_->ReleaseCurlHandle(info->curl_handle(),
+                                               info->cred_data());
     info->SetCredData(NULL);
   }
 }
