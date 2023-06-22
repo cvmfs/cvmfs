@@ -3,8 +3,13 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 CVMFS_TEST_690_HTTP_PID=
+CVMFS_TEST_690_PRIVATE_MOUNTPOINT=
 cleanup() {
   echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_690_PRIVATE_MOUNTPOINT ]; then
+    echo -n "umounting ${CVMFS_TEST_690_PRIVATE_MOUNTPOINT}... "
+    remove_local_mount $CVMFS_TEST_690_PRIVATE_MOUNTPOINT && echo "done" || echo "fail"
+  fi
   [ -z $CVMFS_TEST_690_HTTP_PID ] || sudo kill $CVMFS_TEST_690_HTTP_PID
 }
 
@@ -18,16 +23,31 @@ cvmfs_run_test() {
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   start_transaction $CVMFS_TEST_REPO                             || return $?
-  mkdir -p ${repo_dir}/external                                  || return 1
   mkdir -p ${repo_dir}/internal                                  || return 2
-  echo "Hello World" > ${repo_dir}/external/file                 || return 3
-  cp ${repo_dir}/external/file ${repo_dir}/internal/file         || return 4
+  echo "Hello World" > ${repo_dir}/internal/small                || return 3
+  publish_repo $CVMFS_TEST_REPO -v                               || return 5
 
   echo "*** Check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "*** install a desaster cleanup"
   trap cleanup EXIT HUP INT TERM || return $?
+
+  CVMFS_TEST_690_PRIVATE_MOUNTPOINT="$(pwd)/mountpoint"
+  do_local_mount "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_STREAMING_CACHE=yes" || return 10
+  local talk_socket="$(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO"
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo "$cache_instance"
+  echo "$cache_instance" | grep Streaming || return 11
+
+  ls -lah $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 20
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 21
+  sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
+  cat cache_list | grep small && return 22
 
   return 0
 }
