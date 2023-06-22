@@ -268,6 +268,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
+  t_cache_stream.cc
   t_cache_tiered.cc
   t_callbacks.cc
   t_catalog.cc
