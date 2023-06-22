@@ -73,13 +73,14 @@ class CacheManager : SingleCopy {
   static const uint64_t kSizeUnknown;
 
   /**
-   * Relevant for the quota management
+   * Relevant for the quota management and for downloading
    */
   enum ObjectType {
     kTypeRegular = 0,
     kTypeCatalog,  // implies pinned
     kTypePinned,
     kTypeVolatile,
+    kTypeExternal,
   };
 
   /**
@@ -88,10 +89,17 @@ class CacheManager : SingleCopy {
    * objects.
    */
   struct ObjectInfo {
+    struct Range {
+      Range() : offset(0), size(0) {}
+      uint64_t offset;
+      uint64_t size;
+    };
+
     ObjectInfo() : type(kTypeRegular), description() { }
-    ObjectInfo(ObjectType t, const std::string &d) : type(t), description(d) { }
+    ObjectInfo(ObjectType t, const std::string &d) : type(t), description(d) {}
 
     ObjectType type;
+    Range range;
     /**
      * Typically the path that triggered storing the object in the cache
      */
@@ -134,12 +142,6 @@ class CacheManager : SingleCopy {
   }
   static inline LabeledObject Label(const shash::Any &id, ObjectType type) {
     return LabeledObject(id, type);
-  }
-  static inline LabeledObject Label(
-    const shash::Any &id,
-    const std::string &description)
-  {
-    return LabeledObject(id, description);
   }
   static inline LabeledObject Label(
     const shash::Any &id,
