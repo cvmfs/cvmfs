@@ -75,7 +75,7 @@ class StreamingSink : public cvmfs::Sink {
     return result;
   }
 
-  int64_t GetNBytesWritten() const { return pos_; }
+  int64_t GetNBytesStreamed() const { return pos_; }
 
  private:
    uint64_t pos_;
@@ -113,7 +113,7 @@ int64_t StreamingCacheManager::Stream(
   if (download_job.error_code != download::kFailOk)
     return -EIO;
 
-  return sink.GetNBytesWritten();
+  return sink.GetNBytesStreamed();
 }
 
 
@@ -236,7 +236,12 @@ int64_t StreamingCacheManager::Pread(
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->Pread(info.fd_in_cache_mgr, buf, size, offset);
 
-  return Stream(info, buf, size, offset);
+  uint64_t nbytes_streamed = Stream(info, buf, size, offset);
+  if (nbytes_streamed < offset)
+    return 0;
+  if (nbytes_streamed > (offset + size))
+    return size;
+  return offset + size - nbytes_streamed;
 }
 
 int StreamingCacheManager::Readahead(int fd) {
