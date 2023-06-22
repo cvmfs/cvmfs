@@ -42,6 +42,15 @@ class Watchdog : SingleCopy {
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
 
+  /**
+   * Signals that watchdog should not receive. If it does, report and exit.
+   */
+  static int g_suppressed_signals[13];
+  /**
+   * Signals used by crash signal handler. If received, create a stack trace.
+   */
+  static int g_crash_signals[8];
+
  private:
   typedef std::map<int, struct sigaction> SigactionMap;
 

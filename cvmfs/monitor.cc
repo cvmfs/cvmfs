@@ -57,6 +57,15 @@ using namespace std;  // NOLINT
 
 Watchdog *Watchdog::instance_ = NULL;
 
+int Watchdog::g_suppressed_signals[] = { SIGHUP, SIGINT, SIGQUIT,
+                                SIGILL, SIGABRT, SIGBUS,
+                                SIGFPE, SIGUSR1, SIGSEGV,
+                                SIGUSR2, SIGTERM, SIGXCPU,
+                                SIGXFSZ};
+
+int Watchdog::g_crash_signals[] = { SIGQUIT, SIGILL, SIGABRT,
+                                  SIGFPE, SIGSEGV, SIGBUS,
+                                  SIGPIPE, SIGXFSZ };
 
 Watchdog *Watchdog::Create(FnOnCrash on_crash) {
   assert(instance_ == NULL);
@@ -456,19 +465,9 @@ bool Watchdog::WaitForSupervisee() {
   sigfillset(&sa.sa_mask);
 
   SigactionMap signal_handlers;
-  signal_handlers[SIGHUP]  = sa;
-  signal_handlers[SIGINT]  = sa;
-  signal_handlers[SIGQUIT] = sa;
-  signal_handlers[SIGILL]  = sa;
-  signal_handlers[SIGABRT] = sa;
-  signal_handlers[SIGBUS]  = sa;
-  signal_handlers[SIGFPE]  = sa;
-  signal_handlers[SIGUSR1] = sa;
-  signal_handlers[SIGSEGV] = sa;
-  signal_handlers[SIGUSR2] = sa;
-  signal_handlers[SIGTERM] = sa;
-  signal_handlers[SIGXCPU] = sa;
-  signal_handlers[SIGXFSZ] = sa;
+  for (size_t i = 0; i < sizeof(g_suppressed_signals)/sizeof(int); i++) {
+    signal_handlers[g_suppressed_signals[i]] = sa;
+  }
   SetSignalHandlers(signal_handlers);
 
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
@@ -533,14 +532,9 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   sigfillset(&sa.sa_mask);
 
   SigactionMap signal_handlers;
-  signal_handlers[SIGQUIT] = sa;
-  signal_handlers[SIGILL]  = sa;
-  signal_handlers[SIGABRT] = sa;
-  signal_handlers[SIGFPE]  = sa;
-  signal_handlers[SIGSEGV] = sa;
-  signal_handlers[SIGBUS]  = sa;
-  signal_handlers[SIGPIPE] = sa;
-  signal_handlers[SIGXFSZ] = sa;
+  for (size_t i = 0; i < sizeof(g_crash_signals)/sizeof(int); i++) {
+    signal_handlers[g_crash_signals[i]] = sa;
+  }
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
   pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
