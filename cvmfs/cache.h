@@ -73,32 +73,33 @@ class CacheManager : SingleCopy {
   static const uint64_t kSizeUnknown;
 
   /**
-   * Relevant for the quota management and for downloading
-   */
-  enum ObjectType {
-    kTypeRegular = 0,
-    kTypeCatalog,  // implies pinned
-    kTypePinned,
-    kTypeVolatile,
-    kTypeExternal,
-  };
-
-  /**
    * Meta-data of an object that the cache may or may not maintain.  Good cache
    * implementations should at least distinguish between volatile and regular
    * objects.
    */
   struct ObjectInfo {
+    /**
+     * Relevant for the quota management and for downloading (URL construction)
+     */
+    static const int kLabelCatalog  = 0x01;
+    static const int kLabelPinned   = 0x02;
+    static const int kLabelVolatile = 0x04;
+    static const int kLabelExternal = 0x08;
+    static const int kLabelChunked  = 0x10;
+
     struct Range {
       Range() : offset(0), size(0) {}
       uint64_t offset;
       uint64_t size;
     };
 
-    ObjectInfo() : type(kTypeRegular), description() { }
-    ObjectInfo(ObjectType t, const std::string &d) : type(t), description(d) {}
+    ObjectInfo() : flags(0), description() { }
+    ObjectInfo(int f, const std::string &d) : flags(f), description(d) {}
 
-    ObjectType type;
+    bool IsCatalog() const { return flags & kLabelCatalog; }
+    bool IsPinned() const { return flags & kLabelPinned; }
+
+    int flags;
     Range range;
     /**
      * Typically the path that triggered storing the object in the cache
@@ -114,18 +115,15 @@ class CacheManager : SingleCopy {
     LabeledObject(const shash::Any &id, const ObjectInfo info)
       : id(id)
       , info(info) { }
-    LabeledObject(const shash::Any &id, ObjectType type)
+    LabeledObject(const shash::Any &id, int flags)
       : id(id)
-      , info(type, "") { }
-    LabeledObject(const shash::Any &id, const std::string &description)
-      : id(id)
-      , info(kTypeRegular, description) { }
+      , info(flags, "") { }
     LabeledObject(
       const shash::Any &id,
-      ObjectType type,
+      int flags,
       const std::string &description)
       : id(id)
-      , info(type, description) { }
+      , info(flags, description) { }
 
     shash::Any id;
     ObjectInfo info;
@@ -140,15 +138,15 @@ class CacheManager : SingleCopy {
   {
     return LabeledObject(id, info);
   }
-  static inline LabeledObject Label(const shash::Any &id, ObjectType type) {
-    return LabeledObject(id, type);
+  static inline LabeledObject Label(const shash::Any &id, int flags) {
+    return LabeledObject(id, flags);
   }
   static inline LabeledObject Label(
     const shash::Any &id,
-    ObjectType type,
+    int flags,
     const std::string &description)
   {
-    return LabeledObject(id, type, description);
+    return LabeledObject(id, flags, description);
   }
 
   virtual CacheManagerIds id() = 0;

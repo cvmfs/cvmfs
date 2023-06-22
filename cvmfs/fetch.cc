@@ -83,7 +83,7 @@ int Fetcher::Fetch(
   const uint64_t size,
   const std::string &name,
   const zlib::Algorithms compression_algorithm,
-  const CacheManager::ObjectType object_type,
+  const int object_flags,
   const std::string &alt_url,
   off_t range_offset)
 {
@@ -93,7 +93,7 @@ int Fetcher::Fetch(
   perf::Inc(n_invocations);
 
   // Try to open from local cache
-  if ((fd_return = OpenSelect(id, name, object_type)) >= 0) {
+  if ((fd_return = OpenSelect(id, name, object_flags)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", name.c_str());
     return fd_return;
   }
@@ -124,7 +124,7 @@ int Fetcher::Fetch(
     return fd_return;
   } else {
     // Seems we are the first one, check again in the cache (race condition)
-    fd_return = OpenSelect(id, name, object_type);
+    fd_return = OpenSelect(id, name, object_flags);
     if (fd_return >= 0) {
       pthread_mutex_unlock(lock_queues_download_);
       return fd_return;
@@ -153,7 +153,10 @@ int Fetcher::Fetch(
     SignalWaitingThreads(retval, id, tls);
     return retval;
   }
-  cache_mgr_->CtrlTxn(CacheManager::ObjectInfo(object_type, name), 0, txn);
+  CacheManager::ObjectInfo object_info;
+  object_info.flags = object_flags;
+  object_info.description = name;
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
   TransactionSink sink(cache_mgr_, txn);
@@ -265,13 +268,13 @@ Fetcher::~Fetcher() {
 int Fetcher::OpenSelect(
   const shash::Any &id,
   const std::string &name,
-  const CacheManager::ObjectType object_type)
+  int object_flags)
 {
-  bool is_catalog = object_type == CacheManager::kTypeCatalog;
-  if (is_catalog || (object_type == CacheManager::kTypePinned)) {
+  bool is_catalog = object_flags & CacheManager::ObjectInfo::kLabelCatalog;
+  if (is_catalog || (object_flags & CacheManager::ObjectInfo::kLabelPinned)) {
     return cache_mgr_->OpenPinned(id, name, is_catalog);
   } else {
-    return cache_mgr_->Open(CacheManager::Label(id, object_type, name));
+    return cache_mgr_->Open(CacheManager::Label(id, object_flags, name));
   }
 }
 

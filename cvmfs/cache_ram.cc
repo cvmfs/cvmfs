@@ -230,7 +230,7 @@ void RamCacheManager::CtrlTxn(
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = object_info.description;
-  transaction->buffer.object_type = object_info.type;
+  transaction->buffer.object_flags = object_info.flags;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());
 }
@@ -328,13 +328,18 @@ int RamCacheManager::CommitTxn(void *txn) {
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
 
-  if (transaction->buffer.object_type == kTypeVolatile) {
+  if (transaction->buffer.object_flags &
+      CacheManager::ObjectInfo::kLabelVolatile)
+  {
     store = &volatile_entries_;
   } else {
     store = &regular_entries_;
   }
-  if (transaction->buffer.object_type == kTypePinned ||
-      transaction->buffer.object_type == kTypeCatalog) {
+  if ((transaction->buffer.object_flags &
+       CacheManager::ObjectInfo::kLabelPinned) ||
+      (transaction->buffer.object_flags &
+       CacheManager::ObjectInfo::kLabelCatalog))
+  {
     transaction->buffer.refcount = 1;
   } else {
     transaction->buffer.refcount = 0;

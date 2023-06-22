@@ -127,7 +127,7 @@ class ExternalCacheManager : public CacheManager {
       , buf_pos(0)
       , size(0)
       , expected_size(kSizeUnknown)
-      , object_info(kTypeRegular, "")
+      , object_info()
       , open_fds(0)
       , flushed(false)
       , committed(false)

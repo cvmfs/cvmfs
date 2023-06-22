@@ -117,7 +117,7 @@ class PosixCacheManager : public CacheManager {
       , size(0)
       , expected_size(kSizeUnknown)
       , fd(-1)
-      , object_info(kTypeRegular, "")
+      , object_info()
       , tmp_path()
       , final_path(final_path)
       , id(id)

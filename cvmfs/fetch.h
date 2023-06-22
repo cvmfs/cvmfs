@@ -40,7 +40,7 @@ class TransactionSink : public Sink {
 
   /**
    * Appends data to the sink
-   * 
+   *
    * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
@@ -50,7 +50,7 @@ class TransactionSink : public Sink {
 
   /**
    * Truncate all written data and start over at position zero.
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
@@ -62,7 +62,7 @@ class TransactionSink : public Sink {
    * Purges all resources leaving the sink in an invalid state.
    * More aggressive version of Reset().
    * For some sinks it might do the same as Reset().
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
@@ -123,7 +123,7 @@ class Fetcher : SingleCopy {
             const uint64_t size,
             const std::string &name,
             const zlib::Algorithms compression_algorithm,
-            const CacheManager::ObjectType object_type,
+            const int object_flags,
             const std::string &alt_url = "",
             off_t range_offset = -1);
 
@@ -178,7 +178,7 @@ class Fetcher : SingleCopy {
                             ThreadLocalStorage *tls);
   int OpenSelect(const shash::Any &id,
                  const std::string &name,
-                 const CacheManager::ObjectType object_type);
+                 int object_flags);
 
   /**
    * If set to true, this fetcher is in 'external data' mode:

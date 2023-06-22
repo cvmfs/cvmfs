@@ -379,7 +379,7 @@ std::string LHashMagicXattr::GetValue() {
   CacheManager::ObjectInfo object_info;
   object_info.description = path_.ToString();
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
-    object_info.type = CacheManager::kTypeVolatile;
+    object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
     CacheManager::Label(dirent_->checksum(), object_info));
   if (fd < 0) {
@@ -556,7 +556,7 @@ std::string RepoMetainfoMagicXattr::GetValue() {
   int fd = xattr_mgr_->mount_point()->fetcher()->
             Fetch(metainfo_hash_, CacheManager::kSizeUnknown,
                   "metainfo (" + metainfo_hash_.ToString() + ")",
-                  zlib::kZlibDefault, CacheManager::kTypeRegular, "");
+                  zlib::kZlibDefault, 0, "");
   if (fd < 0) {
     return "Failed to open metadata file";
   }

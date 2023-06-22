@@ -1729,7 +1729,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     CacheManager::kSizeUnknown,
     "tag database for " + fqrn_,
     zlib::kZlibDefault,
-    CacheManager::kTypeRegular);
+    0);
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;

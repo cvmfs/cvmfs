@@ -482,9 +482,10 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_EQ(1U, quota_mgr->last_cmd.size);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeVolatile, "desc0"),
-    0, txn);
+  CacheManager::ObjectInfo object_info;
+  object_info.description = "desc0";
+  object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
   EXPECT_EQ(1U, cache_mgr_->Write(buf, 1, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdInsertVolatile, quota_mgr->last_cmd.cmd);
@@ -493,9 +494,9 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_EQ("desc0", quota_mgr->last_cmd.description);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypePinned, "desc1"),
-    0, txn);
+  object_info.description = "desc1";
+  object_info.flags = CacheManager::ObjectInfo::kLabelPinned;
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
   EXPECT_EQ(2U, cache_mgr_->Write(buf, 2, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
@@ -505,18 +506,17 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_FALSE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 3, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "desc2"),
-    0, txn);
+  object_info.description = "desc2";
+  object_info.flags = CacheManager::ObjectInfo::kLabelCatalog;
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
   EXPECT_EQ(3U, cache_mgr_->Write(buf, 3, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
   EXPECT_TRUE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "fail"),
-    0, txn);
+  object_info.description = "fail";
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
   EXPECT_EQ(-ENOSPC, cache_mgr_->CommitTxn(txn));
 }
 
@@ -535,9 +535,10 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
     cache_mgr_->quota_mgr());
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "desc"),
-    0, txn);
+  CacheManager::ObjectInfo object_info;
+  object_info.description = "desc";
+  object_info.flags = CacheManager::ObjectInfo::kLabelCatalog;
+  cache_mgr_->CtrlTxn(object_info, 0, txn);
   string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));

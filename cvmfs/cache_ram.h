@@ -284,7 +284,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->buffer.object_type == kTypeVolatile) {
+    if (txn->buffer.object_flags & CacheManager::ObjectInfo::kLabelVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;

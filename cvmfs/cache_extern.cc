@@ -447,7 +447,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
 
   if (transaction->object_info_modified) {
     cvmfs::EnumObjectType object_type;
-    transport_.FillObjectType(transaction->object_info.type, &object_type);
+    transport_.FillObjectType(transaction->object_info.flags, &object_type);
     msg_store.set_object_type(object_type);
     msg_store.set_description(transaction->object_info.description);
   }

@@ -218,9 +218,9 @@ TEST_F(T_RamCacheManager, PinnedEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
-  ramcache_.CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypePinned, ""),
-    0, txn1);
+  CacheManager::ObjectInfo object_info;
+  object_info.flags = CacheManager::ObjectInfo::kLabelPinned;
+  ramcache_.CtrlTxn(object_info, 0, txn1);
 
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));
@@ -261,9 +261,9 @@ TEST_F(T_RamCacheManager, VolatileEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
-  ramcache_.CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeVolatile, ""),
-    0, txn4);
+  CacheManager::ObjectInfo object_info;
+  object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
+  ramcache_.CtrlTxn(object_info, 0, txn4);
 
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));

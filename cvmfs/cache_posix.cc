@@ -180,12 +180,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->object_info.type == kTypePinned) ||
-      (transaction->object_info.type == kTypeCatalog))
+  if ((transaction->object_info.flags & ObjectInfo::kLabelPinned) ||
+      (transaction->object_info.flags & ObjectInfo::kLabelCatalog))
   {
     bool retval = quota_mgr_->Pin(
       transaction->id, transaction->size, transaction->object_info.description,
-      (transaction->object_info.type == kTypeCatalog));
+      (transaction->object_info.flags & ObjectInfo::kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -206,17 +206,19 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->object_info.type == kTypePinned) ||
-        (transaction->object_info.type == kTypeCatalog))
+    if ((transaction->object_info.flags & ObjectInfo::kLabelPinned) ||
+        (transaction->object_info.flags & ObjectInfo::kLabelCatalog))
     {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
     // Success, inform quota manager
-    if (transaction->object_info.type == kTypeVolatile) {
+    if (transaction->object_info.flags & ObjectInfo::kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
                                  transaction->object_info.description);
-    } else if (transaction->object_info.type == kTypeRegular) {
+    } else if (!transaction->object_info.IsCatalog() &&
+               !transaction->object_info.IsPinned())
+    {
       quota_mgr_->Insert(transaction->id, transaction->size,
                          transaction->object_info.description);
     }

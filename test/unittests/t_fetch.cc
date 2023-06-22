@@ -221,13 +221,13 @@ TEST_F(T_Fetcher, ExternalFetch) {
   EXPECT_EQ(-EIO,
     external_fetcher_->Fetch(hash_regular_, CacheManager::kSizeUnknown,
                              "/reg-fail", zlib::kZlibDefault,
-                             CacheManager::kTypeRegular));
+                             0));
 
   // Download and store in cache
   int fd = external_fetcher_->Fetch(hash_regular_,
                                     CacheManager::kSizeUnknown, "/reg",
                                     zlib::kZlibDefault,
-                                    CacheManager::kTypeRegular);
+                                    0);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(CacheManager::Label(hash_regular_));
@@ -239,7 +239,7 @@ TEST_F(T_Fetcher, ExternalFetch) {
   rnd_hash.Randomize();
   EXPECT_EQ(-EIO,
     fetcher_->Fetch(rnd_hash, CacheManager::kSizeUnknown, "/reg",
-                    zlib::kZlibDefault, CacheManager::kTypeRegular));
+                    zlib::kZlibDefault, 0));
 }
 
 
@@ -249,18 +249,17 @@ TEST_F(T_Fetcher, Fetch) {
   shash::Any hash_avail(shash::kSha1);
   EXPECT_TRUE(cache_mgr_->CommitFromMem(hash_avail, &x, 1, ""));
   int fd =
-    fetcher_->Fetch(hash_avail, 1, "", zlib::kZlibDefault,
-                    CacheManager::kTypeRegular);
+    fetcher_->Fetch(hash_avail, 1, "", zlib::kZlibDefault, 0);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = fetcher_->Fetch(hash_avail, 1, "", zlib::kZlibDefault,
-                       CacheManager::kTypeCatalog);
+                       CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
   // Download and store in cache
   fd = fetcher_->Fetch(hash_regular_, CacheManager::kSizeUnknown, "reg",
-                       zlib::kZlibDefault, CacheManager::kTypeRegular);
+                       zlib::kZlibDefault, 0);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(CacheManager::Label(hash_regular_));
@@ -272,11 +271,12 @@ TEST_F(T_Fetcher, Fetch) {
   rnd_hash.Randomize();
   EXPECT_EQ(-EIO,
     fetcher_->Fetch(rnd_hash, CacheManager::kSizeUnknown, "rnd",
-                    zlib::kZlibDefault, CacheManager::kTypeRegular));
+                    zlib::kZlibDefault, 0));
 
   // Download and store catalog
   fd = fetcher_->Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
-                       zlib::kZlibDefault, CacheManager::kTypeCatalog);
+                       zlib::kZlibDefault,
+                       CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(CacheManager::Label(hash_catalog_));
@@ -291,13 +291,11 @@ TEST_F(T_Fetcher, FetchUncompressed) {
   // Download and store in cache
   // TODO(jblomer): use CacheManager::kSizeUnknown
   int fd =
-    fetcher_->Fetch(hash_uncompressed_, 1, "x",
-                    zlib::kZlibDefault, CacheManager::kTypeRegular);
+    fetcher_->Fetch(hash_uncompressed_, 1, "x", zlib::kZlibDefault, 0);
   EXPECT_EQ(-EIO, fd);
 
   fd =
-    fetcher_->Fetch(hash_uncompressed_, 1, "x",
-                    zlib::kNoCompression, CacheManager::kTypeRegular);
+    fetcher_->Fetch(hash_uncompressed_, 1, "x", zlib::kNoCompression, 0);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(CacheManager::Label(hash_uncompressed_));
@@ -310,12 +308,12 @@ TEST_F(T_Fetcher, FetchAltPath) {
   unlink((src_path_ + "/" + hash_regular_.MakePath()).c_str());
   int fd;
   fd = fetcher_->Fetch(hash_regular_, CacheManager::kSizeUnknown, "reg",
-                       zlib::kZlibDefault, CacheManager::kTypeRegular);
+                       zlib::kZlibDefault, 0);
   EXPECT_LT(fd, 0);
 
   fd = fetcher_->Fetch(hash_regular_, CacheManager::kSizeUnknown, "reg",
                        zlib::kZlibDefault,
-                       CacheManager::kTypeRegular,
+                       0,
                        "altpath");
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -330,14 +328,13 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
     perf::StatisticsTemplate("fetch", &statistics));
   EXPECT_EQ(-EBADF,
     f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
-            zlib::kZlibDefault, CacheManager::kTypeCatalog));
+            zlib::kZlibDefault, CacheManager::ObjectInfo::kLabelCatalog));
 
   // Wrong size (commit fails)
-  EXPECT_EQ(-EIO, fetcher_->Fetch(hash_cert_, 2, "cat", zlib::kZlibDefault,
-                                  CacheManager::kTypeRegular));
+  EXPECT_EQ(-EIO, fetcher_->Fetch(hash_cert_, 2, "cat", zlib::kZlibDefault, 0));
   EXPECT_TRUE(FileExists(tmp_path_ + "/quarantaine/" + hash_cert_.ToString()));
   int fd = fetcher_->Fetch(hash_cert_, 1, "cat", zlib::kZlibDefault,
-                           CacheManager::kTypeRegular);
+                           0);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
@@ -345,7 +342,7 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
   RemoveTree(tmp_path_ + "/txn");
   EXPECT_EQ(-ENOENT,
     fetcher_->Fetch(hash_regular_, CacheManager::kSizeUnknown, "reg",
-                    zlib::kZlibDefault, CacheManager::kTypeRegular));
+                    zlib::kZlibDefault, 0));
 }
 
 
@@ -359,7 +356,8 @@ void *TestFetchCollapse(void *data) {
   Fetcher *f = info->f;
   BuggyCacheManager *bcm = reinterpret_cast<BuggyCacheManager *>(f->cache_mgr_);
   int fd = f->Fetch(info->hash, CacheManager::kSizeUnknown, "cat",
-                    zlib::kZlibDefault, CacheManager::kTypeCatalog);
+                    zlib::kZlibDefault,
+                    CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, bcm->Close(fd));
   return NULL;
@@ -393,12 +391,12 @@ TEST_F(T_Fetcher, FetchCollapse) {
   Fetcher f(&bcm, download_mgr_, &backoff_throttle_,
     perf::StatisticsTemplate("fetch", &statistics));
   int fd = f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
-                   zlib::kZlibDefault, CacheManager::kTypeCatalog);
+                   zlib::kZlibDefault, CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, bcm.Close(fd));
   // One again, nothing should be locked
   fd = f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
-               zlib::kZlibDefault, CacheManager::kTypeCatalog);
+               zlib::kZlibDefault, CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, bcm.Close(fd));
 
@@ -419,7 +417,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
   // Piggy-back onto existing download
   while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) { }
   fd = f.Fetch(hash_catalog_, CacheManager::kSizeUnknown, "cat",
-               zlib::kZlibDefault, CacheManager::kTypeCatalog);
+               zlib::kZlibDefault, CacheManager::ObjectInfo::kLabelCatalog);
   EXPECT_EQ(-EROFS, fd);
   pthread_join(thread_collapse, NULL);
   pthread_join(thread_collapse2, NULL);

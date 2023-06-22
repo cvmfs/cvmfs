@@ -295,7 +295,7 @@ int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
     // refcount (starting at 1 for pinning, for example)
     mem.refcount = buf.refcount;
   }
-  mem.object_type = buf.object_type;
+  mem.object_flags = buf.object_flags;
   mem.id = buf.id;
   mem.size = buf.size;
   if (entry_count_ == max_entries_) {

@@ -243,11 +243,9 @@ int posix_start_txn(struct cvmcache_hash *id,
 
   CacheManager::ObjectInfo object_info;
   if (info->type == CVMCACHE_OBJECT_CATALOG) {
-    object_info.type = CacheManager::kTypeCatalog;
+    object_info.flags |= CacheManager::ObjectInfo::kLabelCatalog;
   } else if (info->type == CVMCACHE_OBJECT_VOLATILE) {
-    object_info.type = CacheManager::kTypeVolatile;
-  } else {
-    object_info.type = CacheManager::kTypeRegular;
+    object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
   }
   if (info->description) {
     object_info.description = info->description;
