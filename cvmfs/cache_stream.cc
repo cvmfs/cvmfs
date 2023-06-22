@@ -22,7 +22,8 @@ namespace {
 class StreamingSink : public cvmfs::Sink {
  public:
   StreamingSink(void *buf, uint64_t size, uint64_t offset)
-    : pos_(0)
+    : Sink(false /* is_owner */)
+    , pos_(0)
     , window_buf_(buf)
     , window_size_(size)
     , window_offset_(offset)
@@ -61,6 +62,19 @@ class StreamingSink : public cvmfs::Sink {
     return 0;
   }
 
+  virtual int Purge() { return Reset(); }
+  virtual bool IsValid() {
+    return (window_buf_ != NULL) || (window_size_ == 0);
+  }
+  virtual int Flush() { return 0; }
+  virtual bool Reserve(size_t size) { return true; }
+  virtual bool RequiresReserve() { return false; }
+  virtual std::string Describe() {
+    std::string result =  "Streaming sink that is ";
+    result += IsValid() ? "valid"  : "invalid";
+    return result;
+  }
+
   int64_t GetNBytesWritten() const { return pos_; }
 
  private:
@@ -92,8 +106,8 @@ int64_t StreamingCacheManager::Stream(
   download::JobInfo download_job(&url,
                                  true, /* compressed */
                                  true, /* probe_hosts */
-                                 &sink,
-                                 &info.object_id);
+                                 &info.object_id,
+                                 &sink);
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code != download::kFailOk)
