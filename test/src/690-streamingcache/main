@@ -1,0 +1,33 @@
+cvmfs_test_name="Streaming cache manager"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_690_HTTP_PID=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_690_HTTP_PID ] || sudo kill $CVMFS_TEST_690_HTTP_PID
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+  local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
+  local scratch_dir="$(pwd)"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO                             || return $?
+  mkdir -p ${repo_dir}/external                                  || return 1
+  mkdir -p ${repo_dir}/internal                                  || return 2
+  echo "Hello World" > ${repo_dir}/external/file                 || return 3
+  cp ${repo_dir}/external/file ${repo_dir}/internal/file         || return 4
+
+  echo "*** Check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  return 0
+}
