@@ -35,15 +35,18 @@ class T_CacheManager : public ::testing::Test {
     alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_null_, NULL, 0, "null"));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_null_), NULL, 0));
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_one_, &buf, 1, "one"));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_one_), &buf, 1));
 
     unsigned char *zero_page;
     hash_page_.digest[0] = 2;
     zero_page = reinterpret_cast<unsigned char *>(scalloc(4096, 1));
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_page_, zero_page, 4096, "buf"));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_page_), zero_page, 4096));
     free(zero_page);
   }
 
@@ -308,7 +311,8 @@ TEST_F(T_CacheManager, CommitFromMem) {
   shash::Any rnd_hash;
   rnd_hash.Randomize();
   unsigned char buf = '1';
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                        &buf, 1));
   unsigned char *retrieve_buf;
   uint64_t retrieve_size;
   EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(rnd_hash),
@@ -318,7 +322,8 @@ TEST_F(T_CacheManager, CommitFromMem) {
   free(retrieve_buf);
 
   TestCacheManager faulty_cache;
-  EXPECT_FALSE(faulty_cache.CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_FALSE(faulty_cache.CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                          &buf, 1));
 
   string final_dir = tmp_path_ + "/" + rnd_hash.MakePath();
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
@@ -326,7 +331,8 @@ TEST_F(T_CacheManager, CommitFromMem) {
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_page_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink(final_dir.c_str()));
   EXPECT_EQ(0, rmdir(GetParentPath(final_dir).c_str()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                         &buf, 1));
 }
 
 

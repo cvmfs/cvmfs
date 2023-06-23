@@ -243,7 +243,8 @@ TEST_F(T_Fetcher, Fetch) {
   // Cache hit
   unsigned char x = 'x';
   shash::Any hash_avail(shash::kSha1);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(hash_avail, &x, 1, ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(CacheManager::LabeledObject(hash_avail),
+                                        &x, 1));
   int fd =
     fetcher_->Fetch(hash_avail, 1, "", zlib::kZlibDefault, 0);
   EXPECT_GE(fd, 0);
@@ -421,7 +422,8 @@ TEST_F(T_Fetcher, FetchCollapse) {
 
 TEST_F(T_Fetcher, SignalWaitingThreads) {
   unsigned char x = 'x';
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(hash_regular_, &x, 1, ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(
+    CacheManager::LabeledObject(hash_regular_), &x, 1));
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_regular_));
   EXPECT_GE(fd, 0);
   int tls_pipe[2];

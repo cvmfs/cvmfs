@@ -165,10 +165,9 @@ class CacheManager : SingleCopy {
   int OpenPinned(const LabeledObject &object);
   bool Open2Mem(const LabeledObject &object,
                 unsigned char **buffer, uint64_t *size);
-  bool CommitFromMem(const shash::Any &id,
+  bool CommitFromMem(const LabeledObject &object,
                      const unsigned char *buffer,
-                     const uint64_t size,
-                     const std::string &description);
+                     const uint64_t size);
 
   QuotaManager *quota_mgr() { return quota_mgr_; }
 

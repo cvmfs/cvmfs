@@ -77,18 +77,15 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
  * The hash and the memory blob need to match.
  */
 bool CacheManager::CommitFromMem(
-  const shash::Any &id,
+  const LabeledObject &object,
   const unsigned char *buffer,
-  const uint64_t size,
-  const string &description)
+  const uint64_t size)
 {
   void *txn = alloca(this->SizeOfTxn());
-  int fd = this->StartTxn(id, size, txn);
+  int fd = this->StartTxn(object.id, size, txn);
   if (fd < 0)
     return false;
-  Label label;
-  label.description = description;
-  this->CtrlTxn(label, 0, txn);
+  this->CtrlTxn(object.label, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
     this->AbortTxn(txn);

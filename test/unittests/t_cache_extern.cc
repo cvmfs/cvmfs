@@ -349,7 +349,8 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(id, content.length(), txn));
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+                                         data, content.length()));
 }
 
 
@@ -422,8 +423,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+                                        data, content.length()));
   unsigned char *buffer;
   uint64_t size;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buffer, &size));
@@ -433,8 +434,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   content = "";
   HashString(content, &id);
   data = NULL;
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+              data, content.length()));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
@@ -442,8 +443,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
     scalloc(large_size, 1));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+                                        large_buffer, large_size));
   unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
     smalloc(large_size));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"),
@@ -455,8 +456,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
   large_size = 50 * 1024 * 1024 + 1;
   large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+                                        large_buffer, large_size));
   large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"),
                                    &large_buffer_verify, &size));
@@ -659,8 +660,8 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   memset(large_buffer, 1, large_size);
   shash::Any id(shash::kSha1);
   shash::HashMem(large_buffer, large_size, &id);
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+                                        large_buffer, large_size));
 
   const unsigned num_threads = 10;
   pthread_t threads[num_threads];

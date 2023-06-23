@@ -240,9 +240,11 @@ LoadError ClientCatalogManager::LoadCatalog(
   *catalog_hash = ensemble.manifest->catalog_hash();
 
   // Store new manifest and certificate
-  fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
-                                       ensemble.cert_buf, ensemble.cert_size,
-                                       "certificate for " + repo_name_);
+  CacheManager::Label label;
+  label.description = "certificate for " + repo_name_;
+  fetcher_->cache_mgr()->CommitFromMem(
+    CacheManager::LabeledObject(ensemble.manifest->certificate(), label),
+    ensemble.cert_buf, ensemble.cert_size);
   fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
   return catalog::kLoadNew;
 }
