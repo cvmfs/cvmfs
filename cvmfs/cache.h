@@ -94,7 +94,6 @@ class CacheManager : SingleCopy {
     };
 
     ObjectInfo() : flags(0), description() { }
-    ObjectInfo(int f, const std::string &d) : flags(f), description(d) {}
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
@@ -115,39 +114,14 @@ class CacheManager : SingleCopy {
     LabeledObject(const shash::Any &id, const ObjectInfo info)
       : id(id)
       , info(info) { }
-    LabeledObject(const shash::Any &id, int flags)
-      : id(id)
-      , info(flags, "") { }
-    LabeledObject(
-      const shash::Any &id,
-      int flags,
-      const std::string &description)
-      : id(id)
-      , info(flags, description) { }
 
     shash::Any id;
     ObjectInfo info;
   };
-  // Convenience constructors, users can call Open(CacheManager::Label(my_hash))
-  static inline LabeledObject Label(const shash::Any &id) {
-    return LabeledObject(id);
-  }
-  static inline LabeledObject Label(
-    const shash::Any &id,
-    const ObjectInfo &info)
-  {
-    return LabeledObject(id, info);
-  }
-  static inline LabeledObject Label(const shash::Any &id, int flags) {
-    return LabeledObject(id, flags);
-  }
-  static inline LabeledObject Label(
-    const shash::Any &id,
-    int flags,
-    const std::string &description)
-  {
-    return LabeledObject(id, flags, description);
-  }
+  //// Convenience constructors, users can call Open(CacheManager::Label(my_hash))
+  //static inline LabeledObject Label(const shash::Any &id) {
+  //  return LabeledObject(id);
+  //}
 
   virtual CacheManagerIds id() = 0;
   /**

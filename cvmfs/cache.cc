@@ -137,7 +137,7 @@ bool CacheManager::Open2Mem(
 
   ObjectInfo object_info;
   object_info.description = description;
-  int fd = this->Open(Label(id, object_info));
+  int fd = this->Open(LabeledObject(id, object_info));
   if (fd < 0)
     return false;
 
@@ -180,7 +180,7 @@ int CacheManager::OpenPinned(
   object_info.description = description;
   if (is_catalog)
     object_info.flags |= ObjectInfo::kLabelCatalog;
-  int fd = this->Open(Label(id, object_info));
+  int fd = this->Open(LabeledObject(id, object_info));
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {

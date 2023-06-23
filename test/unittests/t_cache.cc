@@ -284,19 +284,19 @@ class TestCacheManager : public CacheManager {
 TEST_F(T_CacheManager, ChecksumFd) {
   shash::Any hash(shash::kSha1);
   EXPECT_EQ(-EBADF, cache_mgr_->ChecksumFd(1000000, &hash));
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
   cache_mgr_->Close(fd);
 
-  fd = cache_mgr_->Open(CacheManager::Label(hash_one_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("0bbd725a1003cd41b89b209f70e514f12f2a1062", hash.ToString());
   cache_mgr_->Close(fd);
 
-  fd = cache_mgr_->Open(CacheManager::Label(hash_page_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_page_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("54b34b84872a06a373967f68726e29353d3fe7b2", hash.ToString());
@@ -394,7 +394,7 @@ TEST_F(T_CacheManager, AbortTxn) {
 
 
 TEST_F(T_CacheManager, Close) {
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(-EBADF, cache_mgr_->Close(fd));
@@ -408,11 +408,11 @@ TEST_F(T_CacheManager, CommitTxn) {
   ASSERT_TRUE(txn != NULL);
   int fd;
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -422,7 +422,7 @@ TEST_F(T_CacheManager, CommitTxn) {
   unsigned char buf = 'A';
   EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, cache_mgr_->GetSize(fd));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, &buf, 1, 0));
@@ -448,7 +448,7 @@ TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
   ASSERT_TRUE(txn != NULL);
   unsigned char content = 'x';
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   EXPECT_EQ(1U, cache_mgr_->Write(&content, 1, txn));
@@ -527,7 +527,7 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   delete cache_mgr_->quota_mgr_;
   cache_mgr_->quota_mgr_ = new TestQuotaManager();
@@ -556,7 +556,7 @@ TEST_F(T_CacheManager, CommitTxnFlushFail) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   int fd = cache_mgr_->StartTxn(rnd_hash, 1, txn);
   EXPECT_GE(fd, 0);
@@ -600,7 +600,7 @@ TEST_F(T_CacheManager, Create) {
 
 TEST_F(T_CacheManager, Dup) {
   EXPECT_EQ(-EBADF, cache_mgr_->Dup(-1));
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
   EXPECT_NE(fd, fd_dup);
@@ -610,12 +610,12 @@ TEST_F(T_CacheManager, Dup) {
 
 
 TEST_F(T_CacheManager, GetSize) {
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
-  fd = cache_mgr_->Open(CacheManager::Label(hash_one_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -632,10 +632,10 @@ TEST_F(T_CacheManager, Open) {
 
   shash::Any rnd_hash;
   rnd_hash.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
   EXPECT_EQ(TestQuotaManager::kCmdUnknown, quota_mgr->last_cmd.cmd);
 
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(TestQuotaManager::kCmdTouch, quota_mgr->last_cmd.cmd);
@@ -649,7 +649,7 @@ TEST_F(T_CacheManager, OpenFromTxn) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   unsigned char buf = 'A';
@@ -686,7 +686,7 @@ TEST_F(T_CacheManager, OpenFromTxn) {
 
 TEST_F(T_CacheManager, Pread) {
   char buf[1024];
-  int fd = cache_mgr_->Open(CacheManager::Label(hash_one_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1U, cache_mgr_->Pread(fd, &buf, 1024, 0));
   EXPECT_EQ('A', buf[0]);
@@ -738,7 +738,7 @@ TEST_F(T_CacheManager, Reset) {
   EXPECT_EQ(5000, cache_mgr_->Write(large_buf, 5000, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(5000, cache_mgr_->GetSize(fd));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, large_buf, 1, 0));
@@ -748,7 +748,7 @@ TEST_F(T_CacheManager, Reset) {
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   cache_mgr_->Close(fd);
@@ -863,7 +863,7 @@ TEST_F(T_CacheManager, Write) {
   EXPECT_EQ(0, cache_mgr_->Write(NULL, 0, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(14096, cache_mgr_->GetSize(fd));
   cache_mgr_->Close(fd);
@@ -897,7 +897,7 @@ TEST_F(T_CacheManager, WriteCompare) {
   EXPECT_EQ(N, cache_mgr_->Write(large_buf, N, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Label(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(N, cache_mgr_->GetSize(fd));
   char receive_buf[N];

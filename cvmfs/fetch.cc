@@ -274,7 +274,10 @@ int Fetcher::OpenSelect(
   if (is_catalog || (object_flags & CacheManager::ObjectInfo::kLabelPinned)) {
     return cache_mgr_->OpenPinned(id, name, is_catalog);
   } else {
-    return cache_mgr_->Open(CacheManager::Label(id, object_flags, name));
+    CacheManager::ObjectInfo object_info;
+    object_info.flags = object_flags;
+    object_info.description = name;
+    return cache_mgr_->Open(CacheManager::LabeledObject(id, object_info));
   }
 }
 

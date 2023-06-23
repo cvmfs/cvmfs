@@ -83,7 +83,7 @@ TEST_F(T_CachePlugin, Connection) {
 TEST_F(T_CachePlugin, OpenClose) {
   shash::Any rnd_id(shash::kSha1);
   rnd_id.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(rnd_id)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_id)));
 
   shash::Any id(shash::kSha1);
   string content = "foo";
@@ -113,7 +113,7 @@ TEST_F(T_CachePlugin, StoreEmpty) {
   EXPECT_EQ(NULL, buffer);
   free(buffer);
 
-  int fd = cache_mgr_->Open(CacheManager::Label(empty_id));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(empty_id));
   EXPECT_GE(fd, 0);
   unsigned char small_buf[1];
   EXPECT_EQ(0, cache_mgr_->Pread(fd, small_buf, 1, 0));
@@ -176,7 +176,7 @@ TEST_F(T_CachePlugin, Read) {
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_odd));
   free(read_buffer);
 
-  int fd = cache_mgr_->Open(CacheManager::Label(id_odd));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(id_odd));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Pread(fd, NULL, 0, 0));
 
@@ -293,7 +293,7 @@ TEST_F(T_CachePlugin, Info) {
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
-  int fd = cache_mgr_->Open(CacheManager::Label(id));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(id));
   EXPECT_GE(fd, 0);
   EXPECT_GT(quota_mgr_->GetSizePinned(), size_pinned);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -343,17 +343,17 @@ TEST_F(T_CachePlugin, Shrink) {
   uint64_t size_with4 = quota_mgr_->GetSize();
   EXPECT_GE(size_with4, size_with3);
 
-  int fd_clg = cache_mgr_->Open(CacheManager::Label(id_clg));
-  int fd_vol = cache_mgr_->Open(CacheManager::Label(id_vol));
+  int fd_clg = cache_mgr_->Open(CacheManager::LabeledObject(id_clg));
+  int fd_vol = cache_mgr_->Open(CacheManager::LabeledObject(id_vol));
   EXPECT_GE(fd_clg, 0);
   EXPECT_GE(fd_vol, 0);
   EXPECT_FALSE(quota_mgr_->Cleanup(0));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(id_reg)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_reg)));
   EXPECT_EQ(0, cache_mgr_->Close(fd_clg));
   EXPECT_EQ(0, cache_mgr_->Close(fd_vol));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(id_vol)));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Label(id_clg)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_vol)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_clg)));
 
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   unsigned char *buf;
@@ -380,7 +380,7 @@ TEST_F(T_CachePlugin, List) {
     descriptions.insert(id.ToString());
     EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, sizeof(i), id.ToString()));
     if ((i % 10) == 0) {
-      int fd = cache_mgr_->Open(CacheManager::Label(id));
+      int fd = cache_mgr_->Open(CacheManager::LabeledObject(id));
       EXPECT_GE(fd, 0);
       open_fds.insert(fd);
     }

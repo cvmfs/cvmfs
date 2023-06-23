@@ -381,7 +381,7 @@ std::string LHashMagicXattr::GetValue() {
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
     object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
-    CacheManager::Label(dirent_->checksum(), object_info));
+    CacheManager::LabeledObject(dirent_->checksum(), object_info));
   if (fd < 0) {
     result = "Not in cache";
   } else {

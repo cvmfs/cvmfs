@@ -62,7 +62,7 @@ class T_StreamingCacheManager : public ::testing::Test {
 };
 
 TEST_F(T_StreamingCacheManager, Basics) {
-  CacheManager::LabeledObject labeled_obj = CacheManager::Label(hash_demo_);
+  CacheManager::LabeledObject labeled_obj(hash_demo_);
   int fd = streaming_cache_->Open(labeled_obj);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(static_cast<int64_t>(demo_.length()),
