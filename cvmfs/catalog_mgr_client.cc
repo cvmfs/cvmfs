@@ -330,9 +330,11 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
 
 
 void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
+  CacheManager::Label label;
+  label.description = "certificate for " + catalog_mgr_->repo_name();
   uint64_t size;
-  bool retval = cache_mgr_->Open2Mem(
-    hash, "certificate for " + catalog_mgr_->repo_name(), &cert_buf, &size);
+  bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
+                                     &cert_buf, &size);
   cert_size = size;
   if (retval)
     perf::Inc(catalog_mgr_->n_certificate_hits_);

@@ -58,6 +58,14 @@ class T_CachePlugin : public ::testing::Test {
     }
   }
 
+  CacheManager::LabeledObject LabelWithDesc(const shash::Any &id,
+                                            const std::string &desc)
+  {
+    CacheManager::Label label;
+    label.description = desc;
+    return CacheManager::LabeledObject(id, label);
+  }
+
   static const int nfiles;
   ExternalCacheManager *cache_mgr_;
   ExternalQuotaManager *quota_mgr_;
@@ -94,7 +102,7 @@ TEST_F(T_CachePlugin, OpenClose) {
     cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 }
@@ -108,7 +116,8 @@ TEST_F(T_CachePlugin, StoreEmpty) {
 
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(empty_id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(empty_id, "test"),
+                                   &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
   free(buffer);
@@ -140,13 +149,16 @@ TEST_F(T_CachePlugin, HashAlgorithms) {
     cache_mgr_->CommitFromMem(id_shake128, data, content.length(), "shake128"));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_sha1, "sha1", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_sha1, "sha1"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_rmd160, "rmd160", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_rmd160, "rmd160"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_shake128, "id_shake128", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_shake128, "id_shake128"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 }
@@ -167,11 +179,13 @@ TEST_F(T_CachePlugin, Read) {
 
   unsigned char *read_buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_even, "even", &read_buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_even, "even"),
+                                   &read_buffer, &size));
   EXPECT_EQ(size, size_even);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_even));
   free(read_buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_odd, "odd", &read_buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_odd, "odd"),
+                                   &read_buffer, &size));
   EXPECT_EQ(size, size_odd);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_odd));
   free(read_buffer);
@@ -220,7 +234,7 @@ TEST_F(T_CachePlugin, TransactionAbort) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -246,7 +260,7 @@ TEST_F(T_CachePlugin, CommitHandover) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -270,7 +284,7 @@ TEST_F(T_CachePlugin, CommitConcurrent) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -358,7 +372,7 @@ TEST_F(T_CachePlugin, Shrink) {
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_txn, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id_txn, "test"), &buf, &size));
   EXPECT_EQ(str_txn, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }

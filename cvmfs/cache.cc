@@ -127,17 +127,14 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
  * \return True if successful, false otherwise.
  */
 bool CacheManager::Open2Mem(
-  const shash::Any &id,
-  const std::string &description,
+  const LabeledObject &object,
   unsigned char **buffer,
   uint64_t *size)
 {
   *size = 0;
   *buffer = NULL;
 
-  Label label;
-  label.description = description;
-  int fd = this->Open(LabeledObject(id, label));
+  int fd = this->Open(object);
   if (fd < 0)
     return false;
 

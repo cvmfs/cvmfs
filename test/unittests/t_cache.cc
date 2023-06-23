@@ -311,8 +311,8 @@ TEST_F(T_CacheManager, CommitFromMem) {
   EXPECT_TRUE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
   unsigned char *retrieve_buf;
   uint64_t retrieve_size;
-  EXPECT_TRUE(
-    cache_mgr_->Open2Mem(rnd_hash, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(rnd_hash),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('1', retrieve_buf[0]);
   free(retrieve_buf);
@@ -334,22 +334,23 @@ TEST_F(T_CacheManager, Open2Mem) {
   unsigned char *retrieve_buf;
   uint64_t retrieve_size;
 
-  EXPECT_FALSE(cache_mgr_->Open2Mem(shash::Any(shash::kMd5), "",
-    &retrieve_buf, &retrieve_size));
+  EXPECT_FALSE(
+    cache_mgr_->Open2Mem(CacheManager::LabeledObject(shash::Any(shash::kMd5)),
+                         &retrieve_buf, &retrieve_size));
 
-  EXPECT_TRUE(
-    cache_mgr_->Open2Mem(hash_null_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash_null_),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(0U, retrieve_size);
   EXPECT_EQ(NULL, retrieve_buf);
 
-  EXPECT_TRUE(cache_mgr_->Open2Mem(
-    hash_one_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash_one_),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('A', retrieve_buf[0]);
 
   TestCacheManager faulty_cache;
-  EXPECT_FALSE(
-    faulty_cache.Open2Mem(hash_one_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_FALSE(faulty_cache.Open2Mem(CacheManager::LabeledObject(hash_one_),
+                                     &retrieve_buf, &retrieve_size));
   EXPECT_EQ(0U, retrieve_size);
   EXPECT_EQ(NULL, retrieve_buf);
 }
