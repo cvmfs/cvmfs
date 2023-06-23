@@ -270,13 +270,14 @@ int Fetcher::OpenSelect(
   const std::string &name,
   int object_flags)
 {
+  CacheManager::Label label;
+  label.flags = object_flags;
+  label.description = name;
   bool is_catalog = object_flags & CacheManager::kLabelCatalog;
   if (is_catalog || (object_flags & CacheManager::kLabelPinned)) {
-    return cache_mgr_->OpenPinned(id, name, is_catalog);
+    label.flags |= CacheManager::kLabelPinned;
+    return cache_mgr_->OpenPinned(CacheManager::LabeledObject(id, label));
   } else {
-    CacheManager::Label label;
-    label.flags = object_flags;
-    label.description = name;
     return cache_mgr_->Open(CacheManager::LabeledObject(id, label));
   }
 }

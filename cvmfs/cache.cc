@@ -171,24 +171,18 @@ bool CacheManager::Open2Mem(
  * do not exist anymore in the cache.  (The quota manager also translates double
  * pins into a no-op, so that the accounting does not get out of sync.)
  */
-int CacheManager::OpenPinned(
-  const shash::Any &id,
-  const string &description,
-  bool is_catalog)
-{
-  Label label;
-  label.description = description;
-  if (is_catalog)
-    label.flags |= kLabelCatalog;
-  int fd = this->Open(LabeledObject(id, label));
+int CacheManager::OpenPinned(const LabeledObject &object) {
+  assert(object.label.IsPinned());
+  int fd = this->Open(object);
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {
       this->Close(fd);
       return size;
     }
-    bool retval =
-      quota_mgr_->Pin(id, static_cast<uint64_t>(size), description, is_catalog);
+    bool retval = quota_mgr_->Pin(
+      object.id, static_cast<uint64_t>(size),
+      object.label.description, object.label.IsCatalog());
     if (!retval) {
       this->Close(fd);
       return -ENOSPC;

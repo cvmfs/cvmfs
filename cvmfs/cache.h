@@ -161,9 +161,7 @@ class CacheManager : SingleCopy {
 
   virtual void Spawn() = 0;
 
-  int OpenPinned(const shash::Any &id,
-                 const std::string &description,
-                 bool is_catalog);
+  int OpenPinned(const LabeledObject &object);
   int ChecksumFd(int fd, shash::Any *id);
   bool Open2Mem(const shash::Any &id, const std::string &description,
                 unsigned char **buffer, uint64_t *size);

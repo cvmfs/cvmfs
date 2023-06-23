@@ -358,20 +358,25 @@ TEST_F(T_CacheManager, Open2Mem) {
 TEST_F(T_CacheManager, OpenPinned) {
   shash::Any rnd_hash(shash::kSha1);
   rnd_hash.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->OpenPinned(rnd_hash, "", false));
+  CacheManager::Label label;
+  label.flags |= CacheManager::kLabelPinned;
+  EXPECT_EQ(-ENOENT,
+    cache_mgr_->OpenPinned(CacheManager::LabeledObject(rnd_hash, label)));
 
   delete cache_mgr_->quota_mgr_;
   TestQuotaManager *quota_mgr = new TestQuotaManager();
   cache_mgr_->quota_mgr_ = quota_mgr;
 
-  int fd = cache_mgr_->OpenPinned(hash_null_, "", false);
+  int fd =
+    cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
   EXPECT_EQ(hash_null_, quota_mgr->last_cmd.hash);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   quota_mgr->Unpin(hash_null_);
 
-  fd = cache_mgr_->OpenPinned(hash_null_, "fail", false);
+  label.description = "fail";
+  fd = cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
   EXPECT_EQ(-ENOSPC, fd);
 }
 
