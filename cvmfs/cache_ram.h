@@ -190,9 +190,7 @@ class RamCacheManager : public CacheManager {
    * @param flags Unused
    * @param txn A pointer to space allocated for storing the transaction details
    */
-  virtual void CtrlTxn(const ObjectInfo &object_info,
-                       const int flags,
-                       void *txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn);
 
   /**
    * Copy the given memory region into the transaction buffer. Copying starts at
@@ -284,7 +282,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->buffer.object_flags & CacheManager::ObjectInfo::kLabelVolatile) {
+    if (txn->buffer.object_flags & CacheManager::kLabelVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;

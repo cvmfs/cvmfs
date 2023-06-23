@@ -63,10 +63,9 @@ TEST_F(T_TieredCacheManager, CopyUp) {
             tiered_cache_->Open(CacheManager::LabeledObject(hash_one_)));
 
   EXPECT_TRUE(lower_cache_->CommitFromMem(hash_one_, &buf_, 1, "one"));
-  CacheManager::ObjectInfo object_info;
-  object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
-  int fd =
-    tiered_cache_->Open(CacheManager::LabeledObject(hash_one_, object_info));
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelVolatile;
+  int fd = tiered_cache_->Open(CacheManager::LabeledObject(hash_one_, label));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, stats_upper_.Lookup("test.n_openvolatile")->Get());
 

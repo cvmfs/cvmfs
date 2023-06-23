@@ -73,27 +73,29 @@ class CacheManager : SingleCopy {
   static const uint64_t kSizeUnknown;
 
   /**
-   * Meta-data of an object that the cache may or may not maintain.  Good cache
-   * implementations should at least distinguish between volatile and regular
-   * objects.
+   * Relevant for the quota management and for downloading (URL construction).
+   * Used in Label::flags.
    */
-  struct ObjectInfo {
-    /**
-     * Relevant for the quota management and for downloading (URL construction)
-     */
-    static const int kLabelCatalog  = 0x01;
-    static const int kLabelPinned   = 0x02;
-    static const int kLabelVolatile = 0x04;
-    static const int kLabelExternal = 0x08;
-    static const int kLabelChunked  = 0x10;
+  static const int kLabelCatalog  = 0x01;
+  static const int kLabelPinned   = 0x02;
+  static const int kLabelVolatile = 0x04;
+  static const int kLabelExternal = 0x08;
+  static const int kLabelChunked  = 0x10;
 
+  /**
+   * Meta-data of an object that the cache may or may not maintain/use.
+   * Good cache implementations should at least distinguish between volatile
+   * and regular objects. The data in the label are sufficient to download an
+   * object, if necessary.
+   */
+  struct Label {
     struct Range {
       Range() : offset(0), size(0) {}
       uint64_t offset;
       uint64_t size;
     };
 
-    ObjectInfo() : flags(0), description() { }
+    Label() : flags(0) { }
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
@@ -107,16 +109,16 @@ class CacheManager : SingleCopy {
   };
 
   /**
-   * A content hash together with a (partial) ObjectInfo meta-data.
+   * A content hash together with the meta-data from a (partial) label.
    */
   struct LabeledObject {
-    explicit LabeledObject(const shash::Any &id) : id(id), info() { }
-    LabeledObject(const shash::Any &id, const ObjectInfo info)
+    explicit LabeledObject(const shash::Any &id) : id(id), label() { }
+    LabeledObject(const shash::Any &id, const Label &l)
       : id(id)
-      , info(info) { }
+      , label(l) { }
 
     shash::Any id;
-    ObjectInfo info;
+    Label label;
   };
   //// Convenience constructors, users can call Open(CacheManager::Label(my_hash))
   //static inline LabeledObject Label(const shash::Any &id) {
@@ -148,7 +150,7 @@ class CacheManager : SingleCopy {
 
   virtual uint32_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
-  virtual void CtrlTxn(const ObjectInfo &object_info,
+  virtual void CtrlTxn(const Label &label,
                        const int flags,  // reserved for future use
                        void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;

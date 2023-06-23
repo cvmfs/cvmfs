@@ -180,12 +180,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->object_info.flags & ObjectInfo::kLabelPinned) ||
-      (transaction->object_info.flags & ObjectInfo::kLabelCatalog))
+  if ((transaction->label.flags & kLabelPinned) ||
+      (transaction->label.flags & kLabelCatalog))
   {
     bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->object_info.description,
-      (transaction->object_info.flags & ObjectInfo::kLabelCatalog));
+      transaction->id, transaction->size, transaction->label.description,
+      (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -206,21 +206,21 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->object_info.flags & ObjectInfo::kLabelPinned) ||
-        (transaction->object_info.flags & ObjectInfo::kLabelCatalog))
+    if ((transaction->label.flags & kLabelPinned) ||
+        (transaction->label.flags & kLabelCatalog))
     {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
     // Success, inform quota manager
-    if (transaction->object_info.flags & ObjectInfo::kLabelVolatile) {
+    if (transaction->label.flags & kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
-                                 transaction->object_info.description);
-    } else if (!transaction->object_info.IsCatalog() &&
-               !transaction->object_info.IsPinned())
+                                 transaction->label.description);
+    } else if (!transaction->label.IsCatalog() &&
+               !transaction->label.IsPinned())
     {
       quota_mgr_->Insert(transaction->id, transaction->size,
-                         transaction->object_info.description);
+                         transaction->label.description);
     }
   }
   transaction->~Transaction();
@@ -280,12 +280,12 @@ PosixCacheManager *PosixCacheManager::Create(
 
 
 void PosixCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
+  const Label &label,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->object_info = object_info;
+  transaction->label = label;
 }
 
 

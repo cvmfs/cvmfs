@@ -153,10 +153,10 @@ int Fetcher::Fetch(
     SignalWaitingThreads(retval, id, tls);
     return retval;
   }
-  CacheManager::ObjectInfo object_info;
-  object_info.flags = object_flags;
-  object_info.description = name;
-  cache_mgr_->CtrlTxn(object_info, 0, txn);
+  CacheManager::Label label;
+  label.flags = object_flags;
+  label.description = name;
+  cache_mgr_->CtrlTxn(label, 0, txn);
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
   TransactionSink sink(cache_mgr_, txn);
@@ -270,14 +270,14 @@ int Fetcher::OpenSelect(
   const std::string &name,
   int object_flags)
 {
-  bool is_catalog = object_flags & CacheManager::ObjectInfo::kLabelCatalog;
-  if (is_catalog || (object_flags & CacheManager::ObjectInfo::kLabelPinned)) {
+  bool is_catalog = object_flags & CacheManager::kLabelCatalog;
+  if (is_catalog || (object_flags & CacheManager::kLabelPinned)) {
     return cache_mgr_->OpenPinned(id, name, is_catalog);
   } else {
-    CacheManager::ObjectInfo object_info;
-    object_info.flags = object_flags;
-    object_info.description = name;
-    return cache_mgr_->Open(CacheManager::LabeledObject(id, object_info));
+    CacheManager::Label label;
+    label.flags = object_flags;
+    label.description = name;
+    return cache_mgr_->Open(CacheManager::LabeledObject(id, label));
   }
 }
 

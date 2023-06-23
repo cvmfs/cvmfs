@@ -86,9 +86,9 @@ bool CacheManager::CommitFromMem(
   int fd = this->StartTxn(id, size, txn);
   if (fd < 0)
     return false;
-  ObjectInfo object_info;
-  object_info.description = description;
-  this->CtrlTxn(object_info, 0, txn);
+  Label label;
+  label.description = description;
+  this->CtrlTxn(label, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
     this->AbortTxn(txn);
@@ -135,9 +135,9 @@ bool CacheManager::Open2Mem(
   *size = 0;
   *buffer = NULL;
 
-  ObjectInfo object_info;
-  object_info.description = description;
-  int fd = this->Open(LabeledObject(id, object_info));
+  Label label;
+  label.description = description;
+  int fd = this->Open(LabeledObject(id, label));
   if (fd < 0)
     return false;
 
@@ -176,11 +176,11 @@ int CacheManager::OpenPinned(
   const string &description,
   bool is_catalog)
 {
-  ObjectInfo object_info;
-  object_info.description = description;
+  Label label;
+  label.description = description;
   if (is_catalog)
-    object_info.flags |= ObjectInfo::kLabelCatalog;
-  int fd = this->Open(LabeledObject(id, object_info));
+    label.flags |= kLabelCatalog;
+  int fd = this->Open(LabeledObject(id, label));
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {

@@ -324,9 +324,9 @@ void CacheTransport::FillObjectType(
   int object_flags, cvmfs::EnumObjectType *wire_type)
 {
   *wire_type = cvmfs::OBJECT_REGULAR;
-  if (object_flags & CacheManager::ObjectInfo::kLabelCatalog)
+  if (object_flags & CacheManager::kLabelCatalog)
     *wire_type = cvmfs::OBJECT_CATALOG;
-  if (object_flags & CacheManager::ObjectInfo::kLabelVolatile)
+  if (object_flags & CacheManager::kLabelVolatile)
     *wire_type = cvmfs::OBJECT_VOLATILE;
 }
 
@@ -364,10 +364,10 @@ bool CacheTransport::ParseObjectType(
     case cvmfs::OBJECT_REGULAR:
       return true;
     case cvmfs::OBJECT_CATALOG:
-      *object_flags |= CacheManager::ObjectInfo::kLabelCatalog;
+      *object_flags |= CacheManager::kLabelCatalog;
       return true;
     case cvmfs::OBJECT_VOLATILE:
-      *object_flags |= CacheManager::ObjectInfo::kLabelVolatile;
+      *object_flags |= CacheManager::kLabelVolatile;
       return true;
     default:
       return false;

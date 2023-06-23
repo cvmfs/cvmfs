@@ -1272,7 +1272,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     string(path.GetChars(), path.GetLength()),
     dirent.compression_algorithm(),
     mount_point_->catalog_mgr()->volatile_flag()
-      ? CacheManager::ObjectInfo::kLabelVolatile : 0);
+      ? CacheManager::kLabelVolatile : 0);
 
   if (fd >= 0) {
     if (perf::Xadd(file_system_->no_open_files(), 1) <
@@ -1393,7 +1393,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
             verbose_path,
             chunks.compression_alg,
             mount_point_->catalog_mgr()->volatile_flag()
-              ? CacheManager::ObjectInfo::kLabelVolatile
+              ? CacheManager::kLabelVolatile
               : 0,
             chunks.path.ToString(),
             chunks.list->AtPtr(chunk_idx)->offset());
@@ -1404,7 +1404,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
             verbose_path,
             chunks.compression_alg,
             mount_point_->catalog_mgr()->volatile_flag()
-              ? CacheManager::ObjectInfo::kLabelVolatile
+              ? CacheManager::kLabelVolatile
               : 0);
         }
         if (chunk_fd.fd < 0) {
@@ -1859,7 +1859,7 @@ bool Pin(const string &path) {
           chunks.AtPtr(i)->size(),
           "Part of " + path,
           dirent.compression_algorithm(),
-          CacheManager::ObjectInfo::kLabelPinned,
+          CacheManager::kLabelPinned,
           path,
           chunks.AtPtr(i)->offset());
       } else {
@@ -1868,7 +1868,7 @@ bool Pin(const string &path) {
           chunks.AtPtr(i)->size(),
           "Part of " + path,
           dirent.compression_algorithm(),
-          CacheManager::ObjectInfo::kLabelPinned);
+          CacheManager::kLabelPinned);
       }
       if (fd < 0) {
         return false;
@@ -1887,7 +1887,7 @@ bool Pin(const string &path) {
     : mount_point_->fetcher();
   int fd = this_fetcher->Fetch(
     dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
-    CacheManager::ObjectInfo::kLabelPinned);
+    CacheManager::kLabelPinned);
   if (fd < 0) {
     return false;
   }

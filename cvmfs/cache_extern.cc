@@ -296,13 +296,13 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
 
 
 void ExternalCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
+  const Label &label,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->object_info = object_info;
-  transaction->object_info_modified = true;
+  transaction->label = label;
+  transaction->label_modified = true;
 }
 
 
@@ -445,11 +445,11 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   msg_store.set_expected_size(transaction->expected_size);
   msg_store.set_last_part(do_commit);
 
-  if (transaction->object_info_modified) {
+  if (transaction->label_modified) {
     cvmfs::EnumObjectType object_type;
-    transport_.FillObjectType(transaction->object_info.flags, &object_type);
+    transport_.FillObjectType(transaction->label.flags, &object_type);
     msg_store.set_object_type(object_type);
-    msg_store.set_description(transaction->object_info.description);
+    msg_store.set_description(transaction->label.description);
   }
 
   RpcJob rpc_job(&msg_store);
@@ -657,7 +657,7 @@ int ExternalCacheManager::Reset(void *txn) {
   transaction->size = 0;
   transaction->open_fds = 0;
   transaction->committed = false;
-  transaction->object_info_modified = true;
+  transaction->label_modified = true;
 
   if (!transaction->flushed)
     return 0;

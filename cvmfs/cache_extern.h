@@ -81,7 +81,7 @@ class ExternalCacheManager : public CacheManager {
   }
 #endif
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const ObjectInfo &object_info,
+  virtual void CtrlTxn(const Label &label,
                        const int flags,
                        void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
@@ -127,11 +127,11 @@ class ExternalCacheManager : public CacheManager {
       , buf_pos(0)
       , size(0)
       , expected_size(kSizeUnknown)
-      , object_info()
+      , label()
       , open_fds(0)
       , flushed(false)
       , committed(false)
-      , object_info_modified(false)
+      , label_modified(false)
       , transaction_id(0)
       , id(id)
     { }
@@ -144,11 +144,11 @@ class ExternalCacheManager : public CacheManager {
     unsigned buf_pos;
     uint64_t size;
     uint64_t expected_size;
-    ObjectInfo object_info;
+    Label label;
     int open_fds;
     bool flushed;
     bool committed;
-    bool object_info_modified;
+    bool label_modified;
     uint64_t transaction_id;
     shash::Any id;
   };  // class Transaction

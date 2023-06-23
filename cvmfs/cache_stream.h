@@ -59,11 +59,8 @@ class StreamingCacheManager : public CacheManager {
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) {
     return cache_mgr_->StartTxn(id, size, txn);
   }
-  virtual void CtrlTxn(const ObjectInfo &object_info,
-                       const int flags,
-                       void *txn)
-  {
-    cache_mgr_->CtrlTxn(object_info, flags, txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn) {
+    cache_mgr_->CtrlTxn(label, flags, txn);
   }
   virtual int64_t Write(const void *buf, uint64_t size, void *txn)
   {

@@ -67,7 +67,7 @@ int TieredCacheManager::Open(const LabeledObject &object) {
     lower_->Close(fd2);
     return fd;
   }
-  upper_->CtrlTxn(object.info, 0, txn);
+  upper_->CtrlTxn(object.label, 0, txn);
 
   std::vector<char> m_buffer;
   m_buffer.resize(kCopyBufferSize);
@@ -134,15 +134,12 @@ CacheManager *TieredCacheManager::Create(
 }
 
 
-void TieredCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
-  const int flags,
-  void *txn)
+void TieredCacheManager::CtrlTxn(const Label &label, const int flags, void *txn)
 {
-  upper_->CtrlTxn(object_info, flags, txn);
+  upper_->CtrlTxn(label, flags, txn);
   if (!lower_readonly_) {
     void *txn2 = static_cast<char*>(txn) + upper_->SizeOfTxn();
-    lower_->CtrlTxn(object_info, flags, txn2);
+    lower_->CtrlTxn(label, flags, txn2);
   }
 }
 

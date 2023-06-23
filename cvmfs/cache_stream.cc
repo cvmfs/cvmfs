@@ -163,7 +163,7 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
   if (fd_in_cache_mgr != -ENOENT)
     return fd_in_cache_mgr;
 
-  if (object.info.IsCatalog() || object.info.IsPinned())
+  if (object.label.IsCatalog() || object.label.IsPinned())
     return -ENOENT;
 
   MutexLockGuard lock_guard(lock_fd_table_);

@@ -53,9 +53,7 @@ class TieredCacheManager : public CacheManager {
   virtual uint32_t SizeOfTxn()
   { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const ObjectInfo &object_info,
-                       const int flags,
-                       void *txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int OpenFromTxn(void *txn) { return upper_->OpenFromTxn(txn); }

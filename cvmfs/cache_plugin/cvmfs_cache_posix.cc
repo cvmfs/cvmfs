@@ -241,16 +241,16 @@ int posix_start_txn(struct cvmcache_hash *id,
   transaction.type = info->type;
   g_transactions->Insert(txn_id, transaction);
 
-  CacheManager::ObjectInfo object_info;
+  CacheManager::Label label;
   if (info->type == CVMCACHE_OBJECT_CATALOG) {
-    object_info.flags |= CacheManager::ObjectInfo::kLabelCatalog;
+    label.flags |= CacheManager::kLabelCatalog;
   } else if (info->type == CVMCACHE_OBJECT_VOLATILE) {
-    object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
+    label.flags = CacheManager::kLabelVolatile;
   }
   if (info->description) {
-    object_info.description = info->description;
+    label.description = info->description;
   }
-  g_cache_mgr->CtrlTxn(object_info, 0, txn);
+  g_cache_mgr->CtrlTxn(label, 0, txn);
   return CVMCACHE_STATUS_OK;
 }
 

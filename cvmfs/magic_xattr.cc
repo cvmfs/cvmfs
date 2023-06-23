@@ -376,12 +376,12 @@ bool LHashMagicXattr::PrepareValueFenced() {
 
 std::string LHashMagicXattr::GetValue() {
   string result;
-  CacheManager::ObjectInfo object_info;
-  object_info.description = path_.ToString();
+  CacheManager::Label label;
+  label.description = path_.ToString();
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
-    object_info.flags = CacheManager::ObjectInfo::kLabelVolatile;
+    label.flags = CacheManager::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
-    CacheManager::LabeledObject(dirent_->checksum(), object_info));
+    CacheManager::LabeledObject(dirent_->checksum(), label));
   if (fd < 0) {
     result = "Not in cache";
   } else {
