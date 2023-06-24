@@ -144,10 +144,6 @@ class CacheManager : SingleCopy {
     shash::Any id;
     Label label;
   };
-  //// Convenience constructors, users can call Open(CacheManager::Label(my_hash))
-  //static inline LabeledObject Label(const shash::Any &id) {
-  //  return LabeledObject(id);
-  //}
 
   virtual CacheManagerIds id() = 0;
   /**

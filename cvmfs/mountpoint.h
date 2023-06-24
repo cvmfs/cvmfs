@@ -505,6 +505,7 @@ class MountPoint : SingleCopy, public BootFactory {
   cvmfs::Fetcher *fetcher() { return fetcher_; }
   bool fixed_catalog() { return fixed_catalog_; }
   std::string fqrn() const { return fqrn_; }
+  // TODO(jblomer): use only a singler fetcher object
   cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
   FileSystem *file_system() { return file_system_; }
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }

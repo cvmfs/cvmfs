@@ -5,15 +5,14 @@
 #ifndef CVMFS_CACHE_STREAM_H_
 #define CVMFS_CACHE_STREAM_H_
 
-#include "cache.h"
-
 #include <pthread.h>
 
 #include <string>
 
-#include <crypto/hash.h>
-#include <fd_table.h>
-#include <util/pointer.h>
+#include "cache.h"
+#include "crypto/hash.h"
+#include "fd_table.h"
+#include "util/pointer.h"
 
 namespace download {
 class DownloadManager;
@@ -80,11 +79,9 @@ class StreamingCacheManager : public CacheManager {
     return cache_mgr_->StoreBreadcrumb(manifest);
   }
 
- protected:
-
  private:
   struct FdInfo {
-    const static int kFlagExternal = 0x01;  ///< use external download manager
+    static const int kFlagExternal = 0x01;  ///< use external download manager
 
     int fd_in_cache_mgr;
     int flags;
@@ -114,7 +111,7 @@ class StreamingCacheManager : public CacheManager {
   /// and its size is returned (-errno on error).
   /// The given section of the object is copied into the provided buffer,
   /// which may be NULL if only the size of the object is relevant.
-  int64_t Stream(FdInfo &info, void *buf, uint64_t size, uint64_t offset);
+  int64_t Stream(const FdInfo &info, void *buf, uint64_t size, uint64_t offset);
 
   UniquePtr<CacheManager> cache_mgr_;
   download::DownloadManager *regular_download_mgr_;

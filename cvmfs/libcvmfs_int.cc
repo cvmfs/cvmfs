@@ -655,7 +655,7 @@ int64_t LibContext::Pread(
         label.size = chunk_list->AtPtr(chunk_idx)->size();
         label.zip_algorithm = compression_alg;
         label.flags |= CacheManager::kLabelChunked;
-        if ( open_chunks.chunk_reflist.external_data) {
+        if (open_chunks.chunk_reflist.external_data) {
           label.flags |= CacheManager::kLabelExternal;
           label.range_offset = chunk_list->AtPtr(chunk_idx)->offset();
         }

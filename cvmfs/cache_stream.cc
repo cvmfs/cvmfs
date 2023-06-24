@@ -78,10 +78,10 @@ class StreamingSink : public cvmfs::Sink {
   int64_t GetNBytesStreamed() const { return pos_; }
 
  private:
-   uint64_t pos_;
-   void *window_buf_;
-   uint64_t window_size_;
-   uint64_t window_offset_;
+  uint64_t pos_;
+  void *window_buf_;
+  uint64_t window_size_;
+  uint64_t window_offset_;
 };  // class StreamingSink
 
 }  // anonymous namespace
@@ -96,7 +96,7 @@ download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
 }
 
 int64_t StreamingCacheManager::Stream(
-  FdInfo &info,
+  const FdInfo &info,
   void *buf,
   uint64_t size,
   uint64_t offset)
