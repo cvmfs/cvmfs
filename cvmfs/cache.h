@@ -13,6 +13,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "util/pointer.h"
@@ -96,7 +97,7 @@ class CacheManager : SingleCopy {
       uint64_t size;
     };
 
-    Label() : flags(0) { }
+    Label() : flags(0), size(kSizeUnknown), zip_algorithm(zlib::kZlibDefault) {}
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
@@ -112,6 +113,8 @@ class CacheManager : SingleCopy {
     }
 
     int flags;
+    uint64_t size;
+    zlib::Algorithms zip_algorithm;
     Range range;
     /**
      * The logical path on the mountpoint connected to the object. For meta-
