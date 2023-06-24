@@ -49,6 +49,9 @@ RamCacheManager::RamCacheManager(
   assert(retval == 0);
   LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
            max_size, max_entries);
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+           "DEPRECATION WARNING: The RAM cache manager is depcreated and "
+           "will be removed from future releases.");
 }
 
 
