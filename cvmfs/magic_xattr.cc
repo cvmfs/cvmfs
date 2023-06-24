@@ -553,10 +553,12 @@ std::string RepoMetainfoMagicXattr::GetValue() {
     return error_reason_;
   }
 
-  int fd = xattr_mgr_->mount_point()->fetcher()->
-            Fetch(metainfo_hash_, CacheManager::kSizeUnknown,
-                  "metainfo (" + metainfo_hash_.ToString() + ")",
-                  zlib::kZlibDefault, 0, "");
+  CacheManager::Label label;
+  label.path = xattr_mgr_->mount_point()->fqrn() +
+               "(" + metainfo_hash_.ToString() + ")";
+  label.flags = CacheManager::kLabelMetainfo;
+  int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
+    CacheManager::LabeledObject(metainfo_hash_, label));
   if (fd < 0) {
     return "Failed to open metadata file";
   }

@@ -258,9 +258,11 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
-  int fd = fetcher_->Fetch(hash, CacheManager::kSizeUnknown, name,
-    zlib::kZlibDefault, CacheManager::kLabelCatalog,
-    alt_catalog_path);
+  CacheManager::Label label;
+  label.path = name;
+  label.flags = CacheManager::kLabelCatalog;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
+                           alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

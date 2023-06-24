@@ -1480,13 +1480,11 @@ void MountPoint::CreateFetchers() {
     backoff_throttle_,
     perf::StatisticsTemplate("fetch", statistics_));
 
-  const bool is_external_data = true;
   external_fetcher_ = new cvmfs::Fetcher(
     file_system_->cache_mgr(),
     external_download_mgr_,
     backoff_throttle_,
-    perf::StatisticsTemplate("fetch-external", statistics_),
-    is_external_data);
+    perf::StatisticsTemplate("fetch-external", statistics_));
 }
 
 
@@ -1724,12 +1722,10 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     return false;
   }
 
-  int fd = fetcher_->Fetch(
-    history_hash,
-    CacheManager::kSizeUnknown,
-    "tag database for " + fqrn_,
-    zlib::kZlibDefault,
-    0);
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelHistory;
+  label.path = fqrn_;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;

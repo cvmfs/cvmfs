@@ -166,7 +166,6 @@ bool CacheManager::Open2Mem(
  * pins into a no-op, so that the accounting does not get out of sync.)
  */
 int CacheManager::OpenPinned(const LabeledObject &object) {
-  assert(object.label.IsPinned());
   int fd = this->Open(object);
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);

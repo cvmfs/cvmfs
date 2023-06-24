@@ -1266,13 +1266,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   Fetcher *this_fetcher = dirent.IsExternalFile()
     ? mount_point_->external_fetcher()
     : mount_point_->fetcher();
-  fd = this_fetcher->Fetch(
-    dirent.checksum(),
-    dirent.size(),
-    string(path.GetChars(), path.GetLength()),
-    dirent.compression_algorithm(),
-    mount_point_->catalog_mgr()->volatile_flag()
-      ? CacheManager::kLabelVolatile : 0);
+  CacheManager::Label label;
+  label.path = path.GetChars(), path.GetLength();
+  label.size = dirent.size();
+  label.zip_algorithm = dirent.compression_algorithm();
+  if (mount_point_->catalog_mgr()->volatile_flag())
+    label.flags |= CacheManager::kLabelVolatile;
+  if (dirent.IsExternalFile())
+    label.flags |= CacheManager::kLabelExternal;
+  fd =
+    this_fetcher->Fetch(CacheManager::LabeledObject(dirent.checksum(), label));
 
   if (fd >= 0) {
     if (perf::Xadd(file_system_->no_open_files(), 1) <
@@ -1385,28 +1388,22 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       // Open file descriptor to chunk
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) file_system_->cache_mgr()->Close(chunk_fd.fd);
-        string verbose_path = "Part of " + chunks.path.ToString();
+        Fetcher *this_fetcher = chunks.external_data
+          ? mount_point_->external_fetcher()
+          : mount_point_->fetcher();
+        CacheManager::Label label;
+        label.path = chunks.path.ToString();
+        label.size = chunks.list->AtPtr(chunk_idx)->size();
+        label.zip_algorithm = chunks.compression_alg;
+        label.flags |= CacheManager::kLabelChunked;
+        if (mount_point_->catalog_mgr()->volatile_flag())
+          label.flags |= CacheManager::kLabelVolatile;
         if (chunks.external_data) {
-          chunk_fd.fd = mount_point_->external_fetcher()->Fetch(
-            chunks.list->AtPtr(chunk_idx)->content_hash(),
-            chunks.list->AtPtr(chunk_idx)->size(),
-            verbose_path,
-            chunks.compression_alg,
-            mount_point_->catalog_mgr()->volatile_flag()
-              ? CacheManager::kLabelVolatile
-              : 0,
-            chunks.path.ToString(),
-            chunks.list->AtPtr(chunk_idx)->offset());
-        } else {
-          chunk_fd.fd = mount_point_->fetcher()->Fetch(
-            chunks.list->AtPtr(chunk_idx)->content_hash(),
-            chunks.list->AtPtr(chunk_idx)->size(),
-            verbose_path,
-            chunks.compression_alg,
-            mount_point_->catalog_mgr()->volatile_flag()
-              ? CacheManager::kLabelVolatile
-              : 0);
+          label.flags |= CacheManager::kLabelExternal;
+          label.range_offset = chunks.list->AtPtr(chunk_idx)->offset();
         }
+        chunk_fd.fd = this_fetcher->Fetch(CacheManager::LabeledObject(
+          chunks.list->AtPtr(chunk_idx)->content_hash(), label));
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
           chunk_tables->Lock();
@@ -1836,6 +1833,10 @@ bool Pin(const string &path) {
     return false;
   }
 
+  Fetcher *this_fetcher = dirent.IsExternalFile()
+    ? mount_point_->external_fetcher()
+    : mount_point_->fetcher();
+
   if (!dirent.IsChunkedFile()) {
     fuse_remounter_->fence()->Leave();
   } else {
@@ -1853,23 +1854,18 @@ bool Pin(const string &path) {
       if (!retval)
         return false;
       int fd = -1;
+      CacheManager::Label label;
+      label.path = path;
+      label.size = chunks.AtPtr(i)->size();
+      label.zip_algorithm = dirent.compression_algorithm();
+      label.flags |= CacheManager::kLabelPinned;
+      label.flags |= CacheManager::kLabelChunked;
       if (dirent.IsExternalFile()) {
-        fd = mount_point_->external_fetcher()->Fetch(
-          chunks.AtPtr(i)->content_hash(),
-          chunks.AtPtr(i)->size(),
-          "Part of " + path,
-          dirent.compression_algorithm(),
-          CacheManager::kLabelPinned,
-          path,
-          chunks.AtPtr(i)->offset());
-      } else {
-        fd = mount_point_->fetcher()->Fetch(
-          chunks.AtPtr(i)->content_hash(),
-          chunks.AtPtr(i)->size(),
-          "Part of " + path,
-          dirent.compression_algorithm(),
-          CacheManager::kLabelPinned);
+        label.flags |= CacheManager::kLabelExternal;
+        label.range_offset = chunks.AtPtr(i)->offset();
       }
+      fd = this_fetcher->Fetch(CacheManager::LabeledObject(
+        chunks.AtPtr(i)->content_hash(), label));
       if (fd < 0) {
         return false;
       }
@@ -1882,12 +1878,13 @@ bool Pin(const string &path) {
     dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  Fetcher *this_fetcher = dirent.IsExternalFile()
-    ? mount_point_->external_fetcher()
-    : mount_point_->fetcher();
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelPinned;
+  label.size = dirent.size();
+  label.path = path;
+  label.zip_algorithm = dirent.compression_algorithm();
   int fd = this_fetcher->Fetch(
-    dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
-    CacheManager::kLabelPinned);
+    CacheManager::LabeledObject(dirent.checksum(), label));
   if (fd < 0) {
     return false;
   }

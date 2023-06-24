@@ -83,6 +83,8 @@ class CacheManager : SingleCopy {
   static const int kLabelExternal    = 0x08;
   static const int kLabelChunked     = 0x10;
   static const int kLabelCertificate = 0x20;
+  static const int kLabelMetainfo    = 0x40;
+  static const int kLabelHistory     = 0x80;
 
   /**
    * Meta-data of an object that the cache may or may not maintain/use.
@@ -91,16 +93,16 @@ class CacheManager : SingleCopy {
    * object, if necessary.
    */
   struct Label {
-    struct Range {
-      Range() : offset(0), size(0) {}
-      uint64_t offset;
-      uint64_t size;
-    };
-
-    Label() : flags(0), size(kSizeUnknown), zip_algorithm(zlib::kZlibDefault) {}
+    Label() : flags(0)
+            , size(kSizeUnknown)
+            , zip_algorithm(zlib::kZlibDefault)
+            , range_offset(-1)
+    {}
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
+    bool IsExternal() const { return flags & kLabelExternal; }
+
     /**
      * The description for the quota manager
      */
@@ -109,13 +111,19 @@ class CacheManager : SingleCopy {
         return "file catalog at " + path;
       if (flags & kLabelCertificate)
         return "certificate for " + path;
+      if (flags & kLabelMetainfo)
+        return "metainfo for " + path;
+      if (flags & kLabelHistory)
+        return "tag database for " + path;
+      if (flags & kLabelChunked)
+        return "Part of " + path;
       return path;
     }
 
     int flags;
-    uint64_t size;
+    uint64_t size;  ///< unzipped size, if known
     zlib::Algorithms zip_algorithm;
-    Range range;
+    off_t range_offset;
     /**
      * The logical path on the mountpoint connected to the object. For meta-
      * data objects, e.g. certificate, catalog, it's the repository name (which
