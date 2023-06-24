@@ -81,16 +81,14 @@ class StreamingCacheManager : public CacheManager {
 
  private:
   struct FdInfo {
-    static const int kFlagExternal = 0x01;  ///< use external download manager
-
     int fd_in_cache_mgr;
-    int flags;
     shash::Any object_id;
+    CacheManager::Label label;
 
-    FdInfo() : fd_in_cache_mgr(-1), flags(0) {}
-    explicit FdInfo(int fd) : fd_in_cache_mgr(fd), flags(0) {}
-    FdInfo(const shash::Any &id, int f)
-      : fd_in_cache_mgr(-1), flags(f), object_id(id) {}
+    FdInfo() : fd_in_cache_mgr(-1) {}
+    explicit FdInfo(int fd) : fd_in_cache_mgr(fd) {}
+    explicit FdInfo(const CacheManager::LabeledObject &object)
+      : fd_in_cache_mgr(-1), object_id(object.id), label(object.label) {}
 
     bool operator ==(const FdInfo &other) const {
       return this->fd_in_cache_mgr == other.fd_in_cache_mgr &&

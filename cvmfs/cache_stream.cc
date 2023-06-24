@@ -90,7 +90,7 @@ class StreamingSink : public cvmfs::Sink {
 download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
   const FdInfo &info)
 {
-  if (info.flags & FdInfo::kFlagExternal)
+  if (info.label.IsExternal())
     return external_download_mgr_;
   return regular_download_mgr_;
 }
@@ -102,12 +102,21 @@ int64_t StreamingCacheManager::Stream(
   uint64_t offset)
 {
   StreamingSink sink(buf, size, offset);
-  std::string url = "/data/" + info.object_id.MakePath();
+  std::string url;
+  if (info.label.IsExternal()) {
+    url = info.label.path;
+  } else {
+    url = "/data/" + info.object_id.MakePath();
+  }
+  bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
   download::JobInfo download_job(&url,
-                                 true, /* compressed */
+                                 is_zipped,
                                  true, /* probe_hosts */
                                  &info.object_id,
                                  &sink);
+  download_job.extra_info = &info.label.path;
+  download_job.range_offset = info.label.range_offset;
+  download_job.range_size = info.label.size;
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code != download::kFailOk)
@@ -167,7 +176,7 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
     return -ENOENT;
 
   MutexLockGuard lock_guard(lock_fd_table_);
-  return fd_table_.OpenFd(FdInfo(object.id, 0));
+  return fd_table_.OpenFd(FdInfo(object));
 }
 
 int64_t StreamingCacheManager::GetSize(int fd) {
@@ -202,7 +211,7 @@ int StreamingCacheManager::Dup(int fd) {
     return fd_table_.OpenFd(FdInfo(dup_fd));
   }
 
-  return fd_table_.OpenFd(FdInfo(info.object_id, info.flags));
+  return fd_table_.OpenFd(FdInfo(LabeledObject(info.object_id, info.label)));
 }
 
 int StreamingCacheManager::Close(int fd) {
