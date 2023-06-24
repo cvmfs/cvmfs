@@ -184,7 +184,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
       (transaction->label.flags & kLabelCatalog))
   {
     bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->label.description,
+      transaction->id, transaction->size, transaction->label.GetDescription(),
       (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
@@ -215,12 +215,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     // Success, inform quota manager
     if (transaction->label.flags & kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
-                                 transaction->label.description);
+                                 transaction->label.GetDescription());
     } else if (!transaction->label.IsCatalog() &&
                !transaction->label.IsPinned())
     {
       quota_mgr_->Insert(transaction->id, transaction->size,
-                         transaction->label.description);
+                         transaction->label.GetDescription());
     }
   }
   transaction->~Transaction();

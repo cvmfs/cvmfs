@@ -176,7 +176,7 @@ int CacheManager::OpenPinned(const LabeledObject &object) {
     }
     bool retval = quota_mgr_->Pin(
       object.id, static_cast<uint64_t>(size),
-      object.label.description, object.label.IsCatalog());
+      object.label.GetDescription(), object.label.IsCatalog());
     if (!retval) {
       this->Close(fd);
       return -ENOSPC;

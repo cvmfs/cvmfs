@@ -155,7 +155,7 @@ int Fetcher::Fetch(
   }
   CacheManager::Label label;
   label.flags = object_flags;
-  label.description = name;
+  label.path = name;
   cache_mgr_->CtrlTxn(label, 0, txn);
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
@@ -272,7 +272,7 @@ int Fetcher::OpenSelect(
 {
   CacheManager::Label label;
   label.flags = object_flags;
-  label.description = name;
+  label.path = name;
   bool is_catalog = object_flags & CacheManager::kLabelCatalog;
   if (is_catalog || (object_flags & CacheManager::kLabelPinned)) {
     label.flags |= CacheManager::kLabelPinned;

@@ -256,11 +256,11 @@ class T_ExternalCacheManager : public ::testing::Test {
     delete mock_plugin_;
   }
 
-  CacheManager::LabeledObject LabelWithDesc(const shash::Any &id,
-                                            const std::string &desc)
+  CacheManager::LabeledObject LabelWithPath(const shash::Any &id,
+                                            const std::string &path)
   {
     CacheManager::Label label;
-    label.description = desc;
+    label.path = path;
     return CacheManager::LabeledObject(id, label);
   }
 
@@ -349,7 +349,7 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(id, content.length(), txn));
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
                                          data, content.length()));
 }
 
@@ -423,31 +423,31 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
                                         data, content.length()));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 
   content = "";
   HashString(content, &id);
   data = NULL;
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
               data, content.length()));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"), &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
 
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
     scalloc(large_size, 1));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
                                         large_buffer, large_size));
   unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
     smalloc(large_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
   EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
@@ -456,10 +456,10 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
   large_size = 50 * 1024 * 1024 + 1;
   large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
                                         large_buffer, large_size));
   large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
   EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
@@ -492,7 +492,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
 
   uint64_t read_size = write_size;
   unsigned char *read_buffer = static_cast<unsigned char *>(smalloc(read_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &read_buffer, &read_size));
   EXPECT_EQ(read_size, write_size);
   EXPECT_EQ(0, memcmp(read_buffer, write_buffer, read_size));
@@ -630,7 +630,7 @@ static void *MainMultiThread(void *data) {
   uint64_t size;
   unsigned char *buffer;
   CacheManager::Label label;
-  label.description = "test";
+  label.path = "test";
   EXPECT_TRUE(
     td->cache_mgr->Open2Mem(CacheManager::LabeledObject(td->id, label),
                             &buffer, &size));
@@ -660,7 +660,7 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   memset(large_buffer, 1, large_size);
   shash::Any id(shash::kSha1);
   shash::HashMem(large_buffer, large_size, &id);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithDesc(id, "test"),
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
                                         large_buffer, large_size));
 
   const unsigned num_threads = 10;

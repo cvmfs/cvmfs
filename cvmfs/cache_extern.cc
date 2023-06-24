@@ -449,7 +449,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
     cvmfs::EnumObjectType object_type;
     transport_.FillObjectType(transaction->label.flags, &object_type);
     msg_store.set_object_type(object_type);
-    msg_store.set_description(transaction->label.description);
+    msg_store.set_description(transaction->label.GetDescription());
   }
 
   RpcJob rpc_job(&msg_store);

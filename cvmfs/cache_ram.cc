@@ -225,7 +225,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 
 void RamCacheManager::CtrlTxn(const Label &label, const int flags, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->description = label.description;
+  transaction->description = label.GetDescription();
   transaction->buffer.object_flags = label.flags;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());

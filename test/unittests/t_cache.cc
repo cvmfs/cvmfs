@@ -21,6 +21,7 @@
 #include "testutil.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -173,7 +174,7 @@ class TestQuotaManager : public QuotaManager {
     last_cmd.size = size;
     last_cmd.description = description;
     last_cmd.is_catalog = is_catalog;
-    return description != "fail";
+    return !HasSuffix(description, "fail", false /* ignore_case */);
   }
   virtual void Unpin(const shash::Any &hash) {
     last_cmd = LastCommand();
@@ -382,7 +383,7 @@ TEST_F(T_CacheManager, OpenPinned) {
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   quota_mgr->Unpin(hash_null_);
 
-  label.description = "fail";
+  label.path = "fail";
   fd = cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
   EXPECT_EQ(-ENOSPC, fd);
 }
@@ -495,7 +496,7 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
   CacheManager::Label label;
-  label.description = "desc0";
+  label.path = "desc0";
   label.flags = CacheManager::kLabelVolatile;
   cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(1U, cache_mgr_->Write(buf, 1, txn));
@@ -506,7 +507,7 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_EQ("desc0", quota_mgr->last_cmd.description);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
-  label.description = "desc1";
+  label.path = "desc1";
   label.flags = CacheManager::kLabelPinned;
   cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(2U, cache_mgr_->Write(buf, 2, txn));
@@ -518,7 +519,7 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_FALSE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 3, txn), 0);
-  label.description = "desc2";
+  label.path = "desc2";
   label.flags = CacheManager::kLabelCatalog;
   cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(3U, cache_mgr_->Write(buf, 3, txn));
@@ -527,7 +528,7 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_TRUE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
-  label.description = "fail";
+  label.path = "fail";
   cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(-ENOSPC, cache_mgr_->CommitTxn(txn));
 }
@@ -548,7 +549,7 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   CacheManager::Label label;
-  label.description = "desc";
+  label.path = "desc";
   label.flags = CacheManager::kLabelCatalog;
   cache_mgr_->CtrlTxn(label, 0, txn);
   string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());

@@ -377,7 +377,7 @@ bool LHashMagicXattr::PrepareValueFenced() {
 std::string LHashMagicXattr::GetValue() {
   string result;
   CacheManager::Label label;
-  label.description = path_.ToString();
+  label.path = path_.ToString();
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
     label.flags = CacheManager::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(

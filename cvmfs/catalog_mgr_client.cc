@@ -241,7 +241,8 @@ LoadError ClientCatalogManager::LoadCatalog(
 
   // Store new manifest and certificate
   CacheManager::Label label;
-  label.description = "certificate for " + repo_name_;
+  label.path = repo_name_;
+  label.flags |= CacheManager::kLabelCertificate;
   fetcher_->cache_mgr()->CommitFromMem(
     CacheManager::LabeledObject(ensemble.manifest->certificate(), label),
     ensemble.cert_buf, ensemble.cert_size);
@@ -333,7 +334,8 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
 
 void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   CacheManager::Label label;
-  label.description = "certificate for " + catalog_mgr_->repo_name();
+  label.flags |= CacheManager::kLabelCertificate;
+  label.path = catalog_mgr_->repo_name();
   uint64_t size;
   bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
                                      &cert_buf, &size);

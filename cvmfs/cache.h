@@ -76,11 +76,12 @@ class CacheManager : SingleCopy {
    * Relevant for the quota management and for downloading (URL construction).
    * Used in Label::flags.
    */
-  static const int kLabelCatalog  = 0x01;
-  static const int kLabelPinned   = 0x02;
-  static const int kLabelVolatile = 0x04;
-  static const int kLabelExternal = 0x08;
-  static const int kLabelChunked  = 0x10;
+  static const int kLabelCatalog     = 0x01;
+  static const int kLabelPinned      = 0x02;
+  static const int kLabelVolatile    = 0x04;
+  static const int kLabelExternal    = 0x08;
+  static const int kLabelChunked     = 0x10;
+  static const int kLabelCertificate = 0x20;
 
   /**
    * Meta-data of an object that the cache may or may not maintain/use.
@@ -99,13 +100,25 @@ class CacheManager : SingleCopy {
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
+    /**
+     * The description for the quota manager
+     */
+    std::string GetDescription() const {
+      if (flags & kLabelCatalog)
+        return "file catalog at " + path;
+      if (flags & kLabelCertificate)
+        return "certificate for " + path;
+      return path;
+    }
 
     int flags;
     Range range;
     /**
-     * Typically the path that triggered storing the object in the cache
+     * The logical path on the mountpoint connected to the object. For meta-
+     * data objects, e.g. certificate, catalog, it's the repository name (which
+     * does not start with a slash).
      */
-    std::string description;
+    std::string path;
   };
 
   /**

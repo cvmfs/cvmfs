@@ -248,7 +248,7 @@ int posix_start_txn(struct cvmcache_hash *id,
     label.flags = CacheManager::kLabelVolatile;
   }
   if (info->description) {
-    label.description = info->description;
+    label.path = info->description;
   }
   g_cache_mgr->CtrlTxn(label, 0, txn);
   return CVMCACHE_STATUS_OK;
