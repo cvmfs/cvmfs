@@ -36,13 +36,13 @@ class StreamingSink : public cvmfs::Sink {
     pos_ += sz;
 
     if (!window_buf_)
-      return sz;
+      return static_cast<int64_t>(sz);
 
     if (pos_ < window_offset_)
-      return sz;
+      return static_cast<int64_t>(sz);
 
     if (old_pos >= (window_offset_ + window_size_))
-      return sz;
+      return static_cast<int64_t>(sz);
 
     uint64_t copy_offset = std::max(old_pos, window_offset_);
     uint64_t inbuf_offset = copy_offset - old_pos;
@@ -54,7 +54,7 @@ class StreamingSink : public cvmfs::Sink {
            reinterpret_cast<const unsigned char *>(buf) + inbuf_offset,
            copy_size);
 
-    return sz;
+    return static_cast<int64_t>(sz);
   }
 
   virtual int Reset() {
@@ -67,7 +67,7 @@ class StreamingSink : public cvmfs::Sink {
     return (window_buf_ != NULL) || (window_size_ == 0);
   }
   virtual int Flush() { return 0; }
-  virtual bool Reserve(size_t size) { return true; }
+  virtual bool Reserve(size_t /* size */) { return true; }
   virtual bool RequiresReserve() { return false; }
   virtual std::string Describe() {
     std::string result =  "Streaming sink that is ";
@@ -75,7 +75,7 @@ class StreamingSink : public cvmfs::Sink {
     return result;
   }
 
-  int64_t GetNBytesStreamed() const { return pos_; }
+  int64_t GetNBytesStreamed() const { return static_cast<int64_t>(pos_); }
 
  private:
   uint64_t pos_;
@@ -116,7 +116,7 @@ int64_t StreamingCacheManager::Stream(
                                  &sink);
   download_job.extra_info = &info.label.path;
   download_job.range_offset = info.label.range_offset;
-  download_job.range_size = info.label.size;
+  download_job.range_size = static_cast<int64_t>(info.label.size);
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code != download::kFailOk)
@@ -249,8 +249,8 @@ int64_t StreamingCacheManager::Pread(
   if (nbytes_streamed < offset)
     return 0;
   if (nbytes_streamed > (offset + size))
-    return size;
-  return offset + size - nbytes_streamed;
+    return static_cast<int64_t>(size);
+  return static_cast<int64_t>(offset + size - nbytes_streamed);
 }
 
 int StreamingCacheManager::Readahead(int fd) {

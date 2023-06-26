@@ -46,9 +46,10 @@ class T_CacheManager : public ::testing::Test {
     unsigned char *zero_page;
     hash_page_.digest[0] = 2;
     zero_page = reinterpret_cast<unsigned char *>(scalloc(4096, 1));
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(
-      CacheManager::LabeledObject(hash_page_), zero_page, 4096));
+    bool retval = cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_page_), zero_page, 4096);
     free(zero_page);
+    ASSERT_TRUE(retval);
   }
 
   virtual void TearDown() {
@@ -242,7 +243,7 @@ class TestCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return type; }
   virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
-  virtual int Open(const LabeledObject &object) {
+  virtual int Open(const LabeledObject & /* object */) {
     return open("/dev/null", O_RDONLY);
   }
   virtual int64_t GetSize(int fd) { return 1; }

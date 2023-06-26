@@ -168,7 +168,7 @@ int Fetcher::Fetch(
   tls->download_job.compressed =
     (object.label.zip_algorithm == zlib::kZlibDefault);
   tls->download_job.range_offset = object.label.range_offset;
-  tls->download_job.range_size = object.label.size;
+  tls->download_job.range_size = static_cast<int64_t>(object.label.size);
   download_mgr_->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {

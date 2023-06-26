@@ -18,7 +18,8 @@ class T_StreamingCacheManager : public ::testing::Test {
   void StageFile(const std::string &content, shash::Any *hash) {
     void *zipped_buf;
     uint64_t zipped_size;
-    zlib::CompressMem2Mem(content.data(), content.length(),
+    zlib::CompressMem2Mem(content.data(),
+                          static_cast<int64_t>(content.length()),
                           &zipped_buf, &zipped_size);
     std::string zipped_data(reinterpret_cast<char *>(zipped_buf), zipped_size);
     HashString(zipped_data, hash);

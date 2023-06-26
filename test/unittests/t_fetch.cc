@@ -126,7 +126,7 @@ class BuggyCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return kUnknownCacheManager; }
   virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
-  virtual int Open(const LabeledObject &object) {
+  virtual int Open(const LabeledObject & /* object */) {
     if (!allow_open) {
       if (open_2nd_try)
         allow_open = true;
@@ -149,7 +149,9 @@ class BuggyCacheManager : public CacheManager {
     *static_cast<int *>(txn) = fd;
     return 0;
   }
-  virtual void CtrlTxn(const Label &label, const int flags, void *txn) {
+  virtual void CtrlTxn(const Label & /* label */, const int /* flags */,
+                       void * /* txn */)
+  {
     if (stall_in_ctrltxn) {
       atomic_inc32(&waiting_in_ctrltxn);
       while (atomic_read32(&continue_ctrltxn) == 0) { }
