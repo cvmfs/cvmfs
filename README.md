@@ -43,3 +43,9 @@ systems as means to distribute the software used to process experiment data.
 - [cvmfs-contrib](https://cvmfs-contrib.github.io/)
   - Community-contributed packages related to CernVM-FS but not maintained by
     the CernVM-FS developer team.
+## How to Interact With Us
+- [CernVM Forum](https://cernvm-forum.cern.ch/) For any kind of support 
+  questions, or problems you encounter.
+- [GitHub Issues](https://github.com/cvmfs/cvmfs/issues) For any kind of
+  bug reporting or improvement requests. This issue tracker is used for all
+  CernVM-FS-related repositories.
