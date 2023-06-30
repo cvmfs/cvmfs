@@ -47,13 +47,14 @@ int main(int argc, char **argv) {
     return ReturnError();
 
   int c;
+  ssize_t nbytes;
   do {
-    retval = read(fd, &c, 1);
-    if (retval == 0)
+    nbytes = read(fd, &c, 1);
+    if (nbytes == 0)
       break;
     printf("%c", c);
-  } while (retval == 1);
-  if (retval < 0)
+  } while (nbytes == 1);
+  if (nbytes < 0)
     return ReturnError();
 
   close(fd);
