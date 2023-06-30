@@ -102,6 +102,7 @@ class CacheManager : SingleCopy {
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
     bool IsExternal() const { return flags & kLabelExternal; }
+    bool IsCertificate() const { return flags & kLabelCertificate; }
 
     /**
      * The description for the quota manager

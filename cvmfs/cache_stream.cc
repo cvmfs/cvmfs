@@ -172,8 +172,11 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
   if (fd_in_cache_mgr != -ENOENT)
     return fd_in_cache_mgr;
 
-  if (object.label.IsCatalog() || object.label.IsPinned())
+  if (object.label.IsCatalog() || object.label.IsPinned() ||
+      object.label.IsCertificate())
+  {
     return -ENOENT;
+  }
 
   MutexLockGuard lock_guard(lock_fd_table_);
   return fd_table_.OpenFd(FdInfo(object));
@@ -276,4 +279,42 @@ int StreamingCacheManager::OpenFromTxn(void *txn) {
 
   MutexLockGuard lock_guard(lock_fd_table_);
   return fd_table_.OpenFd(FdInfo(fd));
+}
+
+void *StreamingCacheManager::DoSaveState() {
+  SavedState *state = new SavedState();
+  state->fd_table = fd_table_.Clone();
+  state->state_backing_cachemgr = cache_mgr_->SaveState(-1);
+  return state;
+}
+
+int StreamingCacheManager::DoRestoreState(void *data) {
+  // When DoRestoreState is called, we have fd 0 assigned to the root file
+  // catalog
+  FdInfo handle_root = fd_table_.GetHandle(0);
+
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+
+  int new_backing_root_fd =
+    cache_mgr_->RestoreState(-1, state->state_backing_cachemgr);
+  fd_table_.AssignFrom(*state->fd_table);
+
+  int new_root_fd = -1;
+  if (handle_root.IsValid()) {
+    if (new_backing_root_fd >= 0)
+      handle_root.fd_in_cache_mgr = new_backing_root_fd;
+    new_root_fd = fd_table_.OpenFd(handle_root);
+    // There must be a free file descriptor because the root file catalog gets
+    // closed before a reload
+    assert(new_root_fd >= 0);
+  }
+  return new_root_fd;
+}
+
+bool StreamingCacheManager::DoFreeState(void *data) {
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  cache_mgr_->FreeState(-1, state->state_backing_cachemgr);
+  delete state->fd_table;
+  delete state;
+  return true;
 }

@@ -82,5 +82,13 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
   cat cache_list | grep foo && return 44
 
+  sudo cvmfs_talk -p $talk_socket cache list
+  sudo cvmfs_talk -p $talk_socket cache list catalogs
+
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 50
+  ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 51
+  md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
+
   return 0
 }

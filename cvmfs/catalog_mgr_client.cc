@@ -112,7 +112,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   std::string *catalog_path,
   shash::Any *catalog_hash)
 {
-  string cvmfs_path = "file catalog at " + repo_name_ + ":" +
+  string cvmfs_path = repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
 

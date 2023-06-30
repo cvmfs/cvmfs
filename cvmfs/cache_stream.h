@@ -79,6 +79,11 @@ class StreamingCacheManager : public CacheManager {
     return cache_mgr_->StoreBreadcrumb(manifest);
   }
 
+ protected:
+  virtual void *DoSaveState();
+  virtual int DoRestoreState(void *data);
+  virtual bool DoFreeState(void *data);
+
  private:
   struct FdInfo {
     int fd_in_cache_mgr;
@@ -99,6 +104,14 @@ class StreamingCacheManager : public CacheManager {
     }
 
     bool IsValid() const { return fd_in_cache_mgr >= 0 || !object_id.IsNull(); }
+  };
+
+  struct SavedState {
+    explicit SavedState()
+      : version(0), fd_table(NULL), state_backing_cachemgr(NULL) { }
+    unsigned int version;
+    FdTable<FdInfo> *fd_table;
+    void *state_backing_cachemgr;
   };
 
   /// Depending on info.flags, selects either the regular or the external
