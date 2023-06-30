@@ -107,8 +107,7 @@ class StreamingCacheManager : public CacheManager {
   };
 
   struct SavedState {
-    explicit SavedState()
-      : version(0), fd_table(NULL), state_backing_cachemgr(NULL) { }
+    SavedState() : version(0), fd_table(NULL), state_backing_cachemgr(NULL) { }
     unsigned int version;
     FdTable<FdInfo> *fd_table;
     void *state_backing_cachemgr;
