@@ -90,5 +90,14 @@ cvmfs_run_test() {
   cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 51
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
 
+  gcc -Wall -o openwaitprint ${src_location}/openwaitprint.c || return 60
+  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  local pid_helper=$!
+
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 61
+  kill -USR1 $pid_helper
+  wait $pid_helper || return 62
+  diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 63
+
   return 0
 }
