@@ -30,12 +30,12 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO                                      || return $?
   echo "CVMFS_COMPRESSION_ALGORITHM=none" | \
     sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  mkdir -p ${repo_dir}/external                                           || return 6
+  cat /dev/urandom | head -c $((1000*1000*25)) > ${repo_dir}/external/foo || return 7
   if ! running_on_s3; then
     echo "CVMFS_EXTERNAL_DATA=true" | \
       sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
-    mkdir -p ${repo_dir}/external                                         || return 6
   fi
-  cat /dev/urandom | head -c $((1000*1000*25)) > ${repo_dir}/external/foo || return 7
   publish_repo $CVMFS_TEST_REPO -v                                        || return 9
 
   echo "*** Check catalog and data integrity"
@@ -90,7 +90,7 @@ cvmfs_run_test() {
   cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 51
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
 
-  gcc -Wall -o openwaitprint ${src_location}/openwaitprint.c || return 60
+  gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 60
   ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
   local pid_helper=$!
 
