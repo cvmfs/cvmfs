@@ -22,8 +22,10 @@
 #include "crypto/hash.h"
 #include "dns.h"
 #include "duplex_curl.h"
+#include "health_check.h"
 #include "jobinfo.h"
 #include "network_errors.h"
+#include "sharding_policy.h"
 #include "sink.h"
 #include "ssl.h"
 #include "statistics.h"
@@ -31,6 +33,7 @@
 #include "util/pipe.h"
 #include "util/pointer.h"
 #include "util/prng.h"
+#include "util/shared_ptr.h"
 
 class InterruptCue;
 
@@ -208,6 +211,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableIgnoreSignatureFailures();
   void UseSystemCertificatePath();
 
+  bool SetShardingPolicy(const ShardingPolicySelector type);
+  void SetDownloadFailoverIndefinitely();
+  void SetFqrn(std::string fqrn) { fqrn_ = fqrn; }
+
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
     return 0;
@@ -339,6 +346,24 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Shard requests across multiple proxies via consistent hashing
    */
   bool opt_proxy_shard_;
+
+  /**
+   * Sharding policy deciding which proxy should be chosen for each download
+   * request
+   */
+  SharedPtr<ShardingPolicy> sharding_policy_;
+  /**
+   * Health check for the proxies
+   */
+  SharedPtr<HealthCheck> health_check_;
+  /**
+   * Endless retries for a failed download (hard failures will result in abort)
+  */
+  bool download_failover_indefinitely_;
+  /**
+   * Repo name. Needed for the re-try logic if a download was unsuccessful
+  */
+  std::string fqrn_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

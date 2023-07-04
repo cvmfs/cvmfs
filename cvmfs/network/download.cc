@@ -70,6 +70,29 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+bool Interrupted(JobInfo *info, std::string fqrn) {
+  if (info->allow_failure()) {
+    return true;
+  }
+
+  if (fqrn.size() > 1) {
+    std::string pause_file = std::string("/var/run/cvmfs/interrupt.") + fqrn;
+
+    LogCvmfs(kLogDownload, kLogDebug,
+            "Interrupted(): checking for existence of %s", pause_file.c_str());
+    if (0 == access(pause_file.c_str(), F_OK)) {
+      LogCvmfs(LogDownload, kLogDebug, "Interrupt marker found - "
+               "Interrupting current download, this will EIO outstanding IO.");
+      if (0 != unlink(pause_file.c_str())) {
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "Couldn't delete interrupt marker: errno=%d", errno);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 static inline bool EscapeUrlChar(char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
       ((input >= 'A') && (input <= 'Z')) ||
@@ -86,9 +109,9 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
 
   output[0] = '%';
   output[1] = static_cast<char>(
-    (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10));
+                             (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10));
   output[2] = static_cast<char>(
-    (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10));
+                             (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10));
   return true;
 }
 
@@ -847,68 +870,82 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   string url_prefix;
 
   MutexLockGuard m(lock_options_);
-  // Check if proxy group needs to be reset from backup to primary
-  if (opt_timestamp_backup_proxies_ > 0) {
-    const time_t now = time(NULL);
-    if (static_cast<int64_t>(now) >
-        static_cast<int64_t>(opt_timestamp_backup_proxies_ +
-                             opt_proxy_groups_reset_after_))
-    {
-      opt_proxy_groups_current_ = 0;
-      opt_timestamp_backup_proxies_ = 0;
-      RebalanceProxiesUnlocked("reset proxy group");
-    }
-  }
-  // Check if load-balanced proxies within the group need to be reset
-  if (opt_timestamp_failover_proxies_ > 0) {
-    const time_t now = time(NULL);
-    if (static_cast<int64_t>(now) >
-        static_cast<int64_t>(opt_timestamp_failover_proxies_ +
-                             opt_proxy_groups_reset_after_))
-    {
-      RebalanceProxiesUnlocked("reset load-balanced proxies");
-    }
-  }
-  // Check if host needs to be reset
-  if (opt_timestamp_backup_host_ > 0) {
-    const time_t now = time(NULL);
-    if (static_cast<int64_t>(now) >
-        static_cast<int64_t>(opt_timestamp_backup_host_ +
-                             opt_host_reset_after_))
-    {
-      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-               "switching host from %s to %s (reset host)",
-               (*opt_host_chain_)[opt_host_chain_current_].c_str(),
-               (*opt_host_chain_)[0].c_str());
-      opt_host_chain_current_ = 0;
-      opt_timestamp_backup_host_ = 0;
-    }
-  }
 
-  ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
-  if (!proxy || (proxy->url == "DIRECT")) {
-    info->SetProxy("DIRECT");
-    curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
-  } else {
-    // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
-    // structure, so we must not pass proxy->... (== current_proxy())
-    // parameters directly
-    std::string purl = proxy->url;
-    dns::Host phost = proxy->host;
-    const bool changed = ValidateProxyIpsUnlocked(purl, phost);
-    // Current proxy may have changed
-    if (changed) {
-      proxy = ChooseProxyUnlocked(info->expected_hash());
+  // sharding policy
+  if (sharding_policy_.UseCount() > 0) {
+    if (info->proxy() != "") {
+      // proxy already set, so this is a failover event
+      perf::Inc(counters_->n_proxy_failover);
     }
-    info->SetProxy(proxy->url);
-    if (proxy->host.status() == dns::kFailOk) {
-      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
-                       info->proxy().c_str());
+    info->SetProxy(sharding_policy_->GetNextProxy(info->url(), info->proxy(),
+                   info->range_offset() == -1 ? 0 : info->range_offset()));
+
+    curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, info->proxy().c_str());
+  } else {  // no sharding policy
+    // Check if proxy group needs to be reset from backup to primary
+    if (opt_timestamp_backup_proxies_ > 0) {
+      const time_t now = time(NULL);
+      if (static_cast<int64_t>(now) >
+          static_cast<int64_t>(opt_timestamp_backup_proxies_ +
+                              opt_proxy_groups_reset_after_))
+      {
+        opt_proxy_groups_current_ = 0;
+        opt_timestamp_backup_proxies_ = 0;
+        RebalanceProxiesUnlocked("reset proxy group");
+      }
+    }
+    // Check if load-balanced proxies within the group need to be reset
+    if (opt_timestamp_failover_proxies_ > 0) {
+      const time_t now = time(NULL);
+      if (static_cast<int64_t>(now) >
+          static_cast<int64_t>(opt_timestamp_failover_proxies_ +
+                              opt_proxy_groups_reset_after_))
+      {
+        RebalanceProxiesUnlocked("reset load-balanced proxies");
+      }
+    }
+    // Check if host needs to be reset
+    if (opt_timestamp_backup_host_ > 0) {
+      const time_t now = time(NULL);
+      if (static_cast<int64_t>(now) >
+          static_cast<int64_t>(opt_timestamp_backup_host_ +
+                              opt_host_reset_after_))
+      {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                "switching host from %s to %s (reset host)",
+                (*opt_host_chain_)[opt_host_chain_current_].c_str(),
+                (*opt_host_chain_)[0].c_str());
+        opt_host_chain_current_ = 0;
+        opt_timestamp_backup_host_ = 0;
+      }
+    }
+
+    ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
+    if (!proxy || (proxy->url == "DIRECT")) {
+      info->SetProxy("DIRECT");
+      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
     } else {
-      // We know it can't work, don't even try to download
-      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+      // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
+      // structure, so we must not pass proxy->... (== current_proxy())
+      // parameters directly
+      std::string purl = proxy->url;
+      dns::Host phost = proxy->host;
+      const bool changed = ValidateProxyIpsUnlocked(purl, phost);
+      // Current proxy may have changed
+      if (changed) {
+        proxy = ChooseProxyUnlocked(info->expected_hash());
+      }
+      info->SetProxy(proxy->url);
+      if (proxy->host.status() == dns::kFailOk) {
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
+                        info->proxy().c_str());
+      } else {
+        // We know it can't work, don't even try to download
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
+      }
     }
-  }
+  }  // end !sharding
+
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
   if (info->proxy() != "DIRECT") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
@@ -1316,39 +1353,64 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            (info->error_code() == kFailProxyHttp)) )
        )
     {
-      try_again = true;
-      // If all proxies failed, do a next round with the next host
-      if (!same_url_retry && (info->num_used_proxies() >= opt_num_proxies_)) {
-        // Check if this can be made a host fail-over
-        if (info->probe_hosts() &&
-            host_chain &&
-            (info->num_used_hosts() < host_chain->size()))
-        {
-          // reset proxy group if not already performed by other handle
-          if (opt_proxy_groups_) {
-            if ((opt_proxy_groups_current_ > 0) ||
-                (opt_proxy_groups_current_burned_ > 0))
-            {
-              opt_proxy_groups_current_ = 0;
-              opt_timestamp_backup_proxies_ = 0;
-              RebalanceProxiesUnlocked("reset proxies for host failover");
+      if (sharding_policy_.UseCount() > 0) {  // sharding policy
+       try_again = true;
+       same_url_retry = false;
+      } else {  // no sharding
+        try_again = true;
+        // If all proxies failed, do a next round with the next host
+        if (!same_url_retry && (info->num_used_proxies() >= opt_num_proxies_)) {
+          // Check if this can be made a host fail-over
+          if (info->probe_hosts() &&
+              host_chain &&
+              (info->num_used_hosts() < host_chain->size()))
+          {
+            // reset proxy group if not already performed by other handle
+            if (opt_proxy_groups_) {
+              if ((opt_proxy_groups_current_ > 0) ||
+                  (opt_proxy_groups_current_burned_ > 0))
+              {
+                opt_proxy_groups_current_ = 0;
+                opt_timestamp_backup_proxies_ = 0;
+                RebalanceProxiesUnlocked("reset proxies for host failover");
+              }
+            }
+
+            // Make it a host failure
+            LogCvmfs(kLogDownload, kLogDebug, "make it a host failure");
+            info->SetNumUsedProxies(1);
+            info->SetErrorCode(kFailHostAfterProxy);
+          } else {
+            if (download_failover_indefinitely_) {
+              // Instead of giving up, reset the num_used_proxies counter,
+              // switch proxy and try again
+              LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                "VerifyAndFinalize() would fail the download here. "
+                "Instead switch proxy and retry download. "
+                "info->probe_hosts=%d host_chain=%x info->num_used_hosts=%d "
+                "host_chain->size()=%d same_url_retry=%d "
+                "info->num_used_proxies=%d opt_num_proxies_=%d",
+                  static_cast<int>(info->probe_hosts()),
+                  host_chain, info->num_used_hosts(),
+                  host_chain ?
+                      host_chain->size() : -1, static_cast<int>(same_url_retry),
+                  info->num_used_proxies(), opt_num_proxies_);
+              info->SetNumUsedProxies(1);
+              RebalanceProxiesUnlocked("failover indefinitely");
+              try_again = !Interrupted(info, fqrn_);
+            } else {
+              try_again = false;
             }
           }
-
-          // Make it a host failure
-          LogCvmfs(kLogDownload, kLogDebug, "make it a host failure");
-          info->SetNumUsedProxies(1);
-          info->SetErrorCode(kFailHostAfterProxy);
-        } else {
-          try_again = false;
-        }
-      }  // Make a proxy failure a host failure
-    }  // Proxy failure assumed
+        }  // Make a proxy failure a host failure
+      }  // Proxy failure assumed
+    }  // end !sharding
   }
 
   if (try_again) {
     LogCvmfs(kLogDownload, kLogDebug, "Trying again on same curl handle, "
-             "same url: %d, error code %d", same_url_retry, info->error_code());
+             "same url: %d, error code %d no-cache %d",
+             same_url_retry, info->error_code(), info->nocache());
     // Reset internal state and destination
     if (info->sink() != NULL && info->sink()->Reset() != 0) {
       info->SetErrorCode(kFailLocalIO);
@@ -1365,55 +1427,66 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (info->compressed()) {
       zlib::DecompressInit(info->GetZstreamPtr());
     }
-    SetRegularCache(info);
 
-    // Failure handling
-    bool switch_proxy = false;
-    bool switch_host = false;
-    switch (info->error_code()) {
-      case kFailBadData:
-        SetNocache(info);
-        break;
-      case kFailProxyResolve:
-      case kFailProxyHttp:
-        switch_proxy = true;
-        break;
-      case kFailHostResolve:
-      case kFailHostHttp:
-      case kFailHostAfterProxy:
-        switch_host = true;
-        break;
-      default:
-        if (IsProxyTransferError(info->error_code())) {
-          if (same_url_retry) {
-            Backoff(info);
-          } else {
-            switch_proxy = true;
-          }
-        } else if (IsHostTransferError(info->error_code())) {
-          if (same_url_retry) {
-            Backoff(info);
-          } else {
-            switch_host = true;
-          }
-        } else {
-          // No other errors expected when retrying
-          PANIC(NULL);
-        }
-    }
-    if (switch_proxy) {
+    if (sharding_policy_.UseCount() > 0) {  // sharding policy
       ReleaseCredential(info);
-      SwitchProxy(info);
-      info->SetNumUsedProxies(info->num_used_proxies() + 1);
       SetUrlOptions(info);
-    }
-    if (switch_host) {
-      ReleaseCredential(info);
-      SwitchHost(info);
-      info->SetNumUsedHosts(info->num_used_hosts() + 1);
-      SetUrlOptions(info);
-    }
+    } else {  // no sharding policy
+      SetRegularCache(info);
 
+      // Failure handling
+      bool switch_proxy = false;
+      bool switch_host = false;
+      switch (info->error_code()) {
+        case kFailBadData:
+          SetNocache(info);
+          break;
+        case kFailProxyResolve:
+        case kFailProxyHttp:
+          switch_proxy = true;
+          break;
+        case kFailHostResolve:
+        case kFailHostHttp:
+        case kFailHostAfterProxy:
+          switch_host = true;
+          break;
+        default:
+          if (IsProxyTransferError(info->error_code())) {
+            if (same_url_retry) {
+              Backoff(info);
+            } else {
+              switch_proxy = true;
+            }
+          } else if (IsHostTransferError(info->error_code())) {
+            if (same_url_retry) {
+              Backoff(info);
+            } else {
+              switch_host = true;
+            }
+          } else {
+            // No other errors expected when retrying
+            PANIC(NULL);
+          }
+      }
+      if (switch_proxy) {
+        ReleaseCredential(info);
+        SwitchProxy(info);
+        info->SetNumUsedProxies(info->num_used_proxies() + 1);
+        SetUrlOptions(info);
+      }
+      if (switch_host) {
+        ReleaseCredential(info);
+        SwitchHost(info);
+        info->SetNumUsedHosts(info->num_used_hosts() + 1);
+        SetUrlOptions(info);
+      }
+    }  // end !sharding
+
+    if (download_failover_indefinitely_) {
+      // try again, breaking if there's a cvmfs reload happening and we are in a
+      // proxy failover. This will EIO the call application.
+      return !Interrupted(info, fqrn_);
+    }
     return true;  // try again
   }
 
@@ -1554,6 +1627,10 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_host_chain_current_ = 0;
   opt_ip_preference_ = dns::kIpPreferSystem;
 
+  sharding_policy_ = SharedPtr<ShardingPolicy>();
+  health_check_ = SharedPtr<HealthCheck>();
+  download_failover_indefinitely_ = false;
+
   counters_ = new Counters(statistics);
 
   user_agent_ = NULL;
@@ -1583,6 +1660,17 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
 
 void DownloadManager::Fini() {
+  if (sharding_policy_.UseCount() > 0) {
+    sharding_policy_.Reset();
+  }
+  if (health_check_.UseCount() > 0) {
+    if (health_check_.Unique()) {
+      LogCvmfs(kLogDownload, kLogDebug, "Stopping healthcheck thread");
+      health_check_->StopHealthcheck();
+    }
+    health_check_.Reset();
+  }
+
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
     pipe_terminate_->Write(kPipeTerminateSignal);
@@ -1640,6 +1728,11 @@ void DownloadManager::Spawn() {
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
+
+  if (health_check_.UseCount() > 0) {
+    LogCvmfs(kLogDownload, kLogDebug, "Starting healthcheck thread");
+    health_check_->StartHealthcheck();
+  }
 }
 
 
@@ -2457,6 +2550,10 @@ void DownloadManager::SetProxyChain(
       for (; iter_ips != best_addresses.end(); ++iter_ips) {
         string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
         infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
+
+        if (sharding_policy_.UseCount() > 0) {
+          sharding_policy_->AddProxy(url_ip);
+        }
       }
     }
     opt_proxy_groups_->push_back(infos);
@@ -2693,6 +2790,20 @@ void DownloadManager::UseSystemCertificatePath() {
   ssl_certificate_store_.UseSystemCertificatePath();
 }
 
+bool DownloadManager::SetShardingPolicy(const ShardingPolicySelector type) {
+  bool success = false;
+  switch (type) {
+    default:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+            "Proposed sharding policy does not exist. Falling back to default");
+  }
+  return success;
+}
+
+void DownloadManager::SetDownloadFailoverIndefinitely() {
+  download_failover_indefinitely_ = true;
+}
+
 /**
  * Creates a copy of the existing download manager.  Must only be called in
  * single-threaded stage because it calls curl_global_init().
@@ -2730,6 +2841,10 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_host_reset_after_ = opt_host_reset_after_;
   clone->credentials_attachment_ = credentials_attachment_;
   clone->ssl_certificate_store_ = ssl_certificate_store_;
+
+  clone->health_check_ = health_check_;
+  clone->sharding_policy_ = sharding_policy_;
+  clone->download_failover_indefinitely_ = download_failover_indefinitely_;
 
   return clone;
 }

@@ -72,6 +72,9 @@ class JobInfo {
   unsigned backoff_ms_;
   unsigned int current_host_chain_index_;
 
+  // allow failure of downloads. default = false
+  bool allow_failure_;
+
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
   // Replace Init() with JobInfo() that is called by the other constructors
   void Init();
@@ -155,6 +158,9 @@ class JobInfo {
   unsigned int current_host_chain_index() const {
                                              return current_host_chain_index_; }
 
+  bool allow_failure() const { return allow_failure_; }
+
+
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
@@ -196,6 +202,8 @@ class JobInfo {
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
   void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
                        { current_host_chain_index_ = current_host_chain_index; }
+
+  void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 
   // needed for fetch.h ThreadLocalStorage
   JobInfo() { Init(); }
