@@ -494,7 +494,7 @@ filter_auto_tags() {
     $(get_swissknife_proxy)                    \
     -x $(get_follow_http_redirects_flag)       | \
     grep -E \
-    '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.?[[:digit:]]{0,3}Z' | \
+    '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?Z' | \
     awk '{print $1 " " $5}')"
   [ "x$auto_tags" = "x" ] && return 0 || true
 
