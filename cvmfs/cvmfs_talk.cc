@@ -143,7 +143,7 @@ bool SendCommand(const std::string &command, InstanceInfo instance_info) {
 static void Usage(const std::string &exe) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Usage: %s [-i instance | -p socket] <command>                     \n"
-    "   By default, iteratate through all instances defined in         \n"
+    "   By default, iterate through all instances defined in         \n"
     "   CVMFS_REPOSITORIES                                             \n"
     "\n"
     "Example:                                                          \n"
