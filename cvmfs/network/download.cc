@@ -934,7 +934,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     if (info->pid != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
-                 "uses secure downloads but no credentials attachment set");
+                 "HTTPS download without credentials: file %s",
+                 info->url->c_str());
       } else {
         bool retval = credentials_attachment_->ConfigureCurlHandle(
           curl_handle, info->pid, &info->cred_data);

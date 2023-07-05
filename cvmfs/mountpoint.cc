@@ -1283,8 +1283,15 @@ MountPoint *MountPoint::Create(
 void MountPoint::CreateAuthz() {
   string optarg;
   string authz_helper;
-  if (options_mgr_->GetValue("CVMFS_AUTHZ_HELPER", &optarg))
-    authz_helper = optarg;
+  if (options_mgr_->GetValue("CVMFS_AUTHZ_HELPER", &optarg)) {
+    // if the default helper should be used, authz_helper must be ""
+    if (ToUpper(optarg) != "DEFAULT") {
+      authz_helper = optarg;
+    }
+  } else {
+    // no authz helper is wanted. so do not initialize it.
+    return;
+  }
   string authz_search_path(kDefaultAuthzSearchPath);
   if (options_mgr_->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &optarg))
     authz_search_path = optarg;
@@ -1368,8 +1375,9 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_ = new download::DownloadManager();
   download_mgr_->Init(kDefaultNumConnections,
                       perf::StatisticsTemplate("download", statistics_));
-  download_mgr_->SetCredentialsAttachment(authz_attachment_);
-
+  if (authz_attachment_ != NULL) {
+    download_mgr_->SetCredentialsAttachment(authz_attachment_);
+  }
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(optarg);
   }
@@ -1843,6 +1851,9 @@ MountPoint::~MountPoint() {
 
 
 void MountPoint::ReEvaluateAuthz() {
+  if (authz_attachment_ == NULL) {
+    return;
+  }
   string old_membership_req = membership_req_;
   has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
   if (old_membership_req != membership_req_) {
