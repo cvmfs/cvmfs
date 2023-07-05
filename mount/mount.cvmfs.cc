@@ -410,6 +410,17 @@ int main(int argc, char **argv) {
     new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
 
+  string optarg;
+  if (options_manager_.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+    SetLogSyslogLevel(String2Uint64(optarg));
+  if (options_manager_.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+    SetLogSyslogFacility(String2Int64(optarg));
+  if (options_manager_.GetValue("CVMFS_USYSLOG", &optarg))
+    SetLogMicroSyslog(optarg);
+  if (options_manager_.GetValue("CVMFS_DEBUGLOG", &optarg))
+    SetLogDebugFile(optarg);
+  SetLogSyslogPrefix(fqrn);
+
   int retval;
   int sysret;
   bool dedicated_cachedir = false;
