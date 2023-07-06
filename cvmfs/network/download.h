@@ -206,6 +206,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableInfoHeader();
   void EnableRedirects();
   void EnableIgnoreSignatureFailures();
+  void EnableHTTPTracing();
+  void AddHTTPTracingHeader(const std::string &header);
   void UseSystemCertificatePath();
 
   unsigned num_hosts() {
@@ -289,6 +291,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * In general it is a bad idea to do this!
    */
   bool ignore_signature_failures_;
+  
+  bool enable_http_tracing_;
+  std::vector<std::string> *http_tracing_headers_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

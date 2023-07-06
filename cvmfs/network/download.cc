@@ -788,7 +788,24 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   if (info->info_header()) {
     header_lists_->AppendHeader(info->headers(), info->info_header());
   }
-  if (info->force_nocache()) {
+  if (enable_http_tracing_) {
+    for (unsigned int i = 0; i < http_tracing_headers_->size(); i++) {
+      header_lists_->AppendHeader(info->headers,
+                                  (*http_tracing_headers_)[i].c_str());
+    }
+    std::string str_pid = "X-CVMFS-PID: " + StringifyInt(info->pid);
+    std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid);
+    std::string str_uid = "X-CVMFS-UID: " + StringifyUint(info->uid);
+
+    header_lists_->AppendHeader(info->headers, str_pid.c_str());
+    header_lists_->AppendHeader(info->headers, str_gid.c_str());
+    header_lists_->AppendHeader(info->headers, str_uid.c_str());
+
+    LogCvmfs(kLogDownload, kLogDebug, "CURL Header for URL: %s is:\n %s",
+             info->url->c_str(), header_lists_->Print(info->headers).c_str());
+  }
+
+  if (info->force_nocache) {
     SetNocache(info);
   } else {
     info->SetNocache(false);
@@ -1481,6 +1498,9 @@ DownloadManager::DownloadManager() {
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
   ignore_signature_failures_ = false;
+
+  enable_http_tracing_ = false;
+  http_tracing_headers_ = new vector<string>();
 
   resolver_ = NULL;
 
@@ -2689,6 +2709,14 @@ void DownloadManager::EnableIgnoreSignatureFailures() {
   ignore_signature_failures_ = true;
 }
 
+void DownloadManager::EnableHTTPTracing() {
+  enable_http_tracing_ = true;
+}
+
+void DownloadManager::AddHTTPTracingHeader(const std::string &header) {
+  http_tracing_headers_->push_back(header);
+}
+
 void DownloadManager::UseSystemCertificatePath() {
   ssl_certificate_store_.UseSystemCertificatePath();
 }
@@ -2716,6 +2744,10 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_backoff_init_ms_ = opt_backoff_init_ms_;
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;
+  clone->enable_http_tracing_ = enable_http_tracing_;
+  if (enable_http_tracing_) {
+    clone->http_tracing_headers_ = new vector<string>(*http_tracing_headers_);
+  }
   clone->follow_redirects_ = follow_redirects_;
   clone->ignore_signature_failures_ = ignore_signature_failures_;
   if (opt_host_chain_) {
