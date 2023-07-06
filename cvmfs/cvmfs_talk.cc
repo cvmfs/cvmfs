@@ -143,7 +143,8 @@ bool SendCommand(const std::string &command, InstanceInfo instance_info) {
 static void Usage(const std::string &exe) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "Usage: %s [-i instance | -p socket] <command>                     \n"
-    "   By default, iteratate through all instances.                   \n"
+    "   By default, iterate through all instances defined in         \n"
+    "   CVMFS_REPOSITORIES                                             \n"
     "\n"
     "Example:                                                          \n"
     "  %s -i atlas.cern.ch pid                                         \n"
@@ -243,7 +244,7 @@ int main(int argc, char *argv[]) {
       command.push_back(' ');
   }
   if (command.empty()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Command missing");
+    Usage(argv[0]);
     return 1;
   }
 
@@ -254,13 +255,22 @@ int main(int argc, char *argv[]) {
     std::string opt_repos;
     options_mgr.GetValue("CVMFS_REPOSITORIES", &opt_repos);
     std::vector<std::string> repos = SplitString(opt_repos, ',');
+    bool is_empty_repo_list = true;
     for (unsigned i = 0; i < repos.size(); ++i) {
       if (repos[i].empty())
         continue;
+      is_empty_repo_list = false;
       instance_info.instance_name = repos[i];
       LogCvmfs(kLogCvmfs, kLogStdout, "%s:", repos[i].c_str());
       bool retval = SendCommand(command, instance_info);
       if (!retval) retcode = 1;
+    }
+    if (is_empty_repo_list) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Warning: no instance was specified. In this case, the command "
+               "is executed for all instances defined in CVMFS_REPOSITORIES but"
+               " this list is empty. Did you mean running \n\n"
+               "    cvmfs_talk -i <repository name> <command>\n");
     }
   } else {
     bool retval = SendCommand(command, instance_info);
