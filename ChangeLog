@@ -1,4 +1,6 @@
 2.11.0:
+  * Warn about potential incorrect use of cvmfs_talk (#3303)
+  * Extend grep filter to accept microsecond precision in tags (#3301)
   * Use logging settings in mount helper (#2962)
   * Fix race in signal handling when authz helper is started (#3211)
   * Fix race in parallel catalog traversal (#3171)
