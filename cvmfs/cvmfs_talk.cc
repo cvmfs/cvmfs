@@ -268,8 +268,8 @@ int main(int argc, char *argv[]) {
     if (is_empty_repo_list) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Warning: no instance was specified. In this case, the command "
-               "is executed for all instances defined in CVMFS_REPOSITORES but "
-               "this list is empty. Did you mean running \n\n"
+               "is executed for all instances defined in CVMFS_REPOSITORIES but"
+               " this list is empty. Did you mean running \n\n"
                "    cvmfs_talk -i <repository name> <command>\n");
     }
   } else {
