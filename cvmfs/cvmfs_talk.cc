@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
       command.push_back(' ');
   }
   if (command.empty()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Command missing");
+    Usage(argv[0]);
     return 1;
   }
 
