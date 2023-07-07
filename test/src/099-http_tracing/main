@@ -10,19 +10,21 @@ TEST099_MOUNTPOINT=/cvmfs/lhcb.cern.ch
 CVMFS_TEST_099_TMPFILE=
 
 mount_and_read() {
-  echo "Check detection of counter change"
+  echo "Mount repo, read and check HTTP tracing headers"
 
   # used in file test_functions for cvmfs_moount()
   CVMFS_TEST_DEBUGLOG="/tmp/$CVMFS_TEST_099_TMPFILE"
-  CVMFS_TEST_QUOTED_PARAM_KEY="CVMFS_HTTP_TRACING_HEADERS"
-  CVMFS_TEST_QUOTED_PARAM_VAL="h1:test|CVMFS-X-h2:ff|X-CVMFS-h3:12_ad |  h4  : 12fs_?"
+  CVMFS_TEST_QUOTED_PARAM_KEY_VAL='CVMFS_HTTP_TRACING_HEADERS="h1:test|CVMFS-X-h2:ff|X-CVMFS-h3:12_ad |  h4  : 12fs_? "'
 
   echo "   Mount $TEST099_REPO"
   cvmfs_mount $TEST099_REPO "CVMFS_HTTP_TRACING=on"
 
+  echo "   Client config $TEST099_REPO"
+  cat /etc/cvmfs/default.local
 
 
-  echo "   Do something to change counters"
+
+  echo "   Access data to send HTTP requests"
   cat $TEST099_MOUNTPOINT/*.sh > /dev/null
   cat $TEST099_MOUNTPOINT/etc/grid-security/*.pem > /dev/null
 

@@ -509,9 +509,8 @@ cvmfs_mount() {
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
 
-  if [ "x$CVMFS_TEST_QUOTED_PARAM_KEY" != "x" ]; then
-    echo $CVMFS_TEST_QUOTED_PARAM_KEY
-    sudo sh -c "echo $CVMFS_TEST_QUOTED_PARAM_KEY=\"'$CVMFS_TEST_QUOTED_PARAM_VAL'\" >> /etc/cvmfs/default.local" || return 100
+  if [ "x$CVMFS_TEST_QUOTED_PARAM_KEY_VAL" != "x" ]; then
+    sudo sh -c "echo '${CVMFS_TEST_QUOTED_PARAM_KEY_VAL}' >> /etc/cvmfs/default.local" || return 100
   fi
 
   if running_on_osx; then
