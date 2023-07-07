@@ -81,7 +81,7 @@ bool Interrupted(JobInfo *info, std::string fqrn) {
     LogCvmfs(kLogDownload, kLogDebug,
             "Interrupted(): checking for existence of %s", pause_file.c_str());
     if (0 == access(pause_file.c_str(), F_OK)) {
-      LogCvmfs(LogDownload, kLogDebug, "Interrupt marker found - "
+      LogCvmfs(kLogDownload, kLogDebug, "Interrupt marker found - "
                "Interrupting current download, this will EIO outstanding IO.");
       if (0 != unlink(pause_file.c_str())) {
         LogCvmfs(kLogDownload, kLogDebug,
