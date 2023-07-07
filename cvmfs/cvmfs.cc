@@ -407,6 +407,9 @@ static uint64_t GetDirentForPath(const PathString &path,
       } else {
         mount_point_->md5path_cache()->Insert(md5path, *dirent);
       }
+    } else {
+      // First time encounter of the inode
+      mount_point_->md5path_cache()->Insert(md5path, *dirent);
     }
     return 1;
   }
