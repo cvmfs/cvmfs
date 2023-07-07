@@ -17,7 +17,7 @@ mount_and_read() {
   CVMFS_TEST_QUOTED_PARAM_KEY_VAL='CVMFS_HTTP_TRACING_HEADERS="h1:test|CVMFS-X-h2:ff|X-CVMFS-h3:12_ad |  h4  : 12fs_? "'
 
   echo "   Mount $TEST099_REPO"
-  cvmfs_mount $TEST099_REPO "CVMFS_HTTP_TRACING=on"
+  cvmfs_mount $TEST099_REPO "CVMFS_HTTP_TRACING=on" || return 1
 
   echo "   Client config $TEST099_REPO"
   cat /etc/cvmfs/default.local
