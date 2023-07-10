@@ -205,6 +205,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnableRedirects();
+  void EnableIgnoreSignatureFailures();
   void UseSystemCertificatePath();
 
   unsigned num_hosts() {
@@ -282,6 +283,12 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+
+  /**
+   * Ignore signature failures during download.
+   * In general it is a bad idea to do this!
+   */
+  bool ignore_signature_failures_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
