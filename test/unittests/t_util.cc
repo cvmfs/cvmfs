@@ -407,6 +407,8 @@ TEST_F(T_Util, GetFileSystemInfo) {
   EXPECT_EQ(kFsTypeProc, fs_info.type);
   fs_info = GetFileSystemInfo("/");
   EXPECT_EQ(kFsTypeUnknown, fs_info.type);
+  fs_info = GetFileSystemInfo("/run");
+  EXPECT_EQ(kFsTypeTmpfs, fs_info.type);
 }
 
 
