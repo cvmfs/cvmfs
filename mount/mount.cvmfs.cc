@@ -416,9 +416,9 @@ int main(int argc, char **argv) {
   if (options_manager_.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
     SetLogSyslogFacility(String2Int64(optarg));
   if (options_manager_.GetValue("CVMFS_USYSLOG", &optarg))
-    SetLogMicroSyslog(optarg);
+    SetLogMicroSyslog(optarg + ".mount");
   if (options_manager_.GetValue("CVMFS_DEBUGLOG", &optarg))
-    SetLogDebugFile(optarg);
+    SetLogDebugFile(optarg + ".mount");
   SetLogSyslogPrefix(fqrn);
 
   int retval;
