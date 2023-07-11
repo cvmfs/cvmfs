@@ -395,7 +395,6 @@ static uint64_t GetDirentForPath(const PathString &path,
   if (retval) {
     if (file_system_->IsNfsSource()) {
       dirent->set_inode(file_system_->nfs_maps()->GetInode(path));
-      mount_point_->md5path_cache()->Insert(md5path, *dirent);
     } else if (live_inode != 0) {
       dirent->set_inode(live_inode);
       if (FixupOpenInode(path, dirent)) {
@@ -404,13 +403,9 @@ static uint64_t GetDirentForPath(const PathString &path,
           path.c_str(), live_inode, dirent->inode());
         return live_inode;
         // Do not populate the md5path cache until the inode tracker is fixed
-      } else {
-        mount_point_->md5path_cache()->Insert(md5path, *dirent);
       }
-    } else {
-      // First time encounter of the inode
-      mount_point_->md5path_cache()->Insert(md5path, *dirent);
     }
+    mount_point_->md5path_cache()->Insert(md5path, *dirent);
     return 1;
   }
 
