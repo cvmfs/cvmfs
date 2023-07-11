@@ -1692,7 +1692,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
                  header_size - header_name_len);
     info->info_header()[header_size-1] = '\0';
   }
-  
+
   if (enable_http_tracing_) {
     const std::string str_pid = "X-CVMFS-PID: " + StringifyInt(info->pid);
     const std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid);
