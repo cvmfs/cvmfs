@@ -25,6 +25,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO                             || return $?
   mkdir -p ${repo_dir}/internal                                  || return 2
   echo "Hello World" > ${repo_dir}/internal/small                || return 3
+  cat /dev/urandom | head -c 2500 > ${repo_dir}/internal/bar     || return 4
   publish_repo $CVMFS_TEST_REPO -v                               || return 5
 
   start_transaction $CVMFS_TEST_REPO                                      || return $?
@@ -81,6 +82,19 @@ cvmfs_run_test() {
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 43
   sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
   cat cache_list | grep foo && return 44
+
+  local size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo)
+  local size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo | wc -c)
+  echo "*** size of 'foo': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 45
+  size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small)
+  size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small | wc -c)
+  echo "*** size of 'small': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 46
+  size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar)
+  size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar | wc -c)
+  echo "*** size of 'bar': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 47
 
   sudo cvmfs_talk -p $talk_socket cache list
   sudo cvmfs_talk -p $talk_socket cache list catalogs

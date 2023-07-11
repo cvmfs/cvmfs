@@ -253,7 +253,7 @@ int64_t StreamingCacheManager::Pread(
     return 0;
   if (nbytes_streamed > (offset + size))
     return static_cast<int64_t>(size);
-  return static_cast<int64_t>(offset + size - nbytes_streamed);
+  return static_cast<int64_t>(nbytes_streamed - offset);
 }
 
 int StreamingCacheManager::Readahead(int fd) {
