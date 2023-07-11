@@ -58,6 +58,14 @@ class T_CachePlugin : public ::testing::Test {
     }
   }
 
+  CacheManager::LabeledObject LabelWithPath(const shash::Any &id,
+                                            const std::string &path)
+  {
+    CacheManager::Label label;
+    label.path = path;
+    return CacheManager::LabeledObject(id, label);
+  }
+
   static const int nfiles;
   ExternalCacheManager *cache_mgr_;
   ExternalQuotaManager *quota_mgr_;
@@ -83,18 +91,18 @@ TEST_F(T_CachePlugin, Connection) {
 TEST_F(T_CachePlugin, OpenClose) {
   shash::Any rnd_id(shash::kSha1);
   rnd_id.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_id)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_id)));
 
   shash::Any id(shash::kSha1);
   string content = "foo";
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        data, content.length()));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 }
@@ -104,16 +112,18 @@ TEST_F(T_CachePlugin, StoreEmpty) {
   shash::Any empty_id(shash::kSha1);
   string empty;
   shash::HashString(empty, &empty_id);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(empty_id, NULL, 0, "empty"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(empty_id, "enpty"),
+                                        NULL, 0));
 
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(empty_id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(empty_id, "test"),
+                                   &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
   free(buffer);
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(empty_id));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(empty_id));
   EXPECT_GE(fd, 0);
   unsigned char small_buf[1];
   EXPECT_EQ(0, cache_mgr_->Pread(fd, small_buf, 1, 0));
@@ -132,21 +142,24 @@ TEST_F(T_CachePlugin, HashAlgorithms) {
   HashString(content, &id_shake128);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id_sha1, data, content.length(), "sha1"));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id_rmd160, data, content.length(), "rmd160"));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id_shake128, data, content.length(), "shake128"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_sha1, "sha1"),
+                                        data, content.length()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_rmd160, "rmd160"),
+                                        data, content.length()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_shake128, "shake128"),
+                                        data, content.length()));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_sha1, "sha1", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_sha1, "sha1"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_rmd160, "rmd160", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_rmd160, "rmd160"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_shake128, "id_shake128", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_shake128, "id_shake128"),
+                                   &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 }
@@ -162,21 +175,25 @@ TEST_F(T_CachePlugin, Read) {
   shash::Any id_odd(shash::kSha1);
   shash::HashMem(buffer, size_even, &id_even);
   shash::HashMem(buffer, size_odd, &id_odd);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_even, buffer, size_even, "even"));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_odd, buffer, size_odd, "odd"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_even, "even"),
+                                        buffer, size_even));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_odd, "odd"),
+                                        buffer, size_odd));
 
   unsigned char *read_buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_even, "even", &read_buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_even, "even"),
+                                   &read_buffer, &size));
   EXPECT_EQ(size, size_even);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_even));
   free(read_buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_odd, "odd", &read_buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_odd, "odd"),
+                                   &read_buffer, &size));
   EXPECT_EQ(size, size_odd);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_odd));
   free(read_buffer);
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(id_odd));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(id_odd));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Pread(fd, NULL, 0, 0));
 
@@ -220,7 +237,7 @@ TEST_F(T_CachePlugin, TransactionAbort) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -246,7 +263,7 @@ TEST_F(T_CachePlugin, CommitHandover) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -270,7 +287,7 @@ TEST_F(T_CachePlugin, CommitConcurrent) {
 
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buf, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -292,8 +309,9 @@ TEST_F(T_CachePlugin, Info) {
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
-  int fd = cache_mgr_->Open(CacheManager::Bless(id));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        data, content.length()));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(id));
   EXPECT_GE(fd, 0);
   EXPECT_GT(quota_mgr_->GetSizePinned(), size_pinned);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -327,13 +345,16 @@ TEST_F(T_CachePlugin, Shrink) {
     reinterpret_cast<const unsigned char *>(str_reg.data()));
   unsigned char *dat_clg = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(str_clg.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_vol, dat_vol, str_vol.length(), ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_vol, ""),
+                                        dat_vol, str_vol.length()));
   uint64_t size_with1 = quota_mgr_->GetSize();
   EXPECT_GT(size_with1, size_vanilla);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_reg, dat_reg, str_reg.length(), ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_reg, ""),
+                                        dat_reg, str_reg.length()));
   uint64_t size_with2 = quota_mgr_->GetSize();
   EXPECT_GT(size_with2, size_with1);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(id_clg, dat_clg, str_clg.length(), ""));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_clg, ""),
+                                        dat_clg, str_clg.length()));
   uint64_t size_with3 = quota_mgr_->GetSize();
   EXPECT_GT(size_with3, size_with2);
   void *txn = alloca(cache_mgr_->SizeOfTxn());
@@ -343,22 +364,22 @@ TEST_F(T_CachePlugin, Shrink) {
   uint64_t size_with4 = quota_mgr_->GetSize();
   EXPECT_GE(size_with4, size_with3);
 
-  int fd_clg = cache_mgr_->Open(CacheManager::Bless(id_clg));
-  int fd_vol = cache_mgr_->Open(CacheManager::Bless(id_vol));
+  int fd_clg = cache_mgr_->Open(CacheManager::LabeledObject(id_clg));
+  int fd_vol = cache_mgr_->Open(CacheManager::LabeledObject(id_vol));
   EXPECT_GE(fd_clg, 0);
   EXPECT_GE(fd_vol, 0);
   EXPECT_FALSE(quota_mgr_->Cleanup(0));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_reg)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_reg)));
   EXPECT_EQ(0, cache_mgr_->Close(fd_clg));
   EXPECT_EQ(0, cache_mgr_->Close(fd_vol));
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_vol)));
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(id_clg)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_vol)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(id_clg)));
 
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   unsigned char *buf;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id_txn, "test", &buf, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_txn, "test"), &buf, &size));
   EXPECT_EQ(str_txn, string(reinterpret_cast<char *>(buf), size));
   free(buf);
 }
@@ -378,9 +399,10 @@ TEST_F(T_CachePlugin, List) {
     unsigned char *data = reinterpret_cast<unsigned char *>(&i);
     HashMem(data, sizeof(i), &id);
     descriptions.insert(id.ToString());
-    EXPECT_TRUE(cache_mgr_->CommitFromMem(id, data, sizeof(i), id.ToString()));
+    EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, id.ToString()),
+                                          data, sizeof(i)));
     if ((i % 10) == 0) {
-      int fd = cache_mgr_->Open(CacheManager::Bless(id));
+      int fd = cache_mgr_->Open(CacheManager::LabeledObject(id));
       EXPECT_GE(fd, 0);
       open_fds.insert(fd);
     }

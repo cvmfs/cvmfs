@@ -130,10 +130,23 @@ string ShowOpenFiles() {
 }
 
 
+class CountOpenFilesHelper {
+ public:
+  CountOpenFilesHelper() : count(0) {}
+
+  void CountSymlink(const string & /* parent_path */, const string & /* name */)
+  {
+    count++;
+  }
+
+  unsigned count;
+};
+
 unsigned GetNoUsedFds() {
   // Syslog file descriptor could still be open
   closelog();
 
+#ifdef __APPLE__
   unsigned result = 0;
   int max_fd = getdtablesize();
   assert(max_fd >= 0);
@@ -143,6 +156,14 @@ unsigned GetNoUsedFds() {
       result++;
   }
   return result;
+#else
+  CountOpenFilesHelper count_files_helper;
+  FileSystemTraversal<CountOpenFilesHelper>
+    traversal(&count_files_helper, "", false);
+  traversal.fn_new_symlink = &CountOpenFilesHelper::CountSymlink;
+  traversal.Recurse("/proc/self/fd");
+  return count_files_helper.count;
+#endif
 }
 
 

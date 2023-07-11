@@ -75,7 +75,7 @@ class PosixCacheManager : public CacheManager {
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
-  virtual int Open(const BlessedObject &object);
+  virtual int Open(const LabeledObject &object);
   virtual int64_t GetSize(int fd);
   virtual int Close(int fd);
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
@@ -84,7 +84,7 @@ class PosixCacheManager : public CacheManager {
 
   virtual uint32_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const ObjectInfo &object_info,
+  virtual void CtrlTxn(const Label &label,
                        const int flags,
                        void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
@@ -117,7 +117,7 @@ class PosixCacheManager : public CacheManager {
       , size(0)
       , expected_size(kSizeUnknown)
       , fd(-1)
-      , object_info(kTypeRegular, "")
+      , label()
       , tmp_path()
       , final_path(final_path)
       , id(id)
@@ -128,7 +128,7 @@ class PosixCacheManager : public CacheManager {
     uint64_t size;
     uint64_t expected_size;
     int fd;
-    ObjectInfo object_info;
+    Label label;
     std::string tmp_path;
     std::string final_path;
     shash::Any id;

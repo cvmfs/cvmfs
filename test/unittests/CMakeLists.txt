@@ -268,6 +268,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_cache.cc
   t_cache_extern.cc
   t_cache_ram.cc
+  t_cache_stream.cc
   t_cache_tiered.cc
   t_callbacks.cc
   t_catalog.cc
@@ -379,6 +380,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
   ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc
   ${CVMFS_SOURCE_DIR}/cache_ram.cc
+  ${CVMFS_SOURCE_DIR}/cache_stream.cc
   ${CVMFS_SOURCE_DIR}/cache_tiered.cc
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc

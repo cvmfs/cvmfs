@@ -34,6 +34,7 @@
 #include "cache_extern.h"
 #include "cache_posix.h"
 #include "cache_ram.h"
+#include "cache_stream.h"
 #include "cache_tiered.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
@@ -1151,7 +1152,20 @@ bool FileSystem::TriageCacheMgr() {
   }
 
   cache_mgr_ = SetupCacheMgr(cache_mgr_instance_);
-  return cache_mgr_ != NULL;
+  if (cache_mgr_ == NULL)
+    return false;
+
+  std::string optarg;
+  if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    unsigned nfiles = kDefaultNfiles;
+    if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
+      nfiles = String2Uint64(optarg);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL);
+  }
+
+  return true;
 }
 
 
@@ -1261,6 +1275,13 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (file_system->cache_mgr()->id() == kStreamingCacheManager) {
+    StreamingCacheManager *streaming_cachemgr =
+      dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr());
+    streaming_cachemgr->SetRegularDownloadManager(mountpoint->download_mgr());
+    streaming_cachemgr->SetExternalDownloadManager(
+      mountpoint->external_download_mgr());
+  }
   if (!mountpoint->CreateResolvConfWatcher()) {
     return mountpoint.Release();
   }
@@ -1459,13 +1480,11 @@ void MountPoint::CreateFetchers() {
     backoff_throttle_,
     perf::StatisticsTemplate("fetch", statistics_));
 
-  const bool is_external_data = true;
   external_fetcher_ = new cvmfs::Fetcher(
     file_system_->cache_mgr(),
     external_download_mgr_,
     backoff_throttle_,
-    perf::StatisticsTemplate("fetch-external", statistics_),
-    is_external_data);
+    perf::StatisticsTemplate("fetch-external", statistics_));
 }
 
 
@@ -1703,12 +1722,10 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     return false;
   }
 
-  int fd = fetcher_->Fetch(
-    history_hash,
-    CacheManager::kSizeUnknown,
-    "tag database for " + fqrn_,
-    zlib::kZlibDefault,
-    CacheManager::kTypeRegular);
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelHistory;
+  label.path = fqrn_;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;

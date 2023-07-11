@@ -21,6 +21,7 @@
 #include "testutil.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -35,16 +36,20 @@ class T_CacheManager : public ::testing::Test {
     alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_null_, NULL, 0, "null"));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_null_), NULL, 0));
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_one_, &buf, 1, "one"));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_one_), &buf, 1));
 
     unsigned char *zero_page;
     hash_page_.digest[0] = 2;
     zero_page = reinterpret_cast<unsigned char *>(scalloc(4096, 1));
-    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_page_, zero_page, 4096, "buf"));
+    bool retval = cache_mgr_->CommitFromMem(
+      CacheManager::LabeledObject(hash_page_), zero_page, 4096);
     free(zero_page);
+    ASSERT_TRUE(retval);
   }
 
   virtual void TearDown() {
@@ -170,7 +175,7 @@ class TestQuotaManager : public QuotaManager {
     last_cmd.size = size;
     last_cmd.description = description;
     last_cmd.is_catalog = is_catalog;
-    return description != "fail";
+    return !HasSuffix(description, "fail", false /* ignore_case */);
   }
   virtual void Unpin(const shash::Any &hash) {
     last_cmd = LastCommand();
@@ -238,7 +243,7 @@ class TestCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return type; }
   virtual std::string Describe() { return "test\n"; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
-  virtual int Open(const BlessedObject &object) {
+  virtual int Open(const LabeledObject & /* object */) {
     return open("/dev/null", O_RDONLY);
   }
   virtual int64_t GetSize(int fd) { return 1; }
@@ -255,7 +260,7 @@ class TestCacheManager : public CacheManager {
     *static_cast<int *>(txn) = fd;
     return 0;
   }
-  virtual void CtrlTxn(const ObjectInfo &info, const int flags, void *txn) { }
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn) { }
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) {
     return -EIO;
   }
@@ -284,19 +289,19 @@ class TestCacheManager : public CacheManager {
 TEST_F(T_CacheManager, ChecksumFd) {
   shash::Any hash(shash::kSha1);
   EXPECT_EQ(-EBADF, cache_mgr_->ChecksumFd(1000000, &hash));
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
   cache_mgr_->Close(fd);
 
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_one_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("0bbd725a1003cd41b89b209f70e514f12f2a1062", hash.ToString());
   cache_mgr_->Close(fd);
 
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_page_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_page_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
   EXPECT_EQ("54b34b84872a06a373967f68726e29353d3fe7b2", hash.ToString());
@@ -308,17 +313,19 @@ TEST_F(T_CacheManager, CommitFromMem) {
   shash::Any rnd_hash;
   rnd_hash.Randomize();
   unsigned char buf = '1';
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                        &buf, 1));
   unsigned char *retrieve_buf;
   uint64_t retrieve_size;
-  EXPECT_TRUE(
-    cache_mgr_->Open2Mem(rnd_hash, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(rnd_hash),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('1', retrieve_buf[0]);
   free(retrieve_buf);
 
   TestCacheManager faulty_cache;
-  EXPECT_FALSE(faulty_cache.CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_FALSE(faulty_cache.CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                          &buf, 1));
 
   string final_dir = tmp_path_ + "/" + rnd_hash.MakePath();
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
@@ -326,7 +333,8 @@ TEST_F(T_CacheManager, CommitFromMem) {
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_page_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink(final_dir.c_str()));
   EXPECT_EQ(0, rmdir(GetParentPath(final_dir).c_str()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(CacheManager::LabeledObject(rnd_hash),
+                                         &buf, 1));
 }
 
 
@@ -334,22 +342,23 @@ TEST_F(T_CacheManager, Open2Mem) {
   unsigned char *retrieve_buf;
   uint64_t retrieve_size;
 
-  EXPECT_FALSE(cache_mgr_->Open2Mem(shash::Any(shash::kMd5), "",
-    &retrieve_buf, &retrieve_size));
+  EXPECT_FALSE(
+    cache_mgr_->Open2Mem(CacheManager::LabeledObject(shash::Any(shash::kMd5)),
+                         &retrieve_buf, &retrieve_size));
 
-  EXPECT_TRUE(
-    cache_mgr_->Open2Mem(hash_null_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash_null_),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(0U, retrieve_size);
   EXPECT_EQ(NULL, retrieve_buf);
 
-  EXPECT_TRUE(cache_mgr_->Open2Mem(
-    hash_one_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash_one_),
+                                   &retrieve_buf, &retrieve_size));
   EXPECT_EQ(1U, retrieve_size);
   EXPECT_EQ('A', retrieve_buf[0]);
 
   TestCacheManager faulty_cache;
-  EXPECT_FALSE(
-    faulty_cache.Open2Mem(hash_one_, "", &retrieve_buf, &retrieve_size));
+  EXPECT_FALSE(faulty_cache.Open2Mem(CacheManager::LabeledObject(hash_one_),
+                                     &retrieve_buf, &retrieve_size));
   EXPECT_EQ(0U, retrieve_size);
   EXPECT_EQ(NULL, retrieve_buf);
 }
@@ -358,20 +367,25 @@ TEST_F(T_CacheManager, Open2Mem) {
 TEST_F(T_CacheManager, OpenPinned) {
   shash::Any rnd_hash(shash::kSha1);
   rnd_hash.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->OpenPinned(rnd_hash, "", false));
+  CacheManager::Label label;
+  label.flags |= CacheManager::kLabelPinned;
+  EXPECT_EQ(-ENOENT,
+    cache_mgr_->OpenPinned(CacheManager::LabeledObject(rnd_hash, label)));
 
   delete cache_mgr_->quota_mgr_;
   TestQuotaManager *quota_mgr = new TestQuotaManager();
   cache_mgr_->quota_mgr_ = quota_mgr;
 
-  int fd = cache_mgr_->OpenPinned(hash_null_, "", false);
+  int fd =
+    cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
   EXPECT_EQ(hash_null_, quota_mgr->last_cmd.hash);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   quota_mgr->Unpin(hash_null_);
 
-  fd = cache_mgr_->OpenPinned(hash_null_, "fail", false);
+  label.path = "fail";
+  fd = cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
   EXPECT_EQ(-ENOSPC, fd);
 }
 
@@ -394,7 +408,7 @@ TEST_F(T_CacheManager, AbortTxn) {
 
 
 TEST_F(T_CacheManager, Close) {
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(-EBADF, cache_mgr_->Close(fd));
@@ -408,11 +422,11 @@ TEST_F(T_CacheManager, CommitTxn) {
   ASSERT_TRUE(txn != NULL);
   int fd;
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -422,7 +436,7 @@ TEST_F(T_CacheManager, CommitTxn) {
   unsigned char buf = 'A';
   EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, cache_mgr_->GetSize(fd));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, &buf, 1, 0));
@@ -448,7 +462,7 @@ TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
   ASSERT_TRUE(txn != NULL);
   unsigned char content = 'x';
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   EXPECT_EQ(1U, cache_mgr_->Write(&content, 1, txn));
@@ -482,9 +496,10 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_EQ(1U, quota_mgr->last_cmd.size);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeVolatile, "desc0"),
-    0, txn);
+  CacheManager::Label label;
+  label.path = "desc0";
+  label.flags = CacheManager::kLabelVolatile;
+  cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(1U, cache_mgr_->Write(buf, 1, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdInsertVolatile, quota_mgr->last_cmd.cmd);
@@ -493,9 +508,9 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_EQ("desc0", quota_mgr->last_cmd.description);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypePinned, "desc1"),
-    0, txn);
+  label.path = "desc1";
+  label.flags = CacheManager::kLabelPinned;
+  cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(2U, cache_mgr_->Write(buf, 2, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
@@ -505,18 +520,17 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   EXPECT_FALSE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 3, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "desc2"),
-    0, txn);
+  label.path = "desc2";
+  label.flags = CacheManager::kLabelCatalog;
+  cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(3U, cache_mgr_->Write(buf, 3, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
   EXPECT_TRUE(quota_mgr->last_cmd.is_catalog);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "fail"),
-    0, txn);
+  label.path = "fail";
+  cache_mgr_->CtrlTxn(label, 0, txn);
   EXPECT_EQ(-ENOSPC, cache_mgr_->CommitTxn(txn));
 }
 
@@ -527,7 +541,7 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   delete cache_mgr_->quota_mgr_;
   cache_mgr_->quota_mgr_ = new TestQuotaManager();
@@ -535,9 +549,10 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
     cache_mgr_->quota_mgr());
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
-  cache_mgr_->CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeCatalog, "desc"),
-    0, txn);
+  CacheManager::Label label;
+  label.path = "desc";
+  label.flags = CacheManager::kLabelCatalog;
+  cache_mgr_->CtrlTxn(label, 0, txn);
   string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
@@ -555,7 +570,7 @@ TEST_F(T_CacheManager, CommitTxnFlushFail) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   int fd = cache_mgr_->StartTxn(rnd_hash, 1, txn);
   EXPECT_GE(fd, 0);
@@ -599,7 +614,7 @@ TEST_F(T_CacheManager, Create) {
 
 TEST_F(T_CacheManager, Dup) {
   EXPECT_EQ(-EBADF, cache_mgr_->Dup(-1));
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
   EXPECT_NE(fd, fd_dup);
@@ -609,12 +624,12 @@ TEST_F(T_CacheManager, Dup) {
 
 
 TEST_F(T_CacheManager, GetSize) {
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
-  fd = cache_mgr_->Open(CacheManager::Bless(hash_one_));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1, cache_mgr_->GetSize(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -631,10 +646,10 @@ TEST_F(T_CacheManager, Open) {
 
   shash::Any rnd_hash;
   rnd_hash.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
   EXPECT_EQ(TestQuotaManager::kCmdUnknown, quota_mgr->last_cmd.cmd);
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_null_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(TestQuotaManager::kCmdTouch, quota_mgr->last_cmd.cmd);
@@ -648,7 +663,7 @@ TEST_F(T_CacheManager, OpenFromTxn) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   ASSERT_TRUE(txn != NULL);
 
-  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_hash)));
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash)));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   unsigned char buf = 'A';
@@ -685,7 +700,7 @@ TEST_F(T_CacheManager, OpenFromTxn) {
 
 TEST_F(T_CacheManager, Pread) {
   char buf[1024];
-  int fd = cache_mgr_->Open(CacheManager::Bless(hash_one_));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(1U, cache_mgr_->Pread(fd, &buf, 1024, 0));
   EXPECT_EQ('A', buf[0]);
@@ -737,7 +752,7 @@ TEST_F(T_CacheManager, Reset) {
   EXPECT_EQ(5000, cache_mgr_->Write(large_buf, 5000, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(5000, cache_mgr_->GetSize(fd));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, large_buf, 1, 0));
@@ -747,7 +762,7 @@ TEST_F(T_CacheManager, Reset) {
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
-  fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
   cache_mgr_->Close(fd);
@@ -862,7 +877,7 @@ TEST_F(T_CacheManager, Write) {
   EXPECT_EQ(0, cache_mgr_->Write(NULL, 0, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(14096, cache_mgr_->GetSize(fd));
   cache_mgr_->Close(fd);
@@ -896,7 +911,7 @@ TEST_F(T_CacheManager, WriteCompare) {
   EXPECT_EQ(N, cache_mgr_->Write(large_buf, N, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(rnd_hash));
+  int fd = cache_mgr_->Open(CacheManager::LabeledObject(rnd_hash));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(N, cache_mgr_->GetSize(fd));
   char receive_buf[N];

@@ -84,7 +84,7 @@ TEST_F(T_RamCacheManager, Read) {
 
   char out[alloc_size];
   memset(out, 0, alloc_size);
-  EXPECT_GE((fd = ramcache_.Open(CacheManager::Bless(a_))), 0);
+  EXPECT_GE((fd = ramcache_.Open(CacheManager::LabeledObject(a_))), 0);
   EXPECT_EQ(alloc_size, ramcache_.Pread(fd, out, alloc_size, 0));
   EXPECT_EQ(0, memcmp(buf, out, alloc_size));
 
@@ -158,7 +158,7 @@ TEST_F(T_RamCacheManager, Eviction) {
   EXPECT_EQ(0, ramcache_.CommitTxn(txn5));
 
   a_.digest[1] = 1;
-  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::Bless(a_)));
+  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::LabeledObject(a_)));
 }
 
 TEST_F(T_RamCacheManager, OpenEntries) {
@@ -218,9 +218,9 @@ TEST_F(T_RamCacheManager, PinnedEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
-  ramcache_.CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypePinned, ""),
-    0, txn1);
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelPinned;
+  ramcache_.CtrlTxn(label, 0, txn1);
 
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));
@@ -235,9 +235,9 @@ TEST_F(T_RamCacheManager, PinnedEntry) {
   EXPECT_EQ(0, ramcache_.CommitTxn(txn5));
 
   a_.digest[1] = 1;
-  EXPECT_GE(ramcache_.Open(CacheManager::Bless(a_)), 0);
+  EXPECT_GE(ramcache_.Open(CacheManager::LabeledObject(a_)), 0);
   a_.digest[1] = 2;
-  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::Bless(a_)));
+  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::LabeledObject(a_)));
 }
 
 TEST_F(T_RamCacheManager, VolatileEntry) {
@@ -261,9 +261,9 @@ TEST_F(T_RamCacheManager, VolatileEntry) {
   a_.digest[1] = 5;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn5));
 
-  ramcache_.CtrlTxn(
-    CacheManager::ObjectInfo(CacheManager::kTypeVolatile, ""),
-    0, txn4);
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelVolatile;
+  ramcache_.CtrlTxn(label, 0, txn4);
 
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));
@@ -278,9 +278,9 @@ TEST_F(T_RamCacheManager, VolatileEntry) {
   EXPECT_EQ(0, ramcache_.CommitTxn(txn5));
 
   a_.digest[1] = 1;
-  EXPECT_GE(ramcache_.Open(CacheManager::Bless(a_)), 0);
+  EXPECT_GE(ramcache_.Open(CacheManager::LabeledObject(a_)), 0);
   a_.digest[1] = 4;
-  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::Bless(a_)));
+  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::LabeledObject(a_)));
 }
 
 TEST_F(T_RamCacheManager, LargeCommit) {
@@ -307,7 +307,7 @@ TEST_F(T_RamCacheManager, LargeCommit) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(-ENOSPC, ramcache_.CommitTxn(txn3));
   a_.digest[1] = 1;
-  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::Bless(a_)));
+  EXPECT_EQ(-ENOENT, ramcache_.Open(CacheManager::LabeledObject(a_)));
   a_.digest[1] = 2;
   EXPECT_EQ(0, ramcache_.Close(fd));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn3));

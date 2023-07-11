@@ -117,12 +117,12 @@ class RamCacheManager : public CacheManager {
    * Open a new file descriptor into the cache. Note that opening entries
    * effectively pins them in the cache, so it may be necessary to close
    * unneeded file descriptors to allow eviction to make room in the cache
-   * @param object The blessed hash key
+   * @param object The tagged hash key
    * @returns A nonnegative integer file descriptor
    * @retval -ENOENT The entry is not in the cache
    * @retval -ENFILE No handles are available
    */
-  virtual int Open(const BlessedObject &object);
+  virtual int Open(const LabeledObject &object);
 
   /**
    * Look up the size in bytes of the open cache entry
@@ -190,9 +190,7 @@ class RamCacheManager : public CacheManager {
    * @param flags Unused
    * @param txn A pointer to space allocated for storing the transaction details
    */
-  virtual void CtrlTxn(const ObjectInfo &object_info,
-                       const int flags,
-                       void *txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn);
 
   /**
    * Copy the given memory region into the transaction buffer. Copying starts at
@@ -284,7 +282,7 @@ class RamCacheManager : public CacheManager {
   }
 
   inline MemoryKvStore *GetTransactionStore(Transaction *txn) {
-    if (txn->buffer.object_type == kTypeVolatile) {
+    if (txn->buffer.object_flags & CacheManager::kLabelVolatile) {
       return &volatile_entries_;
     } else {
       return &regular_entries_;

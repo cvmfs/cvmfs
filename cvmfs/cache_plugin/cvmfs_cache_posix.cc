@@ -168,8 +168,8 @@ int posix_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
     if (change_by < 0) {
       return CVMCACHE_STATUS_BADCOUNT;
     }
-    CacheManager::BlessedObject blessed_object(Chash2Cpphash(id));
-    int fd = g_cache_mgr->Open(blessed_object);
+    CacheManager::LabeledObject labeled_object(Chash2Cpphash(id));
+    int fd = g_cache_mgr->Open(labeled_object);
     if (fd < 0) {
       return CVMCACHE_STATUS_NOENTRY;
     }
@@ -241,18 +241,16 @@ int posix_start_txn(struct cvmcache_hash *id,
   transaction.type = info->type;
   g_transactions->Insert(txn_id, transaction);
 
-  CacheManager::ObjectInfo object_info;
+  CacheManager::Label label;
   if (info->type == CVMCACHE_OBJECT_CATALOG) {
-    object_info.type = CacheManager::kTypeCatalog;
+    label.flags |= CacheManager::kLabelCatalog;
   } else if (info->type == CVMCACHE_OBJECT_VOLATILE) {
-    object_info.type = CacheManager::kTypeVolatile;
-  } else {
-    object_info.type = CacheManager::kTypeRegular;
+    label.flags = CacheManager::kLabelVolatile;
   }
   if (info->description) {
-    object_info.description = info->description;
+    label.path = info->description;
   }
-  g_cache_mgr->CtrlTxn(object_info, 0, txn);
+  g_cache_mgr->CtrlTxn(label, 0, txn);
   return CVMCACHE_STATUS_OK;
 }
 

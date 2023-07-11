@@ -112,7 +112,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   std::string *catalog_path,
   shash::Any *catalog_hash)
 {
-  string cvmfs_path = "file catalog at " + repo_name_ + ":" +
+  string cvmfs_path = repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
       "/" : string(mountpoint.GetChars(), mountpoint.GetLength()));
 
@@ -240,9 +240,12 @@ LoadError ClientCatalogManager::LoadCatalog(
   *catalog_hash = ensemble.manifest->catalog_hash();
 
   // Store new manifest and certificate
-  fetcher_->cache_mgr()->CommitFromMem(ensemble.manifest->certificate(),
-                                       ensemble.cert_buf, ensemble.cert_size,
-                                       "certificate for " + repo_name_);
+  CacheManager::Label label;
+  label.path = repo_name_;
+  label.flags |= CacheManager::kLabelCertificate;
+  fetcher_->cache_mgr()->CommitFromMem(
+    CacheManager::LabeledObject(ensemble.manifest->certificate(), label),
+    ensemble.cert_buf, ensemble.cert_size);
   fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
   return catalog::kLoadNew;
 }
@@ -255,8 +258,11 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
-  int fd = fetcher_->Fetch(hash, CacheManager::kSizeUnknown, name,
-    zlib::kZlibDefault, CacheManager::kTypeCatalog, alt_catalog_path);
+  CacheManager::Label label;
+  label.path = name;
+  label.flags = CacheManager::kLabelCatalog;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
+                           alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;
@@ -329,9 +335,12 @@ bool ClientCatalogManager::IsRevisionBlacklisted() {
 
 
 void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
+  CacheManager::Label label;
+  label.flags |= CacheManager::kLabelCertificate;
+  label.path = catalog_mgr_->repo_name();
   uint64_t size;
-  bool retval = cache_mgr_->Open2Mem(
-    hash, "certificate for " + catalog_mgr_->repo_name(), &cert_buf, &size);
+  bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
+                                     &cert_buf, &size);
   cert_size = size;
   if (retval)
     perf::Inc(catalog_mgr_->n_certificate_hits_);

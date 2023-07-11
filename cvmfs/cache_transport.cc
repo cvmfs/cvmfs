@@ -321,24 +321,13 @@ void CacheTransport::FillMsgHash(
 
 
 void CacheTransport::FillObjectType(
-  CacheManager::ObjectType object_type,
-  cvmfs::EnumObjectType *wire_type)
+  int object_flags, cvmfs::EnumObjectType *wire_type)
 {
-  switch (object_type) {
-    case CacheManager::kTypeRegular:
-    // TODO(jblomer): "pinned" should mean a permanently open fd
-    case CacheManager::kTypePinned:
-      *wire_type = cvmfs::OBJECT_REGULAR;
-      break;
-    case CacheManager::kTypeCatalog:
-      *wire_type = cvmfs::OBJECT_CATALOG;
-      break;
-    case CacheManager::kTypeVolatile:
-      *wire_type = cvmfs::OBJECT_VOLATILE;
-      break;
-    default:
-      PANIC(NULL);
-  }
+  *wire_type = cvmfs::OBJECT_REGULAR;
+  if (object_flags & CacheManager::kLabelCatalog)
+    *wire_type = cvmfs::OBJECT_CATALOG;
+  if (object_flags & CacheManager::kLabelVolatile)
+    *wire_type = cvmfs::OBJECT_VOLATILE;
 }
 
 
@@ -368,18 +357,17 @@ bool CacheTransport::ParseMsgHash(
 
 
 bool CacheTransport::ParseObjectType(
-  cvmfs::EnumObjectType wire_type,
-  CacheManager::ObjectType *object_type)
+  cvmfs::EnumObjectType wire_type, int *object_flags)
 {
+  *object_flags = 0;
   switch (wire_type) {
     case cvmfs::OBJECT_REGULAR:
-      *object_type = CacheManager::kTypeRegular;
       return true;
     case cvmfs::OBJECT_CATALOG:
-      *object_type = CacheManager::kTypeCatalog;
+      *object_flags |= CacheManager::kLabelCatalog;
       return true;
     case cvmfs::OBJECT_VOLATILE:
-      *object_type = CacheManager::kTypeVolatile;
+      *object_flags |= CacheManager::kLabelVolatile;
       return true;
     default:
       return false;

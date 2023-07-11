@@ -13,6 +13,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "util/pointer.h"
@@ -26,6 +27,7 @@ enum CacheManagerIds {
   kRamCacheManager,
   kTieredCacheManager,
   kExternalCacheManager,
+  kStreamingCacheManager,
 };
 
 enum CacheModes {
@@ -72,81 +74,77 @@ class CacheManager : SingleCopy {
   static const uint64_t kSizeUnknown;
 
   /**
-   * Relevant for the quota management
+   * Relevant for the quota management and for downloading (URL construction).
+   * Used in Label::flags.
    */
-  enum ObjectType {
-    kTypeRegular = 0,
-    kTypeCatalog,  // implies pinned
-    kTypePinned,
-    kTypeVolatile,
-  };
+  static const int kLabelCatalog     = 0x01;
+  static const int kLabelPinned      = 0x02;
+  static const int kLabelVolatile    = 0x04;
+  static const int kLabelExternal    = 0x08;
+  static const int kLabelChunked     = 0x10;
+  static const int kLabelCertificate = 0x20;
+  static const int kLabelMetainfo    = 0x40;
+  static const int kLabelHistory     = 0x80;
 
   /**
-   * Meta-data of an object that the cache may or may not maintain.  Good cache
-   * implementations should at least distinguish between volatile and regular
-   * objects.
+   * Meta-data of an object that the cache may or may not maintain/use.
+   * Good cache implementations should at least distinguish between volatile
+   * and regular objects. The data in the label are sufficient to download an
+   * object, if necessary.
    */
-  struct ObjectInfo {
-    ObjectInfo() : type(kTypeRegular), description() { }
-    ObjectInfo(ObjectType t, const std::string &d) : type(t), description(d) { }
+  struct Label {
+    Label() : flags(0)
+            , size(kSizeUnknown)
+            , zip_algorithm(zlib::kZlibDefault)
+            , range_offset(-1)
+    {}
 
-    ObjectType type;
+    bool IsCatalog() const { return flags & kLabelCatalog; }
+    bool IsPinned() const { return flags & kLabelPinned; }
+    bool IsExternal() const { return flags & kLabelExternal; }
+    bool IsCertificate() const { return flags & kLabelCertificate; }
+
     /**
-     * Typically the path that triggered storing the object in the cache
+     * The description for the quota manager
      */
-    std::string description;
+    std::string GetDescription() const {
+      if (flags & kLabelCatalog)
+        return "file catalog at " + path;
+      if (flags & kLabelCertificate)
+        return "certificate for " + path;
+      if (flags & kLabelMetainfo)
+        return "metainfo for " + path;
+      if (flags & kLabelHistory)
+        return "tag database for " + path;
+      if (flags & kLabelChunked)
+        return "Part of " + path;
+      return path;
+    }
+
+    int flags;
+    uint64_t size;  ///< unzipped size, if known
+    zlib::Algorithms zip_algorithm;
+    off_t range_offset;
+    /**
+     * The logical path on the mountpoint connected to the object. For meta-
+     * data objects, e.g. certificate, catalog, it's the repository name (which
+     * does not start with a slash).
+     */
+    std::string path;
   };
 
   /**
-   * A content hash together with a (partial) ObjectInfo meta-data.
+   * A content hash together with the meta-data from a (partial) label.
    */
-  struct BlessedObject {
-    explicit BlessedObject(const shash::Any &id) : id(id), info() { }
-    BlessedObject(const shash::Any &id, const ObjectInfo info)
+  struct LabeledObject {
+    explicit LabeledObject(const shash::Any &id) : id(id), label() { }
+    LabeledObject(const shash::Any &id, const Label &l)
       : id(id)
-      , info(info) { }
-    BlessedObject(const shash::Any &id, ObjectType type)
-      : id(id)
-      , info(type, "") { }
-    BlessedObject(const shash::Any &id, const std::string &description)
-      : id(id)
-      , info(kTypeRegular, description) { }
-    BlessedObject(
-      const shash::Any &id,
-      ObjectType type,
-      const std::string &description)
-      : id(id)
-      , info(type, description) { }
+      , label(l) { }
 
     shash::Any id;
-    ObjectInfo info;
+    Label label;
   };
-  // Convenience constructors, users can call Open(CacheManager::Bless(my_hash))
-  static inline BlessedObject Bless(const shash::Any &id) {
-    return BlessedObject(id);
-  }
-  static inline BlessedObject Bless(
-    const shash::Any &id,
-    const ObjectInfo &info)
-  {
-    return BlessedObject(id, info);
-  }
-  static inline BlessedObject Bless(const shash::Any &id, ObjectType type) {
-    return BlessedObject(id, type);
-  }
-  static inline BlessedObject Bless(
-    const shash::Any &id,
-    const std::string &description)
-  {
-    return BlessedObject(id, description);
-  }
-  static inline BlessedObject Bless(
-    const shash::Any &id,
-    ObjectType type,
-    const std::string &description)
-  {
-    return BlessedObject(id, type, description);
-  }
 
   virtual CacheManagerIds id() = 0;
   /**
@@ -164,7 +162,7 @@ class CacheManager : SingleCopy {
    * beneficial to register the object with the accurate meta-data, in the same
    * way it is done during transactions.
    */
-  virtual int Open(const BlessedObject &object) = 0;
+  virtual int Open(const LabeledObject &object) = 0;
   virtual int64_t GetSize(int fd) = 0;
   virtual int Close(int fd) = 0;
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) = 0;
@@ -173,7 +171,7 @@ class CacheManager : SingleCopy {
 
   virtual uint32_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
-  virtual void CtrlTxn(const ObjectInfo &object_info,
+  virtual void CtrlTxn(const Label &label,
                        const int flags,  // reserved for future use
                        void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
@@ -184,16 +182,13 @@ class CacheManager : SingleCopy {
 
   virtual void Spawn() = 0;
 
-  int OpenPinned(const shash::Any &id,
-                 const std::string &description,
-                 bool is_catalog);
   int ChecksumFd(int fd, shash::Any *id);
-  bool Open2Mem(const shash::Any &id, const std::string &description,
+  int OpenPinned(const LabeledObject &object);
+  bool Open2Mem(const LabeledObject &object,
                 unsigned char **buffer, uint64_t *size);
-  bool CommitFromMem(const shash::Any &id,
+  bool CommitFromMem(const LabeledObject &object,
                      const unsigned char *buffer,
-                     const uint64_t size,
-                     const std::string &description);
+                     const uint64_t size);
 
   QuotaManager *quota_mgr() { return quota_mgr_; }
 

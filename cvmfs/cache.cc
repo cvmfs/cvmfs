@@ -77,16 +77,15 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
  * The hash and the memory blob need to match.
  */
 bool CacheManager::CommitFromMem(
-  const shash::Any &id,
+  const LabeledObject &object,
   const unsigned char *buffer,
-  const uint64_t size,
-  const string &description)
+  const uint64_t size)
 {
   void *txn = alloca(this->SizeOfTxn());
-  int fd = this->StartTxn(id, size, txn);
+  int fd = this->StartTxn(object.id, size, txn);
   if (fd < 0)
     return false;
-  this->CtrlTxn(ObjectInfo(kTypeRegular, description), 0, txn);
+  this->CtrlTxn(object.label, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
     this->AbortTxn(txn);
@@ -125,15 +124,14 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
  * \return True if successful, false otherwise.
  */
 bool CacheManager::Open2Mem(
-  const shash::Any &id,
-  const std::string &description,
+  const LabeledObject &object,
   unsigned char **buffer,
   uint64_t *size)
 {
   *size = 0;
   *buffer = NULL;
 
-  int fd = this->Open(Bless(id, kTypeRegular, description));
+  int fd = this->Open(object);
   if (fd < 0)
     return false;
 
@@ -167,21 +165,17 @@ bool CacheManager::Open2Mem(
  * do not exist anymore in the cache.  (The quota manager also translates double
  * pins into a no-op, so that the accounting does not get out of sync.)
  */
-int CacheManager::OpenPinned(
-  const shash::Any &id,
-  const string &description,
-  bool is_catalog)
-{
-  ObjectInfo object_info(is_catalog ? kTypeCatalog : kTypeRegular, description);
-  int fd = this->Open(Bless(id, object_info));
+int CacheManager::OpenPinned(const LabeledObject &object) {
+  int fd = this->Open(object);
   if (fd >= 0) {
     int64_t size = this->GetSize(fd);
     if (size < 0) {
       this->Close(fd);
       return size;
     }
-    bool retval =
-      quota_mgr_->Pin(id, static_cast<uint64_t>(size), description, is_catalog);
+    bool retval = quota_mgr_->Pin(
+      object.id, static_cast<uint64_t>(size),
+      object.label.GetDescription(), object.label.IsCatalog());
     if (!retval) {
       this->Close(fd);
       return -ENOSPC;

@@ -1,0 +1,117 @@
+cvmfs_test_name="Streaming cache manager"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST_690_HTTP_PID=
+CVMFS_TEST_690_PRIVATE_MOUNTPOINT=
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_690_PRIVATE_MOUNTPOINT ]; then
+    echo -n "umounting ${CVMFS_TEST_690_PRIVATE_MOUNTPOINT}... "
+    remove_local_mount $CVMFS_TEST_690_PRIVATE_MOUNTPOINT && echo "done" || echo "fail"
+  fi
+  [ -z $CVMFS_TEST_690_HTTP_PID ] || sudo kill $CVMFS_TEST_690_HTTP_PID
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+  local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
+  local scratch_dir="$(pwd)"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO                             || return $?
+  mkdir -p ${repo_dir}/internal                                  || return 2
+  echo "Hello World" > ${repo_dir}/internal/small                || return 3
+  cat /dev/urandom | head -c 2500 > ${repo_dir}/internal/bar     || return 4
+  publish_repo $CVMFS_TEST_REPO -v                               || return 5
+
+  start_transaction $CVMFS_TEST_REPO                                      || return $?
+  echo "CVMFS_COMPRESSION_ALGORITHM=none" | \
+    sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  mkdir -p ${repo_dir}/external                                           || return 6
+  cat /dev/urandom | head -c $((1000*1000*25)) > ${repo_dir}/external/foo || return 7
+  if ! running_on_s3; then
+    echo "CVMFS_EXTERNAL_DATA=true" | \
+      sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  fi
+  publish_repo $CVMFS_TEST_REPO -v                                        || return 9
+
+  echo "*** Check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "*** Plant external file"
+  if ! running_on_s3; then
+    local chunk_list=$(get_xattr chunk_list /var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly/external/foo | tail -n +2)
+    printf "$chunk_list\n"
+    local nchunks=$(printf "$chunk_list\n" | wc -l)
+    [ $nchunks -gt 1 ] || return 30
+    mkdir /srv/cvmfs/${CVMFS_TEST_REPO}/data/external || return 31
+    for c in $chunk_list; do
+      local hash=$(echo $c | cut -d, -f1)
+      cat /srv/cvmfs/${CVMFS_TEST_REPO}/data/${hash:0:2}/${hash:2}P >> \
+        /srv/cvmfs/${CVMFS_TEST_REPO}/data/external/foo || return 32
+    done
+  fi
+
+  echo "*** install a desaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  CVMFS_TEST_690_PRIVATE_MOUNTPOINT="$(pwd)/mountpoint"
+  echo "CVMFS_STREAMING_CACHE=yes" > test690.conf
+  echo "CVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}" >> test690.conf
+  do_local_mount "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_STREAMING_CACHE=yes\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 10
+  local talk_socket="$(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO"
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo "$cache_instance"
+  echo "$cache_instance" | grep Streaming || return 11
+
+  ls -lah $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 20
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 21
+  sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
+  cat cache_list | grep small && return 22
+
+  local is_external=$(get_xattr external_file $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo)
+  running_on_s3 || [ x"$is_external" = "x1" ] || return 42
+  md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 43
+  sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
+  cat cache_list | grep foo && return 44
+
+  local size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo)
+  local size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo | wc -c)
+  echo "*** size of 'foo': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 45
+  size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small)
+  size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small | wc -c)
+  echo "*** size of 'small': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 46
+  size_md=$(stat --format=%s $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar)
+  size_cat=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar | wc -c)
+  echo "*** size of 'bar': $size_md / $size_cat"
+  [ $size_md -eq $size_cat ] || return 47
+
+  sudo cvmfs_talk -p $talk_socket cache list
+  sudo cvmfs_talk -p $talk_socket cache list catalogs
+
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 50
+  ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 51
+  md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
+
+  gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 60
+  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  local pid_helper=$!
+
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 61
+  kill -USR1 $pid_helper
+  wait $pid_helper || return 62
+  diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 63
+
+  return 0
+}

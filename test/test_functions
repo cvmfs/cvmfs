@@ -2375,7 +2375,7 @@ EOF
   else
     cat $config_file > $config
   fi
-  echo "$extra_option" >> $config
+  printf "$extra_option\n" >> $config
   echo "  *** local mount config:"
   cat "$config"
 

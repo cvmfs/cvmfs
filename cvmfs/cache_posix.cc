@@ -180,12 +180,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->object_info.type == kTypePinned) ||
-      (transaction->object_info.type == kTypeCatalog))
+  if ((transaction->label.flags & kLabelPinned) ||
+      (transaction->label.flags & kLabelCatalog))
   {
     bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->object_info.description,
-      (transaction->object_info.type == kTypeCatalog));
+      transaction->id, transaction->size, transaction->label.GetDescription(),
+      (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -206,19 +206,21 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->object_info.type == kTypePinned) ||
-        (transaction->object_info.type == kTypeCatalog))
+    if ((transaction->label.flags & kLabelPinned) ||
+        (transaction->label.flags & kLabelCatalog))
     {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
     // Success, inform quota manager
-    if (transaction->object_info.type == kTypeVolatile) {
+    if (transaction->label.flags & kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
-                                 transaction->object_info.description);
-    } else if (transaction->object_info.type == kTypeRegular) {
+                                 transaction->label.GetDescription());
+    } else if (!transaction->label.IsCatalog() &&
+               !transaction->label.IsPinned())
+    {
       quota_mgr_->Insert(transaction->id, transaction->size,
-                         transaction->object_info.description);
+                         transaction->label.GetDescription());
     }
   }
   transaction->~Transaction();
@@ -278,12 +280,12 @@ PosixCacheManager *PosixCacheManager::Create(
 
 
 void PosixCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
+  const Label &label,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->object_info = object_info;
+  transaction->label = label;
 }
 
 
@@ -356,7 +358,7 @@ int64_t PosixCacheManager::GetSize(int fd) {
 }
 
 
-int PosixCacheManager::Open(const BlessedObject &object) {
+int PosixCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
   int result = open(path.c_str(), O_RDONLY);
 

@@ -40,7 +40,7 @@ class TransactionSink : public Sink {
 
   /**
    * Appends data to the sink
-   * 
+   *
    * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
@@ -50,7 +50,7 @@ class TransactionSink : public Sink {
 
   /**
    * Truncate all written data and start over at position zero.
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
@@ -62,7 +62,7 @@ class TransactionSink : public Sink {
    * Purges all resources leaving the sink in an invalid state.
    * More aggressive version of Reset().
    * For some sinks it might do the same as Reset().
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
@@ -115,17 +115,11 @@ class Fetcher : SingleCopy {
   Fetcher(CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
-          perf::StatisticsTemplate statistics,
-          bool external_data = false);
+          perf::StatisticsTemplate statistics);
   ~Fetcher();
-  // TODO(jblomer): reduce number of arguments
-  int Fetch(const shash::Any &id,
-            const uint64_t size,
-            const std::string &name,
-            const zlib::Algorithms compression_algorithm,
-            const CacheManager::ObjectType object_type,
-            const std::string &alt_url = "",
-            off_t range_offset = -1);
+
+  int Fetch(const CacheManager::LabeledObject &object,
+            const std::string &alt_url = "");
 
   CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
@@ -176,16 +170,7 @@ class Fetcher : SingleCopy {
   void CleanupTls(ThreadLocalStorage *tls);
   void SignalWaitingThreads(const int fd, const shash::Any &id,
                             ThreadLocalStorage *tls);
-  int OpenSelect(const shash::Any &id,
-                 const std::string &name,
-                 const CacheManager::ObjectType object_type);
-
-  /**
-   * If set to true, this fetcher is in 'external data' mode:
-   * instead of constructing the to-be-downloaded URL from the entry hash,
-   * it will use the filename.
-   */
-  bool external_;
+  int OpenSelect(const CacheManager::LabeledObject &object);
 
   /**
    * Key to the thread's ThreadLocalStorage memory

@@ -376,12 +376,12 @@ bool LHashMagicXattr::PrepareValueFenced() {
 
 std::string LHashMagicXattr::GetValue() {
   string result;
-  CacheManager::ObjectInfo object_info;
-  object_info.description = path_.ToString();
+  CacheManager::Label label;
+  label.path = path_.ToString();
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
-    object_info.type = CacheManager::kTypeVolatile;
+    label.flags = CacheManager::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
-    CacheManager::Bless(dirent_->checksum(), object_info));
+    CacheManager::LabeledObject(dirent_->checksum(), label));
   if (fd < 0) {
     result = "Not in cache";
   } else {
@@ -553,10 +553,12 @@ std::string RepoMetainfoMagicXattr::GetValue() {
     return error_reason_;
   }
 
-  int fd = xattr_mgr_->mount_point()->fetcher()->
-            Fetch(metainfo_hash_, CacheManager::kSizeUnknown,
-                  "metainfo (" + metainfo_hash_.ToString() + ")",
-                  zlib::kZlibDefault, CacheManager::kTypeRegular, "");
+  CacheManager::Label label;
+  label.path = xattr_mgr_->mount_point()->fqrn() +
+               "(" + metainfo_hash_.ToString() + ")";
+  label.flags = CacheManager::kLabelMetainfo;
+  int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
+    CacheManager::LabeledObject(metainfo_hash_, label));
   if (fd < 0) {
     return "Failed to open metadata file";
   }

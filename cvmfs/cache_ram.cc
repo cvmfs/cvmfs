@@ -49,6 +49,9 @@ RamCacheManager::RamCacheManager(
   assert(retval == 0);
   LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
            max_size, max_entries);
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+           "DEPRECATION WARNING: The RAM cache manager is depcreated and "
+           "will be removed from future releases.");
 }
 
 
@@ -75,7 +78,7 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
-int RamCacheManager::Open(const BlessedObject &object) {
+int RamCacheManager::Open(const LabeledObject &object) {
   WriteLockGuard guard(rwlock_);
   return DoOpen(object.id);
 }
@@ -223,14 +226,12 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 }
 
 
-void RamCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
-  const int flags,
-  void *txn)
+void RamCacheManager::CtrlTxn(const Label &label, const int /* flags */,
+                              void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->description = object_info.description;
-  transaction->buffer.object_type = object_info.type;
+  transaction->description = label.GetDescription();
+  transaction->buffer.object_flags = label.flags;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());
 }
@@ -328,13 +329,15 @@ int RamCacheManager::CommitTxn(void *txn) {
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
 
-  if (transaction->buffer.object_type == kTypeVolatile) {
+  if (transaction->buffer.object_flags & CacheManager::kLabelVolatile)
+  {
     store = &volatile_entries_;
   } else {
     store = &regular_entries_;
   }
-  if (transaction->buffer.object_type == kTypePinned ||
-      transaction->buffer.object_type == kTypeCatalog) {
+  if ((transaction->buffer.object_flags & CacheManager::kLabelPinned) ||
+      (transaction->buffer.object_flags & CacheManager::kLabelCatalog))
+  {
     transaction->buffer.refcount = 1;
   } else {
     transaction->buffer.refcount = 0;
