@@ -797,9 +797,9 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid);
     std::string str_uid = "X-CVMFS-UID: " + StringifyUint(info->uid);
 
-    header_lists_->AppendHeader(info->headers, str_pid.c_str());
-    header_lists_->AppendHeader(info->headers, str_gid.c_str());
-    header_lists_->AppendHeader(info->headers, str_uid.c_str());
+    header_lists_->AppendHeader(info->headers, strdup(str_pid.c_str()));
+    header_lists_->AppendHeader(info->headers, strdup(str_gid.c_str()));
+    header_lists_->AppendHeader(info->headers, strdup(str_uid.c_str()));
 
     LogCvmfs(kLogDownload, kLogDebug, "CURL Header for URL: %s is:\n %s",
              info->url->c_str(), header_lists_->Print(info->headers).c_str());
