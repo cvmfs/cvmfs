@@ -793,13 +793,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
       header_lists_->AppendHeader(info->headers,
                                   (*http_tracing_headers_)[i].c_str());
     }
-    std::string str_pid = "X-CVMFS-PID: " + StringifyInt(info->pid);
-    std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid);
-    std::string str_uid = "X-CVMFS-UID: " + StringifyUint(info->uid);
 
-    header_lists_->AppendHeader(info->headers, strdup(str_pid.c_str()));
-    header_lists_->AppendHeader(info->headers, strdup(str_gid.c_str()));
-    header_lists_->AppendHeader(info->headers, strdup(str_uid.c_str()));
+    header_lists_->AppendHeader(info->headers, info->tracing_header_pid);
+    header_lists_->AppendHeader(info->headers, info->tracing_header_gid);
+    header_lists_->AppendHeader(info->headers, info->tracing_header_uid);
 
     LogCvmfs(kLogDownload, kLogDebug, "CURL Header for URL: %s is:\n %s",
              info->url->c_str(), header_lists_->Print(info->headers).c_str());
@@ -1694,6 +1691,21 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     EscapeHeader(*(info->extra_info()), info->info_header() + header_name_len,
                  header_size - header_name_len);
     info->info_header()[header_size-1] = '\0';
+  }
+  
+  if (enable_http_tracing_) {
+    const std::string str_pid = "X-CVMFS-PID: " + StringifyInt(info->pid);
+    const std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid);
+    const std::string str_uid = "X-CVMFS-UID: " + StringifyUint(info->uid);
+
+    // will be auto freed at the end of this function Fetch(JobInfo *info)
+    info->tracing_header_pid = static_cast<char *>(alloca(str_pid.size() + 1));
+    info->tracing_header_gid = static_cast<char *>(alloca(str_gid.size() + 1));
+    info->tracing_header_uid = static_cast<char *>(alloca(str_uid.size() + 1));
+
+    memcpy(info->tracing_header_pid, str_pid.c_str(), str_pid.size() + 1);
+    memcpy(info->tracing_header_gid, str_gid.c_str(), str_gid.size() + 1);
+    memcpy(info->tracing_header_uid, str_uid.c_str(), str_uid.size() + 1);
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {

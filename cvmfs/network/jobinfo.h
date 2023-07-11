@@ -154,6 +154,26 @@ class JobInfo {
   unsigned backoff_ms() const { return backoff_ms_; }
   unsigned int current_host_chain_index() const {
                                              return current_host_chain_index_; }
+  // Internal state, don't touch
+  CURL *curl_handle;
+  curl_slist *headers;
+  char *info_header;
+  char *tracing_header_pid;
+  char *tracing_header_gid;
+  char *tracing_header_uid;
+  z_stream zstream;
+  shash::ContextPtr hash_context;
+  /// Pipe used for the return value
+  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  std::string proxy;
+  bool nocache;
+  Failures error_code;
+  int http_code;
+  unsigned char num_used_proxies;
+  unsigned char num_used_hosts;
+  unsigned char num_retries;
+  unsigned backoff_ms;
+  unsigned int current_host_chain_index;
 
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
