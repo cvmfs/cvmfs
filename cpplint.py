@@ -6327,4 +6327,8 @@ def main():
 
 
 if __name__ == '__main__':
+  if sys.version_info.major > 2:
+    print("Wrong python version!")
+    print("cpplint.py must be run with python 2")
+    print("Your version: Python", sys.version)
   main()
