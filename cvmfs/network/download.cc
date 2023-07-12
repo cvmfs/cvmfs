@@ -1198,7 +1198,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
             LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                     "ignoring failed hash verification of %s "
                     "(expected %s, got %s)",
-                    info->url()->c_str(), info->expected_hash()->ToString().c_str(),
+                    info->url()->c_str(),
+                    info->expected_hash()->ToString().c_str(),
                     match_hash.ToString().c_str());
           } else {
             LogCvmfs(kLogDownload, kLogDebug,
