@@ -291,7 +291,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * In general it is a bad idea to do this!
    */
   bool ignore_signature_failures_;
-  
+
   bool enable_http_tracing_;
   std::vector<std::string> *http_tracing_headers_;
 
