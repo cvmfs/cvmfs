@@ -14,6 +14,7 @@
 #include "network/sink.h"
 #include "quota.h"
 #include "util/mutex.h"
+#include "util/pointer.h"
 #include "util/smalloc.h"
 
 
@@ -109,18 +110,21 @@ int64_t StreamingCacheManager::Stream(
     url = "/data/" + info.object_id.MakePath();
   }
   bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
-  download::JobInfo download_job(&url,
-                                 is_zipped,
-                                 true, /* probe_hosts */
-                                 &info.object_id,
-                                 &sink);
-  download_job.extra_info = &info.label.path;
-  download_job.range_offset = info.label.range_offset;
-  download_job.range_size = static_cast<int64_t>(info.label.size);
-  SelectDownloadManager(info)->Fetch(&download_job);
 
-  if (download_job.error_code != download::kFailOk)
+  UniquePtr<download::JobInfo> download_job(
+       download::JobInfo::CreateWithSink(&url,
+                                         is_zipped,
+                                         true,  /* probe_hosts */
+                                         &info.object_id,
+                                         &sink));
+  download_job->SetExtraInfo(&info.label.path);
+  download_job->SetRangeOffset(info.label.range_offset);
+  download_job->SetRangeSize(static_cast<int64_t>(info.label.size));
+  SelectDownloadManager(info)->Fetch(download_job.weak_ref());
+
+  if (download_job->error_code() != download::kFailOk) {
     return -EIO;
+  }
 
   return sink.GetNBytesStreamed();
 }
