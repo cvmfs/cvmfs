@@ -9,6 +9,7 @@
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

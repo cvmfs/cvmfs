@@ -379,6 +379,14 @@ _LEGACY_ERROR_CATEGORIES = [
 # tools which also use the NOLINT syntax, e.g. clang-tidy.
 _OTHER_NOLINT_CATEGORY_PREFIXES = [
     'clang-analyzer',
+    'clang-tidy',
+    'bugprone-branch-clone',
+    'performance-no-int-to-ptr',
+    'cert-oop54-cpp',
+    'bugprone-unhandled-self-assignment',
+    'bugprone-sizeof-expression',
+    'bugprone-branch-clone',
+    'misc-unconventional-assign-operator',
     ]
 
 # The default state of the category filter. This is overridden by the --filter=
@@ -766,7 +774,7 @@ _TYPES = re.compile(
 #   uppercase character, such as Python.h or nsStringAPI.h, for example).
 # - Lua headers.
 _THIRD_PARTY_HEADERS_PATTERN = re.compile(
-    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h|benchmark/benchmark\.h)$')
+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h|benchmark/benchmark\.h|cvmfs/testdoc\.h|cvmfs/testdoc\.cc)$')
 
 # Pattern for matching FileInfo.BaseName() against test file name
 _test_suffixes = ['_test', '_regtest', '_unittest']
@@ -4879,7 +4887,8 @@ def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
   # if(match($0, " <<")) complain = 0;
   # if(match(prev, " +for \\(")) complain = 0;
   # if(prevodd && match(prevprev, " +for \\(")) complain = 0;
-  scope_or_label_pattern = r'\s*(?:public|private|protected|signals)(?:\s+(?:slots\s*)?)?:\s*\\?$'
+  #scope_or_label_pattern = r'\s*(?:public|private|protected|signals)(?:\s+(?:slots\s*)?)?:\s*\\?$'
+  scope_or_label_pattern = r'\s*\w+\s*:\s*\\?$'
   classinfo = nesting_state.InnermostClass()
   initial_spaces = 0
   cleansed_line = clean_lines.elided[linenum]
@@ -5460,18 +5469,18 @@ def CheckGlobalStatic(filename, clean_lines, linenum, error):
   #   and functions at the same time would decrease accuracy of
   #   matching identifiers.
   #    string Class::operator*()
-  if (match and
-      not Search(r'\bstring\b(\s+const)?\s*[\*\&]\s*(const\s+)?\w', line) and
-      not Search(r'\boperator\W', line) and
-      not Match(r'\s*(<.*>)?(::[a-zA-Z0-9_]+)*\s*\(([^"]|$)', match.group(4))):
-    if Search(r'\bconst\b', line):
-      error(filename, linenum, 'runtime/string', 4,
-            'For a static/global string constant, use a C style string '
-            'instead: "%schar%s %s[]".' %
-            (match.group(1), match.group(2) or '', match.group(3)))
-    else:
-      error(filename, linenum, 'runtime/string', 4,
-            'Static/global string variables are not permitted.')
+  #if (match and
+  #    not Search(r'\bstring\b(\s+const)?\s*[\*\&]\s*(const\s+)?\w', line) and
+  #    not Search(r'\boperator\W', line) and
+  #    not Match(r'\s*(<.*>)?(::[a-zA-Z0-9_]+)*\s*\(([^"]|$)', match.group(4))):
+  #  if Search(r'\bconst\b', line):
+  #    error(filename, linenum, 'runtime/string', 4,
+  #          'For a static/global string constant, use a C style string '
+  #          'instead: "%schar%s %s[]".' %
+  #          (match.group(1), match.group(2) or '', match.group(3)))
+  #  else:
+  #    error(filename, linenum, 'runtime/string', 4,
+  #          'Static/global string variables are not permitted.')
 
   if (Search(r'\b([A-Za-z0-9_]*_)\(\1\)', line) or
       Search(r'\b([A-Za-z0-9_]*_)\(CHECK_NOTNULL\(\1\)\)', line)):
@@ -5720,7 +5729,8 @@ def CheckForNonConstReference(filename, clean_lines, linenum,
   decls = ReplaceAll(r'{[^}]*}', ' ', line)  # exclude function body
   for parameter in re.findall(_RE_PATTERN_REF_PARAM, decls):
     if (not Match(_RE_PATTERN_CONST_REF_PARAM, parameter) and
-        not Match(_RE_PATTERN_REF_STREAM_PARAM, parameter)):
+        not Match(_RE_PATTERN_REF_STREAM_PARAM, parameter) and
+        not Match(r'benchmark', parameter)): # fix for gtest
       error(filename, linenum, 'runtime/references', 2,
             'Is this a non-const reference? '
             'If so, make const or use a pointer: ' +

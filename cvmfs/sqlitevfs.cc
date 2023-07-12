@@ -359,7 +359,7 @@ static int VfsRdOnlyRandomness(
   int nBuf,
   char *zBuf)
 {
-  assert((size_t)nBuf >= (sizeof(time_t) + sizeof(int)));
+  assert(static_cast<size_t>(nBuf) >= (sizeof(time_t) + sizeof(int)));
   perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_rand);
   memset(zBuf, 0, nBuf);
   pid_t randomnessPid = getpid();
@@ -370,7 +370,7 @@ static int VfsRdOnlyRandomness(
     time(&t);
     memcpy(zBuf, &t, sizeof(t));
     memcpy(&zBuf[sizeof(t)], &randomnessPid, sizeof(randomnessPid));
-    assert(sizeof(t) + sizeof(randomnessPid) <= (size_t)nBuf);
+    assert(sizeof(t) + sizeof(randomnessPid) <= static_cast<size_t>(nBuf));
     nBuf = sizeof(t) + sizeof(randomnessPid);
   } else {
     do {
