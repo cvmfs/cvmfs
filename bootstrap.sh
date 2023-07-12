@@ -250,6 +250,7 @@ build_lib() {
     libarchive)
       do_extract "libarchive" "libarchive-${LIBARCHIVE_VERSION}.tar.gz"
       patch_external "libarchive" "fix-new-glibc.patch"
+      patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
     go)
