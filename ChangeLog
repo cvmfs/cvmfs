@@ -1,4 +1,5 @@
 2.11.0:
+  * Add development option _CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES (#3317)
   * Add streaming cache mode through CVMFS_STREAMING_CACHE=yes (#3263, #2948)
   * Use dedicated log files for mount helper (#3314)
   * Warn about potential incorrect use of cvmfs_talk (#3303)
