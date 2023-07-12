@@ -1187,12 +1187,20 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         shash::Any match_hash;
         shash::Final(info->hash_context, &match_hash);
         if (match_hash != *(info->expected_hash)) {
-          LogCvmfs(kLogDownload, kLogDebug,
-                   "hash verification of %s failed (expected %s, got %s)",
-                   info->url->c_str(), info->expected_hash->ToString().c_str(),
-                   match_hash.ToString().c_str());
-          info->error_code = kFailBadData;
-          break;
+          if (ignore_signature_failures_) {
+            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+                    "ignoring failed hash verification of %s "
+                    "(expected %s, got %s)",
+                    info->url->c_str(), info->expected_hash->ToString().c_str(),
+                    match_hash.ToString().c_str());
+          } else {
+            LogCvmfs(kLogDownload, kLogDebug,
+                    "hash verification of %s failed (expected %s, got %s)",
+                    info->url->c_str(), info->expected_hash->ToString().c_str(),
+                    match_hash.ToString().c_str());
+            info->error_code = kFailBadData;
+            break;
+          }
         }
       }
 
@@ -1464,6 +1472,7 @@ DownloadManager::DownloadManager() {
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
+  ignore_signature_failures_ = false;
 
   resolver_ = NULL;
 
@@ -2669,6 +2678,10 @@ void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
 }
 
+void DownloadManager::EnableIgnoreSignatureFailures() {
+  ignore_signature_failures_ = true;
+}
+
 void DownloadManager::UseSystemCertificatePath() {
   ssl_certificate_store_.UseSystemCertificatePath();
 }
@@ -2697,6 +2710,7 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;
   clone->follow_redirects_ = follow_redirects_;
+  clone->ignore_signature_failures_ = ignore_signature_failures_;
   if (opt_host_chain_) {
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);

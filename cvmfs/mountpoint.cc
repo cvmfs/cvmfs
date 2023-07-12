@@ -1395,6 +1395,14 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->SetHostChain(optarg);
   }
 
+  if (options_mgr_->GetValue("_CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    download_mgr_->EnableIgnoreSignatureFailures();
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      "Development option: Activate ignore signature failures during download. "
+      "DO NOT USE IN PRODUCTION");
+  }
+
   SetupDnsTuning(download_mgr_);
   SetupHttpTuning();
 
