@@ -14,6 +14,7 @@
 #include "network/sink.h"
 #include "quota.h"
 #include "util/mutex.h"
+#include "util/pointer.h"
 #include "util/smalloc.h"
 
 
