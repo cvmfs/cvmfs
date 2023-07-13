@@ -239,13 +239,19 @@ PosixCacheManager *PosixCacheManager::Create(
   assert(cache_manager.IsValid());
 
   cache_manager->rename_workaround_ = rename_workaround;
+
+  FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
+
+  if (fs_info.type == kFsTypeTmpfs) {
+    cache_manager->is_tmpfs_ = true;
+  }
+
   if (cache_manager->alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
       return NULL;
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
-    FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
     switch (fs_info.type) {
       case kFsTypeNFS:
         cache_manager->rename_workaround_ = kRenameLink;
@@ -257,9 +263,6 @@ PosixCacheManager *PosixCacheManager::Create(
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on BeeGFS.");
         break;
-      case kFsTypeTmpfs:
-        cache_manager->is_tmpfs_ = true;
-      break;
       default:
         break;
     }

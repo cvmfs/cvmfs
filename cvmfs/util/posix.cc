@@ -198,6 +198,9 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
     case kFsTypeBeeGFS:
       result.type = kFsTypeBeeGFS;
       break;
+    case kFsTypeTmpfs:
+      result.type = kFsTypeTmpfs;
+      break;
     default:
       result.type = kFsTypeUnknown;
   }
