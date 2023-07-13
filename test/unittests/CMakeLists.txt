@@ -117,121 +117,129 @@ endif (BUILD_SHRINKWRAP)
 # cvmfs_test_publish
 #
 if (BUILD_SERVER)
-  add_executable (cvmfs_test_publish
-                  c_http_server.cc
-                  publish/c_repository.cc
-                  publish/main.cc
-                  publish/t_command.cc
-                  publish/t_env.cc
-                  publish/t_diff.cc
-                  publish/t_session.cc
-                  publish/t_repository.cc
-                  publish/t_settings.cc
-                  publish/t_transaction.cc
-                  publish/t_util.cc
+  set (CVMFS_UNITTEST_SERVER_SOURCES
+       c_http_server.cc
+       publish/c_repository.cc
+       publish/main.cc
+       publish/t_command.cc
+       publish/t_env.cc
+       publish/t_diff.cc
+       publish/t_session.cc
+       publish/t_repository.cc
+       publish/t_settings.cc
+       publish/t_transaction.cc
+       publish/t_util.cc
 
-                  ../common/env.cc
+       ../common/env.cc
 
-                  ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
-                  ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
-                  ${CVMFS_SOURCE_DIR}/publish/cmd_util.cc
-                  ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
-                  ${CVMFS_SOURCE_DIR}/publish/command.cc
-                  ${CVMFS_SOURCE_DIR}/publish/except.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_abort.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_env.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_session.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc
-                  ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
-                  ${CVMFS_SOURCE_DIR}/publish/settings.cc
+       ${CVMFS_SOURCE_DIR}/publish/cmd_help.cc
+       ${CVMFS_SOURCE_DIR}/publish/cmd_mkfs.cc
+       ${CVMFS_SOURCE_DIR}/publish/cmd_util.cc
+       ${CVMFS_SOURCE_DIR}/publish/cmd_zpipe.cc
+       ${CVMFS_SOURCE_DIR}/publish/command.cc
+       ${CVMFS_SOURCE_DIR}/publish/except.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_abort.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_env.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_diff.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_managed.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_session.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_tags.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_transaction.cc
+       ${CVMFS_SOURCE_DIR}/publish/repository_util.cc
+       ${CVMFS_SOURCE_DIR}/publish/settings.cc
 
-                  ${CVMFS_SOURCE_DIR}/backoff.cc
-                  ${CVMFS_SOURCE_DIR}/catalog.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
-                  ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
-                  ${CVMFS_SOURCE_DIR}/compression.cc
-                  ${CVMFS_SOURCE_DIR}/directory_entry.cc
-                  ${CVMFS_SOURCE_DIR}/gateway_util.cc
-                  ${CVMFS_SOURCE_DIR}/globals.cc
-                  ${CVMFS_SOURCE_DIR}/history_sql.cc
-                  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/item.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
-                  ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
-                  ${CVMFS_SOURCE_DIR}/json_document.cc
-                  ${CVMFS_SOURCE_DIR}/malloc_arena.cc
-                  ${CVMFS_SOURCE_DIR}/manifest.cc
-                  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
-                  ${CVMFS_SOURCE_DIR}/network/dns.cc
-                  ${CVMFS_SOURCE_DIR}/network/download.cc
-                  ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
-                  ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
-                  ${CVMFS_SOURCE_DIR}/network/sink_file.cc
-                  ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
-                  ${CVMFS_SOURCE_DIR}/network/sink_path.cc
-                  ${CVMFS_SOURCE_DIR}/options.cc
-                  ${CVMFS_SOURCE_DIR}/pack.cc
-                  ${CVMFS_SOURCE_DIR}/reflog.cc
-                  ${CVMFS_SOURCE_DIR}/reflog_sql.cc
-                  ${CVMFS_SOURCE_DIR}/sanitizer.cc
-                  ${CVMFS_SOURCE_DIR}/session_context.cc
-                  ${CVMFS_SOURCE_DIR}/shortstring.cc
-                  ${CVMFS_SOURCE_DIR}/sql.cc
-                  ${CVMFS_SOURCE_DIR}/sqlitemem.cc
-                  ${CVMFS_SOURCE_DIR}/ssl.cc
-                  ${CVMFS_SOURCE_DIR}/statistics.cc
-                  ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
-                  ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
-                  ${CVMFS_SOURCE_DIR}/sync_item.cc
-                  ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
-                  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
-                  ${CVMFS_SOURCE_DIR}/sync_union.cc
-                  ${CVMFS_SOURCE_DIR}/sync_union_aufs.cc
-                  ${CVMFS_SOURCE_DIR}/sync_union_overlayfs.cc
-                  ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
-                  ${CVMFS_SOURCE_DIR}/upload.cc
-                  ${CVMFS_SOURCE_DIR}/upload_facility.cc
-                  ${CVMFS_SOURCE_DIR}/upload_gateway.cc
-                  ${CVMFS_SOURCE_DIR}/upload_local.cc
-                  ${CVMFS_SOURCE_DIR}/upload_s3.cc
-                  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
-                  ${CVMFS_SOURCE_DIR}/whitelist.cc
-                  ${CVMFS_SOURCE_DIR}/xattr.cc
+       ${CVMFS_SOURCE_DIR}/backoff.cc
+       ${CVMFS_SOURCE_DIR}/catalog.cc
+       ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+       ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+       ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+       ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+       ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+       ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
+       ${CVMFS_SOURCE_DIR}/compression.cc
+       ${CVMFS_SOURCE_DIR}/directory_entry.cc
+       ${CVMFS_SOURCE_DIR}/gateway_util.cc
+       ${CVMFS_SOURCE_DIR}/globals.cc
+       ${CVMFS_SOURCE_DIR}/history_sql.cc
+       ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/chunk_detector.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/item.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/item_mem.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/pipeline.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_chunk.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_compress.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_hash.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_read.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_register.cc
+       ${CVMFS_SOURCE_DIR}/ingestion/task_write.cc
+       ${CVMFS_SOURCE_DIR}/json_document.cc
+       ${CVMFS_SOURCE_DIR}/malloc_arena.cc
+       ${CVMFS_SOURCE_DIR}/manifest.cc
+       ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+       ${CVMFS_SOURCE_DIR}/network/dns.cc
+       ${CVMFS_SOURCE_DIR}/network/download.cc
+       ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
+       ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
+       ${CVMFS_SOURCE_DIR}/network/sink_file.cc
+       ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
+       ${CVMFS_SOURCE_DIR}/network/sink_path.cc
+       ${CVMFS_SOURCE_DIR}/options.cc
+       ${CVMFS_SOURCE_DIR}/pack.cc
+       ${CVMFS_SOURCE_DIR}/reflog.cc
+       ${CVMFS_SOURCE_DIR}/reflog_sql.cc
+       ${CVMFS_SOURCE_DIR}/sanitizer.cc
+       ${CVMFS_SOURCE_DIR}/session_context.cc
+       ${CVMFS_SOURCE_DIR}/shortstring.cc
+       ${CVMFS_SOURCE_DIR}/sql.cc
+       ${CVMFS_SOURCE_DIR}/sqlitemem.cc
+       ${CVMFS_SOURCE_DIR}/ssl.cc
+       ${CVMFS_SOURCE_DIR}/statistics.cc
+       ${CVMFS_SOURCE_DIR}/swissknife_assistant.cc
+       ${CVMFS_SOURCE_DIR}/swissknife_lease_curl.cc
+       ${CVMFS_SOURCE_DIR}/sync_item.cc
+       ${CVMFS_SOURCE_DIR}/sync_item_tar.cc
+       ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+       ${CVMFS_SOURCE_DIR}/sync_union.cc
+       ${CVMFS_SOURCE_DIR}/sync_union_aufs.cc
+       ${CVMFS_SOURCE_DIR}/sync_union_overlayfs.cc
+       ${CVMFS_SOURCE_DIR}/sync_union_tarball.cc
+       ${CVMFS_SOURCE_DIR}/upload.cc
+       ${CVMFS_SOURCE_DIR}/upload_facility.cc
+       ${CVMFS_SOURCE_DIR}/upload_gateway.cc
+       ${CVMFS_SOURCE_DIR}/upload_local.cc
+       ${CVMFS_SOURCE_DIR}/upload_s3.cc
+       ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+       ${CVMFS_SOURCE_DIR}/whitelist.cc
+       ${CVMFS_SOURCE_DIR}/xattr.cc
   )
+  set (CVMFS_UNITTEST_SERVER_LINK_LIBRARIES "")
+  list (APPEND CVMFS_UNITTEST_SERVER_LINK_LIBRARIES
+        ${GTEST_LIBRARIES}
+        ${OPENSSL_LIBRARIES}
+        ${CURL_LIBRARIES}
+        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
+        ${OPENSSL_LIBRARIES}
+        ${SQLITE3_LIBRARY}
+        ${ZLIB_LIBRARIES}
+        ${VJSON_LIBRARIES}
+        ${CAP_LIBRARIES}
+        ${LibArchive_LIBRARY}
+        ${RT_LIBRARY}
+        pthread
+        dl
+  )
+  add_executable (cvmfs_test_publish ${CVMFS_UNITTEST_SERVER_SOURCES})
+
   set_target_properties (cvmfs_test_publish PROPERTIES
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
   )
+
   target_link_libraries (cvmfs_test_publish
                          cvmfs_crypto
                          cvmfs_util
-                         ${GTEST_LIBRARIES}
-                         ${OPENSSL_LIBRARIES}
-                         ${CURL_LIBRARIES}
-                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-                         ${OPENSSL_LIBRARIES}
-                         ${SQLITE3_LIBRARY}
-                         ${ZLIB_LIBRARIES}
-                         ${VJSON_LIBRARIES}
-                         ${CAP_LIBRARIES}
-                         ${LibArchive_LIBRARY}
-                         ${RT_LIBRARY}
-                         pthread
-                         dl)
+                         ${CVMFS_UNITTEST_SERVER_LINK_LIBRARIES})
+
   if (INSTALL_UNITTESTS)
     install (
       TARGETS      cvmfs_test_publish
@@ -239,6 +247,25 @@ if (BUILD_SERVER)
       DESTINATION  bin
     )
   endif ()
+
+  if (BUILD_UNITTESTS_DEBUG)
+  add_executable (cvmfs_test_publish_debug ${CVMFS_UNITTEST_SERVER_SOURCES})
+  set_target_properties (cvmfs_test_publish_debug PROPERTIES
+                         COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
+  )
+  target_link_libraries (cvmfs_test_publish_debug
+                         cvmfs_crypto_debug
+                         cvmfs_util_debug
+                         ${CVMFS_UNITTEST_SERVER_LINK_LIBRARIES})
+
+  if (INSTALL_UNITTESTS)
+    install (
+      TARGETS      cvmfs_test_publish_debug
+      RUNTIME
+      DESTINATION  bin
+    )
+  endif ()
+endif ()
 endif (BUILD_SERVER)
 
 
