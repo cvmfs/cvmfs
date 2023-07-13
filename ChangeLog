@@ -1,5 +1,6 @@
 2.11.0:
-  * Restrict error handling of readahead #3305 
+  * Check for writable log file directories in chkconfig (#3310)
+  * Restrict error handling of readahead (#3305)
   * Fix tmpfs recognition to skip readahead (#3316)
   * Add development option _CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES (#3317)
   * Add streaming cache mode through CVMFS_STREAMING_CACHE=yes (#3263, #2948)
