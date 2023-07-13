@@ -68,7 +68,8 @@ bool SyncUnionTarball::Initialize() {
   }
 
   if (result != ARCHIVE_OK) {
-    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
+    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive: %s",
+             archive_error_string(src));
     return false;
   }
 
