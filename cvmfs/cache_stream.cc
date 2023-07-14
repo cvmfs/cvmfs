@@ -110,7 +110,7 @@ int64_t StreamingCacheManager::Stream(
   }
   bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
 
-  download::JobInfo download_job(&url,is_zipped, true /* probe_hosts */,
+  download::JobInfo download_job(&url, is_zipped, true /* probe_hosts */,
                                  &info.object_id, &sink);
   download_job.SetExtraInfo(&info.label.path);
   download_job.SetRangeOffset(info.label.range_offset);
