@@ -1,4 +1,5 @@
 2.11.0:
+  * [gw] Fix occasional lease contention errors (#3259, #3077)
   * Check for writable log file directories in chkconfig (#3310)
   * Restrict error handling of readahead (#3305)
   * Fix tmpfs recognition to skip readahead (#3316)
