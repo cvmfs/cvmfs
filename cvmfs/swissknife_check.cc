@@ -1012,6 +1012,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  // Check meta-info object
   if (!manifest->meta_info().IsNull()) {
     string tmp_file;
     if (!is_remote_)
@@ -1023,6 +1024,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                manifest->meta_info().ToString().c_str());
       return 1;
     }
+    unlink(tmp_file.c_str());
   }
 
   shash::Any reflog_hash;
