@@ -329,7 +329,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
  *
  * TODO(vavolkl): This method is large and does a lot of checks
  * that could be split into smaller ones.
- * 
+ *
  */
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
@@ -679,7 +679,7 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
                                      &pathsink);
   download::Failures retval = download_manager()->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
              catalog_hash.ToString().c_str(), retval);
     return "";
   }
@@ -1010,6 +1010,19 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (!manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
     return 1;
+  }
+
+  if (!manifest->meta_info().IsNull()) {
+    string tmp_file;
+    if (!is_remote_)
+      tmp_file = DecompressPiece(manifest->meta_info());
+    else
+      tmp_file = DownloadPiece(manifest->meta_info());
+    if (tmp_file == "") {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository metainfo %s",
+               manifest->meta_info().ToString().c_str());
+      return 1;
+    }
   }
 
   shash::Any reflog_hash;
