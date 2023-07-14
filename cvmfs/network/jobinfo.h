@@ -72,6 +72,10 @@ class JobInfo {
   unsigned backoff_ms_;
   unsigned int current_host_chain_index_;
 
+  // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
+  // Replace Init() with JobInfo() that is called by the other constructors
+  void Init();
+
  public:
   /**
    * Sink version: downloads entire data chunk where URL u points to
@@ -193,40 +197,8 @@ class JobInfo {
   void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
                        { current_host_chain_index_ = current_host_chain_index; }
 
-  JobInfo() :
-    pipe_job_results(NULL),
-    url_(NULL),
-    compressed_(false),
-    probe_hosts_(false),
-    head_request_(false),
-    follow_redirects_(false),
-    force_nocache_(false),
-    pid_(-1),
-    uid_(-1),
-    gid_(-1),
-    cred_data_(NULL),
-    interrupt_cue_(NULL),
-    sink_(NULL),
-    expected_hash_(NULL),
-    extra_info_(NULL),
-    //
-    range_offset_(-1),
-    range_size_(-1),
-    //
-    curl_handle_(NULL),
-    headers_(NULL),
-    info_header_(NULL),
-    nocache_(false),
-    error_code_(kFailOther),
-    http_code_(-1),
-    num_used_proxies_(0),
-    num_used_hosts_(0),
-    num_retries_(0),
-    backoff_ms_(0),
-    current_host_chain_index_(0)
-  {
-    memset(&zstream_, 0, sizeof(zstream_));
-  }
+  // needed for fetch.h ThreadLocalStorage
+  JobInfo() { Init(); }
 };  // JobInfo
 
 }  // namespace download
