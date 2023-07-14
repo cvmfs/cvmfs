@@ -15,7 +15,6 @@
 #include "manifest_fetch.h"
 #include "network/download.h"
 #include "upload.h"
-#include "util/pointer.h"
 
 using namespace std;         // NOLINT
 using namespace swissknife;  // NOLINT
@@ -346,10 +345,8 @@ bool CommandTag::FetchObject(const std::string &repository_url,
   const std::string url = repository_url + "/data/" + object_hash.MakePath();
 
   cvmfs::PathSink pathsink(destination_path);
-  UniquePtr<download::JobInfo> download_object(
-                                 download::JobInfo::CreateWithSink(
-                                   &url, true, false, &object_hash, &pathsink));
-  dl_retval = download_manager()->Fetch(download_object.weak_ref());
+  download::JobInfo download_object(&url, true, false, &object_hash, &pathsink);
+  dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object '%s' (%d - %s)",

@@ -169,9 +169,8 @@ bool CommandCheck::Exists(const string &file)
   } else {
     const string url = repo_base_path_ + "/" + file;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "[Exists::url] %s", url.c_str());
-    UniquePtr<download::JobInfo> head(download::JobInfo::CreateWithoutSink(
-                                                                  &url, false));
-    return download_manager()->Fetch(head.weak_ref()) == download::kFailOk;
+    download::JobInfo head(&url, false);
+    return download_manager()->Fetch(&head) == download::kFailOk;
   }
 }
 
@@ -188,11 +187,8 @@ string CommandCheck::FetchPath(const string &path) {
   const string url = repo_base_path_ + "/" + path;
   if (is_remote_) {
     cvmfs::FileSink filesink(f);
-    UniquePtr<download::JobInfo> download_job(
-                    download::JobInfo::CreateWithSink(&url, false, false, NULL,
-                                                      &filesink));
-    download::Failures retval = download_manager()->Fetch(
-                                                       download_job.weak_ref());
+    download::JobInfo download_job(&url, false, false, NULL, &filesink);
+    download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
@@ -679,11 +675,9 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
   const string url = repo_base_path_ + "/" + source;
 
   cvmfs::PathSink pathsink(dest);
-  UniquePtr<download::JobInfo> download_catalog(
-        download::JobInfo::CreateWithSink(&url, true, false, &catalog_hash,
-                                          &pathsink));
-  download::Failures retval = download_manager()->
-                                             Fetch(download_catalog.weak_ref());
+  download::JobInfo download_catalog(&url, true, false, &catalog_hash,
+                                     &pathsink);
+  download::Failures retval = download_manager()->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
              catalog_hash.ToString().c_str(), retval);

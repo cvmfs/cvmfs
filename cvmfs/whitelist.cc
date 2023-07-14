@@ -222,10 +222,9 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
 
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
   cvmfs::MemSink whitelist_memsink;
-  UniquePtr<download::JobInfo> download_whitelist(
-      download::JobInfo::CreateWithSink(&whitelist_url, false,
-                                        probe_hosts, NULL, &whitelist_memsink));
-  retval_dl = download_manager_->Fetch(download_whitelist.weak_ref());
+  download::JobInfo download_whitelist(&whitelist_url, false, probe_hosts, NULL,
+                                       &whitelist_memsink);
+  retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
   plain_size_ = whitelist_memsink.pos();
@@ -243,10 +242,9 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     const string whitelist_pkcs7_url =
       base_url + string("cvmfswhitelist.pkcs7");
     cvmfs::MemSink pkcs7_memsink;
-    UniquePtr<download::JobInfo> download_whitelist_pkcs7(
-          download::JobInfo::CreateWithSink(&whitelist_pkcs7_url, false,
-                                            probe_hosts, NULL, &pkcs7_memsink));
-    retval_dl = download_manager_->Fetch(download_whitelist_pkcs7.weak_ref());
+    download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
+                                             probe_hosts, NULL, &pkcs7_memsink);
+    retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
     pkcs7_size_ = pkcs7_memsink.pos();

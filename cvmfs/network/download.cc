@@ -2015,15 +2015,14 @@ void DownloadManager::ProbeHosts() {
   string url;
 
   cvmfs::MemSink memsink;
-  UniquePtr<JobInfo> info(JobInfo::CreateWithSink(&url, false, false, NULL,
-                                                  &memsink));
+  JobInfo info(&url, false, false, NULL, &memsink);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
 
       struct timeval tv_start, tv_end;
       gettimeofday(&tv_start, NULL);
-      Failures result = Fetch(info.weak_ref());
+      Failures result = Fetch(&info);
       gettimeofday(&tv_end, NULL);
       memsink.Reset();
       if (result == kFailOk) {
@@ -2090,9 +2089,8 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
     LogCvmfs(kLogDownload, kLogDebug,
              "requesting ordered server list from %s", url.c_str());
     cvmfs::MemSink memsink;
-    UniquePtr<JobInfo> info(JobInfo::CreateWithSink(&url, false, false, NULL,
-                                                    &memsink));
-    Failures result = Fetch(info.weak_ref());
+    JobInfo info(&url, false, false, NULL, &memsink);
+    Failures result = Fetch(&info);
     if (result == kFailOk) {
       string order(reinterpret_cast<char*>(memsink.data()), memsink.pos());
       memsink.Reset();

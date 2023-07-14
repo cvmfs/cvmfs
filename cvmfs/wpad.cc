@@ -174,10 +174,9 @@ string AutoProxy(DownloadManager *download_manager) {
     LogCvmfs(kLogDownload, kLogDebug, "looking for proxy config at %s",
              pac_paths[i].c_str());
     cvmfs::MemSink pac_memsink;
-    UniquePtr<download::JobInfo> download_pac(
-            download::JobInfo::CreateWithSink(&pac_paths[i], false, false, NULL,
-                                              &pac_memsink));
-    int retval = download_manager->Fetch(download_pac.weak_ref());
+    download::JobInfo download_pac(&pac_paths[i], false, false, NULL,
+                                   &pac_memsink);
+    int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
       retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data()),

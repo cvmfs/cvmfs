@@ -57,12 +57,9 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     download_manager->SetRetryParameters(kDownloadRetries, 500, 2000);
 
     cvmfs::MemSink manifest_memsink;
-    UniquePtr<download::JobInfo> download_manifest(
-                              download::JobInfo::CreateWithSink(
-                                &manifest_url, false, false, NULL,
-                                &manifest_memsink));
-    download::Failures retval = download_manager->
-                                            Fetch(download_manifest.weak_ref());
+    download::JobInfo download_manifest(&manifest_url, false, false, NULL,
+                                        &manifest_memsink);
+    download::Failures retval = download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));

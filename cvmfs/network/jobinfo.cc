@@ -7,28 +7,19 @@
 
 namespace download {
 
-JobInfo* JobInfo::CreateWithSink(const std::string *u, const bool c,
-                                 const bool ph, const shash::Any *h,
-                                 cvmfs::Sink *s) {
-  UniquePtr<JobInfo> jobinfo(new JobInfo());
-
-  jobinfo->SetUrl(u);
-  jobinfo->SetCompressed(c);
-  jobinfo->SetProbeHosts(ph);
-  jobinfo->SetExpectedHash(h);
-  jobinfo->SetSink(s);
-
-  return jobinfo.Release();
+JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
+         const shash::Any *h, cvmfs::Sink *s) : JobInfo() {
+  url_ = u;
+  compressed_ = c;
+  probe_hosts_ = ph;
+  expected_hash_ = h;
+  sink_ = s;
 }
 
-JobInfo* JobInfo::CreateWithoutSink(const std::string *u, const bool ph) {
-  UniquePtr<JobInfo> jobinfo(new JobInfo());
-
-  jobinfo->SetUrl(u);
-  jobinfo->SetProbeHosts(ph);
-  jobinfo->SetHeadRequest(true);
-
-  return jobinfo.Release();
+JobInfo::JobInfo(const std::string *u, const bool ph) : JobInfo() {
+  url_ = u;
+  probe_hosts_ = ph;
+  head_request_ = true;
 }
 
 

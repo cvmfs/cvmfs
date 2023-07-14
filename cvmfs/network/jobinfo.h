@@ -56,7 +56,7 @@ class JobInfo {
   off_t range_offset_;
   off_t range_size_;
 
-  // Internal state, don't touch
+  // Internal state
   CURL *curl_handle_;
   curl_slist *headers_;
   char *info_header_;
@@ -73,11 +73,17 @@ class JobInfo {
   unsigned int current_host_chain_index_;
 
  public:
-  static JobInfo* CreateWithSink(const std::string *u, const bool c,
-                                 const bool ph, const shash::Any *h,
-                                 cvmfs::Sink *s);
 
-  static JobInfo* CreateWithoutSink(const std::string *u, const bool ph);
+  /**
+   * Sink version: downloads entire data chunk where URL u points to
+   */
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          const shash::Any *h, cvmfs::Sink *s);
+
+  /**
+   * No sink version: Only downloads header where the URL u points to
+   */
+  JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
     if (pipe_job_results.IsValid()) {
@@ -99,7 +105,6 @@ class JobInfo {
    */
   bool IsFileNotFound();
 
-  // Getter Pointer
   pid_t *GetPidPtr() { return &pid_; }
   uid_t *GetUidPtr() { return &uid_; }
   gid_t *GetGidPtr() { return &gid_; }
@@ -113,7 +118,6 @@ class JobInfo {
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
                                            return pipe_job_results.weak_ref(); }
 
-  // Getter
   const std::string* url() const { return url_; }
   bool compressed() const { return compressed_; }
   bool probe_hosts() const { return probe_hosts_; }
@@ -148,7 +152,6 @@ class JobInfo {
   unsigned int current_host_chain_index() const {
                                              return current_host_chain_index_; }
 
-  // Setter
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }

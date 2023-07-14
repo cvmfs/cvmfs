@@ -37,9 +37,8 @@ static bool IsRemote(const string &repository) {
 bool CommandInfo::Exists(const string &repository, const string &file) const {
   if (IsRemote(repository)) {
     const string url = repository + "/" + file;
-    UniquePtr<download::JobInfo> head(download::JobInfo::CreateWithoutSink(
-                                                                  &url, false));
-    return download_manager()->Fetch(head.weak_ref()) == download::kFailOk;
+    download::JobInfo head(&url, false);
+    return download_manager()->Fetch(&head) == download::kFailOk;
   } else {
     return FileExists(file);
   }
@@ -129,11 +128,9 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (IsRemote(repository)) {
     const string url = repository + "/.cvmfspublished";
     cvmfs::MemSink manifest_memsink;
-    UniquePtr<download::JobInfo> download_manifest(
-                    download::JobInfo::CreateWithSink(&url, false, false, NULL,
-                                                      &manifest_memsink));
-    download::Failures retval = download_manager()->
-                                            Fetch(download_manifest.weak_ref());
+    download::JobInfo download_manifest(&url, false, false, NULL,
+                                        &manifest_memsink);
+    download::Failures retval = download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -254,11 +251,9 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     }
     const string url = repository + "/data/" + meta_info.MakePath();
     cvmfs::MemSink metainfo_memsink;
-    UniquePtr<download::JobInfo> download_metainfo(
-              download::JobInfo::CreateWithSink(&url, true, false, &meta_info,
-                                                &metainfo_memsink));
-    download::Failures retval = download_manager()->
-                                            Fetch(download_metainfo.weak_ref());
+    download::JobInfo download_metainfo(&url, true, false, &meta_info,
+                                        &metainfo_memsink);
+    download::Failures retval = download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,
