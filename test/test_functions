@@ -2586,6 +2586,20 @@ EOF'
     $gateway_script status
 }
 
+restart_repository_gateway() {
+    echo "Restarting repository gateway"
+
+    gateway_script=/usr/libexec/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    if [ -f /usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh ]; then
+      gateway_script=/usr/lib/cvmfs-gateway/scripts/run_cvmfs_gateway.sh
+    fi
+
+    sudo $gateway_script restart
+    while ! $gateway_script status; do
+      sleep 1
+    done
+}
+
 lockfile() {
   if [ ! -x lockfile ]; then
     gcc -Wall -o lockfile ${TEST_ROOT}/common/lockfile.c || return 10
