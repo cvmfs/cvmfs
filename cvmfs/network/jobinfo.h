@@ -73,7 +73,6 @@ class JobInfo {
   unsigned int current_host_chain_index_;
 
  public:
-
   /**
    * Sink version: downloads entire data chunk where URL u points to
    */
