@@ -184,7 +184,7 @@ class JobInfo {
   void SetZstream(z_stream zstream) { zstream_ = zstream; }
   void SetHashContext(shash::ContextPtr hash_context)
                                                { hash_context_ = hash_context; }
-  void SetProxy(std::string proxy) { proxy_ = proxy; }
+  void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
