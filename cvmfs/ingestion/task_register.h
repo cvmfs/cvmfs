@@ -22,16 +22,19 @@ class TaskRegister
 {
  public:
   TaskRegister(Tube<FileItem> *tube_in,
-               Tube<FileItem> *tube_counter)
+               Tube<FileItem> *tube_ctr_inflight_pre,
+               Tube<FileItem> *tube_ctr_inflight_post)
     : TubeConsumer<FileItem>(tube_in)
-    , tube_counter_(tube_counter)
+    , tube_ctr_inflight_pre_(tube_ctr_inflight_pre)
+    , tube_ctr_inflight_post_(tube_ctr_inflight_post)
   { }
 
  protected:
   virtual void Process(FileItem *file_item);
 
  private:
-  Tube<FileItem> *tube_counter_;
+  Tube<FileItem> *tube_ctr_inflight_pre_;
+  Tube<FileItem> *tube_ctr_inflight_post_;
 };  // class TaskRegister
 
 #endif  // CVMFS_INGESTION_TASK_REGISTER_H_

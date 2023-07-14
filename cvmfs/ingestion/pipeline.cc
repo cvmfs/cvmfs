@@ -35,14 +35,15 @@ IngestionPipeline::IngestionPipeline(
   , maximal_chunk_size_(spooler_definition.max_file_chunk_size)
   , spawned_(false)
   , uploader_(uploader)
-  , tube_counter_(kMaxFilesInFlight)
+  , tube_ctr_inflight_pre_(kMaxFilesInFlight)
 {
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
     tubes_register_.TakeTube(tube);
-    TaskRegister *task = new TaskRegister(tube, &tube_counter_);
+    TaskRegister *task = new TaskRegister(tube,
+      &tube_ctr_inflight_pre_, &tube_ctr_inflight_post_);
     task->RegisterListener(&IngestionPipeline::OnFileProcessed, this);
     tasks_register_.TakeConsumer(task);
   }
@@ -131,7 +132,8 @@ void IngestionPipeline::Process(
     hash_suffix,
     allow_chunking && chunking_enabled_,
     generate_legacy_bulk_chunks_);
-  tube_counter_.EnqueueBack(file_item);
+  tube_ctr_inflight_post_.EnqueueBack(file_item);
+  tube_ctr_inflight_pre_.EnqueueBack(file_item);
   tube_input_.EnqueueBack(file_item);
 }
 
@@ -148,7 +150,7 @@ void IngestionPipeline::Spawn() {
 
 
 void IngestionPipeline::WaitFor() {
-  tube_counter_.Wait();
+  tube_ctr_inflight_post_.Wait();
 }
 
 
