@@ -693,7 +693,7 @@ bool CompressMem2File(const unsigned char *buf, const size_t size,
 
   // Compress the given memory buffer
   do {
-    used = min((size_t)kZChunk, size - offset);
+    used = min(static_cast<size_t>(kZChunk), size - offset);
     strm.avail_in = used;
 
     flush = (strm.avail_in < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
