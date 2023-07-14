@@ -2595,6 +2595,9 @@ restart_repository_gateway() {
     fi
 
     sudo $gateway_script restart
+    while ! $gateway_script status; do
+      sleep 1
+    done
 }
 
 lockfile() {
