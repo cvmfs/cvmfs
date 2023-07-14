@@ -6,6 +6,9 @@
 #define CVMFS_NETWORK_SHARDING_POLICY_H_
 
 #include <string>
+
+#include "util/single_copy.h"
+
 namespace download {
 
 // Return values of the sharding policy classes (including custom classes)

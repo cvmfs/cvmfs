@@ -213,7 +213,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetDownloadFailoverIndefinitely();
-  void SetFqrn(std::string fqrn) { fqrn_ = fqrn; }
+  void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();

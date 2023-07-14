@@ -5,6 +5,8 @@
 #ifndef CVMFS_NETWORK_HEALTH_CHECK_H_
 #define CVMFS_NETWORK_HEALTH_CHECK_H_
 
+#include "util/single_copy.h"
+
 namespace download {
 
 /**

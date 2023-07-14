@@ -70,7 +70,7 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-bool Interrupted(JobInfo *info, std::string fqrn) {
+bool Interrupted(JobInfo *info, const std::string &fqrn) {
   if (info->allow_failure()) {
     return true;
   }
