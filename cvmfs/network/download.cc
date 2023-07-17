@@ -323,6 +323,53 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   return num_bytes;
 }
 
+#ifdef DEBUGMSG
+static int CallbackCurlDebug(
+  CURL */* handle */,
+  curl_infotype type,
+  char *data,
+  size_t size,
+  void * /* clientp */)
+{
+  const char *prefix = "";
+  switch (type) {
+    case CURLINFO_TEXT:
+      prefix = "{info} ";
+      break;
+    case CURLINFO_HEADER_IN:
+      prefix = "{header/in} ";
+      break;
+    case CURLINFO_HEADER_OUT:
+      prefix = "{header/out} ";
+      break;
+    case CURLINFO_DATA_IN:
+      LogCvmfs(kLogCurl, kLogDebug, "{data/in} <snip>");
+      return 0;
+    case CURLINFO_DATA_OUT:
+      LogCvmfs(kLogCurl, kLogDebug, "{data/out} <snip>");
+      return 0;
+    case CURLINFO_SSL_DATA_IN:
+      LogCvmfs(kLogCurl, kLogDebug, "{ssldata/in} <snip>");
+      return 0;
+    case CURLINFO_SSL_DATA_OUT:
+      LogCvmfs(kLogCurl, kLogDebug, "{ssldata/out} <snip>");
+      return 0;
+    default:
+      // just log the message
+      break;
+  }
+  std::string msg(data, size);
+  for (size_t i = 0; i < msg.length(); ++i) {
+    if (msg[i] == '\0')
+      msg[i] = '~';
+  }
+
+  LogCvmfs(kLogCurl, kLogDebug, "%s%s",
+           prefix, Trim(msg, true /* trim_newline */).c_str());
+  return 0;
+}
+#endif
+
 //------------------------------------------------------------------------------
 
 
@@ -837,6 +884,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_STDERR, curl_debug_file_);
     curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
   }
+#ifdef DEBUGMSG
+  curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+  curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, CallbackCurlDebug);
+#endif
 }
 
 
