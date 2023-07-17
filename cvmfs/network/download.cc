@@ -325,7 +325,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
 #ifdef DEBUGMSG
 static int CallbackCurlDebug(
-  CURL */* handle */,
+  CURL * /* handle */,
   curl_infotype type,
   char *data,
   size_t size,
