@@ -739,14 +739,14 @@ int FuseMain(int argc, char *argv[]) {
      vector<string> cpus = SplitString(parameter, ',');
      CPU_ZERO(&mask);
      for (vector<string>::iterator i = cpus.begin(); i != cpus.end(); i++) {
-        CPU_SET(String2Uint64(*i), &mask);
+        CPU_SET(String2Uint64(Trim(*i)), &mask);
      }
      LogCvmfs(kLogCvmfs, kLogStdout,
-              "Setting CPU Affinity to %s", parameter.c_str());
+              "CernVM-FS: setting CPU Affinity to %s", parameter.c_str());
      int err = sched_setaffinity(0, sizeof(mask), &mask);
      if (err != 0) {
         LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
-                 "Setting CPU Affinity failed with error %d", err);
+                 "Setting CPU Affinity failed with error %d", errno);
      }
 #else
      LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
