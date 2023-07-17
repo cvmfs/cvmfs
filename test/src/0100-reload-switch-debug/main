@@ -1,0 +1,128 @@
+cvmfs_test_name="Switch between debug and normal mode during cvmfs reload"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+source ./src/0100-reload-switch-debug/setup_teardown
+
+TEST0100_REPO=lhcb.cern.ch
+TEST0100_MOUNTPOINT=/cvmfs/lhcb.cern.ch
+
+CVMFS_TEST_0100_TMPFILE=
+
+mount_with_debuglog() {
+  CVMFS_TEST_DEBUGLOG=$(echo "\"${CVMFS_TEST_0100_TMPFILE}\"")
+
+  echo "   ** Mount_with_debuglog"
+  cvmfs_mount $TEST0100_REPO || return $?
+}
+
+mount_without_debuglog() {
+  CVMFS_TEST_DEBUGLOG=""
+
+  echo "   ** Mount_without_debuglog"
+  cvmfs_mount $TEST0100_REPO || return $?
+}
+
+reload_without_debuglog() {
+  echo "   ** Access some data at $TEST0100_REPO"
+  cat /cvmfs/$TEST0100_REPO/*.sh > /dev/null || return 10
+
+  # assumption: debug log is already there
+  echo "   ** Check non-empty existence of debug log"
+  if [[ -s $CVMFS_TEST_0100_TMPFILE ]]
+  then
+    echo "     *** True"
+  else
+    echo "     *** False"
+    return 11
+  fi
+
+  echo "   ** Remove CVMFS_DEBUGLOG from config"
+  sudo sed -i '/^CVMFS_DEBUGLOG=/d' /etc/cvmfs/default.local
+
+  echo "   ** Reload config"
+  sudo cvmfs_config reload > /dev/null
+
+  echo "   ** Wipe cache"
+  sudo cvmfs_config wipecache > /dev/null
+
+  echo "   ** Get last line of debug log"
+  local last_line=$(sudo tail -1 $CVMFS_TEST_0100_TMPFILE)
+
+  echo "   ** Access some data at $TEST0100_REPO"
+  cat /cvmfs/$TEST0100_REPO/*.sh > /dev/null || return 11
+
+  echo "   ** Get again last line of debug log"
+  local new_last_line=$(sudo tail -1 $CVMFS_TEST_0100_TMPFILE)
+
+  echo "   ** Make sure last line is the same"
+  [ "$last_line" = "$new_last_line" ] || return 12
+
+  echo "   ** Success"
+}
+
+reload_with_debuglog() {
+  echo "   ** Access some data at $TEST0100_REPO"
+  cat /cvmfs/$TEST0100_REPO/*.sh > /dev/null || return 20
+
+  # assumption: debug log is not there
+  echo "   ** Check that debug log does not exist"
+  if [[ -f $CVMFS_TEST_0100_TMPFILE ]]
+  then
+    echo "     *** False: File exists"
+    return 21
+  else
+    echo "     *** True: File does not exist"
+  fi
+
+  echo "   ** Add CVMFS_DEBUGLOG to config"
+  sudo echo "CVMFS_DEBUGLOG=\"$CVMFS_TEST_0100_TMPFILE\"" | sudo tee -a /etc/cvmfs/default.local
+
+  echo "   ** Reload config"
+  sudo cvmfs_config reload > /dev/null
+
+  echo "   ** Wipe cache"
+  sudo cvmfs_config wipecache > /dev/null
+
+  echo "   ** Get last line of debug log"
+  local last_line=$(sudo tail -1 $CVMFS_TEST_0100_TMPFILE)
+
+  echo "   ** Access some data at $TEST0100_REPO"
+  cat /cvmfs/$TEST0100_REPO/*.sh > /dev/null || return 21
+
+  echo "   ** Get again last line of debug log"
+  local new_last_line=$(sudo tail -1 $CVMFS_TEST_0100_TMPFILE)
+
+  echo "   ** Make sure last lines are not the same"
+  [ "$last_line" = "$new_last_line" ] && return 22
+
+  echo "   ** Success"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local_script_dir=$2
+  trap cleanup HUP INT TERM EXIT || return $?
+
+  echo "create temporary directory"
+  CVMFS_TEST_0100_TMPFILE=$(mktemp /tmp/test0100.log.XXXXXXXX)
+  echo "tmpfile is $CVMFS_TEST_0100_TMPFILE"
+
+  # delete it because of wrong ownership, let cvmfs create it itself
+  rm $CVMFS_TEST_0100_TMPFILE
+
+  echo "1) Mount with debug log, reload without debug log"
+  mount_with_debuglog || return $?
+  reload_without_debuglog || return $?
+
+  cvmfs_umount $TEST0100_REPO || return $?
+  sudo rm -f "${CVMFS_TEST_0100_TMPFILE}"
+
+  echo "2) Mount without debug log, reload with debug log"
+  mount_without_debuglog || return $?
+  reload_with_debuglog || return $?
+
+  cvmfs_umount $TEST0100_REPO || return $?
+
+  return 0
+}
