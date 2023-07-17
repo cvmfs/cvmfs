@@ -668,7 +668,6 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string talk_socket_path_;
   uid_t talk_socket_uid_;
   gid_t talk_socket_gid_;
-  FILE *curl_debug_logfile_;
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_

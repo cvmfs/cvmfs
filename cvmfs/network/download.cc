@@ -880,10 +880,6 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
   }
-  if (curl_debug_file_) {
-    curl_easy_setopt(handle, CURLOPT_STDERR, curl_debug_file_);
-    curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
-  }
 #ifdef DEBUGMSG
   curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
   curl_easy_setopt(handle, CURLOPT_DEBUGFUNCTION, CallbackCurlDebug);
@@ -1626,11 +1622,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
     kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
-  curl_debug_file_ = NULL;
-}
-
-void DownloadManager::SetCurlDebugFile(FILE *f) {
-  curl_debug_file_ = f;
 }
 
 void DownloadManager::Fini() {

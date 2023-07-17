@@ -1297,17 +1297,6 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
 
   mountpoint->boot_status_ = loader::kFailOk;
-
-  std::string optarg;
-  if (options_mgr->GetValue("CVMFS_CURL_DEBUGLOG", &optarg)) {
-    mountpoint->curl_debug_logfile_ = fopen(optarg.c_str(), "a");
-    mountpoint->download_mgr_->SetCurlDebugFile(
-       mountpoint->curl_debug_logfile_);
-    mountpoint->external_download_mgr_->SetCurlDebugFile(
-       mountpoint->curl_debug_logfile_);
-  } else {
-    mountpoint->curl_debug_logfile_ = NULL;
-  }
   return mountpoint.Release();
 }
 
@@ -1825,7 +1814,6 @@ MountPoint::MountPoint(
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
   , talk_socket_gid_(0)
-  , curl_debug_logfile_(NULL)
 {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
@@ -1876,11 +1864,6 @@ MountPoint::~MountPoint() {
   delete uuid_;
 
   delete statfs_cache_;
-
-  if (curl_debug_logfile_) {
-     fclose(curl_debug_logfile_);
-     curl_debug_logfile_ = NULL;
-  }
 }
 
 

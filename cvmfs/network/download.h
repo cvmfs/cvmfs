@@ -207,7 +207,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void EnableRedirects();
   void EnableIgnoreSignatureFailures();
   void UseSystemCertificatePath();
-  void SetCurlDebugFile(FILE *f);
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -217,7 +216,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   dns::IpPreference opt_ip_preference() const {
     return opt_ip_preference_;
   }
-
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
@@ -395,8 +393,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
-
-  FILE *curl_debug_file_;
 };  // DownloadManager
 
 }  // namespace download
