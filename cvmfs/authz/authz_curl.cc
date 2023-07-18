@@ -158,6 +158,10 @@ bool AuthzAttachment::ConfigureCurlHandle(
 {
   assert(info_data);
 
+  // File catalog has no membership requirement, no tokens to attach
+  if (membership_.empty())
+    return false;
+
   // We cannot rely on libcurl to pipeline (yet), as cvmfs may
   // bounce between different auth handles.
   curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1);
