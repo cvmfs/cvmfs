@@ -56,6 +56,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
+                                 src/1*                                       \
                               || retval=1
 
 

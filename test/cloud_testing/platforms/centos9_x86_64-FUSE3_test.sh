@@ -32,6 +32,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/096-cancelreq                            \
                                  --                                           \
                                  src/0*                                       \
+                                 src/1*                                       \
                               || retval=1
 
 

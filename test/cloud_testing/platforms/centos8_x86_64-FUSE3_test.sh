@@ -22,6 +22,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
+                                 src/1*                                       \
                               || retval=1
 
 
