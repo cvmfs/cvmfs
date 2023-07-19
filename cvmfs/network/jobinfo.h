@@ -60,6 +60,9 @@ class JobInfo {
   CURL *curl_handle_;
   curl_slist *headers_;
   char *info_header_;
+  char *tracing_header_pid_;
+  char *tracing_header_gid_;
+  char *tracing_header_uid_;
   z_stream zstream_;
   shash::ContextPtr hash_context_;
   std::string proxy_;
@@ -142,6 +145,9 @@ class JobInfo {
   CURL *curl_handle() const { return curl_handle_; }
   curl_slist *headers() const { return headers_; }
   char *info_header() const { return info_header_; }
+  char *tracing_header_pid() const { return tracing_header_pid_; }
+  char *tracing_header_gid() const { return tracing_header_gid_; }
+  char *tracing_header_uid() const { return tracing_header_uid_; }
   z_stream zstream() const { return zstream_; }
   shash::ContextPtr hash_context() const { return hash_context_; }
   std::string proxy() const { return proxy_; }
@@ -154,26 +160,6 @@ class JobInfo {
   unsigned backoff_ms() const { return backoff_ms_; }
   unsigned int current_host_chain_index() const {
                                              return current_host_chain_index_; }
-  // Internal state, don't touch
-  CURL *curl_handle;
-  curl_slist *headers;
-  char *info_header;
-  char *tracing_header_pid;
-  char *tracing_header_gid;
-  char *tracing_header_uid;
-  z_stream zstream;
-  shash::ContextPtr hash_context;
-  /// Pipe used for the return value
-  UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
-  std::string proxy;
-  bool nocache;
-  Failures error_code;
-  int http_code;
-  unsigned char num_used_proxies;
-  unsigned char num_used_hosts;
-  unsigned char num_retries;
-  unsigned backoff_ms;
-  unsigned int current_host_chain_index;
 
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
@@ -201,6 +187,12 @@ class JobInfo {
   void SetCurlHandle(CURL *curl_handle) { curl_handle_ = curl_handle; }
   void SetHeaders(curl_slist *headers) { headers_ = headers; }
   void SetInfoHeader(char *info_header) { info_header_ = info_header; }
+  void SetTracingHeaderPid (char *tracing_header_pid)
+                                  { tracing_header_pid_ = tracing_header_pid; };
+  void SetTracingHeaderGid (char *tracing_header_gid)
+                                  { tracing_header_gid_ = tracing_header_gid; };
+  void SetTracingHeaderUid (char *tracing_header_uid)
+                                  { tracing_header_uid_ = tracing_header_uid; };
   void SetZstream(z_stream zstream) { zstream_ = zstream; }
   void SetHashContext(shash::ContextPtr hash_context)
                                                { hash_context_ = hash_context; }
