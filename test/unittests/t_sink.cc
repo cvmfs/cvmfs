@@ -378,7 +378,7 @@ TEST_F(T_Sink, PathSinkPurge) {
 }
 
 TEST_F(T_Sink, PathSinkNotValid) {
-  cvmfs::FileSink sink(NULL);
+  cvmfs::PathSink sink("");
   ASSERT_FALSE(sink.IsValid());
 }
 
