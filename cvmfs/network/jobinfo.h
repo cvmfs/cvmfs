@@ -187,11 +187,11 @@ class JobInfo {
   void SetCurlHandle(CURL *curl_handle) { curl_handle_ = curl_handle; }
   void SetHeaders(curl_slist *headers) { headers_ = headers; }
   void SetInfoHeader(char *info_header) { info_header_ = info_header; }
-  void SetTracingHeaderPid (char *tracing_header_pid)
+  void SetTracingHeaderPid(char *tracing_header_pid)
                                   { tracing_header_pid_ = tracing_header_pid; };
-  void SetTracingHeaderGid (char *tracing_header_gid)
+  void SetTracingHeaderGid(char *tracing_header_gid)
                                   { tracing_header_gid_ = tracing_header_gid; };
-  void SetTracingHeaderUid (char *tracing_header_uid)
+  void SetTracingHeaderUid(char *tracing_header_uid)
                                   { tracing_header_uid_ = tracing_header_uid; };
   void SetZstream(z_stream zstream) { zstream_ = zstream; }
   void SetHashContext(shash::ContextPtr hash_context)

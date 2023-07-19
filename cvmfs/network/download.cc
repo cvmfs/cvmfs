@@ -799,7 +799,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     header_lists_->AppendHeader(info->headers(), info->tracing_header_uid());
 
     LogCvmfs(kLogDownload, kLogDebug, "CURL Header for URL: %s is:\n %s",
-             info->url()->c_str(), header_lists_->Print(info->headers()).c_str());
+           info->url()->c_str(), header_lists_->Print(info->headers()).c_str());
   }
 
   if (info->force_nocache()) {
