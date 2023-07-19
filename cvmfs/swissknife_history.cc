@@ -345,8 +345,7 @@ bool CommandTag::FetchObject(const std::string &repository_url,
   const std::string url = repository_url + "/data/" + object_hash.MakePath();
 
   cvmfs::PathSink pathsink(destination_path);
-  download::JobInfo download_object(&url, true, false,
-                                    &object_hash, &pathsink);
+  download::JobInfo download_object(&url, true, false, &object_hash, &pathsink);
   dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {

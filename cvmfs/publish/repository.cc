@@ -207,7 +207,8 @@ void Repository::DownloadRootObjects(
     std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_info(&info_url, true /* compressed */,
-                         true /* probe_hosts */, &info_hash, &metainfo_memsink);
+                                    true /* probe_hosts */, &info_hash,
+                                    &metainfo_memsink);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
@@ -230,8 +231,8 @@ bool Repository::IsMasterReplica() {
   std::string url = settings_.url() + "/.cvmfs_master_replica";
   download::JobInfo head(&url, false /* probe_hosts */);
   download::Failures retval = download_mgr_->Fetch(&head);
-  if (retval == download::kFailOk) return true;
-  if (head.IsFileNotFound()) return false;
+  if (retval == download::kFailOk) { return true; }
+  if (head.IsFileNotFound()) { return false; }
 
   throw EPublish(std::string("error looking for .cvmfs_master_replica [") +
                  download::Code2Ascii(retval) + "]");

@@ -151,8 +151,8 @@ static unsigned EscapeHeader(const string &header,
 
 
 static Failures PrepareDownloadDestination(JobInfo *info) {
-  if (info->sink != NULL && !info->sink->IsValid()) {
-    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink);
+  if (info->sink() != NULL && !info->sink()->IsValid()) {
+    cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink());
     if (psink != NULL) {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
                                         " (errno=%d).", psink->path().c_str(),
@@ -160,7 +160,7 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
       return kFailLocalIO;
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "Failed to create a valid sink: \n %s",
-                                         info->sink->Describe().c_str());
+                                         info->sink()->Describe().c_str());
       return kFailOther;
     }
   }
@@ -184,28 +184,29 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/1.", false)) {
-    if (header_line.length() < 10)
+    if (header_line.length() < 10) {
       return 0;
+    }
 
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
     // Code is initialized to -1
     if (header_line.length() > i+2) {
-      info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
+      info->SetHttpCode(DownloadManager::ParseHttpCode(&header_line[i]));
     }
 
-    if ((info->http_code / 100) == 2) {
+    if ((info->http_code() / 100) == 2) {
       return num_bytes;
-    } else if ((info->http_code == 301) ||
-               (info->http_code == 302) ||
-               (info->http_code == 303) ||
-               (info->http_code == 307))
+    } else if ((info->http_code() == 301) ||
+               (info->http_code() == 302) ||
+               (info->http_code() == 303) ||
+               (info->http_code() == 307))
     {
-      if (!info->follow_redirects) {
+      if (!info->follow_redirects()) {
         LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
                  header_line.c_str());
-        info->error_code = kFailHostHttp;
+        info->SetErrorCode(kFailHostHttp);
         return 0;
       }
       LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
@@ -214,57 +215,57 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       return num_bytes;
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s [%d]",
-               header_line.c_str(), info->http_code);
-      if (((info->http_code / 100) == 5) ||
-          (info->http_code == 400) || (info->http_code == 404))
+               header_line.c_str(), info->http_code());
+      if (((info->http_code() / 100) == 5) ||
+          (info->http_code() == 400) || (info->http_code() == 404))
       {
         // 5XX returned by host
         // 400: error from the GeoAPI module
         // 404: the stratum 1 does not have the newest files
-        info->error_code = kFailHostHttp;
-      } else if (info->http_code == 429) {
+        info->SetErrorCode(kFailHostHttp);
+      } else if (info->http_code() == 429) {
         // 429: rate throttling (we ignore the backoff hint for the time being)
-        info->error_code = kFailHostConnection;
+        info->SetErrorCode(kFailHostConnection);
       } else {
-        info->error_code = (info->proxy == "DIRECT") ? kFailHostHttp :
-                                                       kFailProxyHttp;
+        info->SetErrorCode((info->proxy() == "DIRECT") ? kFailHostHttp :
+                                                       kFailProxyHttp);
       }
       return 0;
     }
   }
 
   // If needed: allocate space in sink
-  if (info->sink != NULL && info->sink->RequiresReserve() &&
+  if (info->sink() != NULL && info->sink()->RequiresReserve() &&
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
     char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %" PRIu64, tmp, &length);
     if (length > 0) {
-      if (!info->sink->Reserve(length)) {
+      if (!info->sink()->Reserve(length)) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                  "resource %s too large to store in memory (%" PRIu64 ")",
-                 info->url->c_str(), length);
-        info->error_code = kFailTooBig;
+                 info->url()->c_str(), length);
+        info->SetErrorCode(kFailTooBig);
         return 0;
       }
     } else {
       // Empty resource
-      info->sink->Reserve(0);
+      info->sink()->Reserve(0);
     }
   } else if (HasPrefix(header_line, "LOCATION:", true)) {
     // This comes along with redirects
     LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
   } else if (HasPrefix(header_line, "X-SQUID-ERROR:", true)) {
     // Reinterpret host error as proxy error
-    if (info->error_code == kFailHostHttp) {
-      info->error_code = kFailProxyHttp;
+    if (info->error_code() == kFailHostHttp) {
+      info->SetErrorCode(kFailProxyHttp);
     }
   } else if (HasPrefix(header_line, "PROXY-STATUS:", true)) {
     // Reinterpret host error as proxy error if applicable
-    if ((info->error_code == kFailHostHttp) &&
+    if ((info->error_code() == kFailHostHttp) &&
         (header_line.find("error=") != string::npos)) {
-      info->error_code = kFailProxyHttp;
+      info->SetErrorCode(kFailProxyHttp);
     }
   }
 
@@ -284,39 +285,39 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   // TODO(heretherebedragons) remove if no error comes up
   // as this means only jobinfo data request (and not header only)
   // come here
-  assert(info->sink != NULL);
+  assert(info->sink() != NULL);
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
   if (num_bytes == 0)
     return 0;
 
-  if (info->expected_hash) {
+  if (info->expected_hash()) {
     shash::Update(reinterpret_cast<unsigned char *>(ptr),
-                  num_bytes, info->hash_context);
+                  num_bytes, info->hash_context());
   }
 
-  if (info->compressed) {
+  if (info->compressed()) {
     zlib::StreamStates retval =
       zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                    &info->zstream, info->sink);
+                                   info->GetZstreamPtr(), info->sink());
     if (retval == zlib::kStreamDataError) {
       LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
-                info->url->c_str());
-      info->error_code = kFailBadData;
+                info->url()->c_str());
+      info->SetErrorCode(kFailBadData);
       return 0;
     } else if (retval == zlib::kStreamIOError) {
       LogCvmfs(kLogDownload, kLogSyslogErr,
-                "decompressing %s, local IO error", info->url->c_str());
-      info->error_code = kFailLocalIO;
+                "decompressing %s, local IO error", info->url()->c_str());
+      info->SetErrorCode(kFailLocalIO);
       return 0;
     }
   } else {
-    int64_t written = info->sink->Write(ptr, num_bytes);
+    int64_t written = info->sink()->Write(ptr, num_bytes);
     if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
       LogCvmfs(kLogDownload, kLogDebug,
         "Failed to perform write of %zu bytes to sink %s with errno %d",
-        num_bytes, info->sink->Describe().c_str(), written);
+        num_bytes, info->sink()->Describe().c_str(), written);
     }
   }
 
@@ -561,7 +562,8 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          info->pipe_job_results->Write<download::Failures>(info->error_code);
+          info->GetPipeJobResultWeakRef()->
+                                  Write<download::Failures>(info->error_code());
         }
       }
     }
@@ -774,36 +776,36 @@ void DownloadManager::ReleaseCurlHandle(CURL *handle) {
  */
 void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
-  info->curl_handle = handle;
-  info->error_code = kFailOk;
-  info->http_code = -1;
-  info->follow_redirects = follow_redirects_;
-  info->num_used_proxies = 1;
-  info->num_used_hosts = 1;
-  info->num_retries = 0;
-  info->backoff_ms = 0;
-  info->headers = header_lists_->DuplicateList(default_headers_);
-  if (info->info_header) {
-    header_lists_->AppendHeader(info->headers, info->info_header);
+  info->SetCurlHandle(handle);
+  info->SetErrorCode(kFailOk);
+  info->SetHttpCode(-1);
+  info->SetFollowRedirects(follow_redirects_);
+  info->SetNumUsedProxies(1);
+  info->SetNumUsedHosts(1);
+  info->SetNumRetries(0);
+  info->SetBackoffMs(0);
+  info->SetHeaders(header_lists_->DuplicateList(default_headers_));
+  if (info->info_header()) {
+    header_lists_->AppendHeader(info->headers(), info->info_header());
   }
-  if (info->force_nocache) {
+  if (info->force_nocache()) {
     SetNocache(info);
   } else {
-    info->nocache = false;
+    info->SetNocache(false);
   }
-  if (info->compressed) {
-    zlib::DecompressInit(&(info->zstream));
+  if (info->compressed()) {
+    zlib::DecompressInit(info->GetZstreamPtr());
   }
-  if (info->expected_hash) {
-    assert(info->hash_context.buffer != NULL);
-    shash::Init(info->hash_context);
+  if (info->expected_hash()) {
+    assert(info->hash_context().buffer != NULL);
+    shash::Init(info->hash_context());
   }
 
-  if ((info->range_offset != -1) && (info->range_size)) {
+  if ((info->range_offset() != -1) && (info->range_size())) {
     char byte_range_array[100];
-    const int64_t range_lower = static_cast<int64_t>(info->range_offset);
+    const int64_t range_lower = static_cast<int64_t>(info->range_offset());
     const int64_t range_upper = static_cast<int64_t>(
-      info->range_offset + info->range_size - 1);
+                                 info->range_offset() + info->range_size() - 1);
     if (snprintf(byte_range_array, sizeof(byte_range_array),
                  "%" PRId64 "-%" PRId64,
                  range_lower, range_upper) == 100)
@@ -820,8 +822,8 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
                    static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, static_cast<void *>(info));
-  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->headers);
-  if (info->head_request) {
+  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->headers());
+  if (info->head_request()) {
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
   } else {
     curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
@@ -841,7 +843,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
  * set an error code, in which case the further processing should react on.
  */
 void DownloadManager::SetUrlOptions(JobInfo *info) {
-  CURL *curl_handle = info->curl_handle;
+  CURL *curl_handle = info->curl_handle();
   string url_prefix;
 
   MutexLockGuard m(lock_options_);
@@ -883,10 +885,10 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     }
   }
 
-  ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash);
+  ProxyInfo *proxy = ChooseProxyUnlocked(info->expected_hash());
   if (!proxy || (proxy->url == "DIRECT")) {
-    info->proxy = "DIRECT";
-    curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
+    info->SetProxy("DIRECT");
+    curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
   } else {
     // Note: inside ValidateProxyIpsUnlocked() we may change the proxy data
     // structure, so we must not pass proxy->... (== current_proxy())
@@ -895,18 +897,20 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     dns::Host phost = proxy->host;
     const bool changed = ValidateProxyIpsUnlocked(purl, phost);
     // Current proxy may have changed
-    if (changed)
-      proxy = ChooseProxyUnlocked(info->expected_hash);
-    info->proxy = proxy->url;
+    if (changed) {
+      proxy = ChooseProxyUnlocked(info->expected_hash());
+    }
+    info->SetProxy(proxy->url);
     if (proxy->host.status() == dns::kFailOk) {
-      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY,
+                       info->proxy().c_str());
     } else {
       // We know it can't work, don't even try to download
-      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "0.0.0.0");
+      curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "0.0.0.0");
     }
   }
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
-  if (info->proxy != "DIRECT") {
+  if (info->proxy() != "DIRECT") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_proxy_);
   } else {
@@ -916,12 +920,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (!opt_dns_server_.empty())
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
-  if (info->probe_hosts && opt_host_chain_) {
+  if (info->probe_hosts() && opt_host_chain_) {
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
-    info->current_host_chain_index = opt_host_chain_current_;
+    info->SetCurrentHostChainIndex(opt_host_chain_current_);
   }
 
-  string url = url_prefix + *(info->url);
+  string url = url_prefix + *(info->url());
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
@@ -931,13 +935,13 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
                "Failed to set SSL certificate path %s",
                ssl_certificate_store_.GetCaPath().c_str());
     }
-    if (info->pid != -1) {
+    if (info->pid() != -1) {
       if (credentials_attachment_ == NULL) {
         LogCvmfs(kLogDownload, kLogDebug,
                  "uses secure downloads but no credentials attachment set");
       } else {
         bool retval = credentials_attachment_->ConfigureCurlHandle(
-          curl_handle, info->pid, &info->cred_data);
+          curl_handle, info->pid(), info->GetCredDataPtr());
         if (!retval) {
           LogCvmfs(kLogDownload, kLogDebug, "failed attaching credentials");
         }
@@ -960,17 +964,17 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     string replacement;
     if (proxy_template_forced_ != "") {
       replacement = proxy_template_forced_;
-    } else if (info->proxy == "DIRECT") {
+    } else if (info->proxy() == "DIRECT") {
       replacement = proxy_template_direct_;
     } else {
       if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
         // It doesn't make sense to use the fallback proxies in Geo-API requests
         // since the fallback proxies are supposed to get sorted, too.
-        info->proxy = "DIRECT";
-        curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "");
+        info->SetProxy("DIRECT");
+        curl_easy_setopt(info->curl_handle(), CURLOPT_PROXY, "");
         replacement = proxy_template_direct_;
       } else {
-        replacement = ChooseProxyUnlocked(info->expected_hash)->host.name();
+        replacement = ChooseProxyUnlocked(info->expected_hash())->host.name();
       }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
@@ -983,17 +987,17 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   // static_cast<cvmfs::MemSink*>(info->sink)->size() == 0
   // and just always call info->sink->Reserve()
   // we should do a speed check
-  if ((info->sink != NULL) && info->sink->RequiresReserve() &&
-      (static_cast<cvmfs::MemSink*>(info->sink)->size() == 0) &&
+  if ((info->sink() != NULL) && info->sink()->RequiresReserve() &&
+      (static_cast<cvmfs::MemSink*>(info->sink())->size() == 0) &&
       HasPrefix(url, "file://", false)) {
     platform_stat64 stat_buf;
     int retval = platform_stat(url.c_str(), &stat_buf);
     if (retval != 0) {
       // this is an error: file does not exist or out of memory
       // error is caught in other code section.
-      info->sink->Reserve(64ul * 1024ul);
+      info->sink()->Reserve(64ul * 1024ul);
     } else {
-      info->sink->Reserve(stat_buf.st_size);
+      info->sink()->Reserve(stat_buf.st_size);
     }
   }
 
@@ -1096,9 +1100,9 @@ bool DownloadManager::CanRetry(const JobInfo *info) {
   MutexLockGuard m(lock_options_);
   unsigned max_retries = opt_max_retries_;
 
-  return !info->nocache && (info->num_retries < max_retries) &&
-         (IsProxyTransferError(info->error_code) ||
-          IsHostTransferError(info->error_code));
+  return !(info->nocache()) && (info->num_retries() < max_retries) &&
+          (IsProxyTransferError(info->error_code()) ||
+           IsHostTransferError(info->error_code()));
 }
 
 /**
@@ -1117,26 +1121,29 @@ void DownloadManager::Backoff(JobInfo *info) {
     backoff_max_ms = opt_backoff_max_ms_;
   }
 
-  info->num_retries++;
+  info->SetNumRetries(info->num_retries() + 1);
   perf::Inc(counters_->n_retries);
-  if (info->backoff_ms == 0) {
-    info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
+  if (info->backoff_ms() == 0) {
+    info->SetBackoffMs(prng_.Next(backoff_init_ms + 1));  // Must be != 0
   } else {
-    info->backoff_ms *= 2;
+    info->SetBackoffMs(info->backoff_ms() * 2);
   }
-  if (info->backoff_ms > backoff_max_ms) info->backoff_ms = backoff_max_ms;
+  if (info->backoff_ms() > backoff_max_ms) {
+    info->SetBackoffMs(backoff_max_ms);
+  }
 
-  LogCvmfs(kLogDownload, kLogDebug, "backing off for %d ms", info->backoff_ms);
-  SafeSleepMs(info->backoff_ms);
+  LogCvmfs(kLogDownload, kLogDebug, "backing off for %d ms",
+                                    info->backoff_ms());
+  SafeSleepMs(info->backoff_ms());
 }
 
 void DownloadManager::SetNocache(JobInfo *info) {
-  if (info->nocache)
+  if (info->nocache())
     return;
-  header_lists_->AppendHeader(info->headers, "Pragma: no-cache");
-  header_lists_->AppendHeader(info->headers, "Cache-Control: no-cache");
-  curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
-  info->nocache = true;
+  header_lists_->AppendHeader(info->headers(), "Pragma: no-cache");
+  header_lists_->AppendHeader(info->headers(), "Cache-Control: no-cache");
+  curl_easy_setopt(info->curl_handle(), CURLOPT_HTTPHEADER, info->headers());
+  info->SetNocache(true);
 }
 
 
@@ -1145,12 +1152,12 @@ void DownloadManager::SetNocache(JobInfo *info) {
  * disappears from the list of headers to let proxies work normally.
  */
 void DownloadManager::SetRegularCache(JobInfo *info) {
-  if (info->nocache == false)
+  if (info->nocache() == false)
     return;
-  header_lists_->CutHeader("Pragma: no-cache", &(info->headers));
-  header_lists_->CutHeader("Cache-Control: no-cache", &(info->headers));
-  curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
-  info->nocache = false;
+  header_lists_->CutHeader("Pragma: no-cache", info->GetHeadersPtr());
+  header_lists_->CutHeader("Cache-Control: no-cache", info->GetHeadersPtr());
+  curl_easy_setopt(info->curl_handle(), CURLOPT_HTTPHEADER, info->headers());
+  info->SetNocache(false);
 }
 
 
@@ -1158,11 +1165,11 @@ void DownloadManager::SetRegularCache(JobInfo *info) {
  * Frees the storage associated with the authz attachment from the job
  */
 void DownloadManager::ReleaseCredential(JobInfo *info) {
-  if (info->cred_data) {
+  if (info->cred_data()) {
     assert(credentials_attachment_ != NULL);  // Someone must have set it
-    credentials_attachment_->ReleaseCurlHandle(info->curl_handle,
-                                               info->cred_data);
-    info->cred_data = NULL;
+    credentials_attachment_->ReleaseCurlHandle(info->curl_handle(),
+                                               info->cred_data());
+    info->SetCredData(NULL);
   }
 }
 
@@ -1176,75 +1183,77 @@ void DownloadManager::ReleaseCredential(JobInfo *info) {
 bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   LogCvmfs(kLogDownload, kLogDebug,
            "Verify downloaded url %s, proxy %s (curl error %d)",
-           info->url->c_str(), info->proxy.c_str(), curl_error);
-  UpdateStatistics(info->curl_handle);
+           info->url()->c_str(), info->proxy().c_str(), curl_error);
+  UpdateStatistics(info->curl_handle());
 
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
       // Verify content hash
-      if (info->expected_hash) {
+      if (info->expected_hash()) {
         shash::Any match_hash;
-        shash::Final(info->hash_context, &match_hash);
-        if (match_hash != *(info->expected_hash)) {
+        shash::Final(info->hash_context(), &match_hash);
+        if (match_hash != *(info->expected_hash())) {
           if (ignore_signature_failures_) {
             LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                     "ignoring failed hash verification of %s "
                     "(expected %s, got %s)",
-                    info->url->c_str(), info->expected_hash->ToString().c_str(),
+                    info->url()->c_str(),
+                    info->expected_hash()->ToString().c_str(),
                     match_hash.ToString().c_str());
           } else {
             LogCvmfs(kLogDownload, kLogDebug,
                     "hash verification of %s failed (expected %s, got %s)",
-                    info->url->c_str(), info->expected_hash->ToString().c_str(),
+                    info->url()->c_str(),
+                   info->expected_hash()->ToString().c_str(),
                     match_hash.ToString().c_str());
-            info->error_code = kFailBadData;
+            info->SetErrorCode(kFailBadData);
             break;
           }
         }
       }
 
-      info->error_code = kFailOk;
+      info->SetErrorCode(kFailOk);
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
-      info->error_code = kFailUnsupportedProtocol;
+      info->SetErrorCode(kFailUnsupportedProtocol);
       break;
     case CURLE_URL_MALFORMAT:
-      info->error_code = kFailBadUrl;
+      info->SetErrorCode(kFailBadUrl);
       break;
     case CURLE_COULDNT_RESOLVE_PROXY:
-      info->error_code = kFailProxyResolve;
+      info->SetErrorCode(kFailProxyResolve);
       break;
     case CURLE_COULDNT_RESOLVE_HOST:
-      info->error_code = kFailHostResolve;
+      info->SetErrorCode(kFailHostResolve);
       break;
     case CURLE_OPERATION_TIMEDOUT:
-      info->error_code = (info->proxy == "DIRECT") ?
-                         kFailHostTooSlow : kFailProxyTooSlow;
+    info->SetErrorCode((info->proxy() == "DIRECT") ?
+                         kFailHostTooSlow : kFailProxyTooSlow);
       break;
     case CURLE_PARTIAL_FILE:
     case CURLE_GOT_NOTHING:
     case CURLE_RECV_ERROR:
-      info->error_code = (info->proxy == "DIRECT") ?
-                         kFailHostShortTransfer : kFailProxyShortTransfer;
+      info->SetErrorCode((info->proxy() == "DIRECT") ?
+                         kFailHostShortTransfer : kFailProxyShortTransfer);
       break;
     case CURLE_FILE_COULDNT_READ_FILE:
     case CURLE_COULDNT_CONNECT:
-      if (info->proxy != "DIRECT") {
+      if (info->proxy() != "DIRECT") {
         // This is a guess.  Fail-over can still change to switching host
-        info->error_code = kFailProxyConnection;
+        info->SetErrorCode(kFailProxyConnection);
       } else {
-        info->error_code = kFailHostConnection;
+        info->SetErrorCode(kFailHostConnection);
       }
       break;
     case CURLE_TOO_MANY_REDIRECTS:
-      info->error_code = kFailHostConnection;
+      info->SetErrorCode(kFailHostConnection);
       break;
     case CURLE_SSL_CACERT_BADFILE:
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
                "Failed to load certificate bundle. "
                "X509_CERT_BUNDLE might point to the wrong location.");
-      info->error_code = kFailHostConnection;
+      info->SetErrorCode(kFailHostConnection);
       break;
     // As of curl 7.62.0, CURLE_SSL_CACERT is the same as
     // CURLE_PEER_FAILED_VERIFICATION
@@ -1253,7 +1262,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                "invalid SSL certificate of remote host. "
                "X509_CERT_DIR and/or X509_CERT_BUNDLE might point to the wrong "
                "location.");
-      info->error_code = kFailHostConnection;
+      info->SetErrorCode(kFailHostConnection);
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
@@ -1263,13 +1272,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // The curl error CURLE_SEND_ERROR can be seen when a cache is misbehaving
       // and closing connections before the http request send is completed.
       // Handle this error, treating it as a short transfer error.
-      info->error_code = (info->proxy == "DIRECT") ?
-        kFailHostShortTransfer : kFailProxyShortTransfer;
+      info->SetErrorCode((info->proxy() == "DIRECT") ?
+        kFailHostShortTransfer : kFailProxyShortTransfer);
       break;
     default:
       LogCvmfs(kLogDownload, kLogSyslogErr, "unexpected curl error (%d) while "
-               "trying to fetch %s", curl_error, info->url->c_str());
-      info->error_code = kFailOther;
+               "trying to fetch %s", curl_error, info->url()->c_str());
+      info->SetErrorCode(kFailOther);
       break;
   }
 
@@ -1278,42 +1287,42 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   // Determination if download should be repeated
   bool try_again = false;
   bool same_url_retry = CanRetry(info);
-  if (info->error_code != kFailOk) {
+  if (info->error_code() != kFailOk) {
     MutexLockGuard m(lock_options_);
-    if (info->error_code == kFailBadData) {
-      if (!info->nocache) {
+    if (info->error_code() == kFailBadData) {
+      if (!info->nocache()) {
         try_again = true;
       } else {
         // Make it a host failure
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "data corruption with no-cache header, try another host");
 
-        info->error_code = kFailHostHttp;
+        info->SetErrorCode(kFailHostHttp);
       }
     }
     if ( same_url_retry || (
-         ( (info->error_code == kFailHostResolve) ||
-           IsHostTransferError(info->error_code) ||
-           (info->error_code == kFailHostHttp)) &&
-         info->probe_hosts &&
-         host_chain && (info->num_used_hosts < host_chain->size()))
+         ( (info->error_code() == kFailHostResolve) ||
+           IsHostTransferError(info->error_code()) ||
+           (info->error_code() == kFailHostHttp)) &&
+         info->probe_hosts() &&
+         host_chain && (info->num_used_hosts() < host_chain->size()))
        )
     {
       try_again = true;
     }
     if ( same_url_retry || (
-         ( (info->error_code == kFailProxyResolve) ||
-           IsProxyTransferError(info->error_code) ||
-           (info->error_code == kFailProxyHttp)) )
+         ( (info->error_code() == kFailProxyResolve) ||
+           IsProxyTransferError(info->error_code()) ||
+           (info->error_code() == kFailProxyHttp)) )
        )
     {
       try_again = true;
       // If all proxies failed, do a next round with the next host
-      if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
+      if (!same_url_retry && (info->num_used_proxies() >= opt_num_proxies_)) {
         // Check if this can be made a host fail-over
-        if (info->probe_hosts &&
+        if (info->probe_hosts() &&
             host_chain &&
-            (info->num_used_hosts < host_chain->size()))
+            (info->num_used_hosts() < host_chain->size()))
         {
           // reset proxy group if not already performed by other handle
           if (opt_proxy_groups_) {
@@ -1328,8 +1337,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
           // Make it a host failure
           LogCvmfs(kLogDownload, kLogDebug, "make it a host failure");
-          info->num_used_proxies = 1;
-          info->error_code = kFailHostAfterProxy;
+          info->SetNumUsedProxies(1);
+          info->SetErrorCode(kFailHostAfterProxy);
         } else {
           try_again = false;
         }
@@ -1339,29 +1348,29 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   if (try_again) {
     LogCvmfs(kLogDownload, kLogDebug, "Trying again on same curl handle, "
-             "same url: %d, error code %d", same_url_retry, info->error_code);
+             "same url: %d, error code %d", same_url_retry, info->error_code());
     // Reset internal state and destination
-    if (info->sink != NULL && info->sink->Reset() != 0) {
-      info->error_code = kFailLocalIO;
+    if (info->sink() != NULL && info->sink()->Reset() != 0) {
+      info->SetErrorCode(kFailLocalIO);
       goto verify_and_finalize_stop;
     }
-    if (info->interrupt_cue && info->interrupt_cue->IsCanceled()) {
-      info->error_code = kFailCanceled;
+    if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
+      info->SetErrorCode(kFailCanceled);
       goto verify_and_finalize_stop;
     }
 
-    if (info->expected_hash) {
-      shash::Init(info->hash_context);
+    if (info->expected_hash()) {
+      shash::Init(info->hash_context());
     }
-    if (info->compressed) {
-      zlib::DecompressInit(&info->zstream);
+    if (info->compressed()) {
+      zlib::DecompressInit(info->GetZstreamPtr());
     }
     SetRegularCache(info);
 
     // Failure handling
     bool switch_proxy = false;
     bool switch_host = false;
-    switch (info->error_code) {
+    switch (info->error_code()) {
       case kFailBadData:
         SetNocache(info);
         break;
@@ -1375,13 +1384,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         switch_host = true;
         break;
       default:
-        if (IsProxyTransferError(info->error_code)) {
+        if (IsProxyTransferError(info->error_code())) {
           if (same_url_retry) {
             Backoff(info);
           } else {
             switch_proxy = true;
           }
-        } else if (IsHostTransferError(info->error_code)) {
+        } else if (IsHostTransferError(info->error_code())) {
           if (same_url_retry) {
             Backoff(info);
           } else {
@@ -1395,13 +1404,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (switch_proxy) {
       ReleaseCredential(info);
       SwitchProxy(info);
-      info->num_used_proxies++;
+      info->SetNumUsedProxies(info->num_used_proxies() + 1);
       SetUrlOptions(info);
     }
     if (switch_host) {
       ReleaseCredential(info);
       SwitchHost(info);
-      info->num_used_hosts++;
+      info->SetNumUsedHosts(info->num_used_hosts() + 1);
       SetUrlOptions(info);
     }
 
@@ -1411,17 +1420,16 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
  verify_and_finalize_stop:
   // Finalize, flush destination file
   ReleaseCredential(info);
-  if (info->sink != NULL && info->sink->Flush() != 0) {
-    info->error_code = kFailLocalIO;
+  if (info->sink() != NULL && info->sink()->Flush() != 0) {
+    info->SetErrorCode(kFailLocalIO);
   }
 
-  if (info->compressed) {
-    zlib::DecompressFini(&info->zstream);
-  }
+  if (info->compressed())
+    zlib::DecompressFini(info->GetZstreamPtr());
 
-  if (info->headers) {
-    header_lists_->PutList(info->headers);
-    info->headers = NULL;
+  if (info->headers()) {
+    header_lists_->PutList(info->headers());
+    info->SetHeaders(NULL);
   }
 
   return false;  // stop transfer and return to Fetch()
@@ -1640,44 +1648,43 @@ void DownloadManager::Spawn() {
  */
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
-  assert(info->url != NULL);
+  assert(info->url() != NULL);
 
   Failures result;
   result = PrepareDownloadDestination(info);
   if (result != kFailOk)
     return result;
 
-  if (info->expected_hash) {
-    const shash::Algorithms algorithm = info->expected_hash->algorithm;
-    info->hash_context.algorithm = algorithm;
-    info->hash_context.size = shash::GetContextSize(algorithm);
-    info->hash_context.buffer = alloca(info->hash_context.size);
+  if (info->expected_hash()) {
+    const shash::Algorithms algorithm = info->expected_hash()->algorithm;
+    info->GetHashContextPtr()->algorithm = algorithm;
+    info->GetHashContextPtr()->size = shash::GetContextSize(algorithm);
+    info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
 
   // Prepare cvmfs-info: header, allocate string on the stack
-  info->info_header = NULL;
-  if (enable_info_header_ && info->extra_info) {
+  info->SetInfoHeader(NULL);
+  if (enable_info_header_ && info->extra_info()) {
     const char *header_name = "cvmfs-info: ";
     const size_t header_name_len = strlen(header_name);
     const unsigned header_size = 1 + header_name_len +
-      EscapeHeader(*(info->extra_info), NULL, 0);
-    info->info_header = static_cast<char *>(alloca(header_size));
-    memcpy(info->info_header, header_name, header_name_len);
-    EscapeHeader(*(info->extra_info), info->info_header + header_name_len,
+      EscapeHeader(*(info->extra_info()), NULL, 0);
+    info->SetInfoHeader(static_cast<char *>(alloca(header_size)));
+    memcpy(info->info_header(), header_name, header_name_len);
+    EscapeHeader(*(info->extra_info()), info->info_header() + header_name_len,
                  header_size - header_name_len);
-    info->info_header[header_size-1] = '\0';
+    info->info_header()[header_size-1] = '\0';
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    if (!info->pipe_job_results.IsValid()) {
-      info->pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
+    if (!info->IsValidPipeJobResults()) {
+      info->CreatePipeJobResults();
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
-    // NOLINTNEXTLINE(bugprone-sizeof-expression)
     pipe_jobs_->Write<JobInfo*>(info);
-    info->pipe_job_results->Read<download::Failures>(&result);
+    info->GetPipeJobResultWeakRef()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     MutexLockGuard l(lock_synchronous_mode_);
@@ -1696,16 +1703,16 @@ Failures DownloadManager::Fetch(JobInfo *info) {
                    static_cast<int64_t>(elapsed * 1000));
       }
     } while (VerifyAndFinalize(retval, info));
-    result = info->error_code;
-    ReleaseCurlHandle(info->curl_handle);
+    result = info->error_code();
+    ReleaseCurlHandle(info->curl_handle());
   }
 
   if (result != kFailOk) {
     LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
              Code2Ascii(result));
 
-    if (info->sink != NULL) {
-      info->sink->Purge();
+    if (info->sink() != NULL) {
+      info->sink()->Purge();
     }
   }
 
@@ -1889,7 +1896,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
   const unsigned group_size = group->size();
   unsigned failed = 0;
   for (unsigned i = 0; i < group_size - opt_proxy_groups_current_burned_; ++i) {
-    if (info && (info->proxy == (*group)[i].url)) {
+    if (info && (info->proxy() == (*group)[i].url)) {
       // Move to list of failed proxies
       opt_proxy_groups_current_burned_++;
       swap((*group)[i],
@@ -1951,18 +1958,18 @@ void DownloadManager::SwitchHost(JobInfo *info) {
     return;
   }
 
-  if (info && (info->current_host_chain_index != opt_host_chain_current_)) {
+  if (info && (info->current_host_chain_index() != opt_host_chain_current_)) {
     LogCvmfs(kLogDownload, kLogDebug,
              "don't switch host, "
              "last used host: %s, current host: %s",
-             (*opt_host_chain_)[info->current_host_chain_index].c_str(),
+             (*opt_host_chain_)[info->current_host_chain_index()].c_str(),
              (*opt_host_chain_)[opt_host_chain_current_].c_str());
     return;
   }
 
   string reason = "manually triggered";
   if (info) {
-    reason = download::Code2Ascii(info->error_code);
+    reason = download::Code2Ascii(info->error_code());
   }
 
   string old_host = (*opt_host_chain_)[opt_host_chain_current_];
