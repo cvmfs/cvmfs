@@ -1668,7 +1668,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
   // split xattr if of format <name>_<num>
   // for different "pages" of xattr to be returned
-  // if no <num> is valid, the first page is printed 
+  // if no <num> is valid, the first page is printed
   // as String2Uint64 failure defaults to 0
   string paged_attr = "user.chunk_list";
   if (attr.rfind(paged_attr, 0) == 0) {
@@ -1676,7 +1676,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
     vector<string> tokens = SplitString(name, '_');
 
-    attr_page_num = String2Uint64(tokens[tokens.size() - 1]);
+    attr_page_num =
+                 static_cast<int32_t>(String2Uint64(tokens[tokens.size() - 1]));
   }
 
 

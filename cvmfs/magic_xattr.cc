@@ -245,9 +245,9 @@ bool ChunkListMagicXattr::PrepareValueFenced(int32_t attr_page_num) {
                 "'chunked', but no chunks found.", path_.c_str());
       return false;
     } else {
-      const int32_t kB_limit = 64 * 1024;
-      const int32_t header_size = 120;
-      const int32_t max_digits_offset =
+      const size_t kB_limit = 64 * 1024;
+      const size_t header_size = 120;
+      const size_t max_digits_offset =
                       StringifyInt(chunks.At(chunks.size()-1).offset()).size();
 
       // entry_size is calculated to find out how many entries we can show per
@@ -264,12 +264,13 @@ bool ChunkListMagicXattr::PrepareValueFenced(int32_t attr_page_num) {
       // +      max offset within file (this should be the max size of any
       //                             chunk, but for simplicity we use this here.
       //                             this should be for sure larger.)
-      const int32_t entry_size = 3 + 3 + StringifyUint(chunks.size()).size() +
-                                 chunks.At(0).content_hash().ToString().size() +
-                                 max_digits_offset + max_digits_offset;
-      const int32_t entries_per_page = (kB_limit - header_size) / entry_size;
+      const size_t entry_size = (3ul * 2) +
+                                StringifyUint(chunks.size()).size() +
+                                chunks.At(0).content_hash().ToString().size() +
+                                max_digits_offset + max_digits_offset;
+      const size_t entries_per_page = (kB_limit - header_size) / entry_size;
 
-      const int32_t num_pages = chunks.size() / entries_per_page +
+      const size_t num_pages = chunks.size() / entries_per_page +
                               ((chunks.size() % entries_per_page != 0) ? 1 : 0);
 
       chunk_list_  = "Access different pages with 'chunk_list_<page>' ";
@@ -279,12 +280,12 @@ bool ChunkListMagicXattr::PrepareValueFenced(int32_t attr_page_num) {
       chunk_list_ += "max_pages,curr_page,idx,hash,offset,size\n";
 
       attr_page_num = attr_page_num == 0 ? 1 : attr_page_num;
-      int32_t attr_page_num_fixed = attr_page_num - 1;
+      size_t attr_page_num_fixed = static_cast<size_t>(attr_page_num) - 1;
       size_t start_entry = entries_per_page * attr_page_num_fixed;
       for (size_t i = start_entry;
                   i < chunks.size() && i < start_entry + entries_per_page;
                   ++i) {
-        chunk_list_ += StringifyInt(num_pages) + ",";
+        chunk_list_ += StringifyUint(num_pages) + ",";
         chunk_list_ += StringifyInt(attr_page_num) + ",";
         chunk_list_ += StringifyUint(i) + ",";
         chunk_list_ += chunks.At(i).content_hash().ToString() + ",";

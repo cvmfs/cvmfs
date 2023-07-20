@@ -96,7 +96,7 @@ class BaseMagicXattr {
   * inside FuseRemounter::fence(), which should prevent data races.
   */
   virtual bool PrepareValueFenced() { return true; }
-  virtual bool PrepareValueFenced(int32_t attr_page_num) { return true; }
+  virtual bool PrepareValueFenced(int32_t /*attr_page_num*/) { return true; }
 
   MagicXattrManager *xattr_mgr_;
   PathString path_;
