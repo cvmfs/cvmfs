@@ -155,10 +155,15 @@ bool MagicXattrManager::IsPrivilegedGid(gid_t gid) {
   return privileged_xattr_gids_.count(gid) > 0;
 }
 
-bool BaseMagicXattr::PrepareValueFencedProtected(gid_t gid) {
+bool BaseMagicXattr::PrepareValueFencedProtected(gid_t gid,
+                                                 int32_t attr_page_num) {
   assert(xattr_mgr_->is_frozen());
   if (is_protected_ && !xattr_mgr_->IsPrivilegedGid(gid)) {
     return false;
+  }
+
+  if (attr_page_num != -1) {
+    return PrepareValueFenced(attr_page_num);
   }
 
   return PrepareValueFenced();
@@ -222,28 +227,74 @@ std::string CatalogCountersMagicXattr::GetValue() {
   return res;
 }
 
-bool ChunkListMagicXattr::PrepareValueFenced() {
-  chunk_list_ = "hash,offset,size\n";
+bool ChunkListMagicXattr::PrepareValueFenced(int32_t attr_page_num) {
+  chunk_list_ = "ERROR: No chunks! ";
   if (!dirent_->IsRegular()) {
+    chunk_list_ += "Not a regular file\n";
     return false;
   }
+
   if (dirent_->IsChunkedFile()) {
     FileChunkList chunks;
     if (!xattr_mgr_->mount_point()->catalog_mgr()
                      ->ListFileChunks(path_, dirent_->hash_algorithm(), &chunks)
         || chunks.IsEmpty())
     {
+      chunk_list_ += "File marked as chunked, but no chunks found\n";
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
                 "'chunked', but no chunks found.", path_.c_str());
       return false;
     } else {
-      for (size_t i = 0; i < chunks.size(); ++i) {
+      const int32_t kB_limit = 64 * 1024;
+      const int32_t header_size = 120;
+      const int32_t max_digits_offset =
+                      StringifyInt(chunks.At(chunks.size()-1).offset()).size();
+
+      // entry_size is calculated to find out how many entries we can show per
+      // page. It depends on the file itself, depending how many characters are
+      // needed to represent the largest number.
+      // This is some pessimisitic estimation.
+      //
+      // The number of characters per line is calculated the following:
+      // characters per entry =
+      //        2 * num pages  (can have up to 999 pages)
+      // +      maximum chunk size
+      // +      hash (is constant value for all hashes)
+      // +      max offset within file
+      // +      max offset within file (this should be the max size of any
+      //                             chunk, but for simplicity we use this here.
+      //                             this should be for sure larger.)
+      const int32_t entry_size = 3 + 3 + StringifyUint(chunks.size()).size() +
+                                 chunks.At(0).content_hash().ToString().size() +
+                                 max_digits_offset + max_digits_offset;
+      const int32_t entries_per_page = (kB_limit - header_size) / entry_size;
+
+      const int32_t num_pages = chunks.size() / entries_per_page +
+                              ((chunks.size() % entries_per_page != 0) ? 1 : 0);
+
+      chunk_list_  = "Access different pages with 'chunk_list_<page>' ";
+      chunk_list_ += "( " + StringifyInt(num_pages);
+      chunk_list_ += num_pages > 1 ? " pages )\n" : " page )\n";
+
+      chunk_list_ += "max_pages,curr_page,idx,hash,offset,size\n";
+
+      attr_page_num = attr_page_num == 0 ? 1 : attr_page_num;
+      int32_t attr_page_num_fixed = attr_page_num - 1;
+      size_t start_entry = entries_per_page * attr_page_num_fixed;
+      for (size_t i = start_entry;
+                  i < chunks.size() && i < start_entry + entries_per_page;
+                  ++i) {
+        chunk_list_ += StringifyInt(num_pages) + ",";
+        chunk_list_ += StringifyInt(attr_page_num) + ",";
+        chunk_list_ += StringifyUint(i) + ",";
         chunk_list_ += chunks.At(i).content_hash().ToString() + ",";
         chunk_list_ += StringifyInt(chunks.At(i).offset()) + ",";
         chunk_list_ += StringifyUint(chunks.At(i).size()) + "\n";
       }
     }
   } else {
+    chunk_list_ = "max_pages,curr_page,idx,hash,offset,size\n";
+    chunk_list_ += "1,1,0,";
     chunk_list_ += dirent_->checksum().ToString() + ",";
     chunk_list_ += "0,";
     chunk_list_ += StringifyUint(dirent_->size()) + "\n";

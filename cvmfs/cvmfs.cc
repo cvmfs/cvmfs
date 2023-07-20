@@ -112,6 +112,7 @@
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
+#include "util/string.h"
 #include "util/uuid.h"
 #include "wpad.h"
 #include "xattr.h"
@@ -1662,7 +1663,24 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
-  const string attr = name;
+  string attr = name;
+  int32_t attr_page_num = -1;
+
+  // split xattr if of format <name>_<num>
+  // for different "pages" of xattr to be returned
+  // if no <num> is valid, the first page is printed 
+  // as String2Uint64 failure defaults to 0
+  string paged_attr = "user.chunk_list";
+  if (attr.rfind(paged_attr, 0) == 0) {
+    attr = paged_attr;
+
+    vector<string> tokens = SplitString(name, '_');
+
+    attr_page_num = String2Uint64(tokens[tokens.size() - 1]);
+  }
+
+
+
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
@@ -1696,7 +1714,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attr, path, &d));
   if (!magic_xattr.IsNull()) {
     magic_xattr_success = magic_xattr->
-                              PrepareValueFencedProtected(fuse_ctx->gid);
+                      PrepareValueFencedProtected(fuse_ctx->gid, attr_page_num);
   }
 
   fuse_remounter_->fence()->Leave();

@@ -102,6 +102,8 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
+    // in debug mode this fails because a time stamp is added at the end of
+    // the message
     EXPECT_TRUE(HasSuffix(attr->GetValue(), "<snip>\n", false /* ign_case */));
   }
 }
@@ -149,7 +151,7 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
 
   ASSERT_FALSE(attr.IsNull());
-  ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
-  ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
+  ASSERT_FALSE(attr->PrepareValueFencedProtected(2, -1));
+  ASSERT_TRUE(attr->PrepareValueFencedProtected(1, -1));
   EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());
 }

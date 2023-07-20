@@ -65,7 +65,7 @@ class BaseMagicXattr {
   /**
    * Access right check before normal fence
    */
-  bool PrepareValueFencedProtected(gid_t gid);
+  bool PrepareValueFencedProtected(gid_t gid, int32_t attr_page_num);
 
   /**
    * This function needs to be called after PrepareValueFenced(),
@@ -96,6 +96,7 @@ class BaseMagicXattr {
   * inside FuseRemounter::fence(), which should prevent data races.
   */
   virtual bool PrepareValueFenced() { return true; }
+  virtual bool PrepareValueFenced(int32_t attr_page_num) { return true; }
 
   MagicXattrManager *xattr_mgr_;
   PathString path_;
@@ -235,7 +236,7 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
 class ChunkListMagicXattr : public RegularMagicXattr {
   std::string chunk_list_;
 
-  virtual bool PrepareValueFenced();
+  virtual bool PrepareValueFenced(int32_t attr_page_num);
   virtual std::string GetValue();
 };
 
