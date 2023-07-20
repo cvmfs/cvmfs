@@ -15,7 +15,7 @@ cvmfs_run_test() {
   fi
 
   echo "*** mount cernvm-prod.cern.ch normally"
-  cvmfs_mount cernvm-prod.cern.ch CVMFS_CPU_AFFINITY=0 || return 1
+  cvmfs_mount cernvm-prod.cern.ch CVMFS_CPU_AFFINITY=0,1 || return 1
 
   local pid=$(get_xattr pid /cvmfs/cernvm-prod.cern.ch/)
   echo "*** PID is $pid"
@@ -25,7 +25,7 @@ cvmfs_run_test() {
 
   taskset -c -a -p $pid | while read t; do
     echo "*** Checking task $t"
-    [ "$(echo "$t" | awk '{print $NF}')" = "0" ] || return 1
+    [ "$(echo "$t" | awk '{print $NF}')" = "0,1" ] || return 1
   done || return 20
 
   return 0
