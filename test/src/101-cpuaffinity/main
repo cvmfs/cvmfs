@@ -14,7 +14,7 @@ cvmfs_run_test() {
     return 0
   fi
 
-  echo "*** mount cernvm-prod.cern.ch normally"
+  echo "*** mount cernvm-prod.cern.ch with cpu affinity 0,1"
   cvmfs_mount cernvm-prod.cern.ch CVMFS_CPU_AFFINITY=0,1 || return 1
 
   local pid=$(get_xattr pid /cvmfs/cernvm-prod.cern.ch/)
