@@ -29,13 +29,8 @@ type WishFriendly struct {
 	ExpandedTagImagesFlat  []*Image
 }
 
-func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string) (wish WishFriendly, err error) {
+func CreateWish(inputImg Image, outputImage, cvmfsRepo, userInput, userOutput string) (wish WishFriendly, err error) {
 
-	inputImg, err := ParseImage(inputImage)
-	if err != nil {
-		err = fmt.Errorf("%s | %s", err.Error(), "Error in parsing the input image")
-		return
-	}
 	inputImg.User = userInput
 
 	wish.InputName = inputImg.WholeName()
@@ -66,7 +61,7 @@ func CreateWish(inputImage, outputImage, cvmfsRepo, userInput, userOutput string
 	if errEx != nil {
 		err = errEx
 		l.LogE(err).WithFields(log.Fields{
-			"input image": inputImage}).
+			"input image": inputImg.WholeName()}).
 			Error("Error in retrieving all the tags from the image")
 		return
 	}
