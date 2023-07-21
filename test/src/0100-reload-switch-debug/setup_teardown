@@ -1,7 +1,0 @@
-cleanup() {
-  echo "cleanup $cvmfs_test_name"
-  if [ "x$CVMFS_TEST_098_TMPFILE" != "x" ]; then
-    rm $CVMFS_TEST_098_TMPFILE
-  fi
-}
-
