@@ -50,9 +50,12 @@ cvmfs_run_test() {
     [ $nchunks -gt 1 ] || return 30
     mkdir /srv/cvmfs/${CVMFS_TEST_REPO}/data/external || return 31
     for c in $chunk_list; do
-      local hash=$(echo $c | cut -d, -f1)
-      cat /srv/cvmfs/${CVMFS_TEST_REPO}/data/${hash:0:2}/${hash:2}P >> \
-        /srv/cvmfs/${CVMFS_TEST_REPO}/data/external/foo || return 32
+      # ignore header
+      if [ "x$c" != "xmax_pages,curr_page,idx,hash,offset,size" ]; then
+        local hash=$(echo $c | cut -d, -f4)
+        cat /srv/cvmfs/${CVMFS_TEST_REPO}/data/${hash:0:2}/${hash:2}P >> \
+          /srv/cvmfs/${CVMFS_TEST_REPO}/data/external/foo || return 32
+      fi
     done
   fi
 

@@ -85,17 +85,17 @@ cvmfs_run_test() {
   runc_chunk_list=$(get_xattr chunk_list /cvmfs/grid.cern.ch/vc/containers/runc)
   [ "x$runc_chunks" = "x2" ] || return 6
   runc_chunk_list_n=$(echo $runc_chunk_list | wc -w | awk '{print $1}')
-  [ "x$runc_chunk_list_n" = "x3" ] || return 7
-  runc_chunk_list_header=$(echo $runc_chunk_list | cut -d" " -f1)
-  [ "x$runc_chunk_list_header" = "xhash,offset,size" ] || return 8
+  [ "x$runc_chunk_list_n" = "x12" ] || return 7
+  runc_chunk_list_header=$(echo $runc_chunk_list | cut -d" " -f10)
+  [ "x$runc_chunk_list_header" = "xmax_pages,curr_page,idx,hash,offset,size" ] || return 8
   # test a short non-chunked file
   readme_chunks=$(get_xattr chunks /cvmfs/grid.cern.ch/README)
   readme_chunk_list=$(get_xattr chunk_list /cvmfs/grid.cern.ch/README)
   [ "x$readme_chunks" = "x1" ] || return 9
   readme_chunk_list_1=$(echo $readme_chunk_list | cut -d" " -f2)
-  readme_chunk_hash=$(echo $readme_chunk_list_1 | cut -d"," -f1)
-  readme_chunk_offset=$(echo $readme_chunk_list_1 | cut -d"," -f2)
-  readme_chunk_size=$(echo $readme_chunk_list_1 | cut -d"," -f3)
+  readme_chunk_hash=$(echo $readme_chunk_list_1 | cut -d"," -f4)
+  readme_chunk_offset=$(echo $readme_chunk_list_1 | cut -d"," -f5)
+  readme_chunk_size=$(echo $readme_chunk_list_1 | cut -d"," -f6)
   readme_hash=$(get_xattr hash /cvmfs/grid.cern.ch/README)
   if running_on_osx; then
     readme_size=$(gstat -c%s /cvmfs/grid.cern.ch/README)
