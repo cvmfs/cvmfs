@@ -26,6 +26,8 @@ void TaskRegister::Process(FileItem *file_item) {
            file_item->bulk_hash().ToString().c_str(),
            file_item->hash_suffix());
 
+  tube_ctr_inflight_pre_->PopFront();
+
   NotifyListeners(upload::SpoolerResult(0,
     file_item->path(),
     file_item->bulk_hash(),
@@ -33,5 +35,6 @@ void TaskRegister::Process(FileItem *file_item) {
     file_item->compression_algorithm()));
 
   delete file_item;
-  tube_counter_->PopFront();
+
+  tube_ctr_inflight_post_->PopFront();
 }

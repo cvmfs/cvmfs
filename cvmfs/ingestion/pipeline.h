@@ -56,7 +56,16 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
   bool spawned_;
   upload::AbstractUploader *uploader_;
   // TODO(jblomer): a semaphore would be faster!
-  Tube<FileItem> tube_counter_;
+  // We need to have two in-flight counters: the pre-counter decreases
+  // before the final NotifyListeners() call, so that the callback can schedule
+  // a new job into the pipeline.  This happens when finished child catalogs
+  // trigger uploading the parent catalog.
+  // The pre-counter sets the kMaxFilesInFlight limit.
+  Tube<FileItem> tube_ctr_inflight_pre_;
+  // The post counter is set after the final callback.  It is used to wait
+  // for the pipeline to finish.
+  Tube<FileItem> tube_ctr_inflight_post_;
+
   Tube<FileItem> tube_input_;
 
   TubeConsumerGroup<FileItem> tasks_read_;
