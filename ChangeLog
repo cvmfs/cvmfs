@@ -1,4 +1,5 @@
 2.11.0:
+  * [server] Fix deadlock in uploading pipeline (#3195)
   * [gw] Fix transaction abort after gateway restart (#3128)
   * [gw] Fix occasional lease contention errors (#3259, #3077)
   * Check for writable log file directories in chkconfig (#3310)
