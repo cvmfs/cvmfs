@@ -47,7 +47,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
 
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
-  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_info);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog           *parent_catalog);

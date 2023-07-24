@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <map>
+#include <vector>
 
 #include "catalog.h"
 #include "util/posix.h"
@@ -18,19 +19,20 @@ namespace manifest {
 Breadcrumb::Breadcrumb(const std::string &from_string) {
   timestamp = 0;
 
-  if(from_string.size() > 0 ) {
+  if (from_string.size() > 0) {
     // Separate hash from timestamp
-    std::vector<std::string> vec_split_timestamp = SplitString(from_string, 'T');
+    std::vector<std::string> vec_split_timestamp =
+                                                  SplitString(from_string, 'T');
 
     catalog_hash =
       shash::MkFromHexPtr(shash::HexPtr(vec_split_timestamp[0]),
                                         shash::kSuffixCatalog);
 
-    if(vec_split_timestamp.size() > 1) {
+    if (vec_split_timestamp.size() > 1) {
       // check if revision number is included
       std::vector<std::string> vec_split_revision =
-                                          SplitString(vec_split_timestamp[1], 'R');
-      
+                                       SplitString(vec_split_timestamp[1], 'R');
+
       // Get local last modified time and revision
       if (vec_split_revision.size() == 1) {
           timestamp = String2Uint64(vec_split_revision[0]);

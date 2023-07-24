@@ -244,17 +244,17 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   EXPECT_EQ(root_hash_str, root_info.hash().ToString());
 
   // load nested catalog
-  const PathString nestedMntpnt("/dir/dir2");
-  const shash::Any& ncatalogHash = mp->catalog_mgr()->
-                              GetNestedCatalogHash(nestedMntpnt);
-  CatalogContext nctlg_info(ncatalogHash, nestedMntpnt);
+  const PathString nested_mntpnt("/dir/dir2");
+  const shash::Any& n_catalog_hash = mp->catalog_mgr()->
+                              GetNestedCatalogHash(nested_mntpnt);
+  CatalogContext n_ctlg_context(n_catalog_hash, nested_mntpnt);
 
   EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalogByHash(&nctlg_info));
+    mp->catalog_mgr()->LoadCatalogByHash(&n_ctlg_context));
 
   // also chached should return the same answer
   EXPECT_EQ(catalog::kLoadNew,
-    mp->catalog_mgr()->LoadCatalogByHash(&nctlg_info));
+    mp->catalog_mgr()->LoadCatalogByHash(&n_ctlg_context));
 }
 
 
@@ -276,17 +276,17 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
   // load nested catalog
-  const PathString nestedMntpnt("/dir/dir2");
-  const shash::Any& ncatalogHash = mp->catalog_mgr()->
-                                             GetNestedCatalogHash(nestedMntpnt);
-  CatalogContext ctlg_info(ncatalogHash, nestedMntpnt);
+  const PathString nested_mntpnt("/dir/dir2");
+  const shash::Any& n_catalog_hash = mp->catalog_mgr()->
+                                            GetNestedCatalogHash(nested_mntpnt);
+  CatalogContext ctlg_context(n_catalog_hash, nested_mntpnt);
 
   EXPECT_EQ(catalog::kLoadNew,
-            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_context));
 
   // also chached should return the same answer
   EXPECT_EQ(catalog::kLoadNew,
-            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_context));
 
   // break URL to repo
   mp->download_mgr()->SetProxyChain("file://noValidURL", "",
@@ -297,9 +297,9 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
 
 
   // fetch hash but do not load catalog
-  const PathString nestedMntpntNoDwnld("/dir/dir3");
-  const shash::Any& ncatalogHashNoDwnld = mp->catalog_mgr()->
-                                      GetNestedCatalogHash(nestedMntpntNoDwnld);
+  const PathString nested_mntpntNoDwnld("/dir/dir3");
+  const shash::Any& n_catalog_hashNoDwnld = mp->catalog_mgr()->
+                                     GetNestedCatalogHash(nested_mntpntNoDwnld);
 
   // try to load from cache
   CatalogContext root_info;
@@ -310,12 +310,13 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
   EXPECT_EQ(root_info.hash().ToString(), root_hash_str);
 
   EXPECT_EQ(catalog::kLoadNew,
-            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info));
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_context));
 
   // fail to load new unloaded nested catalog
-  CatalogContext ctlg_info_failed(ncatalogHashNoDwnld, nestedMntpntNoDwnld);
+  CatalogContext ctlg_context_failed(n_catalog_hashNoDwnld,
+                                     nested_mntpntNoDwnld);
   EXPECT_EQ(catalog::kLoadFail,
-            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_info_failed));
+            mp->catalog_mgr()->LoadCatalogByHash(&ctlg_context_failed));
 }
 
 TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
@@ -339,7 +340,8 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   // this will perform a check vs storage loaction which has the most recent one
   CatalogContext root_info;
 
-  // TODO(heretherebedragons) is it true that MountPoint::Create does NOT load the root catalog???
+  // TODO(heretherebedragons) is it true that MountPoint::Create does NOT
+  // load the root catalog???
   // apparently it does.. loadcatalogbyhash had a small bug with offline_mode_
   EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->GetNewRootCatalogContext(&root_info));

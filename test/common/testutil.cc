@@ -529,18 +529,19 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
 }
 
 catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
-                            CatalogContext *ctlg_info) {
+                            CatalogContext *ctlg_context) {
   LogCvmfs(kLogCache, kLogDebug,
                               "catalog::MockCatalogManager::LoadCatalogByHash");
-  map<PathString, MockCatalog*>::iterator it =
-                                     catalog_map_.find(ctlg_info->mountpoint());
-  if (it != catalog_map_.end() && !ctlg_info->hash().IsNull()) {
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
+                                                    ctlg_context->mountpoint());
+  if (it != catalog_map_.end() && !ctlg_context->hash().IsNull()) {
     return kLoadUp2Date;
   } else {
-    MockCatalog *catalog = new MockCatalog(ctlg_info->mountpoint().ToString(),
-                                           ctlg_info->hash(), 4096, 1, 0,
-                                           true, NULL, NULL);
-    catalog_map_[ctlg_info->mountpoint()] = catalog;
+    MockCatalog *catalog = new MockCatalog(
+                                          ctlg_context->mountpoint().ToString(),
+                                          ctlg_context->hash(), 4096, 1, 0,
+                                          true, NULL, NULL);
+    catalog_map_[ctlg_context->mountpoint()] = catalog;
   }
   return kLoadNew;
 }

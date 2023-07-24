@@ -118,20 +118,20 @@ template <class CatalogT>
 LoadReturn AbstractCatalogManager<CatalogT>::RemountDryrun() {
   LogCvmfs(kLogCatalog, kLogDebug,
            "dryrun remounting repositories");
-  CatalogContext ctlg_info;
-  return GetNewRootCatalogContext(&ctlg_info);
+  CatalogContext ctlg_context;
+  return GetNewRootCatalogContext(&ctlg_context);
 }
 
 template <class CatalogT>
 LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
-  CatalogContext ctlg_info;
+  CatalogContext ctlg_context;
 
   // TODO(heretherebedragons) Is this necessary or can we move it outside?
-  // allow ctlg_info from dryrun as input parameter? (= +1 IF statement but
+  // allow ctlg_context from dryrun as input parameter? (= +1 IF statement but
   // overall less compute? (depending which remount is called how often))
   // alternatively: expose GetNewRootCatalogContext to public
-  if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
+  if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
     LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
                                 "Did not find any valid root catalog to mount");
     return kLoadFail;
@@ -139,17 +139,17 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
 
   WriteLock();
 
-  const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root =
-                  CreateCatalog(ctlg_info.mountpoint(), ctlg_info.hash(), NULL);
+    CatalogT *new_root = CreateCatalog(ctlg_context.mountpoint(),
+                                       ctlg_context.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_info.sqlite_path(), new_root);
+    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -174,13 +174,14 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
 
   WriteLock();
 
-  CatalogContext ctlg_info(root_hash, PathString("", 0), kCtlgLocationMounted);
+  CatalogContext ctlg_context(root_hash, PathString("", 0),
+                                                          kCtlgLocationMounted);
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
   // TODO(heretherebedragons) HERE IS A PROBLEM: THE CATALOG REVISION IS NOT
   // SET CORRECTLY. WOULD NEED SPECIAL TREATEMENT
-  const LoadReturn load_error = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew || load_error == kLoadUp2Date) {
     inode_t old_inode_gauge = inode_gauge_;
@@ -188,9 +189,9 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
     CatalogT *new_root =
-                       CreateCatalog(PathString("", 0), ctlg_info.hash(), NULL);
+                    CreateCatalog(PathString("", 0), ctlg_context.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(ctlg_info.sqlite_path(), new_root);
+    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -908,10 +909,10 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return attached_catalog;
   }
 
-  CatalogContext ctlg_info(hash, mountpoint, kCtlgLocationMounted);
+  CatalogContext ctlg_context(hash, mountpoint, kCtlgLocationMounted);
 
-  if (ctlg_info.IsRootCatalog() && hash.IsNull()) {
-    if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
+  if (ctlg_context.IsRootCatalog() && hash.IsNull()) {
+    if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
       LogCvmfs(kLogCatalog, kLogDebug,
                                    "failed to retrieve valid root catalog '%s'",
                                    mountpoint.c_str());
@@ -919,19 +920,19 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     }
   }
 
-  const LoadReturn retval = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn retval = LoadCatalogByHash(&ctlg_context);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(ctlg_info.mountpoint(),
-                                   ctlg_info.hash(),
+  attached_catalog = CreateCatalog(ctlg_context.mountpoint(),
+                                   ctlg_context.hash(),
                                    parent_catalog);
 
   // Attach loaded catalog
-  if (!AttachCatalog(ctlg_info.sqlite_path(), attached_catalog)) {
+  if (!AttachCatalog(ctlg_context.sqlite_path(), attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
     UnloadCatalog(attached_catalog);
@@ -955,26 +956,26 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  CatalogContext ctlg_info(hash, mountpoint, kCtlgLocationMounted);
+  CatalogContext ctlg_context(hash, mountpoint, kCtlgLocationMounted);
 
   // do i need this here?
-  if (ctlg_info.IsRootCatalog()) {
-    if (GetNewRootCatalogContext(&ctlg_info) == kLoadFail) {
+  if (ctlg_context.IsRootCatalog()) {
+    if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
       return NULL;
     }
   }
 
-  const LoadReturn load_ret = LoadCatalogByHash(&ctlg_info);
+  const LoadReturn load_ret = LoadCatalogByHash(&ctlg_context);
 
   // TODO(heretherebedragons) correct if statement?
   if (load_ret != kLoadNew && load_ret != kLoadUp2Date) {
     return NULL;
   }
 
-  assert(hash == ctlg_info.hash());  // TODO(heretherebedragons) why?
+  assert(hash == ctlg_context.hash());  // TODO(heretherebedragons) why?
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
-                                             ctlg_info.sqlite_path(),
-                                             ctlg_info.hash());
+                                             ctlg_context.sqlite_path(),
+                                             ctlg_context.hash());
   catalog->TakeDatabaseFileOwnership();
   return catalog;
 }

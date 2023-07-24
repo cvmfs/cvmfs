@@ -79,7 +79,7 @@ enum RootCatalogLocation {
  *  - Call LoadCatalogByHash()
  *    - This will set: sqlite_path
  * 2) Load a catalog based on a given hash
- *  - Populate CatalogContext object, used constructor depending on catalog type
+ *  - Populate CatalogContext object; used constructor depends on catalog type
  *    - Root catalog: CatalogContext(shash::Any hash, PathString mountpoint,
               RootCatalogLocation location)
       - Nested catalog: CatalogContext(shash::Any hash, PathString mountpoint)
@@ -154,7 +154,7 @@ struct CatalogContext {
   uint64_t root_ctlg_revision_;
   // root catalog: location is mandatory for LoadCatalogByHash()
   RootCatalogLocation root_ctlg_location_;
-  // root catalog: for location = server mandatory for LoadCatalogByHash()
+  // root catalog: if location = server mandatory for LoadCatalogByHash()
   UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
 };
 
@@ -326,8 +326,8 @@ class AbstractCatalogManager : public SingleCopy {
    *
    * See class description of CatalogContext for more information.
    */
-  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *catalog_info) = 0;
-  virtual LoadReturn LoadCatalogByHash(CatalogContext *catalog_info) = 0;
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result) = 0;
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }

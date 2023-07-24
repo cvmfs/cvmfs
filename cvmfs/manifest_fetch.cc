@@ -78,7 +78,6 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog)) {
     return kFailOk;
   }
-    
 
   // Load certificate
   certificate_hash = ensemble->manifest->certificate();
@@ -202,7 +201,6 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
       DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
               signature_manager, download_manager, ensemble);
   if ((result != kFailOk) &&
-      (result != kFailUp2Date) &&
       (result != kFailLoad) &&
       (result != kFailInvalidCertificate) &&
       (download_manager->num_hosts() > 1))

@@ -75,7 +75,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
 
  protected:
   LoadReturn GetNewRootCatalogContext(CatalogContext *result);
-  LoadReturn LoadCatalogByHash(CatalogContext* ctlg_info);
+  LoadReturn LoadCatalogByHash(CatalogContext* ctlg_context);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,

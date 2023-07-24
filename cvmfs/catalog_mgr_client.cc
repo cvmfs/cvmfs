@@ -161,7 +161,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
   if (breadcrumb_revision <= GetRevisionNoLock()
      || breadcrumb_revision == -1ul) {
-    std::map<PathString, shash::Any>::iterator curr_hash_itr = 
+    std::map<PathString, shash::Any>::iterator curr_hash_itr =
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = GetRevisionNoLock();
@@ -211,7 +211,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
             "failed fetch manifest from server: "
             "manifest too old or server unreachable (%d - %s)",
             manifest_failure, manifest::Code2Ascii(manifest_failure));
-  
+
   // corner case: server not reachable, local revision is 0. We can not
   // distinguish if local revision number is valid or invalid. Most likely
   // it is invalid - so fail
@@ -234,54 +234,59 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 /**
  * Loads (and fetches) a catalog by hash for a given mountpoint.
  *
- * Special case for root catalog: ctlg_info->root_ctlg_location must be given.
- * If it is kCtlgLocationServer than another check for the most recent 
+ * Special case for root catalog: ctlg_context->root_ctlg_location must be given.
+ * If it is kCtlgLocationServer than another check for the most recent
  * manifest is done.
  *
- * @param [in, out] ctlg_info mandatory fields (input): mountpoint, hash
+ * @param [in, out] ctlg_context mandatory fields (input): mountpoint, hash
  *         additional mandatory fields for root catalog: root_ctlg_location
  *         output: sqlite_path is set if catalog fetch successful
  * @return kLoadUp2Date for root catalog that is already mounted
  *         kLoadNew for any other successful load
  *         kLoadFail on failure
  */
-LoadReturn ClientCatalogManager::LoadCatalogByHash(CatalogContext *ctlg_info) {
+LoadReturn ClientCatalogManager::LoadCatalogByHash(
+                                                 CatalogContext *ctlg_context) {
   string catalog_descr = "file catalog at " + repo_name_ + ":" +
-    (ctlg_info->IsRootCatalog() ?
-      "/" : string(ctlg_info->mountpoint().GetChars(),
-                   ctlg_info->mountpoint().GetLength()));
+    (ctlg_context->IsRootCatalog() ?
+      "/" : string(ctlg_context->mountpoint().GetChars(),
+                   ctlg_context->mountpoint().GetLength()));
 
-  catalog_descr += " (" + ctlg_info->hash().ToString() + ")";
+  catalog_descr += " (" + ctlg_context->hash().ToString() + ")";
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
-  if (ctlg_info->IsRootCatalog() && fixed_alt_root_catalog_) {
-    alt_root_catalog_path = ctlg_info->hash().MakeAlternativePath();
+  if (ctlg_context->IsRootCatalog() && fixed_alt_root_catalog_) {
+    alt_root_catalog_path = ctlg_context->hash().MakeAlternativePath();
   }
 
   // TODO(heretherebedragons) could help: fetch should return if fetch from
   // cache or from remote would save us the if in L283
-  LoadReturn load_ret = FetchCatalogByHash(ctlg_info->hash(), catalog_descr,
+  LoadReturn load_ret = FetchCatalogByHash(ctlg_context->hash(), catalog_descr,
                                            alt_root_catalog_path,
-                                           ctlg_info->GetSqlitePathPtr());
+                                           ctlg_context->GetSqlitePathPtr());
   if (load_ret == catalog::kLoadNew) {
-    loaded_catalogs_[ctlg_info->mountpoint()] = ctlg_info->hash();
+    loaded_catalogs_[ctlg_context->mountpoint()] = ctlg_context->hash();
 
-    if (ctlg_info->IsRootCatalog()) {  // root catalog
-      if (ctlg_info->root_ctlg_location() == kCtlgLocationMounted) {
+    if (ctlg_context->IsRootCatalog()) {  // root catalog
+      if (ctlg_context->root_ctlg_location() == kCtlgLocationMounted) {
         return kLoadUp2Date;
       }
 
       // if coming from server: update breadcrumb
-      if (ctlg_info->root_ctlg_location() == kCtlgLocationServer) {
+      if (ctlg_context->root_ctlg_location() == kCtlgLocationServer) {
           // Store new manifest and certificate
+          CacheManager::Label label;
+          label.path = repo_name_;
+          label.flags |= CacheManager::kLabelCertificate;
           fetcher_->cache_mgr()->CommitFromMem(
-                                  ctlg_info->manifest_ensemble()->certificate(),
-                                  ctlg_info->manifest_ensemble()->cert_buf,
-                                  ctlg_info->manifest_ensemble()->cert_size,
-                                  "certificate for " + repo_name_);
+                CacheManager::LabeledObject(ctlg_context->manifest_ensemble()->
+                                                        manifest->certificate(),
+                                            label),
+                                  ctlg_context->manifest_ensemble()->cert_buf,
+                                  ctlg_context->manifest_ensemble()->cert_size);
           fetcher_->cache_mgr()->StoreBreadcrumb(
-                                     *ctlg_info->manifest_ensemble()->manifest);
+                                  *ctlg_context->manifest_ensemble()->manifest);
       }
     }
   }
