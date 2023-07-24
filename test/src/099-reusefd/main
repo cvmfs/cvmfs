@@ -6,8 +6,8 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount alice.cern.ch CVMFS_DEBUGLOG=/tmp/debug.log CVMFS_CACHE_PRIMARY=posix_refcount || return 10
-
+  #cvmfs_mount alice.cern.ch CVMFS_DEBUGLOG=/tmp/debug.log CVMFS_CACHE_PRIMARY=posix_refcount || return 10
+  mount -t cvmfs alice.cern.ch /cvmfs/alice.cern.ch
   ############
   # open some test file in several simultaneously in different processes
 
@@ -32,6 +32,7 @@ cvmfs_run_test() {
     echo "The cvmfs process has several open file descriptors for the same open test file" && return 20
   fi
   sleep 3
+  umount /cvmfs/alice.cern.ch
   return 0
 }
 

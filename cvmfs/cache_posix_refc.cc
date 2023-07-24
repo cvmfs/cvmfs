@@ -102,88 +102,16 @@ PosixRefcountCacheManager *PosixRefcountCacheManager::Create(
 
 
 int PosixRefcountCacheManager::Close(int fd) {
-    int retval = -1;
-    int refc = -1;
-    {
-      MutexLockGuard lock_guard(lock_cache_refcount_);
-      if (map_refcount_.find(fd) != map_refcount_.end()) {
-        refc = map_refcount_[fd];
-        if (refc > 0) {
-          map_refcount_[fd] = refc - 1;
-          retval = 0;
-        } else {
-          retval = close(fd);
-          map_refcount_[fd] = -1;
-        }
-    } else {
-        retval = close(fd);
-    }
-  }
-
+  int retval = fd_mgr.Close(fd);
   if (retval != 0)
     return -errno;
   return 0;
 }
 
-
-string PosixRefcountCacheManager::Describe() {
-  return "Posix cache manager with refcount of file descriptors"
-    "(cache directory: " + cache_path_ + ")\n";
-}
-
-
-/**
- * Nothing to do, the kernel keeps the state of open file descriptors.  Return
- * a dummy memory location.
- */
-void *PosixRefcountCacheManager::DoSaveState() {
-  char *c = reinterpret_cast<char *>(smalloc(1));
-  *c = '\0';
-  return c;
-}
-
-
-int PosixRefcountCacheManager::DoRestoreState(void *data) {
-  assert(data);
-  char *c = reinterpret_cast<char *>(data);
-  assert(*c == '\0');
-  return -1;
-}
-
-
-bool PosixRefcountCacheManager::DoFreeState(void *data) {
-  free(data);
-  return true;
-}
-
-
 int PosixRefcountCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
-  int result = -1;
-  {
-    MutexLockGuard lock_guard(lock_cache_refcount_);
-    if (!map_fd_.Contains(object.id)) {
-      result = open(path.c_str(), O_RDONLY);
-      if (result >= 0) {
-        map_fd_.Insert(object.id, result);
-      }
-    } else {
-      map_fd_.Lookup(object.id, &result);
-      if (map_refcount_[result] == -1) {
-        result = open(path.c_str(), O_RDONLY);
-        map_fd_.Insert(object.id, result);
-      }
-    }
-    if (result >= 0) {
-      if (map_refcount_.find(result) != map_refcount_.end()) {
-        map_refcount_[result] += 1;
-      } else {
-        map_refcount_[result] = 1;
-      }
-    }
-  }
-
-  if (result >= 0) {
+  int result = fd_mgr.Open(object.id, path);
+  if (result >= -1) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
     quota_mgr_->Touch(object.id);
@@ -193,3 +121,34 @@ int PosixRefcountCacheManager::Open(const LabeledObject &object) {
   }
   return result;
 }
+
+
+string PosixRefcountCacheManager::Describe() {
+  return "Posix cache manager with refcount of file descriptors"
+    "(cache directory: " + cache_path_ + ")\n";
+}
+
+
+void *PosixRefcountCacheManager::DoSaveState() {
+  SavedState *state = new SavedState();
+  state->fd_mgr = fd_mgr.Clone();
+  return state;
+}
+
+
+int PosixRefcountCacheManager::DoRestoreState(void *data) {
+  assert(data);
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  fd_mgr.AssignFrom(state->fd_mgr);
+  return -1;
+}
+
+
+bool PosixRefcountCacheManager::DoFreeState(void *data) {
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  delete state->fd_mgr;
+  delete state;
+  return true;
+}
+
+
