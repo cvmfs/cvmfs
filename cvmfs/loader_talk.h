@@ -14,7 +14,6 @@ bool Init(const std::string &socket_path);
 void Spawn();
 void Fini();
 
-int MainReload(const std::string &socket_path, const bool stop_and_go);
 int MainReload(const std::string &socket_path, const bool stop_and_go,
                const bool debug);
 

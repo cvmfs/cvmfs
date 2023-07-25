@@ -543,10 +543,15 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 }
 
 Failures Reload(const int fd_progress, const bool stop_and_go,
-                const bool debug_mode) {
+                const ReloadMode reload_mode) {
   int retval;
 
-  debug_mode_ = debug_mode;
+  // for legacy call we take the current state of debug_mode_
+  if (reload_mode == kReloadDebug) {
+    debug_mode_ = true;
+  } else if (reload_mode == kReloadNoDebug) {
+    debug_mode_ = false;
+  }
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -618,9 +623,6 @@ int FuseMain(int argc, char *argv[]) {
 
   int retval;
 
-  // check if already mounted in debug mode
-  debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
-
   // Jump into alternative process flavors (e.g. shared cache manager)
   // We are here due to a fork+execve (ManagedExec in util.cc) or due to
   // utility calls of cvmfs2
@@ -634,8 +636,17 @@ int FuseMain(int argc, char *argv[]) {
 
       // always last param of the cvmfs2 __RELOAD__ command
       // check if debug mode is requested
+      // NOTE:
+      // debug mode is decided based on CVMFS_DEBUGLOG being set or not
+      // this means: reloading is now always based on CVMFS_DEBUGLOG, and
+      // reload ignores the current state
+      //
+      // if you mount with debug but do not set CVMFS_DEBUGLOG and reload,
+      // you will reload with
       if (std::string(argv[argc - 1]) == std::string("--debug")) {
         debug_mode_ = true;
+      } else {
+        debug_mode_ = false;
       }
       retval = loader_talk::MainReload(argv[2], stop_and_go, debug_mode_);
 
@@ -682,6 +693,7 @@ int FuseMain(int argc, char *argv[]) {
       return 0;
     }
 
+    debug_mode_ = getenv("__CVMFS_DEBUG_MODE__") != NULL;
     cvmfs_exports_ = LoadLibrary(debug_mode_, NULL);
     if (!cvmfs_exports_)
       return kFailLoadLibrary;

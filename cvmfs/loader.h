@@ -242,8 +242,14 @@ struct CvmfsExports {
   struct fuse_lowlevel_ops cvmfs_operations;
 };
 
+enum ReloadMode {
+  kReloadNoDebug = 0,
+  kReloadDebug,
+  kReloadLegacy
+};
+
 Failures Reload(const int fd_progress, const bool stop_and_go,
-                const bool debug);
+                const ReloadMode reload_mode = kReloadLegacy);
 
 }  // namespace loader
 
