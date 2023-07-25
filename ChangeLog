@@ -1,4 +1,5 @@
 2.11.0:
+  * [server]  Verify meta-info object in cvmfs_server check (#3139) 
   * [client] Allow CPU affinity setting through CVMFS_CPU_AFFINITY (#3330)
   * [server] Fix deadlock in uploading pipeline (#3195)
   * [gw] Fix transaction abort after gateway restart (#3128)
