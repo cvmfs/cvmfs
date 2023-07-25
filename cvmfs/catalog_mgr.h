@@ -58,7 +58,7 @@ enum LoadReturn {
  * Used as part of the process of loading a catalog.
  * - GetNewRootCatalogContext() sets the location within the CatalogContext obj
  * - LoadCatalogByHash(): when loading a root catalog it uses the location
- *                        stored withing the CatalogContext object to retrieve
+ *                        stored within the CatalogContext object to retrieve
  *                        the root catalog from the right location
  */
 enum RootCatalogLocation {
@@ -96,7 +96,7 @@ struct CatalogContext {
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
-  CatalogContext(shash::Any hash, PathString mountpoint) :
+  CatalogContext(shash::Any hash, const PathString &mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
@@ -104,7 +104,7 @@ struct CatalogContext {
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
 
-  CatalogContext(shash::Any hash, PathString mountpoint,
+  CatalogContext(shash::Any hash, const PathString &mountpoint,
               RootCatalogLocation location) :
               hash_(hash),
               mountpoint_(mountpoint),
@@ -130,8 +130,9 @@ struct CatalogContext {
                                        { return manifest_ensemble_.weak_ref(); }
 
   void SetHash(shash::Any hash) { hash_ = hash; }
-  void SetMountpoint(PathString mountpoint) { mountpoint_ = mountpoint; }
-  void SetSqlitePath(std::string sqlite_path) { sqlite_path_ = sqlite_path; }
+  void SetMountpoint(const PathString &mountpoint) { mountpoint_ = mountpoint; }
+  void SetSqlitePath(const std::string &sqlite_path)
+                                                 { sqlite_path_ = sqlite_path; }
   void SetRootCtlgRevision(uint64_t root_ctlg_revision)
                                    { root_ctlg_revision_ = root_ctlg_revision; }
   void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)

@@ -143,9 +143,9 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     breadcrumb_timestamp = breadcrumb.timestamp;
     breadcrumb_revision = breadcrumb.revision;
     LogCvmfs(kLogCache, kLogDebug,
-              "cached copy publish date %s (hash %s, revision %lu)",
-              StringifyTime(breadcrumb_timestamp, true).c_str(),
-              breadcrumb_hash.ToString().c_str(), breadcrumb.revision);
+           "cached copy publish date %s (hash %s, revision %lu)",
+           StringifyTime(static_cast<long>(breadcrumb_timestamp), true).c_str(),
+           breadcrumb_hash.ToString().c_str(), breadcrumb.revision);
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
   }
@@ -299,7 +299,7 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
  * Successful load always returns kLoadNew (independent of the location) and
  * sets the sqlite_path variable.
  *
- * @param [out] sqlite_path of the catalog if succcessfully fetched
+ * @param [out] sqlite_path of the catalog if successfully fetched
  * @return kLoadNew on success
  *         kLoadNoSpace out of space, no room on the device to open the catalog
  *         kLoadFail on all other failures

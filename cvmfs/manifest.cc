@@ -72,8 +72,9 @@ bool Breadcrumb::Export(const string &fqrn, const string &directory,
 }
 
 std::string Breadcrumb::ToString() const {
-  return catalog_hash.ToString() + "T" + StringifyInt(timestamp)
-                                 + "R" + StringifyInt(revision);
+  return catalog_hash.ToString() 
+                           + "T" + StringifyInt(static_cast<int64_t>(timestamp))
+                           + "R" + StringifyUint(revision);
 }
 
 
@@ -266,7 +267,7 @@ Breadcrumb Manifest::ReadBreadcrumb(
     return breadcrumb;
   }
   char tmp[164];
-  int read_bytes;
+  size_t read_bytes;
   if ((read_bytes = fread(tmp, 1, 164, fbreadcrumb)) > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }

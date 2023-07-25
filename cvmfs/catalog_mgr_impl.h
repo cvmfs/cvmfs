@@ -180,7 +180,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   // needs only mountpoint, hash and root_ctlg_location
 
   // TODO(heretherebedragons) HERE IS A PROBLEM: THE CATALOG REVISION IS NOT
-  // SET CORRECTLY. WOULD NEED SPECIAL TREATEMENT
+  // SET CORRECTLY. WOULD NEED SPECIAL TREATMENT
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew || load_error == kLoadUp2Date) {
