@@ -2,7 +2,7 @@
   * [client] Allow CPU affinity setting through CVMFS_CPU_AFFINITY (#3330)
   * [server] Fix deadlock in uploading pipeline (#3195)
   * [gw] Fix transaction abort after gateway restart (#3128)
-  * [gw] Fix occasional lease contention errors (#3259, #3077)
+  * [gw] Fix occasional lease contention errors (#3259, #3077, #3272)
   * Check for writable log file directories in chkconfig (#3310)
   * Restrict error handling of readahead (#3305)
   * Fix tmpfs recognition to skip readahead (#3316)
