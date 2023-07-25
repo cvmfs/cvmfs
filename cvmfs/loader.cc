@@ -634,7 +634,7 @@ int FuseMain(int argc, char *argv[]) {
 
       // always last param of the cvmfs2 __RELOAD__ command
       // check if debug mode is requested
-      if (!strcmp("--debug", argv[argc-1])) {
+      if (std::string(argv[argc - 1]) == std::string("--debug")) {
         debug_mode_ = true;
       }
       retval = loader_talk::MainReload(argv[2], stop_and_go, debug_mode_);
