@@ -13,7 +13,7 @@ mount_and_read() {
   echo "Mount repo, read and check HTTP tracing headers"
 
   # used in file test_functions for cvmfs_moount()
-  CVMFS_TEST_DEBUGLOG="/tmp/$CVMFS_TEST_099_TMPFILE"
+  CVMFS_TEST_DEBUGLOG="$CVMFS_TEST_099_TMPFILE"
   CVMFS_TEST_QUOTED_PARAM_KEY_VAL='CVMFS_HTTP_TRACING_HEADERS="h1:test|CVMFS-X-h2:ff|X-CVMFS-h3:12_ad |  h4  : 12fs_? "'
 
   echo "   Mount $TEST099_REPO"
@@ -22,25 +22,30 @@ mount_and_read() {
   echo "   Client config $TEST099_REPO"
   cat /etc/cvmfs/default.local
 
-
-
   echo "   Access data to send HTTP requests"
-  cat $TEST099_MOUNTPOINT/*.sh > /dev/null
-  cat $TEST099_MOUNTPOINT/etc/grid-security/*.pem > /dev/null
+  local some_files
+  some_files=$(find $TEST099_MOUNTPOINT -type f | head -n3)
+  cat "$some_files" > /dev/null
 
   echo "   Umount $TEST099_REPO"
-  test099_unmount $TEST099_REPO
+  cvmfs_umount $TEST099_REPO
 
-  pwd
-  echo $CVMFS_TEST_099_TMPFILE
-  echo "   Check output in file /tmp/$CVMFS_TEST_099_TMPFILE"
-  local h1=$(sudo grep -c /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-h1: test")
-  local h2=$(sudo grep -c /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-h2: ff")
-  local h3=$(sudo grep -c /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-h3: 12_ad")
-  local h4=$(sudo grep -c /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-h4: 12fs_?")
-  local pid=$(sudo grep /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-PID:" | sort | uniq | wc -l)
-  local gid=$(sudo grep /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-GID:" | sort | uniq | wc -l)
-  local uid=$(sudo grep /tmp/$CVMFS_TEST_099_TMPFILE -e "X-CVMFS-UID:" | sort | uniq | wc -l)
+  echo "   Check output in file $CVMFS_TEST_099_TMPFILE"
+  local h1
+  local h2
+  local h3
+  local h4
+  local pid
+  local gid
+  local uid
+
+  h1=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h1: test")
+  h2=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h2: ff")
+  h3=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h3: 12_ad")
+  h4=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h4: 12fs_?")
+  pid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-PID:" | sort | uniq | wc -l)
+  gid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-GID:" | sort | uniq | wc -l)
+  uid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-UID:" | sort | uniq | wc -l)
 
   echo "      Occurence of h1 correct? $h1 > 0"
   [ "$h1" -gt "0" ] || return 10
@@ -57,11 +62,10 @@ mount_and_read() {
   [ "$pid" -gt "1" ] || return 20
 
   echo "      Unique occurence of gid correct? $gid > 1"
-  [ "$pid" -gt "1" ] || return 20
+  [ "$gid" -gt "1" ] || return 21
 
   echo "      Unique occurence of uid correct? $uid > 1"
-  [ "$pid" -gt "1" ] || return 20
-
+  [ "$uid" -gt "1" ] || return 22
 
   echo "   ... Success"
 }
@@ -71,7 +75,9 @@ cvmfs_run_test() {
   trap cleanup HUP INT TERM EXIT || return $?
 
   echo "create temporary directory"
-  CVMFS_TEST_099_TMPFILE=$(mktemp ./test099.log.XXXXXXXX)
+  CVMFS_TEST_099_TMPFILE=$(mktemp /tmp/cvmfs_test099.log.XXXXXXXX)
+  # needed because of wrong file ownership
+  sudo rm -f "$CVMFS_TEST_099_TMPFILE"
   echo "tmpfile is $CVMFS_TEST_099_TMPFILE"
 
   mount_and_read || return $?

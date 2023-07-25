@@ -1,21 +1,7 @@
-test099_mount() {
-  local repo=$1
-  local params=$2
-
-  cvmfs_mount $repo $params
-}
-
-test099_unmount() {
-  local repo=$1
-
-  cvmfs_umount $repo
-}
-
 cleanup() {
   echo "cleanup $cvmfs_test_name"
   if [ "x$CVMFS_TEST_099_TMPFILE" != "x" ]; then
-    rm $CVMFS_TEST_099_TMPFILE
-    sudo rm /tmp/$CVMFS_TEST_099_TMPFILE
+    sudo rm -f $CVMFS_TEST_099_TMPFILE
   fi
 }
 
