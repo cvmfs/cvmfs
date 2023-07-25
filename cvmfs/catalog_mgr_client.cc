@@ -143,9 +143,9 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     breadcrumb_timestamp = breadcrumb.timestamp;
     breadcrumb_revision = breadcrumb.revision;
     LogCvmfs(kLogCache, kLogDebug,
-           "cached copy publish date %s (hash %s, revision %lu)",
-           StringifyTime(static_cast<long>(breadcrumb_timestamp), true).c_str(),
-           breadcrumb_hash.ToString().c_str(), breadcrumb.revision);
+        "cached copy publish date %s (hash %s, revision %lu)",
+        StringifyTime(static_cast<int64_t>(breadcrumb_timestamp), true).c_str(),
+        breadcrumb_hash.ToString().c_str(), breadcrumb.revision);
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
   }

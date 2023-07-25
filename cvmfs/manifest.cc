@@ -72,7 +72,7 @@ bool Breadcrumb::Export(const string &fqrn, const string &directory,
 }
 
 std::string Breadcrumb::ToString() const {
-  return catalog_hash.ToString() 
+  return catalog_hash.ToString()
                            + "T" + StringifyInt(static_cast<int64_t>(timestamp))
                            + "R" + StringifyUint(revision);
 }
