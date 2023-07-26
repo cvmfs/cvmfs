@@ -15,7 +15,7 @@ namespace download {
 enum ShardingPolicyReturn {
   kShardingPolicySucess = 0,
   kShardingPolicyProxySwitch,
-  kShardingPolicyFailProxy
+  kShardingPolicyProxyFail
 };
 
 // List of available custom ShardingPolicy classes
@@ -29,20 +29,13 @@ enum ShardingPolicySelector {
  */
 class ShardingPolicy : SingleCopy {
  public:
-  /**
-   * Creates the requested sharding policy. This function is also used to
-   * register new classes to aggregate telemetry.
-   *
-   * Returns the newly created TelemetryAggregator or NULL if the creation
-   * was not successful.
-  */
-  // static ShardingPolicy* Create(const ShardingPolicySelector type);
   ShardingPolicy() {}
   virtual ~ShardingPolicy() {}
 
-  virtual void AddProxy(std::string proxy) = 0;
+  virtual void AddProxy(const std::string &proxy) = 0;
   virtual std::string GetNextProxy(const std::string *url,
-                                   std::string current_proxy, size_t off) = 0;
+                                   const std::string &current_proxy,
+                                   size_t off) = 0;
   virtual int32_t GetNumberOfProxiesOnline() = 0;
   virtual std::string GetProxyList() = 0;
   virtual void LogProxyList() = 0;

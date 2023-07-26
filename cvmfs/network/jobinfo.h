@@ -19,11 +19,11 @@
 #include "compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "network_errors.h"
-#include "sink.h"
-#include "sink_file.h"
-#include "sink_mem.h"
-#include "sink_path.h"
+#include "network/network_errors.h"
+#include "network/sink.h"
+#include "network/sink_file.h"
+#include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "util/pipe.h"
 
 class InterruptCue;
@@ -72,7 +72,7 @@ class JobInfo {
   unsigned backoff_ms_;
   unsigned int current_host_chain_index_;
 
-  // allow failure of downloads. default = false
+  // Don't fail-over proxies on download errors. default = false
   bool allow_failure_;
 
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)

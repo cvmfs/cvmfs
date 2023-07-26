@@ -20,13 +20,13 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
-#include "dns.h"
 #include "duplex_curl.h"
-#include "health_check.h"
-#include "jobinfo.h"
-#include "network_errors.h"
-#include "sharding_policy.h"
-#include "sink.h"
+#include "network/dns.h"
+#include "network/health_check.h"
+#include "network/jobinfo.h"
+#include "network/network_errors.h"
+#include "network/sharding_policy.h"
+#include "network/sink.h"
 #include "ssl.h"
 #include "statistics.h"
 #include "util/atomic.h"
@@ -212,7 +212,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void UseSystemCertificatePath();
 
   bool SetShardingPolicy(const ShardingPolicySelector type);
-  void SetDownloadFailoverIndefinitely();
+  void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
 
   unsigned num_hosts() {
@@ -350,16 +350,24 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Sharding policy deciding which proxy should be chosen for each download
    * request
+   * 
+   * Sharding policy is shared between all download managers. As such shared
+   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<ShardingPolicy> sharding_policy_;
   /**
    * Health check for the proxies
+   * 
+   * Health check is shared between all download managers. As such shared
+   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<HealthCheck> health_check_;
   /**
    * Endless retries for a failed download (hard failures will result in abort)
   */
-  bool download_failover_indefinitely_;
+  bool failover_indefinitely_;
   /**
    * Repo name. Needed for the re-try logic if a download was unsuccessful
   */

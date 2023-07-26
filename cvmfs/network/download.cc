@@ -70,17 +70,17 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-bool Interrupted(JobInfo *info, const std::string &fqrn) {
+bool Interrupted(const std::string &fqrn, JobInfo *info) {
   if (info->allow_failure()) {
     return true;
   }
 
-  if (fqrn.size() > 1) {
+  if (!fqrn.empty()) {
     std::string pause_file = std::string("/var/run/cvmfs/interrupt.") + fqrn;
 
     LogCvmfs(kLogDownload, kLogDebug,
             "Interrupted(): checking for existence of %s", pause_file.c_str());
-    if (0 == access(pause_file.c_str(), F_OK)) {
+    if (FileExists(pause_file)) {
       LogCvmfs(kLogDownload, kLogDebug, "Interrupt marker found - "
                "Interrupting current download, this will EIO outstanding IO.");
       if (0 != unlink(pause_file.c_str())) {
@@ -1381,7 +1381,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
             info->SetNumUsedProxies(1);
             info->SetErrorCode(kFailHostAfterProxy);
           } else {
-            if (download_failover_indefinitely_) {
+            if (failover_indefinitely_) {
               // Instead of giving up, reset the num_used_proxies counter,
               // switch proxy and try again
               LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
@@ -1397,7 +1397,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                   info->num_used_proxies(), opt_num_proxies_);
               info->SetNumUsedProxies(1);
               RebalanceProxiesUnlocked("failover indefinitely");
-              try_again = !Interrupted(info, fqrn_);
+              try_again = !Interrupted(fqrn_, info);
             } else {
               try_again = false;
             }
@@ -1482,10 +1482,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
     }  // end !sharding
 
-    if (download_failover_indefinitely_) {
+    if (failover_indefinitely_) {
       // try again, breaking if there's a cvmfs reload happening and we are in a
       // proxy failover. This will EIO the call application.
-      return !Interrupted(info, fqrn_);
+      return !Interrupted(fqrn_, info);
     }
     return true;  // try again
   }
@@ -1629,7 +1629,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   sharding_policy_ = SharedPtr<ShardingPolicy>();
   health_check_ = SharedPtr<HealthCheck>();
-  download_failover_indefinitely_ = false;
+  failover_indefinitely_ = false;
 
   counters_ = new Counters(statistics);
 
@@ -2800,8 +2800,8 @@ bool DownloadManager::SetShardingPolicy(const ShardingPolicySelector type) {
   return success;
 }
 
-void DownloadManager::SetDownloadFailoverIndefinitely() {
-  download_failover_indefinitely_ = true;
+void DownloadManager::SetFailoverIndefinitely() {
+  failover_indefinitely_ = true;
 }
 
 /**
@@ -2844,7 +2844,8 @@ DownloadManager *DownloadManager::Clone(
 
   clone->health_check_ = health_check_;
   clone->sharding_policy_ = sharding_policy_;
-  clone->download_failover_indefinitely_ = download_failover_indefinitely_;
+  clone->failover_indefinitely_ = failover_indefinitely_;
+  clone->fqrn_ = fqrn_;
 
   return clone;
 }

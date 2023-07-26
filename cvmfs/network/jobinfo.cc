@@ -66,6 +66,8 @@ void JobInfo::Init() {
   backoff_ms_ = 0;
   current_host_chain_index_ = 0;
 
+  allow_failure_ = false;
+
   memset(&zstream_, 0, sizeof(zstream_));
 }
 
