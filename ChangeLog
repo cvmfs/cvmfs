@@ -1,4 +1,5 @@
 2.11.0:
+  * [gw] Fix publication of uncompressed files through gateway (#3338)
   * [client] Add curl debug info to debug log (#3329)
   * [server] Verify meta-info object in cvmfs_server check (#3139) 
   * [client] Allow CPU affinity setting through CVMFS_CPU_AFFINITY (#3330)
