@@ -1397,7 +1397,7 @@ bool MountPoint::CreateDownloadManagers() {
     if (optarg.compare("EXTERNAL") == 0) {
       download_mgr_->SetShardingPolicy(download::kShardingPolicyExternal);
       download_mgr_->SetFqrn(fqrn());
-    } 
+    }
   }
 
   if (options_mgr_->GetValue("CVMFS_FAILOVER_INDEFINITELY", &optarg) &&
