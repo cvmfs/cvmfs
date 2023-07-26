@@ -70,22 +70,10 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   params->hash_alg = shash::ParseHashAlgorithm(hash_algorithm_str);
   params->hash_alg_str = hash_algorithm_str;
 
-  std::string compression_algorithm_str;
-  if (!parser.GetValue("CVMFS_COMPRESSION_ALGORITHM",
-                       &compression_algorithm_str)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "Missing parameter %s in repository configuration file.",
-             "CVMFS_COMPRESSION_ALGORITHM");
-    return false;
-  }
-  params->compression_alg =
-      zlib::ParseCompressionAlgorithm(compression_algorithm_str);
-
-  /**
-   * The receiver does not store files, only catalogs.  We can safely disable
-   * this option.
-   */
+  // The receiver does not store files, only catalogs.
+  // We can safely hard-code the following options
   params->generate_legacy_bulk_chunks = false;
+  params->compression_alg = zlib::kZlibDefault;
 
   std::string use_chunking_str;
   if (!parser.GetValue("CVMFS_USE_FILE_CHUNKING", &use_chunking_str)) {
