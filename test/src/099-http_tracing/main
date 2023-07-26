@@ -25,7 +25,9 @@ mount_and_read() {
   echo "   Access data to send HTTP requests"
   local some_files
   some_files=$(find $TEST099_MOUNTPOINT -type f | head -n3)
-  cat "$some_files" > /dev/null
+  for a_file in $some_files; do
+    cat "$a_file" > /dev/null
+  done
 
   echo "   Umount $TEST099_REPO"
   cvmfs_umount $TEST099_REPO
@@ -51,8 +53,8 @@ mount_and_read() {
   [ "$h1" -gt "0" ] || return 10
   echo "      Occurence of h2 correct? $h2 == 0"
   [ "$h2" -eq "0" ] || return 11
-  echo "      Occurence of h3 correct? $h3 > 0"
-  [ "$h3" -gt "0" ] || return 12
+  echo "      Occurence of h3 correct? $h3 == 0"
+  [ "$h3" -eq "0" ] || return 12
   echo "      Occurence of h4 correct? $h4 > 0"
   [ "$h4" -gt "0" ] || return 13
 

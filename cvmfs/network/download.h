@@ -293,7 +293,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool ignore_signature_failures_;
 
   bool enable_http_tracing_;
-  std::vector<std::string> *http_tracing_headers_;
+  std::vector<std::string> http_tracing_headers_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

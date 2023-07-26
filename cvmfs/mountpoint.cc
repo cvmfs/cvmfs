@@ -1485,19 +1485,11 @@ bool MountPoint::CreateDownloadManagers() {
           std::string key = Trim(key_val[0]);
 
           if (!sanitizer.IsValid(key)) {
-            // check if the key starts already with the X-CVMFS- prefix and that
-            // no other "-" are part of it. If yes accept it as valid
-            // tracing header
-            if (key.compare(0, prefix.size(), prefix) == 0 &&
-                SplitString(key, '-').size() == 3) {
-              prefix = "";
-            } else {
-              LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-              "Http tracing header: Skipping current token part of "
-              "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only alphanumeric keys "
-              "are allowed (a-z, A-Z, 0-9). Token: %s", token.c_str());
-              continue;
-            }
+            LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+            "Http tracing header: Skipping current token part of "
+            "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only alphanumeric keys "
+            "are allowed (a-z, A-Z, 0-9). Token: %s", token.c_str());
+            continue;
           }
 
           std::string final_token = prefix + key + ": " + Trim(key_val[1]);

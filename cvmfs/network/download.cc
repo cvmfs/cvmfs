@@ -789,9 +789,9 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     header_lists_->AppendHeader(info->headers(), info->info_header());
   }
   if (enable_http_tracing_) {
-    for (unsigned int i = 0; i < http_tracing_headers_->size(); i++) {
+    for (unsigned int i = 0; i < http_tracing_headers_.size(); i++) {
       header_lists_->AppendHeader(info->headers(),
-                                  (*http_tracing_headers_)[i].c_str());
+                                  (http_tracing_headers_)[i].c_str());
     }
 
     header_lists_->AppendHeader(info->headers(), info->tracing_header_pid());
@@ -1497,7 +1497,7 @@ DownloadManager::DownloadManager() {
   ignore_signature_failures_ = false;
 
   enable_http_tracing_ = false;
-  http_tracing_headers_ = new vector<string>();
+  http_tracing_headers_ = vector<string>();
 
   resolver_ = NULL;
 
@@ -2726,7 +2726,7 @@ void DownloadManager::EnableHTTPTracing() {
 }
 
 void DownloadManager::AddHTTPTracingHeader(const std::string &header) {
-  http_tracing_headers_->push_back(header);
+  http_tracing_headers_.push_back(header);
 }
 
 void DownloadManager::UseSystemCertificatePath() {
@@ -2757,9 +2757,7 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;
   clone->enable_http_tracing_ = enable_http_tracing_;
-  if (enable_http_tracing_) {
-    clone->http_tracing_headers_ = new vector<string>(*http_tracing_headers_);
-  }
+  clone->http_tracing_headers_ = http_tracing_headers_;
   clone->follow_redirects_ = follow_redirects_;
   clone->ignore_signature_failures_ = ignore_signature_failures_;
   if (opt_host_chain_) {
