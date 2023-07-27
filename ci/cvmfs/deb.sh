@@ -61,6 +61,7 @@ fi
 # Fuse3 is only available as of Debian 10 "buster" and Ubuntu 20.04
 if [ x"$(lsb_release -sc)" = x"bullseye" -o \
      x"$(lsb_release -sc)" = x"buster" -o \
+     x"$(lsb_release -sc)" = x"bookworm" -o \
      x"$(lsb_release -sc)" = x"focal" -o \
      x"$(lsb_release -sc)" = x"jammy" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
