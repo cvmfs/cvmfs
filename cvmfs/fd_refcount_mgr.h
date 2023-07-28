@@ -23,9 +23,16 @@ static inline uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
 }
 
-
 class FdRefcountMgr {
  public:
+  /**
+   * Helper class containing the values for the map: fd -> refcount+id
+  */
+  struct FdRefcountInfo {
+    int refcount;  /// refcount for the times the fd was opened in the cache
+    shash::Any id;  /// hash of the object opened through the fd
+  };
+
   FdRefcountMgr() {
     const shash::Any hash_null;
     map_fd_.Init(16, hash_null, hasher_any);
@@ -37,7 +44,7 @@ class FdRefcountMgr {
   }
 
   FdRefcountMgr(
-        SmallHashDynamic<int, std::pair<int, shash::Any>> map_refcount,
+        SmallHashDynamic<int, FdRefcountInfo> map_refcount,
         SmallHashDynamic<shash::Any, int> map_fd):
         map_refcount_(map_refcount), map_fd_(map_fd) {
     const shash::Any hash_null;
@@ -59,7 +66,7 @@ class FdRefcountMgr {
     map_refcount_ = other->GetRefcountMap();
   }
 
-  SmallHashDynamic<int, std::pair<int, shash::Any>> GetRefcountMap() const {
+  SmallHashDynamic<int, FdRefcountInfo> GetRefcountMap() const {
     return map_refcount_;
   }
 
@@ -80,11 +87,14 @@ class FdRefcountMgr {
       map_fd_.Lookup(id, &result);
     }
     if (result >= 0) {
-       std::pair<int, shash::Any>* refc_info = new std::pair<int, shash::Any>();
+       FdRefcountInfo* refc_info = new FdRefcountInfo();
       if (map_refcount_.Lookup(result, refc_info)) {
-        map_refcount_.Insert(result, {refc_info->first + 1, id});
+        refc_info->refcount++;
+        map_refcount_.Insert(result, *refc_info);
         } else {
-        map_refcount_.Insert(result, {1, id});
+        refc_info->refcount = 1;
+        refc_info->id = id;
+        map_refcount_.Insert(result, *refc_info);
       }
     }
     }
@@ -95,14 +105,15 @@ class FdRefcountMgr {
     int retval = -1;
     {
       MutexLockGuard lock_guard(lock_cache_refcount_);
-      std::pair<int, shash::Any>* refc_info = new std::pair<int, shash::Any>();
+      FdRefcountInfo* refc_info = new FdRefcountInfo();
       if (map_refcount_.Lookup(fd, refc_info)) {
-        if (refc_info->first > 0) {
-          map_refcount_.Insert(fd, {refc_info->first -1, refc_info->second});
+        if (refc_info->refcount > 0) {
+          refc_info->refcount -= 1;
+          map_refcount_.Insert(fd, *refc_info);
           retval = 0;
         } else {
           retval = close(fd);
-          map_fd_.Erase(refc_info->second);
+          map_fd_.Erase(refc_info->id);
           map_refcount_.Erase(fd);
         }
     } else {
@@ -118,7 +129,7 @@ class FdRefcountMgr {
   }
 
  private:
-  SmallHashDynamic<int, std::pair<int, shash::Any>> map_refcount_;
+  SmallHashDynamic<int, FdRefcountInfo> map_refcount_;
   SmallHashDynamic<shash::Any, int> map_fd_;
   pthread_mutex_t *lock_cache_refcount_;
 };
