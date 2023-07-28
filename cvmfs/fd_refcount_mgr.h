@@ -117,7 +117,10 @@ class FdRefcountMgr {
           map_refcount_.Erase(fd);
         }
       } else {
-      retval = close(fd);
+        // fd not present in our table - this should never happen!
+        LogCvmfs(kLogCache, kLogWarning, "WARNING: trying to close fd that "
+                                         " is not in refcount tables");
+        retval = close(fd);
       }
     }
   return retval;
