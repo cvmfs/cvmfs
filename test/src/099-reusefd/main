@@ -11,9 +11,9 @@ cvmfs_run_test() {
   ############
   # open some test file in several simultaneously in different processes
 
-  testfile="/cvmfs/alice.cern.ch/el6-x86_64/Packages/AliDPG/prod-202306-01-1/README.md"
+  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
   # testfile has the following cvmfs hash:
-  testfile_hash="72a19643e2d198ccf96b7eb5f870dd0deaa6ade0"
+  testfile_hash=$(get_xattr hash $testfile)
 
   for i in {1..10}; do
     timeout 2s tail -f ${testfile} > /dev/null &
