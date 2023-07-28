@@ -11,12 +11,12 @@ CVMFS_TEST_100_TMPFILE=
 
 mount_with_debuglog() {
   echo "   ** Mount_with_debuglog"
-  cvmfs_mount $TEST100_REPO CVMFS_DEBUGLOG="${CVMFS_TEST_100_TMPFILE}" || return $?
+  cvmfs_mount $TEST100_REPO CVMFS_KCACHE_TIMEOUT=5 CVMFS_DEBUGLOG="${CVMFS_TEST_100_TMPFILE}" || return $?
 }
 
 mount_without_debuglog() {
   echo "   ** Mount_without_debuglog"
-  cvmfs_mount $TEST100_REPO || return $?
+  cvmfs_mount $TEST100_REPO CVMFS_KCACHE_TIMEOUT=5 || return $?
 }
 
 reload_without_debuglog() {
