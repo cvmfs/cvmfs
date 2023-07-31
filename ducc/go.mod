@@ -3,6 +3,7 @@ module github.com/cvmfs/ducc
 require (
 	github.com/docker/docker v0.0.0-20190123164140-de86ba27fbea
 	github.com/google/uuid v1.2.0
+	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/olekukonko/tablewriter v0.0.1
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/otiai10/copy v1.3.0
