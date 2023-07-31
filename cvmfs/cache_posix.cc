@@ -228,25 +228,14 @@ int PosixCacheManager::CommitTxn(void *txn) {
   return result;
 }
 
-
-PosixCacheManager *PosixCacheManager::Create(
-  const string &cache_path,
-  const bool alien_cache,
-  const RenameWorkarounds rename_workaround)
-{
-  UniquePtr<PosixCacheManager> cache_manager(
-    new PosixCacheManager(cache_path, alien_cache));
-  assert(cache_manager.IsValid());
-
-  cache_manager->rename_workaround_ = rename_workaround;
-
+bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
   FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
 
   if (fs_info.type == kFsTypeTmpfs) {
-    cache_manager->is_tmpfs_ = true;
+    is_tmpfs_ = true;
   }
 
-  if (cache_manager->alien_cache_) {
+  if (alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
       return NULL;
     }
@@ -254,12 +243,12 @@ PosixCacheManager *PosixCacheManager::Create(
              "Cache directory structure created.");
     switch (fs_info.type) {
       case kFsTypeNFS:
-        cache_manager->rename_workaround_ = kRenameLink;
+        rename_workaround_ = kRenameLink;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on NFS.");
         break;
       case kFsTypeBeeGFS:
-        cache_manager->rename_workaround_ = kRenameSamedir;
+        rename_workaround_ = kRenameSamedir;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on BeeGFS.");
         break;
@@ -275,6 +264,24 @@ PosixCacheManager *PosixCacheManager::Create(
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
+    return NULL;
+  }
+  return true;
+}
+
+PosixCacheManager *PosixCacheManager::Create(
+  const string &cache_path,
+  const bool alien_cache,
+  const RenameWorkarounds rename_workaround)
+{
+  UniquePtr<PosixCacheManager> cache_manager(
+    new PosixCacheManager(cache_path, alien_cache));
+  assert(cache_manager.IsValid());
+
+  cache_manager->rename_workaround_ = rename_workaround;
+
+  bool result_ = cache_manager->InitCacheDirectory(cache_path);
+  if (!result_) {
     return NULL;
   }
 

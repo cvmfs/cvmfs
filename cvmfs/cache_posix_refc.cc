@@ -25,41 +25,8 @@ PosixRefcountCacheManager *PosixRefcountCacheManager::Create(
 
   cache_manager->rename_workaround_ = rename_workaround;
 
-  FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
-
-  if (fs_info.type == kFsTypeTmpfs) {
-    cache_manager->is_tmpfs_ = true;
-  }
-
-  if (cache_manager->alien_cache_) {
-    if (!MakeCacheDirectories(cache_path, 0770)) {
-      return NULL;
-    }
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Cache directory structure created.");
-    switch (fs_info.type) {
-      case kFsTypeNFS:
-        cache_manager->rename_workaround_ = kRenameLink;
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Alien cache is on NFS.");
-        break;
-      case kFsTypeBeeGFS:
-        cache_manager->rename_workaround_ = kRenameSamedir;
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Alien cache is on BeeGFS.");
-        break;
-      default:
-        break;
-    }
-  } else {
-    if (!MakeCacheDirectories(cache_path, 0700))
-      return NULL;
-  }
-
-  // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
-  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "Not mounting on cvmfs 2.0.X cache");
+  bool result_ = cache_manager->InitCacheDirectory(cache_path);
+  if (!result_) {
     return NULL;
   }
 

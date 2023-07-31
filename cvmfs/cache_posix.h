@@ -109,6 +109,7 @@ class PosixCacheManager : public CacheManager {
   virtual void *DoSaveState();
   virtual int DoRestoreState(void *data);
   virtual bool DoFreeState(void *data);
+  bool InitCacheDirectory(const string &cache_path);
 
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
