@@ -1,4 +1,5 @@
 2.11.0:
+  * [client] Custom http tracing headers (#3094)
   * [client] Allow change to/from debug mode during cvmfs_config reload (#2897)
   * [client] Use http client auth only if membership is set (#3333)
   * [gw] Fix publication of uncompressed files through gateway (#3338)
