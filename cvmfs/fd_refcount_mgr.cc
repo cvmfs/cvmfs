@@ -1,0 +1,112 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ */
+
+#include "fd_refcount_mgr.h"
+
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <string>
+
+
+int FdRefcountMgr::Open(const shash::Any id, const std::string path) {
+  int result = -1;
+  {
+    MutexLockGuard lock_guard(lock_cache_refcount_);
+    if (!map_fd_.Contains(id)) {
+      result = open(path.c_str(), O_RDONLY);
+      if (result >= 0) {
+        map_fd_.Insert(id, result);
+      }
+    } else {
+      map_fd_.Lookup(id, &result);
+    }
+    if (result >= 0) {
+      FdRefcountInfo* refc_info = new FdRefcountInfo();
+      if (map_refcount_.Lookup(result, refc_info)) {
+        refc_info->refcount++;
+        map_refcount_.Insert(result, *refc_info);
+      } else {
+        refc_info->refcount = 1;
+        refc_info->id = id;
+        map_refcount_.Insert(result, *refc_info);
+      }
+    }
+  }
+  return result;
+}
+
+int FdRefcountMgr::Close(int fd) {
+  int retval = -1;
+  {
+    MutexLockGuard lock_guard(lock_cache_refcount_);
+    FdRefcountInfo* refc_info = new FdRefcountInfo();
+    if (map_refcount_.Lookup(fd, refc_info)) {
+      if (refc_info->refcount > 0) {
+        refc_info->refcount -= 1;
+        map_refcount_.Insert(fd, *refc_info);
+        retval = 0;
+      } else {
+        retval = close(fd);
+        map_fd_.Erase(refc_info->id);
+        map_refcount_.Erase(fd);
+      }
+    } else {
+      // fd not present in our table - this should never happen!
+      LogCvmfs(kLogCache, kLogWarning,
+               "WARNING: trying to close fd that "
+               " is not in refcount tables");
+      retval = close(fd);
+    }
+  }
+  return retval;
+}
+
+FdRefcountMgr* FdRefcountMgr::Clone() {
+  FdRefcountMgr* clone = new FdRefcountMgr(map_refcount_, map_fd_);
+  return clone;
+}
+
+SmallHashDynamic<shash::Any, int> FdRefcountMgr::GetFdMap() const {
+  return map_fd_;
+}
+
+SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo>
+    FdRefcountMgr::GetRefcountMap() const {
+  return map_refcount_;
+}
+
+void FdRefcountMgr::AssignFrom(const FdRefcountMgr* other) {
+  map_fd_ = other->GetFdMap();
+  map_refcount_ = other->GetRefcountMap();
+}
+
+FdRefcountMgr::~FdRefcountMgr() {
+  pthread_mutex_destroy(lock_cache_refcount_);
+  free(lock_cache_refcount_);
+}
+
+FdRefcountMgr::FdRefcountMgr() {
+  const shash::Any hash_null;
+  map_fd_.Init(16, hash_null, hasher_any);
+  map_refcount_.Init(16, 0, hasher_int);
+  lock_cache_refcount_ =
+      reinterpret_cast<pthread_mutex_t*>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
+  assert(retval == 0);
+}
+
+FdRefcountMgr::FdRefcountMgr(
+    SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo> map_refcount,
+                             SmallHashDynamic<shash::Any, int> map_fd)
+    : map_refcount_(map_refcount), map_fd_(map_fd) {
+  const shash::Any hash_null;
+  map_fd_.Init(16, hash_null, hasher_any);
+  map_refcount_.Init(16, 0, hasher_int);
+  lock_cache_refcount_ =
+      reinterpret_cast<pthread_mutex_t*>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
+  assert(retval == 0);
+}
