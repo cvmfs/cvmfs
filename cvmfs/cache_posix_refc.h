@@ -5,26 +5,11 @@
 #ifndef CVMFS_CACHE_POSIX_REFC_H_
 #define CVMFS_CACHE_POSIX_REFC_H_
 
-#include <stdint.h>
-#include <sys/types.h>
 
-#include <map>
 #include <string>
-#include <vector>
 
-#include "backoff.h"
-#include "cache.h"
 #include "cache_posix.h"
-#include "catalog_mgr.h"
-#include "crypto/signature.h"
 #include "fd_refcount_mgr.h"
-#include "file_chunk.h"
-#include "gtest/gtest_prod.h"
-#include "manifest_fetch.h"
-#include "shortstring.h"
-#include "statistics.h"
-#include "util/atomic.h"
-
 
 /**
  * Like the Posix Cache Manager, but deduplicates file descriptors for open

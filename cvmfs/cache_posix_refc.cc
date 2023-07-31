@@ -8,42 +8,8 @@
 #include "cvmfs_config.h"
 #include "cache_posix_refc.h"
 
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <pthread.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#ifndef __APPLE__
-#include <sys/statfs.h>
-#endif
-#include <unistd.h>
-
-#include <algorithm>
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <map>
-#include <vector>
-
-#include <iostream>
-
-#include "crypto/hash.h"
-#include "crypto/signature.h"
-#include "directory_entry.h"
-#include "manifest.h"
-#include "manifest_fetch.h"
-#include "network/download.h"
 #include "quota.h"
-#include "shortstring.h"
-#include "statistics.h"
-#include "util/atomic.h"
-#include "util/logging.h"
-#include "util/platform.h"
 #include "util/posix.h"
-#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
