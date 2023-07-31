@@ -32,7 +32,6 @@ cvmfs_run_test() {
     echo "The cvmfs process has several open file descriptors for the same open test file" && return 20
   fi
 
-  sleep 3
   return 0
 }
 
