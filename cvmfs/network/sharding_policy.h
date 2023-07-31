@@ -36,7 +36,7 @@ class ShardingPolicy : SingleCopy {
   virtual std::string GetNextProxy(const std::string *url,
                                    const std::string &current_proxy,
                                    size_t off) = 0;
-  // TODOO(heretherebedragons) change return type to unsigned
+  // TODO(heretherebedragons) change return type to unsigned
   virtual int32_t GetNumberOfProxiesOnline() = 0;
   // TODO(heretherebedragons) change return type to std::vector<std::string>
   virtual std::string GetProxyList() = 0;

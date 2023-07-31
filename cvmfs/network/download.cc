@@ -74,7 +74,7 @@ namespace download {
  * Returns the status if an interrupted happened for a given repository.
  * 
  * Used only in case CVMFS_FAILOVER_INDEFINITELY (failover_indefinitely_) is set
- * where failed downloads are retried indefinitely, unless an interrupt occured.
+ * where failed downloads are retried indefinitely, unless an interrupt occurred
  * 
  * @note If you use this functionality you need to change the source code of
  * e.g. cvmfs_config reload to create the file. See comment below.
