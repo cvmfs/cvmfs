@@ -496,7 +496,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
   string error_messages;
 
-  static vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
+  vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
   if (library_paths.empty()) {
     library_paths.push_back(local_lib_path + library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
@@ -541,9 +541,16 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
-
-Failures Reload(const int fd_progress, const bool stop_and_go) {
+Failures Reload(const int fd_progress, const bool stop_and_go,
+                const ReloadMode reload_mode) {
   int retval;
+
+  // for legacy call we take the current state of debug_mode_
+  if (reload_mode == kReloadDebug) {
+    debug_mode_ = true;
+  } else if (reload_mode == kReloadNoDebug) {
+    debug_mode_ = false;
+  }
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -625,7 +632,23 @@ int FuseMain(int argc, char *argv[]) {
       bool stop_and_go = false;
       if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
         stop_and_go = true;
-      retval = loader_talk::MainReload(argv[2], stop_and_go);
+
+      // always last param of the cvmfs2 __RELOAD__ command
+      // check if debug mode is requested
+      // NOTE:
+      // debug mode is decided based on CVMFS_DEBUGLOG being set or not
+      // this means: reloading is now always based on CVMFS_DEBUGLOG, and
+      // reload ignores the current state
+      //
+      // if you mount with debug but do not set CVMFS_DEBUGLOG and reload,
+      // you will reload with
+      if (std::string(argv[argc - 1]) == std::string("--debug")) {
+        debug_mode_ = true;
+      } else {
+        debug_mode_ = false;
+      }
+      retval = loader_talk::MainReload(argv[2], stop_and_go, debug_mode_);
+
       if ((retval != 0) && (stop_and_go)) {
         CreateFile(string(argv[2]) + ".paused.crashed", 0600);
       }
