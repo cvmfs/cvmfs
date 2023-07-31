@@ -147,8 +147,7 @@ class PosixCacheManager : public CacheManager {
   }
 
   std::string GetPathInCache(const shash::Any &id);
-  int Rename(const char *oldpath, const char *newpath);
-  int Flush(Transaction *transaction);
+
 
   std::string cache_path_;
   std::string txn_template_path_;
@@ -162,6 +161,14 @@ class PosixCacheManager : public CacheManager {
    * value in this variable.
    */
   atomic_int32 no_inflight_txns_;
+
+
+
+
+
+ private:
+  int Rename(const char *oldpath, const char *newpath);
+  int Flush(Transaction *transaction);
 
   /**
    * Hack for HDFS which writes file sizes asynchronously.
