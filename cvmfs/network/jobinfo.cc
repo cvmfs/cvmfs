@@ -57,6 +57,9 @@ void JobInfo::Init() {
   curl_handle_ = NULL;
   headers_ = NULL;
   info_header_ = NULL;
+  tracing_header_pid_ = NULL;
+  tracing_header_gid_ = NULL;
+  tracing_header_uid_ = NULL;
   nocache_ = false;
   error_code_ = kFailOther;
   http_code_ = -1;

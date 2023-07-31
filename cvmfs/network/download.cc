@@ -835,6 +835,20 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   if (info->info_header()) {
     header_lists_->AppendHeader(info->headers(), info->info_header());
   }
+  if (enable_http_tracing_) {
+    for (unsigned int i = 0; i < http_tracing_headers_.size(); i++) {
+      header_lists_->AppendHeader(info->headers(),
+                                  (http_tracing_headers_)[i].c_str());
+    }
+
+    header_lists_->AppendHeader(info->headers(), info->tracing_header_pid());
+    header_lists_->AppendHeader(info->headers(), info->tracing_header_gid());
+    header_lists_->AppendHeader(info->headers(), info->tracing_header_uid());
+
+    LogCvmfs(kLogDownload, kLogDebug, "CURL Header for URL: %s is:\n %s",
+           info->url()->c_str(), header_lists_->Print(info->headers()).c_str());
+  }
+
   if (info->force_nocache()) {
     SetNocache(info);
   } else {
@@ -1533,6 +1547,9 @@ DownloadManager::DownloadManager() {
   follow_redirects_ = false;
   ignore_signature_failures_ = false;
 
+  enable_http_tracing_ = false;
+  http_tracing_headers_ = vector<string>();
+
   resolver_ = NULL;
 
   opt_timestamp_backup_proxies_ = 0;
@@ -1724,6 +1741,21 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     EscapeHeader(*(info->extra_info()), info->info_header() + header_name_len,
                  header_size - header_name_len);
     info->info_header()[header_size-1] = '\0';
+  }
+
+  if (enable_http_tracing_) {
+    const std::string str_pid = "X-CVMFS-PID: " + StringifyInt(info->pid());
+    const std::string str_gid = "X-CVMFS-GID: " + StringifyUint(info->gid());
+    const std::string str_uid = "X-CVMFS-UID: " + StringifyUint(info->uid());
+
+    // will be auto freed at the end of this function Fetch(JobInfo *info)
+    info->SetTracingHeaderPid(static_cast<char *>(alloca(str_pid.size() + 1)));
+    info->SetTracingHeaderGid(static_cast<char *>(alloca(str_gid.size() + 1)));
+    info->SetTracingHeaderUid(static_cast<char *>(alloca(str_uid.size() + 1)));
+
+    memcpy(info->tracing_header_pid(), str_pid.c_str(), str_pid.size() + 1);
+    memcpy(info->tracing_header_gid(), str_gid.c_str(), str_gid.size() + 1);
+    memcpy(info->tracing_header_uid(), str_uid.c_str(), str_uid.size() + 1);
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
@@ -2739,6 +2771,14 @@ void DownloadManager::EnableIgnoreSignatureFailures() {
   ignore_signature_failures_ = true;
 }
 
+void DownloadManager::EnableHTTPTracing() {
+  enable_http_tracing_ = true;
+}
+
+void DownloadManager::AddHTTPTracingHeader(const std::string &header) {
+  http_tracing_headers_.push_back(header);
+}
+
 void DownloadManager::UseSystemCertificatePath() {
   ssl_certificate_store_.UseSystemCertificatePath();
 }
@@ -2766,6 +2806,8 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_backoff_init_ms_ = opt_backoff_init_ms_;
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;
+  clone->enable_http_tracing_ = enable_http_tracing_;
+  clone->http_tracing_headers_ = http_tracing_headers_;
   clone->follow_redirects_ = follow_redirects_;
   clone->ignore_signature_failures_ = ignore_signature_failures_;
   if (opt_host_chain_) {

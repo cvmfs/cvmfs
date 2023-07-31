@@ -1455,6 +1455,51 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->ShardProxies();
   }
 
+  // configure http tracing header
+  if (options_mgr_->GetValue("CVMFS_HTTP_TRACING", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->EnableHTTPTracing();
+    if (options_mgr_->GetValue("CVMFS_HTTP_TRACING_HEADERS", &optarg)) {
+      if (optarg.size() > 1000) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+            "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given %d )",
+            optarg.size());
+      } else {
+        std::vector<std::string> tokens = SplitString(optarg, '|');
+        sanitizer::AlphaNumSanitizer sanitizer;
+
+        for (unsigned int i = 0; i < tokens.size(); i++) {
+          std::string token = Trim(tokens[i]);
+
+          std::vector<std::string> key_val = SplitString(token, ':');
+
+          if (key_val.size() != 2) {
+            LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+              "Http tracing header: Skipping current token part of "
+              "CVMFS_HTTP_TRACING_HEADERS! Invalid "
+              "<key:value> pair. Token: %s", token.c_str());
+            continue;
+          }
+
+          std::string prefix = "X-CVMFS-";
+          std::string key = Trim(key_val[0]);
+
+          if (!sanitizer.IsValid(key)) {
+            LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+            "Http tracing header: Skipping current token part of "
+            "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only alphanumeric keys "
+            "are allowed (a-z, A-Z, 0-9). Token: %s", token.c_str());
+            continue;
+          }
+
+          std::string final_token = prefix + key + ": " + Trim(key_val[1]);
+
+          download_mgr_->AddHTTPTracingHeader(final_token);
+        }
+      }
+    }
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
