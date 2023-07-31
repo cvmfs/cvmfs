@@ -44,7 +44,7 @@ int PosixRefcountCacheManager::Close(int fd) {
 int PosixRefcountCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
   int result = fd_mgr.Open(object.id, path);
-  if (result >= -1) {
+  if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
     quota_mgr_->Touch(object.id);
