@@ -16,7 +16,7 @@ cvmfs_run_test() {
   testfile_hash=$(get_xattr hash $testfile)
 
   for i in {1..10}; do
-    timeout 2s tail -f ${testfile} > /dev/null &
+    tail -f ${testfile} > /dev/null &
   done;
   sleep 1;
 
@@ -32,6 +32,7 @@ cvmfs_run_test() {
     echo "The cvmfs process has several open file descriptors for the same open test file" && return 20
   fi
 
+  jobs -p | xargs kill
   return 0
 }
 
