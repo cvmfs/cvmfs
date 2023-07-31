@@ -6,7 +6,47 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount alice.cern.ch CVMFS_CACHE_PRIMARY=posix_refcount || return 10
+
+  ############### 1) Check that the normal cache manager 
+  ############### creates new fds for the same object 
+  cvmfs_mount alice.cern.ch CVMFS_DEBUGLOG=/tmp/deb.log CVMFS_CACHE_PRIMARY=posix || return 10
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  # testfile has the following cvmfs hash:
+  testfile_hash=$(get_xattr hash $testfile)
+
+  for i in {1..10}; do
+    timeout 2s tail -f ${testfile} > /dev/null &
+  done;
+  sleep 1;
+
+  ###########
+  # check the open file descriptors of the cvmfs2 process 
+  alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
+  echo $alice_pid
+  num_open_fds=$(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
+
+  echo "jobs:"
+  jobs -p;
+
+
+  echo $(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2})
+  if [ "$num_open_fds" -lt "2" ]; then
+    echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
+    return 21
+  else
+    echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
+  fi
+
+  jobs -p | xargs kill
+  sleep 1;
+
+  cvmfs_umount alice.cern.ch || return 22
+
+  cvmfs_mount alice.cern.ch CVMFS_CACHE_PRIMARY=posix_refcount || return 30
 
   ############
   # open some test file in several simultaneously in different processes
@@ -29,7 +69,7 @@ cvmfs_run_test() {
 
   echo $(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2})
   if [ "$num_open_fds" -gt "1" ]; then
-    echo "The cvmfs process has several open file descriptors for the same open test file" && return 20
+    echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file" && return 40
   fi
 
   jobs -p | xargs kill
