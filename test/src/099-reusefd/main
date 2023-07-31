@@ -6,7 +6,7 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount alice.cern.ch CVMFS_DEBUGLOG=/tmp/debug.log CVMFS_CACHE_PRIMARY=posix_refcount || return 10
+  cvmfs_mount alice.cern.ch CVMFS_CACHE_PRIMARY=posix_refcount || return 10
 
   ############
   # open some test file in several simultaneously in different processes
