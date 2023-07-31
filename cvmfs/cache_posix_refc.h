@@ -26,8 +26,6 @@
 #include "util/atomic.h"
 
 
-
-
 /**
  * Like the Posix Cache Manager, but deduplicates file descriptors for open
  * files with a reference counter.
