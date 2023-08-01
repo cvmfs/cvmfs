@@ -622,9 +622,14 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
            instance.c_str());
   string instance_type;
   if (instance == kDefaultCacheMgrInstance) {
-    instance_type = "posix";
-  } else if (instance == "posix_refcount") {
+    std::string use_refcount;
+    options_mgr_->GetValue("CVMFS_CACHE_REFCOUNT",
+                           &use_refcount);
+    if (options_mgr_->IsOn(use_refcount)) {
     instance_type = "posix_refcount";
+    } else {
+    instance_type = "posix";
+    }
   } else {
     options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_TYPE", instance),
                            &instance_type);

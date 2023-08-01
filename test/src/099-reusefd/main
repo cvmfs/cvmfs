@@ -13,7 +13,7 @@ cvmfs_run_test() {
 
   ############### 1) Check that the normal cache manager 
   ############### creates new fds for the same object 
-  cvmfs_mount alice.cern.ch  || return 10
+  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
 
   ############
   # open some test file in several simultaneously in different processes
@@ -47,7 +47,10 @@ cvmfs_run_test() {
 
   cvmfs_umount alice.cern.ch || return 22
 
-  cvmfs_mount alice.cern.ch CVMFS_CACHE_PRIMARY=posix_refcount || return 30
+  ############### 2) Check that the refcounted cache manager 
+  ############### reuses fds for the same object 
+
+  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=yes || return 30
 
   ############
   # open some test file in several simultaneously in different processes
