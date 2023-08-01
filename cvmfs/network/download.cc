@@ -77,7 +77,7 @@ namespace download {
  * where failed downloads are retried indefinitely, unless an interrupt occurred
  * 
  * @note If you use this functionality you need to change the source code of
- * e.g. cvmfs_config reload to create the file. See comment below.
+ * e.g. cvmfs_config reload to create a sentinel file. See comment below.
  * 
  * @return true if an interrupt occurred
  *         false otherwise
@@ -89,9 +89,9 @@ bool Interrupted(const std::string &fqrn, JobInfo *info) {
 
   if (!fqrn.empty()) {
     // see https://github.com/cvmfs/cvmfs/pull/3304#discussion_r1278991197
-    // it is up to the user the create the file if CVMFS_FAILOVER_INDEFINITELY
-    // is used. It must be created during "cvmfs_config reload" and
-    // "cvmfs_config reload $fqrn"
+    // it is up to the user the create this sentinel file ("pause_file") if
+    // CVMFS_FAILOVER_INDEFINITELY is used. It must be created during 
+    // "cvmfs_config reload" and "cvmfs_config reload $fqrn"
     std::string pause_file = std::string("/var/run/cvmfs/interrupt.") + fqrn;
 
     LogCvmfs(kLogDownload, kLogDebug,
