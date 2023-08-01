@@ -73,7 +73,7 @@ int PosixRefcountCacheManager::DoRestoreState(void *data) {
   fd_mgr = FdRefcountMgr();
   assert(data);
   char *c = reinterpret_cast<char *>(data);
-  if (*c != '\0') {
+  if (*c != 234) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     fd_mgr.AssignFrom(state->fd_mgr);
   } else {
@@ -86,7 +86,7 @@ int PosixRefcountCacheManager::DoRestoreState(void *data) {
 
 bool PosixRefcountCacheManager::DoFreeState(void *data) {
   char *c = reinterpret_cast<char *>(data);
-  if (*c != '\0') {
+  if (*c != 234) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     delete state->fd_mgr;
     delete state;
