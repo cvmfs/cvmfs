@@ -564,7 +564,7 @@ string FileSystem::MkCacheParm(
 {
   assert(HasPrefix(generic_parameter, "CVMFS_CACHE_", false));
 
-  if (instance == kDefaultCacheMgrInstance || instance == "posix_refcount") {
+  if (instance == kDefaultCacheMgrInstance) {
     // Compatibility parameter names
     if ((generic_parameter == "CVMFS_CACHE_SHARED") &&
         !options_mgr_->IsDefined(generic_parameter))
@@ -621,23 +621,17 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   LogCvmfs(kLogCvmfs, kLogDebug, "setting up cache manager instance %s",
            instance.c_str());
   string instance_type;
+  string use_refcount;
   if (instance == kDefaultCacheMgrInstance) {
-    std::string use_refcount;
     options_mgr_->GetValue("CVMFS_CACHE_REFCOUNT",
                            &use_refcount);
-    if (options_mgr_->IsOn(use_refcount)) {
-    instance_type = "posix_refcount";
-    } else {
     instance_type = "posix";
-    }
   } else {
     options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_TYPE", instance),
                            &instance_type);
   }
   if (instance_type == "posix") {
-    return SetupPosixCacheMgr(instance);
-  } else if (instance_type == "posix_refcount") {
-    return SetupPosixRefcountCacheMgr(instance);
+    return SetupPosixCacheMgr(instance, options_mgr_->IsOn(use_refcount));
   } else if (instance_type == "ram") {
     return SetupRamCacheMgr(instance);
   } else if (instance_type == "tiered") {
@@ -692,17 +686,25 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 }
 
 
-CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
+CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance, bool use_refcount) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  CacheManager* cache_mgr;
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-
-  UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
+  if (!use_refcount) {
+  cache_mgr = PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
-                          : PosixCacheManager::kRenameNormal));
-  if (!cache_mgr.IsValid()) {
+                          : PosixCacheManager::kRenameNormal);
+  } else {
+    cache_mgr = PosixRefcountCacheManager::Create(
+      settings.cache_path,
+      settings.is_alien,
+      settings.avoid_rename ? PosixCacheManager::kRenameLink
+                            : PosixCacheManager::kRenameNormal);
+  }
+  if (!cache_mgr) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
@@ -715,40 +717,10 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr))
       return NULL;
   }
-  return cache_mgr.Release();
-}
-
-CacheManager *FileSystem::SetupPosixRefcountCacheMgr(const string &instance) {
-  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
-  if (!CheckPosixCacheSettings(settings))
-    return NULL;
-
-  UniquePtr<PosixRefcountCacheManager> cache_mgr(
-    PosixRefcountCacheManager::Create(
-      settings.cache_path,
-      settings.is_alien,
-      settings.avoid_rename ? PosixCacheManager::kRenameLink
-                            : PosixCacheManager::kRenameNormal));
-  if (!cache_mgr.IsValid()) {
-    boot_error_ = "Failed to setup posix refc cache '" + instance + "' in " +
-                  settings.cache_path + ": " + strerror(errno);
-    boot_status_ = loader::kFailCacheDir;
-    return NULL;
-  }
-
-  // Sentinel file for future use
-  // Might be a read-only cache
-  const bool ignore_failure = settings.is_alien;
-  CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
-
-  if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
-      return NULL;
-  }
-  return cache_mgr.Release();
+  return cache_mgr;
 }
 
 
