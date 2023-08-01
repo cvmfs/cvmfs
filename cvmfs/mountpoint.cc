@@ -905,7 +905,7 @@ bool FileSystem::SetupNfsMaps() {
     nfs_maps_dir_ = workspace_;
 
   string no_nfs_sentinel;
-  if (cache_mgr_->id() == kPosixCacheManager || 
+  if (cache_mgr_->id() == kPosixCacheManager ||
       cache_mgr_->id() == kPosixRefcountCacheManager) {
     PosixCacheManager *posix_cache_mgr =
         reinterpret_cast<PosixCacheManager *>(cache_mgr_);

@@ -35,7 +35,7 @@ class PosixRefcountCacheManager : public PosixCacheManager {
   virtual int Open(const LabeledObject &object);
   virtual int Close(int fd);
   virtual std::string Describe();
-  virtual CacheManagerIds id() { return kPosixRefcountCacheManager; };
+  virtual CacheManagerIds id() { return kPosixRefcountCacheManager; }
 
  protected:
   struct SavedState {
