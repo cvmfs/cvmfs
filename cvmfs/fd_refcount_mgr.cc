@@ -97,8 +97,8 @@ FdRefcountMgr::FdRefcountMgr() {
 }
 
 FdRefcountMgr::FdRefcountMgr(
-    SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo> map_refcount,
-                             SmallHashDynamic<shash::Any, int> map_fd)
+    const SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo> &map_refcount,
+                            const SmallHashDynamic<shash::Any, int> &map_fd)
     : map_refcount_(map_refcount), map_fd_(map_fd) {
   const shash::Any hash_null;
   map_fd_.Init(16, hash_null, hasher_any);
