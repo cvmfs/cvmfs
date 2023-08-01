@@ -310,7 +310,7 @@ string PosixCacheManager::Describe() {
  */
 void *PosixCacheManager::DoSaveState() {
   char *c = reinterpret_cast<char *>(smalloc(1));
-  *c = 234;
+  *c = '\0';
   return c;
 }
 
@@ -318,7 +318,7 @@ void *PosixCacheManager::DoSaveState() {
 int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
   char *c = reinterpret_cast<char *>(data);
-  assert(*c == 234);
+  assert(*c == '\0');
   return -1;
 }
 

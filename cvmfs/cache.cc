@@ -197,7 +197,10 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
     abort();
   }
   if (state->manager_type != id()) {
-    if ((state->manager_type != kPosixCacheManager) && (id() != kPosixRefcountCacheManager)) {
+    // exception: we do allow switching from the non-refcounted
+    // to the refcounted posix cache manager
+    if ((state->manager_type != kPosixCacheManager) &&
+         (id() != kPosixRefcountCacheManager)) {
       if (fd_progress >= 0)
         SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
       abort();
