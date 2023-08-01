@@ -44,7 +44,7 @@ int FdRefcountMgr::Close(int fd) {
     MutexLockGuard lock_guard(lock_cache_refcount_);
     FdRefcountInfo* refc_info = new FdRefcountInfo();
     if (map_refcount_.Lookup(fd, refc_info)) {
-      if (refc_info->refcount > 0) {
+      if (refc_info->refcount > 1) {
         refc_info->refcount -= 1;
         map_refcount_.Insert(fd, *refc_info);
         retval = 0;
