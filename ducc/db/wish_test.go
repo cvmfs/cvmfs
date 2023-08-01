@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"reflect"
 	"testing"
 
 	"github.com/cvmfs/ducc/test"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestCreateWish(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -76,7 +77,7 @@ func TestCreateWish(t *testing.T) {
 }
 
 func TestGetWish(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -113,6 +114,26 @@ func TestGetWish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("GetAllWishes", func(t *testing.T) {
+		wishes, err := GetAllWishes(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(wishes) != len(dbWishes) {
+			t.Fatalf("Expected %d wishes, got %d", len(dbWishes), len(wishes))
+		}
+		want := make([]Wish, len(dbWishes))
+		copy(want, dbWishes)
+		// Sort both slices, since the order is not guaranteed
+		sortWishesByID(want)
+		sortWishesByID(wishes)
+		for i, wish := range wishes {
+			if !reflect.DeepEqual(want[i], wish) {
+				t.Fatalf("Expected %v, got %v", dbWishes[i], wish)
+			}
+		}
+	})
 
 	t.Run("GetWishesByValues", func(t *testing.T) {
 		input := []WishIdentifier{
@@ -230,7 +251,7 @@ func TestGetWish(t *testing.T) {
 }
 
 func TestGetWishesSource(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -298,7 +319,7 @@ func TestGetWishesSource(t *testing.T) {
 }
 
 func TestDeleteWishID(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 

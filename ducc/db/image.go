@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/opencontainers/go-digest"
@@ -25,6 +26,17 @@ type Image struct {
 	Repository string
 	Tag        string
 	Digest     digest.Digest
+}
+
+func (i Image) AsURL() string {
+	digestOrTag := ""
+	if i.Digest != "" {
+		digestOrTag = "@" + i.Digest.String()
+	} else {
+		digestOrTag = ":" + i.Tag
+	}
+
+	return fmt.Sprintf("%s://%s/%s%s", i.RegistryScheme, i.RegistryHost, i.Repository, digestOrTag)
 }
 
 // CreateImage takes in an image and creates it in the database. The ID field is ignored.
@@ -78,6 +90,51 @@ func CreateImages(tx *sql.Tx, images []Image) ([]Image, error) {
 			return nil, err
 		}
 		out = append(out, image)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+// GetAllImages returns all images in the database.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+func GetAllImages(tx *sql.Tx) ([]Image, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images"
+
+	rows, err := tx.Query(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]Image, 0)
+	for rows.Next() {
+		image, err := parseImageFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, image)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
 	if ownTx {

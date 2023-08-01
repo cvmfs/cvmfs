@@ -16,6 +16,28 @@ type scannableRow interface {
 	Scan(dest ...any) error
 }
 
+// ValueWithDefault is a value that will take the default value if not set
+type ValueWithDefault[T any] struct {
+	Value     T    `json:"value"`
+	IsDefault bool `json:"isDefault"`
+}
+
+// nullBoolToValueWithDefault converts a sql.NullBool to a ValueWithDefault[bool].
+// If the sql.NullBool is not valid, the default value is returned.
+// Else, the value is returned.
+func nullBoolToValueWithDefault(val sql.NullBool, defaultValue bool) ValueWithDefault[bool] {
+	if !val.Valid {
+		return ValueWithDefault[bool]{
+			Value:     defaultValue,
+			IsDefault: true,
+		}
+	}
+	return ValueWithDefault[bool]{
+		Value:     val.Bool,
+		IsDefault: false,
+	}
+}
+
 // Open opens a database transaction, which can be used for calling multiple operations atomically.
 // Remember to call `tx.Commit()` or `tx.Rollback()` when done.
 func GetTransaction() (*sql.Tx, error) {
@@ -61,5 +83,12 @@ func Init(db *sql.DB) error {
 	}
 
 	g_db = db
+	return nil
+}
+
+func Close() error {
+	if g_db != nil {
+		return g_db.Close()
+	}
 	return nil
 }

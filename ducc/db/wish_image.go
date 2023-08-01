@@ -5,6 +5,57 @@ import (
 	"fmt"
 )
 
+// GetImagesByWishIDs takes in a list of wishIDs and returns all images linked to each wish
+// in a 2D slice. The first dimension is the wishID, in the same order as the input slice.
+// The second dimension is the list of images linked to the wish.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+
+func GetImagesByWishIDs(tx *sql.Tx, wishIDs []WishID) ([][]Image, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images JOIN wish_image ON images.id = wish_image.image_id  WHERE wish_image.wish_id = ?"
+	prepStmnt, err := tx.Prepare(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer prepStmnt.Close()
+
+	out := make([][]Image, 0, len(wishIDs))
+
+	for _, wishID := range wishIDs {
+		row, err := prepStmnt.Query(wishID)
+		if err != nil {
+			return nil, err
+		}
+		images := make([]Image, 0)
+		for row.Next() {
+			image, err := parseImageFromRow(row)
+			if err != nil {
+				return nil, err
+			}
+			images = append(images, image)
+		}
+		out = append(out, images)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 // GetImagesByWishID returns all images linked to a wish.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
 func GetImagesByWishID(tx *sql.Tx, wishID WishID) ([]Image, error) {
@@ -55,6 +106,7 @@ func UpdateImagesForWish(tx *sql.Tx, wishId WishID, images []Image) (created []I
 	ownTx := false
 	if tx == nil {
 		ownTx = true
+		var err error
 		tx, err = g_db.Begin()
 		if err != nil {
 			return nil, nil, nil, err
@@ -254,4 +306,66 @@ func linkImagesToWish(tx *sql.Tx, wishID WishID, imageIDs []ImageID) (updated []
 	}
 
 	return updated, nil
+}
+
+// GetWishesByImageID returns all wishes linked to an image.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+func GetWishesByImageID(tx *sql.Tx, imageID ImageID) ([]Wish, error) {
+	wishes, err := GetWishesByImageIDs(tx, []ImageID{imageID})
+	if err != nil {
+		return nil, err
+	}
+	return wishes[0], nil
+}
+
+// GetWishesByImageIDs returns all wishes linked to a list of images.
+// It returns a 2D slice of wishes. The first dimension corresponds to the image IDs, in the same order
+// as the input slice. The second dimension corresponds to the wishes linked to each image.
+// Unless all images are found, sql.NoRows is returned.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+
+func GetWishesByImageIDs(tx *sql.Tx, imageIDs []ImageID) ([][]Wish, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT " + wishSqlFieldsOrdered + " FROM wishes JOIN wish_image ON wishes.id = wish_image.wish_id WHERE wish_image.image_id = ?"
+	prepStmnt, err := tx.Prepare(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer prepStmnt.Close()
+
+	out := make([][]Wish, 0, len(imageIDs))
+	for _, imageID := range imageIDs {
+		row, err := prepStmnt.Query(imageID)
+		if err != nil {
+			return nil, err
+		}
+		wishes := make([]Wish, 0)
+		for row.Next() {
+			wish, err := parseWishFromRow(row)
+			if err != nil {
+				return nil, err
+			}
+			wishes = append(wishes, wish)
+		}
+		out = append(out, wishes)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
 }

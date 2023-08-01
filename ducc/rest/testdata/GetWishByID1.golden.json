@@ -1,0 +1,49 @@
+{
+    "ResponseCode": 200,
+    "Headers": {
+        "Content-Type": [
+            "application/json"
+        ]
+    },
+    "Body": {
+        "id": "3b971878-56d7-4cf3-8efc-cea93cdfdecc",
+        "cvmfsRepository": "cvmfs",
+        "inputRegistryScheme": "https",
+        "inputRegistryHostname": "registry",
+        "inputRepository": "repository",
+        "inputDigest": "",
+        "inputTag": "tag",
+        "inputTagWildcard": false,
+        "outputURL": "",
+        "source": "source",
+        "createLayers": {
+            "value": true,
+            "isDefault": true
+        },
+        "createThinImage": {
+            "value": false,
+            "isDefault": true
+        },
+        "createPodman": {
+            "value": true,
+            "isDefault": true
+        },
+        "createFlat": {
+            "value": true,
+            "isDefault": true
+        },
+        "webhookEnabled": {
+            "value": false,
+            "isDefault": true
+        },
+        "fullSyncIntervalSec": 10,
+        "lastConfigUpdate": "",
+        "lastFullSync": "",
+        "syncedImages": [
+            {
+                "id": "b0877660-18bb-4c5c-9af5-a8cd886ebded",
+                "url": "https://registry/repository:tag"
+            }
+        ]
+    }
+}

@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"sort"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/google/uuid"
@@ -30,14 +31,14 @@ type WishIdentifier struct {
 }
 
 type WishOutputOptions struct {
-	CreateLayers    bool
-	CreateFlat      bool
-	CreatePodman    bool
-	CreateThinImage bool
+	CreateLayers    ValueWithDefault[bool]
+	CreateFlat      ValueWithDefault[bool]
+	CreatePodman    ValueWithDefault[bool]
+	CreateThinImage ValueWithDefault[bool]
 }
 
 type WishScheduleOptions struct {
-	WebhookEnabled bool
+	WebhookEnabled ValueWithDefault[bool]
 }
 
 type Wish struct {
@@ -114,6 +115,40 @@ func CreateWishesByIdentifiers(tx *sql.Tx, identifiers []WishIdentifier) ([]Wish
 	}
 
 	return createdWishes, nil
+}
+
+func GetAllWishes(tx *sql.Tx) ([]Wish, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT " + wishSqlFieldsOrdered + " from wishes ORDER BY id ASC"
+	rows, err := tx.Query(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	wishes, err := parseWishesFromRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return wishes, nil
 }
 
 // GetWishByID returns a wish by its ID
@@ -328,31 +363,12 @@ func parseWishFromRow(row scannableRow) (Wish, error) {
 		w.Identifier.InputDigest, _ = digest.Parse(input_digest.String)
 		// TODO: Handle invalid database state
 	}
-	if create_layers.Valid {
-		w.OutputOptions.CreateLayers = create_layers.Bool
-	} else {
-		w.OutputOptions.CreateLayers = config.DEFAULT_CREATELAYERS
-	}
-	if create_flat.Valid {
-		w.OutputOptions.CreateFlat = create_flat.Bool
-	} else {
-		w.OutputOptions.CreateFlat = config.DEFAULT_CREATEFLAT
-	}
-	if create_podman.Valid {
-		w.OutputOptions.CreatePodman = create_podman.Bool
-	} else {
-		w.OutputOptions.CreatePodman = config.DEFAULT_CREATEPODMAN
-	}
-	if create_thin.Valid {
-		w.OutputOptions.CreateThinImage = create_thin.Bool
-	} else {
-		w.OutputOptions.CreateThinImage = config.DEFAULT_CREATETHINIMAGE
-	}
-	if webhook_enabled.Valid {
-		w.ScheduleOptions.WebhookEnabled = webhook_enabled.Bool
-	} else {
-		w.ScheduleOptions.WebhookEnabled = config.DEFAULT_WEBHOOKENABLED
-	}
+	w.OutputOptions.CreateLayers = nullBoolToValueWithDefault(create_layers, config.DEFAULT_CREATELAYERS)
+	w.OutputOptions.CreateFlat = nullBoolToValueWithDefault(create_flat, config.DEFAULT_CREATEFLAT)
+	w.OutputOptions.CreatePodman = nullBoolToValueWithDefault(create_podman, config.DEFAULT_CREATEPODMAN)
+	w.OutputOptions.CreateThinImage = nullBoolToValueWithDefault(create_thin, config.DEFAULT_CREATETHINIMAGE)
+
+	w.ScheduleOptions.WebhookEnabled = nullBoolToValueWithDefault(webhook_enabled, config.DEFAULT_WEBHOOKENABLED)
 
 	return w, nil
 }
@@ -372,4 +388,12 @@ func parseWishesFromRows(rows *sql.Rows) ([]Wish, error) {
 	}
 
 	return wishes, nil
+}
+
+// sortWishesByID sorts a slice of wishes by their ID.
+// NB! This modifies the slice in place.
+func sortWishesByID(wishes []Wish) {
+	sort.Slice(wishes, func(i, j int) bool {
+		return wishes[i].ID.String() < wishes[j].ID.String()
+	})
 }
