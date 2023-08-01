@@ -24,11 +24,11 @@ class QuotaManager;
 enum CacheManagerIds {
   kUnknownCacheManager = 0,
   kPosixCacheManager,
-  kPosixRefcountCacheManager,
   kRamCacheManager,
   kTieredCacheManager,
   kExternalCacheManager,
   kStreamingCacheManager,
+  kPosixRefcountCacheManager,
 };
 
 enum CacheModes {

@@ -905,7 +905,8 @@ bool FileSystem::SetupNfsMaps() {
     nfs_maps_dir_ = workspace_;
 
   string no_nfs_sentinel;
-  if (cache_mgr_->id() == kPosixCacheManager) {
+  if (cache_mgr_->id() == kPosixCacheManager || 
+      cache_mgr_->id() == kPosixRefcountCacheManager) {
     PosixCacheManager *posix_cache_mgr =
         reinterpret_cast<PosixCacheManager *>(cache_mgr_);
     no_nfs_sentinel = posix_cache_mgr->cache_path() + "/no_nfs_maps." + name_;
@@ -924,7 +925,8 @@ bool FileSystem::SetupNfsMaps() {
     return true;
   }
 
-  assert(cache_mgr_->id() == kPosixCacheManager);
+  assert(cache_mgr_->id() == kPosixCacheManager ||
+         cache_mgr_->id() == kPosixRefcountCacheManager);
   assert(IsNfsSource());
   if (!no_nfs_sentinel.empty() && FileExists(no_nfs_sentinel)) {
     boot_error_ = "Cache was used without NFS maps before. "
@@ -1136,7 +1138,8 @@ void FileSystem::SetupUuid() {
  * cache in order to properly unravel the file system stack on shutdown.
  */
 void FileSystem::TearDown2ReadOnly() {
-  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == kPosixCacheManager)) {
+  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == kPosixCacheManager ||
+      cache_mgr_->id() == kPosixRefcountCacheManager)) {
     PosixCacheManager *posix_cache_mgr =
       reinterpret_cast<PosixCacheManager *>(cache_mgr_);
     posix_cache_mgr->TearDown2ReadOnly();
