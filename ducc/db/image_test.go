@@ -12,7 +12,7 @@ import (
 )
 
 func TestCreateImage(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -37,7 +37,7 @@ func TestCreateImage(t *testing.T) {
 }
 
 func TestCreateImages(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -78,7 +78,7 @@ func TestCreateImages(t *testing.T) {
 }
 
 func TestGetImageByValue(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
@@ -166,4 +166,42 @@ func TestGetImageByValue(t *testing.T) {
 			t.Fatal("Expected IDs to be different")
 		}
 	})
+}
+
+func TestGetAllImages(t *testing.T) {
+	db := CreateInMemDBForTesting()
+	Init(db)
+	defer db.Close()
+
+	inputImages := []Image{
+		{
+			RegistryScheme: "https",
+			RegistryHost:   "registry",
+			Repository:     "repository",
+			Tag:            "latest",
+		},
+		{
+			RegistryScheme: "http",
+			RegistryHost:   "registry2",
+			Repository:     "repository2",
+			Digest:         digest.FromString(""),
+		},
+	}
+	inputImages, err := CreateImages(nil, inputImages)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	images, err := GetAllImages(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(images) != len(inputImages) {
+		t.Fatalf("Expected %d images, got %d", len(inputImages), len(images))
+	}
+	for i := range images {
+		if !reflect.DeepEqual(inputImages[i], images[i]) {
+			t.Fatalf("Expected %v, got %v", inputImages[i], images[i])
+		}
+	}
 }

@@ -1,7 +1,7 @@
 
 /* TODO: Consider using WIHOUT_ROWID. Chcek performance  */
-
-CREATE TABLE "wishes" (
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "wishes" (
     id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
 
@@ -21,9 +21,9 @@ CREATE TABLE "wishes" (
     webhook_enabled BOOLEAN
 );
 
-CREATE INDEX "wishes_source_idx" ON "wishes" ("source");
+CREATE INDEX IF NOT EXISTS "wishes_source_idx" ON "wishes" ("source");
 
-CREATE TABLE "images" (
+CREATE TABLE IF NOT EXISTS "images" (
     id TEXT PRIMARY KEY,
     digest TEXT,
     tag TEXT,
@@ -32,10 +32,11 @@ CREATE TABLE "images" (
     repository TEXT NOT NULL
 );
 
-CREATE TABLE "wish_image" (
+CREATE TABLE IF NOT EXISTS "wish_image" (
     wish_id TEXT NOT NULL,
     image_id TEXT NOT NULL,
 
     FOREIGN KEY (wish_id) REFERENCES wishes (id) ON DELETE CASCADE,
     FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
 );
+COMMIT;

@@ -7,7 +7,7 @@ import (
 )
 
 func TestUpdateImagesAndGetImages(t *testing.T) {
-	db := createInMemDBForTesting()
+	db := CreateInMemDBForTesting()
 	Init(db)
 	defer db.Close()
 
