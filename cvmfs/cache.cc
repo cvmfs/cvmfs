@@ -101,7 +101,9 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
   if (fd_progress >= 0)
     SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
   assert(state->version == kStateVersion);
-  assert(state->manager_type == id());
+  assert(state->manager_type == id() ||
+         ((state->manager_type == kPosixCacheManager)
+           && id() == kPosixRefcountCacheManager));
   bool result = DoFreeState(state->concrete_state);
   if (!result) {
     if (fd_progress >= 0) {
@@ -195,9 +197,11 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
     abort();
   }
   if (state->manager_type != id()) {
-    if (fd_progress >= 0)
-      SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
-    abort();
+    if ((state->manager_type != kPosixCacheManager) && (id() != kPosixRefcountCacheManager)) {
+      if (fd_progress >= 0)
+        SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
+      abort();
+    }
   }
   int new_root_fd = DoRestoreState(state->concrete_state);
   if (new_root_fd < -1) {

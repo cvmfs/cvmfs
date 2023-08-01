@@ -1,0 +1,43 @@
+#!/bin/bash
+
+cvmfs_test_name="Check that open cache file descriptors from different processes are not duplicated in cvmfs"
+cvmfs_test_suites="quick"
+
+cleanup() {
+  jobs -p | xargs kill || true
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+
+  ############### 1) Check that the normal cache manager 
+  ############### creates new fds for the same object 
+  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+
+
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  # testfile has the following cvmfs hash:
+  testfile_hash=$(get_xattr hash $testfile)
+
+  for i in {1..10}; do
+    tail -f ${testfile} > /dev/null 2>&1 &
+  done;
+  trap cleanup EXIT HUP INT TERM
+  sleep 1;
+
+
+  sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=yes\" >> /etc/cvmfs/default.local" || return 2
+  
+  sudo cvmfs_config reload || return 20
+
+
+
+  cleanup
+  return 0
+}
+

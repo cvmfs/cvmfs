@@ -70,17 +70,29 @@ void *PosixRefcountCacheManager::DoSaveState() {
 
 
 int PosixRefcountCacheManager::DoRestoreState(void *data) {
+  fd_mgr = FdRefcountMgr();
   assert(data);
-  SavedState *state = reinterpret_cast<SavedState *>(data);
-  fd_mgr.AssignFrom(state->fd_mgr);
+  char *c = reinterpret_cast<char *>(data);
+  if (*c != '\0') {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    fd_mgr.AssignFrom(state->fd_mgr);
+  } else {
+      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                     "non-refcounted posix cache manager");
+  }
   return -1;
 }
 
 
 bool PosixRefcountCacheManager::DoFreeState(void *data) {
-  SavedState *state = reinterpret_cast<SavedState *>(data);
-  delete state->fd_mgr;
-  delete state;
+  char *c = reinterpret_cast<char *>(data);
+  if (*c != '\0') {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    delete state->fd_mgr;
+    delete state;
+  } else {
+    free(data);
+  }
   return true;
 }
 
