@@ -15,13 +15,11 @@ int FdRefcountMgr::Open(const shash::Any id, const std::string path) {
   int result = -1;
   {
     MutexLockGuard lock_guard(lock_cache_refcount_);
-    if (!map_fd_.Contains(id)) {
+    if (!map_fd_.Lookup(id, &result)) {
       result = open(path.c_str(), O_RDONLY);
       if (result >= 0) {
         map_fd_.Insert(id, result);
       }
-    } else {
-      map_fd_.Lookup(id, &result);
     }
     if (result >= 0) {
       FdRefcountInfo* refc_info = new FdRefcountInfo();
