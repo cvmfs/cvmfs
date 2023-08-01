@@ -42,7 +42,7 @@ class PosixRefcountCacheManager : public PosixCacheManager {
     SavedState() : version(0), magic_number(32123), fd_mgr(NULL) { }
     unsigned int version;
     /// this helps to distinguish from the SavedState of the normal
-    // posix cache manager 
+    /// posix cache manager
     unsigned int magic_number;
     FdRefcountMgr *fd_mgr;
   };
