@@ -67,18 +67,18 @@ FdRefcountMgr* FdRefcountMgr::Clone() {
   return clone;
 }
 
-SmallHashDynamic<shash::Any, int> FdRefcountMgr::GetFdMap() const {
-  return map_fd_;
+SmallHashDynamic<shash::Any, int> * FdRefcountMgr::GetFdMap() {
+  return &map_fd_;
 }
 
-SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo>
-    FdRefcountMgr::GetRefcountMap() const {
-  return map_refcount_;
+SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo>*
+    FdRefcountMgr::GetRefcountMap() {
+  return &map_refcount_;
 }
 
-void FdRefcountMgr::AssignFrom(const FdRefcountMgr* other) {
-  map_fd_ = other->GetFdMap();
-  map_refcount_ = other->GetRefcountMap();
+void FdRefcountMgr::AssignFrom(FdRefcountMgr* other) {
+  map_fd_ = *other->GetFdMap();
+  map_refcount_ = *other->GetRefcountMap();
 }
 
 FdRefcountMgr::~FdRefcountMgr() {
@@ -99,10 +99,12 @@ FdRefcountMgr::FdRefcountMgr() {
 FdRefcountMgr::FdRefcountMgr(
     const SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo> &map_refcount,
                             const SmallHashDynamic<shash::Any, int> &map_fd)
-    : map_refcount_(map_refcount), map_fd_(map_fd) {
+{
   const shash::Any hash_null;
   map_fd_.Init(16, hash_null, hasher_any);
   map_refcount_.Init(16, 0, hasher_int);
+  map_refcount_ = map_refcount;
+  map_fd_ = map_fd;
   lock_cache_refcount_ =
       reinterpret_cast<pthread_mutex_t*>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
