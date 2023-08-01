@@ -686,7 +686,8 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 }
 
 
-CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance, bool use_refcount) {
+CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance,
+                                             bool use_refcount) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   CacheManager* cache_mgr;
   if (!CheckPosixCacheSettings(settings))
