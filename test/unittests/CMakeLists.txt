@@ -406,6 +406,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/cache_extern.cc
   ${CVMFS_SOURCE_DIR}/cache_posix.cc
+  ${CVMFS_SOURCE_DIR}/cache_posix_refc.cc
   ${CVMFS_SOURCE_DIR}/cache_plugin/channel.cc
   ${CVMFS_SOURCE_DIR}/cache_ram.cc
   ${CVMFS_SOURCE_DIR}/cache_stream.cc
@@ -424,6 +425,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
+  ${CVMFS_SOURCE_DIR}/fd_refcount_mgr.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/file_watcher.cc
