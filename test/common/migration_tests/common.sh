@@ -46,7 +46,7 @@ guess_package_url() {
   # CentOS 9
   elif [ -f /etc/os-release ]; then
     local platform="$(. /etc/os-release; echo $PLATFORM_ID)"
-    if [ x"$platform" -eq "xplatform:el9" ]; then
+    if [ x"$platform" = "xplatform:el9" ]; then
       local architecture=$(uname -m)
       package_file_name="${package_name}-${cvmfs_version_string}.el9.${architecture}.rpm"
     fi
