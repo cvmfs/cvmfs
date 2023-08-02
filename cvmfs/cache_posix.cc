@@ -237,7 +237,7 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
 
   if (alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
-      return NULL;
+      return false;
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
@@ -257,14 +257,14 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
     }
   } else {
     if (!MakeCacheDirectories(cache_path, 0700))
-      return NULL;
+      return false;
   }
 
   // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
-    return NULL;
+    return false;
   }
   return true;
 }
