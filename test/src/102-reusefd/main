@@ -18,9 +18,9 @@ cvmfs_run_test() {
   ############
   # open some test file in several simultaneously in different processes
 
-  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  local testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
   # testfile has the following cvmfs hash:
-  testfile_hash=$(get_xattr hash $testfile)
+  local testfile_hash=$(get_xattr hash $testfile)
 
   for i in {1..10}; do
     tail -f ${testfile} > /dev/null 2>&1 &
@@ -30,10 +30,8 @@ cvmfs_run_test() {
 
   ###########
   # check the open file descriptors of the cvmfs2 process 
-  alice_pid=$(sudo cvmfs_talk -i alice.cern.ch pid)
+  local alice_pid=$(sudo cvmfs_talk -i alice.cern.ch pid)
   num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
-
-
 
   if [ "$num_open_fds" -lt "2" ]; then
     echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
@@ -70,13 +68,11 @@ cvmfs_run_test() {
   alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
   num_open_fds=$(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
 
-
     echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file"
   if [ "$num_open_fds" -gt "1" ]; then
     return 40
   fi
 
-  cleanup
   return 0
 }
 
