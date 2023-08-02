@@ -71,7 +71,7 @@ using namespace std;  // NOLINT
 namespace download {
 
 /**
- * Returns the status if an interrupted happened for a given repository.
+ * Returns the status if an interrupt happened for a given repository.
  *
  * Used only in case CVMFS_FAILOVER_INDEFINITELY (failover_indefinitely_) is set
  * where failed downloads are retried indefinitely, unless an interrupt occurred
