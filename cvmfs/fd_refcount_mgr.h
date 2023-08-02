@@ -44,9 +44,9 @@ class FdRefcountMgr {
 
   void AssignFrom(FdRefcountMgr *other);
 
-  SmallHashDynamic<int, FdRefcountInfo>* GetRefcountMap();
+  SmallHashDynamic<int, FdRefcountInfo>* GetRefcountMapPtr();
 
-  SmallHashDynamic<shash::Any, int> * GetFdMap();
+  SmallHashDynamic<shash::Any, int>* GetFdMapPtr();
 
   int Open(const shash::Any id, const std::string& path);
 
@@ -55,15 +55,17 @@ class FdRefcountMgr {
   FdRefcountMgr* Clone();
 
  private:
-  /** map for fd -> refcount lookups. A backreference
-  * to the object id is included in FdRefcountInfo in order 
-  * to be able to remove the file descriptor from map_fd_.
-  */
+  /** 
+   * map for fd -> refcount lookups. A backreference
+   * to the object id is included in FdRefcountInfo in order 
+   * to be able to remove the file descriptor from map_fd_.
+   */
   SmallHashDynamic<int, FdRefcountInfo> map_refcount_;
-  /** map for object id -> fd lookups, used when 
+  /** 
+   * map for object id -> fd lookups, used when 
    * opening files in the cache. The fd is used as key
    * in the refcount map.
-  */
+   */
   SmallHashDynamic<shash::Any, int> map_fd_;
   pthread_mutex_t *lock_cache_refcount_;
 };

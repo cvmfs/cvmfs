@@ -53,7 +53,7 @@ int FdRefcountMgr::Close(int fd) {
     } else {
       // fd not present in our table - this should only happen
       // when reloading from the normal posix cache manager!
-      LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
+      LogCvmfs(kLogCache, kLogDebug,
                "WARNING: trying to close fd that "
                " is not in refcount tables");
       retval = close(fd);
@@ -102,7 +102,7 @@ FdRefcountMgr::FdRefcountMgr(
 {
   const shash::Any hash_null;
   map_fd_.Init(16, hash_null, hasher_any);
-  map_refcount_.Init(16, 0, hasher_int);
+  map_refcount_.Init(16, -1, hasher_int);
   map_refcount_ = map_refcount;
   map_fd_ = map_fd;
   lock_cache_refcount_ =
