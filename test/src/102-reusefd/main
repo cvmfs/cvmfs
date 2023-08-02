@@ -30,7 +30,7 @@ cvmfs_run_test() {
 
   ###########
   # check the open file descriptors of the cvmfs2 process 
-  alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
+  alice_pid=$(sudo cvmfs_talk -i alice.cern.ch pid)
   num_open_fds=$(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
 
 
