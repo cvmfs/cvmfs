@@ -3,8 +3,6 @@
  *
  */
 
-#define __STDC_FORMAT_MACROS
-
 #include "cvmfs_config.h"
 #include "cache_posix_refc.h"
 
