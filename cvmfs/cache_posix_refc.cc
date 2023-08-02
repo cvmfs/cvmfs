@@ -71,7 +71,7 @@ int PosixRefcountCacheManager::DoRestoreState(void *data) {
   fd_mgr = FdRefcountMgr();
   assert(data);
   SavedState *state = reinterpret_cast<SavedState *>(data);
-  if (state->magic_number == 32123) {
+  if (state->magic_number == 123) {
     LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                    "refcounted posix cache manager");
 
@@ -87,7 +87,7 @@ int PosixRefcountCacheManager::DoRestoreState(void *data) {
 bool PosixRefcountCacheManager::DoFreeState(void *data) {
   assert(data);
   SavedState *state = reinterpret_cast<SavedState *>(data);
-  if (state->magic_number == 32123) {
+  if (state->magic_number == 123) {
     delete state->fd_mgr;
     delete state;
   } else {
