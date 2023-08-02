@@ -493,6 +493,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression.cc
+                  fd_refcount_mgr.cc
                   manifest.cc
                   quota.cc
   )

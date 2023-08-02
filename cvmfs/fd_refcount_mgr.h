@@ -36,11 +36,11 @@ class FdRefcountMgr {
 
   FdRefcountMgr();
 
+  ~FdRefcountMgr();
+
   FdRefcountMgr(
         const SmallHashDynamic<int, FdRefcountInfo> &map_refcount,
         const SmallHashDynamic<shash::Any, int> &map_fd);
-
-  ~FdRefcountMgr();
 
   void AssignFrom(FdRefcountMgr *other);
 

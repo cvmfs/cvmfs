@@ -16,6 +16,7 @@
 #include "cache.h"
 #include "catalog_mgr.h"
 #include "crypto/signature.h"
+#include "fd_refcount_mgr.h"
 #include "file_chunk.h"
 #include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
@@ -71,8 +72,13 @@ class PosixCacheManager : public CacheManager {
   static PosixCacheManager *Create(
     const std::string &cache_path,
     const bool alien_cache,
-    const RenameWorkarounds rename_workaround = kRenameNormal);
-  virtual ~PosixCacheManager() { }
+    const RenameWorkarounds rename_workaround = kRenameNormal,
+    const bool do_refcount = false);
+  virtual ~PosixCacheManager() { 
+    if (nullptr != fd_mgr) {
+      delete(fd_mgr);
+    }
+  }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const LabeledObject &object);
@@ -134,7 +140,8 @@ class PosixCacheManager : public CacheManager {
     shash::Any id;
   };
 
-  PosixCacheManager(const std::string &cache_path, const bool alien_cache)
+  PosixCacheManager(const std::string &cache_path, const bool alien_cache,
+                    const bool do_refcount = false)
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
@@ -142,8 +149,13 @@ class PosixCacheManager : public CacheManager {
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
     , is_tmpfs_(false)
+    , do_refcount_(do_refcount)
+    , fd_mgr(nullptr)
   {
     atomic_init32(&no_inflight_txns_);
+    if (do_refcount) {
+      fd_mgr = new FdRefcountMgr();
+    }
   }
 
   std::string GetPathInCache(const shash::Any &id);
@@ -175,6 +187,11 @@ class PosixCacheManager : public CacheManager {
    * True if posixcache is on tmpfs (and with this already in RAM)
    */
   bool is_tmpfs_;
+  /**
+   * Refcount and return only unique file descriptors
+   */
+  const bool do_refcount_;
+  FdRefcountMgr* fd_mgr;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_

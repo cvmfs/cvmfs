@@ -138,7 +138,12 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int PosixCacheManager::Close(int fd) {
-  int retval = close(fd);
+  int retval;
+  if (do_refcount_) {
+    retval = fd_mgr->Close(fd);
+  } else {
+    retval = close(fd);
+  }
   if (retval != 0)
     return -errno;
   return 0;
@@ -272,10 +277,11 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
 PosixCacheManager *PosixCacheManager::Create(
   const string &cache_path,
   const bool alien_cache,
-  const RenameWorkarounds rename_workaround)
+  const RenameWorkarounds rename_workaround,
+  const bool do_refcount)
 {
   UniquePtr<PosixCacheManager> cache_manager(
-    new PosixCacheManager(cache_path, alien_cache));
+    new PosixCacheManager(cache_path, alien_cache, do_refcount));
   assert(cache_manager.IsValid());
 
   cache_manager->rename_workaround_ = rename_workaround;
@@ -370,8 +376,12 @@ int64_t PosixCacheManager::GetSize(int fd) {
 
 int PosixCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
-  int result = open(path.c_str(), O_RDONLY);
-
+  int result;
+  if (do_refcount_) {
+    result = fd_mgr->Open(object.id, path);
+  } else {
+    result = open(path.c_str(), O_RDONLY);
+  }
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
