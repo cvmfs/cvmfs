@@ -197,9 +197,9 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
   // exception: we do allow switching from the non-refcounted
   // to the refcounted posix cache manager
   if (!IsReloadCompatible(state->manager_type, id())) {
-      if (fd_progress >= 0) {
-        SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
-      abort();
+    if (fd_progress >= 0) {
+      SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
+    abort();
     }
   }
   int new_root_fd = DoRestoreState(state->concrete_state);
