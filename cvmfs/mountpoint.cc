@@ -1136,7 +1136,7 @@ void FileSystem::SetupUuid() {
  * cache in order to properly unravel the file system stack on shutdown.
  */
 void FileSystem::TearDown2ReadOnly() {
-  if ((cache_mgr_ != NULL) && 
+  if ((cache_mgr_ != NULL) &&
       (cache_mgr_->IsPosixCompatible(cache_mgr_->id()))) {
     PosixCacheManager *posix_cache_mgr =
       reinterpret_cast<PosixCacheManager *>(cache_mgr_);
