@@ -178,6 +178,19 @@ class FuseInterruptCue : public InterruptCue {
   fuse_req_t *req_ptr_;
 };
 
+/**
+ * Options related to the fuse kernel connection. The capabilities are
+ * determined only once at mount time. If the capability trigger certain
+ * behavior of the cvmfs fuse module, it needs to be re-triggered on reload.
+ * Used in SaveState and RestoreState to store the details of symlink caching.
+ */
+struct FuseState {
+  FuseState() : version(0), cache_symlinks(false), has_dentry_expire(false) {}
+  unsigned version;
+  bool cache_symlinks;
+  bool has_dentry_expire;
+};
+
 
 static inline double GetKcacheTimeout() {
   if (!fuse_remounter_->IsCaching())
@@ -2515,6 +2528,17 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);
 
+  msg_progress = "Saving fuse state\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
+  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
+  saved_fuse_state->has_dentry_expire =
+    cvmfs::mount_point_->fuse_expire_entry();
+  loader::SavedState *state_fuse = new loader::SavedState();
+  state_fuse->state_id = loader::kStateFuse;
+  state_fuse->state = saved_fuse_state;
+  saved_states->push_back(state_fuse);
+
   // Close open file catalogs
   ShutdownMountpoint();
 
@@ -2693,6 +2717,17 @@ static bool RestoreState(const int fd_progress,
         cvmfs::file_system_->RemapCatalogFd(0, new_root_fd);
       }
     }
+
+    if (saved_states[i]->state_id == loader::kStateFuse) {
+      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
+      cvmfs::FuseState *fuse_state =
+        static_cast<cvmfs::FuseState *>(saved_states[i]->state);
+      if (!fuse_state->cache_symlinks)
+        cvmfs::mount_point_->DisableCacheSymlinks();
+      if (fuse_state->has_dentry_expire)
+        cvmfs::mount_point_->EnableFuseExpireEntry();
+      SendMsg2Socket(fd_progress, " done\n");
+    }
   }
   if (cvmfs::mount_point_->inode_annotation()) {
     uint64_t saved_generation = cvmfs::inode_generation_info_.inode_generation;
@@ -2773,6 +2808,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateOpenFilesCounter:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
         delete static_cast<uint32_t *>(saved_states[i]->state);
+        break;
+      case loader::kStateFuse:
+        SendMsg2Socket(fd_progress, "Releasing fuse state\n");
+        delete static_cast<cvmfs::FuseState *>(saved_states[i]->state);
         break;
       default:
         break;
