@@ -84,7 +84,7 @@ FdRefcountMgr::~FdRefcountMgr() {
 FdRefcountMgr::FdRefcountMgr() {
   const shash::Any hash_null;
   map_fd_.Init(16, hash_null, hasher_any);
-  map_refcount_.Init(16, 0, hasher_int);
+  map_refcount_.Init(16, -1, hasher_int);
   lock_cache_refcount_ =
       reinterpret_cast<pthread_mutex_t*>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
