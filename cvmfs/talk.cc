@@ -556,7 +556,7 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->statistics()->Lookup("page_cache_tracker.n_open_cached")->
         Set(page_cache_stats.n_open_cached);
 
-      if (file_system->cache_mgr()->id() == kPosixCacheManager) {
+      if (CacheManager::IsPosixCompatible(file_system->cache_mgr()->id())) {
         PosixCacheManager *cache_mgr =
           reinterpret_cast<PosixCacheManager *>(
             file_system->cache_mgr());
@@ -701,7 +701,7 @@ void *TalkManager::MainResponder(void *data) {
     } else if (line == "version patchlevel") {
       talk_mgr->Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
     } else if (line == "tear down to read-only") {
-      if (file_system->cache_mgr()->id() != kPosixCacheManager) {
+      if (!CacheManager::IsPosixCompatible(file_system->cache_mgr()->id())) {
         talk_mgr->Answer(con_fd, "not supported\n");
       } else {
         // hack
