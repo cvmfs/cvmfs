@@ -51,8 +51,9 @@ int FdRefcountMgr::Close(int fd) {
         map_refcount_.Erase(fd);
       }
     } else {
-      // fd not present in our table - this should never happen!
-      LogCvmfs(kLogCache, kLogWarning,
+      // fd not present in our table - this should only happen
+      // when reloading from the normal posix cache manager!
+      LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
                "WARNING: trying to close fd that "
                " is not in refcount tables");
       retval = close(fd);
