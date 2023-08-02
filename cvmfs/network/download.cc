@@ -88,7 +88,6 @@ bool Interrupted(const std::string &fqrn, JobInfo *info) {
   }
 
   if (!fqrn.empty()) {
-    // see https://github.com/cvmfs/cvmfs/pull/3304#discussion_r1278991197
     // it is up to the user the create this sentinel file ("pause_file") if
     // CVMFS_FAILOVER_INDEFINITELY is used. It must be created during
     // "cvmfs_config reload" and "cvmfs_config reload $fqrn"
