@@ -2528,6 +2528,17 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);
 
+  msg_progress = "Saving fuse state\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
+  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
+  saved_fuse_state->has_dentry_expire =
+    cvmfs::mount_point_->fuse_expire_entry();
+  loader::SavedState *state_fuse = new loader::SavedState();
+  state_fuse->state_id = loader::kStateFuse;
+  state_fuse->state = saved_fuse_state;
+  saved_states->push_back(state_fuse);
+
   // Close open file catalogs
   ShutdownMountpoint();
 
@@ -2544,17 +2555,6 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_num_fd->state_id = loader::kStateOpenFilesCounter;
   state_num_fd->state = saved_num_fd;
   saved_states->push_back(state_num_fd);
-
-  msg_progress = "Saving fuse state\n";
-  SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
-  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
-  saved_fuse_state->has_dentry_expire =
-    cvmfs::mount_point_->fuse_expire_entry();
-  loader::SavedState *state_fuse = new loader::SavedState();
-  state_fuse->state_id = loader::kStateFuse;
-  state_fuse->state = saved_fuse_state;
-  saved_states->push_back(state_fuse);
 
   return true;
 }
