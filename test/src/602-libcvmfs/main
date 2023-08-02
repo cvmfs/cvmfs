@@ -1,5 +1,6 @@
 cvmfs_test_name="Libcvmfs test"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_602_REPO_COUNT=0
 CVMFS_TEST_602_REPO_PREFIX="test.cern.ch.libcvmfs_"
