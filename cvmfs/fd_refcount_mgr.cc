@@ -23,12 +23,11 @@ int FdRefcountMgr::Open(const shash::Any id, const std::string& path) {
     FdRefcountInfo refc_info;
     if (map_refcount_.Lookup(result, &refc_info)) {
       refc_info.refcount++;
-      map_refcount_.Insert(result, refc_info);
     } else {
       refc_info.refcount = 1;
       refc_info.id = id;
-      map_refcount_.Insert(result, refc_info);
     }
+    map_refcount_.Insert(result, refc_info);
   }
   return result;
 }
