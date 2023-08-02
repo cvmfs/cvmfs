@@ -10,7 +10,7 @@
 #include <string>
 
 
-int FdRefcountMgr::Open(const shash::Any id, const std::string path) {
+int FdRefcountMgr::Open(const shash::Any id, const std::string& path) {
   int result = -1;
   {
     MutexLockGuard lock_guard(lock_cache_refcount_);
@@ -21,14 +21,14 @@ int FdRefcountMgr::Open(const shash::Any id, const std::string path) {
       }
     }
     if (result >= 0) {
-      FdRefcountInfo* refc_info = new FdRefcountInfo();
-      if (map_refcount_.Lookup(result, refc_info)) {
-        refc_info->refcount++;
-        map_refcount_.Insert(result, *refc_info);
+      FdRefcountInfo refc_info;
+      if (map_refcount_.Lookup(result, &refc_info)) {
+        refc_info.refcount++;
+        map_refcount_.Insert(result, refc_info);
       } else {
-        refc_info->refcount = 1;
-        refc_info->id = id;
-        map_refcount_.Insert(result, *refc_info);
+        refc_info.refcount = 1;
+        refc_info.id = id;
+        map_refcount_.Insert(result, refc_info);
       }
     }
   }
@@ -39,15 +39,15 @@ int FdRefcountMgr::Close(int fd) {
   int retval = -1;
   {
     MutexLockGuard lock_guard(lock_cache_refcount_);
-    FdRefcountInfo* refc_info = new FdRefcountInfo();
-    if (map_refcount_.Lookup(fd, refc_info)) {
-      if (refc_info->refcount > 1) {
-        refc_info->refcount -= 1;
-        map_refcount_.Insert(fd, *refc_info);
+    FdRefcountInfo refc_info;
+    if (map_refcount_.Lookup(fd, &refc_info)) {
+      if (refc_info.refcount > 1) {
+        refc_info.refcount -= 1;
+        map_refcount_.Insert(fd, refc_info);
         retval = 0;
       } else {
         retval = close(fd);
-        map_fd_.Erase(refc_info->id);
+        map_fd_.Erase(refc_info.id);
         map_refcount_.Erase(fd);
       }
     } else {

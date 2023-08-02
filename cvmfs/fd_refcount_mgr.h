@@ -48,7 +48,7 @@ class FdRefcountMgr {
 
   SmallHashDynamic<shash::Any, int> * GetFdMap();
 
-  int Open(const shash::Any id, const std::string path);
+  int Open(const shash::Any id, const std::string& path);
 
   int Close(int fd);
 
