@@ -26,7 +26,7 @@ class FdRefcountMgr {
  public:
   /**
    * Helper class containing the values for the map: fd -> refcount+id
-  */
+   */
   struct FdRefcountInfo {
     int refcount;  /// refcount for the times the fd was opened in the cache
     shash::Any id;  /// hash of the object opened through the fd
