@@ -1391,6 +1391,20 @@ bool MountPoint::CreateDownloadManagers() {
                       perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
+  // must be set before proxy and host chains are being initialized
+  // error output is handled in SetShardingPolicy
+  if (options_mgr_->GetValue("CVMFS_PROXY_SHARDING_POLICY", &optarg)) {
+    if (optarg.compare("EXTERNAL") == 0) {
+      download_mgr_->SetShardingPolicy(download::kShardingPolicyExternal);
+      download_mgr_->SetFqrn(fqrn());
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_FAILOVER_INDEFINITELY", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+      download_mgr_->SetFailoverIndefinitely();
+  }
+
   if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(optarg);
   }

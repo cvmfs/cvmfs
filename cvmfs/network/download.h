@@ -20,17 +20,20 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
-#include "dns.h"
 #include "duplex_curl.h"
-#include "jobinfo.h"
-#include "network_errors.h"
-#include "sink.h"
+#include "network/dns.h"
+#include "network/health_check.h"
+#include "network/jobinfo.h"
+#include "network/network_errors.h"
+#include "network/sharding_policy.h"
+#include "network/sink.h"
 #include "ssl.h"
 #include "statistics.h"
 #include "util/atomic.h"
 #include "util/pipe.h"
 #include "util/pointer.h"
 #include "util/prng.h"
+#include "util/shared_ptr.h"
 
 class InterruptCue;
 
@@ -210,6 +213,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void AddHTTPTracingHeader(const std::string &header);
   void UseSystemCertificatePath();
 
+  bool SetShardingPolicy(const ShardingPolicySelector type);
+  void SetFailoverIndefinitely();
+  void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
     return 0;
@@ -344,6 +351,32 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Shard requests across multiple proxies via consistent hashing
    */
   bool opt_proxy_shard_;
+
+  /**
+   * Sharding policy deciding which proxy should be chosen for each download
+   * request
+   * 
+   * Sharding policy is shared between all download managers. As such shared
+   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * (We cannot assume the order in which the download managers are stopped)
+   */
+  SharedPtr<ShardingPolicy> sharding_policy_;
+  /**
+   * Health check for the proxies
+   * 
+   * Health check is shared between all download managers. As such shared
+   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * (We cannot assume the order in which the download managers are stopped)
+   */
+  SharedPtr<HealthCheck> health_check_;
+  /**
+   * Endless retries for a failed download (hard failures will result in abort)
+  */
+  bool failover_indefinitely_;
+  /**
+   * Repo name. Needed for the re-try logic if a download was unsuccessful
+  */
+  std::string fqrn_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

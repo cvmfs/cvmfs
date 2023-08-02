@@ -71,8 +71,8 @@ class SharedPtr {
   template <class Y>
   SharedPtr& operator=(SharedPtr<Y> const& r) {  // never throws
     Reset();
-    value_ = r.value_;
-    count_ = r.count_;
+    value_ = r.Get();
+    count_ = r.GetCountPtr();
     if (count_) {
       atomic_inc64(count_);
     }
@@ -109,6 +109,10 @@ class SharedPtr {
 
   element_type* Get() const {  // never throws
     return value_;
+  }
+
+  atomic_int64* GetCountPtr() const {
+    return count_;
   }
 
   bool Unique() const {  // never throws

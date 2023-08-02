@@ -19,11 +19,11 @@
 #include "compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "network_errors.h"
-#include "sink.h"
-#include "sink_file.h"
-#include "sink_mem.h"
-#include "sink_path.h"
+#include "network/network_errors.h"
+#include "network/sink.h"
+#include "network/sink_file.h"
+#include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "util/pipe.h"
 
 class InterruptCue;
@@ -74,6 +74,9 @@ class JobInfo {
   unsigned char num_retries_;
   unsigned backoff_ms_;
   unsigned int current_host_chain_index_;
+
+  // Don't fail-over proxies on download errors. default = false
+  bool allow_failure_;
 
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
   // Replace Init() with JobInfo() that is called by the other constructors
@@ -161,6 +164,9 @@ class JobInfo {
   unsigned int current_host_chain_index() const {
                                              return current_host_chain_index_; }
 
+  bool allow_failure() const { return allow_failure_; }
+
+
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
@@ -208,6 +214,8 @@ class JobInfo {
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
   void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
                        { current_host_chain_index_ = current_host_chain_index; }
+
+  void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 
   // needed for fetch.h ThreadLocalStorage
   JobInfo() { Init(); }
