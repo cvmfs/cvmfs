@@ -185,8 +185,9 @@ class FuseInterruptCue : public InterruptCue {
  * Used in SaveState and RestoreState to store the details of symlink caching.
  */
 struct FuseState {
-  FuseState() : version(0), has_dentry_expire(false) {}
+  FuseState() : version(0), cache_symlinks(false), has_dentry_expire(false) {}
   unsigned version;
+  bool cache_symlinks;
   bool has_dentry_expire;
 };
 
@@ -2547,6 +2548,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   msg_progress = "Saving fuse state\n";
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
+  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
   saved_fuse_state->has_dentry_expire =
     cvmfs::mount_point_->fuse_expire_entry();
   loader::SavedState *state_fuse = new loader::SavedState();
@@ -2720,6 +2722,8 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, "Restoring fuse state... ");
       cvmfs::FuseState *fuse_state =
         static_cast<cvmfs::FuseState *>(saved_states[i]->state);
+      if (!fuse_state->cache_symlinks)
+        cvmfs::mount_point_->DisableCacheSymlinks();
       if (fuse_state->has_dentry_expire)
         cvmfs::mount_point_->EnableFuseExpireEntry();
       SendMsg2Socket(fd_progress, " done\n");
