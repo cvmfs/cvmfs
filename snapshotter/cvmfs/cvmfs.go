@@ -26,6 +26,7 @@ const (
 type Filesystem struct {
 	fsAbsoluteMountpoint string
 	mountedLayers        map[string]string
+	mountedPaths         map[string]bool
 	mountedLayersLock    sync.Mutex
 }
 
@@ -37,6 +38,7 @@ type Config struct {
 func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.FileSystem, error) {
 	var absolutePath string
 	mountedLayersMap := make(map[string]string)
+	mountedPathsMap := make(map[string]bool)
 	if config.AbsoluteMountpoint == "" {
 		repository := config.Repository
 		if repository == "" {
@@ -50,7 +52,7 @@ func NewFilesystem(ctx context.Context, root string, config *Config) (snapshot.F
 	if _, err := os.Stat(absolutePath); err != nil {
 		log.G(ctx).WithField("absolutePath", absolutePath).Warning("Impossible to stat the absolute path, is the filesystem mounted properly? Error: ", err)
 	}
-	return &Filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap}, nil
+	return &Filesystem{fsAbsoluteMountpoint: absolutePath, mountedLayers: mountedLayersMap, mountedPaths: mountedPathsMap}, nil
 }
 
 func (fs *Filesystem) Mount(ctx context.Context, mountpoint string, labels map[string]string) error {
@@ -70,6 +72,12 @@ func (fs *Filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 		return err
 	}
 	log.G(ctx).WithField("layer digest", digest).Debug("cvmfs: Layer present in CVMFS")
+	// Check if the layer is already mounted 
+	if _, found := fs.mountedPaths[path]; found {
+	      err := fmt.Errorf("layer %s is already mounted", digest)
+	      log.G(ctx).WithError(err).WithField("layer digest", digest).Debug("cvmfs: Layer was already mounted")
+              return err
+        }
 	err := syscall.Mount(path, mountpoint, "", syscall.MS_BIND, "")
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("layer digest", digest).WithField("mountpoint", mountpoint).Debug("cvmfs: Error in bind mounting the layer.")
@@ -78,6 +86,7 @@ func (fs *Filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 	fs.mountedLayersLock.Lock()
 	defer fs.mountedLayersLock.Unlock()
 	fs.mountedLayers[mountpoint] = path
+	fs.mountedPaths[path] = true
 	return nil
 }
 
