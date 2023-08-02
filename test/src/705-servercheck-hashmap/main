@@ -1,6 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="Hashmap to avoid duplicated lookups in cvmfs_server check"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 
 cvmfs_run_test() {
