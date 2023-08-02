@@ -1,6 +1,5 @@
 /**
  * This file is part of the CernVM File System.
- *
  */
 
 #include "fd_refcount_mgr.h"

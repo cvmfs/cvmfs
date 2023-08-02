@@ -162,10 +162,6 @@ class PosixCacheManager : public CacheManager {
    */
   atomic_int32 no_inflight_txns_;
 
-
-
-
-
  private:
   int Rename(const char *oldpath, const char *newpath);
   int Flush(Transaction *transaction);

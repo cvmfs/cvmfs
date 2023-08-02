@@ -26,7 +26,7 @@ cvmfs_run_test() {
     tail -f ${testfile} > /dev/null 2>&1 &
   done;
   trap cleanup EXIT HUP INT TERM
-  sleep 1;
+  sleep 1
 
   ###########
   # check the open file descriptors of the cvmfs2 process 
