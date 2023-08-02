@@ -175,6 +175,14 @@ class PosixCacheManager : public CacheManager {
   atomic_int32 no_inflight_txns_;
 
  private:
+  struct SavedState {
+    SavedState() : version(0), magic_number(123), fd_mgr(NULL) { }
+    unsigned int version;
+    /// this helps to distinguish from the SavedState of the normal
+    /// posix cache manager
+    char magic_number;
+    FdRefcountMgr *fd_mgr;
+  };
   int Rename(const char *oldpath, const char *newpath);
   int Flush(Transaction *transaction);
 

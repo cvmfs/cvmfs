@@ -298,6 +298,13 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   string optarg;
   PosixCacheSettings settings;
 
+  if (options_mgr_->GetValue("CVMFS_CACHE_REFCOUNT",
+                             &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    settings.do_refcount = true;
+  }
+
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
       && options_mgr_->IsOn(optarg))
@@ -621,17 +628,14 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   LogCvmfs(kLogCvmfs, kLogDebug, "setting up cache manager instance %s",
            instance.c_str());
   string instance_type;
-  string use_refcount;
   if (instance == kDefaultCacheMgrInstance) {
-    options_mgr_->GetValue("CVMFS_CACHE_REFCOUNT",
-                           &use_refcount);
     instance_type = "posix";
   } else {
     options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_TYPE", instance),
                            &instance_type);
   }
   if (instance_type == "posix") {
-    return SetupPosixCacheMgr(instance, options_mgr_->IsOn(use_refcount));
+    return SetupPosixCacheMgr(instance);
   } else if (instance_type == "ram") {
     return SetupRamCacheMgr(instance);
   } else if (instance_type == "tiered") {
@@ -686,25 +690,17 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 }
 
 
-CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance,
-                                             bool use_refcount) {
+CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   CacheManager* cache_mgr;
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-  if (!use_refcount) {
   cache_mgr = PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
-                          : PosixCacheManager::kRenameNormal);
-  } else {
-    cache_mgr = PosixRefcountCacheManager::Create(
-      settings.cache_path,
-      settings.is_alien,
-      settings.avoid_rename ? PosixCacheManager::kRenameLink
-                            : PosixCacheManager::kRenameNormal);
-  }
+                          : PosixCacheManager::kRenameNormal,
+    settings.do_refcount);
   if (!cache_mgr) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);

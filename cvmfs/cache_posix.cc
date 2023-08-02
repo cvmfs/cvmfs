@@ -315,6 +315,11 @@ string PosixCacheManager::Describe() {
  * a dummy memory location.
  */
 void *PosixCacheManager::DoSaveState() {
+  if (do_refcount_) {
+    SavedState *state = new SavedState();
+    state->fd_mgr = fd_mgr->Clone();
+    return state;
+  }
   char *c = reinterpret_cast<char *>(smalloc(1));
   *c = '\0';
   return c;
@@ -323,6 +328,19 @@ void *PosixCacheManager::DoSaveState() {
 
 int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
+  if (do_refcount_) {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    if (state->magic_number == 123) {
+      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                    "refcounted posix cache manager");
+
+      fd_mgr->AssignFrom(state->fd_mgr);
+    } else {
+      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                    "non-refcounted posix cache manager");
+    }
+    return -1;
+  }
   char *c = reinterpret_cast<char *>(data);
   assert(*c == '\0');
   return -1;
@@ -330,6 +348,19 @@ int PosixCacheManager::DoRestoreState(void *data) {
 
 
 bool PosixCacheManager::DoFreeState(void *data) {
+  assert(data);
+  if (do_refcount_) {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    if (state->magic_number == 123) {
+      delete state->fd_mgr;
+      delete state;
+    } else {
+      // this should be the dummy SavedState
+      // of the regular posix cache manager
+      free(data);
+    }
+    return true;
+  }
   free(data);
   return true;
 }

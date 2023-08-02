@@ -31,6 +31,20 @@ cvmfs_run_test() {
   
   sudo cvmfs_config reload || return 20
 
+  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  # testfile has the following cvmfs hash:
+  testfile_hash=$(get_xattr hash $testfile)
+
+  for i in {1..10}; do
+    tail -f ${testfile} > /dev/null 2>&1 &
+  done;
+  trap cleanup EXIT HUP INT TERM
+  sleep 1;
+
+  sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=no\" >> /etc/cvmfs/default.local" || return 2
+
+  sudo cvmfs_config reload || return 30
+
   return 0
 }
 

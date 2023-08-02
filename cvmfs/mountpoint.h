@@ -260,7 +260,7 @@ class FileSystem : SingleCopy, public BootFactory {
     PosixCacheSettings() :
       is_shared(false), is_alien(false), is_managed(false),
       avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
-      quota_limit(0)
+      quota_limit(0), do_refcount(false)
       { }
     bool is_shared;
     bool is_alien;
@@ -273,6 +273,7 @@ class FileSystem : SingleCopy, public BootFactory {
      * cache when the limit is exceeded.
      */
     int64_t quota_limit;
+    bool do_refcount;
     std::string cache_path;
     /**
      * Different from cache_path only if CVMFS_WORKSPACE or
@@ -304,8 +305,7 @@ class FileSystem : SingleCopy, public BootFactory {
   bool CheckInstanceName(const std::string &instance);
   bool TriageCacheMgr();
   CacheManager *SetupCacheMgr(const std::string &instance);
-  CacheManager *SetupPosixCacheMgr(const std::string &instance,
-                                   bool use_refcount);
+  CacheManager *SetupPosixCacheMgr(const std::string &instance);
   CacheManager *SetupRamCacheMgr(const std::string &instance);
   CacheManager *SetupTieredCacheMgr(const std::string &instance);
   CacheManager *SetupExternalCacheMgr(const std::string &instance);
