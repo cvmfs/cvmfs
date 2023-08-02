@@ -12,24 +12,22 @@
 
 int FdRefcountMgr::Open(const shash::Any id, const std::string& path) {
   int result = -1;
-  {
-    MutexLockGuard lock_guard(lock_cache_refcount_);
-    if (!map_fd_.Lookup(id, &result)) {
-      result = open(path.c_str(), O_RDONLY);
-      if (result >= 0) {
-        map_fd_.Insert(id, result);
-      }
-    }
+  MutexLockGuard lock_guard(lock_cache_refcount_);
+  if (!map_fd_.Lookup(id, &result)) {
+    result = open(path.c_str(), O_RDONLY);
     if (result >= 0) {
-      FdRefcountInfo refc_info;
-      if (map_refcount_.Lookup(result, &refc_info)) {
-        refc_info.refcount++;
-        map_refcount_.Insert(result, refc_info);
-      } else {
-        refc_info.refcount = 1;
-        refc_info.id = id;
-        map_refcount_.Insert(result, refc_info);
-      }
+      map_fd_.Insert(id, result);
+    }
+  }
+  if (result >= 0) {
+    FdRefcountInfo refc_info;
+    if (map_refcount_.Lookup(result, &refc_info)) {
+      refc_info.refcount++;
+      map_refcount_.Insert(result, refc_info);
+    } else {
+      refc_info.refcount = 1;
+      refc_info.id = id;
+      map_refcount_.Insert(result, refc_info);
     }
   }
   return result;
@@ -37,27 +35,25 @@ int FdRefcountMgr::Open(const shash::Any id, const std::string& path) {
 
 int FdRefcountMgr::Close(int fd) {
   int retval = -1;
-  {
-    MutexLockGuard lock_guard(lock_cache_refcount_);
-    FdRefcountInfo refc_info;
-    if (map_refcount_.Lookup(fd, &refc_info)) {
-      if (refc_info.refcount > 1) {
-        refc_info.refcount -= 1;
-        map_refcount_.Insert(fd, refc_info);
-        retval = 0;
-      } else {
-        retval = close(fd);
-        map_fd_.Erase(refc_info.id);
-        map_refcount_.Erase(fd);
-      }
+  MutexLockGuard lock_guard(lock_cache_refcount_);
+  FdRefcountInfo refc_info;
+  if (map_refcount_.Lookup(fd, &refc_info)) {
+    if (refc_info.refcount > 1) {
+      refc_info.refcount -= 1;
+      map_refcount_.Insert(fd, refc_info);
+      retval = 0;
     } else {
-      // fd not present in our table - this should only happen
-      // when reloading from the normal posix cache manager!
-      LogCvmfs(kLogCache, kLogDebug,
-               "WARNING: trying to close fd that "
-               " is not in refcount tables");
       retval = close(fd);
+      map_fd_.Erase(refc_info.id);
+      map_refcount_.Erase(fd);
     }
+  } else {
+    // fd not present in our table - this should only happen
+    // when reloading from the normal posix cache manager!
+    LogCvmfs(kLogCache, kLogDebug,
+              "WARNING: trying to close fd that "
+              " is not in refcount tables");
+    retval = close(fd);
   }
   return retval;
 }
@@ -67,18 +63,18 @@ FdRefcountMgr* FdRefcountMgr::Clone() {
   return clone;
 }
 
-SmallHashDynamic<shash::Any, int> * FdRefcountMgr::GetFdMap() {
+SmallHashDynamic<shash::Any, int> * FdRefcountMgr::GetFdMapPtr() {
   return &map_fd_;
 }
 
 SmallHashDynamic<int, FdRefcountMgr::FdRefcountInfo>*
-    FdRefcountMgr::GetRefcountMap() {
+    FdRefcountMgr::GetRefcountMapPtr() {
   return &map_refcount_;
 }
 
 void FdRefcountMgr::AssignFrom(FdRefcountMgr* other) {
-  map_fd_ = *other->GetFdMap();
-  map_refcount_ = *other->GetRefcountMap();
+  map_fd_ = *other->GetFdMapPtr();
+  map_refcount_ = *other->GetRefcountMapPtr();
 }
 
 FdRefcountMgr::~FdRefcountMgr() {
