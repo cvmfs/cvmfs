@@ -70,15 +70,15 @@ void *PosixRefcountCacheManager::DoSaveState() {
 int PosixRefcountCacheManager::DoRestoreState(void *data) {
   fd_mgr = FdRefcountMgr();
   assert(data);
-    SavedState *state = reinterpret_cast<SavedState *>(data);
+  SavedState *state = reinterpret_cast<SavedState *>(data);
   if (state->magic_number == 32123) {
-      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
-                                     "refcounted posix cache manager");
+    LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                   "refcounted posix cache manager");
 
     fd_mgr.AssignFrom(state->fd_mgr);
   } else {
-      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
-                                     "non-refcounted posix cache manager");
+    LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                   "non-refcounted posix cache manager");
   }
   return -1;
 }
