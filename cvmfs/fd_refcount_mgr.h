@@ -30,6 +30,8 @@ class FdRefcountMgr {
   struct FdRefcountInfo {
     int refcount;  /// refcount for the times the fd was opened in the cache
     shash::Any id;  /// hash of the object opened through the fd
+
+    FdRefcountInfo(): refcount(-1) { }
   };
 
   FdRefcountMgr();
