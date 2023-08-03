@@ -297,7 +297,7 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   string optarg;
   PosixCacheSettings settings;
 
-  if (options_mgr_->GetValue("CVMFS_CACHE_REFCOUNT",
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_REFCOUNT", instance),
                              &optarg)
       && options_mgr_->IsOn(optarg))
   {
