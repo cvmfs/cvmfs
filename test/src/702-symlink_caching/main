@@ -58,7 +58,7 @@ cleanup_mount_on_top() {
 
 # should work both for libfuse2 and libfuse3 as
 # - libfuse2 does not evict dentries
-# - libfuse3 expires dentries instead of evicting
+# - libfuse3.15.1 expires dentries instead of evicting
 mount_on_top() {
   local mntpnt="$1"
   echo $mntpnt
@@ -80,7 +80,7 @@ mount_on_top() {
   # better to use: sudo cvmfs_config reload $CVMFS_TEST_REPO || return 36
   # however this is not possible with a socket
   # as such workaround: use remount sync
-  # this requires change to repo to foce catalog update
+  # this requires change to repo to force catalog update
   add_some_tmp_file_to_repo
   sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 36
 
@@ -109,6 +109,8 @@ check_libfuse2() {
   echo "  *** Testing caching..."
   local res=$(check_readlink_is_cached $mntpnt $symlink_name)
 
+  [ $res = "1" ] || return 11
+
   echo ""
   echo "  *** Testing mount on top..."
   mount_on_top $mntpnt || return $?
@@ -119,7 +121,7 @@ check_libfuse2() {
   echo "*** FINISHED Testing libfuse2"
   echo ""
 
-  [ $res = "1" ] || return 11
+
 }
 
 # for fuse3 (prerequirement: fuse >= 3.10)
@@ -127,6 +129,10 @@ check_libfuse2() {
 # 1) symlinks are cached in kernel
 # 2) symlinks switching from location with a short path --> long path should 
 #    not trunacte
+#
+# TODO(HereThereBeDragons)
+# this code does not do proper check it. it still assumes no correct
+# support of expire
 check_libfuse3() {
   local mntpnt="$1"
   local config_file_path="$2"
@@ -157,6 +163,9 @@ check_libfuse3() {
     local res_switch="1"
   fi
 
+  [ $res_cached = "0" ] || return 20
+  [ $res_switch = "0" ] || return 21
+
   echo ""
   echo "  *** Testing mount on top..."
   mount_on_top $mntpnt || return $?
@@ -165,8 +174,6 @@ check_libfuse3() {
   echo "  *** Unmount repo"
   private_unmount
 
-  [ $res_cached = "0" ] || return 20
-  [ $res_switch = "0" ] || return 21
 
   echo ""
   echo "*** FINISHED Testing libfuse3"
