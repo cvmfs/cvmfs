@@ -148,10 +148,9 @@ class PosixCacheManager : public CacheManager {
     , reports_correct_filesize_(true)
     , is_tmpfs_(false)
     , do_refcount_(do_refcount)
-    , fd_mgr(0)
+    , fd_mgr_(new FdRefcountMgr())
   {
     atomic_init32(&no_inflight_txns_);
-    fd_mgr = new FdRefcountMgr();
   }
 
   std::string GetPathInCache(const shash::Any &id);
@@ -196,7 +195,7 @@ class PosixCacheManager : public CacheManager {
    * Refcount and return only unique file descriptors
    */
   bool do_refcount_;
-  UniquePtr<FdRefcountMgr> fd_mgr;
+  UniquePtr<FdRefcountMgr> fd_mgr_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_

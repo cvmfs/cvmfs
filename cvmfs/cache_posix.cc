@@ -140,7 +140,7 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 int PosixCacheManager::Close(int fd) {
   int retval;
   if (do_refcount_) {
-    retval = fd_mgr->Close(fd);
+    retval = fd_mgr_->Close(fd);
   } else {
     retval = close(fd);
   }
@@ -324,7 +324,7 @@ string PosixCacheManager::Describe() {
 void *PosixCacheManager::DoSaveState() {
   if (do_refcount_) {
     SavedState *state = new SavedState();
-    state->fd_mgr = fd_mgr->Clone();
+    state->fd_mgr = fd_mgr_->Clone();
     return state;
   }
   char *c = reinterpret_cast<char *>(smalloc(1));
@@ -341,7 +341,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
       LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                     "refcounted posix cache manager");
 
-      fd_mgr->AssignFrom(state->fd_mgr.weak_ref());
+      fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
     } else {
       LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                     "non-refcounted posix cache manager");
@@ -356,7 +356,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
     LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
                                     "refcounted posix cache manager - this "
                                     " is not possible, keep refcounting.");
-    fd_mgr->AssignFrom(state->fd_mgr.weak_ref());
+    fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
     do_refcount_ = true;
   }
   return -1;
@@ -420,7 +420,7 @@ int PosixCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
   int result;
   if (do_refcount_) {
-    result = fd_mgr->Open(object.id, path);
+    result = fd_mgr_->Open(object.id, path);
   } else {
     result = open(path.c_str(), O_RDONLY);
   }
