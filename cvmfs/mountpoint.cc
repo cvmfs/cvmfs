@@ -33,7 +33,6 @@
 #include "cache.h"
 #include "cache_extern.h"
 #include "cache_posix.h"
-#include "cache_posix_refc.h"
 #include "cache_ram.h"
 #include "cache_stream.h"
 #include "cache_tiered.h"
