@@ -20,7 +20,7 @@ cvmfs_run_test() {
   # testfile has the following cvmfs hash:
   local testfile_hash=$(get_xattr hash $testfile)
 
-    gcc -Wall -pthread -o openwaitprint $src_location/openwaitprint.c || return 60
+   gcc -Wall -pthread -o openwaitprint $src_location/openwaitprint.c || return 60
   ./openwaitprint $testfile > test &
   local pid_helper1=$!
   ./openwaitprint $testfile > test &
