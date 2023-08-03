@@ -424,6 +424,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc
+  ${CVMFS_SOURCE_DIR}/fd_refcount_mgr.cc
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/file_watcher.cc

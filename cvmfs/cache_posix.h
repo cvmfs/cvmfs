@@ -16,6 +16,7 @@
 #include "cache.h"
 #include "catalog_mgr.h"
 #include "crypto/signature.h"
+#include "fd_refcount_mgr.h"
 #include "file_chunk.h"
 #include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
@@ -71,7 +72,8 @@ class PosixCacheManager : public CacheManager {
   static PosixCacheManager *Create(
     const std::string &cache_path,
     const bool alien_cache,
-    const RenameWorkarounds rename_workaround = kRenameNormal);
+    const RenameWorkarounds rename_workaround = kRenameNormal,
+    const bool do_refcount = false);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -111,6 +113,8 @@ class PosixCacheManager : public CacheManager {
   virtual bool DoFreeState(void *data);
 
  private:
+  bool InitCacheDirectory(const string &cache_path);
+
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
@@ -134,7 +138,8 @@ class PosixCacheManager : public CacheManager {
     shash::Any id;
   };
 
-  PosixCacheManager(const std::string &cache_path, const bool alien_cache)
+  PosixCacheManager(const std::string &cache_path, const bool alien_cache,
+                    const bool do_refcount = false)
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
@@ -142,6 +147,8 @@ class PosixCacheManager : public CacheManager {
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
     , is_tmpfs_(false)
+    , do_refcount_(do_refcount)
+    , fd_mgr_(new FdRefcountMgr())
   {
     atomic_init32(&no_inflight_txns_);
   }
@@ -149,6 +156,7 @@ class PosixCacheManager : public CacheManager {
   std::string GetPathInCache(const shash::Any &id);
   int Rename(const char *oldpath, const char *newpath);
   int Flush(Transaction *transaction);
+
 
   std::string cache_path_;
   std::string txn_template_path_;
@@ -163,6 +171,17 @@ class PosixCacheManager : public CacheManager {
    */
   atomic_int32 no_inflight_txns_;
 
+  static const char kMagicRefcount = 123;
+  static const char kMagicNoRefcount = '\0';
+  struct SavedState {
+    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(NULL) { }
+    /// this helps to distinguish from the SavedState of the normal
+    /// posix cache manager
+    char magic_number;
+    unsigned int version;
+    UniquePtr<FdRefcountMgr> fd_mgr;
+  };
+
   /**
    * Hack for HDFS which writes file sizes asynchronously.
    */
@@ -172,6 +191,11 @@ class PosixCacheManager : public CacheManager {
    * True if posixcache is on tmpfs (and with this already in RAM)
    */
   bool is_tmpfs_;
+  /**
+   * Refcount and return only unique file descriptors
+   */
+  bool do_refcount_;
+  UniquePtr<FdRefcountMgr> fd_mgr_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
