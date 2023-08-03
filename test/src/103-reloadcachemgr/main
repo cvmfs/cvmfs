@@ -83,9 +83,12 @@ cvmfs_run_test() {
   kill -USR1 $pid_helper6
   wait $pid_helper6 || return 67
 
+  cat $testfile > testfile7
+
   diff testfile4 $testfile || return 76
   diff testfile5 $testfile || return 77
   diff testfile6 $testfile || return 78
+  diff testfile7 $testfile || return 79
 
   cvmfs_umount alice.cern.ch || return 80
 
