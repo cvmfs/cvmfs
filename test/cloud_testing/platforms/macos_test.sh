@@ -53,6 +53,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
                                    src/094-attachmount                          \
                                    src/095-fuser                                \
                                    src/102-reusefd                              \
+                                   src/103-reloadcachemgr                       \
                                    --                                           \
                                    src/0*                                       \
                                    src/1*
