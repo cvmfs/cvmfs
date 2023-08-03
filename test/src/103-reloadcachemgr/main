@@ -9,6 +9,7 @@ cleanup() {
 
 cvmfs_run_test() {
   logfile=$1
+  src_location=$2
 
   ############### 1) Check that the normal cache manager 
   ############### creates new fds for the same object 
@@ -21,29 +22,58 @@ cvmfs_run_test() {
   # testfile has the following cvmfs hash:
   testfile_hash=$(get_xattr hash $testfile)
 
-  for i in {1..10}; do
-    tail -f ${testfile} > /dev/null 2>&1 &
-  done;
-  trap cleanup EXIT HUP INT TERM
+  gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 60
+
+    ./openwaitprint $testfile > testfile1 &
+  local pid_helper1=$!
+  ./openwaitprint $testfile > testfile2 &
+  local pid_helper2=$!
+  ./openwaitprint $testfile > testfile3 &
+  local pid_helper3=$!
+
+
   sleep 1;
 
   sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=yes\" >> /etc/cvmfs/default.local" || return 2
   
   sudo cvmfs_config reload || return 20
 
-  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
-  # testfile has the following cvmfs hash:
-  testfile_hash=$(get_xattr hash $testfile)
+    ./openwaitprint $testfile > testfile4 &
+  local pid_helper4=$!
+  ./openwaitprint $testfile > testfile5 &
+  local pid_helper5=$!
+  ./openwaitprint $testfile > testfile6 &
+  local pid_helper6=$!
 
-  for i in {1..10}; do
-    tail -f ${testfile} > /dev/null 2>&1 &
-  done;
-  trap cleanup EXIT HUP INT TERM
-  sleep 1;
+    kill -USR1 $pid_helper1
+  wait $pid_helper1 || return 65
+  kill -USR1 $pid_helper2
+  wait $pid_helper2 || return 66
+  kill -USR1 $pid_helper3
+  wait $pid_helper3 || return 67
+
+  diff testfile1 $testfile || return 73
+  diff testfile2 $testfile || return 74
+  diff testfile3 $testfile || return 75
+
+
 
   sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=no\" >> /etc/cvmfs/default.local" || return 2
 
   sudo cvmfs_config reload || return 30
+
+    kill -USR1 $pid_helper4
+  wait $pid_helper4 || return 65
+  kill -USR1 $pid_helper5
+  wait $pid_helper5 || return 66
+  kill -USR1 $pid_helper6
+  wait $pid_helper6 || return 67
+
+  diff testfile4 $testfile || return 76
+  diff testfile5 $testfile || return 77
+  diff testfile6 $testfile || return 78
+
+  cvmfs_umount alice.cern.ch || return 80
 
   return 0
 }
