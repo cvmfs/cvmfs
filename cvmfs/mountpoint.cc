@@ -691,16 +691,15 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
-  CacheManager* cache_mgr;
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-  cache_mgr = PosixCacheManager::Create(
+  UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
                           : PosixCacheManager::kRenameNormal,
-    settings.do_refcount);
-  if (!cache_mgr) {
+    settings.do_refcount));
+  if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
@@ -713,10 +712,10 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   CreateFile(settings.cache_path + "/.cvmfscache", 0600, ignore_failure);
 
   if (settings.is_managed) {
-    if (!SetupPosixQuotaMgr(settings, cache_mgr))
+    if (!SetupPosixQuotaMgr(settings, cache_mgr.weak_ref()))
       return NULL;
   }
-  return cache_mgr;
+  return cache_mgr.Release();
 }
 
 
