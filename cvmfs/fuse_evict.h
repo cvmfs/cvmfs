@@ -11,7 +11,6 @@
 #include "bigvector.h"
 #include "duplex_fuse.h"
 #include "gtest/gtest_prod.h"
-#include "mountpoint.h"
 #include "shortstring.h"
 #include "util/atomic.h"
 #include "util/single_copy.h"
@@ -20,6 +19,8 @@ namespace glue {
 class InodeTracker;
 class DentryTracker;
 }
+
+class MountPoint;
 
 /**
  * This class can poke all known dentries out of the kernel caches.  This allows
@@ -31,6 +32,7 @@ class DentryTracker;
  * avoid a deadlock in the fuse callbacks (see Fuse documentation).
  */
 class FuseInvalidator : SingleCopy {
+  friend class T_FuseInvalidator;  // for T_FuseInvalidator.SetUp()
   FRIEND_TEST(T_FuseInvalidator, StartStop);
   FRIEND_TEST(T_FuseInvalidator, InvalidateTimeout);
   FRIEND_TEST(T_FuseInvalidator, InvalidateOps);
@@ -65,15 +67,6 @@ class FuseInvalidator : SingleCopy {
   FuseInvalidator(MountPoint *mountpoint,
                   void **fuse_channel_or_session,
                   bool fuse_notify_invalidation);
-  
-  /**
-   * CONSTRUCTOR ONLY FOR UNITTESTS - mountpoint will illegally be null
-   * ( we do not want to construct a full mountpoint in the unittest )
-   */
-  FuseInvalidator(glue::InodeTracker *inode_tracker,
-                glue::DentryTracker *dentry_tracker,
-                void **fuse_channel_or_session,
-                bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
   void InvalidateInodes(Handle *handle);
@@ -81,6 +74,14 @@ class FuseInvalidator : SingleCopy {
   void InvalidateDentry(uint64_t parent_ino, const NameString &name);
 
  private:
+   /**
+   * CONSTRUCTOR ONLY FOR UNITTESTS - mountpoint will illegally be null
+   * ( we do not want to construct a full mountpoint in the unittest )
+   */
+  FuseInvalidator(glue::InodeTracker *inode_tracker,
+                glue::DentryTracker *dentry_tracker,
+                void **fuse_channel_or_session,
+                bool fuse_notify_invalidation);
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
    */

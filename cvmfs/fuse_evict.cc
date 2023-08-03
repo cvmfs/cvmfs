@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include "glue_buffer.h"
+#include "mountpoint.h"
 #include "shortstring.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -68,7 +69,7 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 FuseInvalidator::FuseInvalidator(
   MountPoint *mount_point,
   void **fuse_channel_or_session,
-  bool fuse_notify_invalidation)                                       
+  bool fuse_notify_invalidation)
   : mount_point_(mount_point)
   , inode_tracker_(mount_point->inode_tracker())
   , dentry_tracker_(mount_point->dentry_tracker())
@@ -81,10 +82,6 @@ FuseInvalidator::FuseInvalidator(
   atomic_init32(&terminated_);
 }
 
-/**
- * CONSTRUCTOR ONLY FOR UNITTESTS - mountpoint will illegally be null
- * ( we do not want to construct a full mountpoint in the unittest )
-*/
 FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   glue::DentryTracker *dentry_tracker,
@@ -261,10 +258,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     int (*notify_func)(struct fuse_chan*, fuse_ino_t, const char*, size_t);
     notify_func = &fuse_lowlevel_notify_inval_entry;
 #else
-    
     int (*notify_func)(struct fuse_session*, fuse_ino_t, const char*, size_t);
     notify_func = &fuse_lowlevel_notify_inval_entry;
-
 #if FUSE_CAP_EXPIRE_ONLY
     // must be libfuse >= 3.15.1, otherwise the signature is wrong and it
     // will fail building

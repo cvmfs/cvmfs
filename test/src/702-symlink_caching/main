@@ -130,7 +130,7 @@ check_libfuse2() {
 # 2) symlinks switching from location with a short path --> long path should 
 #    not trunacte
 #
-# TODO TODO
+# TODO(HereThereBeDragons)
 # this code does not do proper check it. it still assumes no correct
 # support of expire
 check_libfuse3() {
