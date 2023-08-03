@@ -78,7 +78,7 @@ cvmfs_run_test() {
   kill -USR1 $pid_helper3
   wait $pid_helper3 || return 67
 
-    echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file"
+  echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file"
   if [ "$num_open_fds" -gt "1" ]; then
     return 40
   fi
