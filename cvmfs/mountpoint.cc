@@ -1139,6 +1139,11 @@ void FileSystem::RemapCatalogFd(int from, int to) {
   sqlite::RegisterFdMapping(from, to);
 }
 
+void FileSystem::ReplaceCacheManager(CacheManager *new_cache_mgr) {
+  cache_mgr_ = new_cache_mgr;
+  sqlite::ReplaceCacheManager(new_cache_mgr);
+}
+
 
 bool FileSystem::TriageCacheMgr() {
   cache_mgr_instance_ = kDefaultCacheMgrInstance;

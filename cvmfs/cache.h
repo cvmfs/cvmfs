@@ -204,6 +204,9 @@ class CacheManager : SingleCopy {
    */
   int RestoreState(const int fd_progress, void *state);
   void FreeState(const int fd_progress, void *state);
+  CacheManagerIds PeekState(void *state) {
+    return static_cast<State *>(state)->manager_type;
+  }
 
   /**
    * While not strictly necessary, cache managers often have a directory

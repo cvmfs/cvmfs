@@ -65,6 +65,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   uint64_t loaded_inodes() const { return loaded_inodes_; }
   std::string repo_name() const { return repo_name_; }
   manifest::Manifest *manifest() const { return manifest_.weak_ref(); }
+  int root_fd() const { return root_fd_; }
 
  protected:
   LoadError LoadCatalog(const PathString  &mountpoint,
@@ -102,6 +103,12 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;
   perf::Counter *n_certificate_misses_;
+
+  /**
+   * File descriptor of first loaded catalog; used for mapping the root catalog
+   * file descriptor when restoring the cache manager after a fuse module reload
+   */
+  int root_fd_;
 };
 
 
