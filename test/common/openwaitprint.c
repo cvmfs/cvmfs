@@ -1,6 +1,6 @@
 /**
  * This file is part of the CernVM File System.
- * Helper for integration test 690 (streaming cache manager)
+ * Helper for cache manager integration tests, e.g. 690 (streaming cache manager)
  */
 
 #include <errno.h>
