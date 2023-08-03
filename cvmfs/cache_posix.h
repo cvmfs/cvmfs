@@ -111,6 +111,8 @@ class PosixCacheManager : public CacheManager {
   virtual void *DoSaveState();
   virtual int DoRestoreState(void *data);
   virtual bool DoFreeState(void *data);
+
+ private:
   bool InitCacheDirectory(const string &cache_path);
 
   struct Transaction {
@@ -167,8 +169,6 @@ class PosixCacheManager : public CacheManager {
    * value in this variable.
    */
   atomic_int32 no_inflight_txns_;
-
- private:
 
   static const char kMagicRefcount = 123;
   static const char kMagicNoRefcount = '\0';
