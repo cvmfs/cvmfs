@@ -154,6 +154,8 @@ class PosixCacheManager : public CacheManager {
   }
 
   std::string GetPathInCache(const shash::Any &id);
+  int Rename(const char *oldpath, const char *newpath);
+  int Flush(Transaction *transaction);
 
 
   std::string cache_path_;
@@ -179,8 +181,6 @@ class PosixCacheManager : public CacheManager {
     unsigned int version;
     UniquePtr<FdRefcountMgr> fd_mgr;
   };
-  int Rename(const char *oldpath, const char *newpath);
-  int Flush(Transaction *transaction);
 
   /**
    * Hack for HDFS which writes file sizes asynchronously.
