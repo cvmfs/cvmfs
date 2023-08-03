@@ -306,13 +306,19 @@ void PosixCacheManager::CtrlTxn(
 
 
 string PosixCacheManager::Describe() {
-  return "Posix cache manager (cache directory: " + cache_path_ + ")\n";
+  string msg;
+  if (do_refcount_) {
+    msg = "Refcounting Posix cache manager (cache directory: " + cache_path_ + ")\n";
+  } else {
+    msg = "Posix cache manager (cache directory: " + cache_path_ + ")\n";
+  }
+  return msg;
 }
 
 
 /**
- * Nothing to do, the kernel keeps the state of open file descriptors.  Return
- * a dummy memory location.
+ * If not refcounting, nothing to do, the kernel keeps the state 
+ * of open file descriptors.  Return a dummy memory location.
  */
 void *PosixCacheManager::DoSaveState() {
   if (do_refcount_) {
@@ -334,15 +340,24 @@ int PosixCacheManager::DoRestoreState(void *data) {
       LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                     "refcounted posix cache manager");
 
-      fd_mgr->AssignFrom(state->fd_mgr);
+      fd_mgr->AssignFrom(state->fd_mgr.weak_ref());
     } else {
       LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                     "non-refcounted posix cache manager");
     }
     return -1;
   }
+
   char *c = reinterpret_cast<char *>(data);
-  assert(*c == '\0');
+  assert(*c == '\0' || *c == 123);
+  if (*c == 123) {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
+                                    "refcounted posix cache manager - this "
+                                    " is not possible, keep refcounting.");
+    fd_mgr->AssignFrom(state->fd_mgr.weak_ref());
+    do_refcount_ = true;
+  } 
   return -1;
 }
 
@@ -352,7 +367,6 @@ bool PosixCacheManager::DoFreeState(void *data) {
   if (do_refcount_) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     if (state->magic_number == 123) {
-      delete state->fd_mgr;
       delete state;
     } else {
       // this should be the dummy SavedState

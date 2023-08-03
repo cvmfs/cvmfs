@@ -74,11 +74,7 @@ class PosixCacheManager : public CacheManager {
     const bool alien_cache,
     const RenameWorkarounds rename_workaround = kRenameNormal,
     const bool do_refcount = false);
-  virtual ~PosixCacheManager() {
-    if (!fd_mgr) {
-      delete(fd_mgr);
-    }
-  }
+  virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const LabeledObject &object);
@@ -153,9 +149,7 @@ class PosixCacheManager : public CacheManager {
     , fd_mgr(0)
   {
     atomic_init32(&no_inflight_txns_);
-    if (do_refcount) {
-      fd_mgr = new FdRefcountMgr();
-    }
+    fd_mgr = new FdRefcountMgr();
   }
 
   std::string GetPathInCache(const shash::Any &id);
@@ -176,12 +170,12 @@ class PosixCacheManager : public CacheManager {
 
  private:
   struct SavedState {
-    SavedState() : version(0), magic_number(123), fd_mgr(NULL) { }
-    unsigned int version;
+    SavedState() : magic_number(123), version(0), fd_mgr(NULL) { }
     /// this helps to distinguish from the SavedState of the normal
     /// posix cache manager
     char magic_number;
-    FdRefcountMgr *fd_mgr;
+    unsigned int version;
+    UniquePtr<FdRefcountMgr> fd_mgr;
   };
   int Rename(const char *oldpath, const char *newpath);
   int Flush(Transaction *transaction);
@@ -198,7 +192,7 @@ class PosixCacheManager : public CacheManager {
   /**
    * Refcount and return only unique file descriptors
    */
-  const bool do_refcount_;
+  bool do_refcount_;
   FdRefcountMgr* fd_mgr;
 };  // class PosixCacheManager
 

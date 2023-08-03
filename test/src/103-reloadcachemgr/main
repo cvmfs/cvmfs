@@ -14,6 +14,15 @@ cvmfs_run_test() {
   ############### 1) Check that the normal cache manager 
   ############### creates new fds for the same object 
   cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+  local CVMFS_TEST_REPO=alice.cern.ch
+  local CVMFS_MOUNTPOINT=/cvmfs/alice.cern.ch
+
+  local talk_socket="/var/lib/cvmfs/shared/cvmfs_io.$CVMFS_TEST_REPO"
+  echo $talk_socket
+
+
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
 
   ############
   # open some test file in several simultaneously in different processes
@@ -37,6 +46,9 @@ cvmfs_run_test() {
   sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=yes\" >> /etc/cvmfs/default.local" || return 2
   
   sudo cvmfs_config reload || return 20
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
+
 
     ./openwaitprint $testfile > testfile4 &
   local pid_helper4=$!
@@ -61,6 +73,8 @@ cvmfs_run_test() {
   sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=no\" >> /etc/cvmfs/default.local" || return 2
 
   sudo cvmfs_config reload || return 30
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
 
     kill -USR1 $pid_helper4
   wait $pid_helper4 || return 65
