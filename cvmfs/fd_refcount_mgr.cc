@@ -3,7 +3,10 @@
  */
 
 #include "fd_refcount_mgr.h"
+#include "util/mutex.h"
+#include "util/smalloc.h"
 
+#include <cassert>
 #include <fcntl.h>
 #include <unistd.h>
 

@@ -328,7 +328,7 @@ void *PosixCacheManager::DoSaveState() {
     return state;
   }
   char *c = reinterpret_cast<char *>(smalloc(1));
-  *c = '\0';
+  *c = kMagicNoRefcount;
   return c;
 }
 
@@ -337,7 +337,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
   if (do_refcount_) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
-    if (state->magic_number == 123) {
+    if (state->magic_number == kMagicRefcount) {
       LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
                                     "refcounted posix cache manager");
 
@@ -350,7 +350,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
   }
 
   char *c = reinterpret_cast<char *>(data);
-  assert(*c == '\0' || *c == 123);
+  assert(*c == kMagicNoRefcount || *c == kMagicRefcount);
   if (*c == 123) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
@@ -366,7 +366,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
 bool PosixCacheManager::DoFreeState(void *data) {
   assert(data);
   SavedState *state = reinterpret_cast<SavedState *>(data);
-  if (state->magic_number == 123) {
+  if (state->magic_number == kMagicRefcount) {
     delete state;
   } else {
     // this should be the dummy SavedState

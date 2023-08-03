@@ -169,8 +169,11 @@ class PosixCacheManager : public CacheManager {
   atomic_int32 no_inflight_txns_;
 
  private:
+
+  static const char kMagicRefcount = 123;
+  static const char kMagicNoRefcount = '\0';
   struct SavedState {
-    SavedState() : magic_number(123), version(0), fd_mgr(NULL) { }
+    SavedState() : magic_number(kMagicRefcount), version(0), fd_mgr(NULL) { }
     /// this helps to distinguish from the SavedState of the normal
     /// posix cache manager
     char magic_number;
