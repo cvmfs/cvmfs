@@ -86,14 +86,6 @@ class CacheManager : SingleCopy {
   static const int kLabelMetainfo    = 0x40;
   static const int kLabelHistory     = 0x80;
 
-  static bool IsPosixCompatible(CacheManagerIds id) {
-    return id == kPosixCacheManager;
-  }
-
-  static bool IsReloadCompatible(CacheManagerIds oldId, CacheManagerIds newId) {
-    return oldId == newId; 
-  }
-
   /**
    * Meta-data of an object that the cache may or may not maintain/use.
    * Good cache implementations should at least distinguish between volatile

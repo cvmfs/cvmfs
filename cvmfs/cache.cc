@@ -101,7 +101,7 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
   if (fd_progress >= 0)
     SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
   assert(state->version == kStateVersion);
-  assert(IsReloadCompatible(state->manager_type,  id()));
+  assert(state->manager_type == id());
   bool result = DoFreeState(state->concrete_state);
   if (!result) {
     if (fd_progress >= 0) {
@@ -196,7 +196,7 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
   }
   // exception: we do allow switching from the non-refcounted
   // to the refcounted posix cache manager
-  if (!IsReloadCompatible(state->manager_type, id())) {
+  if (state->manager_type != id()) {
     if (fd_progress >= 0) {
       SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
     abort();

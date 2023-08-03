@@ -308,7 +308,8 @@ void PosixCacheManager::CtrlTxn(
 string PosixCacheManager::Describe() {
   string msg;
   if (do_refcount_) {
-    msg = "Refcounting Posix cache manager (cache directory: " + cache_path_ + ")\n";
+    msg = "Refcounting Posix cache manager"
+          "(cache directory: " + cache_path_ + ")\n";
   } else {
     msg = "Posix cache manager (cache directory: " + cache_path_ + ")\n";
   }
@@ -357,7 +358,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
                                     " is not possible, keep refcounting.");
     fd_mgr->AssignFrom(state->fd_mgr.weak_ref());
     do_refcount_ = true;
-  } 
+  }
   return -1;
 }
 
