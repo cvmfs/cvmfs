@@ -13,7 +13,7 @@ set (LIBCVMFS_CRYPTO_SOURCES
 )
 
 set (LIBCVMFS_CRYPTO_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
-# Prevent symbold from static crypto libs to be re-exported
+# Prevent symbols from static crypto libs to be re-exported
 set (LIBCVMFS_CRYPTO_LINK_FLAGS "-Wl,--exclude-libs,ALL")
 set (LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES ${RT_LIBRARY} "")
 list (APPEND LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES
