@@ -75,7 +75,7 @@ class PosixCacheManager : public CacheManager {
     const RenameWorkarounds rename_workaround = kRenameNormal,
     const bool do_refcount = false);
   virtual ~PosixCacheManager() { 
-    if (nullptr != fd_mgr) {
+    if (!fd_mgr) {
       delete(fd_mgr);
     }
   }
@@ -150,7 +150,7 @@ class PosixCacheManager : public CacheManager {
     , reports_correct_filesize_(true)
     , is_tmpfs_(false)
     , do_refcount_(do_refcount)
-    , fd_mgr(nullptr)
+    , fd_mgr(0)
   {
     atomic_init32(&no_inflight_txns_);
     if (do_refcount) {
