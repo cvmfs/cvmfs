@@ -2,15 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
-#include "fd_refcount_mgr.h"
-#include "util/mutex.h"
-#include "util/smalloc.h"
-
 #include <cassert>
 #include <fcntl.h>
 #include <unistd.h>
-
 #include <string>
+
+#include "fd_refcount_mgr.h"
+#include "util/mutex.h"
+#include "util/smalloc.h"
 
 
 int FdRefcountMgr::Open(const shash::Any id, const std::string& path) {

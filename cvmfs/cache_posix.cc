@@ -138,12 +138,7 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int PosixCacheManager::Close(int fd) {
-  int retval;
-  if (do_refcount_) {
-    retval = fd_mgr_->Close(fd);
-  } else {
-    retval = close(fd);
-  }
+  int retval = do_refcount_ ? fd_mgr_->Close(fd) : close(fd);
   if (retval != 0)
     return -errno;
   return 0;
