@@ -11,6 +11,7 @@
 #include "bigvector.h"
 #include "duplex_fuse.h"
 #include "gtest/gtest_prod.h"
+#include "mountpoint.h"
 #include "shortstring.h"
 #include "util/atomic.h"
 #include "util/single_copy.h"
@@ -61,10 +62,18 @@ class FuseInvalidator : SingleCopy {
     atomic_int32 *status_;
   };
 
-  FuseInvalidator(glue::InodeTracker *inode_tracker,
-                  glue::DentryTracker *dentry_tracker,
+  FuseInvalidator(MountPoint *mountpoint,
                   void **fuse_channel_or_session,
                   bool fuse_notify_invalidation);
+  
+  /**
+   * CONSTRUCTOR ONLY FOR UNITTESTS - mountpoint will illegally be null
+   * ( we do not want to construct a full mountpoint in the unittest )
+   */
+  FuseInvalidator(glue::InodeTracker *inode_tracker,
+                glue::DentryTracker *dentry_tracker,
+                void **fuse_channel_or_session,
+                bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
   void InvalidateInodes(Handle *handle);
@@ -87,6 +96,8 @@ class FuseInvalidator : SingleCopy {
   static const unsigned kCheckTimeoutFreqOps;  // = 256
 
   static void *MainInvalidator(void *data);
+
+  MountPoint *mount_point_;
 
   glue::InodeTracker *inode_tracker_;
   glue::DentryTracker *dentry_tracker_;
