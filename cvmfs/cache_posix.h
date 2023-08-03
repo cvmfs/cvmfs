@@ -74,7 +74,7 @@ class PosixCacheManager : public CacheManager {
     const bool alien_cache,
     const RenameWorkarounds rename_workaround = kRenameNormal,
     const bool do_refcount = false);
-  virtual ~PosixCacheManager() { 
+  virtual ~PosixCacheManager() {
     if (!fd_mgr) {
       delete(fd_mgr);
     }
