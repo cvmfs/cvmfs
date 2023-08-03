@@ -3,9 +3,6 @@
 cvmfs_test_name="Check changing CVMFS_CACHE_REFCOUNT between reloads"
 cvmfs_test_suites="quick"
 
-cleanup() {
-  jobs -p | xargs kill || true
-}
 
 cvmfs_run_test() {
   logfile=$1
