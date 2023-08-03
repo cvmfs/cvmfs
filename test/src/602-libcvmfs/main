@@ -1,5 +1,6 @@
 cvmfs_test_name="Libcvmfs test"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_602_REPO_COUNT=0
 CVMFS_TEST_602_REPO_PREFIX="test.cern.ch.libcvmfs_"
@@ -22,7 +23,7 @@ cvmfs_run_test() {
   [ "x$cache_dir" != "x$PWD" ] || return 1
 
   echo "compiling libcvmfs test binary..."
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
+  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs_client -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
 
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
