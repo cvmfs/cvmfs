@@ -364,18 +364,14 @@ int PosixCacheManager::DoRestoreState(void *data) {
 
 bool PosixCacheManager::DoFreeState(void *data) {
   assert(data);
-  if (do_refcount_) {
-    SavedState *state = reinterpret_cast<SavedState *>(data);
-    if (state->magic_number == 123) {
-      delete state;
-    } else {
-      // this should be the dummy SavedState
-      // of the regular posix cache manager
-      free(data);
-    }
-    return true;
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  if (state->magic_number == 123) {
+    delete state;
+  } else {
+    // this should be the dummy SavedState
+    // of the regular posix cache manager
+    free(data);
   }
-  free(data);
   return true;
 }
 

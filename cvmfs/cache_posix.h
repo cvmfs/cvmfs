@@ -193,7 +193,7 @@ class PosixCacheManager : public CacheManager {
    * Refcount and return only unique file descriptors
    */
   bool do_refcount_;
-  FdRefcountMgr* fd_mgr;
+  UniquePtr<FdRefcountMgr> fd_mgr;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
