@@ -28,7 +28,6 @@ enum CacheManagerIds {
   kTieredCacheManager,
   kExternalCacheManager,
   kStreamingCacheManager,
-  kPosixRefcountCacheManager,
 };
 
 enum CacheModes {
@@ -88,14 +87,11 @@ class CacheManager : SingleCopy {
   static const int kLabelHistory     = 0x80;
 
   static bool IsPosixCompatible(CacheManagerIds id) {
-    return ((id == kPosixCacheManager) ||
-            (id == kPosixRefcountCacheManager));
+    return id == kPosixCacheManager;
   }
 
   static bool IsReloadCompatible(CacheManagerIds oldId, CacheManagerIds newId) {
-    return ((oldId == newId) ||
-              ((oldId == kPosixCacheManager) &&
-               (newId == kPosixRefcountCacheManager)));
+    return oldId == newId; 
   }
 
   /**
