@@ -2,9 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
-#include <cassert>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <cassert>
 #include <string>
 
 #include "fd_refcount_mgr.h"
@@ -55,6 +56,24 @@ int FdRefcountMgr::Close(int fd) {
               "WARNING: trying to close fd that "
               " is not in refcount tables");
     retval = close(fd);
+  }
+  return retval;
+}
+
+int FdRefcountMgr::Dup(int fd) {
+  int retval = -1;
+  MutexLockGuard lock_guard(lock_cache_refcount_);
+  FdRefcountInfo refc_info;
+  if (map_refcount_.Lookup(fd, &refc_info)) {
+      refc_info.refcount += 1;
+      map_refcount_.Insert(fd, refc_info);
+      retval = fd;
+  } else {
+    // fd not present in our table - this should never happen!
+    LogCvmfs(kLogCache, kLogWarning | kLogSyslogWarn,
+              "WARNING: trying to dup fd that "
+              " is not in refcount tables");
+    retval = dup(fd);
   }
   return retval;
 }

@@ -52,6 +52,8 @@ class FdRefcountMgr {
 
   int Close(int fd);
 
+  int Dup(int fd);
+
   FdRefcountMgr* Clone();
 
  private:

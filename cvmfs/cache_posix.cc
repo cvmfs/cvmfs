@@ -363,17 +363,18 @@ bool PosixCacheManager::DoFreeState(void *data) {
   SavedState *state = reinterpret_cast<SavedState *>(data);
   if (state->magic_number == kMagicRefcount) {
     delete state;
-  } 
+  } else {
   // If not refcounted, the state is the dummy SavedState
   // of the regular posix cache manager
   free(data);
+  }
   return true;
 }
 
 
 
 int PosixCacheManager::Dup(int fd) {
-  int new_fd = dup(fd);
+  int new_fd = do_refcount_ ? fd_mgr_->Dup(fd) : dup(fd);
   if (new_fd < 0)
     return -errno;
   return new_fd;
@@ -435,7 +436,13 @@ int PosixCacheManager::OpenFromTxn(void *txn) {
   int retval = Flush(transaction);
   if (retval < 0)
     return retval;
-  int fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
+  int fd_rdonly;
+
+  if (do_refcount_) {
+    fd_rdonly = fd_mgr_->Open(transaction->id, transaction->tmp_path.c_str());
+  } else {
+    fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
+  }
   if (fd_rdonly == -1)
     return -errno;
   return fd_rdonly;
