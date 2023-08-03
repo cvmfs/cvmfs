@@ -13,8 +13,12 @@ set (LIBCVMFS_CRYPTO_SOURCES
 )
 
 set (LIBCVMFS_CRYPTO_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
-# Prevent symbols from static crypto libs to be re-exported
-set (LIBCVMFS_CRYPTO_LINK_FLAGS "-Wl,--exclude-libs,ALL")
+if (NOT MACOSX)
+  # Prevent symbols from static crypto libs to be re-exported
+  # Ideally we would also do this on macOS. However, on macOS we would need to link with the
+  # -hidden-l$lib flag instead, and there does not seem to be a good way to express that in cmake.
+  set (LIBCVMFS_CRYPTO_LINK_FLAGS "-Wl,--exclude-libs,ALL")
+endif ()
 set (LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES ${RT_LIBRARY} "")
 list (APPEND LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES
       ${RT_LIBRARY}
