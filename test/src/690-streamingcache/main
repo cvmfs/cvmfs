@@ -135,14 +135,14 @@ cvmfs_run_test() {
                  "$CVMFS_TEST_REPO" \
                  "$(get_repo_url $CVMFS_TEST_REPO)" \
                  "" \
-                 "CVMFS_DEBUGLOG=/tmp/debug.log\nCVMFS_STREAMING_CACHE=no\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 81
+                 "CVMFS_STREAMING_CACHE=no\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 81
   config=$(sudo cvmfs_talk -p $talk_socket parameters | \
     grep ^CVMFS_STREAMING_CACHE | awk '{print $NF}')
   echo "*** config is $config"
   echo "CVMFS_STREAMING_CACHE=yes" >> $config
   ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
   pid_helper=$!
-  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO --debug || return 82
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 82
   sudo cvmfs_talk -p $talk_socket parameters
   sudo cvmfs_talk -p $talk_socket cache instance
   kill -USR1 $pid_helper
