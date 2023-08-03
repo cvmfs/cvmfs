@@ -181,6 +181,11 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
   return fd_table_.OpenFd(FdInfo(object));
 }
 
+int StreamingCacheManager::PlantFd(int fd_in_cache_mgr) {
+  MutexLockGuard lock_guard(lock_fd_table_);
+  return fd_table_.OpenFd(FdInfo(fd_in_cache_mgr));
+}
+
 int64_t StreamingCacheManager::GetSize(int fd) {
   FdInfo info;
   {
@@ -316,4 +321,9 @@ bool StreamingCacheManager::DoFreeState(void *data) {
   delete state->fd_table;
   delete state;
   return true;
+}
+
+CacheManager *StreamingCacheManager::MoveOutBackingCacheMgr(int *root_fd) {
+  *root_fd = fd_table_.GetHandle(0).fd_in_cache_mgr;
+  return cache_mgr_.Release();
 }

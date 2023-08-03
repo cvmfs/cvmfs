@@ -543,4 +543,11 @@ void RegisterFdMapping(int from, int to) {
   fd_to_->push_back(to);
 }
 
+void ReplaceCacheManager(CacheManager *new_cache_mgr) {
+  sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName);
+  if (vfs == NULL)
+    return;
+  static_cast<VfsRdOnly *>(vfs->pAppData)->cache_mgr = new_cache_mgr;
+}
+
 }  // namespace sqlite

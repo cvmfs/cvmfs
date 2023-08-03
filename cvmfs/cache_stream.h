@@ -79,6 +79,15 @@ class StreamingCacheManager : public CacheManager {
     return cache_mgr_->StoreBreadcrumb(manifest);
   }
 
+  // Used in cvmfs' RestoreState to switch back from the streaming to the
+  // regular cache manager. At this point, the streaming cache manager has
+  // opened the root file catalog. We need to return the file descriptor in
+  // the wrapped cache manager, too.
+  CacheManager *MoveOutBackingCacheMgr(int *root_fd);
+  // Used in cvmfs' RestoreState to create a virtual file descriptor for the
+  // root catalog fd, that has been already opened in the backing cache manager
+  int PlantFd(int fd_in_cache_mgr);
+
  protected:
   virtual void *DoSaveState();
   virtual int DoRestoreState(void *data);

@@ -24,6 +24,8 @@ cvmfs_run_test() {
 
   start_transaction $CVMFS_TEST_REPO                             || return $?
   mkdir -p ${repo_dir}/internal                                  || return 2
+  mkdir -p ${repo_dir}/nested                                    || return 2
+  touch ${repo_dir}/nested/.cvmfscatalog                         || return 2
   echo "Hello World" > ${repo_dir}/internal/small                || return 3
   cat /dev/urandom | head -c 2500 > ${repo_dir}/internal/bar     || return 4
   publish_repo $CVMFS_TEST_REPO -v                               || return 5
@@ -60,8 +62,6 @@ cvmfs_run_test() {
   trap cleanup EXIT HUP INT TERM || return $?
 
   CVMFS_TEST_690_PRIVATE_MOUNTPOINT="$(pwd)/mountpoint"
-  echo "CVMFS_STREAMING_CACHE=yes" > test690.conf
-  echo "CVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}" >> test690.conf
   do_local_mount "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO" \
                  "$(get_repo_url $CVMFS_TEST_REPO)" \
@@ -112,6 +112,44 @@ cvmfs_run_test() {
   kill -USR1 $pid_helper
   wait $pid_helper || return 62
   diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 63
+
+  echo "*** ignore changing from streaming to non-streaming"
+  local config=$(sudo cvmfs_talk -p $talk_socket parameters | \
+    grep ^CVMFS_STREAMING_CACHE | awk '{print $NF}')
+  echo "*** config is $config"
+  echo "CVMFS_STREAMING_CACHE=no" >> $config
+  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  pid_helper=$!
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 70
+  sudo cvmfs_talk -p $talk_socket parameters
+  sudo cvmfs_talk -p $talk_socket cache instance
+  kill -USR1 $pid_helper
+  wait $pid_helper || return 71
+  diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 72
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar > /dev/null || return 73
+  ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 74
+
+  echo "*** ignore changing from non-streaming to streaming"
+  remove_local_mount $CVMFS_TEST_690_PRIVATE_MOUNTPOINT || return 80
+  do_local_mount "$CVMFS_TEST_690_PRIVATE_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_DEBUGLOG=/tmp/debug.log\nCVMFS_STREAMING_CACHE=no\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 81
+  config=$(sudo cvmfs_talk -p $talk_socket parameters | \
+    grep ^CVMFS_STREAMING_CACHE | awk '{print $NF}')
+  echo "*** config is $config"
+  echo "CVMFS_STREAMING_CACHE=yes" >> $config
+  ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
+  pid_helper=$!
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO --debug || return 82
+  sudo cvmfs_talk -p $talk_socket parameters
+  sudo cvmfs_talk -p $talk_socket cache instance
+  kill -USR1 $pid_helper
+  wait $pid_helper || return 83
+  diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 84
+  cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/bar > /dev/null || return 85
+  ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/ || return 86
 
   return 0
 }
