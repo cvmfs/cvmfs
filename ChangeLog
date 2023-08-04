@@ -1,4 +1,5 @@
 2.11.0:
+  * [client] Re-use the file descriptor for a file already open in the local cache (#3067)
   * Support latest signature of fuse_lowlevel_notify_expire_entry (#3352)
   * [client] Placeholder for custom proxy health check and sharding policy (#3095) 
   * [client] Custom http tracing headers (#3094)
