@@ -92,6 +92,10 @@ var handler = PatternHandler{[]patternRoute{
 	// Webhooks
 	NewRoute("POST", "/webhooks/harbor", notImplementedHandler),
 
+	// HTML
+	NewRoute("GET", "/html/jobs/("+uuidRegex+")", getTaskHtmlHandler),
+	NewRoute("GET", "/html/images", getImagesHtmlHandler),
+
 	// Other general actions
 	// - Clean up orphaned images
 	// - Clean up orphaned layers
