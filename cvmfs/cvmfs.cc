@@ -68,6 +68,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_stream.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compat.h"
@@ -2709,12 +2710,54 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
+      int old_root_fd = cvmfs::mount_point_->catalog_mgr()->root_fd();
+
+      // TODO(jblomer): make this less hacky
+
+      CacheManagerIds saved_type =
+        cvmfs::file_system_->cache_mgr()->PeekState(saved_states[i]->state);
+      int fixup_root_fd = -1;
+
+      if ((saved_type == kStreamingCacheManager) &&
+          (cvmfs::file_system_->cache_mgr()->id() != kStreamingCacheManager))
+      {
+        // stick to the streaming cache manager
+        StreamingCacheManager *new_cache_mgr = new
+          StreamingCacheManager(cvmfs::max_open_files_,
+                                cvmfs::file_system_->cache_mgr(),
+                                cvmfs::mount_point_->download_mgr(),
+                                cvmfs::mount_point_->external_download_mgr());
+        fixup_root_fd = new_cache_mgr->PlantFd(old_root_fd);
+        cvmfs::file_system_->ReplaceCacheManager(new_cache_mgr);
+        cvmfs::mount_point_->fetcher()->ReplaceCacheManager(new_cache_mgr);
+        cvmfs::mount_point_->external_fetcher()->ReplaceCacheManager(
+          new_cache_mgr);
+      }
+
+      if ((cvmfs::file_system_->cache_mgr()->id() == kStreamingCacheManager) &&
+          (saved_type != kStreamingCacheManager))
+      {
+        // stick to the cache manager wrapped into the streaming cache
+        CacheManager *wrapped_cache_mgr = dynamic_cast<StreamingCacheManager *>(
+            cvmfs::file_system_->cache_mgr())->MoveOutBackingCacheMgr(
+              &fixup_root_fd);
+        delete cvmfs::file_system_->cache_mgr();
+        cvmfs::file_system_->ReplaceCacheManager(wrapped_cache_mgr);
+        cvmfs::mount_point_->fetcher()->ReplaceCacheManager(wrapped_cache_mgr);
+        cvmfs::mount_point_->external_fetcher()->ReplaceCacheManager(
+          wrapped_cache_mgr);
+      }
+
       int new_root_fd = cvmfs::file_system_->cache_mgr()->RestoreState(
         fd_progress, saved_states[i]->state);
       LogCvmfs(kLogCvmfs, kLogDebug, "new root file catalog descriptor @%d",
                new_root_fd);
       if (new_root_fd >= 0) {
-        cvmfs::file_system_->RemapCatalogFd(0, new_root_fd);
+        cvmfs::file_system_->RemapCatalogFd(old_root_fd, new_root_fd);
+      } else if (fixup_root_fd >= 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "new root file catalog descriptor (fixup) @%d", fixup_root_fd);
+        cvmfs::file_system_->RemapCatalogFd(old_root_fd, fixup_root_fd);
       }
     }
 

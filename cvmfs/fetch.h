@@ -121,6 +121,9 @@ class Fetcher : SingleCopy {
   int Fetch(const CacheManager::LabeledObject &object,
             const std::string &alt_url = "");
 
+  void ReplaceCacheManager(CacheManager *new_cache_mgr) {
+    cache_mgr_ = new_cache_mgr;
+  }
   CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
 

@@ -45,6 +45,7 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   , all_inodes_(0)
   , loaded_inodes_(0)
   , fixed_alt_root_catalog_(false)
+  , root_fd_(-1)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
   n_certificate_hits_ = mountpoint->statistics()->Register(
@@ -264,6 +265,9 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
                            alt_catalog_path);
   if (fd >= 0) {
+    if (root_fd_ < 0) {
+      root_fd_ = fd;
+    }
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;
   }
