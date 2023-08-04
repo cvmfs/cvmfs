@@ -207,9 +207,6 @@ func (t *Task) setTaskStatusWithoutLocking(tx *sql.Tx, status TaskStatus) error 
 		defer tx.Rollback()
 	}
 
-	t.cv.L.Lock()
-	defer t.cv.L.Unlock()
-
 	stnmt := "UPDATE tasks SET status=? WHERE id=?"
 	_, err := tx.Exec(stnmt, status, t.ID)
 	if err != nil {
