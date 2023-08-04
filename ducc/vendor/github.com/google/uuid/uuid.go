@@ -14,9 +14,9 @@ import (
 	"strings"
 )
 
-// A UUID is a 128 bit (16 byte) Universal Unique IDentifier as defined in RFC
+// A TaskID is a 128 bit (16 byte) Universal Unique IDentifier as defined in RFC
 // 4122.
-type UUID [16]byte
+type TaskID [16]byte
 
 // A Version represents a UUID's version.
 type Version byte
@@ -46,8 +46,8 @@ func (err invalidLengthError) Error() string {
 // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx are decoded as well as the
 // Microsoft encoding {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} and the raw hex
 // encoding: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
-func Parse(s string) (UUID, error) {
-	var uuid UUID
+func Parse(s string) (TaskID, error) {
+	var uuid TaskID
 	switch len(s) {
 	// xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	case 36:
@@ -97,8 +97,8 @@ func Parse(s string) (UUID, error) {
 }
 
 // ParseBytes is like Parse, except it parses a byte slice instead of a string.
-func ParseBytes(b []byte) (UUID, error) {
-	var uuid UUID
+func ParseBytes(b []byte) (TaskID, error) {
+	var uuid TaskID
 	switch len(b) {
 	case 36: // xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	case 36 + 9: // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -142,7 +142,7 @@ func ParseBytes(b []byte) (UUID, error) {
 
 // MustParse is like Parse but panics if the string cannot be parsed.
 // It simplifies safe initialization of global variables holding compiled UUIDs.
-func MustParse(s string) UUID {
+func MustParse(s string) TaskID {
 	uuid, err := Parse(s)
 	if err != nil {
 		panic(`uuid: Parse(` + s + `): ` + err.Error())
@@ -152,13 +152,13 @@ func MustParse(s string) UUID {
 
 // FromBytes creates a new UUID from a byte slice. Returns an error if the slice
 // does not have a length of 16. The bytes are copied from the slice.
-func FromBytes(b []byte) (uuid UUID, err error) {
+func FromBytes(b []byte) (uuid TaskID, err error) {
 	err = uuid.UnmarshalBinary(b)
 	return uuid, err
 }
 
 // Must returns uuid if err is nil and panics otherwise.
-func Must(uuid UUID, err error) UUID {
+func Must(uuid TaskID, err error) TaskID {
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +167,7 @@ func Must(uuid UUID, err error) UUID {
 
 // String returns the string form of uuid, xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 // , or "" if uuid is invalid.
-func (uuid UUID) String() string {
+func (uuid TaskID) String() string {
 	var buf [36]byte
 	encodeHex(buf[:], uuid)
 	return string(buf[:])
@@ -175,14 +175,14 @@ func (uuid UUID) String() string {
 
 // URN returns the RFC 2141 URN form of uuid,
 // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,  or "" if uuid is invalid.
-func (uuid UUID) URN() string {
+func (uuid TaskID) URN() string {
 	var buf [36 + 9]byte
 	copy(buf[:], "urn:uuid:")
 	encodeHex(buf[9:], uuid)
 	return string(buf[:])
 }
 
-func encodeHex(dst []byte, uuid UUID) {
+func encodeHex(dst []byte, uuid TaskID) {
 	hex.Encode(dst, uuid[:4])
 	dst[8] = '-'
 	hex.Encode(dst[9:13], uuid[4:6])
@@ -195,7 +195,7 @@ func encodeHex(dst []byte, uuid UUID) {
 }
 
 // Variant returns the variant encoded in uuid.
-func (uuid UUID) Variant() Variant {
+func (uuid TaskID) Variant() Variant {
 	switch {
 	case (uuid[8] & 0xc0) == 0x80:
 		return RFC4122
@@ -209,7 +209,7 @@ func (uuid UUID) Variant() Variant {
 }
 
 // Version returns the version of uuid.
-func (uuid UUID) Version() Version {
+func (uuid TaskID) Version() Version {
 	return Version(uuid[6] >> 4)
 }
 

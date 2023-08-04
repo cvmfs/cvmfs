@@ -107,7 +107,7 @@ func UpdateImagesForWish(tx *sql.Tx, wishId WishID, images []Image) (created []I
 	if tx == nil {
 		ownTx = true
 		var err error
-		tx, err = g_db.Begin()
+		tx, err = GetTransaction()
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -191,7 +191,7 @@ func UpdateImagesForWish(tx *sql.Tx, wishId WishID, images []Image) (created []I
 	}
 
 	if ownTx {
-		err = tx.Commit()
+		err := tx.Commit()
 		if err != nil {
 			return nil, nil, nil, err
 		}

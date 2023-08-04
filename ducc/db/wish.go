@@ -17,7 +17,7 @@ const wishIdentifierSqlQueryDigest string = "source=? AND cvmfs_repository=? AND
 const wishIdentifierSqlFieldsOrdered string = "id, source, cvmfs_repository, input_tag, input_tag_wildcard, input_digest, input_repository, input_registry_scheme, input_registry_hostname"
 const wishIdentifierSqlFieldsQs string = "?,?,?,?,?,?,?,?,?"
 
-type WishID = uuid.UUID
+type WishID = uuid.TaskID
 
 type WishIdentifier struct {
 	Source                string

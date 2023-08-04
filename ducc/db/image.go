@@ -14,9 +14,10 @@ const imageIdentifierSqlFieldsOrdered string = "digest, tag, registry_scheme, re
 const imageIdentifierSqlFieldsQueryTag string = "digest IS NULL AND tag=? AND registry_scheme=? AND registry_hostname=? AND repository=?"
 const imageIdentifierSqlFieldsQueryDigest string = "digest=? AND tag IS NULL AND registry_scheme=? AND registry_hostname=? AND repository=?"
 const imageIdentifierSqlFieldsQs string = "?,?,?,?,?"
-const imageSqlFieldsOrdered = "id, digest, tag, registry_scheme, registry_hostname, repository"
+const imageSqlFieldsOrdered string = "id, digest, tag, registry_scheme, registry_hostname, repository"
+const imageSqlFieldsOrderedPrefixed string = "images.id, images.digest, images.tag, images.registry_scheme, images.registry_hostname, images.repository"
 
-type ImageID = uuid.UUID
+type ImageID = uuid.TaskID
 
 type Image struct {
 	ID             ImageID
@@ -196,6 +197,59 @@ func GetImagesByValues(tx *sql.Tx, images []Image) ([]Image, error) {
 		} else {
 			row = prepStmntTag.QueryRow(image.Tag, image.RegistryScheme, image.RegistryHost, image.Repository)
 		}
+		image, err := parseImageFromRow(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, image)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+// GetImageByID returns an image from the database by ID.
+// If no image is found, an error is returned.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+func GetImageByID(tx *sql.Tx, imageID ImageID) (Image, error) {
+	images, err := GetImagesByIDs(tx, []ImageID{imageID})
+	if err != nil {
+		return Image{}, err
+	}
+	return images[0], nil
+}
+
+// GetImagesByIDs tals in a slice of image IDs and returns the corresponding images.
+// Unless all images are found, an error is returned.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+func GetImagesByIDs(tx *sql.Tx, imageIDs []ImageID) ([]Image, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images WHERE id = ?"
+	prepStmnt, err := tx.Prepare(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer prepStmnt.Close()
+
+	out := make([]Image, 0, len(imageIDs))
+	for _, imageID := range imageIDs {
+		row := prepStmnt.QueryRow(imageID)
 		image, err := parseImageFromRow(row)
 		if err != nil {
 			return nil, err
