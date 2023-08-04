@@ -69,8 +69,9 @@ int FdRefcountMgr::Dup(int fd) {
       map_refcount_.Insert(fd, refc_info);
       retval = fd;
   } else {
-    // fd not present in our table - this should never happen!
-    LogCvmfs(kLogCache, kLogWarning | kLogSyslogWarn,
+    // fd not present in our table - this should
+    // not happen in the current usage of Dup
+    LogCvmfs(kLogCache, kLogDebug,
               "WARNING: trying to dup fd that "
               " is not in refcount tables");
     retval = dup(fd);
