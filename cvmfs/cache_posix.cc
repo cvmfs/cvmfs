@@ -346,7 +346,7 @@ int PosixCacheManager::DoRestoreState(void *data) {
 
   char *c = reinterpret_cast<char *>(data);
   assert(*c == kMagicNoRefcount || *c == kMagicRefcount);
-  if (*c == 123) {
+  if (*c == kMagicRefcount) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
                                     "refcounted posix cache manager - this "
