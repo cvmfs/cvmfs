@@ -120,6 +120,7 @@ func GetManifestsByImageIDs(tx *sql.Tx, imageIDs []ImageID) ([]Manifest, error) 
 		if err != nil {
 			return nil, err
 		}
+		defer rows.Close()
 		for rows.Next() {
 			layer, err := parseLayerFromRow(rows)
 			if err != nil {
