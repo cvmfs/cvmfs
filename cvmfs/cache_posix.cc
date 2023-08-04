@@ -364,9 +364,9 @@ bool PosixCacheManager::DoFreeState(void *data) {
   if (state->magic_number == kMagicRefcount) {
     delete state;
   } else {
-  // If not refcounted, the state is the dummy SavedState
-  // of the regular posix cache manager
-  free(data);
+    // If not refcounted, the state is the dummy SavedState
+    // of the regular posix cache manager
+    free(data);
   }
   return true;
 }
