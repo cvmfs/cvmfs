@@ -32,7 +32,7 @@ cvmfs_run_test() {
   ###########
   # check the open file descriptors of the cvmfs2 process 
   local alice_pid=$(sudo cvmfs_talk -i alice.cern.ch pid)
-  local num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
+  local num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep "$(get_cvmfs_cachedir alice.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
   echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
   if [ "$num_open_fds" -lt "2" ]; then
@@ -69,7 +69,7 @@ cvmfs_run_test() {
   ###########
   # check the open file descriptors of the cvmfs2 process 
   alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
-  num_open_fds=$(ls -l /proc/$alice_pid/fd/ | grep /var/lib/cvmfs/shared/${testfile_hash:0:2}/${testfile_hash:2} | wc -l)
+  local num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep "$(get_cvmfs_cachedir alice.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
   kill -USR1 $pid_helper1
   wait $pid_helper1 || return 65

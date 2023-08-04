@@ -14,7 +14,7 @@ cvmfs_run_test() {
   local CVMFS_TEST_REPO=alice.cern.ch
   local CVMFS_MOUNTPOINT=/cvmfs/alice.cern.ch
 
-  local talk_socket="/var/lib/cvmfs/shared/cvmfs_io.$CVMFS_TEST_REPO"
+  local talk_socket="$(get_cvmfs_cachedir $CVMFS_TEST_REPO)/cvmfs_io.$CVMFS_TEST_REPO"
   echo $talk_socket
 
 
