@@ -260,8 +260,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 #else
     int (*notify_func)(struct fuse_session*, fuse_ino_t, const char*, size_t);
     notify_func = &fuse_lowlevel_notify_inval_entry;
-#if FUSE_CAP_EXPIRE_ONLY
-    // must be libfuse >= 3.15.1, otherwise the signature is wrong and it
+#if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 16)
+    // must be libfuse >= 3.16, otherwise the signature is wrong and it
     // will fail building
     // mount_point can only be NULL for unittests
     if (invalidator->mount_point_ != NULL &&
