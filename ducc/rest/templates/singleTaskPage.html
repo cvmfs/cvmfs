@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task Status</title>
+</head>
+<body>
+    <h1>Task ID: {{.TaskSnapshot.ID}}</h1>
+    <h2>Type: {{.TaskSnapshot.Type}}</h2>
+    <h2>Status: {{.TaskSnapshot.Status}}</h2>
+    <h2>Result: {{.TaskSnapshot.Result}}</h2>
+    {{if .ChildSnapshots}}
+    <h3>Subtasks:</h3>
+    <table border="1">
+	<tr>
+	<th>Task Type</th>
+	<th>Task Status</th>
+	<th>Task Result</th>
+	</tr>
+    {{range .ChildSnapshots}}
+	<tr>
+        <td><a href="/html/jobs/{{.ID}}">{{.Type}}</a></td>
+		<td>{{.Status}}</td>
+		<td>{{.Result}}</td>
+	</tr>
+    {{end}}
+    </table>
+    {{end}}
+    <h3>Logs:</h3>
+    <table border="1">
+    <tr>
+        <th>Severity</th>
+        <th>Timestamp</th>
+        <th>Message</th>
+    </tr>
+    {{range .TaskSnapshot.Logs}}
+    <tr>
+        <td>{{LogSeverityToText .Severity}}</td>
+        <td>{{.Timestamp}}</td>
+        <td>{{.Message}}</td>
+    </tr>
+    {{end}}
+    </table>
+</body>
+</html>
