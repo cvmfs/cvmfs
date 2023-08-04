@@ -297,6 +297,13 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   string optarg;
   PosixCacheSettings settings;
 
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_REFCOUNT", instance),
+                             &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    settings.do_refcount = true;
+  }
+
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
       && options_mgr_->IsOn(optarg))
@@ -686,12 +693,12 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
-                          : PosixCacheManager::kRenameNormal));
+                          : PosixCacheManager::kRenameNormal,
+    settings.do_refcount));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
@@ -1123,7 +1130,8 @@ void FileSystem::SetupUuid() {
  * cache in order to properly unravel the file system stack on shutdown.
  */
 void FileSystem::TearDown2ReadOnly() {
-  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == kPosixCacheManager)) {
+  if ((cache_mgr_ != NULL) &&
+      (cache_mgr_->id() == kPosixCacheManager)) {
     PosixCacheManager *posix_cache_mgr =
       reinterpret_cast<PosixCacheManager *>(cache_mgr_);
     posix_cache_mgr->TearDown2ReadOnly();

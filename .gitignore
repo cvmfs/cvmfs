@@ -15,6 +15,7 @@ python/MANIFEST
 
 # Visual Studio Code
 .browse.VC.*
+.vscode
 
 # Eclipse-related files
 .project
