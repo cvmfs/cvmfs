@@ -30,18 +30,13 @@
       return -1;
     }
     static int __attribute__((used)) fuse_lowlevel_notify_inval_entry(
-      void *, unsigned /*fuse_ino_t*/, const char *, size_t)  // NOLINT
-    {
-      fuse_lowlevel_notify_inval_entry_cnt++;
-      return -1;
-    }
-    static int __attribute__((used)) fuse_lowlevel_notify_expire_entry(
-      void *, unsigned /*fuse_ino_t*/, const char *, size_t, enum fuse_expire_flags)  // NOLINT
+      struct fuse_chan *, fuse_ino_t, const char *, size_t)  // NOLINT
     {
       fuse_lowlevel_notify_inval_entry_cnt++;
       return -1;
     }
   }
+  #define CVMFS_USE_LIBFUSE 2
 #else  // CVMFS_LIBCVMFS
   #ifndef CVMFS_USE_LIBFUSE
     #error "Build system error: CVMFS_USE_LIBFUSE unset"

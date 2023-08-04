@@ -2384,7 +2384,7 @@ EOF
   cat "$config"
 
   if [ ! -z $mount_options ]; then
-    mount_options="${$mount_options},"
+    mount_options="${mount_options},"
   fi
 
   if [ x"$as_root" != x"" ]; then
