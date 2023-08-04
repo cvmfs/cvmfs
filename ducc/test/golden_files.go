@@ -17,6 +17,14 @@ func CompareWithGoldenFile(t *testing.T, goldenFilePath string, value string, up
 		}
 	}
 
+	if update {
+		// Delete the file if it exists
+		err := os.Remove(goldenFilePath)
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatalf("Failed to delete previous golden file \"%s\": %s", goldenFilePath, err)
+		}
+	}
+
 	f, err := os.OpenFile(goldenFilePath, os.O_RDWR+os.O_CREATE, 0644)
 	if err != nil {
 		t.Fatal(err)

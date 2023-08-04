@@ -16,7 +16,7 @@ var (
 	NameSpaceURL  = Must(Parse("6ba7b811-9dad-11d1-80b4-00c04fd430c8"))
 	NameSpaceOID  = Must(Parse("6ba7b812-9dad-11d1-80b4-00c04fd430c8"))
 	NameSpaceX500 = Must(Parse("6ba7b814-9dad-11d1-80b4-00c04fd430c8"))
-	Nil           UUID // empty UUID, all zeros
+	Nil           TaskID // empty UUID, all zeros
 )
 
 // NewHash returns a new UUID derived from the hash of space concatenated with
@@ -24,12 +24,12 @@ var (
 // first 16 bytes of the hash are used to form the UUID.  The version of the
 // UUID will be the lower 4 bits of version.  NewHash is used to implement
 // NewMD5 and NewSHA1.
-func NewHash(h hash.Hash, space UUID, data []byte, version int) UUID {
+func NewHash(h hash.Hash, space TaskID, data []byte, version int) TaskID {
 	h.Reset()
 	h.Write(space[:]) //nolint:errcheck
 	h.Write(data)     //nolint:errcheck
 	s := h.Sum(nil)
-	var uuid UUID
+	var uuid TaskID
 	copy(uuid[:], s)
 	uuid[6] = (uuid[6] & 0x0f) | uint8((version&0xf)<<4)
 	uuid[8] = (uuid[8] & 0x3f) | 0x80 // RFC 4122 variant
@@ -39,15 +39,15 @@ func NewHash(h hash.Hash, space UUID, data []byte, version int) UUID {
 // NewMD5 returns a new MD5 (Version 3) UUID based on the
 // supplied name space and data.  It is the same as calling:
 //
-//  NewHash(md5.New(), space, data, 3)
-func NewMD5(space UUID, data []byte) UUID {
+//	NewHash(md5.New(), space, data, 3)
+func NewMD5(space TaskID, data []byte) TaskID {
 	return NewHash(md5.New(), space, data, 3)
 }
 
 // NewSHA1 returns a new SHA1 (Version 5) UUID based on the
 // supplied name space and data.  It is the same as calling:
 //
-//  NewHash(sha1.New(), space, data, 5)
-func NewSHA1(space UUID, data []byte) UUID {
+//	NewHash(sha1.New(), space, data, 5)
+func NewSHA1(space TaskID, data []byte) TaskID {
 	return NewHash(sha1.New(), space, data, 5)
 }

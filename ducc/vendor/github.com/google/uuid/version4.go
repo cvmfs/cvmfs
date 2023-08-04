@@ -9,15 +9,15 @@ import "io"
 // New creates a new random UUID or panics.  New is equivalent to
 // the expression
 //
-//    uuid.Must(uuid.NewRandom())
-func New() UUID {
+//	uuid.Must(uuid.NewRandom())
+func New() TaskID {
 	return Must(NewRandom())
 }
 
 // NewString creates a new random UUID and returns it as a string or panics.
 // NewString is equivalent to the expression
 //
-//    uuid.New().String()
+//	uuid.New().String()
 func NewString() string {
 	return Must(NewRandom()).String()
 }
@@ -29,18 +29,18 @@ func NewString() string {
 //
 // A note about uniqueness derived from the UUID Wikipedia entry:
 //
-//  Randomly generated UUIDs have 122 random bits.  One's annual risk of being
-//  hit by a meteorite is estimated to be one chance in 17 billion, that
-//  means the probability is about 0.00000000006 (6 × 10−11),
-//  equivalent to the odds of creating a few tens of trillions of UUIDs in a
-//  year and having one duplicate.
-func NewRandom() (UUID, error) {
+//	Randomly generated UUIDs have 122 random bits.  One's annual risk of being
+//	hit by a meteorite is estimated to be one chance in 17 billion, that
+//	means the probability is about 0.00000000006 (6 × 10−11),
+//	equivalent to the odds of creating a few tens of trillions of UUIDs in a
+//	year and having one duplicate.
+func NewRandom() (TaskID, error) {
 	return NewRandomFromReader(rander)
 }
 
 // NewRandomFromReader returns a UUID based on bytes read from a given io.Reader.
-func NewRandomFromReader(r io.Reader) (UUID, error) {
-	var uuid UUID
+func NewRandomFromReader(r io.Reader) (TaskID, error) {
+	var uuid TaskID
 	_, err := io.ReadFull(r, uuid[:])
 	if err != nil {
 		return Nil, err
