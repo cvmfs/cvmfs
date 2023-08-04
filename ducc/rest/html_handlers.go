@@ -81,6 +81,7 @@ func renderTaskTemplate(taskId db.TaskID) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
 
 	// Get the task snapshot
 	snapshot, err := db.GetTaskSnapshotByID(tx, taskId)
@@ -120,6 +121,10 @@ func renderTaskTemplate(taskId db.TaskID) ([]byte, error) {
 	var buf bytes.Buffer
 	err = t.Execute(&buf, data)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 

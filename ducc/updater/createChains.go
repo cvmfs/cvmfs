@@ -38,7 +38,7 @@ var currentlyIngestingLinks = make(map[ingestChainLinkKey]db.TaskPtr)
 func CreateFlat(image db.Image, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_FLAT)
 	if err != nil {
-		return db.TaskPtr{}, err
+		return db.NullTaskPtr(), err
 	}
 
 	// Check that we have the manifest
@@ -117,7 +117,7 @@ func CreateFlat(image db.Image, cvmfsRepo string) (db.TaskPtr, error) {
 func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN)
 	if err != nil {
-		return db.TaskPtr{}, err
+		return db.NullTaskPtr(), err
 	}
 
 	prevLinkTask := db.NullTaskPtr()
@@ -171,7 +171,7 @@ func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.Task
 func createSingularityFiles(image db.Image, chain Chain) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_SINGULARITY_FILES)
 	if err != nil {
-		return db.TaskPtr{}, err
+		return db.NullTaskPtr(), err
 	}
 
 	go func() {
@@ -218,8 +218,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		task.LogFatal(nil, fmt.Sprintf("Failed to create \"%s\" task: %s", db.TASK_DOWNLOAD_BLOB, err))
 		return ptr, nil
 	}
-	task.LinkSubtask(nil, downloadLayerTaskPtr)
-	if err != nil {
+	if err := task.LinkSubtask(nil, downloadLayerTaskPtr); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" task as subtask: %s", db.TASK_DOWNLOAD_BLOB, err))
 		return ptr, nil
 	}
@@ -230,8 +229,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		task.LogFatal(nil, fmt.Sprintf("Failed to create \"%s\" task: %s", db.TASK_INGEST_CHAIN_LINK, err))
 		return ptr, nil
 	}
-	err = task.LinkSubtask(nil, ingestChainLinkTaskPtr)
-	if err != nil {
+	if err := task.LinkSubtask(nil, ingestChainLinkTaskPtr); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" task as subtask: %s", db.TASK_INGEST_CHAIN_LINK, err))
 		return ptr, nil
 	}
@@ -278,9 +276,10 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully ingested chain link")
 
-		// Release the downloaded layer
-		releaseBlob(chainLink.LayerDigest)
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Released downloaded layer blob")
+		// Remove the task from the currently ingesting map
+		currentlyIngestingLinksMutex.Lock()
+		delete(currentlyIngestingLinks, key)
+		currentlyIngestingLinksMutex.Unlock()
 
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task completed")
@@ -292,7 +291,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_CHAIN_LINK)
 	if err != nil {
-		return db.TaskPtr{}, err
+		return db.NullTaskPtr(), err
 	}
 
 	go func() {
@@ -302,6 +301,11 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Sleeping for 1 second to ensure that cvmfs is ready for new ingestion.")
 		time.Sleep(1 * time.Second)
+
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for lock on cvmfs repo")
+		cvmfsLock.Lock()
+		defer cvmfsLock.Unlock()
+
 		task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Ingesting chain link %s into CVMFS", link.ChainDigest.String()))
 
 		blobPath := path.Join(config.TMP_FILE_PATH, "blobs", link.LayerDigest.Encoded())
@@ -340,6 +344,10 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest chain link: %s", err))
 			return
 		}
+
+		// Release the downloaded layer
+		releaseBlob(link.LayerDigest)
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Released blob %s", link.LayerDigest.String()))
 
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task completed successfully")

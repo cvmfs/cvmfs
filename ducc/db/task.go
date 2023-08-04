@@ -30,6 +30,7 @@ const (
 
 	// CREATE_LAYERS needs the following steps:
 	TASK_INGEST_LAYERS        TaskType = "INGEST_LAYERS"
+	TASK_CREATE_LAYER         TaskType = "CREATE_LAYER"
 	TASK_INGEST_LAYER         TaskType = "INGEST_LAYER"
 	TASK_WRITE_IMAGE_METADATA TaskType = "WRITE_IMAGE_METADATA"
 

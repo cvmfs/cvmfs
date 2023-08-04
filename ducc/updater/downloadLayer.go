@@ -30,13 +30,17 @@ func DownloadLayer(layerDigest digest.Digest) (db.TaskPtr, error) {
 		fmt.Printf("Using existing download task for layer %s\n", layerDigest.String())
 		return existingTask, nil
 	}
-	downloadsMutex.Unlock()
 
 	task, ptr, err := db.CreateTask(nil, db.TASK_DOWNLOAD_BLOB)
 	if err != nil {
 		fmt.Printf("Failed to create download task for %s: %s\n", layerDigest.String(), err.Error())
+		downloadsMutex.Unlock()
 		return db.TaskPtr{}, err
 	}
+	// Register that we are downloading this layer
+	pendingDownloads[layerDigest] = ptr
+	useCount[layerDigest] = 1
+	downloadsMutex.Unlock()
 
 	// Find from where we can download the layer
 	images, err := db.GetImagesByLayerDigest(nil, layerDigest)

@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 
 func CreateInMemDBForTesting() *sql.DB {
 	// Open in memory database
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite3", ":memory:?cache=shared")
 	if err != nil {
 		panic(err)
 	}

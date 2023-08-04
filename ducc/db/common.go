@@ -55,6 +55,7 @@ func GetTransaction() (*sql.Tx, error) {
 		return nil, errors.New("database not initialized")
 	}
 	tx, err := g_db.Begin()
+	// TODO: Might want to retry, especially if the error is "database is locked"
 	if err != nil {
 		panic(err)
 	}
