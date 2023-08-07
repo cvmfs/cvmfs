@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS "images" (
     tag TEXT,
     registry_scheme TEXT NOT NULL,
     registry_hostname TEXT NOT NULL,
-    repository TEXT NOT NULL
+    repository TEXT NOT NULL,
+
+    manifest_digest TEXT,
+    manifest_last_fetched TEXT
 );
 
 CREATE TABLE IF NOT EXISTS "wish_image" (
@@ -38,31 +41,6 @@ CREATE TABLE IF NOT EXISTS "wish_image" (
 
     FOREIGN KEY (wish_id) REFERENCES wishes (id) ON DELETE CASCADE,
     FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS "manifests" (
-    image_id TEXT NOT NULL,
-    file_digest TEXT NOT NULL,
-    schema_version INTEGER NOT NULL,
-    media_type TEXT NOT NULL,
-
-    config_digest TEXT NOT NULL,
-    config_media_type TEXT NOT NULL,
-    config_size INTEGER NOT NULL,
-
-    PRIMARY KEY (image_id),
-    FOREIGN KEY (image_id)  REFERENCES images (id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS "manifest_layers" (
-    manifest_id TEXT NOT NULL,
-    layer_number INTEGER NOT NULL,
-    digest TEXT NOT NULL,
-    media_type TEXT NOT NULL,
-    size INTEGER NOT NULL,
-
-    PRIMARY KEY (manifest_id, layer_number),
-    FOREIGN KEY (manifest_id) REFERENCES manifests (image_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "tasks" (

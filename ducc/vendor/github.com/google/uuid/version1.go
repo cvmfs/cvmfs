@@ -16,8 +16,8 @@ import (
 // return the current NewUUID returns nil and an error.
 //
 // In most cases, New should be used.
-func NewUUID() (TaskID, error) {
-	var uuid TaskID
+func NewUUID() (UUID, error) {
+	var uuid UUID
 	now, seq, err := GetTime()
 	if err != nil {
 		return uuid, err

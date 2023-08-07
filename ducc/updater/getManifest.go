@@ -1,58 +1,33 @@
 package updater
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/registry"
-	"github.com/google/uuid"
 	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func GetAndStoreManifest(image db.Image) error {
-	if (image.ID == uuid.TaskID{}) {
-		return fmt.Errorf("image is missing ID")
-	}
-
-	manifest, err := fetchManifest(image)
+func FetchManifestAndSaveDigest(image db.Image) (v1.Manifest, digest.Digest, error) {
+	manifest, manifestDigest, err := fetchManifest(image)
 	if err != nil {
-		return err
+		return v1.Manifest{}, "", err
 	}
 
-	tx, err := db.GetTransaction()
+	image.Digest = manifestDigest
+	err = db.UpdateManifestDigestByImageID(nil, image.ID, manifestDigest)
 	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Ensure that the image still exists. Also makes sure we have the correct ID.
-	image, err = db.GetImageByValue(tx, image)
-	if err == sql.ErrNoRows {
-		return errors.New("image no longer exists")
-	} else if err != nil {
-		return err
+		return v1.Manifest{}, "", err
 	}
 
-	// Update the manifest for the image
-	err = db.CreateManifestForImageID(tx, image.ID, manifest)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return manifest, manifestDigest, nil
 }
 
-func fetchManifest(image db.Image) (db.Manifest, error) {
+func fetchManifest(image db.Image) (v1.Manifest, digest.Digest, error) {
 	var digestOrTag string
 	if image.Digest != "" {
 		digestOrTag = image.Digest.String()
@@ -64,35 +39,35 @@ func fetchManifest(image db.Image) (db.Manifest, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	// TODO: Support manifest lists and potentially other media types
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	req.Header.Add("Accept", "application/vnd.oci.image.manifest.v1+json")
 
 	// The registry handles authentication and backoff
 	registry := registry.GetOrCreateRegistry(registry.ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
 	res, err := registry.PerformRequest(req)
 	if err != nil {
-		return db.Manifest{}, err
+		return v1.Manifest{}, "", err
 	}
 	defer res.Body.Close()
 
 	bytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return db.Manifest{}, err
+		return v1.Manifest{}, "", err
 	}
-	manifest, err := parseManifestFromBytes(bytes)
+	manifest, fileDigest, err := parseManifestFromBytes(bytes)
 	if err != nil {
-		return db.Manifest{}, err
+		return v1.Manifest{}, "", err
 	}
 
-	return manifest, nil
+	return manifest, fileDigest, nil
 }
 
-func parseManifestFromBytes(bytes []byte) (db.Manifest, error) {
-	var out db.Manifest
-
+func parseManifestFromBytes(bytes []byte) (v1.Manifest, digest.Digest, error) {
+	var out v1.Manifest
 	err := json.Unmarshal(bytes, &out)
 	if err != nil {
-		return db.Manifest{}, fmt.Errorf("error in decoding the manifest from the server: %s", err)
+		return v1.Manifest{}, "", fmt.Errorf("error in decoding the manifest from the server: %s", err)
 	}
-	out.FileDigest = digest.SHA256.FromBytes(bytes)
+	manifestDigest := digest.SHA256.FromBytes(bytes)
 
-	return out, nil
+	return out, manifestDigest, nil
 }

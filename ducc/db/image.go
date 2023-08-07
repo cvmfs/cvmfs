@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/opencontainers/go-digest"
@@ -17,7 +18,7 @@ const imageIdentifierSqlFieldsQs string = "?,?,?,?,?"
 const imageSqlFieldsOrdered string = "id, digest, tag, registry_scheme, registry_hostname, repository"
 const imageSqlFieldsOrderedPrefixed string = "images.id, images.digest, images.tag, images.registry_scheme, images.registry_hostname, images.repository"
 
-type ImageID = uuid.TaskID
+type ImageID = uuid.UUID
 
 type Image struct {
 	ID             ImageID
@@ -267,6 +268,34 @@ func GetImagesByIDs(tx *sql.Tx, imageIDs []ImageID) ([]Image, error) {
 	return out, nil
 }
 
+func UpdateManifestDigestByImageID(tx *sql.Tx, imageID ImageID, digest digest.Digest) error {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "UPDATE images SET manifest_digest = ?, manifest_last_fetched = ? WHERE id = ?"
+	curTimeStr := ToDBTimeStamp(time.Now())
+	_, err := tx.Exec(stmnt, digest.String(), curTimeStr, imageID)
+	if err != nil {
+		return err
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // parseImageFromRow takes in input a row from the images table and scans it into an Image struct.
 // The row must contain the exact fields of the constant imageSqlFieldsOrdered, in the same order.
 func parseImageFromRow(row scannableRow) (Image, error) {
@@ -288,4 +317,11 @@ func parseImageFromRow(row scannableRow) (Image, error) {
 		image.Tag = tag.String
 	}
 	return image, nil
+}
+
+func (i Image) getFriendlyName() string {
+	if i.Digest != "" {
+		return fmt.Sprintf("%s/%s@%s", i.RegistryHost, i.Repository, i.Digest)
+	}
+	return i.Tag
 }

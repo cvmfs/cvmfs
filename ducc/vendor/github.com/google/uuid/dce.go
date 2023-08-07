@@ -29,7 +29,7 @@ const (
 //
 // For a given domain/id pair the same token may be returned for up to
 // 7 minutes and 10 seconds.
-func NewDCESecurity(domain Domain, id uint32) (TaskID, error) {
+func NewDCESecurity(domain Domain, id uint32) (UUID, error) {
 	uuid, err := NewUUID()
 	if err == nil {
 		uuid[6] = (uuid[6] & 0x0f) | 0x20 // Version 2
@@ -42,28 +42,28 @@ func NewDCESecurity(domain Domain, id uint32) (TaskID, error) {
 // NewDCEPerson returns a DCE Security (Version 2) UUID in the person
 // domain with the id returned by os.Getuid.
 //
-//	NewDCESecurity(Person, uint32(os.Getuid()))
-func NewDCEPerson() (TaskID, error) {
+//  NewDCESecurity(Person, uint32(os.Getuid()))
+func NewDCEPerson() (UUID, error) {
 	return NewDCESecurity(Person, uint32(os.Getuid()))
 }
 
 // NewDCEGroup returns a DCE Security (Version 2) UUID in the group
 // domain with the id returned by os.Getgid.
 //
-//	NewDCESecurity(Group, uint32(os.Getgid()))
-func NewDCEGroup() (TaskID, error) {
+//  NewDCESecurity(Group, uint32(os.Getgid()))
+func NewDCEGroup() (UUID, error) {
 	return NewDCESecurity(Group, uint32(os.Getgid()))
 }
 
 // Domain returns the domain for a Version 2 UUID.  Domains are only defined
 // for Version 2 UUIDs.
-func (uuid TaskID) Domain() Domain {
+func (uuid UUID) Domain() Domain {
 	return Domain(uuid[9])
 }
 
 // ID returns the id for a Version 2 UUID. IDs are only defined for Version 2
 // UUIDs.
-func (uuid TaskID) ID() uint32 {
+func (uuid UUID) ID() uint32 {
 	return binary.BigEndian.Uint32(uuid[0:4])
 }
 

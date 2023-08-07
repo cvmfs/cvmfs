@@ -18,7 +18,7 @@ const taskRelationSqlFieldsQs string = "?, ?, ?"
 const taskLogQueryFields string = "severity, message, timestamp"
 const taskLogQueryQs string = "?, ?, ?"
 
-type TaskID = uuid.TaskID
+type TaskID = uuid.UUID
 type TaskType string
 
 const (
@@ -39,6 +39,7 @@ const (
 	TASK_CREATE_CHAIN_LINK        TaskType = "CREATE_CHAIN_LINK"
 	TASK_INGEST_CHAIN_LINK        TaskType = "INGEST_CHAIN_LINK"
 	TASK_CREATE_SINGULARITY_FILES TaskType = "CREATE_SINGULARITY_FILES"
+	TASK_FETCH_OCI_CONFIG         TaskType = "FETCH_OCI_CONFIG"
 
 	// This is used by both CREATE_LAYERS and CREATE_FLAT
 	TASK_DOWNLOAD_BLOB TaskType = "DOWNLOAD_BLOB"
@@ -376,6 +377,28 @@ func (tPtr TaskPtr) Start(tx *sql.Tx) (TaskStatus, error) {
 
 	var err error
 	tPtr.task.setTaskStatusWithoutLocking(tx, TASK_STATUS_PENDING)
+	if err != nil {
+		return "", err
+	}
+	tPtr.cv.Broadcast()
+	return tPtr.task.Status, nil
+}
+
+// Skips starts the task, and returns the status of the task.
+// If the task status was TASK_STATUS_NONE, it will be set to TASK_STATUS_SKIPPED.
+// If the task has already been started, this is a no-op.
+// This method is thread safe, by locking the task CV mutex. Be careful of recursive locks.
+// It will broadcast on the task CV, so any goroutine waiting on the CV will be woken up.
+// If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
+func (tPtr TaskPtr) Skip(tx *sql.Tx) (TaskStatus, error) {
+	tPtr.cv.L.Lock()
+	defer tPtr.cv.L.Unlock()
+	if tPtr.task.Status != TASK_STATUS_NONE {
+		return tPtr.task.Status, nil
+	}
+
+	var err error
+	tPtr.task.setTaskStatusWithoutLocking(tx, TASK_STATUS_DONE)
 	if err != nil {
 		return "", err
 	}

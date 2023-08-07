@@ -35,7 +35,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/image"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // The two functions below come from:
@@ -62,7 +62,7 @@ func Escape(s string) string {
 // This other functions are adaptations of:
 // https://raw.githubusercontent.com/hpcng/singularity/0eca74e26dc6bc26e86ce203f704d46e22c68e55/internal/pkg/build/sources/conveyorPacker_oci.go
 
-func InsertRunScript(rootPath string, ociImage image.Image) (err error) {
+func InsertRunScript(rootPath string, ociImage v1.Image) (err error) {
 	imgConfig := ociImage.Config
 	f, err := os.Create(rootPath + "/.singularity.d/runscript")
 	if err != nil {
@@ -147,7 +147,7 @@ exec "$@"
 	return nil
 }
 
-func InsertEnv(rootPath string, ociImage image.Image) (err error) {
+func InsertEnv(rootPath string, ociImage v1.Image) (err error) {
 	imgConfig := ociImage.Config
 	f, err := os.Create(rootPath + "/.singularity.d/env/10-docker2singularity.sh")
 	if err != nil {
