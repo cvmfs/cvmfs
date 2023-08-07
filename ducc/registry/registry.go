@@ -1,11 +1,18 @@
 package registry
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 	"sync"
+
+	"github.com/cvmfs/ducc/config"
+	"github.com/opencontainers/go-digest"
 )
 
 var localRegistriesMutex sync.Mutex
@@ -217,4 +224,52 @@ func parseBearerToken(token string) (realm string, options map[string]string, er
 		}
 	}
 	return
+}
+
+func (cr *ContainerRegistry) DownloadBlob(blobDigest digest.Digest, repository string, acceptHeaders []string) error {
+	url := fmt.Sprintf("%s/%s/blobs/%s", cr.BaseUrl(), repository, blobDigest.String())
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("error in creating request: %s", err)
+	}
+
+	for _, header := range acceptHeaders {
+		req.Header.Add("Accept", header)
+	}
+
+	res, err := cr.PerformRequest(req)
+	if err != nil {
+		return fmt.Errorf("error in fetching blob: %s", err)
+	}
+	defer res.Body.Close()
+
+	if 200 > res.StatusCode || res.StatusCode >= 300 {
+		return fmt.Errorf("error in fetching blob: %s", res.Status)
+	}
+
+	os.MkdirAll(path.Join(config.TMP_FILE_PATH, "blobs"), os.FileMode(0755))
+	filePath := path.Join(config.TMP_FILE_PATH, "blobs", blobDigest.Encoded())
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0644))
+	if err != nil {
+		return fmt.Errorf("error in creating file: %s", err)
+	}
+	// Verify the checksum while writing to the file
+	reader := bufio.NewReader(io.TeeReader(res.Body, file))
+	var checksum digest.Digest
+	var checksumErr error
+	checksum, err = digest.SHA256.FromReader(reader)
+	file.Close()
+	if err != nil {
+		err = fmt.Errorf("error in calculating checksum: %s", checksumErr)
+	}
+	if checksum != blobDigest {
+		err = fmt.Errorf("checksum mismatch: expected %s, got %s", blobDigest.String(), checksum.String())
+	}
+	if err != nil {
+		// Something went wrong, remove the file
+		fmt.Printf("Error: %s\n", err.Error())
+		os.Remove(filePath)
+		return err
+	}
+	return nil
 }

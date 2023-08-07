@@ -19,7 +19,6 @@ import (
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
 	notification "github.com/cvmfs/ducc/notification"
-	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 
 	"github.com/docker/docker/api/types"
@@ -146,7 +145,8 @@ func ConvertWishFlat(wish WishFriendly) error {
 				return os.MkdirAll(filepath.Dir(completeSingularityPriPath), constants.DirPermision)
 			})
 		}
-		ociImage, err := inputImage.GetOCIImage()
+		// TODO: Remove this entire function. It will be replaced by the new implementation
+		/*ociImage, err := inputImage.GetOCIImage()
 		if err != nil {
 			if firstError == nil {
 				firstError = err
@@ -154,11 +154,11 @@ func ConvertWishFlat(wish WishFriendly) error {
 			l.LogE(err).Error("Error in getting the OCI image configuration")
 			i.Error(err).Elapsed(t1).Send()
 			continue
-		}
+		}*/
 		// we create the image with the correct singularity's dotfiles
 		err = cvmfs.WithinTransaction(wish.CvmfsRepo,
 			func() error {
-				if err := singularity.MakeBaseEnv(completeSingularityPriPath); err != nil {
+				/*if err := singularity.MakeBaseEnv(completeSingularityPriPath); err != nil {
 					l.LogE(err).Error("Error in creating the base singularity environment")
 					return err
 				}
@@ -169,7 +169,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 				if err := singularity.InsertEnv(completeSingularityPriPath, ociImage); err != nil {
 					l.LogE(err).Error("Error in inserting the singularity environment")
 					return err
-				}
+				}*/
 				return nil
 			},
 			cvmfs.NewTemplateTransaction(

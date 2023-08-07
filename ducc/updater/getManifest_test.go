@@ -22,7 +22,7 @@ func TestExampleManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifest, err := parseManifestFromBytes(bytes)
+	manifest, _, err := parseManifestFromBytes(bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestFetchManifest(t *testing.T) {
 		Tag:            "latest",
 	}
 
-	manifest, err := fetchManifest(image)
+	manifest, _, err := fetchManifest(image)
 	if err != nil {
 		t.Fatal(err)
 	}

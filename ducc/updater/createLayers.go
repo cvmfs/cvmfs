@@ -12,7 +12,9 @@ import (
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/lib"
+	"github.com/cvmfs/ducc/registry"
 	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ingestLayerKey struct {
@@ -23,22 +25,14 @@ type ingestLayerKey struct {
 var currentlyIngestingLayersMutex = sync.Mutex{}
 var currentlyIngestingLayers = make(map[ingestLayerKey]db.TaskPtr)
 
-func CreateLayers(image db.Image, cvmfsRepo string) (db.TaskPtr, error) {
+func CreateLayers(image db.Image, manifest v1.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
 
-	// Check that we have the manifest
-	manifest, err := db.GetManifestByImageID(nil, image.ID)
-	if err != nil {
-		task.LogFatal(nil, fmt.Sprintf("Could not find manifest for image %s", image.ID))
-		return ptr, nil
-	}
-	task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Found manifest for image %s", image.ID))
-
 	// Ingest the layers
-	ingestLayersTask, err := ingestLayers(manifest, cvmfsRepo)
+	ingestLayersTask, err := ingestLayers(image, manifest, cvmfsRepo)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_INGEST_LAYERS, err.Error()))
 		return ptr, nil
@@ -71,7 +65,7 @@ func CreateLayers(image db.Image, cvmfsRepo string) (db.TaskPtr, error) {
 	return ptr, nil
 }
 
-func ingestLayers(manifest db.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
+func ingestLayers(image db.Image, manifest v1.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_LAYERS)
 	if err != nil {
 		return db.NullTaskPtr(), err
@@ -79,8 +73,8 @@ func ingestLayers(manifest db.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
 
 	createLayerTasks := make([]db.TaskPtr, len(manifest.Layers))
 	for i, layer := range manifest.Layers {
-		isCompressed := db.LayerMediaTypeIsCompressed(layer.MediaType)
-		createLayerTask, err := createLayer(layer.Digest, isCompressed, cvmfsRepo)
+		isCompressed := LayerMediaTypeIsCompressed(layer.MediaType)
+		createLayerTask, err := createLayer(image, layer.Digest, isCompressed, cvmfsRepo)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_CREATE_LAYER, err.Error()))
 			return ptr, nil
@@ -116,7 +110,7 @@ func ingestLayers(manifest db.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
 	return ptr, nil
 }
 
-func createLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (db.TaskPtr, error) {
+func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvmfsRepo string) (db.TaskPtr, error) {
 	// Check if we are already creating this layer
 	currentlyIngestingLayersMutex.Lock()
 	if ptr, ok := currentlyIngestingLayers[ingestLayerKey{layerDigest, cvmfsRepo}]; ok {
@@ -145,7 +139,8 @@ func createLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 	}
 
 	// We create a task to download the layer
-	downloadLayerTask, err := DownloadLayer(layerDigest)
+	registryPtr := registry.GetOrCreateRegistry(registry.ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
+	downloadLayerTask, err := DownloadBlob(registryPtr, image.Repository, layerDigest, nil)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_DOWNLOAD_BLOB, err.Error()))
 		return ptr, nil

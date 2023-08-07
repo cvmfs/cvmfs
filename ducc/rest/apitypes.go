@@ -8,16 +8,16 @@ import (
 )
 
 type Wish struct {
-	Id                    uuid.TaskID `json:"id"`
-	CvmfsRepository       string      `json:"cvmfsRepository"`
-	InputRegistryScheme   string      `json:"inputRegistryScheme"`
-	InputRegistryHostname string      `json:"inputRegistryHostname"`
-	InputRepository       string      `json:"inputRepository"`
-	InputDigest           string      `json:"inputDigest"`
-	InputTag              string      `json:"inputTag"`
-	InputTagWildcard      bool        `json:"inputTagWildcard"`
-	OutputURL             string      `json:"outputURL"`
-	Source                string      `json:"source"`
+	Id                    uuid.UUID `json:"id"`
+	CvmfsRepository       string    `json:"cvmfsRepository"`
+	InputRegistryScheme   string    `json:"inputRegistryScheme"`
+	InputRegistryHostname string    `json:"inputRegistryHostname"`
+	InputRepository       string    `json:"inputRepository"`
+	InputDigest           string    `json:"inputDigest"`
+	InputTag              string    `json:"inputTag"`
+	InputTagWildcard      bool      `json:"inputTagWildcard"`
+	OutputURL             string    `json:"outputURL"`
+	Source                string    `json:"source"`
 
 	CreateLayers    db.ValueWithDefault[bool] `json:"createLayers"`
 	CreateThinImage db.ValueWithDefault[bool] `json:"createThinImage"`
@@ -34,13 +34,13 @@ type Wish struct {
 }
 
 type Image struct {
-	Id             uuid.TaskID `json:"id"`
-	URL            string      `json:"url"`
-	RegistryScheme string      `json:"registryScheme"`
-	RegistryHost   string      `json:"registryHost"`
-	Repository     string      `json:"repository"`
-	Tag            string      `json:"tag"`
-	Digest         string      `json:"digest"`
+	Id             uuid.UUID `json:"id"`
+	URL            string    `json:"url"`
+	RegistryScheme string    `json:"registryScheme"`
+	RegistryHost   string    `json:"registryHost"`
+	Repository     string    `json:"repository"`
+	Tag            string    `json:"tag"`
+	Digest         string    `json:"digest"`
 
 	Wishes []WishSummary `json:"wishes"`
 }
@@ -53,13 +53,13 @@ func ToImageSummary(img Image) ImageSummary {
 }
 
 type ImageSummary struct {
-	Id  uuid.TaskID `json:"id"`
-	URL string      `json:"url"`
+	Id  uuid.UUID `json:"id"`
+	URL string    `json:"url"`
 }
 
 type WishSummary struct {
-	Id  uuid.TaskID `json:"id"`
-	URL string      `json:"url"`
+	Id  uuid.UUID `json:"id"`
+	URL string    `json:"url"`
 }
 
 func DbWishToWishSummary(w db.Wish) WishSummary {
