@@ -251,8 +251,8 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Created catalog for layer %s", layerDigest.String()))
 
-		// Ingest the layer
-		ingestPath := path.Join(".layers", layerDigest.Encoded()[:2], layerDigest.Encoded()[2:])
+		// Ingest the layer FS
+		ingestPath := cvmfs.LayerRootfsPath(cvmfsRepo, layerDigest.Encoded())
 		if err := cvmfs.Ingest(cvmfsRepo, readHashCloseSizer, "--catalog", "-t", "-", "-b", ingestPath); err != nil {
 			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest layer %s: %s", layerDigest.String(), err.Error()))
