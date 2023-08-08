@@ -6,6 +6,7 @@
 #include "loader_talk.h"
 
 #include <errno.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -63,25 +64,48 @@ static void *MainTalk(void *data __attribute__((unused))) {
       break;
     }
 
+    LogCvmfs(kLogCvmfs, kLogSyslog, "Main Talk");
+
     char command;
     ReloadMode reload_mode = kReloadLegacy;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      if ((command == 'd') || (command == 'n')) {
-        // version that specifies reloading in debug or non-debug mode
-        // receives 2 commands
-        // first: debug (d) / non-debug(n)
-        // second: 'R' or 'S'
-        reload_mode = command == 'd' ? kReloadDebug : kReloadNoDebug;
-        if (recv(con_fd, &command, 1, 0) > 0) {
-          if ((command != 'R') && (command != 'S')) {
-            SendMsg2Socket(con_fd, "unknown command\n");
-            continue;
-          }
+      LogCvmfs(kLogCvmfs, kLogSyslog, "1st Command received %c %d", command, (command == 'S'));
+      bool unkown_command = true;
+      if ((command == 'S') || (command == 'R')) {
+        struct pollfd fd;
+        int ret;
+
+        LogCvmfs(kLogCvmfs, kLogSyslog, "Check if 2nd command arrives");
+        // check if second command arrives
+        fd.fd = con_fd;
+        fd.events = POLLIN;
+        ret = poll(&fd, 1, 1000); // 1 second for timeout
+        switch (ret) {
+          case -1:
+            LogCvmfs(kLogCvmfs, kLogSyslog, "ERROR");
+            // Error
+          break;
+          case 0:
+            // Timeout = Legacy Version (cannot switch debug on/off)
+            LogCvmfs(kLogCvmfs, kLogSyslog, "Run into timeout - reload from legacy version?");
+            unkown_command = false;
+          break;
+          default: // Version that can set debug on/off
+            LogCvmfs(kLogCvmfs, kLogSyslog, "2nd command arrived");
+            char second_cmd;
+            if (recv(con_fd, &second_cmd, 1, 0) > 0) {
+              if ((second_cmd == 'd') || (second_cmd == 'n')) {
+                reload_mode = second_cmd == 'd' ? kReloadDebug : kReloadNoDebug;
+                unkown_command = false;
+              }
+            }
+          break;
         }
-      } else if ((command != 'R') && (command != 'S')) {  // legacy support
+      }
+      if (unkown_command) {
         SendMsg2Socket(con_fd, "unknown command\n");
         continue;
-      }
+       }
 
       SetLogMicroSyslog(*usyslog_path_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module. Reload mode=%d",
@@ -136,12 +160,11 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-
-  // reload mode: debug (d) or non-debug (n)
-  char command = debug ? 'd' : 'n';
+  char command = stop_and_go ? 'S' : 'R';
   WritePipe(socket_fd, &command, 1);
 
-  command = stop_and_go ? 'S' : 'R';
+  // reload mode: debug (d) or non-debug (n)
+  command = debug ? 'd' : 'n';
   WritePipe(socket_fd, &command, 1);
 
   char buf;
