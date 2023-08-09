@@ -75,7 +75,7 @@ TEST_F(T_MagicXattr, TestFqrn) {
   MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
   ASSERT_FALSE(attr.IsNull());
   ASSERT_TRUE(attr->PrepareValueFenced());
-  EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());
+  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0).c_str());
 }
 
 TEST_F(T_MagicXattr, TestLogBuffer) {
@@ -94,7 +94,7 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
-    EXPECT_TRUE(HasSuffix(attr->GetValue(), "test\n", false /* ign_case */));
+    EXPECT_TRUE(HasSuffix(attr->GetValue(0), "test\n", false /* ign_case */));
   }
 
   LogCvmfs(kLogCvmfs, 0, "%s", std::string(6000, 'x').c_str());
@@ -102,7 +102,7 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
-    EXPECT_TRUE(HasSuffix(attr->GetValue(), "<snip>\n", false /* ign_case */));
+    EXPECT_TRUE(HasSuffix(attr->GetValue(0), "<snip>\n", false /* ign_case */));
   }
 }
 
@@ -151,5 +151,5 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   ASSERT_FALSE(attr.IsNull());
   ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
   ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
-  EXPECT_STREQ("keys.cern.ch", attr->GetValue().c_str());
+  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0).c_str());
 }

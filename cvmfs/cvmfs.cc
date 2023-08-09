@@ -1692,7 +1692,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
-  const string attr = name;
+  vector<string> tokens = SplitString(name, '~');
+
+  const uint32_t attr_req_page = tokens.size() > 1 ?
+            static_cast<uint32_t>(String2Uint64(tokens[tokens.size() - 1])) : 0;
+
+  const string attr = tokens[0];
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
@@ -1744,7 +1749,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   string attribute_value;
 
   if (!magic_xattr.IsNull()) {
-    attribute_value = magic_xattr->GetValue();
+    attribute_value = magic_xattr->GetValue(attr_req_page);
   } else {
     if (!xattrs.Get(attr, &attribute_value)) {
       fuse_reply_err(req, ENOATTR);
@@ -2078,7 +2083,7 @@ class ExpiresMagicXattr : public BaseMagicXattr {
     return true;
   }
 
-  virtual std::string GetValue() {
+  virtual std::string GetValue(uint32_t /*requested_page*/) {
     if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
       return "never (fixed root catalog)";
     } else {
@@ -2089,7 +2094,7 @@ class ExpiresMagicXattr : public BaseMagicXattr {
 };
 
 class InodeMaxMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
+  virtual std::string GetValue(uint32_t /*requested_page*/) {
     return StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
       xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge());
@@ -2097,17 +2102,18 @@ class InodeMaxMagicXattr : public BaseMagicXattr {
 };
 
 class MaxFdMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
+  virtual std::string GetValue(uint32_t /*requested_page*/) {
     return StringifyInt(cvmfs::max_open_files_ - cvmfs::kNumReservedFd);
   }
 };
 
 class PidMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() { return StringifyInt(cvmfs::pid_); }
+  virtual std::string GetValue(uint32_t /*requested_page*/) {
+    return StringifyInt(cvmfs::pid_); }
 };
 
 class UptimeMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
+  virtual std::string GetValue(uint32_t /*requested_page*/) {
     time_t now = time(NULL);
     uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
     return StringifyInt(uptime / 60);

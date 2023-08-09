@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "backoff.h"
 #include "catalog_counters.h"
@@ -38,7 +39,20 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  * To read out the attribute value, do:
  * 0. Get an instance through MagicXattrManager::Get()
  * 1. Call PrepareValueFenced() inside FuseRemounter::fence()
- * 2. Call GetValue() to get the actual value (can be called outside the fence)
+ * 2. Call GetValue(uint32_t requested_page) to get the actual value
+ *    (can be called outside the fence)
+ * 
+ * Implementation notes:
+ * - best is to write the results to "std::vector<std::string> result_pages_"
+ *   even if it is just a sinlge page xattr
+ * - if no modification is needed outside of PrepareValueFenced(),
+ *   no specific implementation for GetValue() is needed.
+ *   BaseMagicXattr::GetValue() will be called that takes care both of single
+ *   and multi-page xattrs
+ *   (if you do not use it do not forget to call HeaderMultipage() first)
+ * - for multi-page xattrs, a sinlge page should not be larger than
+ *   BaseMagicXattr::kMaxCharsPerPage
+ * - Do not forget to call result_pages_.clear() before each new request
  */
 class BaseMagicXattr {
   friend class MagicXattrManager;
@@ -73,8 +87,18 @@ class BaseMagicXattr {
    * It does the computationaly intensive part, which should not
    * be done inside the FuseRemounter::fence(), and returns the
    * value.
+   * 
+   * Note: if the xattr is an attribute using "result_pages_" to write the
+   * results to, the BaseMagicXattr::GetValue() will take care of the proper
+   * print format. (single page = print just the result, multi-page = add some 
+   * header).
+   * 
+   * For examples see:
+   * 1) chunk_list that does not have its own implementation at all
+   * 2) proxy_list that modifies "result_pages_" before calling the base func
+   *    BaseMagicXattr::GetValue()
    */
-  virtual std::string GetValue() = 0;
+  virtual std::string GetValue(uint32_t requested_page);
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
 
   void Lock(PathString path, catalog::DirectoryEntry *dirent) {
@@ -90,6 +114,9 @@ class BaseMagicXattr {
 
   virtual ~BaseMagicXattr() {}
 
+  // how many chars per page (with some leeway). system maximum would be 64k
+  static const uint32_t kMaxCharsPerPage = 40000;
+
  protected:
   /**
   * This function is used to obtain the necessary information while
@@ -97,12 +124,15 @@ class BaseMagicXattr {
   */
   virtual bool PrepareValueFenced() { return true; }
 
+  std::string HeaderMultipage(uint32_t max_pages, uint32_t requested_page);
+
   MagicXattrManager *xattr_mgr_;
   PathString path_;
   catalog::DirectoryEntry *dirent_;
 
   pthread_mutex_t access_mutex_;
   bool is_protected_;
+  std::vector<std::string> result_pages_;
 };
 
 /**
@@ -219,7 +249,7 @@ class MagicXattrManager : public SingleCopy {
 
 class AuthzMagicXattr : public BaseMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
   virtual MagicXattrFlavor GetXattrFlavor();
 };
 
@@ -229,66 +259,63 @@ class CatalogCountersMagicXattr : public BaseMagicXattr {
   catalog::Counters counters_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ChunkListMagicXattr : public RegularMagicXattr {
-  std::string chunk_list_;
-
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
 };
 
 class ChunksMagicXattr : public RegularMagicXattr {
   uint64_t n_chunks_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class CompressionMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class DirectIoMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ExternalFileMagicXattr : public RegularMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ExternalHostMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ExternalTimeoutMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class FqrnMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class HashMagicXattr : public WithHashMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class HostMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class HostListMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class LHashMagicXattr : public WithHashMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class LogBufferXattr : public BaseMagicXattr {
@@ -302,69 +329,69 @@ class LogBufferXattr : public BaseMagicXattr {
   // attribute a little.
   BackoffThrottle throttle_;
 
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NCleanup24MagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NClgMagicXattr : public BaseMagicXattr {
   int n_catalogs_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NDirOpenMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NDownloadMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NIOErrMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class NOpenMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class HitrateMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ProxyMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ProxyListMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ProxyListExternalMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class PubkeysMagicXattr : public BaseMagicXattr {
   std::string pubkeys_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RawlinkMagicXattr : public SymlinkMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RepoCountersMagicXattr : public BaseMagicXattr {
   catalog::Counters counters_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RepoMetainfoMagicXattr : public BaseMagicXattr {
@@ -374,65 +401,65 @@ class RepoMetainfoMagicXattr : public BaseMagicXattr {
   std::string error_reason_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RevisionMagicXattr : public BaseMagicXattr {
   uint64_t revision_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RootHashMagicXattr : public BaseMagicXattr {
   shash::Any root_hash_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class RxMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class SpeedMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class TagMagicXattr : public BaseMagicXattr {
   std::string tag_;
 
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class TimeoutMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class TimeoutDirectMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class TimestampLastIOErrMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class UsedFdMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class UsedDirPMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class VersionMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 class ExternalURLMagicXattr : public ExternalMagicXattr {
   virtual bool PrepareValueFenced();
-  virtual std::string GetValue();
+  virtual std::string GetValue(uint32_t requested_page);
 };
 
 #endif  // CVMFS_MAGIC_XATTR_H_
