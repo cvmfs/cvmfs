@@ -75,6 +75,7 @@ cvmfs_run_test() {
 
   # do the CernVM-FS package update
   echo "updating CernVM-FS server package to version $current_version"
+  install_packages "$CVMFS_LIBS_PACKAGE" || return 161
   install_packages "$CVMFS_SERVER_PACKAGE" || return 16
 
   # migrate repositories created under old version
