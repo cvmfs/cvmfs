@@ -44,13 +44,13 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  * 
  * Implementation notes:
  * - best is to write the results to "std::vector<std::string> result_pages_"
- *   even if it is just a sinlge page xattr
+ *   even if it is just a single page xattr
  * - if no modification is needed outside of PrepareValueFenced(),
  *   no specific implementation for GetValue() is needed.
  *   BaseMagicXattr::GetValue() will be called that takes care both of single
  *   and multi-page xattrs
  *   (if you do not use it do not forget to call HeaderMultipage() first)
- * - for multi-page xattrs, a sinlge page should not be larger than
+ * - for multi-page xattrs, a single page should not be larger than
  *   BaseMagicXattr::kMaxCharsPerPage
  * - Do not forget to call result_pages_.clear() before each new request
  */
