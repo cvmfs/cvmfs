@@ -32,6 +32,8 @@ install_from_repo bc
 install_from_repo java-1.8.0-openjdk
 install_from_repo tree
 install_from_repo fuse-overlayfs
+install_from_repo git
+install_from_repo perl
 
 # traffic shaping
 # install_from_repo trickle

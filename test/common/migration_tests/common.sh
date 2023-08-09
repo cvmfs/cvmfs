@@ -270,3 +270,7 @@ fi
 if [ x"$CVMFS_CONFIG_PACKAGE" = x"" ] || [ ! -f $CVMFS_CONFIG_PACKAGE ]; then
   echo "CernVM-FS config package '$CVMFS_CONFIG_PACKAGE' not found!"
 fi
+
+if [ x"$CVMFS_LIBS_PACKAGE" = x"" ] || [ ! -f $CVMFS_LIBS_PACKAGE ]; then
+  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
+fi
