@@ -84,7 +84,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
             // Timeout = Legacy Version (cannot switch debug on/off)
             unkown_command = false;
           break;
-          default: // Version that can set debug on/off
+          default:  // Version that can set debug on/off
             char second_cmd;
             if (recv(con_fd, &second_cmd, 1, 0) > 0) {
               if ((second_cmd == 'd') || (second_cmd == 'n')) {
