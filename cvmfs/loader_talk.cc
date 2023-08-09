@@ -64,7 +64,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
       break;
     }
 
-    char command;
+    char command = '?';
+    char second_cmd = '?';
     ReloadMode reload_mode = kReloadLegacy;
     if (recv(con_fd, &command, 1, 0) > 0) {
       bool unkown_command = true;
@@ -85,7 +86,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
             unkown_command = false;
           break;
           default:  // Version that can set debug on/off
-            char second_cmd;
             if (recv(con_fd, &second_cmd, 1, 0) > 0) {
               if ((second_cmd == 'd') || (second_cmd == 'n')) {
                 reload_mode = second_cmd == 'd' ? kReloadDebug : kReloadNoDebug;
@@ -96,9 +96,11 @@ static void *MainTalk(void *data __attribute__((unused))) {
         }
       }
       if (unkown_command) {
-        SendMsg2Socket(con_fd, "unknown command\n");
+        std::string msg = "unknown reload command: " + std::string(1, command) +
+                          " " + std::string(1, second_cmd) + "\n";
+        SendMsg2Socket(con_fd, msg);
         continue;
-       }
+      }
 
       SetLogMicroSyslog(*usyslog_path_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module. Reload mode=%d",
