@@ -64,34 +64,27 @@ static void *MainTalk(void *data __attribute__((unused))) {
       break;
     }
 
-    LogCvmfs(kLogCvmfs, kLogSyslog, "Main Talk");
-
     char command;
     ReloadMode reload_mode = kReloadLegacy;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "1st Command received %c %d", command, (command == 'S'));
       bool unkown_command = true;
       if ((command == 'S') || (command == 'R')) {
         struct pollfd fd;
         int ret;
 
-        LogCvmfs(kLogCvmfs, kLogSyslog, "Check if 2nd command arrives");
-        // check if second command arrives
+        // check if second command arrives (in legacy no 2nd cmd arrives)
         fd.fd = con_fd;
         fd.events = POLLIN;
-        ret = poll(&fd, 1, 1000); // 1 second for timeout
+        ret = poll(&fd, 1, 1000);  // 1 sec timeout
         switch (ret) {
           case -1:
-            LogCvmfs(kLogCvmfs, kLogSyslog, "ERROR");
             // Error
           break;
           case 0:
             // Timeout = Legacy Version (cannot switch debug on/off)
-            LogCvmfs(kLogCvmfs, kLogSyslog, "Run into timeout - reload from legacy version?");
             unkown_command = false;
           break;
           default: // Version that can set debug on/off
-            LogCvmfs(kLogCvmfs, kLogSyslog, "2nd command arrived");
             char second_cmd;
             if (recv(con_fd, &second_cmd, 1, 0) > 0) {
               if ((second_cmd == 'd') || (second_cmd == 'n')) {

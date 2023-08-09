@@ -633,13 +633,6 @@ int FuseMain(int argc, char *argv[]) {
       if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
         stop_and_go = true;
 
-      LogCvmfs(kLogCvmfs, kLogStderr, "version: cvmfs_fix_debug_reload");
-
-      for (int i = 0; i < argc; i++) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Argc: %d, argv %s", i, argv[i]);
-      }
-
-
       // always last param of the cvmfs2 __RELOAD__ command
       // check if debug mode is requested
       // NOTE:
