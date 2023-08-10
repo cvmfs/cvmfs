@@ -6,7 +6,6 @@
 #include "loader_talk.h"
 
 #include <errno.h>
-#include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -64,41 +63,23 @@ static void *MainTalk(void *data __attribute__((unused))) {
       break;
     }
 
-    char command = '?';
-    char second_cmd = '?';
+    char command;
     ReloadMode reload_mode = kReloadLegacy;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      bool unkown_command = true;
-      if ((command == 'S') || (command == 'R')) {
-        struct pollfd fd;
-        int ret;
-
-        // check if second command arrives (in legacy no 2nd cmd arrives)
-        fd.fd = con_fd;
-        fd.events = POLLIN;
-        ret = poll(&fd, 1, 1000);  // 1 sec timeout
-        switch (ret) {
-          case -1:
-            // Error
-          break;
-          case 0:
-            // Timeout = Legacy Version (cannot switch debug on/off)
-            unkown_command = false;
-          break;
-          default:  // Version that can set debug on/off
-            if (recv(con_fd, &second_cmd, 1, 0) > 0) {
-              if ((second_cmd == 'd') || (second_cmd == 'n')) {
-                reload_mode = second_cmd == 'd' ? kReloadDebug : kReloadNoDebug;
-                unkown_command = false;
-              }
-            }
-          break;
+      if ((command == 'd') || (command == 'n')) {
+        // version that specifies reloading in debug or non-debug mode
+        // receives 2 commands
+        // first: debug (d) / non-debug(n)
+        // second: 'R' or 'S'
+        reload_mode = command == 'd' ? kReloadDebug : kReloadNoDebug;
+        if (recv(con_fd, &command, 1, 0) > 0) {
+          if ((command != 'R') && (command != 'S')) {
+            SendMsg2Socket(con_fd, "unknown command\n");
+            continue;
+          }
         }
-      }
-      if (unkown_command) {
-        std::string msg = "unknown reload command: " + std::string(1, command) +
-                          " " + std::string(1, second_cmd) + "\n";
-        SendMsg2Socket(con_fd, msg);
+      } else if ((command != 'R') && (command != 'S')) {  // legacy support
+        SendMsg2Socket(con_fd, "unknown command\n");
         continue;
       }
 
@@ -155,11 +136,12 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-  char command = stop_and_go ? 'S' : 'R';
-  WritePipe(socket_fd, &command, 1);
 
   // reload mode: debug (d) or non-debug (n)
-  command = debug ? 'd' : 'n';
+  char command = debug ? 'd' : 'n';
+  WritePipe(socket_fd, &command, 1);
+
+  command = stop_and_go ? 'S' : 'R';
   WritePipe(socket_fd, &command, 1);
 
   char buf;
