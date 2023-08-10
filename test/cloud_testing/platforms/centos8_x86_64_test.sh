@@ -76,10 +76,11 @@ CVMFS_TEST_CLASS_NAME=ServerMigrationTests                        \
             migration_tests/5*                                    \
          || retval=1
 
-echo "running DUCC test cases..."
-CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
-./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   src/4*                               \
-                                || retval=1
+# TODO(vavolkl): fix docker issues on el8
+#echo "running DUCC test cases..."
+#CVMFS_TEST_CLASS_NAME=DUCCTests                                         \
+#./run.sh $DUCCTEST_LOGFILE -o ${DUCCTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+#                                   src/4*                               \
+#                                || retval=1
 
 exit $retval
