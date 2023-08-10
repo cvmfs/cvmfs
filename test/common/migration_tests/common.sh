@@ -21,8 +21,10 @@ guess_package_url() {
   fi
 
   # Ubuntu
+  local short_id=$(lsb_release --id --short 2>/dev/null)
   if [ -f /etc/debian_version ]                               && \
-     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ]
+     { [ x${short_id} = x"Ubuntu" ] || \
+       [ x${short_id} = x"Debian" ] ; }
   then
     local release=1
     local architecture=$(uname -m)
@@ -32,8 +34,8 @@ guess_package_url() {
     package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
 
   # CentOS 7, 8
-  elif [ x$(lsb_release --id --short 2>/dev/null) = x"CentOS" ] || \
-       [ x$(lsb_release --id --short 2>/dev/null) = x"AlmaLinux" ]; then
+  elif [ x${short_id} = x"CentOS" ] || \
+       [ x${short_id} = x"AlmaLinux" ]; then
     local release=1
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
