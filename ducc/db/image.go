@@ -41,6 +41,14 @@ func (i Image) AsURL() string {
 	return fmt.Sprintf("%s://%s/%s%s", i.RegistryScheme, i.RegistryHost, i.Repository, digestOrTag)
 }
 
+func (i Image) GetSimpleName() string {
+	// TODO: Verify that this does what we want
+	if i.Tag != "" {
+		return fmt.Sprintf("%s/%s:%s", i.RegistryHost, i.Repository, i.Tag)
+	}
+	return fmt.Sprintf("%s/%s@%s", i.RegistryHost, i.Repository, i.Digest)
+}
+
 // CreateImage takes in an image and creates it in the database. The ID field is ignored.
 // It returns the same image with the ID field set, according to its assigned database ID.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
@@ -124,12 +132,12 @@ func GetAllImages(tx *sql.Tx) ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	out := make([]Image, 0)
 	for rows.Next() {
 		image, err := parseImageFromRow(rows)
 		if err != nil {
+			rows.Close()
 			return nil, err
 		}
 		out = append(out, image)

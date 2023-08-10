@@ -32,14 +32,15 @@ func GetImagesByWishIDs(tx *sql.Tx, wishIDs []WishID) ([][]Image, error) {
 	out := make([][]Image, 0, len(wishIDs))
 
 	for _, wishID := range wishIDs {
-		row, err := prepStmnt.Query(wishID)
+		rows, err := prepStmnt.Query(wishID)
 		if err != nil {
 			return nil, err
 		}
 		images := make([]Image, 0)
-		for row.Next() {
-			image, err := parseImageFromRow(row)
+		for rows.Next() {
+			image, err := parseImageFromRow(rows)
 			if err != nil {
+				rows.Close()
 				return nil, err
 			}
 			images = append(images, image)
@@ -75,12 +76,12 @@ func GetImagesByWishID(tx *sql.Tx, wishID WishID) ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	images := make([]Image, 0)
 	for rows.Next() {
 		image, err := parseImageFromRow(rows)
 		if err != nil {
+			rows.Close()
 			return nil, err
 		}
 		images = append(images, image)
@@ -345,14 +346,15 @@ func GetWishesByImageIDs(tx *sql.Tx, imageIDs []ImageID) ([][]Wish, error) {
 
 	out := make([][]Wish, 0, len(imageIDs))
 	for _, imageID := range imageIDs {
-		row, err := prepStmnt.Query(imageID)
+		rows, err := prepStmnt.Query(imageID)
 		if err != nil {
 			return nil, err
 		}
 		wishes := make([]Wish, 0)
-		for row.Next() {
-			wish, err := parseWishFromRow(row)
+		for rows.Next() {
+			wish, err := parseWishFromRow(rows)
 			if err != nil {
+				rows.Close()
 				return nil, err
 			}
 			wishes = append(wishes, wish)

@@ -57,7 +57,7 @@ func GetTransaction() (*sql.Tx, error) {
 	tx, err := g_db.Begin()
 	// TODO: Might want to retry, especially if the error is "database is locked"
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return tx, nil
 }
@@ -65,6 +65,7 @@ func GetTransaction() (*sql.Tx, error) {
 // Init initializes the database connection
 // If the existing database is not empty, it will be migrated to the latest schema version
 func Init(db *sql.DB) error {
+	db.SetMaxOpenConns(1)
 	var userVersion int
 	err := db.QueryRow("PRAGMA user_version").Scan(&userVersion)
 	if err != nil {

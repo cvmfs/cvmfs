@@ -6,9 +6,12 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
+	"reflect"
 	"sync"
 
 	"github.com/cvmfs/ducc/config"
+	"github.com/cvmfs/ducc/constants"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/lib"
@@ -25,20 +28,30 @@ type ingestLayerKey struct {
 var currentlyIngestingLayersMutex = sync.Mutex{}
 var currentlyIngestingLayers = make(map[ingestLayerKey]db.TaskPtr)
 
-func CreateLayers(image db.Image, manifest v1.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
+func CreateLayers(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
 
 	// Ingest the layers
-	ingestLayersTask, err := ingestLayers(image, manifest, cvmfsRepo)
+	ingestLayersTask, err := ingestLayers(image, manifest.Manifest, cvmfsRepo)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_INGEST_LAYERS, err.Error()))
 		return ptr, nil
 	}
 	if err := task.LinkSubtask(nil, ingestLayersTask); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" as subtask: %s", db.TASK_INGEST_LAYERS, err.Error()))
+		return ptr, nil
+	}
+
+	writeImageMetadataTask, err := writeImageMetadata(image, manifest, cvmfsRepo)
+	if err != nil {
+		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_WRITE_IMAGE_METADATA, err.Error()))
+		return ptr, nil
+	}
+	if err := task.LinkSubtask(nil, writeImageMetadataTask); err != nil {
+		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" as subtask: %s", db.TASK_WRITE_IMAGE_METADATA, err.Error()))
 		return ptr, nil
 	}
 
@@ -53,9 +66,20 @@ func CreateLayers(image db.Image, manifest v1.Manifest, cvmfsRepo string) (db.Ta
 		ingestLayersResult := ingestLayersTask.WaitUntilDone()
 		if !db.TaskResultSuccessful(ingestLayersResult) {
 			task.LogFatal(nil, "Failed to ingest layers")
+			writeImageMetadataTask.Cancel(nil)
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully ingested layers")
+
+		// Start writing the image metadata
+		writeImageMetadataTask.Start(nil)
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task for writing image metadata. Waiting for it to finish")
+		writeImageMetadataResult := writeImageMetadataTask.WaitUntilDone()
+		if !db.TaskResultSuccessful(writeImageMetadataResult) {
+			task.LogFatal(nil, "Failed to write image metadata")
+			return
+		}
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully wrote image metadata")
 
 		// Mark the task as completed
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
@@ -243,7 +267,8 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		// TODO: This should be done in a transaction, as failing in the middle would
 		// leave the repository in an inconsistent state.
 
-		layerPath := cvmfs.LayerPath(cvmfsRepo, layerDigest.Encoded())
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction for creating catalogs")
+		layerPath := cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerPath(cvmfsRepo, layerDigest.Encoded()))
 		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, layerPath); err != nil {
 			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
 			task.LogFatal(nil, fmt.Sprintf("Failed to create catalog for layer %s: %s", layerDigest.String(), err.Error()))
@@ -252,7 +277,8 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Created catalog for layer %s", layerDigest.String()))
 
 		// Ingest the layer FS
-		ingestPath := cvmfs.LayerRootfsPath(cvmfsRepo, layerDigest.Encoded())
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS for ingesting layer")
+		ingestPath := cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerRootfsPath(cvmfsRepo, layerDigest.Encoded()))
 		if err := cvmfs.Ingest(cvmfsRepo, readHashCloseSizer, "--catalog", "-t", "-", "-b", ingestPath); err != nil {
 			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest layer %s: %s", layerDigest.String(), err.Error()))
@@ -261,6 +287,7 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully ingested layer %s", layerDigest.String()))
 
 		// Write the layer metadata
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction for writing metadata")
 		if err := lib.StoreLayerInfo(cvmfsRepo, layerDigest.Encoded(), readHashCloseSizer); err != nil {
 			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
 			task.LogFatal(nil, fmt.Sprintf("Failed to store layer metadata for layer %s: %s", layerDigest.String(), err.Error()))
@@ -291,4 +318,87 @@ func layerExistsInCvmfs(layerDigest digest.Digest, cvmfsRepo string) (bool, erro
 		return false, nil
 	}
 	return false, err
+}
+
+func writeImageMetadata(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+	task, ptr, err := db.CreateTask(nil, db.TASK_WRITE_IMAGE_METADATA)
+	if err != nil {
+		return db.NullTaskPtr(), err
+	}
+
+	fetchConfigTask, err := FetchAndParseConfigTask(image, manifest.Manifest.Config.Digest)
+	if err != nil {
+		task.LogFatal(nil, fmt.Sprintf("Failed to create fetch config task: %s", err.Error()))
+		return ptr, nil
+	}
+	if err := task.LinkSubtask(nil, fetchConfigTask); err != nil {
+		task.LogFatal(nil, fmt.Sprintf("Failed to link fetch config task: %s", err.Error()))
+		return ptr, nil
+	}
+
+	go func() {
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for task to start")
+		task.WaitForStart()
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Task started")
+
+		// First, get the config
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Starting download of image config")
+		fetchConfigTask.Start(nil)
+
+		if !db.TaskResultSuccessful(fetchConfigTask.WaitUntilDone()) {
+			task.LogFatal(nil, "Failed to fetch and parse config")
+			return
+		}
+		artifact, err := fetchConfigTask.GetArtifact()
+		if err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to get artifact from fetch config task: %s", err.Error()))
+			return
+		}
+		config, ok := artifact.(ConfigWithBytesAndDigest)
+		if !ok {
+			task.LogFatal(nil, fmt.Sprintf("Invalid config type: %s", reflect.TypeOf(artifact).String()))
+			return
+		}
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully downloaded image config")
+
+		cvmfsLock.Lock()
+		defer cvmfsLock.Unlock()
+
+		abort := false
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction")
+		if err := cvmfs.WithinTransaction(cvmfsRepo, func() error {
+			imagePath := filepath.Join("/cvmfs", cvmfsRepo, constants.ImagesSubDir, manifest.ManifestDigest.Encoded()[:2], manifest.ManifestDigest.Encoded())
+			// Ensure the image directory exists
+			if err := os.MkdirAll(imagePath, constants.DirPermision); err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to create image directory: %s", err.Error()))
+				abort = true
+				return err
+			}
+			// Write manifest
+			if err := os.WriteFile(filepath.Join(imagePath, "manifest.json"), manifest.ManifestBytes, constants.FilePermision); err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to write manifest: %s", err.Error()))
+				abort = true
+				return err
+			}
+			// Write config
+			if err := os.WriteFile(filepath.Join(imagePath, "config.json"), config.ConfigBytes, constants.FilePermision); err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to write config: %s", err.Error()))
+				abort = true
+				return err
+			}
+			return nil
+		}); err != nil {
+			task.LogFatal(nil, fmt.Sprintf("CvmFS transaction failed: %s", err.Error()))
+			return
+		}
+		if abort {
+			task.LogFatal(nil, "CvmFS transaction aborted")
+			return
+		}
+
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Successfully wrote image metadata")
+		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
+	}()
+
+	return ptr, nil
 }
