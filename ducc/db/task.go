@@ -22,6 +22,8 @@ type TaskID = uuid.UUID
 type TaskType string
 
 const (
+	TASK_UPDATE TaskType = "UPDATE"
+
 	// The main tasks:
 	TASK_CREATE_FLAT   TaskType = "CREATE_FLAT"
 	TASK_CREATE_LAYERS TaskType = "CREATE_LAYERS"
@@ -43,6 +45,8 @@ const (
 
 	// This is used by both CREATE_LAYERS and CREATE_FLAT
 	TASK_DOWNLOAD_BLOB TaskType = "DOWNLOAD_BLOB"
+
+	TASK_MISC TaskType = "MISC"
 )
 
 type TaskStatus string
@@ -76,7 +80,11 @@ type Task struct {
 	Status   TaskStatus
 	Result   TaskResult
 	Subtasks []TaskPtr
-	cv       *sync.Cond
+
+	Artifact   any
+	IsArtifact bool
+
+	cv *sync.Cond
 }
 
 type TaskPtr struct {
@@ -315,9 +323,20 @@ func (t *Task) LinkSubtask(tx *sql.Tx, child TaskPtr) error {
 	t.cv.L.Lock()
 	defer t.cv.L.Unlock()
 
-	stnmt := "INSERT INTO task_relations (" + taskRelationSqlFields + ") VALUES (" + taskRelationSqlFieldsQs + ")"
+	// First, check if the exact same relation already exists
+	stmntCHeck := "SELECT COUNT(*) FROM task_relations WHERE task1_id=? AND task2_id=? AND relation=?"
+	var count int
+	if err := tx.QueryRow(stmntCHeck, child.GetValue().ID, t.ID, TASK_RELATION_SUBTASK_OF).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		// This exact relation already exists, so we don't need to do anything
+		return nil
+	}
+
+	stmntInsert := "INSERT INTO task_relations (" + taskRelationSqlFields + ") VALUES (" + taskRelationSqlFieldsQs + ")"
 	childID := child.GetValue().ID
-	_, err := tx.Exec(stnmt, childID, t.ID, TASK_RELATION_SUBTASK_OF)
+	_, err := tx.Exec(stmntInsert, childID, t.ID, TASK_RELATION_SUBTASK_OF)
 	if err != nil {
 		return err
 	}
@@ -342,7 +361,7 @@ func (t *Task) LogFatal(tx *sql.Tx, message string) error {
 	return t.SetTaskCompleted(tx, TASK_RESULT_FAILURE)
 }
 
-// WaitForStart blocks until the task has been started.
+// WaitUntilDone blocks until the task has been completed.
 func (tPtr TaskPtr) WaitUntilDone() TaskResult {
 	tPtr.cv.L.Lock()
 	defer tPtr.cv.L.Unlock()
@@ -406,6 +425,26 @@ func (tPtr TaskPtr) Skip(tx *sql.Tx) (TaskStatus, error) {
 	return tPtr.task.Status, nil
 }
 
+func (tPtr TaskPtr) GetArtifact() (any, error) {
+	tPtr.cv.L.Lock()
+	defer tPtr.cv.L.Unlock()
+	if tPtr.task.IsArtifact {
+		return tPtr.task.Artifact, nil
+	}
+	return nil, errors.New("task does not have an artifact")
+}
+
+func (t *Task) SetArtifact(artifact any) error {
+	t.cv.L.Lock()
+	defer t.cv.L.Unlock()
+	if t.IsArtifact {
+		return errors.New("task already has an artifact")
+	}
+	t.Artifact = artifact
+	t.IsArtifact = true
+	return nil
+}
+
 // GetTaskSnapshot returns a snapshot of the task with the given ID.
 // If no task with the given ID exists, an sql.ErrNoRows is returned.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
@@ -449,6 +488,7 @@ func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]TaskSnapshot, error)
 	if err != nil {
 		return nil, err
 	}
+	defer subTasksPrepStmnt.Close()
 
 	taskSnapshots := make([]TaskSnapshot, len(taskIDs))
 	for i, taskID := range taskIDs {
@@ -467,11 +507,11 @@ func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]TaskSnapshot, error)
 		if err != nil {
 			return nil, err
 		}
-		defer logsRows.Close()
 		logs := make([]Log, 0)
 		for logsRows.Next() {
 			log, err := parseLogFromRow(logsRows)
 			if err != nil {
+				logsRows.Close()
 				return nil, err
 			}
 			logs = append(logs, log)
@@ -483,13 +523,13 @@ func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]TaskSnapshot, error)
 		if err != nil {
 			return nil, err
 		}
-		defer subTaskRows.Close()
 
 		subTaskIDs := make([]TaskID, 0)
 		for subTaskRows.Next() {
 			var subTaskID TaskID
 			err := subTaskRows.Scan(&subTaskID)
 			if err != nil {
+				subTaskRows.Close()
 				return nil, err
 			}
 			subTaskIDs = append(subTaskIDs, subTaskID)
@@ -548,12 +588,12 @@ func GetLogsByTaskIDs(tx *sql.Tx, taskIDs []TaskID) ([][]Log, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
 
 		logs[i] = make([]Log, 0)
 		for rows.Next() {
 			log, err := parseLogFromRow(rows)
 			if err != nil {
+				rows.Close()
 				return nil, err
 			}
 			logs[i] = append(logs[i], log)
@@ -617,4 +657,8 @@ func (t *Task) LogGoroutineStop(result TaskResult) error {
 		err = t.Log(nil, LOG_SEVERITY_DEBUG, "Task has failed before Start() was called. Stopping goroutine")
 	}
 	return err
+}
+
+func (tPtr TaskPtr) Cancel(tx *sql.Tx) error {
+	return tPtr.task.SetTaskCompleted(tx, TASK_RESULT_CANCELLED)
 }

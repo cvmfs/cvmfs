@@ -11,29 +11,6 @@ import (
 	"github.com/cvmfs/ducc/test"
 )
 
-func TestExampleManifest(t *testing.T) {
-	f, err := os.Open("testdata/example_manifest.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	bytes, err := io.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	manifest, _, err := parseManifestFromBytes(bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	parsedMaifestJSON, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	test.CompareWithGoldenFile(t, "testdata/example_manifest.golden.json", string(parsedMaifestJSON), *test.UpdateTests)
-}
-
 func TestFetchManifest(t *testing.T) {
 	stop := make(chan interface{})
 	ready := make(chan interface{})
@@ -49,7 +26,7 @@ func TestFetchManifest(t *testing.T) {
 		Tag:            "latest",
 	}
 
-	manifest, _, err := fetchManifest(image)
+	manifest, err := fetchAndParseManifest(image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +50,7 @@ func mockManifestServer(stop <-chan interface{}, ready chan<- interface{}) {
 	f.Close()
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
 		w.Write(manifest)
 		w.WriteHeader(http.StatusOK)
 	}

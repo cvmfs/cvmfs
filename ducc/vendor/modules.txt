@@ -74,8 +74,8 @@ github.com/docker/go-units
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
-# github.com/google/go-cmp v0.2.0
-## explicit
+# github.com/google/go-cmp v0.5.8
+## explicit; go 1.13
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
@@ -151,6 +151,8 @@ github.com/vbatts/tar-split/tar/storage
 # golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 ## explicit; go 1.11
 golang.org/x/crypto/ssh/terminal
+# golang.org/x/exp v0.0.0-20230809094429-853ea248256d
+## explicit; go 1.20
 # golang.org/x/net v0.0.0-20201021035429-f5854403a974
 ## explicit; go 1.11
 golang.org/x/net/internal/socks

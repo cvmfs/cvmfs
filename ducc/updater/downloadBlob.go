@@ -18,7 +18,6 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 	if existingTask, ok := pendingDownloads[blobDigest]; ok {
 		useCount[blobDigest]++
 		downloadsMutex.Unlock()
-		fmt.Printf("Using existing download task for blob %s\n", blobDigest.String())
 		return existingTask, nil
 	}
 
