@@ -3,7 +3,6 @@
   * Support latest signature of fuse_lowlevel_notify_expire_entry (#3352)
   * [client] Placeholder for custom proxy health check and sharding policy (#3095) 
   * [client] Custom http tracing headers (#3094)
-  * [client] Allow change to/from debug mode during cvmfs_config reload (#2897)
   * [client] Use http client auth only if membership is set (#3333)
   * [gw] Fix publication of uncompressed files through gateway (#3338)
   * [client] Add curl debug info to debug log (#3329)
