@@ -64,29 +64,15 @@ static void *MainTalk(void *data __attribute__((unused))) {
     }
 
     char command;
-    ReloadMode reload_mode = kReloadLegacy;
     if (recv(con_fd, &command, 1, 0) > 0) {
-      if ((command == 'd') || (command == 'n')) {
-        // version that specifies reloading in debug or non-debug mode
-        // receives 2 commands
-        // first: debug (d) / non-debug(n)
-        // second: 'R' or 'S'
-        reload_mode = command == 'd' ? kReloadDebug : kReloadNoDebug;
-        if (recv(con_fd, &command, 1, 0) > 0) {
-          if ((command != 'R') && (command != 'S')) {
-            SendMsg2Socket(con_fd, "unknown command\n");
-            continue;
-          }
-        }
-      } else if ((command != 'R') && (command != 'S')) {  // legacy support
+      if ((command != 'R') && (command != 'S')) {
         SendMsg2Socket(con_fd, "unknown command\n");
         continue;
       }
 
       SetLogMicroSyslog(*usyslog_path_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module. Reload mode=%d",
-                                      reload_mode);
-      int retval = Reload(con_fd, command == 'S', reload_mode);
+      LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
+      int retval = Reload(con_fd, command == 'S');
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
@@ -125,8 +111,7 @@ void Fini() {
 /**
  * Connects to a loader socket and triggers the reload
  */
-int MainReload(const std::string &socket_path, const bool stop_and_go,
-               const bool debug) {
+int MainReload(const std::string &socket_path, const bool stop_and_go) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Connecting to CernVM-FS loader... ");
   int socket_fd = ConnectSocket(socket_path);
@@ -136,14 +121,8 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-
-  // reload mode: debug (d) or non-debug (n)
-  char command = debug ? 'd' : 'n';
+  const char command = stop_and_go ? 'S' : 'R';
   WritePipe(socket_fd, &command, 1);
-
-  command = stop_and_go ? 'S' : 'R';
-  WritePipe(socket_fd, &command, 1);
-
   char buf;
   int retval;
   while ((retval = read(socket_fd, &buf, 1)) == 1) {

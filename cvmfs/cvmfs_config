@@ -1057,11 +1057,6 @@ cvmfs_status() {
 _cvmfs_reload_pause() {
   # Helper function to put a particular repository in sleep mode
   local mountpoint="$1"
-  local debug_flag=""
- 
-  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
-    debug_flag="--debug"
-  fi
 
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
@@ -1074,7 +1069,7 @@ _cvmfs_reload_pause() {
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
     rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go ${debug_flag} | \
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
     awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
   cd /
   echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1105,19 +1100,14 @@ cvmfs_reload() {
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   local clean_cache; clean_cache=0
   local cache_directories=
-  local debug_flag=""
   if [ "x$1" = "x-c" ]; then
     clean_cache=1
     shift
     cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
-    if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
-      debug_flag="--debug"
-    fi
-
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn ${debug_flag}
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn
     return $?
   fi
 

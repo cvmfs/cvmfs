@@ -14,8 +14,7 @@ bool Init(const std::string &socket_path);
 void Spawn();
 void Fini();
 
-int MainReload(const std::string &socket_path, const bool stop_and_go,
-               const bool debug);
+int MainReload(const std::string &socket_path, const bool stop_and_go);
 
 }  // namespace loader_talk
 }  // namespace loader
