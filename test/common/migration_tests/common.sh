@@ -39,14 +39,14 @@ guess_package_url() {
     local release=1
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}-${release}.el${slc_major_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el${slc_major_version}.${architecture}.rpm"
 
   # Fedora
   elif [ -f /etc/fedora-release ]; then
     local release=1
     local fedora_version=$(cat /etc/fedora-release | tr -Cd 0-9)
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}-${release}.fc${fedora_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.fc${fedora_version}.${architecture}.rpm"
 
   # CentOS 9
   elif [ -f /etc/os-release ]; then
@@ -54,7 +54,7 @@ guess_package_url() {
     local platform="$(. /etc/os-release; echo $PLATFORM_ID)"
     if [ x"$platform" = "xplatform:el9" ]; then
       local architecture=$(uname -m)
-      package_file_name="${package_name}-${cvmfs_version_string}-${release}.el9.${architecture}.rpm"
+      package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el9.${architecture}.rpm"
     fi
 
   # to be extended

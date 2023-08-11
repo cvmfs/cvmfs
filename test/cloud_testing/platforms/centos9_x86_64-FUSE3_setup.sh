@@ -35,6 +35,12 @@ install_from_repo fuse-overlayfs
 install_from_repo git
 install_from_repo perl
 
+# for building kernel
+install_from_repo zlib-devel
+install_from_repo libattr-devel
+install_from_repo openssl-devel
+install_from_repo libuuid-devel
+
 # traffic shaping
 # install_from_repo trickle
 # TODO: uncomment once trickle is available for Centos 9
