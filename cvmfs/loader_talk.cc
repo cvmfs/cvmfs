@@ -178,6 +178,8 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
       continue;
     }
 
+    // chars are received one by one; in order to check if we get
+    // "unknown command" a string is constructed here
     if (!past_first_line) {
       if (buf == '\n') {
         LogCvmfs(kLogCvmfs, kLogStdout, "%s", first_line.c_str());
