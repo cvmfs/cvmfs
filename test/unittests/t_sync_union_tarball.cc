@@ -50,7 +50,7 @@ TEST_F(T_SyncUnionTarball, Simple) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
   publish::SyncUnionTarball sync_union(
                                   m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u,"", false);
+                                  "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -64,7 +64,7 @@ TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
   std::string tar_filename = CreateTarFile("tar.tar", four_empty_files);
   publish::SyncUnionTarball sync_union(
                                   m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u,"", false);
+                                  "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -78,7 +78,7 @@ TEST_F(T_SyncUnionTarball, Complex) {
   std::string tar_filename = CreateTarFile("tar.tar", complex_tar);
   publish::SyncUnionTarball sync_union(
                                   m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u,"", false);
+                                  "tmpsync", -1u, -1u, "", false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
