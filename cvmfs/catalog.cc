@@ -237,7 +237,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
 /**
  * Removes the mountpoint and prepends the root prefix to path
  */
-shash::Md5 Catalog::NormalizePath(const PathString &path) const {
+CVMFS_EXPORT shash::Md5 Catalog::NormalizePath(const PathString &path) const {
   if (is_regular_mountpoint_)
     return shash::Md5(path.GetChars(), path.GetLength());
 

@@ -23,6 +23,7 @@
 #include "sql.h"
 #include "uid_map.h"
 #include "xattr.h"
+#include "util/export.h"
 
 namespace swissknife {
 class CommandMigrate;
@@ -88,7 +89,7 @@ class InodeAnnotation {
  *
  * Read-only catalog. A sub-class provides read-write access.
  */
-class Catalog : SingleCopy {
+class CVMFS_EXPORT Catalog : SingleCopy {
   FRIEND_TEST(T_Catalog, NormalizePath);
   FRIEND_TEST(T_Catalog, PlantPath);
   friend class swissknife::CommandMigrate;  // for catalog version migration

@@ -211,7 +211,7 @@ class DirectoryEntryBase {
  protected:
   // Inodes are generated based on the rowid of the entry in the file catalog.
   inode_t inode_;
-
+ public:
   // Data from struct stat
   NameString name_;
   unsigned int mode_;

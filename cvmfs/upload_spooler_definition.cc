@@ -14,7 +14,7 @@ namespace upload {
 const char* SpoolerDefinition::kDriverNames[] =
   {"S3", "local", "gw", "mock", "unknown"};
 
-SpoolerDefinition::SpoolerDefinition(
+CVMFS_EXPORT SpoolerDefinition::SpoolerDefinition(
     const std::string& definition_string,
     const shash::Algorithms hash_algorithm,
     const zlib::Algorithms compression_algorithm,
@@ -74,7 +74,7 @@ SpoolerDefinition::SpoolerDefinition(
   valid_ = true;
 }
 
-SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
+CVMFS_EXPORT SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
   SpoolerDefinition result(*this);
   result.compression_alg = zlib::kZlibDefault;
   return result;

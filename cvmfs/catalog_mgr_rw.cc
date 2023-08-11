@@ -28,7 +28,7 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-WritableCatalogManager::WritableCatalogManager(
+CVMFS_EXPORT WritableCatalogManager::WritableCatalogManager(
   const shash::Any          &base_hash,
   const std::string         &stratum0,
   const string              &dir_temp,
@@ -65,7 +65,7 @@ WritableCatalogManager::WritableCatalogManager(
 }
 
 
-WritableCatalogManager::~WritableCatalogManager() {
+CVMFS_EXPORT WritableCatalogManager::~WritableCatalogManager() {
   pthread_mutex_destroy(sync_lock_);
   free(sync_lock_);
   pthread_mutex_destroy(catalog_processing_lock_);

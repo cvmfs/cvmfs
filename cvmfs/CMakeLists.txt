@@ -757,6 +757,7 @@ if (BUILD_SERVER)
        reflog_sql.cc
        sanitizer.cc
        session_context.cc
+       server_tool.cc
        shortstring.cc
        sql.cc
        sqlitemem.cc
@@ -780,7 +781,7 @@ if (BUILD_SERVER)
        whitelist.cc
        xattr.cc
   )
-  set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
+  set (LIBCVMFS_SERVER_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
   set (LIBCVMFS_SERVER_LINK_LIBRARIES "")
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}

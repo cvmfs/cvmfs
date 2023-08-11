@@ -41,6 +41,7 @@
 #include "file_chunk.h"
 #include "upload_spooler_result.h"
 #include "util/concurrency.h"
+#include "util/export.h"
 #include "xattr.h"
 
 class XattrList;
@@ -67,14 +68,14 @@ class CatalogBalancer;
 
 namespace catalog {
 
-class WritableCatalogManager : public SimpleCatalogManager {
+class CVMFS_EXPORT WritableCatalogManager : public SimpleCatalogManager {
   friend class CatalogBalancer<WritableCatalogManager>;
   // TODO(jblomer): only needed to get Spooler's hash algorithm.  Remove me
   // after refactoring of the swissknife utility.
   friend class VirtualCatalog;
 
  public:
-  WritableCatalogManager(const shash::Any  &base_hash,
+  CVMFS_EXPORT WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
@@ -87,7 +88,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          bool is_balanceable,
                          unsigned max_weight,
                          unsigned min_weight);
-  ~WritableCatalogManager();
+  CVMFS_EXPORT ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
                                               const std::string &voms_authz,

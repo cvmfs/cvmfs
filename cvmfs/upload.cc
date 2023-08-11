@@ -12,7 +12,7 @@
 
 namespace upload {
 
-Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
+CVMFS_EXPORT Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
                                   perf::StatisticsTemplate *statistics) {
   Spooler *result = new Spooler(spooler_definition);
   if (!result->Initialize(statistics)) {
@@ -22,10 +22,10 @@ Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
   return result;
 }
 
-Spooler::Spooler(const SpoolerDefinition &spooler_definition)
+CVMFS_EXPORT Spooler::Spooler(const SpoolerDefinition &spooler_definition)
     : spooler_definition_(spooler_definition) {}
 
-Spooler::~Spooler() {
+CVMFS_EXPORT Spooler::~Spooler() {
   FinalizeSession(false);
   if (uploader_.IsValid()) {
     uploader_->TearDown();
