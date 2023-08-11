@@ -169,6 +169,15 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_DOWNLOAD_BLOB, err.Error()))
 		return ptr, nil
 	}
+	// Want to release the blob as soon as we are done with it.
+	// If we return early, we need to release it in this function.
+	// If not, the task goroutine will release it.
+	earlyReturn := true
+	defer func() {
+		if earlyReturn {
+			releaseBlob(layerDigest)
+		}
+	}()
 	if err := task.LinkSubtask(nil, downloadLayerTask); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" as subtask: %s", db.TASK_DOWNLOAD_BLOB, err.Error()))
 		return ptr, nil
@@ -185,7 +194,9 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 		return ptr, nil
 	}
 
+	earlyReturn = false
 	go func() {
+		defer releaseBlob(layerDigest)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for task to start")
 		task.WaitForStart()
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task started")
@@ -296,8 +307,6 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully stored layer metadata for layer %s", layerDigest.String()))
 		// END CVMFS METATRANSACTION
 
-		// Release the downloaded blob
-		releaseBlob(layerDigest)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Released blob %s", layerDigest.String()))
 
 		// Mark the task as completed
