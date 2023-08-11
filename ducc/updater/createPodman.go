@@ -207,7 +207,7 @@ func CreatePodman(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created links")
 
 			// Create lower files for the new layers
-			if err := createLowerFilesCVMFS(cvmfsRepo, newLayersInfo); err != nil {
+			if err := createLowerFilesCVMFS(cvmfsRepo, manifestLayersInfo, newLayersInfo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to create lower files: %s", err.Error()))
 				abort = true
 				return err
@@ -647,8 +647,49 @@ func generateChainID(parentChainID digest.Digest, diffDigest digest.Digest) (dig
 	return digest.SHA256.FromBytes(append(parentChainIDBytes, diffDigestBytes...)), nil
 }
 
-func createLowerFilesCVMFS(cvmfsRepo string, newLayersInfo []PodmanLayerInfo) error {
+func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInfo, newLayersInfo []PodmanLayerInfo) error {
 	lowerString := ""
+
+	numExistingLayers := len(manifestLayersInfo) - len(newLayersInfo)
+	if numExistingLayers > 0 {
+		// We have existing layers, so start with the lower string for the last existing layer
+		// Since layer short IDs are random, we need to read from CVMFS, not from the manifest
+		existingLowerFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "lower"))
+		if errors.Is(err, os.ErrNotExist) {
+			// OK, the layer does not have a lower file, so we just start with an empty string
+		} else if err != nil {
+			return fmt.Errorf("failed to open existing lower file: %w", err)
+		} else {
+			if err != nil {
+				return fmt.Errorf("failed to open existing lower file: %w", err)
+			}
+			existingLowerStringBytes, err := io.ReadAll(existingLowerFile)
+			if err != nil {
+				existingLowerFile.Close()
+				return fmt.Errorf("failed to read existing lower file: %w", err)
+			}
+			existingLowerFile.Close()
+			lowerString = string(existingLowerStringBytes)
+		}
+
+		// Append the last layer short ID to the lower string
+		existingLinkFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "link"))
+		if err != nil {
+			return fmt.Errorf("failed to open existing link file: %w", err)
+		}
+		existingLinkStringBytes, err := io.ReadAll(existingLinkFile)
+		if err != nil {
+			existingLinkFile.Close()
+			return fmt.Errorf("failed to read existing link file: %w", err)
+		}
+		existingLinkFile.Close()
+		if lowerString == "" {
+			lowerString = "l/" + string(existingLinkStringBytes)
+		} else {
+			lowerString = fmt.Sprintf("l/%s:%s", string(existingLinkStringBytes), lowerString)
+		}
+	}
+
 	for _, layer := range newLayersInfo {
 		if lowerString != "" {
 			lowerFilePath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", layer.ID, "lower")
