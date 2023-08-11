@@ -145,7 +145,7 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   // send "unknown command" and close the connection. We try to send
   // both the commands and react according to what we read from the socket.
 
-  int retval;
+  ssize_t retval;
   do {
     retval = send(socket_fd, commands, 2, MSG_NOSIGNAL);
   } while ((retval <= 0) && (errno == EINTR));
