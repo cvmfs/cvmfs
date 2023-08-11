@@ -136,19 +136,60 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
-
   // reload mode: debug (d) or non-debug (n)
-  char command = debug ? 'd' : 'n';
-  WritePipe(socket_fd, &command, 1);
+  char commands[2];
+  commands[0] = debug ? 'd' : 'n';
+  commands[1] = stop_and_go ? 'S' : 'R';
 
-  command = stop_and_go ? 'S' : 'R';
-  WritePipe(socket_fd, &command, 1);
+  // Loaders before version 2.11 won't recognize 'd' or 'n'. They will
+  // send "unknown command" and close the connection. We try to send
+  // both the commands and react according to what we read from the socket.
+
+  ssize_t retval;
+  do {
+    retval = send(socket_fd, commands, 2, MSG_NOSIGNAL);
+  } while ((retval <= 0) && (errno == EINTR));
+
+  if (retval <= 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Sending reload command failed!");
+    return 103;
+  }
 
   char buf;
-  int retval;
+  std::string first_line;
+  bool past_first_line = false;
   while ((retval = read(socket_fd, &buf, 1)) == 1) {
     if (buf == '~')
       break;
+
+    if (first_line == "unknown command") {
+      // We have a pre-2.11 loader, reconnect to the socket
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Connecting in backwards compatibility mode");
+      close(socket_fd);
+      socket_fd = ConnectSocket(socket_path);
+      if (socket_fd < 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "reconnecting failed!");
+        return 104;
+      }
+      WritePipe(socket_fd, &commands[1], 1);
+      first_line.clear();
+      past_first_line = true;
+      continue;
+    }
+
+    // chars are received one by one; in order to check if we get
+    // "unknown command" a string is constructed here
+    if (!past_first_line) {
+      if (buf == '\n') {
+        LogCvmfs(kLogCvmfs, kLogStdout, "%s", first_line.c_str());
+        past_first_line = true;
+      } else {
+        first_line.push_back(buf);
+      }
+      continue;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%c", buf);
   }
   if (retval != 1) {
