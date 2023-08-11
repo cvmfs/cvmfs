@@ -16,7 +16,7 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 	// Then we can just wait for that task to finish.
 	downloadsMutex.Lock()
 	if existingTask, ok := pendingDownloads[blobDigest]; ok {
-		useCount[blobDigest]++
+		useCount[blobDigest] = useCount[blobDigest] + 1
 		downloadsMutex.Unlock()
 		return existingTask, nil
 	}
@@ -38,6 +38,13 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Downloading blob %s", blobDigest.String()))
 		err := registry.DownloadBlob(blobDigest, repository, acceptHeaders)
 		if err != nil {
+			// If the download failed, we remove the task from the pending downloads
+			// and file use count maps.
+			// The next time the blob is requested, it will therefore be downloaded again.
+			downloadsMutex.Lock()
+			delete(pendingDownloads, blobDigest)
+			delete(useCount, blobDigest)
+			downloadsMutex.Unlock()
 			task.LogFatal(nil, fmt.Sprintf("Failed to download blob %s: %s", blobDigest.String(), err.Error()))
 			return
 		}
@@ -59,7 +66,7 @@ func releaseBlob(fileDigest digest.Digest) {
 	if count == 0 {
 		delete(pendingDownloads, fileDigest)
 		delete(useCount, fileDigest)
-		os.Remove(path.Join(config.TMP_FILE_PATH, "blobs", fileDigest.String()))
+		os.Remove(path.Join(config.TMP_FILE_PATH, "blobs", fileDigest.Encoded()))
 		return
 	}
 	useCount[fileDigest] = count

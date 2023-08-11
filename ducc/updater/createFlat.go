@@ -195,7 +195,6 @@ func createSingularityFiles(image db.Image, manifest ManifestWithBytesAndDigest,
 	}
 
 	go func() {
-		defer releaseBlob(manifest.Manifest.Config.Digest)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
 		task.WaitForStart()
 		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
@@ -380,6 +379,15 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		task.LogFatal(nil, fmt.Sprintf("Failed to create \"%s\" task: %s", db.TASK_DOWNLOAD_BLOB, err))
 		return ptr, nil
 	}
+	// Want to release the blob as soon as we are done with it.
+	// If we return early, we need to release it in this function.
+	// If not, the task goroutine will release it.
+	earlyReturn := true
+	defer func() {
+		if earlyReturn {
+			releaseBlob(chainLink.LayerDigest)
+		}
+	}()
 	if err := task.LinkSubtask(nil, downloadLayerTaskPtr); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" task as subtask: %s", db.TASK_DOWNLOAD_BLOB, err))
 		return ptr, nil
@@ -396,7 +404,9 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		return ptr, nil
 	}
 
+	earlyReturn = false
 	go func() {
+		defer releaseBlob(chainLink.LayerDigest)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
 		status := task.WaitForStart()
 		if status == db.TASK_STATUS_DONE {
@@ -506,10 +516,6 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest chain link: %s", err))
 			return
 		}
-
-		// Release the downloaded layer
-		releaseBlob(link.LayerDigest)
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Released blob %s", link.LayerDigest.String()))
 
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task completed successfully")
