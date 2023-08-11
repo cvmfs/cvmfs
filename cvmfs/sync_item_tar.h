@@ -33,6 +33,10 @@ class SyncItemTar : public SyncItem {
   SyncItemTar(const std::string &relative_parent_path,
               const std::string &filename, struct archive *archive,
               struct archive_entry *entry, Signal *read_archive_signal,
+              const SyncUnion *union_engine, const uid_t uid, const gid_t gid);
+  SyncItemTar(const std::string &relative_parent_path,
+              const std::string &filename, struct archive *archive,
+              struct archive_entry *entry, Signal *read_archive_signal,
               const SyncUnion *union_engine);
 
  private:
@@ -42,6 +46,8 @@ class SyncItemTar : public SyncItem {
   mutable platform_stat64 tar_stat_;
   mutable bool obtained_tar_stat_;
   Signal *read_archive_signal_;
+  const uid_t uid_;
+  const gid_t gid_;
 };
 
 }  // namespace publish

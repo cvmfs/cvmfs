@@ -56,6 +56,8 @@ struct SyncParameters {
         is_balanced(false),
         max_weight(kDefaultMaxWeight),
         min_weight(kDefaultMinWeight),
+        gid(-1u),
+        uid(-1u),
         session_token_file(),
         key_file(),
         repo_tag() {}
@@ -106,6 +108,8 @@ struct SyncParameters {
   bool is_balanced;
   unsigned max_weight;
   unsigned min_weight;
+  gid_t gid;
+  uid_t uid;
 
   // Parameters for when upstream type is HTTP
   std::string session_token_file;

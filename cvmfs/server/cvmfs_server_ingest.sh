@@ -18,6 +18,11 @@ cvmfs_server_ingest() {
   local tar_file=""
   local to_delete="" # directories or file to delete before the extraction
   local name="" #repository name
+  local user=""
+  local group=""
+  local uid=""
+  local gid=""
+  local keep_ownership=false
   local create_catalog=false
 
   local force_native=0
@@ -46,6 +51,15 @@ cvmfs_server_ingest() {
       -c | --catalog )
         create_catalog=true
         ;;
+      -u | --user )
+        user=$2
+      ;;
+      -g | --group )
+        group=$2
+      ;;
+      -k | --keep-ownership )
+        keep_ownership=true
+      ;;
     esac
     shift
   done
@@ -66,6 +80,53 @@ cvmfs_server_ingest() {
   fi
 
   load_repo_config $name
+
+  #### check and set uid/gid
+  # error: cannot keep ownership while also requesting other user/group
+  if { [ x"$user" != "x" ] || [ x"$group" != "x" ]; } && [ $keep_ownership = true ]; then
+    die "You cannot provide both: either provide user (-u)/group (-g) or keep the ownership (-k) of the tarball"
+  fi  
+
+
+  # error: group also needs user
+  if [ x"$user" = "x" ] && [ x"$group" != "x" ]; then
+    die "If providing a group name, you also must provide a user (use -u) to set new owner of the ingest tarball"
+  fi
+
+  # both set
+  if [ x"$user" != "x" ]; then
+    uid=$(id -u "$user")
+
+    if [[ x"$uid" = xi* ]]; then
+      die "User set but no valid user name given"
+    fi
+  fi
+
+  if [ x"$group" != "x" ]; then
+    gid=$(getent group "$group" | awk -F':' '{print $3;}')
+
+    if [ x"$gid" = "x" ]; then
+      die "Group set but no valid group name given"
+    fi
+  fi
+  # only user set: get gid from user
+  if [ x"$group" != "x" ]; then
+    gid=$(id -g "$user")
+  fi
+  # use default cvmfs repo owner
+  if [ x"$user" = "x" ] && [ x"$group" = "x" ] && [ $keep_ownership = false ]; then
+    uid=$(id -u "$CVMFS_USER")
+    gid=$(id -g "$CVMFS_USER")
+
+    if [[ x"$uid" = xi* ]]; then
+      die "Default CVMFS_USER $CVMFS_USER for the repo does not exist"
+    fi
+  fi
+  # keep tar ball ownership
+  if [ $keep_ownership = true ]; then
+    uid="-1"
+    gid="-1"
+  fi
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
@@ -208,6 +269,8 @@ cvmfs_server_ingest() {
     -o $manifest                                \
     -K $CVMFS_PUBLIC_KEY                        \
     -N $name                                    \
+    -U $uid                                     \
+    -G $gid                                     \
     "
 
   if [ ! x"$tar_file" = "x" ]; then

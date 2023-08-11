@@ -88,6 +88,19 @@ class SyncItemDummyDir : public SyncItemNative {
     scratch_stat_.stat.st_uid = getuid();
     scratch_stat_.stat.st_gid = getgid();
   }
+  SyncItemDummyDir(const std::string &relative_parent_path,
+                   const std::string &filename, const SyncUnion *union_engine,
+                   const SyncItemType entry_type, uid_t uid, gid_t gid)
+      : SyncItemNative(relative_parent_path, filename, union_engine,
+                       entry_type) {
+    assert(kItemDir == entry_type);
+
+    scratch_stat_.obtained = true;
+    scratch_stat_.stat.st_mode = kPermision;
+    scratch_stat_.stat.st_nlink = 1;
+    scratch_stat_.stat.st_uid = uid;
+    scratch_stat_.stat.st_gid = gid;
+  }
 
  private:
   static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR |
