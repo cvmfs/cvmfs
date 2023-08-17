@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"sort"
+	"time"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/google/uuid"
@@ -38,7 +39,9 @@ type WishOutputOptions struct {
 }
 
 type WishScheduleOptions struct {
-	WebhookEnabled ValueWithDefault[bool]
+	WebhookEnabled         ValueWithDefault[bool]
+	CheckImageInfoInterval ValueWithDefault[time.Duration]
+	ExpandWildcardInterval ValueWithDefault[time.Duration]
 }
 
 type Wish struct {

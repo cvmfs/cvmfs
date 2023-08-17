@@ -48,6 +48,20 @@ func nullBoolToValueWithDefault(val sql.NullBool, defaultValue bool) ValueWithDe
 	}
 }
 
+func nullSecondsToValueWithDefault(val sql.NullInt64, defaultValue time.Duration) ValueWithDefault[time.Duration] {
+	if !val.Valid {
+		return ValueWithDefault[time.Duration]{
+			Value:     defaultValue,
+			IsDefault: true,
+		}
+	}
+	// Convert seconds to duration
+	return ValueWithDefault[time.Duration]{
+		Value:     time.Duration(val.Int64) * time.Second,
+		IsDefault: false,
+	}
+}
+
 // GetTransaction opens a database transaction, which can be used for calling multiple operations atomically.
 // Remember to call `tx.Commit()` or `tx.Rollback()` when done.
 func GetTransaction() (*sql.Tx, error) {
