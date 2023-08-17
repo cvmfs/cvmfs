@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS "tasks" (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
     status TEXT NOT NULL,
-    result TEXT NOT NULL
+    result TEXT NOT NULL,
+
+    start_timestamp TEXT NOT NULL,
 );
 
 CREATE TABLE IF NOT EXISTS "task_logs"(
@@ -68,5 +70,34 @@ CREATE TABLE IF NOT EXISTS "task_relations" (
     FOREIGN KEY (task1_id) REFERENCES tasks (id) ON DELETE CASCADE,
     FOREIGN KEY (task2_id) REFERENCES tasks (id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS "checks" (
+    id TEXT PRIMARY KEY,
+
+    type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+
+    status TEXT NOT NULL,
+
+    /* If actions are started by this check, they are referenced here */
+    task_id TEXT,
+
+    FOREIGN KEY (task_id) REFERENCES tasks (id)
+);
+
+CREATE TABLE IF NOT EXISTS "checkTriggers" (
+    id TEXT PRIMARY KEY,
+
+    check_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    
+    type TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    details TEXT NOT NULL,
+    
+    check_id TEXT,
+
+    FOREIGN KEY (check_id) REFERENCES checks (id) ON DELETE CASCADE
+)
 
 COMMIT;
