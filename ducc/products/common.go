@@ -1,10 +1,11 @@
-package updater
+package products
 
 import (
 	"fmt"
 	"sync"
 
 	"github.com/cvmfs/ducc/db"
+	"github.com/cvmfs/ducc/registry"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -79,7 +80,7 @@ func LayerMediaTypeIsForeign(layerMediaType string) bool {
 	return false
 }
 
-func FullUpdate(image db.Image, manifest ManifestWithBytesAndDigest, outputOptions db.WishOutputOptions, cvmfsRepo string) (db.TaskPtr, error) {
+func FullUpdate(image db.Image, manifest registry.ManifestWithBytesAndDigest, outputOptions db.WishOutputOptions, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_UPDATE)
 	if err != nil {
 		return db.TaskPtr{}, err
