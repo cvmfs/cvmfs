@@ -1,4 +1,4 @@
-package updater
+package products
 
 import (
 	"compress/gzip"
@@ -28,7 +28,7 @@ type ingestLayerKey struct {
 var currentlyIngestingLayersMutex = sync.Mutex{}
 var currentlyIngestingLayers = make(map[ingestLayerKey]db.TaskPtr)
 
-func CreateLayers(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS)
 	if err != nil {
 		return db.NullTaskPtr(), err
@@ -329,13 +329,13 @@ func layerExistsInCvmfs(layerDigest digest.Digest, cvmfsRepo string) (bool, erro
 	return false, err
 }
 
-func writeImageMetadata(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	task, ptr, err := db.CreateTask(nil, db.TASK_WRITE_IMAGE_METADATA)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
 
-	fetchConfigTask, err := FetchAndParseConfigTask(image, manifest.Manifest.Config.Digest)
+	fetchConfigTask, err := registry.FetchAndParseConfigTask(image, manifest.Manifest.Config.Digest)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create fetch config task: %s", err.Error()))
 		return ptr, nil
@@ -363,7 +363,7 @@ func writeImageMetadata(image db.Image, manifest ManifestWithBytesAndDigest, cvm
 			task.LogFatal(nil, fmt.Sprintf("Failed to get artifact from fetch config task: %s", err.Error()))
 			return
 		}
-		config, ok := artifact.(ConfigWithBytesAndDigest)
+		config, ok := artifact.(registry.ConfigWithBytesAndDigest)
 		if !ok {
 			task.LogFatal(nil, fmt.Sprintf("Invalid config type: %s", reflect.TypeOf(artifact).String()))
 			return

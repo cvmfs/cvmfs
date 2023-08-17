@@ -1,4 +1,4 @@
-package updater
+package products
 
 import (
 	"reflect"

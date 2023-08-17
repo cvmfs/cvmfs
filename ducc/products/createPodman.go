@@ -1,4 +1,4 @@
-package updater
+package products
 
 import (
 	"crypto/rand"
@@ -19,6 +19,7 @@ import (
 	"github.com/cvmfs/ducc/constants"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
+	"github.com/cvmfs/ducc/registry"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -42,7 +43,7 @@ type PodmanLayerInfo struct {
 	UncompressedDigest   digest.Digest `json:"diff-digest,omitempty"`
 }
 
-func CreatePodman(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	// TODO: Check if the image is already being created
 
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_PODMAN)
@@ -51,7 +52,7 @@ func CreatePodman(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo
 	}
 
 	// We need the config
-	fetchConfigTask, err := FetchAndParseConfigTask(image, manifest.Manifest.Config.Digest)
+	fetchConfigTask, err := registry.FetchAndParseConfigTask(image, manifest.Manifest.Config.Digest)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create fetch config task: %s", err.Error()))
 		return ptr, err
@@ -77,7 +78,7 @@ func CreatePodman(image db.Image, manifest ManifestWithBytesAndDigest, cvmfsRepo
 			task.LogFatal(nil, fmt.Sprintf("Failed to get artifact from fetch config task: %s", err.Error()))
 			return
 		}
-		config, ok := artifact.(ConfigWithBytesAndDigest)
+		config, ok := artifact.(registry.ConfigWithBytesAndDigest)
 		if !ok {
 			task.LogFatal(nil, fmt.Sprintf("Invalid config type: %s", reflect.TypeOf(artifact).String()))
 			return
@@ -455,7 +456,7 @@ func createPodmanLayerInfo(manifest v1.Manifest, config v1.Image) ([]PodmanLayer
 	return out, nil
 }
 
-func getPodmanNames(image db.Image, manifest ManifestWithBytesAndDigest) []string {
+func getPodmanNames(image db.Image, manifest registry.ManifestWithBytesAndDigest) []string {
 	// TODO: Do we want the digest name here?
 	var names = make([]string, 0)
 	if image.Tag != "" {
@@ -465,7 +466,7 @@ func getPodmanNames(image db.Image, manifest ManifestWithBytesAndDigest) []strin
 	return names
 }
 
-func createPodmanImageInfo(image db.Image, manifest ManifestWithBytesAndDigest, topLayerID string) PodmanImageInfo {
+func createPodmanImageInfo(image db.Image, manifest registry.ManifestWithBytesAndDigest, topLayerID string) PodmanImageInfo {
 	return PodmanImageInfo{
 		ID:      manifest.ManifestDigest.Encoded(),
 		Names:   getPodmanNames(image, manifest),
