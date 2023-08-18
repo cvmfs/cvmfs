@@ -103,6 +103,7 @@ BuildRequires: fuse-devel
 %if 0%{?build_fuse3}
 BuildRequires: fuse3-devel
 %endif
+BuildRequires: git
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
