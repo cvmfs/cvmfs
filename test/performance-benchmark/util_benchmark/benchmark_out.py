@@ -48,9 +48,9 @@ def writeResultsInternalRaw(outdir, outname, dict_full_cvmfs_internals):
         idx += 1
 
 def writeResultsTracing(outdir, outname, dict_tracing):
-  if len(dict_tracing[dict_tracing.keys()[0]]) < 1:
+  if len(dict_tracing[[*dict_tracing.keys()][0]]) < 1:
     return
-  
+
   tracing_outdir = "cvmfs_tracing/"
   if os.path.isdir(outdir + tracing_outdir) == False:
     os.makedirs(outdir + tracing_outdir)
