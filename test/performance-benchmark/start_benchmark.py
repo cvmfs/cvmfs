@@ -82,7 +82,7 @@ def setCvmfsConfig(filename, option, print_config=True):
     print("CVMFS CONFIG in /etc/cvmfs/default.local:")
     with open("/etc/cvmfs/default.local", "r") as cvmfs_config:
       for line in cvmfs_config:
-        print(line)
+        print(line, end="")
 
 ##
 # Main function that times the benchmark
@@ -155,9 +155,9 @@ if __name__ == "__main__":
 
       ## 3) loop over commands
       for name, partial_cmd in commands.items():
-        print("***", cvmfs_version, cvmfs_build_dir)
-        print("***", option)
-        print("***", name)
+        print("*** CVMFS:", cvmfs_version, cvmfs_build_dir)
+        print("*** Extra client options:", option)
+        print("*** command name:", name)
         print("***", partial_cmd)
 
         partial_cmd["time"] = time_command
@@ -168,7 +168,8 @@ if __name__ == "__main__":
 
         ## 4) loop over number of threads
         for num_threads in thread_configs:
-          print("***", num_threads)
+          print("")
+          print("*** Num threads:", num_threads)
 
           cache_setups = [["cold_cache", benchmark_time.wipe_cache],
                          ["warm_cache", benchmark_time.wipe_kernel_cache],
@@ -185,24 +186,22 @@ if __name__ == "__main__":
             cache_label = cache_setup[0]
             cache_setup_func = cache_setup[1]
 
-            print(cache_label)
+            print("    ", cache_label)
 
             start_times[cache_label] = dt.datetime.now()
             if callable(cache_setup_func):
-              print(cache_label, "with setup", partial_cmd)
               dict_cache, dict_full_cvmfs_internals, dict_tracing = \
                     benchmark_time.timeme(setup=cache_setup_func,
                                           stmt=partial(benchmark_time.do_thing,
                                                        partial_cmd, num_threads),
                                           number=1, repeat=repetitions)
             else:
-              print(cache_label, "without setup", partial_cmd)
               dict_cache, dict_full_cvmfs_internals, dict_tracing = \
                     benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
                                                        partial_cmd, num_threads),
                                           number=1, repeat=repetitions)
             
-            print("DONE", cache_label, "after",
+            print("    ...done", cache_label, "after",
                   (dt.datetime.now() - start_times[cache_label]).total_seconds(),
                   "seconds")
             all_data[cache_label] = dict_cache
