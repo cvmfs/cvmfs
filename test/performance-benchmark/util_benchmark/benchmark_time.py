@@ -30,7 +30,7 @@ def getTimeFormat():
   time_format = '"\n'
   for key, val in dict_time_format.items():
     time_format += key + " " + val + " \n"
-  time_format += '"'  
+  time_format += '"'
 
   return time_format
 
@@ -40,7 +40,7 @@ def wipe_kernel_cache():
 
 def wipe_cache():
   subprocess.check_call(["cvmfs_config", "wipecache"], stdout=subprocess.DEVNULL)
-  
+
   # do not use with autofs
   #subprocess.check_call(["sudo", "cvmfs_config", "reload"], stdout=subprocess.DEVNULL)
 

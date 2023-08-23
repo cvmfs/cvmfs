@@ -12,6 +12,25 @@ from util_benchmark import benchmark_time
 from util_benchmark import benchmark_cvmfs
 from util_benchmark import benchmark_out
 
+################################################################################
+#
+#                       CVMFS - PERFORMANCE BENCHMARK
+#
+################################################################################
+
+
+
+################################
+# Get "base" of the output name
+################################
+# Includes: cvmfs_version, run options and number of threads
+# 
+# If needed to destinguish different branches/builds this is done based on
+# the build dir of cvmfs (assumption here is that different branches are
+# saved/built in different folders)
+#
+# Used as a base to extended for the different outputs:
+# data, cvmfs_internals_raw, and tracing
 def getOutname(cvmfs_build_dir, name, option, num_threads):
   if "after" in cvmfs_build_dir:
     outname = name + "_" + cvmfs_version + "-after" + "_" + option + \
@@ -28,8 +47,19 @@ def getOutname(cvmfs_build_dir, name, option, num_threads):
 
   return outname
 
+###################
+# Set CVMFS Config
+###################
+#
+# CVMFS client config parameters chosen based on which "options" are added
+# Format of options: string where each option is split by "_"
+# e.g. "symlink_trace_debuglog"
+# 
+# When adding new options, make sure that are not partial matches of each other
+# as we just check the entire option-string if the option is part of it
+# (we dont split by "_" )
 def setCvmfsConfig(filename, option, print_config=True):
-  new_config = 'CVMFS_HTTP_PROXY="DIRECT"\n'
+  new_config = 'CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"\n'
   new_config += "CVMFS_QUOTA_LIMIT=10000\n"
   new_config += "CVMFS_AUTO_UPDATE=NO\n"
   if "symlink" in option:
@@ -54,28 +84,62 @@ def setCvmfsConfig(filename, option, print_config=True):
       for line in cvmfs_config:
         print(line)
 
+##
+# Main function that times the benchmark
+##
+# See description at the very top of this file "CVMFS - PERFORMANCE BENCHMARK"
+#
 if __name__ == "__main__":
-  commands = benchmark_cmds.chep23_selected_commands #{ **chep23_lhcb_commands, **chep23_atlas_commands} #, **chep23_alice_commands }
-  repos = benchmark_cmds.getReposToMount(commands)
+  
+  ##############################################################################
+  ## PARAMS set by user
+  #########################
 
+  # selected commands to run (cmds are in util_benchmark/benchmark_cmds.py)
+  # to combine multiple cmd sets use: { **chep23_lhcb_commands, **chep23_atlas_commands}
+  commands = benchmark_cmds.chep23_selected_commands
 
-  # repetitions for how often the command is timed in a row for each cache
-  repetitions = 3
+  # how often the command is timed in a row for each cache type
+  repetitions = 3  
+  
+  # if autofs should be used; better without
+  # if =False make sure that autofs is stopped and autofs does not continue
+  #           to mount /cvmfs (use `umount -lf /cvmfs`)
   use_autofs = False
 
+  # array of build dirs of cvmfs to run the performance benchmark with
+  # see getOutname() to destinguish between same version but different branch
+  cvmfs_build_dirs = ["/home/lpromber/epSft/cvmfs/build"] 
+  thread_configs = [1] # array; with how many threads the program should be run
+
+  # combination of cvmfs client config that should be in addition enabled
+  # best to separate params with "_"; see setCvmfsConfig() for more
+  run_options = ["symlink_statfs_kernel_trace", "statfs_kernel"]
+
+  # base dir where the results should be written to
   outdir = "./data/"
 
+  #########################
+  ## END PARAMS set by user
+  ##############################################################################
+
+  repos = benchmark_cmds.getReposToMount(commands)
   # setup time command
   time_command = "/usr/bin/time -f " + benchmark_time.getTimeFormat()
 
+  # if needed: make outdir
+  if os.path.isdir(outdir) == False:
+    os.makedirs(outdir)
+
 
   ## 1) loop over different cvmfs versions in different dirs
-  for cvmfs_build_dir in ["/home/lpromber/epSft/cvmfs/build"]:
+  for cvmfs_build_dir in cvmfs_build_dirs:
     # install cvmfs version build in directory $cvmfs_build_dir
     benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
 
-    ## 2) loop over different client configs (needs a remount of mountpoint, reload is not enough!)
-    for option in ["symlink_statfs_kernel", "statfs_kernel"]:
+    ## 2) loop over different client configs (needs a remount of mountpoint,
+    ##                                        reload is not enough!)
+    for option in run_options:
       setCvmfsConfig("/etc/cvmfs/default.local", option)
 
       if use_autofs == True:
@@ -98,10 +162,12 @@ if __name__ == "__main__":
 
         partial_cmd["time"] = time_command
 
+        print("*** preloading proxy cache...")
         benchmark_time.preloadProxy(partial_cmd)
+        print("    ...done")
 
         ## 4) loop over number of threads
-        for num_threads in [1]:
+        for num_threads in thread_configs:
           print("***", num_threads)
 
           cache_setups = [["cold_cache", benchmark_time.wipe_cache],
@@ -114,6 +180,7 @@ if __name__ == "__main__":
           all_cvmfs_raw_dict = defaultdict()
           all_dict_tracing = defaultdict()
 
+          ## 4a) time each command in each cache_setup (cold, warm, hot)
           for cache_setup in cache_setups:
             cache_label = cache_setup[0]
             cache_setup_func = cache_setup[1]
@@ -123,24 +190,24 @@ if __name__ == "__main__":
             start_times[cache_label] = dt.datetime.now()
             if callable(cache_setup_func):
               print(cache_label, "with setup", partial_cmd)
-              # dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-              #       benchmark_time.timeme(setup=cache_setup_func,
-              #                             stmt=partial(benchmark_time.do_thing,
-              #                                         partial_cmd, num_threads),
-              #                             number=1, repeat=repetitions)
+              dict_cache, dict_full_cvmfs_internals, dict_tracing = \
+                    benchmark_time.timeme(setup=cache_setup_func,
+                                          stmt=partial(benchmark_time.do_thing,
+                                                       partial_cmd, num_threads),
+                                          number=1, repeat=repetitions)
             else:
               print(cache_label, "without setup", partial_cmd)
-              # dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-              #       benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
-              #                                         partial_cmd, num_threads),
-              #                             number=1, repeat=repetitions)
+              dict_cache, dict_full_cvmfs_internals, dict_tracing = \
+                    benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
+                                                       partial_cmd, num_threads),
+                                          number=1, repeat=repetitions)
             
             print("DONE", cache_label, "after",
                   (dt.datetime.now() - start_times[cache_label]).total_seconds(),
                   "seconds")
-            # all_data[cache_label] = dict_cache
-            # all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
-            # all_dict_tracing[cache_label] = dict_tracing
+            all_data[cache_label] = dict_cache
+            all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
+            all_dict_tracing[cache_label] = dict_tracing
 
 
           print("complete run time: ",
@@ -154,11 +221,10 @@ if __name__ == "__main__":
 
           print("final_outname", final_outname)
 
-          # print data
-          # benchmark_out.writeResults(outdir, final_outname, all_data, name,
-          #                            cvmfs_version, num_threads)
-          # benchmark_out.writeResultsInternalRaw(outdir, final_outname,
-          #                                       all_cvmfs_raw_dict)
-          # benchmark_out.writeResultsTracing(outdir, final_outname,
-          #                                   all_dict_tracing)
-
+          ## 4b) write data
+          benchmark_out.writeResults(outdir, final_outname, all_data, name,
+                                     cvmfs_version, num_threads)
+          benchmark_out.writeResultsInternalRaw(outdir, final_outname,
+                                                all_cvmfs_raw_dict)
+          benchmark_out.writeResultsTracing(outdir, final_outname,
+                                            all_dict_tracing)

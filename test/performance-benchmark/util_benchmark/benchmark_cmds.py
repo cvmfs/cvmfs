@@ -41,5 +41,5 @@ def getReposToMount(commands):
     if not commands[cmd_name]["repos"] in repos:
       for repo in commands[cmd_name]["repos"]:
         repos.append(repo)
-  
+
   return repos
