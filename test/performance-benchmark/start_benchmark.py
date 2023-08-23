@@ -17,7 +17,28 @@ from util_benchmark import benchmark_out
 #                       CVMFS - PERFORMANCE BENCHMARK
 #
 ################################################################################
-
+#
+# Performance benchmark to time jobs/commands executed using CVMFS.
+# 
+# For this the command "time" is being used to extract metrics from the system
+#
+# This benchmark provides automatized utilities to:
+# - run on multiple  manually compiled cvmfs installations (cvmfs/build dir needed)
+# - run multiple different thread configurations
+# - run with multiple different CVMFS client configurations
+# - auto-increment file name so that rerunning the same config does not
+#   overwrite old results
+#
+# In the main function below, there is a section of user defined parameters
+#
+# Output ($outdir is defined by user):
+# - csv file with all metrics extracted with "time" and cvmfs internal affairs
+#   counters (dir: $outdir)
+# - raw output of cvmfs internal affairs (dir: $outdir/cvmfs_internal_raw)
+# - if client config uses TRACEFILE then the tracing is written to
+#   (dir: $outdir/cvmfs_tracing)
+#
+################################################################################
 
 
 ################################
@@ -214,7 +235,7 @@ if __name__ == "__main__":
                 "seconds")
 
 
-          # set output name
+          # set output name: auto-increment so not to overwrite old results
           outname = getOutname(cvmfs_build_dir, name, option, num_threads)
           final_outname = benchmark_out.getOutnameWithNextNumber(outdir, outname)
 
