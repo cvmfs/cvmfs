@@ -102,7 +102,7 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 }
 
 func fetchTags(registry *ContainerRegistry, wish db.Wish) ([]string, error) {
-	url := fmt.Sprintf("%s://%s/%s/tags/list", wish.Identifier.InputRegistryScheme, wish.Identifier.InputRegistryHostname, wish.Identifier.InputRepository)
+	url := fmt.Sprintf("%s://%s/v2/%s/tags/list", wish.Identifier.InputRegistryScheme, wish.Identifier.InputRegistryHostname, wish.Identifier.InputRepository)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Accept", "application/json")
 	res, err := registry.PerformRequest(req)
@@ -110,6 +110,10 @@ func fetchTags(registry *ContainerRegistry, wish db.Wish) ([]string, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error in fetching the tags from the server: %s", res.Status)
+	}
 
 	var tagList struct{ Tags []string }
 	if err = json.NewDecoder(res.Body).Decode(&tagList); err != nil {

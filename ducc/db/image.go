@@ -15,8 +15,7 @@ const imageIdentifierSqlFieldsOrdered string = "digest, tag, registry_scheme, re
 const imageIdentifierSqlFieldsQueryTag string = "digest IS NULL AND tag=? AND registry_scheme=? AND registry_hostname=? AND repository=?"
 const imageIdentifierSqlFieldsQueryDigest string = "digest=? AND tag IS NULL AND registry_scheme=? AND registry_hostname=? AND repository=?"
 const imageIdentifierSqlFieldsQs string = "?,?,?,?,?"
-const imageSqlFieldsOrdered string = "id, digest, tag, registry_scheme, registry_hostname, repository"
-const imageSqlFieldsOrderedPrefixed string = "images.id, images.digest, images.tag, images.registry_scheme, images.registry_hostname, images.repository"
+const imageSqlFieldsPrefixed string = "images.id, images.digest, images.tag, images.registry_scheme, images.registry_hostname, images.repository"
 
 type ImageID = uuid.UUID
 
@@ -76,7 +75,7 @@ func CreateImages(tx *sql.Tx, images []Image) ([]Image, error) {
 		defer tx.Rollback()
 	}
 
-	const stmnt string = "INSERT INTO images (id, " + imageIdentifierSqlFieldsOrdered + ") VALUES (" + imageIdentifierSqlFieldsQs + ",?) RETURNING " + imageSqlFieldsOrdered
+	const stmnt string = "INSERT INTO images (id, " + imageIdentifierSqlFieldsOrdered + ") VALUES (" + imageIdentifierSqlFieldsQs + ",?) RETURNING " + imageSqlFieldsPrefixed
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
@@ -126,7 +125,7 @@ func GetAllImages(tx *sql.Tx) ([]Image, error) {
 		defer tx.Rollback()
 	}
 
-	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images"
+	const stmnt string = "SELECT " + imageSqlFieldsPrefixed + " FROM images"
 
 	rows, err := tx.Query(stmnt)
 	if err != nil {
@@ -185,8 +184,8 @@ func GetImagesByValues(tx *sql.Tx, images []Image) ([]Image, error) {
 		defer tx.Rollback()
 	}
 
-	const stmntTag string = "SELECT " + imageSqlFieldsOrdered + " FROM images WHERE " + imageIdentifierSqlFieldsQueryTag
-	const stmntDigest string = "SELECT " + imageSqlFieldsOrdered + " FROM images WHERE " + imageIdentifierSqlFieldsQueryDigest
+	const stmntTag string = "SELECT " + imageSqlFieldsPrefixed + " FROM images WHERE " + imageIdentifierSqlFieldsQueryTag
+	const stmntDigest string = "SELECT " + imageSqlFieldsPrefixed + " FROM images WHERE " + imageIdentifierSqlFieldsQueryDigest
 	prepStmntTag, err := tx.Prepare(stmntTag)
 	if err != nil {
 		return nil, err
@@ -249,7 +248,7 @@ func GetImagesByIDs(tx *sql.Tx, imageIDs []ImageID) ([]Image, error) {
 		defer tx.Rollback()
 	}
 
-	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images WHERE id = ?"
+	const stmnt string = "SELECT " + imageSqlFieldsPrefixed + " FROM images WHERE id = ?"
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
@@ -332,4 +331,135 @@ func (i Image) getFriendlyName() string {
 		return fmt.Sprintf("%s/%s@%s", i.RegistryHost, i.Repository, i.Digest)
 	}
 	return i.Tag
+}
+
+func GetAllCvmfsRepos(tx *sql.Tx) ([]string, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT DISTINCT cvmfs_repository FROM wishes"
+	rows, err := tx.Query(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0)
+	for rows.Next() {
+		var repo string
+		err := rows.Scan(&repo)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, repo)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func GetImagesByCvmfsRepos(tx *sql.Tx, cvmfsRepos []string) ([][]Image, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	// Need to join wishes with wish_image with images
+	const stmnt string = "SELECT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id JOIN wishes ON wish_image.wish_id = wishes.id WHERE wishes.cvmfs_repository = ?"
+	prepStmnt, err := tx.Prepare(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer prepStmnt.Close()
+
+	out := make([][]Image, 0, len(cvmfsRepos))
+	for _, cvmfsRepo := range cvmfsRepos {
+		rows, err := prepStmnt.Query(cvmfsRepo)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		images := make([]Image, 0)
+		for rows.Next() {
+			image, err := parseImageFromRow(rows)
+			if err != nil {
+				return nil, err
+			}
+			images = append(images, image)
+		}
+		// TODO: Do this other places as well
+		if rows.Err() != nil {
+			return nil, err
+		}
+		out = append(out, images)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func GetImagesWithWish(tx *sql.Tx) ([]Image, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "SELECT DISTINCT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id"
+	rows, err := tx.Query(stmnt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]Image, 0)
+	for rows.Next() {
+		image, err := parseImageFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, image)
+	}
+	if rows.Err() != nil {
+		return nil, err
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
 }

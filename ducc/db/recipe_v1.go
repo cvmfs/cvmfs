@@ -61,10 +61,17 @@ func ImportRecipeV1(recipe RecipeV1) (created []Wish, deleted []Wish, err error)
 
 // filterNewWishes returns a slice of identifiers that are not already in the database
 func filterNewWishes(tx *sql.Tx, identifiers []WishIdentifier) ([]WishIdentifier, error) {
-	existingWishes, err := GetWishesByValues(tx, identifiers)
+	existingWishes := make([]Wish, 0)
+	dbWishes, err := GetWishesByValue(tx, identifiers)
 	if err != nil {
 		return nil, err
 	}
+	for _, wishPtr := range dbWishes {
+		if wishPtr != nil {
+			existingWishes = append(existingWishes, *wishPtr)
+		}
+	}
+
 	numNewWishes := len(identifiers) - len(existingWishes)
 	if numNewWishes == 0 {
 		return []WishIdentifier{}, nil
@@ -145,7 +152,7 @@ func ParseYamlRecipeV1(data []byte, source string) (RecipeV1, error) {
 	}
 
 	for _, inputImage := range recipeYamlV1.Input {
-		url, err := ParseWishInputURL(inputImage)
+		url, err := ParseImageURL(inputImage)
 		if err != nil {
 			return RecipeV1{}, err
 		}
