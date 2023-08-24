@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,20 +25,52 @@ type ManifestListWithBytesAndDigest struct {
 	ManifestListDigest digest.Digest
 }
 
-var NoManifestListError = errors.New("Manifest list not supported")
+var ErrNoManifestList = errors.New("manifest list not supported")
 
-func FetchManifestAndSaveDigest(image db.Image) (ManifestWithBytesAndDigest, error) {
-	out, _, _, err := FetchAndParseManifestAndList(image)
+const TASK_FETCH_MANIFEST db.TaskType = "FETCH_MANIFEST"
+
+func FetchManifestTask(tx *sql.Tx, image db.Image) (db.TaskPtr, error) {
+	ownTx := false
+	if tx == nil {
+		var err error
+		tx, err = db.GetTransaction()
+		if err != nil {
+			return db.NullTaskPtr(), err
+		}
+		defer tx.Rollback()
+		ownTx = true
+	}
+	titleStr := fmt.Sprintf("Fetch manifest for %s", image.GetSimpleName())
+	task, ptr, err := db.CreateTask(tx, TASK_FETCH_MANIFEST, titleStr)
 	if err != nil {
-		return out, err
+		return db.NullTaskPtr(), err
 	}
 
-	err = db.UpdateManifestDigestByImageID(nil, image.ID, out.ManifestDigest)
-	if err != nil {
-		return out, err
+	if ownTx {
+		if err := tx.Commit(); err != nil {
+			return db.NullTaskPtr(), err
+		}
 	}
 
-	return out, nil
+	go func() {
+		status := task.WaitForStart()
+		if status == db.TASK_STATUS_DONE {
+			return
+		}
+		manifest, _, gotManifestList, err := FetchAndParseManifestAndList(image)
+		if err != nil {
+			task.LogFatal(nil, fmt.Sprintf("error fetching manifest: %s", err))
+			return
+		}
+		if gotManifestList {
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "repository supplied manifest list")
+		}
+
+		task.SetArtifact(manifest)
+		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully fetched manifest")
+	}()
+	return ptr, nil
 }
 
 func FetchAndParseManifestAndList(image db.Image) (ManifestWithBytesAndDigest, ManifestListWithBytesAndDigest, bool, error) {

@@ -29,7 +29,8 @@ var currentlyIngestingLayersMutex = sync.Mutex{}
 var currentlyIngestingLayers = make(map[ingestLayerKey]db.TaskPtr)
 
 func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS)
+	titleStr := fmt.Sprintf("Create layers for %s in %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -90,7 +91,8 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 }
 
 func ingestLayers(image db.Image, manifest v1.Manifest, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_LAYERS)
+	titleStr := fmt.Sprintf("Ingest layers for %s to %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_LAYERS, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -141,7 +143,8 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 		currentlyIngestingLayersMutex.Unlock()
 		return ptr, nil
 	}
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYER)
+	titleStr := fmt.Sprintf("Create layer %s for %s in %s", layerDigest.String(), image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYER, titleStr)
 	if err != nil {
 		currentlyIngestingLayersMutex.Unlock()
 		return db.NullTaskPtr(), err
@@ -235,7 +238,8 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 }
 
 func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_LAYER)
+	titleStr := fmt.Sprintf("Ingest layer %s to %s", layerDigest.String(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_LAYER, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -330,7 +334,8 @@ func layerExistsInCvmfs(layerDigest digest.Digest, cvmfsRepo string) (bool, erro
 }
 
 func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_WRITE_IMAGE_METADATA)
+	titleStr := fmt.Sprintf("Write image metadata for %s to %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_WRITE_IMAGE_METADATA, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}

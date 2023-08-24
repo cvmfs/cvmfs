@@ -140,18 +140,18 @@ func TestGetWish(t *testing.T) {
 			dbWishIdentifiers[0],
 			dbWishIdentifiers[1],
 		}
-		wishes, err := GetWishesByValues(nil, input)
+		wishes, err := GetWishesByValue(nil, input)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(wishes) != len(input) {
 			t.Fatalf("Expected %d wishes, got %d", len(input), len(wishes))
 		}
-		for i, wish := range wishes {
-			if !test.EqualsExceptForFields(dbWishes[i], wish, []string{"ID"}) {
-				t.Fatalf("Expected %v, got %v", dbWishes[i], wish)
+		for i, wishPtr := range wishes {
+			if !test.EqualsExceptForFields(dbWishes[i], *wishPtr, []string{"ID"}) {
+				t.Fatalf("Expected %v, got %v", dbWishes[i], *wishPtr)
 			}
-			if wish.ID != dbWishes[i].ID {
+			if wishPtr.ID != dbWishes[i].ID {
 				t.Fatal("Expected ID to be set")
 			}
 		}
@@ -159,7 +159,7 @@ func TestGetWish(t *testing.T) {
 
 	t.Run("GetWishByValue", func(t *testing.T) {
 		input := dbWishIdentifiers[0]
-		wish, err := GetWishByValues(nil, input)
+		wish, err := GetWishByValue(nil, input)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -175,7 +175,7 @@ func TestGetWish(t *testing.T) {
 		input := dbWishIdentifiers[0]
 		input.InputTag = "notfound"
 
-		_, err := GetWishByValues(nil, input)
+		_, err := GetWishByValue(nil, input)
 		if err != sql.ErrNoRows {
 			t.Fatal("Expected sql.ErrNoRows, got", err)
 		}
@@ -190,9 +190,18 @@ func TestGetWish(t *testing.T) {
 			notfound,
 		}
 
-		_, err := GetWishesByValues(nil, input)
-		if err != sql.ErrNoRows {
-			t.Fatal("Expected sql.ErrNoRows, got", err)
+		res, err := GetWishesByValue(nil, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) != 2 {
+			t.Fatalf("Expected 2 wishes, got %d", len(res))
+		}
+		if res[0] == nil {
+			t.Fatal("Expected wish")
+		}
+		if res[1] != nil {
+			t.Fatal("Expected nil wish")
 		}
 	})
 

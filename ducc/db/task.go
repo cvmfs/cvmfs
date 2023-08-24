@@ -3,14 +3,16 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-const taskSqlFields string = "id, type, status, result"
-const taskSqlFieldsQs string = "?, ?, ?, ?"
+const taskSqlFields string = "id, type, status, title, result, created_timestamp, start_timestamp, done_timestamp"
+const taskSqlFieldsPrefixed string = "tasks.id, tasks.type, tasks.status, tasks.title, tasks.result, tasks.created_timestamp, tasks.created_timestamp, tasks.start_timestamp, tasks.done_timestamp"
+const taskSqlFieldsQs string = "?, ?, ?, ?, ?, ?, ?, ?"
 const taskLogSqlFields string = "task_id, severity, message, timestamp"
 const taskLogSqlFieldsQs string = "?, ?, ?, ?"
 const taskRelationSqlFields string = "task1_id, task2_id, relation"
@@ -22,9 +24,12 @@ type TaskID = uuid.UUID
 type TaskType string
 
 const (
-	TASK_UPDATE TaskType = "UPDATE"
+	TASK_UPDATE_WISH  TaskType = "UPDATE_WISH"
+	TASK_UPDATE_IMAGE TaskType = "UPDATE IMAGE"
 
-	// The main tasks:
+	TASK_UPDATE_IMAGE_IN_REPO TaskType = "UPDATE_IMAGE_IN_REPO"
+
+	// The main product tasks:
 	TASK_CREATE_FLAT   TaskType = "CREATE_FLAT"
 	TASK_CREATE_LAYERS TaskType = "CREATE_LAYERS"
 	TASK_CREATE_PODMAN TaskType = "CREATE_PODMAN"
@@ -66,6 +71,7 @@ const (
 	TASK_RESULT_FAILURE   TaskResult = "FAILURE"
 	TASK_RESULT_SKIPPED   TaskResult = "SKIPPED"
 	TASK_RESULT_CANCELLED TaskResult = "CANCELLED"
+	TASK_RESULT_ABORTED   TaskResult = "ABORTED"
 )
 
 type TaskRelation string
@@ -78,8 +84,12 @@ type Task struct {
 	ID       TaskID
 	Type     TaskType
 	Status   TaskStatus
+	Title    string
 	Result   TaskResult
 	Subtasks []TaskPtr
+
+	Input   any
+	IsInput bool
 
 	Artifact   any
 	IsArtifact bool
@@ -91,12 +101,19 @@ type TaskPtr struct {
 	task *Task
 	cv   *sync.Cond
 }
+type SmallTaskSnapshot struct {
+	ID               TaskID
+	Type             TaskType
+	Status           TaskStatus
+	CreatedTimestamp time.Time
+	StartTimestamp   time.Time
+	DoneTimestamp    time.Time
+	Title            string
+	Result           TaskResult
+}
 
-type TaskSnapshot struct {
-	ID         TaskID
-	Type       TaskType
-	Status     TaskStatus
-	Result     TaskResult
+type FullTaskSnapshot struct {
+	SmallTaskSnapshot
 	SubtaskIDs []TaskID
 	Logs       []Log
 }
@@ -140,7 +157,7 @@ func TaskResultSuccessful(result TaskResult) bool {
 // the corresponding task goroutine. Modifying the task struct directly is not thread safe.
 // The TaskPtr can be used by other parts of the code, and all its methods are thread safe.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
-func CreateTask(tx *sql.Tx, taskType TaskType) (*Task, TaskPtr, error) {
+func CreateTask(tx *sql.Tx, taskType TaskType, title string) (*Task, TaskPtr, error) {
 	ownTx := false
 	if tx == nil {
 		ownTx = true
@@ -161,13 +178,14 @@ func CreateTask(tx *sql.Tx, taskType TaskType) (*Task, TaskPtr, error) {
 		ID:       id,
 		Type:     taskType,
 		Status:   TASK_STATUS_NONE,
+		Title:    title,
 		Result:   TASK_RESULT_NONE,
 		Subtasks: make([]TaskPtr, 0),
 		cv:       sync.NewCond(&sync.Mutex{}),
 	}
 
 	stnmt := "INSERT INTO tasks (" + taskSqlFields + ") VALUES (" + taskSqlFieldsQs + ")"
-	_, err = tx.Exec(stnmt, newTask.ID, newTask.Type, newTask.Status, newTask.Result)
+	_, err = tx.Exec(stnmt, newTask.ID, newTask.Type, newTask.Status, newTask.Title, newTask.Result, ToDBTimeStamp(time.Now()), sql.NullString{Valid: false}, sql.NullString{Valid: false})
 	if err != nil {
 		return nil, TaskPtr{}, err
 	}
@@ -253,8 +271,8 @@ func (t *Task) SetTaskCompleted(tx *sql.Tx, result TaskResult) error {
 	t.cv.L.Lock()
 	defer t.cv.L.Unlock()
 
-	stnmt := "UPDATE tasks SET status=?, result=? WHERE id=?"
-	_, err := tx.Exec(stnmt, TASK_STATUS_DONE, result, t.ID)
+	stnmt := "UPDATE tasks SET status=?, result=?, done_timestamp=? WHERE id=?"
+	_, err := tx.Exec(stnmt, TASK_STATUS_DONE, result, ToDBTimeStamp(time.Now()), t.ID)
 	if err != nil {
 		return err
 	}
@@ -272,8 +290,84 @@ func (t *Task) SetTaskCompleted(tx *sql.Tx, result TaskResult) error {
 	return nil
 }
 
+func SetTaskStatusById(tx *sql.Tx, taskID TaskID, status TaskStatus) error {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	stnmt := "UPDATE tasks SET status=? WHERE id=?"
+	_, err := tx.Exec(stnmt, status, taskID)
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func SetTaskResultById(tx *sql.Tx, taskID TaskID, result TaskResult) error {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	stnmt := "UPDATE tasks SET result=? WHERE id=?"
+	_, err := tx.Exec(stnmt, result, taskID)
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func AppendLogToTaskByID(tx *sql.Tx, taskID TaskID, severity LogSeverity, message string) error {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	const stmnt string = "INSERT INTO task_logs (" + taskLogSqlFields + ") VALUES (" + taskLogSqlFieldsQs + ")"
+	timeStamp := ToDBTimeStamp(time.Now())
+
+	_, err := tx.Exec(stmnt, taskID, severity, message, timeStamp)
+	if err != nil {
+		return err
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Log adds a log entry to the task.
-// This method is thread safe, by locking the task CV mutex. Be careful of recursive locks.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
 func (t *Task) Log(tx *sql.Tx, severity LogSeverity, message string) error {
 	ownTx := false
@@ -399,6 +493,56 @@ func (tPtr TaskPtr) Start(tx *sql.Tx) (TaskStatus, error) {
 	if err != nil {
 		return "", err
 	}
+	if err := setStartTimestamp(tx, tPtr.task.ID); err != nil {
+		return "", err
+	}
+
+	tPtr.cv.Broadcast()
+	return tPtr.task.Status, nil
+}
+
+func setStartTimestamp(tx *sql.Tx, taskID TaskID) error {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	stmnt := "UPDATE tasks SET start_timestamp=? WHERE id=?"
+	_, err := tx.Exec(stmnt, ToDBTimeStamp(time.Now()), taskID)
+
+	if ownTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (tPtr TaskPtr) StartWithInput(tx *sql.Tx, input any) (TaskStatus, error) {
+	tPtr.cv.L.Lock()
+	defer tPtr.cv.L.Unlock()
+	if tPtr.task.Status != TASK_STATUS_NONE {
+		return tPtr.task.Status, nil
+	}
+
+	if tPtr.task.IsInput {
+		return "", errors.New("task already has an input")
+	}
+
+	tPtr.task.Input = input
+
+	var err error
+	tPtr.task.setTaskStatusWithoutLocking(tx, TASK_STATUS_PENDING)
+	if err != nil {
+		return "", err
+	}
 	tPtr.cv.Broadcast()
 	return tPtr.task.Status, nil
 }
@@ -445,13 +589,22 @@ func (t *Task) SetArtifact(artifact any) error {
 	return nil
 }
 
+func (t *Task) GetInput() (any, error) {
+	t.cv.L.Lock()
+	defer t.cv.L.Unlock()
+	if t.IsInput {
+		return t.Input, nil
+	}
+	return nil, errors.New("task does not have an input")
+}
+
 // GetTaskSnapshot returns a snapshot of the task with the given ID.
 // If no task with the given ID exists, an sql.ErrNoRows is returned.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
-func GetTaskSnapshotByID(tx *sql.Tx, taskID TaskID) (TaskSnapshot, error) {
+func GetTaskSnapshotByID(tx *sql.Tx, taskID TaskID) (FullTaskSnapshot, error) {
 	tasks, err := GetTaskSnapshotsByIDs(tx, []TaskID{taskID})
 	if err != nil {
-		return TaskSnapshot{}, err
+		return FullTaskSnapshot{}, err
 	}
 	return tasks[0], nil
 }
@@ -459,7 +612,7 @@ func GetTaskSnapshotByID(tx *sql.Tx, taskID TaskID) (TaskSnapshot, error) {
 // GetTaskSnapshotsByIDs returns a slice of snapshots of the tasks with the given IDs.
 // Unless all tasks are found, an error is returned.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
-func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]TaskSnapshot, error) {
+func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]FullTaskSnapshot, error) {
 	ownTx := false
 	if tx == nil {
 		ownTx = true
@@ -490,14 +643,15 @@ func GetTaskSnapshotsByIDs(tx *sql.Tx, taskIDs []TaskID) ([]TaskSnapshot, error)
 	}
 	defer subTasksPrepStmnt.Close()
 
-	taskSnapshots := make([]TaskSnapshot, len(taskIDs))
+	taskSnapshots := make([]FullTaskSnapshot, len(taskIDs))
 	for i, taskID := range taskIDs {
+		var snapshot FullTaskSnapshot
 		// Get the task itself
 		taskRow := taskPrepStmnt.QueryRow(taskID)
 		if err != nil {
 			return nil, err
 		}
-		snapshot, err := parseTaskSnapShotFromRow(taskRow)
+		snapshot.SmallTaskSnapshot, err = parseSmallTaskSnapshotFromRow(taskRow)
 		if err != nil {
 			return nil, err
 		}
@@ -629,15 +783,34 @@ func parseLogFromRow(row scannableRow) (Log, error) {
 	return log, nil
 }
 
-// parseTaskSnapShotFromRow parses a task snapshot from a row returned by a query.
-// The row must contain the fields of taskSqlFields, in the same order.
-// Note that the fields Subtask IDs and Logs are not populated, and set to nil.
-func parseTaskSnapShotFromRow(row scannableRow) (TaskSnapshot, error) {
-	var taskSnapshot TaskSnapshot
+func parseSmallTaskSnapshotFromRow(row scannableRow) (SmallTaskSnapshot, error) {
+	var taskSnapshot SmallTaskSnapshot
 
-	err := row.Scan(&taskSnapshot.ID, &taskSnapshot.Type, &taskSnapshot.Status, &taskSnapshot.Result)
+	var startTimestampStr, doneTimestampStr sql.NullString
+	var createdTimestampStr string
+
+	err := row.Scan(&taskSnapshot.ID, &taskSnapshot.Type, &taskSnapshot.Status, &taskSnapshot.Title, &taskSnapshot.Result, &createdTimestampStr, &startTimestampStr, &doneTimestampStr)
 	if err != nil {
-		return TaskSnapshot{}, err
+		return SmallTaskSnapshot{}, err
+	}
+
+	taskSnapshot.CreatedTimestamp, err = FromDBTimeStamp(createdTimestampStr)
+	if err != nil {
+		return SmallTaskSnapshot{}, fmt.Errorf("invalid timestamp: %v", err)
+	}
+
+	if startTimestampStr.Valid {
+		taskSnapshot.StartTimestamp, err = FromDBTimeStamp(startTimestampStr.String)
+		if err != nil {
+			return SmallTaskSnapshot{}, fmt.Errorf("invalid timestamp: %v", err)
+		}
+	}
+
+	if doneTimestampStr.Valid {
+		taskSnapshot.DoneTimestamp, err = FromDBTimeStamp(doneTimestampStr.String)
+		if err != nil {
+			return SmallTaskSnapshot{}, fmt.Errorf("invalid timestamp: %v", err)
+		}
 	}
 
 	return taskSnapshot, nil
@@ -661,4 +834,185 @@ func (t *Task) LogGoroutineStop(result TaskResult) error {
 
 func (tPtr TaskPtr) Cancel(tx *sql.Tx) error {
 	return tPtr.task.SetTaskCompleted(tx, TASK_RESULT_CANCELLED)
+}
+
+func GetTasksByStatusAndType(tx *sql.Tx, statusFilter []TaskStatus, typeFilter []TaskType) ([]SmallTaskSnapshot, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	// Reserve space for ID
+	var args = make([]any, 1)
+
+	typeQuery := ""
+	if len(typeFilter) > 0 {
+		typeQuery = " AND type IN ("
+		for i, checkType := range typeFilter {
+			if i > 0 {
+				typeQuery += ","
+			}
+			typeQuery += "?"
+			args = append(args, checkType)
+		}
+		typeQuery += ")"
+	}
+
+	statusQuery := ""
+	if len(statusFilter) > 0 {
+		statusQuery = " AND status IN ("
+		for i, statusType := range statusFilter {
+			if i > 0 {
+				statusQuery += ","
+			}
+			statusQuery += "?"
+			args = append(args, statusType)
+		}
+		statusQuery += ")"
+	}
+
+	stmnt := "SELECT " + taskSqlFields + " FROM tasks" + typeQuery + statusQuery + "ORDER BY start_timestamp DESC"
+
+	rows, err := tx.Query(stmnt, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]SmallTaskSnapshot, 0)
+	for rows.Next() {
+		check, err := parseSmallTaskSnapshotFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, check)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func GetRootTasks(tx *sql.Tx) ([]SmallTaskSnapshot, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	stmnt := "SELECT " + taskSqlFields + " FROM tasks WHERE id NOT IN (SELECT task1_id FROM task_relations WHERE relation = ?)"
+	rows, err := tx.Query(stmnt, TASK_RELATION_SUBTASK_OF)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]SmallTaskSnapshot, 0)
+	for rows.Next() {
+		check, err := parseSmallTaskSnapshotFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, check)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func GetAllUnfinishedTasks(tx *sql.Tx) ([]SmallTaskSnapshot, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	stmnt := "SELECT " + taskSqlFields + " FROM tasks WHERE status != ?"
+	rows, err := tx.Query(stmnt, TASK_STATUS_DONE)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]SmallTaskSnapshot, 0)
+	for rows.Next() {
+		check, err := parseSmallTaskSnapshotFromRow(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, check)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func GetAllUnfinishedRootTasks(tx *sql.Tx) ([]SmallTaskSnapshot, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	stmnt := "SELECT " + taskSqlFields + " FROM tasks WHERE status != ? AND id NOT IN (SELECT task1_id FROM task_relations WHERE relation = ?)"
+	rows, err := tx.Query(stmnt, TASK_STATUS_DONE, TASK_RELATION_SUBTASK_OF)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]SmallTaskSnapshot, 0)
+	for rows.Next() {
+		check, err := parseSmallTaskSnapshotFromRow(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, check)
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
 }

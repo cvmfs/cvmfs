@@ -45,8 +45,8 @@ type PodmanLayerInfo struct {
 
 func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	// TODO: Check if the image is already being created
-
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_PODMAN)
+	titleStr := fmt.Sprintf("Create Podman image for %s in %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_PODMAN, titleStr)
 	if err != nil {
 		return db.TaskPtr{}, err
 	}

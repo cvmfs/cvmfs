@@ -18,7 +18,7 @@ type ParsedWishInputURL struct {
 	Digest      digest.Digest
 }
 
-func ParseWishInputURL(imageUrl string) (ParsedWishInputURL, error) {
+func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 	// TODO: This is copied from lib/parse and should be verified
 	url, err := url.Parse(imageUrl)
 	if err != nil {
@@ -29,7 +29,7 @@ func ParseWishInputURL(imageUrl string) (ParsedWishInputURL, error) {
 		// likely the protocol `https://` is missing in the image string.
 		// worth to try to append it, and re-parse the image
 		image2 := "https://" + imageUrl
-		img2, err2 := ParseWishInputURL(image2)
+		img2, err2 := ParseImageURL(image2)
 		if err2 == nil {
 			return img2, err2
 		}

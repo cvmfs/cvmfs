@@ -1,5 +1,5 @@
 
-/* TODO: Consider using WIHOUT_ROWID. Chcek performance  */
+/* TODO: Consider using WIHOUT_ROWID. Check performance  */
 BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "wishes" (
     id TEXT PRIMARY KEY,
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS "wishes" (
     create_podman BOOLEAN,
     create_thin BOOLEAN,
 
+    update_interval_sec INTEGER,
     webhook_enabled BOOLEAN
 );
 
@@ -49,7 +50,11 @@ CREATE TABLE IF NOT EXISTS "tasks" (
     status TEXT NOT NULL,
     result TEXT NOT NULL,
 
-    start_timestamp TEXT NOT NULL,
+    title TEXT NOT NULL,
+
+    created_timestamp TEXT NOT NULL,
+    start_timestamp TEXT,
+    done_timestamp TEXT
 );
 
 CREATE TABLE IF NOT EXISTS "task_logs"(
@@ -71,33 +76,19 @@ CREATE TABLE IF NOT EXISTS "task_relations" (
     FOREIGN KEY (task2_id) REFERENCES tasks (id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "checks" (
+CREATE TABLE IF NOT EXISTS "triggers" (
     id TEXT PRIMARY KEY,
 
-    type TEXT NOT NULL,
-    entity_id TEXT NOT NULL,
-
-    status TEXT NOT NULL,
-
-    /* If actions are started by this check, they are referenced here */
-    task_id TEXT,
-
-    FOREIGN KEY (task_id) REFERENCES tasks (id)
-);
-
-CREATE TABLE IF NOT EXISTS "checkTriggers" (
-    id TEXT PRIMARY KEY,
-
-    check_type TEXT NOT NULL,
-    entity_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    object_id TEXT NOT NULL,
     
-    type TEXT NOT NULL,
     timestamp TEXT NOT NULL,
+    reason TEXT NOT NULL,
     details TEXT NOT NULL,
     
-    check_id TEXT,
+    task_id TEXT,
 
-    FOREIGN KEY (check_id) REFERENCES checks (id) ON DELETE CASCADE
-)
+    FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
+);
 
 COMMIT;

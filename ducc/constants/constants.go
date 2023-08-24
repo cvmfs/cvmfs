@@ -11,7 +11,7 @@ var DirtyChainSubDir = ".dirty-chains"
 const LayersDirectory string = ".layers" // To replace SubDirInsideRepo
 const LayersRootFSSubDir string = "layerfs"
 
-const PodmanSubDir string = ".podmanStore"
+const PodmanSubDir string = "podmanStore"
 const ImagesSubDir string = ".images"
 
 var DirPermision = os.FileMode(0755)

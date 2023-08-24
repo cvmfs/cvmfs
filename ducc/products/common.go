@@ -80,8 +80,9 @@ func LayerMediaTypeIsForeign(layerMediaType string) bool {
 	return false
 }
 
-func FullUpdate(image db.Image, manifest registry.ManifestWithBytesAndDigest, outputOptions db.WishOutputOptions, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_UPDATE)
+func UpdateImageInRepoTask(image db.Image, manifest registry.ManifestWithBytesAndDigest, outputOptions db.WishOutputOptions, cvmfsRepo string) (db.TaskPtr, error) {
+	titleStr := fmt.Sprintf("Update image %s to CVMFS repo %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_UPDATE_IMAGE_IN_REPO, titleStr)
 	if err != nil {
 		return db.TaskPtr{}, err
 	}

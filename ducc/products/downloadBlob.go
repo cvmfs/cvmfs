@@ -21,7 +21,8 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 		return existingTask, nil
 	}
 
-	task, ptr, err := db.CreateTask(nil, db.TASK_DOWNLOAD_BLOB)
+	titleStr := fmt.Sprintf("Download blob %s", blobDigest.String())
+	task, ptr, err := db.CreateTask(nil, db.TASK_DOWNLOAD_BLOB, titleStr)
 	if err != nil {
 		fmt.Printf("Failed to create download task for %s: %s\n", blobDigest.String(), err.Error())
 		downloadsMutex.Unlock()

@@ -10,7 +10,6 @@ import (
 	"path"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/constants"
@@ -42,7 +41,8 @@ var currentlyIngestingLinksMutex = sync.Mutex{}
 var currentlyIngestingLinks = make(map[ingestChainLinkKey]db.TaskPtr)
 
 func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_FLAT)
+	titleStr := fmt.Sprintf("Create flat image for %s in %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_FLAT, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -116,7 +116,8 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 // TODO: Setup private, public paths
 
 func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN)
+	titleStr := fmt.Sprintf("Create chain for %s in %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -178,7 +179,8 @@ func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.Task
 }
 
 func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesAndDigest, chain Chain, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_SINGULARITY_FILES)
+	titleStr := fmt.Sprintf("Create singularity files for %s in %s", image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_SINGULARITY_FILES, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -353,7 +355,8 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		currentlyIngestingLinksMutex.Unlock()
 		return taskPtr, nil
 	}
-	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN_LINK)
+	titleStr := fmt.Sprintf("Create chain link %s for %s in %s", chainLink.ChainDigest.String(), image.GetSimpleName(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN_LINK, titleStr)
 	if err != nil {
 		return db.TaskPtr{}, err
 	}
@@ -461,7 +464,8 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 }
 
 func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_CHAIN_LINK)
+	titleStr := fmt.Sprintf("Ingest chain link %s into %s", link.ChainDigest.String(), cvmfsRepo)
+	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_CHAIN_LINK, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
@@ -471,9 +475,6 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 		task.WaitForStart()
 		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Sleeping for 1 second to ensure that cvmfs is ready for new ingestion.")
-		time.Sleep(1 * time.Second)
-
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for lock on cvmfs repo")
 		cvmfsLock.Lock()
 		defer cvmfsLock.Unlock()

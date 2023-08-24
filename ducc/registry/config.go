@@ -65,7 +65,8 @@ func fetchAndParseConfig(image db.Image, configDigest digest.Digest) (ConfigWith
 }
 
 func FetchAndParseConfigTask(image db.Image, configDigest digest.Digest) (db.TaskPtr, error) {
-	task, ptr, err := db.CreateTask(nil, db.TASK_FETCH_OCI_CONFIG)
+	titleStr := fmt.Sprintf("Fetch and parse config for %s", image.GetSimpleName())
+	task, ptr, err := db.CreateTask(nil, db.TASK_FETCH_OCI_CONFIG, titleStr)
 	if err != nil {
 		return db.TaskPtr{}, err
 	}

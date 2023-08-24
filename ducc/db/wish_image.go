@@ -22,7 +22,7 @@ func GetImagesByWishIDs(tx *sql.Tx, wishIDs []WishID) ([][]Image, error) {
 		defer tx.Rollback()
 	}
 
-	const stmnt string = "SELECT " + imageSqlFieldsOrdered + " FROM images JOIN wish_image ON images.id = wish_image.image_id  WHERE wish_image.wish_id = ?"
+	const stmnt string = "SELECT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id  WHERE wish_image.wish_id = ?"
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func GetImagesByWishID(tx *sql.Tx, wishID WishID) ([]Image, error) {
 		defer tx.Rollback()
 	}
 
-	stmnt := "SELECT " + imageSqlFieldsOrdered + " FROM images JOIN wish_image ON images.id = wish_image.image_id  WHERE wish_image.wish_id = ?"
+	stmnt := "SELECT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id  WHERE wish_image.wish_id = ?"
 	rows, err := tx.Query(stmnt, wishID)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func GetWishesByImageIDs(tx *sql.Tx, imageIDs []ImageID) ([][]Wish, error) {
 		defer tx.Rollback()
 	}
 
-	const stmnt string = "SELECT " + wishSqlFieldsOrdered + " FROM wishes JOIN wish_image ON wishes.id = wish_image.wish_id WHERE wish_image.image_id = ?"
+	const stmnt string = "SELECT " + wishSqlFieldsPrefied + " FROM wishes JOIN wish_image ON wishes.id = wish_image.wish_id WHERE wish_image.image_id = ?"
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
