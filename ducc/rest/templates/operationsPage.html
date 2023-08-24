@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Operations</title>
+</head>
+<body>
+    <h1>{{if .All}}All{{else}}Running{{end}} Operations</h1>
+    {{if gt .NumExcluded 0}}
+        <p>Currently hiding {{.NumExcluded}} compleded operations from the list.<br><a href="/operations?all">Show all operations</a></p>
+    {{end}}
+    <table border="1">
+    <tr>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Result</th>
+        <th>Created</th>
+    </tr>
+    {{range .Tasks}}
+	<tr>
+        <td><a href="/tasks/{{.ID}}">{{.Type}}</a></td>
+        <td>{{.Title}}</td>
+		<td>{{.Status}}</td>
+		<td>{{.Result}}</td>
+        <td>{{.CreatedTimestamp}}</td>
+	</tr>
+    {{end}}
+</table>
+</body>
+</html>

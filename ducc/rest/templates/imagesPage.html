@@ -13,7 +13,7 @@
         </tr>
     {{range .Images}}
 	<tr>
-        <td>{{.RegistryScheme}}://{{.RegistryHost}}</td>
+        <td>{{.RegistryScheme}}://{{.GetSimpleName}}</td>
         <td>{{.Repository}}</td>
         <td>{{.Tag}}</td>
 	</tr>

@@ -4,17 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/cvmfs/ducc/db"
+	"github.com/cvmfs/ducc/errorcodes"
 	"github.com/google/uuid"
 )
 
 const uuidRegex string = "[0-9(a-f|A-F)]{8}-[0-9(a-f|A-F)]{4}-4[0-9(a-f|A-F)]{3}-[89ab][0-9(a-f|A-F)]{3}-[0-9(a-f|A-F)]{12}"
+const optionalTrailingSlashesRegex string = "/*"
 
 type ctxKey struct{}
 
@@ -25,9 +29,9 @@ func getField(r *http.Request, index int) string {
 }
 
 // ServeHTTP implements the http.Handler interface for PatternHandler
-func (this *PatternHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (ph PatternHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var allow []string
-	for _, route := range this.routes {
+	for _, route := range ph.routes {
 		matches := route.pattern.FindStringSubmatch(r.URL.Path)
 		if len(matches) > 0 {
 			if r.Method != route.method {
@@ -45,6 +49,25 @@ func (this *PatternHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.NotFound(w, r)
+}
+
+func StartRestServer(done chan<- any, bindPort int, bindInterface string) *http.Server {
+	srv := &http.Server{Addr: fmt.Sprintf("%s:%d", bindInterface, bindPort), Handler: handler}
+
+	go func() {
+		defer close(done)
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			fmt.Printf("REST server error: %s", err)
+			os.Exit(errorcodes.RESTServerError)
+		}
+	}()
+
+	return srv
+}
+
+func RunRestApi(ctx context.Context, bindPort int, bindInterface string) {
+	http.HandleFunc("/", handler.ServeHTTP)
+	http.ListenAndServe(fmt.Sprintf("%s:%d", bindInterface, bindPort), nil)
 }
 
 type patternRoute struct {
@@ -65,47 +88,42 @@ type PatternHandler struct {
 // By defining the routes in a variable, we can easily test them
 var handler = PatternHandler{[]patternRoute{
 	// Wishes
-	NewRoute("GET", "/wishes", getAllWishesHandler),
-	NewRoute("POST", "/wishes", notImplementedHandler),
-	NewRoute("POST", "/wishes/("+uuidRegex+")/sync", notImplementedHandler),
-	NewRoute("GET", "/wishes/("+uuidRegex+")", getWishHandler),
-	NewRoute("DELETE", "/wishes/("+uuidRegex+")", notImplementedHandler),
-	NewRoute("POST", "/wishes/("+uuidRegex+")/sync", notImplementedHandler),
-	NewRoute("GET", "/wishes/("+uuidRegex+")/images", notImplementedHandler),
-	NewRoute("GET", "/wishes/("+uuidRegex+")/jobs", notImplementedHandler),
+	NewRoute("GET", "/api/v1/wishes/*", getAllWishesHandler),
+	NewRoute("POST", "/api/v1/wishes/("+uuidRegex+")/sync", notImplementedHandler),
+	NewRoute("GET", "/api/v1/wishes/("+uuidRegex+")", getWishHandler),
+	NewRoute("POST", "/api/v1/wishes/("+uuidRegex+")/sync", notImplementedHandler),
+	NewRoute("GET", "/api/v1/("+uuidRegex+")/images", notImplementedHandler),
+	NewRoute("GET", "/api/v1/("+uuidRegex+")/jobs", notImplementedHandler),
 
 	// Images
-	NewRoute("GET", "/images", getAllImagesHandler),
-	NewRoute("GET", "/images/("+uuidRegex+")", notImplementedHandler),
-	NewRoute("POST", "/images/("+uuidRegex+")/delete", notImplementedHandler),
-	NewRoute("POST", "/images/("+uuidRegex+")/sync", notImplementedHandler),
-	NewRoute("GET", "/images/("+uuidRegex+")/jobs", notImplementedHandler),
+	NewRoute("GET", "/api/v1/images/*", getAllImagesHandler),
+	NewRoute("GET", "/api/v1/images/("+uuidRegex+")", notImplementedHandler),
+	NewRoute("POST", "/api/v1/images/("+uuidRegex+")/delete", notImplementedHandler),
+	NewRoute("POST", "/api/v1/images/("+uuidRegex+")/sync", notImplementedHandler),
+	NewRoute("GET", "/api/v1/images/("+uuidRegex+")/jobs", notImplementedHandler),
 
 	// Jobs
-	NewRoute("GET", "/jobs", notImplementedHandler),
-	NewRoute("GET", "/jobs/("+uuidRegex+")", notImplementedHandler),
-	NewRoute("POST", "/jobs/("+uuidRegex+")/cancel", notImplementedHandler),
+	NewRoute("GET", "/api/v1/tasks/*", notImplementedHandler),
+	NewRoute("GET", "/api/v1/tasks/("+uuidRegex+")", notImplementedHandler),
+	NewRoute("POST", "/api/v1/tasks/("+uuidRegex+")/cancel", notImplementedHandler),
 
 	// Recipes
-	NewRoute("POST", "/recipes/(.+)", applyRecipeHandler),
+	NewRoute("POST", "/api/v1/recipes/(.+)", applyRecipeHandler),
 
 	// Webhooks
-	NewRoute("POST", "/webhooks/harbor", notImplementedHandler),
+	NewRoute("POST", "/api/v1/webhooks/harbor", notImplementedHandler),
 
 	// HTML
-	NewRoute("GET", "/html/jobs/("+uuidRegex+")", getTaskHtmlHandler),
-	NewRoute("GET", "/html/images", getImagesHtmlHandler),
+	NewRoute("GET", "/", frontPageHtmlHandler),
+	NewRoute("GET", "/tasks/("+uuidRegex+")", getTaskHtmlHandler),
+	NewRoute("GET", "/operations/*", operationsHtmlHandler),
+	NewRoute("GET", "/images/*", getImagesHtmlHandler),
 
 	// Other general actions
 	// - Clean up orphaned images
 	// - Clean up orphaned layers
 
 }}
-
-func RunRestApi() {
-	http.HandleFunc("/", handler.ServeHTTP)
-	http.ListenAndServe(":8080", nil)
-}
 
 func notImplementedHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -220,11 +238,11 @@ func applyRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the recipe
 	recipe, err := db.ParseYamlRecipeV1(body, source)
 	if err != nil {
+		fmt.Printf("Invalid recipe: %s\n", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("Invalid recipe: %s", err.Error())))
 		return
 	}
-
 	// Import the recipe
 	newWishes, deletedWishes, err := db.ImportRecipeV1(recipe)
 	if err != nil {
@@ -233,6 +251,9 @@ func applyRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: Schedule update of the new wishes
+	/*for _, wish := range newWishes {
+		// TODO: daemon.TriggerCheck(wish.ID, db.OP_TYPE_EXPAND_WILDCARDS, db.TRIGGER_TYPE_MANUAL, fmt.Sprintf("Recipe %s applied", source))
+	}*/
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf("Successfully applied recipe. Imported %d wish(es), deleted %d wish(es)", len(newWishes), len(deletedWishes))))
