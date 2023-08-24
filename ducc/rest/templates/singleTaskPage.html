@@ -4,7 +4,8 @@
     <title>Task Status</title>
 </head>
 <body>
-    <h1>Task ID: {{.TaskSnapshot.ID}}</h1>
+    <h1>{{.TaskSnapshot.Title}}</h1>
+    <p>ID: {{.TaskSnapshot.ID}}</p>
     <h2>Type: {{.TaskSnapshot.Type}}</h2>
     <h2>Status: {{.TaskSnapshot.Status}}</h2>
     <h2>Result: {{.TaskSnapshot.Result}}</h2>
@@ -13,12 +14,14 @@
     <table border="1">
 	<tr>
 	<th>Task Type</th>
+    <th>Title</th>
 	<th>Task Status</th>
 	<th>Task Result</th>
 	</tr>
     {{range .ChildSnapshots}}
 	<tr>
-        <td><a href="/html/jobs/{{.ID}}">{{.Type}}</a></td>
+        <td><a href="/tasks/{{.ID}}">{{.Type}}</a></td>
+        <td>{{.Title}}</td>
 		<td>{{.Status}}</td>
 		<td>{{.Result}}</td>
 	</tr>
