@@ -48,7 +48,7 @@ def plotSingleFile(filename, csv_labels, outdir):
     for ele in params:
         plt.rcParams.update(ele)
 
-    for label in labels.split(", "):
+    for label in labels.split(","):
       for cache in cache_labels:
         row = ast.literal_eval(df.loc[label][cache])
         y_data[label].append(row)
@@ -56,15 +56,21 @@ def plotSingleFile(filename, csv_labels, outdir):
     ax1 = plt.axes()
     idx = 0
 
+    if len(labels.split(",")) > 1:
+      colors=visulization_colors.colors3_3
+    else:
+      colors=visulization_colors.cache_colors
+
     for key, val in y_data.items():
       for cacheData in val:
         ax1.scatter(
             [i for i in range(len(cacheData))],
             cacheData,
             #yerr=errorY[firstX:i],
-            label=" ".join(cache_labels[idx % 3].split("_")),
+            label=" ".join(cache_labels[idx % 3].split("_")) if len(labels.split(",")) == 1 \
+                  else key + " " + " ".join(cache_labels[idx % 3].split("_")) ,
             marker="o",
-            color=visulization_colors.cache_colors[idx % len(visulization_colors.cache_colors)],
+            color=colors[idx % len(colors)],
             s=8**2,
             rasterized=True
             )
