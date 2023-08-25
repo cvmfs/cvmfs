@@ -4,45 +4,26 @@
 #             COMMANDS RUN ON CVMFS INFRASTRUCTURE
 ################################################################################
 #
-# Dictionary with commands and their needed cvmfs repositories used in 
+# Dictionary with commands and their needed cvmfs repositories used in
 # ../start_benchmark.py
 #
 # the given command will be combined with the command "time"
 # PLEASE ensure that "time <your command>" correctly times the command
-# especially with bash files one needs to double check. 
+# especially with bash files one needs to double check.
 #
 ################################################################################
 
 # CHEP 23 Commands
-chep23_atlas_commands = {
-  "atlas-tensorflow": {"command": "./scripts/11-atlas-tensorflow.sh",
-                        "repos": ["unpacked.cern.ch"]},
-  #"atlas-environment": "./scripts/12-atlas-environment.sh",
-  # to be able to run atlas athena you first need to execute once ./scripts/20-atlas.athena-setup.sh
-  #"atlas-athena - build externals": "./scripts/21-atlas.athena-build_externals.sh",
-  #"atlas-athena - build": "./scripts/21-atlas.athena-build.sh",
-}
-
-chep23_lhcb_commands = {
-  "lhcb-env": {"command": "./scripts/13-lhcb.sh",
-                "repos": ["lhcb.cern.ch"]},
-  "LCG-view": {"command": '/usr/bin/bash -c ". /cvmfs/sft.cern.ch/lcg/views/LCG_103/x86_64-centos9-gcc11-opt/setup.sh"',
-                "repos": ["sft.cern.ch"]},
-}
-
-chep23_alice_commands = {
-  "alice-pipeline": "./scripts/41-alice-pipeline-createAndLaunchContainer.sh 5"
-}
-
 chep23_selected_commands = {
-#   "tensorflow" : { "command": "./scripts/50-tensorflow.sh",
-#                    "repos": [ "sft.cern.ch" ] },
-    "root" :      { "command": "./scripts/51-root.sh",
-                     "repos": [ "sft.cern.ch" ] },
-#    "dd4hep" :    { "command": "./scripts/60-dd4hep.sh",
-#                     "repos": [ "sft.cern.ch" ] },
+  "tensorflow" : { "command": "./scripts/50-tensorflow.sh",
+                   "repos": [ "sft.cern.ch" ] },
+  "root" :       { "command": "./scripts/51-root.sh",
+                   "repos": [ "sft.cern.ch" ] },
+  "dd4hep" :     { "command": "./scripts/60-dd4hep.sh",
+                   "repos": [ "sft.cern.ch" ] },
+# for cms dont forget to update SWVERSION in ../scripts/70-cms.sh
 #  "cms" :       { "command": "./scripts/70-cms.sh",
-#                    "repos": [ "cms-ib.cern.ch" ] },
+#                  "repos": [ "cms-ib.cern.ch" ] },
 }
 
 
