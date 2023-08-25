@@ -23,11 +23,19 @@ from util_benchmark import benchmark_out
 # For this the command "time" is being used to extract metrics from the system
 #
 # This benchmark provides automatized utilities to:
-# - run on multiple  manually compiled cvmfs installations (cvmfs/build dir needed)
+# - run on multiple manually compiled cvmfs installations (build dir needed)
 # - run multiple different thread configurations
 # - run with multiple different CVMFS client configurations
 # - auto-increment file name so that rerunning the same config does not
 #   overwrite old results
+# - rerun the same command with different caching levels
+#   (the higher the number of repetitions, the more accurate is the average
+#    performance measured by the benchmark)
+#   - cold cache: no local caching, only remote on the proxy
+#   - warm cache: local cvmfs cache on disk (and on remote proxy);
+#                 no kernel caching between repetitions of the same command
+#   - hot cache: local cvmfs cache on disk and kernel caching between
+#                repetitions of the same command
 #
 # In the main function below, there is a section of user defined parameters
 #
@@ -130,7 +138,7 @@ if __name__ == "__main__":
 
   # array of build dirs of cvmfs to run the performance benchmark with
   # see getOutname() to destinguish between same version but different branch
-  cvmfs_build_dirs = ["/home/lpromber/epSft/cvmfs/build"] 
+  cvmfs_build_dirs = ["/home/<user>/cvmfs/build"] 
   thread_configs = [1] # array; with how many threads the program should be run
 
   # combination of cvmfs client config that should be in addition enabled
