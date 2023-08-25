@@ -44,7 +44,8 @@ cvmfs_version_labels_dict = {
 
 option_labels_dict = {
   "statfs_kernel" : "Default",
-  "symlink_statfs_kernel": "Symlink Caching"
+  "symlink_statfs_kernel": "Symlink Caching",
+  "symlink_statfs_kernel_trace": "Symlink Caching (T)"
 }
 
 def getDistinctCommands(files):

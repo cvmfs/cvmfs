@@ -36,7 +36,6 @@ def getReposToMount(commands):
   repos = ["cvmfs-config.cern.ch"]
 
   for cmd_name in commands:
-    print(commands[cmd_name])
     if not commands[cmd_name]["repos"] in repos:
       for repo in commands[cmd_name]["repos"]:
         repos.append(repo)
