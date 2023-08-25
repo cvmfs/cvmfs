@@ -24,4 +24,4 @@ cache_colors_light = [newBlueLight, newOrangeLight, newRedLight]
 
 colors3_3 = [dark_blue, light_blue, cyan,
              dark_green, med_green, dark_yellow,
-             dark_red, light_red, magenta] 
+             dark_red, light_red, magenta]

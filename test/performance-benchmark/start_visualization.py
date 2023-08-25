@@ -51,7 +51,7 @@ if __name__ == "__main__":
   # ../start_benchmark.py
   #
   # not yet existing labels and combinations like "user,system,real" must be
-  # be added here visualization_time.measurement_label_dict 
+  # be added here visualization_time.measurement_label_dict
   # for readability dont combine more than 3 labels
   csv_labels = ["user,system,real", "user", "system", "real"]
 
@@ -62,16 +62,16 @@ if __name__ == "__main__":
   versions = ["2.9.4.0", "2.11.0.0-bisect", "2.11.0.0-fix-perf"]
   versions_cvmfs_options = ['statfs_kernel', 'symlink_statfs_kernel']
   create_version_plots = True
-  
+
   # for comparing cvmfs_configs
   # each option must be added to visualization_time.option_labels_dict
   # and define its label how it is shown in the boxplot
-  options = ['statfs_kernel', 'symlink_statfs_kernel'] 
+  options = ['statfs_kernel', 'symlink_statfs_kernel']
   options_cvmfs_versions = ["2.11.0.0-bisect"]
   create_option_plots = True
 
   create_scatter_plots = False
-  
+
 
   # repos for which cvmfs_internal_labels should be plotted
   repos = ["sft.cern.ch", "cms-ib.cern.ch"]
@@ -166,10 +166,3 @@ if __name__ == "__main__":
     # #scatter plot single file
     for filename in tqdm.tqdm(files):
       visualization_plotting.plotSingleFile(filename, csv_labels, outdir)
-
-
-
-
-
-
-

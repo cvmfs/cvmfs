@@ -19,7 +19,7 @@ from util_benchmark import benchmark_out
 ################################################################################
 #
 # Performance benchmark to time jobs/commands executed using CVMFS.
-# 
+#
 # For this the command "time" is being used to extract metrics from the system
 #
 # This benchmark provides automatized utilities to:
@@ -53,7 +53,7 @@ from util_benchmark import benchmark_out
 # Get "base" of the output name
 ################################
 # Includes: cvmfs_version, run options and number of threads
-# 
+#
 # If needed to destinguish different branches/builds this is done based on
 # the build dir of cvmfs (assumption here is that different branches are
 # saved/built in different folders)
@@ -83,7 +83,7 @@ def getOutname(cvmfs_build_dir, name, option, num_threads):
 # CVMFS client config parameters chosen based on which "options" are added
 # Format of options: string where each option is split by "_"
 # e.g. "symlink_trace_debuglog"
-# 
+#
 # When adding new options, make sure that are not partial matches of each other
 # as we just check the entire option-string if the option is part of it
 # (we dont split by "_" )
@@ -119,7 +119,7 @@ def setCvmfsConfig(filename, option, print_config=True):
 # See description at the very top of this file "CVMFS - PERFORMANCE BENCHMARK"
 #
 if __name__ == "__main__":
-  
+
   ##############################################################################
   ## PARAMS set by user
   #########################
@@ -129,8 +129,8 @@ if __name__ == "__main__":
   commands = benchmark_cmds.chep23_selected_commands
 
   # how often the command is timed in a row for each cache type
-  repetitions = 3  
-  
+  repetitions = 3
+
   # if autofs should be used; better without
   # if =False make sure that autofs is stopped and autofs does not continue
   #           to mount /cvmfs (use `umount -lf /cvmfs`)
@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
   # array of build dirs of cvmfs to run the performance benchmark with
   # see getOutname() to destinguish between same version but different branch
-  cvmfs_build_dirs = ["/home/<user>/cvmfs/build"] 
+  cvmfs_build_dirs = ["/home/<user>/cvmfs/build", "/home/<user>/cvmfs-other/build"]
   thread_configs = [1] # array; with how many threads the program should be run
 
   # combination of cvmfs client config that should be in addition enabled
@@ -184,6 +184,7 @@ if __name__ == "__main__":
 
       ## 3) loop over commands
       for name, partial_cmd in commands.items():
+        print("\n")
         print("*** CVMFS:", cvmfs_version, cvmfs_build_dir)
         print("*** Extra client options:", option)
         print("*** command name:", name)
@@ -203,7 +204,7 @@ if __name__ == "__main__":
           cache_setups = [["cold_cache", benchmark_time.wipe_cache],
                          ["warm_cache", benchmark_time.wipe_kernel_cache],
                          ["hot_cache", ""]]
-          
+
           # dictionaries holding the results
           start_times = defaultdict()
           all_data = defaultdict()
@@ -229,7 +230,7 @@ if __name__ == "__main__":
                     benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
                                                        partial_cmd, num_threads),
                                           number=1, repeat=repetitions)
-            
+
             print("    ...done", cache_label, "after",
                   (dt.datetime.now() - start_times[cache_label]).total_seconds(),
                   "seconds")

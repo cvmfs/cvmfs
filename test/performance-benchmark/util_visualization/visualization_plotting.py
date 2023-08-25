@@ -7,11 +7,10 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.transforms import IdentityTransform
 
 import os
 
-from util_visualization import visulization_colors
+from util_visualization import visualization_colors
 from util_visualization import visualization_time
 import ast
 
@@ -57,9 +56,9 @@ def plotSingleFile(filename, csv_labels, outdir):
     idx = 0
 
     if len(labels.split(",")) > 1:
-      colors=visulization_colors.colors3_3
+      colors=visualization_colors.colors3_3
     else:
-      colors=visulization_colors.cache_colors
+      colors=visualization_colors.cache_colors
 
     for key, val in y_data.items():
       for cacheData in val:
@@ -77,7 +76,7 @@ def plotSingleFile(filename, csv_labels, outdir):
         idx += 1
 
     num_threads = filename.split("_")[-2]
-    all_measurements = len(y_data[[*y_data.keys()][0]][0]) 
+    all_measurements = len(y_data[[*y_data.keys()][0]][0])
     repetitions = all_measurements / int(num_threads)
     ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( " + \
                    num_threads + " threads " + " x " + \
@@ -86,7 +85,7 @@ def plotSingleFile(filename, csv_labels, outdir):
 
     # needed to draw legend dynamically below x-axis label
     fig.canvas.draw()
-    x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0 
+    x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0
     lgnd= plt.legend(framealpha=0.8,
                      fontsize=32,
                      loc='upper center',
@@ -167,7 +166,7 @@ def _prepareData(dirname, csv_labels, version_or_option, thread, cmd,
             if cache == cache_labels[0] or "cvmfs_internal" not in comparison_to_plot:
               cvmfs_data[comperator][label][cache].append(ele)
               last_val = ele
-            else: # for cvmfs_internal: warm and hot cache take delta as the 
+            else: # for cvmfs_internal: warm and hot cache take delta as the
                   # counters accumulate
               cvmfs_data[comperator][label][cache].append(ele - last_val)
               last_val = ele
@@ -187,7 +186,7 @@ def _prepareData(dirname, csv_labels, version_or_option, thread, cmd,
           x_labels.append(x_label_dict[comperator] + " " + label)
         else:
           x_labels.append(x_label_dict[comperator])
-  
+
   return y_data, x_labels, x_title
 
 ##
@@ -206,10 +205,10 @@ def _prepareData(dirname, csv_labels, version_or_option, thread, cmd,
 # It is possible that csv_labels consists of multiple csv_labels of the "time"
 # cmd (not for internal affairs). E.g. "user,system,real" will result in plotting
 # each label in the same boxplot, but having its own separate "box" aka:
-# user cold, user warm, user hot, system cold, ..., system hot, real cold, ... 
+# user cold, user warm, user hot, system cold, ..., system hot, real cold, ...
 #
 # For this following might need population by the user:
-# - visualization_time.cvmfs_version_labels_dict for different 
+# - visualization_time.cvmfs_version_labels_dict for different
 #                                             CVMFS version/branches/directories
 # - visualization_time.option_labels_dict for different CVMFS client configs
 # - visualization_time.measurement_label_dict for combining different csv_labels
@@ -245,8 +244,8 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
   bplot = ax1.boxplot(y_data, patch_artist=True, vert=True)
 
   # color the boxplot
-  baseColorSchema = visulization_colors.cache_colors
-  baseColorSchemaLight = visulization_colors.cache_colors_light
+  baseColorSchema = visualization_colors.cache_colors
+  baseColorSchemaLight = visualization_colors.cache_colors_light
   threeColors = []
 
   counter = 0
@@ -260,7 +259,7 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
     patch.set_facecolor(threeColors[counter % len(threeColors)])
     patch.set_edgecolor(threeColors[counter % len(threeColors)])
     counter += 1
-  
+
   counter = 0
   for patch in bplot["medians"]:
     patch.set_color(threeColors[counter % len(threeColors)])
@@ -286,7 +285,7 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
     patch.set_linewidth(4)
     counter += 1
   # end color the boxplot
- 
+
 
   ax1.set_xlabel(x_title)
   if "cvmfs_internal" in comparison_to_plot:
@@ -298,7 +297,7 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
   ax1.set_xticklabels(x_labels)
 
   plt.gca().set_ylim(bottom=0)
-  plt.xticks(rotation=45)
+  plt.xticks(rotation=60)
 
   # rotate stronger if we have more labels (only happens if combining multiple
   # csv_labels)
@@ -312,7 +311,7 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
 
   # needed to draw legend dynamically below x-axis label
   fig.canvas.draw()
-  x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0 
+  x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0
   ax1.legend(custom_lines,
              [ele.replace("_", " ") for ele in cache_labels],
              loc='upper center',
