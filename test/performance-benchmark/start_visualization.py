@@ -40,7 +40,7 @@ if __name__ == "__main__":
   ## PARAMS set by user
   #########################
   # directory containing all .csv files that should be compared
-  dirname = "data/jakobBisectComparison/"
+  dirname = "data/final_selection/"
   # directory where to write the plots, will be created if needed
   outdir = "./results"
   # if empty will make it for all threads available
