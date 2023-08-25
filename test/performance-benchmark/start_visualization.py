@@ -68,7 +68,7 @@ if __name__ == "__main__":
   # and define its label how it is shown in the boxplot
   options = ['statfs_kernel', 'symlink_statfs_kernel'] 
   options_cvmfs_versions = ["2.11.0.0-bisect"]
-  create_option_plots = False
+  create_option_plots = True
 
   create_scatter_plots = False
   
@@ -116,6 +116,10 @@ if __name__ == "__main__":
   print("commands:", cmds)
   print("client configs:", options)
   print("num threads:", num_threads)
+  print("")
+  print("csv_labels", csv_labels)
+  print("repos", repos)
+  print("cvfms_internal_labels", cvmfs_internal_labels)
 
 
   # build full label by adding the repo in front
@@ -160,9 +164,7 @@ if __name__ == "__main__":
   if create_scatter_plots == True:
     print("\n\nPlotting: scatter plot\n")
     # #scatter plot single file
-    for filename in files:
-      print("filename", filename)
-      print("csv_labels", csv_labels)
+    for filename in tqdm.tqdm(files):
       visualization_plotting.plotSingleFile(filename, csv_labels, outdir)
 
 
