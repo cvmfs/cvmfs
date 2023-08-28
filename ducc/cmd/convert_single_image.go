@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -39,6 +40,11 @@ var convertSingleImageCmd = &cobra.Command{
 	Short: "Convert a single image",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Init Registries
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		defer cancelFunc()
+		registry.InitRegistries(ctx, nil, nil)
+
 		fmt.Printf("Converting image %s\n", args[0])
 
 		inputImage := args[0]

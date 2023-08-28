@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -36,6 +37,10 @@ var convertCmd = &cobra.Command{
 	Short: "Convert the wishes",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Init Registries
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		defer cancelFunc()
+		registry.InitRegistries(ctx, nil, nil)
 
 		outputOptions := db.WishOutputOptions{
 			CreateLayers:    db.ValueWithDefault[bool]{Value: config.DEFAULT_CREATELAYERS, IsDefault: true},
