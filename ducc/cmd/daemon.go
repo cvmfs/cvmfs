@@ -14,6 +14,7 @@ import (
 	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/errorcodes"
+	"github.com/cvmfs/ducc/registry"
 	"github.com/cvmfs/ducc/rest"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -44,6 +45,11 @@ var daemonCmd = &cobra.Command{
 	Short: "Run DUCC in daemon mode",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Init Registries
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		defer cancelFunc()
+		registry.InitRegistries(ctx, nil, nil)
+
 		if err := os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
 			fmt.Printf("Error creating directory for database: %s\n", err)
 			os.Exit(errorcodes.OpenDatabaseFileError)

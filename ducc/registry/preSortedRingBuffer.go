@@ -72,7 +72,7 @@ func (rb *PreSortedRingBuffer) Pop() (int64, error) {
 	return popped, nil
 }
 
-// binarySearchGeq returns the index and value of the first element greater than or equal to val.
+// BinarySearchGeq returns the index and value of the first element greater than or equal to val.
 func (rb *PreSortedRingBuffer) BinarySearchGeq(val int64) (int, int64, bool) {
 	low, high := 0, rb.Size()-1
 

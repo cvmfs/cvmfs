@@ -2,6 +2,7 @@ package registry
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/opencontainers/go-digest"
@@ -17,6 +20,11 @@ import (
 
 var localRegistriesMutex sync.Mutex
 var localRegistries = make(map[ContainerRegistryIdentifier]*ContainerRegistry)
+var registriesCtx context.Context
+
+var defaultRateLimitIntervals = []RateLimit{{Interval: 1 * time.Minute, MaxCount: 200}, {Interval: 10 * time.Second, MaxCount: 50}}
+
+const defaultExponentialBase = 2
 
 type ContainerRegistryCredentials struct {
 	Username string
@@ -34,15 +42,30 @@ type ContainerRegistry struct {
 	Identifier ContainerRegistryIdentifier
 
 	// Authentication
-	Credentials     ContainerRegistryCredentials
-	TokenCv         *sync.Cond
-	token           string
-	gotToken        bool
-	waitingForToken bool
-	// TODO: Some kind of auth error variable that can be checked
-	// Number of simultaneous connections to the registry
+	Credentials ContainerRegistryCredentials
+	tokenMutex  sync.Mutex
+	token       string
+
+	wwwAuthenticateMutex sync.Mutex
+	wwwAuthenticate      string
+
+	numAuthFailures         uint64
+	backoffAndAuthTurnstile *BackoffTurnstile
+	requestLimiter          *RequestLimiter
 
 	Client *http.Client
+}
+
+func InitRegistries(ctx context.Context, registries []ContainerRegistryIdentifier, credentials map[ContainerRegistryIdentifier]ContainerRegistryCredentials) {
+	registriesCtx = ctx
+	for _, registry := range registries {
+		// If the registry does not exist, create it
+		GetOrCreateRegistry(registry)
+	}
+	for registry, credentials := range credentials {
+		// Set the credentials for the registry
+		GetOrCreateRegistry(registry).Credentials = credentials
+	}
 }
 
 // GetOrCreateRegistry returns a pointer to a ContainerRegistry object.
@@ -60,8 +83,14 @@ func GetOrCreateRegistry(identifier ContainerRegistryIdentifier) *ContainerRegis
 	// Registry does not exist, create it
 	newRegistry := ContainerRegistry{
 		Identifier: identifier,
-		TokenCv:    sync.NewCond(&sync.Mutex{}),
-		Client:     &http.Client{},
+
+		tokenMutex: sync.Mutex{},
+		token:      "",
+
+		backoffAndAuthTurnstile: NewBackoffTurnstile(registriesCtx, defaultExponentialBase, config.REGISTRY_INITIAL_BACKOFF, config.REGISTRY_MAX_BACKOFF),
+		requestLimiter:          NewRequestLimiter(registriesCtx, config.REGISTRY_MAX_CONCURRENT_REQUESTS, defaultRateLimitIntervals),
+
+		Client: &http.Client{},
 	}
 
 	return &newRegistry
@@ -72,32 +101,60 @@ func (cr ContainerRegistry) BaseUrl() string {
 	return fmt.Sprintf("%s://%s/v2", cr.Identifier.Scheme, cr.Identifier.Hostname)
 }
 
-// waitUntilReadyToPerformRequest blocks until the registry is ready to perform a request.
-func (cr *ContainerRegistry) waitUntilReadyToPerformRequest() {
-	// If we are waiting for a new token, hold the request until we get one
-	// TODO: Backoff after 429 Too Many Requests
-	cr.TokenCv.L.Lock()
-	for cr.waitingForToken {
-		cr.TokenCv.Wait()
-	}
-	cr.TokenCv.L.Unlock()
-}
-
 // PerformRequest performs a request to the registry. It blocks until a response is received.
 // If the request returns a 401, a new token is requested and the request is retried.
 // If the request returns a 429, the request is retried after a backoff.
 // In both these cases, the function blocks until the response for the next request has been received.
 func (cr *ContainerRegistry) PerformRequest(req *http.Request) (*http.Response, error) {
-retryRequest:
-	cr.waitUntilReadyToPerformRequest()
+	var turnstileOnce sync.Once
+	var tokenOnce sync.Once
 
-	// If we have a token, add it to the request
-	cr.TokenCv.L.Lock()
-	tokenToSend := cr.token
-	if cr.gotToken {
-		req.Header.Set("Authorization", tokenToSend)
+	cr.requestLimiter.Enter()
+	defer cr.requestLimiter.Exit()
+retryRequest:
+	// Don't send out new requests if the context is cancelled
+	select {
+	case <-registriesCtx.Done():
+		return nil, fmt.Errorf("context cancelled")
+	default:
 	}
-	cr.TokenCv.L.Unlock()
+
+	cr.backoffAndAuthTurnstile.Enter()
+	defer func() { turnstileOnce.Do(cr.backoffAndAuthTurnstile.Exit) }()
+	cr.tokenMutex.Lock()
+	defer func() { tokenOnce.Do(cr.tokenMutex.Unlock) }()
+
+	if numAuthFailures := atomic.LoadUint64(&cr.numAuthFailures); numAuthFailures == 1 {
+		// There has been an authentication failure, we need to get a new token before performing the request
+		cr.wwwAuthenticateMutex.Lock()
+		wwwAuthenticate := cr.wwwAuthenticate
+		cr.wwwAuthenticateMutex.Unlock()
+		var err error
+		cr.token, err = requestAuthToken(wwwAuthenticate, cr.Credentials.Username, cr.Credentials.Password)
+		if err != nil {
+			if cr.Credentials.Username == "" && cr.Credentials.Password == "" {
+				// We already tried with no username and password, return the error
+				atomic.AddUint64(&cr.numAuthFailures, 1)
+				return nil, err
+			}
+			// As a last resort, try again with no username and password
+			cr.token, err = requestAuthToken(wwwAuthenticate, "", "")
+			if err != nil {
+				atomic.AddUint64(&cr.numAuthFailures, 1)
+				return nil, err
+			}
+		}
+		atomic.StoreUint64(&cr.numAuthFailures, 0)
+	} else if numAuthFailures > 1 {
+		// We already tried to authenticate, but it failed
+		return nil, fmt.Errorf("authentication failed")
+	}
+	// If we have a token, add it to the request
+	if cr.token != "" {
+		req.Header.Set("Authorization", cr.token)
+	}
+	tokenOnce.Do(cr.tokenMutex.Unlock)
+	turnstileOnce.Do(cr.backoffAndAuthTurnstile.Exit)
 
 	// Perform the request
 	res, err := cr.Client.Do(req)
@@ -108,50 +165,27 @@ retryRequest:
 
 	// We got a good response, everything is fine
 	if res.StatusCode < 300 && res.StatusCode >= 200 {
-		// TODO: logging
+		// Valid response, reset the exponential backoff
+		cr.backoffAndAuthTurnstile.ResetExponentialBackoff()
 		return res, nil
 	}
 
-	// We are rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
+		// We are rate limited, handle the backoff and retry
 		res.Body.Close()
-		// TODO: Handle rate limit wait
+		cr.backoffAndAuthTurnstile.SetBackoff(res)
 		goto retryRequest
 	}
+
 	if res.StatusCode == http.StatusUnauthorized {
-		WwwAuthenticate := res.Header["Www-Authenticate"][0]
+		// We are unauthorized
+		cr.wwwAuthenticateMutex.Lock()
+		cr.wwwAuthenticate = res.Header["Www-Authenticate"][0]
+		cr.wwwAuthenticateMutex.Unlock()
 		res.Body.Close()
-
-		cr.TokenCv.L.Lock()
-		if cr.waitingForToken || tokenToSend != cr.token {
-			// Another thread has already requested a new token
-			cr.TokenCv.L.Unlock()
-			goto retryRequest
-		}
-
-		// We need to request a new token
-		cr.waitingForToken = true
-		cr.TokenCv.L.Unlock()
-
-		token, err := requestAuthToken(WwwAuthenticate, cr.Credentials.Username, cr.Credentials.Password)
-		if err != nil {
-			// As a last resort, try again with no username and password
-			if cr.Credentials.Username == "" && cr.Credentials.Password == "" {
-				// We already tried with no username and password, return the error
-				return nil, err
-			}
-			token, err = requestAuthToken(WwwAuthenticate, "", "")
-			if err != nil {
-				return nil, err
-			}
-		}
-		cr.TokenCv.L.Lock()
-		cr.token = token
-		cr.gotToken = true
-		cr.waitingForToken = false
-		cr.TokenCv.L.Unlock()
+		// If we are not currently in an authentication failure, set the counter to 1
+		atomic.CompareAndSwapUint64(&cr.numAuthFailures, 0, 1)
 		goto retryRequest
-
 	}
 	return res, err
 }
@@ -162,7 +196,7 @@ func requestAuthToken(token, user, pass string) (authToken string, err error) {
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequest("GET", realm, nil)
+	req, err := http.NewRequestWithContext(registriesCtx, "GET", realm, nil)
 	if err != nil {
 		return
 	}

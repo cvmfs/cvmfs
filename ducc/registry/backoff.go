@@ -39,6 +39,7 @@ type BackoffTurnstile struct {
 // maxBackoff is the maximum backoff time.
 // The turnstile is initially free.
 // The turnstile goroutine is started in the background. It is stopped when the context is cancelled.
+// After the context is cancelled, all operations on the turnstile will be no-ops and return immediately.
 func NewBackoffTurnstile(ctx context.Context, exponentialBase float64, initialBackoff, maxBackoff time.Duration) *BackoffTurnstile {
 	backoff := BackoffTurnstile{
 		ctx: ctx,
@@ -67,21 +68,34 @@ func NewBackoffTurnstile(ctx context.Context, exponentialBase float64, initialBa
 // Enter() will block for any goroutine that calls it until the backoff is over.
 // If the backoff is already set to a later time, it is not changed.
 // If the backoff is further in the future than the max backoff time, it is set to the max backoff time.
+// If the BackoffTurnstile context is cancelled, this function returns immediately.
 func (b *BackoffTurnstile) SetBackoff(res *http.Response) {
-	b.newBackoff <- res
+	select {
+	case b.newBackoff <- res:
+	case <-b.ctx.Done():
+	}
 }
 
 // Enter blocks until the turnstile is free.
 // If the turnstile is in a backoff, Enter blocks until the backoff is over.
 // After Enter returns, the turnstile is occupied. No other goroutine can enter until Exit is called.
+// If the BackoffTurnstile context is cancelled, this function returns immediately.
 func (b *BackoffTurnstile) Enter() {
-	b.enter <- struct{}{}
+	select {
+	case b.enter <- struct{}{}:
+	case <-b.ctx.Done():
+	}
+
 }
 
 // Exit frees the turnstile.
 // Only call this function after Enter has been called.
+// If the BackoffTurnstile context is cancelled, this function returns immediately.
 func (b *BackoffTurnstile) Exit() {
-	b.exit <- struct{}{}
+	select {
+	case b.exit <- struct{}{}:
+	case <-b.ctx.Done():
+	}
 }
 
 // ResetExponentialBackoff resets the exponential backoff counter.

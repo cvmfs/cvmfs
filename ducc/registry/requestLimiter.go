@@ -3,7 +3,6 @@ package registry
 import (
 	"container/list"
 	"context"
-	"fmt"
 	"sort"
 	"time"
 )
@@ -49,7 +48,6 @@ func NewRequestLimiter(ctx context.Context, maxConcurrentRequests int, rateLimit
 			continue
 		}
 		rateLimit := rateLimit
-		fmt.Println(rateLimit)
 		internalRateLimits = append(internalRateLimits, rateLimit)
 	}
 
@@ -89,16 +87,24 @@ func NewRequestLimiter(ctx context.Context, maxConcurrentRequests int, rateLimit
 }
 
 // Enter blocks until the request limiter is ready to perform a request.
+// If the RequestLimiter's context is cancelled, this function returns immediately.
 func (r *RequestLimiter) Enter() {
 	ready := make(chan struct{})
 	r.enter <- ready
-	<-ready
+	select {
+	case <-ready:
+	case <-r.ctx.Done(): // Context is cancelled, return immediately
+	}
 }
 
 // Exit signals that this goroutine is done performing a request, freeing up space for another request.
 // This function should be called after previously calling Enter.
 func (r *RequestLimiter) Exit() {
-	r.exit <- struct{}{}
+	select {
+	case r.exit <- struct{}{}:
+	case <-r.ctx.Done(): // Context is cancelled, return immediately
+	}
+
 }
 
 // work is the main function of the RequestLimiter.
