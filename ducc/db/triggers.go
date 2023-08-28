@@ -107,7 +107,7 @@ func GetTasksForObjectIDs(tx *sql.Tx, objectIDs []uuid.UUID, actionFilter []stri
 		args = append(args, limit)
 	}
 
-	stmnt := "SELECT " + taskSqlFieldsPrefixed + " FROM tasks JOIN triggers ON tasks.id = triggers.task_id WHERE triggers.object_id = ?" + typeQuery + statusQuery + " ORDER BY task.start_timestamp DESC" + limitQuery
+	stmnt := "SELECT " + taskSqlFieldsPrefixed + " FROM tasks JOIN triggers ON tasks.id = triggers.task_id WHERE triggers.object_id = ?" + typeQuery + statusQuery + " ORDER BY tasks.start_timestamp DESC" + limitQuery
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
