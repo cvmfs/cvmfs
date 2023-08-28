@@ -54,6 +54,14 @@ enable_resolv_conf() {
 
 cleanup() {
   echo "running cleanup()..."
+
+  for file in $(pwd)/secure_mnt.l*;
+  do
+    echo "***********PRINT DEBUGLOG: $file *****************"
+    sudo cat $file
+    echo "***********END PRINT DEBUGLOG $file *****************"
+  done
+
   enable_resolv_conf
   sudo umount ${TEST647_GRID_MOUNTPOINT}
   [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
@@ -263,7 +271,8 @@ cvmfs_run_test() {
   disable_resolv_conf
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
-                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" || return 19
+                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" \
+                         || return 19
   enable_resolv_conf
 
   # Create a stupid simple bearer token
