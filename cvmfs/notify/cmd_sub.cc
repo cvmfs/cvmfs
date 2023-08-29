@@ -33,7 +33,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       : notify::SubscriberSSE(server_url),
         repository_(repository),
         stats_(),
-        dl_mgr_(new download::DownloadManager()),
+        dl_mgr_(new download::DownloadManager(kMaxPoolHandles,
+                                perf::StatisticsTemplate("download", &stats_))),
         sig_mgr_(new signature::SignatureManager()),
         revision_(min_revision),
         continuous_(continuous),
@@ -52,9 +53,6 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
                "SwissknifeSubscriber - could not parse configuration file");
       return false;
     }
-
-    dl_mgr_->Init(kMaxPoolHandles,
-                  perf::StatisticsTemplate("download", &stats_));
 
     std::string arg;
     if (options.GetValue("CVMFS_SERVER_URL", &arg)) {

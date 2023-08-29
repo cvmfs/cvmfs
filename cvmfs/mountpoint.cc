@@ -1399,9 +1399,8 @@ bool MountPoint::CreateCatalogManager() {
 
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
-  download_mgr_ = new download::DownloadManager();
-  download_mgr_->Init(kDefaultNumConnections,
-                      perf::StatisticsTemplate("download", statistics_));
+  download_mgr_ = new download::DownloadManager(kDefaultNumConnections,
+                             perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   // must be set before proxy and host chains are being initialized

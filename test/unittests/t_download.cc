@@ -36,13 +36,12 @@ namespace download {
 
 class T_Download : public FileSandbox {
  public:
-  T_Download() : FileSandbox(string(tmp_path) + "/server_dir") {}
+  T_Download() : FileSandbox(string(tmp_path) + "/server_dir"),
+                 download_mgr(DownloadManager(8,
+                              perf::StatisticsTemplate("test", &statistics))) {}
 
  protected:
   virtual void SetUp() {
-    download_mgr.Init(8,
-      perf::StatisticsTemplate("test", &statistics));
-
     CreateSandbox();
   }
 
@@ -181,7 +180,8 @@ TEST_F(T_Download, Clone) {
   delete download_mgr_cloned;
 
   // Don't crash
-  DownloadManager *dm = new DownloadManager();
+  DownloadManager *dm = new DownloadManager(1,
+                                    perf::StatisticsTemplate("h", &statistics));
   download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics));
   delete dm;
   delete download_mgr_cloned;
@@ -197,8 +197,7 @@ TEST_F(T_Download, Multiple) {
   string src_path = GetAbsolutePath(GetSmallFile());
   string src_url = "file://" + src_path;
 
-  DownloadManager second_mgr;
-  second_mgr.Init(8,
+  DownloadManager second_mgr(8,
     perf::StatisticsTemplate("second", &statistics));
 
   cvmfs::FileSink filesink(fdest);

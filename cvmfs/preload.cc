@@ -29,9 +29,7 @@ const int kDefaultPreloaderTimeout = 10;
 const int kDefaultPreloaderRetries = 2;
 
 namespace swissknife {
-download::DownloadManager *g_download_manager;
-signature::SignatureManager *g_signature_manager;
-perf::Statistics *g_statistics;
+
 void Usage() {
     LogCvmfs(kLogCvmfs, kLogStderr, "Version: %s\n\n"
     "Usage:\n"
@@ -195,10 +193,6 @@ int main(int argc, char *argv[]) {
   }
 
   // now launch swissknife_pull
-  swissknife::g_download_manager = new download::DownloadManager();
-  swissknife::g_signature_manager = new signature::SignatureManager();
-  swissknife::g_statistics = new perf::Statistics();
-
   // load the command
   if (HasDirtabChanged(dirtab, dirtab_in_cache)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: new dirtab, forced run");

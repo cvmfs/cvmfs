@@ -78,9 +78,8 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
     if (rvi != 0)
       throw EPublish("cannot set X509_CERT_BUNDLE environment variable");
   }
-  download_mgr_ = new download::DownloadManager();
-  download_mgr_->Init(16,
-                      perf::StatisticsTemplate("download", statistics_));
+  download_mgr_ = new download::DownloadManager(16,
+                             perf::StatisticsTemplate("download", statistics_));
   download_mgr_->UseSystemCertificatePath();
 
   if (settings.proxy() != "") {
