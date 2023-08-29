@@ -36,7 +36,7 @@ func TestGenerateFixture1(t *testing.T) {
 
 	wishesIdentifiers := []WishIdentifier{
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -45,7 +45,7 @@ func TestGenerateFixture1(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source2",
+			Wishlist:              "source2",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -54,7 +54,7 @@ func TestGenerateFixture1(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "*",
 			InputTagWildcard:      true,

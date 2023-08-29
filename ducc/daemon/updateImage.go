@@ -40,7 +40,6 @@ func UpdateImageTask(tx *sql.Tx, image db.Image) (db.TaskPtr, error) {
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
-	fmt.Printf("http://localhost:8080/html/jobs/%s\n", task.ID.String())
 
 	// Find what wishes reference this image
 	wishes, err := db.GetWishesByImageID(tx, image.ID)

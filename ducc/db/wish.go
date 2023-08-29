@@ -24,7 +24,7 @@ const wishIdentifierSqlFieldsQs string = "?,?,?,?,?,?,?,?,?"
 type WishID = uuid.UUID
 
 type WishIdentifier struct {
-	Source                string
+	Wishlist              string
 	CvmfsRepository       string
 	InputTag              string
 	InputTagWildcard      bool
@@ -128,7 +128,7 @@ func CreateWishesByIdentifiers(tx *sql.Tx, identifiers []WishIdentifier) ([]Wish
 		input_tag := sql.NullString{String: identifier.InputTag, Valid: identifier.InputTag != ""}
 		input_digest := sql.NullString{String: identifier.InputDigest.String(), Valid: identifier.InputDigest != digest.Digest("")}
 
-		row := prepStmnt.QueryRow(wishId, identifier.Source, identifier.CvmfsRepository, input_tag, identifier.InputTagWildcard, input_digest, identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
+		row := prepStmnt.QueryRow(wishId, identifier.Wishlist, identifier.CvmfsRepository, input_tag, identifier.InputTagWildcard, input_digest, identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
 		w, err := parseWishFromRow(row)
 		if err != nil {
 			return nil, err
@@ -146,7 +146,7 @@ func CreateWishesByIdentifiers(tx *sql.Tx, identifiers []WishIdentifier) ([]Wish
 	return createdWishes, nil
 }
 
-func CreateWishes(tx *sql.Tx, wishes []Wish) ([]Wish, error) {
+func CreateWishes(tx *sql.Tx, wishes []Wish, updateExisting bool) ([]Wish, error) {
 	ownTx := false
 	if tx == nil {
 		ownTx = true
@@ -158,7 +158,12 @@ func CreateWishes(tx *sql.Tx, wishes []Wish) ([]Wish, error) {
 		defer tx.Rollback()
 	}
 
-	stmnt := "INSERT INTO wishes (" + wishSqlFields + ") VALUES (" + wishSqlFieldsQs + ") RETURNING " + wishSqlFields
+	updateExistingStmnt := ""
+	if updateExisting {
+		updateExistingStmnt = "OR REPLACE "
+	}
+
+	stmnt := "INSERT " + updateExistingStmnt + "INTO wishes (" + wishSqlFields + ") VALUES (" + wishSqlFieldsQs + ") RETURNING " + wishSqlFields
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
@@ -188,7 +193,7 @@ func CreateWishes(tx *sql.Tx, wishes []Wish) ([]Wish, error) {
 		updateInterval := sql.NullInt64{Int64: int64(wish.ScheduleOptions.UpdateInterval.Value.Seconds()), Valid: !wish.ScheduleOptions.UpdateInterval.IsDefault}
 		webhookEnabled := sql.NullBool{Bool: wish.ScheduleOptions.WebhookEnabled.Value, Valid: !wish.ScheduleOptions.WebhookEnabled.IsDefault}
 
-		row := prepStmnt.QueryRow(wishID, wish.Identifier.Source, wish.Identifier.CvmfsRepository, inputTag, wish.Identifier.InputTagWildcard, inputDigest, wish.Identifier.InputRepository, wish.Identifier.InputRegistryScheme, wish.Identifier.InputRegistryHostname, createLayers, createFlat, createPodman, createThin, updateInterval, webhookEnabled)
+		row := prepStmnt.QueryRow(wishID, wish.Identifier.Wishlist, wish.Identifier.CvmfsRepository, inputTag, wish.Identifier.InputTagWildcard, inputDigest, wish.Identifier.InputRepository, wish.Identifier.InputRegistryScheme, wish.Identifier.InputRegistryHostname, createLayers, createFlat, createPodman, createThin, updateInterval, webhookEnabled)
 		w, err := parseWishFromRow(row)
 		if err != nil {
 			return nil, err
@@ -343,9 +348,9 @@ func GetWishesByValue(tx *sql.Tx, identifiers []WishIdentifier) ([]*Wish, error)
 
 		var row *sql.Row
 		if identifier.InputDigest != "" {
-			row = prepStmntDigest.QueryRow(identifier.Source, identifier.CvmfsRepository, identifier.InputTagWildcard, identifier.InputDigest.String(), identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
+			row = prepStmntDigest.QueryRow(identifier.Wishlist, identifier.CvmfsRepository, identifier.InputTagWildcard, identifier.InputDigest.String(), identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
 		} else {
-			row = prepStmntTag.QueryRow(identifier.Source, identifier.CvmfsRepository, identifier.InputTag, identifier.InputTagWildcard, identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
+			row = prepStmntTag.QueryRow(identifier.Wishlist, identifier.CvmfsRepository, identifier.InputTag, identifier.InputTagWildcard, identifier.InputRepository, identifier.InputRegistryScheme, identifier.InputRegistryHostname)
 		}
 
 		wish, err := parseWishFromRow(row)
@@ -393,7 +398,7 @@ func GetWishesBySource(tx *sql.Tx, source string) ([]Wish, error) {
 	return wishes, nil
 }
 
-// DeleteWishesBySource deletes all wishes from the database with the given source.
+// DeleteWishedByID deletes a wished from the database by its ID.
 // Unless all wishes are deleted, an error is returned.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
 func DeleteWishesByIDs(tx *sql.Tx, ids []WishID) error {
@@ -441,7 +446,7 @@ func DeleteWishesByIDs(tx *sql.Tx, ids []WishID) error {
 	return nil
 }
 
-func GetWishesByIDPrefix(tx *sql.Tx, idPrefix string) ([]Wish, error) {
+func GetWishesByIDPrefixes(tx *sql.Tx, idPrefixes []string) ([][]Wish, error) {
 	ownTx := false
 	if tx == nil {
 		ownTx = true
@@ -453,16 +458,18 @@ func GetWishesByIDPrefix(tx *sql.Tx, idPrefix string) ([]Wish, error) {
 		defer tx.Rollback()
 	}
 
+	out := make([][]Wish, 0, len(idPrefixes))
 	const stmnt string = "SELECT " + wishSqlFields + " from wishes WHERE id LIKE ? ORDER BY id ASC"
-	rows, err := tx.Query(stmnt, idPrefix+"%")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out, err := parseWishesFromRows(rows)
-	if err != nil {
-		return nil, err
+	for i, idPrefix := range idPrefixes {
+		rows, err := tx.Query(stmnt, idPrefix+"%")
+		if err != nil {
+			return nil, err
+		}
+		out[i], err = parseWishesFromRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
 	}
 
 	if ownTx {
@@ -475,6 +482,66 @@ func GetWishesByIDPrefix(tx *sql.Tx, idPrefix string) ([]Wish, error) {
 	return out, nil
 }
 
+// FilterNewWishes returns a slice of identifiers that are not already in the database
+func FilterNewWishes(tx *sql.Tx, identifiers []WishIdentifier) (new []WishIdentifier, existing []Wish, err error) {
+	existing = make([]Wish, 0)
+
+	dbWishes, err := GetWishesByValue(tx, identifiers)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, wishPtr := range dbWishes {
+		if wishPtr != nil {
+			existing = append(existing, *wishPtr)
+		}
+	}
+
+	// We create a map of existing wishes for fast lookup
+	existingWishesMap := make(map[WishIdentifier]struct{}, len(existing))
+	for _, wish := range existing {
+		existingWishesMap[wish.Identifier] = struct{}{}
+	}
+
+	numNewWishes := len(identifiers) - len(existingWishesMap)
+	new = make([]WishIdentifier, 0, numNewWishes)
+	for _, identifier := range identifiers {
+		_, exists := existingWishesMap[identifier]
+		if !exists {
+			new = append(new, identifier)
+		}
+	}
+	return new, existing, nil
+}
+
+// getDeletedWishes returns a slice Wishes that have the same source as the recipe, but are not in the recipe
+// This is used to delete wishes that are not in the recipe anymore
+func GetDeletedWishIDs(tx *sql.Tx, source string, identifiers []WishIdentifier) ([]Wish, error) {
+
+	wishesInDB, err := GetWishesBySource(tx, source)
+	if err != nil {
+		return nil, err
+	}
+	numDeletedWishes := len(wishesInDB) - len(identifiers)
+	if numDeletedWishes == 0 {
+		return []Wish{}, nil
+	}
+
+	// We create a map of wishes in the recipe for fast lookup
+	identifiersMap := make(map[WishIdentifier]struct{}, len(identifiers))
+	for _, identifier := range identifiers {
+		identifiersMap[identifier] = struct{}{}
+	}
+
+	out := make([]Wish, 0, numDeletedWishes)
+	for _, wish := range wishesInDB {
+		_, exists := identifiersMap[wish.Identifier]
+		if !exists {
+			out = append(out, wish)
+		}
+	}
+	return out, nil
+}
+
 // parseWishesFromRows takes in a sql.Rows and Scans it into a wish.
 // If any options contain NULL, the default values will be used.
 // The row must contain the exact fields in the wishSqlFieldsOrdered constant, in the same order.
@@ -483,7 +550,7 @@ func parseWishFromRow(row scannableRow) (Wish, error) {
 	var input_tag, input_digest sql.NullString
 	var create_layers, create_flat, create_podman, create_thin, webhook_enabled sql.NullBool
 	var update_interval_sec sql.NullInt64
-	err := row.Scan(&w.ID, &w.Identifier.Source, &w.Identifier.CvmfsRepository, &input_tag, &w.Identifier.InputTagWildcard, &input_digest, &w.Identifier.InputRepository, &w.Identifier.InputRegistryScheme, &w.Identifier.InputRegistryHostname, &create_layers, &create_flat, &create_podman, &create_thin, &update_interval_sec, &webhook_enabled)
+	err := row.Scan(&w.ID, &w.Identifier.Wishlist, &w.Identifier.CvmfsRepository, &input_tag, &w.Identifier.InputTagWildcard, &input_digest, &w.Identifier.InputRepository, &w.Identifier.InputRegistryScheme, &w.Identifier.InputRegistryHostname, &create_layers, &create_flat, &create_podman, &create_thin, &update_interval_sec, &webhook_enabled)
 	if err != nil {
 		return Wish{}, err
 	}

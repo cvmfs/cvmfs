@@ -117,7 +117,6 @@ func Run(ctx context.Context, done chan<- any) {
 			}
 
 			for i, operation := range toCombine {
-				fmt.Printf("Type of operation: %T, %s\n", operation, reflect.TypeOf(operation))
 				switch operation := reflect.ValueOf(operation).Elem().Interface().(type) {
 				case *TriggeredUpdateImageOperation:
 					// If this is a triggered operation, we already have a trigger
@@ -190,6 +189,16 @@ func Run(ctx context.Context, done chan<- any) {
 			if err != nil {
 				panic(fmt.Errorf("error creating task in DB: %s", err))
 			}
+		case DELETE_WISH_ACTION:
+			// There is only one operation for this action, so we take the first one
+			operation := reflect.ValueOf(toCombine[0]).Elem().Interface().(*TriggeredDeleteWishOperation)
+			// Delete the wish
+			taskPtr, err = DeleteWishTask(tx, operation.WishID)
+			if err != nil {
+				panic(fmt.Errorf("error creating task in DB: %s", err))
+			}
+			// Remove the object from the operations map, no need to trigger it again
+			operations.RemoveObject(operation.WishID.String())
 		default:
 			panic(fmt.Errorf("unknown action: %s", actionID))
 		}
@@ -280,6 +289,13 @@ func restoreUnfinishedTriggers(tx *sql.Tx) error {
 				forceUpdateImages: true, // TODO: Restore forceUpdateImages state. For now, we always force update
 			}
 			operations.Schedule(&op, wish.ID.String(), UPDATE_WISH_ACTION, trigger.Timestamp)
+		case DELETE_WISH_ACTION:
+			wishID := uuid.MustParse(trigger.ObjectID.String())
+			op := TriggeredDeleteWishOperation{
+				WishID:  wishID,
+				Trigger: trigger,
+			}
+			operations.Schedule(&op, wishID.String(), DELETE_WISH_ACTION, trigger.Timestamp)
 		default:
 			return fmt.Errorf("unknown trigger action: %s", trigger.Action)
 		}

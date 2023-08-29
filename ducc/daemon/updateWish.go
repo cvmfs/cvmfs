@@ -38,7 +38,6 @@ func UpdateWishTask(tx *sql.Tx, wish db.Wish, forceUpdateImages bool) (db.TaskPt
 	if err != nil {
 		return db.NullTaskPtr(), err
 	}
-	fmt.Printf("http://localhost:8080/html/jobs/%s\n", task.ID)
 
 	if ownTx {
 		if err := tx.Commit(); err != nil {
@@ -93,7 +92,6 @@ func UpdateWishTask(tx *sql.Tx, wish db.Wish, forceUpdateImages bool) (db.TaskPt
 }
 
 func TriggerUpdateWish(tx *sql.Tx, wish db.Wish, forceUpdateImages bool, reason string, details string) (db.Trigger, error) {
-
 	trigger := db.Trigger{
 		Action:   UPDATE_WISH_ACTION,
 		ObjectID: wish.ID,
@@ -103,7 +101,7 @@ func TriggerUpdateWish(tx *sql.Tx, wish db.Wish, forceUpdateImages bool, reason 
 		Details:   details,
 	}
 
-	trigger, err := db.CreateTrigger(nil, trigger)
+	trigger, err := db.CreateTrigger(tx, trigger)
 	if err != nil {
 		return db.Trigger{}, err
 	}
@@ -116,17 +114,6 @@ func TriggerUpdateWish(tx *sql.Tx, wish db.Wish, forceUpdateImages bool, reason 
 }
 
 func scheduleUpdateWish(tx *sql.Tx, wish db.Wish) error {
-	ownTx := false
-	if tx == nil {
-		var err error
-		tx, err = db.GetTransaction()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-		ownTx = true
-	}
-
 	// Find out when the last task was done
 	tasks, err := db.GetTasksForObjectID(tx, wish.ID, []string{UPDATE_WISH_ACTION}, []db.TaskStatus{db.TASK_STATUS_DONE}, 1)
 	if err != nil {
@@ -154,12 +141,5 @@ func scheduleUpdateWish(tx *sql.Tx, wish db.Wish) error {
 	scheduledExpand := ScheduledUpdateWishOperation{wish: wish}
 	operations.Schedule(&scheduledExpand, wish.ID.String(), UPDATE_WISH_ACTION, nextCheckTime)
 
-	if ownTx {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-	}
-
 	return nil
-
 }

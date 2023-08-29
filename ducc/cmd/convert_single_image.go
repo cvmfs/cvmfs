@@ -12,6 +12,7 @@ import (
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/cvmfs"
+	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/errorcodes"
 	l "github.com/cvmfs/ducc/log"
@@ -36,9 +37,10 @@ func init() {
 }
 
 var convertSingleImageCmd = &cobra.Command{
-	Use:   "convert-single-image [image to convert] [cvmfs repository]",
-	Short: "Convert a single image",
-	Args:  cobra.ExactArgs(2),
+	Use:        "convert-single-image [image to convert] [cvmfs repository]",
+	Short:      "Convert a single image",
+	Args:       cobra.ExactArgs(2),
+	Deprecated: "please use 'wish add --standalone' instead. ",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
@@ -92,13 +94,13 @@ var convertSingleImageCmd = &cobra.Command{
 			os.Exit(errorcodes.RepoNotExistsError)
 		}
 
-		parsedUrl, err := db.ParseImageURL(inputImage)
+		parsedUrl, err := daemon.ParseImageURL(inputImage)
 		if err != nil {
 			fmt.Printf("\"%s\" is not a valid image identifier\n", inputImage)
 		}
 		wish := db.Wish{
 			Identifier: db.WishIdentifier{
-				Source:                "cli",
+				Wishlist:              "cli",
 				CvmfsRepository:       cvmfsRepo,
 				InputTag:              parsedUrl.Tag,
 				InputTagWildcard:      parsedUrl.TagWildcard,
