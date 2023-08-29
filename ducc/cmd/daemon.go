@@ -50,7 +50,7 @@ var daemonCmd = &cobra.Command{
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		defer cancelFunc()
-		registry.InitRegistries(ctx, nil, nil)
+		registry.InitRegistriesFromEnv(ctx)
 
 		if err := os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
 			fmt.Printf("Error creating directory for database: %s\n", err)
