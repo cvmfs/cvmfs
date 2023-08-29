@@ -235,14 +235,19 @@ func scheduleUpdateImage(tx *sql.Tx, image db.Image) error {
 	}
 
 	var lastUpdate *db.SmallTaskSnapshot
+	var nextUpdateTime time.Time
 	if len(tasks) > 0 {
 		lastUpdate = &tasks[0]
 	}
-
-	// Calculate the next update time
-	nextUpdateTime := lastUpdate.DoneTimestamp.Add(time.Duration(shortestIntervalWish.ScheduleOptions.UpdateInterval.Value) * time.Second)
-	if nextUpdateTime.Before(time.Now()) {
+	if lastUpdate == nil {
 		nextUpdateTime = time.Now()
+	} else {
+
+		// Calculate the next update time
+		nextUpdateTime = lastUpdate.DoneTimestamp.Add(time.Duration(shortestIntervalWish.ScheduleOptions.UpdateInterval.Value) * time.Second)
+		if nextUpdateTime.Before(time.Now()) {
+			nextUpdateTime = time.Now()
+		}
 	}
 
 	// Create and schedule the update
