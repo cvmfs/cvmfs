@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/sys/unix"
 
@@ -405,7 +406,7 @@ func LayerMetadataPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerPath(CVMFSRepo, layerDigest), ".metadata")
 }
 
-//from /cvmfs/$REPO/foo/bar -> foo/bar
+// from /cvmfs/$REPO/foo/bar -> foo/bar
 func TrimCVMFSRepoPrefix(path string) string {
 	return strings.Join(strings.Split(path, string(os.PathSeparator))[3:], string(os.PathSeparator))
 }
@@ -482,7 +483,7 @@ func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
 	return nil
 }
 
-//writes data to file and publish in cvmfs repo path
+// writes data to file and publish in cvmfs repo path
 func WriteDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 	tmpFile, err := temp.UserDefinedTempFile()
 	if err != nil {
@@ -520,8 +521,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 	dir := filepath.Dir(newChainPath)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		// if the directory does not exists, we create it
-
-		if err := WithinTransaction(CVMFSRepo, func() error {
+		if success, err := WithinTransactionNew(CVMFSRepo, func() error {
 			os.MkdirAll(dir, constants.DirPermision)
 			filePath := filepath.Join(dir, ".cvmfscatalog")
 			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, constants.FilePermision)
@@ -534,6 +534,8 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			return nil
 		}); err != nil {
 			return err
+		} else if !success {
+			return fmt.Errorf("error in creating the directory for the new chain")
 		}
 	}
 	// then we need the template transaction to populate it
@@ -543,7 +545,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			source:      TrimCVMFSRepoPrefix(ChainPath(CVMFSRepo, previousChainId)),
 			destination: TrimCVMFSRepoPrefix(newChainPath),
 		}
-		if err := WithinTransaction(CVMFSRepo, func() error {
+		if success, err := WithinTransactionNew(CVMFSRepo, func() error {
 			source := ChainPath(CVMFSRepo, previousChainId)
 			sourceDirs, err := ioutil.ReadDir(source)
 			if err != nil {
@@ -568,10 +570,21 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			return nil
 		}, opt); err != nil {
 			return err
+		} else if !success {
+			return fmt.Errorf("error in creating the template transaction for the new chain")
 		}
 	}
 	// finally we need the sneaky transaction to create the chain
-	if err := ExecuteAndOpenTransaction(CVMFSRepo, func() error {
+	closeSneakyTransactionOnce := sync.Once{}
+	success, _, stdErr, err := OpenTransactionNew(CVMFSRepo)
+	if err != nil {
+		return fmt.Errorf("error in opening the sneaky transaction for the new chain: %s", err)
+	} else if !success {
+		return fmt.Errorf("error in opening the sneaky transaction for the new chain: %s", stdErr)
+	}
+	defer func() { closeSneakyTransactionOnce.Do(func() { AbortTransactionNew(CVMFSRepo) }) }()
+
+	if func() error {
 	loop:
 		for {
 			header, err := layer.Next()
@@ -706,13 +719,14 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				return err
 			}
 		}
-	}); err != nil {
+	}(); err != nil {
+		closeSneakyTransactionOnce.Do(func() { AbortTransactionNew(CVMFSRepo) })
 		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
 		// the creation of the chain is not complete, we delete the template created as well
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
+		IngestDeleteNew(CVMFSRepo, TrimCVMFSRepoPrefix(newChainPath))
 		// we catch a problem in the creation of the chain, and the chain was destructed
 		// we don't need anymore the dirty flag
-		IngestDelete(CVMFSRepo, TrimCVMFSRepoPrefix(dirtyChainPath))
+		IngestDeleteNew(CVMFSRepo, TrimCVMFSRepoPrefix(dirtyChainPath))
 		return err
 	}
 	// everything went well, this flag is not necessary anymore
@@ -720,7 +734,19 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 
 	// now the transaction is open and the sneaky overlay is populated
 	// we don't need to do anything else at this point and we can close the transaction
-	return Publish(CVMFSRepo)
+
+	{
+		// Publish the transaction.
+		closeSneakyTransactionOnce.Do(func() {}) // Prevent the transaction from being aborted later
+		success, _, stdErr, err := PublishTransactionNew(CVMFSRepo)
+		if err != nil {
+			return fmt.Errorf("error in publishing the sneaky transaction for the new chain: %s", err)
+		}
+		if !success {
+			return fmt.Errorf("error in publishing the sneaky transaction for the new chain: %s", stdErr)
+		}
+	}
+	return nil
 }
 
 func isWhiteout(path string) bool {

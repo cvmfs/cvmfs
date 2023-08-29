@@ -10,9 +10,6 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// TODO: Proper locking system for cvmfs. Need to look at existing code.
-var cvmfsLock sync.RWMutex
-
 // TODO: Proper locking system for downloads.
 var downloadsMutex = sync.Mutex{}
 var pendingDownloads = make(map[digest.Digest]db.TaskPtr)

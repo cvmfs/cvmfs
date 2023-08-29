@@ -245,14 +245,11 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 				return
 			}
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Public symlink not up to date, creating new")
-			cvmfsLock.Lock()
 			err := cvmfs.CreateSymlinkIntoCVMFS(cvmfsRepo, publicSymlinkPathShort, privatePathShort)
 			if err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
-				cvmfsLock.Unlock()
 				return
 			}
-			cvmfsLock.Unlock()
 			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Successfully created new public flat symlink, %s -> %s", publicSymlinkPathShort, privatePathShort))
 			fetchConfigTask.Skip(nil)
 			task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
@@ -280,7 +277,6 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 
 		lastChainDirectory := cvmfs.ChainPath(cvmfsRepo, chain[len(chain)-1].ChainDigest.Encoded())
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Acquiring CVMFS lock")
-		cvmfsLock.Lock()
 
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Creating .chains and .flat directories")
 		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, ".chains"); err != nil {
@@ -322,7 +318,6 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			cvmfs.NewTemplateTransaction(cvmfs.TrimCVMFSRepoPrefix(lastChainDirectory), privatePathShort))
 		if err != nil {
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
-			cvmfsLock.Unlock()
 			return
 		}
 
@@ -332,12 +327,10 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
-			cvmfsLock.Unlock()
 			return
 		}
 
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
-		cvmfsLock.Unlock()
 
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task completed")
@@ -471,15 +464,8 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 	}
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
 		task.WaitForStart()
 		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for lock on cvmfs repo")
-		cvmfsLock.Lock()
-		defer cvmfsLock.Unlock()
-
-		task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Ingesting chain link %s into CVMFS", link.ChainDigest.String()))
 
 		blobPath := path.Join(config.TMP_FILE_PATH, "blobs", link.LayerDigest.Encoded())
 		fileReader, err := os.Open(blobPath)
@@ -512,6 +498,12 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			// Want to avoid .Encoded() panicing if link.PreviousChainDigest is empty
 			previousChainID = link.PreviousChainDigest.Encoded()
 		}
+
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for CVMFS lock")
+		cvmfs.GetLock(cvmfsRepo)
+		defer cvmfs.Unlock(cvmfsRepo)
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Got CVMFS lock")
+
 		err = cvmfs.CreateSneakyChain(cvmfsRepo, link.ChainDigest.Encoded(), previousChainID, tarReader)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest chain link: %s", err))

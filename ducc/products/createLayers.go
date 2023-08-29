@@ -2,16 +2,16 @@ package products
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"sync"
+	"time"
 
 	"github.com/cvmfs/ducc/config"
-	"github.com/cvmfs/ducc/constants"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/lib"
@@ -46,7 +46,7 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		return ptr, nil
 	}
 
-	writeImageMetadataTask, err := writeImageMetadata(image, manifest, cvmfsRepo)
+	/*writeImageMetadataTask, err := writeImageMetadata(image, manifest, cvmfsRepo)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_WRITE_IMAGE_METADATA, err.Error()))
 		return ptr, nil
@@ -54,7 +54,7 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 	if err := task.LinkSubtask(nil, writeImageMetadataTask); err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to add \"%s\" as subtask: %s", db.TASK_WRITE_IMAGE_METADATA, err.Error()))
 		return ptr, nil
-	}
+	}*/
 
 	go func() {
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for task to start")
@@ -67,19 +67,19 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		ingestLayersResult := ingestLayersTask.WaitUntilDone()
 		if !db.TaskResultSuccessful(ingestLayersResult) {
 			task.LogFatal(nil, "Failed to ingest layers")
-			writeImageMetadataTask.Cancel(nil)
+			//writeImageMetadataTask.Cancel(nil)
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully ingested layers")
 
 		// Start writing the image metadata
-		writeImageMetadataTask.Start(nil)
+		//writeImageMetadataTask.Start(nil)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task for writing image metadata. Waiting for it to finish")
-		writeImageMetadataResult := writeImageMetadataTask.WaitUntilDone()
+		/*writeImageMetadataResult := writeImageMetadataTask.WaitUntilDone()
 		if !db.TaskResultSuccessful(writeImageMetadataResult) {
 			task.LogFatal(nil, "Failed to write image metadata")
 			return
-		}
+		}*/
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully wrote image metadata")
 
 		// Mark the task as completed
@@ -274,44 +274,83 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 		// We get the digest and size of the uncompressed layer
 		readHashCloseSizer := lib.NewReadAndHash(uncompressedReader)
 
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for lock on cvmfs repo")
-		cvmfsLock.Lock()
-		defer cvmfsLock.Unlock()
-
 		// BEGIN CVMFS METATRANSACTION
 		// TODO: This should be done in a transaction, as failing in the middle would
 		// leave the repository in an inconsistent state.
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for lock on cvmfs repo")
+		cvmfs.GetLock(cvmfsRepo)
+		defer cvmfs.Unlock(cvmfsRepo)
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Acquired lock on cvmfs repo")
 
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction for creating catalogs")
-		layerPath := cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerPath(cvmfsRepo, layerDigest.Encoded()))
-		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, layerPath); err != nil {
-			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
+		success, stdOut, stdErr, err := cvmfs.OpenTransactionNew(cvmfsRepo)
+		if err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to open cvmfs transaction: %s", err.Error()))
+			return
+		} else if !success {
+			task.LogFatal(nil, fmt.Sprintf("Failed to open cvmfs transaction: %s", stdErr))
+			return
+		} else {
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Opened cvmfs transaction for creating catalog: %s", stdOut))
+		}
+		_, err = cvmfs.CreateCatalogNew(cvmfs.LayerPath(cvmfsRepo, layerDigest.Encoded()))
+		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create catalog for layer %s: %s", layerDigest.String(), err.Error()))
+			err := cvmfs.AbortTransactionNew(cvmfsRepo)
+			if err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to abort cvmfs transaction: %s", err.Error()))
+			}
 			return
 		}
+		{
+			success, stdOut, stdErr, err := cvmfs.PublishTransactionNew(cvmfsRepo)
+			if err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to publish cvmfs transaction: %s", err.Error()))
+				return
+			} else if !success {
+				task.LogFatal(nil, fmt.Sprintf("Failed to publish cvmfs transaction: %s", stdErr))
+				return
+			} else {
+				task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Published cvmfs transaction: %s", stdOut))
+			}
+		}
+
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Created catalog for layer %s", layerDigest.String()))
 
 		// Ingest the layer FS
+		layerPath := cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerPath(cvmfsRepo, layerDigest.Encoded()))
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS for ingesting layer")
 		ingestPath := cvmfs.TrimCVMFSRepoPrefix(cvmfs.LayerRootfsPath(cvmfsRepo, layerDigest.Encoded()))
-		if err := cvmfs.Ingest(cvmfsRepo, readHashCloseSizer, "--catalog", "-t", "-", "-b", ingestPath); err != nil {
-			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
+		if err := cvmfs.IngestNew(cvmfsRepo, readHashCloseSizer, "--catalog", "-t", "-", "-b", ingestPath); err != nil {
+			cvmfs.RemoveDirectoryNew(cvmfsRepo, layerPath)
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest layer %s: %s", layerDigest.String(), err.Error()))
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully ingested layer %s", layerDigest.String()))
 
+		success, stdOut, stdErr, err = cvmfs.OpenTransactionNew(cvmfsRepo)
+		if err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to open cvmfs transaction: %s", err.Error()))
+			return
+		} else if !success {
+			task.LogFatal(nil, fmt.Sprintf("Failed to open cvmfs transaction: %s", stdErr))
+			return
+		} else {
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Opened cvmfs transaction for writing metadata: %s", stdOut))
+		}
+
 		// Write the layer metadata
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction for writing metadata")
-		if err := lib.StoreLayerInfo(cvmfsRepo, layerDigest.Encoded(), readHashCloseSizer); err != nil {
-			cvmfs.RemoveDirectory(cvmfsRepo, layerPath)
+		if err := StoreLayerInfoNew(cvmfsRepo, layerDigest.Encoded(), readHashCloseSizer); err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to store layer metadata for layer %s: %s", layerDigest.String(), err.Error()))
+			err := cvmfs.AbortTransactionNew(cvmfsRepo)
+			if err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to abort cvmfs transaction: %s", err.Error()))
+			}
+			cvmfs.RemoveDirectoryNew(cvmfsRepo, layerPath)
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully stored layer metadata for layer %s", layerDigest.String()))
 		// END CVMFS METATRANSACTION
-
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Released blob %s", layerDigest.String()))
 
 		// Mark the task as completed
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
@@ -333,7 +372,7 @@ func layerExistsInCvmfs(layerDigest digest.Digest, cvmfsRepo string) (bool, erro
 	return false, err
 }
 
-func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+/*func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	titleStr := fmt.Sprintf("Write image metadata for %s to %s", image.GetSimpleName(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_WRITE_IMAGE_METADATA, titleStr)
 	if err != nil {
@@ -375,9 +414,6 @@ func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDi
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully downloaded image config")
 
-		cvmfsLock.Lock()
-		defer cvmfsLock.Unlock()
-
 		abort := false
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting CVMFS transaction")
 		if err := cvmfs.WithinTransaction(cvmfsRepo, func() error {
@@ -415,4 +451,38 @@ func writeImageMetadata(image db.Image, manifest registry.ManifestWithBytesAndDi
 	}()
 
 	return ptr, nil
+}*/
+
+func StoreLayerInfoNew(CVMFSRepo string, layerDigest string, r lib.ReadHashCloseSizer) (err error) {
+	layersdata := []lib.LayerInfo{}
+	layerInfoPath := filepath.Join(cvmfs.LayerMetadataPath(CVMFSRepo, layerDigest), "layers.json")
+
+	diffID := fmt.Sprintf("%x", r.Sum(nil))
+	size := r.GetSize()
+	created := time.Now()
+	layerinfo := lib.LayerInfo{
+		ID:                   diffID,
+		Created:              created,
+		CompressedDiffDigest: "sha256:" + layerDigest,
+		UncompressedDigest:   "sha256:" + diffID,
+		UncompressedSize:     size,
+	}
+	layersdata = append(layersdata, layerinfo)
+
+	jsonLayerInfo, err := json.MarshalIndent(layersdata, "", " ")
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(layerInfoPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(jsonLayerInfo)
+	if err != nil {
+		return err
+	}
+	return
 }

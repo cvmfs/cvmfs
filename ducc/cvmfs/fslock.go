@@ -3,6 +3,7 @@ package cvmfs
 import (
 	"os"
 
+	"github.com/cvmfs/ducc/constants"
 	l "github.com/cvmfs/ducc/log"
 	"github.com/rubyist/lockfile"
 )
@@ -40,6 +41,10 @@ func (d dummyFSLock) Unlock() {
 }
 
 func newFSLock(path string) fSLock {
+	if err := os.MkdirAll(lockDirectory, constants.DirPermision); err != nil {
+		l.LogE(err).Warning("Impossible to create FS level lock, DO NOT run multiple process")
+		return dummyFSLock{path: path, realLock: nil}
+	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		l.LogE(err).Warning("Impossible to create FS level lock, DO NOT run multiple process")
