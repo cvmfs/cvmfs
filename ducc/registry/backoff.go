@@ -10,14 +10,12 @@ import (
 	"time"
 )
 
-// BackoffTurnstile is a turnstile that can be put in a backoff state.
-// Enter will block until both the turnstile is free, and any backoff is over.
-// Exit frees the turnstile.
+// BackoffGuard is used to prevent new requests from being made for a certain amount of time.
+// Enter will block until any backoff is over.
 // A backoff can be set by calling SetBackoff.
 // A backoff can be reset by calling ResetExponentialBackoff.
-// Use NewBackoffTurnstile to create a new BackoffTurnstile.
-// Do not modify the fields of a BackoffTurnstile struct directly.
-type BackoffTurnstile struct {
+// Use NewBackoff to create a new BackoffGuard, do not modify the fields of a BackoffGuard struct directly.
+type BackoffGuard struct {
 	ctx context.Context
 
 	backoffUntil time.Time
@@ -29,25 +27,22 @@ type BackoffTurnstile struct {
 	maxExponentialBackoff time.Duration
 
 	enter      chan struct{}
-	exit       chan struct{}
 	newBackoff chan *http.Response
 }
 
-// NewBackoffTurnstile creates a new BackoffTurnstile.
+// NewBackoffGuard creates a new BackoffGuard
 // exponentialBase is the base of the exponential backoff.
 // initialBackoff is the initial backoff time for exponential backoff.
 // maxBackoff is the maximum backoff time.
-// The turnstile is initially free.
-// The turnstile goroutine is started in the background. It is stopped when the context is cancelled.
+// Goroutine is started in the background. It is stopped when the context is cancelled.
 // After the context is cancelled, all operations on the turnstile will be no-ops and return immediately.
-func NewBackoffTurnstile(ctx context.Context, exponentialBase float64, initialBackoff, maxBackoff time.Duration) *BackoffTurnstile {
-	backoff := BackoffTurnstile{
+func NewBackoffGuard(ctx context.Context, exponentialBase float64, initialBackoff, maxBackoff time.Duration) *BackoffGuard {
+	backoff := BackoffGuard{
 		ctx: ctx,
 
 		backoffTimer: time.NewTimer(0),
 
 		enter:      make(chan struct{}),
-		exit:       make(chan struct{}),
 		newBackoff: make(chan *http.Response),
 
 		expoBase:              exponentialBase,
@@ -69,18 +64,16 @@ func NewBackoffTurnstile(ctx context.Context, exponentialBase float64, initialBa
 // If the backoff is already set to a later time, it is not changed.
 // If the backoff is further in the future than the max backoff time, it is set to the max backoff time.
 // If the BackoffTurnstile context is cancelled, this function returns immediately.
-func (b *BackoffTurnstile) SetBackoff(res *http.Response) {
+func (b *BackoffGuard) SetBackoff(res *http.Response) {
 	select {
 	case b.newBackoff <- res:
 	case <-b.ctx.Done():
 	}
 }
 
-// Enter blocks until the turnstile is free.
 // If the turnstile is in a backoff, Enter blocks until the backoff is over.
-// After Enter returns, the turnstile is occupied. No other goroutine can enter until Exit is called.
 // If the BackoffTurnstile context is cancelled, this function returns immediately.
-func (b *BackoffTurnstile) Enter() {
+func (b *BackoffGuard) Enter() {
 	select {
 	case b.enter <- struct{}{}:
 	case <-b.ctx.Done():
@@ -88,24 +81,14 @@ func (b *BackoffTurnstile) Enter() {
 
 }
 
-// Exit frees the turnstile.
-// Only call this function after Enter has been called.
-// If the BackoffTurnstile context is cancelled, this function returns immediately.
-func (b *BackoffTurnstile) Exit() {
-	select {
-	case b.exit <- struct{}{}:
-	case <-b.ctx.Done():
-	}
-}
-
 // ResetExponentialBackoff resets the exponential backoff counter.
 // This function should be called upon a successful request to prevent a long backoff next time.
-func (b *BackoffTurnstile) ResetExponentialBackoff() {
+func (b *BackoffGuard) ResetExponentialBackoff() {
 	atomic.StoreUint64(&b.numExpoBackoffs, 0)
 }
 
 // work is the main loop of the turnstile goroutine.
-func (b *BackoffTurnstile) work() {
+func (b *BackoffGuard) work() {
 workLoop:
 	for {
 	enterLoop:
@@ -117,26 +100,11 @@ workLoop:
 			case <-b.enter:
 				break enterLoop
 			case req := <-b.newBackoff:
-				// We got a new backoff, wait for it to finish
 				b.setBackoffInternal(req)
 				continue enterLoop
 			case <-b.ctx.Done():
 				break workLoop
 			}
-		}
-	exitLoop:
-		// Someone entered the turnstile, now we wait for them to exit
-		for {
-			select {
-			case <-b.exit:
-				// Someone exited the turnstile, it is now free
-				break exitLoop
-			case req := <-b.newBackoff:
-				b.setBackoffInternal(req)
-			case <-b.ctx.Done():
-				break workLoop
-			}
-
 		}
 	}
 	// Stop the timer and drain the channel
@@ -149,7 +117,7 @@ workLoop:
 }
 
 // waitForBackoffInternal waits for the backoff to finish, while handling new backoffs.
-func (b *BackoffTurnstile) waitForBackoffInternal() {
+func (b *BackoffGuard) waitForBackoffInternal() {
 backoffLoop:
 	for b.backoffUntil.After(time.Now()) {
 		select {
@@ -166,7 +134,7 @@ backoffLoop:
 }
 
 // setBackoffInternal sets the backoff time, and starts the backoff timer.
-func (b *BackoffTurnstile) setBackoffInternal(res *http.Response) {
+func (b *BackoffGuard) setBackoffInternal(res *http.Response) {
 	numBackoffs := atomic.LoadUint64(&b.numExpoBackoffs)
 	// Try to get the header Retry-After
 	backoffDuration, err := getRetryAfterDuration(res)

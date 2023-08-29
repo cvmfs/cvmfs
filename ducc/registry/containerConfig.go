@@ -30,7 +30,7 @@ func fetchAndParseConfig(image db.Image, configDigest digest.Digest) (ConfigWith
 
 	// The registry handles authentication and backoff
 	registry := GetOrCreateRegistry(ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	res, err := registry.PerformRequest(req)
+	res, err := registry.PerformRequest(req, image.Repository)
 	if err != nil {
 		return out, err
 	}

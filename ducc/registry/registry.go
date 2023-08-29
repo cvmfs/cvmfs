@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -37,23 +38,64 @@ type ContainerRegistryIdentifier struct {
 	//port string TODO: Determine if this is needed
 	//proxy string TODO: Determine if this is needed
 }
+type tokenAuth struct {
+	token           string
+	wwwAuthenticate string
+	mutex           sync.Mutex
+	numAuthFailures uint64
+}
 
 type ContainerRegistry struct {
 	Identifier ContainerRegistryIdentifier
 
 	// Authentication
 	Credentials ContainerRegistryCredentials
-	tokenMutex  sync.Mutex
-	token       string
+	authMutex   sync.Mutex
+	tokens      map[string]*tokenAuth
 
-	wwwAuthenticateMutex sync.Mutex
-	wwwAuthenticate      string
-
-	numAuthFailures         uint64
-	backoffAndAuthTurnstile *BackoffTurnstile
-	requestLimiter          *RequestLimiter
+	numAuthFailures uint64
+	backoffGuard    *BackoffGuard
+	requestLimiter  *RequestLimiter
 
 	Client *http.Client
+}
+
+func InitRegistriesFromEnv(ctx context.Context) {
+	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
+
+	identifiers := make([]ContainerRegistryIdentifier, 0)
+	credentials := make(map[ContainerRegistryIdentifier]ContainerRegistryCredentials)
+	for _, r := range strings.Split(regs, ",") {
+		if r == "" {
+			continue
+		}
+
+		iEnv := "DUCC_" + r + "_IDENT"
+		uEnv := "DUCC_" + r + "_USER"
+		uPass := "DUCC_" + r + "_PASS"
+		proxyEnv := "DUCC_" + r + "_PROXY"
+		ident := os.Getenv(iEnv)
+		user := os.Getenv(uEnv)
+		pass := os.Getenv(uPass)
+		proxy := os.Getenv(proxyEnv)
+
+		if ident == "" || ((user == "" || pass == "") && proxy == "") {
+			log.Fatalf("missing either $%s, ($%s or $%s) or %s for %s",
+				iEnv, uEnv, uPass, proxyEnv, r)
+		}
+
+		newIdentifier := ContainerRegistryIdentifier{
+			Scheme:   "https",
+			Hostname: ident,
+		}
+
+		identifiers = append(identifiers, newIdentifier)
+		credentials[newIdentifier] = ContainerRegistryCredentials{
+			Username: user,
+			Password: pass,
+		}
+	}
+	InitRegistries(ctx, identifiers, credentials)
 }
 
 func InitRegistries(ctx context.Context, registries []ContainerRegistryIdentifier, credentials map[ContainerRegistryIdentifier]ContainerRegistryCredentials) {
@@ -84,20 +126,21 @@ func GetOrCreateRegistry(identifier ContainerRegistryIdentifier) *ContainerRegis
 	newRegistry := ContainerRegistry{
 		Identifier: identifier,
 
-		tokenMutex: sync.Mutex{},
-		token:      "",
+		authMutex: sync.Mutex{},
+		tokens:    make(map[string]*tokenAuth),
 
-		backoffAndAuthTurnstile: NewBackoffTurnstile(registriesCtx, defaultExponentialBase, config.REGISTRY_INITIAL_BACKOFF, config.REGISTRY_MAX_BACKOFF),
-		requestLimiter:          NewRequestLimiter(registriesCtx, config.REGISTRY_MAX_CONCURRENT_REQUESTS, defaultRateLimitIntervals),
+		backoffGuard:   NewBackoffGuard(registriesCtx, defaultExponentialBase, config.REGISTRY_INITIAL_BACKOFF, config.REGISTRY_MAX_BACKOFF),
+		requestLimiter: NewRequestLimiter(registriesCtx, config.REGISTRY_MAX_CONCURRENT_REQUESTS, defaultRateLimitIntervals),
 
 		Client: &http.Client{},
 	}
 
+	localRegistries[identifier] = &newRegistry
 	return &newRegistry
 }
 
 // BaseUrl returns the base url of the registry for v2 requests.
-func (cr ContainerRegistry) BaseUrl() string {
+func (cr *ContainerRegistry) BaseUrl() string {
 	return fmt.Sprintf("%s://%s/v2", cr.Identifier.Scheme, cr.Identifier.Hostname)
 }
 
@@ -105,12 +148,11 @@ func (cr ContainerRegistry) BaseUrl() string {
 // If the request returns a 401, a new token is requested and the request is retried.
 // If the request returns a 429, the request is retried after a backoff.
 // In both these cases, the function blocks until the response for the next request has been received.
-func (cr *ContainerRegistry) PerformRequest(req *http.Request) (*http.Response, error) {
-	var turnstileOnce sync.Once
-	var tokenOnce sync.Once
-
+func (cr *ContainerRegistry) PerformRequest(req *http.Request, repository string) (*http.Response, error) {
 	cr.requestLimiter.Enter()
 	defer cr.requestLimiter.Exit()
+	var auth *tokenAuth
+
 retryRequest:
 	// Don't send out new requests if the context is cancelled
 	select {
@@ -119,18 +161,31 @@ retryRequest:
 	default:
 	}
 
-	cr.backoffAndAuthTurnstile.Enter()
-	defer func() { turnstileOnce.Do(cr.backoffAndAuthTurnstile.Exit) }()
-	cr.tokenMutex.Lock()
-	defer func() { tokenOnce.Do(cr.tokenMutex.Unlock) }()
+	cr.authMutex.Lock()
 
-	if numAuthFailures := atomic.LoadUint64(&cr.numAuthFailures); numAuthFailures == 1 {
+	// We use per-repository tokens, as the scope of the token is usually the repository
+	if repository != "" {
+		var ok bool
+		auth, ok = cr.tokens[repository]
+		if !ok {
+			auth = &tokenAuth{}
+			cr.tokens[repository] = auth
+		}
+	} else {
+		auth = &tokenAuth{}
+	}
+	auth.mutex.Lock() // Lock this repository
+	once := sync.Once{}
+	defer once.Do(auth.mutex.Unlock)
+	cr.authMutex.Unlock() // Unlock the registry-wide map
+
+	// Wait for potential backoff to finish
+	cr.backoffGuard.Enter()
+
+	if numAuthFailures := atomic.LoadUint64(&auth.numAuthFailures); numAuthFailures >= 1 {
 		// There has been an authentication failure, we need to get a new token before performing the request
-		cr.wwwAuthenticateMutex.Lock()
-		wwwAuthenticate := cr.wwwAuthenticate
-		cr.wwwAuthenticateMutex.Unlock()
 		var err error
-		cr.token, err = requestAuthToken(wwwAuthenticate, cr.Credentials.Username, cr.Credentials.Password)
+		auth.token, err = requestAuthToken(auth.wwwAuthenticate, cr.Credentials.Username, cr.Credentials.Password)
 		if err != nil {
 			if cr.Credentials.Username == "" && cr.Credentials.Password == "" {
 				// We already tried with no username and password, return the error
@@ -138,23 +193,22 @@ retryRequest:
 				return nil, err
 			}
 			// As a last resort, try again with no username and password
-			cr.token, err = requestAuthToken(wwwAuthenticate, "", "")
+			auth.token, err = requestAuthToken(auth.wwwAuthenticate, "", "")
 			if err != nil {
 				atomic.AddUint64(&cr.numAuthFailures, 1)
 				return nil, err
 			}
 		}
 		atomic.StoreUint64(&cr.numAuthFailures, 0)
-	} else if numAuthFailures > 1 {
-		// We already tried to authenticate, but it failed
+	} else if numAuthFailures > 3 {
+		// We already tried to authenticate twice, but it failed
 		return nil, fmt.Errorf("authentication failed")
 	}
 	// If we have a token, add it to the request
-	if cr.token != "" {
-		req.Header.Set("Authorization", cr.token)
+	if auth.token != "" {
+		req.Header.Set("Authorization", auth.token)
 	}
-	tokenOnce.Do(cr.tokenMutex.Unlock)
-	turnstileOnce.Do(cr.backoffAndAuthTurnstile.Exit)
+	once.Do(auth.mutex.Unlock)
 
 	// Perform the request
 	res, err := cr.Client.Do(req)
@@ -166,25 +220,25 @@ retryRequest:
 	// We got a good response, everything is fine
 	if res.StatusCode < 300 && res.StatusCode >= 200 {
 		// Valid response, reset the exponential backoff
-		cr.backoffAndAuthTurnstile.ResetExponentialBackoff()
+		cr.backoffGuard.ResetExponentialBackoff()
 		return res, nil
 	}
 
 	if res.StatusCode == http.StatusTooManyRequests {
 		// We are rate limited, handle the backoff and retry
 		res.Body.Close()
-		cr.backoffAndAuthTurnstile.SetBackoff(res)
+		cr.backoffGuard.SetBackoff(res)
 		goto retryRequest
 	}
 
 	if res.StatusCode == http.StatusUnauthorized {
-		// We are unauthorized
-		cr.wwwAuthenticateMutex.Lock()
-		cr.wwwAuthenticate = res.Header["Www-Authenticate"][0]
-		cr.wwwAuthenticateMutex.Unlock()
+		// We are unauthorized, store auth info
+		auth.mutex.Lock()
+		auth.wwwAuthenticate = res.Header["Www-Authenticate"][0]
+		auth.mutex.Unlock()
 		res.Body.Close()
-		// If we are not currently in an authentication failure, set the counter to 1
-		atomic.CompareAndSwapUint64(&cr.numAuthFailures, 0, 1)
+		// If we are not already in an authentication failure, set the counter to 1
+		atomic.CompareAndSwapUint64(&auth.numAuthFailures, 0, 1)
 		goto retryRequest
 	}
 	return res, err
@@ -271,7 +325,7 @@ func (cr *ContainerRegistry) DownloadBlob(blobDigest digest.Digest, repository s
 		req.Header.Add("Accept", header)
 	}
 
-	res, err := cr.PerformRequest(req)
+	res, err := cr.PerformRequest(req, repository)
 	if err != nil {
 		return fmt.Errorf("error in fetching blob: %s", err)
 	}

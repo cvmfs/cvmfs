@@ -94,7 +94,7 @@ func FetchAndParseManifestAndList(image db.Image) (ManifestWithBytesAndDigest, M
 
 	// The registry handles authentication and backoff
 	registry := GetOrCreateRegistry(ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	res, err := registry.PerformRequest(req)
+	res, err := registry.PerformRequest(req, image.Repository)
 	if err != nil {
 		return manifestOut, manifestListOut, false, err
 	}
@@ -171,16 +171,16 @@ func fetchAndParseManifest(image db.Image) (ManifestWithBytesAndDigest, error) {
 	}
 	url := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", image.RegistryScheme, image.RegistryHost, image.Repository, digestOrTag)
 	registry := GetOrCreateRegistry(ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	return fetchAndParseManifestInternal(registry, url)
+	return fetchAndParseManifestInternal(registry, image.Repository, url)
 }
 
 func fetchAndParseManifestByBlobID(image db.Image, blobID digest.Digest) (ManifestWithBytesAndDigest, error) {
 	url := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", image.RegistryScheme, image.RegistryHost, image.Repository, blobID)
 	registry := GetOrCreateRegistry(ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	return fetchAndParseManifestInternal(registry, url)
+	return fetchAndParseManifestInternal(registry, image.Repository, url)
 }
 
-func fetchAndParseManifestInternal(registry *ContainerRegistry, url string) (ManifestWithBytesAndDigest, error) {
+func fetchAndParseManifestInternal(registry *ContainerRegistry, repository string, url string) (ManifestWithBytesAndDigest, error) {
 	var out ManifestWithBytesAndDigest
 	req, _ := http.NewRequest("GET", url, nil)
 	// We prefer the OCI manifest, but fall back to the Docker manifest
@@ -190,7 +190,7 @@ func fetchAndParseManifestInternal(registry *ContainerRegistry, url string) (Man
 	// Temporary add in manifest list support
 
 	// The registry handles authentication and backoff
-	res, err := registry.PerformRequest(req)
+	res, err := registry.PerformRequest(req, repository)
 	if err != nil {
 		return out, err
 	}
@@ -242,7 +242,7 @@ func fetchAndParseManifestList(image db.Image) (ManifestListWithBytesAndDigest, 
 
 	// The registry handles authentication and backoff
 	registry := GetOrCreateRegistry(ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	res, err := registry.PerformRequest(req)
+	res, err := registry.PerformRequest(req, image.Repository)
 	if err != nil {
 		return out, err
 	}

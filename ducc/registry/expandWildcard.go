@@ -105,7 +105,7 @@ func fetchTags(registry *ContainerRegistry, wish db.Wish) ([]string, error) {
 	url := fmt.Sprintf("%s://%s/v2/%s/tags/list", wish.Identifier.InputRegistryScheme, wish.Identifier.InputRegistryHostname, wish.Identifier.InputRepository)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("Accept", "application/json")
-	res, err := registry.PerformRequest(req)
+	res, err := registry.PerformRequest(req, wish.Identifier.InputRepository)
 	if err != nil {
 		return nil, err
 	}
