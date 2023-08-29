@@ -227,9 +227,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   }
 
  private:
-  DownloadManager();
-  void Init(const unsigned max_pool_handles,
-            const perf::StatisticsTemplate &statistics);
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
