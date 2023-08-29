@@ -458,7 +458,7 @@ func GetWishesByIDPrefixes(tx *sql.Tx, idPrefixes []string) ([][]Wish, error) {
 		defer tx.Rollback()
 	}
 
-	out := make([][]Wish, 0, len(idPrefixes))
+	out := make([][]Wish, len(idPrefixes))
 	const stmnt string = "SELECT " + wishSqlFields + " from wishes WHERE id LIKE ? ORDER BY id ASC"
 	for i, idPrefix := range idPrefixes {
 		rows, err := tx.Query(stmnt, idPrefix+"%")
