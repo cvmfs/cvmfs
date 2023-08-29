@@ -13,7 +13,7 @@ func TestUpdateImagesAndGetImages(t *testing.T) {
 
 	dbWishIdentifiers := []WishIdentifier{
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag*",
 			InputTagWildcard:      true,

@@ -24,7 +24,7 @@ func ExpandWildcardAndStoreImages(wish db.Wish) (created []db.Image, updated []d
 
 	// Ensure that the wish still exists
 	if _, err := db.GetWishByID(tx, wish.ID); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("error getting wish by ID. Is it deleted? : %s", err)
 	}
 
 	// Update the images for the wish

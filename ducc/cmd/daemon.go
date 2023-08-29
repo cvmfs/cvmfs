@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cvmfs/ducc/daemon"
+	"github.com/cvmfs/ducc/daemon/rpc"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/errorcodes"
 	"github.com/cvmfs/ducc/registry"
@@ -41,9 +42,10 @@ func init() {
 }
 
 var daemonCmd = &cobra.Command{
-	Use:   "daemon [flags]",
-	Short: "Run DUCC in daemon mode",
-	Args:  cobra.ExactArgs(0),
+	Use:    "daemon [flags]",
+	Short:  "Start DUCC in daemon mode",
+	Args:   cobra.ExactArgs(0),
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
@@ -88,7 +90,7 @@ var daemonCmd = &cobra.Command{
 		// Start RPC
 		rpcCleanupDone := make(chan any)
 		rpcCtx, rpcCancelFunc := context.WithCancel(context.Background())
-		go daemon.RunRpcServer(rpcCtx, rpcCleanupDone)
+		go rpc.RunRpcServer(rpcCtx, rpcCleanupDone)
 
 		// Handle signals
 		signals := make(chan os.Signal, 1)

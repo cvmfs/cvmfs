@@ -20,14 +20,12 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "cvmfs_ducc",
-	Short: "Show the several commands available.",
+	DisableFlagsInUseLine: false,
+	Use:                   os.Args[0],
+	Short:                 "Daemon for Unpacking Container images into Cvmfs (DUCC)",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		lib.SetupNotification()
 		lib.SetupRegistries()
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		lib.StopNotification()

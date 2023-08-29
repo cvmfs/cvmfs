@@ -17,7 +17,7 @@ func TestCreateWish(t *testing.T) {
 
 	t.Run("CreateWishByIdentifier", func(t *testing.T) {
 		identifier := WishIdentifier{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -40,7 +40,7 @@ func TestCreateWish(t *testing.T) {
 	t.Run("CreateWishesByIdentifiers", func(t *testing.T) {
 		identifiers := []WishIdentifier{
 			{
-				Source:                "source",
+				Wishlist:              "source",
 				CvmfsRepository:       "cvmfs",
 				InputTag:              "tag",
 				InputTagWildcard:      false,
@@ -49,7 +49,7 @@ func TestCreateWish(t *testing.T) {
 				InputRegistryHostname: "registry",
 			},
 			{
-				Source:                "source",
+				Wishlist:              "source",
 				CvmfsRepository:       "cvmfs",
 				InputTag:              "tag2",
 				InputTagWildcard:      false,
@@ -83,7 +83,7 @@ func TestGetWish(t *testing.T) {
 
 	dbWishIdentifiers := []WishIdentifier{
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag*",
 			InputTagWildcard:      true,
@@ -92,7 +92,7 @@ func TestGetWish(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -101,7 +101,7 @@ func TestGetWish(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputDigest:           digest.FromString("digest"),
 			InputRepository:       "repository2",
@@ -266,7 +266,7 @@ func TestGetWishesSource(t *testing.T) {
 
 	dbWishIdentifiers := []WishIdentifier{
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag*",
 			InputTagWildcard:      true,
@@ -275,7 +275,7 @@ func TestGetWishesSource(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -284,7 +284,7 @@ func TestGetWishesSource(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source2",
+			Wishlist:              "source2",
 			CvmfsRepository:       "cvmfs",
 			InputDigest:           digest.FromString("digest"),
 			InputRepository:       "repository2",
@@ -334,7 +334,7 @@ func TestDeleteWishID(t *testing.T) {
 
 	dbWishIdentifiers := []WishIdentifier{
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag*",
 			InputTagWildcard:      true,
@@ -343,7 +343,7 @@ func TestDeleteWishID(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source",
+			Wishlist:              "source",
 			CvmfsRepository:       "cvmfs",
 			InputTag:              "tag",
 			InputTagWildcard:      false,
@@ -352,7 +352,7 @@ func TestDeleteWishID(t *testing.T) {
 			InputRegistryHostname: "registry",
 		},
 		{
-			Source:                "source2",
+			Wishlist:              "source2",
 			CvmfsRepository:       "cvmfs",
 			InputDigest:           digest.FromString("digest"),
 			InputRepository:       "repository2",

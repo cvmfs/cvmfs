@@ -1,4 +1,4 @@
-package db
+package daemon
 
 import (
 	"errors"
@@ -6,8 +6,67 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/cvmfs/ducc/db"
 	"github.com/opencontainers/go-digest"
+	"gopkg.in/yaml.v2"
 )
+
+type RecipeV1 struct {
+	Wishlist     string
+	CvmfsRepo    string
+	User         string // TODO: Deprecate?
+	OutputFormat string // TODO: Deprecate?
+	Wishes       []db.WishIdentifier
+}
+
+type YamlRecipeV1 struct {
+	Version      int      `yaml:"version"`
+	User         string   `yaml:"user"`
+	CVMFSRepo    string   `yaml:"cvmfs_repo"`
+	OutputFormat string   `yaml:"output_format"`
+	Input        []string `yaml:"input"`
+}
+
+// ParseYamlRecipeV1 parses a recipe in YAML format, and returns a RecipeV1 struct.
+func ParseYamlRecipeV1(data []byte, wishlist string) (RecipeV1, error) {
+	recipeYamlV1 := YamlRecipeV1{}
+	err := yaml.Unmarshal(data, &recipeYamlV1)
+	if err != nil {
+		return RecipeV1{}, err
+	}
+
+	//TODO: Parse the cvmfs repo.
+	// We could check that it exists, but it's not really necessary. We will have to check
+	// later in case of deletion anyway.
+	// However, we should check that it's a valid cvmfs repo name, to avoid problems or path traversal.
+
+	recipe := RecipeV1{
+		Wishlist:     wishlist,
+		CvmfsRepo:    recipeYamlV1.CVMFSRepo,
+		User:         recipeYamlV1.User,
+		OutputFormat: recipeYamlV1.OutputFormat,
+		Wishes:       make([]db.WishIdentifier, 0, len(recipeYamlV1.Input)),
+	}
+
+	for _, inputImage := range recipeYamlV1.Input {
+		url, err := ParseImageURL(inputImage)
+		if err != nil {
+			return RecipeV1{}, err
+		}
+		identifier := db.WishIdentifier{
+			Wishlist:              recipe.Wishlist,
+			CvmfsRepository:       recipe.CvmfsRepo,
+			InputTag:              url.Tag,
+			InputTagWildcard:      url.TagWildcard,
+			InputDigest:           url.Digest,
+			InputRepository:       url.Repository,
+			InputRegistryScheme:   url.Scheme,
+			InputRegistryHostname: url.Registry,
+		}
+		recipe.Wishes = append(recipe.Wishes, identifier)
+	}
+	return recipe, nil
+}
 
 type ParsedWishInputURL struct {
 	Scheme      string

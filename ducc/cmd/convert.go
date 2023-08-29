@@ -29,13 +29,14 @@ func init() {
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
-	rootCmd.AddCommand(convertCmd)
+	rootCmd.AddCommand()
 }
 
 var convertCmd = &cobra.Command{
-	Use:   "convert wish-list.yaml",
-	Short: "Convert the wishes",
-	Args:  cobra.ExactArgs(1),
+	Deprecated: "please use 'recipe apply --standalone' instead. ",
+	Use:        "convert wish-list.yaml",
+	Short:      "Convert the wishes",
+	Args:       cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
@@ -80,7 +81,7 @@ var convertCmd = &cobra.Command{
 			l.LogE(err).Error("Impossible to read the recipe file")
 			os.Exit(errorcodes.GetRecipeFileError)
 		}
-		recipe, err := db.ParseYamlRecipeV1(data, "cmd")
+		recipe, err := daemon.ParseYamlRecipeV1(data, "cmd")
 		if err != nil {
 			l.LogE(err).Error("Impossible to parse the recipe file")
 			os.Exit(errorcodes.ParseRecipeFileError)
@@ -108,7 +109,7 @@ var convertCmd = &cobra.Command{
 				OutputOptions: outputOptions,
 			}
 		}
-		dbWishes, err := db.CreateWishes(nil, wishes)
+		dbWishes, err := db.CreateWishes(nil, wishes, false)
 		if err != nil {
 			panic(fmt.Sprintf("Unable to create wishes: %s", err))
 		}

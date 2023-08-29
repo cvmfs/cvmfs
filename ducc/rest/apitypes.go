@@ -92,7 +92,7 @@ func CreateApiWishFromDBWish(wish db.Wish, images []db.Image) Wish {
 		InputTag:              wish.Identifier.InputTag,
 		InputTagWildcard:      wish.Identifier.InputTagWildcard,
 		OutputURL:             "", //TODO
-		Source:                wish.Identifier.Source,
+		Source:                wish.Identifier.Wishlist,
 
 		CreateLayers:    wish.OutputOptions.CreateLayers,
 		CreateThinImage: wish.OutputOptions.CreateThinImage,
