@@ -11,7 +11,7 @@ import (
 )
 
 const taskSqlFields string = "id, type, status, title, result, created_timestamp, start_timestamp, done_timestamp"
-const taskSqlFieldsPrefixed string = "tasks.id, tasks.type, tasks.status, tasks.title, tasks.result, tasks.created_timestamp, tasks.created_timestamp, tasks.start_timestamp, tasks.done_timestamp"
+const taskSqlFieldsPrefixed string = "tasks.id, tasks.type, tasks.status, tasks.title, tasks.result, tasks.created_timestamp, tasks.start_timestamp, tasks.done_timestamp"
 const taskSqlFieldsQs string = "?, ?, ?, ?, ?, ?, ?, ?"
 const taskLogSqlFields string = "task_id, severity, message, timestamp"
 const taskLogSqlFieldsQs string = "?, ?, ?, ?"
