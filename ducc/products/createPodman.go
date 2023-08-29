@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/cvmfs/ducc/constants"
@@ -63,7 +64,6 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 	}
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for start")
 		task.WaitForStart()
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting podman image creation")
 
@@ -84,68 +84,53 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 			return
 		}
 
-		// 1. Ensure that podman directories and catalogs exist
-		// TODO: Do we really want to create all these catalogs here?
-		// Isn't it better to do this as some kind of initialization step?
-		createCatalogIntoDirs := []string{
-			constants.PodmanSubDir,
-			path.Join(constants.PodmanSubDir, "overlay"),
-			path.Join(constants.PodmanSubDir, "overlay-images"),
-			path.Join(constants.PodmanSubDir, "overlay-layers")}
-		for _, dir := range createCatalogIntoDirs {
-			err = cvmfs.CreateCatalogIntoDir(cvmfsRepo, dir)
-			if err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to create catalog %s", dir))
-				return
-			}
-		}
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully created Podman metadata catalogs")
-
-		// 2. Get existing images metadata
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Getting existing image metadata")
-		existingImagesInfo, err := getExistingPodmanImageInfoFromCVMFS(cvmfsRepo)
+		// We need to lock CVMFS, and start a transaction
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for CVMFS lock")
+		cvmfs.GetLock(cvmfsRepo)
+		defer cvmfs.Unlock(cvmfsRepo)
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Got CVMFS lock, waiting for transaction")
+		endTransactionOnce := sync.Once{}
+		ok, stdOut, stdErr, err := cvmfs.OpenTransactionNew(cvmfsRepo)
 		if err != nil {
-			task.LogFatal(nil, fmt.Sprintf("Failed to get existing image metadata: %s", err.Error()))
+			task.LogFatal(nil, fmt.Sprintf("Failed to open transaction: %s", err.Error()))
 			return
-		}
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully got existing image metadata")
-
-		// 3. Check if image already exists, and correct names if needed
-		names := getPodmanNames(image, manifest)
-		updatedImagesInfo, alreadyExists := preparePodmanImageMetadata(existingImagesInfo, manifest.ManifestDigest, names)
-		if alreadyExists {
-			// Check if we have updated the image metadata
-			if reflect.DeepEqual(existingImagesInfo, updatedImagesInfo) {
-				// No changes
-				task.Log(nil, db.LOG_SEVERITY_INFO, "Podman image already exists in cvmfs, and metadata is up to date. Skipping creation.")
-				task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
-				return
-			}
-			cvmfsLock.Lock()
-			defer cvmfsLock.Unlock()
-			abort := false
-			if err := cvmfs.WithinTransaction(cvmfsRepo, func() error {
-				if err := updatePodmanImageStoreCVMFS(updatedImagesInfo, cvmfsRepo); err != nil {
-					task.LogFatal(nil, fmt.Sprintf("Failed to update images.json: %s", err.Error()))
-					abort = true
-					return err
+		} else if !ok {
+			task.LogFatal(nil, fmt.Sprintf("Failed to open transaction\nstdout:\n\n%s\nstderr:%s\n", stdOut, stdErr))
+			return
+		} else {
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully opened transaction\n%s", stdOut))
+			// Abort the transaction if we exit early
+			defer endTransactionOnce.Do(func() {
+				err := cvmfs.AbortTransactionNew(cvmfsRepo)
+				if err != nil {
+					task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to abort transaction: %s", err.Error()))
 				}
-				return nil
-			}); err != nil {
-				task.LogFatal(nil, "CVMFS transaction failed")
-				return
-			}
-			if abort {
-				task.LogFatal(nil, "Failed to update images.json")
-				return
-			}
-
-			task.Log(nil, db.LOG_SEVERITY_INFO, "Podman image already exists in cvmfs, but metadata was outdated. Updated metadata.")
-			task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
-			return
+				task.Log(nil, db.LOG_SEVERITY_DEBUG, "Aborted transaction")
+			})
 		}
 
-		// 4. Create Podman layer metadata for the layers in the manifest
+		madeChanges := false // If we made changes, we need to commit them
+
+		// 1. Ensure that podman directories and catalogs exist
+		requiredCatalogs := []string{
+			constants.PodmanSubDir,
+			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay"),
+			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-images"),
+			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-layers"),
+		}
+		for _, dir := range requiredCatalogs {
+			changed, err := cvmfs.CreateCatalogNew(dir)
+			if err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to create catalog %s: %s", dir, err))
+				return
+			}
+			if changed {
+				task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Created catalog %s", dir))
+				madeChanges = true
+			}
+		}
+
+		// 2. Create Podman layer metadata for the layers in the manifest
 		manifestLayersInfo, err := createPodmanLayerInfo(manifest.Manifest, config.Config)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create layer metadata: %s", err.Error()))
@@ -157,97 +142,137 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 		topLayerID := manifestLayersInfo[len(manifestLayersInfo)-1].ID
 
-		// 5. Get existing layer info
-		existingLayersInfo, err := getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo)
+		// 3. Get existing layer info
+		layersInfo, err := getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to get existing layer metadata: %s", err.Error()))
 			return
 		}
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Successfully got existing layer metadata")
 
-		// 6. Append any new layers to the existing layers info, ignoring duplicates
-		updatedLayersInfo, newLayersInfo := updatePodmanLayerMetadata(existingLayersInfo, manifestLayersInfo)
-		task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Out of the %d image layers, %d were already present in the Podman store", len(manifestLayersInfo), len(manifestLayersInfo)-len(newLayersInfo)))
+		// 4. Append any new layers to the existing layers info, ignoring duplicates
+		var newLayersInfo []PodmanLayerInfo
+		layersInfo, newLayersInfo = updatePodmanLayerMetadata(layersInfo, manifestLayersInfo)
+		if len(newLayersInfo) > 0 {
+			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Imported %d new layers. %d were already present in the Podman store.", len(newLayersInfo), len(manifestLayersInfo)-len(newLayersInfo)))
+			madeChanges = true
 
-		// 7. Create and append the new image to the existing images info
-		newImageInfo := createPodmanImageInfo(image, manifest, topLayerID)
-		updatedImagesInfo = append(updatedImagesInfo, newImageInfo)
-
-		// Finally, write file changes to CVMFS, in one transaction
-		abort := false // TODO: Make withinTransaction return if the transaction was aborted
-		if err := cvmfs.WithinTransaction(cvmfsRepo, func() error {
-			// Append to layers.json
-			if err := updatePodmanLayerStoreCVMFS(updatedLayersInfo, cvmfsRepo); err != nil {
+			// Update layers.json
+			if err := updatePodmanLayerStoreCVMFS(layersInfo, cvmfsRepo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to append to layers.json: %s", err.Error()))
-				abort = true
-				return err
+				return
 			}
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Updated layers.json")
 
-			// Write updated images.json
-			if err := updatePodmanImageStoreCVMFS(updatedImagesInfo, cvmfsRepo); err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to update images.json: %s", err.Error()))
-				abort = true
-				return err
-			}
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Updated images.json")
+			// We create files for the new layers here
 
 			// Link rootfs for the new layers
-			if err := LinkRootfsIntoPodmanStore(cvmfsRepo, newLayersInfo); err != nil {
+			if err = LinkRootfsIntoPodmanStore(cvmfsRepo, newLayersInfo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to link rootfs: %s", err.Error()))
-				abort = true
-				return err
+				return
 			}
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Linked rootfs")
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Linked rootfs for new layers")
 
 			// Create links for the new layers
-			if err := createLinks(cvmfsRepo, newLayersInfo); err != nil {
+			if err = createLinks(cvmfsRepo, newLayersInfo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to create links: %s", err.Error()))
-				abort = true
-				return err
+				return
 			}
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created links")
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created links for new layers")
 
 			// Create lower files for the new layers
 			if err := createLowerFilesCVMFS(cvmfsRepo, manifestLayersInfo, newLayersInfo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to create lower files: %s", err.Error()))
-				abort = true
-				return err
+				return
 			}
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created lower files")
+		}
 
-			// Create lock files, in case they don't already exist
-			if err := createLockFilesCVMFS(cvmfsRepo); err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to create lock files: %s", err.Error()))
-				abort = true
-				return err
+		// 5. Get existing images metadata
+		imagesInfo, err := getExistingPodmanImageInfoFromCVMFS(cvmfsRepo)
+		if err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to get existing image metadata: %s", err.Error()))
+			return
+		}
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Successfully got existing image metadata")
+
+		// 6. Update image metadata
+		names := getPodmanNames(image, manifest)
+		var changed bool
+		var alreadyExists bool
+		changed, alreadyExists, imagesInfo = updatePodmanImageNames(imagesInfo, manifest.ManifestDigest, names)
+		if changed {
+			task.Log(nil, db.LOG_SEVERITY_INFO, "Updated image names in podman store image metadata")
+			madeChanges = true
+		}
+		if !alreadyExists {
+			// Append the new image to the existing images info
+			newImageInfo := createPodmanImageInfo(image, manifest, topLayerID)
+			imagesInfo = append(imagesInfo, newImageInfo)
+			task.Log(nil, db.LOG_SEVERITY_INFO, "Appended the new image to podman store image metadata")
+			madeChanges = true
+		}
+		if madeChanges {
+			// Write updated images.json
+			if err := updatePodmanImageStoreCVMFS(imagesInfo, cvmfsRepo); err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to update images.json: %s", err.Error()))
+				return
 			}
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Updated images.json")
+		}
+
+		// Create lock files, in case they don't already exist
+		if changed, err = createLockFilesCVMFS(cvmfsRepo); err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to create lock files: %s", err.Error()))
+			return
+		}
+		if changed {
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created lock files")
+			madeChanges = true
+		}
 
-			// Create a link to the manifest file
-			if err := linkManifestFileCVMFS(image, manifest.ManifestDigest, cvmfsRepo); err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to create manifest link: %s", err.Error()))
-				abort = true
-				return err
-			}
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created manifest link")
-
-			// Create a link to the config file
-			if err := linkConfigFileCVMFS(image, manifest.Manifest.Config.Digest, manifest.ManifestDigest, cvmfsRepo); err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to create config link: %s", err.Error()))
-				abort = true
-				return err
-			}
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created config link")
-
-			return nil
-		}); err != nil {
-			task.LogFatal(nil, fmt.Sprintf("Failed to publish updated files to CVMFS: %s", err.Error()))
+		// Create the manifest file
+		if changed, err = createManifestFileCVMFS(manifest, cvmfsRepo); err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to create manifest file: %s", err.Error()))
 			return
 		}
-		if abort {
-			task.LogFatal(nil, "CVMFS transaction was aborted due to previous errors")
+		if changed {
+			madeChanges = true
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created manifest file in Podman store")
+		}
+
+		// Create the config file
+		if changed, err = createConfigFileCVMFS(config, manifest.ManifestDigest, cvmfsRepo); err != nil {
+			task.LogFatal(nil, fmt.Sprintf("Failed to create config link: %s", err.Error()))
 			return
 		}
+		if changed {
+			madeChanges = true
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created config file in Podman store")
+		}
+
+		if !madeChanges {
+			task.Log(nil, db.LOG_SEVERITY_INFO, "No changes made to Podman store, skipping publish")
+			task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
+			return
+		}
+
+		//  We have made changes, so we need to commit the transaction
+		{
+			// Stop the transaction from being aborted
+			endTransactionOnce.Do(func() {})
+			ok, stdOut, stdErr, err := cvmfs.PublishTransactionNew(cvmfsRepo)
+			if err != nil {
+				task.LogFatal(nil, fmt.Sprintf("Failed to commit transaction: %s", err.Error()))
+				return
+			} else if !ok {
+				task.LogFatal(nil, fmt.Sprintf("Failed to commit transaction\nstdout:\n\n%s\nstderr:%s\n", stdOut, stdErr))
+				return
+			} else {
+				task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Successfully committed transaction\n%s", stdOut))
+			}
+		}
+
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully published Podman image to CVMFS")
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 	}()
@@ -403,20 +428,8 @@ func LinkRootfsIntoPodmanStore(cvmfsRepo string, layersInfo []PodmanLayerInfo) e
 		if err := os.Symlink(relativePath, symlinkPath); err != nil {
 			return err
 		}
-
-		/*// We create a second symlink to the overlay directory
-		overlaySymlinkPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", layerInfo.ID)
-		relativePath, err = filepath.Rel(filepath.Dir(overlaySymlinkPath), podmanLayerRootFSPath)
-		if err != nil {
-			return err
-		}
-		if err := os.Remove(overlaySymlinkPath); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		if err := os.Symlink(relativePath, overlaySymlinkPath); err != nil {
-			return err
-		}*/
 	}
+
 	return nil
 }
 
@@ -475,27 +488,37 @@ func createPodmanImageInfo(image db.Image, manifest registry.ManifestWithBytesAn
 	}
 }
 
-func preparePodmanImageMetadata(existingData []PodmanImageInfo, newImageDigest digest.Digest, newImageNames []string) (updatedData []PodmanImageInfo, alreadyPresent bool) {
-	alreadyPresent = false
-	out := make([]PodmanImageInfo, 0)
-
+// Updates the names of the images in the existing image metadata if needed.
+// Returns the updated metadata and a bool indicating if changes were made.
+func updatePodmanImageNames(existingData []PodmanImageInfo, newImageDigest digest.Digest, newImageNames []string) (changed bool, imageExists bool, updatedData []PodmanImageInfo) {
+	changed = false
+	imageExists = false
+	out := make([]PodmanImageInfo, 0, len(existingData))
 	for _, existingImage := range existingData {
 		if existingImage.ID == newImageDigest.Encoded() {
-			alreadyPresent = true
-			// Image already exists, update the names
+			// Image already exists, we might need to update the names
+			imageExists = true
 			combinedNames := removeDuplicateStrings(append(existingImage.Names, newImageNames...))
-			existingImage.Names = combinedNames
+			if !reflect.DeepEqual(existingImage.Names, combinedNames) {
+				// We have changed the names
+				changed = true
+				existingImage.Names = combinedNames
+			}
 			out = append(out, existingImage)
 			continue
 		}
 		// An existing image with a different digest could have the same name.
 		// This means that the existing image is outdated.
 		// We solve this by removing any conflicting names from the existing image.
-		existingImage.Names = differenceOfStringSets(existingImage.Names, newImageNames)
+		newNames := differenceOfStringSets(existingImage.Names, newImageNames)
+		if !reflect.DeepEqual(existingImage.Names, newNames) {
+			// We have changed the names
+			changed = true
+			existingImage.Names = newNames
+		}
 		out = append(out, existingImage)
 	}
-
-	return out, alreadyPresent
+	return changed, imageExists, out
 }
 
 func updatePodmanLayerMetadata(existingLayers []PodmanLayerInfo, NewLayers []PodmanLayerInfo) (updatedData []PodmanLayerInfo, addedLayers []PodmanLayerInfo) {
@@ -716,7 +739,7 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 	return nil
 }
 
-func createLockFilesCVMFS(cvmfsRepo string) error {
+func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
 	layerLockPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-layers", "layers.lock")
 	imageLockPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", "images.lock")
 
@@ -725,66 +748,98 @@ func createLockFilesCVMFS(cvmfsRepo string) error {
 		// File already exists, we are good
 	} else if err != nil {
 		// Something else went wrong
-		return err
+		return changed, fmt.Errorf("failed to create layers.lock: %w", err)
 	} else {
 		// We just created the file
 		file.Close()
+		changed = true
 	}
 
 	file, err = os.OpenFile(imageLockPath, os.O_CREATE, constants.FilePermision)
 	if errors.Is(err, os.ErrExist) {
 	} else if err != nil {
-		return err
+		return changed, fmt.Errorf("failed to create images.lock: %w", err)
 	} else {
 		file.Close()
+		changed = true
 	}
 
-	return nil
+	return changed, nil
 }
 
-func linkManifestFileCVMFS(image db.Image, imageDigest digest.Digest, cvmfsRepo string) error {
-	symlinkPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", imageDigest.Encoded(), "manifest")
-	targetPath := filepath.Join("/cvmfs", cvmfsRepo, constants.ImagesSubDir, imageDigest.Encoded()[:2], imageDigest.Encoded(), "manifest.json")
+func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (changed bool, err error) {
+	manifestPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", manifest.ManifestDigest.Encoded(), "manifest")
+
+	fileInfo, err := os.Stat(manifestPath)
+	if err == nil {
+		if fileInfo.Mode().IsRegular() {
+			// File already exists, we are good
+			return false, nil
+		}
+		// Previously, symlinks were used here. Let's remove it and create a new regular file.
+		if err := os.Remove(manifestPath); err != nil {
+			return false, fmt.Errorf("failed to remove existing manifest symlink: %w", err)
+		}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("failed to stat manifest file: %w", err)
+	}
 
 	// Create the image directory if it doesn't exist
-	err := os.MkdirAll(filepath.Dir(symlinkPath), constants.DirPermision)
+	err = os.MkdirAll(filepath.Dir(manifestPath), constants.DirPermision)
 	if err != nil {
-		return err
+		return true, fmt.Errorf("failed to create image directory: %w", err)
 	}
 
-	relPath, err := filepath.Rel(filepath.Dir(symlinkPath), targetPath)
+	// Create the manifest file
+	file, err := os.OpenFile(manifestPath, os.O_CREATE|os.O_WRONLY, constants.FilePermision)
 	if err != nil {
-		return err
+		return true, fmt.Errorf("failed to create manifest file: %w", err)
+	}
+	defer file.Close()
+
+	// Write the manifest to the file
+	if _, err := file.Write(manifest.ManifestBytes); err != nil {
+		return true, fmt.Errorf("failed to write manifest file: %w", err)
 	}
 
-	if err := os.Symlink(relPath, symlinkPath); err != nil {
-		return err
-	}
-
-	return nil
+	return true, nil
 }
 
-func linkConfigFileCVMFS(image db.Image, configDigest digest.Digest, imageDigest digest.Digest, cvmfsRepo string) error {
-
-	configFilename := "=" + base64.StdEncoding.EncodeToString([]byte(configDigest.String()))
-
+func createConfigFileCVMFS(config registry.ConfigWithBytesAndDigest, imageDigest digest.Digest, cvmfsRepo string) (changed bool, err error) {
+	configFilename := "=" + base64.StdEncoding.EncodeToString([]byte(config.ConfigDigest.String()))
 	symlinkPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", imageDigest.Encoded(), configFilename)
-	targetPath := filepath.Join("/cvmfs", cvmfsRepo, constants.ImagesSubDir, imageDigest.Encoded()[:2], imageDigest.Encoded(), "config.json")
+
+	fileInfo, err := os.Stat(symlinkPath)
+	if err == nil {
+		if fileInfo.Mode().IsRegular() {
+			// File already exists, we are good
+			return false, nil
+		}
+		// Previously, symlinks were used here. Let's remove it and create a new regular file.
+		if err := os.Remove(symlinkPath); err != nil {
+			return false, fmt.Errorf("failed to remove existing config symlink: %w", err)
+		}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("failed to stat config file: %w", err)
+	}
 
 	// Create the image directory if it doesn't exist
-	err := os.MkdirAll(filepath.Dir(symlinkPath), constants.DirPermision)
+	err = os.MkdirAll(filepath.Dir(symlinkPath), constants.DirPermision)
 	if err != nil {
-		return err
+		return true, fmt.Errorf("failed to create image directory: %w", err)
 	}
 
-	relPath, err := filepath.Rel(filepath.Dir(symlinkPath), targetPath)
+	// Create the config file
+	file, err := os.OpenFile(symlinkPath, os.O_CREATE|os.O_WRONLY, constants.FilePermision)
 	if err != nil {
-		return err
+		return true, fmt.Errorf("failed to create config file: %w", err)
+	}
+	defer file.Close()
+
+	// Write the config to the file
+	if _, err := file.Write(config.ConfigBytes); err != nil {
+		return true, fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	if err := os.Symlink(relPath, symlinkPath); err != nil {
-		return err
-	}
-
-	return nil
+	return true, nil
 }

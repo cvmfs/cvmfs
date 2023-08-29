@@ -3,6 +3,7 @@ package cvmfs
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,8 @@ import (
 	l "github.com/cvmfs/ducc/log"
 	log "github.com/sirupsen/logrus"
 )
+
+var lockDirectory = "/tmp/cvmfs/ducc/repo_locks/"
 
 type TransactionOption interface {
 	ToString() string
@@ -33,7 +36,7 @@ var locksMap = make(map[string]*sync.Mutex)
 var locksFile = make(map[string]fSLock)
 var lockMap = &sync.Mutex{}
 
-func getLock(CVMFSRepo string) {
+func GetLock(CVMFSRepo string) {
 	lockMap.Lock()
 	lc := locksMap[CVMFSRepo]
 	if lc == nil {
@@ -42,7 +45,7 @@ func getLock(CVMFSRepo string) {
 	}
 	f := locksFile[CVMFSRepo]
 	if f == nil {
-		f = newFSLock("/tmp/DUCC.lock")
+		f = newFSLock(filepath.Join(lockDirectory, CVMFSRepo+".lock"))
 		locksFile[CVMFSRepo] = f
 		f = locksFile[CVMFSRepo]
 	}
@@ -60,7 +63,7 @@ func getLock(CVMFSRepo string) {
 	}
 }
 
-func unlock(CVMFSRepo string) {
+func Unlock(CVMFSRepo string) {
 	lockMap.Lock()
 	l := locksMap[CVMFSRepo]
 	f := locksFile[CVMFSRepo]
@@ -76,9 +79,9 @@ func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...Tran
 		cmd = append(cmd, opt.ToString())
 	}
 	cmd = append(cmd, CVMFSRepo)
-	getLock(CVMFSRepo)
+	GetLock(CVMFSRepo)
 	if err := f(); err != nil {
-		unlock(CVMFSRepo)
+		Unlock(CVMFSRepo)
 		return err
 	}
 	err := exec.ExecCommand(cmd...).Start()
@@ -97,7 +100,7 @@ func OpenTransaction(CVMFSRepo string, options ...TransactionOption) error {
 }
 
 func Publish(CVMFSRepo string) error {
-	defer unlock(CVMFSRepo)
+	defer Unlock(CVMFSRepo)
 	err := exec.ExecCommand("cvmfs_server", "publish", CVMFSRepo).Start()
 	if err != nil {
 		l.LogE(err).WithFields(
@@ -114,7 +117,7 @@ func Publish(CVMFSRepo string) error {
 }
 
 func Abort(CVMFSRepo string) error {
-	defer unlock(CVMFSRepo)
+	defer Unlock(CVMFSRepo)
 	err := abort(CVMFSRepo)
 	if err != nil {
 		l.LogE(err).WithFields(
@@ -163,13 +166,13 @@ func Ingest(CVMFSRepo string, input io.ReadCloser, options ...string) error {
 		cmd = append(cmd, opt)
 	}
 	cmd = append(cmd, CVMFSRepo)
-	getLock(CVMFSRepo)
-	defer unlock(CVMFSRepo)
+	GetLock(CVMFSRepo)
+	defer Unlock(CVMFSRepo)
 	return exec.ExecCommand(cmd...).StdIn(input).Start()
 }
 
 func IngestDelete(CVMFSRepo string, path string) error {
-	getLock(CVMFSRepo)
-	defer unlock(CVMFSRepo)
+	GetLock(CVMFSRepo)
+	defer Unlock(CVMFSRepo)
 	return exec.ExecCommand("cvmfs_server", "ingest", "--delete", path, CVMFSRepo).Start()
 }
