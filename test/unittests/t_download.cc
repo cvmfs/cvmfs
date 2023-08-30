@@ -548,4 +548,63 @@ TEST_F(T_Download, ParseHttpCode) {
   EXPECT_EQ(999, DownloadManager::ParseHttpCode(digits));
 }
 
+/**
+ * @note changes here must be MANUALLY updated in the unittest t_download.cc
+*/
+static inline bool EscapeUrlChar(unsigned char input, char output[3]) {
+  if (((input >= '0') && (input <= '9')) ||
+      ((input >= 'A') && (input <= 'Z')) ||
+      ((input >= 'a') && (input <= 'z')) ||
+      (input == '/') || (input == ':') || (input == '.') ||
+      (input == '@') ||
+      (input == '+') || (input == '-') ||
+      (input == '_') || (input == '~') ||
+      (input == '[') || (input == ']') || (input == ','))
+  {
+    output[0] = input;
+    return false;
+  }
+
+  output[0] = '%';
+  output[1] = static_cast<char>(
+                             (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10));
+  output[2] = static_cast<char>(
+                             (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10));
+  return true;
+}
+
+
+/**
+ * Escape special chars from the URL, except for ':' and '/',
+ * which should keep their meaning.
+ * 
+ * @note changes here must be MANUALLY updated in the unittest t_download.cc
+ */
+static string EscapeUrl(const string &url) {
+  string escaped;
+  escaped.reserve(url.length());
+
+  char escaped_char[3];
+  for (unsigned i = 0, s = url.length(); i < s; ++i) {
+    if (EscapeUrlChar(url[i], escaped_char)) {
+      escaped.append(escaped_char, 3);
+    } else {
+      escaped.push_back(escaped_char[0]);
+    }
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "escaped %s to %s",
+           url.c_str(), escaped.c_str());
+
+  return escaped;
+}
+
+
+TEST_F(T_Download, EscapeUrl) {
+  std::string url = "http://ab0341.¡ÿϦ랝"; // c2a1 c3bf cfa6 eb9e9d
+  std::string correct = "http://ab0341.%C2%A1%C3%BF%CF%A6%EB%9E%9D";
+  std::string res = EscapeUrl(url);
+
+  EXPECT_TRUE(res == correct);
+}
+
 }  // namespace download

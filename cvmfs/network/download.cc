@@ -108,7 +108,10 @@ bool Interrupted(const std::string &fqrn, JobInfo *info) {
   return false;
 }
 
-static inline bool EscapeUrlChar(char input, char output[3]) {
+/**
+ * @note changes here must be MANUALLY updated in the unittest t_download.cc
+*/
+static inline bool EscapeUrlChar(unsigned char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
       ((input >= 'A') && (input <= 'Z')) ||
       ((input >= 'a') && (input <= 'z')) ||
@@ -134,6 +137,8 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
 /**
  * Escape special chars from the URL, except for ':' and '/',
  * which should keep their meaning.
+ * 
+ * @note changes here must be MANUALLY updated in the unittest t_download.cc
  */
 static string EscapeUrl(const string &url) {
   string escaped;
