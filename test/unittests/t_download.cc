@@ -37,22 +37,21 @@ namespace download {
 class T_Download : public FileSandbox {
  public:
   T_Download() : FileSandbox(string(tmp_path) + "/server_dir"),
-                 download_mgr(NULL) {}
+                 download_mgr(new DownloadManager(8,
+                             perf::StatisticsTemplate("test", &statistics))) {}
 
  protected:
   virtual void SetUp() {
     CreateSandbox();
-    download_mgr = new DownloadManager(8,
-                             perf::StatisticsTemplate("test", &statistics));
   }
 
   virtual void TearDown() {
     RemoveSandbox();
-    delete download_mgr;
   }
 
   virtual ~T_Download() {
     download_mgr->Fini();
+    delete download_mgr;
   }
 
   FILE *CreateTemporaryFile(std::string *path) const {
