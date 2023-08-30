@@ -561,7 +561,7 @@ static inline bool EscapeUrlChar(unsigned char input, char output[3]) {
       (input == '_') || (input == '~') ||
       (input == '[') || (input == ']') || (input == ','))
   {
-    output[0] = input;
+    output[0] = static_cast<char>(input);
     return false;
   }
 
