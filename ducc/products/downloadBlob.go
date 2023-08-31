@@ -35,7 +35,9 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 
 	go func() {
 		// Download the layer
-		task.WaitForStart()
+		if !task.WaitForStart() {
+			return
+		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Downloading blob %s", blobDigest.String()))
 		err := registry.DownloadBlob(blobDigest, repository, acceptHeaders)
 		if err != nil {

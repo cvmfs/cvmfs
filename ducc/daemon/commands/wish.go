@@ -2,6 +2,7 @@ package commands
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/cvmfs/ducc/config"
@@ -45,6 +46,21 @@ func (c *CommandService) AddWish(args AddWishArgs, response *AddWishResponse) er
 		InputRegistryHostname: wishInput.Registry,
 	}
 
+	// Check if wish already exists
+	existingWish, err := db.GetWishByValue(nil, wishIdentifier)
+	if errors.Is(err, sql.ErrNoRows) {
+	} else if err != nil {
+		return fmt.Errorf("could not get wish from DB: %s", err)
+	} else {
+		*response = existingWish
+		// Lets trigger an update anyway
+		_, err = daemon.TriggerUpdateWish(nil, existingWish, false, "New Wish", "Triggered through CLI")
+		if err != nil {
+			return fmt.Errorf("could not trigger update: %s", err)
+		}
+		return nil
+	}
+
 	wishes := []db.Wish{{Identifier: wishIdentifier, OutputOptions: args.OutputOptions, ScheduleOptions: args.ScheduleOptions}}
 	wishes, err = db.CreateWishes(nil, wishes, false)
 	if err != nil {
@@ -78,6 +94,7 @@ func (c *CommandService) ListWishes(args ListWishesArgs, reply *ListWishesRespon
 }
 
 type SyncWishesArgs struct {
+	All               bool
 	IDs               []string
 	ForceUpdateImages bool
 }
@@ -93,11 +110,20 @@ type AmbiguousWish struct {
 	MatchedWishes []db.Wish
 }
 
-func (c *CommandService) UpdateWish(args SyncWishesArgs, reply *SyncWishesResponse) error {
+func (c *CommandService) UpdateWishes(args SyncWishesArgs, reply *SyncWishesResponse) error {
 	var err error
-	reply.Synced, reply.NotFound, reply.Ambiguous, err = findWishesByIDPrefix(nil, args.IDs)
-	if err != nil {
-		return fmt.Errorf("could not get wishes from DB: %s", err)
+	if args.All {
+		reply.Ambiguous = make([]AmbiguousWish, 0)
+		reply.NotFound = make([]string, 0)
+		reply.Synced, err = db.GetAllWishes(nil)
+		if err != nil {
+			return fmt.Errorf("could not get wishes from DB: %s", err)
+		}
+	} else {
+		reply.Synced, reply.NotFound, reply.Ambiguous, err = findWishesByIDPrefix(nil, args.IDs)
+		if err != nil {
+			return fmt.Errorf("could not get wishes from DB: %s", err)
+		}
 	}
 	reply.Triggers = make([]db.Trigger, 0)
 	for _, wish := range reply.Synced {
@@ -136,13 +162,12 @@ func (c *CommandService) DeleteWishes(args DeleteWishesArgs, reply *DeleteWishes
 	}
 
 	for _, wish := range reply.Deleted {
-		trigger, err := daemon.TriggerDeleteWish(nil, wish.ID, "Recipe", "Wish not present in recipe")
+		trigger, err := daemon.TriggerDeleteWish(nil, wish.ID, "Deleted", "Deleted by user")
 		if err != nil {
 			reply.Error = append(reply.Error, DeleteWishError{Wish: wish, Err: err})
 		}
 		reply.Triggers = append(reply.Triggers, trigger)
 	}
-
 	return nil
 }
 
@@ -162,9 +187,11 @@ func findWishesByIDPrefix(tx *sql.Tx, idPrefixes []string) (found []db.Wish, not
 	for i, wishes := range wishesByPrefix {
 		if len(wishes) == 0 {
 			notFound = append(notFound, idPrefixes[i])
+			continue
 		}
 		if len(wishes) > 1 {
 			ambiguous = append(ambiguous, AmbiguousWish{Input: idPrefixes[i], MatchedWishes: wishes})
+			continue
 		}
 		foundMap[wishes[0].ID] = wishes[0]
 	}

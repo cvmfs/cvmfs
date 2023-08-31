@@ -25,7 +25,8 @@ var createThin bool
 var updateIntervalStr string
 var webhookEnabled bool
 
-var syncAllImages bool
+var syncAllWishes bool
+var onlyNewTags bool
 var wishlist string
 
 func init() {
@@ -44,8 +45,8 @@ func init() {
 	cmdWish.AddCommand(cmdWishLs)
 
 	cmdWish.AddCommand(cmdWishSync)
-	cmdWishSync.Flags().BoolVarP(&syncAllImages, "all", "a", false, "trigger a sync for all images matching the wish, not just any new tags")
-	cmdWishSync.Flags().StringVar(&wishlist, "wishlist", "default", "add the wish to the specified wishlist")
+	cmdWishSync.Flags().BoolVarP(&syncAllWishes, "all", "a", false, "sync all wishes")
+	cmdWishSync.Flags().BoolVar(&onlyNewTags, "only-new-tags", false, "only update any new tags, not existing ones")
 
 	cmdWish.AddCommand(cmdWishRm)
 }
@@ -123,9 +124,10 @@ var cmdWishAdd = &cobra.Command{
 }
 
 var cmdWishLs = &cobra.Command{
-	Use:   "ls",
-	Short: "List all wishes",
-	Args:  cobra.NoArgs,
+	Use:     "ls",
+	Short:   "List all wishes",
+	Aliases: []string{"list"},
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Connect to daemon
 		client, err := rpc.Dial("unix", daemonRpc.RpcAddress)
@@ -162,7 +164,7 @@ var cmdWishLs = &cobra.Command{
 var cmdWishSync = &cobra.Command{
 	Use:   "sync <wish id>...",
 	Short: "trigger a sync for the specified wish(es)",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Connect to daemon
 		client, err := rpc.Dial("unix", daemonRpc.RpcAddress)
@@ -171,12 +173,25 @@ var cmdWishSync = &cobra.Command{
 			return err
 		}
 
+		if syncAllWishes {
+			if len(args) > 0 {
+				fmt.Fprint(os.Stderr, "Cannot specify both --all and specific wish IDs\n")
+				return errors.New("cannot specify both --all and specific wish IDs")
+			}
+		} else {
+			if len(args) == 0 {
+				fmt.Fprint(os.Stderr, "Must specify either --all or at least one wish ID\n")
+				return errors.New("must specify either --all or at least one wish ID")
+			}
+		}
+
 		rpcArgs := daemonCommands.SyncWishesArgs{
+			All:               syncAllWishes,
 			IDs:               args,
-			ForceUpdateImages: syncAllImages,
+			ForceUpdateImages: !onlyNewTags,
 		}
 		rpcResult := daemonCommands.SyncWishesResponse{}
-		err = client.Call("CommandService.UpdateWish", rpcArgs, &rpcResult)
+		err = client.Call("CommandService.UpdateWishes", rpcArgs, &rpcResult)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running command: %s\n", err)
 			return err

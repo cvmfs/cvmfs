@@ -50,7 +50,6 @@ func GetLock(CVMFSRepo string) {
 		f = locksFile[CVMFSRepo]
 	}
 	lockMap.Unlock()
-
 	lc.Lock()
 	err := f.LockWriteB()
 	for err != nil {
@@ -65,12 +64,9 @@ func GetLock(CVMFSRepo string) {
 
 func Unlock(CVMFSRepo string) {
 	lockMap.Lock()
-	l := locksMap[CVMFSRepo]
-	f := locksFile[CVMFSRepo]
+	locksMap[CVMFSRepo].Unlock()
+	locksFile[CVMFSRepo].Unlock()
 	lockMap.Unlock()
-
-	l.Unlock()
-	f.Unlock()
 }
 
 func ExecuteAndOpenTransaction(CVMFSRepo string, f func() error, options ...TransactionOption) error {

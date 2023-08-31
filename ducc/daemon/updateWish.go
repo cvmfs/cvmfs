@@ -46,7 +46,9 @@ func UpdateWishTask(tx *sql.Tx, wish db.Wish, forceUpdateImages bool) (db.TaskPt
 	}
 
 	go func() {
-		task.WaitForStart()
+		if !task.WaitForStart() {
+			return
+		}
 		new, updated, deleted, err := registry.ExpandWildcardAndStoreImages(wish)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Error expanding wildcard: %s", err))
