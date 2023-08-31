@@ -3,6 +3,7 @@ package products
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/registry"
@@ -14,6 +15,17 @@ import (
 var downloadsMutex = sync.Mutex{}
 var pendingDownloads = make(map[digest.Digest]db.TaskPtr)
 var useCount = make(map[digest.Digest]int)
+
+// struct for entries in layers.json
+type LayerInfo struct {
+	ID                   string    `json:"id,omitempty"`
+	Parent               string    `json:"parent,omitempty"`
+	Created              time.Time `json:"created,omitempty"`
+	CompressedDiffDigest string    `json:"compressed-diff-digest,omitempty"`
+	CompressedSize       int       `json:"compressed-size,omitempty"`
+	UncompressedDigest   string    `json:"diff-digest,omitempty"`
+	UncompressedSize     int64     `json:"diff-size,omitempty"`
+}
 
 func ManifestContainsForeignLayers(manifest v1.Manifest) bool {
 	for _, layer := range manifest.Layers {

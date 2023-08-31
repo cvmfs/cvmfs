@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"os"
+	"path/filepath"
+	"time"
+)
 
 const DEFAULT_CREATELAYERS = true
 const DEFAULT_CREATETHINIMAGE = false
@@ -11,7 +15,9 @@ const DEFAULT_UPDATEINTERVAL = time.Hour
 const MIN_UPDATEINTERVAL = 5 * time.Minute
 const DEFAULT_WEBHOOKENABLED = false
 
-const TMP_FILE_PATH = "/tmp/cvmfs/ducc"
+var TempDir string = filepath.Join(os.TempDir(), "cvmfs", "ducc")
+var DownloadsDir string = filepath.Join(TempDir, "downloads")
+
 const CVMFS_CHAINS_DIR = ".chains"
 
 const REGISTRY_INITIAL_BACKOFF = 1 * time.Second

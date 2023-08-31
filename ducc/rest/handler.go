@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/errorcodes"
 	"github.com/google/uuid"
 )
 
@@ -49,18 +47,19 @@ func (ph PatternHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func StartRestServer(done chan<- any, bindPort int, bindInterface string) *http.Server {
+func StartRestServer(done chan<- any, bindPort int, bindInterface string) (*http.Server, <-chan error) {
 	srv := &http.Server{Addr: fmt.Sprintf("%s:%d", bindInterface, bindPort), Handler: handler}
+
+	errorChan := make(chan error, 1)
 
 	go func() {
 		defer close(done)
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			fmt.Printf("REST server error: %s", err)
-			os.Exit(errorcodes.RESTServerError)
+			errorChan <- fmt.Errorf("REST server error: %w", err)
 		}
 	}()
 
-	return srv
+	return srv, errorChan
 }
 
 func RunRestApi(ctx context.Context, bindPort int, bindInterface string) {

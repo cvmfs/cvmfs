@@ -1,17 +1,12 @@
-package lib
+package util
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base32"
-	"encoding/base64"
 	"hash"
 	"io"
 	"os"
-	"strings"
 
-	l "github.com/cvmfs/ducc/log"
-	temp "github.com/cvmfs/ducc/temp"
+	"github.com/cvmfs/ducc/config"
 )
 
 type ReadHashCloseSizer interface {
@@ -38,7 +33,7 @@ type OnDiskReadAndHash struct {
 // To avoid using the network, on Close() we could close the request body
 func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
 	defer r.Close()
-	f, err := temp.UserDefinedTempFile()
+	f, err := os.CreateTemp(config.TempDir, "write_data")
 	if err != nil {
 		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
@@ -51,7 +46,6 @@ func NewOnDiskReadAndHash(r io.ReadCloser) (*OnDiskReadAndHash, error) {
 		os.RemoveAll(f.Name())
 		return &OnDiskReadAndHash{}, err
 	}
-	l.Log().Info("Done downloading")
 	readAndHash := NewReadAndHash(f)
 	return &OnDiskReadAndHash{ReadAndHash: readAndHash, path: f.Name()}, nil
 }
@@ -63,7 +57,7 @@ func (r *OnDiskReadAndHash) Close() error {
 	return r.ReadAndHash.Close()
 }
 
-//encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
+// encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
 type ReadAndHash struct {
 	r    io.ReadCloser
 	tr   io.Reader
@@ -114,33 +108,4 @@ func (rh *ReadAndHash) Size() int {
 
 func (rh *ReadAndHash) Close() error {
 	return rh.r.Close()
-}
-
-//generates the file name for link dir in podman store
-func generateID(l int) (string, error) {
-	randomid := make([]byte, 16)
-	n, err := io.ReadFull(rand.Reader, randomid)
-	if n != len(randomid) || err != nil {
-		return "", err
-	}
-	s := base32.StdEncoding.EncodeToString(randomid)
-	return s[:l], nil
-}
-
-//generates the file name for config file (compliant with libpod) in podman store.
-func generateConfigFileName(digest string) (fname string, err error) {
-	reader := strings.NewReader(digest)
-	for reader.Len() > 0 {
-		ch, size, err := reader.ReadRune()
-		if err != nil || size != 1 {
-			break
-		}
-		if ch != '.' && !(ch >= '0' && ch <= '9') && !(ch >= 'a' && ch <= 'z') {
-			break
-		}
-	}
-	if reader.Len() > 0 {
-		fname = "=" + base64.StdEncoding.EncodeToString([]byte(digest))
-	}
-	return
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/test"
+	"github.com/cvmfs/ducc/util/test"
 )
 
 func TestFetchManifest(t *testing.T) {

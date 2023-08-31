@@ -3,7 +3,6 @@ package products
 import (
 	"fmt"
 	"os"
-	"path"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/db"
@@ -69,7 +68,7 @@ func releaseBlob(fileDigest digest.Digest) {
 	if count == 0 {
 		delete(pendingDownloads, fileDigest)
 		delete(useCount, fileDigest)
-		os.Remove(path.Join(config.TMP_FILE_PATH, "blobs", fileDigest.Encoded()))
+		os.Remove(config.DownloadsDir)
 		return
 	}
 	useCount[fileDigest] = count

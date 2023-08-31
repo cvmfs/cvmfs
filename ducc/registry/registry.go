@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -60,7 +59,7 @@ type ContainerRegistry struct {
 	Client *http.Client
 }
 
-func InitRegistriesFromEnv(ctx context.Context) {
+func InitRegistriesFromEnv(ctx context.Context) error {
 	regs := os.Getenv("DUCC_AUTH_REGISTRIES")
 
 	identifiers := make([]ContainerRegistryIdentifier, 0)
@@ -80,7 +79,7 @@ func InitRegistriesFromEnv(ctx context.Context) {
 		proxy := os.Getenv(proxyEnv)
 
 		if ident == "" || ((user == "" || pass == "") && proxy == "") {
-			log.Fatalf("missing either $%s, ($%s or $%s) or %s for %s",
+			return fmt.Errorf("missing either $%s, ($%s or $%s) or %s for %s",
 				iEnv, uEnv, uPass, proxyEnv, r)
 		}
 
@@ -96,6 +95,7 @@ func InitRegistriesFromEnv(ctx context.Context) {
 		}
 	}
 	InitRegistries(ctx, identifiers, credentials)
+	return nil
 }
 
 func InitRegistries(ctx context.Context, registries []ContainerRegistryIdentifier, credentials map[ContainerRegistryIdentifier]ContainerRegistryCredentials) {
@@ -108,6 +108,7 @@ func InitRegistries(ctx context.Context, registries []ContainerRegistryIdentifie
 		// Set the credentials for the registry
 		GetOrCreateRegistry(registry).Credentials = credentials
 	}
+	return
 }
 
 // GetOrCreateRegistry returns a pointer to a ContainerRegistry object.
@@ -335,8 +336,10 @@ func (cr *ContainerRegistry) DownloadBlob(blobDigest digest.Digest, repository s
 		return fmt.Errorf("error in fetching blob: %s", res.Status)
 	}
 
-	os.MkdirAll(path.Join(config.TMP_FILE_PATH, "blobs"), os.FileMode(0755))
-	filePath := path.Join(config.TMP_FILE_PATH, "blobs", blobDigest.Encoded())
+	if err := os.MkdirAll(path.Join(config.DownloadsDir), os.FileMode(0755)); err != nil {
+		return fmt.Errorf("error in creating downloads directory: %w", err)
+	}
+	filePath := path.Join(config.DownloadsDir, blobDigest.Encoded())
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0644))
 	if err != nil {
 		return fmt.Errorf("error in creating file: %s", err)

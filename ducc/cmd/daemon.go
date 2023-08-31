@@ -14,7 +14,6 @@ import (
 	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/daemon/rpc"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/errorcodes"
 	"github.com/cvmfs/ducc/registry"
 	"github.com/cvmfs/ducc/rest"
 
@@ -46,42 +45,48 @@ var daemonCmd = &cobra.Command{
 	Short:  "Start DUCC in daemon mode",
 	Args:   cobra.ExactArgs(0),
 	Hidden: true,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		defer cancelFunc()
-		registry.InitRegistriesFromEnv(ctx)
+		if err := registry.InitRegistriesFromEnv(ctx); err != nil {
+			return fmt.Errorf("error initializing registries: %w", err)
+		}
 
 		if err := os.MkdirAll(filepath.Dir(databasePath), 0755); err != nil {
-			fmt.Printf("Error creating directory for database: %s\n", err)
-			os.Exit(errorcodes.OpenDatabaseFileError)
+			return fmt.Errorf("error creating directory for database: %w", err)
 		}
 		database, err := sql.Open("sqlite3", databasePath)
 		if err != nil {
-			fmt.Printf("Error opening database: %s\n", err)
-			os.Exit(errorcodes.OpenDatabaseFileError)
+			return fmt.Errorf("error opening database: %w", err)
 		}
 
 		if err := db.Init(database); err != nil {
-			fmt.Printf("Error initializing database: %s\n", err)
-			os.Exit(errorcodes.DatabaseError)
+			return fmt.Errorf("error initializing database: %w", err)
 		}
 		defer db.Close()
 
 		var restServer *http.Server
+		var restServerErrorChan <-chan error
 		var restServerCleanupDone chan any
 		if restAPI {
 			// Start the REST API server
 			restServerCleanupDone = make(chan any) // We create a new channel here, so we can close it later
-			restServer = rest.StartRestServer(restServerCleanupDone, restAPIPort, restAPIInterface)
+			restServer, restServerErrorChan = rest.StartRestServer(restServerCleanupDone, restAPIPort, restAPIInterface)
+			// Give the rest server a little time to start up, check for errors
+			select {
+			case err := <-restServerErrorChan:
+				return fmt.Errorf("error starting REST API server: %w", err)
+			case <-time.After(100 * time.Millisecond):
+			}
+
 			fmt.Printf("Running REST API on http://%s:%d\n", restAPIInterface, restAPIPort)
 		}
 
 		// Start the daemon
 		err = daemon.Init(automaticScheduling)
 		if err != nil {
-			fmt.Printf("Error initializing daemon: %s\n", err)
-			os.Exit(errorcodes.InternalLogicError)
+			return fmt.Errorf("error initializing daemon: %w", err)
 		}
 		daemonCtx, daemonCancelFunc := context.WithCancel(context.Background())
 		daemonCleanupDone := make(chan any)
@@ -100,7 +105,7 @@ var daemonCmd = &cobra.Command{
 			signal := <-signals
 			switch signal {
 			case syscall.SIGINT, syscall.SIGTERM:
-				fmt.Println("Received SIGINT or SIGTERM, shutting down...")
+				fmt.Printf("Received %s, shutting down...\n", signal)
 				if restServer != nil {
 					// After 5 seconds, we give up and force the server to shut down
 					ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -112,7 +117,7 @@ var daemonCmd = &cobra.Command{
 
 				rpcCancelFunc()
 				<-rpcCleanupDone
-				return
+				return nil
 				/*
 					TODO: Implement reloading of configuration
 					case syscall.SIGHUP:

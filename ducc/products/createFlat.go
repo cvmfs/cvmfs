@@ -13,12 +13,11 @@ import (
 	"sync"
 
 	"github.com/cvmfs/ducc/config"
-	"github.com/cvmfs/ducc/constants"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/lib"
+	singularity "github.com/cvmfs/ducc/products/singularity"
 	"github.com/cvmfs/ducc/registry"
-	"github.com/cvmfs/ducc/singularity"
+	"github.com/cvmfs/ducc/util"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/unix"
@@ -30,24 +29,24 @@ type ChainLink struct {
 	LayerDigest digest.Digest
 	Compressed  bool
 
-	ChainDigest         digest.Digest
-	PreviousChainDigest digest.Digest
+	LegacyChainDigest         digest.Digest
+	PreviousLegacyChainDigest digest.Digest
 }
 
 type ingestChainLinkKey struct {
-	digest    digest.Digest
-	cvmfsRepo string
+	legacyChainDigest digest.Digest
+	cvmfsRepo         string
 }
 
 var currentlyIngestingLinksMutex = sync.Mutex{}
 var currentlyIngestingLinks = make(map[ingestChainLinkKey]db.TaskPtr)
 
 func ChainPath(cvmfsRepo string, legacyChainDigest digest.Digest) string {
-	return filepath.Join("/", "cvmfs", cvmfsRepo, constants.ChainSubDir, legacyChainDigest.Encoded()[0:2], legacyChainDigest.Encoded())
+	return filepath.Join("/", "cvmfs", cvmfsRepo, config.ChainSubDir, legacyChainDigest.Encoded()[0:2], legacyChainDigest.Encoded())
 }
 
 func DirtyChainPath(cvmfsRepo string, legacyChainDigest digest.Digest) string {
-	return filepath.Join("/", "cvmfs", cvmfsRepo, constants.DirtyChainSubDir, legacyChainDigest.Encoded())
+	return filepath.Join("/", "cvmfs", cvmfsRepo, config.DirtyChainSubDir, legacyChainDigest.Encoded())
 }
 
 func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
@@ -281,7 +280,7 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			}
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Public symlink not up to date, creating new")
 			success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
-				if err := os.MkdirAll(path.Dir(publicSymlinkPath), constants.DirPermision); err != nil {
+				if err := os.MkdirAll(path.Dir(publicSymlinkPath), config.DirPermision); err != nil {
 					task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink directory: %s", err))
 					return err
 				}
@@ -324,7 +323,7 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			task.LogFatal(nil, fmt.Sprintf("Failed to get artifact from fetch config task: %s", err.Error()))
 			return
 		}
-		config, ok := artifact.(registry.ConfigWithBytesAndDigest)
+		imageConfig, ok := artifact.(registry.ConfigWithBytesAndDigest)
 		if !ok {
 			task.LogFatal(nil, fmt.Sprintf("Invalid config type: %s", reflect.TypeOf(artifact).String()))
 			return
@@ -337,7 +336,7 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			cvmfs.Unlock(cvmfsRepo)
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Released CVMFS lock")
 		}()
-		lastChainDirectory := cvmfs.ChainPath(cvmfsRepo, chain[len(chain)-1].ChainDigest.Encoded())
+		lastChainDirectory := ChainPath(cvmfsRepo, chain[len(chain)-1].LegacyChainDigest)
 
 		// First we create the private flat directory with catalog
 		success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
@@ -345,7 +344,7 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating catalog inside `.flat` directory")
 				return err
 			}
-			if err := os.MkdirAll(path.Dir(privatePath), constants.DirPermision); err != nil {
+			if err := os.MkdirAll(path.Dir(privatePath), config.DirPermision); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating directory inside .flat directory")
 				return err
 			}
@@ -362,15 +361,15 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating the base singularity environment")
 				return err
 			}
-			if err := singularity.InsertRunScript(privatePath, config.Config); err != nil {
+			if err := singularity.InsertRunScript(privatePath, imageConfig.Config); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in inserting the singularity runscript")
 				return err
 			}
-			if err := singularity.InsertEnv(privatePath, config.Config); err != nil {
+			if err := singularity.InsertEnv(privatePath, imageConfig.Config); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in inserting the singularity environment")
 				return err
 			}
-			if err := os.MkdirAll(path.Dir(publicSymlinkPath), constants.DirPermision); err != nil {
+			if err := os.MkdirAll(path.Dir(publicSymlinkPath), config.DirPermision); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create image directory %s: %s", publicSymlinkPath, err))
 				return err
 			}
@@ -402,13 +401,13 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prevLinkTask db.TaskPtr) (db.TaskPtr, error) {
 	// Check if the same chain link is already being ingested.
 	// Then we can just wait for that task to finish.
-	key := ingestChainLinkKey{chainLink.ChainDigest, cvmfsRepo}
+	key := ingestChainLinkKey{chainLink.LegacyChainDigest, cvmfsRepo}
 	currentlyIngestingLinksMutex.Lock()
 	if taskPtr, ok := currentlyIngestingLinks[key]; ok {
 		currentlyIngestingLinksMutex.Unlock()
 		return taskPtr, nil
 	}
-	titleStr := fmt.Sprintf("Create chain link %s for %s in %s", chainLink.ChainDigest.String(), image.GetSimpleName(), cvmfsRepo)
+	titleStr := fmt.Sprintf("Create chain link %s for %s in %s", chainLink.LegacyChainDigest.String(), image.GetSimpleName(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN_LINK, titleStr)
 	if err != nil {
 		return db.TaskPtr{}, err
@@ -433,11 +432,11 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 	if dirty {
 		task.Log(nil, db.LOG_SEVERITY_INFO, "The chain link is dirty. Likely somethink went wrong during ingestion. Cleaning up before continuing")
 		if success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
-			if err := os.RemoveAll(ChainPath(cvmfsRepo, chainLink.ChainDigest)); err != nil {
+			if err := os.RemoveAll(ChainPath(cvmfsRepo, chainLink.LegacyChainDigest)); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to remove dirty chain link: %s", err))
 				return err
 			}
-			if err := os.RemoveAll(DirtyChainPath(cvmfsRepo, chainLink.ChainDigest)); err != nil {
+			if err := os.RemoveAll(DirtyChainPath(cvmfsRepo, chainLink.LegacyChainDigest)); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to remove dirty chain link flag: %s", err))
 				return err
 			}
@@ -508,7 +507,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 
 		// We then wait for the previous chain link to finish
 		if prevLinkTask != db.NullTaskPtr() {
-			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Waiting for ingestion of previous chain link (%s) to complete.", chainLink.PreviousChainDigest.String()))
+			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Waiting for ingestion of previous chain link (%s) to complete.", chainLink.PreviousLegacyChainDigest.String()))
 			result := prevLinkTask.WaitUntilDone()
 			if !db.TaskResultSuccessful(result) {
 				task.LogFatal(nil, "Previous chain link failed")
@@ -540,7 +539,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 }
 
 func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
-	titleStr := fmt.Sprintf("Ingest chain link %s into %s", link.ChainDigest.String(), cvmfsRepo)
+	titleStr := fmt.Sprintf("Ingest chain link %s into %s", link.LegacyChainDigest.String(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_INGEST_CHAIN_LINK, titleStr)
 	if err != nil {
 		return db.NullTaskPtr(), err
@@ -551,7 +550,7 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			return
 		}
 
-		blobPath := path.Join(config.TMP_FILE_PATH, "blobs", link.LayerDigest.Encoded())
+		blobPath := path.Join(config.DownloadsDir)
 		fileReader, err := os.Open(blobPath)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to open layer file %s: %s", blobPath, err))
@@ -574,7 +573,7 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Layer is not compressed, using file reader directly")
 		}
 		// We get the digest and size of the uncompressed layer
-		readHashCloseSizer := lib.NewReadAndHash(uncompressedReader)
+		readHashCloseSizer := util.NewReadAndHash(uncompressedReader)
 		tarReader := *tar.NewReader(readHashCloseSizer)
 
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for CVMFS lock")
@@ -582,7 +581,7 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 		defer cvmfs.Unlock(cvmfsRepo)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Got CVMFS lock")
 
-		err = CreateSneakyChain(cvmfsRepo, link.ChainDigest, link.PreviousChainDigest, tarReader)
+		err = CreateSneakyChain(cvmfsRepo, link.LegacyChainDigest, link.PreviousLegacyChainDigest, tarReader)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest chain link: %s", err))
 			return
@@ -596,7 +595,7 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 }
 
 func checkChainLink(chainLink ChainLink, cvmfsRepo string) (exists bool, dirty bool, err error) {
-	if _, err := os.Stat(cvmfs.ChainPath(cvmfsRepo, chainLink.ChainDigest.Encoded())); err != nil {
+	if _, err := os.Stat(ChainPath(cvmfsRepo, chainLink.LegacyChainDigest)); err != nil {
 		// For some reason, we have to cast this to a PathError.
 		// If not, errors.Is(os.ErrNotExist, err) will return false when a parent directory does not exist.
 		var pathErr *os.PathError
@@ -611,7 +610,7 @@ func checkChainLink(chainLink ChainLink, cvmfsRepo string) (exists bool, dirty b
 
 	// Chain link exists, but we need to check if it is dirty
 	// We do this by checking if the dirty chain directory exists
-	if _, err := os.Stat(cvmfs.DirtyChainPath(cvmfsRepo, chainLink.ChainDigest.Encoded())); err != nil {
+	if _, err := os.Stat(DirtyChainPath(cvmfsRepo, chainLink.LegacyChainDigest)); err != nil {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) {
 			err = pathErr.Err
@@ -638,11 +637,11 @@ func GenerateChainFromManifest(m v1.Manifest) Chain {
 		}
 
 		if i == 0 {
-			link.PreviousChainDigest = ""
-			link.ChainDigest = link.LayerDigest
+			link.PreviousLegacyChainDigest = ""
+			link.LegacyChainDigest = link.LayerDigest
 		} else {
-			link.PreviousChainDigest = chain[i-1].ChainDigest
-			link.ChainDigest = digest.FromString(fmt.Sprintf("%s %s", link.PreviousChainDigest.Encoded(), link.LayerDigest.Encoded()))
+			link.PreviousLegacyChainDigest = chain[i-1].LegacyChainDigest
+			link.LegacyChainDigest = digest.FromString(fmt.Sprintf("%s %s", link.PreviousLegacyChainDigest.Encoded(), link.LayerDigest.Encoded()))
 		}
 
 		chain[i] = link
@@ -661,15 +660,15 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		// if the directory does not exists, we create it
 		if success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
-			os.MkdirAll(dir, constants.DirPermision)
+			os.MkdirAll(dir, config.DirPermision)
 			filePath := filepath.Join(dir, ".cvmfscatalog")
-			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, config.FilePermision)
 			if err != nil {
 				return err
 			}
 			f.Close()
 			// We mark the chain as dirty, in case something goes wrong
-			err = os.MkdirAll(dirtyChainPath, constants.DirPermision)
+			err = os.MkdirAll(dirtyChainPath, config.DirPermision)
 			if err != nil {
 				return err
 			}
@@ -703,7 +702,7 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
 			}
 
-			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, config.FilePermision)
 			f.Close()
 			return nil
 		}, opt); err != nil {
@@ -729,7 +728,7 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 		for {
 			header, err := layer.Next()
 			if err == io.EOF {
-				f, err := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+				f, err := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, config.FilePermision)
 				if err != nil {
 					return fmt.Errorf("error in creating the .cvmfscatalog file: %w", err)
 				}
@@ -748,7 +747,7 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 			path := filepath.Join(sneakyChainPath, header.Name)
 			dir := filepath.Dir(path)
 
-			os.MkdirAll(dir, constants.DirPermision)
+			os.MkdirAll(dir, config.DirPermision)
 			if cvmfs.IsWhiteout(path) {
 				// this will be an empty file
 				// check if it is an opaque directory or a standard whiteout file
@@ -774,7 +773,7 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 
 			case tar.TypeDir:
 				{
-					err := os.MkdirAll(path, constants.DirPermision)
+					err := os.MkdirAll(path, config.DirPermision)
 					if err != nil {
 						return fmt.Errorf("error in creating directory: %w", err)
 					}
@@ -782,7 +781,7 @@ func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, par
 				}
 			case tar.TypeReg, tar.TypeRegA:
 				{
-					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
+					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, config.FilePermision)
 					if err != nil {
 						return fmt.Errorf("error in creating file: %w", err)
 					}

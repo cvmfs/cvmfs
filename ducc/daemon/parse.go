@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -94,18 +93,18 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 		}
 
 		// some other error, let's return the first error
-		return ParsedWishInputURL{}, fmt.Errorf("Impossible to identify the registry of the image: %s", imageUrl)
+		return ParsedWishInputURL{}, fmt.Errorf("impossible to identify the registry of the image: %s", imageUrl)
 	}
 	if url.Scheme != "http" && url.Scheme != "https" {
-		return ParsedWishInputURL{}, fmt.Errorf("Unsupported protocol: %s", url.Scheme)
+		return ParsedWishInputURL{}, fmt.Errorf("unsupported protocol: %s", url.Scheme)
 	}
 
 	if url.Path == "" {
-		return ParsedWishInputURL{}, fmt.Errorf("Impossible to identify the repository of the image: %s", imageUrl)
+		return ParsedWishInputURL{}, fmt.Errorf("impossible to identify the repository of the image: %s", imageUrl)
 	}
 	colonPathSplitted := strings.Split(url.Path, ":")
 	if len(colonPathSplitted) == 0 {
-		return ParsedWishInputURL{}, fmt.Errorf("Impossible to identify the path of the image: %s", imageUrl)
+		return ParsedWishInputURL{}, fmt.Errorf("impossible to identify the path of the image: %s", imageUrl)
 	}
 	// no split happened, hence we don't have neither a tag nor a digest, but only a path
 	if len(colonPathSplitted) == 1 {
@@ -114,7 +113,7 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 		repository := strings.TrimLeft(colonPathSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return ParsedWishInputURL{}, fmt.Errorf("Impossible to find the repository for: %s", imageUrl)
+			return ParsedWishInputURL{}, fmt.Errorf("impossible to find the repository for: %s", imageUrl)
 		}
 		return ParsedWishInputURL{
 			Scheme:     url.Scheme,
@@ -126,7 +125,7 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 	}
 	if len(colonPathSplitted) > 3 {
 		fmt.Println(colonPathSplitted)
-		return ParsedWishInputURL{}, fmt.Errorf("Impossible to parse the string into an image, too many `:` in : %s", imageUrl)
+		return ParsedWishInputURL{}, fmt.Errorf("impossible to parse the string into an image, too many `:` in : %s", imageUrl)
 	}
 	// the colon `:` is used also as separator in the digest between sha256
 	// and the actuall digest, a len(pathSplitted) == 2 could either means
@@ -138,14 +137,14 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 	// digest, if it produce more than two we have an error.
 	atPathSplitted := strings.Split(url.Path, "@")
 	if len(atPathSplitted) > 2 {
-		return ParsedWishInputURL{}, fmt.Errorf("To many `@` in the image name: %s", imageUrl)
+		return ParsedWishInputURL{}, fmt.Errorf("too many `@` in the image name: %s", imageUrl)
 	}
 	var repoTag string
 	var parsedDigest digest.Digest
 	if len(atPathSplitted) == 2 {
 		parsedDigest, err = digest.Parse(atPathSplitted[1])
 		if err != nil {
-			return ParsedWishInputURL{}, fmt.Errorf("Impossible to parse the digest: %s", atPathSplitted[1])
+			return ParsedWishInputURL{}, fmt.Errorf("impossible to parse the digest: %s", atPathSplitted[1])
 		}
 		repoTag = atPathSplitted[0]
 	}
@@ -161,7 +160,7 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 		repository := strings.TrimLeft(colonRepoTagSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return ParsedWishInputURL{}, fmt.Errorf("Impossible to find the repository for: %s", imageUrl)
+			return ParsedWishInputURL{}, fmt.Errorf("impossible to find the repository for: %s", imageUrl)
 		}
 		tag := ""
 		if parsedDigest == "" {
@@ -182,7 +181,7 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 		repository := strings.TrimLeft(colonRepoTagSplitted[0], "/")
 		repository = strings.TrimRight(repository, "/")
 		if repository == "" {
-			return ParsedWishInputURL{}, fmt.Errorf("Impossible to find the repository for: %s", imageUrl)
+			return ParsedWishInputURL{}, fmt.Errorf("impossible to find the repository for: %s", imageUrl)
 		}
 		tag := colonRepoTagSplitted[1]
 		if parsedDigest != "" {
@@ -200,9 +199,5 @@ func ParseImageURL(imageUrl string) (ParsedWishInputURL, error) {
 			TagWildcard: tagWildcard,
 		}, nil
 	}
-	return ParsedWishInputURL{}, fmt.Errorf("Impossible to parse the wish: %s", imageUrl)
-}
-
-func parseRecipe(recipe string) (RecipeV1, error) {
-	return RecipeV1{}, errors.New("not implemented")
+	return ParsedWishInputURL{}, fmt.Errorf("impossible to parse the wish: %s", imageUrl)
 }

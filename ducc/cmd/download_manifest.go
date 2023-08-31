@@ -1,15 +1,16 @@
 package cmd
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/cvmfs/ducc/lib"
-	l "github.com/cvmfs/ducc/log"
+	"github.com/cvmfs/ducc/daemon"
+	"github.com/cvmfs/ducc/db"
+	"github.com/cvmfs/ducc/registry"
 )
 
 var (
@@ -26,27 +27,32 @@ var downloadManifestCmd = &cobra.Command{
 	Short:   "Download the manifest of the image, if sucessful it will print the manifest itself, otherwise will show what went wrong.",
 	Aliases: []string{"get-manifest"},
 	Args:    cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		img, err := lib.ParseImage(args[0])
+	RunE: func(cmd *cobra.Command, args []string) error {
+		parsedInput, err := daemon.ParseImageURL(args[0])
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		if img.Tag == "" && img.Digest == "" {
-			log.Fatal("Please provide either the image tag or the image digest")
-		}
-		if username != "" {
-			img.User = username
+			return fmt.Errorf("error parsing the image URL: %w", err)
 		}
 
-		manifest, err := img.GetManifest()
-		if err != nil {
-			l.LogE(err).Fatal("Error in getting the manifest")
+		image := db.Image{
+			ID:             db.ImageID(uuid.New()),
+			RegistryScheme: parsedInput.Scheme,
+			RegistryHost:   parsedInput.Registry,
+			Repository:     parsedInput.Repository,
+			Tag:            parsedInput.Tag,
+			Digest:         parsedInput.Digest,
 		}
-		text, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			l.LogE(err).Fatal("Error in encoding the manifest as JSON")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err := registry.InitRegistriesFromEnv(ctx); err != nil {
+			return fmt.Errorf("error initializing registries: %w", err)
 		}
-		fmt.Println(string(text))
+		manifest, _, _, err := registry.FetchAndParseManifestAndList(image)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error fetching the manifest: %s\n", err)
+			return err
+		}
+		os.Stdout.Write(manifest.ManifestBytes)
+		return nil
 	},
 }

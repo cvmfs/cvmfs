@@ -1,11 +1,11 @@
-package lib
+package util
 
 import (
 	"io"
 	"os"
 	"sync"
 
-	temp "github.com/cvmfs/ducc/temp"
+	"github.com/cvmfs/ducc/config"
 )
 
 type DiskBufferReadAndHash struct {
@@ -19,7 +19,7 @@ type diskBuffer struct {
 }
 
 func NewDiskBuffer(r io.ReadCloser) (io.ReadCloser, error) {
-	f, err := temp.UserDefinedTempFile()
+	f, err := os.CreateTemp(config.TempDir, "write_data")
 	if err != nil {
 		os.RemoveAll(f.Name())
 		return &diskBuffer{}, err

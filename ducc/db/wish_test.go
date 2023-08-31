@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cvmfs/ducc/test"
+	"github.com/cvmfs/ducc/util/test"
 	"github.com/google/uuid"
 	"github.com/opencontainers/go-digest"
 )

@@ -24,9 +24,12 @@ type AddWishResponse = db.Wish
 func (c *CommandService) AddWish(args AddWishArgs, response *AddWishResponse) error {
 
 	// Sanitize input
-	if !cvmfs.RepositoryExists(args.CvmfsRepository) {
+	if exists, err := cvmfs.RepositoryExists(args.CvmfsRepository); err != nil {
+		return fmt.Errorf("could not check if repository %s exists: %s", args.CvmfsRepository, err)
+	} else if !exists {
 		return fmt.Errorf("repository %s does not exist", args.CvmfsRepository)
 	}
+
 	if !args.ScheduleOptions.UpdateInterval.IsDefault && args.ScheduleOptions.UpdateInterval.Value < config.MIN_UPDATEINTERVAL {
 		return fmt.Errorf("update interval cannot be shorter than %s", config.MIN_UPDATEINTERVAL.String())
 	}
