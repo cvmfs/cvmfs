@@ -53,8 +53,7 @@ func FetchManifestTask(tx *sql.Tx, image db.Image) (db.TaskPtr, error) {
 	}
 
 	go func() {
-		status := task.WaitForStart()
-		if status == db.TASK_STATUS_DONE {
+		if !task.WaitForStart() {
 			return
 		}
 		manifest, _, gotManifestList, err := FetchAndParseManifestAndList(image)

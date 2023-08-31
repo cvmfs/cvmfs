@@ -163,14 +163,6 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 	return err
 }
 
-type Backlink struct {
-	Origin []string `json:"origin"`
-}
-
-func GetBacklinkPath(CVMFSRepo, layerDigest string) string {
-	return filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "origin.json")
-}
-
 func GetBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err error) {
 	backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
 	llog := func(l *log.Entry) *log.Entry {

@@ -36,10 +36,9 @@ const (
 	TASK_CREATE_THIN   TaskType = "CREATE_THIN"
 
 	// CREATE_LAYERS needs the following steps:
-	TASK_INGEST_LAYERS        TaskType = "INGEST_LAYERS"
-	TASK_CREATE_LAYER         TaskType = "CREATE_LAYER"
-	TASK_INGEST_LAYER         TaskType = "INGEST_LAYER"
-	TASK_WRITE_IMAGE_METADATA TaskType = "WRITE_IMAGE_METADATA"
+	TASK_CREATE_LAYER TaskType = "CREATE_LAYER"
+	TASK_INGEST_LAYER TaskType = "INGEST_LAYER"
+	CREATE_IMAGE_DATA TaskType = "CREATE_IMAGE_DATA"
 
 	// CREATE_FLAT needs the following steps:
 	TASK_CREATE_CHAIN             TaskType = "CREATE_CHAIN"
@@ -466,13 +465,19 @@ func (tPtr TaskPtr) WaitUntilDone() TaskResult {
 }
 
 // WaitForStart blocks until Task.Start() has been called.
-func (t *Task) WaitForStart() TaskStatus {
+// If false is returned, the task should not be started.
+func (t *Task) WaitForStart() bool {
 	t.cv.L.Lock()
 	defer t.cv.L.Unlock()
 	for t.Status == TASK_STATUS_NONE {
 		t.cv.Wait()
 	}
-	return t.Status
+	if t.Status == TASK_STATUS_DONE {
+		return false
+	}
+	t.setTaskStatusWithoutLocking(nil, TASK_STATUS_RUNNING)
+	setStartTimestamp(nil, t.ID)
+	return true
 }
 
 // Start starts the task, and returns the status of the task.
@@ -493,9 +498,7 @@ func (tPtr TaskPtr) Start(tx *sql.Tx) (TaskStatus, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := setStartTimestamp(tx, tPtr.task.ID); err != nil {
-		return "", err
-	}
+	// We call setStartTimestamp in task.WaitForStart(), not here
 
 	tPtr.cv.Broadcast()
 	return tPtr.task.Status, nil
@@ -814,22 +817,6 @@ func parseSmallTaskSnapshotFromRow(row scannableRow) (SmallTaskSnapshot, error) 
 	}
 
 	return taskSnapshot, nil
-}
-
-// LogGoroutineStop is used to log the reason why a goroutine is not starting normally after a call to Task.Start().
-func (t *Task) LogGoroutineStop(result TaskResult) error {
-	var err error
-	switch result {
-	case TASK_RESULT_SUCCESS:
-		err = t.Log(nil, LOG_SEVERITY_DEBUG, "Task has already been completed successfully. Stopping goroutine")
-	case TASK_RESULT_SKIPPED:
-		err = t.Log(nil, LOG_SEVERITY_DEBUG, "Task has already been skipped. Stopping goroutine")
-	case TASK_RESULT_CANCELLED:
-		err = t.Log(nil, LOG_SEVERITY_DEBUG, "Task has been cancelled. Stopping goroutine")
-	case TASK_RESULT_FAILURE:
-		err = t.Log(nil, LOG_SEVERITY_DEBUG, "Task has failed before Start() was called. Stopping goroutine")
-	}
-	return err
 }
 
 func (tPtr TaskPtr) Cancel(tx *sql.Tx) error {

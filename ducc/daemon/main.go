@@ -190,6 +190,11 @@ func Run(ctx context.Context, done chan<- any) {
 				panic(fmt.Errorf("error creating task in DB: %s", err))
 			}
 		case DELETE_WISH_ACTION:
+			// We have pre-created triggers for this action, so we just need to get the IDs
+			for i, operation := range toCombine {
+				trigger := reflect.ValueOf(operation).Elem().Interface().(*TriggeredDeleteWishOperation).Trigger
+				triggerIDs[i] = trigger.ID
+			}
 			// There is only one operation for this action, so we take the first one
 			operation := reflect.ValueOf(toCombine[0]).Elem().Interface().(*TriggeredDeleteWishOperation)
 			// Delete the wish

@@ -87,7 +87,7 @@ func UpdateImageTask(tx *sql.Tx, image db.Image) (db.TaskPtr, error) {
 	}
 
 	go func() {
-		if task.WaitForStart() == db.TASK_STATUS_DONE {
+		if !task.WaitForStart() {
 			return
 		}
 

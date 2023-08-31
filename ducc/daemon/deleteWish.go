@@ -55,7 +55,7 @@ func DeleteWishTask(tx *sql.Tx, wishID db.WishID) (db.TaskPtr, error) {
 	titleStr := "Delete wish with ID " + wishID.String()
 	// Get the wish
 	wish, err := db.GetWishByID(tx, wishID)
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return db.TaskPtr{}, err
 	} else if err == nil {
 		foundTask = true
@@ -75,17 +75,17 @@ func DeleteWishTask(tx *sql.Tx, wishID db.WishID) (db.TaskPtr, error) {
 
 	if err := db.DeleteWishesByIDs(tx, []db.WishID{wishID}); err != nil {
 		task.LogFatal(tx, fmt.Sprintf("Error deleting wish: %s", err))
-		return ptr, err
+		return ptr, nil
 	}
+
+	task.SetTaskCompleted(tx, db.TASK_RESULT_SUCCESS)
 
 	if ownTx {
 		if err := tx.Commit(); err != nil {
 			task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Error committing transaction: %s", err))
-			return ptr, err
+			return ptr, nil
 		}
 	}
-
-	task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 
 	return ptr, nil
 }

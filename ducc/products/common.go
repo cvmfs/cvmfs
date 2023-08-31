@@ -151,9 +151,9 @@ func UpdateImageInRepoTask(image db.Image, manifest registry.ManifestWithBytesAn
 	}*/
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for start")
-		task.WaitForStart()
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting update")
+		if !task.WaitForStart() {
+			return
+		}
 
 		// Wa can start createFlatTask and createLayersTask in parallel
 		if outputOptions.CreateLayers.Value {

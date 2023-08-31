@@ -2,15 +2,17 @@ package cvmfs
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"os/exec"
 
 	"github.com/cvmfs/ducc/constants"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func OpenTransactionNew(cvmfsRepo string, opts ...TransactionOption) (success bool, stdout string, stderr string, err error) {
@@ -127,35 +129,83 @@ func IngestDeleteNew(CVMFSRepo string, path string) error {
 	return nil
 }
 
-func RemoveDirectoryNew(CVMFSRepo string, dirPath ...string) error {
-	path := []string{"/cvmfs", CVMFSRepo}
-	for _, p := range dirPath {
-		path = append(path, p)
+type Backlink struct {
+	Origin []string `json:"origin"`
+}
+
+func GetBacklinkPath(CVMFSRepo, layerDigest string) string {
+	return filepath.Join(LayerMetadataPath(CVMFSRepo, layerDigest), "origin.json")
+}
+
+func GetBacklinkFromLayerNew(CVMFSRepo, layerDigest string) (backlink Backlink, err error) {
+	backlinkPath := GetBacklinkPath(CVMFSRepo, layerDigest)
+
+	if _, err := os.Stat(backlinkPath); os.IsNotExist(err) {
+		return Backlink{Origin: []string{}}, nil
 	}
-	directory := filepath.Join(path...)
-	stat, err := os.Stat(directory)
+
+	backlinkFile, err := os.Open(backlinkPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	if !stat.Mode().IsDir() {
-		err = fmt.Errorf("Trying to remove something different from a directory")
-		return err
+		return backlink, fmt.Errorf("error in opening the backlink file: %v", err)
 	}
 
-	dirsSplitted := strings.Split(directory, string(os.PathSeparator))
-	if len(dirsSplitted) <= 3 || dirsSplitted[1] != "cvmfs" {
-		err := fmt.Errorf("directory not in the CVMFS repo")
-		return err
+	byteBackLink, err := ioutil.ReadAll(backlinkFile)
+	if err != nil {
+		return backlink, fmt.Errorf("error in reading the bytes from the origin file: %v", err)
 	}
-	_, err = WithinTransactionNew(CVMFSRepo, func() error {
-		err := os.RemoveAll(directory)
+
+	err = backlinkFile.Close()
+	if err != nil {
+		return backlink, fmt.Errorf("error in closing the file after reading: %v", err)
+	}
+
+	err = json.Unmarshal(byteBackLink, &backlink)
+	if err != nil {
+		return backlink, fmt.Errorf("error in unmarshaling the files: %v", err)
+	}
+	return backlink, nil
+}
+
+// Need to be in a transaction when calling this function
+func CreateLayersBacklinkNew(CVMFSRepo string, manifest v1.Manifest, imageName string) error {
+
+	backlinks := make(map[string][]byte)
+
+	for _, layer := range manifest.Layers {
+		configDigest := manifest.Config.Digest.String()
+
+		backlink, err := GetBacklinkFromLayerNew(CVMFSRepo, layer.Digest.Encoded())
 		if err != nil {
+			//TODO: Log "Error in obtaining the backlink from a layer digest, skipping..."
 		}
-		return err
-	})
+		backlink.Origin = append(backlink.Origin, configDigest)
 
-	return err
+		backlinkBytesMarshal, err := json.Marshal(backlink)
+		if err != nil {
+			// TODO: Log "error in marshaling backlinks"
+			continue
+		}
+
+		backlinkPath := GetBacklinkPath(CVMFSRepo, layer.Digest.Encoded())
+		backlinks[backlinkPath] = backlinkBytesMarshal
+	}
+
+	for path, fileContent := range backlinks {
+		// the path may not be there, check,
+		// and if it doesn't exists create it
+		dir := filepath.Dir(path)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			err = os.MkdirAll(dir, constants.DirPermision)
+			if err != nil {
+				// TODO: Log "Error in creating the directory for the backlinks file, skipping..."
+				continue
+			}
+		}
+		err := os.WriteFile(path, fileContent, constants.FilePermision)
+		if err != nil {
+			// TODO: Log "Error in writing the backlinks file"
+			continue
+		}
+	}
+	return nil
 }

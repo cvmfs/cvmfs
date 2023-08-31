@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sync"
 
@@ -82,9 +83,7 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 
 	go func() {
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
-		status := task.WaitForStart()
-		if status == db.TASK_STATUS_DONE {
-			// TODO: Cancel the subtasks
+		if !task.WaitForStart() {
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
@@ -97,6 +96,8 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 			return
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully created chain")
+
+		// Create singularity files
 		singularityFilesTaskPtr.Start(nil)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started singularity files creation, waiting for it to finish")
 		result = singularityFilesTaskPtr.WaitUntilDone()
@@ -113,8 +114,6 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 	return ptr, nil
 }
 
-// TODO: Setup private, public paths
-
 func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.TaskPtr, error) {
 	titleStr := fmt.Sprintf("Create chain for %s in %s", image.GetSimpleName(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_CHAIN, titleStr)
@@ -129,7 +128,6 @@ func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.Task
 			task.LogFatal(nil, fmt.Sprintf("Failed to create \"%s\" task: %s", db.TASK_CREATE_CHAIN_LINK, err))
 			return ptr, nil
 		}
-		// TODO: This does a lot of DB commits. Maybe we should batch them?
 		err = task.LinkSubtask(nil, subTask)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to set \"%s\" tasks as subtask: %s", db.TASK_CREATE_CHAIN_LINK, err))
@@ -139,39 +137,64 @@ func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.Task
 	}
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
-		status := task.WaitForStart()
-		if status == db.TASK_STATUS_DONE {
+		if !task.WaitForStart() {
 			return
 		}
-		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
 
+		cvmfs.GetLock(cvmfsRepo)
 		// Create the .chains directory with a catalog if it doesn't exist
-		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, ".chains"); err != nil {
+		success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			_, err := cvmfs.CreateCatalogNew(filepath.Join("/cvmfs", "cvmfsRepo", ".chains"))
+			if err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create catalog: %s", err))
+				return err
+			}
+			return nil
+		})
+		cvmfs.Unlock(cvmfsRepo)
+		if err != nil || !success {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create .chains directory: %s", err))
 			return
 		}
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created .chains directory")
 
 		// Start the subtasks, building the chain links
+		isError := false
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Started creating chain links.")
 		for _, subTaskPtr := range task.Subtasks {
+			if isError {
+				subTaskPtr.Cancel(nil)
+				continue
+			}
 			_, err := subTaskPtr.Start(nil)
 			if err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to start subtask: %s", err))
-				return
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to start subtask: %s", err))
+				isError = true
 			}
 		}
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started creating chain links, waiting for them to finish")
-
-		// We wait for the last chain step to finish
-		resultLastChainStep := task.Subtasks[len(task.Subtasks)-1].WaitUntilDone()
-		if !db.TaskResultSuccessful(resultLastChainStep) {
-			task.LogFatal(nil, "Failed to ingest all chain links")
+		if isError {
+			task.LogFatal(nil, "Could not create all chain links")
 			return
 		}
+
+		// Wait for the subtasks to finish. Even though they depend on each other, by starting
+		// them, we allow the downloads to happen in parallel.
+		for _, subTaskPtr := range task.Subtasks {
+			if isError {
+				subTaskPtr.Cancel(nil)
+				continue
+			}
+			if !db.TaskResultSuccessful(subTaskPtr.WaitUntilDone()) {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Failed while creating a chain link")
+				isError = true
+			}
+		}
+		if isError {
+			task.LogFatal(nil, "Could not create all chain links")
+			return
+		}
+
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully created chain links")
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully created all chain links")
 	}()
 
 	return ptr, nil
@@ -197,10 +220,18 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 	}
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
-		task.WaitForStart()
-		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
+		if !task.WaitForStart() {
+			return
+		}
+
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for CVMFS lock")
+		cvmfs.GetLock(cvmfsRepo)
+		once := sync.Once{}
+		defer once.Do(func() {
+			cvmfs.Unlock(cvmfsRepo)
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Released CVMFS lock")
+		})
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Acquired CVMFS lock")
 
 		var tagOrDigest string
 		if image.Tag != "" {
@@ -211,9 +242,8 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 
 		publicSymlinkPathShort := path.Join(image.RegistryHost, image.Repository+":"+tagOrDigest)
 		publicSymlinkPath := path.Join("/cvmfs", cvmfsRepo, publicSymlinkPathShort)
-		var publicSymlinkInfo os.FileInfo
 		var publicSymlinkExists bool
-		publicSymlinkInfo, err = os.Stat(publicSymlinkPath)
+		publicSymlinkInfo, err := os.Stat(publicSymlinkPath)
 		if errors.Is(err, os.ErrNotExist) {
 			publicSymlinkExists = false
 		} else if err != nil {
@@ -225,9 +255,8 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 
 		privatePathShort := path.Join(".flat", manifest.ManifestDigest.Encoded()[:2], manifest.ManifestDigest.Encoded())
 		privatePath := path.Join("/cvmfs", cvmfsRepo, privatePathShort)
-		var privatePathInfo os.FileInfo
 		var privatePathExists bool
-		privatePathInfo, err = os.Stat(privatePath)
+		privatePathInfo, err := os.Stat(privatePath)
 		if errors.Is(err, os.ErrNotExist) {
 			privatePathExists = false
 		} else if err != nil {
@@ -245,22 +274,43 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 				return
 			}
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Public symlink not up to date, creating new")
-			err := cvmfs.CreateSymlinkIntoCVMFS(cvmfsRepo, publicSymlinkPathShort, privatePathShort)
-			if err != nil {
-				task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
+			success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+				if err := os.MkdirAll(path.Dir(publicSymlinkPath), constants.DirPermision); err != nil {
+					task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink directory: %s", err))
+					return err
+				}
+				relativePath, err := filepath.Rel(path.Dir(publicSymlinkPath), privatePath)
+				if err != nil {
+					task.LogFatal(nil, fmt.Sprintf("Failed to create relative path for public flat symlink: %s", err))
+					return err
+				}
+				if err := os.Symlink(relativePath, publicSymlinkPath); err != nil {
+					task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
+					return err
+				}
+				return nil
+			})
+			if (!success) || err != nil {
+				task.LogFatal(nil, fmt.Sprintf("CVMFS transaction failed: %s", err))
 				return
 			}
-			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Successfully created new public flat symlink, %s -> %s", publicSymlinkPathShort, privatePathShort))
+			task.Log(nil, db.LOG_SEVERITY_INFO, fmt.Sprintf("Successfully updated symlink, %s -> %s", publicSymlinkPathShort, privatePathShort))
 			fetchConfigTask.Skip(nil)
 			task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 			return
 		}
 
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Starting download of image config")
-		fetchConfigTask.Start(nil)
+		once.Do(func() {
+			cvmfs.Unlock(cvmfsRepo)
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock while downloading image config")
+		})
 
+		// We need to create the private flat directory, including config and runscript
+		// For that, we need to download the image config.
+		task.Log(nil, db.LOG_SEVERITY_INFO, "Starting download of image config object")
+		fetchConfigTask.Start(nil)
 		if !db.TaskResultSuccessful(fetchConfigTask.WaitUntilDone()) {
-			task.LogFatal(nil, "Failed to fetch and parse config")
+			task.LogFatal(nil, "Failed to fetch and parse config object")
 			return
 		}
 		artifact, err := fetchConfigTask.GetArtifact()
@@ -275,62 +325,66 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 		}
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Successfully downloaded image config")
 
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for CVMFS lock")
+		cvmfs.GetLock(cvmfsRepo)
+		defer func() {
+			cvmfs.Unlock(cvmfsRepo)
+			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Released CVMFS lock")
+		}()
 		lastChainDirectory := cvmfs.ChainPath(cvmfsRepo, chain[len(chain)-1].ChainDigest.Encoded())
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Acquiring CVMFS lock")
 
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Creating .chains and .flat directories")
-		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, ".chains"); err != nil {
-			task.LogFatal(nil, "Error in creating catalog inside `.chains` directory")
-			return
-		}
-		if err := cvmfs.CreateCatalogIntoDir(cvmfsRepo, ".flat"); err != nil {
-			task.LogFatal(nil, "Error in creating catalog inside `.flat` directory")
-			return
-		}
-		if err := cvmfs.WithinTransaction(cvmfsRepo,
-			func() error {
-				if err := os.MkdirAll(path.Dir(privatePath), constants.DirPermision); err != nil {
-					task.LogFatal(nil, "Error in creating the private symlink directory")
-					return err
-				}
-				return nil
-			}); err != nil {
+		// First we create the private flat directory with catalog
+		success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			if _, err := cvmfs.CreateCatalogNew(filepath.Join("/cvmfs", cvmfsRepo, ".flat")); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating catalog inside `.flat` directory")
+				return err
+			}
+			if err := os.MkdirAll(path.Dir(privatePath), constants.DirPermision); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating directory inside .flat directory")
+				return err
+			}
+			return nil
+		})
+		if !success || err != nil {
+			task.LogFatal(nil, fmt.Sprintf("CVMFS transaction failed: %s", err))
 			return
 		}
 
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Creating singularity environment and runscript")
-		err = cvmfs.WithinTransaction(cvmfsRepo,
-			func() error {
-				if err := singularity.MakeBaseEnv(privatePath); err != nil {
-					task.LogFatal(nil, "Error in creating the base singularity environment")
-					return err
-				}
-				if err := singularity.InsertRunScript(privatePath, config.Config); err != nil {
-					task.LogFatal(nil, "Error in inserting the singularity runscript")
-					return err
-				}
-				if err := singularity.InsertEnv(privatePath, config.Config); err != nil {
-					task.LogFatal(nil, "Error in inserting the singularity environment")
-					return err
-				}
-				return nil
-			},
+		// Then we populate it using a template transaction
+		success, err = cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			if err := singularity.MakeBaseEnv(privatePath); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in creating the base singularity environment")
+				return err
+			}
+			if err := singularity.InsertRunScript(privatePath, config.Config); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in inserting the singularity runscript")
+				return err
+			}
+			if err := singularity.InsertEnv(privatePath, config.Config); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, "Error in inserting the singularity environment")
+				return err
+			}
+			if err := os.MkdirAll(path.Dir(publicSymlinkPath), constants.DirPermision); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create image directory %s: %s", publicSymlinkPath, err))
+				return err
+			}
+			// Finally, we create the public flat symlink
+			relativePath, err := filepath.Rel(path.Dir(publicSymlinkPath), privatePath)
+			if err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Error creating symlink to .flat directory. Could not get relative path: %s", err))
+				return err
+			}
+			if err := os.Symlink(relativePath, publicSymlinkPath); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create symlink to .flat direcotry: %s", err))
+				return err
+			}
+			return nil
+		},
 			cvmfs.NewTemplateTransaction(cvmfs.TrimCVMFSRepoPrefix(lastChainDirectory), privatePathShort))
-		if err != nil {
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
+		if !success || err != nil {
+			task.LogFatal(nil, fmt.Sprintf("CVMFS transaction failed: %s", err))
 			return
 		}
-
-		// Create the public symlink
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Creating public flat symlink")
-		err = cvmfs.CreateSymlinkIntoCVMFS(cvmfsRepo, publicSymlinkPathShort, privatePathShort)
-		if err != nil {
-			task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
-			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
-			return
-		}
-
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
 
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SUCCESS)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Task completed")
@@ -356,6 +410,13 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 	currentlyIngestingLinks[key] = ptr
 	currentlyIngestingLinksMutex.Unlock()
 
+	cvmfs.GetLock(cvmfsRepo)
+	once := sync.Once{}
+	defer once.Do(func() {
+		cvmfs.Unlock(cvmfsRepo)
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Released CVMFS lock")
+	})
+
 	// If chain link already exists in CVMFS, we can skip it and return instantly
 	exists, err := chainLinkExistsInCvmfs(chainLink, cvmfsRepo)
 	if err != nil {
@@ -367,6 +428,11 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SKIPPED)
 		return ptr, nil
 	}
+
+	once.Do(func() {
+		cvmfs.Unlock(cvmfsRepo)
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Releasing CVMFS lock")
+	})
 
 	// We create the download layer task
 	registryPtr := registry.GetOrCreateRegistry(registry.ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
@@ -403,15 +469,9 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 	earlyReturn = false
 	go func() {
 		defer releaseBlob(chainLink.LayerDigest)
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
-		status := task.WaitForStart()
-		if status == db.TASK_STATUS_DONE {
-			result := ptr.GetValue().Result
-			task.LogGoroutineStop(result)
+		if !task.WaitForStart() {
 			return
 		}
-		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
 
 		// We can begin the download layer task immediately
 		downloadLayerTaskPtr.Start(nil)
@@ -464,8 +524,9 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 	}
 
 	go func() {
-		task.WaitForStart()
-		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
+		if !task.WaitForStart() {
+			return
+		}
 
 		blobPath := path.Join(config.TMP_FILE_PATH, "blobs", link.LayerDigest.Encoded())
 		fileReader, err := os.Open(blobPath)

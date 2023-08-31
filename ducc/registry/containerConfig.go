@@ -71,8 +71,9 @@ func FetchAndParseConfigTask(image db.Image, configDigest digest.Digest) (db.Tas
 		return db.TaskPtr{}, err
 	}
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting for start")
-		task.WaitForStart()
+		if !task.WaitForStart() {
+			return
+		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Fetching and parsing config %s", configDigest.String()))
 		config, err := fetchAndParseConfig(image, configDigest)
 		if err != nil {

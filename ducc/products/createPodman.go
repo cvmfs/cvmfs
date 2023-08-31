@@ -64,7 +64,9 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 	}
 
 	go func() {
-		task.WaitForStart()
+		if !task.WaitForStart() {
+			return
+		}
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Starting podman image creation")
 
 		// 0. We need the config
@@ -113,7 +115,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 
 		// 1. Ensure that podman directories and catalogs exist
 		requiredCatalogs := []string{
-			constants.PodmanSubDir,
+			path.Join("/cvmfs/", constants.PodmanSubDir),
 			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay"),
 			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-images"),
 			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-layers"),
