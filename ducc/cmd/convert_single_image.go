@@ -14,8 +14,8 @@ import (
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/products"
 	"github.com/cvmfs/ducc/registry"
+	"github.com/cvmfs/ducc/unpacker"
 )
 
 var (
@@ -166,7 +166,7 @@ var convertSingleImageCmd = &cobra.Command{
 				manifest := artifact.(registry.ManifestWithBytesAndDigest)
 
 				// Create the outputs
-				updateTask, err := products.UpdateImageInRepoTask(image, manifest, outputOptions, cvmfsRepo)
+				updateTask, err := unpacker.UpdateImageInRepoTask(image, manifest, outputOptions, cvmfsRepo)
 				if err != nil {
 					fmt.Printf("Error in creating the task for image %s: %s\n", image.GetSimpleName(), err)
 					atomic.AddInt32(&failedCount, 1)

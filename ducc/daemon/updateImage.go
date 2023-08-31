@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/products"
 	"github.com/cvmfs/ducc/registry"
+	"github.com/cvmfs/ducc/unpacker"
 )
 
 const UPDATE_IMAGE_ACTION string = "updateImage"
@@ -106,7 +106,7 @@ func UpdateImageTask(tx *sql.Tx, image db.Image) (db.TaskPtr, error) {
 
 		subTasks := make([]db.TaskPtr, 0, len(outputsByCvmfsRepo))
 		for cvmfsRepo, outputs := range outputsByCvmfsRepo {
-			subTask, err := products.UpdateImageInRepoTask(image, manifest, outputs, cvmfsRepo)
+			subTask, err := unpacker.UpdateImageInRepoTask(image, manifest, outputs, cvmfsRepo)
 			if err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Error creating subtask for cvmfs repo %s: %s", cvmfsRepo, err))
 				return

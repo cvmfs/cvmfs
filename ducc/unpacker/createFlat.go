@@ -1,4 +1,4 @@
-package products
+package unpacker
 
 import (
 	"archive/tar"
@@ -15,8 +15,8 @@ import (
 	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
-	singularity "github.com/cvmfs/ducc/products/singularity"
 	"github.com/cvmfs/ducc/registry"
+	singularity "github.com/cvmfs/ducc/unpacker/singularity"
 	"github.com/cvmfs/ducc/util"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
