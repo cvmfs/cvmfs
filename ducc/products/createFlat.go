@@ -21,6 +21,7 @@ import (
 	"github.com/cvmfs/ducc/singularity"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/unix"
 )
 
 type Chain = []ChainLink
@@ -40,6 +41,14 @@ type ingestChainLinkKey struct {
 
 var currentlyIngestingLinksMutex = sync.Mutex{}
 var currentlyIngestingLinks = make(map[ingestChainLinkKey]db.TaskPtr)
+
+func ChainPath(cvmfsRepo string, legacyChainDigest digest.Digest) string {
+	return filepath.Join("/", "cvmfs", cvmfsRepo, constants.ChainSubDir, legacyChainDigest.Encoded()[0:2], legacyChainDigest.Encoded())
+}
+
+func DirtyChainPath(cvmfsRepo string, legacyChainDigest digest.Digest) string {
+	return filepath.Join("/", "cvmfs", cvmfsRepo, constants.DirtyChainSubDir, legacyChainDigest.Encoded())
+}
 
 func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
 	titleStr := fmt.Sprintf("Create flat image for %s in %s", image.GetSimpleName(), cvmfsRepo)
@@ -82,12 +91,9 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 	}
 
 	go func() {
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Waiting to start task")
 		if !task.WaitForStart() {
 			return
 		}
-		task.Log(nil, db.LOG_SEVERITY_INFO, "Started task")
-		task.SetTaskStatus(nil, db.TASK_STATUS_RUNNING)
 		chainTaskPtr.Start(nil)
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Started creating chain, waiting for it to finish")
 		result := chainTaskPtr.WaitUntilDone()
@@ -418,12 +424,29 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 	})
 
 	// If chain link already exists in CVMFS, we can skip it and return instantly
-	exists, err := chainLinkExistsInCvmfs(chainLink, cvmfsRepo)
+	// If it is dirty, we need to clean it up before re-ingesting it
+	exists, dirty, err := checkChainLink(chainLink, cvmfsRepo)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to check if chain link exists in CVMFS: %s", err))
 		return ptr, nil
 	}
-	if exists {
+	if dirty {
+		task.Log(nil, db.LOG_SEVERITY_INFO, "The chain link is dirty. Likely somethink went wrong during ingestion. Cleaning up before continuing")
+		if success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			if err := os.RemoveAll(ChainPath(cvmfsRepo, chainLink.ChainDigest)); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to remove dirty chain link: %s", err))
+				return err
+			}
+			if err := os.RemoveAll(DirtyChainPath(cvmfsRepo, chainLink.ChainDigest)); err != nil {
+				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to remove dirty chain link flag: %s", err))
+				return err
+			}
+			return nil
+		}); !success || err != nil {
+			task.LogFatal(nil, fmt.Sprintf("CVMFS transaction failed: %s", err))
+			return ptr, nil
+		}
+	} else if exists {
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Chain link already exists in CVMFS")
 		task.SetTaskCompleted(nil, db.TASK_RESULT_SKIPPED)
 		return ptr, nil
@@ -554,18 +577,12 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 		readHashCloseSizer := lib.NewReadAndHash(uncompressedReader)
 		tarReader := *tar.NewReader(readHashCloseSizer)
 
-		previousChainID := ""
-		if link.PreviousChainDigest != "" {
-			// Want to avoid .Encoded() panicing if link.PreviousChainDigest is empty
-			previousChainID = link.PreviousChainDigest.Encoded()
-		}
-
 		task.Log(nil, db.LOG_SEVERITY_INFO, "Waiting for CVMFS lock")
 		cvmfs.GetLock(cvmfsRepo)
 		defer cvmfs.Unlock(cvmfsRepo)
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Got CVMFS lock")
 
-		err = cvmfs.CreateSneakyChain(cvmfsRepo, link.ChainDigest.Encoded(), previousChainID, tarReader)
+		err = CreateSneakyChain(cvmfsRepo, link.ChainDigest, link.PreviousChainDigest, tarReader)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to ingest chain link: %s", err))
 			return
@@ -578,14 +595,36 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 	return ptr, nil
 }
 
-func chainLinkExistsInCvmfs(chainLink ChainLink, cvmfsRepo string) (bool, error) {
-	_, err := os.Stat(cvmfs.ChainPath(cvmfsRepo, chainLink.ChainDigest.Encoded()))
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
+func checkChainLink(chainLink ChainLink, cvmfsRepo string) (exists bool, dirty bool, err error) {
+	if _, err := os.Stat(cvmfs.ChainPath(cvmfsRepo, chainLink.ChainDigest.Encoded())); err != nil {
+		// For some reason, we have to cast this to a PathError.
+		// If not, errors.Is(os.ErrNotExist, err) will return false when a parent directory does not exist.
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			err = pathErr.Err
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return false, false, nil
+		}
+		return false, false, err
 	}
-	return false, err
+
+	// Chain link exists, but we need to check if it is dirty
+	// We do this by checking if the dirty chain directory exists
+	if _, err := os.Stat(cvmfs.DirtyChainPath(cvmfsRepo, chainLink.ChainDigest.Encoded())); err != nil {
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			err = pathErr.Err
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return true, false, nil
+		}
+		return true, false, err
+
+	}
+
+	// Dirty chain directory exists
+	return true, true, nil
 }
 
 func GenerateChainFromManifest(m v1.Manifest) Chain {
@@ -609,4 +648,232 @@ func GenerateChainFromManifest(m v1.Manifest) Chain {
 		chain[i] = link
 	}
 	return chain
+}
+
+func CreateSneakyChain(cvmfsRepo string, newLegacyChainDigest digest.Digest, parentLegagyChainDigest digest.Digest, layer tar.Reader) error {
+	sneakyPath := filepath.Join("/", "var", "spool", "cvmfs", cvmfsRepo, "scratch", "current")
+	newChainPath := ChainPath(cvmfsRepo, newLegacyChainDigest)
+	dirtyChainPath := DirtyChainPath(cvmfsRepo, newLegacyChainDigest)
+	sneakyChainPath := filepath.Join(sneakyPath, cvmfs.TrimCVMFSRepoPrefix(newChainPath))
+
+	// we need to create the directory were to do the template transaction
+	dir := filepath.Dir(newChainPath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		// if the directory does not exists, we create it
+		if success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			os.MkdirAll(dir, constants.DirPermision)
+			filePath := filepath.Join(dir, ".cvmfscatalog")
+			f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			if err != nil {
+				return err
+			}
+			f.Close()
+			// We mark the chain as dirty, in case something goes wrong
+			err = os.MkdirAll(dirtyChainPath, constants.DirPermision)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		} else if !success {
+			return fmt.Errorf("error in creating the directory for the new chain")
+		}
+	}
+	// then we need the template transaction to populate it
+	if parentLegagyChainDigest != "" {
+		// if it is the very first chain, we don't need the template transaction
+		opt := cvmfs.TemplateTransaction{
+			Source:      cvmfs.TrimCVMFSRepoPrefix(ChainPath(cvmfsRepo, parentLegagyChainDigest)),
+			Destination: cvmfs.TrimCVMFSRepoPrefix(newChainPath),
+		}
+		if success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
+			source := ChainPath(cvmfsRepo, parentLegagyChainDigest)
+			sourceDirs, err := os.ReadDir(source)
+			if err != nil {
+				return err
+			}
+			destination := newChainPath
+			destinationDirs, err := os.ReadDir(destination)
+			if err != nil {
+				return err
+			}
+
+			if len(sourceDirs) != len(destinationDirs) {
+				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
+			}
+
+			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+			f.Close()
+			return nil
+		}, opt); err != nil {
+			return err
+		} else if !success {
+			return fmt.Errorf("error in creating the template transaction for the new chain")
+		}
+	}
+
+	// Finally we need the sneaky transaction to create the chain
+	// We don't use a simple WithinTransaction, because we need to clean up the files in sneakyDir before abort
+	closeSneakyTransactionOnce := sync.Once{}
+	success, _, stdErr, err := cvmfs.OpenTransactionNew(cvmfsRepo)
+	if err != nil {
+		return fmt.Errorf("error in opening the sneaky transaction for the new chain: %s", err)
+	} else if !success {
+		return fmt.Errorf("error in opening the sneaky transaction for the new chain: %s", stdErr)
+	}
+	defer func() { closeSneakyTransactionOnce.Do(func() { cvmfs.AbortTransactionNew(cvmfsRepo) }) }()
+
+	if func() error {
+	loop:
+		for {
+			header, err := layer.Next()
+			if err == io.EOF {
+				f, err := os.OpenFile(filepath.Join(sneakyChainPath, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)
+				if err != nil {
+					return fmt.Errorf("error in creating the .cvmfscatalog file: %w", err)
+				}
+				f.Close()
+				return nil
+			}
+
+			if err != nil {
+				return fmt.Errorf("error in reading the layer: %w", err)
+			}
+
+			if header == nil {
+				continue loop
+			}
+
+			path := filepath.Join(sneakyChainPath, header.Name)
+			dir := filepath.Dir(path)
+
+			os.MkdirAll(dir, constants.DirPermision)
+			if cvmfs.IsWhiteout(path) {
+				// this will be an empty file
+				// check if it is an opaque directory or a standard whiteout file
+				base := filepath.Base(path)
+				if base == ".wh..wh..opq" {
+					// an opaque directory
+					if err := cvmfs.MakeOpaqueDir(dir); err != nil {
+						return fmt.Errorf("error in making opaque directory: %w", err)
+					}
+				} else {
+					// a whiteout file
+					base = base[4:]
+					path := filepath.Join(dir, base)
+					if err := cvmfs.MakeWhiteoutFile(path); err != nil {
+						return fmt.Errorf("error in making whiteout file: %w", err)
+					}
+				}
+				continue
+			}
+
+			permissionMask := int64(0)
+			switch header.Typeflag {
+
+			case tar.TypeDir:
+				{
+					err := os.MkdirAll(path, constants.DirPermision)
+					if err != nil {
+						return fmt.Errorf("error in creating directory: %w", err)
+					}
+					permissionMask |= 0700
+				}
+			case tar.TypeReg, tar.TypeRegA:
+				{
+					f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, constants.FilePermision)
+					if err != nil {
+						return fmt.Errorf("error in creating file: %w", err)
+					}
+					if _, err = io.Copy(f, &layer); err != nil {
+						f.Close()
+						return fmt.Errorf("error in copying file from tar: %w", err)
+					}
+					f.Close()
+					permissionMask |= 0600
+				}
+			case tar.TypeLink:
+				{
+					// hardlink
+					// maybe we should just copy the file
+					oldLinkName := filepath.Join(sneakyChainPath, header.Linkname)
+					if err := os.Link(oldLinkName, path); err != nil {
+						return fmt.Errorf("error in creating hard link: %w", err)
+					}
+				}
+			case tar.TypeSymlink:
+				{
+					// symlink
+					if err := os.Symlink(header.Linkname, path); err != nil {
+						return fmt.Errorf("error in creating symbolic link: %w", err)
+					}
+					// TODO (smosciat)
+					// do we want to invoke also Lchmod ?
+					// the function does not really exist in std
+					if err := os.Lchown(path, header.Uid, header.Gid); err != nil {
+						return fmt.Errorf("error in chowning symbolic link: %w", err)
+					}
+
+					continue loop
+				}
+			case tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
+				{
+					// char device
+					var mode uint32
+					switch header.Typeflag {
+					case tar.TypeChar:
+						mode = unix.S_IFCHR
+					case tar.TypeBlock:
+						mode = unix.S_IFBLK
+					case tar.TypeFifo:
+						mode = unix.S_IFIFO
+					}
+					dev := unix.Mkdev(uint32(header.Devmajor), uint32(header.Devminor))
+					if err := unix.Mknod(path, uint32(os.FileMode(int64(mode)|header.Mode)), int(dev)); err != nil {
+						return fmt.Errorf("error in creating special file: %w", err)
+					}
+				}
+			default:
+				{
+					// unclear what to do here, just skip it
+					continue loop
+				}
+			}
+
+			// these are common to everything
+			if err := os.Chmod(path, os.FileMode(header.Mode|permissionMask)); err != nil {
+				return fmt.Errorf("error in chmod: %w", err)
+			}
+			if err := os.Chown(path, header.Uid, header.Gid); err != nil {
+				return fmt.Errorf("error in chown: %w", err)
+			}
+			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
+				return fmt.Errorf("error in chtimes: %w", err)
+			}
+		}
+	}(); err != nil {
+		// Clear our sneaky files
+		os.RemoveAll(filepath.Join(sneakyPath, ".chains"))
+		closeSneakyTransactionOnce.Do(func() { cvmfs.AbortTransactionNew(cvmfsRepo) })
+		// Since something went wrong, better to just leave the .dirty flag
+		// If the ingestion failed, likely an immediate cleanup attempt will fail as well
+	}
+	// everything went well, this flag is not necessary anymore
+	os.RemoveAll(dirtyChainPath)
+	// now the transaction is open and the sneaky overlay is populated
+	// we don't need to do anything else at this point and we can close the transaction
+
+	{
+		// Publish the transaction.
+		closeSneakyTransactionOnce.Do(func() {}) // Prevent the transaction from being aborted later
+		success, _, stdErr, err := cvmfs.PublishTransactionNew(cvmfsRepo)
+		if err != nil {
+			return fmt.Errorf("error in publishing the sneaky transaction for the new chain: %w", err)
+		}
+		if !success {
+			return fmt.Errorf("error in publishing the sneaky transaction for the new chain: %s", stdErr)
+		}
+	}
+	return nil
 }
