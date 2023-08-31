@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"sort"
 	"text/template"
+	"time"
 
 	_ "embed"
 
+	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
 	"github.com/google/uuid"
 )
@@ -45,11 +47,6 @@ func frontPageHtmlHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	imagesByRepo, err := db.GetImagesByCvmfsRepos(tx, repositories)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	runningOperations, err := db.GetAllUnfinishedRootTasks(tx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -60,15 +57,29 @@ func frontPageHtmlHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	activeImagesIDs := make([]uuid.UUID, len(activeImages))
+	for i, image := range activeImages {
+		activeImagesIDs[i] = image.ID
+	}
+	lastImageUpdate, err := db.GetLastTriggeredTaskByObjectIDs(tx, []string{daemon.UPDATE_IMAGE_ACTION}, activeImagesIDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	type cvmfsRepoWithImages struct {
-		Repo   string
-		Images []db.Image
+	type imageWithUpdateStatus struct {
+		ImageName         string
+		ShortID           string
+		ImageID           string
+		LastTaskID        string
+		InProgress        string
+		Result            string
+		LastTaskStarted   string
+		LastTaskCompleted string
 	}
 
 	type templateData struct {
@@ -76,7 +87,7 @@ func frontPageHtmlHandler(w http.ResponseWriter, r *http.Request) {
 		NumCvmfsRepos        int
 		NumRunningOperations int
 		NumPendingTriggers   int
-		CvmfsReposWithImages []cvmfsRepoWithImages
+		ImagesWithStatus     []imageWithUpdateStatus
 	}
 
 	data := templateData{
@@ -84,13 +95,27 @@ func frontPageHtmlHandler(w http.ResponseWriter, r *http.Request) {
 		NumCvmfsRepos:        len(repositories),
 		NumRunningOperations: len(runningOperations),
 		NumPendingTriggers:   len(pendingTriggers),
-		CvmfsReposWithImages: make([]cvmfsRepoWithImages, len(repositories)),
+		ImagesWithStatus:     make([]imageWithUpdateStatus, 0),
 	}
-	for i, repo := range repositories {
-		data.CvmfsReposWithImages[i] = cvmfsRepoWithImages{
-			Repo:   repo,
-			Images: imagesByRepo[i],
+
+	for i, task := range lastImageUpdate {
+		status := imageWithUpdateStatus{
+			ImageName:  activeImages[i].GetSimpleName(),
+			ImageID:    activeImages[i].ID.String(),
+			ShortID:    activeImages[i].ID.String()[:8],
+			LastTaskID: task.ID.String(),
+			Result:     string(task.Result),
 		}
+		if task.Status == db.TASK_STATUS_PENDING || task.Status == db.TASK_STATUS_RUNNING {
+			status.InProgress = string(task.Status)
+		}
+		if !task.StartTimestamp.IsZero() {
+			status.LastTaskStarted = humanReadableDuration(time.Since(task.DoneTimestamp)) + " ago"
+		}
+		if !task.DoneTimestamp.IsZero() {
+			status.LastTaskCompleted = humanReadableDuration(time.Since(task.StartTimestamp)) + " ago"
+		}
+		data.ImagesWithStatus = append(data.ImagesWithStatus, status)
 	}
 
 	t := template.Must(template.New("frontPageTemplate").Parse(frontPageHtmlTmpl))
@@ -130,7 +155,7 @@ func operationsHtmlHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Sort the tasks by their creation time
 	sort.Slice(includedTasks, func(i, j int) bool {
-		return includedTasks[i].CreatedTimestamp.Before(includedTasks[j].CreatedTimestamp)
+		return includedTasks[i].CreatedTimestamp.After(includedTasks[j].CreatedTimestamp)
 	})
 
 	type TemplateData struct {
@@ -266,4 +291,21 @@ func renderTaskTemplate(taskId db.TaskID) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func humanReadableDuration(d time.Duration) string {
+	hours := d / time.Hour
+	d -= hours * time.Hour
+
+	minutes := d / time.Minute
+	d -= minutes * time.Minute
+
+	seconds := d / time.Second
+
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
+	} else if minutes > 0 {
+		return fmt.Sprintf("%dm %ds", minutes, seconds)
+	}
+	return fmt.Sprintf("%ds", seconds)
 }

@@ -11,8 +11,6 @@ const triggerSqlFields string = "id, action, object_id, timestamp, reason, detai
 const triggerSqlFieldsPrefixed string = "triggers.id, triggers.action, triggers.object_id, triggers.timestamp, triggers.reason, triggers.details, triggers.task_id"
 const triggerSqlFieldsQs string = "?,?,?,?,?,?,?"
 
-type TriggerType string
-
 type Trigger struct {
 	ID uuid.UUID
 
@@ -426,5 +424,55 @@ func GetPendingTriggers(tx *sql.Tx) ([]Trigger, error) {
 		}
 	}
 
+	return out, nil
+}
+
+func GetLastTriggeredTaskByObjectIDs(tx *sql.Tx, actionFilter []string, IDs []uuid.UUID) ([]*SmallTaskSnapshot, error) {
+	ownTx := false
+	if tx == nil {
+		ownTx = true
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
+
+	// Reserve space for ID
+	var args = make([]any, 1)
+
+	actionQuery := ""
+	if len(actionFilter) > 0 {
+		actionQuery = " AND triggers.action IN ("
+		for i, checkType := range actionFilter {
+			if i > 0 {
+				actionQuery += ","
+			}
+			actionQuery += "?"
+			args = append(args, checkType)
+		}
+		actionQuery += ")"
+	}
+
+	stmnt := "SELECT DISTINCT " + taskSqlFieldsPrefixed + " FROM tasks JOIN triggers ON tasks.id = triggers.task_id WHERE triggers.object_id = ?" + actionQuery + " ORDER BY tasks.created_timestamp DESC LIMIT 1"
+
+	out := make([]*SmallTaskSnapshot, len(IDs))
+	for i, id := range IDs {
+		args[0] = id
+		row := tx.QueryRow(stmnt, args...)
+		task, err := parseSmallTaskSnapshotFromRow(row)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = &task
+	}
+
+	if ownTx {
+		err := tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return out, nil
 }

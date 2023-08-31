@@ -384,7 +384,7 @@ func GetImagesByCvmfsRepos(tx *sql.Tx, cvmfsRepos []string) ([][]Image, error) {
 	}
 
 	// Need to join wishes with wish_image with images
-	const stmnt string = "SELECT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id JOIN wishes ON wish_image.wish_id = wishes.id WHERE wishes.cvmfs_repository = ?"
+	const stmnt string = "SELECT DISTINCT " + imageSqlFieldsPrefixed + " FROM images JOIN wish_image ON images.id = wish_image.image_id JOIN wishes ON wish_image.wish_id = wishes.id WHERE wishes.cvmfs_repository = ?"
 	prepStmnt, err := tx.Prepare(stmnt)
 	if err != nil {
 		return nil, err
