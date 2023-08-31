@@ -59,7 +59,7 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 
 	createLayerTasks := make([]db.TaskPtr, len(manifest.Manifest.Layers))
 	for i, layer := range manifest.Manifest.Layers {
-		isCompressed := LayerMediaTypeIsCompressed(layer.MediaType)
+		isCompressed := registry.LayerMediaTypeIsCompressed(layer.MediaType)
 		createLayerTask, err := createLayer(image, layer.Digest, isCompressed, cvmfsRepo)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_CREATE_LAYER, err.Error()))
@@ -175,7 +175,7 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 
 	// We create a task to download the layer
 	registryPtr := registry.GetOrCreateRegistry(registry.ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	downloadLayerTask, err := DownloadBlob(registryPtr, image.Repository, layerDigest, nil)
+	downloadLayerTask, err := registry.DownloadBlob(registryPtr, image.Repository, layerDigest, nil)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create task of type %s: %s", db.TASK_DOWNLOAD_BLOB, err.Error()))
 		return ptr, nil
@@ -186,7 +186,7 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 	earlyReturn := true
 	defer func() {
 		if earlyReturn {
-			releaseBlob(layerDigest)
+			registry.ReleaseBlob(layerDigest)
 		}
 	}()
 	if err := task.LinkSubtask(nil, downloadLayerTask); err != nil {
@@ -207,7 +207,7 @@ func createLayer(image db.Image, layerDigest digest.Digest, compressed bool, cvm
 
 	earlyReturn = false
 	go func() {
-		defer releaseBlob(layerDigest)
+		defer registry.ReleaseBlob(layerDigest)
 		if !task.WaitForStart() {
 			return
 		}
