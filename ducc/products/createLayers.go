@@ -381,7 +381,7 @@ func createImageData(image db.Image, manifest registry.ManifestWithBytesAndDiges
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created layer backlinks")
 
 			// Create the image metadata dir, and add manifest.json
-			manifestPath := filepath.Join(".metadata", image.GetSimpleName(), "manifest.json")
+			manifestPath := filepath.Join("/cvmfs", cvmfsRepo, ".metadata", image.GetSimpleName(), "manifest.json")
 			if err := os.MkdirAll(filepath.Dir(manifestPath), constants.DirPermision); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create image metadata directory: %s", err.Error()))
 				return err
