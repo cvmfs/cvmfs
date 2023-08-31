@@ -2,45 +2,37 @@ package cmd
 
 import (
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	lib "github.com/cvmfs/ducc/lib"
-	l "github.com/cvmfs/ducc/log"
-	"github.com/cvmfs/ducc/temp"
+	"github.com/cvmfs/ducc/config"
 )
 
+var oldTempDirString string
+
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&temp.TemporaryBaseDir, "temporary-dir", "t", "", "Temporary directory to store files necessary during the conversion of images, it can grow large ~1G. If not set we use the standard of the system $TMP, usually /tmp")
-	if temp.TemporaryBaseDir == "" {
-		temp.TemporaryBaseDir = os.Getenv("DUCC_TMP_DIR")
-	}
-	rootCmd.PersistentFlags().StringVarP(&lib.NotificationFile, "notification-file", "n", "", "File where to publish notification about DUCC progression")
+	// We no longer allow user to change the full temporary directory.
+	// This is because it is used for inter-process communication and locks.
+	// Instead, we allow the user to set the downloads directory.
+	rootCmd.PersistentFlags().StringVarP(&oldTempDirString, "temporary-dir", "t", config.DownloadsDir, "Temporary directory to store downloads needed during conversion. Can grow large.")
+	oldTempDirFlag := rootCmd.PersistentFlags().Lookup("temporary-dir")
+	oldTempDirFlag.Deprecated = "Use --downloads-dir instead"
+	oldTempDirFlag.Hidden = true
+	rootCmd.PersistentFlags().StringVar(&config.TempDir, "downloads-dir", config.DownloadsDir, "Temporary directory to store downloads needed during conversion. Can grow large.")
 }
 
 var rootCmd = &cobra.Command{
 	DisableFlagsInUseLine: false,
 	Use:                   os.Args[0],
 	Short:                 "Daemon for Unpacking Container images into Cvmfs (DUCC)",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		lib.SetupNotification()
-		lib.SetupRegistries()
-	},
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		lib.StopNotification()
+	SilenceUsage:          true,
+	Run: func(cmd *cobra.Command, args []string) {
+		if oldTempDirString != config.DownloadsDir {
+			config.DownloadsDir = oldTempDirString
+		}
 	},
 }
 
 func EntryPoint() {
 	rootCmd.Execute()
-}
-
-func AliveMessage() {
-	ticker := time.NewTicker(30 * time.Second)
-	go func() {
-		for range ticker.C {
-			l.Log().Info("Process alive")
-		}
-	}()
 }

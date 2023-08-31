@@ -14,8 +14,6 @@ import (
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/errorcodes"
-	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/products"
 	"github.com/cvmfs/ducc/registry"
 )
@@ -41,7 +39,7 @@ var convertSingleImageCmd = &cobra.Command{
 	Short:      "Convert a single image",
 	Args:       cobra.ExactArgs(2),
 	Deprecated: "please use 'wish add --standalone' instead. ",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		defer cancelFunc()
@@ -60,17 +58,14 @@ var convertSingleImageCmd = &cobra.Command{
 		}
 
 		if skipLayers {
-			l.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
 			outputOptions.CreateLayers = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 			skipThinImage = true
 			skipPodman = true
 		}
 		if skipFlat {
-			l.Log().Info("Skipping the creation of the flat image since provided --skip-flat")
 			outputOptions.CreateFlat = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 		}
 		if skipPodman {
-			l.Log().Info("Skipping the creation of the podman store since provided --skip-podman")
 			outputOptions.CreatePodman = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 		}
 
@@ -89,9 +84,10 @@ var convertSingleImageCmd = &cobra.Command{
 			}
 		}*/
 
-		if !cvmfs.RepositoryExists(cvmfsRepo) {
-			l.Log().Error("The repository does not seems to exists.")
-			os.Exit(errorcodes.RepoNotExistsError)
+		if exists, err := cvmfs.RepositoryExists(cvmfsRepo); err != nil {
+			return fmt.Errorf("error in checking if the repository exists: %w", err)
+		} else if !exists {
+			return fmt.Errorf("the repository \"%s\" does not exist")
 		}
 
 		parsedUrl, err := daemon.ParseImageURL(inputImage)
@@ -203,5 +199,6 @@ var convertSingleImageCmd = &cobra.Command{
 		if failedCount > 0 {
 			os.Exit(1)
 		}
+		return nil
 	},
 }

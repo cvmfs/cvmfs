@@ -13,8 +13,6 @@ import (
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/daemon"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/errorcodes"
-	l "github.com/cvmfs/ducc/log"
 	"github.com/cvmfs/ducc/registry"
 )
 
@@ -37,7 +35,7 @@ var convertCmd = &cobra.Command{
 	Use:        "convert wish-list.yaml",
 	Short:      "Convert the wishes",
 	Args:       cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Init Registries
 		ctx, cancelFunc := context.WithCancel(context.Background())
 		defer cancelFunc()
@@ -51,17 +49,14 @@ var convertCmd = &cobra.Command{
 		}
 
 		if skipLayers {
-			l.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
 			outputOptions.CreateLayers = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 			skipThinImage = true
 			skipPodman = true
 		}
 		if skipFlat {
-			l.Log().Info("Skipping the creation of the flat image since provided --skip-flat")
 			outputOptions.CreateFlat = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 		}
 		if skipPodman {
-			l.Log().Info("Skipping the creation of the podman store since provided --skip-podman")
 			outputOptions.CreatePodman = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 		}
 
@@ -78,26 +73,27 @@ var convertCmd = &cobra.Command{
 
 		data, err := os.ReadFile(args[0])
 		if err != nil {
-			l.LogE(err).Error("Impossible to read the recipe file")
-			os.Exit(errorcodes.GetRecipeFileError)
+			return fmt.Errorf("impossible to read the recipe file")
 		}
 		recipe, err := daemon.ParseYamlRecipeV1(data, "cmd")
 		if err != nil {
-			l.LogE(err).Error("Impossible to parse the recipe file")
-			os.Exit(errorcodes.ParseRecipeFileError)
+			return fmt.Errorf("impossible to parse the recipe file")
 		}
-		if !cvmfs.RepositoryExists(recipe.CvmfsRepo) {
-			l.LogE(err).Error("The repository does not seems to exists.")
-			os.Exit(errorcodes.RepoNotExistsError)
+		if exists, err := cvmfs.RepositoryExists(recipe.CvmfsRepo); err != nil {
+			return fmt.Errorf("error in checking if repository exists: %w", err)
+		} else if !exists {
+			return fmt.Errorf("the repository \"%s\" does not exist", recipe.CvmfsRepo)
 		}
 
 		// Start an in-memory database
 		database, err := sql.Open("sqlite3", ":memory:")
 		if err != nil {
-			panic("Unable to open in-memory database")
+			return fmt.Errorf("unable to create in-memory database: %w", err)
 		}
 		defer database.Close()
-		db.Init(database)
+		if err := db.Init(database); err != nil {
+			return fmt.Errorf("unable to initialize database: %w", err)
+		}
 
 		fmt.Printf("Recipe contains %d wishes\n", len(recipe.Wishes))
 
@@ -111,7 +107,7 @@ var convertCmd = &cobra.Command{
 		}
 		dbWishes, err := db.CreateWishes(nil, wishes, false)
 		if err != nil {
-			panic(fmt.Sprintf("Unable to create wishes: %s", err))
+			return fmt.Errorf("unable to create wishes: %w", err)
 		}
 
 		failedExpandWildcards := make([]db.Wish, 0)
@@ -124,7 +120,7 @@ var convertCmd = &cobra.Command{
 				continue
 			}
 			if err != nil {
-				fmt.Printf("Error expanding wildcard: %s\n", err)
+				fmt.Fprintf(os.Stderr, "Error expanding wildcard for \"\": %s\n", err)
 				failedExpandWildcards = append(failedExpandWildcards, wish)
 				succededExpandWildcards = append(succededExpandWildcards, wish)
 			}
@@ -198,10 +194,9 @@ var convertCmd = &cobra.Command{
 		}
 
 		if len(failed) > 0 || len(failedExpandWildcards) > 0 {
-			os.Exit(1)
+			return fmt.Errorf("some images failed to convert")
 		}
 
-		os.Exit(0)
-
+		return nil
 	},
 }

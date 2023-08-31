@@ -4,13 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"reflect"
 	"time"
 
 	"github.com/cvmfs/ducc/daemon/scheduler"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/errorcodes"
 	"github.com/google/uuid"
 )
 
@@ -19,14 +17,12 @@ var initOk bool = false
 
 func Init(schedulingEnabled bool) error {
 	if err := acquireDaemonLock(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error acquiring daemon lock: %s Is another daemon instance running?\n", err)
-		os.Exit(errorcodes.DaemonLockError)
+		return fmt.Errorf("error acquiring daemon lock: %w", err)
 	}
 
 	tx, err := db.GetTransaction()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting transaction: %s\n", err)
-		os.Exit(errorcodes.DatabaseError)
+		return fmt.Errorf("could not init daemon, error getting transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -34,17 +30,17 @@ func Init(schedulingEnabled bool) error {
 
 	// We first need to clean up unfinished tasks and restore pending triggers
 	if err := restoreUnfinishedTriggers(tx); err != nil {
-		return fmt.Errorf("error restoring pending triggers: %s", err)
+		return fmt.Errorf("error restoring pending triggers: %w", err)
 	}
 	if err := abortUnfinishedTasks(tx); err != nil {
-		return fmt.Errorf("error aborting unfinished tasks: %s", err)
+		return fmt.Errorf("error aborting unfinished tasks: %w", err)
 	}
 
 	if schedulingEnabled {
 		// Schedule expand wildcards
 		wishes, err := db.GetAllWishes(tx)
 		if err != nil {
-			return fmt.Errorf("error getting all wishes: %s", err)
+			return fmt.Errorf("error getting all wishes: %w", err)
 		}
 		for _, wish := range wishes {
 			if wish.Identifier.InputTagWildcard {
@@ -55,7 +51,7 @@ func Init(schedulingEnabled bool) error {
 		// Schedule image updates
 		images, err := db.GetAllImages(tx)
 		if err != nil {
-			return fmt.Errorf("error getting all images: %s", err)
+			return fmt.Errorf("error getting all images: %w", err)
 		}
 		for _, image := range images {
 			scheduleUpdateImage(tx, image)
@@ -63,16 +59,15 @@ func Init(schedulingEnabled bool) error {
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("error committing transaction: %s", err)
+		return fmt.Errorf("error committing transaction: %w", err)
 	}
 	initOk = true
 	return nil
 }
 
-func Run(ctx context.Context, done chan<- any) {
+func Run(ctx context.Context, done chan<- any) error {
 	if !initOk {
-		fmt.Fprintf(os.Stderr, "daemon.Run() called without calling daemon.Init() first\n")
-		os.Exit(errorcodes.InternalLogicError)
+		return fmt.Errorf("daemon.Run() called without calling daemon.Init() first\n")
 	}
 	defer close(done)
 	for {
@@ -82,7 +77,7 @@ func Run(ctx context.Context, done chan<- any) {
 		toCombine[0], objectID, actionID, _ = operations.WaitForNextOperation(ctx)
 		if toCombine[0] == nil || reflect.ValueOf(toCombine[0]).IsNil() {
 			// We got a timeout
-			return
+			return nil
 		}
 		// Check if there are more operations for this object and action
 		otherOperations := operations.GetOperationsForObjectAction(objectID, actionID)
@@ -113,7 +108,7 @@ func Run(ctx context.Context, done chan<- any) {
 			if err != nil {
 				// TODO: Handle
 				fmt.Printf("Could not get image. Is it deleted?: %s\n", err)
-				return
+				continue
 			}
 
 			for i, operation := range toCombine {

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/cvmfs/ducc/test"
+	"github.com/cvmfs/ducc/util/test"
 	_ "github.com/mattn/go-sqlite3"
 )
 

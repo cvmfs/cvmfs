@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cvmfs/ducc/constants"
+	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/cvmfs"
 	"github.com/cvmfs/ducc/db"
 	"github.com/cvmfs/ducc/registry"
@@ -80,7 +80,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 			task.LogFatal(nil, fmt.Sprintf("Failed to get artifact from fetch config task: %s", err.Error()))
 			return
 		}
-		config, ok := artifact.(registry.ConfigWithBytesAndDigest)
+		imageConfig, ok := artifact.(registry.ConfigWithBytesAndDigest)
 		if !ok {
 			task.LogFatal(nil, fmt.Sprintf("Invalid config type: %s", reflect.TypeOf(artifact).String()))
 			return
@@ -115,10 +115,10 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 
 		// 1. Ensure that podman directories and catalogs exist
 		requiredCatalogs := []string{
-			path.Join("/cvmfs/", constants.PodmanSubDir),
-			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay"),
-			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-images"),
-			path.Join("/cvmfs/", cvmfsRepo, constants.PodmanSubDir, "overlay-layers"),
+			path.Join("/cvmfs/", config.PodmanSubDir),
+			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay"),
+			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay-images"),
+			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay-layers"),
 		}
 		for _, dir := range requiredCatalogs {
 			changed, err := cvmfs.CreateCatalogNew(dir)
@@ -133,7 +133,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 
 		// 2. Create Podman layer metadata for the layers in the manifest
-		manifestLayersInfo, err := createPodmanLayerInfo(manifest.Manifest, config.Config)
+		manifestLayersInfo, err := createPodmanLayerInfo(manifest.Manifest, imageConfig.Config)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create layer metadata: %s", err.Error()))
 			return
@@ -244,7 +244,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 
 		// Create the config file
-		if changed, err = createConfigFileCVMFS(config, manifest.ManifestDigest, cvmfsRepo); err != nil {
+		if changed, err = createConfigFileCVMFS(imageConfig, manifest.ManifestDigest, cvmfsRepo); err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create config link: %s", err.Error()))
 			return
 		}
@@ -283,7 +283,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 }
 
 func getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo string) ([]PodmanLayerInfo, error) {
-	path := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-layers", "layers.json")
+	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
 
 	var layersInfo []PodmanLayerInfo
 
@@ -310,7 +310,7 @@ func getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo string) ([]PodmanLayerInfo, e
 
 // Reads from CVMFS so needs a lock
 func getExistingPodmanImageInfoFromCVMFS(cvmfsRepo string) ([]PodmanImageInfo, error) {
-	path := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", "images.json")
+	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
 
 	var imagesInfo []PodmanImageInfo
 
@@ -336,9 +336,9 @@ func getExistingPodmanImageInfoFromCVMFS(cvmfsRepo string) ([]PodmanImageInfo, e
 }
 
 func updatePodmanImageStoreCVMFS(imagesInfo []PodmanImageInfo, cvmfsRepo string) error {
-	path := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", "images.json")
+	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
 
-	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, constants.FilePermision)
+	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
 		return fmt.Errorf("failed to open images.json: %w", err)
 	}
@@ -356,9 +356,9 @@ func updatePodmanImageStoreCVMFS(imagesInfo []PodmanImageInfo, cvmfsRepo string)
 }
 
 func updatePodmanLayerStoreCVMFS(layersInfo []PodmanLayerInfo, cvmfsRepo string) error {
-	path := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-layers", "layers.json")
+	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
 
-	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, constants.FilePermision)
+	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
 		return fmt.Errorf("failed to open layers.json: %w", err)
 	}
@@ -378,8 +378,8 @@ func updatePodmanLayerStoreCVMFS(layersInfo []PodmanLayerInfo, cvmfsRepo string)
 
 func createLinks(cvmfsRepo string, layerInfo []PodmanLayerInfo) error {
 	// Create the "l" directory if it does not exist
-	linkdirPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", "l")
-	if err := os.MkdirAll(linkdirPath, constants.DirPermision); err != nil {
+	linkdirPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", "l")
+	if err := os.MkdirAll(linkdirPath, config.DirPermision); err != nil {
 		return err
 	}
 	for _, layer := range layerInfo {
@@ -391,13 +391,13 @@ func createLinks(cvmfsRepo string, layerInfo []PodmanLayerInfo) error {
 			return fmt.Errorf("failed to create link: %w", err)
 		}
 		// Create the link file
-		overlayPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", layer.ID)
+		overlayPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", layer.ID)
 		linkFilePath := path.Join(overlayPath, "link")
 		// Create the overlay directory, in case this function is called before the overlay is created
-		if err := os.MkdirAll(overlayPath, constants.DirPermision); err != nil {
+		if err := os.MkdirAll(overlayPath, config.DirPermision); err != nil {
 			return fmt.Errorf("failed to create overlay directory: %w", err)
 		}
-		if err := os.WriteFile(linkFilePath, []byte(layer.ShortID), constants.FilePermision); err != nil {
+		if err := os.WriteFile(linkFilePath, []byte(layer.ShortID), config.FilePermision); err != nil {
 			return fmt.Errorf("failed to write link file: %w", err)
 		}
 	}
@@ -405,19 +405,19 @@ func createLinks(cvmfsRepo string, layerInfo []PodmanLayerInfo) error {
 }
 
 func LinkRootfsIntoPodmanStore(cvmfsRepo string, layersInfo []PodmanLayerInfo) error {
-	podmanRootFSPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay")
+	podmanRootFSPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay")
 	// Create the directory if it does not exist
-	if err := os.MkdirAll(podmanRootFSPath, constants.DirPermision); err != nil {
+	if err := os.MkdirAll(podmanRootFSPath, config.DirPermision); err != nil {
 		return err
 	}
 	for _, layerInfo := range layersInfo {
 		podmanLayerRootFSPath := path.Join(podmanRootFSPath, layerInfo.ID)
 		// Create the layer directory
-		if err := os.MkdirAll(podmanLayerRootFSPath, constants.DirPermision); err != nil {
+		if err := os.MkdirAll(podmanLayerRootFSPath, config.DirPermision); err != nil {
 			return err
 		}
 		// Link "diff" to the actual layer
-		targetPath := cvmfs.LayerRootfsPath(cvmfsRepo, string(layerInfo.CompressedDiffDigest.Encoded()))
+		targetPath := LayerRootfsPath(cvmfsRepo, layerInfo.CompressedDiffDigest)
 		relativePath, err := filepath.Rel(podmanLayerRootFSPath, targetPath)
 		if err != nil {
 			return err
@@ -435,15 +435,15 @@ func LinkRootfsIntoPodmanStore(cvmfsRepo string, layersInfo []PodmanLayerInfo) e
 	return nil
 }
 
-func createPodmanLayerInfo(manifest v1.Manifest, config v1.Image) ([]PodmanLayerInfo, error) {
-	if len(manifest.Layers) != len(config.RootFS.DiffIDs) {
+func createPodmanLayerInfo(manifest v1.Manifest, configObject v1.Image) ([]PodmanLayerInfo, error) {
+	if len(manifest.Layers) != len(configObject.RootFS.DiffIDs) {
 		return nil, fmt.Errorf("number of layers in manifest and config does not match")
 	}
 	out := make([]PodmanLayerInfo, len(manifest.Layers))
 
 	var parentID digest.Digest
 	for i, layer := range manifest.Layers {
-		id, err := generateChainID(parentID, config.RootFS.DiffIDs[i])
+		id, err := generateChainID(parentID, configObject.RootFS.DiffIDs[i])
 		if err != nil {
 			return nil, err
 		}
@@ -459,7 +459,7 @@ func createPodmanLayerInfo(manifest v1.Manifest, config v1.Image) ([]PodmanLayer
 			Created:              time.Now(),
 			CompressedDiffDigest: layer.Digest,
 			CompressedSize:       layer.Size,
-			UncompressedDigest:   config.RootFS.DiffIDs[i],
+			UncompressedDigest:   configObject.RootFS.DiffIDs[i],
 		}
 		out[i].ShortID, err = generatePodmanShortID()
 		if err != nil {
@@ -680,7 +680,7 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 	if numExistingLayers > 0 {
 		// We have existing layers, so start with the lower string for the last existing layer
 		// Since layer short IDs are random, we need to read from CVMFS, not from the manifest
-		existingLowerFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "lower"))
+		existingLowerFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "lower"))
 		if errors.Is(err, os.ErrNotExist) {
 			// OK, the layer does not have a lower file, so we just start with an empty string
 		} else if err != nil {
@@ -699,7 +699,7 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 		}
 
 		// Append the last layer short ID to the lower string
-		existingLinkFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "link"))
+		existingLinkFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "link"))
 		if err != nil {
 			return fmt.Errorf("failed to open existing link file: %w", err)
 		}
@@ -718,8 +718,8 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 
 	for _, layer := range newLayersInfo {
 		if lowerString != "" {
-			lowerFilePath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay", layer.ID, "lower")
-			file, err := os.OpenFile(lowerFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, constants.FilePermision)
+			lowerFilePath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", layer.ID, "lower")
+			file, err := os.OpenFile(lowerFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, config.FilePermision)
 			if err != nil {
 				return fmt.Errorf("failed to create lower file: %w", err)
 			}
@@ -742,10 +742,10 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 }
 
 func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
-	layerLockPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-layers", "layers.lock")
-	imageLockPath := path.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", "images.lock")
+	layerLockPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.lock")
+	imageLockPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.lock")
 
-	file, err := os.OpenFile(layerLockPath, os.O_CREATE, constants.FilePermision)
+	file, err := os.OpenFile(layerLockPath, os.O_CREATE, config.FilePermision)
 	if errors.Is(err, os.ErrExist) {
 		// File already exists, we are good
 	} else if err != nil {
@@ -757,7 +757,7 @@ func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
 		changed = true
 	}
 
-	file, err = os.OpenFile(imageLockPath, os.O_CREATE, constants.FilePermision)
+	file, err = os.OpenFile(imageLockPath, os.O_CREATE, config.FilePermision)
 	if errors.Is(err, os.ErrExist) {
 	} else if err != nil {
 		return changed, fmt.Errorf("failed to create images.lock: %w", err)
@@ -770,7 +770,7 @@ func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
 }
 
 func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (changed bool, err error) {
-	manifestPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", manifest.ManifestDigest.Encoded(), "manifest")
+	manifestPath := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", manifest.ManifestDigest.Encoded(), "manifest")
 
 	fileInfo, err := os.Stat(manifestPath)
 	if err == nil {
@@ -787,13 +787,13 @@ func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfs
 	}
 
 	// Create the image directory if it doesn't exist
-	err = os.MkdirAll(filepath.Dir(manifestPath), constants.DirPermision)
+	err = os.MkdirAll(filepath.Dir(manifestPath), config.DirPermision)
 	if err != nil {
 		return true, fmt.Errorf("failed to create image directory: %w", err)
 	}
 
 	// Create the manifest file
-	file, err := os.OpenFile(manifestPath, os.O_CREATE|os.O_WRONLY, constants.FilePermision)
+	file, err := os.OpenFile(manifestPath, os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
 		return true, fmt.Errorf("failed to create manifest file: %w", err)
 	}
@@ -807,9 +807,9 @@ func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfs
 	return true, nil
 }
 
-func createConfigFileCVMFS(config registry.ConfigWithBytesAndDigest, imageDigest digest.Digest, cvmfsRepo string) (changed bool, err error) {
-	configFilename := "=" + base64.StdEncoding.EncodeToString([]byte(config.ConfigDigest.String()))
-	symlinkPath := filepath.Join("/cvmfs", cvmfsRepo, constants.PodmanSubDir, "overlay-images", imageDigest.Encoded(), configFilename)
+func createConfigFileCVMFS(imageConfig registry.ConfigWithBytesAndDigest, imageDigest digest.Digest, cvmfsRepo string) (changed bool, err error) {
+	imageConfigFilename := "=" + base64.StdEncoding.EncodeToString([]byte(imageConfig.ConfigDigest.String()))
+	symlinkPath := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", imageDigest.Encoded(), imageConfigFilename)
 
 	fileInfo, err := os.Stat(symlinkPath)
 	if err == nil {
@@ -826,20 +826,20 @@ func createConfigFileCVMFS(config registry.ConfigWithBytesAndDigest, imageDigest
 	}
 
 	// Create the image directory if it doesn't exist
-	err = os.MkdirAll(filepath.Dir(symlinkPath), constants.DirPermision)
+	err = os.MkdirAll(filepath.Dir(symlinkPath), config.DirPermision)
 	if err != nil {
 		return true, fmt.Errorf("failed to create image directory: %w", err)
 	}
 
 	// Create the config file
-	file, err := os.OpenFile(symlinkPath, os.O_CREATE|os.O_WRONLY, constants.FilePermision)
+	file, err := os.OpenFile(symlinkPath, os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
 		return true, fmt.Errorf("failed to create config file: %w", err)
 	}
 	defer file.Close()
 
 	// Write the config to the file
-	if _, err := file.Write(config.ConfigBytes); err != nil {
+	if _, err := file.Write(imageConfig.ConfigBytes); err != nil {
 		return true, fmt.Errorf("failed to write config file: %w", err)
 	}
 

@@ -1,8 +1,6 @@
-package constants
+package config
 
-import (
-	"os"
-)
+import "os"
 
 var SubDirInsideRepo = ".layers"
 var ChainSubDir = ".chains"

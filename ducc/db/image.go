@@ -463,3 +463,37 @@ func GetImagesWithWish(tx *sql.Tx) ([]Image, error) {
 
 	return out, nil
 }
+
+func (i *Image) WholeName() string {
+	root := fmt.Sprintf("%s://%s/%s", i.RegistryScheme, i.RegistryHost, i.Repository)
+	if i.Tag != "" {
+		root = fmt.Sprintf("%s:%s", root, i.Tag)
+	}
+	if i.Digest != "" {
+		root = fmt.Sprintf("%s@%s", root, i.Digest)
+	}
+	return root
+}
+
+func (i *Image) GetReference() string {
+	if i.Digest == "" && i.Tag != "" {
+		return ":" + i.Tag
+	}
+	if i.Digest != "" && i.Tag == "" {
+		return "@" + i.Digest.String()
+	}
+	if i.Digest != "" && i.Tag != "" {
+		return ":" + i.Tag + "@" + i.Digest.String()
+	}
+	panic("Image wrong format, missing both tag and digest")
+}
+
+func (i *Image) GetSimpleReference() string {
+	if i.Tag != "" {
+		return i.Tag
+	}
+	if i.Digest != "" {
+		return i.Digest.String()
+	}
+	panic("Image wrong format, missing both tag and digest")
+}

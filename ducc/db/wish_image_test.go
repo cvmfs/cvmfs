@@ -3,7 +3,7 @@ package db
 import (
 	"testing"
 
-	"github.com/cvmfs/ducc/test"
+	"github.com/cvmfs/ducc/util/test"
 )
 
 func TestUpdateImagesAndGetImages(t *testing.T) {
