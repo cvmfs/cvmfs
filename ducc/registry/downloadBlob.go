@@ -1,16 +1,21 @@
-package unpacker
+package registry
 
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/db"
-	"github.com/cvmfs/ducc/registry"
 	"github.com/opencontainers/go-digest"
 )
 
-func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobDigest digest.Digest, acceptHeaders []string) (db.TaskPtr, error) {
+// TODO: Proper locking system for downloads.
+var downloadsMutex = sync.Mutex{}
+var pendingDownloads = make(map[digest.Digest]db.TaskPtr)
+var useCount = make(map[digest.Digest]int)
+
+func DownloadBlob(registry *ContainerRegistry, repository string, blobDigest digest.Digest, acceptHeaders []string) (db.TaskPtr, error) {
 	// Check if the blob is already being downloaded
 	// Then we can just wait for that task to finish.
 	downloadsMutex.Lock()
@@ -57,7 +62,7 @@ func DownloadBlob(registry *registry.ContainerRegistry, repository string, blobD
 	return ptr, nil
 }
 
-func releaseBlob(fileDigest digest.Digest) {
+func ReleaseBlob(fileDigest digest.Digest) {
 	downloadsMutex.Lock()
 	defer downloadsMutex.Unlock()
 	count, ok := useCount[fileDigest]

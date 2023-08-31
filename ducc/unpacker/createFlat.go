@@ -57,7 +57,7 @@ func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cv
 	}
 
 	// Check if the manifest contains foreign layers
-	if ManifestContainsForeignLayers(manifest.Manifest) {
+	if registry.ManifestContainsForeignLayers(manifest.Manifest) {
 		task.LogFatal(nil, "Manifest contains foreign layers. Aborting")
 		return ptr, nil
 	}
@@ -458,7 +458,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 
 	// We create the download layer task
 	registryPtr := registry.GetOrCreateRegistry(registry.ContainerRegistryIdentifier{Scheme: image.RegistryScheme, Hostname: image.RegistryHost})
-	downloadLayerTaskPtr, err := DownloadBlob(registryPtr, image.Repository, chainLink.LayerDigest, nil)
+	downloadLayerTaskPtr, err := registry.DownloadBlob(registryPtr, image.Repository, chainLink.LayerDigest, nil)
 	if err != nil {
 		task.LogFatal(nil, fmt.Sprintf("Failed to create \"%s\" task: %s", db.TASK_DOWNLOAD_BLOB, err))
 		return ptr, nil
@@ -469,7 +469,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 	earlyReturn := true
 	defer func() {
 		if earlyReturn {
-			releaseBlob(chainLink.LayerDigest)
+			registry.ReleaseBlob(chainLink.LayerDigest)
 		}
 	}()
 	if err := task.LinkSubtask(nil, downloadLayerTaskPtr); err != nil {
@@ -490,7 +490,7 @@ func createChainLink(chainLink ChainLink, image db.Image, cvmfsRepo string, prev
 
 	earlyReturn = false
 	go func() {
-		defer releaseBlob(chainLink.LayerDigest)
+		defer registry.ReleaseBlob(chainLink.LayerDigest)
 		if !task.WaitForStart() {
 			return
 		}
@@ -633,7 +633,7 @@ func GenerateChainFromManifest(m v1.Manifest) Chain {
 	for i, layer := range m.Layers {
 		link := ChainLink{
 			LayerDigest: layer.Digest,
-			Compressed:  LayerMediaTypeIsCompressed(layer.MediaType),
+			Compressed:  registry.LayerMediaTypeIsCompressed(layer.MediaType),
 		}
 
 		if i == 0 {
