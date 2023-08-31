@@ -273,7 +273,22 @@ func (t *Task) SetTaskCompleted(tx *sql.Tx, result TaskResult) error {
 	stnmt := "UPDATE tasks SET status=?, result=?, done_timestamp=? WHERE id=?"
 	_, err := tx.Exec(stnmt, TASK_STATUS_DONE, result, ToDBTimeStamp(time.Now()), t.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting task completed: %w", err)
+	}
+
+	// We don't want to leave any subtask running, unless they are children of another uncompleted task
+	for _, subtask := range t.Subtasks {
+		isAbandoned, err := taskIsAbandoned(tx, subtask.GetValue().ID)
+		if err != nil {
+			return fmt.Errorf("error checking if subtask is abandoned: %w", err)
+		}
+		if isAbandoned {
+			// The subtask is abandoned, so we should cancel it
+			err := subtask.Cancel(tx)
+			if err != nil {
+				return fmt.Errorf("error cancelling subtask: %w", err)
+			}
+		}
 	}
 
 	if ownTx {
@@ -287,6 +302,44 @@ func (t *Task) SetTaskCompleted(tx *sql.Tx, result TaskResult) error {
 	t.Status = TASK_STATUS_DONE
 	t.cv.Broadcast()
 	return nil
+}
+
+func taskIsAbandoned(tx *sql.Tx, taskID TaskID) (bool, error) {
+	// Since we are only reading data, we don't need to commit the transaction.
+	if tx == nil {
+		var err error
+		tx, err = GetTransaction()
+		if err != nil {
+			return false, err
+		}
+		defer tx.Rollback()
+	}
+
+	// Is the task done?
+	{
+		const stmnt string = "SELECT COUNT(*) FROM tasks WHERE id=? AND status=?"
+		var count int
+		if err := tx.QueryRow(stmnt, taskID, TASK_STATUS_DONE).Scan(&count); err != nil {
+			return false, fmt.Errorf("error checking if the task is done: %w", err)
+		}
+		if count > 0 {
+			// The task is done, so it is not abandoned
+			return false, nil
+		}
+	}
+
+	// Get the count of parents that are not done
+	{
+		const stmnt string = "SELECT COUNT(*) FROM task_relations JOIN tasks ON task2_id=id WHERE task1_id=? AND relation=? AND status!=?"
+		var count int
+		if err := tx.QueryRow(stmnt, taskID, TASK_RELATION_SUBTASK_OF, TASK_STATUS_DONE).Scan(&count); err != nil {
+			return false, fmt.Errorf("error getting count of non-done parents: %w", err)
+		}
+		if count == 0 {
+			return true, nil
+		}
+		return false, nil
+	}
 }
 
 func SetTaskStatusById(tx *sql.Tx, taskID TaskID, status TaskStatus) error {
