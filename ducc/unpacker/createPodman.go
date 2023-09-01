@@ -115,10 +115,10 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 
 		// 1. Ensure that podman directories and catalogs exist
 		requiredCatalogs := []string{
-			path.Join("/cvmfs/", config.PodmanSubDir),
-			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay"),
-			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay-images"),
-			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir, "overlay-layers"),
+			path.Join("/cvmfs/", cvmfsRepo, config.PodmanSubDir),
+			PodmanRootOverlayPath(cvmfsRepo),
+			PodmanImagesPath(cvmfsRepo),
+			PodmanLayersPath(cvmfsRepo),
 		}
 		for _, dir := range requiredCatalogs {
 			changed, err := cvmfs.CreateCatalogNew(dir)
