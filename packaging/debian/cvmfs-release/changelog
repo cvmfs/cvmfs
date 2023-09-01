@@ -1,3 +1,9 @@
+cvmfs-release (4.1-1) lucid; urgency=low
+
+  * Add Debian 12 "bookworm" platform
+
+ -- Valentin Volkl <vavolkl@cern.ch>  Fri, 01 September 2023 16:20:00 +0200
+
 cvmfs-release (4.0-1) lucid; urgency=low
 
   * Add Ubuntu 22.04 "jammy" platform
