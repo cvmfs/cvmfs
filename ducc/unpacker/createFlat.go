@@ -149,7 +149,7 @@ func createChainForImage(image db.Image, chain Chain, cvmfsRepo string) (db.Task
 		cvmfs.GetLock(cvmfsRepo)
 		// Create the .chains directory with a catalog if it doesn't exist
 		success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
-			_, err := cvmfs.CreateCatalogNew(filepath.Join("/cvmfs", "cvmfsRepo", ".chains"))
+			_, err := cvmfs.CreateCatalogNew(filepath.Join("/cvmfs", cvmfsRepo, ".chains"))
 			if err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create catalog: %s", err))
 				return err
