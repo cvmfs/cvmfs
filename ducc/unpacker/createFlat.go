@@ -245,8 +245,8 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			tagOrDigest = manifest.ManifestDigest.Encoded()
 		}
 
-		publicSymlinkPathShort := path.Join(image.RegistryHost, image.Repository+":"+tagOrDigest)
-		publicSymlinkPath := path.Join("/cvmfs", cvmfsRepo, publicSymlinkPathShort)
+		publicSymlinkPathShort := filepath.Join(image.RegistryHost, image.Repository+":"+tagOrDigest)
+		publicSymlinkPath := filepath.Join("/cvmfs", cvmfsRepo, publicSymlinkPathShort)
 		var publicSymlinkExists bool
 		publicSymlinkInfo, err := os.Stat(publicSymlinkPath)
 		if errors.Is(err, os.ErrNotExist) {
@@ -258,8 +258,8 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			publicSymlinkExists = true
 		}
 
-		privatePathShort := path.Join(".flat", manifest.ManifestDigest.Encoded()[:2], manifest.ManifestDigest.Encoded())
-		privatePath := path.Join("/cvmfs", cvmfsRepo, privatePathShort)
+		privatePathShort := filepath.Join(".flat", manifest.ManifestDigest.Encoded()[:2], manifest.ManifestDigest.Encoded())
+		privatePath := filepath.Join("/cvmfs", cvmfsRepo, privatePathShort)
 		var privatePathExists bool
 		privatePathInfo, err := os.Stat(privatePath)
 		if errors.Is(err, os.ErrNotExist) {
