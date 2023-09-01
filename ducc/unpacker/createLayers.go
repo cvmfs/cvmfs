@@ -257,7 +257,7 @@ func ingestLayer(layerDigest digest.Digest, compressed bool, cvmfsRepo string) (
 			return
 		}
 
-		blobPath := path.Join(config.DownloadsDir)
+		blobPath := path.Join(config.DownloadsDir, layerDigest.Encoded())
 		fileReader, err := os.Open(blobPath)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to open layer file %s: %s", blobPath, err.Error()))
