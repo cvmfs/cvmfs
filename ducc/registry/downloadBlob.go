@@ -73,7 +73,7 @@ func ReleaseBlob(fileDigest digest.Digest) {
 	if count == 0 {
 		delete(pendingDownloads, fileDigest)
 		delete(useCount, fileDigest)
-		os.Remove(config.DownloadsDir)
+		os.Remove(filepath.Join(config.DownloadsDir, fileDigest.Encoded()))
 		return
 	}
 	useCount[fileDigest] = count

@@ -550,7 +550,7 @@ func ingestChainLink(link ChainLink, cvmfsRepo string) (db.TaskPtr, error) {
 			return
 		}
 
-		blobPath := path.Join(config.DownloadsDir)
+		blobPath := filepath.Join(config.DownloadsDir, link.LayerDigest.Encoded())
 		fileReader, err := os.Open(blobPath)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to open layer file %s: %s", blobPath, err))
