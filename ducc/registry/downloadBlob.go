@@ -3,6 +3,7 @@ package registry
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/cvmfs/ducc/config"

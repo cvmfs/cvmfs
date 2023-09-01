@@ -36,12 +36,43 @@ type PodmanImageInfo struct {
 // struct for entries in layers.json
 type PodmanLayerInfo struct {
 	ID                   string        `json:"id,omitempty"`
+	ChainDigest          digest.Digest `json:"-"`
 	ShortID              string        `json:"-"`
 	Parent               string        `json:"parent,omitempty"`
 	Created              time.Time     `json:"created,omitempty"`
 	CompressedDiffDigest digest.Digest `json:"compressed-diff-digest,omitempty"`
 	CompressedSize       int64         `json:"compressed-size,omitempty"`
 	UncompressedDigest   digest.Digest `json:"diff-digest,omitempty"`
+}
+
+func PodmanImagesPath(cvmfsRepo string) string {
+	return filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images")
+}
+func PodmanImagePath(cvmfsRepo string, configDigest digest.Digest) string {
+	// We might want to use a nested directory structure here with the first two characters of the digest
+	// like in .layers and .chains
+	return filepath.Join(PodmanImagesPath(cvmfsRepo), configDigest.Encoded())
+}
+func PodmanManifestPath(cvmfsRepo string, configDigest digest.Digest) string {
+	return filepath.Join(PodmanImagePath(cvmfsRepo, configDigest), "manifest")
+}
+func PodmanConfigPath(cvmfsRepo string, configDigest digest.Digest) string {
+	return filepath.Join(PodmanImagePath(cvmfsRepo, configDigest), "config")
+}
+
+func PodmanLayersPath(cvmfsRepo string) string {
+	return filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers")
+}
+
+func PodmanRootOverlayPath(cvmfsRepo string) string {
+	return filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay")
+}
+func PodmanLayerFSPath(cvmfsRepo string, chainDigest digest.Digest) string {
+	return filepath.Join(PodmanRootOverlayPath(cvmfsRepo), chainDigest.Encoded())
+}
+
+func PodmanLinkDirPath(cvmfsRepo string) string {
+	return filepath.Join(PodmanRootOverlayPath(cvmfsRepo), "l")
 }
 
 func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
@@ -133,6 +164,8 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 
 		// 2. Create Podman layer metadata for the layers in the manifest
+		// TODO: We might want to read the info from .layers/x/y/.metadata/layers.json
+		// because it contains the uncompressed size of the layer.
 		manifestLayersInfo, err := createPodmanLayerInfo(manifest.Manifest, imageConfig.Config)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create layer metadata: %s", err.Error()))
@@ -144,8 +177,8 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 		topLayerID := manifestLayersInfo[len(manifestLayersInfo)-1].ID
 
-		// 3. Get existing layer info
-		layersInfo, err := getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo)
+		// 3. Get existing information about layers (layers.json)
+		layersInfo, err := getExistingPodmanLayerStoreCVMFS(cvmfsRepo)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to get existing layer metadata: %s", err.Error()))
 			return
@@ -168,8 +201,8 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 
 			// We create files for the new layers here
 
-			// Link rootfs for the new layers
-			if err = LinkRootfsIntoPodmanStore(cvmfsRepo, newLayersInfo); err != nil {
+			// Link to the diff in .layers for the new podman store layers
+			if err = linkRootfsIntoPodmanStore(cvmfsRepo, newLayersInfo); err != nil {
 				task.LogFatal(nil, fmt.Sprintf("Failed to link rootfs: %s", err.Error()))
 				return
 			}
@@ -190,8 +223,8 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Created lower files")
 		}
 
-		// 5. Get existing images metadata
-		imagesInfo, err := getExistingPodmanImageInfoFromCVMFS(cvmfsRepo)
+		// 5. Get existing images metadata (images.json)
+		imagesInfo, err := getExistingPodmanImageStoreCVMFS(cvmfsRepo)
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to get existing image metadata: %s", err.Error()))
 			return
@@ -199,7 +232,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Successfully got existing image metadata")
 
 		// 6. Update image metadata
-		names := getPodmanNames(image, manifest)
+		names := getPodmanNames(image, manifest.ManifestDigest)
 		var changed bool
 		var alreadyExists bool
 		changed, alreadyExists, imagesInfo = updatePodmanImageNames(imagesInfo, manifest.ManifestDigest, names)
@@ -244,7 +277,7 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		}
 
 		// Create the config file
-		if changed, err = createConfigFileCVMFS(imageConfig, manifest.ManifestDigest, cvmfsRepo); err != nil {
+		if changed, err = createConfigFileCVMFS(imageConfig, cvmfsRepo); err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to create config link: %s", err.Error()))
 			return
 		}
@@ -282,8 +315,8 @@ func CreatePodman(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 	return ptr, nil
 }
 
-func getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo string) ([]PodmanLayerInfo, error) {
-	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
+func getExistingPodmanLayerStoreCVMFS(cvmfsRepo string) ([]PodmanLayerInfo, error) {
+	path := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
 
 	var layersInfo []PodmanLayerInfo
 
@@ -309,8 +342,8 @@ func getExistingPodmanLayerInfoFromCVMFS(cvmfsRepo string) ([]PodmanLayerInfo, e
 }
 
 // Reads from CVMFS so needs a lock
-func getExistingPodmanImageInfoFromCVMFS(cvmfsRepo string) ([]PodmanImageInfo, error) {
-	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
+func getExistingPodmanImageStoreCVMFS(cvmfsRepo string) ([]PodmanImageInfo, error) {
+	path := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
 
 	var imagesInfo []PodmanImageInfo
 
@@ -336,7 +369,7 @@ func getExistingPodmanImageInfoFromCVMFS(cvmfsRepo string) ([]PodmanImageInfo, e
 }
 
 func updatePodmanImageStoreCVMFS(imagesInfo []PodmanImageInfo, cvmfsRepo string) error {
-	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
+	path := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.json")
 
 	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
@@ -356,7 +389,7 @@ func updatePodmanImageStoreCVMFS(imagesInfo []PodmanImageInfo, cvmfsRepo string)
 }
 
 func updatePodmanLayerStoreCVMFS(layersInfo []PodmanLayerInfo, cvmfsRepo string) error {
-	path := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
+	path := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.json")
 
 	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, config.FilePermision)
 	if err != nil {
@@ -378,23 +411,23 @@ func updatePodmanLayerStoreCVMFS(layersInfo []PodmanLayerInfo, cvmfsRepo string)
 
 func createLinks(cvmfsRepo string, layerInfo []PodmanLayerInfo) error {
 	// Create the "l" directory if it does not exist
-	linkdirPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", "l")
-	if err := os.MkdirAll(linkdirPath, config.DirPermision); err != nil {
+	if err := os.MkdirAll(PodmanLinkDirPath(cvmfsRepo), config.DirPermision); err != nil {
 		return err
 	}
 	for _, layer := range layerInfo {
-		// Generate a random short id
-		// Create the link
-		linkPath := path.Join(linkdirPath, layer.ShortID)
-		targetPath := filepath.Join("..", layer.ID, "diff")
+		// Create the link `overlay/l/<short id>` -> `overlay/<chain id>/diff`
+		linkPath := filepath.Join(PodmanLinkDirPath(cvmfsRepo), layer.ShortID)
+		targetPath, err := filepath.Rel(filepath.Dir(linkPath), filepath.Join(PodmanLayerFSPath(cvmfsRepo, layer.UncompressedDigest), "diff"))
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
 		if err := os.Symlink(targetPath, linkPath); err != nil {
 			return fmt.Errorf("failed to create link: %w", err)
 		}
-		// Create the link file
-		overlayPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", layer.ID)
-		linkFilePath := path.Join(overlayPath, "link")
-		// Create the overlay directory, in case this function is called before the overlay is created
-		if err := os.MkdirAll(overlayPath, config.DirPermision); err != nil {
+		// Create the link file, named `link`, which contains the short id
+		linkFilePath := filepath.Join(PodmanLayerFSPath(cvmfsRepo, layer.ChainDigest), "link")
+		// Create the `overlay/<chain id>`` directory, in case this function is called before the overlay is created
+		if err := os.MkdirAll(PodmanLayerFSPath(cvmfsRepo, layer.ChainDigest), config.DirPermision); err != nil {
 			return fmt.Errorf("failed to create overlay directory: %w", err)
 		}
 		if err := os.WriteFile(linkFilePath, []byte(layer.ShortID), config.FilePermision); err != nil {
@@ -404,25 +437,24 @@ func createLinks(cvmfsRepo string, layerInfo []PodmanLayerInfo) error {
 	return nil
 }
 
-func LinkRootfsIntoPodmanStore(cvmfsRepo string, layersInfo []PodmanLayerInfo) error {
-	podmanRootFSPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay")
+func linkRootfsIntoPodmanStore(cvmfsRepo string, layersInfo []PodmanLayerInfo) error {
 	// Create the directory if it does not exist
-	if err := os.MkdirAll(podmanRootFSPath, config.DirPermision); err != nil {
+	if err := os.MkdirAll(PodmanRootOverlayPath(cvmfsRepo), config.DirPermision); err != nil {
 		return err
 	}
 	for _, layerInfo := range layersInfo {
-		podmanLayerRootFSPath := path.Join(podmanRootFSPath, layerInfo.ID)
+		podmanLayerRootFSPath := filepath.Join(PodmanRootOverlayPath(cvmfsRepo), layerInfo.ID)
 		// Create the layer directory
 		if err := os.MkdirAll(podmanLayerRootFSPath, config.DirPermision); err != nil {
 			return err
 		}
-		// Link "diff" to the actual layer
+		// Link "diff" to the actual unpacked diff in .layers
 		targetPath := LayerRootfsPath(cvmfsRepo, layerInfo.CompressedDiffDigest)
 		relativePath, err := filepath.Rel(podmanLayerRootFSPath, targetPath)
 		if err != nil {
 			return err
 		}
-		symlinkPath := path.Join(podmanLayerRootFSPath, "diff")
+		symlinkPath := filepath.Join(podmanLayerRootFSPath, "diff")
 		// We don't care if there is a file here or not. We just remove it and create the symlink
 		if err := os.Remove(symlinkPath); err != nil && !os.IsNotExist(err) {
 			return err
@@ -441,21 +473,23 @@ func createPodmanLayerInfo(manifest v1.Manifest, configObject v1.Image) ([]Podma
 	}
 	out := make([]PodmanLayerInfo, len(manifest.Layers))
 
-	var parentID digest.Digest
+	var parentChainDigest digest.Digest
 	for i, layer := range manifest.Layers {
-		id, err := generateChainID(parentID, configObject.RootFS.DiffIDs[i])
+		chainID, err := generateChainID(parentChainDigest, configObject.RootFS.DiffIDs[i])
 		if err != nil {
 			return nil, err
 		}
 
-		var parentIDStr string
-		if parentID != "" {
-			parentIDStr = parentID.Encoded()
+		// We don't want .Encoded() to panic if the digest is empty
+		var parentChainIDStr string
+		if parentChainDigest != "" {
+			parentChainIDStr = parentChainDigest.Encoded()
 		}
 
 		out[i] = PodmanLayerInfo{
-			ID:                   id.Encoded(),
-			Parent:               parentIDStr,
+			ID:                   chainID.Encoded(),
+			ChainDigest:          chainID,
+			Parent:               parentChainIDStr,
 			Created:              time.Now(),
 			CompressedDiffDigest: layer.Digest,
 			CompressedSize:       layer.Size,
@@ -465,26 +499,27 @@ func createPodmanLayerInfo(manifest v1.Manifest, configObject v1.Image) ([]Podma
 		if err != nil {
 			return nil, err
 		}
-		parentID = id
+		parentChainDigest = chainID
 	}
 
 	return out, nil
 }
 
-func getPodmanNames(image db.Image, manifest registry.ManifestWithBytesAndDigest) []string {
-	// TODO: Do we want the digest name here?
+func getPodmanNames(image db.Image, manifestDigest digest.Digest) []string {
 	var names = make([]string, 0)
 	if image.Tag != "" {
 		names = append(names, fmt.Sprintf("%s/%s:%s", image.RegistryHost, image.Repository, image.Tag))
 	}
-	names = append(names, fmt.Sprintf("%s/%s@%s", image.RegistryHost, image.Repository, manifest.ManifestDigest))
+	// (oystub): I think it is useful to always have the manifest digest as a name.
+	// But if it's not wanted, the following line can be added only when there is no tag.
+	names = append(names, fmt.Sprintf("%s/%s@%s", image.RegistryHost, image.Repository, manifestDigest.Encoded()))
 	return names
 }
 
 func createPodmanImageInfo(image db.Image, manifest registry.ManifestWithBytesAndDigest, topLayerID string) PodmanImageInfo {
 	return PodmanImageInfo{
-		ID:      manifest.ManifestDigest.Encoded(),
-		Names:   getPodmanNames(image, manifest),
+		ID:      manifest.Manifest.Config.Digest.Encoded(),
+		Names:   getPodmanNames(image, manifest.ManifestDigest),
 		Layer:   topLayerID,
 		Created: time.Now(),
 	}
@@ -673,22 +708,19 @@ func generateChainID(parentChainID digest.Digest, diffDigest digest.Digest) (dig
 	return digest.SHA256.FromBytes(append(parentChainIDBytes, diffDigestBytes...)), nil
 }
 
-func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInfo, newLayersInfo []PodmanLayerInfo) error {
+func createLowerFilesCVMFS(cvmfsRepo string, layersInfo []PodmanLayerInfo, newLayersInfo []PodmanLayerInfo) error {
 	lowerString := ""
 
-	numExistingLayers := len(manifestLayersInfo) - len(newLayersInfo)
+	numExistingLayers := len(layersInfo) - len(newLayersInfo)
 	if numExistingLayers > 0 {
 		// We have existing layers, so start with the lower string for the last existing layer
-		// Since layer short IDs are random, we need to read from CVMFS, not from the manifest
-		existingLowerFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "lower"))
+		// Since it contains short IDs, which are random, we need to read from CVMFS.
+		existingLowerFile, err := os.Open(filepath.Join(PodmanLayerFSPath(cvmfsRepo, layersInfo[numExistingLayers-1].ChainDigest), "lower"))
 		if errors.Is(err, os.ErrNotExist) {
 			// OK, the layer does not have a lower file, so we just start with an empty string
 		} else if err != nil {
 			return fmt.Errorf("failed to open existing lower file: %w", err)
 		} else {
-			if err != nil {
-				return fmt.Errorf("failed to open existing lower file: %w", err)
-			}
 			existingLowerStringBytes, err := io.ReadAll(existingLowerFile)
 			if err != nil {
 				existingLowerFile.Close()
@@ -699,7 +731,8 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 		}
 
 		// Append the last layer short ID to the lower string
-		existingLinkFile, err := os.Open(path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", manifestLayersInfo[numExistingLayers-1].ID, "link"))
+		// Since the short ID is random, we need to read it from CVMFS
+		existingLinkFile, err := os.Open(filepath.Join(PodmanLayerFSPath(cvmfsRepo, layersInfo[numExistingLayers-1].ChainDigest), "link"))
 		if err != nil {
 			return fmt.Errorf("failed to open existing link file: %w", err)
 		}
@@ -718,7 +751,7 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 
 	for _, layer := range newLayersInfo {
 		if lowerString != "" {
-			lowerFilePath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay", layer.ID, "lower")
+			lowerFilePath := filepath.Join(PodmanLayerFSPath(cvmfsRepo, layer.ChainDigest), "lower")
 			file, err := os.OpenFile(lowerFilePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, config.FilePermision)
 			if err != nil {
 				return fmt.Errorf("failed to create lower file: %w", err)
@@ -742,8 +775,8 @@ func createLowerFilesCVMFS(cvmfsRepo string, manifestLayersInfo []PodmanLayerInf
 }
 
 func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
-	layerLockPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-layers", "layers.lock")
-	imageLockPath := path.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", "images.lock")
+	layerLockPath := filepath.Join(PodmanLayersPath(cvmfsRepo), "layers.lock")
+	imageLockPath := filepath.Join(PodmanImagesPath(cvmfsRepo), "images.lock")
 
 	file, err := os.OpenFile(layerLockPath, os.O_CREATE, config.FilePermision)
 	if errors.Is(err, os.ErrExist) {
@@ -770,7 +803,7 @@ func createLockFilesCVMFS(cvmfsRepo string) (changed bool, err error) {
 }
 
 func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (changed bool, err error) {
-	manifestPath := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", manifest.ManifestDigest.Encoded(), "manifest")
+	manifestPath := PodmanManifestPath(cvmfsRepo, manifest.Manifest.Config.Digest)
 
 	fileInfo, err := os.Stat(manifestPath)
 	if err == nil {
@@ -807,9 +840,9 @@ func createManifestFileCVMFS(manifest registry.ManifestWithBytesAndDigest, cvmfs
 	return true, nil
 }
 
-func createConfigFileCVMFS(imageConfig registry.ConfigWithBytesAndDigest, imageDigest digest.Digest, cvmfsRepo string) (changed bool, err error) {
+func createConfigFileCVMFS(imageConfig registry.ConfigWithBytesAndDigest, cvmfsRepo string) (changed bool, err error) {
 	imageConfigFilename := "=" + base64.StdEncoding.EncodeToString([]byte(imageConfig.ConfigDigest.String()))
-	symlinkPath := filepath.Join("/cvmfs", cvmfsRepo, config.PodmanSubDir, "overlay-images", imageDigest.Encoded(), imageConfigFilename)
+	symlinkPath := filepath.Join(PodmanImagePath(cvmfsRepo, imageConfig.ConfigDigest), imageConfigFilename)
 
 	fileInfo, err := os.Stat(symlinkPath)
 	if err == nil {
