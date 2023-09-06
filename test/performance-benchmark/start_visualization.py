@@ -40,11 +40,11 @@ if __name__ == "__main__":
   ## PARAMS set by user
   #########################
   # directory containing all .csv files that should be compared
-  dirname = "data/final_selection/"
+  dirname = "data/loadctlg_cmp2/"
   # directory where to write the plots, will be created if needed
-  outdir = "./results"
+  outdir = "./results/loadctlg_cmp2/"
   # if empty will make it for all threads available
-  num_threads = [32, 64]
+  num_threads = []
 
   # csv_labels are defined in util_benchmark/benchmark_time.dict_time_format
   # and all cvmfs internal affairs counters as shown in a .csv created by
@@ -59,7 +59,7 @@ if __name__ == "__main__":
   # for comparing versions
   # each version must be added to visualization_time.cvmfs_version_labels_dict
   # and define its label how it is shown in the boxplot
-  versions = ["2.9.4.0", "2.11.0.0-bisect", "2.11.0.0-fix-perf"]
+  versions = ["2.11.0.0", "2.11.0.0-loadctlg"]
   versions_cvmfs_options = ['statfs_kernel', 'symlink_statfs_kernel']
   create_version_plots = True
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
   # and define its label how it is shown in the boxplot
   options = ['statfs_kernel', 'symlink_statfs_kernel']
   options_cvmfs_versions = ["2.11.0.0-bisect"]
-  create_option_plots = True
+  create_option_plots = False
 
   create_scatter_plots = False
 
@@ -91,10 +91,10 @@ if __name__ == "__main__":
   # "_sqlite.n_read", "_sqlite.sz_read"
   # ]
 
-  cvmfs_internal_labels = [
-    "_catalog_mgr.n_lookup_path",
-    "_cvmfs.n_fs_readlink"
-  ]
+  # plot all labels
+  cvmfs_internal_labels = ["_" + key for key in \
+                           visualization_time.measurement_cvmfs_internal_dict.keys()]
+
   #########################
   ## END PARAMS set by user
   ##############################################################################
