@@ -82,6 +82,7 @@ int cvmfs_options_parse(SimpleOptionsParser *opts, const char *path) {
   return result ? 0 : -1;
 }
 
+// TODO TODO return bool?
 void cvmfs_options_parse_default(SimpleOptionsParser *opts, const char *fqrn) {
   opts->ParseDefault(fqrn);
 }

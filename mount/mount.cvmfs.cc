@@ -404,10 +404,12 @@ int main(int argc, char **argv) {
   }
   string mountpoint = argv[optind+1];
 
+  // TODO TODO return bool
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
   options_manager_.SwitchTemplateManager(
     new DefaultOptionsTemplateManager(fqrn));
+  // TODO TODO return bool
   options_manager_.ParseDefault(fqrn);
 
   string optarg;

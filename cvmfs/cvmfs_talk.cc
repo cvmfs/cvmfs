@@ -28,6 +28,7 @@ struct InstanceInfo {
   static std::string GetDefaultDomain() {
     std::string result;
     BashOptionsManager options_mgr;
+    // TODO TODO return bool
     options_mgr.ParseDefault("");
     bool retval = options_mgr.GetValue("CVMFS_DEFAULT_DOMAIN", &result);
     if (!retval) {
@@ -45,6 +46,7 @@ struct InstanceInfo {
     }
 
     BashOptionsManager options_mgr;
+    // TODO TODO return bool
     options_mgr.ParseDefault(fqrn);
     if (!options_mgr.GetValue("CVMFS_WORKSPACE", &workspace)) {
       if (!options_mgr.GetValue("CVMFS_CACHE_DIR", &workspace)) {
@@ -251,6 +253,7 @@ int main(int argc, char *argv[]) {
   int retcode = 0;
   if (!instance_info.IsDefined()) {
     BashOptionsManager options_mgr;
+    // TODO TODO return bool
     options_mgr.ParseDefault("");
     std::string opt_repos;
     options_mgr.GetValue("CVMFS_REPOSITORIES", &opt_repos);
