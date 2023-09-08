@@ -395,7 +395,10 @@ std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
   // Get the repository name from the ephemeral writable shell
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
-  omgr.ParsePath(session_dir + "/env.conf", false /* external */);
+  if (!omgr.ParsePath(session_dir + "/env.conf", false /* external */)) {
+    throw EPublish("no config file found in " + session_dir + "/env.conf",
+                   EPublish::kFailInvocation);
+  }
 
   // We require at least CVMFS_FQRN to be set
   std::string fqrn;

@@ -718,11 +718,33 @@ int FuseMain(int argc, char *argv[]) {
   }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
+
+    vector<string> broken_config;
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options_manager->ParsePath(tokens[i], false);
+      if (!options_manager->ParsePath(tokens[i], false)) {
+        broken_config.push_back(tokens[i]);
+      }
+    }
+    if (broken_config.size() > 0) {
+      for (unsigned i = 0, s = broken_config.size(); i < s; ++i) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
+                 "Config path not found: %s", broken_config[i].c_str());
+      }
+
+      if (broken_config.size() == tokens.size()) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
+                 "No valid config path found. Fallback to default!");
+        if (!options_manager->ParseDefault(*repository_name_)) {
+          PANIC(kLogSyslogErr | kLogDebug,
+                 " line. default config could not be loaded");
+        }
+      }
     }
   } else {
-    options_manager->ParseDefault(*repository_name_);
+    if (!options_manager->ParseDefault(*repository_name_)) {
+          PANIC(kLogSyslogErr | kLogDebug,
+                 " line. default config could not be loaded");
+        }
   }
 
 #ifdef __APPLE__

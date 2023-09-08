@@ -130,7 +130,12 @@ bool S3Uploader::ParseSpoolerDefinition(
   // Parse S3 configuration
   BashOptionsManager options_manager = BashOptionsManager(
     new DefaultOptionsTemplateManager(repository_alias_));
-  options_manager.ParsePath(config_path, false);
+  if (!options_manager.ParsePath(config_path, false)) {
+    LogCvmfs(kLogUploadS3, kLogStderr,
+             "Failed to parse S3 config in dir '%s'",
+             config_path.c_str());
+    return false;
+  }
   std::string parameter;
 
   if (!options_manager.GetValue("CVMFS_S3_HOST", &host_name_)) {

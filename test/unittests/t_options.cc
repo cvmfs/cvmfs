@@ -93,7 +93,7 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsTemplateManager *opt_temp_mgr =
     new DefaultOptionsTemplateManager("atlas.cern.ch");
   opt_temp_mgr->SetTemplate("foo", "fourtytwo");
-  options_manager.ParsePath(config_file, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
   options_manager.SwitchTemplateManager(opt_temp_mgr);
 
   // printf("DUMP: ***\n%s\n***\n", options_manager.Dump().c_str());
@@ -144,7 +144,7 @@ TYPED_TEST(T_Options, ParsePath) {
 
 TYPED_TEST(T_Options, ParsePathNoFile) {
   string fileName = "somethingThatDoesntExists";
-  TestFixture::options_manager_.ParsePath(fileName, false);
+  EXPECT_FALSE(TestFixture::options_manager_.ParsePath(fileName, false));
   ASSERT_EQ(0u, TestFixture::options_manager_.GetAllKeys().size());
 }
 
@@ -154,15 +154,15 @@ TYPED_TEST(T_Options, ProtectedParameter) {
   const string &config_file = TestFixture::config_file_;
   const string &config_file_2 = TestFixture::config_file_2_;
 
-  options_manager.ParsePath(config_file, false);
-  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
+  EXPECT_TRUE(options_manager.ParsePath(config_file_2, false));
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
   EXPECT_EQ("/overwritten", container);
 
   options_manager.ClearConfig();
-  options_manager.ParsePath(config_file, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
   options_manager.ProtectParameter("CVMFS_CACHE_BASE");
-  options_manager.ParsePath(config_file_2, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file_2, false));
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &container));
   EXPECT_NE("/overwritten", container);
 }
@@ -170,7 +170,7 @@ TYPED_TEST(T_Options, ProtectedParameter) {
 TYPED_TEST(T_Options, GetEnvironmentSubset) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
 
   EXPECT_EQ(0U,
     options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
@@ -189,7 +189,7 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
 TYPED_TEST(T_Options, SetValue) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
 
   string arg;
   EXPECT_TRUE(options_manager.GetValue("CVMFS_CACHE_BASE", &arg));
@@ -211,7 +211,7 @@ TYPED_TEST(T_Options, SetValue) {
 TYPED_TEST(T_Options, TaintEnvironment) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
-  options_manager.ParsePath(config_file, false);
+  EXPECT_TRUE(options_manager.ParsePath(config_file, false));
 
   string arg;
   EXPECT_FALSE(options_manager.GetValue("NO_SUCH_OPTION", &arg));

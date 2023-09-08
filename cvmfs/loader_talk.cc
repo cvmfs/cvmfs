@@ -194,7 +194,7 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
   }
   if (retval != 1) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Reload CRASHED! "
-             "CernVM-FS mountpoints unusable.");
+          "CernVM-FS mountpoints unusable. Check syslog for more information.");
     return 101;
   }
 

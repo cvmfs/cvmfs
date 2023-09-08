@@ -2158,11 +2158,34 @@ static void InitOptionsMgr(const loader::LoaderExports *loader_exports) {
 
   if (loader_exports->config_files != "") {
     vector<string> tokens = SplitString(loader_exports->config_files, ':');
+
+    vector<string> broken_config;
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      cvmfs::options_mgr_->ParsePath(tokens[i], false);
+      if (!cvmfs::options_mgr_->ParsePath(tokens[i], false)) {
+        broken_config.push_back(tokens[i]);
+      }
+    }
+    if (broken_config.size() > 0) {
+      for (unsigned i = 0, s = broken_config.size(); i < s; ++i) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
+                 "Config path not found: %s", broken_config[i].c_str());
+      }
+
+      if (broken_config.size() == tokens.size()) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogWarn,
+                 "No valid config path found. Fallback to default!");
+        if (!cvmfs::options_mgr_->
+                                ParseDefault(loader_exports->repository_name)) {
+          PANIC(kLogSyslogErr | kLogDebug,
+                                   " line. default config could not be loaded");
+        }
+      }
     }
   } else {
-    cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name);
+    if (!cvmfs::options_mgr_->ParseDefault(loader_exports->repository_name)) {
+      PANIC(kLogSyslogErr | kLogDebug,
+                                   " line. default config could not be loaded");
+    }
   }
 }
 

@@ -256,8 +256,14 @@ void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
   BashOptionsManager options_manager(
     new DefaultOptionsTemplateManager(fqrn_));
   options_manager.ParseDefault(fqrn_);
-  if (!extra_config.empty())
-    options_manager.ParsePath(extra_config, false /* external */);
+  if (!extra_config.empty()) {
+    if (!options_manager.ParsePath(extra_config, false /* external */)) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+                          "Extra config path request but not found: %s. "
+                          "Config might be incomplete",
+                          extra_config.c_str());
+    }
+  }
 
   options_manager.SetValue("CVMFS_MOUNT_DIR",
                            settings_spool_area_.readonly_mnt());

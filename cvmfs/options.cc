@@ -143,7 +143,7 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
   return true;
 }
 
-void BashOptionsManager::ParsePath(const string &config_file,
+bool BashOptionsManager::ParsePath(const string &config_file,
                                    const bool external) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
@@ -210,7 +210,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
                "configuration repository directory does not exist: %s",
                config_path.c_str());
     }
-    return;
+    return false;
   }
 
   int fd_stdin;
@@ -250,6 +250,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
   close(fd_stdout);
   close(fd_stdin);
   fclose(fconfig);
+  return true;
 }
 
 
@@ -279,7 +280,7 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
 }
 
 
-void OptionsManager::ParseDefault(const string &fqrn) {
+bool OptionsManager::ParseDefault(const string &fqrn) {
   if (taint_environment_) {
     int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
     assert(retval == 0);
@@ -294,8 +295,15 @@ void OptionsManager::ParseDefault(const string &fqrn) {
   }
   ProtectParameter("CVMFS_CONFIG_REPOSITORY");
   string external_config_path;
-  if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path))
-    ParsePath(external_config_path + "default.conf", true);
+  if ((fqrn != "") && HasConfigRepository(fqrn, &external_config_path)) {
+    if (!ParsePath(external_config_path + "default.conf", true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Not reachable CVMFS_CONFIG_REPOSITORY: %s! "
+               "Make sure the mountpoint is not stale",
+               external_config_path.c_str());
+      return false;
+    }
+  }
   ParsePath("/etc/cvmfs/default.local", false);
 
   if (fqrn != "") {
@@ -305,9 +313,16 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     tokens.erase(tokens.begin());
     domain = JoinStrings(tokens, ".");
 
-    if (HasConfigRepository(fqrn, &external_config_path))
-      ParsePath(external_config_path+ "domain.d/" + domain + ".conf",
-        true);
+    if (HasConfigRepository(fqrn, &external_config_path)) {
+      if (!ParsePath(external_config_path + "domain.d/" + domain + ".conf",
+                     true)) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                "Not reachable CVMFS_CONFIG_REPOSITORY: %s for domain %s! "
+                "Make sure the mountpoint is not stale",
+                external_config_path.c_str(), domain.c_str());
+        return false;
+      }
+    }
     ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false);
     ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false);
 
@@ -316,6 +331,7 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false);
     ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false);
   }
+  return true;
 }
 
 

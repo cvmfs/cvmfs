@@ -82,13 +82,13 @@ class OptionsManager {
    * @param external     if true it indicates the configuration file is in the
    *                     repository. If false the configuration file is in /etc
    */
-  virtual void ParsePath(const std::string &config_file,
+  virtual bool ParsePath(const std::string &config_file,
                          const bool external) = 0;
 
   /**
    * Parses the default config files for cvmfs
    */
-  void ParseDefault(const std::string &fqrn);
+  bool ParseDefault(const std::string &fqrn);
 
   /**
    * Cleans all information about the variables
@@ -248,10 +248,10 @@ class SimpleOptionsParser : public OptionsManager {
   explicit SimpleOptionsParser(
     OptionsTemplateManager *opt_templ_mgr_param = NULL)
     : OptionsManager(opt_templ_mgr_param) { }
-  virtual void ParsePath(
+  virtual bool ParsePath(
     const std::string &config_file,
     const bool external __attribute__((unused))) {
-    (void) TryParsePath(config_file);
+      return TryParsePath(config_file);
   }
   // Libcvmfs returns success or failure, the fuse module fails silently
   bool TryParsePath(const std::string &config_file);
@@ -269,7 +269,7 @@ class BashOptionsManager : public OptionsManager {
   explicit BashOptionsManager(
     OptionsTemplateManager *opt_templ_mgr_param = NULL)
     : OptionsManager(opt_templ_mgr_param) { }
-  void ParsePath(const std::string &config_file, const bool external);
+  bool ParsePath(const std::string &config_file, const bool external);
 };  // class BashOptionsManager
 
 
