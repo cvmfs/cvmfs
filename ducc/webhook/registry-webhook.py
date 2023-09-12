@@ -7,8 +7,8 @@ import os
 
 app = Flask(__name__)
 
-@app.route("/<path:p>", methods=["POST"])
-def catch_all(p):
+@app.route("/", methods=["POST"])
+def catch_all():
     print(request.json)
     try:
         for (action, image) in handle_harbor(request.json):
