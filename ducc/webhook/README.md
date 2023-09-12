@@ -5,7 +5,7 @@ This small script listens to the webhook notifications from docker and harbor re
 Run with:
 
 ```
-python3 registry-webhook.py -f "notifications.txt" -h 127.0.0.1 -p 8080
+python3 registry-webhook.py -f "notifications.txt" -h 0.0.0.0 -p 8080
 ```
 where the flags account for:
 * `--file`(`-f`): name of the file where the notifications are appended.
