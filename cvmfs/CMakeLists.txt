@@ -60,6 +60,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        compression.cc
        directory_entry.cc
        duplex_fuse.cc
+       fd_refcount_mgr.cc
        fetch.cc
        file_chunk.cc
        file_watcher.cc
@@ -491,6 +492,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression.cc
+                  fd_refcount_mgr.cc
                   manifest.cc
                   quota.cc
   )

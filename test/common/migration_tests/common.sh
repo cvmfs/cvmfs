@@ -21,8 +21,10 @@ guess_package_url() {
   fi
 
   # Ubuntu
+  local short_id=$(lsb_release --id --short 2>/dev/null)
   if [ -f /etc/debian_version ]                               && \
-     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ]
+     { [ x${short_id} = x"Ubuntu" ] || \
+       [ x${short_id} = x"Debian" ] ; }
   then
     local release=1
     local architecture=$(uname -m)
@@ -32,23 +34,27 @@ guess_package_url() {
     package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
 
   # CentOS 7, 8
-  elif [ x$(lsb_release --id --short 2>/dev/null) = x"CentOS" ]; then
+  elif [ x${short_id} = x"CentOS" ] || \
+       [ x${short_id} = x"AlmaLinux" ]; then
+    local release=1
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el${slc_major_version}.${architecture}.rpm"
 
   # Fedora
   elif [ -f /etc/fedora-release ]; then
+    local release=1
     local fedora_version=$(cat /etc/fedora-release | tr -Cd 0-9)
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}.fc${fedora_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.fc${fedora_version}.${architecture}.rpm"
 
   # CentOS 9
   elif [ -f /etc/os-release ]; then
+    local release=1
     local platform="$(. /etc/os-release; echo $PLATFORM_ID)"
     if [ x"$platform" = "xplatform:el9" ]; then
       local architecture=$(uname -m)
-      package_file_name="${package_name}-${cvmfs_version_string}.el9.${architecture}.rpm"
+      package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el9.${architecture}.rpm"
     fi
 
   # to be extended
@@ -269,4 +275,8 @@ fi
 
 if [ x"$CVMFS_CONFIG_PACKAGE" = x"" ] || [ ! -f $CVMFS_CONFIG_PACKAGE ]; then
   echo "CernVM-FS config package '$CVMFS_CONFIG_PACKAGE' not found!"
+fi
+
+if [ x"$CVMFS_LIBS_PACKAGE" = x"" ] || [ ! -f $CVMFS_LIBS_PACKAGE ]; then
+  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
 fi

@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include "glue_buffer.h"
+#include "mountpoint.h"
 #include "shortstring.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -66,11 +67,28 @@ bool FuseInvalidator::HasFuseNotifyInval() {
 
 
 FuseInvalidator::FuseInvalidator(
+  MountPoint *mount_point,
+  void **fuse_channel_or_session,
+  bool fuse_notify_invalidation)
+  : mount_point_(mount_point)
+  , inode_tracker_(mount_point->inode_tracker())
+  , dentry_tracker_(mount_point->dentry_tracker())
+  , fuse_channel_or_session_(fuse_channel_or_session)
+  , spawned_(false)
+{
+  g_fuse_notify_invalidation_ = fuse_notify_invalidation;
+  MakePipe(pipe_ctrl_);
+  memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
+  atomic_init32(&terminated_);
+}
+
+FuseInvalidator::FuseInvalidator(
   glue::InodeTracker *inode_tracker,
   glue::DentryTracker *dentry_tracker,
   void **fuse_channel_or_session,
   bool fuse_notify_invalidation)
-  : inode_tracker_(inode_tracker)
+  : mount_point_(NULL)
+  , inode_tracker_(inode_tracker)
   , dentry_tracker_(dentry_tracker)
   , fuse_channel_or_session_(fuse_channel_or_session)
   , spawned_(false)
@@ -110,7 +128,6 @@ void FuseInvalidator::InvalidateDentry(
   WritePipe(pipe_ctrl_[1], &len, sizeof(len));
   WritePipe(pipe_ctrl_[1], name.GetChars(), len);
 }
-
 
 void *FuseInvalidator::MainInvalidator(void *data) {
   FuseInvalidator *invalidator = reinterpret_cast<FuseInvalidator *>(data);
@@ -236,6 +253,24 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     uint64_t entry_parent;
     NameString entry_name;
     i = 0;
+
+#if CVMFS_USE_LIBFUSE == 2
+    int (*notify_func)(struct fuse_chan*, fuse_ino_t, const char*, size_t);
+    notify_func = &fuse_lowlevel_notify_inval_entry;
+#else
+    int (*notify_func)(struct fuse_session*, fuse_ino_t, const char*, size_t);
+    notify_func = &fuse_lowlevel_notify_inval_entry;
+#if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 16)
+    // must be libfuse >= 3.16, otherwise the signature is wrong and it
+    // will fail building
+    // mount_point can only be NULL for unittests
+    if (invalidator->mount_point_ != NULL &&
+        invalidator->mount_point_->fuse_expire_entry()) {
+      notify_func = &fuse_lowlevel_notify_expire_entry;
+    }
+#endif
+#endif
+
     while (dentries_copy->NextEntry(&dentry_cursor, &entry_parent, &entry_name))
     {
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %d --> %s",
@@ -251,16 +286,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                                   invalidator->fuse_channel_or_session_);
 #endif
 
-// we do not care if fuse kernel supports expire_entry as if it is
-// not support it will just be handled like a fuse_inval
-#ifdef FUSE_CAP_EXPIRE_ONLY
-      fuse_lowlevel_notify_expire_entry(channel_or_session,
-        entry_parent, entry_name.GetChars(), entry_name.GetLength(),
-        FUSE_LL_EXPIRE_ONLY);
-#else
-      fuse_lowlevel_notify_inval_entry(channel_or_session,
-        entry_parent, entry_name.GetChars(), entry_name.GetLength());
-#endif
+      notify_func(channel_or_session, entry_parent, entry_name.GetChars(),
+                                                    entry_name.GetLength());
 
       if ((++i % kCheckTimeoutFreqOps) == 0) {
         if (atomic_read32(&invalidator->terminated_) == 1) {

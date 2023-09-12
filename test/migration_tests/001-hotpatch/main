@@ -1,4 +1,4 @@
-
+#!/bin/bash
 cvmfs_test_name="Hotpatching during Linux kernel tar and checksumming large files"
 
 
@@ -114,7 +114,7 @@ cvmfs_run_test() {
   # previous_version=$(decrement_version $current_version)
   previous_version="2.10.0"
   echo "Version to be downloaded: $previous_version"
-  upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
+  upstream_package_url=$(guess_package_url "cvmfs" ${previous_version})
   echo "Download URL:             $upstream_package_url"
   wget --no-check-certificate --quiet $upstream_package_url || return 2
   upstream_package=$(basename $upstream_package_url)

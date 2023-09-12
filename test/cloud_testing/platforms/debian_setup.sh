@@ -96,6 +96,8 @@ install_from_repo sqlite3                       || die "fail (installing sqlite3
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
 install_from_repo patch                         || die "fail (installing bc)"
+install_from_repo git                           || die "fail (installing git)"
+install_from_repo perl                          || die "fail (installing perl)"
 
 # traffic shaping
 install_from_repo trickle || die "fail (installing trickle)"

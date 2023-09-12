@@ -81,6 +81,9 @@ curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
 sudo yum install -y nodejs
 sudo npm install -g azurite
 
+# building kernel
+install_from_repo perl
+
 # building preloader
 install_from_repo cmake
 install_from_repo zlib-devel
@@ -91,6 +94,7 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
+install_from_repo git
 
 # install docker for testing DUCC
 sudo yum install -y yum-utils

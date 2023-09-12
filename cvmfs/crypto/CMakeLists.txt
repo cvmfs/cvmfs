@@ -13,6 +13,12 @@ set (LIBCVMFS_CRYPTO_SOURCES
 )
 
 set (LIBCVMFS_CRYPTO_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
+if (NOT MACOSX)
+  # Prevent symbols from static crypto libs to be re-exported
+  # Ideally we would also do this on macOS. However, on macOS we would need to link with the
+  # -hidden-l$lib flag instead, and there does not seem to be a good way to express that in cmake.
+  set (LIBCVMFS_CRYPTO_LINK_FLAGS "-Wl,--exclude-libs,ALL")
+endif ()
 set (LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES ${RT_LIBRARY} "")
 list (APPEND LIBCVMFS_CRYPTO_LINK_PUBLIC_LIBRARIES
       ${RT_LIBRARY}
@@ -28,7 +34,8 @@ list (APPEND LIBCVMFS_CRYPTO_LINK_PRIVATE_LIBRARIES
 add_library(cvmfs_crypto SHARED ${LIBCVMFS_CRYPTO_SOURCES})
 set_target_properties (cvmfs_crypto PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
-    COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS}")
+    COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS}"
+    LINK_FLAGS "${LIBCVMFS_CRYPTO_LINK_FLAGS}")
 target_include_directories (cvmfs_crypto PRIVATE ${Libcrypto_INCLUDE_DIRS})
 target_link_libraries (cvmfs_crypto
                        PUBLIC cvmfs_util
@@ -43,7 +50,8 @@ if (BUILD_CVMFS OR BUILD_SERVER_DEBUG OR BUILD_RECEIVER_DEBUG OR BUILD_UNITTESTS
   add_library (cvmfs_crypto_debug SHARED ${LIBCVMFS_CRYPTO_SOURCES})
   set_target_properties (cvmfs_crypto_debug PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -DDEBUGMSG")
+      COMPILE_FLAGS "${LIBCVMFS_CRYPTO_CFLAGS} -O0 -DDEBUGMSG"
+      LINK_FLAGS "${LIBCVMFS_CRYPTO_LINK_FLAGS}")
   target_include_directories (cvmfs_crypto_debug PRIVATE ${Libcrypto_INCLUDE_DIRS})
   target_link_libraries (cvmfs_crypto_debug
                          PUBLIC cvmfs_util_debug

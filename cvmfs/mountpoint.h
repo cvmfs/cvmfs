@@ -198,6 +198,10 @@ class FileSystem : SingleCopy, public BootFactory {
   void TearDown2ReadOnly();
   void RemapCatalogFd(int from, int to);
 
+  // Used in cvmfs' RestoreState to prevent change of cache manager type
+  // during reload
+  void ReplaceCacheManager(CacheManager *new_cache_mgr);
+
   CacheManager *cache_mgr() { return cache_mgr_; }
   std::string cache_mgr_instance() { return cache_mgr_instance_; }
   std::string exe_path() { return exe_path_; }
@@ -260,7 +264,7 @@ class FileSystem : SingleCopy, public BootFactory {
     PosixCacheSettings() :
       is_shared(false), is_alien(false), is_managed(false),
       avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
-      quota_limit(0)
+      quota_limit(0), do_refcount(false)
       { }
     bool is_shared;
     bool is_alien;
@@ -273,6 +277,7 @@ class FileSystem : SingleCopy, public BootFactory {
      * cache when the limit is exceeded.
      */
     int64_t quota_limit;
+    bool do_refcount;
     std::string cache_path;
     /**
      * Different from cache_path only if CVMFS_WORKSPACE or

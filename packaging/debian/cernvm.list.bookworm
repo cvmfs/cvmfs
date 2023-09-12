@@ -1,0 +1,2 @@
+deb http://cvmrepo.s3.cern.ch/cvmrepo/apt bookworm-prod main
+# deb http://cvmrepo.s3.cern.ch/cvmrepo/apt bookworm-testing main

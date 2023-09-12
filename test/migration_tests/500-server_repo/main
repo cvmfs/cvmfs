@@ -1,4 +1,4 @@
-
+#!/bin/bash
 cvmfs_test_name="Migrate repository to newer version"
 MIGRATIONTEST_500_REPO="migrationtest.cern.ch"
 MIGRATIONTEST_500_REPLICA="migrationtest-stratum1.cern.ch"
@@ -25,13 +25,20 @@ cvmfs_run_test() {
   # previous_version=$(decrement_version $current_version)
   previous_version="2.10.0"
   echo "Version to be downloaded: $previous_version"
-  upstream_package_url=$(guess_package_url "cvmfs-server" ${previous_version}-1)
+  upstream_package_url=$(guess_package_url "cvmfs-server" ${previous_version})
+  upstream_libs_package_url=$(guess_package_url "cvmfs-libs" ${previous_version})
   echo "Download URL:             $upstream_package_url"
   wget --no-check-certificate --quiet $upstream_package_url || return 2
   upstream_package=$(basename $upstream_package_url)
   echo "Upstream Package:         $upstream_package"
 
+  upstream_libs_package=$(basename $upstream_libs_package_url)
+  echo "Upstream libs Package:         $upstream_libs_package"
+
   # make sure that there is no version of CernVM-FS server installed
+  if is_installed "cvmfs-libs"; then
+    uninstall_package "cvmfs-server" || return 3
+  fi
   if is_installed "cvmfs-server"; then
     installed_version=$(installed_package_version "cvmfs-server")
     echo "uninstalling CernVM-FS $installed_version"
@@ -40,6 +47,7 @@ cvmfs_run_test() {
 
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS server $previous_version"
+  install_packages $upstream_libs_package || return 4
   install_packages $upstream_package || return 4
 
   # make CernVM-FS ready to go
@@ -75,6 +83,7 @@ cvmfs_run_test() {
 
   # do the CernVM-FS package update
   echo "updating CernVM-FS server package to version $current_version"
+  install_packages "$CVMFS_LIBS_PACKAGE" || return 161
   install_packages "$CVMFS_SERVER_PACKAGE" || return 16
 
   # migrate repositories created under old version

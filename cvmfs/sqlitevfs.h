@@ -29,6 +29,7 @@ bool UnregisterVfsRdOnly();
  * to the fd in the context of the restored cache manager.
  */
 void RegisterFdMapping(int from, int to);
+void ReplaceCacheManager(CacheManager *new_cache_mgr);
 
 }  // namespace sqlite
 

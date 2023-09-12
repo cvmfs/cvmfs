@@ -68,6 +68,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_stream.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compat.h"
@@ -176,6 +177,19 @@ class FuseInterruptCue : public InterruptCue {
   virtual bool IsCanceled() { return fuse_req_interrupted(*req_ptr_); }
  private:
   fuse_req_t *req_ptr_;
+};
+
+/**
+ * Options related to the fuse kernel connection. The capabilities are
+ * determined only once at mount time. If the capability trigger certain
+ * behavior of the cvmfs fuse module, it needs to be re-triggered on reload.
+ * Used in SaveState and RestoreState to store the details of symlink caching.
+ */
+struct FuseState {
+  FuseState() : version(0), cache_symlinks(false), has_dentry_expire(false) {}
+  unsigned version;
+  bool cache_symlinks;
+  bool has_dentry_expire;
 };
 
 
@@ -1922,11 +1936,11 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 #ifdef FUSE_CAP_CACHE_SYMLINKS
     if ((conn->capable & FUSE_CAP_CACHE_SYMLINKS) == FUSE_CAP_CACHE_SYMLINKS) {
       conn->want |= FUSE_CAP_CACHE_SYMLINKS;
-      LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
-                                    "Enable symlink caching");
+      LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: Enable symlink caching");
       #ifndef FUSE_CAP_EXPIRE_ONLY
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
           "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+          "libfuse must be >= 3.16 and kernel >= 6.2-rc1, "
           "mountpoints on top of symlinks will break!");
       #endif
     } else {
@@ -1944,13 +1958,14 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
   }
 
 #ifdef FUSE_CAP_EXPIRE_ONLY
-  if ((conn->capable & FUSE_CAP_EXPIRE_ONLY) == FUSE_CAP_EXPIRE_ONLY) {
+  if ((conn->capable & FUSE_CAP_EXPIRE_ONLY) == FUSE_CAP_EXPIRE_ONLY &&
+       FUSE_VERSION >= FUSE_MAKE_VERSION(3, 16)) {
     mount_point_->EnableFuseExpireEntry();
-    LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: "
-                                   "Enable fuse_expire_entry");
+    LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: Enable fuse_expire_entry ");
   } else if (mount_point_->cache_symlinks()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
       "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
+      "libfuse must be >= 3.16 and kernel >= 6.2-rc1, "
       "mountpoints on top of symlinks will break!");
   }
 #endif
@@ -2515,6 +2530,17 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_inode_generation->state = saved_inode_generation;
   saved_states->push_back(state_inode_generation);
 
+  msg_progress = "Saving fuse state\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
+  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
+  saved_fuse_state->has_dentry_expire =
+    cvmfs::mount_point_->fuse_expire_entry();
+  loader::SavedState *state_fuse = new loader::SavedState();
+  state_fuse->state_id = loader::kStateFuse;
+  state_fuse->state = saved_fuse_state;
+  saved_states->push_back(state_fuse);
+
   // Close open file catalogs
   ShutdownMountpoint();
 
@@ -2685,13 +2711,66 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
+      int old_root_fd = cvmfs::mount_point_->catalog_mgr()->root_fd();
+
+      // TODO(jblomer): make this less hacky
+
+      CacheManagerIds saved_type =
+        cvmfs::file_system_->cache_mgr()->PeekState(saved_states[i]->state);
+      int fixup_root_fd = -1;
+
+      if ((saved_type == kStreamingCacheManager) &&
+          (cvmfs::file_system_->cache_mgr()->id() != kStreamingCacheManager))
+      {
+        // stick to the streaming cache manager
+        StreamingCacheManager *new_cache_mgr = new
+          StreamingCacheManager(cvmfs::max_open_files_,
+                                cvmfs::file_system_->cache_mgr(),
+                                cvmfs::mount_point_->download_mgr(),
+                                cvmfs::mount_point_->external_download_mgr());
+        fixup_root_fd = new_cache_mgr->PlantFd(old_root_fd);
+        cvmfs::file_system_->ReplaceCacheManager(new_cache_mgr);
+        cvmfs::mount_point_->fetcher()->ReplaceCacheManager(new_cache_mgr);
+        cvmfs::mount_point_->external_fetcher()->ReplaceCacheManager(
+          new_cache_mgr);
+      }
+
+      if ((cvmfs::file_system_->cache_mgr()->id() == kStreamingCacheManager) &&
+          (saved_type != kStreamingCacheManager))
+      {
+        // stick to the cache manager wrapped into the streaming cache
+        CacheManager *wrapped_cache_mgr = dynamic_cast<StreamingCacheManager *>(
+            cvmfs::file_system_->cache_mgr())->MoveOutBackingCacheMgr(
+              &fixup_root_fd);
+        delete cvmfs::file_system_->cache_mgr();
+        cvmfs::file_system_->ReplaceCacheManager(wrapped_cache_mgr);
+        cvmfs::mount_point_->fetcher()->ReplaceCacheManager(wrapped_cache_mgr);
+        cvmfs::mount_point_->external_fetcher()->ReplaceCacheManager(
+          wrapped_cache_mgr);
+      }
+
       int new_root_fd = cvmfs::file_system_->cache_mgr()->RestoreState(
         fd_progress, saved_states[i]->state);
       LogCvmfs(kLogCvmfs, kLogDebug, "new root file catalog descriptor @%d",
                new_root_fd);
       if (new_root_fd >= 0) {
-        cvmfs::file_system_->RemapCatalogFd(0, new_root_fd);
+        cvmfs::file_system_->RemapCatalogFd(old_root_fd, new_root_fd);
+      } else if (fixup_root_fd >= 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                 "new root file catalog descriptor (fixup) @%d", fixup_root_fd);
+        cvmfs::file_system_->RemapCatalogFd(old_root_fd, fixup_root_fd);
       }
+    }
+
+    if (saved_states[i]->state_id == loader::kStateFuse) {
+      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
+      cvmfs::FuseState *fuse_state =
+        static_cast<cvmfs::FuseState *>(saved_states[i]->state);
+      if (!fuse_state->cache_symlinks)
+        cvmfs::mount_point_->DisableCacheSymlinks();
+      if (fuse_state->has_dentry_expire)
+        cvmfs::mount_point_->EnableFuseExpireEntry();
+      SendMsg2Socket(fd_progress, " done\n");
     }
   }
   if (cvmfs::mount_point_->inode_annotation()) {
@@ -2773,6 +2852,10 @@ static void FreeSavedState(const int fd_progress,
       case loader::kStateOpenFilesCounter:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
         delete static_cast<uint32_t *>(saved_states[i]->state);
+        break;
+      case loader::kStateFuse:
+        SendMsg2Socket(fd_progress, "Releasing fuse state\n");
+        delete static_cast<cvmfs::FuseState *>(saved_states[i]->state);
         break;
       default:
         break;

@@ -1,6 +1,6 @@
 Name:           cvmfs-release
 Version:        3
-Release:        1
+Release:        2
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -9,8 +9,8 @@ License:        BSD
 # This is a Red Hat maintained package which is specific to
 # our distribution.  Thus the source is only available from
 # within this srpm.
-URL:            http://cvmrepo.web.cern.ch.s3.cern.ch/cvmrepo/yum
-Source0:        http://cvmrepo.web.cern.ch.s3.cern.ch/cvmrepo/yum/RPM-GPG-KEY-CernVM
+URL:            http://cvmrepo.s3.cern.ch/cvmrepo/yum
+Source0:        http://cvmrepo.s3.cern.ch/cvmrepo/yum/RPM-GPG-KEY-CernVM
 Source1:        BSD
 Source2:        cernvm.repo
 
@@ -54,6 +54,8 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Tue Jul 08 2022 Jakob Blomer <jblomer@cern.ch> - 3-2
+- Update S3 repository mirror URL
 * Tue Jul 05 2022 Jakob Blomer <jblomer@cern.ch> - 3-1
 - Set repository URL to S3 mirror
 - Remove cernvm-kernel repository

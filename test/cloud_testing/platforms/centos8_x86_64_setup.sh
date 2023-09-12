@@ -74,6 +74,10 @@ install_from_repo netcat
 # Install the test S3 provider
 install_test_s3
 
+
+# building kernel
+install_from_repo perl
+
 # building preloader
 install_from_repo cmake
 install_from_repo zlib-devel
@@ -84,6 +88,7 @@ install_from_repo python2-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
+install_from_repo git
 
 # install docker for testing DUCC
 sudo yum install -y yum-utils
