@@ -137,6 +137,7 @@ static bool CheckProxy() {
 static bool CheckConcurrentMount(const string &fqrn,
                                  const string &workspace,
                                  string *mountpointp) {
+  LockFile(workspace + "/cvmfs_io." + fqrn + ".mountcheck.lock");
   // Try connecting to cvmfs_io socket
   int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
@@ -456,6 +457,14 @@ int main(int argc, char **argv) {
   }
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
 
+  // Prepare workspace
+  retval = MkdirDeep(workspace, 0755, false);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create workspace %s",
+             workspace.c_str());
+    return 1;
+  }
+
   // This is not a sure thing.  When the CVMFS_CACHE_BASE parameter is changed
   // two repositories can get mounted concurrently (but that should not hurt).
   // If the same repository is mounted multiple times at the same time, there
@@ -493,13 +502,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Prepare workspace and cache directory
-  retval = MkdirDeep(workspace, 0755, false);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create workspace %s",
-             workspace.c_str());
-    return 1;
-  }
+  // Prepare cache directory
   if (dedicated_cachedir) {
     retval = MkdirDeep(cachedir, 0755, false);
     if (!retval) {
