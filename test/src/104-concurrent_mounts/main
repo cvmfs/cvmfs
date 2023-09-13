@@ -1,0 +1,42 @@
+#!/bin/bash
+
+cvmfs_test_name="Check that simultaneous mount attempts only mount the repository once"
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "running cleanup()"
+  # clean up all mount attempts, a bunch of times for good measure 
+  umount /cvmfs/atlas-condb.cern.ch || true
+  umount /cvmfs/atlas-condb.cern.ch || true
+  umount /cvmfs/atlas-condb.cern.ch || true
+  umount /cvmfs/atlas-condb.cern.ch || true
+  umount /cvmfs/atlas-condb.cern.ch || true
+  umount /cvmfs/atlas-condb.cern.ch || true
+  autofs_switch on
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+  autofs_switch off
+
+  trap cleanup EXIT HUP INT TERM || return 2
+
+
+  # try to mount the same repository several times simultaneously
+  cvmfs_mount atlas-condb.cern.ch  &
+  cvmfs_mount atlas-condb.cern.ch  &
+  cvmfs_mount atlas-condb.cern.ch  &
+  cvmfs_mount atlas-condb.cern.ch  &
+
+
+  local num_cvmfs_processes=$(ps -efww | grep mount | grep atlas-condb | wc -l)
+
+  if [ "$num_cvmfs_processes" -gt "2" ]; then
+    echo "Error: more than one cvmfs process running after multiple simultaneous mounts"  
+    return 21
+  fi
+  return 0
+
