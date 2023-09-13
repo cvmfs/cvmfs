@@ -1,0 +1,62 @@
+#!/bin/bash
+
+cvmfs_test_name="Check that simultaneous mount attempts only mount the repository once"
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "running cleanup() ..."
+  echo "  removing temporary changes from /etc/cvmfs/default.local ..."
+  sudo sed -i'' -e '/^CVMFS_HTTP_PROXY=DIRECT/d' /etc/cvmfs/default.local
+  echo "  unmounting all remaining mounts ..."
+  sudo sed -i'' -e '/^CVMFS_HTTP_PROXY=DIRECT/d' /etc/cvmfs/default.local
+  # clean up all mount attempts, a bunch of times for good measure
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null || true
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null|| true
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null|| true
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null|| true
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null|| true
+  sudo umount /cvmfs/atlas-condb.cern.ch 2&>/dev/null|| true
+
+  sudo umount /cvmfs/cvmfs-config.cern.ch 2&>/dev/null|| true
+
+  echo "  restarting autofs ..."
+  autofs_switch on
+  echo "   ... done."
+
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+  # setup
+  autofs_switch off
+  echo "setting up configuration ..."
+  sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local'
+  sudo mkdir -p /cvmfs/atlas-condb.cern.ch
+  echo "mounting config repository ..."
+  sudo mkdir -p /cvmfs/cvmfs-config.cern.ch
+  sudo mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
+
+  trap cleanup EXIT HUP INT TERM || return 2
+
+  # try to mount the same repository several times simultaneously
+  # using the test function mount_cvmfs is not concurrent enough,
+  # so need to mount directly
+  echo "mounting test repository multiple times (all but one are expected to fail) ... "
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sleep 6
+
+  echo "counting cvmfs_processes ..."
+  local num_cvmfs_processes=$(ps -efww | grep mount | grep atlas-condb | wc -l)
+
+  if [ "$num_cvmfs_processes" -gt "2" ]; then
+    echo "ERROR: more than one cvmfs process running after multiple simultaneous mounts"
+    return 21
+  fi
+  return 0
+}
+
