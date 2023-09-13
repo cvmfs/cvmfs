@@ -6,12 +6,12 @@ cvmfs_test_suites="quick"
 cleanup() {
   echo "running cleanup()"
   # clean up all mount attempts, a bunch of times for good measure 
-  umount /cvmfs/atlas-condb.cern.ch || true
-  umount /cvmfs/atlas-condb.cern.ch || true
-  umount /cvmfs/atlas-condb.cern.ch || true
-  umount /cvmfs/atlas-condb.cern.ch || true
-  umount /cvmfs/atlas-condb.cern.ch || true
-  umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
+  sudo umount /cvmfs/atlas-condb.cern.ch || true
   autofs_switch on
 }
 
@@ -26,11 +26,11 @@ cvmfs_run_test() {
 
 
   # try to mount the same repository several times simultaneously
-  mkdir -p /cvmfs/atlas-condb.cern.ch
-  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
-  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
-  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
-  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mkdir -p /cvmfs/atlas-condb.cern.ch
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
 
   local num_cvmfs_processes=$(ps -efww | grep mount | grep atlas-condb | wc -l)
 
