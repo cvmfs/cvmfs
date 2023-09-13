@@ -39,4 +39,5 @@ cvmfs_run_test() {
     return 21
   fi
   return 0
+}
 
