@@ -137,8 +137,7 @@ static bool CheckProxy() {
 static bool CheckConcurrentMount(const string &fqrn,
                                  const string &workspace,
                                  string *mountpointp) {
-  // TODO(vavolkl): enable fix
-  //LockFile(workspace + "/cvmfs_io." + fqrn + ".mountcheck.lock");
+  LockFile(workspace + "/cvmfs_io." + fqrn + ".mountcheck.lock");
   // Try connecting to cvmfs_io socket
   int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
