@@ -26,11 +26,11 @@ cvmfs_run_test() {
 
 
   # try to mount the same repository several times simultaneously
-  cvmfs_mount atlas-condb.cern.ch  &
-  cvmfs_mount atlas-condb.cern.ch  &
-  cvmfs_mount atlas-condb.cern.ch  &
-  cvmfs_mount atlas-condb.cern.ch  &
-
+  mkdir -p /cvmfs/atlas-condb.cern.ch
+  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
+  mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
 
   local num_cvmfs_processes=$(ps -efww | grep mount | grep atlas-condb | wc -l)
 
