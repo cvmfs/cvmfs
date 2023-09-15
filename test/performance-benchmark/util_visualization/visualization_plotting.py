@@ -2,6 +2,7 @@ import glob
 
 import pandas as pd
 import numpy as np
+import tqdm
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -27,7 +28,7 @@ from collections import defaultdict
 #
 # Can accept multiple csv_labels but will create one scatter plot for each
 #
-def plotSingleFile(filename, csv_labels, outdir):
+def plotSingleFile(filename, csv_labels, csv_label_type, outdir):
   df=pd.read_csv(filename, index_col="labels", sep=',')
 
   cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
@@ -48,8 +49,22 @@ def plotSingleFile(filename, csv_labels, outdir):
         plt.rcParams.update(ele)
 
     for label in labels.split(","):
+      if not label in df.index:
+          continue
+      old_val = 0
       for cache in cache_labels:
         row = ast.literal_eval(df.loc[label][cache])
+
+        # modify row if warm/hot metric for internal affairs
+        if ("cvmfs_internal" in csv_label_type):
+          if cache == cache_labels[0]:
+            old_val = row[-1]
+          if cache != cache_labels[0]:
+            for i in range(len(row)):
+              tmp_val = row[i]
+              row[i] = row[i] - old_val
+              old_val = tmp_val
+
         y_data[label].append(row)
 
     ax1 = plt.axes()
@@ -75,13 +90,27 @@ def plotSingleFile(filename, csv_labels, outdir):
             )
         idx += 1
 
-    num_threads = filename.split("_")[-2]
+    # quick escape in case label does not exist.
+    if len(y_data) == 0:
+      continue
+
     all_measurements = len(y_data[[*y_data.keys()][0]][0])
-    repetitions = all_measurements / int(num_threads)
-    ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( " + \
-                   num_threads + " threads " + " x " + \
-                   str(int(repetitions)) + " repetitions)")
-    ax1.set_ylabel(visualization_time.measurement_label_dict[label])
+
+    if "cvmfs_internal" in csv_label_type:
+      repetitions = all_measurements
+      ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( "
+                      + str(int(repetitions)) + " repetitions)")
+    else:
+      num_threads = filename.split("_")[-2]
+      repetitions = all_measurements / int(num_threads)
+      ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( " +
+                    num_threads + " threads " + " x " +
+                    str(int(repetitions)) + " repetitions)")
+    if "cvmfs_internal" in csv_label_type:
+      ax1.set_ylabel(visualization_time.
+                   measurement_cvmfs_internal_dict[label.split("_", 1)[-1]])
+    else:
+      ax1.set_ylabel(visualization_time.measurement_label_dict[label])
 
     # needed to draw legend dynamically below x-axis label
     fig.canvas.draw()
@@ -123,24 +152,21 @@ def plotSingleFile(filename, csv_labels, outdir):
 # x_labels - labels for the x-axis of the plot
 # x_title - title for the x-axis of the plot
 def _prepareData(dirname, csv_labels, version_or_option, thread, cmd,
-             versions_or_options, comparison_to_plot, cache_labels):
+             versions_or_options, comparison_to_plot, cache_labels,
+             x_label_dict, x_title):
   cvmfs_data = {}
 
   ## 1) get data
-  if "version" in comparison_to_plot:
+  if "build" in comparison_to_plot:
     option = version_or_option
-    x_label_dict = visualization_time.cvmfs_version_labels_dict
-    x_title = "CVMFS Version"
-  elif "option" in comparison_to_plot:
+  elif "config" in comparison_to_plot:
     version = version_or_option
-    x_label_dict = visualization_time.option_labels_dict
-    x_title = "CVMFS Client Config"
 
   for comperator in versions_or_options:
-    if "option" in comparison_to_plot:
+    if "config" in comparison_to_plot:
       files = glob.glob(dirname + cmd + "_" + version + "_" + comperator +
                         "_" + thread + "_[0-9]*.csv")
-    elif "version" in comparison_to_plot:
+    elif "build" in comparison_to_plot:
       files = glob.glob(dirname + cmd + "_" + comperator + "_" + option +
                         "_" + thread + "_[0-9]*.csv")
 
@@ -216,13 +242,15 @@ def _prepareData(dirname, csv_labels, version_or_option, thread, cmd,
 #
 #
 def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
-                          versions_or_options, comparison_to_plot, outdir):
+                          versions_or_options, comparison_to_plot, outdir,
+                          x_label_dict, x_title):
   cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
 
   y_data, x_labels, x_title = _prepareData(dirname, csv_labels,
                                            version_or_option, thread, cmd,
                                            versions_or_options,
-                                           comparison_to_plot, cache_labels)
+                                           comparison_to_plot, cache_labels,
+                                           x_label_dict, x_title)
 
   if len(y_data) == 0:
     return
@@ -327,3 +355,109 @@ def boxplotPlotComparison(dirname, csv_labels, version_or_option, thread, cmd,
 
   plt.savefig(outname, bbox_inches='tight', pad_inches=0.2)
   plt.close('all')
+
+#cms_2.9.4.0_statfs_kernel_1_0
+def _csv_header_string():
+  header = "tag, command_label, build_name, client_config, threads, run_id, "
+  header += "repetitions, metric, "
+  
+  for cache in ["cold_cache", "warm_cache", "hot_cache"]:
+    for metric in ["min_val", "first_quartile", "median", "third_quartile",
+                   "max_val"]:
+      header += cache + "_" + metric + ", "
+
+  # remove last comma + whitespace
+  header = header[:-2]
+
+  header += "\n"
+  return header
+
+# TODO TODO use this also for scatter plot
+def _prepare_data_single_file(filename, csv_labels, csv_label_type,
+                      callback, callback_extra_data):
+  df=pd.read_csv(filename, index_col="labels", sep=',')
+
+  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
+
+  for labels in csv_labels:
+    y_data = defaultdict(list)
+
+    for label in labels.split(","):
+      if not label in df.index:
+          continue
+      old_val = 0
+      for cache in cache_labels:
+        row = ast.literal_eval(df.loc[label][cache])
+
+        # modify row if warm/hot metric for internal affairs
+        if ("cvmfs_internal" in csv_label_type):
+          if cache == cache_labels[0]:
+            old_val = row[-1]
+          if cache != cache_labels[0]:
+            for i in range(len(row)):
+              tmp_val = row[i]
+              row[i] = row[i] - old_val
+              old_val = tmp_val
+
+        y_data[label].append(row)
+
+    # quick escape in case label does not exist.
+    if len(y_data) == 0:
+      continue
+
+    callback(y_data, callback_extra_data)
+
+def callback_append_csv(data, extra_data):
+  out_file = extra_data["out_file"]
+  cache_labels = extra_data["cache_labels"]
+  in_filename = extra_data["in_filename"]
+  tag = extra_data["tag"]
+
+  #remove dir
+  tmp = str(in_filename.split("/")[-1])
+  # split at first occurences of _
+  cmd = tmp.split("_", 1)[0]
+  build = tmp.split("_")[1]
+  client_config = tmp.split("_", 2)[2].rsplit("_", 2)[0]
+  threads = tmp.split("_")[-2]
+  run = tmp.split("_")[-1].split(".")[0]
+  
+
+  out_file.write(tag + ", " + cmd + ", " + build + ", " + client_config +  ", ")
+  out_file.write(threads + ", " + run)
+
+  for key, val in data.items():
+      out_file.write(", " + str(len(val[0])) +  ", " + key)
+      for cacheData in val:
+        quants = pd.DataFrame(cacheData).quantile([0, 0.25, 0.5, 0.75, 1])
+        np_quants = np.array(quants)
+        out_file.write(", " + str(np_quants[0][0]))
+        out_file.write(", " + str(np_quants[1][0]))
+        out_file.write(", " + str(np_quants[2][0]))
+        out_file.write(", " + str(np_quants[3][0]))
+  
+  out_file.write("\n")
+
+def append_to_csv(in_filenames, csv_labels, csv_label_type, out_filename, tag):
+  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
+
+  with(open(out_filename,"a")) as file:
+    # file newly created
+    if (file.tell() == 0):
+      file.write(_csv_header_string())
+
+    callback_extra_data = {
+      "out_file": file,
+      "cache_labels": cache_labels,
+      "tag": tag
+    }
+
+    pbar = tqdm.tqdm(in_filenames)
+    for in_filename in pbar:
+      pbar.set_description(in_filename)
+      callback_extra_data["in_filename"] = in_filename
+
+      _prepare_data_single_file(in_filename, csv_labels, csv_label_type,
+                          callback_append_csv, callback_extra_data)
+      
+
