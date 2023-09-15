@@ -1,0 +1,116 @@
+################################################################################
+#       CVMFS Benchmark Visualizer - Example YAML config
+################################################################################
+# Mandatory parameters are marked with MAND
+#
+# How filenames look like created by start_benchmark:
+# <cmd>_<version>-<custom version tag>_<client config 1>_.._<client config n>_<num threads>_<run>.csv
+#
+# e.g.: root_2.11.0.0-bisect_symlink_statfs_kernel_32_0.csv
+
+#################################################
+##              General options
+#################################################
+# (MAND) directory name of input (= out_dirname used in start_benchmark.py)
+in_dirname: ./data/loadctlg_cmp2/
+# directory name of output (default: ./results)
+out_dirname: ./results/loadctlg_cmp2/
+# array of threads used in input (default: use all found)
+num_threads: [10, 32]
+# (MAND) each combination of <version>-<custom version tag> as part of the
+#        filename created by start_benchmark.py needs a separate label
+cvmfs_build_name_labels:
+  "2.9.4.0": "2.9.4"
+  "2.11.0.0-bisect": "2.11.0"
+  "2.11.0.0": "2.11.0"
+  "2.11.0.0-fix-perf": "2.11.0 (J)"
+  "2.11.0.0-loadctlg": "load ctlg"
+# (MAND) each different client config used in start_benchmark.py as part of the
+#        filename needs a separate label
+client_config_labels:
+  "statfs_kernel": "Default"
+  "symlink_statfs_kernel": "Symlink Caching"
+  "symlink_statfs_kernel_trace": "Symlink Caching (T)"
+
+##################################################
+##       Boxplot for cvmfs build comparison
+## (= comparison between different cvmfs versions)
+##################################################
+cvmfs_build_comparison:
+  # (MAND) cvmfs build directories that should be compared within the same plot
+  cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
+  # (MAND) client config for which each a different comparison is created
+  client_configs: ["statfs_kernel"]
+  # selected metrics of the time command
+  # for all metrics see: visualization_time.measurement_label_dict
+  time_metrics: ["user,system,real", "real"]
+  # dont plot any internal affairs metric
+  # if this line is missing: all of them will be plotted
+  # alternative use to plot all: internal_affairs_metrics: ["all"]
+  # see: client_config_comparison for usage of params
+  internal_affairs_metrics: [] 
+  # Optional, as internal_affairs_metrics is NOT set
+  # contains cvmfs repo of which the internal affairs metrics should be
+  # plotted
+  internal_affairs_repos: []
+  # Optionally can turn off the plot creation
+  plot: True
+
+########################################################
+##        Boxplot for client config comparison
+## (= comparison between different cvmfs client configs)
+########################################################
+client_config_comparison:
+  # (MAND)
+  cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
+  # (MAND)
+  client_configs: ["statfs_kernel"]
+  time_metrics: ["real"]
+  # plot internal affairs for:
+  # sft.cern.ch_catalog_mgr.n_lookup_path
+  # cms-ib.cern.ch_catalog_mgr.n_lookup_path
+  # for all metrics see: visualization_time.measurement_cvmfs_internal_dict
+  internal_affairs_metrics: ["catalog_mgr.n_lookup_path"]
+  # (MAND) as internal_affairs_metrics is set
+  internal_affairs_repos: ["sft.cern.ch", "cms-ib.cern.ch"]
+  # Optionally can turn off the plot creation
+  plot: True
+
+########################################################
+##        Scatter plot of single file
+## (= each repetition is a different measurement point)
+########################################################
+scatter_plot:
+  # (Optional)
+  cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
+  # (Optional)
+  client_configs: ["statfs_kernel"]
+  time_metrics: ["real"]
+  internal_affairs_metrics: ["catalog_mgr.n_lookup_path"]
+  # (MAND) as internal_affairs_metrics is set
+  internal_affairs_repos: ["sft.cern.ch", "cms-ib.cern.ch"]
+  # Optionally can turn off the plot creation
+  plot: True
+
+#########################################################
+##                  Append to CSV
+## (= appends to a file: average values of a measurement)
+## each metric creates a new entry for
+## cvmfs_build_names,client_configs-combo
+#########################################################
+append_to_csv:
+  # (MAND) CSV outfile. if does not exist it is created,
+  #        otherwise appended
+  full_out_name: "./data/all_my_data.csv"
+  # (MAND)
+  cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
+  # (MAND)
+  client_configs: ["statfs_kernel"]
+  time_metrics: ["real"]
+  internal_affairs_metrics: ["catalog_mgr.n_lookup_path"]
+  # (MAND) as internal_affairs_metrics is set
+  internal_affairs_repos: ["sft.cern.ch", "cms-ib.cern.ch"]
+  # (MAND) Special tag to help group by within the CSV
+  tag: "PR #42"
+  # Optionally can turn off the writing to csv
+  write: True
