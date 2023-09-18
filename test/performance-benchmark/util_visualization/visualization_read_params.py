@@ -3,6 +3,7 @@ import sys
 import textwrap
 import yaml
 import glob
+import argcomplete
 
 from util_visualization import visualization_time
 
@@ -289,7 +290,8 @@ def getConfig():
     with open(parsed_args.config_file, 'r') as file:
       config = yaml.safe_load(file)
   else:
-    config = set_config()
+    print("No YAML config file given")
+    exit(3)
     # TODO RETURN ERROR AND EXIT
 
   verifyYAML(config)
@@ -298,76 +300,9 @@ def getConfig():
   print("all good")
   return config
 
-
-def set_config():
-  ##############################################################################
-  ## PARAMS set by user
-  #########################
-  # directory containing all .csv files that should be compared
-  dirname = "data/loadctlg_cmp2/"
-  # directory where to write the plots, will be created if needed
-  outdir = "./results/loadctlg_cmp2/"
-  # if empty will make it for all threads available
-  num_threads = []
-
-  # csv_labels are defined in util_benchmark/benchmark_time.dict_time_format
-  # and all cvmfs internal affairs counters as shown in a .csv created by
-  # ../start_benchmark.py
-  #
-  # not yet existing labels and combinations like "user,system,real" must be
-  # be added here visualization_time.measurement_label_dict
-  # for readability dont combine more than 3 labels
-  csv_labels = ["user,system,real", "user", "system", "real"]
-
-
-  # for comparing versions
-  # each version must be added to visualization_time.cvmfs_version_labels_dict
-  # and define its label how it is shown in the boxplot
-  versions = ["2.11.0.0", "2.11.0.0-loadctlg"]
-  versions_cvmfs_options = ['statfs_kernel', 'symlink_statfs_kernel']
-  create_version_plots = True
-
-  # for comparing cvmfs_configs
-  # each option must be added to visualization_time.option_labels_dict
-  # and define its label how it is shown in the boxplot
-  options = ['statfs_kernel', 'symlink_statfs_kernel']
-  options_cvmfs_versions = ["2.11.0.0-bisect"]
-  create_option_plots = False
-
-  create_scatter_plots = False
-
-
-  # repos for which cvmfs_internal_labels should be plotted
-  repos = ["sft.cern.ch", "cms-ib.cern.ch"]
-
-  # repo name will be added as prefix
-  # cvmfs_internal_labels = [
-  # "_catalog_mgr.n_lookup_path", "_catalog_mgr.n_lookup_path_negative",
-  # "_cvmfs.n_fs_open", "_cvmfs.n_fs_read",
-  # "_cvmfs.n_fs_readlink", "_cvmfs.n_fs_stat",
-  # "_download.n_requests", "_download.sz_transfer_time",
-  # "_download.sz_transferred_bytes", "_fetch.n_downloads",
-  # "_fetch.n_invocations", "_inode_cache.n_hit",
-  # "_inode_cache.n_insert", "_inode_cache.n_miss",
-  # "_inode_cache.sz_allocated",
-  # "_inode_tracker.n_hit_inode", "_inode_tracker.n_hit_path",
-  # "_inode_tracker.n_insert", "_linkstring.n_instances",
-  # "_sqlite.n_read", "_sqlite.sz_read"
-  # ]
-
-  # plot all labels
-  cvmfs_internal_labels = ["_" + key for key in \
-                           visualization_time.measurement_cvmfs_internal_dict.keys()]
-
-  #########################
-  ## END PARAMS set by user
-  ##############################################################################
-
-
-
 def parse_arguments():
   parser = argparse.ArgumentParser(
-    prog='python3 start_visualization.py',
+    prog='python3 start_visualization.py -c <myconfig>.yaml',
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=textwrap.dedent("""
 CVMFS Benchmark Visualizer
@@ -379,16 +314,20 @@ super long
     """),
     epilog="end of description")
   parser.add_argument('-c', '--config-file',
-                      help='(optional) YAML config file',
-                      required=False)
+                      help='YAML config file',
+                      required=False).completer = getFiles
   parser.add_argument('--help-config',
-                      help='(optional) More help: How to build the YAML config file',
+                      help='More help: How to build the YAML config file',
                       required=False,
                       action="store_true")
   parser.add_argument('--help-output',
-                      help='(optional) More help: Output of this program (plots, ..)',
+                      help='More help: Output of this program (plots, ..)',
                       required=False,
                       action="store_true")
+  argcomplete.autocomplete(parser)
   return parser.parse_args()
 
 
+def getFiles(prefix, parsed_args, **kwargs):
+  files = glob.glob(prefix + "*")
+  return files

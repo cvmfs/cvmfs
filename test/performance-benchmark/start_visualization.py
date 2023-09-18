@@ -1,8 +1,10 @@
 import glob
 import tqdm
+import sys
 
 from util_visualization import visualization_plotting
 from util_visualization import visualization_time
+from util_visualization import visualization_read_params
 
 ################################################################################
 #
@@ -31,138 +33,166 @@ from util_visualization import visualization_time
 # and all cvmfs internal affairs counters as shown in a .csv created by
 # ../start_benchmark.py
 #
-#
+# To use autocompletion for the command line to find the config file, see here
+# https://pypi.org/project/argcomplete/#activating-global-completion
 #
 ################################################################################
 
-if __name__ == "__main__":
-  ##############################################################################
-  ## PARAMS set by user
-  #########################
-  # directory containing all .csv files that should be compared
-  dirname = "data/loadctlg_cmp2/"
-  # directory where to write the plots, will be created if needed
-  outdir = "./results/loadctlg_cmp2/"
-  # if empty will make it for all threads available
-  num_threads = []
+def _plot_boxplots(config, section, title, comparison_to_plot):
+  if "build" in comparison_to_plot:
+    comperator = "cvmfs_build_names"
+    compare_label = "cvmfs_build_name_labels"
+    outer_iterator = "client_configs"
+    x_title = "CVMFS Version"
+  elif "config" in comparison_to_plot:
+    comperator = "client_configs"
+    compare_label = "client_config_labels"
+    outer_iterator = "cvmfs_build_names"
+    x_title = "CVMFS Client Config"
+  else:
+    print("Wrong comparison_to_plot selected. Either 'build' or 'config'")
+    exit(2)
 
-  # csv_labels are defined in util_benchmark/benchmark_time.dict_time_format
-  # and all cvmfs internal affairs counters as shown in a .csv created by
-  # ../start_benchmark.py
-  #
-  # not yet existing labels and combinations like "user,system,real" must be
-  # be added here visualization_time.measurement_label_dict
-  # for readability dont combine more than 3 labels
-  csv_labels = ["user,system,real", "user", "system", "real"]
+  if (section in config.keys() and config[section]["plot"] == True):
+    print("\n")
+    print("============================================")
+    print("Plotting:", title)
+    print("============================================")
 
+    # build full label by adding the repo in front
+    csv_labels_cvmfs_internal = getCvmfsInternal(config, section)
 
-  # for comparing versions
-  # each version must be added to visualization_time.cvmfs_version_labels_dict
-  # and define its label how it is shown in the boxplot
-  versions = ["2.11.0.0", "2.11.0.0-loadctlg"]
-  versions_cvmfs_options = ['statfs_kernel', 'symlink_statfs_kernel']
-  create_version_plots = True
-
-  # for comparing cvmfs_configs
-  # each option must be added to visualization_time.option_labels_dict
-  # and define its label how it is shown in the boxplot
-  options = ['statfs_kernel', 'symlink_statfs_kernel']
-  options_cvmfs_versions = ["2.11.0.0-bisect"]
-  create_option_plots = False
-
-  create_scatter_plots = False
-
-
-  # repos for which cvmfs_internal_labels should be plotted
-  repos = ["sft.cern.ch", "cms-ib.cern.ch"]
-
-  # repo name will be added as prefix
-  # cvmfs_internal_labels = [
-  # "_catalog_mgr.n_lookup_path", "_catalog_mgr.n_lookup_path_negative",
-  # "_cvmfs.n_fs_open", "_cvmfs.n_fs_read",
-  # "_cvmfs.n_fs_readlink", "_cvmfs.n_fs_stat",
-  # "_download.n_requests", "_download.sz_transfer_time",
-  # "_download.sz_transferred_bytes", "_fetch.n_downloads",
-  # "_fetch.n_invocations", "_inode_cache.n_hit",
-  # "_inode_cache.n_insert", "_inode_cache.n_miss",
-  # "_inode_cache.sz_allocated",
-  # "_inode_tracker.n_hit_inode", "_inode_tracker.n_hit_path",
-  # "_inode_tracker.n_insert", "_linkstring.n_instances",
-  # "_sqlite.n_read", "_sqlite.sz_read"
-  # ]
-
-  # plot all labels
-  cvmfs_internal_labels = ["_" + key for key in \
-                           visualization_time.measurement_cvmfs_internal_dict.keys()]
-
-  #########################
-  ## END PARAMS set by user
-  ##############################################################################
-
-
-  files = glob.glob(dirname + "*.csv")
-
-  cmds = list(visualization_time.getDistinctCommands(files))
-  options = list(visualization_time.getDistinctOptions(files))
-  if len(num_threads) == 0:
-    print("Automatically extracting number of threads...  ", end="")
-    num_threads = list(visualization_time.getDistinctThreads(files))
-    print("done")
-
-  cmds.sort(key=lambda s: s.lower())
-  # options.sort(key=lambda s: s.lower())
-  num_threads.sort()
-
-  print("commands:", cmds)
-  print("client configs:", options)
-  print("num threads:", num_threads)
-  print("")
-  print("csv_labels", csv_labels)
-  print("repos", repos)
-  print("cvfms_internal_labels", cvmfs_internal_labels)
-
-
-  # build full label by adding the repo in front
-  csv_labels_cvmfs_internal = []
-  for repo in repos:
-    for label in cvmfs_internal_labels:
-      csv_labels_cvmfs_internal.append(repo + label)
-
-  if create_option_plots == True:
-    print("\n\nPlotting: compare options\n")
-    # compare options
-    for version in options_cvmfs_versions:
-      for cmd in cmds:
-        for thread in num_threads:
-          print(version, cmd, thread)
-          for label in tqdm.tqdm(csv_labels):
-            visualization_plotting.boxplotPlotComparison(dirname, label,
-                                              version, str(thread), cmd, options,
-                                              "option", outdir)
-          for label in tqdm.tqdm(csv_labels_cvmfs_internal):
-            visualization_plotting.boxplotPlotComparison(dirname, label,
-                                             version, str(thread), cmd, options,
-                                             "option_cvmfs_internal", outdir)
-
-  if create_version_plots == True:
-    print("\n\nPlotting: compare versions\n")
     # compare versions
-    for option in versions_cvmfs_options:
-      for cmd in cmds:
-        for thread in num_threads:
-          print(option, cmd, thread)
-          for label in tqdm.tqdm(csv_labels):
-            visualization_plotting.boxplotPlotComparison(dirname, label, option,
-                                                     str(thread), cmd, versions,
-                                                     "version", outdir)
-          for label in tqdm.tqdm(csv_labels_cvmfs_internal):
-            visualization_plotting.boxplotPlotComparison(dirname, label, option,
-                                               str(thread), cmd, versions,
-                                               "version_cvmfs_internal", outdir)
+    total_itr = (len(config[section][outer_iterator])
+               * len(config["_cmds"])
+               * len(config["num_threads"])
+               * len(config[section]["time_metrics"])
+               + len(config[section][outer_iterator])
+               * len(config["_cmds"])
+               * len(config["num_threads"])
+               * len(csv_labels_cvmfs_internal))
+    pbar = tqdm.tqdm(total=total_itr)
+    for outer_ele in config[section][outer_iterator]:
+      for cmd in config["_cmds"]:
+        for thread in config["num_threads"]:
+          for label in config[section]["time_metrics"]:
+            pbar.set_description(outer_ele + " " + cmd + " "+ str(thread)
+                                 + " " + label)
+            visualization_plotting.boxplotPlotComparison(
+                        config["in_dirname"], label, outer_ele, str(thread),
+                        cmd, config[section][comperator], comparison_to_plot,
+                        config["out_dirname"], config[compare_label],
+                        x_title)
+            pbar.update(1)
+          for label in csv_labels_cvmfs_internal:
+            pbar.set_description(outer_ele + " " + cmd + " " + str(thread)
+                                 + " " + label)
+            visualization_plotting.boxplotPlotComparison(
+                        config["in_dirname"], label, outer_ele, str(thread),
+                        cmd, config[section][comperator],
+                        comparison_to_plot + "_cvmfs_internal", config["out_dirname"],
+                        config[compare_label], x_title)
+            pbar.update(1)
+
+def getCvmfsInternal(config, section):
+  csv_labels_cvmfs_internal = []
+
+  if ("internal_affairs_metrics" in config[section].keys()
+      and len(config[section]["internal_affairs_metrics"]) > 0):
+    for repo in config[section]["internal_affairs_repos"]:
+      for label in config[section]["internal_affairs_metrics"]:
+        csv_labels_cvmfs_internal.append(repo + "_" + label)
+
+  return csv_labels_cvmfs_internal
+
+def _createScatter(config):
+  section = "scatter_plot"
+  if (section in config.keys() and config[section]["plot"] == True):
+    print("\n")
+    print("============================================")
+    print("Plotting:", "Scatter plots")
+    print("============================================")
+    if (    (not "cvmfs_build_names" in config[section].keys()
+             or len(config[section]["cvmfs_build_names"]) == 0)
+        and (not "client_configs" in config[section].keys()
+             or len(config[section]["client_configs"]) == 0)):
+      files = glob.glob(config["in_dirname"] + "*.csv")
+    else:
+      files = []
+      # find the right files for given config/build
+      for build in config[section]["cvmfs_build_names"]:
+        for client_config in config[section]["client_configs"]:
+          for thread in config["num_threads"]:
+            new_files = glob.glob(config["in_dirname"] +  "*_" + build + "_" +
+                                    client_config + "_" + str(thread)
+                                    + "_[0-9]*.csv")
+            files.extend(new_files)
+
+    cvmfs_internal_dict = getCvmfsInternal(config, section)
+    if ("time_metrics" in config[section].keys()
+      and len(config[section]["time_metrics"]) > 0):
+      visualization_plotting.plotSingleFile(files,
+                                        config[section]["time_metrics"],
+                                        "normal", config["out_dirname"])
+    if len(cvmfs_internal_dict) > 0:
+      visualization_plotting.plotSingleFile(files, cvmfs_internal_dict,
+                                      "cvmfs_internal", config["out_dirname"])
+
+def _appendToCsv(config):
+  section = "append_to_csv"
+  if (section in config.keys() and config[section]["write"] == True):
+    print("\n")
+    print("============================================")
+    print("Plotting:", "Append to CSV")
+    print("============================================")
+    if (    (not "cvmfs_build_names" in config[section].keys()
+             or len(config[section]["cvmfs_build_names"]) == 0)
+        and (not "client_configs" in config[section].keys()
+             or len(config[section]["client_configs"]) == 0)):
+      files = glob.glob(config["in_dirname"] + "*.csv")
+    else:
+      files = []
+      # find the right files for given config/build
+      for build in config[section]["cvmfs_build_names"]:
+        for client_config in config[section]["client_configs"]:
+          for thread in config["num_threads"]:
+            new_files = glob.glob(config["in_dirname"] +  "*_" + build + "_" +
+                                    client_config + "_" + str(thread)
+                                    + "_[0-9]*.csv")
+            files.extend(new_files)
+
+    cvmfs_internal_dict = getCvmfsInternal(config, section)
+
+    if ("time_metrics" in config[section].keys()
+      and len(config[section]["time_metrics"]) > 0):
+      print("time_metrics ")
+      visualization_plotting.appendToCsv(files,
+                                        config[section]["time_metrics"],
+                                        "normal", config[section]["full_out_name"],
+                                        config[section]["tag"])
+    if len(cvmfs_internal_dict) > 0:
+      print("internal_affairs_metrics")
+      visualization_plotting.appendToCsv(files, cvmfs_internal_dict,
+                                      "cvmfs_internal",
+                                      config[section]["full_out_name"],
+                                      config[section]["tag"])
 
 
-  if create_scatter_plots == True:
-    print("\n\nPlotting: scatter plot\n")
-    # #scatter plot single file
-    for filename in tqdm.tqdm(files):
-      visualization_plotting.plotSingleFile(filename, csv_labels, outdir)
+if __name__ == "__main__":
+  config = visualization_read_params.getConfig()
+
+  print("Extracted values from files (not YAML config):")
+  print("In dirname:", config["in_dirname"])
+  print("Num files found:", len(config["_files"]))
+  print("Commands:", config["_cmds"])
+  print("Client configs:", config["_client_configs"])
+  print("Build names:", config["_cvmfs_build_names"])
+  print("Num threads:", config["_num_threads"])
+  print("")
+
+  _plot_boxplots(config, "cvmfs_build_comparison",
+                         "CVMFS Build Comparison", "build")
+  _plot_boxplots(config, "client_config_comparison",
+                         "CVMFS Client Config Comparison", "config")
+  _createScatter(config)
+  _appendToCsv(config)
