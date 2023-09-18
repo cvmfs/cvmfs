@@ -18,122 +18,6 @@ import ast
 from collections import defaultdict
 
 ##
-# Scatter plot for a single file and a single csv_label
-##
-# Takes all measurement points available in the file and plots it as scatter
-# plot.
-# This means that if you ran the benchmark with 32 threads and
-# 10 repetitions, a point cloud of 320 points will be plotted for each
-# cache type (cold, warm, hot)
-#
-# Can accept multiple csv_labels but will create one scatter plot for each
-#
-def plotSingleFile(filename, csv_labels, csv_label_type, outdir):
-  df=pd.read_csv(filename, index_col="labels", sep=',')
-
-  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
-
-  for labels in csv_labels:
-    y_data = defaultdict(list)
-
-    scale = 1.5
-    fig = plt.figure(figsize=(16*scale, 9*scale))
-
-    params = [
-            {'font.size': 45},
-            {'axes.labelsize': 40},
-            {'legend.fontsize': 35},
-            {'lines.linewidth': 6}
-        ]
-    for ele in params:
-        plt.rcParams.update(ele)
-
-    for label in labels.split(","):
-      if not label in df.index:
-          continue
-      old_val = 0
-      for cache in cache_labels:
-        row = ast.literal_eval(df.loc[label][cache])
-
-        # modify row if warm/hot metric for internal affairs
-        if ("cvmfs_internal" in csv_label_type):
-          if cache == cache_labels[0]:
-            old_val = row[-1]
-          if cache != cache_labels[0]:
-            for i in range(len(row)):
-              tmp_val = row[i]
-              row[i] = row[i] - old_val
-              old_val = tmp_val
-
-        y_data[label].append(row)
-
-    ax1 = plt.axes()
-    idx = 0
-
-    if len(labels.split(",")) > 1:
-      colors=visualization_colors.colors3_3
-    else:
-      colors=visualization_colors.cache_colors
-
-    for key, val in y_data.items():
-      for cacheData in val:
-        ax1.scatter(
-            [i for i in range(len(cacheData))],
-            cacheData,
-            #yerr=errorY[firstX:i],
-            label=" ".join(cache_labels[idx % 3].split("_")) if len(labels.split(",")) == 1 \
-                  else key + " " + " ".join(cache_labels[idx % 3].split("_")) ,
-            marker="o",
-            color=colors[idx % len(colors)],
-            s=8**2,
-            rasterized=True
-            )
-        idx += 1
-
-    # quick escape in case label does not exist.
-    if len(y_data) == 0:
-      continue
-
-    all_measurements = len(y_data[[*y_data.keys()][0]][0])
-
-    if "cvmfs_internal" in csv_label_type:
-      repetitions = all_measurements
-      ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( "
-                      + str(int(repetitions)) + " repetitions)")
-    else:
-      num_threads = filename.split("_")[-2]
-      repetitions = all_measurements / int(num_threads)
-      ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( " +
-                    num_threads + " threads " + " x " +
-                    str(int(repetitions)) + " repetitions)")
-    if "cvmfs_internal" in csv_label_type:
-      ax1.set_ylabel(visualization_time.
-                   measurement_cvmfs_internal_dict[label.split("_", 1)[-1]])
-    else:
-      ax1.set_ylabel(visualization_time.measurement_label_dict[label])
-
-    # needed to draw legend dynamically below x-axis label
-    fig.canvas.draw()
-    x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0
-    lgnd= plt.legend(framealpha=0.8,
-                     fontsize=32,
-                     loc='upper center',
-                     bbox_to_anchor=(0.5, x_label_lowest_y_pos - 0.15),
-                     ncol=3
-                     )
-    for i in range(len(lgnd.legend_handles)):
-      lgnd.legend_handles[i].sizes = [20**2]
-
-    if os.path.exists(outdir) == False:
-        os.makedirs(outdir)
-
-    outname = outdir + "/Scatterplot_" + \
-              filename.split("/")[-1].split(".csv")[0] + "_" + \
-              "_".join(labels.split(",")) + ".pdf"
-    plt.savefig(outname, bbox_inches='tight', pad_inches=0.2)
-    plt.close('all')
-
-##
 # Prepares data for boxplotPlotComparison()
 ##
 # Internal function that creates one unified multi-dimensional array,
@@ -372,12 +256,76 @@ def _csv_header_string():
   header += "\n"
   return header
 
-# TODO TODO use this also for scatter plot
-def _prepare_data_single_file(filename, csv_labels, csv_label_type,
+##
+# Scatter plot for a single file and a single csv_label
+##
+# Takes all measurement points available in the file and plots it as scatter
+# plot.
+# This means that if you ran the benchmark with 32 threads and
+# 10 repetitions, a point cloud of 320 points will be plotted for each
+# cache type (cold, warm, hot)
+#
+# Allow csv_label_type is either "normal" or "cvmfs_internal"
+#
+# Can accept multiple csv_labels but will create one scatter plot for each
+#
+
+def plotSingleFile(in_filenames, csv_labels, csv_label_type, out_dirname):
+  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
+
+  callback_extra_data = {
+    "out_dirname": out_dirname,
+    "cache_labels": cache_labels,
+    "csv_label_type": csv_label_type
+  }
+
+  pbar = tqdm.tqdm(in_filenames)
+  for in_filename in pbar:
+    pbar.set_description(in_filename)
+    callback_extra_data["in_filename"] = in_filename
+
+    _prepareDataSingleFile(in_filename, csv_labels, csv_label_type,
+                              cache_labels, _callback_scatter_single_file,
+                              callback_extra_data)
+
+##
+# Appends or creates CSV file with data from a single file
+##
+# Takes all measurement points available in the file and creates the following
+# quartiles [0.0, 0.25, 0.5, 0.75, 1.0] and writes them for given csv_labels 
+# into the CSV file.
+#
+# "Tag" is needed, allows to set an identifier for all given "in_filenames"
+#
+# Can accept multiple csv_labels but will create a separate entry for each
+# 
+# Allow csv_label_type is either "normal" or "cvmfs_internal"
+#
+def appendToCsv(in_filenames, csv_labels, csv_label_type, out_filename, tag):
+  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
+
+  with(open(out_filename,"a")) as file:
+    # file newly created
+    if (file.tell() == 0):
+      file.write(_csv_header_string())
+
+    callback_extra_data = {
+      "out_file": file,
+      "cache_labels": cache_labels,
+      "tag": tag
+    }
+
+    pbar = tqdm.tqdm(in_filenames)
+    for in_filename in pbar:
+      pbar.set_description(in_filename)
+      callback_extra_data["in_filename"] = in_filename
+
+      _prepareDataSingleFile(in_filename, csv_labels, csv_label_type,
+                         cache_labels, callback_append_csv, callback_extra_data)
+
+def _prepareDataSingleFile(filename, csv_labels, csv_label_type, cache_labels,
                       callback, callback_extra_data):
   df=pd.read_csv(filename, index_col="labels", sep=',')
-
-  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
 
   for labels in csv_labels:
     y_data = defaultdict(list)
@@ -405,11 +353,10 @@ def _prepare_data_single_file(filename, csv_labels, csv_label_type,
     if len(y_data) == 0:
       continue
 
-    callback(y_data, callback_extra_data)
+    callback(y_data, labels, callback_extra_data)
 
-def callback_append_csv(data, extra_data):
+def callback_append_csv(data, labels, extra_data):
   out_file = extra_data["out_file"]
-  cache_labels = extra_data["cache_labels"]
   in_filename = extra_data["in_filename"]
   tag = extra_data["tag"]
 
@@ -437,27 +384,80 @@ def callback_append_csv(data, extra_data):
         out_file.write(", " + str(np_quants[3][0]))
   
   out_file.write("\n")
-
-def append_to_csv(in_filenames, csv_labels, csv_label_type, out_filename, tag):
-  cache_labels = ["cold_cache", "warm_cache", "hot_cache"]
-
-  with(open(out_filename,"a")) as file:
-    # file newly created
-    if (file.tell() == 0):
-      file.write(_csv_header_string())
-
-    callback_extra_data = {
-      "out_file": file,
-      "cache_labels": cache_labels,
-      "tag": tag
-    }
-
-    pbar = tqdm.tqdm(in_filenames)
-    for in_filename in pbar:
-      pbar.set_description(in_filename)
-      callback_extra_data["in_filename"] = in_filename
-
-      _prepare_data_single_file(in_filename, csv_labels, csv_label_type,
-                          callback_append_csv, callback_extra_data)
       
+def _callback_scatter_single_file(data, labels, extra_data):
+  cache_labels = extra_data["cache_labels"]
+  scale = 1.5
+  fig = plt.figure(figsize=(16*scale, 9*scale))
 
+  params = [
+          {'font.size': 45},
+          {'axes.labelsize': 40},
+          {'legend.fontsize': 35},
+          {'lines.linewidth': 6}
+      ]
+  for ele in params:
+      plt.rcParams.update(ele)
+  
+  ax1 = plt.axes()
+  idx = 0
+
+  if len(labels.split(",")) > 1:
+    colors=visualization_colors.colors3_3
+  else:
+    colors=visualization_colors.cache_colors
+
+  for key, val in data.items():
+    for cacheData in val:
+      ax1.scatter(
+          [i for i in range(len(cacheData))],
+          cacheData,
+          #yerr=errorY[firstX:i],
+          label=" ".join(cache_labels[idx % 3].split("_")) \
+                if len(labels.split(",")) == 1 \
+                else key + " " + " ".join(cache_labels[idx % 3].split("_")) ,
+          marker="o",
+          color=colors[idx % len(colors)],
+          s=8**2,
+          rasterized=True
+          )
+      idx += 1
+
+  all_measurements = len(data[[*data.keys()][0]][0])
+
+  if "cvmfs_internal" in extra_data["csv_label_type"]:
+    repetitions = all_measurements
+    ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( "
+                    + str(int(repetitions)) + " repetitions)")
+  else:
+    num_threads = extra_data["in_filename"].split("_")[-2]
+    repetitions = all_measurements / int(num_threads)
+    ax1.set_xlabel("#Measurements: " + str(all_measurements) + " ( " +
+                  num_threads + " threads " + " x " +
+                  str(int(repetitions)) + " repetitions)")
+  if "cvmfs_internal" in extra_data["csv_label_type"]:
+    ax1.set_ylabel(visualization_time.
+                  measurement_cvmfs_internal_dict[labels.split("_", 1)[-1]])
+  else:
+    ax1.set_ylabel(visualization_time.measurement_label_dict[labels])
+
+  # needed to draw legend dynamically below x-axis label
+  fig.canvas.draw()
+  x_label_lowest_y_pos = ax1.xaxis.label.get_window_extent().y0 / 1000.0
+  lgnd= plt.legend(framealpha=0.8,
+                    fontsize=32,
+                    loc='upper center',
+                    bbox_to_anchor=(0.5, x_label_lowest_y_pos - 0.15),
+                    ncol=3
+                    )
+  for i in range(len(lgnd.legend_handles)):
+    lgnd.legend_handles[i].sizes = [20**2]
+
+  if os.path.exists(extra_data["out_dirname"]) == False:
+      os.makedirs(extra_data["out_dirname"])
+
+  outname = extra_data["out_dirname"] + "/Scatterplot_" + \
+            extra_data["in_filename"].split("/")[-1].split(".csv")[0] + "_" + \
+            "_".join(labels.split(",")) + ".pdf"
+  plt.savefig(outname, bbox_inches='tight', pad_inches=0.2)
+  plt.close('all')
