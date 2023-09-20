@@ -31,7 +31,7 @@ cvmfs_run_test() {
   # try to mount the same repository several times simultaneously
   # using the test function mount_cvmfs is not concurrent enough,
   # so need to mount directly
-  sudo echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local
+  sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/default.local'
   sudo mkdir -p /cvmfs/atlas-condb.cern.ch
   sudo mkdir -p /cvmfs/cvmfs-config.cern.ch
   sudo mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
