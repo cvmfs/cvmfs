@@ -382,7 +382,7 @@ string DownloadManager::EscapeUrl(const string &url) {
 }
 
 /**
- * escaped array needs to be sufficiently large.  It's size is calculated by
+ * escaped array needs to be sufficiently large.  Its size is calculated by
  * passing NULL to EscapeHeader.
  */
 unsigned DownloadManager::EscapeHeader(const string &header,
