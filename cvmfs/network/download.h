@@ -116,6 +116,7 @@ class CredentialsAttachment {
 class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
+  FRIEND_TEST(T_Download, EscapeUrl);
 
  public:
   struct ProxyInfo {
@@ -255,6 +256,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void InitHeaders();
   void FiniHeaders();
   void CloneProxyConfig(DownloadManager *clone);
+
+  bool EscapeUrlChar(unsigned char input, char output[3]);
+  std::string EscapeUrl(const std::string &url);
+  unsigned EscapeHeader(const std::string &header, char *escaped_buf,
+                        size_t buf_size);
 
   inline std::vector<ProxyInfo> *current_proxy_group() const {
     return (opt_proxy_groups_ ?

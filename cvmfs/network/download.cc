@@ -108,86 +108,6 @@ bool Interrupted(const std::string &fqrn, JobInfo *info) {
   return false;
 }
 
-static inline bool EscapeUrlChar(char input, char output[3]) {
-  if (((input >= '0') && (input <= '9')) ||
-      ((input >= 'A') && (input <= 'Z')) ||
-      ((input >= 'a') && (input <= 'z')) ||
-      (input == '/') || (input == ':') || (input == '.') ||
-      (input == '@') ||
-      (input == '+') || (input == '-') ||
-      (input == '_') || (input == '~') ||
-      (input == '[') || (input == ']') || (input == ','))
-  {
-    output[0] = input;
-    return false;
-  }
-
-  output[0] = '%';
-  output[1] = static_cast<char>(
-                             (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10));
-  output[2] = static_cast<char>(
-                             (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10));
-  return true;
-}
-
-
-/**
- * Escape special chars from the URL, except for ':' and '/',
- * which should keep their meaning.
- */
-static string EscapeUrl(const string &url) {
-  string escaped;
-  escaped.reserve(url.length());
-
-  char escaped_char[3];
-  for (unsigned i = 0, s = url.length(); i < s; ++i) {
-    if (EscapeUrlChar(url[i], escaped_char)) {
-      escaped.append(escaped_char, 3);
-    } else {
-      escaped.push_back(escaped_char[0]);
-    }
-  }
-  LogCvmfs(kLogDownload, kLogDebug, "escaped %s to %s",
-           url.c_str(), escaped.c_str());
-
-  return escaped;
-}
-
-
-/**
- * escaped array needs to be sufficiently large.  It's size is calculated by
- * passing NULL to EscapeHeader.
- */
-static unsigned EscapeHeader(const string &header,
-                             char *escaped_buf,
-                             size_t buf_size)
-{
-  unsigned esc_pos = 0;
-  char escaped_char[3];
-  for (unsigned i = 0, s = header.size(); i < s; ++i) {
-    if (EscapeUrlChar(header[i], escaped_char)) {
-      for (unsigned j = 0; j < 3; ++j) {
-        if (escaped_buf) {
-          if (esc_pos >= buf_size)
-            return esc_pos;
-          escaped_buf[esc_pos] = escaped_char[j];
-        }
-        esc_pos++;
-      }
-    } else {
-      if (escaped_buf) {
-        if (esc_pos >= buf_size)
-          return esc_pos;
-        escaped_buf[esc_pos] = escaped_char[0];
-      }
-      esc_pos++;
-    }
-  }
-
-  return esc_pos;
-}
-
-
 static Failures PrepareDownloadDestination(JobInfo *info) {
   if (info->sink() != NULL && !info->sink()->IsValid()) {
     cvmfs::PathSink* psink = dynamic_cast<cvmfs::PathSink*>(info->sink());
@@ -415,6 +335,84 @@ static int CallbackCurlDebug(
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
+
+bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
+  if (((input >= '0') && (input <= '9')) ||
+      ((input >= 'A') && (input <= 'Z')) ||
+      ((input >= 'a') && (input <= 'z')) ||
+      (input == '/') || (input == ':') || (input == '.') ||
+      (input == '@') ||
+      (input == '+') || (input == '-') ||
+      (input == '_') || (input == '~') ||
+      (input == '[') || (input == ']') || (input == ','))
+  {
+    output[0] = static_cast<char>(input);
+    return false;
+  }
+
+  output[0] = '%';
+  output[1] = static_cast<char>(
+                             (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10));
+  output[2] = static_cast<char>(
+                             (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10));
+  return true;
+}
+
+
+/**
+ * Escape special chars from the URL, except for ':' and '/',
+ * which should keep their meaning.
+ */
+string DownloadManager::EscapeUrl(const string &url) {
+  string escaped;
+  escaped.reserve(url.length());
+
+  char escaped_char[3];
+  for (unsigned i = 0, s = url.length(); i < s; ++i) {
+    if (EscapeUrlChar(url[i], escaped_char)) {
+      escaped.append(escaped_char, 3);
+    } else {
+      escaped.push_back(escaped_char[0]);
+    }
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "escaped %s to %s",
+           url.c_str(), escaped.c_str());
+
+  return escaped;
+}
+
+/**
+ * escaped array needs to be sufficiently large.  Its size is calculated by
+ * passing NULL to EscapeHeader.
+ */
+unsigned DownloadManager::EscapeHeader(const string &header,
+                             char *escaped_buf,
+                             size_t buf_size)
+{
+  unsigned esc_pos = 0;
+  char escaped_char[3];
+  for (unsigned i = 0, s = header.size(); i < s; ++i) {
+    if (EscapeUrlChar(header[i], escaped_char)) {
+      for (unsigned j = 0; j < 3; ++j) {
+        if (escaped_buf) {
+          if (esc_pos >= buf_size)
+            return esc_pos;
+          escaped_buf[esc_pos] = escaped_char[j];
+        }
+        esc_pos++;
+      }
+    } else {
+      if (escaped_buf) {
+        if (esc_pos >= buf_size)
+          return esc_pos;
+        escaped_buf[esc_pos] = escaped_char[0];
+      }
+      esc_pos++;
+    }
+  }
+
+  return esc_pos;
+}
 
 /**
  * -1 of digits is not a valid Http return code
