@@ -1,0 +1,68 @@
+################################################################################
+#       CVMFS Benchmark - Example YAML config
+################################################################################
+# Mandatory parameters are marked with (MAND)
+
+#################################################
+##              General options
+#################################################
+
+# (MAND)
+avail_client_configs:
+  default:
+    - 'CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"'
+    - 'CVMFS_AUTO_UPDATE=NO'
+    - 'CVMFS_QUOTA_LIMIT=10000'
+  symlink: 'CVMFS_CACHE_SYMLINKS=1'
+  nocache: 'CVMFS_KCACHE_TIMEOUT=0'
+  statfs: 'CVMFS_STATFS_CACHE_TIMEOUT=600'
+  kernel: 'CVMFS_KCACHE_TIMEOUT=600'
+  debuglog: 'CVMFS_DEBUGLOG=/tmp/cvmfs-benchmark_cvmfs-debuglog-@fqrn@.log'
+  trace: 'CVMFS_TRACEFILE=/tmp/cvmfs-benchmark_cvmfs-trace-@fqrn@.log'
+# (MAND)
+avail_cmds:
+  tensorflow:
+    command: "./scripts/50-tensorflow.sh"
+    repos: ["sft.cern.ch"]
+  root:
+    command: "./scripts/51-root.sh"
+    repos: ["sft.cern.ch"]
+  dd4hep:
+    command: "./scripts/60-dd4hep.sh"
+    repos: [ "sft.cern.ch" ]
+  # for cms dont forget to update SWVERSION in ../scripts/70-cms.sh
+  # cms:
+  #   command: "./scripts/70-cms.sh"
+  #   repos: [ "cms-ib.cern.ch" ]
+
+#################################################
+##              Run options
+#################################################
+# you can have multiple runs for different 
+# command/build/client configs combinations
+# BUT they must always contain something with "run"
+#################################################
+run-1:
+  # (MAND) must be declared in avail_cmds
+  commands: ["tensorflow", "root", "none_existing_cmd"]
+  # (MAND) cvmfs build directories that should be used for the benchmarking
+  cvmfs_build_dirs: ["/home/<user>/cvmfs/build", "/home/<user>/cvmfs-other/build"]
+  # (MAND) must be declard in avail_client_configs, can declare multiple tuples
+  client_configs:
+    - ["default"]
+    - ["default", "symlink"]
+    - ["default", "symlink", "nocache"]
+  # (MAND) 
+  num_threads: [1, 64]
+  repetitions: 5 # if not given: defaults to 10
+  use_autofs: true # if not given: defaults to true
+  out_dirname: "./mydata/here" # if not given: defaults to ./data/<run-name> 
+                               #               here it would be: ./data/run-1/
+  out_name_replacement_of_version: # based on cvmfs_build_dirs name 
+    "cvmfs-other/": "pr241"        # (make sure it is a unique part as it matches)
+                                   # for the entire cvmfs_build_dir string
+                                   # otherwise every match will be added
+  # the outnames will be the following for the 2 cvmfs_build_dirs
+  # ./mydata/here/tensorflow_2.11.0.0_default_symlink_64_0.csv
+  # ./mydata/here/tensorflow_2.11.0.0-pr241_default_symlink_64_0.csv
+  
