@@ -1,7 +1,7 @@
 ################################################################################
 #       CVMFS Benchmark Visualizer - Example YAML config
 ################################################################################
-# Mandatory parameters are marked with MAND
+# Mandatory parameters are marked with (MAND)
 #
 # How filenames look like created by start_benchmark:
 # <cmd>_<version>-<custom version tag>_<client config 1>_.._<client config n>_<num threads>_<run>.csv

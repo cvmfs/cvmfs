@@ -9,6 +9,7 @@ measurement_label_dict = {
 "cpu": "CPU Usage (%)",
 "involuntary_swap": "#Involuntary Swaps",
 "voluntary_swap": "#Voluntary Swaps",
+"avg_mem_kb": "Average Total Memory Usage In KB"
 }
 
 measurement_cvmfs_internal_dict = {
