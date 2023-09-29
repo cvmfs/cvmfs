@@ -1,4 +1,4 @@
-cvmfs-config-default (2.1-0) lucid; urgency=low
+cvmfs-config-default (2.1-1) lucid; urgency=low
 
   * During reload/mount: fallback to local config repo if remote repo is unavailable
 
