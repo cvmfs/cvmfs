@@ -2,12 +2,18 @@
 #       CVMFS Benchmark - Example YAML config
 ################################################################################
 # Mandatory parameters are marked with (MAND)
+#
+# General formatting rules: Please just use single word labels as both "-" and
+# "_" are used as separators in the filename. The layout is important as in the
+# visualization the setup is extracted from the filename.
 
 #################################################
 ##              General options
 #################################################
 
 # (MAND)
+# cvmfs config parameters the should be available
+# ("default" is just a name and not expected)
 avail_client_configs:
   default:
     - 'CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"'
@@ -20,6 +26,11 @@ avail_client_configs:
   debuglog: 'CVMFS_DEBUGLOG=/tmp/cvmfs-benchmark_cvmfs-debuglog-@fqrn@.log'
   trace: 'CVMFS_TRACEFILE=/tmp/cvmfs-benchmark_cvmfs-trace-@fqrn@.log'
 # (MAND)
+# commands that should be available
+# for commands using cvmfs: "repo" must be declared and contain all 
+#                           cvmfs repos that particular command will access
+#                           (cvmfs-config.cern.ch is automatically added)
+# for commands not using cvmfs: "repo" is ignored, can or cannot be declared
 avail_cmds:
   tensorflow:
     command: "./scripts/50-tensorflow.sh"
@@ -34,35 +45,77 @@ avail_cmds:
   # cms:
   #   command: "./scripts/70-cms.sh"
   #   repos: [ "cms-ib.cern.ch" ]
+  sleep:
+    command: "sleep 5"
+    repos: []
+  randomwrites:
+    command: "dd if=/dev/urandom of=/dev/null bs=1M count=1200"
+  
 
-#################################################
+################################################################################
 ##              Run options
-#################################################
-# you can have multiple runs for different 
+################################################################################
+# you can have multiple runs for different
 # command/build/client configs combinations
 # BUT they must always contain something with "run"
-#################################################
+#
+# You can have different runs either using only
+# - commands using cvmfs
+# - commands not needing cvmfs
+# IT IS NOT POSSIBLE TO MIX CVMFS AND NON-CVMFS COMMANDS IN THE SAME RUN!
+#
+################################################################################
+#
+# Example run commands that use cvmfs
+#
+####################################################
 run-1:
+  # Optional (default: true), as such can be omitted if running commands using cvmfs
+  use_cvmfs: False 
   # (MAND) must be declared in avail_cmds
-  commands: ["tensorflow", "root", "none_existing_cmd"]
+  commands: ["tensorflow", "root"]
   # (MAND) cvmfs build directories that should be used for the benchmarking
-  cvmfs_build_dirs: ["/home/<user>/cvmfs/build", "/home/<user>/cvmfs-other/build"]
+  # if "rpm" is used, then the currently installed version is used
+  cvmfs_build_dirs: ["/home/<user>/cvmfs/build", "/home/<user>/cvmfs-other/build", "rpm"]
   # (MAND) must be declard in avail_client_configs, can declare multiple tuples
   client_configs:
     - ["default"]
     - ["default", "symlink"]
     - ["default", "symlink", "nocache"]
-  # (MAND) 
+  # (MAND) how many processes of "command" shall be started in parallel
   num_threads: [1, 64]
-  repetitions: 5 # if not given: defaults to 10
+  repetitions: 5   # if not given: defaults to 10
   use_autofs: true # if not given: defaults to true
-  out_dirname: "./mydata/here" # if not given: defaults to ./data/<run-name> 
+                   # you must make sure beforehand that autofs is in the right status
+  out_dirname: "./mydata/here" # if not given: defaults to ./data/<run-name>
                                #               here it would be: ./data/run-1/
-  out_name_replacement_of_version: # based on cvmfs_build_dirs name 
+  out_name_replacement_of_version: # based on cvmfs_build_dirs name
     "cvmfs-other/": "pr241"        # (make sure it is a unique part as it matches)
                                    # for the entire cvmfs_build_dir string
                                    # otherwise every match will be added
   # the outnames will be the following for the 2 cvmfs_build_dirs
   # ./mydata/here/tensorflow_2.11.0.0_default_symlink_64_0.csv
   # ./mydata/here/tensorflow_2.11.0.0-pr241_default_symlink_64_0.csv
-  
+
+####################################################
+#
+# Example run commands that do not use cvmfs
+#
+####################################################
+run-no-cvmfs-1:
+  # (MAND)
+  use_cvmfs: False
+  # (MAND) must be declared in avail_cmds
+  commands: ["randomwrites", "sleep"]
+  # (MAND) how many processes should be started in parallel of "commands"
+  num_threads: [32]
+  repetitions: 1 # if not given: defaults to 10
+  out_dirname: "./data/sleep" # if not given: defaults to ./data/<run-name>
+                              #               here it would be: ./data/run-no-cvmfs-1/
+  # outnames could be then:
+  # ./data/sleep/sleep_0.0.0_dummy_32_0
+  #
+  # following values can be set but will be overwritten to these values:
+  # cvmfs_build_dirs: ["dummy"]
+  # client_configs: [["dummy"]]
+  # version in the outname is changed to: 0.0.0

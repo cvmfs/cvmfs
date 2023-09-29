@@ -57,8 +57,9 @@ if __name__ == "__main__":
     if not "run" in run:
       continue
 
-    repos = benchmark_cmds.getReposToMount(config[run]["commands"],
-                                           config["avail_cmds"])
+    if config[run]["use_cvmfs"] == True:
+      repos = benchmark_cmds.getReposToMount(config[run]["commands"],
+                                            config["avail_cmds"])
     # setup time command
     time_command = "/usr/bin/time -f " + benchmark_time.getTimeFormat()
 
@@ -70,24 +71,29 @@ if __name__ == "__main__":
     ## 1) loop over different cvmfs versions in different dirs
     for cvmfs_build_dir in config[run]["cvmfs_build_dirs"]:
       # install cvmfs version build in directory $cvmfs_build_dir
-      benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
+      if cvmfs_build_dir.lower() != "rpm":
+        benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
 
       ## 2) loop over different client configs (needs a remount of mountpoint,
       ##                                        reload is not enough!)
       for client_config in config[run]["client_configs"]:
-        benchmark_cmds.setClientConfig("/etc/cvmfs/default.local", client_config,
-                                       config["avail_client_configs"])
+        # run command using cmvfs
+        if config[run]["use_cvmfs"] == True:
+          benchmark_cmds.setClientConfig("/etc/cvmfs/default.local", client_config,
+                                        config["avail_client_configs"])
 
-        if config[run]["use_autofs"] == True:
-          print("autofs")
-          benchmark_cvmfs.clear_and_remount_autofs()
-        else: # version no autofs
-          print("without autofs")
-          benchmark_cvmfs.clear_and_mount_direct(repos)
+          if config[run]["use_autofs"] == True:
+            print("autofs")
+            benchmark_cvmfs.clear_and_reload_autofs()
+          else: # version no autofs
+            print("without autofs")
+            benchmark_cvmfs.clear_and_mount_direct(repos)
 
-        # get cvmfs version
-        print("get cvmfs version")
-        cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
+          # get cvmfs version
+          print("get cvmfs version")
+          cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
+        else: # non-cvmfs cmd
+          cvmfs_version = "0.0.0"
 
         ## 3) loop over commands
         for cmd_name in config[run]["commands"]:
@@ -129,7 +135,7 @@ if __name__ == "__main__":
               start_times[cache_label] = dt.datetime.now()
               if callable(cache_setup_func):
                 dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-                      benchmark_time.timeme(setup=cache_setup_func,
+                      benchmark_time.timeme(setup=cache_setup_func(config[run]["use_cvmfs"]),
                                             stmt=partial(benchmark_time.do_thing,
                                                         partial_cmd, num_threads),
                                             number=1,
@@ -169,9 +175,10 @@ if __name__ == "__main__":
             benchmark_out.writeResults(config[run]["out_dirname"], final_outname,
                                        all_data, cmd_name,
                                        cvmfs_version, num_threads)
-            benchmark_out.writeResultsInternalRaw(config[run]["out_dirname"],
-                                                  final_outname,
-                                                  all_cvmfs_raw_dict)
-            benchmark_out.writeResultsTracing(config[run]["out_dirname"],
-                                              final_outname,
-                                              all_dict_tracing)
+            if config[run]["use_cvmfs"] == True:
+              benchmark_out.writeResultsInternalRaw(config[run]["out_dirname"],
+                                                    final_outname,
+                                                    all_cvmfs_raw_dict)
+              benchmark_out.writeResultsTracing(config[run]["out_dirname"],
+                                                final_outname,
+                                                all_dict_tracing)
