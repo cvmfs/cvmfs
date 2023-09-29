@@ -32,18 +32,18 @@ def getReposToMount(commands, avail_cmds):
 ################################################################################
 def getOutname(cvmfs_build_dir, cmd_name, client_config_list, num_threads,
                cvmfs_version, out_name_replacement_of_version):
-  outname = cmd_name + "_" + cvmfs_version 
+  outname = cmd_name + "_" + cvmfs_version
 
   for ele in out_name_replacement_of_version.keys():
     if ele in cvmfs_build_dir:
       outname += "-" + out_name_replacement_of_version[ele]
-  
+
   print("client_config_list", client_config_list)
   client_config_list.sort()
 
   for param in client_config_list:
     outname += "_" + param
-  
+
   outname += "_" + str(num_threads) + "_"
 
   return outname
@@ -53,9 +53,9 @@ def getOutname(cvmfs_build_dir, cmd_name, client_config_list, num_threads,
 # Set CVMFS Config
 ################################################################################
 #
-# Writes a CVMFS client config based on $client_config to $filename. 
-# 
-# @params 
+# Writes a CVMFS client config based on $client_config to $filename.
+#
+# @params
 #       filename: config file name to which the CVMFS client config is written
 #                 to must be a valid CVMFS client config filename,
 #                 e.g. /etc/cvmfs/default.local
@@ -70,12 +70,12 @@ def setClientConfig(filename, client_config, avail_configs, print_config=True):
         new_config += ele + "\n"
     else:
       new_config += avail_configs[param] + "\n"
-  
+
   print(new_config)
 
   with open(filename, "w") as f:
     f.write(new_config)
-  
+
   if print_config == True:
     print("CVMFS CONFIG in " + filename)
     with open(filename, "r") as cvmfs_config:

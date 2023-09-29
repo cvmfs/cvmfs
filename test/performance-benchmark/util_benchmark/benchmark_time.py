@@ -34,17 +34,18 @@ def getTimeFormat():
 
   return time_format
 
-def wipe_kernel_cache():
+def wipe_kernel_cache(use_cvmfs):
   subprocess.check_call(["sudo", "echo", "3", ">", "/proc/sys/vm/drop_caches"],
                         stdout=subprocess.DEVNULL)
 
-def wipe_cache():
-  subprocess.check_call(["cvmfs_config", "wipecache"], stdout=subprocess.DEVNULL)
+def wipe_cache(use_cvmfs):
+  if use_cvmfs == True:
+    subprocess.check_call(["cvmfs_config", "wipecache"], stdout=subprocess.DEVNULL)
 
   # do not use with autofs
   #subprocess.check_call(["sudo", "cvmfs_config", "reload"], stdout=subprocess.DEVNULL)
 
-  wipe_kernel_cache()
+  wipe_kernel_cache(use_cvmfs)
 
 def preloadProxy(command):
   if "70-cms" in command["command"]:
@@ -143,21 +144,22 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
           dict_results[key].append(float(line.split(" ")[1].split("%")[0]))
 
   # internal affairs
-  for repo in command["repos"]:
-    cvmfs_cmd = "cvmfs_talk -i " + repo + " internal affairs"
-    doit = subprocess.Popen(cvmfs_cmd, universal_newlines=True, shell=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = doit.communicate()
+  if "repos" in command.keys():
+    for repo in command["repos"]:
+      cvmfs_cmd = "cvmfs_talk -i " + repo + " internal affairs"
+      doit = subprocess.Popen(cvmfs_cmd, universal_newlines=True, shell=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      (stdout, stderr) = doit.communicate()
 
-    dict_full_cvmfs_internals[repo].append(stdout)
+      dict_full_cvmfs_internals[repo].append(stdout)
 
-    found_start = False
-    for line in stdout.splitlines():
-      if found_start == True:
-        tmp = line.split("|")
-        dict_results[repo + "_" + tmp[0]].append(float(tmp[1]))
-      if "Name|Value|Description" in line:
-        found_start = True
+      found_start = False
+      for line in stdout.splitlines():
+        if found_start == True:
+          tmp = line.split("|")
+          dict_results[repo + "_" + tmp[0]].append(float(tmp[1]))
+        if "Name|Value|Description" in line:
+          found_start = True
 
   # tracing
   do_tracing = False
