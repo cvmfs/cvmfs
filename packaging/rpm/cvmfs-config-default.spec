@@ -1,7 +1,7 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 2.0
-Release: 2
+Version: 2.1
+Release: 1
 Source0: cern-it1.cern.ch.pub
 Source1: cern-it4.cern.ch.pub
 Source2: cern-it5.cern.ch.pub
@@ -75,6 +75,9 @@ install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/READ
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Wed Sep 13 2023 HereThereBeDragons <HereThereBeDragons@users.noreply.github.com> - 2.1-1
+- During reload/mount: fallback to local config repo if remote repo is unavailable
+
 * Sat Apr 10 2021 Jakob Blomer <jblomer@cern.ch> - 2.0-2
 - Fix RPM linter errors
 
