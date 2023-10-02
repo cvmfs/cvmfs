@@ -1589,8 +1589,13 @@ bool MountPoint::CreateSignatureManager() {
     boot_status_ = loader::kFailSignature;
     return false;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
-           public_keys.c_str());
+
+  if (public_keys.size() > 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
+                                   public_keys.c_str());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
+  }
 
   if (options_mgr_->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
     if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {

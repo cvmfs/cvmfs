@@ -1,3 +1,9 @@
+cvmfs-config-default (2.1-1) lucid; urgency=low
+
+  * During reload/mount: fallback to local config repo if remote repo is unavailable
+
+ -- HereThereBeDragons <HereThereBeDragons@users.noreply.github.com>  Wed, 13 Sep 2023 13:51:10 2023 +0200
+
 cvmfs-config-default (2.0-1) lucid; urgency=low
 
   * Various fixes, use config repository

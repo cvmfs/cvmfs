@@ -19,7 +19,7 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-CVMFS_CONFIG_PACKAGE="cvmfs-config-default_2.0-1_all.deb"
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default_2.1-1_all.deb"
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
