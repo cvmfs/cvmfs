@@ -31,8 +31,12 @@ ar rsc libpacparser.a *.o
 rm -f *.o
 echo "finished creating static link library for libpacparser"
 
-echo "stripping debug symbols for libpacparser..."
-strip -S libpacparser.a
+
+if [ ! -e /etc/fedora-release ] # workaround for a rpmbuild error on fc38
+then 
+  echo "stripping debug symbols for libpacparser..."
+  strip -S libpacparser.a
+fi
 echo "finished building libpacparser.a"
 
 # Install
