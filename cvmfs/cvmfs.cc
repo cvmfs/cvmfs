@@ -1920,15 +1920,15 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
 #ifdef FUSE_CAP_POSIX_ACL
     if ((conn->capable & FUSE_CAP_POSIX_ACL) == 0) {
       PANIC(kLogDebug | kLogSyslogErr,
-            "ACL support requested but missing fuse kernel support, "
+            "FUSE: ACL support requested but missing fuse kernel support, "
             "aborting");
     }
     conn->want |= FUSE_CAP_POSIX_ACL;
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "enforcing ACLs");
 #else
     PANIC(kLogDebug | kLogSyslogErr,
-          "ACL support requested but not available in this version of "
-          "libfuse, aborting");
+          "FUSE: ACL support requested but not available in this version of "
+          "libfuse %d, aborting", FUSE_VERSION);
 #endif
   }
 
@@ -1939,9 +1939,12 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
       LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: Enable symlink caching");
       #ifndef FUSE_CAP_EXPIRE_ONLY
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-          "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
-          "libfuse must be >= 3.16 and kernel >= 6.2-rc1, "
-          "mountpoints on top of symlinks will break!");
+          "FUSE: Symlink caching enabled but no support for fuse_expire_entry. "
+          "Symlinks will be cached but mountpoints on top of symlinks will "
+          "break! "
+          "Current libfuse %d is too old; required: libfuse >= 3.16, "
+          "kernel >= 6.2-rc1",
+          FUSE_VERSION);
       #endif
     } else {
       mount_point_->DisableCacheSymlinks();
@@ -1953,7 +1956,8 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     mount_point_->DisableCacheSymlinks();
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
           "FUSE: Symlink caching requested but missing libfuse support, "
-          "falling back to no caching");
+          "falling back to no caching. Current libfuse %d",
+          FUSE_VERSION);
 #endif
   }
 
@@ -1964,9 +1968,10 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
     LogCvmfs(kLogCvmfs, kLogDebug, "FUSE: Enable fuse_expire_entry ");
   } else if (mount_point_->cache_symlinks()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-      "FUSE: Symlink caching enabled but no support for fuse_expire_entry, "
-      "libfuse must be >= 3.16 and kernel >= 6.2-rc1, "
-      "mountpoints on top of symlinks will break!");
+      "FUSE: Symlink caching enabled but no support for fuse_expire_entry. "
+      "Symlinks will be cached but mountpoints on top of symlinks will break! "
+      "Current libfuse %d; required: libfuse >= 3.16, kernel >= 6.2-rc1",
+      FUSE_VERSION);
   }
 #endif
 }
