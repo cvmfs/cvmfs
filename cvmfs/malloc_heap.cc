@@ -98,7 +98,7 @@ void MallocHeap::MarkFree(void *block) {
   stored_ -= tag->GetSize();
   num_blocks_--;
   // TODO(jblomer): if MarkFree() takes place at the top of the heap, one could
-  // move back the gauge_ pointer.  If this is an optimiziation or unnecessary
+  // move back the gauge_ pointer.  If this is an optimization or unnecessary
   // extra work depends on how the MallocHeap is used.
 }
 

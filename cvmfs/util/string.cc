@@ -192,7 +192,7 @@ string StringifyTimeval(const timeval value) {
 }
 
 /**
- * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Parses a timestamp of the form YYYY-MM-DDTHH:MM:SSZ
  * Return 0 on error
  */
 time_t IsoTimestamp2UtcTime(const std::string &iso8601) {

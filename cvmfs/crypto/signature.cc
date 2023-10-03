@@ -833,7 +833,7 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
 
 
 /**
- * Veryfies a signature against loaded certificate.
+ * Verifies a signature against loaded certificate.
  *
  * \return True if signature is valid, false on error or otherwise
  */
@@ -880,7 +880,7 @@ bool SignatureManager::Verify(const unsigned char *buffer,
 
 
 /**
- * Veryfies a signature against all loaded public keys.
+ * Verifies a signature against all loaded public keys.
  *
  * \return True if signature is valid with any public key, false on error or otherwise
  */
