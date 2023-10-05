@@ -48,7 +48,7 @@ cvmfs_run_test() {
   sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
   sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
   sudo mount -t cvmfs atlas-condb.cern.ch  /cvmfs/atlas-condb.cern.ch &
-  sleep 3
+  sleep 6
 
   echo "counting cvmfs_processes ..."
   local num_cvmfs_processes=$(ps -efww | grep mount | grep atlas-condb | wc -l)
