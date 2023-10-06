@@ -222,7 +222,9 @@ Requires: insserv
 Requires: libcap-progs
   %endif
 %else
+  %if 0%{?rhel} < 8
 Requires: initscripts
+  %endif
 %endif
 Requires: bash
 Requires: coreutils
