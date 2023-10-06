@@ -10,9 +10,10 @@ cvmfs_run_test() {
 
   ############### 1) Check that the normal cache manager 
   ############### creates new fds for the same object 
-  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
-  local CVMFS_TEST_REPO=alice.cern.ch
-  local CVMFS_MOUNTPOINT=/cvmfs/alice.cern.ch
+
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+  local CVMFS_TEST_REPO=atlas.cern.ch
+  local CVMFS_MOUNTPOINT=/cvmfs/atlas.cern.ch
 
   local talk_socket="$(get_cvmfs_cachedir $CVMFS_TEST_REPO)/cvmfs_io.$CVMFS_TEST_REPO"
   echo $talk_socket
@@ -24,7 +25,7 @@ cvmfs_run_test() {
   ############
   # open some test file in several simultaneously in different processes
 
-  testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  testfile=$(find /cvmfs/atlas.cern.ch -type f | head -n1)
   # testfile has the following cvmfs hash:
   testfile_hash=$(get_xattr hash $testfile)
 
@@ -87,7 +88,7 @@ cvmfs_run_test() {
   diff testfile6 $testfile || return 78
   diff testfile7 $testfile || return 79
 
-  cvmfs_umount alice.cern.ch || return 80
+  cvmfs_umount atlas.cern.ch || return 80
 
   return 0
 }
