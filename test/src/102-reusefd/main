@@ -11,12 +11,14 @@ cvmfs_run_test() {
 
   ############### 1) Check that the normal cache manager 
   ############### creates new fds for the same object 
-  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+  # make sure the setting is not overridden by the config repo
+
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
 
   ############
   # open some test file in several simultaneously in different processes
 
-  local testfile=$(find /cvmfs/alice.cern.ch -type f | head -n1)
+  local testfile=$(find /cvmfs/atlas.cern.ch -type f | head -n1)
   # testfile has the following cvmfs hash:
   local testfile_hash=$(get_xattr hash $testfile)
 
@@ -31,8 +33,8 @@ cvmfs_run_test() {
 
   ###########
   # check the open file descriptors of the cvmfs2 process 
-  local alice_pid=$(sudo cvmfs_talk -i alice.cern.ch pid)
-  local num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep "$(get_cvmfs_cachedir alice.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
+  local atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
   echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
   if [ "$num_open_fds" -lt "2" ]; then
@@ -47,12 +49,12 @@ cvmfs_run_test() {
   wait $pid_helper3 || return 64
   sleep 1;
 
-  cvmfs_umount alice.cern.ch || return 22
+  cvmfs_umount atlas.cern.ch || return 22
 
   ############### 2) Check that the refcounted cache manager 
   ############### reuses fds for the same object 
 
-  cvmfs_mount alice.cern.ch CVMFS_CACHE_REFCOUNT=yes || return 30
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=yes || return 30
 
   ############
   # open some test file in several simultaneously in different processes
@@ -68,8 +70,8 @@ cvmfs_run_test() {
 
   ###########
   # check the open file descriptors of the cvmfs2 process 
-  alice_pid=$(cvmfs_talk -i alice.cern.ch pid)
-  local num_open_fds=$(sudo ls -l /proc/$alice_pid/fd/ | grep "$(get_cvmfs_cachedir alice.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
+  atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
   kill -USR1 $pid_helper1
   wait $pid_helper1 || return 65
@@ -83,7 +85,7 @@ cvmfs_run_test() {
     return 40
   fi
 
-  cvmfs_umount alice.cern.ch || return 23
+  cvmfs_umount atlas.cern.ch || return 23
   return 0
 }
 
