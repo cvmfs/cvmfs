@@ -7,6 +7,7 @@
 #ifndef CVMFS_COMPAT_H_
 #define CVMFS_COMPAT_H_
 
+#include <google/dense_hash_map>
 #include <google/sparse_hash_map>
 #include <pthread.h>
 #include <sched.h>

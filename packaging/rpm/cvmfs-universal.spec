@@ -619,6 +619,10 @@ systemctl daemon-reload
 
 %files libs
 %defattr(-,root,root)
+%{_libdir}/libcvmfs_bridge.so
+%{_libdir}/libcvmfs_bridge.so.%{version}
+%{_libdir}/libcvmfs_bridge_debug.so
+%{_libdir}/libcvmfs_bridge_debug.so.%{version}
 %{_libdir}/libcvmfs_cache.so
 %{_libdir}/libcvmfs_cache.so.%{version}
 %{_libdir}/libcvmfs_client.so

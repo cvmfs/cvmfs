@@ -8,6 +8,7 @@
 #
 include (util/CMakeLists.txt)
 include (crypto/CMakeLists.txt)
+include (bridge/CMakeLists.txt)
 
 
 
@@ -226,7 +227,6 @@ if (BUILD_CVMFS)
   set (CVMFS_FUSE_SOURCES
        ${CVMFS_COMMON_CLIENT_SOURCES}
        auto_umount.cc
-       compat.cc
        cvmfs.cc
        fuse_evict.cc
        fuse_remount.cc
