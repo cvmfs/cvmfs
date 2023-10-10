@@ -25,7 +25,7 @@ bool RegisterVfsRdOnly(CacheManager *cache_mgr,
 bool UnregisterVfsRdOnly();
 
 /**
- * After a reload, existing file catalog file dscriptors might need a remap
+ * After a reload, existing file catalog file descriptors might need a remap
  * to the fd in the context of the restored cache manager.
  */
 void RegisterFdMapping(int from, int to);

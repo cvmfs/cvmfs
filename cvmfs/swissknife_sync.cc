@@ -472,7 +472,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
       //       space to verify that it was touched (copy-on-write)
       //       Otherwise we would force the cvmfs client behind the union
       //       file-
-      //       system to (potentially) unncessarily fetch catalogs
+      //       system to (potentially) unnecessarily fetch catalogs
       if (DirectoryExists(scratch_dir_ + candidate_rel) &&
           !FileExists(union_dir_ + candidate_rel + "/.cvmfscatalog")) {
         LogCvmfs(kLogCatalog, kLogStdout,
