@@ -3,7 +3,7 @@
  *
  * An optimized virtual file system layer for the client only.  It expects to
  * operate on immutable, valid SQlite files.  Hence it can do a few
- * optimiziations.  Most notably it doesn't need to know about the path of
+ * optimizations.  Most notably it doesn't need to know about the path of
  * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
