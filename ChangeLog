@@ -1,23 +1,22 @@
 2.12.0:
 
 2.11.1:
- * [client]  Fix race condition on concurrent mounts (#3393)
+ * [client] Fix race condition on concurrent mounts (#3393)
  * [config] Fix client reload if remote config repo is unavailable (#3390)
  * [rpm] Patch out the git build dependency of pacparser (#3376)
  * [rpm] Add Debian 12 bookworm to cvmfs-release
- * [rpm] Limit initscripts dependency to rhel <=7 (#3408) 
-
+ * [rpm] Limit initscripts dependency to rhel <=7 (#3408)
 
 2.11.0:
   * [client] Allow change to/from debug mode during cvmfs_config reload (#2897, #3359)
   * [client] Re-use the file descriptor for a file already open in the local cache (#3067)
   * [client] Support latest signature of fuse_lowlevel_notify_expire_entry (#3352)
-  * [client] Placeholder for custom proxy health check and sharding policy (#3095) 
+  * [client] Placeholder for custom proxy health check and sharding policy (#3095)
   * [client] Custom http tracing headers (#3094)
   * [client] Use http client auth only if membership is set (#3333)
   * [gw] Fix publication of uncompressed files through gateway (#3338)
   * [client] Add curl debug info to debug log (#3329)
-  * [server] Verify meta-info object in cvmfs_server check (#3139) 
+  * [server] Verify meta-info object in cvmfs_server check (#3139)
   * [client] Allow CPU affinity setting through CVMFS_CPU_AFFINITY (#3330)
   * [server] Fix deadlock in uploading pipeline (#3195)
   * [gw] Fix transaction abort after gateway restart (#3128)
