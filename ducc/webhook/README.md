@@ -12,7 +12,7 @@ sudo yum install -y python36-mod_wsgi python3-flask
 sudo pip3 install python-dotenv
 cd /home/centos
 git clone --branch devel --depth 1 https://github.com/cvmfs/cvmfs.git
-cd cvmfs/ducc/webhook/
+cd cvmfs/ducc/webhook/; mkdir logs/
 #
 # set variables in .env file, if you change the PROJECT_PATH var and/or the user, change registry-listener.service accordingly
 #
