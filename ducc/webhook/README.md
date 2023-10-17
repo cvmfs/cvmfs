@@ -4,9 +4,9 @@ The notifications appended are of the form:
 ```
 {id}|{action}|{image}
 ```
-The registry-listener.go check for updates in the notification file and if finds a pushed image executes the cvmfs_ducc program.
+The registry-listener.go script checks for updates in the notification file and if finds a pushed image executes the cvmfs_ducc program.
 
-Example of install and run on a centos7 server as centos user (with sudo privileges). It requires cvmfs_ducc and httpd already installed on the server.
+Below an example of installation and run on a centos7 server as centos user (with sudo privileges). It requires cvmfs_ducc and httpd already installed on the server.
 ```
 sudo yum install -y python36-mod_wsgi python3-flask
 sudo pip3 install python-dotenv
