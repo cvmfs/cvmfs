@@ -148,7 +148,7 @@ func main() {
 
     logfile_name := flag.String("log_file", "ducc-conversion.log", "DUCC log file")
     file_name := flag.String("notifications_file", "notifications.txt", "Notification file")
-    repository_name := flag.String("repository_name", "unpacked.infn.it", "Repository")
+    repository_name := flag.String("repository_name", "unpacked.cern.ch", "Repository")
     flag.Parse()
 
     lname := *logfile_name
