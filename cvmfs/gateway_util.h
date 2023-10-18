@@ -6,10 +6,12 @@
 #define CVMFS_GATEWAY_UTIL_H_
 
 #include <string>
+#include "util/export.h"
+
 
 namespace gateway {
 
-struct GatewayKey {
+struct CVMFS_EXPORT GatewayKey {
  public:
   GatewayKey() {}
   GatewayKey(const std::string &i, const std::string &s) : id_(i), secret_(s) {}
@@ -27,7 +29,7 @@ int APIVersion();
 
 GatewayKey ReadGatewayKey(const std::string& key_file_name);
 
-bool ReadKeys(const std::string& key_file_name, std::string* key_id,
+CVMFS_EXPORT bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret);
 
 bool ParseKey(const std::string& body, std::string* key_id,

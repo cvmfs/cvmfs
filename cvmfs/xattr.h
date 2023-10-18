@@ -9,6 +9,7 @@
 
 #include <map>
 #include <string>
+#include "util/export.h"
 #include <vector>
 
 /**
@@ -26,7 +27,7 @@
  */
 class XattrList {
  public:
-  static const uint8_t kVersion;
+  static const CVMFS_EXPORT uint8_t kVersion;
 
   XattrList() : version_(kVersion) { }
   static XattrList *CreateFromFile(const std::string &path);

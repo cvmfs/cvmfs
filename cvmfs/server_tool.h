@@ -12,19 +12,22 @@
 #include "network/download.h"
 #include "reflog.h"
 #include "statistics.h"
+#include "util/export.h"
 #include "util/pointer.h"
 
-class ServerTool {
- public:
-  ServerTool();
-  virtual ~ServerTool();
 
-  bool InitDownloadManager(const bool follow_redirects,
+
+class CVMFS_EXPORT ServerTool {
+ public:
+  CVMFS_EXPORT ServerTool();
+  CVMFS_EXPORT virtual ~ServerTool();
+
+  CVMFS_EXPORT bool InitDownloadManager(const bool follow_redirects,
                            const std::string &proxy,
                            const unsigned max_pool_handles = 1);
-  bool InitVerifyingSignatureManager(const std::string &pubkey_path,
+  CVMFS_EXPORT bool InitVerifyingSignatureManager(const std::string &pubkey_path,
                                      const std::string &trusted_certs = "");
-  bool InitSigningSignatureManager(const std::string &certificate_path,
+  CVMFS_EXPORT bool InitSigningSignatureManager(const std::string &certificate_path,
                                    const std::string &private_key_path,
                                    const std::string &private_key_password);
 

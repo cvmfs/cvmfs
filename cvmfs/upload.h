@@ -124,6 +124,7 @@
 #include "util/concurrency.h"
 #include "util/pointer.h"
 #include "util/shared_ptr.h"
+#include "util/export.h"
 
 namespace upload {
 
@@ -139,11 +140,11 @@ namespace upload {
  * Note: A spooler is derived from the Observable template, meaning that it
  *       allows for Listeners to be registered onto it.
  */
-class Spooler : public Observable<SpoolerResult> {
+class CVMFS_EXPORT Spooler : public Observable<SpoolerResult> {
  public:
-  static Spooler *Construct(const SpoolerDefinition &spooler_definition,
+  CVMFS_EXPORT static Spooler *Construct(const SpoolerDefinition &spooler_definition,
                               perf::StatisticsTemplate *statistics = NULL);
-  virtual ~Spooler();
+  CVMFS_EXPORT virtual ~Spooler();
 
   /**
    * Prints the name of the targeted backend storage.

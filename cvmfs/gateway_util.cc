@@ -34,7 +34,7 @@ GatewayKey ReadGatewayKey(const std::string& key_file_name) {
   return GatewayKey(id, secret);
 }
 
-bool ReadKeys(const std::string& key_file_name, std::string* key_id,
+CVMFS_EXPORT bool ReadKeys(const std::string& key_file_name, std::string* key_id,
               std::string* secret) {
   if (!(key_id && secret)) {
     return false;

@@ -9,6 +9,7 @@
 
 #include "compression.h"
 #include "crypto/hash.h"
+#include "util/export.h"
 
 namespace upload {
 
@@ -19,7 +20,7 @@ namespace upload {
  * F.e: local:/srv/cvmfs/dev.cern.ch
  *      to define a local spooler with upstream path /srv/cvmfs/dev.cern.ch
  */
-struct SpoolerDefinition {
+struct CVMFS_EXPORT SpoolerDefinition {
   static const unsigned kDefaultMaxConcurrentUploads = 512;
   static const unsigned kDefaultNumUploadTasks = 1;
   static const char* kDriverNames[];  ///< corresponds to DriverType
@@ -34,7 +35,7 @@ struct SpoolerDefinition {
    * @param definition_string   the spooler definition string to be inter-
    *                            preted by the constructor
    */
-  SpoolerDefinition(
+  CVMFS_EXPORT SpoolerDefinition(
       const std::string& definition_string,
       const shash::Algorithms hash_algorithm,
       const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
@@ -46,14 +47,14 @@ struct SpoolerDefinition {
       const std::string& session_token_file = "",
       const std::string& key_file = "");
 
-  bool IsValid() const { return valid_; }
+  CVMFS_EXPORT bool IsValid() const { return valid_; }
 
   /**
    * Creates a new SpoolerDefinition based on an existing one.  The new spooler
    * has compression set to zlib, which is required for catalogs and other meta-
    * objects.
    */
-  SpoolerDefinition Dup2DefaultCompression() const;
+  CVMFS_EXPORT SpoolerDefinition Dup2DefaultCompression() const;
 
   DriverType driver_type;      //!< the type of the spooler driver
   std::string temporary_path;  //!< scratch space for the IngestionPipeline

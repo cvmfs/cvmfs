@@ -6,9 +6,10 @@
 
 #include "util/posix.h"
 
-ServerTool::ServerTool() {}
 
-ServerTool::~ServerTool() {
+CVMFS_EXPORT ServerTool::ServerTool() {}
+
+CVMFS_EXPORT ServerTool::~ServerTool() {
   if (download_manager_.IsValid()) {
     download_manager_->Fini();
   }
@@ -18,7 +19,7 @@ ServerTool::~ServerTool() {
   }
 }
 
-bool ServerTool::InitDownloadManager(const bool follow_redirects,
+CVMFS_EXPORT bool ServerTool::InitDownloadManager(const bool follow_redirects,
                                      const std::string &proxy,
                                      const unsigned max_pool_handles) {
   if (download_manager_.IsValid()) {
@@ -46,7 +47,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   return true;
 }
 
-bool ServerTool::InitVerifyingSignatureManager(
+CVMFS_EXPORT bool ServerTool::InitVerifyingSignatureManager(
     const std::string &pubkey_path, const std::string &trusted_certs) {
   if (signature_manager_.IsValid()) {
     return true;
@@ -71,7 +72,7 @@ bool ServerTool::InitVerifyingSignatureManager(
   return true;
 }
 
-bool ServerTool::InitSigningSignatureManager(
+CVMFS_EXPORT bool ServerTool::InitSigningSignatureManager(
     const std::string &certificate_path, const std::string &private_key_path,
     const std::string &private_key_password) {
   if (signature_manager_.IsValid()) {
