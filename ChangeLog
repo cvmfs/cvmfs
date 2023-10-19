@@ -1,3 +1,5 @@
+2.11.2:
+
 2.11.1:
  * [client] Fix race condition on concurrent mounts (#3393)
  * [config] Fix client reload if remote config repo is unavailable (#3390)
