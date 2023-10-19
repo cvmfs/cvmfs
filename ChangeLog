@@ -1,6 +1,7 @@
 2.12.0:
 
 2.11.2:
+  * [rpm] Match subpackage release in addition to version (#3422)
   * [client] Fix corrupted paths for concurrent external file requests (#3418)
 
 2.11.1:
