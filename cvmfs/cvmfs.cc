@@ -1279,7 +1279,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     ? mount_point_->external_fetcher()
     : mount_point_->fetcher();
   CacheManager::Label label;
-  label.path = path.GetChars(), path.GetLength();
+  label.path = path.ToString();
   label.size = dirent.size();
   label.zip_algorithm = dirent.compression_algorithm();
   if (mount_point_->catalog_mgr()->volatile_flag())

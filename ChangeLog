@@ -1,11 +1,14 @@
 2.12.0:
 
+2.11.2:
+  * [client] Fix corrupted paths for concurrent external file requests (#3418)
+
 2.11.1:
- * [client] Fix race condition on concurrent mounts (#3393)
- * [config] Fix client reload if remote config repo is unavailable (#3390)
- * [rpm] Patch out the git build dependency of pacparser (#3376)
- * [rpm] Add Debian 12 bookworm to cvmfs-release
- * [rpm] Limit initscripts dependency to rhel <=7 (#3408)
+  * [client] Fix race condition on concurrent mounts (#3393)
+  * [config] Fix client reload if remote config repo is unavailable (#3390)
+  * [rpm] Patch out the git build dependency of pacparser (#3376)
+  * [rpm] Add Debian 12 bookworm to cvmfs-release
+  * [rpm] Limit initscripts dependency to rhel <=7 (#3408)
 
 2.11.0:
   * [client] Allow change to/from debug mode during cvmfs_config reload (#2897, #3359)
