@@ -68,6 +68,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "cache.h"
+#include "cache_posix.h"
 #include "cache_stream.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
@@ -161,6 +162,12 @@ uint64_t next_directory_handle_ = 0;
 
 unsigned max_open_files_; /**< maximum allowed number of open files */
 /**
+ * The refcounted cache manager should supress checking the current number
+ * of files opened through cvmfs_open() against the process' file descriptor
+ * limit.
+ */
+bool check_fd_overflow_ = true;
+/**
  * Number of reserved file descriptors for internal use
  */
 const int kNumReservedFd = 512;
@@ -192,6 +199,18 @@ struct FuseState {
   bool has_dentry_expire;
 };
 
+
+/**
+ * Atomic increase of the open files counter. If we use a non-refcounted
+ * POSIX cache manager, check for open fd overflow.  Return false if too many
+ * files are opened.  Otherwise return true (success).
+ */
+static inline bool IncAndCheckNoOpenFiles() {
+  int64_t no_open_files = perf::Xadd(file_system_->no_open_files(), 1);
+  if (!check_fd_overflow_)
+    return true;
+  return no_open_files < (static_cast<int>(max_open_files_) - kNumReservedFd);
+}
 
 static inline double GetKcacheTimeout() {
   if (!fuse_remounter_->IsCaching())
@@ -1174,9 +1193,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "chunked file %s opened (download delayed to read() call)",
              path.c_str());
 
-    if (perf::Xadd(file_system_->no_open_files(), 1) >=
-        (static_cast<int>(max_open_files_))-kNumReservedFd)
-    {
+    if (!IncAndCheckNoOpenFiles()) {
       perf::Dec(file_system_->no_open_files());
       fuse_remounter_->fence()->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
@@ -1290,8 +1307,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     this_fetcher->Fetch(CacheManager::LabeledObject(dirent.checksum(), label));
 
   if (fd >= 0) {
-    if (perf::Xadd(file_system_->no_open_files(), 1) <
-        (static_cast<int>(max_open_files_))-kNumReservedFd) {
+    if (IncAndCheckNoOpenFiles()) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
       fi->fh = fd;
@@ -2229,6 +2245,12 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (!cvmfs::file_system_->IsValid()) {
     *g_boot_error = cvmfs::file_system_->boot_error();
     return cvmfs::file_system_->boot_status();
+  }
+  if ((cvmfs::file_system_->cache_mgr()->id() == kPosixCacheManager) &&
+      dynamic_cast<PosixCacheManager *>(
+        cvmfs::file_system_->cache_mgr())->do_refcount())
+  {
+    cvmfs::check_fd_overflow_ = false;
   }
 
   cvmfs::mount_point_ = MountPoint::Create(loader_exports->repository_name,
