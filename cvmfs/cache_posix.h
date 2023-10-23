@@ -106,6 +106,7 @@ class PosixCacheManager : public CacheManager {
   bool alien_cache() { return alien_cache_; }
   std::string cache_path() { return cache_path_; }
   bool is_tmpfs() { return is_tmpfs_; }
+  bool do_refcount() const { return do_refcount_; }
 
  protected:
   virtual void *DoSaveState();
