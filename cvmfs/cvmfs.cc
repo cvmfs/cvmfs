@@ -206,7 +206,7 @@ struct FuseState {
  * files are opened.  Otherwise return true (success).
  */
 static inline bool IncAndCheckNoOpenFiles() {
-  int64_t no_open_files = perf::Xadd(file_system_->no_open_files(), 1);
+  const int64_t no_open_files = perf::Xadd(file_system_->no_open_files(), 1);
   if (!check_fd_overflow_)
     return true;
   return no_open_files < (static_cast<int>(max_open_files_) - kNumReservedFd);
