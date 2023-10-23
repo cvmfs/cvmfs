@@ -162,7 +162,7 @@ uint64_t next_directory_handle_ = 0;
 
 unsigned max_open_files_; /**< maximum allowed number of open files */
 /**
- * The refcounted cache manager should supress checking the current number
+ * The refcounted cache manager should suppress checking the current number
  * of files opened through cvmfs_open() against the process' file descriptor
  * limit.
  */
