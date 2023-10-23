@@ -9,8 +9,8 @@ cvmfs_run_test() {
   src_location=$2
 
 
-  ############### 1) Check that the normal cache manager 
-  ############### creates new fds for the same object 
+  ############### 1) Check that the normal cache manager
+  ############### creates new fds for the same object
   # make sure the setting is not overridden by the config repo
 
   cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
@@ -32,8 +32,12 @@ cvmfs_run_test() {
 
 
   ###########
-  # check the open file descriptors of the cvmfs2 process 
+  # check the open file descriptors of the cvmfs2 process
   local atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "PID of /cvmfs/atlas.cern.ch is $atlas_pid"
+  echo "Test file is $testfile"
+  echo "Test file in cache: $(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}"
+  sudo ls -l /proc/$atlas_pid/fd/
   local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
   echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
@@ -51,8 +55,8 @@ cvmfs_run_test() {
 
   cvmfs_umount atlas.cern.ch || return 22
 
-  ############### 2) Check that the refcounted cache manager 
-  ############### reuses fds for the same object 
+  ############### 2) Check that the refcounted cache manager
+  ############### reuses fds for the same object
 
   cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=yes || return 30
 
@@ -69,7 +73,7 @@ cvmfs_run_test() {
 
 
   ###########
-  # check the open file descriptors of the cvmfs2 process 
+  # check the open file descriptors of the cvmfs2 process
   atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
 
@@ -86,6 +90,45 @@ cvmfs_run_test() {
   fi
 
   cvmfs_umount atlas.cern.ch || return 23
+
+  echo "Verify CVMFS_NFILES checking"
+  cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=no || return 50
+  local atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "PID of /cvmfs/atlas.cern.ch is $atlas_pid"
+  sudo cat /proc/$atlas_pid/limits
+
+  echo "Non-refcounted manager: should fail"
+  for i in $(seq 1 64); do
+    ./openwaitprint $testfile >/dev/null &
+  done
+  local job_pids=$(jobs -p)
+  local got_emfile=0
+  for p in $job_pids; do
+    kill -USR1 $p
+    wait $p
+    if [ $? -ne 0 ]; then
+      got_emfile=1
+    fi
+  done
+  [ $got_emfile -eq 1 ] || return 51
+
+  cvmfs_umount atlas.cern.ch || return 55
+  cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=yes || return 56
+  echo "Refcounted manager: should succeed"
+  for i in $(seq 1 64); do
+    ./openwaitprint $testfile >/dev/null &
+  done
+  job_pids=$(jobs -p)
+  got_emfile=0
+  for p in $job_pids; do
+    kill -USR1 $p
+    wait $p
+    if [ $? -ne 0 ]; then
+      got_emfile=1
+    fi
+  done
+  [ $got_emfile -eq 1 ] && return 57
+
   return 0
 }
 
