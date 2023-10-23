@@ -1,4 +1,5 @@
 2.11.2:
+  * [client] Suppress CVMFS_NFILES check for refcounted cache manager (#3426)
   * [deb] Let cvmfs-fuse3 depend on cvmfs of same version (#3421)
   * [rpm] Match subpackage release in addition to version (#3422)
   * [client] Fix corrupted paths for concurrent external file requests (#3418)
