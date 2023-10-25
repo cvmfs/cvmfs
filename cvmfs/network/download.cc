@@ -1624,19 +1624,16 @@ void DownloadManager::FiniHeaders() {
 
 DownloadManager::DownloadManager(const unsigned max_pool_handles,
                            const perf::StatisticsTemplate &statistics) :
-                  prng_(Prng()),  // added
+                  prng_(Prng()),
                   pool_handles_idle_(new set<CURL *>),
                   pool_handles_inuse_(new set<CURL *>),
                   pool_max_handles_(max_pool_handles),
-                  user_agent_(NULL),
-                  // pthread_t thread_download_;
                   pipe_terminate_(NULL),
                   pipe_jobs_(NULL),
                   watch_fds_(NULL),
                   watch_fds_size_(0),
                   watch_fds_inuse_(0),
                   watch_fds_max_(4 * max_pool_handles),
-                  opt_dns_server_(""),
                   opt_timeout_proxy_(5),
                   opt_timeout_direct_(10),
                   opt_low_speed_limit_(1024),
@@ -1648,44 +1645,33 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   follow_redirects_(false),
                   ignore_signature_failures_(false),
                   enable_http_tracing_(false),
-                  http_tracing_headers_(vector<string>()),
                   opt_host_chain_(NULL),
                   opt_host_chain_rtt_(NULL),
                   opt_host_chain_current_(0),
                   opt_proxy_groups_(NULL),
                   opt_proxy_groups_current_(0),
                   opt_proxy_groups_current_burned_(0),
-                  opt_proxy_groups_fallback_(0),  // added
+                  opt_proxy_groups_fallback_(0),
                   opt_num_proxies_(0),
-                  opt_proxy_list_(""),  // added
-                  opt_proxy_fallback_list_(""),  // added
-                  opt_proxy_map_(std::map<uint32_t, ProxyInfo *>()),  // added
-                  opt_proxy_urls_(vector<string>()),  // added
                   opt_proxy_shard_(false),
-                  sharding_policy_(SharedPtr<ShardingPolicy>()),
-                  health_check_(SharedPtr<HealthCheck>()),
                   failover_indefinitely_(false),
-                  fqrn_(""),  // added, used in sharding policy && Interrupted()
                   opt_ip_preference_(dns::kIpPreferSystem),
-                  proxy_template_direct_(""),  // added - should be mandatory?
-                  proxy_template_forced_(""),  // added
                   opt_timestamp_backup_proxies_(0),
                   opt_timestamp_failover_proxies_(0),
                   opt_proxy_groups_reset_after_(0),
                   opt_timestamp_backup_host_(0),
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
-                  counters_(new Counters(statistics)),
-                  ssl_certificate_store_(SslCertificateStore())  // added
+                  counters_(new Counters(statistics))
 {
   atomic_init32(&multi_threaded_);
 
   lock_options_ =
-  reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+          reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_options_, NULL);
   assert(retval == 0);
   lock_synchronous_mode_ =
-  reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+          reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
 
@@ -2914,13 +2900,7 @@ DownloadManager *DownloadManager::Clone(
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
   }
-  // opt_ipv4_only_
-  // opt_host_chain_current_(0)
-  // opt_proxy_map_(std::map<uint32_t, ProxyInfo *>()),  // added
-  // opt_proxy_urls_(vector<string>()),  // added
-  // opt_timestamp_backup_proxies_(0),
-  // opt_timestamp_failover_proxies_(0),
-  // opt_timestamp_backup_host_(0),
+
   CloneProxyConfig(clone);
   clone->opt_ip_preference_ = opt_ip_preference_;
   clone->proxy_template_direct_ = proxy_template_direct_;

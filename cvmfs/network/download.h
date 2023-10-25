@@ -380,7 +380,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool failover_indefinitely_;
   /**
    * Repo name. Needed for the re-try logic if a download was unsuccessful
-  */
+   * Used in sharding policy && Interrupted()
+   */
   std::string fqrn_;
 
   /**
