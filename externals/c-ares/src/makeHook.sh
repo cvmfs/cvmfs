@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make
+make -j
 # Don't strip debug symbols
 # strip -S .libs/libcares.a
-make install
+make install -j

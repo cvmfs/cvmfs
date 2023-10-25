@@ -1,6 +1,6 @@
 #!/bin/sh
 
 make clean
-make
+make -j
 strip -S src/.libs/libprotobuf-lite.a
-make install
+make install -j

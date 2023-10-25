@@ -4,6 +4,6 @@ if [[ "x$(uname -s)" == "xDarwin" ]]; then
   cd mybuild
 fi
 
-make
+make -j
 
-make install
+make install -j

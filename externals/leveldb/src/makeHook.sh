@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-CFLAGS="$CVMFS_BASE_C_FLAGS -fPIC" CXXFLAGS="$CVMFS_BASE_CXX_FLAGS -fPIC" make
+CFLAGS="$CVMFS_BASE_C_FLAGS -fPIC" CXXFLAGS="$CVMFS_BASE_CXX_FLAGS -fPIC" make -j
 strip -S libleveldb.a
 
 cp -rv include/leveldb $EXTERNALS_INSTALL_LOCATION/include/

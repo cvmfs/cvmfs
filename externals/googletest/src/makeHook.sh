@@ -3,7 +3,7 @@
 cd build
 make clean
 
-make
+make -j
 
 cp -rv googlemock/gtest/*.a $EXTERNALS_INSTALL_LOCATION/lib/
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make
+make -j
 # Don't strip debug dymbols
 # strip -S lib/.libs/libcurl.a
-make install
+make install -j

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS"
+make CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j
 strip -S libsqlite3.a
 
 cp -rv *.h $EXTERNALS_INSTALL_LOCATION/include/

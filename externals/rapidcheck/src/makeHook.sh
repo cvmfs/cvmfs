@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make
+make -j
 
 cp -rv include/* $EXTERNALS_INSTALL_LOCATION/include/
 cp -rv extras/gtest/include/* $EXTERNALS_INSTALL_LOCATION/include/

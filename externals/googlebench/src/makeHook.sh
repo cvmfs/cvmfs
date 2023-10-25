@@ -1,5 +1,5 @@
 #!/bin/sh
 
 make clean
-make
-make install
+make -j
+make install -j
