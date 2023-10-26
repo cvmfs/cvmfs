@@ -695,7 +695,11 @@ int main(int argc, char **argv) {
       }
     }
     ended = (waitpid(pid_cvmfs, &status, WNOHANG) == pid_cvmfs);
-  } while ((stdout_open || stderr_open) && !ended);
+  } while (stdout_open || stderr_open);
+  if (!ended) {
+    waitpid(pid_cvmfs, &status, 0);
+  }
+
   close(fd_stdout);
   close(fd_stderr);
 
