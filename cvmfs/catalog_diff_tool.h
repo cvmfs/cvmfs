@@ -24,21 +24,28 @@ class CatalogDiffTool {
  public:
   CatalogDiffTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr)
       : repo_path_(""),
+        repo_name_(""),
         temp_dir_prefix_(""),
         download_manager_(NULL),
+        use_local_cache_(false),
         old_catalog_mgr_(old_catalog_mgr),
         new_catalog_mgr_(new_catalog_mgr),
         needs_setup_(false) {}
 
-  CatalogDiffTool(const std::string& repo_path, const shash::Any& old_root_hash,
+  CatalogDiffTool(const std::string& repo_path,
+                  const std::string& repo_name,
+                  const shash::Any& old_root_hash,
                   const shash::Any& new_root_hash,
                   const std::string& temp_dir_prefix,
-                  download::DownloadManager* download_manager)
+                  download::DownloadManager* download_manager,
+                  const bool use_local_cache = false)
       : repo_path_(repo_path),
+        repo_name_(repo_name),
         old_root_hash_(old_root_hash),
         new_root_hash_(new_root_hash),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
+        use_local_cache_(use_local_cache),
         old_raii_temp_dir_(),
         new_raii_temp_dir_(),
         old_catalog_mgr_(),
@@ -114,19 +121,23 @@ class CatalogDiffTool {
 
  private:
   RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,
+                                   const std::string& repo_name,
                                    const std::string& temp_dir,
                                    const shash::Any& root_hash,
                                    download::DownloadManager* download_manager,
-                                   perf::Statistics* stats);
+                                   perf::Statistics* stats,
+                                   bool use_local_cache);
 
   void DiffRec(const PathString& path);
 
   std::string repo_path_;
+  std::string repo_name_;
   shash::Any old_root_hash_;
   shash::Any new_root_hash_;
   std::string temp_dir_prefix_;
 
   download::DownloadManager* download_manager_;
+  bool use_local_cache_;
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;

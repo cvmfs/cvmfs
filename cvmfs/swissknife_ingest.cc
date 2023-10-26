@@ -60,7 +60,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("unknown hash algorithm");
+      PrintError("Swissknife Ingest: unknown hash algorithm");
       return 1;
     }
   }
@@ -158,7 +158,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp,
+      params.base_hash, params.stratum0, params.repo_name, params.dir_temp,
       spooler_catalogs.weak_ref(),
       download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
       params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
@@ -166,7 +166,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
-  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  LogCvmfs(kLogPublish, kLogStdout, "Swissknife Ingest: Processing changes...");
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
     &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
@@ -174,7 +174,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "Initialization of the synchronisation "
+             "Swissknife Ingest: Initialization of the synchronisation "
              "engine failed");
     return 4;
   }
@@ -183,13 +183,13 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "Adding contents of authz file %s to"
+             "Swissknife Ingest: Adding contents of authz file %s to"
              " root catalog.",
              params.authz_file.c_str());
     int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unable to open authz file (%s)"
+               "Swissknife Ingest:  Unable to open authz file (%s)"
                "from the publication process: %s",
                params.authz_file.c_str(), strerror(errno));
       return 7;
@@ -200,8 +200,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     close(fd);
 
     if (!read_successful) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
-               params.authz_file.c_str(), strerror(errno));
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                        "Swissknife Ingest: Failed to read authz file (%s): %s",
+                        params.authz_file.c_str(), strerror(errno));
       return 8;
     }
 
@@ -209,7 +210,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {
-    PrintError("something went wrong during sync");
+    PrintError("Swissknife Ingest: something went wrong during sync");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
       stats_db->UploadStatistics(params.spooler);
@@ -222,12 +223,14 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
   // finalize the spooler
-  LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                           "Swissknife Ingest: Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                            "Swissknife Ingest: Exporting repository manifest");
 
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
@@ -237,7 +240,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
-    PrintError("Failed to commit the transaction.");
+    PrintError("Swissknife Ingest: Failed to commit the transaction.");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
       stats_db->UploadStatistics(params.spooler);
@@ -253,7 +256,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
-    PrintError("Failed to create new repository");
+    PrintError("Swissknife Ingest: Failed to create new repository");
     return 6;
   }
 
