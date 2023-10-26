@@ -35,8 +35,12 @@ class T_ObjectFetcher : public ::testing::Test {
     private_key_path(sandbox + "/" + fqrn + ".key"),
     certificate_path(sandbox + "/" + fqrn + ".crt"),
     master_key_path(sandbox + "/" + fqrn + ".masterkey"),
-    download_manager_(download::DownloadManager(1,
+    download_manager_(new download::DownloadManager(1,
                       perf::StatisticsTemplate("test", &statistics_))) { }
+
+  virtual ~T_ObjectFetcher() {
+    delete download_manager_;
+  }
 
  protected:
   const std::string  sandbox;
@@ -347,7 +351,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void FinalizeExternalManagers() {
-    download_manager_.Fini();
+    download_manager_->Fini();
     signature_manager_.Fini();
   }
 
@@ -439,7 +443,7 @@ class T_ObjectFetcher : public ::testing::Test {
     return new HttpObjectFetcher<>(fqrn,
                                    "file://" + backend_storage,
                                    temp_directory,
-                                   &download_manager_,
+                                   download_manager_,
                                    &signature_manager_);
   }
 
@@ -635,7 +639,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
  private:
   perf::Statistics             statistics_;
-  download::DownloadManager    download_manager_;
+  download::DownloadManager    *download_manager_;
   signature::SignatureManager  signature_manager_;
 };
 
