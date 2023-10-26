@@ -3,7 +3,7 @@
 cd build
 make clean
 
-make -j
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
 
 cp -rv googlemock/gtest/*.a $EXTERNALS_INSTALL_LOCATION/lib/
 

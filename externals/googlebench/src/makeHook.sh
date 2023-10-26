@@ -1,5 +1,5 @@
 #!/bin/sh
 
 make clean
-make -j
-make install -j
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
+make install -j ${CVMFS_BUILD_EXTERNAL_NJOBS}

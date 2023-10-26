@@ -16,7 +16,7 @@ fi
 
 echo "make clean && make for libpacparser (omitting test execution)..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
-make $FIX_PYTHON -C src clean -j
+make $FIX_PYTHON -C src clean -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
 make $FIX_PYTHON $FIX_COMP CVMFS_BASE_C_FLAGS="$CVMFS_BASE_C_FLAGS" -j1 -C src pacparser.o spidermonkey/libjs.a  # default target runs tests!
 echo "finished internal build of libpacparser"
 

@@ -4,6 +4,6 @@ if [[ "x$(uname -s)" == "xDarwin" ]]; then
   cd mybuild
 fi
 
-make -j
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
 
-make install -j
+make install -j ${CVMFS_BUILD_EXTERNAL_NJOBS}

@@ -1,6 +1,6 @@
 #!/bin/sh
 
 make clean
-make -j
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
 strip -S src/.libs/libprotobuf-lite.a
-make install -j
+make install -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
