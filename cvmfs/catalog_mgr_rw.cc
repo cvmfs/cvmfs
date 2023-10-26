@@ -31,6 +31,7 @@ namespace catalog {
 WritableCatalogManager::WritableCatalogManager(
   const shash::Any          &base_hash,
   const std::string         &stratum0,
+  const std::string         &repo_name,
   const string              &dir_temp,
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
@@ -41,9 +42,10 @@ WritableCatalogManager::WritableCatalogManager(
   perf::Statistics          *statistics,
   bool                       is_balanceable,
   unsigned                   max_weight,
-  unsigned                   min_weight)
+  unsigned                   min_weight,
+  const bool                 use_local_cache)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
-      statistics)
+      statistics, false, use_local_cache, repo_name, true)
   , spooler_(spooler)
   , enforce_limits_(enforce_limits)
   , nested_kcatalog_limit_(nested_kcatalog_limit)
@@ -1253,6 +1255,14 @@ void WritableCatalogManager::CatalogUploadCallback(
   assert(catalog_size > 0);
 
   SyncLock();
+
+  // copy file to local cache.server
+  if (use_local_cache_) {
+    CopyPath2Path(result.local_path.c_str(),
+                                 local_cache_dir_ + "/"
+                                 + result.content_hash.MakePathWithoutSuffix());
+  }
+
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
     // them for processing (continuation) if the 'dirty children count' == 0
@@ -1404,6 +1414,14 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
     PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
           result.local_path.c_str(), result.return_code);
   }
+  
+  // copy file to local cache.server
+  if (use_local_cache_) {
+    CopyPath2Path(result.local_path.c_str(),
+                                 local_cache_dir_ + "/"
+                                 + result.content_hash.MakePathWithoutSuffix());
+  }
+
   unlink(result.local_path.c_str());
 }
 

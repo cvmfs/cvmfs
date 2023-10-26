@@ -15,11 +15,11 @@
  * the actual Catalog databases.
  *
  * The inode assignment is based on the fact that the number of entries in a
- * catalog do not change (expect on reload). As we do exactly that with the
+ * catalog do not change (except on reload). As we do exactly that with the
  * WritableCatalogManager here, inode numbers derived from WritableCatalogs
  * and the WritableCatalogManager may (and will) be screwed.  This is not an
  * issue in the current implementation, as they are not used in the syncing
- * process.  Just keep in mind.
+ * process. Just keep in mind.
  *
  * The WritableCatalogManager starts with a base repository (given by the
  * root hash), and downloads and uncompresses all required catalogs into
@@ -76,6 +76,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
  public:
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
+                         const std::string &repo_name,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
@@ -86,7 +87,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          perf::Statistics *statistics,
                          bool is_balanceable,
                          unsigned max_weight,
-                         unsigned min_weight);
+                         unsigned min_weight,
+                         const bool use_local_cache = false);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,

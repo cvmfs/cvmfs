@@ -681,6 +681,7 @@ void Publisher::ConstructSyncManagers() {
     catalog_mgr_ = new catalog::WritableCatalogManager(
       settings_.transaction().base_hash(),
       settings_.url(),
+      settings_.fqrn(),
       settings_.transaction().spool_area().tmp_dir(),
       spooler_catalogs_,
       download_mgr_,
