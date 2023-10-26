@@ -33,11 +33,14 @@ cvmfs_run_test() {
   echo "Upstream Package:         $upstream_package"
 
   upstream_libs_package=$(basename $upstream_libs_package_url)
+  wget --no-check-certificate --quiet $upstream_libs_package_url || return 2
   echo "Upstream libs Package:         $upstream_libs_package"
 
   # make sure that there is no version of CernVM-FS server installed
   if is_installed "cvmfs-libs"; then
-    uninstall_package "cvmfs-server" || return 3
+    installed_version=$(installed_package_version "cvmfs-libs")
+    echo "uninstalling CernVM-FS libs $installed_version"
+    uninstall_package "cvmfs-libs" || return 3
   fi
   if is_installed "cvmfs-server"; then
     installed_version=$(installed_package_version "cvmfs-server")
