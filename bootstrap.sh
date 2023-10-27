@@ -43,6 +43,8 @@ externals_build_dir=$EXTERNALS_BUILD_LOCATION
 externals_install_dir=$EXTERNALS_INSTALL_LOCATION
 repo_root=$(pwd)
 
+# set number of parallel jobs for compiling externals
+export CVMFS_BUILD_EXTERNAL_NJOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null)"
 
 
 print_hint() {

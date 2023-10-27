@@ -1,7 +1,7 @@
 #!/bin/sh
 
 make clean
-make
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
 # Don't strip debug dymbols
 # strip -S lib/.libs/libcurl.a
-make install
+make install -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
