@@ -27,10 +27,15 @@ cvmfs_run_test() {
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs-server" ${previous_version})
   upstream_libs_package_url=$(guess_package_url "cvmfs-libs" ${previous_version})
+  upstream_client_package_url=$(guess_package_url "cvmfs" ${previous_version})
   echo "Download URL:             $upstream_package_url"
   wget --no-check-certificate --quiet $upstream_package_url || return 2
   upstream_package=$(basename $upstream_package_url)
   echo "Upstream Package:         $upstream_package"
+
+  upstream_client_package=$(basename $upstream_client_package_url)
+  wget --no-check-certificate --quiet $upstream_client_package_url || return 2
+  echo "Upstream client Package:         $upstream_client_package"
 
   upstream_libs_package=$(basename $upstream_libs_package_url)
   wget --no-check-certificate --quiet $upstream_libs_package_url || return 2
@@ -51,6 +56,7 @@ cvmfs_run_test() {
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS server $previous_version"
   install_packages $upstream_libs_package || return 4
+  install_packages $upstream_client_package || return 4
   install_packages $upstream_package || return 4
 
   # make CernVM-FS ready to go
@@ -87,6 +93,7 @@ cvmfs_run_test() {
   # do the CernVM-FS package update
   echo "updating CernVM-FS server package to version $current_version"
   install_packages "$CVMFS_LIBS_PACKAGE" || return 161
+  install_packages "$CVMFS_CLIENT_PACKAGE" || return 161
   install_packages "$CVMFS_SERVER_PACKAGE" || return 16
 
   # migrate repositories created under old version
