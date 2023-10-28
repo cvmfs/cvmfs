@@ -92,9 +92,7 @@ cvmfs_run_test() {
 
   # do the CernVM-FS package update
   echo "updating CernVM-FS server package to version $current_version"
-  install_packages "$CVMFS_LIBS_PACKAGE" || return 161
-  install_packages "$CVMFS_CLIENT_PACKAGE" || return 161
-  install_packages "$CVMFS_SERVER_PACKAGE" || return 16
+  install_packages "$CVMFS_LIBS_PACKAGE" "$CVMFS_CLIENT_PACKAGE" "$CVMFS_SERVER_PACKAGE" || return 16
 
   # migrate repositories created under old version
   sudo cvmfs_server migrate $MIGRATIONTEST_500_REPO || return 17
@@ -103,7 +101,7 @@ cvmfs_run_test() {
   # do some ordinary stuff with the repository
   start_transaction $MIGRATIONTEST_500_REPO || return 19
   echo "testfile3" > /cvmfs/$MIGRATIONTEST_500_REPO/testfile3
-  rm /cvmfs/$MIGRATIONTEST_500_REPO/testfile
+  sudo rm -f /cvmfs/$MIGRATIONTEST_500_REPO/testfile
   publish_repo $MIGRATIONTEST_500_REPO || return 20
 
   # synchronize stratum1 with stratum0
