@@ -42,8 +42,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(""),
-        repo_name_(""),
-        use_local_cache_(false),
+        local_cache_dir_(""),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(NULL),
@@ -62,8 +61,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(repo_path),
-        repo_name_(""),
-        use_local_cache_(false),
+        local_cache_dir_(""),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
@@ -73,7 +71,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
         counters_(NULL) {}
 
   CatalogMergeTool(const std::string& repo_path,
-                   const std::string& repo_name,
                    const shash::Any& old_root_hash,
                    const shash::Any& new_root_hash,
                    const PathString& lease_path,
@@ -81,14 +78,13 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    download::DownloadManager* download_manager,
                    manifest::Manifest* manifest,
                    perf::Statistics* statistics,
-                   bool use_local_cache)
-      : CatalogDiffTool<RoCatalogMgr>(repo_path, repo_name,
+                   const std::string& local_cache_dir)
+      : CatalogDiffTool<RoCatalogMgr>(repo_path,
                                       old_root_hash, new_root_hash,
                                       temp_dir_prefix, download_manager,
-                                      use_local_cache),
+                                      local_cache_dir_),
         repo_path_(repo_path),
-        repo_name_(repo_name),
-        use_local_cache_(use_local_cache),
+        local_cache_dir_(local_cache_dir),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
@@ -122,8 +118,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   bool CreateNewManifest(std::string* new_manifest_path);
 
   std::string repo_path_;
-  std::string repo_name_;
-  bool use_local_cache_;
+  const std::string local_cache_dir_;  // path if local cache repo if used
 
   PathString lease_path_;
   std::string temp_dir_prefix_;

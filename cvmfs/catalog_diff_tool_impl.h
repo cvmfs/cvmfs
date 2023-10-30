@@ -51,15 +51,15 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
 
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, repo_name_, old_raii_temp_dir_->dir(),
+        OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
                            old_root_hash_, download_manager_, &stats_old_,
-                           use_local_cache_);
+                           local_cache_dir_);
 
     // New catalog from release manager machine (before lease)
     new_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, repo_name_, new_raii_temp_dir_->dir(),
+        OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
                            new_root_hash_, download_manager_, &stats_new_,
-                           use_local_cache_);
+                           local_cache_dir_);
 
     if (!old_catalog_mgr_.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -84,13 +84,12 @@ bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
 
 template <typename RoCatalogMgr>
 RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
-    const std::string& repo_path, const std::string& repo_name,
-    const std::string& temp_dir,
+    const std::string& repo_path, const std::string& temp_dir,
     const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats, bool use_local_cache) {
+    perf::Statistics* stats, const std::string& local_cache_dir) {
   RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
                                        download_manager, stats, true,
-                                       use_local_cache, repo_name);
+                                       local_cache_dir);
   mgr->Init();
 
   return mgr;

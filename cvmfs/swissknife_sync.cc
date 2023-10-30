@@ -807,13 +807,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
-  bool use_local_cache = false;
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.repo_name, params.dir_temp,
+      params.base_hash, params.stratum0, params.dir_temp,
       spooler_catalogs.weak_ref(),
       download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
       params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
-      params.is_balanced, params.max_weight, params.min_weight, use_local_cache);
+      params.is_balanced, params.max_weight, params.min_weight);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);

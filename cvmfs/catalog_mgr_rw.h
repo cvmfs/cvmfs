@@ -76,7 +76,6 @@ class WritableCatalogManager : public SimpleCatalogManager {
  public:
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
-                         const std::string &repo_name,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
@@ -88,7 +87,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          bool is_balanceable,
                          unsigned max_weight,
                          unsigned min_weight,
-                         const bool use_local_cache = false);
+                         const std::string &dir_cache = "");
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
