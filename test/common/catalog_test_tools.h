@@ -183,8 +183,9 @@ class CatalogTestTool : public ServerTool {
 
   static catalog::WritableCatalogManager* CreateCatalogMgr(
       const shash::Any& root_hash, const std::string stratum0,
-      const std::string& temp_dir, upload::Spooler* spooler,
-      download::DownloadManager* dl_mgr, perf::Statistics* stats);
+      const std::string name, const std::string& temp_dir,
+      upload::Spooler* spooler, download::DownloadManager* dl_mgr,
+      perf::Statistics* stats, const std::string local_cache_dir);
 
   const std::string name_;
 

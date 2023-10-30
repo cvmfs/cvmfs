@@ -31,7 +31,6 @@ namespace catalog {
 WritableCatalogManager::WritableCatalogManager(
   const shash::Any          &base_hash,
   const std::string         &stratum0,
-  const std::string         &repo_name,
   const string              &dir_temp,
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
@@ -43,9 +42,9 @@ WritableCatalogManager::WritableCatalogManager(
   bool                       is_balanceable,
   unsigned                   max_weight,
   unsigned                   min_weight,
-  const bool                 use_local_cache)
+  const                      std::string &dir_cache)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
-      statistics, false, use_local_cache, repo_name, true)
+      statistics, false, dir_cache, true)
   , spooler_(spooler)
   , enforce_limits_(enforce_limits)
   , nested_kcatalog_limit_(nested_kcatalog_limit)
@@ -1257,10 +1256,19 @@ void WritableCatalogManager::CatalogUploadCallback(
   SyncLock();
 
   // copy file to local cache.server
+  // must be an atomic write into the local_cache_dir
+  // as such: create a temporary copy in local_cache_dir/txn
+  // and then do a rename (which is atomic) to the actual cache path
   if (use_local_cache_) {
-    CopyPath2Path(result.local_path.c_str(),
-                                 local_cache_dir_ + "/"
-                                 + result.content_hash.MakePathWithoutSuffix());
+    std::string tmp_catalog_path;
+    std::string cache_catalog_path = local_cache_dir_ + "/"
+                                  + result.content_hash.MakePathWithoutSuffix();
+    FILE *fcatalog = CreateTempFile(local_cache_dir_ + "/txn/catalog", 0666,
+                                                        "w", &tmp_catalog_path);
+    CopyPath2File(result.local_path.c_str(), fcatalog);
+    fclose(fcatalog);
+
+    rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str());
   }
 
   if (catalog->HasParent()) {
@@ -1414,12 +1422,21 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
     PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
           result.local_path.c_str(), result.return_code);
   }
-  
+
   // copy file to local cache.server
+  // must be an atomic write into the local_cache_dir
+  // as such: create a temporary copy in local_cache_dir/txn
+  // and then do a rename (which is atomic) to the actual cache path
   if (use_local_cache_) {
-    CopyPath2Path(result.local_path.c_str(),
-                                 local_cache_dir_ + "/"
-                                 + result.content_hash.MakePathWithoutSuffix());
+    std::string tmp_catalog_path;
+    std::string cache_catalog_path = local_cache_dir_ + "/"
+                                  + result.content_hash.MakePathWithoutSuffix();
+    FILE *fcatalog = CreateTempFile(local_cache_dir_ + "/txn/catalog", 0666,
+                                                        "w", &tmp_catalog_path);
+    CopyPath2File(result.local_path.c_str(), fcatalog);
+    fclose(fcatalog);
+
+    rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str());
   }
 
   unlink(result.local_path.c_str());

@@ -10,6 +10,9 @@
 #include "testutil.h"
 #include "xattr.h"
 
+#include "c_file_sandbox.h"
+#include "c_http_server.h"
+
 namespace {
 const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d100000000",
                         "26ab0db90d72e28ad0ba1e22ee51051000000000",
@@ -75,7 +78,9 @@ class T_CatalogMergeTool : public ::testing::Test {};
 TEST_F(T_CatalogMergeTool, CRUD) {
   DirSpec spec1 = MakeBaseSpec();
 
-  CatalogTestTool tester("test");
+  std::string repo_name = "test";
+
+  CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
 
   EXPECT_TRUE(tester.Apply("first", spec1));
@@ -117,7 +122,8 @@ TEST_F(T_CatalogMergeTool, CRUD) {
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest, &statistics);
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;
@@ -157,6 +163,105 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_FALSE(output_spec.Item("dir/dir"));
 }
 
+// TEST_F(T_CatalogMergeTool, CRUDwithCache) {
+//   DirSpec spec1 = MakeBaseSpec();
+
+//   std::string repo_name = "test";
+//   std::string local_cache_dir =
+//                   GetCurrentWorkingDirectory() + "/cvmfs_ut_catalog_merge_tool";
+//   LogCvmfs(kLogCvmfs, kLogStdout, "local_cache_dir %s", local_cache_dir.c_str());
+
+
+//   CatalogTestTool tester(repo_name);
+//   EXPECT_TRUE(tester.Init());
+
+//   EXPECT_TRUE(tester.Apply("first", spec1));
+
+//   manifest::Manifest first_manifest = *(tester.manifest());
+
+//   DirSpec spec2 = spec1;
+
+//   // add "dir/new_dir" and "dir/new_dir/new_file.txt"
+//   EXPECT_TRUE(spec2.AddDirectory("new_dir", "dir", 4096));
+//   EXPECT_TRUE(spec2.AddFile("new_file.txt", "dir/new_dir", hashes[3], 1024));
+
+//   // enlarge "/dir/file1" in spec2
+//   const DirSpecItem item = *spec2.Item("dir/file1");
+//   catalog::DirectoryEntryBase entry = item.entry_base();
+//   XattrList xattrs = item.xattrs();
+//   const std::string parent = item.parent();
+
+//   catalog::DirectoryEntry updated_entry =
+//       catalog::DirectoryEntryTestFactory::RegularFile(
+//         entry.name().c_str(), entry.size() * 2, entry.checksum());
+//   spec2.SetItem(DirSpecItem(updated_entry, xattrs, parent), "dir/file1");
+
+//   // remove "dir/dir" and "dir/dir/file2"
+//   spec2.RemoveItemRec("dir/dir");
+
+//   EXPECT_TRUE(tester.Apply("second", spec2));
+
+//   MockProxyServer proxy_server(8083);
+//   MockFileServer file_server(8082, "./cvmfs_ut_download/server_dir");
+
+//   UniquePtr<ServerTool> server_tool(new ServerTool());
+//   EXPECT_TRUE(server_tool->InitDownloadManager(true, "http://127.0.0.1:8083/"));
+
+//   receiver::Params params = MakeMergeToolParams("test");
+
+//   CatalogTestTool::History history = tester.history();
+
+//   perf::Statistics statistics;
+
+//   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
+//                              catalog::SimpleCatalogManager>
+//       merge_tool(params.stratum0, history[1].second,
+//                  history[2].second,
+//                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
+//                  server_tool->download_manager(), &first_manifest, &statistics,
+//                  local_cache_dir);
+//   EXPECT_TRUE(merge_tool.Init());
+
+//   std::string output_manifest_path;
+//   uint64_t final_rev;
+//   EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &final_rev));
+//   EXPECT_EQ(2U, final_rev);
+
+//   UniquePtr<manifest::Manifest> output_manifest(
+//       manifest::Manifest::LoadFile(output_manifest_path));
+
+//   EXPECT_TRUE(output_manifest.IsValid());
+
+//   DirSpec output_spec;
+//   EXPECT_TRUE(
+//       tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+
+//   std::string spec2_str;
+//   spec2.ToString(&spec2_str);
+//   std::string out_spec_str;
+//   output_spec.ToString(&out_spec_str);
+
+  
+//   // LogCvmfs(kLogCvmfs, kLogStdout, "Target spec:\n%s", spec2_str.c_str());
+//   // LogCvmfs(kLogCvmfs, kLogStdout, "Output spec:\n%s", out_spec_str.c_str());
+
+//   LogCvmfs(kLogCvmfs, kLogStdout, "Proxy server calls %d", proxy_server.num_processed_requests());
+//   LogCvmfs(kLogCvmfs, kLogStdout, "File server calls %d", file_server.num_processed_requests());
+  
+
+//   // the printed form of the target and output dir specs should be the same
+//   EXPECT_EQ(0, strcmp(spec2_str.c_str(), out_spec_str.c_str()));
+
+//   // check size of "/dir/file1"
+//   EXPECT_EQ(8192u, output_spec.Item("dir/file1")->entry_base().size());
+
+//   // check size of "/dir/new_dir/new_file.txt"
+//   EXPECT_EQ(1024u,
+//             output_spec.Item("dir/new_dir/new_file.txt")->entry_base().size());
+
+//   EXPECT_FALSE(output_spec.Item("dir/dir"));
+// }
+
 TEST_F(T_CatalogMergeTool, Symlink) {
   // we start by creating a simple structure
   // .
@@ -170,7 +275,8 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   EXPECT_TRUE(base.AddDirectory("baz", "bar", 4096));
   EXPECT_TRUE(base.AddNestedCatalog("bar/baz"));
 
-  CatalogTestTool tester("test_symlink");
+  std::string repo_name = "test_symlink";
+  CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
 
   // we apply the structure above to the tester
@@ -193,7 +299,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   UniquePtr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
-  receiver::Params params = MakeMergeToolParams("test_symlink");
+  receiver::Params params = MakeMergeToolParams(repo_name);
 
   CatalogTestTool::History history = tester.history();
 
@@ -201,9 +307,11 @@ TEST_F(T_CatalogMergeTool, Symlink) {
 
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, history[1].second, history[2].second,
+      merge_tool(params.stratum0, history[1].second,
+                 history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest, &statistics);
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;

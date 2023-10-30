@@ -39,13 +39,45 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
-  std::string tmp;
+  FILE *fcatalog;
 
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
-  ctlg_context->SetSqlitePath(tmp);
-  if (!fcatalog) {
-    PANIC(kLogStderr, "failed to create temp file when loading %s",
-          url.c_str());
+  if (use_local_cache_) {
+    std::string tmp_path = local_cache_dir_ + "/"
+                           + effective_hash.MakePathWithoutSuffix();
+
+    ctlg_context->SetSqlitePath(tmp_path);
+
+    // file is cached
+    if (FileExists(tmp_path->c_str())) {
+      if (!copy_to_tmp_dir_) {
+        *catalog_hash = effective_hash;
+        return kLoadNew;
+      } else {  // for writable catalog create copy in dir_temp_
+        std::string cache_path = tmp_path;
+        fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+        if (!fcatalog) {
+          PANIC(kLogStderr, "failed to create temp file when loading %s",
+                url.c_str());
+        }
+        ctlg_context->SetSqlitePath(tmp_path);
+
+        CopyPath2File(cache_path, fcatalog);
+        fclose(fcatalog);
+
+        *catalog_hash = effective_hash;
+        return kLoadNew;
+      }
+    }
+
+    fcatalog = fopen(ctlg_context->sqlite_path().c_str(), "w");
+  } else {  // use tmp file
+    std::string tmp_path;
+    fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+    if (!fcatalog) {
+      PANIC(kLogStderr, "failed to create temp file when loading %s",
+            url.c_str());
+    }
+    ctlg_context->SetSqlitePath(tmp_path);
   }
 
   cvmfs::FileSink filesink(fcatalog);
@@ -60,6 +92,22 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
                       url.c_str(), retval, download::Code2Ascii(retval));
   }
 
+  // for writable catalog make copy in dir_temp_ that can be modified
+  if (use_local_cache_ && copy_to_tmp_dir_) {
+    std::String tmp_path = ctlg_context->sqlite_path();
+    std::string cache_path = tmp_path;
+    fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+    if (!fcatalog) {
+      PANIC(kLogStderr, "failed to create temp file when loading %s",
+            url.c_str());
+    }
+    ctlg_context->SetSqlitePath(tmp_path);
+
+    CopyPath2File(cache_path, fcatalog);
+    fclose(fcatalog);
+  }
+
+  *catalog_hash = effective_hash;
   return kLoadNew;
 }
 
