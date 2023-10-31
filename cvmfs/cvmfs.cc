@@ -1692,12 +1692,26 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
-  vector<string> tokens = SplitString(name, '~');
+  vector<string> tokens_mode_machine = SplitString(name, '~');
+  vector<string> tokens_mode_human = SplitString(name, '@');
 
-  const uint32_t attr_req_page = tokens.size() > 1 ?
-            static_cast<uint32_t>(String2Uint64(tokens[tokens.size() - 1])) : 0;
+  uint32_t attr_req_page;
+  MagicXattrMode xattr_mode;
+  string attr;
 
-  const string attr = tokens[0];
+  if (tokens_mode_human.size() > 1) {
+    attr_req_page = static_cast<uint32_t>(String2Uint64(
+                              tokens_mode_human[tokens_mode_human.size() - 1]));
+    xattr_mode = kXattrHumanMode;
+    attr = tokens_mode_human[0];
+  } else {
+    attr_req_page = tokens_mode_machine.size() > 1 ?
+            static_cast<uint32_t>(String2Uint64(
+                      tokens_mode_machine[tokens_mode_machine.size() - 1])) : 0;
+    xattr_mode = kXattrMachineMode;
+    attr = tokens_mode_machine[0];
+  }
+
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
@@ -1749,7 +1763,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   string attribute_value;
 
   if (!magic_xattr.IsNull()) {
-    attribute_value = magic_xattr->GetValue(attr_req_page);
+    attribute_value = magic_xattr->GetValue(attr_req_page, xattr_mode);
   } else {
     if (!xattrs.Get(attr, &attribute_value)) {
       fuse_reply_err(req, ENOATTR);
@@ -1757,7 +1771,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     }
   }
 
-  if (size == 0) {
+  if (attribute_value == "ENOENT") {
+    fuse_reply_err(req, ENOENT);
+  } else if (size == 0) {
     fuse_reply_xattr(req, attribute_value.length());
   } else if (size >= attribute_value.length()) {
     fuse_reply_buf(req, &attribute_value[0], attribute_value.length());
@@ -2083,40 +2099,42 @@ class ExpiresMagicXattr : public BaseMagicXattr {
     return true;
   }
 
-  virtual std::string GetValue(uint32_t /*requested_page*/) {
+  virtual void FinalizeValue() {
     if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
-      return "never (fixed root catalog)";
+      result_pages_.push_back("never (fixed root catalog)");
+      return;
     } else {
       time_t now = time(NULL);
-      return StringifyInt( (catalogs_valid_until_ - now) / 60);
+      result_pages_.push_back(StringifyInt((catalogs_valid_until_ - now) / 60));
     }
   }
 };
 
 class InodeMaxMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue(uint32_t /*requested_page*/) {
-    return StringifyInt(
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
-      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge());
+      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge()));
   }
 };
 
 class MaxFdMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue(uint32_t /*requested_page*/) {
-    return StringifyInt(cvmfs::max_open_files_ - cvmfs::kNumReservedFd);
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(
+                               cvmfs::max_open_files_ - cvmfs::kNumReservedFd));
   }
 };
 
 class PidMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue(uint32_t /*requested_page*/) {
-    return StringifyInt(cvmfs::pid_); }
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(cvmfs::pid_)); }
 };
 
 class UptimeMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue(uint32_t /*requested_page*/) {
+  virtual void FinalizeValue(){
     time_t now = time(NULL);
     uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
-    return StringifyInt(uptime / 60);
+    result_pages_.push_back(StringifyInt(uptime / 60));
   }
 };
 

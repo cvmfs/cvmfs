@@ -3,7 +3,7 @@ cvmfs_test_suites="quick"
 
 # Test for protected extended attribute access
 check_protected_xattr() {
-  echo "Test protected extended attributes"
+  echo "*** Test protected extended attributes"
   echo "  Having no restrictions"
   cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always" || return 3
   local no_restrictions=$(get_xattr fqrn /cvmfs/grid.cern.ch/README)
@@ -116,6 +116,22 @@ cvmfs_run_test() {
   proxy_list_external=$(get_xattr proxy_list_external /cvmfs/grid.cern.ch/README)
   [ "x$proxy_list" != "x" ] || return 21
   [ "x$proxy_list_external" != "x" ] || return 22
+
+  # check different access modes 
+  echo "*** Check different access modes: human vs machine"
+  runc_chunk_list_machine=$(attr -qg chunk_list~0 /cvmfs/grid.cern.ch/vc/containers/runc)
+  runc_chunk_list_human=$(attr -qg chunk_list@0 /cvmfs/grid.cern.ch/vc/containers/runc)
+
+  [ "x$runc_chunk_list" = "x$runc_chunk_list_machine" ] || return 30
+
+
+  if echo $runc_chunk_list_human | grep -v "# Access page at idx: 0. Total num pages: 1 "; then
+    return 31
+  fi
+
+  if echo $runc_chunk_list_human | grep -v "$runc_chunk_list_machine"; then
+    return 32
+  fi
 
   cvmfs_umount grid.cern.ch || return 2
 

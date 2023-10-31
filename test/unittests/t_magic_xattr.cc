@@ -75,7 +75,7 @@ TEST_F(T_MagicXattr, TestFqrn) {
   MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
   ASSERT_FALSE(attr.IsNull());
   ASSERT_TRUE(attr->PrepareValueFenced());
-  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0).c_str());
+  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0, kXattrMachineMode).c_str());
 }
 
 TEST_F(T_MagicXattr, TestLogBuffer) {
@@ -94,7 +94,8 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
-    EXPECT_TRUE(HasSuffix(attr->GetValue(0), "test\n", false /* ign_case */));
+    EXPECT_TRUE(HasSuffix(attr->GetValue(0, kXattrMachineMode), "test\n",
+                                                         false /* ign_case */));
   }
 
   LogCvmfs(kLogCvmfs, 0, "%s", std::string(6000, 'x').c_str());
@@ -102,7 +103,8 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     MagicXattrRAIIWrapper attr(mgr->GetLocked("user.logbuffer", path, &dirent));
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
-    EXPECT_TRUE(HasSuffix(attr->GetValue(0), "<snip>\n", false /* ign_case */));
+    EXPECT_TRUE(HasSuffix(attr->GetValue(0, kXattrMachineMode), "<snip>\n",
+                                                         false /* ign_case */));
   }
 }
 
@@ -151,5 +153,61 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   ASSERT_FALSE(attr.IsNull());
   ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
   ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
-  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0).c_str());
+  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0, kXattrMachineMode).c_str());
+}
+
+TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
+  PubkeysMagicXattr attr;
+
+  EXPECT_STREQ(attr.GetValue(0, kXattrMachineMode).c_str(), "ENOENT");
+
+  attr.pubkeys_.push_back("xx");
+
+  EXPECT_STREQ(attr.GetValue(0, kXattrMachineMode).c_str(), "xx\n");
+
+  attr.pubkeys_.clear();
+  attr.pubkeys_.push_back(std::string(10000, 'a'));
+  attr.pubkeys_.push_back(std::string(10000, 'b'));
+  attr.pubkeys_.push_back(std::string(10000, 'c'));
+  attr.pubkeys_.push_back(std::string(10000, 'd'));
+  attr.pubkeys_.push_back(std::string(10000, 'e'));
+  attr.pubkeys_.push_back(std::string(10000, 'f'));
+
+  EXPECT_EQ(attr.GetValue(0, kXattrMachineMode).find("ddddddd"),
+            std::string::npos);
+  EXPECT_GE((int) attr.GetValue(0, kXattrMachineMode).find("aaaaaa"), 0);
+  EXPECT_GE((int) attr.GetValue(0, kXattrMachineMode).find("bbbbbb"), 0);
+
+  EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).find("ccccc"),
+            std::string::npos);
+  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).find("dddddd"), 0);
+  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).find("fffffff"), 0);
+
+  EXPECT_STREQ(attr.GetValue(3, kXattrMachineMode).c_str(), "ENOENT");
+  EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).find("# Access page at idx: "),
+            std::string::npos);
+}
+
+TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
+  PubkeysMagicXattr attr;
+
+  EXPECT_EQ((int) attr.GetValue(0, kXattrHumanMode).find(
+                                         "Page requested does not exists."), 0);
+
+  attr.pubkeys_.push_back(std::string(10000, 'a'));
+  attr.pubkeys_.push_back(std::string(10000, 'b'));
+  attr.pubkeys_.push_back(std::string(10000, 'c'));
+  attr.pubkeys_.push_back(std::string(10000, 'd'));
+  attr.pubkeys_.push_back(std::string(10000, 'e'));
+  attr.pubkeys_.push_back(std::string(10000, 'f'));
+
+  EXPECT_EQ((int) attr.GetValue(1, kXattrHumanMode).find(
+                                                  "# Access page at idx: "), 0);
+  EXPECT_EQ(attr.GetValue(1, kXattrHumanMode).find("ccccc"), std::string::npos);
+  EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).find("ddddddd"), 0);
+  EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).find("fffffff"), 0);
+
+
+  EXPECT_EQ((int) attr.GetValue(3, kXattrHumanMode).find(
+                                         "Page requested does not exists."), 0);
 }

@@ -394,6 +394,17 @@ std::string SignatureManager::GetActivePubkeys() const {
   return pubkeys;
 }
 
+std::vector<std::string> SignatureManager::GetActivePubkeysAsVector() const {
+  std::vector<std::string> pubkeys;
+  for (std::vector<RSA *>::const_iterator it = public_keys_.begin();
+       it != public_keys_.end();
+       it++) {
+    pubkeys.push_back(GenerateKeyText(*it));
+  }
+  // NOTE: we do not add the pubkey of the certificate here, as it is
+  // not used for the whitelist verification.
+  return pubkeys;
+}
 
 std::string SignatureManager::GetCertificate() const {
   if (!certificate_) return "";
