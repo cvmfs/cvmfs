@@ -2134,7 +2134,7 @@ class UptimeMagicXattr : public BaseMagicXattr {
   virtual void FinalizeValue(){
     time_t now = time(NULL);
     uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
-    result_pages_.push_back(StringifyInt(uptime / 60));
+    result_pages_.push_back(StringifyUint(uptime / 60));
   }
 };
 

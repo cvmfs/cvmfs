@@ -261,7 +261,7 @@ void CatalogCountersMagicXattr::FinalizeValue() {
 bool ChunkListMagicXattr::PrepareValueFenced() {
   chunk_list_.clear();
 
-  std::string header = "hash,offset,size\n";
+  const std::string header = "hash,offset,size\n";
   std::string chunk_list_page_(header);
   if (!dirent_->IsRegular()) {
     return false;
@@ -476,7 +476,7 @@ void NCleanup24MagicXattr::FinalizeValue() {
   } else {
     const uint64_t period_s = 24 * 60 * 60;
     const uint64_t rate = quota_mgr->GetCleanupRate(period_s);
-    result_pages_.push_back(StringifyInt(rate));
+    result_pages_.push_back(StringifyUint(rate));
   }
 }
 
@@ -543,7 +543,6 @@ static void ListProxy(download::DownloadManager *dm,
   unsigned current_group;
   dm->GetProxyInfo(&proxy_chain, &current_group, NULL);
   std::string buf = "";
-  std::string fulbuf = "";
   for (unsigned int i = 0; i < proxy_chain.size(); i++) {
     for (unsigned int j = 0; j < proxy_chain[i].size(); j++) {
       buf += proxy_chain[i][j].url;
