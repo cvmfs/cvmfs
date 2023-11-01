@@ -132,7 +132,7 @@ class CatalogDiffTool {
   std::string temp_dir_prefix_;
 
   download::DownloadManager* download_manager_;
-  const std::string& local_cache_dir_;  // path if local caching of catalogs
+  const std::string local_cache_dir_;  // path if local caching of catalogs
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;
