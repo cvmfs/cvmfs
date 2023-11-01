@@ -82,7 +82,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
       : CatalogDiffTool<RoCatalogMgr>(repo_path,
                                       old_root_hash, new_root_hash,
                                       temp_dir_prefix, download_manager,
-                                      local_cache_dir_),
+                                      local_cache_dir),
         repo_path_(repo_path),
         local_cache_dir_(local_cache_dir),
         lease_path_(lease_path),
