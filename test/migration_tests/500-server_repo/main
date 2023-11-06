@@ -39,7 +39,9 @@ cvmfs_run_test() {
 
   # make sure that there is no version of CernVM-FS server installed
   if is_installed "cvmfs-libs"; then
-    uninstall_package "cvmfs-server" || return 3
+    installed_version=$(installed_package_version "cvmfs-libs")
+    echo "uninstalling CernVM-FS libs $installed_version"
+    uninstall_package "cvmfs-libs" || return 3
   fi
   if is_installed "cvmfs-server"; then
     installed_version=$(installed_package_version "cvmfs-server")
