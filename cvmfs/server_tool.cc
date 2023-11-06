@@ -25,10 +25,9 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
     return true;
   }
 
-  download_manager_ = new download::DownloadManager();
+  download_manager_ = new download::DownloadManager(max_pool_handles,
+                            perf::StatisticsTemplate("download", statistics()));
   assert(download_manager_.IsValid());
-  download_manager_->Init(max_pool_handles,
-                          perf::StatisticsTemplate("download", statistics()));
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
   download_manager_->SetRetryParameters(kDownloadRetries, 2000, 5000);

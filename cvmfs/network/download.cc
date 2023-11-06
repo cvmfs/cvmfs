@@ -1586,70 +1586,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   return false;  // stop transfer and return to Fetch()
 }
 
-
-DownloadManager::DownloadManager() {
-  pool_handles_idle_ = NULL;
-  pool_handles_inuse_ = NULL;
-  pool_max_handles_ = 0;
-  curl_multi_ = NULL;
-  default_headers_ = NULL;
-
-  atomic_init32(&multi_threaded_);
-  pipe_terminate_ = NULL;
-
-  pipe_jobs_ = NULL;
-  watch_fds_ = NULL;
-  watch_fds_size_ = 0;
-  watch_fds_inuse_ = 0;
-  watch_fds_max_ = 0;
-
-  lock_options_ =
-  reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_options_, NULL);
-  assert(retval == 0);
-  lock_synchronous_mode_ =
-  reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
-  assert(retval == 0);
-
-  opt_dns_server_ = "";
-  opt_ip_preference_ = dns::kIpPreferSystem;
-  opt_timeout_proxy_ = 0;
-  opt_timeout_direct_ = 0;
-  opt_low_speed_limit_ = 0;
-  opt_host_chain_ = NULL;
-  opt_host_chain_rtt_ = NULL;
-  opt_host_chain_current_ = 0;
-  opt_proxy_groups_ = NULL;
-  opt_proxy_groups_current_ = 0;
-  opt_proxy_groups_current_burned_ = 0;
-  opt_num_proxies_ = 0;
-  opt_proxy_shard_ = false;
-  opt_max_retries_ = 0;
-  opt_backoff_init_ms_ = 0;
-  opt_backoff_max_ms_ = 0;
-  enable_info_header_ = false;
-  opt_ipv4_only_ = false;
-  follow_redirects_ = false;
-  ignore_signature_failures_ = false;
-
-  enable_http_tracing_ = false;
-  http_tracing_headers_ = vector<string>();
-
-  resolver_ = NULL;
-
-  opt_timestamp_backup_proxies_ = 0;
-  opt_timestamp_failover_proxies_ = 0;
-  opt_proxy_groups_reset_after_ = 0;
-  opt_timestamp_backup_host_ = 0;
-  opt_host_reset_after_ = 0;
-
-  credentials_attachment_ = NULL;
-
-  counters_ = NULL;
-}
-
-
 DownloadManager::~DownloadManager() {
   pthread_mutex_destroy(lock_options_);
   pthread_mutex_destroy(lock_synchronous_mode_);
@@ -1686,35 +1622,62 @@ void DownloadManager::FiniHeaders() {
   default_headers_ = NULL;
 }
 
-
-void DownloadManager::Init(const unsigned max_pool_handles,
-                           const perf::StatisticsTemplate &statistics)
+DownloadManager::DownloadManager(const unsigned max_pool_handles,
+                           const perf::StatisticsTemplate &statistics) :
+                  prng_(Prng()),
+                  pool_handles_idle_(new set<CURL *>),
+                  pool_handles_inuse_(new set<CURL *>),
+                  pool_max_handles_(max_pool_handles),
+                  pipe_terminate_(NULL),
+                  pipe_jobs_(NULL),
+                  watch_fds_(NULL),
+                  watch_fds_size_(0),
+                  watch_fds_inuse_(0),
+                  watch_fds_max_(4 * max_pool_handles),
+                  opt_timeout_proxy_(5),
+                  opt_timeout_direct_(10),
+                  opt_low_speed_limit_(1024),
+                  opt_max_retries_(0),
+                  opt_backoff_init_ms_(0),
+                  opt_backoff_max_ms_(0),
+                  enable_info_header_(false),
+                  opt_ipv4_only_(false),
+                  follow_redirects_(false),
+                  ignore_signature_failures_(false),
+                  enable_http_tracing_(false),
+                  opt_host_chain_(NULL),
+                  opt_host_chain_rtt_(NULL),
+                  opt_host_chain_current_(0),
+                  opt_proxy_groups_(NULL),
+                  opt_proxy_groups_current_(0),
+                  opt_proxy_groups_current_burned_(0),
+                  opt_proxy_groups_fallback_(0),
+                  opt_num_proxies_(0),
+                  opt_proxy_shard_(false),
+                  failover_indefinitely_(false),
+                  opt_ip_preference_(dns::kIpPreferSystem),
+                  opt_timestamp_backup_proxies_(0),
+                  opt_timestamp_failover_proxies_(0),
+                  opt_proxy_groups_reset_after_(0),
+                  opt_timestamp_backup_host_(0),
+                  opt_host_reset_after_(0),
+                  credentials_attachment_(NULL),
+                  counters_(new Counters(statistics))
 {
   atomic_init32(&multi_threaded_);
-  int retval = curl_global_init(CURL_GLOBAL_ALL);
+
+  lock_options_ =
+          reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_options_, NULL);
+  assert(retval == 0);
+  lock_synchronous_mode_ =
+          reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
+  assert(retval == 0);
+
+  retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
-  pool_handles_idle_ = new set<CURL *>;
-  pool_handles_inuse_ = new set<CURL *>;
-  pool_max_handles_ = max_pool_handles;
-  watch_fds_max_ = 4*pool_max_handles_;
 
-  opt_timeout_proxy_ = 5;
-  opt_timeout_direct_ = 10;
-  opt_low_speed_limit_ = 1024;
-  opt_proxy_groups_current_ = 0;
-  opt_proxy_groups_current_burned_ = 0;
-  opt_num_proxies_ = 0;
-  opt_proxy_shard_ = false;
-  opt_host_chain_current_ = 0;
-  opt_ip_preference_ = dns::kIpPreferSystem;
-
-  sharding_policy_ = SharedPtr<ShardingPolicy>();
-  health_check_ = SharedPtr<HealthCheck>();
-  failover_indefinitely_ = false;
-
-  counters_ = new Counters(statistics);
-
-  user_agent_ = NULL;
   InitHeaders();
 
   curl_multi_ = curl_multi_init();
@@ -2914,13 +2877,12 @@ void DownloadManager::SetFailoverIndefinitely() {
 DownloadManager *DownloadManager::Clone(
   const perf::StatisticsTemplate &statistics)
 {
-  DownloadManager *clone = new DownloadManager();
-  clone->Init(pool_max_handles_, statistics);
-  if (resolver_) {
-    clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
-    clone->SetDnsTtlLimits(resolver_->min_ttl(), resolver_->max_ttl());
-    clone->SetMaxIpaddrPerProxy(resolver_->throttle());
-  }
+  DownloadManager *clone = new DownloadManager(pool_max_handles_, statistics);
+
+  clone->SetDnsParameters(resolver_->retries(), resolver_->timeout_ms());
+  clone->SetDnsTtlLimits(resolver_->min_ttl(), resolver_->max_ttl());
+  clone->SetMaxIpaddrPerProxy(resolver_->throttle());
+
   if (!opt_dns_server_.empty())
     clone->SetDnsServer(opt_dns_server_);
   clone->opt_timeout_proxy_ = opt_timeout_proxy_;
@@ -2938,6 +2900,7 @@ DownloadManager *DownloadManager::Clone(
     clone->opt_host_chain_ = new vector<string>(*opt_host_chain_);
     clone->opt_host_chain_rtt_ = new vector<int>(*opt_host_chain_rtt_);
   }
+
   CloneProxyConfig(clone);
   clone->opt_ip_preference_ = opt_ip_preference_;
   clone->proxy_template_direct_ = proxy_template_direct_;

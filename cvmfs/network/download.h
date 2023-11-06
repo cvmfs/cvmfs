@@ -155,13 +155,12 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static const unsigned kDnsDefaultTimeoutMs = 3000;
   static const unsigned kProxyMapScale = 16;
 
-  DownloadManager();
+  DownloadManager(const unsigned max_pool_handles,
+                  const perf::StatisticsTemplate &statistics);
   ~DownloadManager();
 
   static int ParseHttpCode(const char digits[3]);
 
-  void Init(const unsigned max_pool_handles,
-            const perf::StatisticsTemplate &statistics);
   void Fini();
   void Spawn();
   DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
@@ -361,7 +360,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Sharding policy deciding which proxy should be chosen for each download
    * request
-   * 
+   *
    * Sharding policy is shared between all download managers. As such shared
    * pointers are used to allow for proper clean-up afterwards in Fini()
    * (We cannot assume the order in which the download managers are stopped)
@@ -369,7 +368,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   SharedPtr<ShardingPolicy> sharding_policy_;
   /**
    * Health check for the proxies
-   * 
+   *
    * Health check is shared between all download managers. As such shared
    * pointers are used to allow for proper clean-up afterwards in Fini()
    * (We cannot assume the order in which the download managers are stopped)
@@ -381,7 +380,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool failover_indefinitely_;
   /**
    * Repo name. Needed for the re-try logic if a download was unsuccessful
-  */
+   * Used in sharding policy && Interrupted()
+   */
   std::string fqrn_;
 
   /**

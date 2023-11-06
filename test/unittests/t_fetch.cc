@@ -69,9 +69,8 @@ class T_Fetcher : public ::testing::Test {
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
 
-    download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(8,
-      perf::StatisticsTemplate("test", &statistics_));
+    download_mgr_ = new download::DownloadManager(8,
+                                perf::StatisticsTemplate("test", &statistics_));
     download_mgr_->SetHostChain("file://" + tmp_path_);
 
     fetcher_ = new Fetcher(

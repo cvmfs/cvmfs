@@ -48,10 +48,9 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   if (IsHttpUrl(repo_url)) {
     perf::Statistics stats;
     UniquePtr<download::DownloadManager> download_manager(
-        new download::DownloadManager());
+        new download::DownloadManager(kMaxPoolHandles,
+                                 perf::StatisticsTemplate("download", &stats)));
     assert(download_manager.IsValid());
-    download_manager->Init(kMaxPoolHandles,
-                           perf::StatisticsTemplate("download", &stats));
 
     download_manager->SetTimeout(kDownloadTimeout, kDownloadTimeout);
     download_manager->SetRetryParameters(kDownloadRetries, 500, 2000);

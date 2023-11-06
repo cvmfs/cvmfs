@@ -28,9 +28,8 @@ class T_StreamingCacheManager : public ::testing::Test {
 
   virtual void SetUp() {
     statistics_ = new perf::Statistics();
-    download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(16,
-      perf::StatisticsTemplate("download", statistics_.weak_ref()));
+    download_mgr_ = new download::DownloadManager(16,
+                  perf::StatisticsTemplate("download", statistics_.weak_ref()));
     download_mgr_->SetHostChain("file://" + GetCurrentWorkingDirectory());
     backing_cache_ =
       PosixCacheManager::Create("cache", true /* alien_cache */);

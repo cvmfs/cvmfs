@@ -34,7 +34,8 @@ class T_ObjectFetcher : public ::testing::Test {
     public_key_path(sandbox + "/" + fqrn + ".pub"),
     private_key_path(sandbox + "/" + fqrn + ".key"),
     certificate_path(sandbox + "/" + fqrn + ".crt"),
-    master_key_path(sandbox + "/" + fqrn + ".masterkey") { }
+    master_key_path(sandbox + "/" + fqrn + ".masterkey"),
+    download_manager_(1, perf::StatisticsTemplate("test", &statistics_)) {}
 
  protected:
   const std::string  sandbox;
@@ -340,8 +341,6 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void InitializeExternalManagers() {
-    download_manager_.Init(1,
-      perf::StatisticsTemplate("test", &statistics_));
     signature_manager_.Init();
     ASSERT_TRUE(signature_manager_.LoadPublicRsaKeys(public_key_path));
   }
