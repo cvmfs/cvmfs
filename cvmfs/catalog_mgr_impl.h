@@ -958,12 +958,6 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
 {
   CatalogContext ctlg_context(hash, mountpoint, kCtlgLocationMounted);
 
-  // do i need this here?
-  if (ctlg_context.IsRootCatalog()) {
-    if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
-      return NULL;
-    }
-  }
 
   const LoadReturn load_ret = LoadCatalogByHash(&ctlg_context);
 

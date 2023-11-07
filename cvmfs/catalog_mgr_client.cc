@@ -44,7 +44,7 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   , offline_mode_(false)
   , all_inodes_(0)
   , loaded_inodes_(0)
-  , fixed_root_catalog_(false)
+  , fixed_root_catalog_()
   , fixed_alt_root_catalog_(false)
   , root_fd_(-1)
 {
@@ -100,7 +100,8 @@ bool ClientCatalogManager::InitFixed(
            root_hash.ToString().c_str());
   WriteLock();
   fixed_alt_root_catalog_ = alternative_path;
-  fixed_root_catalog_ = true;
+  fixed_root_catalog_ = root_hash;
+
   bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
@@ -174,8 +175,10 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   UniquePtr<CachedManifestEnsemble> ensemble(
                        new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
   // TODO(heretherebedragons)
-  // breadcrumb_timestamp: does breadcrumb timestamp and revision always go hand in hand?
-  // can it be that the timestamp is older on the server but the revision higher than the breadcrumb?
+  // breadcrumb_timestamp: does breadcrumb timestamp and revision always go hand
+  // in hand?
+  // can it be that the timestamp is older on the server but the revision higher
+  // than the breadcrumb?
   manifest_failure = manifest::Fetch("", repo_name_, breadcrumb_timestamp,
                                      &local_newest_hash, signature_mgr_,
                                      fetcher_->download_mgr(),
@@ -184,9 +187,9 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   if (manifest_failure == manifest::kFailOk) {
     // fixed catalog: just check if server is reachable but use local version
     // TODO(heretherebedragons) OK that this could be in theory the breadcrumb?
-    if (fixed_root_catalog_) {
+    if (fixed_root_catalog_ != shash::Any()) {
       offline_mode_ = false;
-      result->SetHash(local_newest_hash);
+      result->SetHash(fixed_root_catalog_);
       result->SetRootCtlgRevision(local_newest_revision);
       return success_code;
     }
@@ -200,6 +203,12 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     result->SetHash(ensemble->manifest->catalog_hash());
     result->SetRootCtlgRevision(ensemble->manifest->revision());
     result->SetRootCtlgLocation(kCtlgLocationServer);
+    if (ensemble->manifest->has_alt_catalog_path()) {
+      fixed_alt_root_catalog_ = true;
+    } else {
+      fixed_alt_root_catalog_ = false;
+    }
+
     result->TakeManifestEnsemble(
                   static_cast<manifest::ManifestEnsemble*>(ensemble.Release()));
     offline_mode_ = false;

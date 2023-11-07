@@ -103,7 +103,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool offline_mode_;  /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
-  bool fixed_root_catalog_; /**< fixed root hash */
+  shash::Any fixed_root_catalog_;      /**< fixed root hash */
   bool fixed_alt_root_catalog_;  /**< fixed root hash but alternative url */
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;
