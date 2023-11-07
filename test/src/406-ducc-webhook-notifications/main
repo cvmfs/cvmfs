@@ -3,7 +3,7 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 cleanup() {
-  pid=$(ps aux | grep 'registry-webhook.py' | awk -F' ' '{print $2}' )
+  pid=$(ps aux | grep 'registry_webhook.py' | awk -F' ' '{print $2}' )
   kill $pid
 }
 
@@ -56,7 +56,7 @@ cvmfs_run_test() {
     rm -f $notifications_file
     touch $notifications_file
 
-    (python3 /usr/libexec/cvmfs/ducc/registry-webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
+    (python3 /usr/libexec/cvmfs/ducc/registry_webhook.py -f $notifications_file -h 127.0.0.1 -p 8080 -r 5 &) || return 1
 
     if check_port;
     then
