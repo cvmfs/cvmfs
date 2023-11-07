@@ -36,7 +36,7 @@ LoadReturn SimpleCatalogManager::GetNewRootCatalogContext(
 // TODO(herethebedragons) CORRECT?
 LoadReturn SimpleCatalogManager::LoadCatalogByHash(
                                                  CatalogContext *ctlg_context) {
-  shash::Any effective_hash = ctlg_context->hash();
+  const shash::Any effective_hash = ctlg_context->hash();
   assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
@@ -52,7 +52,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
 cvmfs::FileSink filesink(fcatalog);
 download::JobInfo download_catalog(&url, true, false,
                                   &effective_hash, &filesink);
-download::Failures retval = download_manager_->Fetch(&download_catalog);
+const download::Failures retval = download_manager_->Fetch(&download_catalog);
 if (fclose(fcatalog) != 0) {
     PANIC(kLogStderr, "could not close temporary file %s: error %d",
                 tmp.c_str(), retval);

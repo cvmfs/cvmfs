@@ -730,14 +730,7 @@ int LibContext::Remount() {
 
     case catalog::kLoadNew:
       retval = mount_point_->catalog_mgr()->Remount();
-      // TODO see if this fixes test 647 http bearer token
-      if (retval != catalog::kLoadNew) {
-        if (retval == catalog::kLoadUp2Date) {
-          LogCvmfs(kLogCvmfs, kLogDebug, "catalog up to date");
-          return 0;
-        }
-        return -1;
-      }
+
       mount_point_->ReEvaluateAuthz();
       LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
                mount_point_->catalog_mgr()->GetRevision());

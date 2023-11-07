@@ -82,7 +82,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadReturn retval = mountpoint_->catalog_mgr()->RemountDryrun();
+  const catalog::LoadReturn retval =
+                                    mountpoint_->catalog_mgr()->RemountDryrun();
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);

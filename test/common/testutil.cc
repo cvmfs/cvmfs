@@ -510,7 +510,7 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
                                           CatalogContext *result) {
   LogCvmfs(kLogCache, kLogDebug,
                        "catalog::MockCatalogManager::GetNewRootCatalogContext");
-  map<PathString, MockCatalog*>::iterator it =
+  const map<PathString, MockCatalog*>::iterator it =
                                            catalog_map_.find(PathString("", 0));
   if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
@@ -532,7 +532,7 @@ catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
                             CatalogContext *ctlg_context) {
   LogCvmfs(kLogCache, kLogDebug,
                               "catalog::MockCatalogManager::LoadCatalogByHash");
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
+  const map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
                                                     ctlg_context->mountpoint());
   if (it != catalog_map_.end() && !ctlg_context->hash().IsNull()) {
     return kLoadUp2Date;
