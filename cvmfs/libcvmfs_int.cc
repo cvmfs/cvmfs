@@ -721,7 +721,8 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
+  const catalog::LoadReturn retval =
+                                   mount_point_->catalog_mgr()->RemountDryrun();
 
   switch (retval) {
     case catalog::kLoadUp2Date:
