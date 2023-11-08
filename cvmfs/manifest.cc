@@ -267,8 +267,8 @@ Breadcrumb Manifest::ReadBreadcrumb(
     return breadcrumb;
   }
   char tmp[164];
-  size_t read_bytes;
-  if ((read_bytes = fread(tmp, 1, 164, fbreadcrumb)) > 0) {
+  size_t read_bytes = fread(tmp, 1, 164, fbreadcrumb);
+  if (read_bytes > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
   fclose(fbreadcrumb);

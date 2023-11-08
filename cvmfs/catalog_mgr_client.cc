@@ -162,7 +162,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
   if (breadcrumb_revision <= GetRevisionNoLock()
      || breadcrumb_revision == -1ul) {
-    std::map<PathString, shash::Any>::iterator curr_hash_itr =
+    const std::map<PathString, shash::Any>::iterator curr_hash_itr =
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = GetRevisionNoLock();
@@ -271,8 +271,8 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
 
   // TODO(heretherebedragons) could help: fetch should return if fetch from
   // cache or from remote would save us the if in L283
-  LoadReturn load_ret = FetchCatalogByHash(ctlg_context->hash(), catalog_descr,
-                                           alt_root_catalog_path,
+  const LoadReturn load_ret = FetchCatalogByHash(ctlg_context->hash(),
+                                           catalog_descr, alt_root_catalog_path,
                                            ctlg_context->GetSqlitePathPtr());
   if (load_ret == catalog::kLoadNew) {
     loaded_catalogs_[ctlg_context->mountpoint()] = ctlg_context->hash();

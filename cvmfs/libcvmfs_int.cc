@@ -729,7 +729,7 @@ int LibContext::Remount() {
       return 0;
 
     case catalog::kLoadNew:
-      retval = mount_point_->catalog_mgr()->Remount();
+      mount_point_->catalog_mgr()->Remount();
 
       mount_point_->ReEvaluateAuthz();
       LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
