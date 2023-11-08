@@ -1587,6 +1587,57 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 DownloadManager::~DownloadManager() {
+  // cleaned up fini
+  if (sharding_policy_.UseCount() > 0) {
+    sharding_policy_.Reset();
+  }
+  if (health_check_.UseCount() > 0) {
+    if (health_check_.Unique()) {
+      LogCvmfs(kLogDownload, kLogDebug, "Stopping healthcheck thread");
+      health_check_->StopHealthcheck();
+    }
+    health_check_.Reset();
+  }
+
+  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
+    // Shutdown I/O thread
+    pipe_terminate_->Write(kPipeTerminateSignal);
+    pthread_join(thread_download_, NULL);
+    // All handles are removed from the multi stack
+    pipe_terminate_.Destroy();
+    pipe_jobs_.Destroy();
+  }
+
+  for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
+       iEnd = pool_handles_idle_->end(); i != iEnd; ++i)
+  {
+    curl_easy_cleanup(*i);
+  }
+
+  delete pool_handles_idle_;
+  delete pool_handles_inuse_;
+  curl_multi_cleanup(curl_multi_);
+
+  delete header_lists_;
+  if (user_agent_)
+    free(user_agent_);
+
+  delete counters_;
+
+  if (opt_host_chain_) {
+    delete opt_host_chain_;
+    delete opt_host_chain_rtt_;
+  }
+  // opt_proxy_map_.clear();
+
+  if (opt_proxy_groups_) {
+    delete opt_proxy_groups_;
+  }
+
+  curl_global_cleanup();
+  delete resolver_;
+
+  // old destructor
   pthread_mutex_destroy(lock_options_);
   pthread_mutex_destroy(lock_synchronous_mode_);
   free(lock_options_);
@@ -1613,13 +1664,6 @@ void DownloadManager::InitHeaders() {
   default_headers_ = header_lists_->GetList("Connection: Keep-Alive");
   header_lists_->AppendHeader(default_headers_, "Pragma:");
   header_lists_->AppendHeader(default_headers_, user_agent_);
-}
-
-
-void DownloadManager::FiniHeaders() {
-  delete header_lists_;
-  header_lists_ = NULL;
-  default_headers_ = NULL;
 }
 
 DownloadManager::DownloadManager(const unsigned max_pool_handles,
@@ -1701,62 +1745,6 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
     kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
 }
-
-void DownloadManager::Fini() {
-  if (sharding_policy_.UseCount() > 0) {
-    sharding_policy_.Reset();
-  }
-  if (health_check_.UseCount() > 0) {
-    if (health_check_.Unique()) {
-      LogCvmfs(kLogDownload, kLogDebug, "Stopping healthcheck thread");
-      health_check_->StopHealthcheck();
-    }
-    health_check_.Reset();
-  }
-
-  if (atomic_xadd32(&multi_threaded_, 0) == 1) {
-    // Shutdown I/O thread
-    pipe_terminate_->Write(kPipeTerminateSignal);
-    pthread_join(thread_download_, NULL);
-    // All handles are removed from the multi stack
-    pipe_terminate_.Destroy();
-    pipe_jobs_.Destroy();
-  }
-
-  for (set<CURL *>::iterator i = pool_handles_idle_->begin(),
-       iEnd = pool_handles_idle_->end(); i != iEnd; ++i)
-  {
-    curl_easy_cleanup(*i);
-  }
-  delete pool_handles_idle_;
-  delete pool_handles_inuse_;
-  curl_multi_cleanup(curl_multi_);
-  pool_handles_idle_ = NULL;
-  pool_handles_inuse_ = NULL;
-  curl_multi_ = NULL;
-
-  FiniHeaders();
-  if (user_agent_)
-    free(user_agent_);
-  user_agent_ = NULL;
-
-  delete counters_;
-  counters_ = NULL;
-
-  delete opt_host_chain_;
-  delete opt_host_chain_rtt_;
-  opt_proxy_map_.clear();
-  delete opt_proxy_groups_;
-  opt_host_chain_ = NULL;
-  opt_host_chain_rtt_ = NULL;
-  opt_proxy_groups_ = NULL;
-
-  curl_global_cleanup();
-
-  delete resolver_;
-  resolver_ = NULL;
-}
-
 
 /**
  * Spawns the I/O worker thread and switches the module in multi-threaded mode.

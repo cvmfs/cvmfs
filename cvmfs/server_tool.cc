@@ -9,10 +9,6 @@
 ServerTool::ServerTool() {}
 
 ServerTool::~ServerTool() {
-  if (download_manager_.IsValid()) {
-    download_manager_->Fini();
-  }
-
   if (signature_manager_.IsValid()) {
     signature_manager_->Fini();
   }

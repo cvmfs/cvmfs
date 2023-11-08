@@ -84,7 +84,6 @@ class T_Fetcher : public ::testing::Test {
   virtual void TearDown() {
     delete fetcher_;
     delete external_fetcher_;
-    download_mgr_->Fini();
     delete download_mgr_;
     delete cache_mgr_;
     if (tmp_path_ != "")

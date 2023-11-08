@@ -1914,11 +1914,9 @@ MountPoint::~MountPoint() {
   delete external_fetcher_;
   delete fetcher_;
   if (external_download_mgr_ != NULL) {
-    external_download_mgr_->Fini();
     delete external_download_mgr_;
   }
   if (download_mgr_ != NULL) {
-    download_mgr_->Fini();
     delete download_mgr_;
   }
   if (signature_mgr_ != NULL) {

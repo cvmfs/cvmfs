@@ -284,7 +284,6 @@ int MainResolveProxyDescription(int argc, char **argv) {
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);
-  download_manager.Fini();
 
   LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
   return resolved_proxies == "";
