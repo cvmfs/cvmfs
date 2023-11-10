@@ -44,7 +44,7 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  * To read out the attribute value, do:
  * 0. Get an instance through MagicXattrManager::Get()
  * 1. Call PrepareValueFenced() inside FuseRemounter::fence()
- * 2. Call GetValue(uint32_t requested_page, const MagicXattrMode mode);
+ * 2. Call GetValue(int32_t requested_page, const MagicXattrMode mode);
  *    to get the actual value (can be called outside the fence)
  *    This will internally call FinalizeValue() to finalize the value
  *    preparation outside the fuse fence.
@@ -93,12 +93,13 @@ class BaseMagicXattr {
    * It does the computationaly intensive part, which should not
    * be done inside the FuseRemounter::fence(), and returns the
    * value.
-   *
+   * 
    * Internally it calls FinalizeValue() which each MagicXAttr has to implement
    * to set the value of result_pages_
-   *
+   * 
+   * If request_page == -1 than the number of pages available are returned
    */
-  std::string GetValue(uint32_t requested_page,
+  std::string GetValue(int32_t requested_page,
                        const MagicXattrMode mode);
 
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }

@@ -203,22 +203,30 @@ std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t max_pages,
          " with 0)\n";
 }
 
-std::string BaseMagicXattr::GetValue(uint32_t requested_page,
+std::string BaseMagicXattr::GetValue(int32_t requested_page,
                                      const MagicXattrMode mode) {
   result_pages_.clear();
   FinalizeValue();
 
   std::string res = "";
   if (mode == kXattrMachineMode) {
-    if (requested_page >= result_pages_.size()) {
+    if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
       return "ENOENT";
     }
+    if (requested_page == -1) {
+      return "num_pages, " + StringifyUint(result_pages_.size());
+    }
   } else {
-    if (requested_page >= result_pages_.size()) {
+    if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
       return "Page requested does not exists. There are "
-              + StringifyUint(result_pages_.size()) + " pages available.\n"
-              + "Access them with xattr~<page_num> (machine-readable mode) "
-              + "or xattr@<page_num> (human-readable mode)";
+             + StringifyUint(result_pages_.size()) + " pages available.\n"
+             + "Access them with xattr~<page_num> (machine-readable mode) "
+             + "or xattr@<page_num> (human-readable mode).\n"
+             + "Use xattr@? or xattr~? to get extra info about the attribute";
+    } else if (requested_page == -1) {
+      return "Access xattr with xattr~<page_num> (machine-readable mode) or "
+             + std::string(" xattr@<page_num> (human-readable mode).\n")
+             + "Pages available: " + StringifyUint(result_pages_.size());
     } else {
       res = HeaderMultipageHuman(result_pages_.size(), requested_page);
       result_pages_[requested_page];

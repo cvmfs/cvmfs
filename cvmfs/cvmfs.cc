@@ -1695,19 +1695,27 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   vector<string> tokens_mode_machine = SplitString(name, '~');
   vector<string> tokens_mode_human = SplitString(name, '@');
 
-  uint32_t attr_req_page;
+  int32_t attr_req_page;
   MagicXattrMode xattr_mode;
   string attr;
 
   if (tokens_mode_human.size() > 1) {
-    attr_req_page = static_cast<uint32_t>(String2Uint64(
+    if (tokens_mode_human[tokens_mode_human.size() - 1] == "?") {
+      attr_req_page = -1;
+    } else {
+      attr_req_page = static_cast<int32_t>(String2Uint64(
                               tokens_mode_human[tokens_mode_human.size() - 1]));
+    }
     xattr_mode = kXattrHumanMode;
     attr = tokens_mode_human[0];
   } else {
-    attr_req_page = tokens_mode_machine.size() > 1 ?
-            static_cast<uint32_t>(String2Uint64(
+    if (tokens_mode_machine[tokens_mode_machine.size() - 1] == "?") {
+      attr_req_page = -1;
+    } else {
+      attr_req_page = tokens_mode_machine.size() > 1 ?
+            static_cast<int32_t>(String2Uint64(
                       tokens_mode_machine[tokens_mode_machine.size() - 1])) : 0;
+    }
     xattr_mode = kXattrMachineMode;
     attr = tokens_mode_machine[0];
   }
