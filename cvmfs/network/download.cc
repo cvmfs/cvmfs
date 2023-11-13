@@ -1623,16 +1623,9 @@ DownloadManager::~DownloadManager() {
     free(user_agent_);
 
   delete counters_;
-
-  if (opt_host_chain_) {
-    delete opt_host_chain_;
-    delete opt_host_chain_rtt_;
-  }
-  // opt_proxy_map_.clear();
-
-  if (opt_proxy_groups_) {
-    delete opt_proxy_groups_;
-  }
+  delete opt_host_chain_;
+  delete opt_host_chain_rtt_;
+  delete opt_proxy_groups_;
 
   curl_global_cleanup();
   delete resolver_;

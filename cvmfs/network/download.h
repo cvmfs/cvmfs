@@ -360,7 +360,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * request
    *
    * Sharding policy is shared between all download managers. As such shared
-   * pointers are used to allow for proper clean-up afterwards in destructor
+   * pointers are used to allow for proper clean-up afterwards in the destructor
    * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<ShardingPolicy> sharding_policy_;
@@ -368,7 +368,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Health check for the proxies
    *
    * Health check is shared between all download managers. As such shared
-   * pointers are used to allow for proper clean-up afterwards in destructor
+   * pointers are used to allow for proper clean-up afterwards in the destructor
    * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<HealthCheck> health_check_;
