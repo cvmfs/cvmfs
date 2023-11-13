@@ -82,6 +82,9 @@ install_from_repo bzip2
 install_from_repo acl
 install_from_repo git
 
+sudo ln -s /usr/bin/python3 /usr/bin/python || true
+
+
 # Migration test needs lsb_release
 # echo "install lsb_release..."
 # install_from_repo redhat-lsb-core
