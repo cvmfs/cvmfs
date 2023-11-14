@@ -372,6 +372,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_sink.cc
   t_sqlite_database.cc
   t_sqlitemem.cc
+  t_state.cc
   t_statistics.cc
   t_statistics_sql.cc
   t_suid_util.cc
@@ -492,6 +493,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitemem.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/ssl.cc
+  ${CVMFS_SOURCE_DIR}/state.cc
   ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/statistics_database.cc
   ${CVMFS_SOURCE_DIR}/supervisor.cc
@@ -558,6 +560,7 @@ set_target_properties (cvmfs_unittests PROPERTIES
                        COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS}"
 )
 target_link_libraries (cvmfs_unittests
+                       cvmfs_bridge
                        cvmfs_crypto
                        cvmfs_util
                        ${CVMFS_UNITTESTS_LINK_LIBRARIES})
@@ -577,6 +580,7 @@ if (BUILD_UNITTESTS_DEBUG)
                          COMPILE_FLAGS "${CVMFS_UNITTEST_COMMON_CFLAGS} -O0 -DDEBUGMSG"
   )
   target_link_libraries (cvmfs_unittests_debug
+                         cvmfs_bridge_debug
                          cvmfs_crypto_debug
                          cvmfs_util_debug
                          ${CVMFS_UNITTESTS_LINK_LIBRARIES})

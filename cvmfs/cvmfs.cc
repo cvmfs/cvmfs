@@ -67,12 +67,12 @@
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
-#include "bridge/compat.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
+#include "compat.h"
 #include "compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
@@ -103,6 +103,7 @@
 #include "shortstring.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
+#include "state.h"
 #include "statistics.h"
 #include "talk.h"
 #include "telemetry_aggregator.h"
@@ -2578,11 +2579,13 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   saved_states->push_back(state_cache_mgr);
 
   msg_progress = "Saving open files counter\n";
-  uint32_t *saved_num_fd =
-    new uint32_t(cvmfs::file_system_->no_open_files()->Get());
+  size_t nbytes = StateSerializer::SerializeOpenFilesCounter(0, NULL);
+  void *buffer = smalloc(nbytes);
+  StateSerializer::SerializeOpenFilesCounter(
+    cvmfs::file_system_->no_open_files()->Get(), buffer);
   loader::SavedState *state_num_fd = new loader::SavedState();
   state_num_fd->state_id = loader::kStateOpenFilesCounter;
-  state_num_fd->state = saved_num_fd;
+  state_num_fd->state = buffer;
   saved_states->push_back(state_num_fd);
 
   return true;
@@ -2732,8 +2735,10 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
       SendMsg2Socket(fd_progress, "Restoring open files counter... ");
-      cvmfs::file_system_->no_open_files()->Set(*(reinterpret_cast<uint32_t *>(
-        saved_states[i]->state)));
+      uint32_t value;
+      StateSerializer::DeserializeOpenFilesCounter(
+        saved_states[i]->state, &value);
+      cvmfs::file_system_->no_open_files()->Set(value);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2878,7 +2883,7 @@ static void FreeSavedState(const int fd_progress,
         break;
       case loader::kStateOpenFilesCounter:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
-        delete static_cast<uint32_t *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       case loader::kStateFuse:
         SendMsg2Socket(fd_progress, "Releasing fuse state\n");

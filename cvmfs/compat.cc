@@ -3,7 +3,7 @@
  */
 
 #include "cvmfs_config.h"
-#include "bridge/compat.h"
+#include "compat.h"
 
 #include <cstdlib>
 #include <cstring>
