@@ -113,9 +113,9 @@ create_whitelist() {
     else
       masterkeycard_read_pubkey >${whitelist}.pub
     fi
-    ${openssl_keyutil_cmd} -verify -inkey ${whitelist}.pub -pubin -sigfile ${whitelist}.signature -in ${whitelist}.hash > /dev/null 2>&1 \
-      || die "invalid masterkeycard signature"
+    local checkhash="`${openssl_keyutil_cmd} -verify -inkey ${whitelist}.pub -pubin -sigfile ${whitelist}.signature -in ${whitelist}.hash 2>/dev/null`"
     rm -f ${whitelist}.pub
+    [ "$checkhash" = "Signature Verified Successfully" ] || die "invalid masterkeycard signature"
   else
     ${openssl_keyutil_cmd} -inkey $masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
   fi
