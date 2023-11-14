@@ -346,7 +346,6 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void FinalizeExternalManagers() {
-    download_manager_.Fini();
     signature_manager_.Fini();
   }
 

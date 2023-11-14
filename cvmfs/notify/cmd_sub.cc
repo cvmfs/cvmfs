@@ -41,7 +41,6 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
         verbose_(verbose) {}
   virtual ~SwissknifeSubscriber() {
     sig_mgr_->Fini();
-    dl_mgr_->Fini();
   }
 
   bool Init() {

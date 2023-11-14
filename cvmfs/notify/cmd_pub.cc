@@ -62,13 +62,11 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
-      download_manager->Fini();
       return 6;
     }
     manifest_contents = std::string(
                                reinterpret_cast<char*>(manifest_memsink.data()),
                                manifest_memsink.pos());
-    download_manager->Fini();
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);
     if (fd == -1) {

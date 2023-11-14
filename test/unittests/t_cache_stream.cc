@@ -46,7 +46,6 @@ class T_StreamingCacheManager : public ::testing::Test {
 
   virtual void TearDown() {
     streaming_cache_.Destroy();
-    download_mgr_->Fini();
     download_mgr_.Destroy();
     statistics_.Destroy();
   }

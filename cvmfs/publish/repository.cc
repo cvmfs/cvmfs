@@ -92,7 +92,6 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
       DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
     } catch (const EPublish& e) {
       signature_mgr_->Fini();
-      download_mgr_->Fini();
       delete signature_mgr_;
       delete download_mgr_;
       delete statistics_;
@@ -103,7 +102,6 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
 
 Repository::~Repository() {
   if (signature_mgr_ != NULL) signature_mgr_->Fini();
-  if (download_mgr_ != NULL) download_mgr_->Fini();
 
   delete history_;
   delete manifest_;

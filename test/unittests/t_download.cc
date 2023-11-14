@@ -49,10 +49,6 @@ class T_Download : public FileSandbox {
     RemoveSandbox();
   }
 
-  virtual ~T_Download() {
-    download_mgr.Fini();
-  }
-
   FILE *CreateTemporaryFile(std::string *path) const {
     return CreateTempFile(GetCurrentWorkingDirectory() + "/cvmfs_ut_download",
                           0600, "w+", path);
@@ -176,7 +172,6 @@ TEST_F(T_Download, Clone) {
   ASSERT_EQ(info.error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), 1U);
   EXPECT_EQ(memsink.data()[0], '1');
-  download_mgr_cloned->Fini();
   delete download_mgr_cloned;
 
   // Don't crash
@@ -210,7 +205,6 @@ TEST_F(T_Download, Multiple) {
   EXPECT_EQ(info.error_code(), kFailOk);
   EXPECT_EQ(info2.error_code(), kFailOk);
   fclose(fdest);
-  second_mgr.Fini();
 }
 
 
