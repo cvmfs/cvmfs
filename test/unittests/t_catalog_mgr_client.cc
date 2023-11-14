@@ -45,8 +45,6 @@
 
 using namespace std;  // NOLINT
 
-#define GTEST_COUT std::cerr << "[          ] [ INFO ]"
-
 namespace catalog {
 
 class T_CatalogManagerClient : public ::testing::Test {
@@ -75,7 +73,7 @@ class T_CatalogManagerClient : public ::testing::Test {
     if (repo_path_ != "")
       RemoveTree(repo_path_);
     // EXPECT_EQ(used_fds_, GetNoUsedFds()) << ShowOpenFiles();
-    GTEST_COUT << "FD counter test skipped" << std::endl;
+    std::cerr << "FD counter test skipped" << std::endl;
   }
 
  protected:
@@ -231,7 +229,6 @@ TEST_F(T_CatalogManagerClient, LoadByHash) {
   EXPECT_EQ(loader::kFailOk, mp->boot_status());
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
-
   // load root catalog by its hash
   const PathString rootMntpnt("");
   const shash::Any& rootHash = mp->catalog_mgr()->GetRootHash();
@@ -289,9 +286,6 @@ TEST_F(T_CatalogManagerClient, LoadByHashNetworkFailure) {
             mp->catalog_mgr()->LoadCatalogByHash(&ctlg_context));
 
   // break URL to repo
-  mp->download_mgr()->SetProxyChain("file://noValidURL", "",
-                       download::DownloadManager::kSetProxyBoth);
-  mp->download_mgr()->RebalanceProxies();
   mp->download_mgr()->SetHostChain("file://noValidURL");
   mp->download_mgr()->SwitchHost();
 
@@ -337,12 +331,9 @@ TEST_F(T_CatalogManagerClient, LoadRootCatalog) {
   EXPECT_EQ(root_hash_str, mp->catalog_mgr()->GetRootHash().ToString());
 
   // load new root catalog without providing the hash
-  // this will perform a check vs storage loaction which has the most recent one
+  // this will perform a check vs storage location which has the most recent one
   CatalogContext root_info;
 
-  // TODO(heretherebedragons) is it true that MountPoint::Create does NOT
-  // load the root catalog???
-  // apparently it does.. loadcatalogbyhash had a small bug with offline_mode_
   EXPECT_EQ(catalog::kLoadUp2Date,
     mp->catalog_mgr()->GetNewRootCatalogContext(&root_info));
   EXPECT_EQ(catalog::kCtlgLocationMounted, root_info.root_ctlg_location());

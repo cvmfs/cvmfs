@@ -701,7 +701,11 @@ manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
     assert(rv);
     breadcrumb.catalog_hash.suffix = shash::kSuffixCatalog;
     breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
-    breadcrumb.revision = msg_reply->breadcrumb().revision();
+    if (msg_reply->breadcrumb().has_revision()) {
+      breadcrumb.revision = msg_reply->breadcrumb().revision();
+    } else {
+      breadcrumb.revision = 0;
+    }
   }
   return breadcrumb;
 }

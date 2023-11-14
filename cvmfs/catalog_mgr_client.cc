@@ -131,37 +131,35 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // 1) Get alien cache root catalog (local)
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  shash::Any breadcrumb_hash(shash::kSha1, shash::kSuffixCatalog);
-  uint64_t breadcrumb_timestamp = 0;
-  uint64_t breadcrumb_revision = -1ul;
+  shash::Any local_newest_hash(shash::kSha1, shash::kSuffixCatalog);
+  uint64_t breadcrumb_timestamp = 0;  // NOTE: local catalog has no timestamp
+  uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
 
   // TODO(heretherebedragons) how to handle old breadcrumbs that are loaded by
   // default with revision number 0?
   manifest::Breadcrumb breadcrumb =
                               fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
   if (breadcrumb.IsValid()) {
-    breadcrumb_hash = breadcrumb.catalog_hash;
+    local_newest_hash = breadcrumb.catalog_hash;
     breadcrumb_timestamp = breadcrumb.timestamp;
-    breadcrumb_revision = breadcrumb.revision;
+    local_newest_revision = breadcrumb.revision;
     LogCvmfs(kLogCache, kLogDebug,
         "cached copy publish date %s (hash %s, revision %lu)",
         StringifyTime(static_cast<int64_t>(breadcrumb_timestamp), true).c_str(),
-        breadcrumb_hash.ToString().c_str(), breadcrumb.revision);
+        local_newest_hash.ToString().c_str(), breadcrumb.revision);
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum");
   }
 
   // 2) Select local newest catalog: mounted vs alien
 
-  shash::Any local_newest_hash = breadcrumb_hash;
-  uint64_t local_newest_revision = breadcrumb_revision;
   result->SetRootCtlgLocation(kCtlgLocationBreadcrumb);
   LoadReturn success_code = catalog::kLoadNew;
 
   // We only look for currently loaded catalog if the revision is newer than
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
-  if (breadcrumb_revision <= GetRevisionNoLock()
-     || breadcrumb_revision == -1ul) {
+  if (local_newest_revision <= GetRevisionNoLock()
+     || local_newest_revision == manifest::Breadcrumb::kInvalidRevision) {
     const std::map<PathString, shash::Any>::iterator curr_hash_itr =
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
@@ -174,11 +172,6 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   manifest::Failures manifest_failure;
   UniquePtr<CachedManifestEnsemble> ensemble(
                        new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
-  // TODO(heretherebedragons)
-  // breadcrumb_timestamp: does breadcrumb timestamp and revision always go hand
-  // in hand?
-  // can it be that the timestamp is older on the server but the revision higher
-  // than the breadcrumb?
   manifest_failure = manifest::Fetch("", repo_name_, breadcrumb_timestamp,
                                      &local_newest_hash, signature_mgr_,
                                      fetcher_->download_mgr(),
@@ -186,8 +179,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   if (manifest_failure == manifest::kFailOk) {
     // fixed catalog: just check if server is reachable but use local version
-    // TODO(heretherebedragons) OK that this could be in theory the breadcrumb?
-    if (fixed_root_catalog_ != shash::Any()) {
+    if (!fixed_root_catalog_.IsNull()) {
       offline_mode_ = false;
       result->SetHash(fixed_root_catalog_);
       result->SetRootCtlgRevision(local_newest_revision);
@@ -200,20 +192,21 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
           // as local is most likely just "initialized" without valid value
           || (ensemble->manifest->revision() == 0 &&
               local_newest_revision == 0)) {
-    result->SetHash(ensemble->manifest->catalog_hash());
-    result->SetRootCtlgRevision(ensemble->manifest->revision());
-    result->SetRootCtlgLocation(kCtlgLocationServer);
-    if (ensemble->manifest->has_alt_catalog_path()) {
-      fixed_alt_root_catalog_ = true;
-    } else {
-      fixed_alt_root_catalog_ = false;
-    }
+      result->SetHash(ensemble->manifest->catalog_hash());
+      result->SetRootCtlgRevision(ensemble->manifest->revision());
+      result->SetRootCtlgLocation(kCtlgLocationServer);
+      if (ensemble->manifest->has_alt_catalog_path()) {
+        fixed_alt_root_catalog_ = true;
+      } else {
+        fixed_alt_root_catalog_ = false;
+      }
 
-    result->TakeManifestEnsemble(
-                  static_cast<manifest::ManifestEnsemble*>(ensemble.Release()));
-    offline_mode_ = false;
+      result->TakeManifestEnsemble(
+                    static_cast<manifest::ManifestEnsemble*>(
+                                                           ensemble.Release()));
+      offline_mode_ = false;
 
-    return catalog::kLoadNew;
+      return catalog::kLoadNew;
     }
   }
   LogCvmfs(kLogCache, kLogDebug,
@@ -224,7 +217,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // corner case: server not reachable, local revision is 0. We can not
   // distinguish if local revision number is valid or invalid. Most likely
   // it is invalid - so fail
-  if (local_newest_revision == 0 && !manifest_failure == manifest::kFailOk) {
+  if (local_newest_revision == 0 && (manifest_failure != manifest::kFailOk)) {
     return catalog::kLoadFail;
   }
 
@@ -244,8 +237,6 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
  * Loads (and fetches) a catalog by hash for a given mountpoint.
  *
  * Special case for root catalog: ctlg_context->root_ctlg_location must be given.
- * If it is kCtlgLocationServer than another check for the most recent
- * manifest is done.
  *
  * @param [in, out] ctlg_context mandatory fields (input): mountpoint, hash
  *         additional mandatory fields for root catalog: root_ctlg_location
@@ -277,7 +268,7 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
   if (load_ret == catalog::kLoadNew) {
     loaded_catalogs_[ctlg_context->mountpoint()] = ctlg_context->hash();
 
-    if (ctlg_context->IsRootCatalog()) {  // root catalog
+    if (ctlg_context->IsRootCatalog()) {
       if (ctlg_context->root_ctlg_location() == kCtlgLocationMounted) {
         return kLoadUp2Date;
       }

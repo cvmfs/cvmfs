@@ -127,10 +127,6 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
   CatalogContext ctlg_context;
 
-  // TODO(heretherebedragons) Is this necessary or can we move it outside?
-  // allow ctlg_context from dryrun as input parameter? (= +1 IF statement but
-  // overall less compute? (depending which remount is called how often))
-  // alternatively: expose GetNewRootCatalogContext to public
   if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
     LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
                                 "Did not find any valid root catalog to mount");
@@ -179,8 +175,6 @@ LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   // we do not need to set revision as LoadCatalogByHash
   // needs only mountpoint, hash and root_ctlg_location
 
-  // TODO(heretherebedragons) HERE IS A PROBLEM: THE CATALOG REVISION IS NOT
-  // SET CORRECTLY. WOULD NEED SPECIAL TREATMENT
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew || load_error == kLoadUp2Date) {
@@ -684,7 +678,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
 template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
-  const uint64_t revision = revision_cache_;
+  const uint64_t revision = GetRevisionNoLock();
   Unlock();
 
   return revision;
@@ -966,7 +960,6 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
     return NULL;
   }
 
-  assert(hash == ctlg_context.hash());  // TODO(heretherebedragons) why?
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
                                              ctlg_context.sqlite_path(),
                                              ctlg_context.hash());

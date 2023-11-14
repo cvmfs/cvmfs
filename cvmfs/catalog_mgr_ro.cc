@@ -33,7 +33,6 @@ LoadReturn SimpleCatalogManager::GetNewRootCatalogContext(
  * 
  * @return kLoadNew on success
  */
-// TODO(herethebedragons) CORRECT?
 LoadReturn SimpleCatalogManager::LoadCatalogByHash(
                                                  CatalogContext *ctlg_context) {
   const shash::Any effective_hash = ctlg_context->hash();
@@ -43,20 +42,17 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   std::string tmp;
 
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
-  ctlg_context->GetSqlitePathPtr()->assign(tmp);
+  ctlg_context->SetSqlitePath(tmp);
   if (!fcatalog) {
     PANIC(kLogStderr, "failed to create temp file when loading %s",
           url.c_str());
   }
 
-cvmfs::FileSink filesink(fcatalog);
-download::JobInfo download_catalog(&url, true, false,
-                                  &effective_hash, &filesink);
-const download::Failures retval = download_manager_->Fetch(&download_catalog);
-if (fclose(fcatalog) != 0) {
-    PANIC(kLogStderr, "could not close temporary file %s: error %d",
-                tmp.c_str(), retval);
-  }
+  cvmfs::FileSink filesink(fcatalog);
+  download::JobInfo download_catalog(&url, true, false,
+                                    &effective_hash, &filesink);
+  const download::Failures retval = download_manager_->Fetch(&download_catalog);
+  fclose(fcatalog);
 
   if (retval != download::kFailOk) {
     unlink(ctlg_context->GetSqlitePathPtr()->c_str());

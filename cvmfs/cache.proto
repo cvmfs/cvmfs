@@ -25,7 +25,8 @@ option optimize_for = LITE_RUNTIME;
 // # Protocol changelog
 // Version 1: First version
 //   2019-05-27: add breadcrumb handling
-
+// Version 2:
+//   2023-11-14: add (optional) revision to breadcrumb
 
 //------------------------------------------------------------------------------
 // # Enum definitions

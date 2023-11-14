@@ -37,7 +37,6 @@ private_mount() {
 CVMFS_HIDE_MAGIC_XATTRS=no
 CVMFS_QUOTA_LIMIT=15" \
                  || return 1
-                 #"$mount_options" || return 1
 }
 
 private_unmount() {
@@ -53,5 +52,4 @@ cleanup() {
   if [ "x$TEST703_PRIVATE_MOUNT" != "x" ]; then
     private_unmount
   fi
-  sudo rm -rf /tmp/cvmfs-test/workdir/703-catalog_mgr_client
 }

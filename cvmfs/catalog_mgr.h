@@ -71,7 +71,7 @@ enum RootCatalogLocation {
 /**
  * CatalogContext class contains all necessary information to load a catalog and
  * also keeps track of the resulting output.
- * It works the following:
+ * It works as follows:
  * 1) Load a new root catalog:
  *  - Use empty constructor CatalogContext()
  *  - Let the CatalogContext object be populated by GetNewRootCatalogContext()
@@ -91,12 +91,12 @@ struct CatalogContext {
  public:
   CatalogContext() :
               hash_(shash::Any()),
-              mountpoint_(PathString("invalid", 7)),
+              mountpoint_(),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
-  CatalogContext(shash::Any hash, const PathString &mountpoint) :
+  CatalogContext(const shash::Any &hash, const PathString &mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
@@ -104,8 +104,8 @@ struct CatalogContext {
               root_ctlg_location_(kCtlogLocationUnknown),
               manifest_ensemble_(NULL) { }
 
-  CatalogContext(shash::Any hash, const PathString &mountpoint,
-              RootCatalogLocation location) :
+  CatalogContext(const shash::Any &hash, const PathString &mountpoint,
+                 const RootCatalogLocation location) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
@@ -139,7 +139,7 @@ struct CatalogContext {
                                    { root_ctlg_location_ = root_ctlg_location; }
   /**
    * Gives ownership to CatalogContext
-  */
+   */
   void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
                                      { manifest_ensemble_ = manifest_ensemble; }
 
@@ -283,7 +283,6 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
-  uint64_t GetRevisionNoLock() const;
   uint64_t GetTTL() const;
   bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
@@ -322,8 +321,8 @@ class AbstractCatalogManager : public SingleCopy {
    * GetNewRootCatalogContext() populates CatalogContext object with the
    * information needed to retrieve the most recent root catalog independent of
    * its location.
-   * CatalogContext object must be populated with at least hash and mountpoint
-   * to call LoadCatalogByHash().
+   * The CatalogContext object must be populated with at least hash and
+   * mountpoint to call LoadCatalogByHash().
    *
    * See class description of CatalogContext for more information.
    */
@@ -332,6 +331,7 @@ class AbstractCatalogManager : public SingleCopy {
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
+  
 
   /**
    * Create a new Catalog object.
@@ -366,6 +366,7 @@ class AbstractCatalogManager : public SingleCopy {
 
   CatalogT *FindCatalog(const PathString &path) const;
 
+  uint64_t GetRevisionNoLock() const;
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);

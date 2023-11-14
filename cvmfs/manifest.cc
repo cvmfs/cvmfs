@@ -36,8 +36,8 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
       // Get local last modified time and revision
       if (vec_split_revision.size() == 1) {
           timestamp = String2Uint64(vec_split_revision[0]);
-          // TODO(heretherebedragons) old format that does not include
-          // the revision number- IS THIS THE BEST SOLUTION???
+          // No revision found, i.e. the breadcrumb was stored by an older cvmfs
+          // version. We set the revision to 0 as a workaround.
           revision = 0;
       } else {
           timestamp = String2Uint64(vec_split_revision[0]);
