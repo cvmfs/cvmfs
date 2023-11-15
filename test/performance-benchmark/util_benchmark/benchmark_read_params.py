@@ -110,7 +110,7 @@ def verifyCvmfsRun(config, run_name):
         + 'Please double check!\n'
         + 'It is impossible to mix non-cvmfs and cvmfs commands in the same run section',
         file=sys.stderr)
-      exit(22)
+        exit(22)
     else:
       print('In cvmfs run section: "' + run_name + '": '
         + cmd + ' cvmfs repos is missing.\n'
@@ -270,3 +270,4 @@ def getFiles(prefix, parsed_args, **kwargs):
   # #########################
   # ## END PARAMS set by user
   # ##############################################################################
+  
