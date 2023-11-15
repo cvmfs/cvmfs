@@ -104,7 +104,9 @@ enum StateId {
   kStateOpenFiles,          // >= 2.4
   kStateDentryTracker,      // >= 2.7 (renamed from kStateNentryTracker in 2.10)
   kStatePageCacheTracker,   // >= 2.10
-  kStateFuse                // >= 2.11
+  kStateFuse,               // >= 2.11
+  // States using the StateSerializer
+  kStateInodeGenerationV2S, // >= 2.12
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };

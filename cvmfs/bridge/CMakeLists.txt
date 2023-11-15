@@ -1,7 +1,9 @@
 if (BUILD_CVMFS)
 
 set (LIBCVMFS_BRIDGE_SOURCES
+  bridge/ds_stubs.cc
   bridge/marshal.cc
+  bridge/migrate.cc
 )
 
 set (LIBCVMFS_BRIDGE_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_EXCEPTIONS -fexceptions")
