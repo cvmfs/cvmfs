@@ -21,6 +21,10 @@ static size_t SerializeInodeGenerationV1(
   pos += cvm_bridge_write_uint(&value.version, *where);
   pos += cvm_bridge_write_uint64(&value.initial_revision, *where);
   pos += cvm_bridge_write_uint32(&value.incarnation, *where);
+  if (value.version < 2) {
+    return pos - base;
+  }
+
   pos += cvm_bridge_write_uint32(&value.overflow_counter, *where);
   pos += cvm_bridge_write_uint64(&value.inode_generation, *where);
   return pos - base;
@@ -28,14 +32,17 @@ static size_t SerializeInodeGenerationV1(
 
 }  // anonymous namespace
 
-void cvm_bridge_migrate_inode_generation_v1v2s(void **bufptr) {
+void *cvm_bridge_migrate_inode_generation_v1v2s(void *v1) {
   compat::InodeGenerationInfoV1 *info =
-    reinterpret_cast<compat::InodeGenerationInfoV1 *>(*bufptr);
+    reinterpret_cast<compat::InodeGenerationInfoV1 *>(v1);
 
   size_t nbytes = SerializeInodeGenerationV1(*info, NULL);
 
-  void *new_buffer = smalloc(nbytes);
-  SerializeInodeGenerationV1(*info, new_buffer);
-  delete info;
-  *bufptr = new_buffer;
+  void *v2s = smalloc(nbytes);
+  SerializeInodeGenerationV1(*info, v2s);
+  return v2s;
+}
+
+void cvm_bridge_free_inode_generation_v1(void *v1) {
+  delete reinterpret_cast<compat::InodeGenerationInfoV1 *>(v1);
 }

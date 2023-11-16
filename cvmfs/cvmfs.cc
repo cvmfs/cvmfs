@@ -67,6 +67,7 @@
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
+#include "bridge/migrate.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -2485,6 +2486,10 @@ static bool MaintenanceMode(const int fd_progress) {
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
 
+  // For the StateSerializer
+  size_t nbytes = 0;
+  void *buffer = NULL;
+
   unsigned num_open_dirs = cvmfs::directory_handles_->size();
   if (num_open_dirs != 0) {
 #ifdef DEBUGMSG
@@ -2551,11 +2556,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::inode_generation_info_.inode_generation +=
     cvmfs::mount_point_->catalog_mgr()->inode_gauge();
-  cvmfs::InodeGenerationInfo *saved_inode_generation =
-    new cvmfs::InodeGenerationInfo(cvmfs::inode_generation_info_);
+
+  nbytes = StateSerializer::SerializeInodeGeneration(
+    cvmfs::inode_generation_info_, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeInodeGeneration(cvmfs::inode_generation_info_,
+                                            buffer);
   loader::SavedState *state_inode_generation = new loader::SavedState();
-  state_inode_generation->state_id = loader::kStateInodeGeneration;
-  state_inode_generation->state = saved_inode_generation;
+  state_inode_generation->state_id = loader::kStateInodeGenerationV2S;
+  state_inode_generation->state = buffer;
   saved_states->push_back(state_inode_generation);
 
   msg_progress = "Saving fuse state\n";
@@ -2579,8 +2588,8 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   saved_states->push_back(state_cache_mgr);
 
   msg_progress = "Saving open files counter\n";
-  size_t nbytes = StateSerializer::SerializeOpenFilesCounter(0, NULL);
-  void *buffer = smalloc(nbytes);
+  nbytes = StateSerializer::SerializeOpenFilesCounter(0, NULL);
+  buffer = smalloc(nbytes);
   StateSerializer::SerializeOpenFilesCounter(
     cvmfs::file_system_->no_open_files()->Get(), buffer);
   loader::SavedState *state_num_fd = new loader::SavedState();
@@ -2715,19 +2724,29 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
 
-    if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
+    if (saved_states[i]->state_id == loader::kStateInodeGenerationV2S) {
       SendMsg2Socket(fd_progress, "Restoring inode generation... ");
-      cvmfs::InodeGenerationInfo *old_info =
-        (cvmfs::InodeGenerationInfo *)saved_states[i]->state;
-      if (old_info->version == 1) {
+      StateSerializer::DeserializeInodeGeneration(
+        saved_states[i]->state, &cvmfs::inode_generation_info_);
+      ++cvmfs::inode_generation_info_.incarnation;
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
+      SendMsg2Socket(fd_progress, "Migrating inode generation (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_inode_generation_v1v2s(
+        saved_states[i]->state);
+      cvmfs::InodeGenerationInfo old_info;
+      StateSerializer::DeserializeInodeGeneration(v2s, &old_info);
+      if (old_info.version == 1) {
         // Migration
         cvmfs::inode_generation_info_.initial_revision =
-          old_info->initial_revision;
-        cvmfs::inode_generation_info_.incarnation = old_info->incarnation;
+          old_info.initial_revision;
+        cvmfs::inode_generation_info_.incarnation = old_info.incarnation;
         // Note: in the rare case of inode generation being 0 before, inode
         // can clash after reload before remount
       } else {
-        cvmfs::inode_generation_info_ = *old_info;
+        cvmfs::inode_generation_info_ = old_info;
       }
       ++cvmfs::inode_generation_info_.incarnation;
       SendMsg2Socket(fd_progress, " done\n");
@@ -2873,9 +2892,12 @@ static void FreeSavedState(const int fd_progress,
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
-        SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
-        delete static_cast<cvmfs::InodeGenerationInfo *>(
-          saved_states[i]->state);
+        SendMsg2Socket(fd_progress, "Releasing inode generation info (v1)\n");
+        cvm_bridge_free_inode_generation_v1(saved_states[i]->state);
+        break;
+      case loader::kStateInodeGenerationV2S:
+        SendMsg2Socket(fd_progress, "Releasing inode generation info\n");
+        free(saved_states[i]->state);
         break;
       case loader::kStateOpenFiles:
         cvmfs::file_system_->cache_mgr()->FreeState(

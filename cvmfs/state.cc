@@ -31,6 +31,10 @@ size_t StateSerializer::DeserializeInodeGeneration(
   bytes += cvm_bridge_read_uint(bytes, &(value->version));
   bytes += cvm_bridge_read_uint64(bytes, &(value->initial_revision));
   bytes += cvm_bridge_read_uint32(bytes, &(value->incarnation));
+  if (value->version < 2) {
+    return bytes - reinterpret_cast<const unsigned char *>(buffer);
+  }
+
   bytes += cvm_bridge_read_uint32(bytes, &(value->overflow_counter));
   bytes += cvm_bridge_read_uint64(bytes, &(value->inode_generation));
 

@@ -46,12 +46,10 @@ TEST(T_State, InodeGeneration) {
 
   cvmfs::InodeGenerationInfo *value_v1 = new cvmfs::InodeGenerationInfo();
   memcpy(value_v1, &value, sizeof(value));
-  cvm_bridge_migrate_inode_generation_v1v2s(
-    reinterpret_cast<void **>(&value_v1));
+  void *v2s = cvm_bridge_migrate_inode_generation_v1v2s(value_v1);
 
-  EXPECT_EQ(nbytes,
-            StateSerializer::DeserializeInodeGeneration(value_v1, &check));
-  free(value_v1);
+  EXPECT_EQ(nbytes, StateSerializer::DeserializeInodeGeneration(v2s, &check));
+  cvm_bridge_free_inode_generation_v1(value_v1);
 
   EXPECT_EQ(value.version, check.version);
   EXPECT_EQ(value.initial_revision, check.initial_revision);
