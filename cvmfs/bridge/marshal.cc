@@ -40,3 +40,15 @@ size_t cvm_bridge_read_uint(const void *buffer, unsigned *value) {
   *value = *reinterpret_cast<const unsigned *>(buffer);
   return sizeof(unsigned);
 }
+
+size_t cvm_bridge_write_bool(const bool *value, void *buffer) {
+  if (buffer != nullptr) {
+    *reinterpret_cast<bool *>(buffer) = *value;
+  }
+  return 1;
+}
+
+size_t cvm_bridge_read_bool(const void *buffer, bool *value) {
+  *value = *reinterpret_cast<const bool *>(buffer);
+  return 1;
+}

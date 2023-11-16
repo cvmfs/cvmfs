@@ -85,6 +85,7 @@
 #include "file_chunk.h"
 #include "fuse_inode_gen.h"
 #include "fuse_remount.h"
+#include "fuse_state.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "history_sqlite.h"
@@ -187,20 +188,6 @@ class FuseInterruptCue : public InterruptCue {
  private:
   fuse_req_t *req_ptr_;
 };
-
-/**
- * Options related to the fuse kernel connection. The capabilities are
- * determined only once at mount time. If the capability trigger certain
- * behavior of the cvmfs fuse module, it needs to be re-triggered on reload.
- * Used in SaveState and RestoreState to store the details of symlink caching.
- */
-struct FuseState {
-  FuseState() : version(0), cache_symlinks(false), has_dentry_expire(false) {}
-  unsigned version;
-  bool cache_symlinks;
-  bool has_dentry_expire;
-};
-
 
 /**
  * Atomic increase of the open files counter. If we use a non-refcounted
@@ -2569,13 +2556,15 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 
   msg_progress = "Saving fuse state\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
-  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
-  saved_fuse_state->has_dentry_expire =
-    cvmfs::mount_point_->fuse_expire_entry();
+  cvmfs::FuseState saved_fuse_state;
+  saved_fuse_state.cache_symlinks = cvmfs::mount_point_->cache_symlinks();
+  saved_fuse_state.has_dentry_expire = cvmfs::mount_point_->fuse_expire_entry();
+  nbytes = StateSerializer::SerializeFuseState(saved_fuse_state, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeFuseState(saved_fuse_state, buffer);
   loader::SavedState *state_fuse = new loader::SavedState();
-  state_fuse->state_id = loader::kStateFuse;
-  state_fuse->state = saved_fuse_state;
+  state_fuse->state_id = loader::kStateFuseV2S;
+  state_fuse->state = buffer;
   saved_states->push_back(state_fuse);
 
   // Close open file catalogs
@@ -2826,12 +2815,25 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateFuse) {
-      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
-      cvmfs::FuseState *fuse_state =
-        static_cast<cvmfs::FuseState *>(saved_states[i]->state);
-      if (!fuse_state->cache_symlinks)
+      SendMsg2Socket(fd_progress, "Migrating fuse state (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(saved_states[i]->state);
+      cvmfs::FuseState value;
+      StateSerializer::DeserializeFuseState(v2s, &value);
+      free(v2s);
+      if (!value.cache_symlinks)
         cvmfs::mount_point_->DisableCacheSymlinks();
-      if (fuse_state->has_dentry_expire)
+      if (value.has_dentry_expire)
+        cvmfs::mount_point_->EnableFuseExpireEntry();
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateFuseV2S) {
+      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
+      cvmfs::FuseState value;
+      StateSerializer::DeserializeFuseState(saved_states[i], &value);
+      if (!value.cache_symlinks)
+        cvmfs::mount_point_->DisableCacheSymlinks();
+      if (value.has_dentry_expire)
         cvmfs::mount_point_->EnableFuseExpireEntry();
       SendMsg2Socket(fd_progress, " done\n");
     }
@@ -2924,8 +2926,12 @@ static void FreeSavedState(const int fd_progress,
         free(saved_states[i]->state);
         break;
       case loader::kStateFuse:
+        SendMsg2Socket(fd_progress, "Releasing fuse state (v1)\n");
+        cvm_bridge_free_fuse_state_v1(saved_states[i]->state);
+        break;
+      case loader::kStateFuseV2S:
         SendMsg2Socket(fd_progress, "Releasing fuse state\n");
-        delete static_cast<cvmfs::FuseState *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       default:
         break;

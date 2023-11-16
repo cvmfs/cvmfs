@@ -7,6 +7,19 @@
 
 #include "bridge/marshal.h"
 #include "fuse_inode_gen.h"
+#include "fuse_state.h"
+
+size_t StateSerializer::SerializeOpenFilesCounter(
+ const uint32_t &value, void *buffer)
+{
+  return cvm_bridge_write_uint32(&value, buffer);
+}
+
+size_t StateSerializer::DeserializeOpenFilesCounter(
+ const void *buffer, uint32_t *value)
+{
+  return cvm_bridge_read_uint32(buffer, value);
+}
 
 size_t StateSerializer::SerializeInodeGeneration(
   const cvmfs::InodeGenerationInfo &value, void *buffer)
@@ -41,14 +54,26 @@ size_t StateSerializer::DeserializeInodeGeneration(
   return bytes - reinterpret_cast<const unsigned char *>(buffer);
 }
 
-size_t StateSerializer::SerializeOpenFilesCounter(
- const uint32_t &value, void *buffer)
+size_t StateSerializer::SerializeFuseState(
+  const cvmfs::FuseState &value, void *buffer)
 {
-  return cvm_bridge_write_uint32(&value, buffer);
+  unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
+  unsigned char *pos = base;
+  void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
+
+  pos += cvm_bridge_write_uint(&value.version, *where);
+  pos += cvm_bridge_write_bool(&value.cache_symlinks, *where);
+  pos += cvm_bridge_write_bool(&value.has_dentry_expire, *where);
+  return pos - base;
 }
 
-size_t StateSerializer::DeserializeOpenFilesCounter(
- const void *buffer, uint32_t *value)
+size_t StateSerializer::DeserializeFuseState(
+  const void *buffer, cvmfs::FuseState *value)
 {
-  return cvm_bridge_read_uint32(buffer, value);
+  const unsigned char *bytes = reinterpret_cast<const unsigned char *>(buffer);
+
+  bytes += cvm_bridge_read_uint(bytes, &(value->version));
+  bytes += cvm_bridge_read_bool(bytes, &(value->cache_symlinks));
+  bytes += cvm_bridge_read_bool(bytes, &(value->has_dentry_expire));
+  return bytes - reinterpret_cast<const unsigned char *>(buffer);
 }

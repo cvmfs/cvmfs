@@ -14,4 +14,10 @@ struct InodeGenerationInfoV1 {
   uint64_t inode_generation;
 };
 
+struct FuseStateV1 {
+  unsigned version;
+  bool cache_symlinks;
+  bool has_dentry_expire;
+};
+
 } // namespace compat

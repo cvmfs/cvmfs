@@ -32,6 +32,19 @@ static size_t SerializeInodeGenerationV1(
   return pos - base;
 }
 
+static size_t SerializeFuseStateV1(
+  const compat::FuseStateV1 &value, void *buffer)
+{
+  unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
+  unsigned char *pos = base;
+  void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
+
+  pos += cvm_bridge_write_uint(&value.version, *where);
+  pos += cvm_bridge_write_bool(&value.cache_symlinks, *where);
+  pos += cvm_bridge_write_bool(&value.has_dentry_expire, *where);
+  return pos - base;
+}
+
 }  // anonymous namespace
 
 void *cvm_bridge_migrate_nfiles_ctr_v1v2s(void *v1) {
@@ -58,4 +71,17 @@ void *cvm_bridge_migrate_inode_generation_v1v2s(void *v1) {
 
 void cvm_bridge_free_inode_generation_v1(void *v1) {
   delete reinterpret_cast<compat::InodeGenerationInfoV1 *>(v1);
+}
+
+void *cvm_bridge_migrate_fuse_state_v1v2s(void *v1) {
+  compat::FuseStateV1 *info = reinterpret_cast<compat::FuseStateV1 *>(v1);
+
+  size_t nbytes = SerializeFuseStateV1(*info, NULL);
+  void *v2s = smalloc(nbytes);
+  SerializeFuseStateV1(*info, v2s);
+  return v2s;
+}
+
+void cvm_bridge_free_fuse_state_v1(void *v1) {
+  delete reinterpret_cast<compat::FuseStateV1 *>(v1);
 }

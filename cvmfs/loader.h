@@ -109,6 +109,7 @@ enum StateId {
   // States using the StateSerializer
   kStateInodeGenerationV2S,   // >= 2.12
   kStateOpenFilesCounterV2S,  // >= 2.12
+  kStateFuseV2S,              // >= 2.12
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };

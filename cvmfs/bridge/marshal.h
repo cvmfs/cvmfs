@@ -27,6 +27,9 @@ CVMFS_EXPORT size_t cvm_bridge_read_uint64(const void *buffer, uint64_t *value);
 CVMFS_EXPORT size_t cvm_bridge_write_uint(const unsigned *value, void *buffer);
 CVMFS_EXPORT size_t cvm_bridge_read_uint(const void *buffer, unsigned *value);
 
+CVMFS_EXPORT size_t cvm_bridge_write_bool(const bool *value, void *buffer);
+CVMFS_EXPORT size_t cvm_bridge_read_bool(const void *buffer, bool *value);
+
 }  // extern "C"
 
 #endif  // CVMFS_BRIDGE_MARSHAL_H_

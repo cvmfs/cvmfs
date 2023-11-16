@@ -7,6 +7,7 @@
 #include "bridge/marshal.h"
 #include "bridge/migrate.h"
 #include "fuse_inode_gen.h"
+#include "fuse_state.h"
 #include "state.h"
 #include "util/smalloc.h"
 
@@ -62,4 +63,33 @@ TEST(T_State, InodeGeneration) {
   EXPECT_EQ(value.incarnation, check.incarnation);
   EXPECT_EQ(value.overflow_counter, check.overflow_counter);
   EXPECT_EQ(value.inode_generation, check.inode_generation);
+}
+
+TEST(T_State, FuseState) {
+  cvmfs::FuseState value;
+  value.cache_symlinks = true;
+  value.has_dentry_expire = true;
+
+  size_t nbytes = StateSerializer::SerializeFuseState(value, NULL);
+  void *buffer = smalloc(nbytes);
+  EXPECT_EQ(nbytes, StateSerializer::SerializeFuseState(value, buffer));
+
+  cvmfs::FuseState check;
+  EXPECT_EQ(nbytes, StateSerializer::DeserializeFuseState(buffer, &check));
+  free(buffer);
+
+  EXPECT_EQ(value.version, check.version);
+  EXPECT_EQ(value.cache_symlinks, check.cache_symlinks);
+  EXPECT_EQ(value.has_dentry_expire, check.has_dentry_expire);
+
+  cvmfs::FuseState *value_v1 = new cvmfs::FuseState();
+  memcpy(value_v1, &value, sizeof(value));
+  void *v2s = cvm_bridge_migrate_fuse_state_v1v2s(value_v1);
+
+  EXPECT_EQ(nbytes, StateSerializer::DeserializeFuseState(v2s, &check));
+  cvm_bridge_free_fuse_state_v1(value_v1);
+
+  EXPECT_EQ(value.version, check.version);
+  EXPECT_EQ(value.cache_symlinks, check.cache_symlinks);
+  EXPECT_EQ(value.has_dentry_expire, check.has_dentry_expire);
 }
