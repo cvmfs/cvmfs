@@ -20,6 +20,12 @@ TEST(T_State, OpenFilesCounter) {
   uint32_t check;
   EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(buffer, &check));
   EXPECT_EQ(42u, check);
+
+  uint32_t *value_v1 = new uint32_t(137);
+  void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(value_v1);
+  EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(v2s, &check));
+  cvm_bridge_migrate_nfiles_ctr_v1v2s(value_v1);
+  EXPECT_EQ(137u, check);
 }
 
 TEST(T_State, InodeGeneration) {

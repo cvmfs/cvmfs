@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "bridge/migrate.h"
 
+#include <cstdint>
+
 #include "bridge/ds_stubs.h"
 #include "bridge/marshal.h"
 #include "util/smalloc.h"
@@ -31,6 +33,17 @@ static size_t SerializeInodeGenerationV1(
 }
 
 }  // anonymous namespace
+
+void *cvm_bridge_migrate_nfiles_ctr_v1v2s(void *v1) {
+  uint32_t *ctr = reinterpret_cast<uint32_t *>(v1);
+  void *v2s = smalloc(4);
+  cvm_bridge_write_uint32(ctr, v2s);
+  return v2s;
+}
+
+void cvm_bridge_free_nfiles_ctr_v1(void *v1) {
+  delete reinterpret_cast<uint32_t *>(v1);
+}
 
 void *cvm_bridge_migrate_inode_generation_v1v2s(void *v1) {
   compat::InodeGenerationInfoV1 *info =

@@ -9,6 +9,9 @@
 
 extern "C" {
 
+CVMFS_EXPORT void *cvm_bridge_migrate_nfiles_ctr_v1v2s(void *v1);
+CVMFS_EXPORT void cvm_bridge_free_nfiles_ctr_v1(void *v1);
+
 CVMFS_EXPORT void *cvm_bridge_migrate_inode_generation_v1v2s(void *v1);
 CVMFS_EXPORT void cvm_bridge_free_inode_generation_v1(void *v1);
 

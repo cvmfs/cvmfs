@@ -2593,7 +2593,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   StateSerializer::SerializeOpenFilesCounter(
     cvmfs::file_system_->no_open_files()->Get(), buffer);
   loader::SavedState *state_num_fd = new loader::SavedState();
-  state_num_fd->state_id = loader::kStateOpenFilesCounter;
+  state_num_fd->state_id = loader::kStateOpenFilesCounterV2S;
   state_num_fd->state = buffer;
   saved_states->push_back(state_num_fd);
 
@@ -2724,20 +2724,13 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
 
-    if (saved_states[i]->state_id == loader::kStateInodeGenerationV2S) {
-      SendMsg2Socket(fd_progress, "Restoring inode generation... ");
-      StateSerializer::DeserializeInodeGeneration(
-        saved_states[i]->state, &cvmfs::inode_generation_info_);
-      ++cvmfs::inode_generation_info_.incarnation;
-      SendMsg2Socket(fd_progress, " done\n");
-    }
-
     if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
       SendMsg2Socket(fd_progress, "Migrating inode generation (v1 to v2)... ");
       void *v2s = cvm_bridge_migrate_inode_generation_v1v2s(
         saved_states[i]->state);
       cvmfs::InodeGenerationInfo old_info;
       StateSerializer::DeserializeInodeGeneration(v2s, &old_info);
+      free(v2s);
       if (old_info.version == 1) {
         // Migration
         cvmfs::inode_generation_info_.initial_revision =
@@ -2752,7 +2745,26 @@ static bool RestoreState(const int fd_progress,
       SendMsg2Socket(fd_progress, " done\n");
     }
 
+    if (saved_states[i]->state_id == loader::kStateInodeGenerationV2S) {
+      SendMsg2Socket(fd_progress, "Restoring inode generation... ");
+      StateSerializer::DeserializeInodeGeneration(
+        saved_states[i]->state, &cvmfs::inode_generation_info_);
+      ++cvmfs::inode_generation_info_.incarnation;
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
     if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
+      SendMsg2Socket(fd_progress,
+                     "Migrating open files counter (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(saved_states[i]->state);
+      uint32_t value;
+      StateSerializer::DeserializeOpenFilesCounter(v2s, &value);
+      free(v2s);
+      cvmfs::file_system_->no_open_files()->Set(value);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesCounterV2S) {
       SendMsg2Socket(fd_progress, "Restoring open files counter... ");
       uint32_t value;
       StateSerializer::DeserializeOpenFilesCounter(
@@ -2904,6 +2916,10 @@ static void FreeSavedState(const int fd_progress,
           fd_progress, saved_states[i]->state);
         break;
       case loader::kStateOpenFilesCounter:
+        SendMsg2Socket(fd_progress, "Releasing open files counter (v1)\n");
+        cvm_bridge_free_nfiles_ctr_v1(saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesCounterV2S:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
         free(saved_states[i]->state);
         break;
