@@ -19,8 +19,6 @@ set_target_properties (cvmfs_bridge PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_BRIDGE_CFLAGS}")
 target_link_libraries (cvmfs_bridge
-                       cvmfs_crypto
-                       cvmfs_util
                        ${LIBCVMFS_BRIDGE_LINK_LIBRARIES})
 
 install (TARGETS cvmfs_bridge LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -31,8 +29,6 @@ set_target_properties (cvmfs_bridge_debug PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
     COMPILE_FLAGS "${LIBCVMFS_BRIDGE_CFLAGS} -DDEBUGMSG -g -O0")
 target_link_libraries (cvmfs_bridge_debug
-                       cvmfs_crypto_debug
-                       cvmfs_util_debug
                        ${LIBCVMFS_BRIDGE_LINK_LIBRARIES})
 install (TARGETS cvmfs_bridge_debug LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
