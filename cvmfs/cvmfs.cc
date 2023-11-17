@@ -2457,29 +2457,18 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   size_t nbytes = 0;
   void *buffer = NULL;
 
-  unsigned num_open_dirs = cvmfs::directory_handles_->size();
-  if (num_open_dirs != 0) {
-#ifdef DEBUGMSG
-    for (cvmfs::DirectoryHandles::iterator i =
-         cvmfs::directory_handles_->begin(),
-         iEnd = cvmfs::directory_handles_->end(); i != iEnd; ++i)
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
-    }
-#endif
-
-    msg_progress = "Saving open directory handles (" +
-      StringifyInt(num_open_dirs) + " handles)\n";
-    SendMsg2Socket(fd_progress, msg_progress);
-
-    // TODO(jblomer): should rather be saved just in a malloc'd memory block
-    cvmfs::DirectoryHandles *saved_handles =
-      new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
-    loader::SavedState *save_open_dirs = new loader::SavedState();
-    save_open_dirs->state_id = loader::kStateOpenDirs;
-    save_open_dirs->state = saved_handles;
-    saved_states->push_back(save_open_dirs);
-  }
+  msg_progress = "Saving open directory handles (" +
+      StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  nbytes = StateSerializer::SerializeDirectoryHandles(
+    *cvmfs::directory_handles_, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDirectoryHandles(*cvmfs::directory_handles_,
+                                             buffer);
+  loader::SavedState *save_open_dirs = new loader::SavedState();
+  save_open_dirs->state_id = loader::kStateOpenDirsV2S;
+  save_open_dirs->state = buffer;
+  saved_states->push_back(save_open_dirs);
 
   if (!cvmfs::file_system_->IsNfsSource()) {
     msg_progress = "Saving inode tracker\n";
@@ -2570,6 +2559,19 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 }
 
 
+static void FixupDirectoryHandles() {
+  cvmfs::file_system_->no_open_dirs()->Set(cvmfs::directory_handles_->size());
+
+  cvmfs::DirectoryHandles::const_iterator i =
+    cvmfs::directory_handles_->begin();
+  cvmfs::DirectoryHandles::const_iterator iEnd =
+    cvmfs::directory_handles_->end();
+  for (; i != iEnd; ++i) {
+    if (i->first >= cvmfs::next_directory_handle_)
+        cvmfs::next_directory_handle_ = i->first + 1;
+  }
+}
+
 static bool RestoreState(const int fd_progress,
                          const loader::StateList &saved_states)
 {
@@ -2580,20 +2582,24 @@ static bool RestoreState(const int fd_progress,
 
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
-      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
-      delete cvmfs::directory_handles_;
-      cvmfs::DirectoryHandles *saved_handles =
-        (cvmfs::DirectoryHandles *)saved_states[i]->state;
-      cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
-      cvmfs::file_system_->no_open_dirs()->Set(
-        cvmfs::directory_handles_->size());
-      cvmfs::DirectoryHandles::const_iterator i =
-        cvmfs::directory_handles_->begin();
-      for (; i != cvmfs::directory_handles_->end(); ++i) {
-        if (i->first >= cvmfs::next_directory_handle_)
-          cvmfs::next_directory_handle_ = i->first + 1;
-      }
+      SendMsg2Socket(fd_progress,
+                     "Migrating open directory handles (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_directory_handles_v1v2s(
+        saved_states[i]->state);
+      StateSerializer::DeserializeDirectoryHandles(v2s,
+                                                   cvmfs::directory_handles_);
+      free(v2s);
+      FixupDirectoryHandles();
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
+    }
 
+    if (saved_states[i]->state_id == loader::kStateOpenDirsV2S) {
+      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
+
+      StateSerializer::DeserializeDirectoryHandles(saved_states[i]->state,
+                                                   cvmfs::directory_handles_);
+      FixupDirectoryHandles();
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
@@ -2833,8 +2839,12 @@ static void FreeSavedState(const int fd_progress,
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     switch (saved_states[i]->state_id) {
       case loader::kStateOpenDirs:
-        SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
-        delete static_cast<cvmfs::DirectoryHandles *>(saved_states[i]->state);
+        SendMsg2Socket(fd_progress, "Releasing open directory handles (v1)\n");
+        cvm_bridge_free_directory_handles_v1(saved_states[i]->state);
+        break;
+      case loader::kStateOpenDirsV2S:
+        SendMsg2Socket(fd_progress, "Releasing open directory handles\n");
+        free(saved_states[i]->state);
         break;
       case loader::kStateGlueBuffer:
         SendMsg2Socket(

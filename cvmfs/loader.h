@@ -107,6 +107,7 @@ enum StateId {
   kStateFuse,               // >= 2.11
 
   // States using the StateSerializer
+  kStateOpenDirsV2S,          // >= 2.12
   kStateInodeGenerationV2S,   // >= 2.12
   kStateOpenFilesCounterV2S,  // >= 2.12
   kStateFuseV2S,              // >= 2.12
