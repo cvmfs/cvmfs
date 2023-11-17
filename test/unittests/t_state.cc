@@ -23,6 +23,7 @@ TEST(T_State, DirectoryListing) {
   cvmfs::DirectoryHandles check;
   StateSerializer::DeserializeDirectoryHandles(buffer, &check);
   EXPECT_EQ(0u, check.size());
+  free(buffer);
 
   cvmfs::DirectoryListing l1;
   l1.buffer = reinterpret_cast<char *>(smalloc(1));
@@ -47,6 +48,7 @@ TEST(T_State, DirectoryListing) {
   buffer = smalloc(nbytes);
   StateSerializer::SerializeDirectoryHandles(h, buffer);
   StateSerializer::DeserializeDirectoryHandles(buffer, &check);
+  free(buffer);
   EXPECT_EQ(3u, check.size());
 
   EXPECT_EQ('x', check[137].buffer[0]);
@@ -67,6 +69,7 @@ TEST(T_State, DirectoryListing) {
   check.clear();
   void *v2s = cvm_bridge_migrate_directory_handles_v1v2s(old);
   StateSerializer::DeserializeDirectoryHandles(v2s, &check);
+  free(v2s);
   cvm_bridge_free_directory_handles_v1(old);
   EXPECT_EQ(3u, check.size());
   EXPECT_EQ('x', check[137].buffer[0]);
@@ -88,6 +91,7 @@ TEST(T_State, OpenFilesCounter) {
   void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(value_v1);
   EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(v2s, &check));
   cvm_bridge_free_nfiles_ctr_v1(value_v1);
+  free(v2s);
   EXPECT_EQ(137u, check);
 }
 
@@ -119,6 +123,7 @@ TEST(T_State, InodeGeneration) {
 
   EXPECT_EQ(nbytes, StateSerializer::DeserializeInodeGeneration(v2s, &check));
   cvm_bridge_free_inode_generation_v1(value_v1);
+  free(v2s);
 
   EXPECT_EQ(value.version, check.version);
   EXPECT_EQ(value.initial_revision, check.initial_revision);
@@ -150,6 +155,7 @@ TEST(T_State, FuseState) {
 
   EXPECT_EQ(nbytes, StateSerializer::DeserializeFuseState(v2s, &check));
   cvm_bridge_free_fuse_state_v1(value_v1);
+  free(v2s);
 
   EXPECT_EQ(value.version, check.version);
   EXPECT_EQ(value.cache_symlinks, check.cache_symlinks);
