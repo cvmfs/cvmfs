@@ -6,6 +6,7 @@
 #include "bridge/migrate.h"
 
 #include <cstdint>
+#include <cstdlib>
 
 #include "bridge/ds_stubs.h"
 #include "bridge/marshal.h"
@@ -45,7 +46,69 @@ static size_t SerializeFuseStateV1(
   return pos - base;
 }
 
+static size_t SerializeDirectoryListingV1(
+  const compat::DirectoryListingV1 &value, void *buffer)
+{
+  unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
+  unsigned char *pos = base;
+  void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
+
+  cvm_bridge_blob blob;
+  blob.buffer = value.buffer;
+  blob.size = value.size;
+  blob.is_mmapd = (value.capacity == 0);
+  pos += cvm_bridge_write_blob(&blob, *where);
+  pos += cvm_bridge_write_size(&value.size, *where);
+  pos += cvm_bridge_write_size(&value.capacity, *where);
+  return pos - base;
+}
+
+static size_t SerializeDirectoryHandlesV1(
+  const compat::DirectoryHandlesV1 &value, void *buffer)
+{
+  unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
+  unsigned char *pos = base;
+  void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
+
+  size_t size = value.size();
+  pos += cvm_bridge_write_size(&size, *where);
+  for (compat::DirectoryHandlesV1::const_iterator it = value.begin(),
+       itEnd = value.end(); it != itEnd; ++it)
+  {
+    pos += cvm_bridge_write_uint64(&it->first, *where);
+    pos += SerializeDirectoryListingV1(it->second, *where);
+  }
+  return pos - base;
+}
+
 }  // anonymous namespace
+
+void *cvm_bridge_migrate_directory_handles_v1v2s(void *v1) {
+  compat::DirectoryHandlesV1 *h =
+    reinterpret_cast<compat::DirectoryHandlesV1 *>(v1);
+
+  size_t nbytes = SerializeDirectoryHandlesV1(*h, NULL);
+  void *v2s = smalloc(nbytes);
+  SerializeDirectoryHandlesV1(*h, v2s);
+  return v2s;
+}
+
+void cvm_bridge_free_directory_handles_v1(void *v1) {
+  compat::DirectoryHandlesV1 *h =
+    reinterpret_cast<compat::DirectoryHandlesV1 *>(v1);
+  for (compat::DirectoryHandlesV1::const_iterator i = h->begin(),
+       iEnd = h->end(); i != iEnd; ++i)
+  {
+    if (i->second.buffer == NULL)
+      continue;
+    if (i->second.capacity == 0) {
+      smunmap(i->second.buffer);
+    } else {
+      free(i->second.buffer);
+    }
+  }
+  delete h;
+}
 
 void *cvm_bridge_migrate_nfiles_ctr_v1v2s(void *v1) {
   uint32_t *ctr = reinterpret_cast<uint32_t *>(v1);

@@ -37,7 +37,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <google/dense_hash_map>
 #include <inttypes.h>
 #include <pthread.h>
 #include <stddef.h>
@@ -83,6 +82,7 @@
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
+#include "fuse_directory_handle.h"
 #include "fuse_inode_gen.h"
 #include "fuse_remount.h"
 #include "fuse_state.h"
@@ -134,21 +134,6 @@ FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
 
 
-/**
- * For cvmfs_opendir / cvmfs_readdir
- * TODO: use mmap for very large listings
- */
-struct DirectoryListing {
-  char *buffer;  /**< Filled by fuse_add_direntry */
-
-  // Not really used anymore.  But directory listing needs to be migrated during
-  // hotpatch. If buffer is allocated by smmap, capacity is zero.
-  size_t size;
-  size_t capacity;
-
-  DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
-};
-
 const loader::LoaderExports *loader_exports_ = NULL;
 OptionsManager *options_mgr_ = NULL;
 pid_t pid_ = 0;  /**< will be set after daemon() */
@@ -156,9 +141,6 @@ quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 
 
-typedef google::dense_hash_map<uint64_t, DirectoryListing,
-                               hash_murmur<uint64_t> >
-        DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
@@ -2257,8 +2239,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   RegisterMagicXattrs();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
-  cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
-  cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);

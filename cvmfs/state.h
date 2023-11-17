@@ -9,6 +9,7 @@
 #include <cstdint>
 
 namespace cvmfs {
+class DirectoryHandles;
 struct FuseState;
 struct InodeGenerationInfo;
 }
@@ -24,6 +25,11 @@ struct InodeGenerationInfo;
  */
 class StateSerializer {
  public:
+  static size_t SerializeDirectoryHandles(const cvmfs::DirectoryHandles &value,
+                                          void *buffer);
+  static size_t DeserializeDirectoryHandles(const void *buffer,
+                                            cvmfs::DirectoryHandles *value);
+
   static size_t SerializeOpenFilesCounter(const uint32_t &value, void *buffer);
   static size_t DeserializeOpenFilesCounter(const void *buffer,
                                             uint32_t *value);
