@@ -9,6 +9,7 @@ if [ "$IS_64_BIT" = "FALSE" ]; then
   DISABLE_ASM="--disable-asm"
 fi
 
+autoreconf -vfi
 mkdir build && cd build
 CFLAGS="${CVMFS_BASE_C_FLAGS} -fPIC" ../configure \
   --enable-static \
