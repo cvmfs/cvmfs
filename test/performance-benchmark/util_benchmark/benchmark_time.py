@@ -40,7 +40,7 @@ def wipe_kernel_cache(use_cvmfs):
 
 def wipe_cache(use_cvmfs):
   if use_cvmfs == True:
-    subprocess.check_call(["cvmfs_config", "wipecache"], stdout=subprocess.DEVNULL)
+    subprocess.check_call(["sudo", "cvmfs_config", "wipecache"], stdout=subprocess.DEVNULL)
 
   # do not use with autofs
   #subprocess.check_call(["sudo", "cvmfs_config", "reload"], stdout=subprocess.DEVNULL)
@@ -59,7 +59,8 @@ def preloadProxy(command):
       if error_code != 0:
         print("delete workdir/ failed", stdout, "\n", stderr)
 
-    doit = subprocess.Popen(command["time"] + " " + command["command"] + " ./workdir/preload",
+    doit = subprocess.Popen(command["time"] + " " + command["command"]
+                            + " ./workdir/preload",
                             universal_newlines=True, shell=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     doit.communicate()
@@ -71,7 +72,7 @@ def preloadProxy(command):
     doit.communicate()
 
 
-def timeme(stmt="", setup="", cleanup='', final_cleanup='', repeat=1, number=0):
+def timeme(stmt="", setup="", arg_setup=None, cleanup='', final_cleanup='', repeat=1):
   dict_results = defaultdict(list)
   dict_full_cvmfs_internals = defaultdict(list)
   dict_tracing = defaultdict(list)
@@ -81,7 +82,10 @@ def timeme(stmt="", setup="", cleanup='', final_cleanup='', repeat=1, number=0):
 
   for i in tqdm.tqdm(range(repeat)):
     if callable(setup):
-      setup()
+      if arg_setup is None:
+        setup()
+      else:
+        setup(arg_setup)
 
     time.sleep(2)
 
@@ -117,12 +121,14 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
           print("delete workdir/ failed", stdout, "\n", stderr)
 
     for i in range(num_threads):
-      doit.append(subprocess.Popen(command["time"] + " " + command["command"] + " ./workdir/thread" + str(i),
+      doit.append(subprocess.Popen(command["time"] + " " + command["command"]
+                                   + " ./workdir/thread" + str(i),
                                    universal_newlines=True, shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE))
   else:
     for i in range(num_threads):
-      doit.append(subprocess.Popen(command["time"] + " " + command["command"], universal_newlines=True, shell=True,
+      doit.append(subprocess.Popen(command["time"] + " " + command["command"],
+                                   universal_newlines=True, shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE))
 
   for ele in doit:
@@ -146,7 +152,7 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
   # internal affairs
   if "repos" in command.keys():
     for repo in command["repos"]:
-      cvmfs_cmd = "cvmfs_talk -i " + repo + " internal affairs"
+      cvmfs_cmd = "sudo cvmfs_talk -i " + repo + " internal affairs"
       doit = subprocess.Popen(cvmfs_cmd, universal_newlines=True, shell=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       (stdout, stderr) = doit.communicate()
@@ -170,7 +176,7 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
 
   if do_tracing == True:
     for repo in command["repos"]:
-      flush_cmd = "cvmfs_talk -i " + repo + " tracebuffer flush"
+      flush_cmd = "sudo cvmfs_talk -i " + repo + " tracebuffer flush"
       doit = subprocess.Popen(flush_cmd, universal_newlines=True, shell=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       (stdout, stderr) = doit.communicate()
