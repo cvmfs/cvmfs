@@ -79,16 +79,16 @@ if __name__ == "__main__":
         if config[run]["use_cvmfs"] == True:
           benchmark_cmds.setClientConfig("/etc/cvmfs/default.local", client_config,
                                         config["avail_client_configs"])
+          print("\nCVMFS run -", "use autofs:",
+                "true" if config[run]["use_autofs"] else "false")
 
           if config[run]["use_autofs"] == True:
-            print("autofs")
             benchmark_cvmfs.clear_and_reload_autofs()
           else: # version no autofs
-            print("without autofs")
             benchmark_cvmfs.clear_and_mount_direct(repos)
 
           # get cvmfs version
-          print("get cvmfs version")
+          #print("get cvmfs version")
           cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
         else: # non-cvmfs cmd
           cvmfs_version = "0.0.0"
@@ -137,29 +137,23 @@ if __name__ == "__main__":
                                             arg_setup=config[run]["use_cvmfs"],
                                             stmt=partial(benchmark_time.do_thing,
                                                         partial_cmd, num_threads),
-                                            number=1,
                                             repeat=config[run]["repetitions"])
               else:
                 dict_cache, dict_full_cvmfs_internals, dict_tracing = \
                       benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
                                                         partial_cmd, num_threads),
-                                            number=1,
                                             repeat=config[run]["repetitions"])
 
-              print("    ...done", cache_label, "after",
-                    (dt.datetime.now() - start_times[cache_label]).total_seconds(),
-                    "seconds")
               all_data[cache_label] = dict_cache
               all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
               all_dict_tracing[cache_label] = dict_tracing
 
               print("Average real time for all repetitions for", cache_label,
-                    ":", np.average(all_data[cache_label]["real"]))
+                    "in sec:", np.average(all_data[cache_label]["real"]))
 
 
-            print("complete run time: ",
-                  (dt.datetime.now() - start_times[cache_setups[0][0]]).total_seconds(),
-                  "seconds")
+            print("Complete run time (incl. loop overhead) in sec: ",
+                  (dt.datetime.now() - start_times[cache_setups[0][0]]).total_seconds())
 
 
             # set output name: auto-increment so not to overwrite old results
@@ -171,7 +165,7 @@ if __name__ == "__main__":
             final_outname = benchmark_out.getOutnameWithNextNumber(
                                             config[run]["out_dirname"], outname)
 
-            print("final_outname", final_outname)
+            print("Final outname:", final_outname)
 
             ## 4b) write data
             benchmark_out.writeResults(config[run]["out_dirname"], final_outname,

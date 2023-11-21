@@ -190,7 +190,7 @@ def getConfig():
     exit(0)
 
   if (parsed_args.config_file):
-    print("Load config", parsed_args.config_file)
+    print("\nLoad config:", parsed_args.config_file, "\n")
     with open(parsed_args.config_file, 'r') as file:
       config = yaml.safe_load(file)
   else:
@@ -201,8 +201,10 @@ def getConfig():
   verifyYAML(config)
   initConfig(config)
 
-  print(json.dumps(config, sort_keys=True, indent=2))
-  print("all good")
+  if (parsed_args.print_config):
+    print(json.dumps(config, sort_keys=True, indent=2))
+    exit(0)
+
   return config
 
 def parse_arguments():
@@ -221,6 +223,11 @@ super long
   parser.add_argument('-c', '--config-file',
                       help='YAML config file',
                       required=False).completer = getFiles
+  parser.add_argument('-p', '--print-config',
+                      help='Loads and prints config file set with -c/--config-file. '
+                            + 'Does NOT run the benchmark',
+                      required=False,
+                      action="store_true")
   parser.add_argument('--help-config',
                       help='More help: How to build the YAML config file',
                       required=False,
@@ -270,4 +277,3 @@ def getFiles(prefix, parsed_args, **kwargs):
   # #########################
   # ## END PARAMS set by user
   # ##############################################################################
-  

@@ -8,8 +8,6 @@
 def getReposToMount(commands, avail_cmds):
   repos = ["cvmfs-config.cern.ch"]
 
-  print(commands)
-
   for cmd_name in commands:
     if not avail_cmds[cmd_name]["repos"] in repos:
       for repo in avail_cmds[cmd_name]["repos"]:
@@ -38,7 +36,6 @@ def getOutname(cvmfs_build_dir, cmd_name, client_config_list, num_threads,
     if ele in cvmfs_build_dir:
       outname += "-" + out_name_replacement_of_version[ele]
 
-  print("client_config_list", client_config_list)
   client_config_list.sort()
 
   for param in client_config_list:
@@ -71,13 +68,11 @@ def setClientConfig(filename, client_config, avail_configs, print_config=True):
     else:
       new_config += avail_configs[param] + "\n"
 
-  print(new_config)
-
   with open(filename, "w") as f:
     f.write(new_config)
 
   if print_config == True:
-    print("CVMFS CONFIG in " + filename)
+    print("CVMFS config in " + filename, "\n----------------------------------------")
     with open(filename, "r") as cvmfs_config:
       for line in cvmfs_config:
         print(line, end="")
