@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import subprocess
 from functools import partial
 import datetime as dt
-import pandas as pd
 from collections import defaultdict
-import glob
 import os
+import numpy as np
 
 from util_benchmark import benchmark_cmds
 from util_benchmark import benchmark_time
@@ -135,7 +133,8 @@ if __name__ == "__main__":
               start_times[cache_label] = dt.datetime.now()
               if callable(cache_setup_func):
                 dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-                      benchmark_time.timeme(setup=cache_setup_func(config[run]["use_cvmfs"]),
+                      benchmark_time.timeme(setup=cache_setup_func,
+                                            arg_setup=config[run]["use_cvmfs"],
                                             stmt=partial(benchmark_time.do_thing,
                                                         partial_cmd, num_threads),
                                             number=1,
@@ -154,6 +153,9 @@ if __name__ == "__main__":
               all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
               all_dict_tracing[cache_label] = dict_tracing
 
+              print("Average real time for all repetitions for", cache_label,
+                    ":", np.average(all_data[cache_label]["real"]))
+
 
             print("complete run time: ",
                   (dt.datetime.now() - start_times[cache_setups[0][0]]).total_seconds(),
@@ -166,8 +168,8 @@ if __name__ == "__main__":
                                  cmd_name, client_config,
                                  num_threads, cvmfs_version,
                                  config[run]["out_name_replacement_of_version"])
-            final_outname = benchmark_out.getOutnameWithNextNumber(config[run]["out_dirname"],
-                                                                   outname)
+            final_outname = benchmark_out.getOutnameWithNextNumber(
+                                            config[run]["out_dirname"], outname)
 
             print("final_outname", final_outname)
 
