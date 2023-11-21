@@ -13,7 +13,9 @@
 //   - Add cvmcache_get_session()
 // 3 --> 4:
 //   - Add breadcrumb management
-#define LIBCVMFS_CACHE_REVISION 4
+// 4 --> 5:
+//   - Add revision to breadcrumb
+#define LIBCVMFS_CACHE_REVISION 5
 
 #include <stdint.h>
 

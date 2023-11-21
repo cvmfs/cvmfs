@@ -62,7 +62,7 @@ enum LoadReturn {
  *                        the root catalog from the right location
  */
 enum RootCatalogLocation {
-  kCtlogLocationUnknown = 0,
+  kCtlgNoLocationNeeded = 0,  // hash known, no location needed
   kCtlgLocationMounted,      // already loaded in mounted_catalogs_
   kCtlgLocationServer,
   kCtlgLocationBreadcrumb
@@ -94,14 +94,14 @@ struct CatalogContext {
               mountpoint_(),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlogLocationUnknown),
+              root_ctlg_location_(kCtlgNoLocationNeeded),
               manifest_ensemble_(NULL) { }
   CatalogContext(const shash::Any &hash, const PathString &mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlogLocationUnknown),
+              root_ctlg_location_(kCtlgNoLocationNeeded),
               manifest_ensemble_(NULL) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
@@ -283,6 +283,7 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
+  uint64_t GetTimestamp() const;
   uint64_t GetTTL() const;
   bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
@@ -367,6 +368,7 @@ class AbstractCatalogManager : public SingleCopy {
   CatalogT *FindCatalog(const PathString &path) const;
 
   uint64_t GetRevisionNoLock() const;
+  uint64_t GetTimestampNoLock() const;
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
@@ -391,6 +393,7 @@ class AbstractCatalogManager : public SingleCopy {
   int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
+  uint64_t timestamp_cache_;
   /**
    * Try to keep number of nested catalogs below the given limit. Zero means no
    * limit. Surpassing the watermark on mounting a catalog triggers

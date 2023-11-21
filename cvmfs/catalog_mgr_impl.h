@@ -31,6 +31,7 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
+  timestamp_cache_ = 0;
   catalog_watermark_ = 0;
   volatile_flag_ = false;
   has_authz_cache_ = false;
@@ -165,19 +166,20 @@ template <class CatalogT>
 LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   const shash::Any &root_hash)
 {
+  assert(!root_hash.IsNull());
   LogCvmfs(kLogCatalog, kLogDebug,
            "switching to root hash %s", root_hash.ToString().c_str());
 
   WriteLock();
 
   CatalogContext ctlg_context(root_hash, PathString("", 0),
-                                                          kCtlgLocationMounted);
+                                                         kCtlgNoLocationNeeded);
   // we do not need to set revision as LoadCatalogByHash
-  // needs only mountpoint, hash and root_ctlg_location
+  // needs only mountpoint, hash
 
   const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
-  if (load_error == kLoadNew || load_error == kLoadUp2Date) {
+  if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
@@ -695,6 +697,25 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevisionNoLock() const {
 }
 
 template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetTimestamp() const {
+  ReadLock();
+  const uint64_t timestamp = GetTimestampNoLock();
+  Unlock();
+
+  return timestamp;
+}
+
+/**
+ * Like GetTimestamp() only without any locking mechanism.
+ * As such should only be used in conditions where a lock was already taken
+ * and calling GetTimestamp() would otherwise result in a deadlock.
+ */
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetTimestampNoLock() const {
+  return timestamp_cache_;
+}
+
+template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
   ReadLock();
   const bool has_authz = has_authz_cache_;
@@ -950,13 +971,12 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  CatalogContext ctlg_context(hash, mountpoint, kCtlgLocationMounted);
-
+  assert(!hash.IsNull());
+  CatalogContext ctlg_context(hash, mountpoint, kCtlgNoLocationNeeded);
 
   const LoadReturn load_ret = LoadCatalogByHash(&ctlg_context);
 
-  // TODO(heretherebedragons) correct if statement?
-  if (load_ret != kLoadNew && load_ret != kLoadUp2Date) {
+  if (load_ret != kLoadNew) {
     return NULL;
   }
 
@@ -1007,6 +1027,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    timestamp_cache_ = new_catalog->GetLastModified();
     statistics_.catalog_revision->Set(revision_cache_);
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();
