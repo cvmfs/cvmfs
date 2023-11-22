@@ -126,7 +126,6 @@ bool ClientCatalogManager::InitFixed(
  */
 LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
                                                        CatalogContext *result) {
-  assert(fixed_root_catalog_.IsNull());
   result->SetMountpoint(PathString("", 0));
 
   // 1) Get alien cache root catalog (local)
@@ -196,12 +195,12 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   if (manifest_failure == manifest::kFailOk) {
     // assert in first line should prevent this case
     // fixed catalog: just check if server is reachable but use local version
-    // if (!fixed_root_catalog_.IsNull()) {
-    //   offline_mode_ = false;
-    //   result->SetHash(fixed_root_catalog_);
-    //   result->SetRootCtlgRevision(local_newest_revision);
-    //   return success_code;
-    // }
+    if (!fixed_root_catalog_.IsNull()) {
+      offline_mode_ = false;
+      result->SetHash(fixed_root_catalog_);
+      result->SetRootCtlgRevision(local_newest_revision);
+      return success_code;
+    }
 
     // server has newest revision or no valid local revision
     if (ensemble->manifest->revision() > local_newest_revision

@@ -730,7 +730,7 @@ int LibContext::Remount() {
       return 0;
 
     case catalog::kLoadNew:
-      mount_point_->catalog_mgr()->Remount(); 
+      mount_point_->catalog_mgr()->Remount();
 
       if (retval != catalog::kLoadUp2Date && retval != catalog::kLoadNew) {
         return -1;
