@@ -9,7 +9,14 @@ if [ "$IS_64_BIT" = "FALSE" ]; then
   DISABLE_ASM="--disable-asm"
 fi
 
-autoreconf -vfi
+ISA=`grep isa /proc/cpuinfo | head -1 | cut -d: -f2`
+
+echo "System ISA is: $ISA"
+
+case "$ISA" in
+*rv64*) autoreconf -vfi
+esac
+
 mkdir build && cd build
 CFLAGS="${CVMFS_BASE_C_FLAGS} -fPIC" ../configure \
   --enable-static \
