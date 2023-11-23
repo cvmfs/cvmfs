@@ -150,6 +150,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   shash::Any local_newest_hash(shash::kSha1, shash::kSuffixCatalog);
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
+  LoadReturn success_code = catalog::kLoadFail;
 
   manifest::Breadcrumb breadcrumb =
                               fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
@@ -161,21 +162,34 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       "cached copy publish date %s (hash %s, revision %lu)",
       StringifyTime(static_cast<int64_t>(local_newest_timestamp), true).c_str(),
       local_newest_hash.ToString().c_str(), breadcrumb.revision);
+    result->SetRootCtlgLocation(kCtlgLocationBreadcrumb);
+    success_code = catalog::kLoadNew;
   } else {
     LogCvmfs(kLogCache, kLogDebug, "unable to read local checksum %s",
                                    breadcrumb.ToString().c_str());
   }
 
   // 2) Select local newest catalog: mounted vs alien
-
-  result->SetRootCtlgLocation(kCtlgLocationBreadcrumb);
-  LoadReturn success_code = catalog::kLoadNew;
-
-  // TODO(heretherebedragons) this branch can be removed in futur versions
-  if (local_newest_revision == 0) {  // breadcrumb has no revision
-    // revisions are better, but if we dont have any we need to compare by
-    // timestamp (you can have multiple revisions in the same timestamp)
-    if (local_newest_timestamp <= GetTimestampNoLock()) {
+  //    Skip if we do not have a mounted catalog
+  if (GetRevisionNoLock() != 0) {
+    // TODO(heretherebedragons) this branch can be removed in futur versions
+    if (local_newest_revision == 0) {  // breadcrumb has no revision
+      // revisions are better, but if we dont have any we need to compare by
+      // timestamp (you can have multiple revisions in the same timestamp)
+      if (local_newest_timestamp <= GetTimestampNoLock()) {
+        const std::map<PathString, shash::Any>::iterator curr_hash_itr =
+                                      mounted_catalogs_.find(PathString("", 0));
+        local_newest_hash = curr_hash_itr->second;
+        local_newest_revision = GetRevisionNoLock();
+        local_newest_timestamp = GetTimestampNoLock();
+        result->SetRootCtlgLocation(kCtlgLocationMounted);
+        success_code = catalog::kLoadUp2Date;
+      }
+    } else if (local_newest_revision <= GetRevisionNoLock()
+      || local_newest_revision == manifest::Breadcrumb::kInvalidRevision) {
+      // the breadcrumb revision and both revision numbers are valid
+      // We only look for currently loaded catalog if the revision is newer than
+      // the breadcrumb
       const std::map<PathString, shash::Any>::iterator curr_hash_itr =
                                       mounted_catalogs_.find(PathString("", 0));
       local_newest_hash = curr_hash_itr->second;
@@ -184,18 +198,6 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       result->SetRootCtlgLocation(kCtlgLocationMounted);
       success_code = catalog::kLoadUp2Date;
     }
-  } else if (local_newest_revision <= GetRevisionNoLock()
-     || local_newest_revision == manifest::Breadcrumb::kInvalidRevision) {
-    // the breadcrumb revision and both revision numbers are valid
-    // We only look for currently loaded catalog if the revision is newer than
-    // the breadcrumb
-    const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-                                      mounted_catalogs_.find(PathString("", 0));
-    local_newest_hash = curr_hash_itr->second;
-    local_newest_revision = GetRevisionNoLock();
-    local_newest_timestamp = GetTimestampNoLock();
-    result->SetRootCtlgLocation(kCtlgLocationMounted);
-    success_code = catalog::kLoadUp2Date;
   }
 
   // if breadcrumb and currently mounted root catalog have same hash change
@@ -247,6 +249,11 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
             "failed fetch manifest from server: "
             "manifest too old or server unreachable (%d - %s)",
             manifest_failure, manifest::Code2Ascii(manifest_failure));
+
+  if (success_code == catalog::kLoadFail) {
+    LogCvmfs(kLogCache, kLogDebug, "No valid root catalog found!");
+    return success_code;
+  }
 
   if (manifest_failure == manifest::kFailOk
       && ensemble->manifest->revision() == local_newest_revision) {
