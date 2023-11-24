@@ -332,6 +332,7 @@ func (s *Services) RefreshLease(ctx context.Context, token string) (int64, error
 
 	tx, err := s.DB.SQL.BeginTx(ctx, nil)
 	if err != nil {
+		outcome = err.Error()
 		return 0, fmt.Errorf("could not begin transaction: %w", err)
 	}
 	defer tx.Rollback()
@@ -350,6 +351,12 @@ func (s *Services) RefreshLease(ctx context.Context, token string) (int64, error
 
 	lease.Expiration = time.Now().Add(s.Config.MaxLeaseTime)
 
-	return RefreshLeaseByToken(ctx, tx, token, lease.Expiration.UnixMilli())
+	changes, err := RefreshLeaseByToken(ctx, tx, token, lease.Expiration.UnixMilli())
+	if err != nil || changes != 1 {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return 0, err
+	}
+	return lease.Expiration.UnixMilli(), nil
 
 }
