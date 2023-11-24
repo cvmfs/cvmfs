@@ -256,7 +256,7 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 	// We don't check the error - if the statistics are missing, the lease
 	// should still be cancelable
-	s.StatsMgr.PopLease(lease.CombinedLeasePath());
+	s.StatsMgr.PopLease(lease.CombinedLeasePath())
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("could not commit transaction: %w", err)
@@ -320,4 +320,36 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 	}
 
 	return finalRev, nil
+}
+
+func (s *Services) RefreshLease(ctx context.Context, token string) (int64, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "refresh_lease", &outcome, t0)
+
+	tx, err := s.DB.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	lease, err := FindLeaseByToken(ctx, tx, token)
+	if err != nil {
+		outcome = err.Error()
+		return 0, err
+	}
+
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return 0, err
+	}
+
+	lease.Expiration = time.Now().Add(s.Config.MaxLeaseTime)
+
+	return RefreshLeaseByToken(ctx, tx, token, lease.Expiration.UnixMilli())
+
 }
