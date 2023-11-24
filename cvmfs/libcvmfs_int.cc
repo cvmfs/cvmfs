@@ -721,8 +721,7 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  const catalog::LoadReturn retval =
-                                   mount_point_->catalog_mgr()->RemountDryrun();
+  catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
 
   switch (retval) {
     case catalog::kLoadUp2Date:
@@ -730,9 +729,11 @@ int LibContext::Remount() {
       return 0;
 
     case catalog::kLoadNew:
-      mount_point_->catalog_mgr()->Remount();
+      retval = mount_point_->catalog_mgr()->Remount();
 
       if (retval != catalog::kLoadUp2Date && retval != catalog::kLoadNew) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                              "Remount requested to switch catalog but failed");
         return -1;
       }
 

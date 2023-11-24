@@ -91,7 +91,7 @@ struct CatalogContext {
  public:
   CatalogContext() :
               hash_(shash::Any()),
-              mountpoint_(),
+              mountpoint_(PathString("invalid", 7)),  // empty str is root ctlg
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlgNoLocationNeeded),
@@ -332,7 +332,6 @@ class AbstractCatalogManager : public SingleCopy {
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
-
 
   /**
    * Create a new Catalog object.

@@ -128,7 +128,8 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
   CatalogContext ctlg_context;
 
-  if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
+  if (GetNewRootCatalogContext(&ctlg_context) != kLoadNew
+      && GetNewRootCatalogContext(&ctlg_context) != kLoadUp2Date) {
     LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
                                 "Did not find any valid root catalog to mount");
     return kLoadFail;
