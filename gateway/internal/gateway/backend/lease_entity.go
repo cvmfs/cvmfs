@@ -186,7 +186,7 @@ func RefreshLeaseByToken(ctx context.Context, tx *sql.Tx, token string, expirati
 
 	res, err := tx.ExecContext(
 		ctx,
-		"update lease set Expiration =? Lease where Token = ?;", expiration, token)
+		"update lease set Expiration = ? where Token = ?;", expiration, token)
 	if err != nil {
 		return 0, fmt.Errorf("query failed: %w", err)
 	}
