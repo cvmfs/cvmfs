@@ -14,39 +14,82 @@
 
 namespace {
 
-static size_t SerializeInodeGenerationV1(
+template <typename T>
+size_t Serialize(const T &value, void *buffer) {
+  assert(false);
+  return 0;
+}
+
+template <>
+size_t Serialize<bool>(const bool &value, void *buffer) {
+  return cvm_bridge_write_bool(&value, buffer);
+}
+
+template <>
+size_t __attribute__((used))
+Serialize<int32_t>(const int32_t &value, void *buffer) {
+  return cvm_bridge_write_int32(&value, buffer);
+}
+
+template <>
+size_t __attribute__((used))
+Serialize<uint32_t>(const uint32_t &value, void *buffer) {
+  return cvm_bridge_write_uint32(&value, buffer);
+}
+
+template <>
+size_t __attribute__((used))
+Serialize<int64_t>(const int64_t &value, void *buffer) {
+  return cvm_bridge_write_int64(&value, buffer);
+}
+
+template <>
+size_t __attribute__((used))
+Serialize<uint64_t>(const uint64_t &value, void *buffer) {
+  return cvm_bridge_write_uint64(&value, buffer);
+}
+
+template <>
+size_t Serialize<cvm_bridge_blob>(const cvm_bridge_blob &value, void *buffer) {
+  return cvm_bridge_write_blob(&value, buffer);
+}
+
+template <>
+size_t Serialize<compat::InodeGenerationInfoV1>(
   const compat::InodeGenerationInfoV1 &value, void *buffer)
 {
   unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
   unsigned char *pos = base;
   void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
 
-  pos += cvm_bridge_write_uint(&value.version, *where);
-  pos += cvm_bridge_write_uint64(&value.initial_revision, *where);
-  pos += cvm_bridge_write_uint32(&value.incarnation, *where);
+  pos += Serialize<unsigned int>(value.version, *where);
+  pos += Serialize<uint64_t>(value.initial_revision, *where);
+  pos += Serialize<uint32_t>(value.incarnation, *where);
   if (value.version < 2) {
     return pos - base;
   }
 
-  pos += cvm_bridge_write_uint32(&value.overflow_counter, *where);
-  pos += cvm_bridge_write_uint64(&value.inode_generation, *where);
+  pos += Serialize<uint32_t>(value.overflow_counter, *where);
+  pos += Serialize<uint64_t>(value.inode_generation, *where);
   return pos - base;
 }
 
-static size_t SerializeFuseStateV1(
+template <>
+size_t Serialize<compat::FuseStateV1>(
   const compat::FuseStateV1 &value, void *buffer)
 {
   unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
   unsigned char *pos = base;
   void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
 
-  pos += cvm_bridge_write_uint(&value.version, *where);
-  pos += cvm_bridge_write_bool(&value.cache_symlinks, *where);
-  pos += cvm_bridge_write_bool(&value.has_dentry_expire, *where);
+  pos += Serialize<unsigned int>(value.version, *where);
+  pos += Serialize<bool>(value.cache_symlinks, *where);
+  pos += Serialize<bool>(value.has_dentry_expire, *where);
   return pos - base;
 }
 
-static size_t SerializeDirectoryListingV1(
+template <>
+size_t Serialize<compat::DirectoryListingV1>(
   const compat::DirectoryListingV1 &value, void *buffer)
 {
   unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
@@ -57,13 +100,14 @@ static size_t SerializeDirectoryListingV1(
   blob.buffer = value.buffer;
   blob.size = value.size;
   blob.is_mmapd = (value.capacity == 0);
-  pos += cvm_bridge_write_blob(&blob, *where);
-  pos += cvm_bridge_write_size(&value.size, *where);
-  pos += cvm_bridge_write_size(&value.capacity, *where);
+  pos += Serialize<cvm_bridge_blob>(blob, *where);
+  pos += Serialize<size_t>(value.size, *where);
+  pos += Serialize<size_t>(value.capacity, *where);
   return pos - base;
 }
 
-static size_t SerializeDirectoryHandlesV1(
+template <>
+size_t Serialize<compat::DirectoryHandlesV1>(
   const compat::DirectoryHandlesV1 &value, void *buffer)
 {
   unsigned char *base = reinterpret_cast<unsigned char *>(buffer);
@@ -71,12 +115,12 @@ static size_t SerializeDirectoryHandlesV1(
   void** where = (buffer == nullptr) ? &buffer : reinterpret_cast<void**>(&pos);
 
   size_t size = value.size();
-  pos += cvm_bridge_write_size(&size, *where);
+  pos += Serialize<size_t>(size, *where);
   for (compat::DirectoryHandlesV1::const_iterator it = value.begin(),
        itEnd = value.end(); it != itEnd; ++it)
   {
-    pos += cvm_bridge_write_uint64(&it->first, *where);
-    pos += SerializeDirectoryListingV1(it->second, *where);
+    pos += Serialize<uint64_t>(it->first, *where);
+    pos += Serialize<compat::DirectoryListingV1>(it->second, *where);
   }
   return pos - base;
 }
@@ -87,9 +131,9 @@ void *cvm_bridge_migrate_directory_handles_v1v2s(void *v1) {
   compat::DirectoryHandlesV1 *h =
     reinterpret_cast<compat::DirectoryHandlesV1 *>(v1);
 
-  size_t nbytes = SerializeDirectoryHandlesV1(*h, NULL);
+  size_t nbytes = Serialize<compat::DirectoryHandlesV1>(*h, NULL);
   void *v2s = smalloc(nbytes);
-  SerializeDirectoryHandlesV1(*h, v2s);
+  Serialize<compat::DirectoryHandlesV1>(*h, v2s);
   return v2s;
 }
 
@@ -113,7 +157,7 @@ void cvm_bridge_free_directory_handles_v1(void *v1) {
 void *cvm_bridge_migrate_nfiles_ctr_v1v2s(void *v1) {
   uint32_t *ctr = reinterpret_cast<uint32_t *>(v1);
   void *v2s = smalloc(4);
-  cvm_bridge_write_uint32(ctr, v2s);
+  Serialize<uint32_t>(*ctr, v2s);
   return v2s;
 }
 
@@ -125,10 +169,10 @@ void *cvm_bridge_migrate_inode_generation_v1v2s(void *v1) {
   compat::InodeGenerationInfoV1 *info =
     reinterpret_cast<compat::InodeGenerationInfoV1 *>(v1);
 
-  size_t nbytes = SerializeInodeGenerationV1(*info, NULL);
+  size_t nbytes = Serialize<compat::InodeGenerationInfoV1>(*info, NULL);
 
   void *v2s = smalloc(nbytes);
-  SerializeInodeGenerationV1(*info, v2s);
+  Serialize<compat::InodeGenerationInfoV1>(*info, v2s);
   return v2s;
 }
 
@@ -139,9 +183,9 @@ void cvm_bridge_free_inode_generation_v1(void *v1) {
 void *cvm_bridge_migrate_fuse_state_v1v2s(void *v1) {
   compat::FuseStateV1 *info = reinterpret_cast<compat::FuseStateV1 *>(v1);
 
-  size_t nbytes = SerializeFuseStateV1(*info, NULL);
+  size_t nbytes = Serialize<compat::FuseStateV1>(*info, NULL);
   void *v2s = smalloc(nbytes);
-  SerializeFuseStateV1(*info, v2s);
+  Serialize<compat::FuseStateV1>(*info, v2s);
   return v2s;
 }
 
