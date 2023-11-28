@@ -2481,13 +2481,16 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(state_glue_buffer);
   }
 
-  msg_progress = "Saving negative entry cache\n";
+  msg_progress = "Saving dentry tracker\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  glue::DentryTracker *saved_dentry_tracker =
-    new glue::DentryTracker(*cvmfs::mount_point_->dentry_tracker());
+  nbytes = StateSerializer::SerializeDentryTracker(
+    *cvmfs::mount_point_->dentry_tracker(), NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDentryTracker(
+    *cvmfs::mount_point_->dentry_tracker(), buffer);
   loader::SavedState *state_dentry_tracker = new loader::SavedState();
-  state_dentry_tracker->state_id = loader::kStateDentryTracker;
-  state_dentry_tracker->state = saved_dentry_tracker;
+  state_dentry_tracker->state_id = loader::kStateDentryTrackerV2S;
+  state_dentry_tracker->state = buffer;
   saved_states->push_back(state_dentry_tracker);
 
   msg_progress = "Saving page cache entry tracker\n";
@@ -2642,12 +2645,19 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateDentryTracker) {
+      SendMsg2Socket(fd_progress, "Migrating dentry tracker (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_dentry_tracker_v1v2s(
+        saved_states[i]->state);
+      StateSerializer::DeserializeDentryTracker(
+        v2s, cvmfs::mount_point_->dentry_tracker());
+      free(v2s);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateDentryTrackerV2S) {
       SendMsg2Socket(fd_progress, "Restoring dentry tracker... ");
-      cvmfs::mount_point_->dentry_tracker()->~DentryTracker();
-      glue::DentryTracker *saved_dentry_tracker =
-        static_cast<glue::DentryTracker *>(saved_states[i]->state);
-      new (cvmfs::mount_point_->dentry_tracker())
-        glue::DentryTracker(*saved_dentry_tracker);
+      StateSerializer::DeserializeDentryTracker(
+        saved_states[i]->state, cvmfs::mount_point_->dentry_tracker());
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2869,8 +2879,12 @@ static void FreeSavedState(const int fd_progress,
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
       case loader::kStateDentryTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved dentry tracker (v1)\n");
+        cvm_bridge_free_dentry_tracker_v1(saved_states[i]->state);
+        break;
+      case loader::kStateDentryTrackerV2S:
         SendMsg2Socket(fd_progress, "Releasing saved dentry tracker\n");
-        delete static_cast<glue::DentryTracker *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       case loader::kStatePageCacheTracker:
         SendMsg2Socket(fd_progress, "Releasing saved page cache entry cache\n");

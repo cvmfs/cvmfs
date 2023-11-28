@@ -136,17 +136,6 @@ DentryTracker::DentryTracker(const DentryTracker &other) {
 }
 
 
-DentryTracker &DentryTracker::operator= (const DentryTracker &other) {
-  if (&other == this)
-    return *this;
-
-  Lock();
-  CopyFrom(other);
-  Unlock();
-  return *this;
-}
-
-
 void DentryTracker::CopyFrom(const DentryTracker &other) {
   assert(other.version_ == kVersion);
 

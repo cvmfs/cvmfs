@@ -845,7 +845,6 @@ class DentryTracker {
 
   DentryTracker();
   DentryTracker(const DentryTracker &other);
-  DentryTracker &operator= (const DentryTracker &other);
   ~DentryTracker();
 
   /**
