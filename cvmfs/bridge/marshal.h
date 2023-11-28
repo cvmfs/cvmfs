@@ -26,9 +26,16 @@ CVMFS_EXPORT size_t cvm_bridge_write_uint32(const uint32_t *value,
                                             void *buffer);
 CVMFS_EXPORT size_t cvm_bridge_read_uint32(const void *buffer, uint32_t *value);
 
+CVMFS_EXPORT size_t cvm_bridge_write_int32(const int32_t *value,
+                                           void *buffer);
+CVMFS_EXPORT size_t cvm_bridge_read_int32(const void *buffer, int32_t *value);
+
 CVMFS_EXPORT size_t cvm_bridge_write_uint64(const uint64_t *value,
                                             void *buffer);
 CVMFS_EXPORT size_t cvm_bridge_read_uint64(const void *buffer, uint64_t *value);
+
+CVMFS_EXPORT size_t cvm_bridge_write_int64(const int64_t *value, void *buffer);
+CVMFS_EXPORT size_t cvm_bridge_read_int64(const void *buffer, int64_t *value);
 
 CVMFS_EXPORT size_t cvm_bridge_write_uint(const unsigned *value, void *buffer);
 CVMFS_EXPORT size_t cvm_bridge_read_uint(const void *buffer, unsigned *value);

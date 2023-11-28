@@ -14,6 +14,10 @@ struct FuseState;
 struct InodeGenerationInfo;
 }
 
+namespace glue {
+class DentryTracker;
+}
+
 /**
  * Uses the marshalling functions from the bridge library to serialize and
  * deserialize state information that needs to survive a hotpatch/reload.
@@ -29,6 +33,11 @@ class StateSerializer {
                                           void *buffer);
   static size_t DeserializeDirectoryHandles(const void *buffer,
                                             cvmfs::DirectoryHandles *value);
+
+  static size_t SerializeDentryTracker(const glue::DentryTracker &value,
+                                       void *buffer);
+  static size_t DeserializeDentryTracker(const void *buffer,
+                                         glue::DentryTracker *value);
 
   static size_t SerializeOpenFilesCounter(const uint32_t &value, void *buffer);
   static size_t DeserializeOpenFilesCounter(const void *buffer,

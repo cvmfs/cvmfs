@@ -34,6 +34,8 @@
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
 
+class StateSerializer;
+
 namespace glue {
 
 /**
@@ -808,8 +810,9 @@ class InodeTracker {
  */
 class DentryTracker {
   FRIEND_TEST(T_GlueBuffer, DentryTracker);
+  friend class ::StateSerializer;
 
- private:
+ public:
   struct Entry {
     Entry() : expiry(0), inode_parent(0) {}
     Entry(uint64_t e, uint64_t p, const char *n)
@@ -822,7 +825,6 @@ class DentryTracker {
     NameString name;
   };
 
- public:
   struct Cursor {
     explicit Cursor(Entry *h) : head(h), pos(0) {}
     Entry *head;

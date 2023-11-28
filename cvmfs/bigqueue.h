@@ -63,7 +63,7 @@ class BigQueue {
       Migrate(static_cast<int>(static_cast<float>(capacity_ * 0.6)));
   }
 
-  bool Peek(Item **item) {
+  bool Peek(Item **item) const {
     if (IsEmpty())
       return false;
     *item = head_;
@@ -74,9 +74,14 @@ class BigQueue {
     return size_ == 0;
   }
 
-  void Clear() {
+  void Reset(const size_t num_items) {
     Dealloc();
-    Alloc(kNumInit);
+    size_t min_items = kNumInit;
+    Alloc(std::max(num_items, min_items));
+  }
+
+  void Clear() {
+    Reset(kNumInit);
   }
 
   size_t size() const { return size_; }

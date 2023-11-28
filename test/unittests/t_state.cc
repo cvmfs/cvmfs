@@ -9,6 +9,7 @@
 #include "fuse_directory_handle.h"
 #include "fuse_inode_gen.h"
 #include "fuse_state.h"
+#include "glue_buffer.h"
 #include "state.h"
 #include "util/smalloc.h"
 
@@ -79,22 +80,6 @@ TEST(T_State, DirectoryListing) {
   EXPECT_EQ(NULL, check[0].buffer);
 }
 
-TEST(T_State, OpenFilesCounter) {
-  unsigned char buffer[4];
-  EXPECT_EQ(4u, StateSerializer::SerializeOpenFilesCounter(42, NULL));
-  EXPECT_EQ(4u, StateSerializer::SerializeOpenFilesCounter(42, buffer));
-  uint32_t check;
-  EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(buffer, &check));
-  EXPECT_EQ(42u, check);
-
-  uint32_t *value_v1 = new uint32_t(137);
-  void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(value_v1);
-  EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(v2s, &check));
-  cvm_bridge_free_nfiles_ctr_v1(value_v1);
-  free(v2s);
-  EXPECT_EQ(137u, check);
-}
-
 TEST(T_State, InodeGeneration) {
   cvmfs::InodeGenerationInfo value;
   value.initial_revision = 137;
@@ -130,6 +115,59 @@ TEST(T_State, InodeGeneration) {
   EXPECT_EQ(value.incarnation, check.incarnation);
   EXPECT_EQ(value.overflow_counter, check.overflow_counter);
   EXPECT_EQ(value.inode_generation, check.inode_generation);
+}
+
+TEST(T_State, OpenFilesCounter) {
+  unsigned char buffer[4];
+  EXPECT_EQ(4u, StateSerializer::SerializeOpenFilesCounter(42, NULL));
+  EXPECT_EQ(4u, StateSerializer::SerializeOpenFilesCounter(42, buffer));
+  uint32_t check;
+  EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(buffer, &check));
+  EXPECT_EQ(42u, check);
+
+  uint32_t *value_v1 = new uint32_t(137);
+  void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(value_v1);
+  EXPECT_EQ(4u, StateSerializer::DeserializeOpenFilesCounter(v2s, &check));
+  cvm_bridge_free_nfiles_ctr_v1(value_v1);
+  free(v2s);
+  EXPECT_EQ(137u, check);
+}
+
+TEST(T_State, DentryTracker) {
+  glue::DentryTracker t;
+  size_t nbytes = StateSerializer::SerializeDentryTracker(t, NULL);
+  void *buffer = smalloc(nbytes);
+  StateSerializer::SerializeDentryTracker(t, buffer);
+  glue::DentryTracker check;
+  StateSerializer::DeserializeDentryTracker(buffer, &check);
+  free(buffer);
+  EXPECT_TRUE(check.is_active());
+  glue::DentryTracker::Cursor c = check.BeginEnumerate();
+  uint64_t inode_parent;
+  NameString name;
+  EXPECT_FALSE(check.NextEntry(&c, &inode_parent, &name));
+  check.EndEnumerate(&c);
+
+  t.Add(137, "test", 1370);
+  t.Add(42, "test2", 420);
+  nbytes = StateSerializer::SerializeDentryTracker(t, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDentryTracker(t, buffer);
+  StateSerializer::DeserializeDentryTracker(buffer, &check);
+  free(buffer);
+  c = check.BeginEnumerate();
+  EXPECT_TRUE(check.NextEntry(&c, &inode_parent, &name));
+  EXPECT_TRUE(check.NextEntry(&c, &inode_parent, &name));
+  EXPECT_FALSE(check.NextEntry(&c, &inode_parent, &name));
+  check.EndEnumerate(&c);
+
+  t.Disable();
+  nbytes = StateSerializer::SerializeDentryTracker(t, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDentryTracker(t, buffer);
+  StateSerializer::DeserializeDentryTracker(buffer, &check);
+  free(buffer);
+  EXPECT_FALSE(check.is_active());
 }
 
 TEST(T_State, FuseState) {

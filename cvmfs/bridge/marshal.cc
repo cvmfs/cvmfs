@@ -21,6 +21,18 @@ size_t cvm_bridge_read_uint32(const void *buffer, uint32_t *value) {
   return 4;
 }
 
+size_t cvm_bridge_write_int32(const int32_t *value, void *buffer) {
+  if (buffer != nullptr) {
+    memcpy(buffer, value, 4);
+  }
+  return 4;
+}
+
+size_t cvm_bridge_read_int32(const void *buffer, int32_t *value) {
+  memcpy(value, buffer, 4);
+  return 4;
+}
+
 size_t cvm_bridge_write_uint64(const uint64_t *value, void *buffer) {
   if (buffer != nullptr) {
     memcpy(buffer, value, 8);
@@ -29,6 +41,18 @@ size_t cvm_bridge_write_uint64(const uint64_t *value, void *buffer) {
 }
 
 size_t cvm_bridge_read_uint64(const void *buffer, uint64_t *value) {
+  memcpy(value, buffer, 8);
+  return 8;
+}
+
+size_t cvm_bridge_write_int64(const int64_t *value, void *buffer) {
+  if (buffer != nullptr) {
+    memcpy(buffer, value, 8);
+  }
+  return 8;
+}
+
+size_t cvm_bridge_read_int64(const void *buffer, int64_t *value) {
   memcpy(value, buffer, 8);
   return 8;
 }
