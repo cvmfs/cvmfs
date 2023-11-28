@@ -195,16 +195,19 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   // We only look for currently loaded catalog if the revision is newer than
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
-  if (local_newest_revision <= GetRevisionNoLock()
-     || local_newest_revision == manifest::Breadcrumb::kInvalidRevision) {
+  if ((local_newest_revision <= GetRevisionNoLock()
+     || local_newest_revision == manifest::Breadcrumb::kInvalidRevision)
+     && mounted_catalogs_.size() > 0) {
     const std::map<PathString, shash::Any>::iterator curr_hash_itr =
                                       mounted_catalogs_.find(PathString("", 0));
     local_newest_hash = curr_hash_itr->second;
     local_newest_revision = GetRevisionNoLock();
-    local_newest_timestamp = GetTimestampNoLock();
+    // if needed for integration test 707
+    local_newest_timestamp = GetTimestampNoLock() > local_newest_timestamp ?
+                                  GetTimestampNoLock() : local_newest_timestamp;
     result->SetRootCtlgLocation(kCtlgLocationMounted);
     success_code = catalog::kLoadUp2Date;
-  } else if (local_newest_revision == 0) {  // breadcrumb has no revision
+  } else if (local_newest_revision == 0 && mounted_catalogs_.size() > 0) {  // breadcrumb has no revision
     // TODO(heretherebedragons) this branch can be removed in futur versions
 
     // revisions are better, but if we dont have any we need to compare by
@@ -282,16 +285,18 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // corner case: server not reachable, local revision is 0. We can not
   // distinguish if local revision number is valid or invalid. Most likely
   // it is invalid - so fail
-  if (local_newest_revision == 0 && (manifest_failure != manifest::kFailOk)) {
+  if (local_newest_revision == 0 && (manifest_failure != manifest::kFailOk)
+      && local_newest_hash.IsNull()) {
     LogCvmfs(kLogCache, kLogDebug, "No valid root catalog found!");
     return catalog::kLoadFail;
   }
 
   if (!fixed_root_catalog_.IsNull()) {
-      offline_mode_ = true;
-      result->SetHash(fixed_root_catalog_);
-      result->SetRootCtlgRevision(local_newest_revision);
-      return catalog::kLoadUp2Date;
+    LogCvmfs(kLogCache, kLogDebug, "Fixed catalog offline mode!");
+    offline_mode_ = true;
+    result->SetHash(fixed_root_catalog_);
+    result->SetRootCtlgRevision(local_newest_revision);
+    return catalog::kLoadUp2Date;
   }
 
   if (manifest_failure == manifest::kFailOk
@@ -302,6 +307,13 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   }
   result->SetHash(local_newest_hash);
   result->SetRootCtlgRevision(local_newest_revision);
+
+  // for integration test 707
+  if (breadcrumb.IsValid() && result->root_ctlg_location() != kCtlgLocationServer) {
+    if (breadcrumb.catalog_hash == local_newest_hash) {
+      success_code = catalog::kLoadUp2Date;
+    }
+  }
 
   return success_code;
 }

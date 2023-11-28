@@ -23,7 +23,7 @@ breadcrumb_remove_revision_replace_timestamp_with_now() {
   local new_breadcrumb=$(sudo cat "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO" | \
                          awk -F'T' '{print $1;}')
 
-  cur_time=$(date +%s)
+  cur_time=$(date --date="+10 seconds" +%s)
 
   new_breadcrumb+="T$cur_time"
 
@@ -33,8 +33,6 @@ breadcrumb_remove_revision_replace_timestamp_with_now() {
 breadcrumb_replace_revision_large() {
   local new_breadcrumb=$(sudo cat "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO" | \
                          awk -F'R' '{print $1;}')
-
-  cur_time=$(date +%s)
 
   new_breadcrumb+="R200"
 
@@ -121,7 +119,7 @@ no_server() {
 
   private_unmount
 
-  echo "   Revision $oldRevision should be smaller than $newRevision"
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
 
   [ "$oldRevision" -eq "$newRevision" ] || return 30
 
@@ -141,7 +139,7 @@ breadcrumb_timestamp_newer() {
   add_some_tmp_file_to_repo
   echo "   New files were added to the repository."
 
-  sleep 3
+  sleep 2
   breadcrumb_remove_revision_replace_timestamp_with_now
   echo "   Breadcrumb has now a newer timestamp and no revision than remote"
 
@@ -153,7 +151,7 @@ breadcrumb_timestamp_newer() {
 
   private_unmount
 
-  echo "   Old revision $oldRevision should be the same as new revision $newRevision"
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
 
   [ "$oldRevision" -eq "$newRevision" ] || return 40
 
@@ -185,7 +183,7 @@ breadcrumb_revision_large() {
 
   private_unmount
 
-  echo "   Old revision $oldRevision should be the same as new revision $newRevision"
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
 
   [ "$oldRevision" -eq "$newRevision" ] || return 50
 
