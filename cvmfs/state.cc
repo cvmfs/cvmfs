@@ -5,13 +5,13 @@
 #include "cvmfs_config.h"
 #include "state.h"
 
+#include <cassert>
+
 #include "bridge/marshal.h"
 #include "fuse_directory_handle.h"
 #include "fuse_inode_gen.h"
 #include "fuse_state.h"
 #include "glue_buffer.h"
-
-#include <cassert>
 
 namespace {
 
@@ -310,13 +310,13 @@ size_t StateSerializer::DeserializeDentryTracker(const void *buffer,
 }
 
 size_t StateSerializer::SerializeOpenFilesCounter(
- const uint32_t &value, void *buffer)
+  const uint32_t &value, void *buffer)
 {
   return Serialize<uint32_t>(value, buffer);
 }
 
 size_t StateSerializer::DeserializeOpenFilesCounter(
- const void *buffer, uint32_t *value)
+  const void *buffer, uint32_t *value)
 {
   return Deserialize<uint32_t>(buffer, value);
 }

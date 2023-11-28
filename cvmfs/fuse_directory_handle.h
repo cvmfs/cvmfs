@@ -5,12 +5,12 @@
 #ifndef CVMFS_FUSE_DIRECTORY_HANDLE_H_
 #define CVMFS_FUSE_DIRECTORY_HANDLE_H_
 
-#include "util/algorithm.h"
-
 #include <cstddef>
 #include <cstdint>
 
-#include <google/dense_hash_map>
+#include "google/dense_hash_map"
+
+#include "util/algorithm.h"
 
 namespace cvmfs {
 

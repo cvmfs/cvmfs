@@ -2,15 +2,20 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_BRIDGE_DS_STUBS_H_
+#define CVMFS_BRIDGE_DS_STUBS_H_
+
 #include <pthread.h>
 
 #include <cstdint>
 #include <cstring>
+#include <string>
 
-#include <google/dense_hash_map>
+#include "google/dense_hash_map"
 
 #include "util/murmur.hxx"
 #include "util/smalloc.h"
+
 
 namespace compat {
 
@@ -139,4 +144,6 @@ struct DentryTrackerV1 {
   pthread_t thread_cleaner_;
 };  // class DentryTrackerV1
 
-} // namespace compat
+}  // namespace compat
+
+#endif  // CVMFS_BRIDGE_DS_STUBS_H_

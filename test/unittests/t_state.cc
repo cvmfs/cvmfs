@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <cstring>
+
 #include "bridge/marshal.h"
 #include "bridge/migrate.h"
 #include "fuse_directory_handle.h"
@@ -12,9 +15,6 @@
 #include "glue_buffer.h"
 #include "state.h"
 #include "util/smalloc.h"
-
-#include <cstdint>
-#include <cstring>
 
 TEST(T_State, DirectoryListing) {
   cvmfs::DirectoryHandles h;

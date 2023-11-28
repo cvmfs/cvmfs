@@ -5,9 +5,9 @@
 #include "cvmfs_config.h"
 #include "bridge/marshal.h"
 
-#include "util/smalloc.h"
-
 #include <cstring>
+
+#include "util/smalloc.h"
 
 size_t cvm_bridge_write_uint32(const uint32_t *value, void *buffer) {
   if (buffer != nullptr) {
