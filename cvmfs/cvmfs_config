@@ -133,7 +133,7 @@ cvmfs_config_usage() {
   echo "Common configuration tasks for CernVM-FS"
   echo "Usage: $0 <command>"
   echo "Commands are"
-  echo "  setup [nouser] [nocfgmod] [nostart]"
+  echo "  setup [nouser] [nocfgmod] [nostart] [noautofs]"
   if is_wsl2; then
     echo "  wsl2_start"
   fi
