@@ -157,9 +157,14 @@ TEST(T_State, DentryTracker) {
   free(buffer);
   c = check.BeginEnumerate();
   EXPECT_TRUE(check.NextEntry(&c, &inode_parent, &name));
+  EXPECT_EQ(137u, inode_parent);
+  EXPECT_STREQ("test", name.c_str());
   EXPECT_TRUE(check.NextEntry(&c, &inode_parent, &name));
+  EXPECT_EQ(42u, inode_parent);
+  EXPECT_STREQ("test2", name.c_str());
   EXPECT_FALSE(check.NextEntry(&c, &inode_parent, &name));
   check.EndEnumerate(&c);
+  EXPECT_EQ(2u, check.GetStatistics().num_insert);
 
   t.Disable();
   nbytes = StateSerializer::SerializeDentryTracker(t, NULL);
@@ -168,6 +173,21 @@ TEST(T_State, DentryTracker) {
   StateSerializer::DeserializeDentryTracker(buffer, &check);
   free(buffer);
   EXPECT_FALSE(check.is_active());
+
+  glue::DentryTracker *value_v1 = new glue::DentryTracker();
+  value_v1->Add(1, "", 10);
+  void *v2s = cvm_bridge_migrate_dentry_tracker_v1v2s(value_v1);
+  StateSerializer::DeserializeDentryTracker(v2s, &check);
+  free(v2s);
+  cvm_bridge_free_dentry_tracker_v1(value_v1);
+
+  c = check.BeginEnumerate();
+  EXPECT_TRUE(check.NextEntry(&c, &inode_parent, &name));
+  EXPECT_EQ(1u, inode_parent);
+  EXPECT_TRUE(name.IsEmpty());
+  EXPECT_FALSE(check.NextEntry(&c, &inode_parent, &name));
+  check.EndEnumerate(&c);
+  EXPECT_EQ(1u, check.GetStatistics().num_insert);
 }
 
 TEST(T_State, FuseState) {

@@ -135,8 +135,10 @@ size_t SerializeShortstring(const ShortString<StackSize, Type> &value,
   if (buffer) {
     size_t length = value.GetLength();
     Serialize<size_t>(length, buffer);
-    memcpy(reinterpret_cast<char *>(buffer) + sizeof(size_t),
-           value.GetChars(), value.GetLength());
+    if (length > 0) {
+      memcpy(reinterpret_cast<char *>(buffer) + sizeof(size_t),
+             value.GetChars(), value.GetLength());
+    }
   }
   return sizeof(size_t) + value.GetLength();
 }
@@ -147,8 +149,12 @@ size_t DeserializeShortstring(const void *buffer,
 {
   size_t length;
   Deserialize<size_t>(buffer, &length);
-  value->Assign(reinterpret_cast<const char *>(buffer) + sizeof(size_t),
-                length);
+  if (length > 0) {
+    value->Assign(reinterpret_cast<const char *>(buffer) + sizeof(size_t),
+                  length);
+  } else {
+    value->Clear();
+  }
   return sizeof(size_t) + length;
 }
 
