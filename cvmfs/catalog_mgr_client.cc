@@ -167,6 +167,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
   shash::Any local_newest_hash(shash::kSha1, shash::kSuffixCatalog);
+  shash::Any mounted_hash(shash::kSha1, shash::kSuffixCatalog);
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
   // LoadReturn success_code = catalog::kLoadFail;
@@ -195,16 +196,20 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   result->SetRootCtlgLocation(kCtlgLocationBreadcrumb);
   LoadReturn success_code = catalog::kLoadNew;
 
+  if (mounted_catalogs_.size() > 0) {
+    const std::map<PathString, shash::Any>::iterator curr_hash_itr =
+                                      mounted_catalogs_.find(PathString("", 0));
+    mounted_hash = curr_hash_itr->second;
+  }
+
   // We only look for currently loaded catalog if the revision is newer than
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
   if ((local_newest_revision <= GetRevisionNoLock()
      || local_newest_revision == manifest::Breadcrumb::kInvalidRevision)
      && mounted_catalogs_.size() > 0) {
-    const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-                                      mounted_catalogs_.find(PathString("", 0));
-    local_newest_hash = curr_hash_itr->second;
+    local_newest_hash = mounted_hash;
     local_newest_revision = GetRevisionNoLock();
-    // if needed for integration test 707
+    // if needed for integration test 707: breadcrumb_timestamp_newer()
     local_newest_timestamp = GetTimestampNoLock() > local_newest_timestamp ?
                                   GetTimestampNoLock() : local_newest_timestamp;
     result->SetRootCtlgLocation(kCtlgLocationMounted);
@@ -216,9 +221,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     // revisions are better, but if we dont have any we need to compare by
     // timestamp (you can have multiple revisions in the same timestamp)
     if (local_newest_timestamp < GetTimestampNoLock()) {
-      const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-                                      mounted_catalogs_.find(PathString("", 0));
-      local_newest_hash = curr_hash_itr->second;
+      local_newest_hash = mounted_hash;
       local_newest_revision = GetRevisionNoLock();
       local_newest_timestamp = GetTimestampNoLock();
       result->SetRootCtlgLocation(kCtlgLocationMounted);
@@ -311,12 +314,9 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   result->SetHash(local_newest_hash);
   result->SetRootCtlgRevision(local_newest_revision);
 
-  // for integration test 707
-  if (breadcrumb.IsValid() && result->root_ctlg_location()
-                                                       != kCtlgLocationServer) {
-    if (breadcrumb.catalog_hash == local_newest_hash) {
-      success_code = catalog::kLoadUp2Date;
-    }
+  // for integration test 707: breadcrumb_revision_large()
+  if (breadcrumb.IsValid() && breadcrumb.catalog_hash == mounted_hash) {
+    success_code = catalog::kLoadUp2Date;
   }
 
   return success_code;
