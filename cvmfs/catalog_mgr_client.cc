@@ -129,21 +129,22 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   result->SetMountpoint(PathString("", 0));
   // quick escape if we have a fixed catalog
   // if (!fixed_root_catalog_.IsNull()) {
-  //   LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn, "GetNewRootCatalogContext FIXED ROOT CATALOG");
+  //   LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+  //                             "GetNewRootCatalogContext FIXED ROOT CATALOG");
 
   //   result->SetHash(fixed_root_catalog_);
   //   result->SetRootCtlgRevision(GetRevisionNoLock());
 
   //   // it might or might not be already mounted, but we do not care
   //   // as we do no need to download and save the manifest
-  //   // (see LoadCatalogByHash()) as such we must set the location to this value
+  //   // (see LoadCatalogByHash()) as such we must set the location to this
   //   result->SetRootCtlgLocation(kCtlgLocationMounted);
 
   //   // we need the right offline/online mode - so try fetching the manifest
   //   shash::Any tmp_hash = fixed_root_catalog_;
   //   manifest::Failures manifest_failure;
   //   UniquePtr<CachedManifestEnsemble> ensemble(
-  //                       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
+  //                   new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
   //   manifest_failure = manifest::Fetch("", repo_name_, GetTimestampNoLock(),
   //                                     &tmp_hash, signature_mgr_,
   //                                     fetcher_->download_mgr(),
@@ -156,7 +157,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   //   }
 
   //   // we can do this here as the very first time fixed catalog is loaded it
-  //   // call directly MountCatalog() and will skip the call to this function here
+  //   // call directly MountCatalog() and will skip the call to this function
+  //   //  here
   //   return catalog::kLoadUp2Date;
 
   // }
@@ -207,7 +209,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
                                   GetTimestampNoLock() : local_newest_timestamp;
     result->SetRootCtlgLocation(kCtlgLocationMounted);
     success_code = catalog::kLoadUp2Date;
-  } else if (local_newest_revision == 0 && mounted_catalogs_.size() > 0) {  // breadcrumb has no revision
+  } else if (local_newest_revision == 0 && mounted_catalogs_.size() > 0) {
+    // breadcrumb has no revision
     // TODO(heretherebedragons) this branch can be removed in futur versions
 
     // revisions are better, but if we dont have any we need to compare by
@@ -228,7 +231,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // // ? just for weird breadcrumb games for integration test 707 ?
   // if (result->root_ctlg_location() == kCtlgLocationBreadcrumb) {
   //   const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-  //                                     mounted_catalogs_.find(PathString("", 0));
+  //                                  mounted_catalogs_.find(PathString("", 0));
   //   if (curr_hash_itr->second == local_newest_hash) {
   //     success_code = catalog::kLoadUp2Date;
   //   }
@@ -309,7 +312,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   result->SetRootCtlgRevision(local_newest_revision);
 
   // for integration test 707
-  if (breadcrumb.IsValid() && result->root_ctlg_location() != kCtlgLocationServer) {
+  if (breadcrumb.IsValid() && result->root_ctlg_location()
+                                                       != kCtlgLocationServer) {
     if (breadcrumb.catalog_hash == local_newest_hash) {
       success_code = catalog::kLoadUp2Date;
     }
