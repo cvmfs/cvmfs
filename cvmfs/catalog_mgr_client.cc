@@ -118,6 +118,8 @@ bool ClientCatalogManager::InitFixed(
  * Checks the locations: mounted, alien cache and remote (server) and sets the
  * fields of variable "result". For the most recent catalog the location, hash
  * and revision number are set.
+ * 
+ * TODO add why fixed root catalog is also checked here
  *
  * @param [out] result All fields but sqlite_path will be set:
  *                     mountpoint, root_ctl_location, root_ctlg_revision, hash
@@ -229,17 +231,6 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     }
   }
 
-  // // if breadcrumb and currently mounted root catalog have same hash change
-  // // return code
-  // // ? just for weird breadcrumb games for integration test 707 ?
-  // if (result->root_ctlg_location() == kCtlgLocationBreadcrumb) {
-  //   const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-  //                                  mounted_catalogs_.find(PathString("", 0));
-  //   if (curr_hash_itr->second == local_newest_hash) {
-  //     success_code = catalog::kLoadUp2Date;
-  //   }
-  // }
-
   // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
   UniquePtr<CachedManifestEnsemble> ensemble(
@@ -299,7 +290,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   if (!fixed_root_catalog_.IsNull()) {
     LogCvmfs(kLogCache, kLogDebug, "Fixed catalog offline mode!");
-    offline_mode_ = true;
+    offline_mode_ = false;
     result->SetHash(fixed_root_catalog_);
     result->SetRootCtlgRevision(local_newest_revision);
     return catalog::kLoadUp2Date;
