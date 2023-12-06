@@ -229,6 +229,8 @@ cvmfs_setup() {
   done
 
   mkdir -p /cvmfs
+  # set permissions for home dir
+  mkdir -p /var/lib/cvmfs
 
   if [ $nouser -eq 0 ]; then
     if ! check_group "cvmfs"; then
@@ -244,11 +246,9 @@ cvmfs_setup() {
         exit 1
       fi
     fi
+    chown cvmfs:cvmfs /var/lib/cvmfs
   fi
 
-  # set permissions for home dir
-  mkdir -p /var/lib/cvmfs
-  chown cvmfs:cvmfs /var/lib/cvmfs
 
   # put workarounds for OS X in place (CernVM-FS poor-man's relocatability)
   if [ x"$sys_arch" = x"Darwin" ]; then
