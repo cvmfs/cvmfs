@@ -32,9 +32,12 @@ case $sys_arch in
     fi
     if [ -x /sbin/pidof ]; then
       pidof="/sbin/pidof"
-    else
+    elif [ -x /bin/pidof ]; then
       # Ubuntu
       pidof="/bin/pidof"
+    elif [ -x /usr/bin/pidof ]; then
+      # Gentoo
+      pidof="/usr/bin/pidof"
     fi
     if [ -x /sbin/fuser ]; then
       fuser="/sbin/fuser"  # RHEL
