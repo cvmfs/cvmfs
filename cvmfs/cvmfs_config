@@ -279,13 +279,11 @@ cvmfs_setup() {
     fi
   fi
 
-  if [ $nouser -eq 0 ]; then
-    # if group fuse exists, add user cvmfs
-    if check_group "fuse"; then
-      if ! add_user_to_group_fuse; then
-        echo "Cannot add user cvmfs to group fuse"
-        exit 1
-      fi
+  # if group fuse exists, add user cvmfs
+  if check_group "fuse"; then
+    if ! add_user_to_group_fuse; then
+      echo "Cannot add user cvmfs to group fuse"
+      exit 1
     fi
   fi
 
