@@ -68,6 +68,12 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.compression_alg =
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
+  if (args.find('U') != args.end()) {
+    params.uid = static_cast<uid_t>(String2Int64(*args.find('U')->second));
+  }
+  if (args.find('G') != args.end()) {
+    params.gid = static_cast<gid_t>(String2Int64(*args.find('G')->second));
+  }
 
   bool create_catalog = args.find('C') != args.end();
 
@@ -164,8 +170,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
-    &mediator, params.dir_rdonly, params.tar_file,
-    params.base_directory, params.to_delete, create_catalog);
+    &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
+    params.uid, params.gid, params.to_delete, create_catalog);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,

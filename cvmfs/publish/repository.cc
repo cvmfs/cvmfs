@@ -741,6 +741,8 @@ void Publisher::ConstructSyncManagers() {
           // TODO(jblomer): get from settings
           "tar_file",
           "base_directory",
+          -1u,
+          -1u,
           "to_delete",
           false /* create_catalog */);
         break;
