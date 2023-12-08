@@ -100,6 +100,7 @@
 #include "options.h"
 #include "quota_listener.h"
 #include "quota_posix.h"
+#include "sanitizer.h"
 #include "shortstring.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -1695,29 +1696,50 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   vector<string> tokens_mode_machine = SplitString(name, '~');
   vector<string> tokens_mode_human = SplitString(name, '@');
 
-  int32_t attr_req_page;
-  MagicXattrMode xattr_mode;
+  int32_t attr_req_page = 0;
+  MagicXattrMode xattr_mode = kXattrMachineMode;
   string attr;
 
+  bool attr_req_is_valid = false;
+  sanitizer::PositiveIntegerSanitizer page_num_sanitizer;
+
   if (tokens_mode_human.size() > 1) {
-    if (tokens_mode_human[tokens_mode_human.size() - 1] == "?") {
+    const std::string token = tokens_mode_human[tokens_mode_human.size() - 1];
+    if (token == "?") {
+      attr_req_is_valid = true;
       attr_req_page = -1;
     } else {
-      attr_req_page = static_cast<int32_t>(String2Uint64(
-                              tokens_mode_human[tokens_mode_human.size() - 1]));
+      if (page_num_sanitizer.IsValid(token)) {
+        attr_req_is_valid = true;
+        attr_req_page = static_cast<int32_t>(String2Uint64(token));
+      }
     }
     xattr_mode = kXattrHumanMode;
     attr = tokens_mode_human[0];
-  } else {
-    if (tokens_mode_machine[tokens_mode_machine.size() - 1] == "?") {
+  } else if (tokens_mode_machine.size() > 1) {
+    const std::string token =
+                            tokens_mode_machine[tokens_mode_machine.size() - 1];
+    if (token == "?") {
+      attr_req_is_valid = true;
       attr_req_page = -1;
     } else {
-      attr_req_page = tokens_mode_machine.size() > 1 ?
-            static_cast<int32_t>(String2Uint64(
-                      tokens_mode_machine[tokens_mode_machine.size() - 1])) : 0;
+      if (page_num_sanitizer.IsValid(token)) {
+        attr_req_is_valid = true;
+        attr_req_page = static_cast<int32_t>(String2Uint64(token));
+      }
     }
     xattr_mode = kXattrMachineMode;
     attr = tokens_mode_machine[0];
+
+  } else {
+    attr_req_is_valid = true;
+    attr = tokens_mode_machine[0];
+  }
+
+  if (!attr_req_is_valid) {
+    fuse_remounter_->fence()->Leave();
+    fuse_reply_err(req, ENODATA);
+    return;
   }
 
   catalog::DirectoryEntry d;
@@ -1779,8 +1801,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     }
   }
 
-  if (attribute_value == "ENOENT") {
-    fuse_reply_err(req, ENOENT);
+  if (attribute_value == "ENODATA") {
+    fuse_reply_err(req, ENODATA);
   } else if (size == 0) {
     fuse_reply_xattr(req, attribute_value.length());
   } else if (size >= attribute_value.length()) {

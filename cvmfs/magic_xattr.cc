@@ -195,28 +195,28 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   }
 }
 
-std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t max_pages,
-                                            uint32_t requested_page) {
+std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t requested_page) {
   return "# Access page at idx: " + StringifyUint(requested_page) + ". " +
-         "Total num pages: " + StringifyUint(max_pages) +
+         "Total num pages: " + StringifyUint(result_pages_.size()) +
          " (access other pages: xattr~<page_num>, starting " +
-         " with 0)\n";
+         " with 0; number of pages available: xattr~?)\n";
 }
 
 std::string BaseMagicXattr::GetValue(int32_t requested_page,
                                      const MagicXattrMode mode) {
+  assert(requested_page >= -1);
   result_pages_.clear();
   FinalizeValue();
 
   std::string res = "";
   if (mode == kXattrMachineMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
-      return "ENOENT";
+      return "ENODATA";
     }
     if (requested_page == -1) {
       return "num_pages, " + StringifyUint(result_pages_.size());
     }
-  } else {
+  } else if (mode == kXattrHumanMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
       return "Page requested does not exists. There are "
              + StringifyUint(result_pages_.size()) + " pages available.\n"
@@ -228,9 +228,11 @@ std::string BaseMagicXattr::GetValue(int32_t requested_page,
              + std::string(" xattr@<page_num> (human-readable mode).\n")
              + "Pages available: " + StringifyUint(result_pages_.size());
     } else {
-      res = HeaderMultipageHuman(result_pages_.size(), requested_page);
-      result_pages_[requested_page];
+      res = HeaderMultipageHuman(requested_page);
     }
+  } else {
+    PANIC(kLogStderr | kLogSyslogErr,
+            "Unknown mode of magic xattr requested: %d", mode);
   }
 
   res += result_pages_[requested_page];
@@ -272,6 +274,7 @@ bool ChunkListMagicXattr::PrepareValueFenced() {
   const std::string header = "hash,offset,size\n";
   std::string chunk_list_page_(header);
   if (!dirent_->IsRegular()) {
+    chunk_list_.push_back(chunk_list_page_);
     return false;
   }
   if (dirent_->IsChunkedFile()) {
@@ -563,7 +566,7 @@ static void ListProxy(download::DownloadManager *dm,
     }
   }
 
-  if (buf.size() > 0) {
+  if (buf.size() > 0 || result_pages->size() == 0) {
     result_pages->push_back(buf);
   }
 }
@@ -593,31 +596,21 @@ void PubkeysMagicXattr::FinalizeValue() {
     return;
   }
 
-  if (full_size <= kMaxCharsPerPage) {
-    std::string res = "";
+  size_t size_within_page = 0;
+  std::string res = "";
 
-    for (size_t i = 0; i < pubkeys_.size(); i++) {
-      res += pubkeys_[i] + "\n";
-    }
-
-    result_pages_.push_back(res);
-  } else {
-    size_t size_within_page = 0;
-    std::string res = "";
-
-    for (size_t i = 0; i < pubkeys_.size(); i++) {
-      if (size_within_page + pubkeys_[i].size() < kMaxCharsPerPage) {
-        res += pubkeys_[i] + "\n";
-        size_within_page += pubkeys_[i].size() + 1;  // +1 new line char
-      } else {
-        result_pages_.push_back(res);
-        res = pubkeys_[i] + "\n";;
-        size_within_page = pubkeys_[i].size() + 1;  // +1 new line char
-      }
-    }
-    if (res.size() > 0) {
+  for (size_t i = 0; i < pubkeys_.size(); i++) {
+    if (size_within_page + pubkeys_[i].size() >= kMaxCharsPerPage) {
       result_pages_.push_back(res);
+      res = "";
+      size_within_page = 0;
     }
+
+    res += pubkeys_[i];
+    size_within_page += pubkeys_[i].size();
+  }
+  if (res.size() > 0) {
+    result_pages_.push_back(res);
   }
 }
 

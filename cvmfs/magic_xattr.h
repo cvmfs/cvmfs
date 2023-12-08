@@ -128,7 +128,7 @@ class BaseMagicXattr {
   virtual bool PrepareValueFenced() { return true; }
   virtual void FinalizeValue() {}
 
-  std::string HeaderMultipageHuman(uint32_t max_pages, uint32_t requested_page);
+  std::string HeaderMultipageHuman(uint32_t requested_page);
 
   MagicXattrManager *xattr_mgr_;
   PathString path_;

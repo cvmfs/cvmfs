@@ -159,7 +159,7 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
 TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
   PubkeysMagicXattr attr;
 
-  EXPECT_STREQ(attr.GetValue(0, kXattrMachineMode).c_str(), "ENOENT");
+  EXPECT_STREQ(attr.GetValue(0, kXattrMachineMode).c_str(), "ENODATA");
 
   attr.pubkeys_.push_back("xx");
 
@@ -183,7 +183,7 @@ TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
   EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).find("dddddd"), 0);
   EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).find("fffffff"), 0);
 
-  EXPECT_STREQ(attr.GetValue(3, kXattrMachineMode).c_str(), "ENOENT");
+  EXPECT_STREQ(attr.GetValue(3, kXattrMachineMode).c_str(), "ENODATA");
   EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).find("# Access page at idx: "),
             std::string::npos);
 }
