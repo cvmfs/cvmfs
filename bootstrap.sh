@@ -16,7 +16,7 @@ MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
-GO_VERSION=1.18
+GO_VERSION=1.21.4
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -92,7 +92,7 @@ do_extract_go() {
 
   cd $externals_build_dir
   tar xvf "$library_dir/$library_archive"
-  mv go $dest_dir
+  mv go-go${GO_VERSION} $dest_dir
   cd $cdir
   cp -r $library_dir/src/* $dest_dir
 }
@@ -251,7 +251,7 @@ build_lib() {
       ;;
     golang)
       if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-        do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
+        do_extract_go "go" "go${GO_VERSION}.tar.gz"
         do_build "go"
       fi
       ;;

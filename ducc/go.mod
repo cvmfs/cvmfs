@@ -48,4 +48,4 @@ require (
 	gotest.tools v2.2.0+incompatible // indirect
 )
 
-go 1.18
+go 1.20
