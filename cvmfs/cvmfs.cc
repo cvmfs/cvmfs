@@ -1800,6 +1800,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
+    attribute_result.first = true;
   }
 
   if (!attribute_result.first) {

@@ -107,7 +107,8 @@ cvmfs_run_test() {
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
 
   echo "*** Test log buffer (quite basic)"
-  local logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
+  local logbuffer
+  logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
   get_xattr logbuffer /cvmfs/grid.cern.ch/
   [ "x$logbuffer" != "x" ] || return 20
 
@@ -149,12 +150,12 @@ Pages available: 1"
   letters_num=$(get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1) 
   nothing=$(get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1) 
 
-  error="attr_get: No data available"
-
-  echo "raw output"
-  echo $(get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README)
-  echo "capture both"
-  echo $negative_num
+  local error
+  if running_on_osx; then
+    error="No message available on STREAM"
+  else
+    error="attr_get: No data available"
+  fi
 
   if echo $negative_num | grep -v "$error"; then
     return 50
