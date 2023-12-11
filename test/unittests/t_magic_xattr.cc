@@ -154,7 +154,8 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   ASSERT_FALSE(attr.IsNull());
   ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
   ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
-  EXPECT_STREQ("keys.cern.ch", attr->GetValue(0, kXattrMachineMode).second.c_str());
+  EXPECT_STREQ("keys.cern.ch",
+                           attr->GetValue(0, kXattrMachineMode).second.c_str());
 }
 
 TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
@@ -182,11 +183,13 @@ TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
   EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).second.find("ccccc"),
             std::string::npos);
   EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).second.find("dddddd"), 0);
-  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).second.find("fffffff"), 0);
+  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).second.find("fffffff"),
+            0);
 
   EXPECT_FALSE(attr.GetValue(3, kXattrMachineMode).first);
-  EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).second.find("# Access page at idx: "),
-            std::string::npos);
+  EXPECT_EQ(
+      attr.GetValue(1, kXattrMachineMode).second.find("# Access page at idx: "),
+      std::string::npos);
 }
 
 TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
@@ -204,7 +207,8 @@ TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
 
   EXPECT_EQ((int) attr.GetValue(1, kXattrHumanMode).second.find(
                                                   "# Access page at idx: "), 0);
-  EXPECT_EQ(attr.GetValue(1, kXattrHumanMode).second.find("ccccc"), std::string::npos);
+  EXPECT_EQ(attr.GetValue(1, kXattrHumanMode).second.find("ccccc"),
+                                                             std::string::npos);
   EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).second.find("ddddddd"), 0);
   EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).second.find("fffffff"), 0);
 
