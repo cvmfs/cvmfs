@@ -202,7 +202,7 @@ std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t requested_page) {
          " with 0; number of pages available: xattr~?)\n";
 }
 
-std::string BaseMagicXattr::GetValue(int32_t requested_page,
+std::pair<bool, std::string> BaseMagicXattr::GetValue(int32_t requested_page,
                                      const MagicXattrMode mode) {
   assert(requested_page >= -1);
   result_pages_.clear();
@@ -211,22 +211,25 @@ std::string BaseMagicXattr::GetValue(int32_t requested_page,
   std::string res = "";
   if (mode == kXattrMachineMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
-      return "ENODATA";
+      return std::pair<bool, std::string> {false, ""};
     }
     if (requested_page == -1) {
-      return "num_pages, " + StringifyUint(result_pages_.size());
+      return std::pair<bool, std::string> {true,
+                           "num_pages, " + StringifyUint(result_pages_.size())};
     }
   } else if (mode == kXattrHumanMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
-      return "Page requested does not exists. There are "
+      return std::pair<bool, std::string> {true,
+             "Page requested does not exists. There are "
              + StringifyUint(result_pages_.size()) + " pages available.\n"
              + "Access them with xattr~<page_num> (machine-readable mode) "
              + "or xattr@<page_num> (human-readable mode).\n"
-             + "Use xattr@? or xattr~? to get extra info about the attribute";
+             + "Use xattr@? or xattr~? to get extra info about the attribute"};
     } else if (requested_page == -1) {
-      return "Access xattr with xattr~<page_num> (machine-readable mode) or "
+      return std::pair<bool, std::string> {true,
+             "Access xattr with xattr~<page_num> (machine-readable mode) or "
              + std::string(" xattr@<page_num> (human-readable mode).\n")
-             + "Pages available: " + StringifyUint(result_pages_.size());
+             + "Pages available: " + StringifyUint(result_pages_.size())};
     } else {
       res = HeaderMultipageHuman(requested_page);
     }
@@ -237,7 +240,7 @@ std::string BaseMagicXattr::GetValue(int32_t requested_page,
 
   res += result_pages_[requested_page];
 
-  return res;
+  return std::pair<bool, std::string> {true, res};
 }
 
 bool AuthzMagicXattr::PrepareValueFenced() {

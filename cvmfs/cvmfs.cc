@@ -62,6 +62,7 @@
 #include <map>
 #include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "authz/authz_session.h"
@@ -1701,7 +1702,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   string attr;
 
   bool attr_req_is_valid = false;
-  sanitizer::PositiveIntegerSanitizer page_num_sanitizer;
+  const sanitizer::PositiveIntegerSanitizer page_num_sanitizer;
 
   if (tokens_mode_human.size() > 1) {
     const std::string token = tokens_mode_human[tokens_mode_human.size() - 1];
@@ -1790,23 +1791,24 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     return;
   }
 
-  string attribute_value;
+  std::pair<bool, std::string> attribute_result;
 
   if (!magic_xattr.IsNull()) {
-    attribute_value = magic_xattr->GetValue(attr_req_page, xattr_mode);
+    attribute_result = magic_xattr->GetValue(attr_req_page, xattr_mode);
   } else {
-    if (!xattrs.Get(attr, &attribute_value)) {
+    if (!xattrs.Get(attr, &attribute_result.second)) {
       fuse_reply_err(req, ENOATTR);
       return;
     }
   }
 
-  if (attribute_value == "ENODATA") {
+  if (!attribute_result.first) {
     fuse_reply_err(req, ENODATA);
   } else if (size == 0) {
-    fuse_reply_xattr(req, attribute_value.length());
-  } else if (size >= attribute_value.length()) {
-    fuse_reply_buf(req, &attribute_value[0], attribute_value.length());
+    fuse_reply_xattr(req, attribute_result.second.length());
+  } else if (size >= attribute_result.second.length()) {
+    fuse_reply_buf(req, &attribute_result.second[0],
+                         attribute_result.second.length());
   } else {
     fuse_reply_err(req, ERANGE);
   }

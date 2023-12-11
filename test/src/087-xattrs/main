@@ -151,6 +151,11 @@ Pages available: 1"
 
   error="attr_get: No data available"
 
+  echo "raw output"
+  echo $(get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README)
+  echo "capture both"
+  echo $negative_num
+
   if echo $negative_num | grep -v "$error"; then
     return 50
   fi

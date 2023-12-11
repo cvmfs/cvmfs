@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "backoff.h"
@@ -35,8 +36,8 @@ enum MagicXattrMode {
 
 class MagicXattrManager;  // needed for BaseMagicXattr
 /**
- * This is a base class for magic extended attribute. Concrete extended
- * attributes inherit from this class. It should be generally used only
+ * This is a base class for magic extended attribute. Every extended
+ * attributes must inherit from this class. It should be generally used only
  * in cooperation with MagicXattrManager.
  * It contains an access mutex. Users should use Lock() and Release()
  * before and after usage (Lock() is called implicitly in MagicXattrManager).
@@ -45,7 +46,9 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  * 0. Get an instance through MagicXattrManager::Get()
  * 1. Call PrepareValueFenced() inside FuseRemounter::fence()
  * 2. Call GetValue(int32_t requested_page, const MagicXattrMode mode);
- *    to get the actual value (can be called outside the fence)
+ *    It returns a <bool, string> pair where the bool is set to true if the
+ *    request was successful and the string contains the actual value.
+ *    GetValue() can be called outside the fence.
  *    This will internally call FinalizeValue() to finalize the value
  *    preparation outside the fuse fence.
  *
@@ -56,7 +59,7 @@ class MagicXattrManager;  // needed for BaseMagicXattr
  * - BaseMagicXattr::GetValue() takes care of clearing result_pages_ before each
  *   new call of FinalizeValue(), and takes care of adding a header for the
  *   human readable version
- * - In case an invalid request is done in machine-readable mode, a string with
+ * - In case an invalid request happens, GetValue() <bool> is set to false.
  *   "ENOENT" will be returned, while in human-readable mode a more verbose
  *   error message will be returned
  */
@@ -93,14 +96,27 @@ class BaseMagicXattr {
    * It does the computationaly intensive part, which should not
    * be done inside the FuseRemounter::fence(), and returns the
    * value.
-   * 
+   *
    * Internally it calls FinalizeValue() which each MagicXAttr has to implement
    * to set the value of result_pages_
-   * 
-   * If request_page == -1 than the number of pages available are returned
+   *
+   * @params
+   *  - requested_page:
+   *      >= 0: requested paged of the attribute
+   *      -1: get info about xattr: e.g. the number of pages available
+   *  - mode: either machine-readable or human-readable
+   *
+   * @returns
+   *  std::pair<bool, std::string>
+   *   bool = false if in machine-readable mode an invalid request is performed
+   *          (human-readable mode always succeeds and gives a verbose message)
+   *          otherwise true
+   *   std::string = the actual value of the attribute or info element
+   *                 ( or error message in human-readable mode)
+   *
    */
-  std::string GetValue(int32_t requested_page,
-                       const MagicXattrMode mode);
+  std::pair<bool, std::string> GetValue(int32_t requested_page,
+                                        const MagicXattrMode mode);
 
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
 
