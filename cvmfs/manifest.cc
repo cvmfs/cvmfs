@@ -18,31 +18,29 @@ namespace manifest {
 
 Breadcrumb::Breadcrumb(const std::string &from_string) {
   timestamp = 0;
+  revision = 0;  // for backward compatibility: no revision --> revision = 0
 
-  if (from_string.size() > 0) {
-    // Separate hash from timestamp
-    std::vector<std::string> vec_split_timestamp =
-                                                  SplitString(from_string, 'T');
+  if (from_string.empty()) {
+    return;
+  }
 
-    catalog_hash =
-      shash::MkFromHexPtr(shash::HexPtr(vec_split_timestamp[0]),
-                                        shash::kSuffixCatalog);
+  // Separate hash from timestamp
+  std::vector<std::string> vec_split_timestamp = SplitString(from_string, 'T');
 
-    if (vec_split_timestamp.size() > 1) {
-      // check if revision number is included
-      std::vector<std::string> vec_split_revision =
+  catalog_hash = shash::MkFromHexPtr(shash::HexPtr(vec_split_timestamp[0]),
+                                     shash::kSuffixCatalog);
+
+  if (vec_split_timestamp.size() > 1) {
+    // check if revision number is included
+    std::vector<std::string> vec_split_revision =
                                        SplitString(vec_split_timestamp[1], 'R');
 
-      // Get local last modified time and revision
-      if (vec_split_revision.size() == 1) {
-          timestamp = String2Uint64(vec_split_revision[0]);
-          // No revision found, i.e. the breadcrumb was stored by an older cvmfs
-          // version. We set the revision to 0 as a workaround.
-          revision = 0;
-      } else {
-          timestamp = String2Uint64(vec_split_revision[0]);
-          revision = String2Uint64(vec_split_revision[1]);
-      }
+    // Get local last modified time
+    timestamp = String2Uint64(vec_split_revision[0]);
+
+    // Get local revision
+    if (vec_split_revision.size() > 1) {
+      revision = String2Uint64(vec_split_revision[1]);
     }
   }
 }
