@@ -244,11 +244,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
             "manifest too old or server unreachable (%d - %s)",
             manifest_failure, manifest::Code2Ascii(manifest_failure));
 
-  // corner case: server not reachable, local revision is 0. We can not
-  // distinguish if local revision number is valid or invalid. Most likely
-  // it is invalid - so fail
-  if (local_newest_revision == 0 && (manifest_failure != manifest::kFailOk)
-      && local_newest_hash.IsNull()) {
+  // total failure: server not reachable and no valid local hash
+  if ((manifest_failure != manifest::kFailOk) && local_newest_hash.IsNull()) {
     LogCvmfs(kLogCache, kLogDebug, "No valid root catalog found!");
     return catalog::kLoadFail;
   }
