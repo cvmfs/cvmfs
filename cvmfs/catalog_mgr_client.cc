@@ -120,7 +120,7 @@ bool ClientCatalogManager::InitFixed(
  * Checks the locations: mounted, alien cache and remote (server) and sets the
  * fields of variable "result". For the most recent catalog the location, hash
  * and revision number are set.
- * 
+ *
  *
  * @param [out] result All fields but sqlite_path will be set:
  *                     mountpoint, root_ctl_location, root_ctlg_revision, hash
@@ -196,7 +196,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     success_code = catalog::kLoadUp2Date;
   } else if (local_newest_revision == 0 && mounted_catalogs_.size() > 0) {
     // breadcrumb has no revision
-    // TODO(heretherebedragons) this branch can be removed in futur versions
+    // TODO(heretherebedragons) this branch can be removed in future versions
 
     // revisions are better, but if we dont have any we need to compare by
     // timestamp (you can have multiple revisions in the same timestamp)
@@ -229,11 +229,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
       result->SetHash(ensemble->manifest->catalog_hash());
       result->SetRootCtlgRevision(ensemble->manifest->revision());
       result->SetRootCtlgLocation(kCtlgLocationServer);
-      if (ensemble->manifest->has_alt_catalog_path()) {
-        fixed_alt_root_catalog_ = true;
-      } else {
-        fixed_alt_root_catalog_ = false;
-      }
+      fixed_alt_root_catalog_ = ensemble->manifest->has_alt_catalog_path();
 
       result->TakeManifestEnsemble(
                     static_cast<manifest::ManifestEnsemble*>(
