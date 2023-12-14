@@ -1,5 +1,6 @@
 2.12.0:
-  * [server]  Ingest Tarball now with modifiyable ownership (#3362)
+  * [server] Ingest Tarball now with modifiyable ownership (#3362)
+  * [client] Refactoring of file catalog reloads (#3156)
 
 2.11.2:
   * [client] Fix mount helper race condition causing spurious directories (#3430)
