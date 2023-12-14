@@ -31,6 +31,7 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
+  timestamp_cache_ = 0;
   catalog_watermark_ = 0;
   volatile_flag_ = false;
   has_authz_cache_ = false;
@@ -115,28 +116,38 @@ bool AbstractCatalogManager<CatalogT>::Init() {
  * are detached)
  */
 template <class CatalogT>
-LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
+LoadReturn AbstractCatalogManager<CatalogT>::RemountDryrun() {
   LogCvmfs(kLogCatalog, kLogDebug,
-           "remounting repositories (dry run %d)", dry_run);
-  if (dry_run)
-    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
+           "dryrun remounting repositories");
+  CatalogContext ctlg_context;
+  return GetNewRootCatalogContext(&ctlg_context);
+}
+
+template <class CatalogT>
+LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
+  LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
+  CatalogContext ctlg_context;
+
+  if (GetNewRootCatalogContext(&ctlg_context) != kLoadNew
+      && GetNewRootCatalogContext(&ctlg_context) != kLoadUp2Date) {
+    LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories: "
+                                "Did not find any valid root catalog to mount");
+    return kLoadFail;
+  }
 
   WriteLock();
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError load_error = LoadCatalog(PathString("", 0),
-                                           shash::Any(),
-                                           &catalog_path,
-                                           &catalog_hash);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
+
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    CatalogT *new_root = CreateCatalog(ctlg_context.mountpoint(),
+                                       ctlg_context.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(catalog_path, new_root);
+    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -153,28 +164,31 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
  * Remounts to the given hash
  */
 template <class CatalogT>
-LoadError AbstractCatalogManager<CatalogT>::ChangeRoot(
+LoadReturn AbstractCatalogManager<CatalogT>::ChangeRoot(
   const shash::Any &root_hash)
 {
+  assert(!root_hash.IsNull());
   LogCvmfs(kLogCatalog, kLogDebug,
            "switching to root hash %s", root_hash.ToString().c_str());
 
   WriteLock();
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError load_error = LoadCatalog(PathString("", 0),
-                                           root_hash,
-                                           &catalog_path,
-                                           &catalog_hash);
+  CatalogContext ctlg_context(root_hash, PathString("", 0),
+                                                         kCtlgNoLocationNeeded);
+  // we do not need to set revision as LoadCatalogByHash
+  // needs only mountpoint, hash
+
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
+
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
     inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    CatalogT *new_root =
+                    CreateCatalog(PathString("", 0), ctlg_context.hash(), NULL);
     assert(new_root);
-    bool retval = AttachCatalog(catalog_path, new_root);
+    bool retval = AttachCatalog(ctlg_context.sqlite_path(), new_root);
     assert(retval);
 
     if (inode_annotation_) {
@@ -667,12 +681,40 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
 template <class CatalogT>
 uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
-  const uint64_t revision = revision_cache_;
+  const uint64_t revision = GetRevisionNoLock();
   Unlock();
 
   return revision;
 }
 
+/**
+ * Like GetRevision() only without any locking mechanism.
+ * As such should only be used in conditions where a lock was already taken
+ * and calling GetRevision() would otherwise result in a deadlock.
+ */
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetRevisionNoLock() const {
+  return revision_cache_;
+}
+
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetTimestamp() const {
+  ReadLock();
+  const uint64_t timestamp = GetTimestampNoLock();
+  Unlock();
+
+  return timestamp;
+}
+
+/**
+ * Like GetTimestamp() only without any locking mechanism.
+ * As such should only be used in conditions where a lock was already taken
+ * and calling GetTimestamp() would otherwise result in a deadlock.
+ */
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetTimestampNoLock() const {
+  return timestamp_cache_;
+}
 
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string *authz) const {
@@ -879,23 +921,34 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
                                               CatalogT *parent_catalog)
 {
   CatalogT *attached_catalog = NULL;
-  if (IsAttached(mountpoint, &attached_catalog))
+  if (IsAttached(mountpoint, &attached_catalog)) {
     return attached_catalog;
+  }
 
-  string     catalog_path;
-  shash::Any catalog_hash;
-  const LoadError retval =
-    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
+  CatalogContext ctlg_context(hash, mountpoint, kCtlgLocationMounted);
+
+  if (ctlg_context.IsRootCatalog() && hash.IsNull()) {
+    if (GetNewRootCatalogContext(&ctlg_context) == kLoadFail) {
+      LogCvmfs(kLogCatalog, kLogDebug,
+                                   "failed to retrieve valid root catalog '%s'",
+                                   mountpoint.c_str());
+      return NULL;
+    }
+  }
+
+  const LoadReturn retval = LoadCatalogByHash(&ctlg_context);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(mountpoint, catalog_hash, parent_catalog);
+  attached_catalog = CreateCatalog(ctlg_context.mountpoint(),
+                                   ctlg_context.hash(),
+                                   parent_catalog);
 
   // Attach loaded catalog
-  if (!AttachCatalog(catalog_path, attached_catalog)) {
+  if (!AttachCatalog(ctlg_context.sqlite_path(), attached_catalog)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to attach catalog '%s'",
              mountpoint.c_str());
     UnloadCatalog(attached_catalog);
@@ -919,15 +972,18 @@ CatalogT *AbstractCatalogManager<CatalogT>::LoadFreeCatalog(
                                             const PathString     &mountpoint,
                                             const shash::Any     &hash)
 {
-  string new_path;
-  shash::Any check_hash;
-  const LoadError load_error = LoadCatalog(mountpoint, hash, &new_path,
-                                           &check_hash);
-  if (load_error != kLoadNew)
+  assert(!hash.IsNull());
+  CatalogContext ctlg_context(hash, mountpoint, kCtlgNoLocationNeeded);
+
+  const LoadReturn load_ret = LoadCatalogByHash(&ctlg_context);
+
+  if (load_ret != kLoadNew) {
     return NULL;
-  assert(hash == check_hash);
+  }
+
   CatalogT *catalog = CatalogT::AttachFreely(mountpoint.ToString(),
-                                             new_path, hash);
+                                             ctlg_context.sqlite_path(),
+                                             ctlg_context.hash());
   catalog->TakeDatabaseFileOwnership();
   return catalog;
 }
@@ -972,6 +1028,7 @@ bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
   // The revision of the catalog tree is given by the root catalog revision
   if (catalogs_.empty()) {
     revision_cache_ = new_catalog->GetRevision();
+    timestamp_cache_ = new_catalog->GetLastModified();
     statistics_.catalog_revision->Set(revision_cache_);
     has_authz_cache_ = new_catalog->GetVOMSAuthz(&authz_cache_);
     volatile_flag_ = new_catalog->volatile_flag();

@@ -215,6 +215,11 @@ void CachePlugin::HandleBreadcrumbStore(
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
     breadcrumb.timestamp = msg_req->breadcrumb().timestamp();
+    if (msg_req->breadcrumb().has_revision()) {
+      breadcrumb.revision = msg_req->breadcrumb().revision();
+    } else {
+      breadcrumb.revision = 0;
+    }
     cvmfs::EnumStatus status =
       StoreBreadcrumb(msg_req->breadcrumb().fqrn(), breadcrumb);
     msg_reply.set_status(status);
@@ -244,6 +249,7 @@ void CachePlugin::HandleBreadcrumbLoad(
     msg_breadcrumb->set_fqrn(msg_req->fqrn());
     msg_breadcrumb->set_allocated_hash(msg_hash);
     msg_breadcrumb->set_timestamp(breadcrumb.timestamp);
+    msg_breadcrumb->set_revision(breadcrumb.revision);
     msg_reply.set_allocated_breadcrumb(msg_breadcrumb);
   }
   transport->SendFrame(&frame_send);

@@ -82,7 +82,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
+  const catalog::LoadReturn retval =
+                                    mountpoint_->catalog_mgr()->RemountDryrun();
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);
@@ -321,9 +322,9 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
 
   // Ensure that all Fuse callbacks left the catalog query code
   fence_->Drain();
-  catalog::LoadError retval;
+  catalog::LoadReturn retval;
   if (root_hash.IsNull()) {
-    retval = mountpoint_->catalog_mgr()->Remount(false);
+    retval = mountpoint_->catalog_mgr()->Remount();
   } else {
     retval = mountpoint_->catalog_mgr()->ChangeRoot(root_hash);
   }

@@ -258,6 +258,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (result == CVMCACHE_STATUS_OK) {
       breadcrumb->catalog_hash = Chash2Cpphash(&c_breadcrumb.catalog_hash);
       breadcrumb->timestamp = c_breadcrumb.timestamp;
+      breadcrumb->revision = c_breadcrumb.revision;
     }
     return static_cast<cvmfs::EnumStatus>(result);
   }
@@ -271,6 +272,7 @@ class ForwardCachePlugin : public CachePlugin {
     cvmcache_breadcrumb c_breadcrumb;
     c_breadcrumb.catalog_hash = Cpphash2Chash(breadcrumb.catalog_hash);
     c_breadcrumb.timestamp = breadcrumb.timestamp;
+    c_breadcrumb.revision = breadcrumb.revision;
     int result =
       callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(), &c_breadcrumb);
     return static_cast<cvmfs::EnumStatus>(result);

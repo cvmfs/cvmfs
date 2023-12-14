@@ -16,21 +16,29 @@
 namespace manifest {
 
 /**
- * The breadcrumb stores the catalog root hash and a time stamp.  It is used
- * to store the last known copy of the catalog in the cache.
+ * The breadcrumb stores the catalog root hash, its revision and a time stamp.
+ * It is used to store the last known copy of the catalog in the cache.
  */
 struct Breadcrumb {
-  Breadcrumb() : catalog_hash(), timestamp(0) {}
-  Breadcrumb(const shash::Any &h, uint64_t t) : catalog_hash(h), timestamp(t) {}
+  static const uint64_t kInvalidRevision = -1ul;
+
+  Breadcrumb() : catalog_hash(), timestamp(0), revision(kInvalidRevision) {}
+  Breadcrumb(const shash::Any &h, uint64_t t, uint64_t r) :
+                                                          catalog_hash(h),
+                                                          timestamp(t),
+                                                          revision(r) {}
   explicit Breadcrumb(const std::string &from_string);
 
   bool Export(const std::string &fqrn,
               const std::string &directory, const int mode) const;
   std::string ToString() const;
-  bool IsValid() const { return !catalog_hash.IsNull() && (timestamp > 0); }
+  bool IsValid() const { return !catalog_hash.IsNull()
+                                && (timestamp > 0)
+                                && (revision != kInvalidRevision); }
 
   shash::Any catalog_hash;
   uint64_t timestamp;
+  uint64_t revision;
 };
 
 

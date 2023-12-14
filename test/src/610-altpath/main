@@ -1,6 +1,7 @@
 
 cvmfs_test_name="Alternative catalog path"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_610_REPLICA_NAME=
 CVMFS_TEST_610_MOUNTPOINT=

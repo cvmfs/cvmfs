@@ -36,12 +36,13 @@ class T_Manifest : public ::testing::Test {
 
 TEST_F(T_Manifest, Breadcrumb) {
   EXPECT_FALSE(Breadcrumb().IsValid());
-  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kSha1), 0).IsValid());
-  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kShake128), 1).IsValid());
+  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kSha1), 0, 0).IsValid());
+  EXPECT_FALSE(Breadcrumb(shash::Any(shash::kShake128), 1, 0).IsValid());
   shash::Any rnd_hash(shash::kRmd160);
   rnd_hash.Randomize();
-  EXPECT_FALSE(Breadcrumb(rnd_hash, 0).IsValid());
-  EXPECT_TRUE(Breadcrumb(rnd_hash, 1).IsValid());
+  EXPECT_FALSE(Breadcrumb(rnd_hash, 0, 0).IsValid());
+  EXPECT_FALSE(Breadcrumb(rnd_hash, 1, -1ul).IsValid());
+  EXPECT_TRUE(Breadcrumb(rnd_hash, 1, 0).IsValid());
 
   EXPECT_FALSE(Breadcrumb("").IsValid());
   EXPECT_FALSE(Breadcrumb("0").IsValid());
@@ -52,6 +53,8 @@ TEST_F(T_Manifest, Breadcrumb) {
   EXPECT_FALSE(Breadcrumb("0T").IsValid());
   EXPECT_TRUE(
     Breadcrumb("0000000000000000000000000000000000000001T1").IsValid());
+  EXPECT_TRUE(
+    Breadcrumb("0000000000000000000000000000000000000001T1R10").IsValid());
   EXPECT_FALSE(
     Breadcrumb("0000000000000000000000000000000000000001T0").IsValid());
 }

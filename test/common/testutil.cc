@@ -506,21 +506,42 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                          0, is_root, parent_catalog, NULL);
 }
 
-catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
-                                                  const PathString &mountpoint,
-                                                  const shash::Any &hash,
-                                                  string  *catalog_path,
-                                                  shash::Any *catalog_hash)
-{
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
-  if (it != catalog_map_.end() && catalog_hash != NULL) {
+catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
+                                          CatalogContext *result) {
+  LogCvmfs(kLogCache, kLogDebug,
+                       "catalog::MockCatalogManager::GetNewRootCatalogContext");
+  const map<PathString, MockCatalog*>::iterator it =
+                                           catalog_map_.find(PathString("", 0));
+  if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
-    *catalog_hash = catalog->hash();
+    result->SetHash(catalog->hash());
+    // TODO(heretherebedragons) is this the correct choice?
+    result->SetRootCtlgRevision(GetRevision());
+    result->SetRootCtlgLocation(kCtlgLocationServer);
+    result->SetMountpoint(PathString("", 0));
+    result->SetSqlitePath("");
+    return kLoadUp2Date;
+  }
+  // This is an ugly workaround needed, otherwise Init() within
+  // t_catalog_mgr.cc fails as it calls the non-mocked MountCatalog() function
+  // which fails if no valid root catalog is found
+  return kLoadNew;
+}
+
+catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
+                            CatalogContext *ctlg_context) {
+  LogCvmfs(kLogCache, kLogDebug,
+                              "catalog::MockCatalogManager::LoadCatalogByHash");
+  const map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
+                                                    ctlg_context->mountpoint());
+  if (it != catalog_map_.end() && !ctlg_context->hash().IsNull()) {
+    return kLoadUp2Date;
   } else {
-    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
-                                           hash, 4096, 1, 0,
-                                           true, NULL, NULL);
-    catalog_map_[mountpoint] = catalog;
+    MockCatalog *catalog = new MockCatalog(
+                                          ctlg_context->mountpoint().ToString(),
+                                          ctlg_context->hash(), 4096, 1, 0,
+                                          true, NULL, NULL);
+    catalog_map_[ctlg_context->mountpoint()] = catalog;
   }
   return kLoadNew;
 }

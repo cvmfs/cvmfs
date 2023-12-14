@@ -14,25 +14,35 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+// TODO(herethebedragons) correct return value and root_ctlg_location?
+LoadReturn SimpleCatalogManager::GetNewRootCatalogContext(
+                                                       CatalogContext *result) {
+  if (result->hash().IsNull()) {
+    result->SetHash(base_hash_);
+  }
+  result->SetRootCtlgLocation(kCtlgLocationServer);
+  result->SetMountpoint(PathString("", 0));
+
+  return kLoadNew;
+}
+
+
 /**
  * Loads a catalog via HTTP from Statum 0 into a temporary file.
- * @param url_path the url of the catalog to load
- * @param mount_point the file system path where the catalog should be mounted
- * @param catalog_file a pointer to the string containing the full qualified
- *                     name of the catalog afterwards
- * @return 0 on success, different otherwise
+ * See CatalogContext class description for correct usage
+ * 
+ * @return kLoadNew on success
  */
-LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
-                                            const shash::Any  &hash,
-                                            std::string       *catalog_path,
-                                            shash::Any        *catalog_hash)
-{
-  shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
+LoadReturn SimpleCatalogManager::LoadCatalogByHash(
+                                                 CatalogContext *ctlg_context) {
+  const shash::Any effective_hash = ctlg_context->hash();
   assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
 
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
-                                  catalog_path);
+  std::string tmp;
+
+  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp);
+  ctlg_context->SetSqlitePath(tmp);
   if (!fcatalog) {
     PANIC(kLogStderr, "failed to create temp file when loading %s",
           url.c_str());
@@ -40,17 +50,16 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   cvmfs::FileSink filesink(fcatalog);
   download::JobInfo download_catalog(&url, true, false,
-                                     &effective_hash, &filesink);
-  download::Failures retval = download_manager_->Fetch(&download_catalog);
+                                    &effective_hash, &filesink);
+  const download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);
 
   if (retval != download::kFailOk) {
-    unlink(catalog_path->c_str());
-    PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
-          retval, download::Code2Ascii(retval));
+    unlink(ctlg_context->GetSqlitePathPtr()->c_str());
+    PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)",
+                      url.c_str(), retval, download::Code2Ascii(retval));
   }
 
-  *catalog_hash = effective_hash;
   return kLoadNew;
 }
 

@@ -6,9 +6,11 @@
 
 #include <cstdio>
 #include <map>
+#include <vector>
 
 #include "catalog.h"
 #include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -16,20 +18,30 @@ namespace manifest {
 
 Breadcrumb::Breadcrumb(const std::string &from_string) {
   timestamp = 0;
-  int len = from_string.length();
+  revision = 0;  // for backward compatibility: no revision --> revision = 0
+
+  if (from_string.empty()) {
+    return;
+  }
 
   // Separate hash from timestamp
-  int separator_pos = 0;
-  for (; (separator_pos < len) && (from_string[separator_pos] != 'T');
-       ++separator_pos)
-  { }
-  catalog_hash =
-    shash::MkFromHexPtr(shash::HexPtr(from_string.substr(0, separator_pos)),
-                                      shash::kSuffixCatalog);
+  std::vector<std::string> vec_split_timestamp = SplitString(from_string, 'T');
 
-  // Get local last modified time
-  if ((from_string[separator_pos] == 'T') && (len > (separator_pos + 1))) {
-    timestamp = String2Uint64(from_string.substr(separator_pos + 1));
+  catalog_hash = shash::MkFromHexPtr(shash::HexPtr(vec_split_timestamp[0]),
+                                     shash::kSuffixCatalog);
+
+  if (vec_split_timestamp.size() > 1) {
+    // check if revision number is included
+    std::vector<std::string> vec_split_revision =
+                                       SplitString(vec_split_timestamp[1], 'R');
+
+    // Get local last modified time
+    timestamp = String2Uint64(vec_split_revision[0]);
+
+    // Get local revision
+    if (vec_split_revision.size() > 1) {
+      revision = String2Uint64(vec_split_revision[1]);
+    }
   }
 }
 
@@ -58,7 +70,9 @@ bool Breadcrumb::Export(const string &fqrn, const string &directory,
 }
 
 std::string Breadcrumb::ToString() const {
-  return catalog_hash.ToString() + "T" + StringifyInt(timestamp);
+  return catalog_hash.ToString()
+                           + "T" + StringifyInt(static_cast<int64_t>(timestamp))
+                           + "R" + StringifyUint(revision);
 }
 
 
@@ -230,8 +244,8 @@ bool Manifest::Export(const std::string &path) const {
  * Writes the cvmfschecksum.$repository file.  Atomic store.
  */
 bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
-  return Breadcrumb(catalog_hash_, publish_timestamp_).Export(repository_name_,
-                                                              directory, mode);
+  return Breadcrumb(catalog_hash_, publish_timestamp_, revision_).
+                      Export(repository_name_, directory, mode);
 }
 
 
@@ -250,9 +264,9 @@ Breadcrumb Manifest::ReadBreadcrumb(
     // Return invalid breadcrumb if not found
     return breadcrumb;
   }
-  char tmp[128];
-  int read_bytes;
-  if ((read_bytes = fread(tmp, 1, 128, fbreadcrumb)) > 0) {
+  char tmp[164];
+  const size_t read_bytes = fread(tmp, 1, 164, fbreadcrumb);
+  if (read_bytes > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
   fclose(fbreadcrumb);

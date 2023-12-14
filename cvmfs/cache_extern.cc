@@ -701,6 +701,11 @@ manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
     assert(rv);
     breadcrumb.catalog_hash.suffix = shash::kSuffixCatalog;
     breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
+    if (msg_reply->breadcrumb().has_revision()) {
+      breadcrumb.revision = msg_reply->breadcrumb().revision();
+    } else {
+      breadcrumb.revision = 0;
+    }
   }
   return breadcrumb;
 }
@@ -716,6 +721,7 @@ bool ExternalCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
   breadcrumb.set_fqrn(manifest.repository_name());
   breadcrumb.set_allocated_hash(&hash);
   breadcrumb.set_timestamp(manifest.publish_timestamp());
+  breadcrumb.set_revision(manifest.revision());
   cvmfs::MsgBreadcrumbStoreReq msg_breadcrumb_store;
   msg_breadcrumb_store.set_session_id(session_id_);
   msg_breadcrumb_store.set_req_id(NextRequestId());

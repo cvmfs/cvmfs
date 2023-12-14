@@ -13,7 +13,9 @@
 //   - Add cvmcache_get_session()
 // 3 --> 4:
 //   - Add breadcrumb management
-#define LIBCVMFS_CACHE_REVISION 4
+// 4 --> 5:
+//   - Add revision to breadcrumb
+#define LIBCVMFS_CACHE_REVISION 5
 
 #include <stdint.h>
 
@@ -109,6 +111,7 @@ struct cvmcache_session {
 struct cvmcache_breadcrumb {
   struct cvmcache_hash catalog_hash;
   uint64_t timestamp;
+  uint64_t revision;
 };
 
 /**

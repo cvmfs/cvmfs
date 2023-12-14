@@ -75,8 +75,9 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   }
 
   // Quick way out: hash matches base catalog
-  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog))
+  if (base_catalog && (ensemble->manifest->catalog_hash() == *base_catalog)) {
     return kFailOk;
+  }
 
   // Load certificate
   certificate_hash = ensemble->manifest->certificate();

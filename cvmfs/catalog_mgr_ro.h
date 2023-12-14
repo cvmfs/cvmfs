@@ -46,10 +46,8 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     , manage_catalog_files_(manage_catalog_files) { }
 
  protected:
-  virtual LoadError LoadCatalog(const PathString  &mountpoint,
-                                const shash::Any  &hash,
-                                std::string       *catalog_path,
-                                shash::Any        *catalog_hash);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog           *parent_catalog);
