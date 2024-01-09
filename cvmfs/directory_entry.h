@@ -77,25 +77,28 @@ class DirectoryEntryBase {
 
   /**
    * Used in the swissknife for sanity checks and catalog migration.  If
-   * anything is added, also adjust PrintDifferences in swissknife::CommandDiff.
+   * anything is added, also adjust PrintDifferences in swissknife::CommandDiff
+   * and CommandCheck::CompareEntries
    */
   struct Difference {
-    static const unsigned int kIdentical                    = 0x000;
-    static const unsigned int kName                         = 0x001;
-    static const unsigned int kLinkcount                    = 0x002;
-    static const unsigned int kSize                         = 0x004;
-    static const unsigned int kMode                         = 0x008;
-    static const unsigned int kMtime                        = 0x010;
-    static const unsigned int kSymlink                      = 0x020;
-    static const unsigned int kChecksum                     = 0x040;
-    static const unsigned int kHardlinkGroup                = 0x080;
-    static const unsigned int kNestedCatalogTransitionFlags = 0x100;
-    static const unsigned int kChunkedFileFlag              = 0x200;
-    static const unsigned int kHasXattrsFlag                = 0x400;
-    static const unsigned int kExternalFileFlag             = 0x800;
-    static const unsigned int kBindMountpointFlag           = 0x1000;
-    static const unsigned int kHiddenFlag                   = 0x2000;
-    static const unsigned int kDirectIoFlag                 = 0x4000;
+    static const unsigned int kIdentical                    = 0x00000;
+    static const unsigned int kName                         = 0x00001;
+    static const unsigned int kLinkcount                    = 0x00002;
+    static const unsigned int kSize                         = 0x00004;
+    static const unsigned int kMode                         = 0x00008;
+    static const unsigned int kMtime                        = 0x00010;
+    static const unsigned int kSymlink                      = 0x00020;
+    static const unsigned int kChecksum                     = 0x00040;
+    static const unsigned int kHardlinkGroup                = 0x00080;
+    static const unsigned int kNestedCatalogTransitionFlags = 0x00100;
+    static const unsigned int kChunkedFileFlag              = 0x00200;
+    static const unsigned int kHasXattrsFlag                = 0x00400;
+    static const unsigned int kExternalFileFlag             = 0x00800;
+    static const unsigned int kBindMountpointFlag           = 0x01000;
+    static const unsigned int kHiddenFlag                   = 0x02000;
+    static const unsigned int kDirectIoFlag                 = 0x04000;
+    static const unsigned int kUid                          = 0x08000;
+    static const unsigned int kGid                          = 0x10000;
   };
   typedef unsigned int Differences;
 
