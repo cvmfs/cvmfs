@@ -106,6 +106,7 @@ class CVMFS_EXPORT SignatureManager {
   X509 *certificate_;
   std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
   pthread_mutex_t lock_blacklist_;
+  pthread_mutex_t lock_certificate_;
   std::vector<std::string> blacklist_;
   X509_STORE *x509_store_;
   X509_LOOKUP *x509_lookup_;
