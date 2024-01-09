@@ -13,7 +13,8 @@ cvmfs_run_test() {
   local known_pubkey=$(find /etc/cvmfs/keys/ -name "${CVMFS_TEST_REPO}.pub")
   attr -qg pubkeys /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly > pubkey_attr
 
-  if `diff -q pubkey_attr $known_pubkey`; then
+  # attr returns a new line at the end of the key. So ignore blank lines in diff
+  if eval "$(diff -B -q pubkey_attr $known_pubkey)"; then
     echo "Pubkeys match:"
     cat pubkey_attr
   else

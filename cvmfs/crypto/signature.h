@@ -84,6 +84,7 @@ class CVMFS_EXPORT SignatureManager {
 
   // Returns the PEM-encoded text of all loaded RSA pubkeys
   std::string GetActivePubkeys() const;
+  std::vector<std::string> GetActivePubkeysAsVector() const;
   // The PEM-encoded private key matching the public master key
   std::string GetPrivateMasterKey();
   // The PEM-encoded certificate without private key

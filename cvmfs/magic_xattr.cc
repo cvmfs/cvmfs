@@ -195,12 +195,60 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   }
 }
 
+std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t requested_page) {
+  return "# Access page at idx: " + StringifyUint(requested_page) + ". " +
+         "Total num pages: " + StringifyUint(result_pages_.size()) +
+         " (access other pages: xattr~<page_num>, starting " +
+         " with 0; number of pages available: xattr~?)\n";
+}
+
+std::pair<bool, std::string> BaseMagicXattr::GetValue(int32_t requested_page,
+                                     const MagicXattrMode mode) {
+  assert(requested_page >= -1);
+  result_pages_.clear();
+  FinalizeValue();
+
+  std::string res = "";
+  if (mode == kXattrMachineMode) {
+    if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
+      return std::pair<bool, std::string> (false, "");
+    }
+    if (requested_page == -1) {
+      return std::pair<bool, std::string> (true,
+                           "num_pages, " + StringifyUint(result_pages_.size()));
+    }
+  } else if (mode == kXattrHumanMode) {
+    if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
+      return std::pair<bool, std::string> (true,
+             "Page requested does not exists. There are "
+             + StringifyUint(result_pages_.size()) + " pages available.\n"
+             + "Access them with xattr~<page_num> (machine-readable mode) "
+             + "or xattr@<page_num> (human-readable mode).\n"
+             + "Use xattr@? or xattr~? to get extra info about the attribute");
+    } else if (requested_page == -1) {
+      return std::pair<bool, std::string> (true,
+             "Access xattr with xattr~<page_num> (machine-readable mode) or "
+             + std::string(" xattr@<page_num> (human-readable mode).\n")
+             + "Pages available: " + StringifyUint(result_pages_.size()));
+    } else {
+      res = HeaderMultipageHuman(requested_page);
+    }
+  } else {
+    PANIC(kLogStderr | kLogSyslogErr,
+            "Unknown mode of magic xattr requested: %d", mode);
+  }
+
+  res += result_pages_[requested_page];
+
+  return std::pair<bool, std::string> (true, res);
+}
+
 bool AuthzMagicXattr::PrepareValueFenced() {
   return xattr_mgr_->mount_point()->has_membership_req();
 }
 
-std::string AuthzMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->membership_req();
+void AuthzMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->membership_req());
 }
 
 MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
@@ -214,17 +262,22 @@ bool CatalogCountersMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string CatalogCountersMagicXattr::GetValue() {
+void CatalogCountersMagicXattr::FinalizeValue() {
   std::string res;
   res = "catalog_hash: " + hash_.ToString() + "\n";
   res += "catalog_mountpoint: " + subcatalog_path_ + "\n";
   res += counters_.GetCsvMap();
-  return res;
+
+  result_pages_.push_back(res);
 }
 
 bool ChunkListMagicXattr::PrepareValueFenced() {
-  chunk_list_ = "hash,offset,size\n";
+  chunk_list_.clear();
+
+  const std::string header = "hash,offset,size\n";
+  std::string chunk_list_page_(header);
   if (!dirent_->IsRegular()) {
+    chunk_list_.push_back(chunk_list_page_);
     return false;
   }
   if (dirent_->IsChunkedFile()) {
@@ -238,21 +291,32 @@ bool ChunkListMagicXattr::PrepareValueFenced() {
       return false;
     } else {
       for (size_t i = 0; i < chunks.size(); ++i) {
-        chunk_list_ += chunks.At(i).content_hash().ToString() + ",";
-        chunk_list_ += StringifyInt(chunks.At(i).offset()) + ",";
-        chunk_list_ += StringifyUint(chunks.At(i).size()) + "\n";
+        chunk_list_page_ += chunks.At(i).content_hash().ToString() + ",";
+        chunk_list_page_ += StringifyInt(chunks.At(i).offset()) + ",";
+        chunk_list_page_ += StringifyUint(chunks.At(i).size()) + "\n";
+
+        if (chunk_list_page_.size() > kMaxCharsPerPage) {
+          chunk_list_.push_back(chunk_list_page_);
+          chunk_list_page_ = header;
+        }
       }
     }
   } else {
-    chunk_list_ += dirent_->checksum().ToString() + ",";
-    chunk_list_ += "0,";
-    chunk_list_ += StringifyUint(dirent_->size()) + "\n";
+    chunk_list_page_ += dirent_->checksum().ToString() + ",";
+    chunk_list_page_ += "0,";
+    chunk_list_page_ += StringifyUint(dirent_->size()) + "\n";
   }
+
+  // add the last page
+  if (chunk_list_page_.size() > header.size()) {
+    chunk_list_.push_back(chunk_list_page_);
+  }
+
   return true;
 }
 
-std::string ChunkListMagicXattr::GetValue() {
-  return chunk_list_;
+void ChunkListMagicXattr::FinalizeValue() {
+  result_pages_ = chunk_list_;
 }
 
 bool ChunksMagicXattr::PrepareValueFenced() {
@@ -278,80 +342,81 @@ bool ChunksMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string ChunksMagicXattr::GetValue() {
-  return StringifyUint(n_chunks_);
+void ChunksMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyUint(n_chunks_));
 }
 
 bool CompressionMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
 
-std::string CompressionMagicXattr::GetValue() {
-  return zlib::AlgorithmName(dirent_->compression_algorithm());
+void CompressionMagicXattr::FinalizeValue() {
+  result_pages_.push_back(zlib::AlgorithmName(
+                                             dirent_->compression_algorithm()));
 }
 
 bool DirectIoMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
 
-std::string DirectIoMagicXattr::GetValue() {
-  return dirent_->IsDirectIo() ? "1" : "0";
+void DirectIoMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular();
 }
 
-std::string ExternalFileMagicXattr::GetValue() {
-  return dirent_->IsExternalFile() ? "1" : "0";
+void ExternalFileMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsExternalFile() ? "1" : "0");
 }
 
-std::string ExternalHostMagicXattr::GetValue() {
+void ExternalHostMagicXattr::FinalizeValue() {
   std::vector<string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
   xattr_mgr_->mount_point()->external_download_mgr()->GetHostInfo(
     &host_chain, &rtt, &current_host);
   if (host_chain.size()) {
-    return std::string(host_chain[current_host]);
+    result_pages_.push_back(std::string(host_chain[current_host]));
   } else {
-    return "internal error: no hosts defined";
+    result_pages_.push_back("internal error: no hosts defined");
   }
 }
 
-std::string ExternalTimeoutMagicXattr::GetValue() {
+void ExternalTimeoutMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
   xattr_mgr_->mount_point()->external_download_mgr()->
                                       GetTimeout(&seconds, &seconds_direct);
-  return StringifyUint(seconds_direct);
+  result_pages_.push_back(StringifyUint(seconds_direct));
 }
 
-std::string FqrnMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->fqrn();
+void FqrnMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->fqrn());
 }
 
 bool HashMagicXattr::PrepareValueFenced() {
   return !dirent_->checksum().IsNull();
 }
 
-std::string HashMagicXattr::GetValue() {
-  return dirent_->checksum().ToString();
+void HashMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->checksum().ToString());
 }
 
-std::string HostMagicXattr::GetValue() {
+void HostMagicXattr::FinalizeValue() {
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
   xattr_mgr_->mount_point()->download_mgr()->
                                 GetHostInfo(&host_chain, &rtt, &current_host);
   if (host_chain.size()) {
-    return std::string(host_chain[current_host]);
+    result_pages_.push_back(std::string(host_chain[current_host]));
   } else {
-    return "internal error: no hosts defined";
+    result_pages_.push_back("internal error: no hosts defined");
   }
 }
 
-std::string HostListMagicXattr::GetValue() {
+void HostListMagicXattr::FinalizeValue() {
   std::string result;
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
@@ -367,14 +432,14 @@ std::string HostListMagicXattr::GetValue() {
   } else {
     result = "internal error: no hosts defined";
   }
-  return result;
+  result_pages_.push_back(result);
 }
 
 bool LHashMagicXattr::PrepareValueFenced() {
   return !dirent_->checksum().IsNull();
 }
 
-std::string LHashMagicXattr::GetValue() {
+void LHashMagicXattr::FinalizeValue() {
   string result;
   CacheManager::Label label;
   label.path = path_.ToString();
@@ -395,12 +460,12 @@ std::string LHashMagicXattr::GetValue() {
       result = hash.ToString();
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
   }
-  return result;
+  result_pages_.push_back(result);
 }
 
 LogBufferXattr::LogBufferXattr() : BaseMagicXattr(), throttle_(1, 500, 2000) { }
 
-std::string LogBufferXattr::GetValue() {
+void LogBufferXattr::FinalizeValue() {
   throttle_.Throttle();
   std::vector<LogBufferEntry> buffer = GetLogBuffer();
   std::string result;
@@ -414,18 +479,18 @@ std::string LogBufferXattr::GetValue() {
     result += "[" + StringifyTime(itr->timestamp, true /* UTC */) + " UTC] " +
               itr->message + "\n";
   }
-  return result;
+  result_pages_.push_back(result);
 }
 
-std::string NCleanup24MagicXattr::GetValue() {
+void NCleanup24MagicXattr::FinalizeValue() {
   QuotaManager *quota_mgr =
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->quota_mgr();
   if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
-    return StringifyInt(-1);
+    result_pages_.push_back(StringifyInt(-1));
   } else {
     const uint64_t period_s = 24 * 60 * 60;
     const uint64_t rate = quota_mgr->GetCleanupRate(period_s);
-    return StringifyInt(rate);
+    result_pages_.push_back(StringifyUint(rate));
   }
 }
 
@@ -434,55 +499,60 @@ bool NClgMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string NClgMagicXattr::GetValue() {
-  return StringifyInt(n_catalogs_);
+void NClgMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyInt(n_catalogs_));
 }
 
-std::string NDirOpenMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->file_system()->n_fs_dir_open()->ToString();
+void NDirOpenMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->
+                                    file_system()->n_fs_dir_open()->ToString());
 }
 
-std::string NDownloadMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->statistics()->Lookup("fetch.n_downloads")
-                                                                      ->Print();
+void NDownloadMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->statistics()
+                                        ->Lookup("fetch.n_downloads")->Print());
 }
 
-std::string NIOErrMagicXattr::GetValue() {
-  return StringifyInt(xattr_mgr_->mount_point()->file_system()->io_error_info()
-                                                                    ->count());
+void NIOErrMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyInt(xattr_mgr_->mount_point()->file_system()
+                                                   ->io_error_info()->count()));
 }
 
-std::string NOpenMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->file_system()->n_fs_open()->ToString();
+void NOpenMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->n_fs_open()
+                                                                  ->ToString());
 }
 
-std::string HitrateMagicXattr::GetValue() {
+void HitrateMagicXattr::FinalizeValue() {
   int64_t n_invocations =
     xattr_mgr_->mount_point()->statistics()->Lookup("fetch.n_invocations")
                                                                       ->Get();
-  if (n_invocations == 0)
-    return "n/a";
+  if (n_invocations == 0) {
+    result_pages_.push_back("n/a");
+    return;
+  }
 
   int64_t n_downloads =
     xattr_mgr_->mount_point()->statistics()->Lookup("fetch.n_downloads")->Get();
   float hitrate = 100. * (1. -
     (static_cast<float>(n_downloads) / static_cast<float>(n_invocations)));
-  return StringifyDouble(hitrate);
+  result_pages_.push_back(StringifyDouble(hitrate));
 }
 
-std::string ProxyMagicXattr::GetValue() {
+void ProxyMagicXattr::FinalizeValue() {
   vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
   xattr_mgr_->mount_point()->download_mgr()->GetProxyInfo(
     &proxy_chain, &current_group, NULL);
   if (proxy_chain.size()) {
-    return proxy_chain[current_group][0].url;
+    result_pages_.push_back(proxy_chain[current_group][0].url);
   } else {
-    return "DIRECT";
+    result_pages_.push_back("DIRECT");
   }
 }
 
-static std::string ListProxy(download::DownloadManager *dm) {
+static void ListProxy(download::DownloadManager *dm,
+                      std::vector<std::string> *result_pages) {
   vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
   dm->GetProxyInfo(&proxy_chain, &current_group, NULL);
@@ -492,33 +562,67 @@ static std::string ListProxy(download::DownloadManager *dm) {
       buf += proxy_chain[i][j].url;
       buf += "\n";
     }
+
+    if (buf.size() > BaseMagicXattr::kMaxCharsPerPage) {
+      result_pages->push_back(buf);
+      buf = "";
+    }
   }
-  return buf;
+
+  if (buf.size() > 0 || result_pages->size() == 0) {
+    result_pages->push_back(buf);
+  }
 }
 
-std::string ProxyListMagicXattr::GetValue() {
-  return ListProxy(xattr_mgr_->mount_point()->download_mgr());
+void ProxyListMagicXattr::FinalizeValue() {
+  ListProxy(xattr_mgr_->mount_point()->download_mgr(), &result_pages_);
 }
 
-std::string ProxyListExternalMagicXattr::GetValue() {
-  return ListProxy(xattr_mgr_->mount_point()->external_download_mgr());
+void ProxyListExternalMagicXattr::FinalizeValue() {
+  ListProxy(xattr_mgr_->mount_point()->external_download_mgr(), &result_pages_);
 }
 
 bool PubkeysMagicXattr::PrepareValueFenced() {
-  pubkeys_ = xattr_mgr_->mount_point()->signature_mgr()->GetActivePubkeys();
+  pubkeys_ = xattr_mgr_->mount_point()->signature_mgr()
+                                                   ->GetActivePubkeysAsVector();
   return true;
 }
 
-std::string PubkeysMagicXattr::GetValue() {
-  return pubkeys_;
+void PubkeysMagicXattr::FinalizeValue() {
+  size_t full_size = 0;
+
+  for (size_t i = 0; i < pubkeys_.size(); i++) {
+    full_size += pubkeys_[i].size();
+  }
+
+  if (full_size == 0) {
+    return;
+  }
+
+  size_t size_within_page = 0;
+  std::string res = "";
+
+  for (size_t i = 0; i < pubkeys_.size(); i++) {
+    if (size_within_page + pubkeys_[i].size() >= kMaxCharsPerPage) {
+      result_pages_.push_back(res);
+      res = "";
+      size_within_page = 0;
+    }
+
+    res += pubkeys_[i];
+    size_within_page += pubkeys_[i].size();
+  }
+  if (res.size() > 0) {
+    result_pages_.push_back(res);
+  }
 }
 
 bool RawlinkMagicXattr::PrepareValueFenced() {
   return dirent_->IsLink();
 }
 
-std::string RawlinkMagicXattr::GetValue() {
-  return dirent_->symlink().ToString();
+void RawlinkMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->symlink().ToString());
 }
 
 bool RepoCountersMagicXattr::PrepareValueFenced() {
@@ -527,8 +631,8 @@ bool RepoCountersMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string RepoCountersMagicXattr::GetValue() {
-  return counters_.GetCsvMap();
+void RepoCountersMagicXattr::FinalizeValue() {
+  result_pages_.push_back(counters_.GetCsvMap());
 }
 
 uint64_t RepoMetainfoMagicXattr::kMaxMetainfoLength = 65536;
@@ -548,9 +652,10 @@ bool RepoMetainfoMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string RepoMetainfoMagicXattr::GetValue() {
+void RepoMetainfoMagicXattr::FinalizeValue() {
   if (metainfo_hash_.IsNull()) {
-    return error_reason_;
+    result_pages_.push_back(error_reason_);
+    return;
   }
 
   CacheManager::Label label;
@@ -560,13 +665,15 @@ std::string RepoMetainfoMagicXattr::GetValue() {
   int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
     CacheManager::LabeledObject(metainfo_hash_, label));
   if (fd < 0) {
-    return "Failed to open metadata file";
+    result_pages_.push_back("Failed to open metadata file");
+    return;
   }
   uint64_t actual_size = xattr_mgr_->mount_point()->file_system()->cache_mgr()
                                                                  ->GetSize(fd);
   if (actual_size > kMaxMetainfoLength) {
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
-    return "Failed to open: metadata file is too big";
+    result_pages_.push_back("Failed to open: metadata file is too big");
+    return;
   }
   char buffer[kMaxMetainfoLength];
   int64_t bytes_read =
@@ -574,9 +681,10 @@ std::string RepoMetainfoMagicXattr::GetValue() {
                                             ->Pread(fd, buffer, actual_size, 0);
   xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
   if (bytes_read < 0) {
-    return "Failed to read metadata file";
+    result_pages_.push_back("Failed to read metadata file");
+    return;
   }
-  return string(buffer, buffer + bytes_read);
+  result_pages_.push_back(string(buffer, buffer + bytes_read));
 }
 
 bool RevisionMagicXattr::PrepareValueFenced() {
@@ -584,8 +692,8 @@ bool RevisionMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string RevisionMagicXattr::GetValue() {
-  return StringifyUint(revision_);
+void RevisionMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyUint(revision_));
 }
 
 bool RootHashMagicXattr::PrepareValueFenced() {
@@ -593,24 +701,25 @@ bool RootHashMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string RootHashMagicXattr::GetValue() {
-  return root_hash_.ToString();
+void RootHashMagicXattr::FinalizeValue() {
+  result_pages_.push_back(root_hash_.ToString());
 }
 
-std::string RxMagicXattr::GetValue() {
+void RxMagicXattr::FinalizeValue() {
   perf::Statistics *statistics = xattr_mgr_->mount_point()->statistics();
   int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
-  return StringifyInt(rx/1024);
+  result_pages_.push_back(StringifyInt(rx/1024));
 }
 
-std::string SpeedMagicXattr::GetValue() {
+void SpeedMagicXattr::FinalizeValue() {
   perf::Statistics *statistics = xattr_mgr_->mount_point()->statistics();
   int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
   int64_t time = statistics->Lookup("download.sz_transfer_time")->Get();
-  if (time == 0)
-    return "n/a";
-  else
-    return StringifyInt((1000 * (rx/1024))/time);
+  if (time == 0) {
+    result_pages_.push_back("n/a");
+  } else {
+    result_pages_.push_back(StringifyInt((1000 * (rx/1024))/time));
+  }
 }
 
 bool TagMagicXattr::PrepareValueFenced() {
@@ -618,43 +727,45 @@ bool TagMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-std::string TagMagicXattr::GetValue() {
-  return tag_;
+void TagMagicXattr::FinalizeValue() {
+  result_pages_.push_back(tag_);
 }
 
-std::string TimeoutMagicXattr::GetValue() {
+void TimeoutMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
   xattr_mgr_->mount_point()->download_mgr()
                            ->GetTimeout(&seconds, &seconds_direct);
-  return StringifyUint(seconds);
+  result_pages_.push_back(StringifyUint(seconds));
 }
 
-std::string TimeoutDirectMagicXattr::GetValue() {
+void TimeoutDirectMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
   xattr_mgr_->mount_point()->download_mgr()
                            ->GetTimeout(&seconds, &seconds_direct);
-  return StringifyUint(seconds_direct);
+  result_pages_.push_back(StringifyUint(seconds_direct));
 }
 
-std::string TimestampLastIOErrMagicXattr::GetValue() {
-  return StringifyInt(
-    xattr_mgr_->mount_point()->file_system()->io_error_info()
-                                            ->timestamp_last());
+void TimestampLastIOErrMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyInt(xattr_mgr_->mount_point()->
+                             file_system()->io_error_info()->timestamp_last()));
 }
 
-std::string UsedFdMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->file_system()->no_open_files()->ToString();
+void UsedFdMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->
+                                                   no_open_files()->ToString());
 }
 
-std::string UsedDirPMagicXattr::GetValue() {
-  return xattr_mgr_->mount_point()->file_system()->no_open_dirs()->ToString();
+void UsedDirPMagicXattr::FinalizeValue() {
+  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->
+                                                    no_open_dirs()->ToString());
 }
 
-std::string VersionMagicXattr::GetValue() {
-  return std::string(VERSION) + "." + std::string(CVMFS_PATCH_LEVEL);
+void VersionMagicXattr::FinalizeValue() {
+  result_pages_.push_back(std::string(VERSION) + "."
+                                              + std::string(CVMFS_PATCH_LEVEL));
 }
 
-std::string ExternalURLMagicXattr::GetValue() {
+void ExternalURLMagicXattr::FinalizeValue() {
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
@@ -662,10 +773,12 @@ std::string ExternalURLMagicXattr::GetValue() {
     xattr_mgr_->mount_point()->external_download_mgr()->GetHostInfo(
       &host_chain, &rtt, &current_host);
     if (host_chain.size()) {
-      return std::string(host_chain[current_host]) + std::string(path_.c_str());
+      result_pages_.push_back(std::string(host_chain[current_host])
+                              + std::string(path_.c_str()));
+      return;
     }
   }
-  return std::string("");
+  result_pages_.push_back("");
 }
 
 bool ExternalURLMagicXattr::PrepareValueFenced() {

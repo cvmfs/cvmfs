@@ -62,6 +62,7 @@
 #include <map>
 #include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "authz/authz_session.h"
@@ -100,6 +101,7 @@
 #include "options.h"
 #include "quota_listener.h"
 #include "quota_posix.h"
+#include "sanitizer.h"
 #include "shortstring.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
@@ -1692,7 +1694,55 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
   TraceInode(Tracer::kEventGetXAttr, ino, "getxattr()");
 
-  const string attr = name;
+  vector<string> tokens_mode_machine = SplitString(name, '~');
+  vector<string> tokens_mode_human = SplitString(name, '@');
+
+  int32_t attr_req_page = 0;
+  MagicXattrMode xattr_mode = kXattrMachineMode;
+  string attr;
+
+  bool attr_req_is_valid = false;
+  const sanitizer::PositiveIntegerSanitizer page_num_sanitizer;
+
+  if (tokens_mode_human.size() > 1) {
+    const std::string token = tokens_mode_human[tokens_mode_human.size() - 1];
+    if (token == "?") {
+      attr_req_is_valid = true;
+      attr_req_page = -1;
+    } else {
+      if (page_num_sanitizer.IsValid(token)) {
+        attr_req_is_valid = true;
+        attr_req_page = static_cast<int32_t>(String2Uint64(token));
+      }
+    }
+    xattr_mode = kXattrHumanMode;
+    attr = tokens_mode_human[0];
+  } else if (tokens_mode_machine.size() > 1) {
+    const std::string token =
+                            tokens_mode_machine[tokens_mode_machine.size() - 1];
+    if (token == "?") {
+      attr_req_is_valid = true;
+      attr_req_page = -1;
+    } else {
+      if (page_num_sanitizer.IsValid(token)) {
+        attr_req_is_valid = true;
+        attr_req_page = static_cast<int32_t>(String2Uint64(token));
+      }
+    }
+    xattr_mode = kXattrMachineMode;
+    attr = tokens_mode_machine[0];
+
+  } else {
+    attr_req_is_valid = true;
+    attr = tokens_mode_machine[0];
+  }
+
+  if (!attr_req_is_valid) {
+    fuse_remounter_->fence()->Leave();
+    fuse_reply_err(req, ENODATA);
+    return;
+  }
+
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
@@ -1741,21 +1791,25 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     return;
   }
 
-  string attribute_value;
+  std::pair<bool, std::string> attribute_result;
 
   if (!magic_xattr.IsNull()) {
-    attribute_value = magic_xattr->GetValue();
+    attribute_result = magic_xattr->GetValue(attr_req_page, xattr_mode);
   } else {
-    if (!xattrs.Get(attr, &attribute_value)) {
+    if (!xattrs.Get(attr, &attribute_result.second)) {
       fuse_reply_err(req, ENOATTR);
       return;
     }
+    attribute_result.first = true;
   }
 
-  if (size == 0) {
-    fuse_reply_xattr(req, attribute_value.length());
-  } else if (size >= attribute_value.length()) {
-    fuse_reply_buf(req, &attribute_value[0], attribute_value.length());
+  if (!attribute_result.first) {
+    fuse_reply_err(req, ENODATA);
+  } else if (size == 0) {
+    fuse_reply_xattr(req, attribute_result.second.length());
+  } else if (size >= attribute_result.second.length()) {
+    fuse_reply_buf(req, &attribute_result.second[0],
+                         attribute_result.second.length());
   } else {
     fuse_reply_err(req, ERANGE);
   }
@@ -2078,39 +2132,42 @@ class ExpiresMagicXattr : public BaseMagicXattr {
     return true;
   }
 
-  virtual std::string GetValue() {
+  virtual void FinalizeValue() {
     if (catalogs_valid_until_ == MountPoint::kIndefiniteDeadline) {
-      return "never (fixed root catalog)";
+      result_pages_.push_back("never (fixed root catalog)");
+      return;
     } else {
       time_t now = time(NULL);
-      return StringifyInt( (catalogs_valid_until_ - now) / 60);
+      result_pages_.push_back(StringifyInt((catalogs_valid_until_ - now) / 60));
     }
   }
 };
 
 class InodeMaxMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
-    return StringifyInt(
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(
       cvmfs::inode_generation_info_.inode_generation +
-      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge());
+      xattr_mgr_->mount_point()->catalog_mgr()->inode_gauge()));
   }
 };
 
 class MaxFdMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
-    return StringifyInt(cvmfs::max_open_files_ - cvmfs::kNumReservedFd);
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(
+                               cvmfs::max_open_files_ - cvmfs::kNumReservedFd));
   }
 };
 
 class PidMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() { return StringifyInt(cvmfs::pid_); }
+  virtual void FinalizeValue() {
+    result_pages_.push_back(StringifyInt(cvmfs::pid_)); }
 };
 
 class UptimeMagicXattr : public BaseMagicXattr {
-  virtual std::string GetValue() {
+  virtual void FinalizeValue(){
     time_t now = time(NULL);
     uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
-    return StringifyInt(uptime / 60);
+    result_pages_.push_back(StringifyUint(uptime / 60));
   }
 };
 
