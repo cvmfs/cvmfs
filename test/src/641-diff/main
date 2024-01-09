@@ -15,6 +15,7 @@ create_repository_content() {
   touch directory/nested/.cvmfscatalog
   touch directory/foo
   mkdir dir2
+  touch owner
 
   popdir
 }
@@ -35,6 +36,7 @@ change_repository_content() {
   mkdir dir3
   touch dir3/new_file
   touch dir3/.cvmfscatalog
+  sudo chown 99:99 owner
 
 	popdir
 }
@@ -85,6 +87,7 @@ A D /dir3
 A F /dir3/new_file +0
 A F /dir3/.cvmfscatalog +0
 M[SC] F /file
+M[UR] F /owner
 R S /symlink -4
 M[SMLC] FS /directory/foo
 M[N] D /directory/nested
@@ -104,6 +107,7 @@ M[N] D /dir2
 R F /dir2/.cvmfscatalog -0
 R D /dir3
 M[SC] F /file
+M[UR] F /owner
 A S /symlink +4
 M[SMLC] SF /directory/foo
 M[N] D /directory/nested
