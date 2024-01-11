@@ -334,6 +334,19 @@ class AbstractCatalogManager : public SingleCopy {
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
 
   /**
+   * Opportunistic optimization: the client catalog manager uses this method
+   * to preload into the cache a nested catalog that is likely to be required
+   * next. Likely, because there is a race with the root catalog reload which
+   * may result in the wrong catalog being staged. That's not a fault though,
+   * the correct catalog will still be loaded with the write lock held.
+   */
+  virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
+                                        const PathString & /*mountpoint*/)
+  { }
+  void StageNestedCatalog(const PathString &path, const CatalogT *parent,
+                          bool is_listable);
+
+  /**
    * Create a new Catalog object.
    * Every derived class has to implement this and return a newly
    * created (derived) Catalog structure of it's desired type.

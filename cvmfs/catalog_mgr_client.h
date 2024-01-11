@@ -76,6 +76,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
   virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
+  virtual void StageNestedCatalogByHash(const shash::Any &hash,
+                                        const PathString &mountpoint);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
