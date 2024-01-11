@@ -60,7 +60,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     explicit CatalogJob(const std::string &path,
                         const shash::Any &hash,
                         const unsigned tree_level,
-                        const unsigned history_depth,
+                        const uint64_t history_depth,
                         CatalogTN *parent = NULL) :
       CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
                                                    history_depth, parent) {
@@ -403,7 +403,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   unsigned int num_threads_;
   bool serialize_callbacks_;
 
-  unsigned int effective_history_depth_;
+  uint64_t effective_history_depth_;
   time_t effective_timestamp_threshold_;
   TraversalType effective_traversal_type_;
 

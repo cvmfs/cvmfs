@@ -390,7 +390,7 @@ class CommandMigrate : public Command {
   void UploadHistoryClosure(const upload::SpoolerResult &result,
                             Future<shash::Any> *hash);
   bool UpdateUndoTags(PendingCatalog *root_catalog,
-                      unsigned revision,
+                      uint64_t revision,
                       time_t timestamp,
                       shash::Any *history_hash);
 

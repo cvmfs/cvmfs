@@ -2,7 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "notification_client.h"
+
+#include <inttypes.h>
 
 #include <string>
 #include <vector>
@@ -64,9 +71,8 @@ class ActivitySubscriber : public notify::SubscriberSSE {
 
     uint64_t new_revision = manifest->revision();
     LogCvmfs(kLogCvmfs, kLogSyslog,
-             "NotificationClient - repository %s is now at revision %lu, root "
-             "hash: %s",
-             repo_name.c_str(), new_revision,
+             "NotificationClient - repository %s is now at revision %" PRIu64
+             ", root hash: %s", repo_name.c_str(), new_revision,
              manifest->catalog_hash().ToString().c_str());
 
     FuseRemounter::Status status = remounter_->CheckSynchronously();

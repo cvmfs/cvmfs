@@ -37,7 +37,7 @@ bool ValidateArgs(const swissknife::ArgumentList& args) {
   return true;
 }
 
-int GetMinRevision(const swissknife::ArgumentList& args) {
+uint64_t GetMinRevision(const swissknife::ArgumentList& args) {
   if (args.count('m') > 0) {
     return std::atoi(args.find('m')->second->c_str());
   } else {
@@ -81,7 +81,7 @@ int CommandNotify::Main(const ArgumentList& args) {
   } else {  // subscribe
     std::string topic = *args.find('t')->second;
     bool continuous = args.count('c') > 0;
-    int revision = GetMinRevision(args);
+    uint64_t revision = GetMinRevision(args);
     ret = notify::DoSubscribe(server_url, topic, revision, continuous, verbose);
   }
 

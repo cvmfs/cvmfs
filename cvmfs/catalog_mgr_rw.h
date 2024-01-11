@@ -181,7 +181,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
     uint64_t     ttl;
     size_t       size;
     shash::Any   content_hash;
-    unsigned int revision;
+    uint64_t     revision;
   };
 
   struct CatalogUploadContext {

@@ -327,7 +327,7 @@ void CommandMigrate::UploadHistoryClosure(
 
 bool CommandMigrate::UpdateUndoTags(
   PendingCatalog *root_catalog,
-  unsigned revision,
+  uint64_t revision,
   time_t timestamp,
   shash::Any *history_hash)
 {
@@ -352,7 +352,6 @@ bool CommandMigrate::UpdateUndoTags(
 
     tag_trunk.root_hash = root_catalog->new_catalog_hash;
     tag_trunk.size = root_catalog->new_catalog_size;
-    tag_trunk.revision = root_catalog->new_catalog_size;
     tag_trunk.revision = revision;
     tag_trunk.timestamp = timestamp;
 

@@ -163,7 +163,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
     local_newest_timestamp = breadcrumb.timestamp;
     local_newest_revision = breadcrumb.revision;
     LogCvmfs(kLogCache, kLogDebug,
-      "Cached copy publish date %s (hash %s, revision %lu)",
+      "Cached copy publish date %s (hash %s, revision %" PRIu64 ")",
       StringifyTime(static_cast<int64_t>(local_newest_timestamp), true).c_str(),
       local_newest_hash.ToString().c_str(), breadcrumb.revision);
   } else {
@@ -391,8 +391,8 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
 bool ClientCatalogManager::IsRevisionBlacklisted() {
   uint64_t revision = GetRevision();
 
-  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %lu is blacklisted",
-           repo_name_.c_str(), revision);
+  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %" PRIu64
+           " is blacklisted", repo_name_.c_str(), revision);
 
   vector<string> blacklist = signature_mgr_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {

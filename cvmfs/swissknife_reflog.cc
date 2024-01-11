@@ -189,7 +189,7 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   while (!current_hash.IsNull()                  &&
          !reflog_->ContainsCatalog(current_hash) &&
          (current_catalog = FetchCatalog(current_hash)).IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %lu",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %" PRIu64,
              current_hash.ToString().c_str(), current_catalog->GetRevision());
 
     const bool success = reflog_->AddCatalog(current_hash);

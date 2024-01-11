@@ -34,11 +34,11 @@ class History {
  public:
   struct Branch {
     Branch() : initial_revision(0) { }
-    Branch(const std::string &b, const std::string &p, unsigned r)
+    Branch(const std::string &b, const std::string &p, uint64_t r)
       : branch(b), parent(p), initial_revision(r) { }
     std::string branch;
     std::string parent;
-    unsigned initial_revision;
+    uint64_t initial_revision;
 
     bool operator ==(const Branch &other) const {
       return (this->branch == other.branch) &&
@@ -60,11 +60,10 @@ class History {
    * using this struct as a container.
    */
   struct Tag {
-    Tag() :
-      size(0), revision(0), timestamp(0) {}
+    Tag() : size(0), revision(0), timestamp(0) {}
 
     Tag(const std::string &n, const shash::Any &h, const uint64_t s,
-        const unsigned r, const time_t t, const std::string &d,
+        const uint64_t r, const time_t t, const std::string &d,
         const std::string &b) :
       name(n), root_hash(h), size(s), revision(r), timestamp(t),
       description(d), branch(b) {}
@@ -89,7 +88,7 @@ class History {
     std::string    name;
     shash::Any     root_hash;
     uint64_t       size;
-    unsigned       revision;
+    uint64_t       revision;
     time_t         timestamp;
     std::string    description;
     /**
