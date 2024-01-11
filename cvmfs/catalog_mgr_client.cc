@@ -365,6 +365,22 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   return kLoadFail;
 }
 
+void ClientCatalogManager::StageNestedCatalogByHash(
+  const shash::Any &hash,
+  const PathString &mountpoint)
+{
+  string catalog_descr = "file catalog at " + repo_name_ + ":" +
+    string(mountpoint.GetChars(), mountpoint.GetLength()) +
+    " (" + hash.ToString() + ")";
+
+  assert(hash.suffix == shash::kSuffixCatalog);
+  CacheManager::Label label;
+  label.path = catalog_descr;
+  label.flags = CacheManager::kLabelCatalog;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
+  if (fd >= 0)
+    fetcher_->cache_mgr()->Close(fd);
+}
 
 void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
