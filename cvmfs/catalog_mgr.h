@@ -339,6 +339,7 @@ class AbstractCatalogManager : public SingleCopy {
    * next. Likely, because there is a race with the root catalog reload which
    * may result in the wrong catalog being staged. That's not a fault though,
    * the correct catalog will still be loaded with the write lock held.
+   * Note that this method is never used for root catalogs.
    */
   virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
                                         const PathString & /*mountpoint*/)
