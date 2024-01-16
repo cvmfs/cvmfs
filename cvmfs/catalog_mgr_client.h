@@ -63,6 +63,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool InitFixed(const shash::Any &root_hash, bool alternative_path);
 
   shash::Any GetRootHash();
+  std::string GetCatalogDescription(const PathString &mountpoint,
+                                    const shash::Any &hash);
 
   bool IsRevisionBlacklisted();
 

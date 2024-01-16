@@ -267,6 +267,16 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   return success_code;
 }
 
+std::string ClientCatalogManager::GetCatalogDescription(
+  const PathString &mountpoint, const shash::Any &hash)
+{
+  return "file catalog at " + repo_name_ + ":" +
+    (mountpoint.IsEmpty() ? "/"
+                          : string(mountpoint.GetChars(),
+                                   mountpoint.GetLength())) +
+    " (" + hash.ToString() + ")";
+}
+
 /**
  * Loads (and fetches) a catalog by hash for a given mountpoint.
  *
@@ -281,12 +291,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(
                                                  CatalogContext *ctlg_context) {
-  string catalog_descr = "file catalog at " + repo_name_ + ":" +
-    (ctlg_context->IsRootCatalog() ?
-      "/" : string(ctlg_context->mountpoint().GetChars(),
-                   ctlg_context->mountpoint().GetLength()));
-
-  catalog_descr += " (" + ctlg_context->hash().ToString() + ")";
+  string catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
+                                               ctlg_context->hash());
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
@@ -371,11 +377,8 @@ void ClientCatalogManager::StageNestedCatalogByHash(
 {
   assert(hash.suffix == shash::kSuffixCatalog);
 
-  string catalog_descr = "file catalog at " + repo_name_ + ":" +
-    string(mountpoint.GetChars(), mountpoint.GetLength()) +
-    " (" + hash.ToString() + ")";
   CacheManager::Label label;
-  label.path = catalog_descr;
+  label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
