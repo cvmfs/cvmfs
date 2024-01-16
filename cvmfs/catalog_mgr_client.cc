@@ -369,11 +369,11 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   const shash::Any &hash,
   const PathString &mountpoint)
 {
+  assert(hash.suffix == shash::kSuffixCatalog);
+
   string catalog_descr = "file catalog at " + repo_name_ + ":" +
     string(mountpoint.GetChars(), mountpoint.GetLength()) +
     " (" + hash.ToString() + ")";
-
-  assert(hash.suffix == shash::kSuffixCatalog);
   CacheManager::Label label;
   label.path = catalog_descr;
   label.flags = CacheManager::kLabelCatalog;
