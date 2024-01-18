@@ -69,6 +69,13 @@ class Channel : SingleCopy {
     assert(retval == 0);
   }
 
+  void PushBack(ItemT *item) {
+    MutexLockGuard lock_guard(&lock_);
+    items_.push_back(item);
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+  }
+
   /**
    * Remove and return the first element from the queue.  Block if tube is
    * empty.
