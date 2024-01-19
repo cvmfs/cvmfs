@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <new>
 #include <vector>
 
 #include "glue_buffer.h"
@@ -102,7 +103,8 @@ FuseInvalidator::FuseInvalidator(
 FuseInvalidator::~FuseInvalidator() {
   atomic_cas32(&terminated_, 0, 1);
   if (spawned_) {
-    channel_.PushBack(new QuitCommand());
+    QuitCommand *cmd = new (smalloc(sizeof(QuitCommand))) QuitCommand();
+    channel_.PushBack(cmd);
     pthread_join(thread_invalidator_, NULL);
   }
 }
@@ -110,7 +112,8 @@ FuseInvalidator::~FuseInvalidator() {
 
 void FuseInvalidator::InvalidateInodes(Handle *handle) {
   assert(handle != NULL);
-  InvalInodesCommand *inval_inodes_command = new InvalInodesCommand();
+  InvalInodesCommand *inval_inodes_command =
+    new (smalloc(sizeof(InvalInodesCommand))) InvalInodesCommand();
   inval_inodes_command->handle = handle;
   channel_.PushBack(inval_inodes_command);
 }
@@ -132,7 +135,8 @@ void FuseInvalidator::InvalidateDentry(
     return;
   }
 
-  inval_dentry_command = new InvalDentryCommand();
+  inval_dentry_command =
+    new (smalloc(sizeof(InvalDentryCommand))) InvalDentryCommand();
   inval_dentry_command->parent_ino = parent_ino;
   inval_dentry_command->name = name;
   items->push_back(inval_dentry_command);
@@ -148,7 +152,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     Command *command = invalidator->channel_.PopFront();
 
     if (dynamic_cast<QuitCommand *>(command)) {
-      delete command;
+      command->~Command();
+      free(command);
       break;
     }
 
@@ -156,7 +161,6 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       dynamic_cast<InvalDentryCommand *>(command);
     if (inval_dentry_command) {
       if (invalidator->fuse_channel_or_session_ == NULL) {
-        delete inval_dentry_command;
         if (!reported_missing_inval_support) {
           LogCvmfs(kLogCvmfs, kLogSyslogWarn,
                    "missing fuse support for dentry invalidation "
@@ -165,6 +169,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
                    inval_dentry_command->name.ToString().c_str());
           reported_missing_inval_support = true;
         }
+        inval_dentry_command->~InvalDentryCommand();
+        free(inval_dentry_command);
         continue;
       }
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
@@ -183,7 +189,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         inval_dentry_command->name.GetChars(),
         inval_dentry_command->name.GetLength());
 #endif
-      delete inval_dentry_command;
+      inval_dentry_command->~InvalDentryCommand();
+      free(inval_dentry_command);
       continue;
     }
 
@@ -194,7 +201,8 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     Handle *handle = inval_inodes_command->handle;
     LogCvmfs(kLogCvmfs, kLogDebug, "invalidating kernel caches, timeout %u",
              handle->timeout_s_);
-    delete inval_inodes_command;
+    inval_inodes_command->~InvalInodesCommand();
+    free(inval_inodes_command);
 
     uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
