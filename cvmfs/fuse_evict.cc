@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "glue_buffer.h"
 #include "mountpoint.h"

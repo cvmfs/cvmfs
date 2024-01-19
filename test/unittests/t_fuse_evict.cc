@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fuse_evict.h"
 #include "glue_buffer.h"
 #include "util/string.h"
