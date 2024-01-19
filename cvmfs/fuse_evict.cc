@@ -126,6 +126,8 @@ void FuseInvalidator::InvalidateDentry(
       continue;
     if (inval_dentry_command->parent_ino != parent_ino)
       continue;
+    if (inval_dentry_command->name != name)
+      continue;
     channel_.AbortEnqueueing();
     return;
   }
