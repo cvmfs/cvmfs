@@ -1,3 +1,7 @@
+usr/lib/libcvmfs_bridge.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_bridge.so
+usr/lib/libcvmfs_bridge_debug.so.@CVMFS_VERSION@
+usr/lib/libcvmfs_bridge_debug.so
 usr/lib/libcvmfs_cache.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_cache.so
 usr/lib/libcvmfs_client.so.@CVMFS_VERSION@

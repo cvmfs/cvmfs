@@ -37,7 +37,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <google/dense_hash_map>
 #include <inttypes.h>
 #include <pthread.h>
 #include <stddef.h>
@@ -68,6 +67,7 @@
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
+#include "bridge/migrate.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -83,8 +83,10 @@
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
+#include "fuse_directory_handle.h"
 #include "fuse_inode_gen.h"
 #include "fuse_remount.h"
+#include "fuse_state.h"
 #include "globals.h"
 #include "glue_buffer.h"
 #include "history_sqlite.h"
@@ -105,6 +107,7 @@
 #include "shortstring.h"
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
+#include "state.h"
 #include "statistics.h"
 #include "talk.h"
 #include "telemetry_aggregator.h"
@@ -133,21 +136,6 @@ FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
 
 
-/**
- * For cvmfs_opendir / cvmfs_readdir
- * TODO: use mmap for very large listings
- */
-struct DirectoryListing {
-  char *buffer;  /**< Filled by fuse_add_direntry */
-
-  // Not really used anymore.  But directory listing needs to be migrated during
-  // hotpatch. If buffer is allocated by smmap, capacity is zero.
-  size_t size;
-  size_t capacity;
-
-  DirectoryListing() : buffer(NULL), size(0), capacity(0) { }
-};
-
 const loader::LoaderExports *loader_exports_ = NULL;
 OptionsManager *options_mgr_ = NULL;
 pid_t pid_ = 0;  /**< will be set after daemon() */
@@ -155,9 +143,6 @@ quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 
 
-typedef google::dense_hash_map<uint64_t, DirectoryListing,
-                               hash_murmur<uint64_t> >
-        DirectoryHandles;
 DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
@@ -187,20 +172,6 @@ class FuseInterruptCue : public InterruptCue {
  private:
   fuse_req_t *req_ptr_;
 };
-
-/**
- * Options related to the fuse kernel connection. The capabilities are
- * determined only once at mount time. If the capability trigger certain
- * behavior of the cvmfs fuse module, it needs to be re-triggered on reload.
- * Used in SaveState and RestoreState to store the details of symlink caching.
- */
-struct FuseState {
-  FuseState() : version(0), cache_symlinks(false), has_dentry_expire(false) {}
-  unsigned version;
-  bool cache_symlinks;
-  bool has_dentry_expire;
-};
-
 
 /**
  * Atomic increase of the open files counter. If we use a non-refcounted
@@ -2325,8 +2296,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   RegisterMagicXattrs();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
-  cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
-  cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
@@ -2541,29 +2510,22 @@ static bool MaintenanceMode(const int fd_progress) {
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
 
-  unsigned num_open_dirs = cvmfs::directory_handles_->size();
-  if (num_open_dirs != 0) {
-#ifdef DEBUGMSG
-    for (cvmfs::DirectoryHandles::iterator i =
-         cvmfs::directory_handles_->begin(),
-         iEnd = cvmfs::directory_handles_->end(); i != iEnd; ++i)
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
-    }
-#endif
+  // For the StateSerializer
+  size_t nbytes = 0;
+  void *buffer = NULL;
 
-    msg_progress = "Saving open directory handles (" +
-      StringifyInt(num_open_dirs) + " handles)\n";
-    SendMsg2Socket(fd_progress, msg_progress);
-
-    // TODO(jblomer): should rather be saved just in a malloc'd memory block
-    cvmfs::DirectoryHandles *saved_handles =
-      new cvmfs::DirectoryHandles(*cvmfs::directory_handles_);
-    loader::SavedState *save_open_dirs = new loader::SavedState();
-    save_open_dirs->state_id = loader::kStateOpenDirs;
-    save_open_dirs->state = saved_handles;
-    saved_states->push_back(save_open_dirs);
-  }
+  msg_progress = "Saving open directory handles (" +
+      StringifyInt(cvmfs::directory_handles_->size()) + " handles)\n";
+  SendMsg2Socket(fd_progress, msg_progress);
+  nbytes = StateSerializer::SerializeDirectoryHandles(
+    *cvmfs::directory_handles_, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDirectoryHandles(*cvmfs::directory_handles_,
+                                             buffer);
+  loader::SavedState *save_open_dirs = new loader::SavedState();
+  save_open_dirs->state_id = loader::kStateOpenDirsV2S;
+  save_open_dirs->state = buffer;
+  saved_states->push_back(save_open_dirs);
 
   if (!cvmfs::file_system_->IsNfsSource()) {
     msg_progress = "Saving inode tracker\n";
@@ -2576,13 +2538,16 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     saved_states->push_back(state_glue_buffer);
   }
 
-  msg_progress = "Saving negative entry cache\n";
+  msg_progress = "Saving dentry tracker\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  glue::DentryTracker *saved_dentry_tracker =
-    new glue::DentryTracker(*cvmfs::mount_point_->dentry_tracker());
+  nbytes = StateSerializer::SerializeDentryTracker(
+    *cvmfs::mount_point_->dentry_tracker(), NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeDentryTracker(
+    *cvmfs::mount_point_->dentry_tracker(), buffer);
   loader::SavedState *state_dentry_tracker = new loader::SavedState();
-  state_dentry_tracker->state_id = loader::kStateDentryTracker;
-  state_dentry_tracker->state = saved_dentry_tracker;
+  state_dentry_tracker->state_id = loader::kStateDentryTrackerV2S;
+  state_dentry_tracker->state = buffer;
   saved_states->push_back(state_dentry_tracker);
 
   msg_progress = "Saving page cache entry tracker\n";
@@ -2607,22 +2572,28 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::inode_generation_info_.inode_generation +=
     cvmfs::mount_point_->catalog_mgr()->inode_gauge();
-  cvmfs::InodeGenerationInfo *saved_inode_generation =
-    new cvmfs::InodeGenerationInfo(cvmfs::inode_generation_info_);
+
+  nbytes = StateSerializer::SerializeInodeGeneration(
+    cvmfs::inode_generation_info_, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeInodeGeneration(cvmfs::inode_generation_info_,
+                                            buffer);
   loader::SavedState *state_inode_generation = new loader::SavedState();
-  state_inode_generation->state_id = loader::kStateInodeGeneration;
-  state_inode_generation->state = saved_inode_generation;
+  state_inode_generation->state_id = loader::kStateInodeGenerationV2S;
+  state_inode_generation->state = buffer;
   saved_states->push_back(state_inode_generation);
 
   msg_progress = "Saving fuse state\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::FuseState *saved_fuse_state = new cvmfs::FuseState();
-  saved_fuse_state->cache_symlinks = cvmfs::mount_point_->cache_symlinks();
-  saved_fuse_state->has_dentry_expire =
-    cvmfs::mount_point_->fuse_expire_entry();
+  cvmfs::FuseState saved_fuse_state;
+  saved_fuse_state.cache_symlinks = cvmfs::mount_point_->cache_symlinks();
+  saved_fuse_state.has_dentry_expire = cvmfs::mount_point_->fuse_expire_entry();
+  nbytes = StateSerializer::SerializeFuseState(saved_fuse_state, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeFuseState(saved_fuse_state, buffer);
   loader::SavedState *state_fuse = new loader::SavedState();
-  state_fuse->state_id = loader::kStateFuse;
-  state_fuse->state = saved_fuse_state;
+  state_fuse->state_id = loader::kStateFuseV2S;
+  state_fuse->state = buffer;
   saved_states->push_back(state_fuse);
 
   // Close open file catalogs
@@ -2635,16 +2606,31 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   saved_states->push_back(state_cache_mgr);
 
   msg_progress = "Saving open files counter\n";
-  uint32_t *saved_num_fd =
-    new uint32_t(cvmfs::file_system_->no_open_files()->Get());
+  nbytes = StateSerializer::SerializeOpenFilesCounter(0, NULL);
+  buffer = smalloc(nbytes);
+  StateSerializer::SerializeOpenFilesCounter(
+    cvmfs::file_system_->no_open_files()->Get(), buffer);
   loader::SavedState *state_num_fd = new loader::SavedState();
-  state_num_fd->state_id = loader::kStateOpenFilesCounter;
-  state_num_fd->state = saved_num_fd;
+  state_num_fd->state_id = loader::kStateOpenFilesCounterV2S;
+  state_num_fd->state = buffer;
   saved_states->push_back(state_num_fd);
 
   return true;
 }
 
+
+static void FixupDirectoryHandles() {
+  cvmfs::file_system_->no_open_dirs()->Set(cvmfs::directory_handles_->size());
+
+  cvmfs::DirectoryHandles::const_iterator i =
+    cvmfs::directory_handles_->begin();
+  cvmfs::DirectoryHandles::const_iterator iEnd =
+    cvmfs::directory_handles_->end();
+  for (; i != iEnd; ++i) {
+    if (i->first >= cvmfs::next_directory_handle_)
+        cvmfs::next_directory_handle_ = i->first + 1;
+  }
+}
 
 static bool RestoreState(const int fd_progress,
                          const loader::StateList &saved_states)
@@ -2656,20 +2642,24 @@ static bool RestoreState(const int fd_progress,
 
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     if (saved_states[i]->state_id == loader::kStateOpenDirs) {
-      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
-      delete cvmfs::directory_handles_;
-      cvmfs::DirectoryHandles *saved_handles =
-        (cvmfs::DirectoryHandles *)saved_states[i]->state;
-      cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
-      cvmfs::file_system_->no_open_dirs()->Set(
-        cvmfs::directory_handles_->size());
-      cvmfs::DirectoryHandles::const_iterator i =
-        cvmfs::directory_handles_->begin();
-      for (; i != cvmfs::directory_handles_->end(); ++i) {
-        if (i->first >= cvmfs::next_directory_handle_)
-          cvmfs::next_directory_handle_ = i->first + 1;
-      }
+      SendMsg2Socket(fd_progress,
+                     "Migrating open directory handles (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_directory_handles_v1v2s(
+        saved_states[i]->state);
+      StateSerializer::DeserializeDirectoryHandles(v2s,
+                                                   cvmfs::directory_handles_);
+      free(v2s);
+      FixupDirectoryHandles();
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
+    }
 
+    if (saved_states[i]->state_id == loader::kStateOpenDirsV2S) {
+      SendMsg2Socket(fd_progress, "Restoring open directory handles... ");
+
+      StateSerializer::DeserializeDirectoryHandles(saved_states[i]->state,
+                                                   cvmfs::directory_handles_);
+      FixupDirectoryHandles();
       SendMsg2Socket(fd_progress,
         StringifyInt(cvmfs::directory_handles_->size()) + " handles\n");
     }
@@ -2712,12 +2702,19 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateDentryTracker) {
+      SendMsg2Socket(fd_progress, "Migrating dentry tracker (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_dentry_tracker_v1v2s(
+        saved_states[i]->state);
+      StateSerializer::DeserializeDentryTracker(
+        v2s, cvmfs::mount_point_->dentry_tracker());
+      free(v2s);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateDentryTrackerV2S) {
       SendMsg2Socket(fd_progress, "Restoring dentry tracker... ");
-      cvmfs::mount_point_->dentry_tracker()->~DentryTracker();
-      glue::DentryTracker *saved_dentry_tracker =
-        static_cast<glue::DentryTracker *>(saved_states[i]->state);
-      new (cvmfs::mount_point_->dentry_tracker())
-        glue::DentryTracker(*saved_dentry_tracker);
+      StateSerializer::DeserializeDentryTracker(
+        saved_states[i]->state, cvmfs::mount_point_->dentry_tracker());
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2770,27 +2767,51 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateInodeGeneration) {
-      SendMsg2Socket(fd_progress, "Restoring inode generation... ");
-      cvmfs::InodeGenerationInfo *old_info =
-        (cvmfs::InodeGenerationInfo *)saved_states[i]->state;
-      if (old_info->version == 1) {
+      SendMsg2Socket(fd_progress, "Migrating inode generation (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_inode_generation_v1v2s(
+        saved_states[i]->state);
+      cvmfs::InodeGenerationInfo old_info;
+      StateSerializer::DeserializeInodeGeneration(v2s, &old_info);
+      free(v2s);
+      if (old_info.version == 1) {
         // Migration
         cvmfs::inode_generation_info_.initial_revision =
-          old_info->initial_revision;
-        cvmfs::inode_generation_info_.incarnation = old_info->incarnation;
+          old_info.initial_revision;
+        cvmfs::inode_generation_info_.incarnation = old_info.incarnation;
         // Note: in the rare case of inode generation being 0 before, inode
         // can clash after reload before remount
       } else {
-        cvmfs::inode_generation_info_ = *old_info;
+        cvmfs::inode_generation_info_ = old_info;
       }
       ++cvmfs::inode_generation_info_.incarnation;
       SendMsg2Socket(fd_progress, " done\n");
     }
 
+    if (saved_states[i]->state_id == loader::kStateInodeGenerationV2S) {
+      SendMsg2Socket(fd_progress, "Restoring inode generation... ");
+      StateSerializer::DeserializeInodeGeneration(
+        saved_states[i]->state, &cvmfs::inode_generation_info_);
+      ++cvmfs::inode_generation_info_.incarnation;
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
     if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
+      SendMsg2Socket(fd_progress,
+                     "Migrating open files counter (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(saved_states[i]->state);
+      uint32_t value;
+      StateSerializer::DeserializeOpenFilesCounter(v2s, &value);
+      free(v2s);
+      cvmfs::file_system_->no_open_files()->Set(value);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesCounterV2S) {
       SendMsg2Socket(fd_progress, "Restoring open files counter... ");
-      cvmfs::file_system_->no_open_files()->Set(*(reinterpret_cast<uint32_t *>(
-        saved_states[i]->state)));
+      uint32_t value;
+      StateSerializer::DeserializeOpenFilesCounter(
+        saved_states[i]->state, &value);
+      cvmfs::file_system_->no_open_files()->Set(value);
       SendMsg2Socket(fd_progress, " done\n");
     }
 
@@ -2847,12 +2868,25 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateFuse) {
-      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
-      cvmfs::FuseState *fuse_state =
-        static_cast<cvmfs::FuseState *>(saved_states[i]->state);
-      if (!fuse_state->cache_symlinks)
+      SendMsg2Socket(fd_progress, "Migrating fuse state (v1 to v2)... ");
+      void *v2s = cvm_bridge_migrate_nfiles_ctr_v1v2s(saved_states[i]->state);
+      cvmfs::FuseState value;
+      StateSerializer::DeserializeFuseState(v2s, &value);
+      free(v2s);
+      if (!value.cache_symlinks)
         cvmfs::mount_point_->DisableCacheSymlinks();
-      if (fuse_state->has_dentry_expire)
+      if (value.has_dentry_expire)
+        cvmfs::mount_point_->EnableFuseExpireEntry();
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateFuseV2S) {
+      SendMsg2Socket(fd_progress, "Restoring fuse state... ");
+      cvmfs::FuseState value;
+      StateSerializer::DeserializeFuseState(saved_states[i], &value);
+      if (!value.cache_symlinks)
+        cvmfs::mount_point_->DisableCacheSymlinks();
+      if (value.has_dentry_expire)
         cvmfs::mount_point_->EnableFuseExpireEntry();
       SendMsg2Socket(fd_progress, " done\n");
     }
@@ -2872,8 +2906,12 @@ static void FreeSavedState(const int fd_progress,
   for (unsigned i = 0, l = saved_states.size(); i < l; ++i) {
     switch (saved_states[i]->state_id) {
       case loader::kStateOpenDirs:
-        SendMsg2Socket(fd_progress, "Releasing saved open directory handles\n");
-        delete static_cast<cvmfs::DirectoryHandles *>(saved_states[i]->state);
+        SendMsg2Socket(fd_progress, "Releasing open directory handles (v1)\n");
+        cvm_bridge_free_directory_handles_v1(saved_states[i]->state);
+        break;
+      case loader::kStateOpenDirsV2S:
+        SendMsg2Socket(fd_progress, "Releasing open directory handles\n");
+        free(saved_states[i]->state);
         break;
       case loader::kStateGlueBuffer:
         SendMsg2Socket(
@@ -2898,8 +2936,12 @@ static void FreeSavedState(const int fd_progress,
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
       case loader::kStateDentryTracker:
+        SendMsg2Socket(fd_progress, "Releasing saved dentry tracker (v1)\n");
+        cvm_bridge_free_dentry_tracker_v1(saved_states[i]->state);
+        break;
+      case loader::kStateDentryTrackerV2S:
         SendMsg2Socket(fd_progress, "Releasing saved dentry tracker\n");
-        delete static_cast<glue::DentryTracker *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       case loader::kStatePageCacheTracker:
         SendMsg2Socket(fd_progress, "Releasing saved page cache entry cache\n");
@@ -2925,21 +2967,32 @@ static void FreeSavedState(const int fd_progress,
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;
       case loader::kStateInodeGeneration:
-        SendMsg2Socket(fd_progress, "Releasing saved inode generation info\n");
-        delete static_cast<cvmfs::InodeGenerationInfo *>(
-          saved_states[i]->state);
+        SendMsg2Socket(fd_progress, "Releasing inode generation info (v1)\n");
+        cvm_bridge_free_inode_generation_v1(saved_states[i]->state);
+        break;
+      case loader::kStateInodeGenerationV2S:
+        SendMsg2Socket(fd_progress, "Releasing inode generation info\n");
+        free(saved_states[i]->state);
         break;
       case loader::kStateOpenFiles:
         cvmfs::file_system_->cache_mgr()->FreeState(
           fd_progress, saved_states[i]->state);
         break;
       case loader::kStateOpenFilesCounter:
+        SendMsg2Socket(fd_progress, "Releasing open files counter (v1)\n");
+        cvm_bridge_free_nfiles_ctr_v1(saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesCounterV2S:
         SendMsg2Socket(fd_progress, "Releasing open files counter\n");
-        delete static_cast<uint32_t *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       case loader::kStateFuse:
+        SendMsg2Socket(fd_progress, "Releasing fuse state (v1)\n");
+        cvm_bridge_free_fuse_state_v1(saved_states[i]->state);
+        break;
+      case loader::kStateFuseV2S:
         SendMsg2Socket(fd_progress, "Releasing fuse state\n");
-        delete static_cast<cvmfs::FuseState *>(saved_states[i]->state);
+        free(saved_states[i]->state);
         break;
       default:
         break;

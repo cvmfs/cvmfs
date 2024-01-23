@@ -8,6 +8,7 @@
 #
 include (util/CMakeLists.txt)
 include (crypto/CMakeLists.txt)
+include (bridge/CMakeLists.txt)
 
 
 
@@ -238,6 +239,7 @@ if (BUILD_CVMFS)
        notify/subscriber_sse.cc
        quota_listener.cc
        shortstring.cc
+       state.cc
        supervisor.cc
        talk.cc
        url.cc
@@ -279,11 +281,13 @@ if (BUILD_CVMFS)
     LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
   )
   target_link_libraries (cvmfs_fuse
+                         cvmfs_bridge
                          cvmfs_crypto
                          cvmfs_util
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
   )
   target_link_libraries (cvmfs_fuse_debug
+                         cvmfs_bridge_debug
                          cvmfs_crypto_debug
                          cvmfs_util_debug
                          ${FUSE_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
@@ -304,11 +308,13 @@ if (BUILD_CVMFS)
       LINK_FLAGS "${CVMFS_FUSE_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3
+                           cvmfs_bridge
                            cvmfs_crypto
                            cvmfs_util
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
     )
     target_link_libraries (cvmfs_fuse3_debug
+                           cvmfs_bridge_debug
                            cvmfs_crypto_debug
                            cvmfs_util_debug
                            ${FUSE3_LIBRARIES} ${CVMFS_FUSE_LINK_LIBRARIES}
