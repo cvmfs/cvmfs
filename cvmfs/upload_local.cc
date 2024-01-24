@@ -128,7 +128,7 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
   if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
-             "failed to write %d bytes to '%s' "
+             "failed to write %lu bytes to '%s' "
              "(errno: %d)",
              buffer.size, local_handle->temporary_path.c_str(),
              cpy_errno);

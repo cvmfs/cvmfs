@@ -274,7 +274,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     int64_t written = info->sink()->Write(ptr, num_bytes);
     if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
       LogCvmfs(kLogDownload, kLogDebug,
-        "Failed to perform write of %zu bytes to sink %s with errno %d",
+        "Failed to perform write of %zu bytes to sink %s with errno %ld",
         num_bytes, info->sink()->Describe().c_str(), written);
     }
   }
@@ -1465,8 +1465,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
               LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                 "VerifyAndFinalize() would fail the download here. "
                 "Instead switch proxy and retry download. "
-                "info->probe_hosts=%d host_chain=%x info->num_used_hosts=%d "
-                "host_chain->size()=%d same_url_retry=%d "
+                "info->probe_hosts=%d host_chain=%p info->num_used_hosts=%d "
+                "host_chain->size()=%lu same_url_retry=%d "
                 "info->num_used_proxies=%d opt_num_proxies_=%d",
                   static_cast<int>(info->probe_hosts()),
                   host_chain, info->num_used_hosts(),
@@ -2073,7 +2073,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
   }
 
   UpdateProxiesUnlocked("failed proxy");
-  LogCvmfs(kLogDownload, kLogDebug, "%d proxies remain in group",
+  LogCvmfs(kLogDownload, kLogDebug, "%lu proxies remain in group",
            current_proxy_group()->size() - opt_proxy_groups_current_burned_);
 }
 
@@ -2549,7 +2549,7 @@ void DownloadManager::SetProxyChain(
     }
   }
   vector<dns::Host> hosts;
-  LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
+  LogCvmfs(kLogDownload, kLogDebug, "resolving %lu proxy addresses",
            hostnames.size());
   resolver_->ResolveMany(hostnames, &hosts);
 
@@ -2599,7 +2599,7 @@ void DownloadManager::SetProxyChain(
     opt_num_proxies_ += infos.size();
   }
   LogCvmfs(kLogDownload, kLogDebug,
-           "installed %u proxies in %u load-balance groups",
+           "installed %u proxies in %lu load-balance groups",
            opt_num_proxies_, opt_proxy_groups_->size());
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;

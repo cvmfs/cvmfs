@@ -683,7 +683,7 @@ int64_t LibContext::Pread(
         offset_in_chunk);
 
       if (bytes_fetched < 0) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d (%s)",
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %ld (%s)",
                  bytes_fetched,
                  open_chunks.chunk_reflist.path.ToString().c_str());
         return -bytes_fetched;
@@ -738,7 +738,7 @@ int LibContext::Remount() {
       }
 
       mount_point_->ReEvaluateAuthz();
-      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
+      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %lu",
                mount_point_->catalog_mgr()->GetRevision());
       return 0;
 

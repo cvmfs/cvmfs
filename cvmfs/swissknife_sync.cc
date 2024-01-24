@@ -282,7 +282,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
              dirtab_file.c_str());
     return 1;
   }
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %d rules in dirtab '%s'",
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %lu rules in dirtab '%s'",
            dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
@@ -385,7 +385,7 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
 
     if (glob_retval == 0) {
       // found some candidates... filtering by cvmfs catalog structure
-      LogCvmfs(kLogCatalog, kLogDebug, "Found %d entries for pathspec (%s)",
+      LogCvmfs(kLogCatalog, kLogDebug, "Found %lu entries for pathspec (%s)",
                glob_res.gl_pathc, glob_string.c_str());
       FilterCandidatesFromGlobResult(dirtab, glob_res.gl_pathv,
                                      glob_res.gl_pathc, catalog_manager,

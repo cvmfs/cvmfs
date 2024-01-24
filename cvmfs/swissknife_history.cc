@@ -228,7 +228,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   // disable the unlink guard in order to keep the newly exported manifest file
   env->manifest_path.Disable();
   LogCvmfs(kLogCvmfs, kLogVerboseMsg,
-           "exported manifest (%d) with new "
+           "exported manifest (%lu) with new "
            "history '%s'",
            env->manifest->revision(), new_history_hash.ToString().c_str());
 
@@ -272,7 +272,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
   env->manifest->set_catalog_size(catalog_size);
   env->manifest->set_catalog_hash(new_catalog_hash);
 
-  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "uploaded new catalog (%d bytes) '%s'",
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "uploaded new catalog (%lu bytes) '%s'",
            catalog_size, new_catalog_hash.ToString().c_str());
 
   return true;
@@ -410,7 +410,7 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
 
 void CommandTag::PrintTagMachineReadable(
     const history::History::Tag &tag) const {
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s", tag.name.c_str(),
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %lu %d %ld %s %s", tag.name.c_str(),
            tag.root_hash.ToString().c_str(), tag.size, tag.revision,
            tag.timestamp,
            (tag.branch == "") ? "(default)" : tag.branch.c_str(),
@@ -697,7 +697,7 @@ int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
     }
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
+  LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %lu tags",
            condemned_tags.size());
 
   // check if the tags to be deleted exist
@@ -820,7 +820,7 @@ void CommandListTags::PrintHumanReadableTagList(
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
 
   // print the number of tags listed
-  LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %d tags", tags.size());
+  LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %lu tags", tags.size());
 }
 
 void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
@@ -1069,7 +1069,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   const uint64_t current_revision = env->manifest->revision();
   assert(target_tag.revision <= current_revision);
   if (target_tag.revision == current_revision) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to current head (%u)",
+    LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to current head (%lu)",
              current_revision);
     return 1;
   }

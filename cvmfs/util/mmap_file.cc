@@ -69,7 +69,7 @@ bool MemoryMappedFile::Map() {
     // map the given file into memory
     mapping = mmap(NULL, filesize.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (mapping == MAP_FAILED) {  // NOLINT(performance-no-int-to-ptr)
-      LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s (file size: %d) "
+      LogCvmfs(kLogUtility, kLogStderr, "failed to mmap %s (file size: %ld) "
                                         "(errno: %d)",
                 file_path_.c_str(),
                 filesize.st_size,

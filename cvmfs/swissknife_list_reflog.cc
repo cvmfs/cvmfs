@@ -150,7 +150,7 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
   // Clean up reflog file
   delete reflog;
 
-  LogCvmfs(kLogCvmfs, kLogStderr, "Number of objects: %lu", objects_->size());
+  LogCvmfs(kLogCvmfs, kLogStderr, "Number of objects: %u", objects_->size());
 
   if (output_path == "") {
     DumpObjects(stdout);

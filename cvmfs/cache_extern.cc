@@ -325,7 +325,7 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
     WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(id));
     if (fd < 0) {
-      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
                strerror(-fd));
       return fd;
     }
@@ -590,7 +590,7 @@ int ExternalCacheManager::OpenFromTxn(void *txn) {
     WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(transaction->id));
     if (fd < 0) {
-      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
                strerror(-fd));
       return fd;
     }

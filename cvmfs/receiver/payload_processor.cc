@@ -251,7 +251,7 @@ PayloadProcessor::Result PayloadProcessor::Finalize() {
 
   if (GetNumErrors() > 0) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-             "PayloadProcessor - error: % unpacking error(s).", GetNumErrors());
+             "PayloadProcessor - error: %d unpacking error(s).", GetNumErrors());
     return kOtherError;
   }
 

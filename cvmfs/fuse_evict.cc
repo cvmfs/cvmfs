@@ -152,7 +152,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
       if (invalidator->fuse_channel_or_session_ == NULL) {
         if (!reported_missing_inval_support) {
           LogCvmfs(kLogCvmfs, kLogSyslogWarn,
-                   "missing fuse support for dentry invalidation (%d/%s)",
+                   "missing fuse support for dentry invalidation (%lu/%s)",
                    parent_ino, name);
           reported_missing_inval_support = true;
         }
@@ -273,7 +273,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 
     while (dentries_copy->NextEntry(&dentry_cursor, &entry_parent, &entry_name))
     {
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %d --> %s",
+      LogCvmfs(kLogCvmfs, kLogDebug, "evicting dentry %lu --> %s",
                entry_parent, entry_name.c_str());
       // Can fail, e.g. the entry might be already evicted
 #if CVMFS_USE_LIBFUSE == 2

@@ -460,7 +460,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 
   if (file_system_->IsNfsSource()) {
     // NFS mode, just a lookup
-    LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - lookup in NFS maps", ino);
+    LogCvmfs(kLogCvmfs, kLogDebug, "MISS %lu - lookup in NFS maps", ino);
     if (file_system_->nfs_maps()->GetPath(ino, path)) {
       mount_point_->path_cache()->Insert(ino, *path);
       return true;
@@ -471,7 +471,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   if (ino == mount_point_->catalog_mgr()->GetRootInode())
     return true;
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %d - looking in inode tracker", ino);
+  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %lu - looking in inode tracker", ino);
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
   bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
 
@@ -994,7 +994,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   {
     MutexLockGuard m(&lock_directory_handles_);
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "linking directory handle %d to dir inode: %" PRIu64,
+             "linking directory handle %lu to dir inode: %" PRIu64,
              next_directory_handle_, uint64_t(ino));
     (*directory_handles_)[next_directory_handle_] = stream_listing;
     fi->fh = next_directory_handle_;
@@ -1025,7 +1025,7 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
 
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_releasedir on inode %" PRIu64
-           ", handle %d", uint64_t(ino), fi->fh);
+           ", handle %lu", uint64_t(ino), fi->fh);
 
   int reply = 0;
 
@@ -1073,7 +1073,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   HighPrecisionTimer guard_timer(file_system_->hist_fs_readdir());
 
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_readdir on inode %" PRIu64 " reading %d bytes from offset %d",
+           "cvmfs_readdir on inode %" PRIu64 " reading %lu bytes from offset %ld",
            uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)), size, off);
 
   DirectoryListing listing;
@@ -1265,7 +1265,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
     // Update the chunk handle list
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "linking chunk handle %d to unique inode: %" PRIu64,
+             "linking chunk handle %lu to unique inode: %" PRIu64,
              chunk_tables->next_handle, uint64_t(unique_inode));
     chunk_tables->handle2fd.Insert(chunk_tables->next_handle, ChunkFd());
     chunk_tables->handle2uniqino.Insert(chunk_tables->next_handle,
@@ -1358,8 +1358,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
 
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_read inode: %" PRIu64 " reading %d bytes from offset %d "
-           "fd %d", uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)),
+           "cvmfs_read inode: %" PRIu64 " reading %lu bytes from offset %ld "
+           "fd %lu", uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)),
            size, off, fi->fh);
   perf::Inc(file_system_->n_fs_read());
 
@@ -1826,7 +1826,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   ino = catalog_mgr->MangleInode(ino);
   TraceInode(Tracer::kEventListAttr, ino, "listxattr()");
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_listxattr on inode: %" PRIu64 ", size %u [visibility %d]",
+           "cvmfs_listxattr on inode: %" PRIu64 ", size %zu [visibility %d]",
            uint64_t(ino), size,
            mount_point_->magic_xattr_mgr()->visibility());
 
@@ -2258,9 +2258,9 @@ static unsigned CheckMaxOpenFiles() {
     if (soft_limit < cvmfs::kMinOpenFiles) {
       LogCvmfs(kLogCvmfs, kLogSyslogWarn | kLogDebug,
                "Warning: current limits for number of open files are "
-               "(%lu/%lu)\n"
+               "(%u/%u)\n"
                "CernVM-FS is likely to run out of file descriptors, "
-               "set ulimit -n to at least %lu",
+               "set ulimit -n to at least %u",
                soft_limit, hard_limit, cvmfs::kMinOpenFiles);
     }
     max_open_files = soft_limit;
@@ -2328,7 +2328,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::directory_handles_->set_empty_key((uint64_t)(-1));
   cvmfs::directory_handles_->set_deleted_key((uint64_t)(-2));
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
+  LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %lu bits",
            sizeof(fuse_ino_t) * 8);
 
   cvmfs::inode_generation_info_.initial_revision =
@@ -2548,7 +2548,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
          cvmfs::directory_handles_->begin(),
          iEnd = cvmfs::directory_handles_->end(); i != iEnd; ++i)
     {
-      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %d", i->first);
+      LogCvmfs(kLogCvmfs, kLogDebug, "saving dirhandle %lu", i->first);
     }
 #endif
 

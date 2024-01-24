@@ -47,7 +47,7 @@ RamCacheManager::RamCacheManager(
 {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
-  LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
+  LogCvmfs(kLogCache, kLogDebug, "max %lu B, %u entries",
            max_size, max_entries);
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
            "DEPRECATION WARNING: The RAM cache manager is depcreated and "
@@ -246,7 +246,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       perf::Inc(counters_.n_realloc);
       size_t new_size = max(2*transaction->buffer.size,
         static_cast<size_t>(size + transaction->pos));
-      LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
+      LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %lu B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
       void *new_ptr = realloc(transaction->buffer.address, new_size);
@@ -260,7 +260,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       transaction->buffer.size = new_size;
     } else {
       LogCvmfs(kLogCache, kLogDebug,
-               "attempted to write more than requested (%u>%u)",
+               "attempted to write more than requested (%lu>%zu)",
                size, transaction->buffer.size);
       return -EFBIG;
     }
@@ -361,7 +361,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   overrun -= regular_size -regular_entries_.GetUsed();
   if (overrun > 0) {
     LogCvmfs(kLogCache, kLogDebug,
-             "transaction for %s would overrun the cache limit by %d",
+             "transaction for %s would overrun the cache limit by %ld",
              transaction->buffer.id.ToString().c_str(), overrun);
     perf::Inc(counters_.n_full);
     return -ENOSPC;

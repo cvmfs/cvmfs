@@ -727,7 +727,7 @@ SharedPtr<SyncItem> SyncMediator::CreateSyncItem(
 
 void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   LogCvmfs(kLogPublish, kLogVerboseMsg,
-           "Spooler callback for %s, digest %s, produced %d chunks, retval %d",
+           "Spooler callback for %s, digest %s, produced %lu chunks, retval %d",
            result.local_path.c_str(),
            result.content_hash.ToString().c_str(),
            result.file_chunks.size(),

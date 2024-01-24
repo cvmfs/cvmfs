@@ -18,6 +18,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 CVMFS_EXPORT
 void vLogCvmfs(const LogSource source, const int mask,
                const char *format, va_list variadic_list);
+__attribute__((format(printf, 3, 4)))
 CVMFS_EXPORT
 void LogCvmfs(const LogSource source, const int mask, const char *format, ...);
 // Ensure that pure debug messages are not compiled except in DEBUGMSG mode

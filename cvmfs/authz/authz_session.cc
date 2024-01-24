@@ -318,7 +318,7 @@ bool AuthzSessionManager::LookupSessionKey(
     pid2session_.Insert(*pid_key, *session_key);
   }
 
-  LogCvmfs(kLogAuthz, kLogDebug, "Lookup key %d/%" PRIu64 "; sid=%d, bday=%llu",
+  LogCvmfs(kLogAuthz, kLogDebug, "Lookup key %d/%" PRIu64 "; sid=%d, bday=%lu",
            pid_key->pid, pid_key->pid_bday,
            session_key->sid, session_key->sid_bday);
   return true;

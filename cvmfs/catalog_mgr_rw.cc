@@ -1056,9 +1056,9 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
   if (manual_revision > 0) {
     const uint64_t revision = root_catalog->GetRevision();
     if (revision >= manual_revision) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Manual revision (%d) must not be "
+      LogCvmfs(kLogCatalog, kLogStderr, "Manual revision (%lu) must not be "
                                         "smaller than the current root "
-                                        "catalog's (%d). Skipped!",
+                                        "catalog's (%lu). Skipped!",
                                         manual_revision, revision);
     } else {
       // Gets incremented by FinalizeCatalog() afterwards!
@@ -1193,7 +1193,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "%s: catalog at %s has more than %u entries (%u). "
+             "%s: catalog at %s has more than %lu entries (%lu). "
              "Large catalogs stress the CernVM-FS transport infrastructure. "
              "Please split it into nested catalogs or increase the limit.",
              enforce_limits_ ? "FATAL" : "WARNING",

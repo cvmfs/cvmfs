@@ -49,7 +49,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
   }
 
   bool Insert(const fuse_ino_t &inode, const catalog::DirectoryEntry &dirent) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %u -> '%s'",
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %lu -> '%s'",
              inode, dirent.name().c_str());
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
@@ -61,7 +61,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
   {
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %u (%s)",
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %lu (%s)",
              inode, result ? "hit" : "miss");
     return result;
   }
@@ -82,7 +82,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
   }
 
   bool Insert(const fuse_ino_t &inode, const PathString &path) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %u -> '%s'",
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %lu -> '%s'",
              inode, path.c_str());
     const bool result =
       LruCache<fuse_ino_t, PathString>::Insert(inode, path);
@@ -94,7 +94,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
   {
     const bool found =
       LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %u (%s)",
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %lu (%s)",
              inode, found ? "hit" : "miss");
     return found;
   }

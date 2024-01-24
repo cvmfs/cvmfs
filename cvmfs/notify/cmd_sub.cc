@@ -109,7 +109,7 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
     if (new_revision > revision_) {
       LogCvmfs(kLogCvmfs, kLogInfo,
                "SwissknifeSubscriber - repository %s is now at revision %lu.",
-               repo.c_str(), new_revision, revision_);
+               repo.c_str(), new_revision);
       if (verbose_) {
         LogCvmfs(kLogCvmfs, kLogInfo, "%s", msg_text.c_str());
       }

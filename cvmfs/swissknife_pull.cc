@@ -766,7 +766,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Found %lu named snapshots",
              historic_tags.size());
     // TODO(jblomer): We should repliacte the previous history dbs, too,
     // in order to avoid races on fail-over between non-synchronized stratum 1s
@@ -904,7 +904,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", false);
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %u",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %lu",
              ensemble.manifest->revision());
   }
 
