@@ -619,7 +619,7 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    StageNestedCatalog(path, best_fit, false /* is_listable */);	  
+    StageNestedCatalog(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -850,7 +850,7 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
   assert(parent);
   const unsigned path_len = path.GetLength();
 
-  if(getenv("_CVMFS_NO_CATALOG_STAGING")) {
+  if (getenv("_CVMFS_NO_CATALOG_STAGING")) {
     Unlock();
     return;
   }
