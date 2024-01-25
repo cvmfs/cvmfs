@@ -1142,7 +1142,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
       const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
-      LogCvmfs(kLogQuota, kLogDebug, "reserve %d bytes for %s",
+      LogCvmfs(kLogQuota, kLogDebug, "reserve %lu bytes for %s",
                size, hash_str.c_str());
 
       if (quota_mgr->pinned_chunks_.find(hash) ==
@@ -1629,7 +1629,7 @@ void PosixQuotaManager::ProcessCommandBunch(
 
         // Cleanup, move to trash and unlink
         if (!exists && (gauge_ + size > limit_)) {
-          LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %lu",
+          LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %u",
                    gauge_, size);
           retval = DoCleanup(cleanup_threshold_);
           assert(retval != 0);

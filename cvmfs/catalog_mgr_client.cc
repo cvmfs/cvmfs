@@ -391,7 +391,7 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
 bool ClientCatalogManager::IsRevisionBlacklisted() {
   uint64_t revision = GetRevision();
 
-  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %u is blacklisted",
+  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %lu is blacklisted",
            repo_name_.c_str(), revision);
 
   vector<string> blacklist = signature_mgr_->GetBlacklist();

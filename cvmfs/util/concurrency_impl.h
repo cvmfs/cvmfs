@@ -378,8 +378,8 @@ ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
 template <class WorkerT>
 bool ConcurrentWorkers<WorkerT>::Initialize() {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Initializing ConcurrentWorker "
-                                            "object with %d worker threads "
-                                            "and a queue length of %d",
+                                            "object with %lu worker threads "
+                                            "and a queue length of %zu",
            number_of_workers_, jobs_queue_.GetMaximalItemCount());
   // LogCvmfs(kLogConcurrency, kLogStdout, "sizeof(expected_data_t): %d\n"
   //                                           "sizeof(returned_data_t): %d",
@@ -668,7 +668,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
 
   // thanks, and good bye...
   LogCvmfs(kLogConcurrency, kLogVerboseMsg,
-           "All workers stopped. They processed %d jobs. Terminating...",
+           "All workers stopped. They processed %ld jobs. Terminating...",
            atomic_read64(&jobs_processed_));
 }
 

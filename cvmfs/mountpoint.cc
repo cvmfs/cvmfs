@@ -1488,7 +1488,7 @@ bool MountPoint::CreateDownloadManagers() {
     if (options_mgr_->GetValue("CVMFS_HTTP_TRACING_HEADERS", &optarg)) {
       if (optarg.size() > 1000) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-            "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given %d )",
+            "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given %ld )",
             optarg.size());
       } else {
         std::vector<std::string> tokens = SplitString(optarg, '|');

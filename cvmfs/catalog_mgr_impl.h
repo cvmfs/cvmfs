@@ -776,7 +776,7 @@ InodeRange AbstractCatalogManager<CatalogT>::AcquireInodes(uint64_t size) {
   result.size = size;
 
   inode_gauge_ += size;
-  LogCvmfs(kLogCatalog, kLogDebug, "allocating inodes from %d to %d.",
+  LogCvmfs(kLogCatalog, kLogDebug, "allocating inodes from %lu to %lu.",
            result.offset + 1, inode_gauge_);
 
   return result;

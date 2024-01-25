@@ -190,7 +190,7 @@ void *TalkManager::MainResponder(void *data) {
     if (buf[bytes_read-1] == '\0')
       bytes_read--;
     const string line = string(buf, bytes_read);
-    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %u)",
+    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %lu)",
              line.c_str(), line.length());
 
     if (line == "tracebuffer flush") {

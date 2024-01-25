@@ -82,12 +82,12 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     }
   }
   if (diffs & Difference::kLinkcount) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %u / %u",
              a.linkcount(), b.linkcount());
     retval = false;
   }
   if (diffs & Difference::kHardlinkGroup) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %u / %u",
              a.hardlink_group(), b.hardlink_group());
     retval = false;
   }
@@ -97,7 +97,7 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kMode) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %u / %u",
              a.mode(), b.mode());
     retval = false;
   }
@@ -517,8 +517,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
       // Right size of symbolic link?
       if (entries[i].size() != entries[i].symlink().GetLength()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; ",
-                 "expected %s, got %s", full_path.c_str(),
+        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; "
+                 "expected %u, got %lu", full_path.c_str(),
                  entries[i].symlink().GetLength(), entries[i].size());
         retval = false;
       }
@@ -611,7 +611,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
            const string chunk_path = "data/" + chunk_hash.MakePath();
            if (!Exists(chunk_path)) {
               LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                              "offset: %d | size: %d) missing",
+                                              "offset: %ld | size: %lu) missing",
                        this_chunk.content_hash().ToStringWithSuffix().c_str(),
                        full_path.c_str(),
                        this_chunk.offset(),
@@ -625,7 +625,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       // is the aggregated chunk size equal to the actual file size?
       if (aggregated_file_size != entries[i].size()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "chunks of file %s produce a size "
-                                        "mismatch. Calculated %d bytes | %d "
+                                        "mismatch. Calculated %zu bytes | %lu "
                                         "bytes expected",
                  full_path.c_str(),
                  aggregated_file_size,
@@ -647,7 +647,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   // Check directory linkcount
   if (this_directory.linkcount() != num_subdirs + 2) {
     LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
-             "expected %lu, got %lu",
+             "expected %u, got %u",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
     retval = false;
   }
@@ -658,7 +658,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   {
     if (i->second[0].linkcount() != i->second.size()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "hardlink linkcount wrong for %s, "
-               "expected %lu, got %lu",
+               "expected %lu, got %u",
                (path.ToString() + "/" + i->second[0].name().ToString()).c_str(),
                i->second.size(), i->second[0].linkcount());
       retval = false;

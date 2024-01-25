@@ -243,7 +243,7 @@ TelemetryReturn TelemetryAggregatorInflux::SendToInflux(
       return kTelemetryFailSend;
     } else if (static_cast<size_t>(num_bytes_sent) != payload.size())  {
       LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
-                    "Incomplete send. Bytes transferred: %d. Bytes expected %d",
+                    "Incomplete send. Bytes transferred: %zd. Bytes expected %lu",
                     num_bytes_sent, payload.size());
       return kTelemetryFailSend;
     }

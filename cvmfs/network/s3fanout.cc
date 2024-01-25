@@ -133,7 +133,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  LogCvmfs(kLogS3Fanout, kLogDebug, "Data callback with %d bytes", num_bytes);
+  LogCvmfs(kLogS3Fanout, kLogDebug, "Data callback with %zu bytes", num_bytes);
 
   if (num_bytes == 0)
     return 0;
@@ -141,7 +141,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   uint64_t read_bytes = info->origin->Read(ptr, num_bytes);
 
   LogCvmfs(kLogS3Fanout, kLogDebug,
-           "source buffer pushed out %d bytes", read_bytes);
+           "source buffer pushed out %lu bytes", read_bytes);
 
   return read_bytes;
 }
@@ -164,8 +164,8 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
   LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
-           "handle %p, socket %d, action %d, up %d, "
-           "sp %d, fds_inuse %d, jobs %d",
+           "handle %p, socket %d, action %d, up %p, "
+           "sp %p, fds_inuse %d, jobs %d",
            easy, s, action, userp,
            socketp, s3fanout_mgr->watch_fds_inuse_,
            s3fanout_mgr->available_jobs_->Get());
@@ -1060,7 +1060,7 @@ void S3FanoutManager::Backoff(JobInfo *info) {
       {
         LogCvmfs(kLogS3Fanout, kLogStdout,
                  "Warning: S3 backend throttling %ums "
-                 "(total backoff time so far %ums)",
+                 "(total backoff time so far %lums)",
                  info->throttle_ms,
                  statistics_->ms_throttled);
         timestamp_last_throttle_report_ = now;

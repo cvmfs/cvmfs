@@ -124,7 +124,7 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
   walker.FindObjectsAndPopulateReflog();
   reflog->CommitTransaction();
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "found %d entries", reflog->CountEntries());
+  LogCvmfs(kLogCvmfs, kLogStdout, "found %lu entries", reflog->CountEntries());
 
   reflog->DropDatabaseFileOwnership();
   const std::string reflog_db = reflog->database_file();
@@ -189,7 +189,7 @@ void RootChainWalker::WalkRootCatalogs(const shash::Any &root_catalog_hash) {
   while (!current_hash.IsNull()                  &&
          !reflog_->ContainsCatalog(current_hash) &&
          (current_catalog = FetchCatalog(current_hash)).IsValid()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %d",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Catalog: %s Revision: %lu",
              current_hash.ToString().c_str(), current_catalog->GetRevision());
 
     const bool success = reflog_->AddCatalog(current_hash);

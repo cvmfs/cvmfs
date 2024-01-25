@@ -213,7 +213,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.count('t') > 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s%d",
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%lu",
              (human_readable) ? "Time Stamp:                      " : "",
              manifest->publish_timestamp());
   }
