@@ -39,7 +39,7 @@ static void tock(time_t tick) {
   time_t delta = platform_monotonic_time_ns() - tick;
   float delta_ms =  delta /1000000.;
   LogCvmfs(kLogCatalog, kLogDebug,
-		  "Catalog Writelock delay %.3f ms", delta_ms);
+       "Catalog Writelock delay %.3f ms", delta_ms);
 }
 
 
