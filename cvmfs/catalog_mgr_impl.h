@@ -850,7 +850,10 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
   assert(parent);
   const unsigned path_len = path.GetLength();
 
-  if(getenv("_CVMFS_NO_CATALOG_STAGING")) {return;}
+  if(getenv("_CVMFS_NO_CATALOG_STAGING")) {
+    Unlock();
+    return;
+  }
 
   perf::Inc(statistics_.n_nested_listing);
   typedef typename CatalogT::NestedCatalogList NestedCatalogList;
