@@ -31,6 +31,16 @@ namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
 
+static time_t tick(void) {
+  return platform_monotonic_time_ns();
+}
+
+static void tock(time_t tick) {
+  time_t delta = platform_monotonic_time_ns() - tick;
+  float delta_ms =  delta /1000000.;
+  LogCvmfs(kLogCatalog, kLogDebug, "Catalog Writelock delay %.3f ms", delta_ms );
+}
+
 
 /**
  * LookupOption for a directory entry (bitmask).
@@ -387,8 +397,10 @@ class AbstractCatalogManager : public SingleCopy {
     assert(retval == 0);
   }
   inline void WriteLock() const {
+    time_t t =tick();
     int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
+    tock(t);
   }
   inline void Unlock() const {
     int retval = pthread_rwlock_unlock(rwlock_);

@@ -285,7 +285,6 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
     LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
              path.c_str());
     StageNestedCatalog(path, best_fit, false /* is_listable */);
-    Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -386,7 +385,7 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalog(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
@@ -449,7 +448,7 @@ bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
   CatalogT *catalog = best_fit;
   // True if there is an available nested catalog
   if (MountSubtree(test, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalog(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(test);
@@ -505,7 +504,7 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalog(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -544,7 +543,6 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
     StageNestedCatalog(path, best_fit, true /* is_listable */);
-    Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -582,7 +580,6 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
     StageNestedCatalog(path, best_fit, true /* is_listable */);
-    Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -622,7 +619,7 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalog(path, best_fit, false /* is_listable */);	  
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -658,7 +655,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalog(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
@@ -853,6 +850,8 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
   assert(parent);
   const unsigned path_len = path.GetLength();
 
+  if(getenv("_CVMFS_NO_CATALOG_STAGING")) {return;}
+
   perf::Inc(statistics_.n_nested_listing);
   typedef typename CatalogT::NestedCatalogList NestedCatalogList;
   const NestedCatalogList& nested_catalogs = parent->ListNestedCatalogs();
@@ -876,9 +875,13 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
 
     LogCvmfs(kLogCatalog, kLogDebug, "staging nested catalog at %s (%s)",
              i->mountpoint.c_str(), i->hash.ToString().c_str());
-    StageNestedCatalogByHash(i->hash, i->mountpoint);
-    break;
+    shash::Any hash       = shash::Any(i->hash);
+    PathString mountpoint = PathString(i->mountpoint);
+    Unlock();
+    StageNestedCatalogByHash(hash, mountpoint);
+    return;
   }
+  Unlock();
 }
 
 /**
