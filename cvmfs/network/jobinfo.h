@@ -34,7 +34,11 @@ namespace download {
  * Contains all the information to specify a download job.
  */
 class JobInfo {
+ protected:
+  static atomic_int64 next_uuid;
+
  private:
+  int64_t id_;
   /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
   const std::string *url_;
@@ -165,6 +169,7 @@ class JobInfo {
                                              return current_host_chain_index_; }
 
   bool allow_failure() const { return allow_failure_; }
+  int64_t id() const { return id_; }
 
 
   void SetUrl(const std::string *url) { url_ = url; }

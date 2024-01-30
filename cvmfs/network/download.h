@@ -255,7 +255,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void CloneProxyConfig(DownloadManager *clone);
 
   bool EscapeUrlChar(unsigned char input, char output[3]);
-  std::string EscapeUrl(const std::string &url);
+  std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
   unsigned EscapeHeader(const std::string &header, char *escaped_buf,
                         size_t buf_size);
 
