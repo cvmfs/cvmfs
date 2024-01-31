@@ -686,7 +686,7 @@ void *DownloadManager::MainDownload(void *data) {
         int64_t countp;
         curl_easy_getinfo(easy_handle, CURLINFO_REDIRECT_COUNT, &countp);
         LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
-                             "Number of CURL redirects %d", info->id(), countp);
+                      "Number of CURL redirects %" PRId64 , info->id(), countp);
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
@@ -2169,17 +2169,20 @@ void DownloadManager::SwitchHost(JobInfo *info) {
   }
 
   string reason = "manually triggered";
+  string info_id = "";
   if (info) {
     reason = download::Code2Ascii(info->error_code());
+    info_id = "(id " + StringifyInt(info->id()) + ") ";
   }
 
   string old_host = (*opt_host_chain_)[opt_host_chain_current_];
   opt_host_chain_current_ =
       (opt_host_chain_current_ + 1) % opt_host_chain_->size();
   perf::Inc(counters_->n_host_failover);
-  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn, "(id %" PRId64 ")"
-           "switching host from %s to %s (%s)", info->id(), old_host.c_str(),
-           (*opt_host_chain_)[opt_host_chain_current_].c_str(), reason.c_str());
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+          "%sswitching host from %s to %s (%s)", info_id.c_str(),
+          old_host.c_str(), (*opt_host_chain_)[opt_host_chain_current_].c_str(),
+          reason.c_str());
 
   // Remember the timestamp of switching to backup host
   if (opt_host_reset_after_ > 0) {
