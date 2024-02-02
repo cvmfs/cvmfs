@@ -611,7 +611,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
            const string chunk_path = "data/" + chunk_hash.MakePath();
            if (!Exists(chunk_path)) {
               LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                              "offset: %ld | size: %lu) missing",
+                       "offset: %ld | size: %lu) missing",
                        this_chunk.content_hash().ToStringWithSuffix().c_str(),
                        full_path.c_str(),
                        this_chunk.offset(),

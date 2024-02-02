@@ -11,11 +11,11 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "ingestion/tube.h"
 #include "smallhash.h"
 #include "util/atomic.h"
 #include "util/murmur.hxx"
 #include "util/posix.h"
+#include "util/tube.h"
 
 class ItemAllocator;
 

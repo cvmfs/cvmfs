@@ -1073,8 +1073,8 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   HighPrecisionTimer guard_timer(file_system_->hist_fs_readdir());
 
   LogCvmfs(kLogCvmfs, kLogDebug,
-           "cvmfs_readdir on inode %" PRIu64 " reading %lu bytes from offset %ld",
-           uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)), size, off);
+         "cvmfs_readdir on inode %" PRIu64 " reading %lu bytes from offset %ld",
+         uint64_t(mount_point_->catalog_mgr()->MangleInode(ino)), size, off);
 
   DirectoryListing listing;
 
