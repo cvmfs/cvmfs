@@ -1896,7 +1896,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         break;
       }
       // TODO(heretherebedragons) add compression
-    } while(true);
+    } while (true);
 
     info->GetPipeJobResultWeakRef()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);

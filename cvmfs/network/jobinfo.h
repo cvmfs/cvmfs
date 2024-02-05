@@ -40,7 +40,7 @@ enum DataTubeAction {
 /**
  * Wrapper for the data tube to transfer data from CallbackCurlData() that is
  * executed in MainDownload() Thread to Fetch() called by a fuse thread
- * 
+ *
  * TODO(heretherebedragons): do we want to have a pool of those datatubeelements?
  */
 struct DataTubeElement {
@@ -49,10 +49,10 @@ struct DataTubeElement {
   DataTubeAction action;
 
   explicit DataTubeElement(DataTubeAction xact) :
-                                         data(NULL), size(0), action(xact) { };
+                                           data(NULL), size(0), action(xact) { }
   DataTubeElement(char* mov_data, size_t xsize, DataTubeAction xact) :
-                                  data(mov_data), size(xsize), action(xact) { };
-  
+                                   data(mov_data), size(xsize), action(xact) { }
+
   ~DataTubeElement() {
     delete data;
   }
