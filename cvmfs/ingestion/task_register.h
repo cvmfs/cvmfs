@@ -7,9 +7,9 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "ingestion/tube.h"
 #include "upload_spooler_result.h"
 #include "util/concurrency.h"
+#include "util/tube.h"
 
 /**
  * Runs the callback to register processed files in the file catalog.

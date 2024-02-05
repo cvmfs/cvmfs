@@ -67,7 +67,7 @@ ParameterList CommandMigrate::GetParams() const {
 
 
 static void Error(const std::string &message) {
-  LogCvmfs(kLogCatalog, kLogStderr, message.c_str());
+  LogCvmfs(kLogCatalog, kLogStderr, "%s", message.c_str());
 }
 
 

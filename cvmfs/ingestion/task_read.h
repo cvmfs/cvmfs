@@ -9,9 +9,9 @@
 
 #include "ingestion/item.h"
 #include "ingestion/task.h"
-#include "ingestion/tube.h"
 #include "util/atomic.h"
 #include "util/posix.h"
+#include "util/tube.h"
 
 class ItemAllocator;
 
