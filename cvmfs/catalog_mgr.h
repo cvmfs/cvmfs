@@ -23,8 +23,10 @@
 #include "file_chunk.h"
 #include "manifest_fetch.h"
 #include "statistics.h"
+#include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/logging.h"
+#include "util/platform.h"
 
 class XattrList;
 namespace catalog {
@@ -178,6 +180,9 @@ struct Statistics {
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
   perf::Counter *n_detach_siblings;
+  perf::Counter *n_write_lock;
+  perf::Counter *ns_write_lock;
+
   perf::Counter *catalog_revision;
 
   explicit Statistics(perf::Statistics *statistics) {
@@ -196,6 +201,10 @@ struct Statistics {
         "Number of listings of nested catalogs");
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
+    n_write_lock = statistics->Register("catalog_mgr.n_write_lock",
+                                        "number of write lock calls");
+    ns_write_lock = statistics->Register("catalog_mgr.ns_write_lock",
+        "time spent in WriteLock() [ns]");
     catalog_revision = statistics->Register("catalog_revision",
                                     "Revision number of the root file catalog");
   }
@@ -392,8 +401,12 @@ class AbstractCatalogManager : public SingleCopy {
     assert(retval == 0);
   }
   inline void WriteLock() const {
+    uint64_t timestamp = platform_monotonic_time_ns();
     int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
+    perf::Inc(statistics_.n_write_lock);
+    uint64_t duration = platform_monotonic_time_ns() - timestamp;
+    perf::Xadd(statistics_.ns_write_lock, duration);
   }
   inline void Unlock() const {
     int retval = pthread_rwlock_unlock(rwlock_);
