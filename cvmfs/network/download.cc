@@ -699,6 +699,8 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
+          DataTubeElement *ele = new DataTubeElement(kActionStop);
+          info->GetDataTubeWeakRef()->EnqueueBack(ele);
           info->GetPipeJobResultWeakRef()->
                                   Write<download::Failures>(info->error_code());
         }
@@ -1878,10 +1880,24 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
+    if (!info->IsValidDataTube()) {
+      info->CreateDataTube();
+    }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo*>(info);
+
+    do {
+      DataTubeElement* ele = info->GetDataTubeWeakRef()->PopFront();
+
+      if (ele->action == kActionStop) {
+        delete ele;
+        break;
+      }
+      // TODO(heretherebedragons) add compression
+    } while(true);
+
     info->GetPipeJobResultWeakRef()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
