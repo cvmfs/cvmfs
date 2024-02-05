@@ -284,8 +284,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   if (!found && MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
              path.c_str());
-    StageNestedCatalog(path, best_fit, false /* is_listable */);
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -543,8 +542,7 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
-    StageNestedCatalog(path, best_fit, true /* is_listable */);
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, true /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -581,8 +579,7 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
-    StageNestedCatalog(path, best_fit, true /* is_listable */);
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, true /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -845,7 +842,7 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
 
 
 template <class CatalogT>
-void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
+void AbstractCatalogManager<CatalogT>::StageNestedCatalogAndUnlock(
   const PathString &path,
   const CatalogT *parent,
   bool is_listable)
@@ -874,11 +871,13 @@ void AbstractCatalogManager<CatalogT>::StageNestedCatalog(
     if (!is_listable && (path_len == mountpoint_len))
       break;
 
+    Unlock();
     LogCvmfs(kLogCatalog, kLogDebug, "staging nested catalog at %s (%s)",
              i->mountpoint.c_str(), i->hash.ToString().c_str());
     StageNestedCatalogByHash(i->hash, i->mountpoint);
-    break;
+    return;
   }
+  Unlock();
 }
 
 /**

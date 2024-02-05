@@ -344,8 +344,13 @@ class AbstractCatalogManager : public SingleCopy {
   virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
                                         const PathString & /*mountpoint*/)
   { }
-  void StageNestedCatalog(const PathString &path, const CatalogT *parent,
-                          bool is_listable);
+  /**
+   * Called within the ReadLock(), which will be released before downloading
+   * the catalog (and before leaving the method)
+   */
+  void StageNestedCatalogAndUnlock(const PathString &path,
+                                   const CatalogT *parent,
+                                   bool is_listable);
 
   /**
    * Create a new Catalog object.
