@@ -385,7 +385,7 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
@@ -448,7 +448,7 @@ bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
   CatalogT *catalog = best_fit;
   // True if there is an available nested catalog
   if (MountSubtree(test, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(test);
@@ -504,7 +504,7 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -619,7 +619,7 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -655,7 +655,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
