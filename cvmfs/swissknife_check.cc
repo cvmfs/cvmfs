@@ -300,7 +300,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
   // TODO(jblomer): same root hash implies same size and revision
   for (unsigned i = 0; i < tags.size(); ++i) {
     used_branches.insert(tags[i].branch);
-    map<string, uint64_t>::const_iterator iter =
+    const map<string, uint64_t>::const_iterator iter =
       initial_revisions.find(tags[i].branch);
     if (iter == initial_revisions.end()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch %s in tag %s",

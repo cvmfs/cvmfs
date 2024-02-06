@@ -5,6 +5,8 @@
 #ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 #define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 
+#include "garbage_collection/garbage_collector.h"
+
 #include <algorithm>
 #include <limits>
 #include <string>
