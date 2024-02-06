@@ -694,6 +694,12 @@ int main(int argc, char **argv) {
           return 32;
       }
     }
+
+    // TODO(vvolkl): This block has seen several rounds of iterations,
+    // that tried to adress races and incorrect return codes.
+    // Should be looked at once again to make sure the cause of the
+    // race is understood, and if the timeout is really needed.
+
     ended = (waitpid(pid_cvmfs, &status, WNOHANG) == pid_cvmfs);
   } while ((stdout_open || stderr_open) && !ended);
   if (!ended) {
