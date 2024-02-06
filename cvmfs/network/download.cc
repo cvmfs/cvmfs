@@ -683,10 +683,10 @@ void *DownloadManager::MainDownload(void *data) {
         int curl_error = curl_msg->data.result;
         curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
 
-        int64_t countp;
-        curl_easy_getinfo(easy_handle, CURLINFO_REDIRECT_COUNT, &countp);
+        int64_t redir_count;
+        curl_easy_getinfo(easy_handle, CURLINFO_REDIRECT_COUNT, &redir_count);
         LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
-                      "Number of CURL redirects %" PRId64 , info->id(), countp);
+                 "Number of CURL redirects %" PRId64 , info->id(), redir_count);
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {

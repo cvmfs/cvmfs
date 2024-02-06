@@ -34,10 +34,8 @@ namespace download {
  * Contains all the information to specify a download job.
  */
 class JobInfo {
- protected:
-  static atomic_int64 next_uuid;
-
  private:
+  static atomic_int64 next_uuid;
   int64_t id_;
   /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
