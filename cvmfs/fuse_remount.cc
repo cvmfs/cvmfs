@@ -349,7 +349,7 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     SetAlarm(MountPoint::kShortTermTTL);
   } else {
     SetOfflineMode(false);
-    LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %lu",
+    LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %" PRIu64,
              mountpoint_->catalog_mgr()->GetRevision());
     catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
     SetAlarm(mountpoint_->GetEffectiveTtlSec());

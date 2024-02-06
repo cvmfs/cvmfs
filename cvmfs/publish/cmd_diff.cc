@@ -51,7 +51,8 @@ class DiffReporter : public publish::DiffListener {
              "C - content, L - symlink target; entry types: F - regular file, "
              "S - symbolic link, D - directory, N - nested catalog");
     } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "DELTA: %s/r%u (%s) --> %s/r%u (%s)",
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "DELTA: %s/r%" PRIu64 " (%s) --> %s/r%" PRIu64 " (%s)",
                from_tag.name.c_str(), from_tag.revision,
                StringifyTime(from_tag.timestamp, true).c_str(),
                to_tag.name.c_str(), to_tag.revision,

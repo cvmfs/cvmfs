@@ -763,9 +763,8 @@ int GarbageCollect(struct fs_traversal *fs) {
   uint64_t start_time = platform_monotonic_time();
   int retval = fs->garbage_collector(fs->context_);
   uint64_t end_time = platform_monotonic_time();
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "Garbage collection took %d seconds.",
-  (end_time-start_time));
+  LogCvmfs(kLogCvmfs, kLogStdout, "Garbage collection took %lu seconds.",
+           (end_time-start_time));
   return retval;
 }
 

@@ -811,7 +811,8 @@ void Publisher::Sync() {
   catalog_mgr_ = NULL;
 
   if (!settings_.transaction().dry_run()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %lu", manifest_->revision());
+    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %" PRIu64,
+             manifest_->revision());
     reflog_->AddCatalog(manifest_->catalog_hash());
   }
 }

@@ -1056,10 +1056,10 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
   if (manual_revision > 0) {
     const uint64_t revision = root_catalog->GetRevision();
     if (revision >= manual_revision) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Manual revision (%lu) must not be "
-                                        "smaller than the current root "
-                                        "catalog's (%lu). Skipped!",
-                                        manual_revision, revision);
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "Manual revision (%" PRIu64 ") must not be "
+               "smaller than the current root catalog's (%" PRIu64
+               "). Skipped!", manual_revision, revision);
     } else {
       // Gets incremented by FinalizeCatalog() afterwards!
       root_catalog->SetRevision(manual_revision - 1);

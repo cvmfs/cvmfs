@@ -2,7 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "cmd_sub.h"
+
+#include <inttypes.h>
 
 #include "crypto/signature.h"
 #include "manifest.h"
@@ -108,8 +115,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
     bool triggered = false;
     if (new_revision > revision_) {
       LogCvmfs(kLogCvmfs, kLogInfo,
-               "SwissknifeSubscriber - repository %s is now at revision %lu.",
-               repo.c_str(), new_revision);
+               "SwissknifeSubscriber - repository %s is now at revision %"
+               PRIu64 ".", repo.c_str(), new_revision);
       if (verbose_) {
         LogCvmfs(kLogCvmfs, kLogInfo, "%s", msg_text.c_str());
       }

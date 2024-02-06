@@ -63,7 +63,7 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  const int64_t revisions = (args.count('h') > 0) ?
+  const uint64_t revisions = (args.count('h') > 0) ?
     String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
   const time_t timestamp  = (args.count('z') > 0)
     ? static_cast<time_t>(String2Int64(*args.find('z')->second))
@@ -81,12 +81,6 @@ int CommandGc::Main(const ArgumentList &args) {
   const bool upload_statsdb = (args.count('I') > 0);
   const unsigned int num_threads = (args.count('N') > 0) ?
     String2Uint64(*args.find('N')->second) : 8;
-
-  if (revisions < 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "at least one revision needs to be preserved");
-    return 1;
-  }
 
   if (timestamp == GcConfig::kNoTimestamp &&
       revisions == GcConfig::kFullHistory) {
