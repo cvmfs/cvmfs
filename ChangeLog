@@ -1,4 +1,5 @@
 2.12.0:
+  * [client] Avoid possible race in mount helper (#3475)
   * [client] Add paging to xattr (#3355)
   * [server] Ingest Tarball now with modifiyable ownership (#3362)
   * [client] Refactoring of file catalog reloads (#3156)
