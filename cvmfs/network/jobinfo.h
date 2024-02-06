@@ -34,7 +34,8 @@ namespace download {
 enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
-  kActionDecompress
+  kActionEndOfData,
+  kActionDecompressZlib
 };
 
 /**
