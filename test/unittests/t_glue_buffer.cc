@@ -42,10 +42,12 @@ TEST_F(T_GlueBuffer, InodeTracker) {
                         PathString("/foo"));
   inode_tracker_.VfsGet(glue::InodeEx(4, glue::InodeEx::kRegular),
                         PathString("/foo/bar"));
+  inode_tracker_.VfsGet(glue::InodeEx(8, glue::InodeEx::kSymlink),
+                        PathString("/foo/bar/baz"));
   cursor = inode_tracker_.BeginEnumerate();
   int bitset_entry = 0;
   int bitset_inode = 0;
-  for (unsigned i = 0; i < 3; ++i) {
+  for (unsigned i = 0; i < 4; ++i) {
     EXPECT_TRUE(inode_tracker_.NextEntry(&cursor, &inode_parent, &name));
     EXPECT_TRUE(inode_tracker_.NextInode(&cursor, &inode));
     switch (inode_parent) {
@@ -61,6 +63,10 @@ TEST_F(T_GlueBuffer, InodeTracker) {
         EXPECT_EQ("bar", name.ToString());
         bitset_entry |= 4;
         break;
+      case 4:
+        EXPECT_EQ("baz", name.ToString());
+        bitset_entry |= 8;
+        break;
       default:
         EXPECT_FALSE(true);
     }
@@ -74,12 +80,15 @@ TEST_F(T_GlueBuffer, InodeTracker) {
       case 4:
         bitset_inode |= 4;
         break;
+      case 8:
+        bitset_inode |= 8;
+        break;
       default:
         EXPECT_FALSE(true);
     }
   }
-  EXPECT_EQ(7, bitset_entry);
-  EXPECT_EQ(7, bitset_inode);
+  EXPECT_EQ(15, bitset_entry);
+  EXPECT_EQ(15, bitset_inode);
   EXPECT_FALSE(inode_tracker_.NextEntry(&cursor, &inode_parent, &name));
   EXPECT_FALSE(inode_tracker_.NextInode(&cursor, &inode));
   inode_tracker_.EndEnumerate(&cursor);
