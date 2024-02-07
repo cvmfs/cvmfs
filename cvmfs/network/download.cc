@@ -1655,8 +1655,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (failover_indefinitely_) {
       // try again, breaking if there's a cvmfs reload happening and we are in a
       // proxy failover. This will EIO the call application.
-      return !Interrupted(fqrn_, info);
+      bool interrupted = Interrupted(fqrn_, info);
+      if (!interrupted) {
+        info->SetErrorCode(kFailOk);
+      }
+      return !interrupted;
     }
+    info->SetErrorCode(kFailOk);
     return true;  // try again
   }
 
@@ -1920,14 +1925,20 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         break;
       }
       if (ele->action == kActionDecompressZlib) {
+        // quick escape. dont process if error already occured before
+        if (info->error_code() != kFailOk) {
+          delete ele;
+          continue;
+        }
+
         // TODO(heretherebedragons) after rebase add jobinfo id to logmsg
         zlib::StreamStates retval =
               zlib::DecompressZStream2Sink(ele->data,
                                            static_cast<int64_t>(ele->size),
                                            info->GetZstreamPtr(), info->sink());
         if (retval == zlib::kStreamDataError) {
-          LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug, "failed to decompress %s",
-                                                          info->url()->c_str());
+          LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+                               "failed to decompress %s", info->url()->c_str());
           info->SetErrorCode(kFailBadData);
         } else if (retval == zlib::kStreamIOError) {
           LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
