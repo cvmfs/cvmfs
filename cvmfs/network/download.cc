@@ -273,10 +273,10 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       memcpy(data, ptr, num_bytes);
       DataTubeElement *ele = new DataTubeElement(data, num_bytes,
                                                          kActionDecompressZlib);
-      info->GetDataTubeWeakRef()->EnqueueBack(ele);
+      info->GetDataTubePtr()->EnqueueBack(ele);
     } else { // TODO(heretherebedragons) i think we need this here to support
              // the non-multihreaded version?
-      zlib::StreamStates retval =
+      const zlib::StreamStates retval =
         zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
                                     info->GetZstreamPtr(), info->sink());
       if (retval == zlib::kStreamDataError) {
@@ -707,8 +707,8 @@ void *DownloadManager::MainDownload(void *data) {
         // decompressing the data so that VerifyAndFinalize executes correctly
         if (info->IsValidDataTube()) {
           DataTubeElement *ele = new DataTubeElement(kActionEndOfData);
-          info->GetDataTubeWeakRef()->EnqueueBack(ele);
-          info->GetDataTubeWeakRef()->Wait();
+          info->GetDataTubePtr()->EnqueueBack(ele);
+          info->GetDataTubePtr()->Wait();
         }
 
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
@@ -1655,7 +1655,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (failover_indefinitely_) {
       // try again, breaking if there's a cvmfs reload happening and we are in a
       // proxy failover. This will EIO the call application.
-      bool interrupted = Interrupted(fqrn_, info);
+      const bool interrupted = Interrupted(fqrn_, info);
       if (!interrupted) {
         info->SetErrorCode(kFailOk);
       }
@@ -1917,40 +1917,47 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo*>(info);
 
+    bool is_running = true;
     do {
       DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
-      if (ele->action == kActionStop) {
-        delete ele;
+      switch (ele->action) {
+        case kActionStop:
+          is_running = false;
         break;
-      }
-      if (ele->action == kActionDecompressZlib) {
-        // quick escape. dont process if error already occured before
-        if (info->error_code() != kFailOk) {
-          delete ele;
-          continue;
-        }
-
-        // TODO(heretherebedragons) after rebase add jobinfo id to logmsg
-        zlib::StreamStates retval =
-              zlib::DecompressZStream2Sink(ele->data,
+        case kActionEndOfData:
+          /*
+           * End of data processing.
+           * Used for synchronization before calling VerifyAndFinalize()
+           * Next element action received should be kActionStop
+           */
+        break;
+        case kActionDecompressZlib:
+          if (info->error_code() == kFailOk) {  // good to process?
+            const zlib::StreamStates retval =
+                  zlib::DecompressZStream2Sink(ele->data,
                                            static_cast<int64_t>(ele->size),
                                            info->GetZstreamPtr(), info->sink());
-        if (retval == zlib::kStreamDataError) {
+            if (retval == zlib::kStreamDataError) {
+              LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+                                     "(id %" PRId64 ") failed to decompress %s",
+                                     info->id(), info->url()->c_str());
+              info->SetErrorCode(kFailBadData);
+            } else if (retval == zlib::kStreamIOError) {
+              LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+                            "(id %" PRId64 ") decompressing %s, local IO error",
+                            info->id(), info->url()->c_str());
+              info->SetErrorCode(kFailLocalIO);
+            }
+          }
+        break;
+        default:
           LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
-                               "failed to decompress %s", info->url()->c_str());
-          info->SetErrorCode(kFailBadData);
-        } else if (retval == zlib::kStreamIOError) {
-          LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
-                      "decompressing %s, local IO error", info->url()->c_str());
-          info->SetErrorCode(kFailLocalIO);
-        }
-        delete ele;
+                "(id %" PRId64 ") FAILURE - Unkown DataTube Element Action: %d",
+                info->id(), ele->action);
       }
-      if (ele->action == kActionEndOfData) {
-        delete ele;
-      }
-    } while (true);
+      delete ele;
+    } while (is_running);
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
