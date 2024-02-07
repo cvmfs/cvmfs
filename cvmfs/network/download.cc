@@ -700,8 +700,8 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           DataTubeElement *ele = new DataTubeElement(kActionStop);
-          info->GetDataTubeWeakRef()->EnqueueBack(ele);
-          info->GetPipeJobResultWeakRef()->
+          info->GetDataTubePtr()->EnqueueBack(ele);
+          info->GetPipeJobResultPtr()->
                                   Write<download::Failures>(info->error_code());
         }
       }
@@ -1889,7 +1889,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     pipe_jobs_->Write<JobInfo*>(info);
 
     do {
-      DataTubeElement* ele = info->GetDataTubeWeakRef()->PopFront();
+      DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
       if (ele->action == kActionStop) {
         delete ele;
@@ -1898,7 +1898,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       // TODO(heretherebedragons) add compression
     } while (true);
 
-    info->GetPipeJobResultWeakRef()->Read<download::Failures>(&result);
+    info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     MutexLockGuard l(lock_synchronous_mode_);

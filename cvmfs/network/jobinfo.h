@@ -43,7 +43,7 @@ enum DataTubeAction {
  *
  * TODO(heretherebedragons): do we want to have a pool of those datatubeelements?
  */
-struct DataTubeElement {
+struct DataTubeElement : SingleCopy {
   char* data;
   size_t size;
   DataTubeAction action;
@@ -128,12 +128,8 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    if (pipe_job_results.IsValid()) {
-      pipe_job_results.Destroy();
-    }
-    if (data_tube_.IsValid()) {
-      data_tube_.Destroy();
-    }
+    pipe_job_results.Destroy();
+    data_tube_.Destroy();
   }
 
   void CreatePipeJobResults() {
@@ -146,7 +142,7 @@ class JobInfo {
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
-    data_tube_ = new Tube<DataTubeElement>(10);
+    data_tube_ = new Tube<DataTubeElement>(500);
   }
 
   bool IsValidDataTube() {
@@ -169,10 +165,9 @@ class JobInfo {
   curl_slist **GetHeadersPtr() { return &headers_; }
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
-  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
+  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
                                            return pipe_job_results.weak_ref(); }
-  Tube<DataTubeElement> *GetDataTubeWeakRef() {
-                                                 return data_tube_.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
   bool compressed() const { return compressed_; }
