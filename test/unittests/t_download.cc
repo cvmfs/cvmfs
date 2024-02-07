@@ -545,7 +545,7 @@ TEST_F(T_Download, ParseHttpCode) {
 TEST_F(T_Download, EscapeUrl) {
   const std::string url = "http://ab0341.¡ÿϦ랝"; // c2a1 c3bf cfa6 eb9e9d
   const std::string correct = "http://ab0341.%C2%A1%C3%BF%CF%A6%EB%9E%9D";
-  const std::string res = download_mgr.EscapeUrl(url);
+  const std::string res = download_mgr.EscapeUrl(0, url);
 
   EXPECT_TRUE(res == correct);
 }

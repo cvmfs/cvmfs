@@ -7,6 +7,8 @@
 
 namespace download {
 
+atomic_int64 JobInfo::next_uuid = 0;
+
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
   Init();
@@ -35,6 +37,7 @@ bool JobInfo::IsFileNotFound() {
 }
 
 void JobInfo::Init() {
+  id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
   compressed_ = false;
