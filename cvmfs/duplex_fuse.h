@@ -63,7 +63,11 @@
     #endif  // FUSE_VERSION < 28
   #else
     // CVMFS_USE_LIBFUSE == 3
+#ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+    #define FUSE_USE_VERSION 312
+#else
     #define FUSE_USE_VERSION 31
+#endif
     #include <fuse3/fuse.h>
     #include <fuse3/fuse_lowlevel.h>
     #include <fuse3/fuse_opt.h>
