@@ -25,10 +25,38 @@
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
 #include "util/pipe.h"
+#include "util/tube.h"
 
 class InterruptCue;
 
 namespace download {
+
+enum DataTubeAction {
+  kActionStop = 0,
+  kActionContinue,
+  kActionDecompress
+};
+
+/**
+ * Wrapper for the data tube to transfer data from CallbackCurlData() that is
+ * executed in MainDownload() Thread to Fetch() called by a fuse thread
+ *
+ * TODO(heretherebedragons): do we want to have a pool of those datatubeelements?
+ */
+struct DataTubeElement : SingleCopy {
+  char* data;
+  size_t size;
+  DataTubeAction action;
+
+  explicit DataTubeElement(DataTubeAction xact) :
+                                           data(NULL), size(0), action(xact) { }
+  DataTubeElement(char* mov_data, size_t xsize, DataTubeAction xact) :
+                                   data(mov_data), size(xsize), action(xact) { }
+
+  ~DataTubeElement() {
+    delete data;
+  }
+};
 
 /**
  * Contains all the information to specify a download job.
@@ -39,6 +67,9 @@ class JobInfo {
   int64_t id_;
   /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  /// Tube (bounded thread-safe queue) to transport data from CURL callback
+  /// to be decompressed in Fetch() instead of MainDownload()
+  UniquePtr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -97,9 +128,8 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    if (pipe_job_results.IsValid()) {
-      pipe_job_results.Destroy();
-    }
+    pipe_job_results.Destroy();
+    data_tube_.Destroy();
   }
 
   void CreatePipeJobResults() {
@@ -108,6 +138,15 @@ class JobInfo {
 
   bool IsValidPipeJobResults() {
     return pipe_job_results.IsValid();
+  }
+
+  void CreateDataTube() {
+    // TODO(heretherebedragons) change to weighted queue
+    data_tube_ = new Tube<DataTubeElement>(500);
+  }
+
+  bool IsValidDataTube() {
+    return data_tube_.IsValid();
   }
 
   /**
@@ -126,8 +165,9 @@ class JobInfo {
   curl_slist **GetHeadersPtr() { return &headers_; }
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
-  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
+  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
                                            return pipe_job_results.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
   bool compressed() const { return compressed_; }
