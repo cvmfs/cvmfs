@@ -1127,8 +1127,8 @@ int FuseMain(int argc, char *argv[]) {
     fuse_loop_cfg_destroy(fuse_loop_cfg);
 #else
     retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
-#endif // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
-#endif // fuse2/3
+#endif  // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+#endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
 
