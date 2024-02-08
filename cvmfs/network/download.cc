@@ -1953,8 +1953,8 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         break;
         default:
           LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
-                "(id %" PRId64 ") FAILURE - Unkown DataTube Element Action: %d",
-                info->id(), ele->action);
+               "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
+               info->id(), ele->action);
       }
       delete ele;
     } while (is_running);
