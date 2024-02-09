@@ -1,0 +1,14 @@
+[Unit]
+Description=Registry Webhook Listener Service
+After=network.target
+
+[Service]
+Type=simple
+User=almalinux
+WorkingDirectory=/home/almalinux/cvmfs/ducc/webhook
+ExecStart=/usr/bin/mod_wsgi-express-3 start-server registry_webhook.wsgi --https-port 8080 --https-only --server-name <server_name> --ssl-certificate-file hostcert.pem --ssl-certificate-key-file hostkey.pem --user almalinux --server-root=mod_wsgi-express-8080/ --log-directory logs/ --access-log
+StandardOutput=journal
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
