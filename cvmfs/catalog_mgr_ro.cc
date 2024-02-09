@@ -30,7 +30,16 @@ LoadReturn SimpleCatalogManager::GetNewRootCatalogContext(
 /**
  * Loads a catalog via HTTP from Statum 0 into a temporary file.
  * See CatalogContext class description for correct usage
- * 
+ *
+ * Depending on the initialization of SimpleCatalogManager, it can locally
+ * cache catalogs.
+ *
+ * Independent of the catalog being downloaded or being already locally cached,
+ * for WriteableCatalog it creates a new copy of the catalog in a tmp dir.
+ * This is due to write actions having to be transaction-based and therefore
+ * cannot work on standard file locations for cvmfs - someone else could try to
+ * access them in a non-clean state.
+ *
  * @return kLoadNew on success
  */
 LoadReturn SimpleCatalogManager::LoadCatalogByHash(
@@ -41,16 +50,16 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
 
   FILE *fcatalog;
 
+  // use local cache
   if (use_local_cache_) {
     std::string tmp_path = local_cache_dir_ + "/"
                            + effective_hash.MakePathWithoutSuffix();
 
     ctlg_context->SetSqlitePath(tmp_path);
 
-    // file is cached
+    // catalog is cached in "cache_dir/" + standard cvmfs file hiearchy
     if (FileExists(tmp_path.c_str())) {
       if (!copy_to_tmp_dir_) {
-        ctlg_context->SetHash(effective_hash);
         return kLoadNew;
       } else {  // for writable catalog create copy in dir_temp_
         std::string cache_path = tmp_path;
@@ -64,13 +73,14 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
         CopyPath2File(cache_path, fcatalog);
         fclose(fcatalog);
 
-        ctlg_context->SetHash(effective_hash);
         return kLoadNew;
       }
     }
 
+    // file not cache yet
+    // open file to download into "cache_dir/" + standard cvmfs file hiearchy
     fcatalog = fopen(ctlg_context->sqlite_path().c_str(), "w");
-  } else {  // use tmp file
+  } else {  // no local cache; just create a random tmp file for download
     std::string tmp_path;
     fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
     if (!fcatalog) {
