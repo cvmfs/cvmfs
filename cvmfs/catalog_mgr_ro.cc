@@ -57,7 +57,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
 
     ctlg_context->SetSqlitePath(tmp_path);
 
-    // catalog is cached in "cache_dir/" + standard cvmfs file hiearchy
+    // catalog is cached in "cache_dir/" + standard cvmfs file hierarchy
     if (FileExists(tmp_path.c_str())) {
       if (!copy_to_tmp_dir_) {
         return kLoadNew;
@@ -78,7 +78,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
     }
 
     // file not cache yet
-    // open file to download into "cache_dir/" + standard cvmfs file hiearchy
+    // open file to download into "cache_dir/" + standard cvmfs file hierarchy
     fcatalog = fopen(ctlg_context->sqlite_path().c_str(), "w");
   } else {  // no local cache; just create a random tmp file for download
     std::string tmp_path;
