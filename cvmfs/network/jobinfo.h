@@ -35,7 +35,7 @@ enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
   kActionEndOfData,
-  kActionDecompressZlib,
+  kActionUnused,
   kActionData
 };
 
@@ -200,8 +200,7 @@ class JobInfo {
   shash::ContextPtr hash_context() const { return hash_context_; }
   std::string proxy() const { return proxy_; }
   bool nocache() const { return nocache_; }
-  bool stop_data_download()
-                           { return atomic_read32(&stop_data_download_) != 0; }
+  bool stop_data_download() { return atomic_read32(&stop_data_download_) != 0; }
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
   unsigned char num_used_proxies() const { return num_used_proxies_; }
@@ -253,8 +252,8 @@ class JobInfo {
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetStopDataDownload(bool stop_data_download) {
-                                    int32_t tmp = stop_data_download ? 1 : 0;
-                                    atomic_write32(&stop_data_download_, tmp); }
+                                 const int32_t tmp = stop_data_download ? 1 : 0;
+                                 atomic_write32(&stop_data_download_, tmp); }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies)

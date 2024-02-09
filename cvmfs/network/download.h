@@ -34,6 +34,7 @@
 #include "util/pointer.h"
 #include "util/prng.h"
 #include "util/shared_ptr.h"
+#include "util/tube.h"
 
 class InterruptCue;
 
@@ -136,6 +137,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     kSetProxyFallback,
     kSetProxyBoth,
   };
+
+  /**
+   * Tube to hold empty elements use in JobInfo data_tube_
+   * Shared with all DownloadManagers
+   * Must be static because of CallbackCurlData
+   */
+  static Tube<DataTubeElement>* data_tube_empty_elements_;
+  // counter so that last DownloadManager can delete data_tube_empty_elements_
+  // static atomic_int32 counter_use_data_tube_;
 
   /**
    * No attempt was made to order stratum 1 servers
