@@ -209,9 +209,13 @@ if (BUILD_CVMFS)
   )
   if (FUSE3_FOUND)
     add_library (cvmfs_fuse3_stub SHARED ${CVMFS_STUB_SOURCES})
+    set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB_CFLAGS}")
+    if (CVMFS_ENABLE_FUSE3_LOOP_CONFIG)
+      set (CVMFS_STUB3_CFLAGS "${CVMFS_STUB3_CFLAGS} -DCVMFS_ENABLE_FUSE3_LOOP_CONFIG")
+    endif ()
     set_target_properties (cvmfs_fuse3_stub PROPERTIES
       VERSION ${CernVM-FS_VERSION_STRING}
-      COMPILE_FLAGS "${CVMFS_STUB_CFLAGS} -DCVMFS_USE_LIBFUSE=3"
+      COMPILE_FLAGS "${CVMFS_STUB3_CFLAGS} -DCVMFS_USE_LIBFUSE=3"
       LINK_FLAGS "${CVMFS_STUB_LDFLAGS}"
     )
     target_link_libraries (cvmfs_fuse3_stub
