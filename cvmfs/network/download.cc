@@ -70,6 +70,22 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+DataTubeElement* DownloadManager::GetUnusedDataTubeElement() {
+  DataTubeElement* ele = data_tube_empty_elements_->TryPopFront();
+
+  if (ele == NULL) {
+    char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
+    ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+  }
+
+  return ele;
+}
+
+void DownloadManager::PutDataTubeElementToReuse(DataTubeElement* ele) {
+  ele->action = kActionUnused;
+  data_tube_empty_elements_->EnqueueBack(ele);
+}
+
 /**
  * Returns the status if an interrupt happened for a given repository.
  *
@@ -1742,6 +1758,8 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
+  data_tube_empty_elements_.Destroy();
+
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
     pipe_terminate_->Write(kPipeTerminateSignal);
@@ -1860,6 +1878,8 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
 
   InitHeaders();
 
+  data_tube_empty_elements_ = new Tube<DataTubeElement>(200000);
+
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
   curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETFUNCTION, CallbackCurlSocket);
@@ -1895,6 +1915,13 @@ void DownloadManager::Spawn() {
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
+
+  for (size_t i = 0; i < 10000; i++) {
+    char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
+    DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER,
+                                               kActionUnused);
+    data_tube_empty_elements_->EnqueueBack(ele);
+  }
 
   if (health_check_.UseCount() > 0) {
     LogCvmfs(kLogDownload, kLogDebug, "Starting healthcheck thread");
@@ -2025,7 +2052,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
                "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
                info->id(), ele->action);
       }
-      delete ele;
+      PutDataTubeElementToReuse(ele);
     } while (is_running);
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
