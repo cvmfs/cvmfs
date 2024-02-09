@@ -36,6 +36,7 @@ enum DataTubeAction {
   kActionContinue,
   kActionEndOfData,
   kActionDecompressZlib,
+  kActionUnused,
   kActionData
 };
 
