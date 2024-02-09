@@ -262,27 +262,26 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return 0;
   }
 
-  if (info->expected_hash()) {
-    shash::Update(reinterpret_cast<unsigned char *>(ptr),
-                  num_bytes, info->hash_context());
-  }
+  if (info->IsValidDataTube()) {
+    char *data = static_cast<char*>(malloc(num_bytes));
+    memcpy(data, ptr, num_bytes);
+    DataTubeElement *ele = new DataTubeElement(data, num_bytes, kActionData);
+    info->GetDataTubePtr()->EnqueueBack(ele);
+  } else {  // TODO(heretherebedragons) i think we need this here to support
+            // the non-multihreaded version?
+    if (info->expected_hash()) {
+      shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                    num_bytes, info->hash_context());
+    }
 
-  if (info->compressed()) {
-    if (info->IsValidDataTube()) {
-      char *data = static_cast<char*>(malloc(num_bytes));
-      memcpy(data, ptr, num_bytes);
-      DataTubeElement *ele = new DataTubeElement(data, num_bytes,
-                                                         kActionDecompressZlib);
-      info->GetDataTubePtr()->EnqueueBack(ele);
-    } else { // TODO(heretherebedragons) i think we need this here to support
-             // the non-multihreaded version?
+    if (info->compressed()) {
       const zlib::StreamStates retval =
         zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
                                     info->GetZstreamPtr(), info->sink());
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogSyslogErr,
-                                     "(id %" PRId64 ") failed to decompress %s",
-                                       info->id(), info->url()->c_str());
+                                    "(id %" PRId64 ") failed to decompress %s",
+                                      info->id(), info->url()->c_str());
         info->SetErrorCode(kFailBadData);
         return 0;
       } else if (retval == zlib::kStreamIOError) {
@@ -292,13 +291,13 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         info->SetErrorCode(kFailLocalIO);
         return 0;
       }
-    }
-  } else {
-    int64_t written = info->sink()->Write(ptr, num_bytes);
-    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-      LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
+    } else {
+      int64_t written = info->sink()->Write(ptr, num_bytes);
+      if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+        LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
               "Failed to perform write of %zu bytes to sink %s with errno %ld",
               info->id(), num_bytes, info->sink()->Describe().c_str(), written);
+      }
     }
   }
 
@@ -1932,24 +1931,45 @@ Failures DownloadManager::Fetch(JobInfo *info) {
            * Next element action received should be kActionStop
            */
         break;
-        case kActionDecompressZlib:
-          if (info->error_code() == kFailOk) {  // good to process?
+        case kActionData:
+        {
+          // quick escape
+          if (info->error_code() != kFailOk) {
+            break;
+          }
+
+          char *ptr = ele->data;
+          const size_t num_bytes = ele->size;
+          if (info->expected_hash()) {
+            shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                          num_bytes, info->hash_context());
+          }
+
+          if (info->compressed()) {
             const zlib::StreamStates retval =
-                  zlib::DecompressZStream2Sink(ele->data,
-                                           static_cast<int64_t>(ele->size),
-                                           info->GetZstreamPtr(), info->sink());
+              zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
+                                          info->GetZstreamPtr(), info->sink());
             if (retval == zlib::kStreamDataError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+              LogCvmfs(kLogDownload, kLogSyslogErr,
                                      "(id %" PRId64 ") failed to decompress %s",
                                      info->id(), info->url()->c_str());
               info->SetErrorCode(kFailBadData);
             } else if (retval == zlib::kStreamIOError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+              LogCvmfs(kLogDownload, kLogSyslogErr,
                             "(id %" PRId64 ") decompressing %s, local IO error",
                             info->id(), info->url()->c_str());
               info->SetErrorCode(kFailLocalIO);
             }
+          } else {
+            int64_t written = info->sink()->Write(ptr, num_bytes);
+            if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+              LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
+               "Failed to perform write of %zu bytes to sink %s with errno %ld",
+               info->id(), num_bytes, info->sink()->Describe().c_str(),
+               written);
+            }
           }
+        }
         break;
         default:
           LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
