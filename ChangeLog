@@ -1,4 +1,5 @@
 2.12.0:
+  * [client] Support for the new CVMFS_FUSE3_IDLE_THREADS and CVMFS_FUSE3_MAX_THREADS parameters (#3505)
   * [client] Log JobInfo object id and its respective CURL requests (#3492)
   * [server] Consistently use 64bit ints for catalog revision (#3478)
   * [client] Avoid possible race in mount helper (#3475)
