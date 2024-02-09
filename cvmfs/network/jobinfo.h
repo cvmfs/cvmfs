@@ -35,7 +35,8 @@ enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
   kActionEndOfData,
-  kActionDecompressZlib
+  kActionDecompressZlib,
+  kActionData
 };
 
 /**
