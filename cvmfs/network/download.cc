@@ -1917,8 +1917,8 @@ void DownloadManager::Spawn() {
   atomic_inc32(&multi_threaded_);
 
   for (size_t i = 0; i < 10000; i++) {
-    char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
-    DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER,
+    char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
+    DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
                                                kActionUnused);
     data_tube_empty_elements_->EnqueueBack(ele);
   }
