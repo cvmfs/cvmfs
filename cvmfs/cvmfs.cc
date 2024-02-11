@@ -1235,7 +1235,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         fuse_reply_err(req, EIO);
         return;
       }
-      fuse_remounter_->fence()->Leave();
 
       chunk_tables->Lock();
       // Check again to avoid race
@@ -1253,7 +1252,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables->inode2references.Insert(unique_inode, refctr + 1);
       }
     } else {
-      fuse_remounter_->fence()->Leave();
       uint32_t refctr;
       const bool retval = chunk_tables->inode2references.Lookup(unique_inode,
                                                                 &refctr);
@@ -1276,7 +1274,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                                                           &chunk_reflist);
     assert(retval);
 
-    fi->fh = chunk_tables->next_handle;
+    // The following block used to be outside the remount fence.
+    // Now that the issue is fixed, we must not use the barrier anymore
+    // because the remount will then never take place in test 708.
+    // CVMFS_TEST_INJECT_BARRIER("_CVMFS_TEST_BARRIER_OPEN_CHUNKED");
     if (dirent.IsDirectIo()) {
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
@@ -1284,6 +1285,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
           ino, chunk_reflist.HashChunkList(), dirent.GetStatStructure());
     }
     FillOpenFlags(open_directives, fi);
+
+    fuse_remounter_->fence()->Leave();
+
+    fi->fh = chunk_tables->next_handle;
     fi->fh = static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ++chunk_tables->next_handle;
     chunk_tables->Unlock();
@@ -1320,9 +1325,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       // not returning an fd, so close the page cache tracker entry if required
       if (!dirent.IsDirectIo() && !open_directives.direct_io) {
-        fuse_remounter_->fence()->Enter();
         mount_point_->page_cache_tracker()->Close(ino);
-        fuse_remounter_->fence()->Leave();
       }
       fuse_reply_err(req, EMFILE);
       perf::Inc(file_system_->n_emfile());
@@ -1334,9 +1337,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // fd < 0
   // the download has failed. Close the page cache tracker entry if required
   if (!dirent.IsDirectIo() && !open_directives.direct_io) {
-    fuse_remounter_->fence()->Enter();
     mount_point_->page_cache_tracker()->Close(ino);
-    fuse_remounter_->fence()->Leave();
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
