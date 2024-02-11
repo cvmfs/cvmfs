@@ -296,21 +296,16 @@ static bool FixupOpenInode(const PathString &path,
   if (!MayBeInPageCacheTracker(*dirent))
     return false;
 
-  shash::Any hash_open;
-  struct stat info;
-  bool is_open = mount_point_->page_cache_tracker()->GetInfoIfOpen(
-    dirent->inode(), &hash_open, &info);
-  if (!is_open)
-    return false;
-  if (!HasDifferentContent(*dirent, hash_open, info))
-    return false;
+  bool is_stale = mount_point_->page_cache_tracker()->IsStale(*dirent);
 
-  // Overwrite dirent with inode from current generation
-  bool found = mount_point_->catalog_mgr()->LookupPath(
-      path, catalog::kLookupDefault, dirent);
-  assert(found);
+  if (is_stale) {
+    // Overwrite dirent with inode from current generation
+    bool found = mount_point_->catalog_mgr()->LookupPath(
+        path, catalog::kLookupDefault, dirent);
+    assert(found);
+  }
 
-  return true;
+  return is_stale;
 }
 
 static bool GetDirentForInode(const fuse_ino_t ino,
