@@ -1044,7 +1044,7 @@ class PageCacheTracker {
    *  - it is currently open and has a different content than dirent
    *  - it has been previously found stale (no matter if now open or not)
    */
-  bool IsStale(catalog::DirectoryEntry &dirent) {
+  bool IsStale(const catalog::DirectoryEntry &dirent) {
     Entry entry;
     MutexLockGuard guard(lock_);
 
