@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Repository gateway - receiver watchdog"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"

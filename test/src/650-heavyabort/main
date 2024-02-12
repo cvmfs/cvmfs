@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Abort after filling temporary area"
 cvmfs_test_autofs_on_startup=false
 

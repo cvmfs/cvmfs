@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Early Creation of Nested Catalogs"
 cvmfs_test_autofs_on_startup=false
 

@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Ingest same tarball in same location multiple times"
 cvmfs_test_autofs_on_startup=false

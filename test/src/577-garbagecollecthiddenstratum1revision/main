@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Find Intermediate Revisions after Garbage Collection on Stratum0"
 cvmfs_test_autofs_on_startup=false

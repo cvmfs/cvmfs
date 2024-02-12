@@ -1,3 +1,4 @@
+#!/bin/bash
 # This file contains $NR_OF_TESTS tests for checking the store publish statistics feature (checking the database integrity)
 cvmfs_test_name="Store publish statistics in a SQLite database"
 cvmfs_test_autofs_on_startup=false

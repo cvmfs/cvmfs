@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Rename of Directory containing Changes"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
