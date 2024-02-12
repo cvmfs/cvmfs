@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Non-Zero Return Code on Failing Repo-Management Commands"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"

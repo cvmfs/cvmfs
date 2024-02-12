@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Create Stratum0/Stratum1 with custom Upstream String"
 cvmfs_test_autofs_on_startup=false
 

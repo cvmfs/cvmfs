@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Ingest tarball to various subdirectories in the repository"
 cvmfs_test_autofs_on_startup=false

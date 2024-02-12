@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Export CVMFS_FQRN"
 cvmfs_test_suites="quick"

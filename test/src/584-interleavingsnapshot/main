@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Interleaving Stratum1 Snapshot Behaviour"
 cvmfs_test_autofs_on_startup=false

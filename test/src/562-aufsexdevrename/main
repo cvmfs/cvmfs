@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Rename Cross-Branch Directory in AUFS (exdev)"
 cvmfs_test_autofs_on_startup=false

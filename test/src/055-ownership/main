@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Ownership of files and directories"
 cvmfs_test_suites="quick"

@@ -1,3 +1,4 @@
+#!/bin/bash
 # By default, this script runs in testing mode
 # Although it allows for a server debugging mode, which attaches gdb to
 # the `cvmfs_server publish` process and allows for both online and

@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Migrating CernVM-FS 2.0 Repository to 2.1.x"
 cvmfs_test_autofs_on_startup=false

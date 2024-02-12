@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Proper application of CVMFS_MAX_TTL"
 cvmfs_test_suites="quick"
