@@ -284,7 +284,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   if (!found && MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
     LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
              path.c_str());
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -385,7 +385,7 @@ bool AbstractCatalogManager<CatalogT>::LookupNested(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
@@ -448,7 +448,7 @@ bool AbstractCatalogManager<CatalogT>::ListCatalogSkein(
   CatalogT *catalog = best_fit;
   // True if there is an available nested catalog
   if (MountSubtree(test, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(test);
@@ -504,7 +504,7 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -542,7 +542,7 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, true /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -579,7 +579,7 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, true /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, true /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -619,7 +619,7 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
@@ -655,7 +655,7 @@ catalog::Counters AbstractCatalogManager<CatalogT>::LookupCounters(
   CatalogT *best_fit = FindCatalog(catalog_path);
   CatalogT *catalog = best_fit;
   if (MountSubtree(catalog_path, best_fit, false /* is_listable */, NULL)) {
-    Unlock();
+    StageNestedCatalogAndUnlock(path, best_fit, false /* is_listable */);
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(catalog_path);
@@ -840,6 +840,45 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
   return true;
 }
 
+
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::StageNestedCatalogAndUnlock(
+  const PathString &path,
+  const CatalogT *parent,
+  bool is_listable)
+{
+  assert(parent);
+  const unsigned path_len = path.GetLength();
+
+  perf::Inc(statistics_.n_nested_listing);
+  typedef typename CatalogT::NestedCatalogList NestedCatalogList;
+  const NestedCatalogList& nested_catalogs = parent->ListNestedCatalogs();
+
+  for (typename NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+       iEnd = nested_catalogs.end(); i != iEnd; ++i)
+  {
+    if (!path.StartsWith(i->mountpoint))
+      continue;
+
+    // in this case the path doesn't start with
+    // the mountpoint in a file path sense
+    // (e.g. path is /a/bc and mountpoint is /a/b), and will be ignored
+    const unsigned mountpoint_len = i->mountpoint.GetLength();
+    if (path_len > mountpoint_len && path.GetChars()[mountpoint_len] != '/')
+      continue;
+
+    // Found a nested catalog transition point
+    if (!is_listable && (path_len == mountpoint_len))
+      break;
+
+    Unlock();
+    LogCvmfs(kLogCatalog, kLogDebug, "staging nested catalog at %s (%s)",
+             i->mountpoint.c_str(), i->hash.ToString().c_str());
+    StageNestedCatalogByHash(i->hash, i->mountpoint);
+    return;
+  }
+  Unlock();
+}
 
 /**
  * Recursively mounts all nested catalogs required to serve a path.

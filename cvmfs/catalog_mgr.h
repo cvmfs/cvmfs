@@ -23,8 +23,10 @@
 #include "file_chunk.h"
 #include "manifest_fetch.h"
 #include "statistics.h"
+#include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/logging.h"
+#include "util/platform.h"
 
 class XattrList;
 namespace catalog {
@@ -178,6 +180,9 @@ struct Statistics {
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
   perf::Counter *n_detach_siblings;
+  perf::Counter *n_write_lock;
+  perf::Counter *ns_write_lock;
+
   perf::Counter *catalog_revision;
 
   explicit Statistics(perf::Statistics *statistics) {
@@ -196,6 +201,10 @@ struct Statistics {
         "Number of listings of nested catalogs");
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
+    n_write_lock = statistics->Register("catalog_mgr.n_write_lock",
+                                        "number of write lock calls");
+    ns_write_lock = statistics->Register("catalog_mgr.ns_write_lock",
+        "time spent in WriteLock() [ns]");
     catalog_revision = statistics->Register("catalog_revision",
                                     "Revision number of the root file catalog");
   }
@@ -334,6 +343,25 @@ class AbstractCatalogManager : public SingleCopy {
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
 
   /**
+   * Opportunistic optimization: the client catalog manager uses this method
+   * to preload into the cache a nested catalog that is likely to be required
+   * next. Likely, because there is a race with the root catalog reload which
+   * may result in the wrong catalog being staged. That's not a fault though,
+   * the correct catalog will still be loaded with the write lock held.
+   * Note that this method is never used for root catalogs.
+   */
+  virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
+                                        const PathString & /*mountpoint*/)
+  { }
+  /**
+   * Called within the ReadLock(), which will be released before downloading
+   * the catalog (and before leaving the method)
+   */
+  void StageNestedCatalogAndUnlock(const PathString &path,
+                                   const CatalogT *parent,
+                                   bool is_listable);
+
+  /**
    * Create a new Catalog object.
    * Every derived class has to implement this and return a newly
    * created (derived) Catalog structure of it's desired type.
@@ -373,8 +401,12 @@ class AbstractCatalogManager : public SingleCopy {
     assert(retval == 0);
   }
   inline void WriteLock() const {
+    uint64_t timestamp = platform_monotonic_time_ns();
     int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
+    perf::Inc(statistics_.n_write_lock);
+    uint64_t duration = platform_monotonic_time_ns() - timestamp;
+    perf::Xadd(statistics_.ns_write_lock, duration);
   }
   inline void Unlock() const {
     int retval = pthread_rwlock_unlock(rwlock_);
