@@ -116,6 +116,7 @@
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
+#include "util/testing.h"
 #include "util/uuid.h"
 #include "wpad.h"
 #include "xattr.h"
@@ -296,6 +297,8 @@ static bool FixupOpenInode(const PathString &path,
   if (!MayBeInPageCacheTracker(*dirent))
     return false;
 
+  CVMFS_TEST_INJECT_BARRIER("_CVMFS_TEST_BARRIER_INODE_REPLACE");
+
   bool is_stale = mount_point_->page_cache_tracker()->IsStale(*dirent);
 
   if (is_stale) {
@@ -405,6 +408,10 @@ static uint64_t GetDirentForPath(const PathString &path,
   uint64_t live_inode = 0;
   if (!file_system_->IsNfsSource())
     live_inode = mount_point_->inode_tracker()->FindInode(path);
+
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "GetDirentForPath: live inode for %s: %" PRIu64,
+           path.c_str(), live_inode);
 
   shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent)) {
@@ -586,6 +593,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
       // live inode is stale (open file), we replace it
       assert(dirent.IsRegular());
       assert(dirent.inode() != live_inode);
+
       // The new inode is put in the tracker with refcounter == 0
       bool replaced = mount_point_->inode_tracker()->ReplaceInode(
         live_inode, glue::InodeEx(dirent.inode(), dirent.mode()));
