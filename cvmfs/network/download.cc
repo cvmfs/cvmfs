@@ -571,6 +571,15 @@ int DownloadManager::CallbackCurlSocket(CURL * /* easy */,
 }
 
 
+struct TupelJobDone {
+  JobInfo* info;
+  int curl_error;
+  CURL *easy_handle;
+
+  TupelJobDone(JobInfo* i, int error, CURL *handle) :
+                             info(i), curl_error(error), easy_handle(handle) { }
+};
+
 /**
  * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
  */
@@ -597,7 +606,42 @@ void *DownloadManager::MainDownload(void *data) {
   int still_running = 0;
   struct timeval timeval_start, timeval_stop;
   gettimeofday(&timeval_start, NULL);
+
+  // vector of jobinfo elements that are considered finished from CURL pov
+  // but data processing in Fetch() might not be finished yet. Processing must
+  // be finished before being able to call VerifyAndFinalize()
+  std::vector<TupelJobDone> vec_curl_done;
   while (true) {
+    // Check if transfers that are completed have finished their data processing
+    for (size_t i = 0; i < vec_curl_done.size(); ++i) {
+      JobInfo *info = vec_curl_done[i].info;
+      int curl_error = vec_curl_done[i].curl_error;
+      CURL *easy_handle = vec_curl_done[i].easy_handle;
+
+      if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
+        if (download_mgr->VerifyAndFinalize(curl_error, info)) {
+            curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+            curl_multi_socket_action(download_mgr->curl_multi_,
+                                     CURL_SOCKET_TIMEOUT,
+                                     0,
+                                     &still_running);
+        } else {
+          // Return easy handle into pool and write result back
+          download_mgr->ReleaseCurlHandle(easy_handle);
+
+          if (info->IsValidDataTube()) {
+            DataTubeElement *ele = new DataTubeElement(kActionStop);
+            info->GetDataTubePtr()->EnqueueBack(ele);
+          }
+          info->GetPipeJobResultPtr()->
+                              Write<download::Failures>(info->error_code());
+        }
+
+        vec_curl_done.erase(vec_curl_done.begin() + i);
+        --i;
+      }
+    }
+
     int timeout;
     if (still_running) {
       /* NOTE: The following might degrade the performance for many small files
@@ -611,7 +655,7 @@ void *DownloadManager::MainDownload(void *data) {
       */
       timeout = 1;
     } else {
-      timeout = -1;
+      timeout = 1;
       gettimeofday(&timeval_stop, NULL);
       int64_t delta = static_cast<int64_t>(
         1000 * DiffTimeSeconds(timeval_start, timeval_stop));
@@ -702,12 +746,14 @@ void *DownloadManager::MainDownload(void *data) {
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
 
-        // let's notify CURL is done and wait for the finishing of
-        // decompressing the data so that VerifyAndFinalize executes correctly
+        // let's notify CURL is done and queue it up and wait for finishing the
+        // data processing so that VerifyAndFinalize executes correctly
         if (info->IsValidDataTube()) {
           DataTubeElement *ele = new DataTubeElement(kActionEndOfData);
           info->GetDataTubePtr()->EnqueueBack(ele);
-          info->GetDataTubePtr()->Wait();
+          vec_curl_done.emplace_back(
+                                   TupelJobDone(info, curl_error, easy_handle));
+          continue;
         }
 
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
