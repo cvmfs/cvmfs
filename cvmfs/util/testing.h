@@ -12,8 +12,8 @@
 #include <string>
 
 #include "util/posix.h"
-#include "util/string.h"
 #include "util/prng.h"
+#include "util/string.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
