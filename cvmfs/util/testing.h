@@ -22,7 +22,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #ifdef DEBUGMSG
 // Let an external program pause cvmfs if
 //  - program runs in debug mode
-//  - the given environemnt variable is defined _and_
+//  - the given environment variable is defined _and_
 //  - points to an existing file
 //  - whose content is stop/start
 void CVMFS_TEST_INJECT_BARRIER(const char *env) {
