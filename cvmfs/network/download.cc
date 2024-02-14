@@ -258,12 +258,12 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   // the check for kFailOk is to check when using the DataTube that there was
   // not early some cancellation of the download due to error
   // TODO(heretherebedragons) we might want to have this as an atomic variable?
-  if (num_bytes == 0 || info->error_code() != kFailOk) {
+  if (num_bytes == 0 || info->stop_data_download()) {
     return 0;
   }
 
   if (info->IsValidDataTube()) {
-    char *data = static_cast<char*>(malloc(num_bytes));
+    char *data = static_cast<char*>(smalloc(num_bytes));
     memcpy(data, ptr, num_bytes);
     DataTubeElement *ele = new DataTubeElement(data, num_bytes, kActionData);
     info->GetDataTubePtr()->EnqueueBack(ele);
@@ -986,6 +986,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
   info->SetCurlHandle(handle);
   info->SetErrorCode(kFailOk);
+  info->SetStopDataDownload(false);
   info->SetHttpCode(-1);
   info->SetFollowRedirects(follow_redirects_);
   info->SetNumUsedProxies(1);
@@ -1702,11 +1703,11 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // proxy failover. This will EIO the call application.
       const bool interrupted = Interrupted(fqrn_, info);
       if (!interrupted) {
-        info->SetErrorCode(kFailOk);
+        info->SetStopDataDownload(false);
       }
       return !interrupted;
     }
-    info->SetErrorCode(kFailOk);
+    info->SetStopDataDownload(false);
     return true;  // try again
   }
 
@@ -2000,16 +2001,18 @@ Failures DownloadManager::Fetch(JobInfo *info) {
                                      "(id %" PRId64 ") failed to decompress %s",
                                      info->id(), info->url()->c_str());
               info->SetErrorCode(kFailBadData);
+              info->SetStopDataDownload(true);
             } else if (retval == zlib::kStreamIOError) {
               LogCvmfs(kLogDownload, kLogSyslogErr,
                             "(id %" PRId64 ") decompressing %s, local IO error",
                             info->id(), info->url()->c_str());
               info->SetErrorCode(kFailLocalIO);
+              info->SetStopDataDownload(true);
             }
           } else {
             int64_t written = info->sink()->Write(ptr, num_bytes);
             if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-              LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
+              PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
                "Failed to perform write of %zu bytes to sink %s with errno %ld",
                info->id(), num_bytes, info->sink()->Describe().c_str(),
                written);
