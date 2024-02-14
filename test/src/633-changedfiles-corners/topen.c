@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   }
 
   char *path = argv[1];
-  int fd = open(path, O_RDONLY);
+  const int fd = open(path, O_RDONLY);
   if (fd < 0) {
     (void)fprintf(stderr, "cannot open %s\n", path);
     return 1;

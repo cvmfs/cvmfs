@@ -299,11 +299,11 @@ static bool FixupOpenInode(const PathString &path,
 
   CVMFS_TEST_INJECT_BARRIER("_CVMFS_TEST_BARRIER_INODE_REPLACE");
 
-  bool is_stale = mount_point_->page_cache_tracker()->IsStale(*dirent);
+  const bool is_stale = mount_point_->page_cache_tracker()->IsStale(*dirent);
 
   if (is_stale) {
     // Overwrite dirent with inode from current generation
-    bool found = mount_point_->catalog_mgr()->LookupPath(
+    const bool found = mount_point_->catalog_mgr()->LookupPath(
         path, catalog::kLookupDefault, dirent);
     assert(found);
   }

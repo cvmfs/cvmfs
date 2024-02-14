@@ -1046,9 +1046,9 @@ class PageCacheTracker {
    */
   bool IsStale(const catalog::DirectoryEntry &dirent) {
     Entry entry;
-    MutexLockGuard guard(lock_);
+    const MutexLockGuard guard(lock_);
 
-    bool retval = map_.Lookup(dirent.inode(), &entry);
+    const bool retval = map_.Lookup(dirent.inode(), &entry);
     if (!retval)
       return false;
     if (entry.hash.IsNull()) {
