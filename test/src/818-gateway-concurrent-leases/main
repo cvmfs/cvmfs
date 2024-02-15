@@ -27,7 +27,7 @@ cancel_lease () {
 }
 
 stresstest_lease() {
-  for i in {1..50}; do
+  for i in {1..100}; do
     local response=$(get_lease)
     local status=$(echo  ${response} | jq --raw-output .status)
     echo $response
