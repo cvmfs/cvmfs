@@ -34,23 +34,21 @@ stresstest_lease() {
     echo ${status}
     if [ "x${status}" = "xpath_busy" ]; then
       continue;
-          fi
-          if [ "x${status}" != "xok" ]; then
-            echo "${response}">/tmp/cvmfs-test-818.log
-            return 45;
-          fi
-          local session_token=$(echo -n ${response} | jq --raw-output .session_token)
+    fi
+    if [ "x${status}" != "xok" ]; then
+      echo "${response}">/tmp/cvmfs-test-818.log
+      return 45;
+    fi
+    local session_token=$(echo -n ${response} | jq --raw-output .session_token)
     local response_cancel=$(cancel_lease $session_token)
     local status_cancel=$(echo  ${response_cancel} | jq --raw-output .status)
-          if [ "x${status}" != "xok" ]; then
-            echo "${response_cancel}">/tmp/cvmfs-test-818.log
-            return 46;
-          fi
+    if [ "x${status}" != "xok" ]; then
+      echo "${response_cancel}">/tmp/cvmfs-test-818.log
+      return 46;
+    fi
     echo $response_cancel
-    
   done;
   return 0
-
 }
 
 
