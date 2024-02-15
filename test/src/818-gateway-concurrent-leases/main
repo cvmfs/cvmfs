@@ -53,20 +53,20 @@ stresstest_lease() {
 
 
 cvmfs_run_test() {
-    set_up_repository_gateway || return 1
+  set_up_repository_gateway || return 1
 
-    echo "*** Starting initial transaction"
-    cvmfs_server transaction test.repo.org || return 10
-    cvmfs_server publish test.repo.org     || return 11
+  echo "*** Starting initial transaction"
+  cvmfs_server transaction test.repo.org || return 10
+  cvmfs_server publish test.repo.org     || return 11
 
-    echo "*** hammering lease db with api requests"
-    local pids=""
-    stresstest_lease || return 10 & pids="$! $pids"
-    stresstest_lease || return 11 & pids="$! $pids"
-    stresstest_lease || return 12 & pids="$! $pids"
-    stresstest_lease || return 13 & pids="$! $pids"
-    stresstest_lease || return 14 & pids="$! $pids"
-    stresstest_lease || return 15 & pids="$! $pids"
+  echo "*** hammering lease db with api requests"
+  local pids=""
+  stresstest_lease || return 10 & pids="$! $pids"
+  stresstest_lease || return 11 & pids="$! $pids"
+  stresstest_lease || return 12 & pids="$! $pids"
+  stresstest_lease || return 13 & pids="$! $pids"
+  stresstest_lease || return 14 & pids="$! $pids"
+  stresstest_lease || return 15 & pids="$! $pids"
 
   local return_code=0
   for pid in $pids; do
