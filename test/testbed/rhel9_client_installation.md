@@ -6,9 +6,8 @@ dnf install htop
 dnf install autofs zlib-devel libcap-devel httpd attr usbutils buildah
 dnf install git cmake gcc gcc-c++ ninja-build golang
 dnf install openssl-devel bzip2 libuuid-devel
-dnf install vim patch fuse fuse-deve
-dnf install python2 python3 python-unversioned-command valgrind python3-devel unzip meson virtualenv
-dnf install python3 python-unversioned-command valgrind python3-devel unzip meson virtualen
+dnf install vim patch fuse fuse-devel
+dnf install python3 python-unversioned-command valgrind python3-devel unzip meson virtualenv
 ```
 
 ## Patch Kernel
@@ -23,6 +22,10 @@ fuse3-libs-3.10.2-7.el9.x86_64.rpm
 fuse3-debugsource-3.10.2-7.el9.x86_64.rpm
 fuse3-libs-debuginfo-3.10.2-7.el9.x86_64.rpm
 ```
+
+To install all RPMs in the current directory use 
+```
+rpm -U ./*
 
 ## Libfuse: Build and Install
 ```
@@ -80,7 +83,11 @@ For using share memory as cache base for cvmfs create the following:
 mkdir /dev/shm/cvmfs-cache
 ```
 
-Set readahead to 1024 KiB
+--> for this run `./setupClient.sh` once after booting the server
+
+Set readahead to 1024 KiB 
 ```
 echo 1024 > /sys/class/bdi/<fsid>/read_ahead_kb
 ```
+
+--> for this run `./runEachMount.sh /cvmfs/<repo_name>` after every new mounting
