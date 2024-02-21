@@ -21,8 +21,8 @@ SimpleCatalogManager::SimpleCatalogManager(
                        download::DownloadManager  *download_manager,
                        perf::Statistics           *statistics,
                        const bool                  manage_catalog_files,
-                       std::string                 dir_cache,
-                       bool                        copy_to_tmp_dir)
+                       const std::string           dir_cache,
+                       const bool                  copy_to_tmp_dir)
                      : AbstractCatalogManager<Catalog>(statistics)
                      , local_cache_dir_(dir_cache)
                      , copy_to_tmp_dir_(copy_to_tmp_dir)
@@ -32,7 +32,7 @@ SimpleCatalogManager::SimpleCatalogManager(
                      , download_manager_(download_manager)
                      , manage_catalog_files_(manage_catalog_files) {
   if (!dir_cache.empty()) {
-    bool success = MakeCacheDirectories(local_cache_dir_, 0755);
+    const bool success = MakeCacheDirectories(local_cache_dir_, 0755);
 
     if (!success) {
       LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
@@ -66,7 +66,7 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
                       cache_path.c_str());
   }
 
-  bool retval = CopyPath2File(cache_path, fcatalog);
+  const bool retval = CopyPath2File(cache_path, fcatalog);
   if (!retval) {
     PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
   }
@@ -109,7 +109,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
       if (!copy_to_tmp_dir_) {
         return kLoadNew;
       } else {  // for writable catalog create copy in dir_temp_
-        std::string cache_path = tmp_path;
+        const std::string cache_path = tmp_path;
 
         tmp_path = CopyCatalogToTempFile(cache_path);
         ctlg_context->SetSqlitePath(tmp_path);
@@ -149,8 +149,8 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
 
   // for writable catalog make copy in dir_temp_ that can be modified
   if (useLocalCache() && copy_to_tmp_dir_) {
-    std::string cache_path = ctlg_context->sqlite_path();
-    std::string tmp_path = CopyCatalogToTempFile(cache_path);
+    const std::string cache_path = ctlg_context->sqlite_path();
+    const std::string tmp_path = CopyCatalogToTempFile(cache_path);
     ctlg_context->SetSqlitePath(tmp_path);
   }
 

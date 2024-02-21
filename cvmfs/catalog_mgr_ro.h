@@ -40,8 +40,8 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     download::DownloadManager  *download_manager,
     perf::Statistics           *statistics,
     const bool                  manage_catalog_files = false,
-    std::string                 dir_cache = "",
-    bool                        copy_to_tmp_dir = false);
+    const std::string           dir_cache = "",
+    const bool                  copy_to_tmp_dir = false);
 
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
