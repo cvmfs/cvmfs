@@ -734,7 +734,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('G') != args.end()) {
     // parser just for the IsOn() func
-    SimpleOptionsParser parser = SimpleOptionsParser(
+    const SimpleOptionsParser parser = SimpleOptionsParser(
                            new DefaultOptionsTemplateManager(params.repo_name));
     if (parser.IsOn(*args.find('G')->second)) {
       params.local_cache_dir =

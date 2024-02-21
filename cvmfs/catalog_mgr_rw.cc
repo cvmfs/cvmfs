@@ -1241,8 +1241,8 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
 bool WritableCatalogManager::CopyCatalogToLocalCache(
                                           const upload::SpoolerResult &result) {
   std::string tmp_catalog_path;
-  std::string cache_catalog_path = local_cache_dir_ + "/"
-                                + result.content_hash.MakePathWithoutSuffix();
+  const std::string cache_catalog_path = local_cache_dir_ + "/"
+                                  + result.content_hash.MakePathWithoutSuffix();
   FILE *fcatalog = CreateTempFile(local_cache_dir_ + "/txn/catalog", 0666,
                                                       "w", &tmp_catalog_path);
   if (!fcatalog) {
