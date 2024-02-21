@@ -206,6 +206,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void CatalogUploadCallback(const upload::SpoolerResult &result,
                              const CatalogUploadContext   clg_upload_context);
 
+  bool CopyCatalogToLocalCache(const upload::SpoolerResult &result);
+
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
   inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }

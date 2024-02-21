@@ -201,6 +201,7 @@ cvmfs_server_publish() {
         -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
+        -G $CVMFS_SERVER_CATALOG_CACHE                 \
         $(get_follow_http_redirects_flag)              \
         $(get_swissknife_proxy)                        \
         $authz_file                                    \
