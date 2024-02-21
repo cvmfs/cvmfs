@@ -189,7 +189,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   if (args.find('a') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('a')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("Swissknife Sync: unknown hash algorithm");
+      PrintError("Swissknife Sync: Unknown hash algorithm");
       return 1;
     }
   }
@@ -629,7 +629,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
         *args.find('S')->second, &params.virtual_dir_actions);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-                         "Swissknife Sync: invalid virtual catalog options: %s",
+                         "Swissknife Sync: Invalid virtual catalog options: %s",
                           args.find('S')->second->c_str());
       return 1;
     }
@@ -663,7 +663,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("Swissknife Sync: unknown hash algorithm");
+      PrintError("Swissknife Sync: Unknown hash algorithm");
       return 1;
     }
   }
@@ -692,7 +692,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('v') != args.end()) {
     sanitizer::IntegerSanitizer sanitizer;
     if (!sanitizer.IsValid(*args.find('v')->second)) {
-      PrintError("Swissknife Sync: invalid revision number");
+      PrintError("Swissknife Sync: Invalid revision number");
       return 1;
     }
     params.manual_revision = String2Uint64(*args.find('v')->second);
@@ -730,6 +730,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('J') != args.end()) {
     params.repo_tag.SetDescription(*args.find('J')->second);
+  }
+
+  if (args.find('G') != args.end()) {
+    // parser just for the IsOn() func
+    SimpleOptionsParser parser = SimpleOptionsParser(
+                           new DefaultOptionsTemplateManager(params.repo_name));
+    if (parser.IsOn(*args.find('G')->second)) {
+      params.local_cache_dir =
+                       "/var/spool/cvmfs/" + params.repo_name + "/cache.server";
+    }
   }
 
   const bool upload_statsdb = (args.count('I') > 0);
@@ -803,11 +813,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(),
-      download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
-      params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
-      params.is_balanced, params.max_weight, params.min_weight);
+         params.base_hash, params.stratum0, params.dir_temp,
+         spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+         params.nested_kcatalog_limit, params.root_kcatalog_limit,
+         params.file_mbyte_limit, statistics(), params.is_balanced,
+         params.max_weight, params.min_weight, params.local_cache_dir);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
@@ -884,7 +894,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {
-    PrintError("Swissknife Sync: something went wrong during sync");
+    PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
@@ -901,7 +911,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout,
-                            "Swissknife Sync:  Wait for all uploads to finish");
+                             "Swissknife Sync: Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);

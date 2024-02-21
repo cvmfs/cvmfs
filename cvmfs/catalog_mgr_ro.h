@@ -41,31 +41,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     perf::Statistics           *statistics,
     const bool                  manage_catalog_files = false,
     std::string                 dir_cache = "",
-    bool                        copy_to_tmp_dir = false)
-    : AbstractCatalogManager<Catalog>(statistics)
-    , local_cache_dir_(dir_cache)
-    , copy_to_tmp_dir_(copy_to_tmp_dir)
-    , base_hash_(base_hash)
-    , stratum0_(stratum0)
-    , dir_temp_(dir_temp)
-    , download_manager_(download_manager)
-    , manage_catalog_files_(manage_catalog_files) {
-      if (!dir_cache.empty()) {
-        use_local_cache_ = true;
-
-        bool success = MakeCacheDirectories(local_cache_dir_, 0755);
-
-        if (!success) {
-          LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
-                 "Failure during creation of local cache directory for server");
-          use_local_cache_ = false;
-          copy_to_tmp_dir_ = false;
-        }
-      } else {
-        copy_to_tmp_dir_ = false;
-        use_local_cache_ = false;
-      }
-    }
+    bool                        copy_to_tmp_dir = false);
 
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
@@ -88,9 +64,8 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
 
- protected:
-  bool                       use_local_cache_;  // use local cache directory
-                                                // for faster lookup of catalogs
+  bool useLocalCache() { return !local_cache_dir_.empty(); }
+
   std::string                local_cache_dir_;  // absolute path to local cache
                                                 // directory
   bool                       copy_to_tmp_dir_;  // only relevant if using local
@@ -99,6 +74,8 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
                                                 // must be created in dir_temp_
 
  private:
+  std::string CopyCatalogToTempFile(const std::string &cache_path);
+
   shash::Any                 base_hash_;
   std::string                stratum0_;
   std::string                dir_temp_;

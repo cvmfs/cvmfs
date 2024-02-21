@@ -189,7 +189,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Swissknife Ingest:  Unable to open authz file (%s)"
+               "Swissknife Ingest: Unable to open authz file (%s)"
                "from the publication process: %s",
                params.authz_file.c_str(), strerror(errno));
       return 7;
