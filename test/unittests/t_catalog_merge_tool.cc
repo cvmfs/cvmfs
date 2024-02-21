@@ -78,7 +78,7 @@ class T_CatalogMergeTool : public ::testing::Test {};
 TEST_F(T_CatalogMergeTool, CRUD) {
   DirSpec spec1 = MakeBaseSpec();
 
-  std::string repo_name = "test";
+  const std::string repo_name = "test";
 
   CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
@@ -177,7 +177,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   EXPECT_TRUE(base.AddDirectory("baz", "bar", 4096));
   EXPECT_TRUE(base.AddNestedCatalog("bar/baz"));
 
-  std::string repo_name = "test_symlink";
+  const std::string repo_name = "test_symlink";
   CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
 
@@ -201,7 +201,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   UniquePtr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
-  receiver::Params params = MakeMergeToolParams(repo_name);
+  const receiver::Params params = MakeMergeToolParams(repo_name);
 
   CatalogTestTool::History history = tester.history();
 
