@@ -60,12 +60,15 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 #define platform_sighandler_t sig_t
 
-inline std::vector<std::string> platform_mountlist() {
+inline std::vector<std::string> platform_mountlist
+                                (const bool cvmfs_only = false) {
   std::vector<std::string> result;
   struct statfs *mntbufp;
   int num_elems = getmntinfo(&mntbufp, MNT_NOWAIT);  // modifies static memory
   for (int i = 0; i < num_elems; ++i) {
-    result.push_back(mntbufp[i].f_mntonname);
+    if (!cvmfs_only || !strcmp(mntbufp[i].f_fstypename, "osxfuse")) {
+      result.push_back(mntbufp[i].f_mntonname);
+    }
   }
   return result;
 }

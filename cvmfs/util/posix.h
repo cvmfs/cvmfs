@@ -78,7 +78,8 @@ CVMFS_EXPORT bool IsHttpUrl(const std::string &path);
 
 CVMFS_EXPORT std::string ReadSymlink(const std::string &path);
 CVMFS_EXPORT std::string ResolvePath(const std::string &path);
-CVMFS_EXPORT bool IsMountPoint(const std::string &path);
+CVMFS_EXPORT bool IsMountPoint(const std::string &path,
+                               const bool cvmfs_only = false);
 CVMFS_EXPORT FileSystemInfo GetFileSystemInfo(const std::string &path);
 
 CVMFS_EXPORT void CreateFile(const std::string &path, const int mode,
