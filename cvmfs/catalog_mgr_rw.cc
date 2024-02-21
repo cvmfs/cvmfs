@@ -1236,7 +1236,7 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
  * As such: create a temporary copy in local_cache_dir/txn and then do a 
  * `rename` (which is atomic) to the actual cache path
  * 
- * @returns true on sucess, otherwise false
+ * @returns true on success, otherwise false
  */
 bool WritableCatalogManager::CopyCatalogToLocalCache(
                                           const upload::SpoolerResult &result) {
