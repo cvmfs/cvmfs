@@ -48,15 +48,15 @@ func main() {
 			ln   net.Listener
 		)
 
-		for port := cfg.PProfPort; port <= cfg.PProfPortRangeMax ; port++ {
+		for port := cfg.PProfPort; port <= cfg.PProfPortRangeMax; port++ {
 			var err error
 			addr = fmt.Sprintf("localhost:%d", port)
 			ln, err = net.Listen("tcp", addr)
 			if err != nil {
 				if isErrorAddressAlreadyInUse(err) {
-          if port < cfg.PProfPortRangeMax {
-					  continue
-          } // else: we are out of ports to try and report error.
+					if port < cfg.PProfPortRangeMax {
+						continue
+					} // else: we are out of ports to try and report error.
 				}
 				gw.Log("main", gw.LogError).
 					Err(err).
