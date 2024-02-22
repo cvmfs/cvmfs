@@ -25,6 +25,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"
+#include "util/exception.h"
 #include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -536,7 +537,12 @@ class InodeReferences {
       return false;
     }
 
-    assert(refcounter >= by);
+    if (refcounter < by) {
+      PANIC(kLogSyslogErr | kLogDebug,
+            "inode tracker refcount mismatch, inode % " PRIu64
+            ", refcounts %u / %u", inode, refcounter, by);
+    }
+
     if (refcounter == by) {
       map_.Erase(inode);
       return true;
@@ -620,7 +626,11 @@ class InodeTracker {
         shash::Md5 md5path;
         InodeEx inode_ex(inode, InodeEx::kUnknownType);
         bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
-        assert(found);
+        if (!found) {
+          PANIC(kLogSyslogErr | kLogDebug,
+                "inode tracker ref map and path map out of sync: %" PRIu64,
+                inode);
+        }
         tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
         atomic_inc64(&tracker_->statistics_.num_removes);
