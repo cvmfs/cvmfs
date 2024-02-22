@@ -2102,6 +2102,9 @@ TEST(Log2Histogram, 2BinEmpty) {
   for (int i = 0; i < 3; i++) {
     EXPECT_EQ(res[i], atomic_read32(&bins[i]));
   }
+
+  unsigned int q = log2hist.GetQuantile(0.5);
+  EXPECT_EQ(q, 4U);
 }
 
 TEST(Log2Histogram, 2Bins) {
