@@ -1,4 +1,6 @@
 2.12.0:
+  * [client] Improve error logging in inode tracker (#3502)
+  * [client] Fix a few Log2Histogram bugs (#3511)
   * [client] Reduce write lock contention in catalog mgr (#3476)
   * [client] Support for the new CVMFS_FUSE3_IDLE_THREADS and CVMFS_FUSE3_MAX_THREADS parameters (#3505)
   * [client] Log JobInfo object id and its respective CURL requests (#3492)
