@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import sys
 import textwrap
@@ -156,6 +158,13 @@ def verifyYAML(config):
         print('Section: "' + key + '": "use_cvmfs" is not a boolean',
               file=sys.stderr)
         exit(22)
+      if config[key]["use_cvmfs"] == True:
+        if (not "cvmfs_save_raw_results" in config[key].keys()):
+          config[key]["cvmfs_save_raw_results"] = True
+        elif (type(True) != type(config[key]["cvmfs_save_raw_results"])):
+          print('Section: "' + key + '": "cvmfs_save_raw_results" is not a boolean',
+                file=sys.stderr)
+          exit(22)
 
       if config[key]["use_cvmfs"] == True:
         verifyCvmfsRun(config, key)
@@ -196,7 +205,6 @@ def getConfig():
   else:
     print("No YAML config file given")
     exit(3)
-    # TODO RETURN ERROR AND EXIT
 
   verifyYAML(config)
   initConfig(config)
@@ -243,37 +251,3 @@ super long
 def getFiles(prefix, parsed_args, **kwargs):
   files = glob.glob(prefix + "*")
   return files
-
-
-# def setParamConfig():
-  # ##############################################################################
-  # ## PARAMS set by user
-  # #########################
-
-  # # selected commands to run (cmds are in util_benchmark/benchmark_cmds.py)
-  # # to combine multiple cmd sets use: { **chep23_lhcb_commands, **chep23_atlas_commands}
-  # commands = benchmark_cmds.chep23_selected_commands
-
-  # # how often the command is timed in a row for each cache type
-  # repetitions = 3
-
-  # # if autofs should be used; better without
-  # # if =False make sure that autofs is stopped and autofs does not continue
-  # #           to mount /cvmfs (use `umount -lf /cvmfs`)
-  # use_autofs = False
-
-  # # array of build dirs of cvmfs to run the performance benchmark with
-  # # see getOutname() to destinguish between same version but different branch
-  # cvmfs_build_dirs = ["/home/<user>/cvmfs/build", "/home/<user>/cvmfs-other/build"]
-  # thread_configs = [1] # array; with how many threads the program should be run
-
-  # # combination of cvmfs client config that should be in addition enabled
-  # # best to separate params with "_"; see setCvmfsConfig() for more
-  # run_options = ["symlink_statfs_kernel_trace", "statfs_kernel"]
-
-  # # base dir where the results should be written to
-  # outdir = "./data/"
-
-  # #########################
-  # ## END PARAMS set by user
-  # ##############################################################################

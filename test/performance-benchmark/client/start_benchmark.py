@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 from functools import partial
 import datetime as dt
 from collections import defaultdict
@@ -145,7 +146,8 @@ if __name__ == "__main__":
                                             repeat=config[run]["repetitions"])
 
               all_data[cache_label] = dict_cache
-              all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
+              if config[run]["cvmfs_save_raw_results"] == True:
+                all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
               all_dict_tracing[cache_label] = dict_tracing
 
               print("Average real time for all repetitions for", cache_label,

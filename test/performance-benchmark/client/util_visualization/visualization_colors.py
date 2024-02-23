@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 med_green = "#00cc00"
 dark_blue = "#0000cc"
 light_blue = "#8080ff"
