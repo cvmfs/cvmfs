@@ -587,6 +587,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                                       const int size_idx,
                                       const int mode_idx,
                                       const int mtime_idx,
+                                      const int mtimens_idx,
                                       const int flags_idx,
                                       const int name_idx,
                                       const int symlink_idx,
@@ -598,7 +599,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     MakeHardlinks(entry.hardlink_group_,
                   entry.linkcount_);
 
-  return (
+  bool result =
     BindHashBlob(hash_idx, entry.checksum_) &&
     BindInt64(hardlinks_idx, hardlinks) &&
     BindInt64(size_idx, entry.size_) &&
@@ -608,8 +609,14 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindInt64(mtime_idx, entry.mtime_) &&
     BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
     BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
-    BindText(symlink_idx, entry.symlink_.GetChars(), entry.symlink_.GetLength())
-  );  // NOLINT
+    BindText(symlink_idx, entry.symlink_.GetChars(),
+                          entry.symlink_.GetLength());
+  if (entry.HasMtimeNs())
+    result &= BindInt(mtimens_idx, entry.mtime_ns_);
+  else
+    result &= BindNull(mtimens_idx);
+
+  return result;
 }
 
 
@@ -669,14 +676,21 @@ shash::Any SqlListContentHashes::GetHash() const {
            "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
            "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
            "catalog.rowid,      catalog.uid,        catalog.gid, "        \
-           "0"
-#define DB_FIELDS_GE_V2_1_GE_R2                                           \
+           "0, NULL"
+#define DB_FIELDS_GE_V2_1_LT_R7                                           \
            "catalog.hash,       catalog.hardlinks,  catalog.size, "       \
            "catalog.mode,       catalog.mtime,      catalog.flags, "      \
            "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
            "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
            "catalog.rowid,      catalog.uid,        catalog.gid, "        \
-           "catalog.xattr IS NOT NULL"
+           "catalog.xattr IS NOT NULL, NULL"
+#define DB_FIELDS_GE_V2_1_GE_R7                                           \
+           "catalog.hash,       catalog.hardlinks,  catalog.size, "       \
+           "catalog.mode,       catalog.mtime,      catalog.flags, "      \
+           "catalog.name,       catalog.symlink,    catalog.md5path_1, "  \
+           "catalog.md5path_2,  catalog.parent_1,   catalog.parent_2, "   \
+           "catalog.rowid,      catalog.uid,        catalog.gid, "        \
+           "catalog.xattr IS NOT NULL, catalog.mtimens"
 
 #define MAKE_STATEMENT(STMT_TMPL, REV)                        \
   static const std::string REV =                              \
@@ -685,7 +699,8 @@ shash::Any SqlListContentHashes::GetHash() const {
 #define MAKE_STATEMENTS(STMT_TMPL)          \
   MAKE_STATEMENT(STMT_TMPL, LT_V2_1);       \
   MAKE_STATEMENT(STMT_TMPL, GE_V2_1_LT_R2); \
-  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_GE_R2)
+  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_LT_R7); \
+  MAKE_STATEMENT(STMT_TMPL, GE_V2_1_GE_R7)
 
 #define DEFERRED_INIT(DB, REV) \
   DeferredInit((DB).sqlite_db(), (REV).c_str())
@@ -695,8 +710,10 @@ shash::Any SqlListContentHashes::GetHash() const {
     DEFERRED_INIT((DB), LT_V2_1);                                        \
   } else if ((DB).schema_revision() < 2) {                               \
     DEFERRED_INIT((DB), GE_V2_1_LT_R2);                                  \
+  } else if ((DB).schema_revision() < 7) {                               \
+    DEFERRED_INIT((DB), GE_V2_1_LT_R7);                                  \
   } else {                                                               \
-    DEFERRED_INIT((DB), GE_V2_1_GE_R2);                                  \
+    DEFERRED_INIT((DB), GE_V2_1_GE_R7);                                  \
   }
 
 
@@ -747,6 +764,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.is_direct_io_       = (database_flags & kFlagDirectIo);
     result.is_external_file_   = (database_flags & kFlagFileExternal);
     result.has_xattrs_         = RetrieveInt(15) != 0;
+    result.mtime_ns_           = RetrieveNullableInt(16, -1);
     result.checksum_           =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
     result.compression_algorithm_ =
@@ -851,15 +869,17 @@ SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
 //            1             2             3               4
-    "name = :name, symlink = :symlink, uid = :uid, gid = :gid, xattr = :xattr "
+    "name = :name, symlink = :symlink, uid = :uid, gid = :gid, xattr = :xattr, "
 //        5                6               7           8             9
+    "mtimens = :mtimens "
+//             10
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-//                    10                       11
+//                    11                       12
 }
 
 
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
-  return (
+  bool result =
     BindHashBlob(1, entry.checksum_) &&
     BindInt64(2, entry.size_) &&
     BindInt(3, entry.mode_) &&
@@ -867,12 +887,17 @@ bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
     BindText(5, entry.name_.GetChars(),    entry.name_.GetLength()) &&
     BindText(6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
     BindInt64(7, entry.uid_) &&
-    BindInt64(8, entry.gid_));
+    BindInt64(8, entry.gid_);
+  if (entry.HasMtimeNs())
+    result &= BindInt(10, entry.mtime_ns_);
+  else
+    result &= BindNull(10);
+  return result;
 }
 
 
 bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
-  return BindMd5(10, 11, hash);
+  return BindMd5(11, 12, hash);
 }
 
 
@@ -1055,10 +1080,10 @@ SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
     "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
-    "mtime, flags, name, symlink, uid, gid, xattr) "
-    // 9,     10    11     12     13   14   15
+    "mtime, flags, name, symlink, uid, gid, xattr, mtimens) "
+    // 9,     10    11     12     13   14   15     16
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink, :uid, :gid, :xattr);");
+    " :flags, :name, :symlink, :uid, :gid, :xattr, :mtimens);");
 }
 
 
@@ -1073,7 +1098,7 @@ bool SqlDirentInsert::BindParentPathHash(const shash::Md5 &hash) {
 
 
 bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, entry);
+  return BindDirentFields(5, 6, 7, 8, 9, 16, 10, 11, 12, 13, 14, entry);
 }
 
 
@@ -1102,20 +1127,20 @@ SqlDirentUpdate::SqlDirentUpdate(const CatalogDatabase &database) {
 //            1             2             3               4
     "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks, "
 //          5             6                  7                8
-    "uid = :uid, gid = :gid "
-//          9           10
+    "uid = :uid, gid = :gid, mtimens = :mtimens "
+//          9           10             11
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
-//                     11                       12
+//                     12                       13
 }
 
 
 bool SqlDirentUpdate::BindPathHash(const shash::Md5 &hash) {
-  return BindMd5(11, 12, hash);
+  return BindMd5(12, 13, hash);
 }
 
 
 bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
-  return BindDirentFields(1, 8, 2, 3, 4, 5, 6, 7, 9, 10, entry);
+  return BindDirentFields(1, 8, 2, 3, 4, 11, 5, 6, 7, 9, 10, entry);
 }
 
 
