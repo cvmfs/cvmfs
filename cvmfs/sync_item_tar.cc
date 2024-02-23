@@ -120,6 +120,7 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_rdev = entry_stat->st_rdev;
   tar_stat_.st_size = entry_stat->st_size;
   tar_stat_.st_mtime = entry_stat->st_mtime;
+  tar_stat_.st_mtim.tv_nsec = entry_stat->st_mtim.tv_nsec;
   tar_stat_.st_nlink = entry_stat->st_nlink;
 
   if (IsDirectory()) {
@@ -149,7 +150,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.gid_ = this->tar_stat_.st_gid;
   dirent.size_ = this->tar_stat_.st_size;
   dirent.mtime_ = this->tar_stat_.st_mtime;
-  dirent.mtime_ = this->tar_stat_.st_mtim.tv_nsec;
+  dirent.mtime_ns_ = this->tar_stat_.st_mtim.tv_nsec;
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
