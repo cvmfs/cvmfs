@@ -1757,13 +1757,32 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   XattrList xattrs;
   PathString path;
   retval = GetPathForInode(ino, &path);
-  assert(retval);
+
+  if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                    "cvmfs_statfs: Race condition? "
+                    "GetPathForInode did not succeed for path %s "
+                    "(path might have not been set)",
+                    path.c_str())) {
+    fuse_remounter_->fence()->Leave();
+    fuse_reply_err(req, ESTALE);
+    return;
+  }
+
   if (d.IsLink()) {
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupDefault | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
     retval = catalog_mgr->LookupPath(path, lookup_options, &raw_symlink);
-    assert(retval);
+
+    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
+                    "cvmfs_statfs: Race condition? "
+                    "LookupPath did not succeed for path %s",
+                    path.c_str())) {
+      fuse_remounter_->fence()->Leave();
+      fuse_reply_err(req, ESTALE);
+      return;
+    }
+
     d.set_symlink(raw_symlink.symlink());
   }
   if (d.HasXattrs()) {
