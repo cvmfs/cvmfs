@@ -233,6 +233,12 @@ cvmfs_run_test() {
     echo "*** It compare well"
   fi
 
+  echo "checking nanosecond timestamps"
+  echo "entry information of $file:"
+  stat $file || return 50
+  local mtime_ns=$(stat -c%y $file | cut -d. -f2 | awk '{print $1}')
+  [ $mtime_ns -ne 0 ] || return 51
+
   echo "*** ingesting empty tarball with nested catalog"
   cat $script_location/layer.tar | cvmfs_server ingest --base_dir layer -c --tar_file - $CVMFS_TEST_REPO || return 42
   ls /cvmfs/$CVMFS_TEST_REPO/layer/.cvmfscatalog || return 42
