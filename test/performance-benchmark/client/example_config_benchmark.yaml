@@ -71,7 +71,11 @@ avail_cmds:
 ####################################################
 run-1:
   # Optional (default: true), as such can be omitted if running commands using cvmfs
-  use_cvmfs: False 
+  use_cvmfs: true
+  # Optional (default: true), only in combination with cvmfs commands
+  # Toggles if cvmfs internal affairs should be written as raw output, or not
+  # (the normal results are "just" accumulations over cvmfs internal affairs)
+  cvmfs_save_raw_results: false
   # (MAND) must be declared in avail_cmds
   commands: ["tensorflow", "root"]
   # (MAND) cvmfs build directories that should be used for the benchmarking

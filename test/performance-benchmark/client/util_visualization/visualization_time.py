@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 measurement_label_dict = {
 "user": "User Time (s)",
 "system": "System Time (s)",
@@ -81,7 +83,7 @@ measurement_cvmfs_internal_dict = {
   "inode_cache.n_update": "Inode cache: #Updates",
   "inode_cache.n_update_value": "Inode cache: #Value changes",
   "inode_cache.sz_allocated": "Inode cache: #Allocated bytes",
-  "inode_cache.sz_size": "Inode cache: Total size", # TODO which size? bytes?
+  "inode_cache.sz_size": "Inode cache: Total size in bytes",
   "inode_tracker.n_hit_inode": "Inode cache: #Inode lookups",
   "inode_tracker.n_hit_path": "Inode cache: #Successful path lookups",
   "inode_tracker.n_insert": "Inode cache: #Accessed inodes",
@@ -100,7 +102,7 @@ measurement_cvmfs_internal_dict = {
   "md5_path_cache.n_update": "MD5 Path Cache: #Updates",
   "md5_path_cache.n_update_value": "MD5 Path Cache: #Value changes",
   "md5_path_cache.sz_allocated": "MD5 Path Cache: #Allocated bytes ",
-  "md5_path_cache.sz_size": "MD5 Path Cache: Total size",  # TODO which size? bytes?
+  "md5_path_cache.sz_size": "MD5 Path Cache: Total size in bytes", 
   "namestring.n_instances": "#Namestring instances",
   "namestring.n_overflows": "#Namestring overflows",
   "page_cache_tracker.n_insert": "Page Cache: #Added page cache entries",
@@ -118,7 +120,7 @@ measurement_cvmfs_internal_dict = {
   "path_cache.n_update": "Path Cache: #Updates",
   "path_cache.n_update_value": "Path Cache: #Value changes",
   "path_cache.sz_allocated": "Path Cache: #Allocated bytes ",
-  "path_cache.sz_size": "Path Cache: Total size", # TODO which size? bytes?
+  "path_cache.sz_size": "Path Cache: Total size in bytes",
   "pathstring.n_instances": "#Pathstring instances",
   "pathstring.n_overflows": "#Pathstring overflows",
   "sqlite.n_access": "Sqlite: #Access() calls",

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import os
 import glob
 import pandas as pd
@@ -31,6 +32,9 @@ def writeResults(outdir, outname, data, cmd_label, cvmfs_version, num_threads):
   df_results.to_csv(outdir + outname + ".csv", index_label="labels")
 
 def writeResultsInternalRaw(outdir, outname, dict_full_cvmfs_internals):
+  if len(dict_full_cvmfs_internals) < 1:
+    return
+  
   cvmfs_outdir = "cvmfs_internal_raw/"
   if os.path.isdir(outdir + cvmfs_outdir) == False:
     os.makedirs(outdir + cvmfs_outdir)
