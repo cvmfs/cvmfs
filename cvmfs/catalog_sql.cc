@@ -77,7 +77,11 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add self_special and subtree_special statistics counters
 //   5 --> 6: (Jul 01 2021):
 //            * Add kFlagDirectIo
-const unsigned CatalogDatabase::kLatestSchemaRevision = 6;
+//   6 --> 7: (Feb 23 2024):
+//            * Store nanosecond timestamps (mtimens column) in catalog table.
+//              The mtimens column has only the nanosecond part of the timestamp
+//              and may be NULL
+const unsigned CatalogDatabase::kLatestSchemaRevision = 7;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -209,6 +213,22 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
   }
 
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 6)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (6 --> 7)");
+
+    SqlCatalog sql_upgrade1(*this, "ALTER TABLE catalog ADD mtimens INTEGER;");
+    if (!sql_upgrade1.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (6 --> 7)");
+      return false;
+    }
+
+    set_schema_revision(7);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -222,8 +242,8 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
-    " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
-    " xattr BLOB, "
+    " mtimens INTEGER, flags INTEGER, name TEXT, symlink TEXT, uid INTEGER,"
+    " gid INTEGER, xattr BLOB, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
   SqlCatalog(*this,
     "CREATE INDEX idx_catalog_parent "

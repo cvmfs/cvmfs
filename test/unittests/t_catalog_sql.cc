@@ -17,7 +17,39 @@ class T_CatalogSql : public ::testing::Test {
   }
 };
 
+static void RevertToRevision6(catalog::CatalogDatabase *db) {
+  string table_sql;
+  string indexes_sql;
+  sqlite::Sql sql_schema(db->sqlite_db(),
+    "SELECT sql FROM sqlite_master WHERE tbl_name='catalog';");
+  ASSERT_TRUE(sql_schema.FetchRow());
+  table_sql = sql_schema.RetrieveString(0);
+  while (sql_schema.FetchRow()) {
+    if (sql_schema.RetrieveType(0) == SQLITE_TEXT)
+      indexes_sql += sql_schema.RetrieveString(0) + "; ";
+  }
+  string table_sql_r1 = ReplaceAll(table_sql, "mtimens INTEGER,", "");
+  ASSERT_NE(table_sql_r1, table_sql);
+  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE catalog ",
+                            "CREATE TABLE catalog_r1 ");
+  table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE \"catalog\" ",
+                            "CREATE TABLE catalog_r1 ");
+
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DROP TABLE catalog;").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "ALTER TABLE catalog_r1 RENAME TO catalog;").Execute());
+  if (!indexes_sql.empty()) {
+    ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
+  }
+
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "UPDATE properties SET value=6 WHERE key='schema_revision';").Execute());
+}
+
 static void RevertToRevision5(catalog::CatalogDatabase *db) {
+  RevertToRevision6(db);
+
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "UPDATE properties SET value=5 WHERE key='schema_revision';").Execute());
 }
@@ -132,7 +164,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);
 
-  // Revision 1 --> 6
+  // Revision 1 --> 7
   {
     UniquePtr<catalog::CatalogDatabase>
       db(catalog::CatalogDatabase::Create(path));
@@ -150,7 +182,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql2(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
-    EXPECT_EQ(6, sql2.RetrieveInt(0));
+    EXPECT_EQ(7, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql3.FetchRow());
@@ -171,9 +203,12 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM statistics WHERE counter='subtree_special'");
     ASSERT_TRUE(sql7.FetchRow());
     EXPECT_EQ(0, sql7.RetrieveInt(0));
+    sqlite::Sql sql8(db->sqlite_db(), "SELECT COUNT(mtimens) FROM catalog;");
+    ASSERT_TRUE(sql8.FetchRow());
+    EXPECT_EQ(0, sql8.RetrieveInt(0));
   }
 
-  // Revision 0 --> 6
+  // Revision 0 --> 7
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
@@ -194,7 +229,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
-    EXPECT_EQ(6, sql3.RetrieveInt(0));
+    EXPECT_EQ(7, sql3.RetrieveInt(0));
     sqlite::Sql sql4(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
@@ -227,5 +262,8 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM statistics WHERE counter='subtree_special'");
     ASSERT_TRUE(sql11.FetchRow());
     EXPECT_EQ(0, sql11.RetrieveInt(0));
+    sqlite::Sql sql12(db->sqlite_db(), "SELECT COUNT(mtimens) FROM catalog;");
+    ASSERT_TRUE(sql12.FetchRow());
+    EXPECT_EQ(0, sql12.RetrieveInt(0));
   }
 }
