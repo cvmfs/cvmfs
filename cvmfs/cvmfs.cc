@@ -1746,9 +1746,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+
+  if (!found) {
+    fuse_remounter_->fence()->Leave();
+    ReplyNegative(d, req);
+    return;
+  }
+
   bool retval;
   XattrList xattrs;
-
   PathString path;
   retval = GetPathForInode(ino, &path);
   assert(retval);
@@ -1769,6 +1775,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                      path.c_str())) {
       fuse_remounter_->fence()->Leave();
       fuse_reply_err(req, ESTALE);
+      return;
     }
   }
 
@@ -1781,11 +1788,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   fuse_remounter_->fence()->Leave();
-
-  if (!found) {
-    ReplyNegative(d, req);
-    return;
-  }
 
   if (!magic_xattr_success) {
     fuse_reply_err(req, ENOATTR);
