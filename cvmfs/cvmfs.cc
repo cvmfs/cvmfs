@@ -1747,7 +1747,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
 
-  if (!found) {
+  if (false && !found) {
     fuse_remounter_->fence()->Leave();
     ReplyNegative(d, req);
     return;
@@ -1807,6 +1807,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   fuse_remounter_->fence()->Leave();
+
+  // TODO TODO readded to see if where failure of test 089 is
+  if (!found) {
+    ReplyNegative(d, req);
+    return;
+  }
 
   if (!magic_xattr_success) {
     fuse_reply_err(req, ENOATTR);
