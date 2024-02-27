@@ -56,8 +56,6 @@ cvmfs_run_test() {
   CVMFS_CACHE_PLUGIN_RAM_PID=$($CVMFS_CACHE_PLUGIN_RAM_PATH cache.config)
   echo "*** PID of RAM cache plugin is $CVMFS_CACHE_PLUGIN_RAM_PID"
 
-  echo $mount_opts
-
   cvmfs_mount lhcb.cern.ch $mount_opts || return $?
   ls /cvmfs/lhcb.cern.ch > /dev/null || return 10
   filename=$(find /cvmfs/lhcb.cern.ch -type f | head -n1)
