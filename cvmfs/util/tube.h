@@ -88,6 +88,28 @@ class Tube : SingleCopy {
   }
 
   /**
+   * Push an item to the back of the queue.  If queue is full, do nothing with
+   * the item and return NULL.
+   */
+  Link *TryEnqueueBack(ItemT *item) {
+    assert(item != NULL);
+    MutexLockGuard lock_guard(&lock_);
+    if (size_ == limit_) {
+      return NULL;
+    }
+
+    Link *link = new Link(item);
+    link->next_ = head_->next_;
+    link->prev_ = head_;
+    head_->next_->prev_ = link;
+    head_->next_ = link;
+    size_++;
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+    return link;
+  }
+
+  /**
    * Push an item to the front of the queue. Block if queue currently full.
    */
   Link *EnqueueFront(ItemT *item) {
