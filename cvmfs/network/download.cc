@@ -83,7 +83,11 @@ DataTubeElement* DownloadManager::GetUnusedDataTubeElement() {
 
 void DownloadManager::PutDataTubeElementToReuse(DataTubeElement* ele) {
   ele->action = kActionUnused;
-  data_tube_empty_elements_->EnqueueBack(ele);
+  Tube<DataTubeElement>::Link *link =
+                                 data_tube_empty_elements_->TryEnqueueBack(ele);
+  if (link == NULL) {  // queue is at max capacity
+    delete ele;
+  }
 }
 
 /**
