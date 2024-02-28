@@ -48,7 +48,9 @@ cvmfs_run_test() {
 
 
   echo "CVMFS_CACHE_PLUGIN_LOCATOR=tcp=127.0.0.1:$CVMFS_TEST_CACHE_PLUGIN_PORT" > cache.config || return 9
-  echo "CVMFS_CACHE_PLUGIN_SIZE=20" >> cache.config || return 9  # 20 MB should be enough for testing purposes
+  # 20 MB should be enough for testing purposes
+  # Update Feb 2024: 20 MB not enough, 150 MB needed
+  echo "CVMFS_CACHE_PLUGIN_SIZE=150" >> cache.config || return 9  
   echo "CVMFS_CACHE_PLUGIN_TEST=yes" >> cache.config || return 9
   CVMFS_CACHE_PLUGIN_RAM_PID=$($CVMFS_CACHE_PLUGIN_RAM_PATH cache.config)
   echo "*** PID of RAM cache plugin is $CVMFS_CACHE_PLUGIN_RAM_PID"
