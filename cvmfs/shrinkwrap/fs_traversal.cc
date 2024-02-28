@@ -505,6 +505,12 @@ bool Sync(
             result = false;
           }
           break;
+        case S_IFIFO:
+           // Ignore pipe, but continue
+            LogCvmfs(kLogCvmfs, kLogStderr,
+              "Skipping pipe: %s",
+              src_entry);
+          break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
             "Encountered unknown file type '%d' for source file %s",
