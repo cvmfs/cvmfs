@@ -70,8 +70,13 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-DataTubeElement* DownloadManager::GetUnusedDataTubeElement() {
-  DataTubeElement* ele = data_tube_empty_elements_->TryPopFront();
+Tube<DataTubeElement>* DownloadManager::data_tube_empty_elements_ =
+                                              new Tube<DataTubeElement>(200000);
+atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
+
+static DataTubeElement* GetUnusedDataTubeElement() {
+  DataTubeElement* ele = DownloadManager::data_tube_empty_elements_->
+                                                                  TryPopFront();
 
   if (ele == NULL) {
     char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
@@ -81,10 +86,10 @@ DataTubeElement* DownloadManager::GetUnusedDataTubeElement() {
   return ele;
 }
 
-void DownloadManager::PutDataTubeElementToReuse(DataTubeElement* ele) {
+static void PutDataTubeElementToReuse(DataTubeElement* ele) {
   ele->action = kActionUnused;
   Tube<DataTubeElement>::Link *link =
-                                 data_tube_empty_elements_->TryEnqueueBack(ele);
+                DownloadManager::data_tube_empty_elements_->TryEnqueueBack(ele);
   if (link == NULL) {  // queue is at max capacity
     delete ele;
   }
@@ -283,9 +288,10 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   if (info->IsValidDataTube()) {
-    char *data = static_cast<char*>(smalloc(num_bytes));
-    memcpy(data, ptr, num_bytes);
-    DataTubeElement *ele = new DataTubeElement(data, num_bytes, kActionData);
+    DataTubeElement *ele = GetUnusedDataTubeElement();
+    memcpy(ele->data, ptr, num_bytes);
+    ele->size = num_bytes;
+    ele->action = kActionData;
     info->GetDataTubePtr()->EnqueueBack(ele);
   } else {  // TODO(heretherebedragons) i think we need this here to support
             // the non-multihreaded version?
@@ -650,7 +656,8 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           if (info->IsValidDataTube()) {
-            DataTubeElement *ele = new DataTubeElement(kActionStop);
+            DataTubeElement *ele = GetUnusedDataTubeElement();
+            ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
           info->GetPipeJobResultPtr()->
@@ -769,7 +776,8 @@ void *DownloadManager::MainDownload(void *data) {
         // let's notify CURL is done and queue it up and wait for finishing the
         // data processing so that VerifyAndFinalize executes correctly
         if (info->IsValidDataTube()) {
-          DataTubeElement *ele = new DataTubeElement(kActionEndOfData);
+          DataTubeElement *ele = GetUnusedDataTubeElement();
+          ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
           vec_curl_done.emplace_back(
                                    TupelJobDone(info, curl_error, easy_handle));
@@ -1762,7 +1770,12 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  data_tube_empty_elements_.Destroy();
+  int32_t old_count =
+                    atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
+  if (old_count == 1) {
+    delete data_tube_empty_elements_;
+  }
+
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
@@ -1867,6 +1880,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   counters_(new Counters(statistics))
 {
   atomic_init32(&multi_threaded_);
+  atomic_inc32(&DownloadManager::counter_use_data_tube_);
 
   lock_options_ =
           reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -1881,8 +1895,6 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   assert(retval == CURLE_OK);
 
   InitHeaders();
-
-  data_tube_empty_elements_ = new Tube<DataTubeElement>(200000);
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
@@ -1920,11 +1932,13 @@ void DownloadManager::Spawn() {
 
   atomic_inc32(&multi_threaded_);
 
-  for (size_t i = 0; i < 10000; i++) {
-    char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
-    DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
-                                               kActionUnused);
-    data_tube_empty_elements_->EnqueueBack(ele);
+  if (DownloadManager::data_tube_empty_elements_->size() == 0) {
+    for (size_t i = 0; i < 10000; i++) {
+      char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
+      DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
+                                                kActionUnused);
+      DownloadManager::data_tube_empty_elements_->EnqueueBack(ele);
+    }
   }
 
   if (health_check_.UseCount() > 0) {
