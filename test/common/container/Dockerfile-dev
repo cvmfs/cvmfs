@@ -1,0 +1,61 @@
+FROM 	    gitlab-registry.cern.ch/linuxsupport/alma9-base
+
+# This two args should not be necessary, but the bug fixed by
+# https://github.com/opencontainers/runc/pull/2086
+# makes them necessary in our environment
+ARG SFTNIGHT_UID=5005
+ARG SFTNIGHT_GID=5005
+
+RUN         dnf -y update
+RUN         dnf -y install filesystem
+RUN         dnf -y install dnf-utils && dnf config-manager --set-enabled crb
+RUN         dnf -y install epel-release
+RUN         dnf -y install                     \
+                       clang-analyzer          \
+                       clang-tools-extra       \
+                       cmake                   \
+                       curl-devel              \
+                       fuse-devel              \
+                       fuse3-devel             \
+                       gcc-c++                 \
+                       gdb                     \
+                       git                     \
+                       golang                  \
+                       hardlink                \
+                       libattr-devel           \
+                       libcap-devel            \
+                       libffi-devel            \
+                       libuuid-devel           \
+                       make                    \
+                       openssl-devel           \
+                       python3-devel           \
+                       rpm-build               \
+                       ruby-devel              \
+                       selinux-policy-devel    \
+                       selinux-policy-targeted \
+                       systemd                 \
+                       which                   \
+                       valgrind-devel          \
+                       voms-devel              \
+                       zlib-devel              \
+                       attr                    \
+                       autofs                  \
+                       fuse                    \
+                       fuse3                   \
+                       sudo                    \
+                       httpd                   \
+                       wget                    \
+                       lsof                    \
+                       python
+
+
+# Similarly to the node above.
+# `adduser sftnight` should be sufficient, but the bug above requires
+# this workaround
+RUN  groupadd --gid $SFTNIGHT_GID sftnight && \
+        adduser --uid $SFTNIGHT_UID --gid $SFTNIGHT_GID sftnight
+
+RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+CMD ["/usr/sbin/init"]
+
