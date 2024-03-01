@@ -1371,6 +1371,10 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi) {
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
 
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read inode: %" PRIu64 " reading %lu bytes from offset %ld "
            "fd %lu",
