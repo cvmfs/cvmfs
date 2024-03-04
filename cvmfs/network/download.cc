@@ -70,28 +70,33 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-Tube<DataTubeElement>* DownloadManager::data_tube_empty_elements_ =
-                                              new Tube<DataTubeElement>(200000);
+Tube<Tube<DataTubeElement>>* DownloadManager::tube_of_tubes_empty_elements_ =
+                                           new Tube<Tube<DataTubeElement>>(100);
 atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
 
-static DataTubeElement* GetUnusedDataTubeElement() {
-  DataTubeElement* ele = DownloadManager::data_tube_empty_elements_->
-                                                                  TryPopFront();
+static Tube<DataTubeElement>* GetUnusedDataTube() {
+  Tube<DataTubeElement> *tube =
+                  DownloadManager::tube_of_tubes_empty_elements_->TryPopFront();
 
-  if (ele == NULL) {
-    char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
-    ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+  if (tube == NULL) {
+    tube = new Tube<DataTubeElement>(10000);
+
+    for (size_t i = 0; i < 500; i++) {
+      char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
+      DataTubeElement *ele =
+                new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+      tube->EnqueueBack(ele);
+    }
   }
 
-  return ele;
+  return tube;
 }
 
-static void PutDataTubeElementToReuse(DataTubeElement* ele) {
-  ele->action = kActionUnused;
-  Tube<DataTubeElement>::Link *link =
-                DownloadManager::data_tube_empty_elements_->TryEnqueueBack(ele);
+static void PutDataTubeToReuse(Tube<DataTubeElement> *tube) {
+  Tube<Tube<DataTubeElement>>::Link *link =
+           DownloadManager::tube_of_tubes_empty_elements_->TryEnqueueBack(tube);
   if (link == NULL) {  // queue is at max capacity
-    delete ele;
+    delete tube;
   }
 }
 
@@ -287,8 +292,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     return 0;
   }
 
-  if (info->IsValidDataTube()) {
-    DataTubeElement *ele = GetUnusedDataTubeElement();
+  if (info->data_tube_empty_elements() != NULL && info->IsValidDataTube()) {
+    DataTubeElement *ele  = info->GetUnusedDataTubeElement();
     memcpy(ele->data, ptr, num_bytes);
     ele->size = num_bytes;
     ele->action = kActionData;
@@ -645,7 +650,8 @@ void *DownloadManager::MainDownload(void *data) {
       CURL *easy_handle = vec_curl_done[i].easy_handle;
 
       if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
-        if (download_mgr->VerifyAndFinalize(curl_error, info)) {
+        bool ret_verify = download_mgr->VerifyAndFinalize(curl_error, info);
+        if (ret_verify) {
             curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
             curl_multi_socket_action(download_mgr->curl_multi_,
                                      CURL_SOCKET_TIMEOUT,
@@ -655,8 +661,8 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          if (info->IsValidDataTube()) {
-            DataTubeElement *ele = GetUnusedDataTubeElement();
+          if (info->data_tube_empty_elements() != NULL) {
+            DataTubeElement *ele = info->GetUnusedDataTubeElement();
             ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
@@ -775,8 +781,8 @@ void *DownloadManager::MainDownload(void *data) {
 
         // let's notify CURL is done and queue it up and wait for finishing the
         // data processing so that VerifyAndFinalize executes correctly
-        if (info->IsValidDataTube()) {
-          DataTubeElement *ele = GetUnusedDataTubeElement();
+        if (info->data_tube_empty_elements() != NULL) {
+          DataTubeElement *ele = info->GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
           vec_curl_done.emplace_back(
@@ -794,8 +800,9 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          if (info->IsValidDataTube()) {
-            DataTubeElement *ele = new DataTubeElement(kActionStop);
+          if (info->data_tube_empty_elements() != NULL) {
+            DataTubeElement *ele = info->GetUnusedDataTubeElement();
+            ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
           info->GetPipeJobResultPtr()->
@@ -1770,10 +1777,11 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
+  // last download manager deletes the tube
   int32_t old_count =
                     atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
   if (old_count == 1) {
-    delete data_tube_empty_elements_;
+    delete tube_of_tubes_empty_elements_;
   }
 
 
@@ -1932,12 +1940,19 @@ void DownloadManager::Spawn() {
 
   atomic_inc32(&multi_threaded_);
 
-  if (DownloadManager::data_tube_empty_elements_->size() == 0) {
-    for (size_t i = 0; i < 10000; i++) {
-      char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
-      DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
-                                                kActionUnused);
-      DownloadManager::data_tube_empty_elements_->EnqueueBack(ele);
+  if (DownloadManager::tube_of_tubes_empty_elements_->size() == 0) {
+    // TODO(heretherebedragons) maybe use min fuse threads or max fuse threads?
+    for (size_t tube_i = 0; tube_i < 5; tube_i++) {
+      Tube<DataTubeElement>* data_tube_empty_elements =
+                                                   new Tube<DataTubeElement>();
+      for (size_t i = 0; i < 10000; i++) {
+        char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
+        DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
+                                                  kActionUnused);
+        data_tube_empty_elements->EnqueueBack(ele);
+      }
+      DownloadManager::tube_of_tubes_empty_elements_->
+                                          EnqueueBack(data_tube_empty_elements);
     }
   }
 
@@ -1954,6 +1969,8 @@ void DownloadManager::Spawn() {
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
   assert(info->url() != NULL);
+  info->SetStopDataDownload(false);
+
 
   Failures result;
   result = PrepareDownloadDestination(info);
@@ -2002,6 +2019,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     }
     if (!info->IsValidDataTube()) {
       info->CreateDataTube();
+    }
+    if (info->data_tube_empty_elements() == NULL) {
+      info->SetDataTubeEmptyElements(GetUnusedDataTube());
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
@@ -2066,15 +2086,21 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         }
         break;
         default:
-          LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+          PANIC(kLogSyslogErr | kLogDebug,
                "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
                info->id(), ele->action);
       }
-      PutDataTubeElementToReuse(ele);
+      info->PutDataTubeElementToReuse(ele);
     } while (is_running);
-
+    
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
+
+    Tube<DataTubeElement>* tube = info->data_tube_empty_elements();
+    info->SetDataTubeEmptyElements(NULL);
+    PutDataTubeToReuse(tube);
+
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
+
   } else {
     MutexLockGuard l(lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();

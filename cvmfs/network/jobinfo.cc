@@ -9,6 +9,28 @@ namespace download {
 
 atomic_int64 JobInfo::next_uuid = 0;
 
+
+DataTubeElement* JobInfo::GetUnusedDataTubeElement() {
+  DataTubeElement* ele = data_tube_empty_elements_->TryPopFront();
+
+  if (ele == NULL) {
+    char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
+    ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+  }
+
+  return ele;
+}
+
+void JobInfo::PutDataTubeElementToReuse(DataTubeElement* ele) {
+  ele->action = kActionUnused;
+
+  Tube<DataTubeElement>::Link *link =
+                                 data_tube_empty_elements_->TryEnqueueBack(ele);
+  if (link == NULL) {  // queue is at max capacity
+    delete ele;
+  }
+}
+
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
   Init();
@@ -73,6 +95,8 @@ void JobInfo::Init() {
   current_host_chain_index_ = 0;
 
   allow_failure_ = false;
+
+  data_tube_empty_elements_ = NULL;
 
   memset(&zstream_, 0, sizeof(zstream_));
 }

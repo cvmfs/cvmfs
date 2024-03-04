@@ -139,11 +139,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   };
 
   /**
-   * Tube to hold empty elements use in JobInfo data_tube_
+   * Tube holding tubes that hold empty elements use in JobInfo data_tube_
    * Shared with all DownloadManagers
-   * Must be static because of CallbackCurlData
    */
-  static Tube<DataTubeElement>* data_tube_empty_elements_;
+  // TODO TODO remove it being static!!!
+  static Tube<Tube<DataTubeElement>>* tube_of_tubes_empty_elements_;
   // counter so that last DownloadManager can delete data_tube_empty_elements_
   static atomic_int32 counter_use_data_tube_;
 

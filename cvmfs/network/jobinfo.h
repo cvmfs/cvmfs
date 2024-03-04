@@ -72,6 +72,8 @@ class JobInfo {
   /// Tube (bounded thread-safe queue) to transport data from CURL callback
   /// to be decompressed in Fetch() instead of MainDownload()
   UniquePtr<Tube<DataTubeElement> > data_tube_;
+  Tube<DataTubeElement> *data_tube_empty_elements_;
+
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -213,6 +215,8 @@ class JobInfo {
   bool allow_failure() const { return allow_failure_; }
   int64_t id() const { return id_; }
 
+  Tube<DataTubeElement> *data_tube_empty_elements() const 
+                                           { return data_tube_empty_elements_; }
 
   void SetUrl(const std::string *url) { url_ = url; }
   void SetCompressed(bool compressed) { compressed_ = compressed; }
@@ -266,6 +270,11 @@ class JobInfo {
                        { current_host_chain_index_ = current_host_chain_index; }
 
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
+
+  DataTubeElement* GetUnusedDataTubeElement();
+  void PutDataTubeElementToReuse(DataTubeElement* ele);
+  void SetDataTubeEmptyElements(Tube<DataTubeElement> *tube)
+                                           { data_tube_empty_elements_ = tube; }
 
   // needed for fetch.h ThreadLocalStorage
   JobInfo() { Init(); }
