@@ -417,7 +417,7 @@ Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
 }
 
 void DownloadManager::PutDataTubeToReuse(Tube<DataTubeElement> *tube) {
-  Tube<Tube<DataTubeElement>>::Link *link =
+  Tube<Tube<DataTubeElement> >::Link *link =
                             tube_of_tubes_empty_elements_->TryEnqueueBack(tube);
   if (link == NULL) {  // queue is at max capacity
     delete tube;
@@ -781,8 +781,7 @@ void *DownloadManager::MainDownload(void *data) {
           DataTubeElement *ele = info->GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
-          vec_curl_done.emplace_back(
-                                   TupelJobDone(info, curl_error, easy_handle));
+          vec_curl_done.push_back(TupelJobDone(info, curl_error, easy_handle));
           continue;
         }
 
@@ -1931,7 +1930,7 @@ void DownloadManager::Spawn() {
   atomic_inc32(&multi_threaded_);
 
   // TODO(heretherebedragons) maybe use min fuse threads or max fuse threads?
-  tube_of_tubes_empty_elements_ = new Tube<Tube<DataTubeElement>>(100);
+  tube_of_tubes_empty_elements_ = new Tube<Tube<DataTubeElement> >(100);
   for (size_t tube_i = 0; tube_i < 5; tube_i++) {
     Tube<DataTubeElement>* data_tube_empty_elements =
                                                     new Tube<DataTubeElement>();
