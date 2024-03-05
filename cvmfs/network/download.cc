@@ -777,7 +777,8 @@ void *DownloadManager::MainDownload(void *data) {
 
         // let's notify CURL is done and queue it up and wait for finishing the
         // data processing so that VerifyAndFinalize executes correctly
-        if (info->data_tube_empty_elements() != NULL) {
+        if (info->data_tube_empty_elements() != NULL
+            && info->IsValidDataTube()) {
           DataTubeElement *ele = info->GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
@@ -795,7 +796,8 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          if (info->data_tube_empty_elements() != NULL) {
+          if (info->data_tube_empty_elements() != NULL
+              && info->IsValidDataTube()) {
             DataTubeElement *ele = info->GetUnusedDataTubeElement();
             ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
