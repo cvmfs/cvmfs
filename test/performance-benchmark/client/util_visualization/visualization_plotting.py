@@ -384,6 +384,7 @@ def callback_append_csv(data, labels, extra_data):
         out_file.write(", " + str(np_quants[1][0]))
         out_file.write(", " + str(np_quants[2][0]))
         out_file.write(", " + str(np_quants[3][0]))
+        out_file.write(", " + str(np_quants[4][0]))
   
   out_file.write("\n")
       
