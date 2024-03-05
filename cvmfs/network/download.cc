@@ -293,7 +293,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
-      int64_t written = info->sink()->Write(ptr, num_bytes);
+      const int64_t written = info->sink()->Write(ptr, num_bytes);
       if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
               "Failed to perform write of %zu bytes to sink %s with errno %ld",
@@ -405,7 +405,8 @@ Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
     tube = new Tube<DataTubeElement>(10000);
 
     for (size_t i = 0; i < 500; i++) {
-      char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
+      char *data = static_cast<char*>(
+                            smalloc(static_cast<size_t>(CURL_MAX_HTTP_HEADER)));
       DataTubeElement *ele =
                 new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
       tube->EnqueueBack(ele);
@@ -642,12 +643,11 @@ void *DownloadManager::MainDownload(void *data) {
     // Check if transfers that are completed have finished their data processing
     for (size_t i = 0; i < vec_curl_done.size(); ++i) {
       JobInfo *info = vec_curl_done[i].info;
-      int curl_error = vec_curl_done[i].curl_error;
+      const int curl_error = vec_curl_done[i].curl_error;
       CURL *easy_handle = vec_curl_done[i].easy_handle;
 
       if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
-        bool ret_verify = download_mgr->VerifyAndFinalize(curl_error, info);
-        if (ret_verify) {
+        if (download_mgr->VerifyAndFinalize(curl_error, info)) {
             curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
             curl_multi_socket_action(download_mgr->curl_multi_,
                                      CURL_SOCKET_TIMEOUT,
@@ -2064,7 +2064,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
               info->SetStopDataDownload(true);
             }
           } else {
-            int64_t written = info->sink()->Write(ptr, num_bytes);
+            const int64_t written = info->sink()->Write(ptr, num_bytes);
             if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
               PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
                "Failed to perform write of %zu bytes to sink %s with errno %ld",

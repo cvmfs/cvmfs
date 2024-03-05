@@ -443,7 +443,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Tube holding tubes that hold empty elements use in JobInfo data_tube_
    */
-  UniquePtr<Tube<Tube<DataTubeElement>> > tube_of_tubes_empty_elements_;
+  UniquePtr<Tube<Tube<DataTubeElement> > > tube_of_tubes_empty_elements_;
 };  // DownloadManager
 
 }  // namespace download
