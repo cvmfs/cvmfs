@@ -70,36 +70,6 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-Tube<Tube<DataTubeElement>>* DownloadManager::tube_of_tubes_empty_elements_ =
-                                           new Tube<Tube<DataTubeElement>>(100);
-atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
-
-static Tube<DataTubeElement>* GetUnusedDataTube() {
-  Tube<DataTubeElement> *tube =
-                  DownloadManager::tube_of_tubes_empty_elements_->TryPopFront();
-
-  if (tube == NULL) {
-    tube = new Tube<DataTubeElement>(10000);
-
-    for (size_t i = 0; i < 500; i++) {
-      char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
-      DataTubeElement *ele =
-                new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
-      tube->EnqueueBack(ele);
-    }
-  }
-
-  return tube;
-}
-
-static void PutDataTubeToReuse(Tube<DataTubeElement> *tube) {
-  Tube<Tube<DataTubeElement>>::Link *link =
-           DownloadManager::tube_of_tubes_empty_elements_->TryEnqueueBack(tube);
-  if (link == NULL) {  // queue is at max capacity
-    delete tube;
-  }
-}
-
 /**
  * Returns the status if an interrupt happened for a given repository.
  *
@@ -427,6 +397,32 @@ static int CallbackCurlDebug(
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
+
+Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
+  Tube<DataTubeElement> *tube = tube_of_tubes_empty_elements_->TryPopFront();
+
+  if (tube == NULL) {
+    tube = new Tube<DataTubeElement>(10000);
+
+    for (size_t i = 0; i < 500; i++) {
+      char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
+      DataTubeElement *ele =
+                new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+      tube->EnqueueBack(ele);
+    }
+  }
+
+  return tube;
+}
+
+void DownloadManager::PutDataTubeToReuse(Tube<DataTubeElement> *tube) {
+  Tube<Tube<DataTubeElement>>::Link *link =
+                            tube_of_tubes_empty_elements_->TryEnqueueBack(tube);
+  if (link == NULL) {  // queue is at max capacity
+    delete tube;
+  }
+}
+
 
 bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
@@ -1777,13 +1773,7 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  // last download manager deletes the tube
-  int32_t old_count =
-                    atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
-  if (old_count == 1) {
-    delete tube_of_tubes_empty_elements_;
-  }
-
+  tube_of_tubes_empty_elements_.Destroy();
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
@@ -1885,10 +1875,10 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_timestamp_backup_host_(0),
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
-                  counters_(new Counters(statistics))
+                  counters_(new Counters(statistics)),
+                  tube_of_tubes_empty_elements_(NULL)
 {
   atomic_init32(&multi_threaded_);
-  atomic_inc32(&DownloadManager::counter_use_data_tube_);
 
   lock_options_ =
           reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -1940,20 +1930,19 @@ void DownloadManager::Spawn() {
 
   atomic_inc32(&multi_threaded_);
 
-  if (DownloadManager::tube_of_tubes_empty_elements_->size() == 0) {
-    // TODO(heretherebedragons) maybe use min fuse threads or max fuse threads?
-    for (size_t tube_i = 0; tube_i < 5; tube_i++) {
-      Tube<DataTubeElement>* data_tube_empty_elements =
-                                                   new Tube<DataTubeElement>();
-      for (size_t i = 0; i < 10000; i++) {
-        char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
-        DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
-                                                  kActionUnused);
-        data_tube_empty_elements->EnqueueBack(ele);
-      }
-      DownloadManager::tube_of_tubes_empty_elements_->
-                                          EnqueueBack(data_tube_empty_elements);
+  // TODO(heretherebedragons) maybe use min fuse threads or max fuse threads?
+  tube_of_tubes_empty_elements_ = new Tube<Tube<DataTubeElement>>(100);
+  for (size_t tube_i = 0; tube_i < 5; tube_i++) {
+    Tube<DataTubeElement>* data_tube_empty_elements =
+                                                    new Tube<DataTubeElement>();
+    for (size_t i = 0; i < 10000; i++) {
+      char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
+      DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
+                                                 kActionUnused);
+      data_tube_empty_elements->EnqueueBack(ele);
     }
+    DownloadManager::tube_of_tubes_empty_elements_->
+                                          EnqueueBack(data_tube_empty_elements);
   }
 
   if (health_check_.UseCount() > 0) {
@@ -2092,7 +2081,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       }
       info->PutDataTubeElementToReuse(ele);
     } while (is_running);
-    
+
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
 
     Tube<DataTubeElement>* tube = info->data_tube_empty_elements();

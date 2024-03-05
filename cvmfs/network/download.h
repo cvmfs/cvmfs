@@ -139,15 +139,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   };
 
   /**
-   * Tube holding tubes that hold empty elements use in JobInfo data_tube_
-   * Shared with all DownloadManagers
-   */
-  // TODO TODO remove it being static!!!
-  static Tube<Tube<DataTubeElement>>* tube_of_tubes_empty_elements_;
-  // counter so that last DownloadManager can delete data_tube_empty_elements_
-  static atomic_int32 counter_use_data_tube_;
-
-  /**
    * No attempt was made to order stratum 1 servers
    */
   static const int kProbeUnprobed;
@@ -263,6 +254,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void CloneProxyConfig(DownloadManager *clone);
+
+  Tube<DataTubeElement>* GetUnusedDataTube();
+  void PutDataTubeToReuse(Tube<DataTubeElement> *tube);
 
   bool EscapeUrlChar(unsigned char input, char output[3]);
   std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
@@ -445,6 +439,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  /**
+   * Tube holding tubes that hold empty elements use in JobInfo data_tube_
+   */
+  UniquePtr<Tube<Tube<DataTubeElement>> > tube_of_tubes_empty_elements_;
 };  // DownloadManager
 
 }  // namespace download
