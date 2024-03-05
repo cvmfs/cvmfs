@@ -14,7 +14,8 @@ DataTubeElement* JobInfo::GetUnusedDataTubeElement() {
   DataTubeElement* ele = data_tube_empty_elements_->TryPopFront();
 
   if (ele == NULL) {
-    char *data = static_cast<char*>(smalloc(CURL_MAX_HTTP_HEADER));
+    char *data = static_cast<char*>(
+                            smalloc(static_cast<size_t>(CURL_MAX_HTTP_HEADER)));
     ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
   }
 
