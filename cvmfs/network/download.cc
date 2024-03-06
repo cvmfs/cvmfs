@@ -407,8 +407,9 @@ Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
     for (size_t i = 0; i < 500; i++) {
       char *data = static_cast<char*>(
                             smalloc(static_cast<size_t>(CURL_MAX_HTTP_HEADER)));
-      DataTubeElement *ele =
-                new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+      DataTubeElement *ele = new DataTubeElement(data,
+                                      static_cast<size_t>(CURL_MAX_HTTP_HEADER),
+                                      kActionUnused);
       tube->EnqueueBack(ele);
     }
   }
