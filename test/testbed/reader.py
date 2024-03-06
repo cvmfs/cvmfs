@@ -4,6 +4,8 @@ import argcomplete
 import io
 import os
 import random
+import datetime as dt
+import glob
 
 def parse_arguments():
   parser = argparse.ArgumentParser(
@@ -30,9 +32,15 @@ def parse_arguments():
   parser.add_argument('-n', '--num-max-files',
                       help='Maximum number of files to be read. \
                         Use -1 for reading the entire tree once (NOT possible if "random walk" is set). \
-                        If the tree has less files than <entries>, it will reiterate over it again.',
+                        If the tree has less files than <entries>, it will reiterate over it again. \
+                        NOTE: Either this parameter or --time is required',
                       type=int,
-                      required=True)
+                      required=False)
+  parser.add_argument('-t', '--time',
+                      help='Maximum number of seconds until a new read should be initiated. \
+                        NOTE: Either this parameter or --num-max-files is required',
+                      type=int,
+                      required=False)
   parser.add_argument('-k', '--keep',
                       help='Keep files open: During reading chunks of a file keep the file open',
                       required=False,
@@ -48,6 +56,12 @@ def parse_arguments():
                         through the directories until it randomly selects a file. Because of \
                         this, the same file can be read multiple times, and/or not all \
                         files will be read.',
+                      required=False,
+                      action="store_true")
+  parser.add_argument('-d', '--dump-file-list',
+                      help='Dump the list of filenames that have been read. \
+                        Dump is created in current directory \
+                        under the name file_list-<n>.txt with n being the next ',
                       required=False,
                       action="store_true")
   argcomplete.autocomplete(parser)
@@ -155,32 +169,82 @@ if __name__ == "__main__":
 
   read_size = parsed_args.read_size_kb
   max_entries = parsed_args.num_max_files
+  max_time = parsed_args.time
   orig_root = parsed_args.path
 
   seed = random.random()
   random.seed(seed)
 
+  if max_entries == None and max_time == None:
+    print("Stop processing: Either --time or --num-max-files must be set")
+    exit(0)
+  
+  if max_entries == -1 and parsed_args.rw == True:
+    print("--num-max-files cannot be set to -1 for random walk")
+    exit(0)
+  
+  if max_entries == None:
+    max_entries = -2
+
+  end_time = None
+  if max_time != None:
+    end_time = dt.datetime.now() + dt.timedelta(seconds=max_time)
+    print("Time for last read:", end_time)
+  
+  dump_file = None
+  if parsed_args.dump_file_list == True:
+    files = glob.glob("./file_list-" + "[0-9]*.txt")
+    new_num = str(len(files))
+    dump_file = open("./file_list-" + new_num + ".txt", "w")
+
+  is_running = True
   # linear walk
   if parsed_args.rw == False:
-    cur_entries = 0
-    while cur_entries < max_entries or max_entries == -1:
+    cur_entry = 0
+    while is_running == True:
       for root, dirs, files in os.walk(orig_root):
+        if is_running == False:
+          break
         for f in files:
-          if cur_entries == max_entries:
+          if cur_entry == max_entries:
+            is_running = False
             break
+          if end_time != None and dt.datetime.now() > end_time:
+            is_running = False
+            break
+
           full_filename = os.path.join(root, f)
-          cur_entries += 1
+          if dump_file != None:
+            dump_file.write(full_filename  + "\n")
+          cur_entry += 1
           if parsed_args.rr == False:
             readLinear(full_filename, read_size, parsed_args.keep)
           else:
             readRandom(full_filename, read_size, parsed_args.keep)
       if max_entries == -1:
         break
+
   else:  # random walk
-    for i in range(max_entries):
+    cur_entry = 0
+    if max_time != None:
+      end_time = dt.datetime.now() + dt.timedelta(seconds=max_time)
+
+    while is_running == True:
+      if cur_entry == max_entries:
+        is_running = False
+        break
+      if end_time != None and dt.datetime.now() > end_time:
+        is_running = False
+        break
+
       full_filename = getRandomFile(orig_root)
-      # print(full_filename)
+      if dump_file != None:
+        dump_file.write(full_filename + "\n")
+      cur_entry += 1
       if parsed_args.rr == False:
         readLinear(full_filename, read_size, parsed_args.keep)
       else:
         readRandom(full_filename, read_size, parsed_args.keep)
+  
+  if dump_file != None:
+    dump_file.close()
