@@ -422,7 +422,7 @@ void PageCacheTracker::Close(uint64_t inode) {
     return;
   }
 
-  int32_t old_open = entry.nopen;
+  const int32_t old_open = entry.nopen;
   if (entry.nopen < 0) {
     // At this point we know that any stale data has been flushed from the
     // cache and only data related to the currently booked content hash
