@@ -71,7 +71,10 @@ def parse_arguments():
 ## If keep_open is true, the file will be kept open during the entire process.
 ## Otherwise closes the file and reopen it after every chunked read.
 def readLinear(filename, read_size, keep_open):
-  f = io.open(filename, "rb", buffering=read_size)
+  try:
+    f = io.open(filename, "rb", buffering=read_size)
+  except:
+    return False
   f.seek(0, os.SEEK_END)
   file_size = f.tell()
   f.close()
@@ -100,6 +103,8 @@ def readLinear(filename, read_size, keep_open):
       f.close()
       offset += read_size
       # print("Linear", "close", "offset", offset, "idx", i, "read", len(read))
+
+  return True
 
 ## Read a file in random order in <read_size> sized chunks.
 ## There will be as many chunks to read as there would be for a linear read.
@@ -138,6 +143,8 @@ def readRandom(filename, read_size, keep_open):
       f.close()
       # print("Linear", "close", "offset", offset)
 
+  return True
+
 ## Get a random file. For this traverse the directories starting from <root>
 ## Select a random entry of the current directory. If it is a file, return it.
 ## Otherwise continue into the directory and repeat until a file is found.
@@ -148,19 +155,28 @@ def getRandomFile(root):
 
   while True:
     with os.scandir(path) as it:
-      xx = list(it)
-      if len(xx) == 0: # empty dir? start new
+      cur_dir_entries = list(it)
+      if len(cur_dir_entries) == 0: # empty dir? start new
         path = root
         continue
 
-      entry = random.choice(xx)
-      if entry.is_file():
-        return entry.path
-      elif entry.is_dir():
-        path = entry.path
-      else:
-        print("Neither file nor directory ", entry.path)
-        return "error"
+      random.shuffle(cur_dir_entries)
+
+      path = ""
+      for entry in cur_dir_entries:
+        if entry.is_file():
+          # skip all hidden files (.cvmfsdirtab, .cvmfscatalog, ...)
+          if not entry.name.startswith("."):
+            return entry.path
+        elif entry.is_dir():
+          path = entry.path
+          break
+        else:
+          print("Skipping: Neither file nor directory ", entry.path)
+      
+      if path == "":
+        path = root
+
 
 if __name__ == "__main__":
   parsed_args = parse_arguments()
@@ -178,11 +194,11 @@ if __name__ == "__main__":
   if max_entries == None and max_time == None:
     print("Stop processing: Either --time or --num-max-files must be set")
     exit(0)
-  
+
   if max_entries == -1 and parsed_args.rw == True:
     print("--num-max-files cannot be set to -1 for random walk")
     exit(0)
-  
+
   if max_entries == None:
     max_entries = -2
 
@@ -190,7 +206,7 @@ if __name__ == "__main__":
   if max_time != None:
     end_time = dt.datetime.now() + dt.timedelta(seconds=max_time)
     print("Time for last read:", end_time)
-  
+
   dump_file = None
   if parsed_args.dump_file_list == True:
     files = glob.glob("./file_list-" + "[0-9]*.txt")
@@ -214,13 +230,17 @@ if __name__ == "__main__":
             break
 
           full_filename = os.path.join(root, f)
+          if parsed_args.rr == False:
+            success = readLinear(full_filename, read_size, parsed_args.keep)
+          else:
+            success = readRandom(full_filename, read_size, parsed_args.keep)
+
+          if success == False:
+            continue
+
+          cur_entry += 1
           if dump_file != None:
             dump_file.write(full_filename  + "\n")
-          cur_entry += 1
-          if parsed_args.rr == False:
-            readLinear(full_filename, read_size, parsed_args.keep)
-          else:
-            readRandom(full_filename, read_size, parsed_args.keep)
       if max_entries == -1:
         break
 
@@ -237,14 +257,22 @@ if __name__ == "__main__":
         is_running = False
         break
 
-      full_filename = getRandomFile(orig_root)
+      try:
+        full_filename = getRandomFile(orig_root)
+      except IOError:
+        continue
+
+      if parsed_args.rr == False:
+        success = readLinear(full_filename, read_size, parsed_args.keep)
+      else:
+        success = readRandom(full_filename, read_size, parsed_args.keep)
+
+      if success == False:
+        continue
+
+      cur_entry += 1
       if dump_file != None:
         dump_file.write(full_filename + "\n")
-      cur_entry += 1
-      if parsed_args.rr == False:
-        readLinear(full_filename, read_size, parsed_args.keep)
-      else:
-        readRandom(full_filename, read_size, parsed_args.keep)
-  
+
   if dump_file != None:
     dump_file.close()
