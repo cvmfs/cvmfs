@@ -133,12 +133,17 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
   int retval = sqlite3_open_v2(filename().c_str(),
                                &database_.sqlite_db,
                                flags | SQLITE_OPEN_EXRESCODE,
-                               NULL);
+                               "unix-none");
   if (retval != SQLITE_OK) {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s (%d - %d)",
              filename().c_str(), retval, errno);
     return false;
   }
+
+  Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute(); 
+  Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
+  Sql(sqlite_db() , "PRAGMA synchronous=OFF;").Execute();
+  Sql(sqlite_db() , "PRAGMA journal_mode=MEMORY;").Execute();
 
   return true;
 }
@@ -193,6 +198,7 @@ bool Database<DerivedT>::Configure() {
     }
 
     return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
+           Sql(sqlite_db() , "PRAGMA synchronous=OFF;").Execute() &&
            Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
   return true;
