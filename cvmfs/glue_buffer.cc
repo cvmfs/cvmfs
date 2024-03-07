@@ -324,6 +324,13 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   if (!is_active_)
     return open_directives;
 
+  if (inode != info.st_ino) {
+    PANIC(kLogStderr | kLogDebug,
+          "invalid entry on open: %" PRIu64 " with st_ino=%" PRIu64,
+          " hash=%s size=%" PRIu64,
+          inode, info.st_ino, hash.ToString().c_str(), info.st_size);
+  }
+
   MutexLockGuard guard(lock_);
 
   Entry entry;
@@ -415,6 +422,7 @@ void PageCacheTracker::Close(uint64_t inode) {
     return;
   }
 
+  const int32_t old_open = entry.nopen;
   if (entry.nopen < 0) {
     // At this point we know that any stale data has been flushed from the
     // cache and only data related to the currently booked content hash
@@ -424,10 +432,20 @@ void PageCacheTracker::Close(uint64_t inode) {
   entry.nopen--;
   if (entry.nopen == 0) {
     // File closed, remove struct stat information
-    assert(entry.idx_stat >= 0);
+    if (entry.idx_stat < 0) {
+      PANIC(kLogSyslogErr | kLogDebug,
+            "page cache tracker: missing stat entry! Entry info: inode %" PRIu64
+            "  -  open counter %d  -  hash %s",
+            inode, old_open, entry.hash.ToString().c_str());
+    }
     uint64_t inode_update = stat_store_.Erase(entry.idx_stat);
     Entry entry_update;
     retval = map_.Lookup(inode_update, &entry_update);
+    if (!retval) {
+      PANIC(kLogSyslogErr | kLogDebug,
+            "invalid inode in page cache tracker: inode %" PRIu64
+            ", replacing %" PRIu64, inode_update, inode);
+    }
     assert(retval);
     entry_update.idx_stat = entry.idx_stat;
     map_.Insert(inode_update, entry_update);
