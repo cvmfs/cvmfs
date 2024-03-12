@@ -1,4 +1,4 @@
-name: Docker
+name: CI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [devel,master]
 
 jobs:
-  test:
-    name: "Test"
+  docker:
+    name: "Docker"
     runs-on: ubuntu-20.04
 
     steps:
@@ -35,21 +35,23 @@ jobs:
           docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config setup"
           docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config chksetup" || exit 1
 
-      - name: Run quick test suite
+      - name: Run Tests
         run: |
           docker exec -u sftnight -t cvmfs-dev bash -c \
-            "cd /home/sftnight/cvmfs/test && \
-            CVMFS_TEST_USER=sftnight ./run.sh /tmp/cvmfs-test.log -s 'quick' ./src/0* ./src/1*"
+            "cd /home/sftnight/cvmfs/test/common/container && CVMFS_TEST_PROXY=DIRECT bash test.sh"
 
       - name: Archive logs
         if: ${{ always () }}
         run: |
-          docker cp cvmfs-dev:/tmp/cvmfs-test.log /tmp/cvmfs-test.log
+          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
+          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
 
       - name: Upload logs as artifact
         if: ${{ always () }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with: 
           name: CVMFS test logs
-          path: /tmp/cvmfs-test.log
+          path: |
+              /tmp/cvmfs-client-test.log
+              /tmp/cvmfs-server-test.log
 

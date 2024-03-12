@@ -23,7 +23,7 @@ sudo cvmfs_config setup
 
 4. Testing
 ```sh
-cd /home/sftnight/cvmfs/test
-CVMFS_TEST_USER=sftnight ./run.sh /tmp/cvmfs-test.log -s "quick" 
+cd /home/sftnight/cvmfs/test/common/container
+bash test.sh
 ```
 
