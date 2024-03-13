@@ -81,6 +81,13 @@ def verifyNoCvmfsRun(config, run_name):
       + 'It is impossible to mix non-cvmfs and cvmfs commands in the same run section',
       file=sys.stderr)
       exit(22)
+    
+    if (not "send-thread-id" in config["avail_cmds"][cmd].keys()):
+        config["avail_cmds"][cmd]["send-thread-id"] = False
+    elif (type(True) != type(config["avail_cmds"][cmd]["send-thread-id"])):
+      print('Section: commands "' + cmd + '": "send-thread-id" is not a boolean',
+            file=sys.stderr)
+      exit(22)
 
   # just to have the loops corretly running in start_benchmark.py
   config[run_name]["cvmfs_build_dirs"] = [ "dummy" ]
@@ -119,6 +126,13 @@ def verifyCvmfsRun(config, run_name):
         + 'Please double check!\n'
         + 'It is impossible to mix non-cvmfs and cvmfs commands in the same run section',
         file=sys.stderr)
+      exit(22)
+    
+    if (not "send-thread-id" in config["avail_cmds"][cmd].keys()):
+        config["avail_cmds"][cmd]["send-thread-id"] = False
+    elif (type(True) != type(config["avail_cmds"][cmd]["send-thread-id"])):
+      print('Section: "commands" "' + cmd + '": "send-thread-id" is not a boolean',
+            file=sys.stderr)
       exit(22)
 
   for client_config in config[run_name]["client_configs"]:
