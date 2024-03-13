@@ -106,7 +106,7 @@ if __name__ == "__main__":
           partial_cmd["time"] = time_command
 
           print("*** preloading proxy cache...")
-          benchmark_time.preloadProxy(partial_cmd)
+          benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
           print("    ...done")
 
           ## 4) loop over number of threads
@@ -167,7 +167,7 @@ if __name__ == "__main__":
             final_outname = benchmark_out.getOutnameWithNextNumber(
                                             config[run]["out_dirname"], outname)
 
-            print("Final outname:", final_outname)
+            print("Final outname:", config[run]["out_dirname"] + "/" + final_outname)
 
             ## 4b) write data
             benchmark_out.writeResults(config[run]["out_dirname"], final_outname,

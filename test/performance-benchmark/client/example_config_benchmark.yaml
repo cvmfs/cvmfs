@@ -45,6 +45,13 @@ avail_cmds:
   # cms:
   #   command: "./scripts/70-cms.sh"
   #   repos: [ "cms-ib.cern.ch" ]
+  random-walk:
+    command: "./scripts/80-randomread.sh"
+    repos: [ "sft.cern.ch"]
+    # optional: adds the <thread-id> (from 0 to num_threads - 1) as parameter to the command
+    # default: false
+    # e.g. for the 23rd thread call: ./scripts/80-randomread.sh 22
+    send-thread-id: true 
   sleep:
     command: "sleep 5"
     repos: []

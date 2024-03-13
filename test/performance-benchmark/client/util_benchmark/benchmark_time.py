@@ -48,7 +48,7 @@ def wipe_cache(use_cvmfs):
 
   wipe_kernel_cache(use_cvmfs)
 
-def preloadProxy(command):
+def preloadProxy(command, num_threads):
   if "70-cms" in command["command"]:
     if os.path.isdir("./workdir") == True:
       ele = subprocess.Popen("rm -rf ./workdir",
@@ -67,10 +67,30 @@ def preloadProxy(command):
     doit.communicate()
 
   else:
-    doit = subprocess.Popen(command["time"] + " " + command["command"],
-                            universal_newlines=True, shell=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    doit.communicate()
+    if command["send-thread-id"] == True:
+      doit = subprocess.Popen(command["time"] + " " + command["command"],
+                              universal_newlines=True, shell=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      doit.communicate()
+    else:
+      doit = []
+
+      for i in range(num_threads):
+        doit.append(subprocess.Popen(
+                        command["time"] + " " + command["command"] + " " + str(i),
+                        universal_newlines=True, shell=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+      
+      for ele in doit:
+        (stdout, stderr) = ele.communicate()
+        error_code = ele.wait()
+
+        if error_code != 0:
+          print("Failure while executing statement during preloadProxy",
+                command["command"], "error", error_code)
+          print(stderr)
+          print(stdout)
+
 
 
 def timeme(stmt="", setup="", arg_setup=None, cleanup='', final_cleanup='', repeat=1):
@@ -128,21 +148,33 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE))
   else:
     for i in range(num_threads):
-      doit.append(subprocess.Popen(command["time"] + " " + command["command"],
-                                   universal_newlines=True, shell=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+      if command["send-thread-id"] == True:
+        doit.append(subprocess.Popen(command["time"] + " " + command["command"] + " " + str(i),
+                                    universal_newlines=True, shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+      else:
+        doit.append(subprocess.Popen(command["time"] + " " + command["command"],
+                                    universal_newlines=True, shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE))
 
-  for ele in doit:
-    (stdout, stderr) = ele.communicate()
-    error_code = ele.wait()
+  while len(doit) > 0:
+    for ele in reversed(doit):
+      status = ele.poll()
 
-    if error_code != 0:
-      print("Failure while executing statement ", command["command"], "error", error_code)
-      print(stderr)
-      print(stdout)
+      if status != None:
+        (stdout, stderr) = ele.communicate()
+        error_code = ele.wait()
+        doit.remove(ele)
 
-    # /usr/bin/time returns in stderr
-    time_results_str.append(stderr)
+        if error_code != 0:
+          print("Failure while executing statement ", command["command"],
+                "error", error_code)
+          print(stderr)
+          print(stdout)
+
+        # /usr/bin/time returns in stderr
+        time_results_str.append(stderr)
+    time.sleep(1)
 
   for time_result in time_results_str:
     for line in time_result.splitlines():

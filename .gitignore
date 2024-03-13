@@ -32,9 +32,9 @@ externals_build
 externals_install
 
 
-test/performance-benchmark/data
-test/performance-benchmark/results
-test/performance-benchmark/util_*/__pycache__
+test/performance-benchmark/client/data
+test/performance-benchmark/client/results
+test/performance-benchmark/client/util_*/__pycache__
 CMakeFiles/3.22.1
 CMakeFiles/cmake.check_cache
 CMakeFiles/CMakeError.log
