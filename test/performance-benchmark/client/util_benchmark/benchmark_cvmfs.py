@@ -19,7 +19,7 @@ def clear_and_mount_direct(repos):
     if os.path.isdir("/cvmfs/" + repo) == False:
       os.makedirs("/cvmfs/" + repo)
 
-    doit = subprocess.Popen("sudo /usr/bin/cvmfs2 -o rw,system_mount,fsname=cvmfs2," 
+    doit = subprocess.Popen("sudo /usr/bin/cvmfs2 -o rw,system_mount,fsname=cvmfs2,"
                   + "allow_other,grab_mountpoint,uid=`id -u cvmfs`,gid=`id -g cvmfs`,"
                   + "libfuse=3 " + repo + " /cvmfs/" + repo,
                   universal_newlines=True, shell=True,

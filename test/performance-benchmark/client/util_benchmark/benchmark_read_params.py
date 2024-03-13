@@ -81,7 +81,7 @@ def verifyNoCvmfsRun(config, run_name):
       + 'It is impossible to mix non-cvmfs and cvmfs commands in the same run section',
       file=sys.stderr)
       exit(22)
-    
+
     if (not "send-thread-id" in config["avail_cmds"][cmd].keys()):
         config["avail_cmds"][cmd]["send-thread-id"] = False
     elif (type(True) != type(config["avail_cmds"][cmd]["send-thread-id"])):
@@ -127,7 +127,7 @@ def verifyCvmfsRun(config, run_name):
         + 'It is impossible to mix non-cvmfs and cvmfs commands in the same run section',
         file=sys.stderr)
       exit(22)
-    
+
     if (not "send-thread-id" in config["avail_cmds"][cmd].keys()):
         config["avail_cmds"][cmd]["send-thread-id"] = False
     elif (type(True) != type(config["avail_cmds"][cmd]["send-thread-id"])):
