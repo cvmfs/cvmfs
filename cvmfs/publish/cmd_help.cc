@@ -29,7 +29,7 @@ int CmdHelp::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "\nHelp for '%s'", cmd->GetName().c_str());
   for (unsigned i = 0; i < cmd->GetName().length() + 11; ++i)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "=");
-  LogCvmfs(kLogCvmfs, kLogStdout, "");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
   LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", cmd->GetDescription().c_str());
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Usage:");
@@ -45,7 +45,7 @@ int CmdHelp::Main(const Options &options) {
     for (unsigned i = 0; i < ex_lines.size() - 1; ++i) {
       LogCvmfs(kLogCvmfs, kLogStdout, "  [%d] %s", i + 1, ex_lines[i].c_str());
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "");
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
   }
 
   ParameterList params = cmd->GetParams();
@@ -74,7 +74,7 @@ int CmdHelp::Main(const Options &options) {
              params[i].description.c_str(),
              params[i].is_optional ? "" : " [mandatory]");
   }
-  LogCvmfs(kLogCvmfs, kLogStdout, "");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
 
   return 0;
 }

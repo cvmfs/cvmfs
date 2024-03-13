@@ -333,7 +333,7 @@ int main(int argc, char **argv) {
   }
   free(workers);
   if (!g_verbose)
-    LogCvmfs(kLogCvmfs, kLogStdout, "");
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
   LogCvmfs(kLogCvmfs, kLogStdout, "Verified %d files",
            atomic_read32(&g_num_files));
 

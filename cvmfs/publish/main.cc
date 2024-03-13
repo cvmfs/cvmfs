@@ -61,7 +61,7 @@ static void Usage(const std::string &progname,
     LogCvmfs(kLogCvmfs, kLogStdout, "   %s", commands[i]->GetBrief().c_str());
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
 }
 
 
