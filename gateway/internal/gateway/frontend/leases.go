@@ -29,6 +29,8 @@ func MakeLeasesHandler(services be.ActionController) httprouter.Handle {
 			}
 		case "DELETE":
 			handleCancelLease(services, token, w, h)
+		case "PATCH":
+			handleRefreshLease(services, token, w, h)
 		default:
 			gw.LogC(h.Context(), "http", gw.LogError).
 				Msgf("invalid HTTP method: %v", h.Method)
@@ -68,7 +70,7 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 	var reqMsg struct {
 		Path     string `json:"path"`
 		Version  string `json:"api_version"` // cvmfs_swissknife sends this field as a string
-		Hostname string `json:"hostname"` // May be empty for cvmfs < 2.11
+		Hostname string `json:"hostname"`    // May be empty for cvmfs < 2.11
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
 		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
@@ -81,9 +83,9 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 		return
 	}
 
-	hostname := h.RemoteAddr;  // fallback for cvmfs client < 2.11
+	hostname := h.RemoteAddr // fallback for cvmfs client < 2.11
 	if reqMsg.Hostname != "" {
-		hostname = reqMsg.Hostname;
+		hostname = reqMsg.Hostname
 	}
 
 	msg := make(map[string]interface{})
@@ -157,6 +159,27 @@ func handleCancelLease(services be.ActionController, token string, w http.Respon
 		msg["reason"] = err.Error()
 	} else {
 		msg["status"] = "ok"
+	}
+
+	replyJSON(ctx, w, msg)
+}
+
+func handleRefreshLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.Context()
+
+	msg := make(map[string]interface{})
+
+	if expiry, err := services.RefreshLease(ctx, token); err != nil {
+		msg["status"] = "error"
+		msg["reason"] = err.Error()
+	} else {
+		msg["status"] = "ok"
+		msg["expiry"] = expiry
 	}
 
 	replyJSON(ctx, w, msg)
