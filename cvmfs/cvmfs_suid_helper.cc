@@ -104,6 +104,8 @@ static void Remount(const string &path, const RemountType how) {
 
 static void Mount(const string &path) {
   platform_stat64 info;
+#if ENABLE_SYSTEMD_MOUNT==1
+
   int retval = platform_stat("/bin/systemctl", &info);
   if (retval == 0) {
     string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
@@ -126,6 +128,9 @@ static void Mount(const string &path) {
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL, NULL);
   }
+#else
+    ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+#endif
 }
 
 static void Umount(const string &path) {
