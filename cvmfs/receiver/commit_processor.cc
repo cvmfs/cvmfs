@@ -149,11 +149,11 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   shash::Any manifest_base_hash;
-  UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
+  UniquePtr<manifest::Manifest> manifest_tgt(server_tool->FetchRemoteManifest(
       params.stratum0, repo_name, manifest_base_hash));
 
   // Current catalog from the gateway machine
-  if (!manifest.IsValid()) {
+  if (!manifest_tgt.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;
@@ -162,7 +162,7 @@ CommitProcessor::Result CommitProcessor::Process(
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, target root hash: %s",
            lease_path.c_str(),
-           manifest->catalog_hash().ToString(false).c_str());
+           manifest_tgt->catalog_hash().ToString(false).c_str());
 
 
   std::string cache_dir_;
@@ -187,7 +187,7 @@ CommitProcessor::Result CommitProcessor::Process(
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest.weak_ref(),
+                 server_tool->download_manager(), manifest_tgt.weak_ref(),
                  statistics_, cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -247,32 +247,13 @@ CommitProcessor::Result CommitProcessor::Process(
                lease_path.c_str());
   }
 
-  {
-    UniquePtr<ServerTool> server_tool(new ServerTool());
-
-    if (!server_tool->InitDownloadManager(true, params.proxy)) {
-      LogCvmfs(
-          kLogReceiver, kLogSyslogErr,
-          "CommitProcessor - error: Could not initialize the download manager");
-      return kError;
-    }
-
-    if (!server_tool->InitSignatureManager(public_key)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - error: Could not initialize the signature "
-               "manager");
-      return kError;
-    }
-
-    shash::Any manifest_base_hash;
-    UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
-        params.stratum0, repo_name, manifest_base_hash));
-
-    LogCvmfs(kLogReceiver, kLogSyslog,
-             "CommitProcessor - lease_path: %s, new root hash: %s",
-             lease_path.c_str(),
-             manifest->catalog_hash().ToString(false).c_str());
-  }
+  UniquePtr<manifest::Manifest> manifest_new(
+    manifest::Manifest::LoadFile(new_manifest_path));
+  assert(manifest_new.IsValid());
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, new root hash: %s",
+           lease_path.c_str(),
+           manifest_new->catalog_hash().ToString(false).c_str());
 
   // Ensure CVMFS_ROOT_HASH is not set in
   // /var/spool/cvmfs/<REPO_NAME>/client.local
