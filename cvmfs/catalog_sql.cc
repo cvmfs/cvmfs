@@ -611,10 +611,11 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
     BindText(symlink_idx, entry.symlink_.GetChars(),
                           entry.symlink_.GetLength());
-  if (entry.HasMtimeNs())
+  if (entry.HasMtimeNs()) {
     result &= BindInt(mtimens_idx, entry.mtime_ns_);
-  else
+  } else {
     result &= BindNull(mtimens_idx);
+  }
 
   return result;
 }
@@ -888,10 +889,11 @@ bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
     BindText(6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
     BindInt64(7, entry.uid_) &&
     BindInt64(8, entry.gid_);
-  if (entry.HasMtimeNs())
+  if (entry.HasMtimeNs()) {
     result &= BindInt(10, entry.mtime_ns_);
-  else
+  } else {
     result &= BindNull(10);
+  }
   return result;
 }
 
