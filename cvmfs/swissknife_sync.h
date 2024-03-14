@@ -74,7 +74,6 @@ struct SyncParameters {
   std::string spooler_definition;
   std::string union_fs_type;
   std::string public_keys;
-  std::string trusted_certs;
   std::string authz_file;
   std::string tar_file;
   std::string base_directory;
@@ -273,7 +272,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('0', "number of upload tasks"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
-    r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(

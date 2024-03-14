@@ -186,7 +186,6 @@ cvmfs_server_publish() {
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
         -u /cvmfs/$name                                \
         -s ${scratch_dir}                              \
@@ -198,7 +197,6 @@ cvmfs_server_publish() {
         -o $manifest                                   \
         -e $hash_algorithm                             \
         -Z $compression_alg                            \
-        -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \

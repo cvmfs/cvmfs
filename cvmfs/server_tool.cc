@@ -42,7 +42,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
 }
 
 bool ServerTool::InitVerifyingSignatureManager(
-    const std::string &pubkey_path, const std::string &trusted_certs) {
+    const std::string &pubkey_path, const std::string &/*trusted_certs*/) {
   if (signature_manager_.IsValid()) {
     return true;
   }
@@ -54,12 +54,6 @@ bool ServerTool::InitVerifyingSignatureManager(
   if (!signature_manager_->LoadPublicRsaKeys(pubkey_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repo key '%s'",
              pubkey_path.c_str());
-    return false;
-  }
-
-  if (!trusted_certs.empty() &&
-      !signature_manager_->LoadTrustedCaCrl(trusted_certs)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
     return false;
   }
 

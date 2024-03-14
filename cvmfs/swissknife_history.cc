@@ -30,7 +30,6 @@ static void InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Mandatory('w', "repository directory / url"));
   r->push_back(Parameter::Mandatory('t', "temporary scratch directory"));
   r->push_back(Parameter::Optional('p', "public key of the repository"));
-  r->push_back(Parameter::Optional('z', "trusted certificates"));
   r->push_back(Parameter::Optional('f', "fully qualified repository name"));
   r->push_back(Parameter::Optional('r', "spooler definition string"));
   r->push_back(Parameter::Optional('m', "(unsigned) manifest file to edit"));
@@ -60,9 +59,6 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   const string pubkey_path = (args.find('p') == args.end())
                                  ? ""
                                  : MakeCanonicalPath(*args.find('p')->second);
-  const string trusted_certs = (args.find('z') == args.end())
-                                   ? ""
-                                   : MakeCanonicalPath(*args.find('z')->second);
   const shash::Any base_hash =
       (args.find('b') == args.end())
           ? shash::Any()
@@ -129,7 +125,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // initialize the (swissknife global) signature manager (if possible)
   if (!pubkey_path.empty() &&
-      !this->InitVerifyingSignatureManager(pubkey_path, trusted_certs)) {
+      !this->InitVerifyingSignatureManager(pubkey_path)) {
     return NULL;
   }
 

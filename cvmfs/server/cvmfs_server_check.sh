@@ -91,8 +91,7 @@ __do_check() {
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_swissknife_proxy)           \
                      $(get_follow_http_redirects_flag) \
-                     $with_reflog                      \
-                     -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
+                     $with_reflog"
   $user_shell "$check_cmd"
 }
 

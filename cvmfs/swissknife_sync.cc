@@ -659,10 +659,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
   }
 
-  if (args.find('C') != args.end()) {
-    params.trusted_certs = *args.find('C')->second;
-  }
-
   if (args.find('E') != args.end()) params.enforce_limits = true;
   if (args.find('Q') != args.end()) {
     params.nested_kcatalog_limit = String2Uint64(*args.find('Q')->second);
@@ -760,8 +756,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  if (!InitVerifyingSignatureManager(params.public_keys,
-                                     params.trusted_certs)) {
+  if (!InitVerifyingSignatureManager(params.public_keys, "")) {
     return 3;
   }
 

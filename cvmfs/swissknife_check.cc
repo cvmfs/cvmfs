@@ -934,7 +934,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string tag_name;
   string subtree_path = "";
   string pubkey_path = "";
-  string trusted_certs = "";
   string repo_name = "";
   string reflog_chksum_path = "";
 
@@ -959,8 +958,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     pubkey_path = *args.find('k')->second;
   if (DirectoryExists(pubkey_path))
     pubkey_path = JoinStrings(FindFilesBySuffix(pubkey_path, ".pub"), ":");
-  if (args.find('z') != args.end())
-    trusted_certs = *args.find('z')->second;
   if (args.find('N') != args.end())
     repo_name = *args.find('N')->second;
 
@@ -987,7 +984,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    if (!this->InitVerifyingSignatureManager(pubkey_path, trusted_certs)) {
+    if (!this->InitVerifyingSignatureManager(pubkey_path, "")) {
       return 1;
     }
   }
