@@ -854,7 +854,7 @@ void SyncDiffReporter::OnModify(const std::string &path,
 void SyncDiffReporter::CommitReport() {
   if (print_action_ == kPrintDots) {
     if (changed_items_ >= processing_dot_interval_) {
-      LogCvmfs(kLogPublish, kLogStdout, "");
+      LogCvmfs(kLogPublish, kLogStdout | kLogNoLinebreak, "\n");
     }
   }
 }

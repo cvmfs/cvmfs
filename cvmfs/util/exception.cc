@@ -44,7 +44,7 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
   (void) mask;
   throw ECvmfsException(msg);
 #else
-  LogCvmfs(source, mask, msg);
+  LogCvmfs(source, mask, "%s", msg);
   abort();
 #endif
 }
