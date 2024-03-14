@@ -149,7 +149,8 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   shash::Any manifest_base_hash;
-  UniquePtr<manifest::Manifest> manifest_tgt(server_tool->FetchRemoteManifest(
+  const UniquePtr<manifest::Manifest> manifest_tgt(
+    server_tool->FetchRemoteManifest(
       params.stratum0, repo_name, manifest_base_hash));
 
   // Current catalog from the gateway machine
@@ -247,7 +248,7 @@ CommitProcessor::Result CommitProcessor::Process(
                lease_path.c_str());
   }
 
-  UniquePtr<manifest::Manifest> manifest_new(
+  const UniquePtr<manifest::Manifest> manifest_new(
     manifest::Manifest::LoadFile(new_manifest_path));
   assert(manifest_new.IsValid());
   LogCvmfs(kLogReceiver, kLogSyslog,

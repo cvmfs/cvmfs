@@ -68,7 +68,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
                                download_manager(),
                                signature_manager());
     if (reflog_hash.IsNull()) {
-      manifest::Manifest *manifest;
+      manifest::Manifest *manifest = NULL;
       ObjectFetcherFailures::Failures failure;
       switch (failure = object_fetcher.FetchManifest(&manifest)) {
         case ObjectFetcherFailures::kFailOk:
@@ -79,6 +79,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
                     Code2Ascii(failure));
           return 1;
       }
+      delete manifest;
     }
     success = Run(&object_fetcher, repo_name, output_path, reflog_hash);
   } else {
