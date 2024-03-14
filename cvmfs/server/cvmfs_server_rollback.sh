@@ -108,6 +108,7 @@ cvmfs_server_rollback() {
   fi
 
   # do it!
+  rollback_before_hook $name
   echo "Rolling back repository (leaving behind $base_hash)"
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for rollback"
@@ -120,6 +121,7 @@ cvmfs_server_rollback() {
 
   echo "Flushing file system buffers"
   syncfs
+  rollback_after_hook $name
 }
 
 
