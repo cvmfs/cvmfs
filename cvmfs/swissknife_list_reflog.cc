@@ -55,7 +55,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
   const bool follow_redirects = false;
   const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
   if (!this->InitDownloadManager(follow_redirects, proxy) ||
-      !this->InitVerifyingSignatureManager(repo_keys)) {
+      !this->InitSignatureManager(repo_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 1;
   }
