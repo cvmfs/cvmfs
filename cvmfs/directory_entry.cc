@@ -23,7 +23,7 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
   if (mode() != other.mode()) {
     result |= Difference::kMode;
   }
-  if (mtime() != other.mtime()) {
+  if ((mtime() != other.mtime()) || (mtime_ns() != other.mtime_ns())) {
     result |= Difference::kMtime;
   }
   if (symlink() != other.symlink()) {

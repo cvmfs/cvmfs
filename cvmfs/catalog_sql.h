@@ -265,6 +265,7 @@ class SqlDirentWrite : public SqlDirent {
                         const int size_idx,
                         const int mode_idx,
                         const int mtime_idx,
+                        const int mtimens_idx,
                         const int flags_idx,
                         const int name_idx,
                         const int symlink_idx,

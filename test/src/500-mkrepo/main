@@ -72,6 +72,12 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
+  echo "checking nanosecond timestamps"
+  echo "entry information of $repo_dir/file:"
+  stat $repo_dir/file || return 40
+  local mtime_ns=$(stat -c%y $repo_dir/file | cut -d. -f2 | awk '{print $1}')
+  [ $mtime_ns -ne 0 ] || return 41
+
   echo "*** Maximum repository name with 60 characters (CVM-1173)"
   CVMFS_TEST500_LONG_REPONAME=testrepo.osg-software-2580-el7-cvmfs-stratum-0.novalocal.crt
   trap cleanup TERM HUP INT EXIT
