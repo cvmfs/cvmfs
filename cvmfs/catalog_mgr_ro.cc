@@ -70,7 +70,7 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
   if (!retval) {
     PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
   }
-  fclose(fcatalog);
+  (void) fclose(fcatalog);
 
   return tmp_path;
 }
