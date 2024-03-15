@@ -1252,7 +1252,7 @@ bool WritableCatalogManager::CopyCatalogToLocalCache(
     return false;
   }
   CopyPath2File(result.local_path.c_str(), fcatalog);
-  fclose(fcatalog);
+  (void) fclose(fcatalog);
 
   if (rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str()) != 0) {
     LogCvmfs(kLogCatalog, kLogDebug | kLogStderr,
