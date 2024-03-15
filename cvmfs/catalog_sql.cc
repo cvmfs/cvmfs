@@ -608,9 +608,10 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindInt64(gid_idx, entry.gid_) &&
     BindInt64(mtime_idx, entry.mtime_) &&
     BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
-    BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
+    BindText(name_idx, entry.name_.GetChars(),
+                       static_cast<int>(entry.name_.GetLength())) &&
     BindText(symlink_idx, entry.symlink_.GetChars(),
-                          entry.symlink_.GetLength());
+                          static_cast<int>(entry.symlink_.GetLength()));
   if (entry.HasMtimeNs()) {
     result &= BindInt(mtimens_idx, entry.mtime_ns_);
   } else {

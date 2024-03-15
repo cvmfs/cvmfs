@@ -150,7 +150,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.gid_ = this->tar_stat_.st_gid;
   dirent.size_ = this->tar_stat_.st_size;
   dirent.mtime_ = this->tar_stat_.st_mtime;
-  dirent.mtime_ns_ = this->tar_stat_.st_mtim.tv_nsec;
+  dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
