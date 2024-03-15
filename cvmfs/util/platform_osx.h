@@ -314,8 +314,7 @@ inline uint64_t platform_memsize() {
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-static int prctl(int option, uint64_t arg2, uint64_t arg3,
-                uint64_t arg4, uint64_t arg5) { return 0; }
+inline int prctl(int, uint64_t, uint64_t, uint64_t, uint64_t) { return 0; }
 #define PR_SET_DUMPABLE 0
 
 #endif  // CVMFS_UTIL_PLATFORM_OSX_H_
