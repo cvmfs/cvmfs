@@ -756,7 +756,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  if (!InitVerifyingSignatureManager(params.public_keys, "")) {
+  if (!InitVerifyingSignatureManager(params.public_keys)) {
     return 3;
   }
 

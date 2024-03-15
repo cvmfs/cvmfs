@@ -41,8 +41,7 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   return true;
 }
 
-bool ServerTool::InitVerifyingSignatureManager(
-    const std::string &pubkey_path, const std::string &/*trusted_certs*/) {
+bool ServerTool::InitVerifyingSignatureManager(const std::string &pubkey_path) {
   if (signature_manager_.IsValid()) {
     return true;
   }
