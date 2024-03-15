@@ -21,7 +21,7 @@ SimpleCatalogManager::SimpleCatalogManager(
                        download::DownloadManager  *download_manager,
                        perf::Statistics           *statistics,
                        const bool                  manage_catalog_files,
-                       const std::string           dir_cache,
+                       const std::string           &dir_cache,
                        const bool                  copy_to_tmp_dir)
                      : AbstractCatalogManager<Catalog>(statistics)
                      , local_cache_dir_(dir_cache)
