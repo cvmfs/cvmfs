@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DUCC - Images</title>
+</head>
+<body>
+    <h1>Images - CvmFS DUCC</h1>
+    <table border="1">
+        <tr>
+            <th>Registry</th>
+            <th>Repository</th>
+            <th>Tag</th>
+        </tr>
+    {{range .Images}}
+	<tr>
+        <td>{{.RegistryScheme}}://{{.GetSimpleName}}</td>
+        <td>{{.Repository}}</td>
+        <td>{{.Tag}}</td>
+	</tr>
+    {{end}}
+    </table>
+</body>

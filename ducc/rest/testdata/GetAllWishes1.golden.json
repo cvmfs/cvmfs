@@ -1,0 +1,137 @@
+{
+    "ResponseCode": 200,
+    "Headers": {
+        "Content-Type": [
+            "application/json"
+        ]
+    },
+    "Body": [
+        {
+            "id": "3b971878-56d7-4cf3-8efc-cea93cdfdecc",
+            "cvmfsRepository": "cvmfs",
+            "inputRegistryScheme": "https",
+            "inputRegistryHostname": "registry",
+            "inputRepository": "repository",
+            "inputDigest": "",
+            "inputTag": "tag",
+            "inputTagWildcard": false,
+            "outputURL": "",
+            "source": "source",
+            "createLayers": {
+                "value": true,
+                "isDefault": true
+            },
+            "createThinImage": {
+                "value": false,
+                "isDefault": true
+            },
+            "createPodman": {
+                "value": true,
+                "isDefault": true
+            },
+            "createFlat": {
+                "value": true,
+                "isDefault": true
+            },
+            "webhookEnabled": {
+                "value": false,
+                "isDefault": true
+            },
+            "fullSyncIntervalSec": 10,
+            "lastConfigUpdate": "",
+            "lastFullSync": "",
+            "syncedImages": [
+                {
+                    "id": "b0877660-18bb-4c5c-9af5-a8cd886ebded",
+                    "url": "https://registry/repository:tag"
+                }
+            ]
+        },
+        {
+            "id": "9663d5a2-85c0-419a-8d05-677051ee4d8c",
+            "cvmfsRepository": "cvmfs",
+            "inputRegistryScheme": "https",
+            "inputRegistryHostname": "registry",
+            "inputRepository": "repository2",
+            "inputDigest": "",
+            "inputTag": "*",
+            "inputTagWildcard": true,
+            "outputURL": "",
+            "source": "source",
+            "createLayers": {
+                "value": true,
+                "isDefault": true
+            },
+            "createThinImage": {
+                "value": false,
+                "isDefault": true
+            },
+            "createPodman": {
+                "value": true,
+                "isDefault": true
+            },
+            "createFlat": {
+                "value": true,
+                "isDefault": true
+            },
+            "webhookEnabled": {
+                "value": false,
+                "isDefault": true
+            },
+            "fullSyncIntervalSec": 10,
+            "lastConfigUpdate": "",
+            "lastFullSync": "",
+            "syncedImages": [
+                {
+                    "id": "af0d2f66-638a-44df-bf10-85d984a36385",
+                    "url": "https://registry/repository2:latest"
+                },
+                {
+                    "id": "a01ff3c1-645e-44d8-ab44-38eccbc80957",
+                    "url": "https://registry/repository2:debug"
+                }
+            ]
+        },
+        {
+            "id": "b7748fed-c394-408d-a36a-ac0d74972b6f",
+            "cvmfsRepository": "cvmfs",
+            "inputRegistryScheme": "https",
+            "inputRegistryHostname": "registry",
+            "inputRepository": "repository",
+            "inputDigest": "",
+            "inputTag": "tag",
+            "inputTagWildcard": false,
+            "outputURL": "",
+            "source": "source2",
+            "createLayers": {
+                "value": true,
+                "isDefault": true
+            },
+            "createThinImage": {
+                "value": false,
+                "isDefault": true
+            },
+            "createPodman": {
+                "value": true,
+                "isDefault": true
+            },
+            "createFlat": {
+                "value": true,
+                "isDefault": true
+            },
+            "webhookEnabled": {
+                "value": false,
+                "isDefault": true
+            },
+            "fullSyncIntervalSec": 10,
+            "lastConfigUpdate": "",
+            "lastFullSync": "",
+            "syncedImages": [
+                {
+                    "id": "b0877660-18bb-4c5c-9af5-a8cd886ebded",
+                    "url": "https://registry/repository:tag"
+                }
+            ]
+        }
+    ]
+}

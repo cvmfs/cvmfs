@@ -1,14 +1,21 @@
 package cmd
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"os"
+	"sync"
+	"sync/atomic"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/cvmfs/ducc/config"
 	"github.com/cvmfs/ducc/cvmfs"
-	"github.com/cvmfs/ducc/lib"
-	l "github.com/cvmfs/ducc/log"
+	"github.com/cvmfs/ducc/daemon"
+	"github.com/cvmfs/ducc/db"
+	"github.com/cvmfs/ducc/registry"
+	"github.com/cvmfs/ducc/unpacker"
 )
 
 var (
@@ -28,21 +35,41 @@ func init() {
 }
 
 var convertSingleImageCmd = &cobra.Command{
-	Use:   "convert-single-image [image to convert] [cvmfs repository]",
-	Short: "Convert a single image",
-	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		AliveMessage()
+	Use:        "convert-single-image [image to convert] [cvmfs repository]",
+	Short:      "Convert a single image",
+	Args:       cobra.ExactArgs(2),
+	Deprecated: "please use 'wish add --standalone' instead. ",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Init Registries
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		defer cancelFunc()
+		registry.InitRegistries(ctx, nil, nil)
+
+		fmt.Printf("Converting image %s\n", args[0])
 
 		inputImage := args[0]
 		cvmfsRepo := args[1]
 
-		if skipLayers == true {
-			l.Log().Info("Skipping the creation of the thin image and podman store since provided --skip-layers")
+		outputOptions := db.WishOutputOptions{
+			CreateLayers:    db.ValueWithDefault[bool]{Value: config.DEFAULT_CREATELAYERS, IsDefault: true},
+			CreateFlat:      db.ValueWithDefault[bool]{Value: config.DEFAULT_CREATEFLAT, IsDefault: true},
+			CreatePodman:    db.ValueWithDefault[bool]{Value: config.DEFAULT_CREATEPODMAN, IsDefault: true},
+			CreateThinImage: db.ValueWithDefault[bool]{Value: config.DEFAULT_CREATETHINIMAGE, IsDefault: true},
+		}
+
+		if skipLayers {
+			outputOptions.CreateLayers = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
 			skipThinImage = true
 			skipPodman = true
 		}
-		if thinImageName == "" {
+		if skipFlat {
+			outputOptions.CreateFlat = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
+		}
+		if skipPodman {
+			outputOptions.CreatePodman = db.ValueWithDefault[bool]{Value: false, IsDefault: false}
+		}
+
+		/*if thinImageName == "" {
 			l.Log().Info("Skipping the creation of the thin image since did not provided a name for the thin image using the --thin-image-name flag")
 			skipThinImage = true
 			// we need a thinImageName to parse the wish
@@ -55,78 +82,123 @@ var convertSingleImageCmd = &cobra.Command{
 				l.LogE(err).Warning("Asked to create the docker thin image but did not provide the password for the registry, we cannot push the thin image to the registry, hence we won't create it. We will unpack the layers.")
 				skipThinImage = true
 			}
+		}*/
+
+		if exists, err := cvmfs.RepositoryExists(cvmfsRepo); err != nil {
+			return fmt.Errorf("error in checking if the repository exists: %w", err)
+		} else if !exists {
+			return fmt.Errorf("the repository \"%s\" does not exist")
 		}
 
-		if !cvmfs.RepositoryExists(cvmfsRepo) {
-			l.Log().Error("The repository does not seems to exists.")
-			os.Exit(RepoNotExistsError)
-		}
-
-		input, err := lib.ParseImage(inputImage)
-		wish, err := lib.CreateWish(input, thinImageName, cvmfsRepo, username, username)
+		parsedUrl, err := daemon.ParseImageURL(inputImage)
 		if err != nil {
-			l.LogE(err).Error("Error in creating the wish to convert")
+			fmt.Printf("\"%s\" is not a valid image identifier\n", inputImage)
+		}
+		wish := db.Wish{
+			Identifier: db.WishIdentifier{
+				Wishlist:              "cli",
+				CvmfsRepository:       cvmfsRepo,
+				InputTag:              parsedUrl.Tag,
+				InputTagWildcard:      parsedUrl.TagWildcard,
+				InputDigest:           parsedUrl.Digest,
+				InputRepository:       parsedUrl.Repository,
+				InputRegistryScheme:   parsedUrl.Scheme,
+				InputRegistryHostname: parsedUrl.Registry,
+			},
+		}
+		images, err := registry.ExpandWildcard(wish)
+		if err != nil {
+			fmt.Printf("Error in expanding the wildcard string: %s\n", err)
 			os.Exit(1)
 		}
-		fields := log.Fields{
-			"input image":    wish.InputName,
-			"repository":     wish.CvmfsRepo,
-			"total attempts": attempts}
 
-		if !skipFlat {
-			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishFlat(wish)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Error("Error in converting singularity image")
-				} else {
-					log.Info("Successfully created the singularity image")
-					break
-				}
+		if wish.Identifier.InputTagWildcard {
+			if len(images) == 0 {
+				fmt.Printf("The wildcard identifier \"%s\" does not match any image\n", inputImage)
+				os.Exit(1)
 			}
+			fmt.Printf("The wildcard identifier \"%s\" matches %d image(s):\n", inputImage, len(images))
+			for _, image := range images {
+				fmt.Printf("\t- %s\n", image.GetSimpleName())
+			}
+		} else {
+			fmt.Printf("Converting image %s\n", images[0].GetSimpleName())
+		}
+		fmt.Println("")
+
+		// We need an in-memory database to store the tasks
+		inMemDb, err := sql.Open("sqlite3", ":memory:")
+		if err != nil {
+			fmt.Printf("Error in creating the in-memory database: %s\n", err)
+			os.Exit(1)
+		}
+		db.Init(inMemDb)
+
+		totalCount := int32(len(images))
+		successCount := int32(0)
+		failedCount := int32(0)
+
+		// Update each image
+		wg := sync.WaitGroup{}
+		for _, image := range images {
+			image := image
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				task, err := registry.FetchManifestTask(nil, image)
+				if err != nil {
+					fmt.Printf("Error in creating the task for image %s: %s\n", image.GetSimpleName(), err)
+					os.Exit(1)
+				}
+				task.Start(nil)
+				result := task.WaitUntilDone()
+				if result != db.TASK_RESULT_SUCCESS {
+					fmt.Printf("Error in fetching the manifest for image %s: %s\n", image.GetSimpleName(), result)
+					atomic.AddInt32(&failedCount, 1)
+					return
+				}
+				artifact, err := task.GetArtifact()
+				if err != nil {
+					fmt.Printf("Error in fetching the manifest for image %s: %s\n", image.GetSimpleName(), err)
+					atomic.AddInt32(&failedCount, 1)
+					return
+				}
+				manifest := artifact.(registry.ManifestWithBytesAndDigest)
+
+				// Create the outputs
+				updateTask, err := unpacker.UpdateImageInRepoTask(image, manifest, outputOptions, cvmfsRepo)
+				if err != nil {
+					fmt.Printf("Error in creating the task for image %s: %s\n", image.GetSimpleName(), err)
+					atomic.AddInt32(&failedCount, 1)
+					return
+				}
+				updateTask.Start(nil)
+				result = updateTask.WaitUntilDone()
+				if result != db.TASK_RESULT_SUCCESS {
+					fmt.Printf("Error in updating the image %s: %s\n", image.GetSimpleName(), result)
+					atomic.AddInt32(&failedCount, 1)
+					return
+				}
+				atomic.AddInt32(&successCount, 1)
+				remaining := totalCount - atomic.LoadInt32(&successCount) - atomic.LoadInt32(&failedCount)
+				if remaining < 0 {
+					fmt.Printf("%d/%d image(s) remaining\n", remaining, totalCount)
+				}
+			}()
 		}
 
-		if !skipLayers {
-			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Error("Error in converting wish (layers)")
-				} else {
-					log.Info("Successfully converted the layers")
-					break
-				}
-			}
+		wg.Wait()
+		fmt.Printf("Operation complete!\n")
+		if successCount > 0 {
+			fmt.Printf("Successfully converted %d image(s)\n", successCount)
+		}
+		if failedCount > 0 {
+			fmt.Printf("Failed to convert %d image(s)\n", failedCount)
 		}
 
-		if !skipThinImage {
-			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishDocker(wish)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Error("Error in converting wish (docker)")
-				} else {
-					log.Info("Successfully converted wish (docker)")
-					break
-				}
-			}
+		if failedCount > 0 {
+			os.Exit(1)
 		}
-
-		if !skipPodman {
-			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishPodman(wish, convertAgain)
-				log := l.LogE(err).WithFields(fields).
-					WithFields(log.Fields{"attempts number": i})
-				if err != nil {
-					log.Error("Error in converting wish (podman)")
-				} else {
-					log.Info("Successfully converted with (podman)")
-					break
-				}
-			}
-		}
+		return nil
 	},
 }

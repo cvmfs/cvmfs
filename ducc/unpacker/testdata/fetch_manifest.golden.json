@@ -1,0 +1,30 @@
+{
+  "Manifest": {
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "digest": "sha256:b5b2b2c507a0944348e0303114d8d93aaaa081732b86451d9bce1f432a537bc7",
+      "size": 7023
+    },
+    "layers": [
+      {
+        "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+        "digest": "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
+        "size": 32654
+      },
+      {
+        "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+        "digest": "sha256:3c3a4604a545cdc127456d94e421cd355bca5b528f4a9c1905b15da2eb4a4c6b",
+        "size": 16724
+      },
+      {
+        "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+        "digest": "sha256:ec4b8955958665577945c89419d1af06b5f7636b4ac3da7f12184802ad867736",
+        "size": 73109
+      }
+    ]
+  },
+  "ManifestBytes": "ewogICJzY2hlbWFWZXJzaW9uIjogMiwKICAibWVkaWFUeXBlIjogImFwcGxpY2F0aW9uL3ZuZC5kb2NrZXIuZGlzdHJpYnV0aW9uLm1hbmlmZXN0LnYyK2pzb24iLAogICJjb25maWciOiB7CiAgICAgICJtZWRpYVR5cGUiOiAiYXBwbGljYXRpb24vdm5kLmRvY2tlci5jb250YWluZXIuaW1hZ2UudjEranNvbiIsCiAgICAgICJkaWdlc3QiOiAic2hhMjU2OmI1YjJiMmM1MDdhMDk0NDM0OGUwMzAzMTE0ZDhkOTNhYWFhMDgxNzMyYjg2NDUxZDliY2UxZjQzMmE1MzdiYzciLAogICAgICAic2l6ZSI6IDcwMjMKICB9LAogICJsYXllcnMiOiBbCiAgICAgIHsKICAgICAgICAgICJtZWRpYVR5cGUiOiAiYXBwbGljYXRpb24vdm5kLmRvY2tlci5pbWFnZS5yb290ZnMuZGlmZi50YXIuZ3ppcCIsCiAgICAgICAgICAiZGlnZXN0IjogInNoYTI1NjplNjkyNDE4ZTRjYmFmOTBjYTY5ZDA1YTY2NDAzNzQ3YmFhMzNlZTA4ODA2NjUwYjUxZmFiODE1YWQ3ZmMzMzFmIiwKICAgICAgICAgICJzaXplIjogMzI2NTQKICAgICAgfSwKICAgICAgewogICAgICAgICAgIm1lZGlhVHlwZSI6ICJhcHBsaWNhdGlvbi92bmQuZG9ja2VyLmltYWdlLnJvb3Rmcy5kaWZmLnRhci5nemlwIiwKICAgICAgICAgICJkaWdlc3QiOiAic2hhMjU2OjNjM2E0NjA0YTU0NWNkYzEyNzQ1NmQ5NGU0MjFjZDM1NWJjYTViNTI4ZjRhOWMxOTA1YjE1ZGEyZWI0YTRjNmIiLAogICAgICAgICAgInNpemUiOiAxNjcyNAogICAgICB9LAogICAgICB7CiAgICAgICAgICAibWVkaWFUeXBlIjogImFwcGxpY2F0aW9uL3ZuZC5kb2NrZXIuaW1hZ2Uucm9vdGZzLmRpZmYudGFyLmd6aXAiLAogICAgICAgICAgImRpZ2VzdCI6ICJzaGEyNTY6ZWM0Yjg5NTU5NTg2NjU1Nzc5NDVjODk0MTlkMWFmMDZiNWY3NjM2YjRhYzNkYTdmMTIxODQ4MDJhZDg2NzczNiIsCiAgICAgICAgICAic2l6ZSI6IDczMTA5CiAgICAgIH0KICBdCn0=",
+  "ManifestDigest": "sha256:770e0ec654172d397388955594a6ebdd356f6e6acc35d8a80383d3e89a921f1a"
+}

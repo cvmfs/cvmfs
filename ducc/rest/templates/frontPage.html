@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CVMFS DUCC</title>
+</head>
+<body>
+    <h1>DUCC - Daemon for Unpacking Container images into CVMFS</h1>
+    <p>Keeping {{.NumActiveImages}} container <a href="/images"> {{if eq .NumActiveImages 1}}image{{else}}images{{end}}</a> up to date for {{.NumCvmfsRepos}} CVMFS {{if eq .NumCvmfsRepos 1}}repository{{else}}repositories{{end}}.</p>
+    <table border="1">
+        <tr>
+            <th>Short ID</th>
+            <th>Image</th>
+            <th>Activity</th>
+            <th>Result</th>
+            <th>Last Run</th>
+        </tr>
+    
+    {{range .ImagesWithStatus}}
+        <tr>
+            <td>{{.ShortID}}</td>
+            <td>{{.ImageName}}</a></td>
+            <td>{{.InProgress}}</td>
+            <td>{{.Result}}</td>
+            <td><a href="/tasks/{{.LastTaskID}}">[->]</a></td>
+        </tr>
+    {{end}}
+    </table>
+    <p>Currently running {{.NumRunningOperations}} <a href="/operations">{{if eq .NumRunningOperations 1}}operation{{else}}operations{{end}}</a>, and {{.NumPendingTriggers}} <a href="/triggers">{{if eq .NumPendingTriggers 1}}trigger{{else}}triggers{{end}}</a> remaining to process.</p>
+</body>
