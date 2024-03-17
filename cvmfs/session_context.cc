@@ -19,7 +19,7 @@
 
 namespace {
 // Maximum number of jobs during a session. No limit, for practical
-// purposes. Note that we use uint32_t so that the FifoChannel code works
+// purposes. Note that we use uint32_t so that the Tube code works
 // correctly with this limit on 32bit systems.
 const uint32_t kMaxNumJobs = std::numeric_limits<uint32_t>::max();
 }
@@ -74,7 +74,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(kMaxNumJobs, kMaxNumJobs),
+    : upload_results_(kMaxNumJobs),
       api_url_(),
       session_token_(),
       key_id_(),
@@ -118,8 +118,7 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   bytes_committed_ = 0u;
   bytes_dispatched_ = 0u;
 
-  // Ensure that the upload job and result queues are empty
-  upload_results_.Drop();
+  assert(upload_results_.IsEmpty());
 
   // Ensure that there are not open object packs
   if (current_pack_) {
@@ -156,7 +155,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
 
   bool results = true;
   while (!upload_results_.IsEmpty()) {
-    Future<bool>* future = upload_results_.Dequeue();
+    Future<bool>* future = upload_results_.PopBack();
     results = future->Get() && results;
     delete future;
   }
@@ -253,7 +252,7 @@ void SessionContextBase::Dispatch() {
   }
 
   bytes_dispatched_ += current_pack_->size();
-  upload_results_.Enqueue(DispatchObjectPack(current_pack_));
+  upload_results_.EnqueueFront(DispatchObjectPack(current_pack_));
 }
 
 SessionContext::SessionContext()
@@ -265,8 +264,7 @@ SessionContext::SessionContext()
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
-  upload_jobs_ = new FifoChannel<UploadJob*>(max_queue_size, max_queue_size);
-  upload_jobs_->Drop();
+  upload_jobs_ = new Tube<UploadJob>(max_queue_size);
 
   int retval =
       pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
@@ -283,7 +281,7 @@ bool SessionContext::FinalizeDerived() {
   // TODO(jblomer): Refactor SessionContext (and Uploader*) classes to
   // use a factory method for construction.
   //
-  upload_jobs_->Enqueue(&terminator_);
+  upload_jobs_->EnqueueFront(&terminator_);
   pthread_join(worker_, NULL);
 
   return true;
@@ -311,7 +309,7 @@ Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
   UploadJob* job = new UploadJob;
   job->pack = pack;
   job->result = new Future<bool>();
-  upload_jobs_->Enqueue(job);
+  upload_jobs_->EnqueueFront(job);
   return job->result;
 }
 
@@ -399,7 +397,7 @@ void* SessionContext::UploadLoop(void* data) {
   UploadJob *job;
 
   while (true) {
-    job = ctx->upload_jobs_->Dequeue();
+    job = ctx->upload_jobs_->PopBack();
     if (job == &terminator_)
       return NULL;
     if (!ctx->DoUpload(job)) {

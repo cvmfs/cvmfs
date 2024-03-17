@@ -12,6 +12,7 @@
 #include "repository_tag.h"
 #include "util/concurrency.h"
 #include "util/pointer.h"
+#include "util/tube.h"
 
 namespace upload {
 
@@ -72,7 +73,7 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
-  FifoChannel<Future<bool>*> upload_results_;
+  Tube<Future<bool> > upload_results_;
 
   std::string api_url_;
   std::string session_token_;
@@ -120,7 +121,7 @@ class SessionContext : public SessionContextBase {
  private:
   static void* UploadLoop(void* data);
 
-  UniquePtr<FifoChannel<UploadJob*> > upload_jobs_;
+  UniquePtr<Tube<UploadJob> > upload_jobs_;
 
   pthread_t worker_;
 
