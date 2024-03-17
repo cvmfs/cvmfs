@@ -83,7 +83,6 @@ SessionContextBase::SessionContextBase()
       active_handles_(),
       current_pack_(NULL),
       current_pack_mtx_(),
-      objects_dispatched_(0),
       bytes_committed_(0),
       bytes_dispatched_(0),
       initialized_(false) {}
@@ -116,7 +115,6 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   secret_ = secret;
   max_pack_size_ = max_pack_size;
 
-  atomic_init64(&objects_dispatched_);
   bytes_committed_ = 0u;
   bytes_dispatched_ = 0u;
 
@@ -157,12 +155,10 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
   }
 
   bool results = true;
-  int64_t jobs_finished = 0;
-  while (!upload_results_.IsEmpty() || (jobs_finished < NumJobsSubmitted())) {
+  while (!upload_results_.IsEmpty()) {
     Future<bool>* future = upload_results_.Dequeue();
     results = future->Get() && results;
     delete future;
-    jobs_finished++;
   }
 
   if (commit) {
@@ -249,10 +245,6 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
   return true;
 }
 
-int64_t SessionContextBase::NumJobsSubmitted() const {
-  return atomic_read64(&objects_dispatched_);
-}
-
 void SessionContextBase::Dispatch() {
   MutexLockGuard lock(current_pack_mtx_);
 
@@ -260,7 +252,6 @@ void SessionContextBase::Dispatch() {
     return;
   }
 
-  atomic_inc64(&objects_dispatched_);
   bytes_dispatched_ += current_pack_->size();
   upload_results_.Enqueue(DispatchObjectPack(current_pack_));
 }

@@ -72,8 +72,6 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
-  int64_t NumJobsSubmitted() const;
-
   FifoChannel<Future<bool>*> upload_results_;
 
   std::string api_url_;
@@ -91,7 +89,6 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
   ObjectPack* current_pack_;
   pthread_mutex_t current_pack_mtx_;
 
-  mutable atomic_int64 objects_dispatched_;
   uint64_t bytes_committed_;
   uint64_t bytes_dispatched_;
 
