@@ -45,7 +45,7 @@ void Future<T>::Set(const T &object) {
 template <typename T>
 void Future<T>::Wait() const {
   MutexLockGuard guard(mutex_);
-  if (!object_was_set_) {
+  while (!object_was_set_) {
     pthread_cond_wait(&object_set_, &mutex_);
   }
   assert(object_was_set_);
