@@ -5,13 +5,17 @@
 #ifndef CVMFS_SESSION_CONTEXT_H_
 #define CVMFS_SESSION_CONTEXT_H_
 
+#include <pthread.h>
+
 #include <string>
 #include <vector>
 
 #include "pack.h"
 #include "repository_tag.h"
 #include "util/concurrency.h"
+#include "util/future.h"
 #include "util/pointer.h"
+#include "util/tube.h"
 
 namespace upload {
 
@@ -72,9 +76,7 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
 
   virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
 
-  int64_t NumJobsSubmitted() const;
-
-  FifoChannel<Future<bool>*> upload_results_;
+  Tube<Future<bool> > upload_results_;
 
   std::string api_url_;
   std::string session_token_;
@@ -91,7 +93,6 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
   ObjectPack* current_pack_;
   pthread_mutex_t current_pack_mtx_;
 
-  mutable atomic_int64 objects_dispatched_;
   uint64_t bytes_committed_;
   uint64_t bytes_dispatched_;
 
@@ -123,7 +124,7 @@ class SessionContext : public SessionContextBase {
  private:
   static void* UploadLoop(void* data);
 
-  UniquePtr<FifoChannel<UploadJob*> > upload_jobs_;
+  UniquePtr<Tube<UploadJob> > upload_jobs_;
 
   pthread_t worker_;
 

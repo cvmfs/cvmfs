@@ -40,7 +40,7 @@
 #include "catalog_rw.h"
 #include "file_chunk.h"
 #include "upload_spooler_result.h"
-#include "util/concurrency.h"
+#include "util/future.h"
 #include "xattr.h"
 
 class XattrList;
