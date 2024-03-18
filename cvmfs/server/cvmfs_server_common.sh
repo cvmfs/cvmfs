@@ -1193,7 +1193,7 @@ setup_and_mount_new_repository() {
     echo -n "(overlayfs) "
     cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,fsname=$name,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
-overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,noauto,nodev,ro 0 0 # added by CernVM-FS for $name
+overlay_$name /cvmfs/$name overlay upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=$ofs_workdir,metacopy=on,redirect_dir=on,noauto,nodev,ro 0 0 # added by CernVM-FS for $name
 EOF
   else
     echo -n "(aufs) "
@@ -1260,7 +1260,7 @@ is_empty_repository() {
 # garbage collections
 #
 # @param name  the name of the repository to be checked
-# @return      0 if it contains a reference log
+#   @return      0 if it contains a reference log
 has_reference_log() {
   local name=$1
   local url=""
