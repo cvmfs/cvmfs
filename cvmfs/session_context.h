@@ -5,12 +5,15 @@
 #ifndef CVMFS_SESSION_CONTEXT_H_
 #define CVMFS_SESSION_CONTEXT_H_
 
+#include <pthread.h>
+
 #include <string>
 #include <vector>
 
 #include "pack.h"
 #include "repository_tag.h"
 #include "util/concurrency.h"
+#include "util/future.h"
 #include "util/pointer.h"
 #include "util/tube.h"
 

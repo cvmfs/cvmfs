@@ -11,7 +11,7 @@
 #include "crypto/hash.h"
 #include "history_sqlite.h"
 #include "swissknife.h"
-#include "util/concurrency.h"
+#include "util/future.h"
 
 namespace manifest {
 class Manifest;

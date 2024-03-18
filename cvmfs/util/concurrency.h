@@ -52,55 +52,6 @@ class CVMFS_EXPORT Lockable : SingleCopy {
 
 
 /**
- * This is a simple implementation of a Future wrapper template.
- * It is used as a proxy for results that are computed asynchronously and might
- * not be available on the first access.
- * Since this is a very simple implementation one needs to use the Future's
- * Get() and Set() methods to obtain the containing data resp. to write it.
- * Note: More than a single call to Set() is prohibited!
- *       If Get() is called before Set() the calling thread will block until
- *       the value has been set by a different thread.
- *
- * @param T  the value type wrapped by this Future template
- */
-template <typename T>
-class Future : SingleCopy {
- public:
-  Future();
-  virtual ~Future();
-
-  /**
-   * Save an asynchronously computed value into the Future. This potentially
-   * unblocks threads that already wait for the value.
-   * @param object  the value object to be set
-   */
-  void     Set(const T &object);
-
-  /**
-   * Retrieves the wrapped value object. If the value is not yet available it
-   * will automatically block until a different thread calls Set().
-   * @return  the containing value object
-   */
-  T&       Get();
-  const T& Get() const;
-
- protected:
-  void Wait() const;
-
- private:
-  T                       object_;
-  mutable pthread_mutex_t mutex_;
-  mutable pthread_cond_t  object_set_;
-  bool                    object_was_set_;
-};
-
-
-//
-// -----------------------------------------------------------------------------
-//
-
-
-/**
  * This counter can be counted up and down using the usual increment/decrement
  * operators. It allows threads to wait for it to become zero as well as to
  * block when a specified maximal value would be exceeded by an increment.

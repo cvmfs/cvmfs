@@ -13,61 +13,6 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 //
 // +----------------------------------------------------------------------------
-// |  Future
-//
-
-
-template <typename T>
-Future<T>::Future() : object_(), object_was_set_(false) {
-  const bool init_successful = (pthread_mutex_init(&mutex_, NULL)     == 0   &&
-                                pthread_cond_init(&object_set_, NULL) == 0);
-  assert(init_successful);
-}
-
-
-template <typename T>
-Future<T>::~Future() {
-  pthread_cond_destroy(&object_set_);
-  pthread_mutex_destroy(&mutex_);
-}
-
-
-template <typename T>
-void Future<T>::Set(const T &object) {
-  MutexLockGuard guard(mutex_);
-  assert(!object_was_set_);
-  object_         = object;
-  object_was_set_ = true;
-  pthread_cond_broadcast(&object_set_);
-}
-
-
-template <typename T>
-void Future<T>::Wait() const {
-  MutexLockGuard guard(mutex_);
-  while (!object_was_set_) {
-    pthread_cond_wait(&object_set_, &mutex_);
-  }
-  assert(object_was_set_);
-}
-
-
-template <typename T>
-T& Future<T>::Get() {
-  Wait();
-  return object_;
-}
-
-
-template <typename T>
-const T& Future<T>::Get() const {
-  Wait();
-  return object_;
-}
-
-
-//
-// +----------------------------------------------------------------------------
 // |  SynchronizingCounter
 //
 
