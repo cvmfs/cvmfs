@@ -1260,7 +1260,7 @@ is_empty_repository() {
 # garbage collections
 #
 # @param name  the name of the repository to be checked
-#   @return      0 if it contains a reference log
+# @return      0 if it contains a reference log
 has_reference_log() {
   local name=$1
   local url=""
