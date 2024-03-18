@@ -305,12 +305,13 @@ bool SessionContext::Commit(const std::string& old_root_hash,
                         request, &buffer);
 }
 
-Future<bool>* SessionContext::DispatchObjectPack(ObjectPack* pack) {
-  UploadJob* job = new UploadJob;
+Future<bool> *SessionContext::DispatchObjectPack(ObjectPack* pack) {
+  UploadJob *job = new UploadJob;
+  Future<bool> *result = new Future<bool>();
   job->pack = pack;
-  job->result = new Future<bool>();
+  job->result = result;
   upload_jobs_->EnqueueFront(job);
-  return job->result;
+  return result;
 }
 
 bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
