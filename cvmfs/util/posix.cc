@@ -1772,7 +1772,9 @@ static bool CloseAllFildesUntilMaxFD(
 
 /**
  * Loop through /proc/self/fd and close the listed FDs.
+ * Not used on macOS.
  */
+#ifndef __APPLE__
 static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
 {
   DIR *dirp = opendir("/proc/self/fd");
@@ -1802,6 +1804,7 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
 
   return true;
 }
+#endif
 
 /**
  * Closes all file descriptors except the ones in preserve_fildes.
