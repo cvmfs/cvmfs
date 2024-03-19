@@ -481,46 +481,53 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   sqlite3_reset(stmt_unblock_);
   assert(result);
 
-  // Double fork avoids zombie, forked removal process must not flush file
-  // buffers
-  if (!trash.empty()) {
-    if (async_delete_) {
-      pid_t pid;
-      int statloc;
-      if ((pid = fork()) == 0) {
-        // TODO(jblomer): eviciting files in the cache should perhaps become a
-        // thread.  This would also allow to block the chunks and prevent the
-        // race with re-insertion.  Then again, a thread can block umount.
-#ifndef DEBUGMSG
-        CloseAllFildes(std::set<int>());
-#endif
-        if (fork() == 0) {
-          for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-            LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
-            unlink(trash[i].c_str());
-          }
-          _exit(0);
-        }
-        _exit(0);
-      } else {
-        if (pid > 0)
-          waitpid(pid, &statloc, 0);
-        else
-          return false;
-      }
-    } else {  // !async_delete_
-      for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-        LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
-        unlink(trash[i].c_str());
-      }
-    }
-  }
+  if (!EmptyTrash(trash))
+    return false;
 
   if (gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "request to clean until %" PRIu64 ", "
              "but effective gauge is %" PRIu64, leave_size, gauge_);
     return false;
+  }
+  return true;
+}
+
+bool PosixQuotaManager::EmptyTrash(const std::vector<std::string> &trash) {
+  if (trash.empty())
+    return true;
+
+  if (async_delete_) {
+    // Double fork avoids zombie, forked removal process must not flush file
+    // buffers
+    pid_t pid;
+    int statloc;
+    if ((pid = fork()) == 0) {
+      // TODO(jblomer): eviciting files in the cache should perhaps become a
+      // thread. This would also allow to block the chunks and prevent the
+      // race with re-insertion. Then again, a thread can block umount.
+#ifndef DEBUGMSG
+      CloseAllFildes(std::set<int>());
+#endif
+      if (fork() == 0) {
+        for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+          LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+          unlink(trash[i].c_str());
+        }
+        _exit(0);
+      }
+      _exit(0);
+    } else {
+      if (pid > 0)
+        waitpid(pid, &statloc, 0);
+      else
+        return false;
+    }
+  } else {  // !async_delete_
+    for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+      LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+      unlink(trash[i].c_str());
+    }
   }
   return true;
 }

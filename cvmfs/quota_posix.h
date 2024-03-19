@@ -208,6 +208,7 @@ class PosixQuotaManager : public QuotaManager {
   void CloseDatabase();
   bool Contains(const std::string &hash_str);
   bool DoCleanup(const uint64_t leave_size);
+  bool EmptyTrash(const std::vector<std::string> &trash);
 
   void MakeReturnPipe(int pipe[2]);
   int BindReturnPipe(int pipe_wronly);
