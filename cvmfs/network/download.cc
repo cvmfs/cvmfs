@@ -292,7 +292,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
-      int64_t written = info->sink()->Write(ptr, num_bytes);
+      const int64_t written = info->sink()->Write(ptr, num_bytes);
       if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
               "Failed to perform write of %zu bytes to sink %s with errno %ld",
@@ -615,7 +615,7 @@ void *DownloadManager::MainDownload(void *data) {
     // Check if transfers that are completed have finished their data processing
     for (size_t i = 0; i < vec_curl_done.size(); ++i) {
       JobInfo *info = vec_curl_done[i].info;
-      int curl_error = vec_curl_done[i].curl_error;
+      const int curl_error = vec_curl_done[i].curl_error;
       CURL *easy_handle = vec_curl_done[i].easy_handle;
 
       if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
@@ -751,8 +751,7 @@ void *DownloadManager::MainDownload(void *data) {
         if (info->IsValidDataTube()) {
           DataTubeElement *ele = new DataTubeElement(kActionEndOfData);
           info->GetDataTubePtr()->EnqueueBack(ele);
-          vec_curl_done.emplace_back(
-                                   TupelJobDone(info, curl_error, easy_handle));
+          vec_curl_done.push_back(TupelJobDone(info, curl_error, easy_handle));
           continue;
         }
 
@@ -2010,7 +2009,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
               info->SetStopDataDownload(true);
             }
           } else {
-            int64_t written = info->sink()->Write(ptr, num_bytes);
+            const int64_t written = info->sink()->Write(ptr, num_bytes);
             if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
               PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
                "Failed to perform write of %zu bytes to sink %s with errno %ld",

@@ -253,8 +253,8 @@ class JobInfo {
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetStopDataDownload(bool stop_data_download) {
-                                    int32_t tmp = stop_data_download ? 1 : 0;
-                                    atomic_write32(&stop_data_download_, tmp); }
+                                 const int32_t tmp = stop_data_download ? 1 : 0;
+                                 atomic_write32(&stop_data_download_, tmp); }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies)
