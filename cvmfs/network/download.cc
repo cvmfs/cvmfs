@@ -667,7 +667,7 @@ void *DownloadManager::MainDownload(void *data) {
                               Write<download::Failures>(info->error_code());
         }
 
-        vec_curl_done.erase(vec_curl_done.begin() + i);
+        vec_curl_done.erase(vec_curl_done.begin() + static_cast<int64_t>(i));
         --i;
       }
     }
