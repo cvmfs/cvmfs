@@ -72,7 +72,7 @@ namespace download {
 
 Tube<DataTubeElement>* DownloadManager::data_tube_empty_elements_ =
                                               new Tube<DataTubeElement>(200000);
-atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
+// atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
 
 static DataTubeElement* GetUnusedDataTubeElement() {
   DataTubeElement* ele = DownloadManager::data_tube_empty_elements_->
@@ -781,8 +781,7 @@ void *DownloadManager::MainDownload(void *data) {
           DataTubeElement *ele = GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
-          vec_curl_done.emplace_back(
-                                   TupelJobDone(info, curl_error, easy_handle));
+          vec_curl_done.push_back(TupelJobDone(info, curl_error, easy_handle));
           continue;
         }
 
@@ -1772,11 +1771,11 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  const int32_t old_count =
-                    atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
-  if (old_count == 1) {
-    delete data_tube_empty_elements_;
-  }
+  // const int32_t old_count =
+  //                   atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
+  // if (old_count == 1) {
+  //   delete data_tube_empty_elements_;
+  // }
 
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
@@ -1882,7 +1881,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   counters_(new Counters(statistics))
 {
   atomic_init32(&multi_threaded_);
-  atomic_inc32(&DownloadManager::counter_use_data_tube_);
+  // atomic_inc32(&DownloadManager::counter_use_data_tube_);
 
   lock_options_ =
           reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -1938,7 +1937,7 @@ void DownloadManager::Spawn() {
     for (size_t i = 0; i < 10000; i++) {
       char *data = static_cast<char*>(
                              smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-      DataTubeElement *ele = new DataTubeElement(data, 
+      DataTubeElement *ele = new DataTubeElement(data,
                                        static_cast<size_t>(CURL_MAX_WRITE_SIZE),
                                        kActionUnused);
       DownloadManager::data_tube_empty_elements_->EnqueueBack(ele);
