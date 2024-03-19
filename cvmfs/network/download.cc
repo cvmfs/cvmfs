@@ -1772,7 +1772,7 @@ DownloadManager::~DownloadManager() {
   }
 
   // const int32_t old_count =
-  //                   atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
+  //                atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
   // if (old_count == 1) {
   //   delete data_tube_empty_elements_;
   // }
