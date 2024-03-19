@@ -291,6 +291,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (info->IsValidDataTube()) {
     DataTubeElement *ele = GetUnusedDataTubeElement();
+    assert(num_bytes <= static_cast<size_t>(CURL_MAX_WRITE_SIZE));
     memcpy(ele->data, ptr, num_bytes);
     ele->size = num_bytes;
     ele->action = kActionData;
@@ -320,7 +321,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         return 0;
       }
     } else {
-      int64_t written = info->sink()->Write(ptr, num_bytes);
+      const int64_t written = info->sink()->Write(ptr, num_bytes);
       if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
         LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
               "Failed to perform write of %zu bytes to sink %s with errno %ld",
@@ -796,7 +797,8 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           if (info->IsValidDataTube()) {
-            DataTubeElement *ele = new DataTubeElement(kActionStop);
+            DataTubeElement *ele = GetUnusedDataTubeElement();
+            ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
           info->GetPipeJobResultPtr()->
