@@ -79,8 +79,10 @@ static DataTubeElement* GetUnusedDataTubeElement() {
                                                                   TryPopFront();
 
   if (ele == NULL) {
-    char *data = static_cast<char*>(malloc(CURL_MAX_HTTP_HEADER));
-    ele = new DataTubeElement(data, CURL_MAX_HTTP_HEADER, kActionUnused);
+    char *data = static_cast<char*>(
+                            smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
+    ele = new DataTubeElement(data, static_cast<size_t>(CURL_MAX_WRITE_SIZE),
+                              kActionUnused);
   }
 
   return ele;
@@ -641,7 +643,7 @@ void *DownloadManager::MainDownload(void *data) {
     // Check if transfers that are completed have finished their data processing
     for (size_t i = 0; i < vec_curl_done.size(); ++i) {
       JobInfo *info = vec_curl_done[i].info;
-      int curl_error = vec_curl_done[i].curl_error;
+      const int curl_error = vec_curl_done[i].curl_error;
       CURL *easy_handle = vec_curl_done[i].easy_handle;
 
       if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
@@ -1770,7 +1772,7 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  int32_t old_count =
+  const int32_t old_count =
                     atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
   if (old_count == 1) {
     delete data_tube_empty_elements_;
@@ -1934,9 +1936,11 @@ void DownloadManager::Spawn() {
 
   if (DownloadManager::data_tube_empty_elements_->size() == 0) {
     for (size_t i = 0; i < 10000; i++) {
-      char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
-      DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
-                                                kActionUnused);
+      char *data = static_cast<char*>(
+                             smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
+      DataTubeElement *ele = new DataTubeElement(data, 
+                                       static_cast<size_t>(CURL_MAX_WRITE_SIZE),
+                                       kActionUnused);
       DownloadManager::data_tube_empty_elements_->EnqueueBack(ele);
     }
   }
@@ -2055,7 +2059,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
               info->SetStopDataDownload(true);
             }
           } else {
-            int64_t written = info->sink()->Write(ptr, num_bytes);
+            const int64_t written = info->sink()->Write(ptr, num_bytes);
             if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
               PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
                "Failed to perform write of %zu bytes to sink %s with errno %ld",
