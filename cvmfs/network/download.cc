@@ -264,6 +264,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (info->data_tube_empty_elements() != NULL && info->IsValidDataTube()) {
     DataTubeElement *ele  = info->GetUnusedDataTubeElement();
+    assert(num_bytes <= CURL_MAX_WRITE_SIZE);
     memcpy(ele->data, ptr, num_bytes);
     ele->size = num_bytes;
     ele->action = kActionData;
@@ -406,9 +407,9 @@ Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
 
     for (size_t i = 0; i < 500; i++) {
       char *data = static_cast<char*>(
-                            smalloc(static_cast<size_t>(CURL_MAX_HTTP_HEADER)));
+                             smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
       DataTubeElement *ele = new DataTubeElement(data,
-                                      static_cast<size_t>(CURL_MAX_HTTP_HEADER),
+                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE),
                                       kActionUnused);
       tube->EnqueueBack(ele);
     }
@@ -1938,9 +1939,11 @@ void DownloadManager::Spawn() {
     Tube<DataTubeElement>* data_tube_empty_elements =
                                                     new Tube<DataTubeElement>();
     for (size_t i = 0; i < 10000; i++) {
-      char *data = static_cast<char*>(malloc(CURL_MAX_WRITE_SIZE));
-      DataTubeElement *ele = new DataTubeElement(data, CURL_MAX_WRITE_SIZE,
-                                                 kActionUnused);
+      char *data = static_cast<char*>(
+                             smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
+      DataTubeElement *ele = new DataTubeElement(data,
+                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE),
+                                      kActionUnused);
       data_tube_empty_elements->EnqueueBack(ele);
     }
     DownloadManager::tube_of_tubes_empty_elements_->
@@ -2091,7 +2094,6 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     PutDataTubeToReuse(tube);
 
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
-
   } else {
     MutexLockGuard l(lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();
