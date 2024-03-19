@@ -145,7 +145,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    */
   static Tube<DataTubeElement>* data_tube_empty_elements_;
   // counter so that last DownloadManager can delete data_tube_empty_elements_
-  static atomic_int32 counter_use_data_tube_;
+  // static atomic_int32 counter_use_data_tube_;
 
   /**
    * No attempt was made to order stratum 1 servers
