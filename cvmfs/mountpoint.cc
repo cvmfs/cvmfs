@@ -1596,14 +1596,6 @@ bool MountPoint::CreateSignatureManager() {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
 
-  if (options_mgr_->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
-    if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {
-      boot_error_ = "failed to load trusted certificates";
-      boot_status_ = loader::kFailSignature;
-      return false;
-    }
-  }
-
   return true;
 }
 

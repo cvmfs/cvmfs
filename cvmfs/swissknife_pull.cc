@@ -526,9 +526,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (DirectoryExists(master_keys))
     master_keys = JoinStrings(FindFilesBySuffix(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
-  string trusted_certs;
-  if (args.find('y') != args.end())
-    trusted_certs = *args.find('y')->second;
   if (args.find('n') != args.end())
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
@@ -589,18 +586,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!this->InitVerifyingSignatureManager(master_keys, trusted_certs)) {
+  if (!this->InitVerifyingSignatureManager(master_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize CVMFS signatures");
     return 1;
   } else {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: using public key(s) %s",
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
-    if (!trusted_certs.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-               "CernVM-FS: using trusted certificates in %s",
-               JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
-    }
   }
 
   unsigned current_group;

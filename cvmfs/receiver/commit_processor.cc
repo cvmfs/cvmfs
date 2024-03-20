@@ -138,9 +138,7 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
-  const std::string trusted_certs =
-      "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
-  if (!server_tool->InitVerifyingSignatureManager(public_key, trusted_certs)) {
+  if (!server_tool->InitVerifyingSignatureManager(public_key)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the signature manager");
@@ -257,10 +255,7 @@ CommitProcessor::Result CommitProcessor::Process(
     }
 
     const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
-    const std::string trusted_certs =
-        "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
-    if (!server_tool->InitVerifyingSignatureManager(public_key,
-                                                    trusted_certs)) {
+    if (!server_tool->InitVerifyingSignatureManager(public_key)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "CommitProcessor - error: Could not initialize the signature "
                "manager");

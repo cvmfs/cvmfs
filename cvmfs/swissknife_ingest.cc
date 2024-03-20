@@ -128,8 +128,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  if (!InitVerifyingSignatureManager(params.public_keys,
-                                     params.trusted_certs)) {
+  if (!InitVerifyingSignatureManager(params.public_keys)) {
     return 3;
   }
 

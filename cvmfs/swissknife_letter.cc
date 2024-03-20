@@ -110,17 +110,15 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   string fqrn;
   string text;
   string key_path;
-  string cacrl_path;
   fqrn = *args.find('f')->second;
   key_path = *args.find('k')->second;
   if (args.find('t') != args.end()) text = *args.find('t')->second;
-  if (args.find('z') != args.end()) cacrl_path = *args.find('z')->second;
 
   whitelist::Failures retval_wl;
   letter::Failures retval_ltr;
 
   if (verify) {
-    if (!InitVerifyingSignatureManager(key_path, cacrl_path)) {
+    if (!InitVerifyingSignatureManager(key_path)) {
       return 2;
     }
 
