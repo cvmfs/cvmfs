@@ -185,6 +185,11 @@ class PosixQuotaManager : public QuotaManager {
   static const unsigned kCommandBufferSize = 32;
 
   /**
+   * Batch size for database operations during DoCleanup()
+   */
+  static const unsigned kEvictBatchSize = 10000;
+
+  /**
    * Make sure that the amount of data transferred through the RPC pipe is
    * within the OS's guarantees for atomicity.
    */

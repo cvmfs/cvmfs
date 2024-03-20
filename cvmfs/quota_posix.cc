@@ -426,36 +426,59 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     return true;
 
   // TODO(jblomer) transaction
-  LogCvmfs(kLogQuota, kLogSyslog,
+  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
            "clean up cache until at most %lu KB is used", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
   bool result;
-  string hash_str;
   vector<string> trash;
 
   do {
     sqlite3_reset(stmt_lru_);
-    if (sqlite3_step(stmt_lru_) != SQLITE_ROW) {
-      LogCvmfs(kLogQuota, kLogDebug, "could not get lru-entry");
+
+    std::vector<shash::Any> candidates;
+    std::vector<uint64_t> sizes;
+    candidates.reserve(kEvictBatchSize);
+    sizes.reserve(kEvictBatchSize);
+    string hash_str;
+    unsigned i = 0;
+    while (sqlite3_step(stmt_lru_) == SQLITE_ROW) {
+      hash_str = string(reinterpret_cast<const char *>(
+                        sqlite3_column_text(stmt_lru_, 0)));
+      candidates.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
+      sizes.push_back(sqlite3_column_int64(stmt_lru_, 1));
+      i++;
+    }
+    if (candidates.empty()) {
+      LogCvmfs(kLogQuota, kLogDebug, "no more entries to evict");
       break;
     }
 
-    hash_str = string(reinterpret_cast<const char *>(
-                      sqlite3_column_text(stmt_lru_, 0)));
-    LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
-    shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
+    const unsigned N = candidates.size();
+    for (i = 0; i < N; ++i) {
+      // That's a critical condition.  We must not delete a not yet inserted
+      // pinned file as it is already reserved (but will be inserted later).
+      // Instead, set the pin bit in the db to not run into an endless loop
+      if (pinned_chunks_.find(candidates[i]) != pinned_chunks_.end()) {
+        hash_str = candidates[i].ToString();
+        sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+        sqlite3_reset(stmt_block_);
+        assert(result);
+        continue;
+      }
 
-    // That's a critical condition.  We must not delete a not yet inserted
-    // pinned file as it is already reserved (but will be inserted later).
-    // Instead, set the pin bit in the db to not run into an endless loop
-    if (pinned_chunks_.find(hash) == pinned_chunks_.end()) {
-      trash.push_back(cache_dir_ + "/" + hash.MakePathWithoutSuffix());
-      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
+      LogCvmfs(kLogQuota, kLogDebug, "removing %s",
+               candidates[i].ToString().c_str());
+
+      trash.push_back(cache_dir_ + "/" + candidates[i].MakePathWithoutSuffix());
+      gauge_ -= sizes[i];
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
                hash_str.c_str(), gauge_);
 
+      hash_str = candidates[i].ToString();
       sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
                         SQLITE_STATIC);
       result = (sqlite3_step(stmt_rm_) == SQLITE_DONE);
@@ -468,12 +491,9 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
                  "Restart cvmfs with clean cache.", hash_str.c_str(), result);
         return false;
       }
-    } else {
-      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-      sqlite3_reset(stmt_block_);
-      assert(result);
+
+      if (gauge_ <= leave_size)
+        break;
     }
   } while (gauge_ > leave_size);
 
@@ -863,10 +883,11 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
                      -1, &stmt_size_, NULL);
   sqlite3_prepare_v2(database_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
                      -1, &stmt_rm_, NULL);
-  sqlite3_prepare_v2(database_,
-                     "SELECT sha1, size FROM cache_catalog WHERE "
-                     "acseq=(SELECT min(acseq) "
-                     "FROM cache_catalog WHERE pinned<>2);",
+  sqlite3_prepare_v2(database_, (std::string(
+                     "SELECT sha1, size FROM cache_catalog "
+                     "WHERE pinned<>2 "
+                     "ORDER BY acseq ASC "
+                     "LIMIT ") + StringifyInt(kEvictBatchSize) + ";").c_str(),
                      -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(database_,
                      ("SELECT path FROM cache_catalog WHERE type=" +
