@@ -58,7 +58,7 @@ class T_QuotaManager : public ::testing::Test {
                                 false);
     ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
 
-    for (unsigned i = 0; i < 40000; ++i) {
+    for (unsigned i = 0; i < 50002; ++i) {
       hashes_.push_back(shash::Any(shash::kSha1));
       EncodeInHash(i, hashes_[i]);
     }
@@ -66,6 +66,7 @@ class T_QuotaManager : public ::testing::Test {
   }
 
   void EncodeInHash(int value, shash::Any &hash) {
+    assert(value < (1 << 16));
     hash.digest[0] = value / 256;
     hash.digest[1] = value % 256;
   }
