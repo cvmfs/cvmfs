@@ -309,8 +309,7 @@ void CatalogTestTool::UpdateManifest() {
 }
 
 // Note: we always apply the dir spec to the revision corresponding to the
-// original,
-//       empty repository.
+// original, empty repository.
 bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ =
@@ -450,8 +449,8 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any& root_hash,
                                         DirSpec* spec) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                       spooler_.weak_ref(), download_manager(), &stats));
+          CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                          spooler_.weak_ref(), download_manager(), &stats));
 
   if (!catalog_mgr.IsValid()) {
     return false;
@@ -488,7 +487,7 @@ catalog::WritableCatalogManager* CatalogTestTool::CreateCatalogMgr(
   catalog::WritableCatalogManager* catalog_mgr =
       new catalog::WritableCatalogManager(root_hash, stratum0, temp_dir,
                                           spooler, dl_mgr, false, 0, 0, 0,
-                                          stats, false, 0, 0);
+                                          stats, false, 0, 0, "");
   catalog_mgr->Init();
 
   return catalog_mgr;

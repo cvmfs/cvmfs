@@ -227,7 +227,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
 
   echo "***{3} look for the warning"
-  cat $publish_log_2 | grep -q "^WARNING.*FrancoisHollande" || return 4
+  cat $publish_log_2 | grep -q "^Swissknife Sync: WARNING.*FrancoisHollande" || return 4
 
   echo "***{3} starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
@@ -264,10 +264,10 @@ cvmfs_run_test() {
   [ -f $PWD/donttouch/nested/.cvmfscatalog ] && return 70
 
   echo "***{4} look for the warnings"
-  cat $publish_log_3 | grep -q "^WARNING.*JohannWolfgangGoethe" || return 7
-  cat $publish_log_3 | grep -q "^WARNING.*GeorgeWashington"     || return 8
-  cat $publish_log_3 | grep -q "^WARNING.*BarackObama"          || return 9
-  cat $publish_log_3 | grep -q "^WARNING.*universe"             || return 10
+  cat $publish_log_3 | grep -q "^Swissknife Sync: WARNING.*JohannWolfgangGoethe" || return 7
+  cat $publish_log_3 | grep -q "^Swissknife Sync: WARNING.*GeorgeWashington"     || return 8
+  cat $publish_log_3 | grep -q "^Swissknife Sync: WARNING.*BarackObama"          || return 9
+  cat $publish_log_3 | grep -q "^Swissknife Sync: WARNING.*universe"             || return 10
 
   echo "***{4} check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
