@@ -284,7 +284,6 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   // the check for kFailOk is to check when using the DataTube that there was
   // not early some cancellation of the download due to error
-  // TODO(heretherebedragons) we might want to have this as an atomic variable?
   if (num_bytes == 0 || info->stop_data_download()) {
     return 0;
   }
@@ -1959,6 +1958,7 @@ void DownloadManager::Spawn() {
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
   assert(info->url() != NULL);
+  info->SetStopDataDownload(false);
 
   Failures result;
   result = PrepareDownloadDestination(info);
@@ -2031,7 +2031,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         case kActionData:
         {
           // quick escape
-          if (info->error_code() != kFailOk) {
+          if (info->stop_data_download()) {
             break;
           }
 
