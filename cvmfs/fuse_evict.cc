@@ -13,6 +13,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <new>
+#include <vector>
 
 #include "glue_buffer.h"
 #include "mountpoint.h"
@@ -77,7 +79,6 @@ FuseInvalidator::FuseInvalidator(
   , spawned_(false)
 {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
-  MakePipe(pipe_ctrl_);
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
   atomic_init32(&terminated_);
 }
@@ -94,7 +95,6 @@ FuseInvalidator::FuseInvalidator(
   , spawned_(false)
 {
   g_fuse_notify_invalidation_ = fuse_notify_invalidation;
-  MakePipe(pipe_ctrl_);
   memset(&thread_invalidator_, 0, sizeof(thread_invalidator_));
   atomic_init32(&terminated_);
 }
@@ -103,30 +103,44 @@ FuseInvalidator::FuseInvalidator(
 FuseInvalidator::~FuseInvalidator() {
   atomic_cas32(&terminated_, 0, 1);
   if (spawned_) {
-    char c = 'Q';
-    WritePipe(pipe_ctrl_[1], &c, 1);
+    QuitCommand *cmd = new (smalloc(sizeof(QuitCommand))) QuitCommand();
+    channel_.PushBack(cmd);
     pthread_join(thread_invalidator_, NULL);
   }
-  ClosePipe(pipe_ctrl_);
 }
 
 
 void FuseInvalidator::InvalidateInodes(Handle *handle) {
   assert(handle != NULL);
-  char c = 'I';
-  WritePipe(pipe_ctrl_[1], &c, 1);
-  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+  InvalInodesCommand *inval_inodes_command =
+    new (smalloc(sizeof(InvalInodesCommand))) InvalInodesCommand();
+  inval_inodes_command->handle = handle;
+  channel_.PushBack(inval_inodes_command);
 }
 
 void FuseInvalidator::InvalidateDentry(
   uint64_t parent_ino, const NameString &name)
 {
-  char c = 'D';
-  WritePipe(pipe_ctrl_[1], &c, 1);
-  WritePipe(pipe_ctrl_[1], &parent_ino, sizeof(parent_ino));
-  unsigned len = name.GetLength();
-  WritePipe(pipe_ctrl_[1], &len, sizeof(len));
-  WritePipe(pipe_ctrl_[1], name.GetChars(), len);
+  InvalDentryCommand *inval_dentry_command;
+  vector<Command *> *items = channel_.StartEnqueueing();
+  for (size_t i = 0; i < items->size(); ++i) {
+    inval_dentry_command = dynamic_cast<InvalDentryCommand *>(items->at(i));
+    if (!inval_dentry_command)
+      continue;
+    if (inval_dentry_command->parent_ino != parent_ino)
+      continue;
+    if (inval_dentry_command->name != name)
+      continue;
+    channel_.AbortEnqueueing();
+    return;
+  }
+
+  inval_dentry_command =
+    new (smalloc(sizeof(InvalDentryCommand))) InvalDentryCommand();
+  inval_dentry_command->parent_ino = parent_ino;
+  inval_dentry_command->name = name;
+  items->push_back(inval_dentry_command);
+  channel_.CommitEnqueueing();
 }
 
 void *FuseInvalidator::MainInvalidator(void *data) {
@@ -134,48 +148,61 @@ void *FuseInvalidator::MainInvalidator(void *data) {
   LogCvmfs(kLogCvmfs, kLogDebug, "starting dentry invalidator thread");
 
   bool reported_missing_inval_support = false;
-  char c;
-  Handle *handle;
   while (true) {
-    ReadPipe(invalidator->pipe_ctrl_[0], &c, 1);
-    if (c == 'Q')
-      break;
+    Command *command = invalidator->channel_.PopFront();
 
-    if (c == 'D') {
-      uint64_t parent_ino;
-      unsigned len;
-      ReadPipe(invalidator->pipe_ctrl_[0], &parent_ino, sizeof(parent_ino));
-      ReadPipe(invalidator->pipe_ctrl_[0], &len, sizeof(len));
-      char *name = static_cast<char *>(smalloc(len + 1));
-      ReadPipe(invalidator->pipe_ctrl_[0], name, len);
-      name[len] = '\0';
+    if (dynamic_cast<QuitCommand *>(command)) {
+      command->~Command();
+      free(command);
+      break;
+    }
+
+    InvalDentryCommand *inval_dentry_command =
+      dynamic_cast<InvalDentryCommand *>(command);
+    if (inval_dentry_command) {
       if (invalidator->fuse_channel_or_session_ == NULL) {
         if (!reported_missing_inval_support) {
           LogCvmfs(kLogCvmfs, kLogSyslogWarn,
-                   "missing fuse support for dentry invalidation (%lu/%s)",
-                   parent_ino, name);
+                   "missing fuse support for dentry invalidation "
+                   "(%" PRIu64 "/%s)",
+                   inval_dentry_command->parent_ino,
+                   inval_dentry_command->name.ToString().c_str());
           reported_missing_inval_support = true;
         }
-        free(name);
+        inval_dentry_command->~InvalDentryCommand();
+        free(inval_dentry_command);
         continue;
       }
       LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
-               parent_ino, name);
+               inval_dentry_command->parent_ino,
+               inval_dentry_command->name.ToString().c_str());
 #if CVMFS_USE_LIBFUSE == 2
       fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
-        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+        invalidator->fuse_channel_or_session_),
+        inval_dentry_command->parent_ino,
+        inval_dentry_command->name.GetChars(),
+        inval_dentry_command->name.GetLength());
 #else
       fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
-        invalidator->fuse_channel_or_session_), parent_ino, name, len);
+        invalidator->fuse_channel_or_session_),
+        inval_dentry_command->parent_ino,
+        inval_dentry_command->name.GetChars(),
+        inval_dentry_command->name.GetLength());
 #endif
-      free(name);
+      inval_dentry_command->~InvalDentryCommand();
+      free(inval_dentry_command);
       continue;
     }
 
-    assert(c == 'I');
-    ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
+    InvalInodesCommand *inval_inodes_command =
+      dynamic_cast<InvalInodesCommand *>(command);
+    assert(inval_inodes_command);
+
+    Handle *handle = inval_inodes_command->handle;
     LogCvmfs(kLogCvmfs, kLogDebug, "invalidating kernel caches, timeout %u",
              handle->timeout_s_);
+    inval_inodes_command->~InvalInodesCommand();
+    free(inval_inodes_command);
 
     uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 

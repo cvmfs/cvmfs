@@ -23,6 +23,88 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 /**
+ * A thread-safe, unbounded vector of items that implement a FIFO channel.
+ * Uses conditional variables to block when threads try to pop from the empty
+ * channel.
+ */
+template <class ItemT>
+class Channel : SingleCopy {
+ public:
+  Channel() {
+    int retval = pthread_mutex_init(&lock_, NULL);
+    assert(retval == 0);
+    retval = pthread_cond_init(&cond_populated_, NULL);
+    assert(retval == 0);
+  }
+
+  ~Channel() {
+    pthread_cond_destroy(&cond_populated_);
+    pthread_mutex_destroy(&lock_);
+  }
+
+  /**
+   * Returns the queue locked and ready for appending 1 item.
+   */
+  std::vector<ItemT *> *StartEnqueueing() {
+    int retval = pthread_mutex_lock(&lock_);
+    assert(retval == 0);
+    return &items_;
+  }
+
+  /**
+   * Unlocks the queue. The queue must remain unchanged when this is called.
+   */
+  void AbortEnqueueing() {
+    int retval = pthread_mutex_unlock(&lock_);
+    assert(retval == 0);
+  }
+
+  /**
+   * 1 new item was added to the queue. Unlock and signal to reader thread.
+   */
+  void CommitEnqueueing() {
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+    retval = pthread_mutex_unlock(&lock_);
+    assert(retval == 0);
+  }
+
+  void PushBack(ItemT *item) {
+    MutexLockGuard lock_guard(&lock_);
+    items_.push_back(item);
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+  }
+
+  /**
+   * Remove and return the first element from the queue.  Block if tube is
+   * empty.
+   */
+  ItemT *PopFront() {
+    MutexLockGuard lock_guard(&lock_);
+    while (items_.size() == 0)
+      pthread_cond_wait(&cond_populated_, &lock_);
+    ItemT *item = items_[0];
+    items_.erase(items_.begin());
+    return item;
+  }
+
+ private:
+  /**
+   * The locked queue/channel
+   */
+  std::vector<ItemT *> items_;
+  /**
+   * Protects all internal state
+   */
+  pthread_mutex_t lock_;
+  /**
+   * Signals if there are items enqueued
+   */
+  pthread_cond_t cond_populated_;
+};
+
+/**
  * Implements a simple interface to lock objects of derived classes. Classes that
  * inherit from Lockable are also usable with the LockGuard template for scoped
  * locking semantics.

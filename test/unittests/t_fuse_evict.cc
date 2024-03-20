@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "fuse_evict.h"
 #include "glue_buffer.h"
 #include "util/string.h"
@@ -37,8 +39,6 @@ TEST_F(T_FuseInvalidator, StartStop) {
     new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
   noop_invalidator->Spawn();
   EXPECT_TRUE(noop_invalidator->spawned_);
-  EXPECT_GE(noop_invalidator->pipe_ctrl_[0], 0);
-  EXPECT_GE(noop_invalidator->pipe_ctrl_[1], 0);
   delete noop_invalidator;
 }
 

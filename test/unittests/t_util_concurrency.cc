@@ -24,6 +24,44 @@ class DummyLocker {
   mutable bool locked;
 };
 
+static void *MainChannelWrite(void *data) {
+  Channel<int> *channel = static_cast<Channel<int> *>(data);
+  for (int i = 0; i < 10000; ++i) {
+    std::vector<int *> *items = channel->StartEnqueueing();
+    if (i % 2 == 0) {
+      items->push_back(new int(i));
+      channel->CommitEnqueueing();
+    } else {
+      channel->AbortEnqueueing();
+    }
+  }
+  return NULL;
+}
+
+static void *MainChannelRead(void *data) {
+  Channel<int> *channel = static_cast<Channel<int> *>(data);
+  for (int i = 0; i < 5000; ++i) {
+    int *item = channel->PopFront();
+    EXPECT_EQ(2*i, *item);
+    delete item;
+  }
+  return NULL;
+}
+
+TEST(T_UtilConcurrency, Channel) {
+  Channel<int> channel;
+  pthread_t thread_write;
+  pthread_t thread_read;
+  int retval = pthread_create(&thread_write, NULL, MainChannelWrite, &channel);
+  ASSERT_EQ(0, retval);
+  retval = pthread_create(&thread_read, NULL, MainChannelRead, &channel);
+  ASSERT_EQ(0, retval);
+  retval = pthread_join(thread_read, NULL);
+  ASSERT_EQ(0, retval);
+  retval = pthread_join(thread_write, NULL);
+  ASSERT_EQ(0, retval);
+}
+
 TEST(T_UtilConcurrency, ArbitraryLockGurad) {
   DummyLocker locker;
   ASSERT_FALSE(locker.locked);
