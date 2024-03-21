@@ -180,9 +180,19 @@ class PosixQuotaManager : public QuotaManager {
   };
 
   /**
+   * Used for batch queries in DoCleanup()
+   */
+  struct EvictCandidate {
+    uint64_t size;
+    uint64_t acseq;
+    shash::Any hash;
+    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
+      : size(s), acseq(a), hash(h) {}
+  };
+
+  /**
    * Magic number to make reading PIDs from lockfiles more robust and versionable
    */
-
   static const unsigned kLockFileMagicNumber = 142857;
 
   /**
