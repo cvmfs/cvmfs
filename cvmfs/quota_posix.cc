@@ -39,7 +39,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -150,6 +150,7 @@ void PosixQuotaManager::CloseDatabase() {
   if (stmt_list_) sqlite3_finalize(stmt_list_);
   if (stmt_lru_) sqlite3_finalize(stmt_lru_);
   if (stmt_rm_) sqlite3_finalize(stmt_rm_);
+  if (stmt_rm_batch_) sqlite3_finalize(stmt_rm_batch_);
   if (stmt_size_) sqlite3_finalize(stmt_size_);
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
@@ -164,6 +165,7 @@ void PosixQuotaManager::CloseDatabase() {
   stmt_list_volatile_ = NULL;
   stmt_list_ = NULL;
   stmt_rm_ = NULL;
+  stmt_rm_batch_ = NULL;
   stmt_size_ = NULL;
   stmt_touch_ = NULL;
   stmt_unpin_ = NULL;
@@ -425,6 +427,14 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   if (gauge_ <= leave_size)
     return true;
 
+  struct EvictCandidate {
+    uint64_t size;
+    uint64_t acseq;
+    shash::Any hash;
+    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
+      : size(s), acseq(a), hash(h) {}
+  };
+
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
            "clean up cache until at most %lu KB is used", leave_size/1024);
@@ -434,20 +444,28 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   bool result;
   vector<string> trash;
 
+  // Note that volatile files start counting from the smallest int64 number:
+  // the absolute sequence number with the first bit set in two's complement.
+  // So -1 can be a marker that will never appear in the database.
+  int64_t max_acseq = -1;
   do {
     sqlite3_reset(stmt_lru_);
+    sqlite3_bind_int64(stmt_lru_, 1, (max_acseq == -1) ?
+                       std::numeric_limits<int64_t>::min() : (max_acseq + 1));
 
-    std::vector<shash::Any> candidates;
-    std::vector<uint64_t> sizes;
+    std::vector<EvictCandidate> candidates;
     candidates.reserve(kEvictBatchSize);
-    sizes.reserve(kEvictBatchSize);
     string hash_str;
     unsigned i = 0;
     while (sqlite3_step(stmt_lru_) == SQLITE_ROW) {
-      hash_str = string(reinterpret_cast<const char *>(
-                        sqlite3_column_text(stmt_lru_, 0)));
-      candidates.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
-      sizes.push_back(sqlite3_column_int64(stmt_lru_, 1));
+      hash_str = reinterpret_cast<const char *>(
+        sqlite3_column_text(stmt_lru_, 0));
+      LogCvmfs(kLogQuota, kLogDebug, "add %s to candidates for eviction",
+               hash_str.c_str());
+      candidates.push_back(EvictCandidate(
+        shash::MkFromHexPtr(shash::HexPtr(hash_str)),
+        sqlite3_column_int64(stmt_lru_, 1),
+        sqlite3_column_int64(stmt_lru_, 2)));
       i++;
     }
     if (candidates.empty()) {
@@ -460,8 +478,10 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
-      if (pinned_chunks_.find(candidates[i]) != pinned_chunks_.end()) {
-        hash_str = candidates[i].ToString();
+      if (pinned_chunks_.find(candidates[i].hash) != pinned_chunks_.end()) {
+        hash_str = candidates[i].hash.ToString();
+        LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction",
+                 hash_str.c_str());
         sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
                           SQLITE_STATIC);
         result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
@@ -470,36 +490,28 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
         continue;
       }
 
-      LogCvmfs(kLogQuota, kLogDebug, "removing %s",
-               candidates[i].ToString().c_str());
-
-      trash.push_back(cache_dir_ + "/" + candidates[i].MakePathWithoutSuffix());
-      gauge_ -= sizes[i];
+      trash.push_back(cache_dir_ + "/" +
+                      candidates[i].hash.MakePathWithoutSuffix());
+      gauge_ -= candidates[i].size;
+      max_acseq = candidates[i].acseq;
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
-               hash_str.c_str(), gauge_);
-
-      hash_str = candidates[i].ToString();
-      sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      result = (sqlite3_step(stmt_rm_) == SQLITE_DONE);
-      sqlite3_reset(stmt_rm_);
-
-      if (!result) {
-        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-                 "failed to find %s in cache database (%d). "
-                 "Cache database is out of sync. "
-                 "Restart cvmfs with clean cache.", hash_str.c_str(), result);
-        return false;
-      }
+               candidates[i].hash.ToString().c_str(), gauge_);
 
       if (gauge_ <= leave_size)
         break;
     }
   } while (gauge_ > leave_size);
 
-  result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
-  sqlite3_reset(stmt_unblock_);
-  assert(result);
+  if (max_acseq != -1) {
+    sqlite3_bind_int64(stmt_rm_batch_, 1, max_acseq);
+    result = (sqlite3_step(stmt_rm_batch_) == SQLITE_DONE);
+    assert(result);
+    sqlite3_reset(stmt_rm_batch_);
+
+    result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
+    sqlite3_reset(stmt_unblock_);
+    assert(result);
+  }
 
   if (!EmptyTrash(trash))
     return false;
@@ -883,9 +895,12 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
                      -1, &stmt_size_, NULL);
   sqlite3_prepare_v2(database_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
                      -1, &stmt_rm_, NULL);
+  sqlite3_prepare_v2(database_,
+                     "DELETE FROM cache_catalog WHERE acseq<=:a AND pinned<>2;",
+                     -1, &stmt_rm_batch_, NULL);
   sqlite3_prepare_v2(database_, (std::string(
-                     "SELECT sha1, size FROM cache_catalog "
-                     "WHERE pinned<>2 "
+                     "SELECT sha1, size, acseq FROM cache_catalog "
+                     "WHERE pinned<>2 AND acseq>=:a "
                      "ORDER BY acseq ASC "
                      "LIMIT ") + StringifyInt(kEvictBatchSize) + ";").c_str(),
                      -1, &stmt_lru_, NULL);
@@ -1566,6 +1581,7 @@ PosixQuotaManager::PosixQuotaManager(
   , stmt_lru_(NULL)
   , stmt_size_(NULL)
   , stmt_rm_(NULL)
+  , stmt_rm_batch_(NULL)
   , stmt_list_(NULL)
   , stmt_list_pinned_(NULL)
   , stmt_list_catalogs_(NULL)

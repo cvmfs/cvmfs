@@ -187,7 +187,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Batch size for database operations during DoCleanup()
    */
-  static const unsigned kEvictBatchSize = 10000;
+  static const unsigned kEvictBatchSize = 1000;
 
   /**
    * Make sure that the amount of data transferred through the RPC pipe is
@@ -332,6 +332,7 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_lru_;
   sqlite3_stmt *stmt_size_;
   sqlite3_stmt *stmt_rm_;
+  sqlite3_stmt *stmt_rm_batch_;
   sqlite3_stmt *stmt_list_;
   sqlite3_stmt *stmt_list_pinned_;  /**< Loaded catalogs are pinned. */
   sqlite3_stmt *stmt_list_catalogs_;
