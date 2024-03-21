@@ -174,6 +174,17 @@ class PosixQuotaManager : public QuotaManager {
   };
 
   /**
+   * Used for batch queries in DoCleanup()
+   */
+  struct EvictCandidate {
+    uint64_t size;
+    uint64_t acseq;
+    shash::Any hash;
+    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
+      : size(s), acseq(a), hash(h) {}
+  };
+
+  /**
    * Maximum page cache per thread (Bytes).
    */
   static const unsigned kSqliteMemPerThread = 2*1024*1024;

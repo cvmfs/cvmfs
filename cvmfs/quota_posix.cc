@@ -427,14 +427,6 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   if (gauge_ <= leave_size)
     return true;
 
-  struct EvictCandidate {
-    uint64_t size;
-    uint64_t acseq;
-    shash::Any hash;
-    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
-      : size(s), acseq(a), hash(h) {}
-  };
-
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
            "clean up cache until at most %lu KB is used", leave_size/1024);
