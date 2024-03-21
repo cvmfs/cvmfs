@@ -41,7 +41,7 @@ func ReadConfig() (*Config, error) {
 	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
 	pflag.Int("port", 4929, "HTTP frontend port")
 	pflag.Int("pprof_port", 6060, "pprof port on localhost")
-	pflag.Int("pprof_port_range_max", 6080, "pprof port on localhost")
+	pflag.Int("pprof_port_range_max", 6260, "pprof port on localhost")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")
