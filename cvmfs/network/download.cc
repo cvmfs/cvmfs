@@ -1908,6 +1908,7 @@ void DownloadManager::Spawn() {
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
   assert(info->url() != NULL);
+  info->SetStopDataDownload(false);
 
   Failures result;
   result = PrepareDownloadDestination(info);
@@ -1980,7 +1981,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         case kActionData:
         {
           // quick escape
-          if (info->error_code() != kFailOk) {
+          if (info->stop_data_download()) {
             break;
           }
 
