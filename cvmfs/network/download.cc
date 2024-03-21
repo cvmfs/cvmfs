@@ -2040,7 +2040,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
         case kActionData:
         {
           // quick escape
-          if (info->error_code() != kFailOk) {
+          if (info->stop_data_download()) {
             break;
           }
 
