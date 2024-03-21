@@ -60,15 +60,15 @@ class T_QuotaManager : public ::testing::Test {
 
     for (unsigned i = 0; i < 50002; ++i) {
       hashes_.push_back(shash::Any(shash::kSha1));
-      EncodeInHash(i, hashes_[i]);
+      EncodeInHash(i, &hashes_[i]);
     }
     prng_.InitLocaltime();
   }
 
-  void EncodeInHash(int value, shash::Any &hash) {
+  void EncodeInHash(int value, shash::Any *hash) {
     assert(value < (1 << 16));
-    hash.digest[0] = value / 256;
-    hash.digest[1] = value % 256;
+    hash->digest[0] = value / 256;
+    hash->digest[1] = value % 256;
   }
 
   int DecodeFromHash(const shash::Any &hash) {
