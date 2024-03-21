@@ -195,6 +195,10 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "H" : "hidden");
     if (diff & catalog::DirectoryEntryBase::Difference::kDirectIoFlag)
       result_list.push_back(machine_readable_ ? "D" : "direct-io");
+    if (diff & catalog::DirectoryEntryBase::Difference::kUid)
+      result_list.push_back(machine_readable_ ? "U" : "uid");
+    if (diff & catalog::DirectoryEntryBase::Difference::kGid)
+      result_list.push_back(machine_readable_ ? "R" : "gid");
 
     return machine_readable_ ? ("[" + JoinStrings(result_list, "") + "]")
                              : (" [" + JoinStrings(result_list, ", ") + "]");
