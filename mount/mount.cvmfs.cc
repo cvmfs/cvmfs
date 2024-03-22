@@ -70,6 +70,7 @@ static string MkFqrn(const string &repository) {
 
 
 static bool CheckFuse() {
+  return true;
   string fuse_device;
   int retval;
 #ifdef __APPLE__
@@ -77,18 +78,18 @@ static bool CheckFuse() {
                   "load_macfuse");
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading macFUSE");
-    return false;
+    //return false;
   }
   fuse_device = "/dev/macfuse0";
 #else
   fuse_device = "/dev/fuse";
 #endif
-  platform_stat64 info;
-  retval = platform_stat(fuse_device.c_str(), &info);
-  if ((retval != 0) || !S_ISCHR(info.st_mode)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Fuse not loaded");
-    return false;
-  }
+  //platform_stat64 info;
+  //retval = platform_stat(fuse_device.c_str(), &info);
+  //if ((retval != 0) || !S_ISCHR(info.st_mode)) {
+  //  LogCvmfs(kLogCvmfs, kLogStderr, "Fuse not loaded");
+  //  return false;
+  //}
   return true;
 }
 

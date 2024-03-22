@@ -470,15 +470,15 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
-    echo "Error: macFUSE is missing."
-    num_errors=$(($num_errors+1))
-  fi
-  check_dev_fuse
-  exit_code=$?
-  if [ $exit_code -ne 0 ]; then
-    num_errors=$(($num_errors+$exit_code))
-  fi
+  #if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
+  #  echo "Error: macFUSE is missing."
+  #  num_errors=$(($num_errors+1))
+  #fi
+  #check_dev_fuse
+  #exit_code=$?
+  #if [ $exit_code -ne 0 ]; then
+  #  num_errors=$(($num_errors+$exit_code))
+  #fi
 
   # Check that /etc/nsswitch.conf is readable from cvmfs user
   if [ -f /etc/nsswitch.conf ]; then

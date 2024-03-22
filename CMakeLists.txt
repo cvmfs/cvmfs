@@ -418,9 +418,11 @@ endif ()
 # Fuse client only
 if (BUILD_CVMFS)
   if (MACOSX)
-    find_package (OSXFuse REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
-    set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
+    #find_package (OSXFuse)
+    #set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
+    #set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} "/usr/local/include" "/usr/local/include/fuse")
+    set (FUSE_LIBRARIES "/usr/local/lib/libfuse-t.dylib") # just abstract the difference here... they are compatible
   else (MACOSX)
     find_package (FUSE REQUIRED)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})
