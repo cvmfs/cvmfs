@@ -215,6 +215,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
+  void SetParallelDownloadOptions(int64_t num_max_parallel_downloads,
+                                  int64_t buffer_size_per_parallel_download_kb);
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
 
   unsigned num_hosts() {
@@ -444,6 +446,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Tube holding tubes that hold empty elements use in JobInfo data_tube_
    */
   UniquePtr<Tube<Tube<DataTubeElement> > > tube_of_tubes_empty_elements_;
+  int64_t num_max_parallel_downloads_;
+  int64_t buffer_size_per_parallel_download_kb_;
 };  // DownloadManager
 
 }  // namespace download

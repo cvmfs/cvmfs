@@ -1526,6 +1526,28 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MAX_NUM", &optarg)) {
+    const int64_t num_max_parallel_downloads = String2Int64(optarg);
+    if (num_max_parallel_downloads > 0
+        && options_mgr_->GetValue("CVMFS_PARALLEL_BUFFER_SIZE_PER_DOWNLOAD",
+                                  &optarg)) {
+      const int64_t buffer_size_per_parallel_download_kb = String2Int64(optarg);
+      if (buffer_size_per_parallel_download_kb > 0) {
+        download_mgr_->SetParallelDownloadOptions(num_max_parallel_downloads,
+                                          buffer_size_per_parallel_download_kb);
+      } else {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+            "CVMFS_PARALLEL_BUFFER_SIZE_PER_DOWNLOAD must be a positiv value. "
+            "Value given %s", optarg.c_str());
+      }
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+          "CVMFS_PARALLEL_DOWNLOAD_MAX_NUM must be a positiv value. "
+          "Value given %s and CVMFS_PARALLEL_BUFFER_SIZE_PER_DOWNLOAD "
+          "must be set.", optarg.c_str());
+    }
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 

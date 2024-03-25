@@ -400,30 +400,15 @@ const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
 
 Tube<DataTubeElement>* DownloadManager::GetUnusedDataTube() {
-  Tube<DataTubeElement> *tube = tube_of_tubes_empty_elements_->TryPopFront();
-
-  if (tube == NULL) {
-    tube = new Tube<DataTubeElement>(10000);
-
-    for (size_t i = 0; i < 500; i++) {
-      char *data = static_cast<char*>(
-                             smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-      DataTubeElement *ele = new DataTubeElement(data,
-                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE),
-                                      kActionUnused);
-      tube->EnqueueBack(ele);
-    }
-  }
+  Tube<DataTubeElement> *tube = tube_of_tubes_empty_elements_->PopFront();
 
   return tube;
 }
 
+// TODO TODO Change create procedure of tube_of_tubes_empty_elements_
+// use cvmfs params
 void DownloadManager::PutDataTubeToReuse(Tube<DataTubeElement> *tube) {
-  Tube<Tube<DataTubeElement> >::Link *link =
-                            tube_of_tubes_empty_elements_->TryEnqueueBack(tube);
-  if (link == NULL) {  // queue is at max capacity
-    delete tube;
-  }
+  tube_of_tubes_empty_elements_->EnqueueBack(tube);
 }
 
 
@@ -1879,7 +1864,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
                   counters_(new Counters(statistics)),
-                  tube_of_tubes_empty_elements_(NULL)
+                  tube_of_tubes_empty_elements_(NULL),
+                  num_max_parallel_downloads_(-1),
+                  buffer_size_per_parallel_download_kb_(-1)
 {
   atomic_init32(&multi_threaded_);
 
@@ -1933,21 +1920,37 @@ void DownloadManager::Spawn() {
 
   atomic_inc32(&multi_threaded_);
 
-  // TODO(heretherebedragons) maybe use min fuse threads or max fuse threads?
-  tube_of_tubes_empty_elements_ = new Tube<Tube<DataTubeElement> >(100);
-  for (size_t tube_i = 0; tube_i < 5; tube_i++) {
-    Tube<DataTubeElement>* data_tube_empty_elements =
+  if (num_max_parallel_downloads_ > 0) {
+    tube_of_tubes_empty_elements_ =
+                  new Tube<Tube<DataTubeElement> >(num_max_parallel_downloads_);
+    const size_t num_ele_per_tube =
+                    static_cast<size_t>(buffer_size_per_parallel_download_kb_) <
+                                    static_cast<size_t>(CURL_MAX_WRITE_SIZE) ?
+                                    1 :
+                                      buffer_size_per_parallel_download_kb_ /
+                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE);
+    for (size_t tube_i = 0; tube_i < tube_of_tubes_empty_elements_->size();
+                                                                     tube_i++) {
+      Tube<DataTubeElement>* data_tube_empty_elements =
                                                     new Tube<DataTubeElement>();
-    for (size_t i = 0; i < 10000; i++) {
-      char *data = static_cast<char*>(
+
+      for (size_t i = 0; i < num_ele_per_tube; i++) {
+        char *data = static_cast<char*>(
                              smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-      DataTubeElement *ele = new DataTubeElement(data,
-                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE),
-                                      kActionUnused);
-      data_tube_empty_elements->EnqueueBack(ele);
-    }
-    DownloadManager::tube_of_tubes_empty_elements_->
+        DataTubeElement *ele = new DataTubeElement(data,
+                                       static_cast<size_t>(CURL_MAX_WRITE_SIZE),
+                                       kActionUnused);
+        data_tube_empty_elements->EnqueueBack(ele);
+      }
+      DownloadManager::tube_of_tubes_empty_elements_->
                                           EnqueueBack(data_tube_empty_elements);
+    }
+    LogCvmfs(kLogDownload, kLogDebug, "Parallel downloads: %ld, "
+                                      "Extra memory needed (KB): %ld",
+                                      num_max_parallel_downloads_,
+                                      CURL_MAX_WRITE_SIZE
+                                      * num_max_parallel_downloads_
+                                      * num_ele_per_tube);
   }
 
   if (health_check_.UseCount() > 0) {
@@ -2011,87 +2014,95 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
-    if (!info->IsValidDataTube()) {
-      info->CreateDataTube();
-    }
-    if (info->data_tube_empty_elements() == NULL) {
-      info->SetDataTubeEmptyElements(GetUnusedDataTube());
+    if (num_max_parallel_downloads_ > 0) {
+      if (!info->IsValidDataTube()) {
+        info->CreateDataTube();
+      }
+      if (info->data_tube_empty_elements() == NULL) {
+        info->SetDataTubeEmptyElements(GetUnusedDataTube());
+      }
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo*>(info);
 
-    bool is_running = true;
-    do {
-      DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
-      switch (ele->action) {
-        case kActionStop:
-          is_running = false;
-        break;
-        case kActionEndOfData:
-          /*
-           * End of data processing.
-           * Used for synchronization before calling VerifyAndFinalize()
-           * Next element action received should be kActionStop
-           */
-        break;
-        case kActionData:
-        {
-          // quick escape
-          if (info->stop_data_download()) {
-            break;
-          }
+    if (num_max_parallel_downloads_ > 0) {
+      bool is_running = true;
+      do {
+        DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
-          char *ptr = ele->data;
-          const size_t num_bytes = ele->size;
-          if (info->expected_hash()) {
-            shash::Update(reinterpret_cast<unsigned char *>(ptr),
-                          num_bytes, info->hash_context());
-          }
+        switch (ele->action) {
+          case kActionStop:
+            is_running = false;
+          break;
+          case kActionEndOfData:
+            /*
+            * End of data processing.
+            * Used for synchronization before calling VerifyAndFinalize()
+            * Next element action received should be kActionStop
+            */
+          break;
+          case kActionData:
+          {
+            // quick escape
+            if (info->stop_data_download()) {
+              break;
+            }
 
-          if (info->compressed()) {
-            const zlib::StreamStates retval =
-              zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                          info->GetZstreamPtr(), info->sink());
-            if (retval == zlib::kStreamDataError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr,
+            char *ptr = ele->data;
+            const size_t num_bytes = ele->size;
+            if (info->expected_hash()) {
+              shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                            num_bytes, info->hash_context());
+            }
+
+            if (info->compressed()) {
+              const zlib::StreamStates retval =
+                zlib::DecompressZStream2Sink(ptr,
+                                           static_cast<int64_t>(num_bytes),
+                                           info->GetZstreamPtr(), info->sink());
+              if (retval == zlib::kStreamDataError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
                                      "(id %" PRId64 ") failed to decompress %s",
                                      info->id(), info->url()->c_str());
-              info->SetErrorCode(kFailBadData);
-              info->SetStopDataDownload(true);
-            } else if (retval == zlib::kStreamIOError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr,
+                info->SetErrorCode(kFailBadData);
+                info->SetStopDataDownload(true);
+              } else if (retval == zlib::kStreamIOError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
                             "(id %" PRId64 ") decompressing %s, local IO error",
                             info->id(), info->url()->c_str());
-              info->SetErrorCode(kFailLocalIO);
-              info->SetStopDataDownload(true);
-            }
-          } else {
-            const int64_t written = info->sink()->Write(ptr, num_bytes);
-            if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-              PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
-               "Failed to perform write of %zu bytes to sink %s with errno %ld",
-               info->id(), num_bytes, info->sink()->Describe().c_str(),
-               written);
+                info->SetErrorCode(kFailLocalIO);
+                info->SetStopDataDownload(true);
+              }
+            } else {
+              const int64_t written = info->sink()->Write(ptr, num_bytes);
+              if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+                PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
+                "Failed to perform write of %zu bytes to sink %s with errno %ld",
+                info->id(), num_bytes, info->sink()->Describe().c_str(),
+                written);
+              }
             }
           }
-        }
-        break;
-        default:
-          PANIC(kLogSyslogErr | kLogDebug,
+          break;
+          default:
+            PANIC(kLogSyslogErr | kLogDebug,
                "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
                info->id(), ele->action);
-      }
-      info->PutDataTubeElementToReuse(ele);
-    } while (is_running);
+        }
+        info->PutDataTubeElementToReuse(ele);
+      } while (is_running);
+    }
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
 
-    Tube<DataTubeElement>* tube = info->data_tube_empty_elements();
-    info->SetDataTubeEmptyElements(NULL);
-    PutDataTubeToReuse(tube);
+    if (num_max_parallel_downloads_ > 0) {
+      Tube<DataTubeElement>* tube = info->data_tube_empty_elements();
+      info->SetDataTubeEmptyElements(NULL);
+      PutDataTubeToReuse(tube);
+    }
 
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
@@ -3197,6 +3208,20 @@ void DownloadManager::CloneProxyConfig(DownloadManager *clone) {
   clone->opt_proxy_groups_ = new vector< vector<ProxyInfo> >(
     *opt_proxy_groups_);
   clone->UpdateProxiesUnlocked("cloned");
+}
+
+void DownloadManager::SetParallelDownloadOptions(
+                                 int64_t num_max_parallel_downloads,
+                                 int64_t buffer_size_per_parallel_download_kb) {
+  if (num_max_parallel_downloads > 0
+      && buffer_size_per_parallel_download_kb / CURL_MAX_WRITE_SIZE > 0) {
+    num_max_parallel_downloads_ = num_max_parallel_downloads;
+    buffer_size_per_parallel_download_kb_ =
+                                           buffer_size_per_parallel_download_kb;
+  } else {
+    num_max_parallel_downloads_ = -1;
+    buffer_size_per_parallel_download_kb_ = -1;
+  }
 }
 
 }  // namespace download

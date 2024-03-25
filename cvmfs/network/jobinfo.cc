@@ -11,26 +11,13 @@ atomic_int64 JobInfo::next_uuid = 0;
 
 
 DataTubeElement* JobInfo::GetUnusedDataTubeElement() {
-  DataTubeElement* ele = data_tube_empty_elements_->TryPopFront();
-
-  if (ele == NULL) {
-    char *data = static_cast<char*>(
-                            smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-    ele = new DataTubeElement(data, static_cast<size_t>(CURL_MAX_WRITE_SIZE),
-                              kActionUnused);
-  }
-
+  DataTubeElement* ele = data_tube_empty_elements_->PopFront();
   return ele;
 }
 
 void JobInfo::PutDataTubeElementToReuse(DataTubeElement* ele) {
   ele->action = kActionUnused;
-
-  Tube<DataTubeElement>::Link *link =
-                                 data_tube_empty_elements_->TryEnqueueBack(ele);
-  if (link == NULL) {  // queue is at max capacity
-    delete ele;
-  }
+  data_tube_empty_elements_->EnqueueBack(ele);
 }
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
