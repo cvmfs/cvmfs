@@ -70,33 +70,6 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-Tube<DataTubeElement>* DownloadManager::data_tube_empty_elements_ =
-                                              new Tube<DataTubeElement>(200000);
-// atomic_int32 DownloadManager::counter_use_data_tube_ = 0;
-
-static DataTubeElement* GetUnusedDataTubeElement() {
-  DataTubeElement* ele = DownloadManager::data_tube_empty_elements_->
-                                                                  TryPopFront();
-
-  if (ele == NULL) {
-    char *data = static_cast<char*>(
-                            smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-    ele = new DataTubeElement(data, static_cast<size_t>(CURL_MAX_WRITE_SIZE),
-                              kActionUnused);
-  }
-
-  return ele;
-}
-
-static void PutDataTubeElementToReuse(DataTubeElement* ele) {
-  ele->action = kActionUnused;
-  Tube<DataTubeElement>::Link *link =
-                DownloadManager::data_tube_empty_elements_->TryEnqueueBack(ele);
-  if (link == NULL) {  // queue is at max capacity
-    delete ele;
-  }
-}
-
 /**
  * Returns the status if an interrupt happened for a given repository.
  *
@@ -282,21 +255,19 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
-  // the check for kFailOk is to check when using the DataTube that there was
-  // not early some cancellation of the download due to error
   if (num_bytes == 0 || info->stop_data_download()) {
     return 0;
   }
 
   if (info->IsValidDataTube()) {
-    DataTubeElement *ele = GetUnusedDataTubeElement();
-    assert(num_bytes <= static_cast<size_t>(CURL_MAX_WRITE_SIZE));
+    DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                     GetUnusedDataTubeElement();
+    assert(num_bytes <= info->parallel_dwnld_coord()->buffer_size());
     memcpy(ele->data, ptr, num_bytes);
     ele->size = num_bytes;
     ele->action = kActionData;
     info->GetDataTubePtr()->EnqueueBack(ele);
-  } else {  // TODO(heretherebedragons) i think we need this here to support
-            // the non-multihreaded version?
+  } else {
     if (info->expected_hash()) {
       shash::Update(reinterpret_cast<unsigned char *>(ptr),
                     num_bytes, info->hash_context());
@@ -424,6 +395,23 @@ static int CallbackCurlDebug(
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
+
+void DownloadManager::InitParallelDownload(int64_t parallel_dwld_min_buffers,
+                                       int64_t parallel_dwld_max_buffers,
+                                       int64_t parallel_dwld_inflight_buffers) {
+  assert(!parallel_dwnld_coord_.IsValid());
+  if (parallel_dwld_min_buffers < 0 || parallel_dwld_max_buffers < 0
+      || parallel_dwld_inflight_buffers < 1) {
+    use_parallel_download_ = false;
+    return;
+  }
+  parallel_dwnld_coord_ = new ParallelDownloadCoordinator(
+                                      parallel_dwld_min_buffers,
+                                      parallel_dwld_max_buffers,
+                                      parallel_dwld_inflight_buffers,
+                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE));
+  use_parallel_download_ = true;
+}
 
 bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
@@ -599,15 +587,6 @@ int DownloadManager::CallbackCurlSocket(CURL * /* easy */,
 }
 
 
-struct TupelJobDone {
-  JobInfo* info;
-  int curl_error;
-  CURL *easy_handle;
-
-  TupelJobDone(JobInfo* i, int error, CURL *handle) :
-                             info(i), curl_error(error), easy_handle(handle) { }
-};
-
 /**
  * Worker thread event loop.  Waits on new JobInfo structs on a pipe.
  */
@@ -637,6 +616,7 @@ void *DownloadManager::MainDownload(void *data) {
   struct timeval timeval_start, timeval_stop;
   gettimeofday(&timeval_start, NULL);
 
+  // used for parallel_download
   // vector of jobinfo elements that are considered finished from CURL pov
   // but data processing in Fetch() might not be finished yet. Processing must
   // be finished before being able to call VerifyAndFinalize()
@@ -660,7 +640,8 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           if (info->IsValidDataTube()) {
-            DataTubeElement *ele = GetUnusedDataTubeElement();
+            DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                     GetUnusedDataTubeElement();
             ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
@@ -782,7 +763,8 @@ void *DownloadManager::MainDownload(void *data) {
         // let's notify CURL is done and queue it up and wait for finishing the
         // data processing so that VerifyAndFinalize executes correctly
         if (info->IsValidDataTube()) {
-          DataTubeElement *ele = GetUnusedDataTubeElement();
+          DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                     GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
           info->GetDataTubePtr()->EnqueueBack(ele);
           vec_curl_done.push_back(TupelJobDone(info, curl_error, easy_handle));
@@ -800,7 +782,8 @@ void *DownloadManager::MainDownload(void *data) {
           download_mgr->ReleaseCurlHandle(easy_handle);
 
           if (info->IsValidDataTube()) {
-            DataTubeElement *ele = GetUnusedDataTubeElement();
+            DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                     GetUnusedDataTubeElement();
             ele->action = kActionStop;
             info->GetDataTubePtr()->EnqueueBack(ele);
           }
@@ -1795,12 +1778,9 @@ DownloadManager::~DownloadManager() {
     health_check_.Reset();
   }
 
-  // const int32_t old_count =
-  //                atomic_xadd32(&DownloadManager::counter_use_data_tube_, -1);
-  // if (old_count == 1) {
-  //   delete data_tube_empty_elements_;
-  // }
-
+  // TODO(heretherebedragons) is this an issue if JobInfo elements
+  // are still alive?
+  parallel_dwnld_coord_.Destroy();
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
@@ -1904,10 +1884,11 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_timestamp_backup_host_(0),
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
-                  counters_(new Counters(statistics))
+                  counters_(new Counters(statistics)),
+                  use_parallel_download_(false),
+                  parallel_dwnld_coord_(NULL)
 {
   atomic_init32(&multi_threaded_);
-  // atomic_inc32(&DownloadManager::counter_use_data_tube_);
 
   lock_options_ =
           reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -1958,17 +1939,6 @@ void DownloadManager::Spawn() {
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
-
-  if (DownloadManager::data_tube_empty_elements_->size() == 0) {
-    for (size_t i = 0; i < 10000; i++) {
-      char *data = static_cast<char*>(
-                             smalloc(static_cast<size_t>(CURL_MAX_WRITE_SIZE)));
-      DataTubeElement *ele = new DataTubeElement(data,
-                                       static_cast<size_t>(CURL_MAX_WRITE_SIZE),
-                                       kActionUnused);
-      DownloadManager::data_tube_empty_elements_->EnqueueBack(ele);
-    }
-  }
 
   if (health_check_.UseCount() > 0) {
     LogCvmfs(kLogDownload, kLogDebug,
@@ -2031,78 +2001,82 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
-    if (!info->IsValidDataTube()) {
-      info->CreateDataTube();
+    if (use_parallel_download_ && !info->IsValidDataTube()) {
+      info->SetupParallelDownload(parallel_dwnld_coord_.weak_ref());
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo*>(info);
 
-    bool is_running = true;
-    do {
-      DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
+    if (use_parallel_download_) {
+      bool is_running = true;
+      do {
+        DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
-      switch (ele->action) {
-        case kActionStop:
-          is_running = false;
-        break;
-        case kActionEndOfData:
-          /*
-           * End of data processing.
-           * Used for synchronization before calling VerifyAndFinalize()
-           * Next element action received should be kActionStop
-           */
-        break;
-        case kActionData:
-        {
-          // quick escape
-          if (info->stop_data_download()) {
-            break;
-          }
+        switch (ele->action) {
+          case kActionStop:
+            is_running = false;
+          break;
+          case kActionEndOfData:
+            /*
+            * End of data processing.
+            * Used for synchronization before calling VerifyAndFinalize()
+            * Next element action received should be kActionStop
+            */
+          break;
+          case kActionData:
+          {
+            // quick escape
+            if (info->stop_data_download()) {
+              break;
+            }
 
-          char *ptr = ele->data;
-          const size_t num_bytes = ele->size;
-          if (info->expected_hash()) {
-            shash::Update(reinterpret_cast<unsigned char *>(ptr),
-                          num_bytes, info->hash_context());
-          }
+            char *ptr = ele->data;
+            const size_t num_bytes = ele->size;
+            if (info->expected_hash()) {
+              shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                            num_bytes, info->hash_context());
+            }
 
-          if (info->compressed()) {
-            const zlib::StreamStates retval =
-              zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                          info->GetZstreamPtr(), info->sink());
-            if (retval == zlib::kStreamDataError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr,
+            if (info->compressed()) {
+              const zlib::StreamStates retval =
+                zlib::DecompressZStream2Sink(ptr,
+                                           static_cast<int64_t>(num_bytes),
+                                           info->GetZstreamPtr(), info->sink());
+              if (retval == zlib::kStreamDataError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
                                      "(id %" PRId64 ") failed to decompress %s",
                                      info->id(), info->url()->c_str());
-              info->SetErrorCode(kFailBadData);
-              info->SetStopDataDownload(true);
-            } else if (retval == zlib::kStreamIOError) {
-              LogCvmfs(kLogDownload, kLogSyslogErr,
+                info->SetErrorCode(kFailBadData);
+                info->SetStopDataDownload(true);
+              } else if (retval == zlib::kStreamIOError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
                             "(id %" PRId64 ") decompressing %s, local IO error",
                             info->id(), info->url()->c_str());
-              info->SetErrorCode(kFailLocalIO);
-              info->SetStopDataDownload(true);
-            }
-          } else {
-            const int64_t written = info->sink()->Write(ptr, num_bytes);
-            if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-              PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
-               "Failed to perform write of %zu bytes to sink %s with errno %ld",
-               info->id(), num_bytes, info->sink()->Describe().c_str(),
-               written);
+                info->SetErrorCode(kFailLocalIO);
+                info->SetStopDataDownload(true);
+              }
+            } else {
+              const int64_t written = info->sink()->Write(ptr, num_bytes);
+              if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+                PANIC(kLogStderr | kLogDebug, "(id %" PRId64 ") "
+                        "Failed to perform write of %zu bytes to sink %s "
+                        "with errno %ld",
+                        info->id(), num_bytes, info->sink()->Describe().c_str(),
+                        written);
+              }
             }
           }
-        }
-        break;
-        default:
-          LogCvmfs(kLogDownload, kLogSyslogErr | kLogDebug,
+          break;
+          default:
+            PANIC(kLogSyslogErr | kLogDebug,
                "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
                info->id(), ele->action);
-      }
-      PutDataTubeElementToReuse(ele);
-    } while (is_running);
+        }
+        info->parallel_dwnld_coord()->PutDataTubeElementToReuse(ele);
+      } while (is_running);
+    }  // end use_parallel_download_
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
@@ -3209,6 +3183,12 @@ DownloadManager *DownloadManager::Clone(
   clone->sharding_policy_ = sharding_policy_;
   clone->failover_indefinitely_ = failover_indefinitely_;
   clone->fqrn_ = fqrn_;
+
+  if (use_parallel_download_) {
+    clone->InitParallelDownload(parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->inflight_buffers());
+  }
 
   return clone;
 }

@@ -18,6 +18,7 @@
 #include "network/sink.h"
 #include "statistics.h"
 #include "util/file_guard.h"
+#include "util/platform.h"
 #include "util/posix.h"
 #include "util/prng.h"
 
@@ -549,6 +550,84 @@ TEST_F(T_Download, EscapeUrl) {
   const std::string res = download_mgr.EscapeUrl(0, url);
 
   EXPECT_TRUE(res == correct);
+}
+
+TEST_F(T_Download, ParallelDownload) {
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  MockFileServer file_server(8082, sandbox_path_);
+
+  string src_path = GetBigFile();
+  string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
+
+  cvmfs::FileSink filesink(fdest);
+
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
+              NULL, &filesink);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(file_server.num_processed_requests(), 1);
+  EXPECT_EQ(info.error_code(), kFailOk);
+
+  DownloadManager *parallel_dm = new DownloadManager(1,
+                                  perf::StatisticsTemplate("h", &statistics));
+  parallel_dm->InitParallelDownload(500, 500, 500);
+  EXPECT_TRUE(parallel_dm->use_parallel_download());
+  JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
+              NULL, &filesink);
+  parallel_dm->Fetch(&info2);
+  EXPECT_EQ(file_server.num_processed_requests(), 2);
+  EXPECT_EQ(info2.error_code(), kFailOk);
+
+
+
+  // test correct initialization of InitParallelDownload()
+  DownloadManager *dm = new DownloadManager(1,
+                                    perf::StatisticsTemplate("f", &statistics));
+  EXPECT_FALSE(dm->use_parallel_download());
+  delete dm;
+
+  // test extrem values for parallel download
+  dm = new DownloadManager(1, perf::StatisticsTemplate("j", &statistics));
+  dm->InitParallelDownload(0, 0, 1);
+  EXPECT_TRUE(dm->use_parallel_download());
+  JobInfo info3(&src_url, false /* compressed */, false /* probe hosts */,
+               NULL, &filesink);
+  dm->Fetch(&info3);
+  EXPECT_EQ(info3.error_code(), kFailOk);
+  fclose(fdest);
+  delete dm;
+
+  dm = new DownloadManager(1, perf::StatisticsTemplate("l", &statistics));
+  dm->InitParallelDownload(10, 5, 1);
+  EXPECT_TRUE(dm->use_parallel_download());
+  EXPECT_TRUE(dm->use_parallel_download());
+  EXPECT_EQ(dm->GetParallelDwnldCoordPtr()->min_buffers(), 5);
+  EXPECT_EQ(dm->GetParallelDwnldCoordPtr()->max_buffers(), 5);
+  EXPECT_EQ(dm->GetParallelDwnldCoordPtr()->inflight_buffers(), 1);
+  delete dm;
+
+  // test correct cloning of ParallelDownloadCoordinator
+  DownloadManager *download_mgr_cloned = download_mgr.Clone(
+                                    perf::StatisticsTemplate("x", &statistics));
+  EXPECT_FALSE(download_mgr_cloned->use_parallel_download());
+  EXPECT_TRUE(download_mgr_cloned->GetParallelDwnldCoordPtr() == NULL);
+  delete download_mgr_cloned;
+
+  download_mgr_cloned = parallel_dm->Clone(
+                                    perf::StatisticsTemplate("g", &statistics));
+  EXPECT_TRUE(download_mgr_cloned->use_parallel_download());
+  EXPECT_EQ(parallel_dm->GetParallelDwnldCoordPtr()->min_buffers(),
+    download_mgr_cloned->GetParallelDwnldCoordPtr()->min_buffers());
+  EXPECT_EQ(parallel_dm->GetParallelDwnldCoordPtr()->max_buffers(),
+    download_mgr_cloned->GetParallelDwnldCoordPtr()->max_buffers());
+  EXPECT_EQ(parallel_dm->GetParallelDwnldCoordPtr()->inflight_buffers(),
+    download_mgr_cloned->GetParallelDwnldCoordPtr()->inflight_buffers());
+  delete download_mgr_cloned;
+
+  delete parallel_dm;
 }
 
 }  // namespace download
