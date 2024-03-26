@@ -80,6 +80,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/parallel_download_coordinator.cc
        network/sink_file.cc
        network/sink_mem.cc
        network/sink_path.cc
@@ -599,6 +600,7 @@ if (BUILD_SERVER)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/parallel_download_coordinator.cc
        network/s3fanout.cc
        network/sink_file.cc
        network/sink_mem.cc
@@ -740,6 +742,7 @@ if (BUILD_SERVER)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/parallel_download_coordinator.cc
        network/s3fanout.cc
        network/sink_file.cc
        network/sink_mem.cc
@@ -833,6 +836,7 @@ if (BUILD_SERVER)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/parallel_download_coordinator.cc
        network/sink_file.cc
        network/sink_mem.cc
        network/sink_path.cc
@@ -1038,6 +1042,7 @@ if(BUILD_RECEIVER)
        network/dns.cc
        network/download.cc
        network/jobinfo.cc
+       network/parallel_download_coordinator.cc
        network/s3fanout.cc
        network/sink_file.cc
        network/sink_mem.cc
@@ -1198,6 +1203,7 @@ if (BUILD_PRELOADER)
                   network/dns.cc
                   network/download.cc
                   network/jobinfo.cc
+                  network/parallel_download_coordinator.cc
                   network/s3fanout.cc
                   network/sink_file.cc
                   network/sink_mem.cc

@@ -25,6 +25,7 @@
 #include "network/health_check.h"
 #include "network/jobinfo.h"
 #include "network/network_errors.h"
+#include "network/parallel_download_coordinator.h"
 #include "network/sharding_policy.h"
 #include "network/sink.h"
 #include "ssl.h"
@@ -139,15 +140,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   };
 
   /**
-   * Tube to hold empty elements use in JobInfo data_tube_
-   * Shared with all DownloadManagers
-   * Must be static because of CallbackCurlData
-   */
-  static Tube<DataTubeElement>* data_tube_empty_elements_;
-  // counter so that last DownloadManager can delete data_tube_empty_elements_
-  // static atomic_int32 counter_use_data_tube_;
-
-  /**
    * No attempt was made to order stratum 1 servers
    */
   static const int kProbeUnprobed;
@@ -225,6 +217,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+  void InitParallelDownload(int64_t parallel_dwld_min_buffers,
+                            int64_t parallel_dwld_max_buffers,
+                            int64_t parallel_dwld_inflight_buffers);
+  ParallelDownloadCoordinator *GetParallelDwnldCoordPtr() {
+                          return parallel_dwnld_coord_.weak_ref(); }
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -445,6 +442,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  bool use_parallel_download_;
+  UniquePtr<ParallelDownloadCoordinator > parallel_dwnld_coord_;
 };  // DownloadManager
 
 }  // namespace download
