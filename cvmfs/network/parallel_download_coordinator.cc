@@ -32,7 +32,7 @@ ParallelDownloadCoordinator::ParallelDownloadCoordinator(
     min_buffers_ = max_buffers_;
   }
 
-  for (int64_t i = 0; i < min_buffers; i++) {
+  for (int64_t i = 0; i < min_buffers_; i++) {
     char *data = static_cast<char*>(smalloc(buffer_size_));
     DataTubeElement *ele = new DataTubeElement(data, buffer_size_,
                                                kActionUnused);

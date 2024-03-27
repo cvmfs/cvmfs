@@ -59,6 +59,9 @@ class ParallelDownloadCoordinator {
   DataTubeElement* GetUnusedDataTubeElement();
   void PutDataTubeElementToReuse(DataTubeElement* ele);
   size_t buffer_size() const { return buffer_size_; }
+  int64_t min_buffers() const { return min_buffers_; }
+  int64_t max_buffers() const { return max_buffers_; }
+  int64_t inflight_buffers() const { return inflight_buffers_; }
 
  private:
   int64_t min_buffers_;

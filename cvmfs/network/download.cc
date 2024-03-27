@@ -3140,6 +3140,12 @@ DownloadManager *DownloadManager::Clone(
   clone->failover_indefinitely_ = failover_indefinitely_;
   clone->fqrn_ = fqrn_;
 
+  if (use_parallel_download_) {
+    clone->InitParallelDownload(parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->inflight_buffers());
+  }
+
   return clone;
 }
 
