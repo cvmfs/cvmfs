@@ -1862,6 +1862,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
                   counters_(new Counters(statistics)),
+                  use_parallel_download_(false),
                   parallel_dwnld_coord_(NULL)
 {
   atomic_init32(&multi_threaded_);

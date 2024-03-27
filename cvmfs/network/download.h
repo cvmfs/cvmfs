@@ -221,7 +221,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
                             int64_t parallel_dwld_max_buffers,
                             int64_t parallel_dwld_inflight_buffers);
   ParallelDownloadCoordinator *GetParallelDwnldCoordPtr() {
-                          return parallel_dwnld_coord_.weak_ref(); }
+                                      return parallel_dwnld_coord_.weak_ref(); }
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -231,6 +231,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   dns::IpPreference opt_ip_preference() const {
     return opt_ip_preference_;
   }
+
+  bool use_parallel_download() const { return use_parallel_download_; }
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
