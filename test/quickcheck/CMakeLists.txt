@@ -65,6 +65,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
+  ${CVMFS_SOURCE_DIR}/network/parallel_download_coordinator.cc
   ${CVMFS_SOURCE_DIR}/network/s3fanout.cc
   ${CVMFS_SOURCE_DIR}/network/sink_file.cc
   ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
