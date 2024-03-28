@@ -78,8 +78,14 @@ void JobInfo::Init() {
   memset(&zstream_, 0, sizeof(zstream_));
 }
 
+/**
+ * Setup all (communication) objects needed to be able to perform parallel
+ * download.
+ */
 void JobInfo::SetupParallelDownload(ParallelDownloadCoordinator*
                                                          parallel_dwnld_coord) {
+  assert(parallel_dwnld_coord != NULL);
+  assert(!data_tube_.IsValid());
   parallel_dwnld_coord_ = parallel_dwnld_coord;
   data_tube_ = new Tube<DataTubeElement>(parallel_dwnld_coord->buffer_size());
 }

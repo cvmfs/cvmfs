@@ -1,5 +1,31 @@
 /**
  * This file is part of the CernVM File System.
+ * 
+ * The ParallelDownloadCoordinator provides all facilities to perform parallel
+ * downloading. While CURL download request with the multi handle are by 
+ * definition in parallel, the subsequent handling of the callbacks are not.
+ * Here in the DownloadManager, the MainDownload()-Thread sequentially polls
+ * for events happening and sequentially processes them.
+ * 
+ * In the classical approach, a fuse-thread requests to download an object via
+ * Fetch(). The MainDownload()-thread process this request and sends it to CURL.
+ * The MainDownload() then waits for all CallbackCurlData()-calls. Each
+ * CallbackCurlData() will get a chunk of data that needs to be decompressed.
+ * As such, every single invocation of CallbackCurlData() is handled 
+ * sequentially - for ALL downloads. There is no parallelism in MainDownload().
+ * This is a bottleneck if many parallel downloads are performed.
+ * 
+ * The ParallelDownloadCoordinator provides functionality which allows to
+ * quickly copy the CallbackCurlData() buffer and send it over to Fetch().
+ * Instead of Fetch() only waiting to finished the download, it now can perform
+ * the decompression. Additional synchronization is needed so that
+ * VerifyAndFinalize() is only called after CURL has finished the download
+ * AND all data chunks were decompressed in Fetch().
+ * 
+ * To prevent too many malloc/free, ParallelDownloadCoordinator has a global
+ * queue of empty buffer elements (DataTubeElement) which CallbackCurlData()
+ * will use to transfer the data to Fetch(). If no DataTubeElement is available
+ * a new one is created. If too many DataTubeElement exist, they are deleted.
  */
 
 #include "network/parallel_download_coordinator.h"

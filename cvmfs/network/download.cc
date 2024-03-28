@@ -255,8 +255,6 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
-  // the check for kFailOk is to check when using the DataTube that there was
-  // not early some cancellation of the download due to error
   if (num_bytes == 0 || info->stop_data_download()) {
     return 0;
   }
@@ -401,6 +399,7 @@ const int DownloadManager::kProbeGeo      = -3;
 void DownloadManager::InitParallelDownload(int64_t parallel_dwld_min_buffers,
                                        int64_t parallel_dwld_max_buffers,
                                        int64_t parallel_dwld_inflight_buffers) {
+  assert(!parallel_dwnld_coord_.IsValid());
   if (parallel_dwld_min_buffers < 0 || parallel_dwld_max_buffers < 0
       || parallel_dwld_inflight_buffers < 1) {
     use_parallel_download_ = false;
@@ -586,7 +585,6 @@ int DownloadManager::CallbackCurlSocket(CURL * /* easy */,
 
   return 0;
 }
-
 
 
 /**

@@ -445,6 +445,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    */
   SslCertificateStore ssl_certificate_store_;
 
+  /**
+   * Parallel download that allows the fuse-thread calling Fetch() to perform
+   * the decompression instead of the sequentially executed CallbackCurlData()
+   */
   bool use_parallel_download_;
   UniquePtr<ParallelDownloadCoordinator > parallel_dwnld_coord_;
 };  // DownloadManager
