@@ -559,42 +559,26 @@ TEST_F(T_Download, ParallelDownload) {
 
   MockFileServer file_server(8082, sandbox_path_);
 
-  string src_path = GetHugeFile();
+  string src_path = GetBigFile();
   string src_url = "http://127.0.0.1:8082/" + GetFileName(src_path);
 
-  uint64_t sum_normal = 0;
-  uint64_t sum_parallel = 0;
+  cvmfs::FileSink filesink(fdest);
+
+  JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
+              NULL, &filesink);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(file_server.num_processed_requests(), 1);
+  EXPECT_EQ(info.error_code(), kFailOk);
 
   DownloadManager *parallel_dm = new DownloadManager(1,
                                   perf::StatisticsTemplate("h", &statistics));
   parallel_dm->InitParallelDownload(500, 500, 500);
-
-  cvmfs::FileSink filesink(fdest);
-
-  // speed test. parallel should be at least as fast as serialized
-  // this seems to fail occassionally even over looping
-  // for (int i = 0; i < 10; i++) {
-  //   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
-  //               NULL, &filesink);
-  //   uint64_t before_normal = platform_monotonic_time_ns();
-  //   download_mgr.Fetch(&info);
-  //   uint64_t after_normal = platform_monotonic_time_ns();
-  //   EXPECT_EQ(file_server.num_processed_requests(), i*2 + 1);
-  //   EXPECT_EQ(info.error_code(), kFailOk);
-
-  //   EXPECT_TRUE(parallel_dm->use_parallel_download());
-  //   JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
-  //               NULL, &filesink);
-  //   uint64_t before_parallel = platform_monotonic_time_ns();
-  //   parallel_dm->Fetch(&info2);
-  //   uint64_t after_parallel = platform_monotonic_time_ns();
-  //   EXPECT_EQ(file_server.num_processed_requests(), (i+1)*2);
-  //   EXPECT_EQ(info2.error_code(), kFailOk);
-
-  //   sum_normal += after_normal - before_normal;
-  //   sum_parallel += after_parallel - before_parallel;
-  // }
-  // EXPECT_GE(sum_normal, sum_parallel);
+  EXPECT_TRUE(parallel_dm->use_parallel_download());
+  JobInfo info2(&src_url, false /* compressed */, false /* probe hosts */,
+              NULL, &filesink);
+  parallel_dm->Fetch(&info2);
+  EXPECT_EQ(file_server.num_processed_requests(), 2);
+  EXPECT_EQ(info2.error_code(), kFailOk);
 
 
 
