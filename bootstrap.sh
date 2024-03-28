@@ -255,7 +255,7 @@ build_lib() {
       patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
-    go)
+    golang)
       if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
         do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
         do_build "go"
@@ -277,7 +277,7 @@ if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
 if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-    missing_libs="$missing_libs go"
+    missing_libs="$missing_libs golang"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
