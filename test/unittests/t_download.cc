@@ -568,7 +568,7 @@ TEST_F(T_Download, ParallelDownload) {
   DownloadManager *parallel_dm = new DownloadManager(1,
                                   perf::StatisticsTemplate("h", &statistics));
   parallel_dm->InitParallelDownload(500, 500, 500);
-  
+
   cvmfs::FileSink filesink(fdest);
 
   // speed test. parallel should be at least as fast as serialized
@@ -606,7 +606,7 @@ TEST_F(T_Download, ParallelDownload) {
 
   // test extrem values for parallel download
   dm = new DownloadManager(1, perf::StatisticsTemplate("j", &statistics));
-  dm->InitParallelDownload(0,0,1);
+  dm->InitParallelDownload(0, 0, 1);
   EXPECT_TRUE(dm->use_parallel_download());
   JobInfo info3(&src_url, false /* compressed */, false /* probe hosts */,
                NULL, &filesink);
@@ -616,7 +616,7 @@ TEST_F(T_Download, ParallelDownload) {
   delete dm;
 
   dm = new DownloadManager(1, perf::StatisticsTemplate("l", &statistics));
-  dm->InitParallelDownload(10,5,1);
+  dm->InitParallelDownload(10, 5, 1);
   EXPECT_TRUE(dm->use_parallel_download());
   EXPECT_TRUE(dm->use_parallel_download());
   EXPECT_EQ(dm->GetParallelDwnldCoordPtr()->min_buffers(), 5);
