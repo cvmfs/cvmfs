@@ -74,7 +74,7 @@ class ParallelDownloadCoordinator {
   int64_t inflight_buffers() const { return inflight_buffers_; }
 
  private:
-  int64_t min_buffers_;  // num eles prefilled into data_tube_empty_elements_
+  int64_t min_buffers_;  // prefilled #elements in data_tube_empty_elements_
   int64_t max_buffers_;  // max size of data_tube_empty_elements_
 
   /**
