@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cvmfs-default
+spec:
+  csi:
+    driver: cvmfs.csi.cern.ch
+    volumeHandle: cvmfs-default
+  accessModes:
+  - ReadOnlyMany
+  capacity:
+    storage: 1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvmfs
+  namespace: default
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 1
+  volumeName: cvmfs-default
+  storageClassName: ""
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: validation-cern
+  labels:
+    app: validation-cern
+    ci: "true"
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+       - name: atlas
+         image: busybox
+         command: ["/bin/sh", "-c", "cat /cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase/README.INSTALL"]
+         volumeMounts:
+           - mountPath: /cvmfs
+             mountPropagation: HostToContainer
+             name: cvmfs
+       - name: cms
+         image: busybox
+         command: ["/bin/sh", "-c", "cat /cvmfs/cms.cern.ch/README"]
+         volumeMounts:
+           - mountPath: /cvmfs
+             mountPropagation: HostToContainer
+             name: cvmfs
+      volumes:
+      - name: cvmfs
+        persistentVolumeClaim:
+          claimName: cvmfs
+          readOnly: true

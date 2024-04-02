@@ -1,0 +1,16 @@
+{{- if .Values.cvmfsConfig }}
+{{- fail "cvmfsConfig is not supported anymore. Please use extraConfigMaps, extraVolumes and extraVolumeMounts instead." }}
+{{- end }}
+{{- range $key, $value := .Values.extraConfigMaps }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $key }}
+  labels:
+    {{- include "cvmfs-csi.common.metaLabels" $ | nindent 4 }}
+data:
+  {{- range $dataKey, $dataValue := $value }}
+  {{ $dataKey }}: {{ tpl (toYaml $dataValue) $ | indent 2 }}
+  {{- end }}
+{{- end }}

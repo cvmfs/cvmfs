@@ -1,0 +1,239 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: {{ include "cvmfs-csi.nodeplugin.fullname" . }}
+  labels:
+    {{- include "cvmfs-csi.nodeplugin.labels" .  | nindent 4 }}
+spec:
+  updateStrategy: {{ toYaml .Values.nodeplugin.updateStrategySpec | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "cvmfs-csi.nodeplugin.matchLabels" .  | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cvmfs-csi.nodeplugin.labels" .  | nindent 8 }}
+    spec:
+      # hostPID is required for autofs to work.
+      hostPID: {{ .Values.nodeplugin.hostPID }}
+      {{- if .Values.nodeplugin.serviceAccount.use }}
+      serviceAccount: {{ include "cvmfs-csi.serviceAccountName.nodeplugin" . }}
+      {{- end }}
+      containers:
+        - name: registrar
+          image: {{ .Values.nodeplugin.registrar.image.repository }}:{{ .Values.nodeplugin.registrar.image.tag }}
+          imagePullPolicy: {{ .Values.nodeplugin.registrar.image.pullPolicy }}
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --csi-address=$(CSI_ADDRESS)
+            - --kubelet-registration-path=$(KUBELET_CSI_REGISTRATION_PATH)
+          env:
+            - name: CSI_ADDRESS
+              value: /csi/{{ .Values.cvmfsCSIPluginSocketFile }}
+            - name: KUBELET_CSI_REGISTRATION_PATH
+              value: {{ .Values.kubeletDirectory }}/plugins/{{ .Values.csiDriverName }}/{{ .Values.cvmfsCSIPluginSocketFile }}
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+          {{- with .Values.nodeplugin.registrar.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        - name: nodeplugin
+          image: {{ .Values.nodeplugin.plugin.image.repository }}:{{ .Values.nodeplugin.plugin.image.tag }}
+          command: [/csi-cvmfsplugin]
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --nodeid=$(NODE_ID)
+            - --endpoint=$(CSI_ENDPOINT)
+            - --drivername=$(CSI_DRIVERNAME)
+            - --role=identity,node
+            - --automount-startup-timeout={{ .Values.automountDaemonStartupTimeout }}
+            - --singlemount-runner-endpoint=unix:///var/lib/cvmfs.csi.cern.ch/singlemount-runner.sock
+          imagePullPolicy: {{ .Values.nodeplugin.plugin.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: unix://{{ .Values.kubeletDirectory }}/plugins/{{ .Values.csiDriverName }}/{{ .Values.cvmfsCSIPluginSocketFile }}
+            - name: CSI_DRIVERNAME
+              value: {{ .Values.csiDriverName }}
+          volumeMounts:
+            - name: plugins-dir
+              mountPath: {{ .Values.kubeletDirectory }}/plugins
+              mountPropagation: Bidirectional
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - name: runtime-metadata
+              mountPath: /var/lib/cvmfs.csi.cern.ch
+            - name: host-sys
+              mountPath: /sys
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+            - name: autofs-root
+              mountPath: /cvmfs
+              mountPropagation: Bidirectional
+            {{- with .Values.nodeplugin.plugin.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.nodeplugin.plugin.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        - name: automount
+          image: {{ .Values.nodeplugin.automount.image.repository }}:{{ .Values.nodeplugin.automount.image.tag }}
+          command: [/automount-runner]
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --unmount-timeout={{ .Values.automountDaemonUnmountTimeout }}
+            - --has-alien-cache={{ .Values.cache.alien.enabled }}
+          imagePullPolicy: {{ .Values.nodeplugin.plugin.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - mountPath: /sys
+              name: host-sys
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+            - name: autofs-root
+              mountPath: /cvmfs
+              mountPropagation: Bidirectional
+            - name: cvmfs-localcache
+              mountPath: /cvmfs-localcache
+            {{- if .Values.cache.alien.enabled }}
+            - name: cvmfs-aliencache
+              mountPath: /cvmfs-aliencache
+            {{- end }}
+            {{- with .Values.nodeplugin.automount.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.nodeplugin.plugin.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        - name: automount-reconciler
+          image: {{ .Values.nodeplugin.automountReconciler.image.repository }}:{{ .Values.nodeplugin.automountReconciler.image.tag }}
+          command: [/automount-reconciler]
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --period={{ .Values.automountReconcilePeriod }}
+          imagePullPolicy: {{ .Values.nodeplugin.automountReconciler.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - name: autofs-root
+              mountPath: /cvmfs
+              mountPropagation: Bidirectional
+            - name: cvmfs-localcache
+              mountPath: /cvmfs-localcache
+            {{- with .Values.nodeplugin.automountReconciler.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.nodeplugin.automountReconciler.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        - name: singlemount
+          image: {{ .Values.nodeplugin.singlemount.image.repository }}:{{ .Values.nodeplugin.singlemount.image.tag }}
+          command: [/singlemount-runner]
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --endpoint=unix:///var/lib/cvmfs.csi.cern.ch/singlemount-runner.sock
+          imagePullPolicy: {{ .Values.nodeplugin.singlemount.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - name: plugins-dir
+              mountPath: {{ .Values.kubeletDirectory }}/plugins
+              mountPropagation: Bidirectional
+            - name: pods-mount-dir
+              mountPath: {{ .Values.kubeletDirectory }}/pods
+              mountPropagation: Bidirectional
+            - mountPath: /sys
+              name: host-sys
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+            - name: runtime-metadata
+              mountPath: /var/lib/cvmfs.csi.cern.ch
+            {{- with .Values.nodeplugin.singlemount.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.nodeplugin.singlemount.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: {{ .Values.kubeletDirectory }}/plugins/{{ .Values.csiDriverName }}
+            type: DirectoryOrCreate
+        - name: plugins-dir
+          hostPath:
+            path: {{ .Values.kubeletDirectory }}/plugins
+        - name: registration-dir
+          hostPath:
+            path: {{ .Values.kubeletDirectory }}/plugins_registry
+            type: DirectoryOrCreate
+        - name: pods-mount-dir
+          hostPath:
+            path: {{ .Values.kubeletDirectory }}/pods
+            type: Directory
+        - name: host-sys
+          hostPath:
+            path: /sys
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: runtime-metadata
+          emptyDir: {}
+        - name: autofs-root
+          hostPath:
+            path: {{ .Values.automountHostPath }}
+            type: DirectoryOrCreate
+        - name: cvmfs-localcache
+          {{- toYaml .Values.cache.local.volumeSpec | nindent 10 }}
+        {{- if .Values.cache.alien.enabled }}
+        - name: cvmfs-aliencache
+          {{- toYaml .Values.cache.alien.volumeSpec | nindent 10 }}
+        {{- end }}
+        {{- with .Values.nodeplugin.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeplugin.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeplugin.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeplugin.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeplugin.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}

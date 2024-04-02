@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cvmfs-all-repos
+  labels:
+    app: cvmfs-all-repos
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cvmfs-all-repos
+  template:
+    metadata:
+      labels:
+        app: cvmfs-all-repos
+    spec:
+      containers:
+       - name: idle
+         image: busybox
+         imagePullPolicy: IfNotPresent
+         command: [ "/bin/sh", "-c", "trap : TERM INT; (while true; do sleep 1000; done) & wait" ]
+         volumeMounts:
+           - name: my-cvmfs
+             mountPath: /my-cvmfs
+             # CVMFS automount volumes must be mounted with HostToContainer mount propagation.
+             mountPropagation: HostToContainer
+      volumes:
+       - name: my-cvmfs
+         persistentVolumeClaim:
+           claimName: cvmfs

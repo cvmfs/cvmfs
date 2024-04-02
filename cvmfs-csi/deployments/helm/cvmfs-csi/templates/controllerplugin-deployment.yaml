@@ -1,0 +1,71 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ include "cvmfs-csi.controllerplugin.fullname" . }}
+  labels:
+    {{- include "cvmfs-csi.controllerplugin.labels" .  | nindent 4 }}
+spec:
+  replicas: {{ .Values.controllerplugin.replicas }}
+  strategy: {{ toYaml .Values.controllerplugin.deploymentStrategySpec | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "cvmfs-csi.controllerplugin.matchLabels" .  | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cvmfs-csi.controllerplugin.labels" .  | nindent 8 }}
+    spec:
+      serviceAccount: {{ include "cvmfs-csi.serviceAccountName.controllerplugin" . }}
+      containers:
+        - name: provisioner
+          image: {{ .Values.controllerplugin.provisioner.image.repository }}:{{ .Values.controllerplugin.provisioner.image.tag }}
+          imagePullPolicy: {{ .Values.controllerplugin.provisioner.image.pullPolicy }}
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --csi-address=$(CSI_ADDRESS)
+            - --leader-election=true
+          env:
+            - name: CSI_ADDRESS
+              value: unix:///csi/{{ .Values.cvmfsCSIPluginSocketFile }}
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          {{- with .Values.controllerplugin.provisioner.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        - name: controllerplugin
+          image: {{ .Values.controllerplugin.plugin.image.repository }}:{{ .Values.controllerplugin.plugin.image.tag }}
+          imagePullPolicy: {{ .Values.controllerplugin.plugin.image.pullPolicy }}
+          command: [/csi-cvmfsplugin]
+          args:
+            - -v={{ .Values.logVerbosityLevel }}
+            - --nodeid=$(NODE_ID)
+            - --endpoint=$(CSI_ENDPOINT)
+            - --drivername=$(CSI_DRIVERNAME)
+            - --role=identity,controller
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/{{ .Values.cvmfsCSIPluginSocketFile }}
+            - name: CSI_DRIVERNAME
+              value: {{ .Values.csiDriverName }}
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          {{- with .Values.controllerplugin.plugin.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+      {{- with .Values.controllerplugin.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerplugin.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerplugin.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerplugin.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}

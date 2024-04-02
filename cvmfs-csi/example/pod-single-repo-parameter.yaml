@@ -1,0 +1,47 @@
+# This demo shows how to mount a single CVMFS repository
+# using the `repository` storage class parameter.
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cvmfs-atlas-nightlies
+provisioner: cvmfs.csi.cern.ch
+parameters:
+  # Repository address goes here.
+  repository: atlas-nightlies.cern.ch
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cvmfs-atlas-nightlies
+  namespace: default
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      # Volume size value has no effect and is ignored
+      # by the driver, but must be non-zero.
+      storage: 1
+  storageClassName: cvmfs-atlas-nightlies
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cvmfs-atlas-nightlies
+  namespace: default
+spec:
+  containers:
+   - name: idle
+     image: busybox
+     imagePullPolicy: IfNotPresent
+     command: [ "/bin/sh", "-c", "trap : TERM INT; (while true; do sleep 1000; done) & wait" ]
+     volumeMounts:
+       - name: my-cvmfs-atlas-nightlies
+         mountPath: /atlas-nightlies
+         # Note that unlike demo-single-repo-subpath.yaml, in this
+         # case we don't set mountPropagation nor subPath.
+  volumes:
+   - name: my-cvmfs-atlas-nightlies
+     persistentVolumeClaim:
+       claimName: cvmfs-atlas-nightlies

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cvmfs-alice
+spec:
+  containers:
+   - name: idle
+     image: busybox
+     imagePullPolicy: IfNotPresent
+     command: [ "/bin/sh", "-c", "trap : TERM INT; (while true; do sleep 1000; done) & wait" ]
+     volumeMounts:
+       - name: my-cvmfs
+         # It is possible to mount a single CVMFS repository by specifying subPath.
+         subPath: alice.cern.ch
+         mountPath: /my-alice-cvmfs
+         mountPropagation: HostToContainer
+  volumes:
+   - name: my-cvmfs
+     persistentVolumeClaim:
+       claimName: cvmfs
