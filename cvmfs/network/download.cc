@@ -255,11 +255,14 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
-  if (num_bytes == 0 || info->stop_data_download()) {
+  if (num_bytes == 0) {
     return 0;
   }
 
-  if (info->IsValidDataTube()) {
+  if (info->parallel_dwnld_coord()) {
+    if (info->stop_data_download()) {
+      return 0;
+    }
     DataTubeElement *ele = info->parallel_dwnld_coord()->
                                                      GetUnusedDataTubeElement();
     assert(num_bytes <= info->parallel_dwnld_coord()->buffer_size());
@@ -623,34 +626,36 @@ void *DownloadManager::MainDownload(void *data) {
   std::vector<TupelJobDone> vec_curl_done;
   while (true) {
     // Check if transfers that are completed have finished their data processing
-    for (size_t i = 0; i < vec_curl_done.size(); ++i) {
-      JobInfo *info = vec_curl_done[i].info;
-      const int curl_error = vec_curl_done[i].curl_error;
-      CURL *easy_handle = vec_curl_done[i].easy_handle;
+    if (download_mgr->use_parallel_download_) {
+      for (size_t i = 0; i < vec_curl_done.size(); ++i) {
+        JobInfo *info = vec_curl_done[i].info;
+        const int curl_error = vec_curl_done[i].curl_error;
+        CURL *easy_handle = vec_curl_done[i].easy_handle;
 
-      if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
-        if (download_mgr->VerifyAndFinalize(curl_error, info)) {
-            curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
-            curl_multi_socket_action(download_mgr->curl_multi_,
-                                     CURL_SOCKET_TIMEOUT,
-                                     0,
-                                     &still_running);
-        } else {
-          // Return easy handle into pool and write result back
-          download_mgr->ReleaseCurlHandle(easy_handle);
+        if (info->GetDataTubePtr()->IsEmpty()) {  // data processing done
+          if (download_mgr->VerifyAndFinalize(curl_error, info)) {
+              curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+              curl_multi_socket_action(download_mgr->curl_multi_,
+                                      CURL_SOCKET_TIMEOUT,
+                                      0,
+                                      &still_running);
+          } else {
+            // Return easy handle into pool and write result back
+            download_mgr->ReleaseCurlHandle(easy_handle);
 
-          if (info->IsValidDataTube()) {
-            DataTubeElement *ele = info->parallel_dwnld_coord()->
+            if (info->IsValidDataTube()) {
+              DataTubeElement *ele = info->parallel_dwnld_coord()->
                                                      GetUnusedDataTubeElement();
-            ele->action = kActionStop;
-            info->GetDataTubePtr()->EnqueueBack(ele);
+              ele->action = kActionStop;
+              info->GetDataTubePtr()->EnqueueBack(ele);
+            }
+            info->GetPipeJobResultPtr()->
+                                Write<download::Failures>(info->error_code());
           }
-          info->GetPipeJobResultPtr()->
-                              Write<download::Failures>(info->error_code());
-        }
 
-        vec_curl_done.erase(vec_curl_done.begin() + static_cast<int64_t>(i));
-        --i;
+          vec_curl_done.erase(vec_curl_done.begin() + static_cast<int64_t>(i));
+          --i;
+        }
       }
     }
 
@@ -667,7 +672,11 @@ void *DownloadManager::MainDownload(void *data) {
       */
       timeout = 1;
     } else {
-      timeout = 1;
+      if (download_mgr->use_parallel_download_) {
+        timeout = 1;
+      } else {
+        timeout = -1;
+      }
       gettimeofday(&timeval_stop, NULL);
       int64_t delta = static_cast<int64_t>(
         1000 * DiffTimeSeconds(timeval_start, timeval_stop));
@@ -762,7 +771,7 @@ void *DownloadManager::MainDownload(void *data) {
 
         // let's notify CURL is done and queue it up and wait for finishing the
         // data processing so that VerifyAndFinalize executes correctly
-        if (info->IsValidDataTube()) {
+        if (info->parallel_dwnld_coord()) {
           DataTubeElement *ele = info->parallel_dwnld_coord()->
                                                      GetUnusedDataTubeElement();
           ele->action = kActionEndOfData;
@@ -781,7 +790,7 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          if (info->IsValidDataTube()) {
+          if (info->parallel_dwnld_coord()) {
             DataTubeElement *ele = info->parallel_dwnld_coord()->
                                                      GetUnusedDataTubeElement();
             ele->action = kActionStop;
