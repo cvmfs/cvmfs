@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    branches: [devel, master]
+    tags: "*"
+  pull_request:
+    branches: [devel, master]
+
+jobs:
+  build-bin:
+    name: Build binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # actions/setup-go@v4
+        with:
+          go-version: "1.20"
+
+      - name: Build binary
+        run: |
+          cd cvmfs-csi
+          make build-cross
+
+      - name: Archive binaries
+        if: always()
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # actions/upload-artifact@v4
+        with:
+          name: bin
+          path: cvmfs-csi/bin
+
+  build-image:
+    name: Build image
+    needs: build-bin
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY_IMAGE_PATH: registry.cern.ch/cvmfs-csi/cvmfs-csi
+      REGISTRY: registry.cern.ch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # actions/checkout@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # sigstore/cosign-installer@v3.4.0
+
+      - name: Login to Registry
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Download binaries
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # actions/download-artifact@v4
+        with:
+          name: bin
+          path: cvmfs-csi/bin
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@2b51285047da1547ffb1b2203d8be4c0af6b1f20 # docker/setup-buildx-action@v3
+
+      - name: Build and push container images
+        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a # docker/build-push-action@v2
+        id: build-and-push
+        with:
+          context: cvmfs-csi
+          file: cvmfs-csi/deployments/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: "${{ env.REGISTRY_IMAGE_PATH }}:${{ github.ref_name }}"
+          build-args: RELEASE=${{ github.ref_name || github.sha }} GITREF=${{ github.sha }} CREATED=${{ github.event.created_at }}
+
+      - name: Sign image
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY '${{ env.REGISTRY_IMAGE_PATH }}:${{ github.ref_name }}@${{ steps.build-and-push.outputs.digest }}'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Scan image
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: aquasecurity/trivy-action@f72b7e8127f2e443feedad3c314e6fe75e5a8b84 # aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.REGISTRY_IMAGE_PATH }}:${{ github.ref_name }}"
+
+  build-chart:
+    name: Build chart
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: registry.cern.ch
+      REGISTRY_CHART_PATH: registry.cern.ch/cvmfs-csi/charts
+      CHART_NAME: cvmfs-csi
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # azure/setup-helm@v3
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # sigstore/cosign-installer@v3.4.0
+
+      - name: Login to Registry
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME  }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push chart
+        uses: bsord/helm-push@650e04843d399b727368d37022b576c6a6ff3291 # bsord/helm-push@v4.1.0
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          useOCIRegistry: true
+          registry-url: "oci://${{ env.REGISTRY_CHART_PATH }}"
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          access-token: ${{ secrets.REGISTRY_PASSWORD }}
+          force: true
+          chart-folder: cvmfs-csi/deployments/helm/cvmfs-csi
+
+      - name: Sign chart
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY '${{ env.REGISTRY_CHART_PATH }}/${{ env.CHART_NAME }}:${{ github.ref_name }}'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Scan chart
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: aquasecurity/trivy-action@f72b7e8127f2e443feedad3c314e6fe75e5a8b84 # aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.REGISTRY_CHART_PATH }}/${{ env.CHART_NAME }}:${{ github.ref_name }}"
+
