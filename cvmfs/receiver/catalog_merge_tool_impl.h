@@ -107,9 +107,10 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
+  bool ret=true;	
   const PathString rel_path = MakeRelative(path);
 
   const std::string parent_path =
@@ -118,7 +119,18 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
   if (entry.IsDirectory()) {
     output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     if (entry.IsNestedCatalogMountpoint()) {
+      RoCatalogMgr *new_catalog_mgr =
+        CatalogDiffTool<RoCatalogMgr>::GetNewCatalogMgr();
+      PathString mountpoint;
+      shash::Any new_hash;
+      uint64_t new_size;
+      bool found = new_catalog_mgr->LookupNested(path, &mountpoint,
+                                                     &new_hash, &new_size);
+
       output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+      output_catalog_mgr_->SwapNestedCatalog(rel_path.ToString(), new_hash,
+                                           new_size);
+      ret = false;      
     }
     perf::Inc(counters_->n_directories_added);
   } else if (entry.IsRegular() || entry.IsLink()) {
@@ -140,6 +152,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     }
     perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
+  return ret;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>

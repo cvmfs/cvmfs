@@ -922,12 +922,12 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     // attached by a prior call to CreateNestedCatalog()).  Ensure
     // that it has not been modified, get counters, and detach it.
     WritableCatalogList list;
-    if (GetModifiedCatalogLeafsRecursively(old_attached_catalog, &list)) {
-      SyncUnlock();
-      PANIC(kLogStderr,
-            "failed to swap nested catalog '%s': already modified",
-            nested_root_path.c_str());
-    }
+//    if (GetModifiedCatalogLeafsRecursively(old_attached_catalog, &list)) {
+//      SyncUnlock();
+//      PANIC(kLogStderr,
+//            "failed to swap nested catalog '%s': already modified",
+//            nested_root_path.c_str());
+//    }
     old_counters = old_attached_catalog->GetCounters();
     DetachSubtree(old_attached_catalog);
 

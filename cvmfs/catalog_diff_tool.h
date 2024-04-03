@@ -87,7 +87,7 @@ class CatalogDiffTool {
    */
   virtual bool IsReportablePath(const PathString& /* path */) { return true; }
 
-  virtual void ReportAddition(const PathString& path,
+  virtual bool ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,
                               const FileChunkList& chunks) = 0;
