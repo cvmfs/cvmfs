@@ -17,7 +17,7 @@
 syntax = "proto3";
 package cvmfs.csi.cern.ch.v1;
 
-option go_package = "github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount/pb/v1";
+option go_package = "github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount/pb/v1";
 
 // Single provides a service for mounting CVMFS repositories as private mounts.
 // See https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#private-mount-points

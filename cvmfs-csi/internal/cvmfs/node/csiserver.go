@@ -23,9 +23,9 @@ import (
 	"os"
 	"path"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount"
-	singlemountv1 "github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/mountutils"
+	"github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount"
+	singlemountv1 "github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
+	"github.com/cvmfs/cvmfs-csi/internal/mountutils"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"

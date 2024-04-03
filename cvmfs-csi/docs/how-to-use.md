@@ -371,4 +371,4 @@ There are two ways to resolve this:
 * Increase the value of [CVMFS_QUOTA_LIMIT](https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#cache-settings) in the `cvmfs-csi-default-local` ConfigMap (or use the Helm value `cache.local.cvmfsQuotaLimit`).
 * Set up an [Alien cache volume](https://cvmfs.readthedocs.io/en/stable/cpt-configure.html#alien-cache) and use it with the `alien.cache` Helm chart value.
 
-You can find more details and troubleshooting steps for this issue in <https://github.com/cvmfs-contrib/cvmfs-csi/issues/89>.
+You can find more details and troubleshooting steps for this issue in <https://github.com/cvmfs/cvmfs-csi/issues/89>.

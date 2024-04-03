@@ -21,13 +21,13 @@ See the [Table of Contents](#table-of-contents) for different ways to help and d
 
 ## I Have a Question
 
-> If you want to ask a question, we assume that you have read the available [Documentation](https://github.com/cvmfs-contrib/cvmfs-csi/tree/master/docs).
+> If you want to ask a question, we assume that you have read the available [Documentation](https://github.com/cvmfs/cvmfs-csi/tree/master/docs).
 
-Before you ask a question, it is best to search for existing [Issues](https://github.com/cvmfs-contrib/cvmfs-csi/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
+Before you ask a question, it is best to search for existing [Issues](https://github.com/cvmfs/cvmfs-csi/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
 
 If you then still feel the need to ask a question and need clarification, we recommend the following:
 
-- Open an [Issue](https://github.com/cvmfs-contrib/cvmfs-csi/issues/new).
+- Open an [Issue](https://github.com/cvmfs/cvmfs-csi/issues/new).
 - Provide as much context as you can about what you're running into.
 - Provide information about your environment, depending on what seems relevant.
 
@@ -43,8 +43,8 @@ If you then still feel the need to ask a question and need clarification, we rec
 A good bug report shouldn't leave others needing to chase you up for more information. Therefore, we ask you to investigate carefully, collect information and describe the issue in detail in your report. Please complete the following steps in advance to help us fix any potential bug as fast as possible.
 
 - Make sure that you are using the latest version.
-- Determine if your bug is really a bug and not an error on your side e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://github.com/cvmfs-contrib/cvmfs-csi/tree/master/docs). If you are looking for support, you might want to check [this section](#i-have-a-question)).
-- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/cvmfs-contrib/cvmfs-csi/issues?q=label%3Abug).
+- Determine if your bug is really a bug and not an error on your side e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://github.com/cvmfs/cvmfs-csi/tree/master/docs). If you are looking for support, you might want to check [this section](#i-have-a-question)).
+- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/cvmfs/cvmfs-csi/issues?q=label%3Abug).
 - Also make sure to search the internet (including Stack Overflow) to see if users outside of the GitHub community have discussed the issue.
 - Collect information about the bug:
   - Stack trace (Traceback)
@@ -56,7 +56,7 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 
 We use GitHub issues to track bugs and errors. If you run into an issue with the project:
 
-- Open an [Issue](https://github.com/cvmfs-contrib/cvmfs-csi/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
+- Open an [Issue](https://github.com/cvmfs/cvmfs-csi/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
 - Explain the behavior you would expect and the actual behavior.
 - Please provide as much context as possible and describe the *reproduction steps* that someone else can follow to recreate the issue on their own. This may include your code (for good bug reports you should isolate the problem and create a reduced test case).
 
@@ -76,13 +76,13 @@ This section guides you through submitting an enhancement suggestion for cvmfs-c
 #### Before Submitting an Enhancement
 
 - Make sure that you are using the latest version.
-- Read the [documentation](https://github.com/cvmfs-contrib/cvmfs-csi/tree/master/docs) carefully and find out if the functionality is already covered, maybe by an individual configuration.
-- Perform a [search](https://github.com/cvmfs-contrib/cvmfs-csi/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
+- Read the [documentation](https://github.com/cvmfs/cvmfs-csi/tree/master/docs) carefully and find out if the functionality is already covered, maybe by an individual configuration.
+- Perform a [search](https://github.com/cvmfs/cvmfs-csi/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
 - Find out whether your idea fits with the scope and aims of the project. It's up to you to make a strong case to convince the project's developers of the merits of this feature. Keep in mind that we want features that will be useful to the majority of our users and not just a small subset. If you're just targeting a minority of users, consider writing an add-on/plugin library.
 
 #### How Do I Submit a Good Enhancement Suggestion?
 
-Enhancement suggestions are tracked as [GitHub issues](https://github.com/cvmfs-contrib/cvmfs-csi/issues).
+Enhancement suggestions are tracked as [GitHub issues](https://github.com/cvmfs/cvmfs-csi/issues).
 
 - Use a **clear and descriptive title** for the issue to identify the suggestion.
 - Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
@@ -91,7 +91,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/cvmfs-
 
 ### Your First Code Contribution
 
-If the contribution you are planning to work on is non-trivial, please open an [Issues](https://github.com/cvmfs-contrib/cvmfs-csi/issues).
+If the contribution you are planning to work on is non-trivial, please open an [Issues](https://github.com/cvmfs/cvmfs-csi/issues).
 
 - Setup your development environment and make sure you can [build cvmfs-csi from source code](/docs/building-from-source.md).
 - While it is possible to run the CSI driver standalone and locally, it's best to [deploy it in a real Kubernetes cluster](/docs/deploying.md).
@@ -108,7 +108,7 @@ This repository is hosted on GitHub, and so follows the regular [GitHub workflow
 * To publish a release, create a [Git tag](https://git-scm.com/book/en/v2/Git-Basics-Tagging) in the format of `v<Major>.<Minor>.<Patch>` (e.g. `v1.2.3`, see [Semantic versioning](https://semver.org/)). By pushing the tag, a CI pipeline is triggered: a new container image and chart will be built and pushed to CERN's container artifact registry. Note that tags that are pushed are immutable and may not be deleted or overwritten. Before tagging a release, consider first tagging a release candidate -- in that case use format `v<Major>.<Minor>.<Patch>-rc.<Release candidate number>` (e.g. `v1.2.3-rc.0`).
   * The built image is tagged with Git's tag.
   * The chart is tagged with the `version` value specified in [Chart.yaml](/deployments/helm/cvmfs-csi). Don't forget to update this value too before making a release.
-* When done, [publish the release](https://github.com/cvmfs-contrib/cvmfs-csi/releases/new).
+* When done, [publish the release](https://github.com/cvmfs/cvmfs-csi/releases/new).
 
 ## Attribution
 This guide is based on the **contributing-gen**. [Make your own](https://github.com/bttger/contributing-gen)!

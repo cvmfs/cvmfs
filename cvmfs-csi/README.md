@@ -6,10 +6,10 @@ See project documentation at [docs/](./docs).
 
 ## Reporting bugs
 
-Please report issues at <https://github.com/cvmfs-contrib/cvmfs-csi/issues/new>.
+Please report issues at <https://github.com/cvmfs/cvmfs-csi/issues/new>.
 
 ## Contributing
 
 Please read the [Contributing document](/CONTRIBUTING.md) first.
 
-You can submit patches using GitHub pull requests at <https://github.com/cvmfs-contrib/cvmfs-csi/pulls>. For larger changes please open an Issue to discuss them first before submitting patches.
+You can submit patches using GitHub pull requests at <https://github.com/cvmfs/cvmfs-csi/pulls>. For larger changes please open an Issue to discuss them first before submitting patches.

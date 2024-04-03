@@ -24,10 +24,10 @@ import (
 	goexec "os/exec"
 	"path"
 
-	pb "github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/mountutils"
+	pb "github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
+	"github.com/cvmfs/cvmfs-csi/internal/mountutils"
 )
 
 const (

@@ -19,7 +19,7 @@ package identity
 import (
 	"context"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/version"
+	"github.com/cvmfs/cvmfs-csi/internal/version"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )

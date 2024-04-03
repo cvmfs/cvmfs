@@ -20,7 +20,7 @@ import (
 	"bytes"
 	goexec "os/exec"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
 )
 
 func Unmount(mountpoint string, extraArgs ...string) error {

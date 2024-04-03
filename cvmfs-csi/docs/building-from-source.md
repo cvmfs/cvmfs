@@ -4,9 +4,9 @@ There are pre-built container images available from [cvmfsplugin repo at CERN re
 
 CVMFS CSI is written in Go. Make sure you have Go compiler and other related build tools installed before continuing.
 
-Clone [github.com/cvmfs-contrib/cvmfs-csi](https://github.com/cvmfs-contrib/cvmfs-csi) repository:
+Clone [github.com/cvmfs/cvmfs-csi](https://github.com/cvmfs/cvmfs-csi) repository:
 ```bash
-git clone https://github.com/cvmfs-contrib/cvmfs-csi.git
+git clone https://github.com/cvmfs/cvmfs-csi.git
 cd cvmfs-csi
 ```
 

@@ -27,9 +27,9 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/env"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
+	"github.com/cvmfs/cvmfs-csi/internal/cvmfs/env"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
 )
 
 const (

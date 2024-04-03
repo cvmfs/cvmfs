@@ -1,19 +1,2 @@
 bin
 _dist
-
-# Emacs save files
-*~
-\#*\#
-.\#*
-
-# Vim-related files
-[._]*.s[a-w][a-z]
-[._]s[a-w][a-z]
-*.un~
-Session.vim
-.netrwhist
-
-# git merge files
-*.orig
-*.patch
-*.rej

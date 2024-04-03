@@ -97,6 +97,13 @@ func (srv *Server) ControllerUnpublishVolume(
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+func (srv *Server) ControllerModifyVolume(
+	context.Context,
+	*csi.ControllerModifyVolumeRequest,
+) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 func (srv *Server) ValidateVolumeCapabilities(
 	ctx context.Context,
 	req *csi.ValidateVolumeCapabilitiesRequest,

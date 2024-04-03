@@ -22,9 +22,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/driver"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
-	cvmfsversion "github.com/cvmfs-contrib/cvmfs-csi/internal/version"
+	"github.com/cvmfs/cvmfs-csi/internal/cvmfs/driver"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
+	cvmfsversion "github.com/cvmfs/cvmfs-csi/internal/version"
 
 	"k8s.io/klog/v2"
 )

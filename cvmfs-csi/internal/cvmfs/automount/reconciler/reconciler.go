@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/mountutils"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
+	"github.com/cvmfs/cvmfs-csi/internal/mountutils"
 
 	"github.com/moby/sys/mountinfo"
 )

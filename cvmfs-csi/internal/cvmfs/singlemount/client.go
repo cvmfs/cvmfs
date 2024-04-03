@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
+	pb "github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"

@@ -19,8 +19,8 @@ package node
 import (
 	goexec "os/exec"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/mountutils"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/mountutils"
 )
 
 func bindMount(from, to string) error {

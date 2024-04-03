@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
-	cvmfsversion "github.com/cvmfs-contrib/cvmfs-csi/internal/version"
+	"github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
+	cvmfsversion "github.com/cvmfs/cvmfs-csi/internal/version"
 
 	"k8s.io/klog/v2"
 )

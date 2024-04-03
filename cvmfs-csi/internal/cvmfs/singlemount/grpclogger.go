@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
 
 	"google.golang.org/grpc"
 )

@@ -24,10 +24,10 @@ import (
 	goexec "os/exec"
 	"sync"
 
-	pb "github.com/cvmfs-contrib/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/grpcutils"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
+	pb "github.com/cvmfs/cvmfs-csi/internal/cvmfs/singlemount/pb/v1"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/grpcutils"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

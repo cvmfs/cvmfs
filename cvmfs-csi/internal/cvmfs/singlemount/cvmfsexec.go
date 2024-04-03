@@ -22,8 +22,8 @@ import (
 	goexec "os/exec"
 	"strings"
 
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/exec"
-	"github.com/cvmfs-contrib/cvmfs-csi/internal/log"
+	"github.com/cvmfs/cvmfs-csi/internal/exec"
+	"github.com/cvmfs/cvmfs-csi/internal/log"
 )
 
 var cvmfsErrMessages = []string{
