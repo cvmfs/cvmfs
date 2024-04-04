@@ -45,6 +45,8 @@ class JobInfo {
   /// Tube (bounded thread-safe queue) to transport data from CURL callback
   /// to be decompressed in Fetch() instead of MainDownload()
   UniquePtr<Tube<DataTubeElement> > data_tube_;
+  /// Tube to send commands from Fetch() to MainDownload()
+  UniquePtr<Tube<DataTubeElement> > cmd_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -107,6 +109,7 @@ class JobInfo {
   ~JobInfo() {
     pipe_job_results.Destroy();
     data_tube_.Destroy();
+    cmd_tube_.Destroy();
   }
 
   void CreatePipeJobResults() {
@@ -144,6 +147,7 @@ class JobInfo {
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
                                            return pipe_job_results.weak_ref(); }
   Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
+  Tube<DataTubeElement> *GetCmdTubePtr() { return cmd_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
   bool compressed() const { return compressed_; }

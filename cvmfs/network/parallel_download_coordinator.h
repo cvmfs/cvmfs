@@ -17,18 +17,25 @@ class JobInfo;
  */
 enum DataTubeAction {
   kActionStop = 0,
-  kActionContinue,
+  kActionUnused,        // unused data element
+  kActionData,
   kActionEndOfData,
-  kActionUnused,
-  kActionData
+  kActionDownloadDone,  // download processing is completely finished
+                        // (download be success or failure)
+  // hand-shake commands for failed downloads, must be done in order
+  kActionCheckRepeat,   // download failure, check if repeat should be performed
+  kActionShouldRetry,   // download failure, check if retry should be executed
+  kActionRetry          // download failure, do retry
 };
 
 /**
- * Wrapper for the data tube to transfer data from CallbackCurlData() that is
- * executed in MainDownload() Thread to Fetch() called by a fuse thread
+ * Struct with additional info for the data tube to transfer data
+ * from CallbackCurlData() [MainDownload()-thread] to Fetch() [fuse thread]
  *
- * It is also used for synchronization communication. For this DataTubeAction
+ * It is also used to communicate synchronization. For this only DataTubeAction
  * is used.
+ *
+ * DataTubeElement is the owner of "data" and will free it on destruction.
  */
 struct DataTubeElement : SingleCopy {
   char* data;
@@ -53,11 +60,9 @@ struct DataTubeElement : SingleCopy {
  */
 struct TupelJobDone {
   JobInfo* info;
-  int curl_error;
   CURL *easy_handle;
 
-  TupelJobDone(JobInfo* i, int error, CURL *handle) :
-                             info(i), curl_error(error), easy_handle(handle) { }
+  TupelJobDone(JobInfo* i, CURL *handle) : info(i), easy_handle(handle) { }
 };
 
 class ParallelDownloadCoordinator {
@@ -66,8 +71,8 @@ class ParallelDownloadCoordinator {
                               int64_t max_buffers,
                               int64_t inflight_buffers,
                               size_t buffer_size);
-  DataTubeElement* GetUnusedDataTubeElement();
-  void PutDataTubeElementToReuse(DataTubeElement* ele);
+  DataTubeElement* GetUnusedElement();
+  void PutElementToReuse(DataTubeElement* ele);
   size_t buffer_size() const { return buffer_size_; }
   int64_t min_buffers() const { return min_buffers_; }
   int64_t max_buffers() const { return max_buffers_; }
@@ -95,7 +100,6 @@ class ParallelDownloadCoordinator {
   /**
    * Tube to hold empty elements use in JobInfo data_tube_
    * Shared with all DownloadManagers
-   * Must be static because of CallbackCurlData
    */
   UniquePtr<Tube<DataTubeElement> > data_tube_empty_elements_;
 };  // ParallelDownloadCoordinator

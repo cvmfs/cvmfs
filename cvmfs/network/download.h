@@ -261,7 +261,13 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
   void SetRegularCache(JobInfo *info);
+
+  bool VerifyDownloadSuccess(const int curl_error, JobInfo *info);
+  bool ShouldRepeatDownload(JobInfo *info);
+  bool ShouldRetry(JobInfo *info);
+  void FinalizeDownload(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
+
   void InitHeaders();
   void CloneProxyConfig(DownloadManager *clone);
 
@@ -453,8 +459,9 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   SslCertificateStore ssl_certificate_store_;
 
   /**
-   * Parallel download that allows the fuse-thread calling Fetch() to perform
-   * the decompression instead of the sequentially executed CallbackCurlData()
+   * Parallel download: Allows the fuse-thread that calls Fetch() to perform
+   * the decompression instead of within the sequentially executed
+   * CallbackCurlData()
    */
   bool use_parallel_download_;
   UniquePtr<ParallelDownloadCoordinator > parallel_dwnld_coord_;

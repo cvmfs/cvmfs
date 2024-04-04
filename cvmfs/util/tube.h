@@ -76,15 +76,7 @@ class Tube : SingleCopy {
     while (size_ == limit_)
       pthread_cond_wait(&cond_capacious_, &lock_);
 
-    Link *link = new Link(item);
-    link->next_ = head_->next_;
-    link->prev_ = head_;
-    head_->next_->prev_ = link;
-    head_->next_ = link;
-    size_++;
-    int retval = pthread_cond_signal(&cond_populated_);
-    assert(retval == 0);
-    return link;
+    return EnqueueBackUnlocked(item);
   }
 
   /**
@@ -98,15 +90,7 @@ class Tube : SingleCopy {
       return NULL;
     }
 
-    Link *link = new Link(item);
-    link->next_ = head_->next_;
-    link->prev_ = head_;
-    head_->next_->prev_ = link;
-    head_->next_ = link;
-    size_++;
-    int retval = pthread_cond_signal(&cond_populated_);
-    assert(retval == 0);
-    return link;
+    return EnqueueBackUnlocked(item);
   }
 
   /**
@@ -225,6 +209,18 @@ class Tube : SingleCopy {
       assert(retval == 0);
     }
     return item;
+  }
+
+  Link *EnqueueBackUnlocked(ItemT *item) {
+    Link *link = new Link(item);
+    link->next_ = head_->next_;
+    link->prev_ = head_;
+    head_->next_->prev_ = link;
+    head_->next_ = link;
+    size_++;
+    int retval = pthread_cond_signal(&cond_populated_);
+    assert(retval == 0);
+    return link;
   }
 
 

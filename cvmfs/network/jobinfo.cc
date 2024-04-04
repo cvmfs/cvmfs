@@ -75,12 +75,15 @@ void JobInfo::Init() {
 
   allow_failure_ = false;
 
+  data_tube_ = NULL;
+  cmd_tube_ = NULL;
+
   memset(&zstream_, 0, sizeof(zstream_));
 }
 
 /**
  * Setup all (communication) objects needed to be able to perform parallel
- * download.
+ * downloads.
  */
 void JobInfo::SetupParallelDownload(ParallelDownloadCoordinator*
                                                          parallel_dwnld_coord) {
@@ -88,6 +91,7 @@ void JobInfo::SetupParallelDownload(ParallelDownloadCoordinator*
   assert(!data_tube_.IsValid());
   parallel_dwnld_coord_ = parallel_dwnld_coord;
   data_tube_ = new Tube<DataTubeElement>(parallel_dwnld_coord->buffer_size());
+  cmd_tube_ = new Tube<DataTubeElement>(1);
 }
 
 }  // namespace download
