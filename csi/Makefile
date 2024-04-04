@@ -111,7 +111,7 @@ image: build
 		--build-arg RELEASE=$(IMAGE_TAG)                           \
 		--build-arg GITREF=$(GIT_COMMIT)                           \
 		--build-arg CREATED=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
-		-t registry.cern.ch/kubernetes/cvmfs-csi:$(IMAGE_TAG)      \
+		-t registry.cern.ch/cvmfs/csi:$(IMAGE_TAG)      \
 		-f ./deployments/docker/Dockerfile .
 
 # ------------------------------------------------------------------------------

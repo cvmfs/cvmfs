@@ -8,7 +8,7 @@ You can install the Helm chart from CERN repositories:
 
 Helm installation:
 ```
-helm install cvmfs-csi oci://registry.cern.ch/kubernetes/charts/cvmfs-csi --version <Chart tag>
+helm install cvmfs-csi oci://registry.cern.ch/cvmfs/charts/cvmfs-csi --version <Chart tag>
 ```
 
 ### Install from source
