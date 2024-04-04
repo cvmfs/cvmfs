@@ -1,0 +1,26 @@
+name: Test
+
+on:
+  push:
+    branches: [devel, master]
+    tags: "*"
+  pull_request:
+    branches: [devel, master]
+
+jobs:
+  test-csi:
+    name: Test CSI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # actions/setup-go@v4
+        with:
+          go-version: "1.20"
+
+      - name: Test binary
+        run: |
+          cd csi
+          go test -v ./...
