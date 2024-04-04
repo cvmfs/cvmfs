@@ -209,17 +209,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (!recurse) continue;
     }
 
-    if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
-      if (old_entry.IsDirectory()) {
-        DiffRec(old_path);
-      } else if (new_entry.IsDirectory()) {
-        DiffRec(new_path);
-      }
-      continue;
+    if (old_entry.IsDirectory() || new_entry.IsDirectory()) {
+      DiffRec(old_path);
     }
-
-    // Recursion
-    DiffRec(old_path);
   }
 }
 
