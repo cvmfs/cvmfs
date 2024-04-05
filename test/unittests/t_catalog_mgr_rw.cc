@@ -222,4 +222,71 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
                                               subX_hash, subX_size));
 }
 
+TEST_F(T_CatalogMgrRw, GraftNestedCatalog) {
+  CatalogTestTool tester("graft_nested_catalog");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+
+  catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
+
+  PathString path;
+  shash::Any sub1_hash;
+  uint64_t sub1_size;
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
+                                        &path, &sub1_hash, &sub1_size));
+
+  catalog_mgr->RemoveNestedCatalog("dir/dir/dir/sub1");
+  catalog_mgr->RemoveDirectory("dir/dir/dir/sub1");
+  catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size);
+
+  DirectoryEntry dirent;
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1",
+                                      kLookupDefault, &dirent));
+  EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
+  shash::Any check_hash;
+  uint64_t check_size;
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
+                                        &path, &check_hash, &check_size));
+  EXPECT_EQ(sub1_hash, check_hash);
+  EXPECT_EQ(sub1_size, check_size);
+}
+
+TEST_F(T_CatalogMgrRw, GraftNestedCatalogFail) {
+  CatalogTestTool tester("graft_nested_catalog_fail_slow");
+  EXPECT_TRUE(tester.Init());
+
+  DirSpec spec = MakeBaseSpec();
+  EXPECT_TRUE(tester.ApplyAtRootHash(tester.manifest()->catalog_hash(), spec));
+
+  catalog::WritableCatalogManager *catalog_mgr = tester.catalog_mgr();
+
+  PathString path;
+  shash::Any sub1_hash;
+  uint64_t sub1_size;
+  shash::Any sub2_hash;
+  uint64_t sub2_size;
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
+                                        &path, &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"),
+                                        &path, &sub2_hash, &sub2_size));
+
+  // Fail if directory is not empty
+  EXPECT_ANY_THROW(
+    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size));
+
+  catalog_mgr->RemoveNestedCatalog("dir/dir/dir/sub1");
+  catalog_mgr->RemoveDirectory("dir/dir/dir/sub1");
+  // Wrong nested catalog should fail
+  EXPECT_ANY_THROW(
+    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub2_hash, sub2_size));
+
+  // Missing parent should fail
+  catalog_mgr->RemoveDirectory("dir/dir/dir");
+  EXPECT_DEATH(
+    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size),
+    ".*");
+}
+
 }  // namespace catalog

@@ -1004,6 +1004,101 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   SyncUnlock();
 }
 
+/**
+ * Install a nested catalog (catalog hierarchy) at a new, empty directory
+ *
+ * The mountpoint directory must not yet exist. Its parent directory, however
+ * must exist. This method combines functionality from AddDirectory(),
+ * CreateNestedCatalog() and SwapNestedCatalog().
+ * The new nested catalog won't get attached.
+ *
+ * @param mountpoint - the path where the nested catalog should be installed
+ * @param new_hash - the hash of the new nested catalog
+ * @param new_size - the size of the new nested catalog
+ */
+void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
+                                                const shash::Any &new_hash,
+                                                const uint64_t new_size)
+{
+  const string nested_root_path = MakeRelativePath(mountpoint);
+  const string parent_path = GetParentPath(nested_root_path);
+  const PathString nested_root_ps = PathString(nested_root_path);
+
+  assert(!nested_root_path.empty());
+
+  // Load freely attached new catalog
+  UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
+  if (!new_catalog.IsValid()) {
+    PANIC(kLogStderr,
+          "failed to graft nested catalog '%s': failed to load new catalog",
+          nested_root_path.c_str());
+  }
+  if (new_catalog->root_prefix() != nested_root_ps) {
+    PANIC(kLogStderr,
+          "invalid nested catalog for grafting at '%s': catalog rooted at '%s'",
+          nested_root_path.c_str(),
+          new_catalog->root_prefix().ToString().c_str());
+  }
+
+  // Get new catalog root directory entry
+  DirectoryEntry dirent;
+  XattrList xattrs;
+  const bool dirent_found = new_catalog->LookupPath(nested_root_ps, &dirent);
+  if (!dirent_found) {
+    PANIC(kLogStderr,
+          "failed to swap nested catalog '%s': missing dirent in new catalog",
+          nested_root_path.c_str());
+  }
+  if (dirent.HasXattrs()) {
+    const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
+                                                            &xattrs);
+    if (!xattrs_found) {
+      PANIC(kLogStderr,
+            "failed to swap nested catalog '%s': missing xattrs in new catalog",
+            nested_root_path.c_str());
+    }
+  }
+  // Transform the nested catalog root into a transition point to be inserted
+  // in the parent catalog
+  dirent.set_is_nested_catalog_root(false);
+  dirent.set_is_nested_catalog_mountpoint(true);
+
+  // Add directory and nested catalog
+
+  SyncLock();
+  WritableCatalog *parent_catalog;
+  DirectoryEntry parent_entry;
+  if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
+    SyncUnlock();
+    PANIC(kLogStderr, "catalog for directory '%s' cannot be found",
+          parent_path.c_str());
+  }
+  if (parent_catalog->LookupPath(nested_root_ps, NULL)) {
+    SyncUnlock();
+    PANIC(kLogStderr, "invalid attempt to graft nested catalog into existing "
+                      "directory '%s'", nested_root_path.c_str());
+  }
+  parent_catalog->AddEntry(dirent, xattrs, nested_root_path, parent_path);
+  parent_entry.set_linkcount(parent_entry.linkcount() + 1);
+  parent_catalog->UpdateEntry(parent_entry, parent_path);
+  if (parent_entry.IsNestedCatalogRoot()) {
+    WritableCatalog *grand_parent_catalog =
+      reinterpret_cast<WritableCatalog *>(parent_catalog->parent());
+    parent_entry.set_is_nested_catalog_root(false);
+    parent_entry.set_is_nested_catalog_mountpoint(true);
+    grand_parent_catalog->UpdateEntry(parent_entry, parent_path);
+  }
+
+  parent_catalog->InsertNestedCatalog(
+    nested_root_path, NULL, new_hash, new_size);
+
+  // Fix-up counters
+  Counters counters;
+  DeltaCounters delta = Counters::Diff(counters, new_catalog->GetCounters());
+  delta.PopulateToParent(&parent_catalog->delta_counters_);
+
+  SyncUnlock();
+}
 
 /**
  * Checks if a nested catalog starts at this path.  The path must be valid.
