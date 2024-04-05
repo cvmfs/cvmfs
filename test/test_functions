@@ -2646,6 +2646,10 @@ set_up_repository_gateway() {
     echo "  Cleaning up the repository gateway db"
     sudo rm -rf /var/lib/cvmfs-gateway/*
 
+    echo "  Cleaning up the debug log"
+    sudo mkdir -p /var/log/cvmfs_receiver
+    sudo rm -f /var/log/cvmfs_receiver/debug.log
+
     echo "  Writing configuration files"
     sudo bash -c 'cat <<EOF > /etc/cvmfs/gateway/repo.json
 {
@@ -2701,6 +2705,12 @@ restart_repository_gateway() {
     while ! $gateway_script status; do
       sleep 1
     done
+}
+
+grep_receiver_debuglog() {
+  local needle="$1"
+
+  sudo grep "$needle" /var/log/cvmfs_receiver/debug.log
 }
 
 lockfile() {
