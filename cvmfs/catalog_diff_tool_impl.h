@@ -100,6 +100,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     return;
   }
 
+  LogCvmfs(kLogReceiver, kLogDebug, "DiffRec: recursing into %s",
+           path.ToString().c_str());
+
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
