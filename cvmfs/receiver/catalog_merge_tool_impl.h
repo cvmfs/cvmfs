@@ -107,7 +107,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
@@ -140,6 +140,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     }
     perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
+  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
