@@ -16,6 +16,7 @@
 #include "reactor.h"
 
 static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
+static const char *kDefaultDebugLog = "/dev/null";
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
@@ -27,6 +28,9 @@ swissknife::ParameterList MakeParameterList() {
       'w', "Watchdog stacktrace output dir, "
            "use without parameter to disable watchdog. "
            "Default: " + std::string(kDefaultReceiverLogDir)));
+  params.push_back(swissknife::Parameter::Optional(
+      'd', "Path to debug log. Ignored if the non-debug version runs, "
+           "Default: " + std::string(kDefaultDebugLog)));
   return params;
 }
 
@@ -86,12 +90,22 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // The receiver is spawned from the gateway go service. The gateway connects
+  // a pipe to stdout and stderr but will collect the results only at the end.
+  // This means that only small pieces of output can be send to stdout or
+  // stderr, otherwise the pipes run full and block.
+  // This should probably be addressed.
+  //
+  // For the debug mode, the gateway sets a debug log file that is collected
+  // after the application quits.
+
   SetLogSyslogFacility(1);
   SetLogSyslogShowPID(true);
 
   int fdin = 0;
   int fdout = 1;
   std::string watchdog_out_dir = kDefaultReceiverLogDir;
+  std::string debug_log = kDefaultDebugLog;
   if (arguments.find('i') != arguments.end()) {
     fdin = std::atoi(arguments.find('i')->second->c_str());
   }
@@ -101,6 +115,12 @@ int main(int argc, char** argv) {
   if (arguments.find('w') != arguments.end()) {
     watchdog_out_dir = *arguments.find('w')->second;
   }
+  if (arguments.find('d') != arguments.end()) {
+    debug_log = *arguments.find('d')->second;
+  }
+
+  // The gateway hard-codes this to /var/log/cvmfs_receiver/debug.log
+  SetLogDebugFile(debug_log);
 
   // Spawn monitoring process (watchdog)
   UniquePtr<Watchdog> watchdog;
