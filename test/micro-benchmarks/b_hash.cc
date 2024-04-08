@@ -87,3 +87,15 @@ BENCHMARK_DEFINE_F(BM_Hash, Shake128)(benchmark::State &st) {
 }
 BENCHMARK_REGISTER_F(BM_Hash, Shake128)->Repetitions(3)->Arg(100)->Arg(4096)->
   Arg(100*1024);
+
+BENCHMARK_DEFINE_F(BM_Hash, Sha256)(benchmark::State &st) {
+  unsigned size = st.range(0);
+  unsigned char buffer[size];
+  std::string hex_digest;
+  while (st.KeepRunning()) {
+    hex_digest = shash::Sha256Mem(buffer, size);
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Hash, Sha256)->Repetitions(3)->Arg(100)->Arg(4096)->
+  Arg(100*1024);
