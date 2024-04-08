@@ -134,6 +134,7 @@ set (UBENCHMARKS_LINK_LIBRARIES benchmark::benchmark
                                 c-ares::cares
                                 ${OPENSSL_LIBRARIES}
                                 ${Libcrypto_LIBRARIES}
+                                ${Libnettle_LIBRARIES}
                                 ${SHA3_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
