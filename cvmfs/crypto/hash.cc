@@ -8,10 +8,10 @@
 #include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <openssl/hmac.h>
-#include <openssl/md5.h>
-#include <openssl/ripemd.h>
-#include <openssl/sha.h>
+#include <nettle/md5.h>
+#include <nettle/ripemd160.h>
+#include <nettle/sha1.h>
+#include <nettle/sha2.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -148,11 +148,11 @@ Any MkFromSuffixedHexPtr(const HexPtr hex) {
 unsigned GetContextSize(const Algorithms algorithm) {
   switch (algorithm) {
     case kMd5:
-      return sizeof(MD5_CTX);
+      return sizeof(md5_ctx);
     case kSha1:
-      return sizeof(SHA_CTX);
+      return sizeof(sha1_ctx);
     case kRmd160:
-      return sizeof(RIPEMD160_CTX);
+      return sizeof(ripemd160_ctx);
     case kShake128:
       return sizeof(Keccak_HashInstance);
     default:
@@ -165,19 +165,15 @@ void Init(ContextPtr context) {
   HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
-      assert(context.size == sizeof(MD5_CTX));
-      MD5_Init(reinterpret_cast<MD5_CTX *>(context.buffer));
+      md5_init(reinterpret_cast<md5_ctx *>(context.buffer));
       break;
     case kSha1:
-      assert(context.size == sizeof(SHA_CTX));
-      SHA1_Init(reinterpret_cast<SHA_CTX *>(context.buffer));
+      sha1_init(reinterpret_cast<sha1_ctx *>(context.buffer));
       break;
     case kRmd160:
-      assert(context.size == sizeof(RIPEMD160_CTX));
-      RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
+      ripemd160_init(reinterpret_cast<ripemd160_ctx *>(context.buffer));
       break;
     case kShake128:
-      assert(context.size == sizeof(Keccak_HashInstance));
       keccak_result = Keccak_HashInitialize_SHAKE128(
         reinterpret_cast<Keccak_HashInstance *>(context.buffer));
       assert(keccak_result == SUCCESS);
@@ -193,19 +189,16 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
   HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
-      assert(context.size == sizeof(MD5_CTX));
-      MD5_Update(reinterpret_cast<MD5_CTX *>(context.buffer),
-                 buffer, buffer_length);
+      md5_update(reinterpret_cast<md5_ctx *>(context.buffer),
+                  buffer_length, buffer);
       break;
     case kSha1:
-      assert(context.size == sizeof(SHA_CTX));
-      SHA1_Update(reinterpret_cast<SHA_CTX *>(context.buffer),
-                  buffer, buffer_length);
+      sha1_update(reinterpret_cast<sha1_ctx *>(context.buffer),
+                  buffer_length, buffer);
       break;
     case kRmd160:
-      assert(context.size == sizeof(RIPEMD160_CTX));
-      RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
-                       buffer, buffer_length);
+      ripemd160_update(reinterpret_cast<ripemd160_ctx *>(context.buffer),
+                       buffer_length, buffer);
       break;
     case kShake128:
       assert(context.size == sizeof(Keccak_HashInstance));
@@ -222,22 +215,18 @@ void Final(ContextPtr context, Any *any_digest) {
   HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
-      assert(context.size == sizeof(MD5_CTX));
-      MD5_Final(any_digest->digest,
-                reinterpret_cast<MD5_CTX *>(context.buffer));
+      md5_digest(reinterpret_cast<md5_ctx *>(context.buffer),
+                 MD5_DIGEST_SIZE, any_digest->digest);
       break;
     case kSha1:
-      assert(context.size == sizeof(SHA_CTX));
-      SHA1_Final(any_digest->digest,
-                 reinterpret_cast<SHA_CTX *>(context.buffer));
+      sha1_digest(reinterpret_cast<sha1_ctx *>(context.buffer),
+                  SHA1_DIGEST_SIZE, any_digest->digest);
       break;
     case kRmd160:
-      assert(context.size == sizeof(RIPEMD160_CTX));
-      RIPEMD160_Final(any_digest->digest,
-                      reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
+      ripemd160_digest(reinterpret_cast<ripemd160_ctx *>(context.buffer),
+                       RIPEMD160_DIGEST_SIZE, any_digest->digest);
       break;
     case kShake128:
-      assert(context.size == sizeof(Keccak_HashInstance));
       keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
                         context.buffer), NULL);
       assert(keccak_result == SUCCESS);
@@ -357,22 +346,21 @@ Md5::Md5(const AsciiPtr ascii) {
   algorithm = kMd5;
   const string *str = ascii.str;
 
-  MD5_CTX md5_state;
-  MD5_Init(&md5_state);
-  MD5_Update(&md5_state, reinterpret_cast<const unsigned char *>(&(*str)[0]),
-             str->length());
-  MD5_Final(digest, &md5_state);
+  md5_ctx md5_state;
+  md5_init(&md5_state);
+  md5_update(&md5_state, str->length(),
+             reinterpret_cast<const uint8_t *>(&(*str)[0]));
+  md5_digest(&md5_state, MD5_DIGEST_SIZE, digest);
 }
 
 
 Md5::Md5(const char *chars, const unsigned length) {
   algorithm = kMd5;
 
-  MD5_CTX md5_state;
-  MD5_Init(&md5_state);
-  MD5_Update(&md5_state, reinterpret_cast<const unsigned char *>(chars),
-             length);
-  MD5_Final(digest, &md5_state);
+  md5_ctx md5_state;
+  md5_init(&md5_state);
+  md5_update(&md5_state, length, reinterpret_cast<const uint8_t *>(chars));
+  md5_digest(&md5_state, MD5_DIGEST_SIZE, digest);
 }
 
 
@@ -395,11 +383,10 @@ Md5 Any::CastToMd5() {
   return result;
 }
 
-#ifndef OPENSSL_API_INTERFACE_V09
-static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
+static string HexFromSha256(unsigned char digest[SHA256_DIGEST_SIZE]) {
   string result;
-  result.reserve(2 * SHA256_DIGEST_LENGTH);
-  for (unsigned i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+  result.reserve(2 * SHA256_DIGEST_SIZE);
+  for (unsigned i = 0; i < SHA256_DIGEST_SIZE; ++i) {
     const char d1 = digest[i] / 16;
     const char d2 = digest[i] % 16;
     result.push_back(d1 + ((d1 <= 9) ? '0' : 'a' - 10));
@@ -407,18 +394,14 @@ static string HexFromSha256(unsigned char digest[SHA256_DIGEST_LENGTH]) {
   }
   return result;
 }
-#endif
 
 string Sha256File(const string &filename) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0)
     return "";
 
-  SHA256_CTX ctx;
-  SHA256_Init(&ctx);
+  sha256_ctx ctx;
+  sha256_init(&ctx);
 
   unsigned char io_buffer[4096];
   int actual_bytes;
@@ -429,24 +412,22 @@ string Sha256File(const string &filename) {
       close(fd);
       return "";
     }
-    SHA256_Update(&ctx, io_buffer, actual_bytes);
+    sha256_update(&ctx, actual_bytes, io_buffer);
   }
   close(fd);
 
-  unsigned char digest[SHA256_DIGEST_LENGTH];
-  SHA256_Final(digest, &ctx);
+  unsigned char digest[SHA256_DIGEST_SIZE];
+  sha256_digest(&ctx, SHA256_DIGEST_SIZE, digest);
   return HexFromSha256(digest);
-#endif
 }
 
 string Sha256Mem(const unsigned char *buffer, const unsigned buffer_size) {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
-  unsigned char digest[SHA256_DIGEST_LENGTH];
-  SHA256(buffer, buffer_size, digest);
+  unsigned char digest[SHA256_DIGEST_SIZE];
+  sha256_ctx ctx;
+  sha256_init(&ctx);
+  sha256_update(&ctx, buffer_size, buffer);
+  sha256_digest(&ctx, SHA256_DIGEST_SIZE, digest);
   return HexFromSha256(digest);
-#endif
 }
 
 string Sha256String(const string &content) {
@@ -460,17 +441,17 @@ std::string Hmac256(
   const std::string &content,
   bool raw_output)
 {
-#ifdef OPENSSL_API_INTERFACE_V09
-  PANIC(NULL);
-#else
-  unsigned char digest[SHA256_DIGEST_LENGTH];
+  sha256_ctx ctx;
+  unsigned char digest[SHA256_DIGEST_SIZE];
   const unsigned block_size = 64;
   const unsigned key_length = key.length();
   unsigned char key_block[block_size];
   memset(key_block, 0, block_size);
   if (key_length > block_size) {
-    SHA256(reinterpret_cast<const unsigned char *>(key.data()), key_length,
-           key_block);
+    sha256_init(&ctx);
+    sha256_update(&ctx, key_length,
+                  reinterpret_cast<const unsigned char *>(key.data()));
+    sha256_digest(&ctx, SHA256_DIGEST_SIZE, key_block);
   } else {
     if (key.length() > 0)
       memcpy(key_block, key.data(), key_length);
@@ -478,28 +459,26 @@ std::string Hmac256(
 
   unsigned char pad_block[block_size];
   // Inner hash
-  SHA256_CTX ctx_inner;
-  unsigned char digest_inner[SHA256_DIGEST_LENGTH];
-  SHA256_Init(&ctx_inner);
+  unsigned char digest_inner[SHA256_DIGEST_SIZE];
+  sha256_init(&ctx);
   for (unsigned i = 0; i < block_size; ++i)
     pad_block[i] = key_block[i] ^ 0x36;
-  SHA256_Update(&ctx_inner, pad_block, block_size);
-  SHA256_Update(&ctx_inner, content.data(), content.length());
-  SHA256_Final(digest_inner, &ctx_inner);
+  sha256_update(&ctx, block_size, pad_block);
+  sha256_update(&ctx, content.length(),
+                reinterpret_cast<const unsigned char *>(content.data()));
+  sha256_digest(&ctx, SHA256_DIGEST_SIZE, digest_inner);
 
   // Outer hash
-  SHA256_CTX ctx_outer;
-  SHA256_Init(&ctx_outer);
+  sha256_init(&ctx);
   for (unsigned i = 0; i < block_size; ++i)
     pad_block[i] = key_block[i] ^ 0x5c;
-  SHA256_Update(&ctx_outer, pad_block, block_size);
-  SHA256_Update(&ctx_outer, digest_inner, SHA256_DIGEST_LENGTH);
+  sha256_update(&ctx, block_size, pad_block);
+  sha256_update(&ctx, SHA256_DIGEST_SIZE, digest_inner);
 
-  SHA256_Final(digest, &ctx_outer);
+  sha256_digest(&ctx, SHA256_DIGEST_SIZE, digest);
   if (raw_output)
-    return string(reinterpret_cast<const char *>(digest), SHA256_DIGEST_LENGTH);
+    return string(reinterpret_cast<const char *>(digest), SHA256_DIGEST_SIZE);
   return HexFromSha256(digest);
-#endif
 }
 
 }  // namespace shash
