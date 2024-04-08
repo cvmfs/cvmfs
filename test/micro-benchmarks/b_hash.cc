@@ -63,3 +63,27 @@ BENCHMARK_DEFINE_F(BM_Hash, Sha1)(benchmark::State &st) {
 }
 BENCHMARK_REGISTER_F(BM_Hash, Sha1)->Repetitions(3)->Arg(100)->Arg(4096)->
   Arg(100*1024);
+
+BENCHMARK_DEFINE_F(BM_Hash, Rmd160)(benchmark::State &st) {
+  unsigned size = st.range(0);
+  unsigned char buffer[size];
+  shash::Any content_hash(shash::kRmd160);
+  while (st.KeepRunning()) {
+    HashMem(buffer, size, &content_hash);
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Hash, Rmd160)->Repetitions(3)->Arg(100)->Arg(4096)->
+  Arg(100*1024);
+
+BENCHMARK_DEFINE_F(BM_Hash, Shake128)(benchmark::State &st) {
+  unsigned size = st.range(0);
+  unsigned char buffer[size];
+  shash::Any content_hash(shash::kShake128);
+  while (st.KeepRunning()) {
+    HashMem(buffer, size, &content_hash);
+  }
+  st.SetItemsProcessed(st.iterations());
+}
+BENCHMARK_REGISTER_F(BM_Hash, Shake128)->Repetitions(3)->Arg(100)->Arg(4096)->
+  Arg(100*1024);
