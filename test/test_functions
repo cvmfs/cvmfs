@@ -60,7 +60,7 @@ if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
   echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
 fi
 if [ ! -z "$CVMFS_TEST_GEO_ACCOUNT_ID" ]; then
-  echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee /etc/cvmfs/server.local > /dev/null
+  echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee -a /etc/cvmfs/server.local > /dev/null
 fi
 
 if [ -f /.dockerinit ]; then
