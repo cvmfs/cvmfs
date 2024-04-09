@@ -17,7 +17,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "crypto/openssl_version.h"
 #include "util/exception.h"
 #include "KeccakHash.h"
 
