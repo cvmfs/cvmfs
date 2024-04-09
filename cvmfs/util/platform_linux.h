@@ -20,6 +20,7 @@
 #include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -349,6 +350,12 @@ inline uint64_t platform_realtime_ns() {
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+}
+
+inline void platform_getrandom(void *buf, size_t length) {
+  const ssize_t retval = getrandom(buf, length, 0);
+  assert(retval >= 0);
+  assert(static_cast<size_t>(retval) == length);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

@@ -310,6 +310,10 @@ inline uint64_t platform_memsize() {
   return ramsize;
 }
 
+inline void platform_getrandom(void *buf, size_t length) {
+  arc4random_buf(buf, length);
+}
+
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
 #endif
