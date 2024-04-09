@@ -1,3 +1,7 @@
+
+2.11.3:
+ * [server] Update method of downloading the MaxMind GeoIP (#3566)
+
 2.11.2:
   * [client] Fix mount helper race condition causing spurious directories (#3430)
   * [client] Suppress CVMFS_NFILES check for refcounted cache manager (#3426)
