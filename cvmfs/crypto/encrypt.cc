@@ -7,7 +7,6 @@
 
 #include <fcntl.h>
 #include <openssl/evp.h>
-#include <openssl/rand.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -34,12 +33,7 @@ Key *Key::CreateRandomly(const unsigned size) {
   result->size_ = size;
   result->data_ = reinterpret_cast<unsigned char *>(smalloc(size));
   // TODO(jblomer): pin memory in RAM
-  int retval = RAND_bytes(result->data_, result->size_);
-  if (retval != 1) {
-    // Not enough entropy
-    delete result;
-    result = NULL;
-  }
+  platform_getrandom(result->data_, result->size_);
   return result;
 }
 
