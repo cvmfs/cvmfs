@@ -60,7 +60,6 @@ set_target_properties (${PROJECT_UBENCHMARKS_NAME} PROPERTIES
                        LINK_FLAGS "${CVMFS_UBENCHMARKS_LD_FLAGS}")
 
 set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
-                                ${Libcrypto_LIBRARIES}
                                 ${Libnettle_LIBRARIES}
                                 ${SHA3_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
