@@ -149,11 +149,6 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     new_path.Truncate(length_after_truncate);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
-    XattrList xattrs;
-    if (new_entry.HasXattrs()) {
-      new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
-    }
-
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
       if (IsReportablePath(new_path)) {
@@ -161,6 +156,10 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
         if (new_entry.IsChunkedFile()) {
           new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                            &chunks);
+        }
+        XattrList xattrs;
+        if (new_entry.HasXattrs()) {
+          new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
         }
         ReportAddition(new_path, new_entry, xattrs, chunks);
       }
@@ -203,6 +202,10 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (new_entry.IsChunkedFile()) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
+      }
+      XattrList xattrs;
+      if (new_entry.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
       }
       bool recurse =
         ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
