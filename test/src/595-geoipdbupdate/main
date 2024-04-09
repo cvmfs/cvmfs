@@ -4,8 +4,8 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 # NOTE:
-#  A full test requires a valid CVMFS_GEO_LICENSE_KEY in a
-#    /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER.
+#  A full test requires a valid CVMFS_GEO_ACCOUNT_ID and CVMFS_GEO_LICENSE_KEY
+#  in a /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER.
 #  Test will be skipped with a warning if either CVMFS_GEO_DB_FILE is
 #    set or there's no CVMFS_GEO_LICENSE_KEY but there is a system
 #    geo DB in /usr/share/GeoIP.
@@ -90,13 +90,21 @@ cvmfs_run_test() {
     return 0
   fi
 
-  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
-    if [ -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
+  if [ -z "$CVMFS_GEO_ACCOUNT_ID" -o -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+    if [ -z "$CVMFS_GEO_LICENSE_KEY" -a -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
       echo "System geo database installed, skipping tests"
       CVMFS_GENERAL_WARNING_FLAG=1
       return 0
     fi
-    echo "No geo license key or db file found"
+    ACCT_MSG=
+    LICENSE_MSG=
+    if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
+      ACCT_MSG=", geo account ID"
+    fi
+    if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+      LICENSE_MSG=", geo license key"
+    fi
+    echo The following are not found: db file${ACCT_MSG}${LICENSE_MSG}
     return 1
   fi
 
