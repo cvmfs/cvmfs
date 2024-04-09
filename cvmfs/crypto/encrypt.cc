@@ -6,7 +6,8 @@
 #include "crypto/encrypt.h"
 
 #include <fcntl.h>
-#include <openssl/evp.h>
+#include <nettle/aes.h>
+#include <nettle/cbc.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -15,7 +16,6 @@
 #include <ctime>
 
 #include "crypto/hash.h"
-#include "crypto/openssl_version.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/platform.h"
@@ -208,113 +208,75 @@ bool Cipher::Decrypt(
 
 
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
+  if (ciphertext.length() <= kIvSize)
+    return "";
+  if ((ciphertext.length() % AES_BLOCK_SIZE) != 0)
+    return "";
+
+  string plaintext;
+  struct CBC_CTX(struct aes256_ctx, AES_BLOCK_SIZE) cbc_ctx;
+
   assert(key.size() == kKeySize);
-  int retval;
-  if (ciphertext.size() < kIvSize)
-    return "";
+  aes256_set_decrypt_key(&cbc_ctx.ctx, key.data());
 
-  const unsigned char *iv = reinterpret_cast<const unsigned char *>(
-    ciphertext.data());
+  CBC_SET_IV(&cbc_ctx, ciphertext.data());
 
-  // See OpenSSL documentation for the size
-  unsigned char *plaintext = reinterpret_cast<unsigned char *>(
-    smalloc(kBlockSize + ciphertext.size() - kIvSize));
-  int plaintext_len;
-  int tail_len;
-#ifdef OPENSSL_API_INTERFACE_V11
-  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
-#else
-  EVP_CIPHER_CTX ctx;
-  EVP_CIPHER_CTX_init(&ctx);
-  EVP_CIPHER_CTX *ctx_ptr = &ctx;
-#endif
-  retval = EVP_DecryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
-  assert(retval == 1);
-  retval = EVP_DecryptUpdate(ctx_ptr,
-             plaintext, &plaintext_len,
-             reinterpret_cast<const unsigned char *>(
-               ciphertext.data() + kIvSize),
-             ciphertext.length() - kIvSize);
-  if (retval != 1) {
-    free(plaintext);
-#ifdef OPENSSL_API_INTERFACE_V11
-    EVP_CIPHER_CTX_free(ctx_ptr);
-#else
-    retval = EVP_CIPHER_CTX_cleanup(&ctx);
-    assert(retval == 1);
-#endif
-    return "";
-  }
-  retval = EVP_DecryptFinal_ex(ctx_ptr, plaintext + plaintext_len, &tail_len);
-#ifdef OPENSSL_API_INTERFACE_V11
-  EVP_CIPHER_CTX_free(ctx_ptr);
-#else
-  int retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
-  assert(retval_2 == 1);
-#endif
-  if (retval != 1) {
-    free(plaintext);
-    return "";
-  }
+  plaintext.resize(ciphertext.length() - kIvSize);
+  assert(plaintext.length() > 0);
 
-  plaintext_len += tail_len;
-  if (plaintext_len == 0) {
-    free(plaintext);
+  CBC_DECRYPT(&cbc_ctx, aes256_decrypt, plaintext.length(),
+              reinterpret_cast<uint8_t *>(plaintext.data()),
+              reinterpret_cast<const uint8_t *>(ciphertext.data()) + kIvSize);
+
+  unsigned char padding_value = plaintext[plaintext.length() - 1];
+  if (padding_value > AES_BLOCK_SIZE || padding_value > plaintext.length())
     return "";
-  }
-  string result(reinterpret_cast<char *>(plaintext), plaintext_len);
-  free(plaintext);
-  return result;
+  plaintext.resize(plaintext.length() - padding_value);
+
+  return plaintext;
 }
 
 
 string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
+  string ciphertext;
+  struct CBC_CTX(struct aes256_ctx, AES_BLOCK_SIZE) cbc_ctx;
+
   assert(key.size() == kKeySize);
-  int retval;
+  aes256_set_encrypt_key(&cbc_ctx.ctx, key.data());
 
-  shash::Md5 md5(GenerateIv(key));
   // iv size happens to be md5 digest size
-  unsigned char *iv = md5.digest;
+  shash::Md5 md5(GenerateIv(key));
+  CBC_SET_IV(&cbc_ctx, md5.digest);
 
-  // See OpenSSL documentation as for the size.  Additionally, we prepend the
-  // initialization vector.
-  unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
-    smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
-  memcpy(ciphertext, iv, kIvSize);
-  int cipher_len = 0;
-  int tail_len = 0;
-#ifdef OPENSSL_API_INTERFACE_V11
-  EVP_CIPHER_CTX *ctx_ptr = EVP_CIPHER_CTX_new();
-#else
-  EVP_CIPHER_CTX ctx;
-  EVP_CIPHER_CTX_init(&ctx);
-  EVP_CIPHER_CTX *ctx_ptr = &ctx;
-#endif
-  retval = EVP_EncryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
-  assert(retval == 1);
-  // Older versions of OpenSSL don't allow empty input buffers
-  if (!plaintext.empty()) {
-    retval = EVP_EncryptUpdate(ctx_ptr,
-               ciphertext + kIvSize, &cipher_len,
-               reinterpret_cast<const unsigned char *>(plaintext.data()),
-               plaintext.length());
-    assert(retval == 1);
+  // cipher length: IV + plaintext length + padding
+  const size_t length_tail = plaintext.length() % AES_BLOCK_SIZE;
+  const size_t length_padding = AES_BLOCK_SIZE - length_tail;
+  const size_t length_cipher = AES_BLOCK_SIZE + plaintext.length() +
+                               length_padding;
+
+  ciphertext.resize(length_cipher);
+
+  memcpy(ciphertext.data(), md5.digest, AES_BLOCK_SIZE);
+  // Encrypt all full blocks of the plain text
+  if (plaintext.length() / AES_BLOCK_SIZE > 0) {
+    CBC_ENCRYPT(&cbc_ctx, aes256_encrypt,
+                AES_BLOCK_SIZE * (plaintext.length() / AES_BLOCK_SIZE),
+                reinterpret_cast<uint8_t *>(ciphertext.data()) + AES_BLOCK_SIZE,
+                reinterpret_cast<const uint8_t *>(plaintext.data()));
   }
-  retval = EVP_EncryptFinal_ex(ctx_ptr, ciphertext + kIvSize + cipher_len,
-                               &tail_len);
-  assert(retval == 1);
-#ifdef OPENSSL_API_INTERFACE_V11
-  EVP_CIPHER_CTX_free(ctx_ptr);
-#else
-  retval = EVP_CIPHER_CTX_cleanup(&ctx);
-  assert(retval == 1);
-#endif
 
-  cipher_len += tail_len;
-  assert(cipher_len > 0);
-  string result(reinterpret_cast<char *>(ciphertext), kIvSize + cipher_len);
-  free(ciphertext);
-  return result;
+  // PKCS padding block
+  unsigned char *padding_block = reinterpret_cast<uint8_t *>(ciphertext.data())
+                                 + ciphertext.length() - AES_BLOCK_SIZE;
+  if (length_tail > 0) {
+    memcpy(padding_block, plaintext.data() + plaintext.length() - length_tail,
+           length_tail);
+  }
+  memset(padding_block + length_tail, length_padding, length_padding);
+  CBC_ENCRYPT(&cbc_ctx, aes256_encrypt, AES_BLOCK_SIZE,
+              padding_block, padding_block);
+
+  return ciphertext;
 }
 
 
