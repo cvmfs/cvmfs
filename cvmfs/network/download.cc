@@ -2807,22 +2807,6 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
   unsigned num_alive = (group->size() - opt_proxy_groups_current_burned_);
   string old_proxy = JoinStrings(opt_proxy_urls_, "|");
 
-  // only for non-sharding request get the host name of the old proxy
-  std::string old_host_name = "";
-  if (!opt_proxy_shard_ && opt_proxy_urls_.size() > 0
-      && opt_proxy_groups_->size() > 0) {
-      int prev_idx = opt_proxy_groups_current_ == 0 ?
-                        opt_proxy_groups_->size() - 1
-                        : opt_proxy_groups_current_ - 1;
-      vector<ProxyInfo> *prev_group = &((*opt_proxy_groups_)[prev_idx]);
-      for (size_t i = 0; i < prev_group->size(); i++) {
-        ProxyInfo *proxy = &(*prev_group)[i];
-        if (opt_proxy_urls_[0] == proxy->url) {
-          old_host_name = proxy->host.name();
-        }
-      }
-  }
-
   // Rebuild proxy map and URL list
   opt_proxy_map_.clear();
   opt_proxy_urls_.clear();
@@ -2855,27 +2839,14 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
   }
   sort(opt_proxy_urls_.begin(), opt_proxy_urls_.end());
 
-  // only for non-sharding request get the host name of the new proxy
-  std::string new_host_name = "";
-  if (!opt_proxy_shard_ && opt_proxy_urls_.size() > 0) {
-    for (size_t i = 0; i < group->size(); i++) {
-      ProxyInfo *proxy = &(*group)[i];
-      if (opt_proxy_urls_[0] == proxy->url) {
-        new_host_name = proxy->host.name();
-      }
-    }
-  }
-
-
   // Report any change in proxy usage
   string new_proxy = JoinStrings(opt_proxy_urls_, "|");
   if (new_proxy != old_proxy) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-           "(manager '%s') switching proxy from %s [%s] to %s [%s]. Reason: %s",
+           "(manager '%s') switching proxy from %s to %s. Reason: %s",
            name_.c_str(), (old_proxy.empty() ? "(none)" : old_proxy.c_str()),
-           old_host_name.c_str(),
            (new_proxy.empty() ? "(none)" : new_proxy.c_str()),
-           new_host_name.c_str(), reason.c_str());
+           reason.c_str());
   }
 }
 
