@@ -217,9 +217,18 @@ __do_all_checks() {
   fi
   [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
 
-  local check_lock=/var/spool/cvmfs/is_checking_all
-  if ! acquire_lock $check_lock; then
-    to_syslog "skipping start of cvmfs_server check because $check_lock held by active process"
+  # This check is for backward compatibility, can eventually be removed
+  local old_check_all_lock=/var/spool/cvmfs/is_checking_all
+  if [ -f $old_check_all_lock ]; then
+    to_syslog "skipping starting cvmfs_server check -a because old $old_check_all_lock still exists"
+    return 1
+  fi
+
+  # Use /dev/shm for the lock because it is world-writable and goes away
+  # after reboot
+  local check_all_lock=/dev/shm/cvmfs_is_checking_all
+  if ! acquire_lock $check_all_lock; then
+    to_syslog "skipping starting cvmfs_server check -a because $check_all_lock held by active process"
     return 1
   fi
 
@@ -257,7 +266,7 @@ __do_all_checks() {
 
   done
 
-  release_lock $check_lock
+  release_lock $check_all_lock
 }
 
 cvmfs_server_check() {
