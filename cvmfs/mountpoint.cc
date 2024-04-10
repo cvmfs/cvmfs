@@ -2125,7 +2125,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string optarg;
   external_download_mgr_ =
     download_mgr_->Clone(perf::StatisticsTemplate("download-external",
-      statistics_));
+      statistics_), "external");
 
   unsigned timeout;
   unsigned timeout_direct;
