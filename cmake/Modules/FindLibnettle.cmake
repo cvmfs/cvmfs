@@ -10,13 +10,13 @@
 find_path(
   Libnettle_INCLUDE_DIRS
   NAMES nettle/version.h
-  PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/include
+  PATHS ${EXTERNALS_INSTALL_LOCATION}/include
 )
 
 find_library(
   Libnettle_LIBRARIES
   NAMES nettle
-  PATHS ${EXTERNALS_INSTALL_LOCATION}/crypto/lib
+  PATHS ${EXTERNALS_INSTALL_LOCATION}/lib
 )
 
 include(FindPackageHandleStandardArgs)
