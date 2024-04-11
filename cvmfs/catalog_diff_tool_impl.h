@@ -187,9 +187,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
         old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
         old_entry.IsNestedCatalogMountpoint()) {
-
       if (IsIgnoredPath(old_path) || IsIgnoredPath(new_path)) continue;
-        
       // Early recursion stop if nested catalogs are identical
       shash::Any id_nested_from, id_nested_to;
       id_nested_from = old_catalog_mgr_->GetNestedCatalogHash(old_path);
