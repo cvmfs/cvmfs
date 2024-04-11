@@ -451,8 +451,13 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
                  names[i].c_str(), ipv4_addresses[i][j].c_str());
         continue;
       }
-      LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-               names[i].c_str(), ipv4_addresses[i][j].c_str());
+      if (names[i] == host.name_) {
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
+                                names[i].c_str(), ipv4_addresses[i][j].c_str());
+      } else {
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s -> %s",
+            names[i].c_str(), host.name_.c_str(), ipv4_addresses[i][j].c_str());
+      }
       host.ipv4_addresses_.insert(ipv4_addresses[i][j]);
     }
 
@@ -464,8 +469,13 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
         continue;
       }
       // For URLs we need brackets around IPv6 addresses
-      LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-               names[i].c_str(), ipv6_addresses[i][j].c_str());
+      if (names[i] == host.name_) {
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
+                                names[i].c_str(), ipv6_addresses[i][j].c_str());
+      } else {
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s -> %s",
+            names[i].c_str(), host.name_.c_str(), ipv6_addresses[i][j].c_str());
+      }
       host.ipv6_addresses_.insert("[" + ipv6_addresses[i][j] + "]");
     }
 
