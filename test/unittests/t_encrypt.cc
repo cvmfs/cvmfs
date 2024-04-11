@@ -146,7 +146,7 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   string empty;
   string dummy = "Hello, World!";
   string dummy2 = k->ToBase64();
-  string dummy3 = "0123456789ABCDEF"; // AES block size
+  string dummy3 = "0123456789ABCDEF";  // AES block size
   string dummy4(1000, 'x');
   string ciphertext;
   string ciphertext_two;
