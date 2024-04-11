@@ -183,7 +183,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     i_from++;
     i_to++;
 
-    if (IsIgnoredPath(old_path) || IsIgnoredPath(new_path)) continue;
+    if (IsIgnoredPath(old_path)) continue;
 
     catalog::DirectoryEntryBase::Differences diff =
         old_entry.CompareTo(new_entry);
