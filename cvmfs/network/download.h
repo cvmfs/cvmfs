@@ -164,7 +164,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
             const perf::StatisticsTemplate &statistics);
   void Fini();
   void Spawn();
-  DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
+  DownloadManager *Clone(const perf::StatisticsTemplate &statistics,
+                         const std::string &cloned_name);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -383,6 +384,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Repo name. Needed for the re-try logic if a download was unsuccessful
   */
   std::string fqrn_;
+
+  /**
+   * Name of the download manager (default is "standard")
+   */
+  std::string name_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

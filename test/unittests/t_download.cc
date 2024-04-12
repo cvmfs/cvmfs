@@ -159,7 +159,7 @@ TEST_F(T_Download, RemoteFile) {
 
 TEST_F(T_Download, Clone) {
   DownloadManager *download_mgr_cloned = download_mgr.Clone(
-    perf::StatisticsTemplate("x", &statistics));
+    perf::StatisticsTemplate("x", &statistics), "cloned");
 
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
@@ -182,7 +182,8 @@ TEST_F(T_Download, Clone) {
 
   // Don't crash
   DownloadManager *dm = new DownloadManager();
-  download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics));
+  download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics),
+                                  "cloned");
   delete dm;
   delete download_mgr_cloned;
 }
