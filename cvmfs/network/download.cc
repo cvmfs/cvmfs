@@ -1512,7 +1512,7 @@ void DownloadManager::ReleaseCredential(JobInfo *info) {
  * - ShouldRetry in Fetch() [fuse-thread]
  *
  * If any of those functions report back that the download should be stopped
- * (because of successful download or retry not permitted), that specfic
+ * (because of successful download or retry not permitted), that specific
  * function will take care of the cleanup.
  *
  * @returns true if another download should be performed, false otherwise
@@ -1531,7 +1531,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
  * Step 1/3 for checking if the CURL download was successful.
  * (Please check VerifyAndFinalize() for more explanation)
  *
- * Determines if an error occured during the download and if yes, sets the
+ * Determines if an error occurred during the download and if yes, sets the
  * error code accordingly in the jobinfo object.
  *
  * @note If the download was successful, it takes care of cleanup.
@@ -1659,7 +1659,7 @@ bool DownloadManager::VerifyDownloadSuccess(const int curl_error,
  * (Please check VerifyAndFinalize() for more explanation)
  *
  * Checks if an unsuccessful download should be repeated. Implements failure
- * logic. Migh rebalance proxies if needed.
+ * logic. Might rebalance proxies if needed.
  *
  * @note This function should only be called, if the download has failed.
  * @note If the download should not be repeated, it takes care of cleanup.
