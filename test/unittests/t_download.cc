@@ -611,13 +611,15 @@ TEST_F(T_Download, ParallelDownload) {
 
   // test correct cloning of ParallelDownloadCoordinator
   DownloadManager *download_mgr_cloned = download_mgr.Clone(
-                                    perf::StatisticsTemplate("x", &statistics));
+                                    perf::StatisticsTemplate("x", &statistics),
+                                    "cloned1");
   EXPECT_FALSE(download_mgr_cloned->use_parallel_download());
   EXPECT_TRUE(download_mgr_cloned->GetParallelDwnldCoordPtr() == NULL);
   delete download_mgr_cloned;
 
   download_mgr_cloned = parallel_dm->Clone(
-                                    perf::StatisticsTemplate("g", &statistics));
+                                    perf::StatisticsTemplate("g", &statistics),
+                                    "cloned2");
   EXPECT_TRUE(download_mgr_cloned->use_parallel_download());
   EXPECT_EQ(parallel_dm->GetParallelDwnldCoordPtr()->min_buffers(),
     download_mgr_cloned->GetParallelDwnldCoordPtr()->min_buffers());

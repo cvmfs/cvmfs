@@ -1531,8 +1531,7 @@ bool MountPoint::CreateDownloadManagers() {
   int64_t parallel_dwld_max_buffers = -1;
   int64_t parallel_dwld_inflight_buffers = -1;
 
-  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MIN_BUFFERS",
-                             &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MIN_BUFFERS", &optarg)) {
     parallel_dwld_min_buffers = String2Int64(optarg);
     if (parallel_dwld_min_buffers < 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
@@ -1542,8 +1541,7 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
-  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MAX_BUFFERS",
-                             &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MAX_BUFFERS", &optarg)) {
     parallel_dwld_max_buffers = String2Int64(optarg);
     if (parallel_dwld_max_buffers < 0) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,

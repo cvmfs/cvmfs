@@ -455,8 +455,9 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
       escaped.push_back(escaped_char[0]);
     }
   }
-  LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") escaped %s to %s",
-                                      jobinfo_id, url.c_str(), escaped.c_str());
+  LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
+                                    "escaped %s to %s", name_.c_str(),
+                                    jobinfo_id, url.c_str(), escaped.c_str());
 
   return escaped;
 }
@@ -667,9 +668,9 @@ void *DownloadManager::MainDownload(void *data) {
               remove_job = true;
             break;
             default:
-            PANIC(kLogSyslogErr | kLogDebug,
-               "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
-               info->id(), ele->action);
+            PANIC(kLogSyslogErr | kLogDebug, "(manager %s - id %" PRId64 ") "
+                          "FAILURE - Unknown DataTube Element Action: %d",
+                          download_mgr->name_.c_str(), info->id(), ele->action);
           }
 
           // download is finished, release CURL resources and inform Fetch()
@@ -1737,18 +1738,18 @@ bool DownloadManager::ShouldRepeatDownload(JobInfo *info) {
             // Instead of giving up, reset the num_used_proxies counter,
             // switch proxy and try again
             LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                  "(manager '%s' - id %" PRId64 ") "
-                  "VerifyAndFinalize() would fail the download here. "
-                  "Instead switch proxy and retry download. "
-                  "info->probe_hosts=%d host_chain=%p info->num_used_hosts=%d "
-                  "host_chain->size()=%lu same_url_retry=%d "
-                  "info->num_used_proxies=%d opt_num_proxies_=%d",
-                  name_.c_str(), info->id(),
-                  static_cast<int>(info->probe_hosts()),
-                  host_chain, info->num_used_hosts(),
-                  host_chain ?
-                    host_chain->size() : -1, static_cast<int>(same_url_retry),
-                  info->num_used_proxies(), opt_num_proxies_);
+                   "(manager '%s' - id %" PRId64 ") "
+                   "VerifyAndFinalize() would fail the download here. "
+                   "Instead switch proxy and retry download. "
+                   "info->probe_hosts=%d host_chain=%p info->num_used_hosts=%d "
+                   "host_chain->size()=%lu same_url_retry=%d "
+                   "info->num_used_proxies=%d opt_num_proxies_=%d",
+                   name_.c_str(), info->id(),
+                   static_cast<int>(info->probe_hosts()),
+                   host_chain, info->num_used_hosts(),
+                   host_chain ?
+                      host_chain->size() : -1, static_cast<int>(same_url_retry),
+                   info->num_used_proxies(), opt_num_proxies_);
             info->SetNumUsedProxies(1);
             RebalanceProxiesUnlocked("download failed - failover indefinitely");
             try_again = !Interrupted(fqrn_, info);
@@ -1785,9 +1786,9 @@ bool DownloadManager::ShouldRetry(JobInfo *info) {
   assert(info->error_code() != kFailOk);
   bool same_url_retry = CanRetry(info);
   LogCvmfs(kLogDownload, kLogDebug, "(manager '%s' - id %" PRId64 ") "
-              "Trying again on same curl handle, same url: %d, "
-              "error code %d no-cache %d", name_.c_str(), info->id(),
-              same_url_retry, info->error_code(), info->nocache());
+                         "Trying again on same curl handle, same url: %d, "
+                         "error code %d no-cache %d", name_.c_str(), info->id(),
+                         same_url_retry, info->error_code(), info->nocache());
   // Reset internal state and destination
   if (info->sink() != NULL && info->sink()->Reset() != 0) {
     info->SetErrorCode(kFailLocalIO);
@@ -2206,24 +2207,26 @@ Failures DownloadManager::Fetch(JobInfo *info) {
                                            info->GetZstreamPtr(), info->sink());
               if (retval == zlib::kStreamDataError) {
                 LogCvmfs(kLogDownload, kLogSyslogErr,
-                                     "(id %" PRId64 ") failed to decompress %s",
-                                     info->id(), info->url()->c_str());
+                      "(manager '%s' - id %" PRId64 ") failed to decompress %s",
+                      name_.c_str(), info->id(), info->url()->c_str());
                 info->SetErrorCode(kFailBadData);
                 info->SetStopDataDownload(true);
               } else if (retval == zlib::kStreamIOError) {
                 LogCvmfs(kLogDownload, kLogSyslogErr,
-                            "(id %" PRId64 ") decompressing %s, local IO error",
-                            info->id(), info->url()->c_str());
+                          "(manager '%s' - id %" PRId64 ") "
+                          "decompressing %s, local IO error",
+                          name_.c_str(), info->id(), info->url()->c_str());
                 info->SetErrorCode(kFailLocalIO);
                 info->SetStopDataDownload(true);
               }
             } else {
               const int64_t written = info->sink()->Write(ptr, num_bytes);
               if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-                LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
+                LogCvmfs(kLogDownload, kLogDebug,
+                                     "(manager '%s' - id %" PRId64 ") "
                                      "Failed to perform write of %zu bytes "
                                      "to sink %s with errno %ld",
-                                     info->id(), num_bytes,
+                                     name_.c_str(), info->id(), num_bytes,
                                      info->sink()->Describe().c_str(), written);
                 info->SetErrorCode(kFailLocalIO);
                 info->SetStopDataDownload(true);
@@ -2232,9 +2235,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
           }
           break;
           default:
-            PANIC(kLogSyslogErr | kLogDebug,
-               "(id %" PRId64 ") FAILURE - Unknown DataTube Element Action: %d",
-               info->id(), ele->action);
+            PANIC(kLogSyslogErr | kLogDebug, "(manager '%s' - id %" PRId64 ") "
+                               " FAILURE - Unknown DataTube Element Action: %d",
+                               name_.c_str(), info->id(), ele->action);
         }
         info->parallel_dwnld_coord()->PutElementToReuse(ele);
       } while (is_running);
@@ -2674,8 +2677,8 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
                               name_.c_str(),
                               dns::ExtractHost(host_chain_shuffled[i]).c_str());
         // remove new line at end of "order"
-        LogCvmfs(kLogDownload, kLogDebug, "order is %s",
-                                  Trim(order, true /* trim_newline */).c_str());
+        LogCvmfs(kLogDownload, kLogDebug, "(manager '%s') order is %s",
+                   name_.c_str(), Trim(order, true /* trim_newline */).c_str());
         success = true;
         break;
       }
