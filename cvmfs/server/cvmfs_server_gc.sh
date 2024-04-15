@@ -160,6 +160,16 @@ cvmfs_server_gc() {
     fi
   fi
 
+  # Use /dev/shm for the lock file because it is world-writable and goes
+  # away during reboot
+  local gc_all_lock=/dev/shm/cvmfs_is_gcing_all
+  if [ $all_collectable -ne 0 ]; then
+    if ! acquire_lock $gc_all_lock; then
+      to_syslog "skipping starting cvmfs_server gc -a because $gc_all_lock held by active process"
+      return 1
+    fi
+  fi
+
   for name in $names; do
 
     if [ $all_collectable -eq 0 ]; then
@@ -198,6 +208,10 @@ cvmfs_server_gc() {
       # Errors will be in the log.
     fi
   done
+
+  if [ $all_collectable -ne 0 ]; then
+    release_lock $gc_all_lock
+  fi
 }
 
 __restore_cvmfs_gateway() {
