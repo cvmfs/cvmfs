@@ -639,6 +639,7 @@ if (BUILD_SERVER)
        swissknife_history.cc
        swissknife_info.cc
        swissknife_ingest.cc
+       swissknife_ingestsql.cc
        swissknife_lease.cc
        swissknife_lease_curl.cc
        swissknife_lease_json.cc
@@ -683,6 +684,7 @@ if (BUILD_SERVER)
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
+        ${LIBACL_LIBRARY}
         pthread
         dl
   )
