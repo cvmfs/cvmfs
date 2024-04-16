@@ -13,6 +13,7 @@ cvmfs_run_test() {
   ############### creates new fds for the same object
   # make sure the setting is not overridden by the config repo
 
+
   cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
 
   ############
@@ -98,10 +99,12 @@ cvmfs_run_test() {
   sudo cat /proc/$atlas_pid/limits
 
   echo "Non-refcounted manager: should fail"
+  local job_pids=""
   for i in $(seq 1 64); do
     ./openwaitprint $testfile >/dev/null &
+    job_pids="$job_pids $!"
   done
-  local job_pids=$(jobs -p)
+  sleep 1
   local got_emfile=0
   for p in $job_pids; do
     kill -USR1 $p
@@ -115,10 +118,12 @@ cvmfs_run_test() {
   cvmfs_umount atlas.cern.ch || return 55
   cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=yes || return 56
   echo "Refcounted manager: should succeed"
+  job_pids=""
   for i in $(seq 1 64); do
     ./openwaitprint $testfile >/dev/null &
+    job_pids="$job_pids $!"
   done
-  job_pids=$(jobs -p)
+  sleep 1
   got_emfile=0
   for p in $job_pids; do
     kill -USR1 $p
