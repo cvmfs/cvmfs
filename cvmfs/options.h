@@ -108,9 +108,11 @@ class OptionsManager {
    *
    * @param  key variable to be accessed in the map
    * @param  value container of the received value, if it exists
+   * @param  delims container of the delimiters used in the value, if it exists
    * @return true if there was a value stored in the map for key
    */
-  bool GetValue(const std::string &key, std::string *value) const;
+  bool GetValue(const std::string &key, std::string *value,
+                const std::vector<char> &delims = std::vector<char>()) const;
 
   /**
    * Gets the stored value for a concrete variable. Panics if the value is
