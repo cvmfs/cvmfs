@@ -40,10 +40,17 @@ enum StreamStates {
   kStreamEnd,
 };
 
-// Do not change order of algorithms.  Used as flags in the catalog
+/**
+ * Do not change order of algorithms.  Used as flags in the catalog
+ *
+ * kZstdFast, kZstdDefault, kZstdStrong only from cvmfs 2.12 on
+ */
 enum Algorithms {
   kZlibDefault = 0,
   kNoCompression,
+  kZstdFast,
+  kZstdDefault,
+  kZstdStrong
 };
 
 /**
