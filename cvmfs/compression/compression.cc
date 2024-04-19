@@ -148,7 +148,7 @@ const unsigned kBufferSize = 32768;
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if ((algorithm_option == "default") || (algorithm_option == "zlib")) {
     return kZlibDefault;
-  } 
+  }
   if (algorithm_option == "none") {
     return kNoCompression;
   }
