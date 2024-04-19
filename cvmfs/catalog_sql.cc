@@ -77,7 +77,9 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //            * add self_special and subtree_special statistics counters
 //   5 --> 6: (Jul 01 2021):
 //            * Add kFlagDirectIo
-const unsigned CatalogDatabase::kLatestSchemaRevision = 6;
+//   6 --> 7: (Apr 2024):
+//            * add (compression) algorithm column to nested_catalogs table
+const unsigned CatalogDatabase::kLatestSchemaRevision = 7;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -205,6 +207,25 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     set_schema_revision(6);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 6)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (6 --> 7)");
+
+    SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs "
+                                  "ADD algorithm INTEGER;");
+    if (!sql_upgrade.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs "
+                                       "to revision 2.7");
+      return false;
+    }
+
+    set_schema_revision(7);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision "
+                                       "to revision 2.7");
       return false;
     }
   }
@@ -878,7 +899,11 @@ SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 {
   // We cannot access nested catalogs where the content hash is missing
   static const char *stmt_0_9 =
-    "SELECT '', 0 FROM nested_catalogs;";
+    "SELECT '', 0, 0 FROM nested_catalogs;";
+  static const char *stmt_2_5_ge_7 =
+    "SELECT sha1, size, algorithm FROM nested_catalogs WHERE path=:path "
+    "UNION ALL SELECT sha1, size, algorithm "
+    "FROM bind_mountpoints WHERE path=:path;";
   static const char *stmt_2_5_ge_4 =
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path "
     "UNION ALL SELECT sha1, size FROM bind_mountpoints WHERE path=:path;";
@@ -886,9 +911,13 @@ SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path;";
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
-    "SELECT sha1, 0 FROM nested_catalogs WHERE path=:path;";
+    "SELECT sha1, 0, 0 FROM nested_catalogs WHERE path=:path;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+     (database.schema_revision() >= 7))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_7);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
      (database.schema_revision() >= 4))
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
@@ -923,6 +952,10 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
   return RetrieveInt64(1);
 }
 
+zlib::Algorithms SqlNestedCatalogLookup::GetAlgorithm() const {
+  return static_cast<zlib::Algorithms>(RetrieveInt64(2));
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -932,17 +965,24 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
 {
   // We cannot access nested catalogs where the content hash is missing
   static const char *stmt_0_9 =
-    "SELECT '', '', 0 FROM nested_catalogs;";
+    "SELECT '', '', 0, 0 FROM nested_catalogs;";
+  static const char *stmt_2_5_ge_7 =
+    "SELECT path, sha1, size, algorithm FROM nested_catalogs "
+    "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_4 =
-    "SELECT path, sha1, size FROM nested_catalogs "
+    "SELECT path, sha1, size, 0 FROM nested_catalogs "
     "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_1_lt_4 =
-    "SELECT path, sha1, size FROM nested_catalogs;";
+    "SELECT path, sha1, size, 0 FROM nested_catalogs;";
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
-    "SELECT path, sha1, 0 FROM nested_catalogs;";
+    "SELECT path, sha1, 0, 0 FROM nested_catalogs;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+     (database.schema_revision() >= 7))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_7);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
      (database.schema_revision() >= 4))
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_4);
@@ -978,6 +1018,10 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
   return RetrieveInt64(2);
 }
 
+zlib::Algorithms SqlNestedCatalogListing::GetAlgorithm() const {
+  return static_cast<zlib::Algorithms>(RetrieveInt64(3));
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -987,14 +1031,20 @@ SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
 {
   // We cannot access nested catalogs where the content hash is missing
   static const char *stmt_0_9 =
-    "SELECT '', '', 0 FROM nested_catalogs;";
+    "SELECT '', '', 0, 0 FROM nested_catalogs;";
+  static const char *stmt_2_5_ge_7 =
+    "SELECT path, sha1, size, algorithm FROM nested_catalogs;";
   static const char *stmt_2_5_ge_1 =
-    "SELECT path, sha1, size FROM nested_catalogs;";
+    "SELECT path, sha1, size, 0 FROM nested_catalogs;";
   // Internally converts NULL to 0 for size
   static const char *stmt_2_5_lt_1 =
-    "SELECT path, sha1, 0 FROM nested_catalogs;";
+    "SELECT path, sha1, 0, 0 FROM nested_catalogs;";
 
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
+     (database.schema_revision() >= 7))
+  {
+    DeferredInit(database.sqlite_db(), stmt_2_5_ge_7);
+  } else if (database.IsEqualSchema(database.schema_version(), 2.5) &&
      (database.schema_revision() >= 1))
   {
     DeferredInit(database.sqlite_db(), stmt_2_5_ge_1);
@@ -1026,6 +1076,9 @@ uint64_t SqlOwnNestedCatalogListing::GetSize() const {
   return RetrieveInt64(2);
 }
 
+zlib::Algorithms SqlOwnNestedCatalogListing::GetAlgorithm() const {
+  return static_cast<zlib::Algorithms>(RetrieveInt64(3));
+}
 
 //------------------------------------------------------------------------------
 
