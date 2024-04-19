@@ -146,10 +146,21 @@ const unsigned kBufferSize = 32768;
  * Aborts if string doesn't match any of the algorithms.
  */
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
-  if ((algorithm_option == "default") || (algorithm_option == "zlib"))
+  if ((algorithm_option == "default") || (algorithm_option == "zlib")) {
     return kZlibDefault;
-  if (algorithm_option == "none")
+  } 
+  if (algorithm_option == "none") {
     return kNoCompression;
+  }
+  if (algorithm_option == "zstd-fast") {
+    return kZstdFast;
+  }
+  if (algorithm_option == "zstd-default") {
+    return kZstdDefault;
+  }
+  if (algorithm_option == "zstd-strong") {
+    return kZstdStrong;
+  }
   PANIC(kLogStderr, "unknown compression algorithms: %s",
         algorithm_option.c_str());
 }
@@ -162,6 +173,15 @@ std::string AlgorithmName(const zlib::Algorithms alg) {
       break;
     case kNoCompression:
       return "none";
+      break;
+    case kZstdFast:
+      return "zstd-fast";
+      break;
+    case kZstdDefault:
+      return "zstd-default";
+      break;
+    case kZstdStrong:
+      return "zstd-strong";
       break;
     // Purposely did not add a 'default' statement here: this will
     // cause the compiler to generate a warning if a new algorithm
