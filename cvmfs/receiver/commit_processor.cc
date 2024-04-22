@@ -12,7 +12,7 @@
 #include "catalog_merge_tool.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"

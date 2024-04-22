@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "cache_posix.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "quota_posix.h"
 #include "testutil.h"

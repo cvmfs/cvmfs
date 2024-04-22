@@ -57,7 +57,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_mgr_client.cc
        catalog_sql.cc
        clientctx.cc
-       compression.cc
+       compression/compression.cc
        directory_entry.cc
        duplex_fuse.cc
        fd_refcount_mgr.cc
@@ -136,7 +136,7 @@ if (BUILD_CVMFS)
   # /usr/bin/cvmfs_fsck
   #
   add_executable (cvmfs_fsck
-                  compression.cc
+                  compression/compression.cc
                   cvmfs_fsck.cc
                   statistics.cc
   )
@@ -495,7 +495,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache_plugin/cvmfs_cache_posix.cc
                   cache.cc
                   cache_posix.cc
-                  compression.cc
+                  compression/compression.cc
                   fd_refcount_mgr.cc
                   manifest.cc
                   quota.cc
@@ -573,7 +573,7 @@ if (BUILD_SERVER)
        catalog_rw.cc
        catalog_virtual.cc
        clientctx.cc
-       compression.cc
+       compression/compression.cc
        directory_entry.cc
        file_chunk.cc
        gateway_util.cc
@@ -717,7 +717,7 @@ if (BUILD_SERVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_virtual.cc
-       compression.cc
+       compression/compression.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -827,7 +827,7 @@ if (BUILD_SERVER)
   #
   set (CVMFS_PUBLISH_SOURCES
        backoff.cc
-       compression.cc
+       compression/compression.cc
        directory_entry.cc
        manifest.cc
        network/dns.cc
@@ -1014,7 +1014,7 @@ if(BUILD_RECEIVER)
        catalog_sql.cc
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
-       compression.cc
+       compression/compression.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -1176,7 +1176,7 @@ if (BUILD_PRELOADER)
                   backoff.cc
                   catalog.cc
                   catalog_sql.cc
-                  compression.cc
+                  compression/compression.cc
                   gateway_util.cc
                   globals.cc
                   history_sql.cc
