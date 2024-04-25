@@ -470,9 +470,13 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
-    echo "Error: macFUSE is missing."
-    num_errors=$(($num_errors+1))
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    # Check that all required components for fuse-t are presented
+    check_fuse_t_installation
+    if [ $? -ne 0 ]; then
+      echo "Error: FUSE-T is not installed."
+      num_errors=$(($num_errors+1))
+    fi
   fi
   check_dev_fuse
   exit_code=$?
@@ -1756,6 +1760,23 @@ check_cvmfs_user() {
   esac
 }
 
+# Expected to be ran only on macOS
+check_fuse_t_installation() {
+  local product="fuse-t"
+  local nfsV4ServerLink="/usr/local/bin/go-nfsv4"
+  local dylibPath="/usr/local/lib/lib${product}.dylib"
+  local staticLibPath="/usr/local/lib/lib${product}.a"
+
+  # Check for existence of required files and links
+  local paths=("$nfsV4ServerLink" "$dylibPath" "$staticLibPath")
+  for path in "${paths[@]}"; do
+    if [ ! -e "$path" ]; then
+      echo "Error: Missing required file or directory: $path"
+      return 1
+    fi
+  done
+  return 0
+}
 
 check_dev_fuse() {
   local charDevice
@@ -1766,8 +1787,9 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/macfuse0 ;;
-
+      # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
+      return 0 ;;
+      
     * )
      echo "Architecture $sys_arch is not supported"
      exit 1 ;;
@@ -1779,9 +1801,6 @@ check_dev_fuse() {
     if [ x"$sys_arch" = x"Linux" ]; then
       echo "Error: character device $charDevice does not exist"
       return_code=$(($return_code+1))
-    elif [ x"$sys_arch" = x"Darwin" ]; then
-      echo -n "Warning: character device $charDevice does not exist. "
-      echo "Please make sure that macFUSE is installed."
     fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
