@@ -76,8 +76,8 @@ static bool IsFuseTInstalled() {
   platform_stat64 info;
   for (int idx = 0; idx < pathsNumber; ++idx) {
     bzero(&info, sizeof(platform_stat64));
-    int retval = platform_lstat(fuseTComponentsPaths[idx].c_str(), &info);
-    if ((retval != 0) || !S_ISREG(info.st_mode) != 0) {
+    int retval = platform_stat(fuseTComponentsPaths[idx].c_str(), &info);
+    if ((retval != 0) || !S_ISREG(info.st_mode)) {
       return false;
     }
   }
