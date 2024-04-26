@@ -4,8 +4,12 @@
 
 #include "gtest/gtest.h"
 
+#include <cstdlib>  // for rand()
 
+#include "compression/input_mem.h"
 #include "compression/compression.h"
+#include "network/sink.h"
+#include "network/sink_mem.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 
@@ -20,6 +24,7 @@ class T_Compressor : public ::testing::Test {
     // Compress a known String
     test_string = strdup("Hello World!");
     ptr_test_string = test_string;
+    str_test_string = test_string;
 
     // Include the null character
     size_input = strlen(test_string) + 1;
@@ -39,6 +44,7 @@ class T_Compressor : public ::testing::Test {
   }
 
   char *test_string, *ptr_test_string;
+  std::string str_test_string;
   UniquePtr<Compressor> compressor;
   unsigned char *buf;
   size_t buf_size;
@@ -49,13 +55,77 @@ class T_Compressor : public ::testing::Test {
 };
 
 
+TEST_F(T_Compressor, CompressionSinkMem2Mem) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+
+  // Compress the output
+  unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
+
+  InputMem in = InputMem(input, str_test_string.size(), 16384);
+  cvmfs::MemSink out = cvmfs::MemSink(500);
+
+  zlib::StreamStates res = compressor->CompressStream(in, out);
+
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(out.pos(), 0U);
+
+  // Decompress it, check if it's still the same
+  char *decompress_buf;
+  uint64_t decompress_size;
+  DecompressMem2Mem(out.data(), out.pos() + 1,
+    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
+
+  // Check if the string is the same as the beginning
+  ASSERT_EQ(0, strcmp(decompress_buf, test_string));
+
+  free(decompress_buf);
+}
+
+TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+
+  // Compress the output
+  size_t in_size = 16384;
+  size_t chunk_size = 8000;
+
+  char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *input = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    input[i] = letters[rand() % 26];
+  }
+
+  InputMem in = InputMem(input, in_size, chunk_size);
+  cvmfs::MemSink out = cvmfs::MemSink(in_size);
+
+  zlib::StreamStates res = compressor->CompressStream(in, out);
+
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(out.pos(), 0U);
+
+  // Decompress it, check if it's still the same
+  char *decompress_buf;
+  uint64_t decompress_size;
+  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos() + 1,
+    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
+
+  EXPECT_EQ(in_size, decompress_size);
+
+  // Check if the string is the same as the beginning
+  ASSERT_EQ(0, memcmp(decompress_buf, input, in_size));
+
+  free(decompress_buf);
+}
+
+
 TEST_F(T_Compressor, Compression) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
 
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
   bool deflate_finished =
-    compressor->Deflate(true, &input, &size_input, &buf, &buf_size);
+    compressor->CompressStream(true, &input, &size_input, &buf, &buf_size);
 
   ASSERT_TRUE(deflate_finished);
   ASSERT_GT(buf_size, 0U);
@@ -77,7 +147,7 @@ TEST_F(T_Compressor, Compression) {
 TEST_F(T_Compressor, CompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
   unsigned char *compress_buf =
-    new unsigned char[compressor->DeflateBound(long_size)];
+    new unsigned char[compressor->CompressUpperBound(long_size)];
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
@@ -87,7 +157,7 @@ TEST_F(T_Compressor, CompressionLong) {
   while (!deflate_finished) {
     // Compress the output in multiple stages
     deflate_finished =
-      compressor->Deflate(true, &input, &remaining, &buf, &buf_size);
+      compressor->CompressStream(true, &input, &remaining, &buf, &buf_size);
     memcpy(compress_buf + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;
@@ -116,7 +186,7 @@ TEST_F(T_Compressor, EchoCompression) {
 
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
   bool deflate_finished =
-    compressor->Deflate(true, &input, &size_input, &buf, &buf_size);
+    compressor->CompressStream(true, &input, &size_input, &buf, &buf_size);
 
   ASSERT_TRUE(deflate_finished);
   ASSERT_GT(buf_size, 0U);
@@ -131,7 +201,7 @@ TEST_F(T_Compressor, EchoCompression) {
 TEST_F(T_Compressor, EchoCompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
   UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
-    smalloc(compressor->DeflateBound(long_size))));
+    smalloc(compressor->CompressUpperBound(long_size))));
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
@@ -141,7 +211,7 @@ TEST_F(T_Compressor, EchoCompressionLong) {
   while (!deflate_finished) {
     // Compress the output in multiple stages
     deflate_finished =
-      compressor->Deflate(true, &input, &remaining, &buf, &buf_size);
+      compressor->CompressStream(true, &input, &remaining, &buf, &buf_size);
     memcpy(compress_buf.weak_ref() + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;
