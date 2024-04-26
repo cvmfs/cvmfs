@@ -12,6 +12,7 @@
 #include <string>
 
 #include "duplex_zlib.h"
+#include "input_abstract.h"
 #include "network/sink.h"
 #include "util/plugin.h"
 
@@ -38,6 +39,7 @@ enum StreamStates {
   kStreamIOError,
   kStreamContinue,
   kStreamEnd,
+  kStreamError,
 };
 
 // Do not change order of algorithms.  Used as flags in the catalog
@@ -79,49 +81,24 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual bool Deflate(const bool flush,
-                       unsigned char **inbuf, size_t *inbufsize,
-                       unsigned char **outbuf, size_t *outbufsize) = 0;
-
-  /**
-   * Return an upper bound on the number of bytes required in order to compress
-   * an input number of bytes.
-   * Returns: Upper bound on the number of bytes required to compress.
-   */
+  virtual StreamStates CompressStream(InputAbstract &input,
+                                      cvmfs::Sink &output) { return kStreamError; }
+  virtual StreamStates CompressStream(InputAbstract &input,
+                                      cvmfs::Sink &output,
+                                      shash::Any *compressed_hash) { return kStreamError; }
+  virtual bool CompressStream(const bool flush,
+                                unsigned char **inbuf, size_t *inbufsize,
+                                unsigned char **outbuf, size_t *outbufsize) = 0;
+  virtual bool ResetStream() { return false; }
+  virtual size_t CompressUpperBound(const size_t bytes) { return 0; };
+  
   virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor* Clone() = 0;
 
   static void RegisterPlugins();
-};
 
-
-class ZlibCompressor: public Compressor {
- public:
-  explicit ZlibCompressor(const Algorithms &alg);
-  ZlibCompressor(const ZlibCompressor &other);
-  ~ZlibCompressor();
-
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
-               unsigned char **outbuf, size_t *outbufsize);
-  size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
-  static bool WillHandle(const zlib::Algorithms &alg);
-
- private:
-  z_stream stream_;
-};
-
-
-class EchoCompressor: public Compressor {
- public:
-  explicit EchoCompressor(const Algorithms &alg);
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
-               unsigned char **outbuf, size_t *outbufsize);
-  size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
-  static bool WillHandle(const zlib::Algorithms &alg);
+ protected:
+  const unsigned kZChunk = 16384;
 };
 
 
