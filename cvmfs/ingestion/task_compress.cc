@@ -43,8 +43,8 @@ void TaskCompress::Process(BlockItem *input_block) {
     size_t remaining_in_output =
       output_block->capacity() - output_block->size();
 
-    done = compressor->Deflate(flush,
-      &input_data, &remaining_in_input, &output_data, &remaining_in_output);
+    done = compressor->CompressStream(flush, &input_data, &remaining_in_input,
+                                      &output_data, &remaining_in_output);
     // remaining_in_output is now number of consumed bytes
     output_block->set_size(output_block->size() + remaining_in_output);
 

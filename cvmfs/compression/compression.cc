@@ -10,6 +10,8 @@
 
 #include "cvmfs_config.h"
 #include "compression/compression.h"
+#include "compression/zlib.h"
+#include "compression/echo.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -25,6 +27,8 @@
 #include "util/platform.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
+
+#include <iostream>
 
 using namespace std;  // NOLINT
 
@@ -798,7 +802,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
                        void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
-  int z_ret;
+  int z_ret = Z_ERRNO;
   z_stream strm;
   int64_t pos = 0;
   uint64_t alloc_size = kZChunk;
@@ -808,7 +812,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
   *out_size = 0;
 
   do {
-    strm.avail_in = (kZChunk > (size-pos)) ? size-pos : kZChunk;
+    strm.avail_in = ((size-pos) < kZChunk) ? size-pos : kZChunk;
     strm.next_in = ((unsigned char *)buf)+pos;
 
     // Run inflate() on input until output buffer not full
@@ -860,123 +864,83 @@ void Compressor::RegisterPlugins() {
   RegisterPlugin<EchoCompressor>();
 }
 
+// // TODO TODO add which compressor in log
+// bool Compressor::CompressPath2Path(const std::string &src,
+//                                    const std::string &dest) {
+//   FILE *fsrc = fopen(src.c_str(), "r");
+//   if (!fsrc) {
+//     LogCvmfs(kLogCompress, kLogDebug,  "open %s as compression source failed",
+//              src.c_str());
+//     return false;
+//   }
 
-//------------------------------------------------------------------------------
+//   FILE *fdest = fopen(dest.c_str(), "w");
+//   if (!fdest) {
+//     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination  "
+//              "failed with errno=%d", dest.c_str(), errno);
+//     fclose(fsrc);
+//     return false;
+//   }
 
+//   LogCvmfs(kLogCompress, kLogDebug, "opened %s and %s for compression",
+//            src.c_str(), dest.c_str());
+//   const bool result = CompressFile2File(fsrc, fdest);
 
-bool ZlibCompressor::WillHandle(const zlib::Algorithms &alg) {
-  return alg == kZlibDefault;
-}
+//   fclose(fsrc);
+//   fclose(fdest);
+//   return result;
+// }
 
+// bool Compressor::CompressPath2Path(const std::string &src,
+//                          const std::string &dest, shash::Any *compressed_hash) {
+//   FILE *fsrc = fopen(src.c_str(), "r");
+//   if (!fsrc) {
+//     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression source failed",
+//              src.c_str());
+//     return false;
+//   }
 
-ZlibCompressor::ZlibCompressor(const Algorithms &alg)
-  : Compressor(alg)
-{
-  stream_.zalloc   = Z_NULL;
-  stream_.zfree    = Z_NULL;
-  stream_.opaque   = Z_NULL;
-  stream_.next_in  = Z_NULL;
-  stream_.avail_in = 0;
-  const int zlib_retval = deflateInit(&stream_, Z_DEFAULT_COMPRESSION);
-  assert(zlib_retval == 0);
-}
+//   FILE *fdest = fopen(dest.c_str(), "w");
+//   if (!fdest) {
+//     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression destination "
+//              "failed with errno=%d", dest.c_str(), errno);
+//     fclose(fsrc);
+//     return false;
+//   }
 
+//   LogCvmfs(kLogCompress, kLogDebug, "opened %s and %s for compression",
+//            src.c_str(), dest.c_str());
+//   bool result = false;
+//   if (!CompressFile2File(fsrc, fdest, compressed_hash))
+//     goto compress_path2path_final;
+//   platform_stat64 info;
+//   if (platform_fstat(fileno(fsrc), &info) != 0) goto compress_path2path_final;
+//   // TODO(jakob): open in the right mode from the beginning
+//   if (fchmod(fileno(fdest), info.st_mode) != 0) goto compress_path2path_final;
 
-Compressor* ZlibCompressor::Clone() {
-  ZlibCompressor* other = new ZlibCompressor(zlib::kZlibDefault);
-  assert(stream_.avail_in == 0);
-  // Delete the other stream
-  int retcode = deflateEnd(&other->stream_);
-  assert(retcode == Z_OK);
-  retcode = deflateCopy(const_cast<z_streamp>(&other->stream_), &stream_);
-  assert(retcode == Z_OK);
-  return other;
-}
+//   result = true;
 
-bool ZlibCompressor::Deflate(
-  const bool flush,
-  unsigned char **inbuf, size_t *inbufsize,
-  unsigned char **outbuf, size_t *outbufsize)
-{
-  // Adding compression
-  stream_.avail_in = *inbufsize;
-  stream_.next_in = *inbuf;
-  const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
-  int retcode = 0;
+//  compress_path2path_final:
+//   fclose(fsrc);
+//   fclose(fdest);
+//   return result;
+// }
 
-  // TODO(jblomer) Figure out what exactly behaves differently with zlib 1.2.10
-  // if ((*inbufsize == 0) && !flush)
-  //   return true;
+// bool Compressor::CompressFile2File(FILE *fsrc, FILE *fdest);
+// bool Compressor::CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
+// bool Compressor::CompressPath2File(const std::string &src, FILE *fdest,
+//                         shash::Any *compressed_hash);
+// bool Compressor::CompressMem2File(const unsigned char *buf, const size_t size,
+//                       FILE *fdest, shash::Any *compressed_hash);
 
-  stream_.avail_out = *outbufsize;
-  stream_.next_out = *outbuf;
-
-  // Deflate in zlib!
-  retcode = deflate(&stream_, flush_int);
-  assert(retcode == Z_OK || retcode == Z_STREAM_END);
-
-  *outbufsize -= stream_.avail_out;
-  *inbuf = stream_.next_in;
-  *inbufsize = stream_.avail_in;
-
-  return (flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0)
-         || (flush_int == Z_FINISH  && retcode == Z_STREAM_END);
-}
-
-
-ZlibCompressor::~ZlibCompressor() {
-  int retcode = deflateEnd(&stream_);
-  assert(retcode == Z_OK);
-}
-
-
-size_t ZlibCompressor::DeflateBound(const size_t bytes) {
-  // Call zlib's deflate bound
-  return deflateBound(&stream_, bytes);
-}
-
-
-//------------------------------------------------------------------------------
+// bool Compressor::CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
+// bool Compressor::CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
+// bool Compressor::CompressFd2Null(int fd_src, shash::Any *compressed_hash,
+//                       uint64_t* size = NULL);
 
 
-EchoCompressor::EchoCompressor(const zlib::Algorithms &alg):
-  Compressor(alg)
-{
-}
-
-
-bool EchoCompressor::WillHandle(const zlib::Algorithms &alg) {
-  return alg == kNoCompression;
-}
-
-
-Compressor* EchoCompressor::Clone() {
-  return new EchoCompressor(zlib::kNoCompression);
-}
-
-
-bool EchoCompressor::Deflate(
-  const bool flush,
-  unsigned char **inbuf, size_t *inbufsize,
-  unsigned char **outbuf, size_t *outbufsize)
-{
-  size_t bytes_to_copy = min(*outbufsize, *inbufsize);
-  memcpy(*outbuf, *inbuf, bytes_to_copy);
-  const bool done = (bytes_to_copy == *inbufsize);
-
-  // Update the return variables
-  *inbuf += bytes_to_copy;
-  *outbufsize = bytes_to_copy;
-  *inbufsize -= bytes_to_copy;
-
-  return done;
-}
-
-
-size_t EchoCompressor::DeflateBound(const size_t bytes) {
-  // zero bytes as an upper bound is no good because some callers want to
-  // allocate buffers according to this value
-  return (bytes == 0) ? 1 : bytes;
-}
+// // User of these functions has to free out_buf, if successful
+// bool Compressor::CompressMem2Mem(const void *buf, const int64_t size,
+//                       void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
