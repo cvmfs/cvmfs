@@ -191,6 +191,84 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
   free(in_buf);
 }
 
+TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {
+  compressor = zlib::Compressor::Construct(zlib::kNoCompression);
+
+  // Compress the output
+  size_t in_size = 16384;
+  size_t chunk_size = 8000;
+
+  char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *input = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    input[i] = letters[rand() % 26];
+  }
+
+  InputMem in = InputMem(input, in_size, chunk_size);
+  cvmfs::MemSink out = cvmfs::MemSink(in_size);
+
+  zlib::StreamStates res = compressor->CompressStream(&in, &out);
+
+  EXPECT_EQ(res, zlib::kStreamEnd);
+
+  // Check if decompressed content is equal to original one
+  EXPECT_EQ(0, memcmp(out.data(), input, in_size));
+
+  free(input);
+}
+
+// Also tests Input_File and SinkFile because *Path uses it under the hood
+TEST_F(T_Compressor, EchoCompressionSinkPath2PathLarge) {
+  compressor = zlib::Compressor::Construct(zlib::kNoCompression);
+  size_t in_size = 16384*3;  // make large than decomp buffer size (32 KB)
+  size_t chunk_size = 8000;
+
+  char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *in_buf = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    in_buf[i] = letters[rand() % 26];
+  }
+
+  std::string in_path;
+  FILE *in_f = CreateTempFile(sandbox_path, 0600, "w+", &in_path);
+  fwrite(in_buf, 1, in_size, in_f);
+  fclose(in_f);
+  InputPath input = InputPath(in_path, chunk_size);
+
+  std::string out_path;
+  FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
+  fclose(out_f);
+
+  cvmfs::PathSink out = cvmfs::PathSink(out_path);
+
+  // Compress the output
+  zlib::StreamStates res = compressor->CompressStream(&input, &out);
+
+  EXPECT_EQ(res, zlib::kStreamEnd);
+
+  out_f = fopen(out_path.c_str(), "rb");
+
+  // get file sizes; read decompressed file into buffer
+  fseek(out_f, 0L, SEEK_END);
+  size_t out_size = ftell(out_f);
+
+  unsigned char *out_buf = static_cast<unsigned char*>(smalloc(out_size));
+  fseek(out_f, 0L, SEEK_SET);
+  EXPECT_GT(fread(out_buf, 1, out_size, out_f), 0ul);
+  fclose(out_f);
+
+  // Check if decompressed content is equal to original one
+  EXPECT_EQ(in_size, out_size);
+  EXPECT_EQ(0, memcmp(out_buf, in_buf, in_size));
+
+  free(out_buf);
+  free(in_buf);
+}
+
 
 TEST_F(T_Compressor, Compression) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
