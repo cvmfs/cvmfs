@@ -3,6 +3,7 @@
  */
 
 #include "input_file.h"
+#include "util/smalloc.h"
 
 namespace zlib {
 
@@ -11,7 +12,7 @@ InputFile::InputFile(const FILE* src, const size_t max_chunk_size,
                                   InputAbstract(is_owner, max_chunk_size, NULL),
                                   src_(src) {
   if (IsValid()) {
-    chunk_ = static_cast<char*>(smalloc(max_chunk_size_));
+    chunk_ = static_cast<unsigned char*>(smalloc(max_chunk_size_));
     has_chunk_left_ = true;
   }
 }
@@ -21,7 +22,7 @@ InputFile::~InputFile() {
     free(chunk_);
 
     if (is_owner_) {
-      close(src);
+      fclose(const_cast<FILE*>(src_));
     }
   }
 }
@@ -29,14 +30,16 @@ InputFile::~InputFile() {
 
 
 bool InputFile::NextChunk() {
-  chunk_size_ = fread(chunk_, 1, max_chunk_size_, src_);
+  chunk_size_ = fread(chunk_, 1, max_chunk_size_, const_cast<FILE*>(src_));
 
-  if (ferror(src_)) {
+  if (ferror(const_cast<FILE*>(src_))) {
+    has_chunk_left_ = false;
+
     return false;
   }
 
-  if (chunk_size_ < max_chunk_size) {
-    if (feof(src_)) {
+  if (chunk_size_ < max_chunk_size_) {
+    if (feof(const_cast<FILE*>(src_))) {
       has_chunk_left_ = false;
     }
   }
@@ -50,4 +53,4 @@ bool InputFile::IsValid() {
 
 
 
-} // namespace zlib
+}  // namespace zlib

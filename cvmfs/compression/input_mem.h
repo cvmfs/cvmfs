@@ -12,7 +12,7 @@ namespace zlib {
 class InputMem : public InputAbstract {
  public:
   InputMem(const unsigned char *src, const size_t src_size,
-           const size_t max_chunk_size, bool is_owner=false);
+           const size_t max_chunk_size, bool is_owner = false);
   virtual ~InputMem();
   virtual bool NextChunk();
   virtual bool IsValid();
@@ -23,6 +23,6 @@ class InputMem : public InputAbstract {
   size_t idx_;
 };
 
-} // namespace zlib
+}  // namespace zlib
 
-#endif // CVMFS_COMPRESSION_INPUT_MEM_H_
+#endif  // CVMFS_COMPRESSION_INPUT_MEM_H_
