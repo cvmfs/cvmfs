@@ -8,9 +8,7 @@
  * TODO: think about code deduplication
  */
 
-#include "cvmfs_config.h"
-#include "compression/compression.h"
-#include "compression/echo.h"
+#include "echo.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -20,6 +18,8 @@
 #include <cassert>
 #include <cstring>
 
+#include "cvmfs_config.h"
+#include "compression.h"
 #include "crypto/hash.h"
 #include "util/exception.h"
 #include "util/logging.h"

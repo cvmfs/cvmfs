@@ -8,10 +8,7 @@
  * TODO: think about code deduplication
  */
 
-#include "cvmfs_config.h"
-#include "compression/compression.h"
-#include "compression/zlib.h"
-#include "compression/echo.h"
+#include "compression.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -20,6 +17,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <iostream>
+
+#include "cvmfs_config.h"
+#include "echo.h"
+#include "zlib.h"
 
 #include "crypto/hash.h"
 #include "util/exception.h"
@@ -28,7 +30,6 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 
-#include <iostream>
 
 using namespace std;  // NOLINT
 
@@ -869,7 +870,7 @@ void Compressor::RegisterPlugins() {
 //                                    const std::string &dest) {
 //   FILE *fsrc = fopen(src.c_str(), "r");
 //   if (!fsrc) {
-//     LogCvmfs(kLogCompress, kLogDebug,  "open %s as compression source failed",
+//     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression source failed",
 //              src.c_str());
 //     return false;
 //   }
@@ -892,7 +893,7 @@ void Compressor::RegisterPlugins() {
 // }
 
 // bool Compressor::CompressPath2Path(const std::string &src,
-//                          const std::string &dest, shash::Any *compressed_hash) {
+//                       const std::string &dest, shash::Any *compressed_hash) {
 //   FILE *fsrc = fopen(src.c_str(), "r");
 //   if (!fsrc) {
 //     LogCvmfs(kLogCompress, kLogDebug, "open %s as compression source failed",
@@ -914,9 +915,9 @@ void Compressor::RegisterPlugins() {
 //   if (!CompressFile2File(fsrc, fdest, compressed_hash))
 //     goto compress_path2path_final;
 //   platform_stat64 info;
-//   if (platform_fstat(fileno(fsrc), &info) != 0) goto compress_path2path_final;
-//   // TODO(jakob): open in the right mode from the beginning
-//   if (fchmod(fileno(fdest), info.st_mode) != 0) goto compress_path2path_final;
+//  if (platform_fstat(fileno(fsrc), &info) != 0) goto compress_path2path_final;
+//  // TODO(jakob): open in the right mode from the beginning
+//  if (fchmod(fileno(fdest), info.st_mode) != 0) goto compress_path2path_final;
 
 //   result = true;
 
@@ -927,13 +928,15 @@ void Compressor::RegisterPlugins() {
 // }
 
 // bool Compressor::CompressFile2File(FILE *fsrc, FILE *fdest);
-// bool Compressor::CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
+// bool Compressor::CompressFile2File(FILE *fsrc, FILE *fdest,
+//                                    shash::Any *compressed_hash);
 // bool Compressor::CompressPath2File(const std::string &src, FILE *fdest,
 //                         shash::Any *compressed_hash);
-// bool Compressor::CompressMem2File(const unsigned char *buf, const size_t size,
-//                       FILE *fdest, shash::Any *compressed_hash);
+// bool Compressor::CompressMem2File(const unsigned char *buf,
+//                 const size_t size, FILE *fdest, shash::Any *compressed_hash);
 
-// bool Compressor::CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
+// bool Compressor::CompressPath2Null(const std::string &src,
+//                                    shash::Any *compressed_hash);
 // bool Compressor::CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
 // bool Compressor::CompressFd2Null(int fd_src, shash::Any *compressed_hash,
 //                       uint64_t* size = NULL);

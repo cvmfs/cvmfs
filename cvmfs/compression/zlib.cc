@@ -8,9 +8,8 @@
  * TODO: think about code deduplication
  */
 
-#include "cvmfs_config.h"
-#include "compression/compression.h"
-#include "compression/zlib.h"
+
+#include "zlib.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -20,6 +19,8 @@
 #include <cassert>
 #include <cstring>
 
+#include "cvmfs_config.h"
+#include "compression.h"
 #include "crypto/hash.h"
 #include "util/exception.h"
 #include "util/logging.h"
@@ -101,8 +102,8 @@ size_t ZlibCompressor::CompressUpperBound(const size_t bytes) {
   return deflateBound(&stream_, bytes);
 }
 
-StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
-                                            cvmfs::Sink &output) {
+StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
+                                            cvmfs::Sink *output) {
   if (!is_healthy_) {
     return kStreamError;
   }
@@ -112,15 +113,15 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
   int flush = Z_NO_FLUSH;
 
   do {
-    if (!input.NextChunk()) {
-      return kStreamIOError; 
+    if (!input->NextChunk()) {
+      return kStreamIOError;
     }
 
-    stream_.avail_in = input.chunk_size();
-    if (!input.has_chunk_left()) {
+    stream_.avail_in = input->chunk_size();
+    if (!input->has_chunk_left()) {
       flush = Z_FINISH;
     }
-    stream_.next_in = input.chunk();
+    stream_.next_in = input->chunk();
 
     // Run deflate() on input until output buffer has no space left
     do {
@@ -134,14 +135,17 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
         return kStreamDataError;
       }
       size_t have = kZChunk - stream_.avail_out;
+      int64_t written = output->Write(out, have);
 
-      if (output.Write(out, have) != static_cast<int64_t>(have)) {
+      if (written != static_cast<int64_t>(have)) {
         deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamIOError;
       }
     } while (stream_.avail_out == 0);
   } while (flush != Z_FINISH);
+
+  output->Flush();
 
   if (z_ret != Z_STREAM_END) {
     // here in original code "output" was reset and deleted
@@ -154,8 +158,8 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
   }
 }
 
-StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
-                                            cvmfs::Sink &output,
+StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
+                                            cvmfs::Sink *output,
                                             shash::Any *compressed_hash) {
   if (!is_healthy_) {
     return kStreamError;
@@ -170,15 +174,15 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
   shash::Init(hash_context);
 
   do {
-    if (!input.NextChunk()) {
-      return kStreamIOError; 
+    if (!input->NextChunk()) {
+      return kStreamIOError;
     }
 
-    stream_.avail_in = input.chunk_size();
-    if (!input.has_chunk_left()) {
+    stream_.avail_in = input->chunk_size();
+    if (!input->has_chunk_left()) {
       flush = Z_FINISH;
     }
-    stream_.next_in = input.chunk();
+    stream_.next_in = input->chunk();
 
     // Run deflate() on input until output buffer has no space left
     do {
@@ -192,8 +196,9 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
         return kStreamDataError;
       }
       size_t have = kZChunk - stream_.avail_out;
+      int64_t written = output->Write(out, have);
 
-      if (output.Write(out, have) != static_cast<int64_t>(have)) {
+      if (written != static_cast<int64_t>(have)) {
         deflateEnd(&stream_);
         is_healthy_ = false;
         return kStreamIOError;
@@ -201,6 +206,8 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract &input,
       shash::Update(out, have, hash_context);
     } while (stream_.avail_out == 0);
   } while (flush != Z_FINISH);
+
+  output->Flush();
 
   if (z_ret != Z_STREAM_END) {
     // here in original code "output" was reset and deleted
