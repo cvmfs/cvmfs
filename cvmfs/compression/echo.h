@@ -20,6 +20,12 @@ namespace zlib {
 class EchoCompressor: public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);
+
+  virtual StreamStates CompressStream(InputAbstract *input,
+                                      cvmfs::Sink *output);
+  virtual StreamStates CompressStream(InputAbstract *input,
+                                      cvmfs::Sink *output,
+                                      shash::Any *compressed_hash);
   bool CompressStream(const bool flush,
                       unsigned char **inbuf, size_t *inbufsize,
                       unsigned char **outbuf, size_t *outbufsize);
@@ -28,6 +34,9 @@ class EchoCompressor: public Compressor {
                                              return CompressUpperBound(bytes); }
   Compressor* Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
+
+ private:
+  bool is_healthy_;
 };
 
 }  // namespace zlib
