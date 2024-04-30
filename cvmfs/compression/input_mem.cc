@@ -3,7 +3,6 @@
  */
 
 #include <cstdlib>
-#include <iostream>
 #include "input_mem.h"
 
 namespace zlib {
@@ -27,11 +26,9 @@ InputMem::~InputMem() {
   }
 }
 
-
-
 bool InputMem::NextChunk() {
-  if ((idx_ != -1ul && idx_ + max_chunk_size_ >= src_size_) || !has_chunk_left_) {
-    std::cerr << "NextChunk: return false" << std::endl;
+  if ((idx_ != -1ul && idx_ + max_chunk_size_ >= src_size_)
+      || !has_chunk_left_) {
     return false;
   }
 
@@ -39,7 +36,7 @@ bool InputMem::NextChunk() {
   if (idx_ == -1ul) {
     idx_ = 0;
   } else {
-    idx_ += max_chunk_size_; 
+    idx_ += max_chunk_size_;
   }
 
   if (src_size_ - idx_ <= max_chunk_size_) {
@@ -51,9 +48,6 @@ bool InputMem::NextChunk() {
   // we need to ignore "const" to be able to use InputAbstract protected vars
   chunk_ = const_cast<unsigned char*>(src_) + idx_;
 
-  std::cerr << "NextChunk: return true - chunk size " <<  chunk_size_ <<
-               " idx " << idx_ << " has chunks left " << has_chunk_left_  << std::endl;
-
   return true;
 }
 
@@ -61,4 +55,4 @@ bool InputMem::IsValid() {
   return src_ != NULL;
 }
 
-} // namespace zlib
+}  // namespace zlib

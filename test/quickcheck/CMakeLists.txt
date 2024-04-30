@@ -40,7 +40,9 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
   ${CVMFS_SOURCE_DIR}/compression/echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_file.cc
   ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_path.cc
   ${CVMFS_SOURCE_DIR}/compression/zlib.cc
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/crypto/signature.cc
