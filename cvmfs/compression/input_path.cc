@@ -8,6 +8,8 @@
 
 namespace zlib {
 
+InputPath::InputPath(const std::string& path) : InputPath(path, 16384) { }
+
 InputPath::InputPath(const std::string& path, const size_t max_chunk_size) :
                                       InputAbstract(true, max_chunk_size, NULL),
                                       path_(path) {

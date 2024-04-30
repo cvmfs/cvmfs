@@ -15,6 +15,7 @@ namespace zlib {
 
 class InputPath : public InputAbstract {
  public:
+  explicit InputPath(const std::string& path);
   InputPath(const std::string& path, const size_t max_chunk_size);
   virtual ~InputPath() { }
 

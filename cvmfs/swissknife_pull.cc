@@ -25,12 +25,14 @@
 
 #include "catalog.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
@@ -225,15 +227,19 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval;
+
+  zlib::Compressor *compressor;
   if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
-    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
+    compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
   } else {
-    retval = CopyMem2File(buffer, size, ftmp);
+    compressor = zlib::Compressor::Construct(zlib::kNoCompression);
   }
-  assert(retval);
-  fclose(ftmp);
+  zlib::InputMem in_mem(buffer, size);
+  cvmfs::FileSink out_f(ftmp, true);
+
+  zlib::StreamStates retval = compressor->CompressStream(&in_mem, &out_f);
+  assert(retval == zlib::kStreamEnd);
+
   Store(tmp_file, dest_path, true);
 }
 

@@ -11,8 +11,10 @@
 
 #include "catalog_rw.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "network/sink_file.h"
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -513,10 +515,12 @@ void CatalogTestTool::CreateHistory(
   }
   history_hash->suffix = shash::kSuffixHistory;
   ASSERT_TRUE(zlib::CompressPath2Null(history_path, history_hash));
-  ASSERT_TRUE(
-    zlib::CompressPath2Path(
-      history_path,
-      repo_path_ + "/data/" + history_hash->MakePath()));
+
+  zlib::Compressor *compress = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputPath in_path(history_path);
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + history_hash->MakePath());
+  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path);
+  EXPECT_EQ(retval, zlib::kStreamEnd);
 }
 
 
@@ -668,9 +672,12 @@ void CatalogTestTool::CreateKeys(
   hash_cert->suffix = shash::kSuffixCertificate;
   ASSERT_TRUE(
     zlib::CompressPath2Null(repo_path_ + "/testrepo.crt", hash_cert));
-  ASSERT_TRUE(
-    zlib::CompressPath2Path(repo_path_ + "/testrepo.crt",
-                            repo_path_ + "/data/" + hash_cert->MakePath()));
+
+  zlib::Compressor *compress = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputPath in_path(repo_path_ + "/testrepo.crt");
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + hash_cert->MakePath());
+  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path);
+  EXPECT_EQ(retval, zlib::kStreamEnd);
 
   *public_key = repo_path_ + string("/testrepo.pub");
 }

@@ -467,13 +467,13 @@ TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   EXPECT_EQ(1U, cache_mgr_->Write(&content, 1, txn));
   EXPECT_EQ(-EIO, cache_mgr_->CommitTxn(txn));
-  unsigned char *buf;
-  unsigned buf_size;
-  EXPECT_TRUE(CopyPath2Mem(tmp_path_ + "/quarantaine/" + rnd_hash.ToString(),
-                           &buf, &buf_size));
-  EXPECT_EQ(1U, buf_size);
-  EXPECT_EQ(content, buf[0]);
-  free(buf);
+
+  zlib::Compressor *copy = zlib::Compressor::Construct(zlib::kNoCompression);
+  zlib::InputPath in_path(tmp_path_ + "/quarantaine/" + rnd_hash.ToString());
+  cvmfs::MemSink out_mem(0);
+  EXPECT_EQ(copy->CompressStream(&in_path, &out_mem), zlib::kStreamEnd);
+  EXPECT_EQ(1U, out_mem.pos());
+  EXPECT_EQ(content, out_mem.data()[0]);
 }
 
 

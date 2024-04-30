@@ -10,7 +10,12 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/compression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "crypto/signature.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
@@ -402,6 +407,16 @@ class LocalObjectFetcher :
     }
 
     // decompress or copy the requested object file
+    // TODO(heretherebedragons) for later..
+    // zlib::Decompressor compressor;
+    // if (decompress) {
+    //   decompress = zlib::Decompressor::Construct(zlib::kZlibDefault);
+    // } else {
+    //   decompress = zlib::Decompressor::Construct(zlib::kNoCompression);
+    // }
+    // InputPath input = InputPath(in_path);
+    // FileSink output = FileSink(f, true);
+
     const bool success = (decompress)
       ? zlib::DecompressPath2File(source, f)
       : CopyPath2File(source, f);

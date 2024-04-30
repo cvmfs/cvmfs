@@ -16,7 +16,10 @@
 
 #include "catalog_balancer.h"
 #include "catalog_rw.h"
+#include "compression/compression.h"
+#include "compression/input_path.h"
 #include "manifest.h"
+#include "network/sink_path.h"
 #include "statistics.h"
 #include "upload.h"
 #include "util/exception.h"
@@ -151,9 +154,13 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   }
   string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
-  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
-                                        &hash_catalog);
-  if (!retval) {
+
+  zlib::Compressor *compress = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputPath in_path(file_path);
+  cvmfs::PathSink out_path(file_path_compressed);
+  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path,
+                                                       &hash_catalog);
+  if (retval != zlib::kStreamEnd) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
              file_path.c_str());
     unlink(file_path.c_str());

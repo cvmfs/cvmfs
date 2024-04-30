@@ -11,8 +11,10 @@
 
 #include "catalog_sql.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
+#include "network/sink_file.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "testutil.h"
@@ -596,8 +598,15 @@ class T_ObjectFetcher : public ::testing::Test {
   void CommitIntoStorage(const std::string  &tmp_path,
                                shash::Any   *content_hash) {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
-    ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, txn_path, content_hash)) <<
-      "failed to compress file " << tmp_path << " to " << txn_path;
+
+    zlib::Compressor *compress =
+                                zlib::Compressor::Construct(zlib::kZlibDefault);
+    zlib::InputPath in_path(tmp_path);
+    cvmfs::PathSink out_path(txn_path);
+    zlib::StreamStates retval =
+                    compress->CompressStream(&in_path, &out_path, content_hash);
+    EXPECT_EQ(retval, zlib::kStreamEnd) << "failed to compress file " <<
+                                           tmp_path << " to " << txn_path;
     InsertIntoStorage(txn_path, *content_hash);
   }
 
