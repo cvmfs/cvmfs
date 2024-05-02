@@ -14,7 +14,7 @@ cvmfs_run_test() {
   # add caching to config
   local repo_server_config=/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
   cat $repo_server_config
-  echo "CVMFS_SERVER_CATALOG_CACHE=true" | sudo tee -a "$repo_server_config"
+  echo "CVMFS_SERVER_USE_CATALOG_CACHE=true" | sudo tee -a "$repo_server_config"
 
   # new transaction to have some cached catalogs
   start_transaction "$CVMFS_TEST_REPO" || return $?
@@ -25,7 +25,6 @@ cvmfs_run_test() {
 
   # mount repo to extract hash
   echo "*** Mount repo to extract catalog hash of /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog"
-  sudo cvmfs_server mount $CVMFS_TEST_REPO
   local nested_ctlg_hash
   local catalog_counters
   catalog_counters=$(get_xattr catalog_counters "/cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog")
@@ -40,17 +39,11 @@ cvmfs_run_test() {
   local retval
   ### add C flag at the end to hash to find proper file
   nested_ctlg_hash="${nested_ctlg_hash}C"
-  retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  [[ $retval =~ "available" ]] || return 3
-  # delete_from_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 4 <--- this does NOT work!
-  echo "    Check if file was really removed"
-  # retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  # echo $retval
-
+  peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 3
   # manually delete
   sudo rm -f /srv/cvmfs/$CVMFS_TEST_REPO/$(make_path $nested_ctlg_hash)
-  retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  [[ $retval =~ "not found" ]] || return 5
+  echo "    Check if file was really removed"
+  peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" && return 5
 
   # check local catalog caching availability
   echo "*** Add new files to subdirectory part of deleted nested catalog."
@@ -63,13 +56,12 @@ cvmfs_run_test() {
   # Test the reverse
   echo "*** NOW TEST THE REVERSE: fail if no caching is available"
   echo "*** Remove local caching for publishing from config."
-  sudo sed -i '/CVMFS_SERVER_CATALOG_CACHE/d' "$repo_server_config"
+  sudo sed -i '/CVMFS_SERVER_USE_CATALOG_CACHE/d' "$repo_server_config"
   cat $repo_server_config
 
 
   # mount repo to extract hash
   echo "*** Mount repo to extract catalog hash of /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog"
-  sudo cvmfs_server mount $CVMFS_TEST_REPO
   local nested_ctlg_hash
   local catalog_counters
   catalog_counters=$(get_xattr catalog_counters "/cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog")
@@ -84,17 +76,11 @@ cvmfs_run_test() {
   local retval
   ### add C flag at the end to hash to find proper file
   nested_ctlg_hash="${nested_ctlg_hash}C"
-  retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  [[ $retval =~ "available" ]] || return 8
-  # delete_from_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 4 <--- this does NOT work!
-  echo "    Check if file was really removed"
-  # retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  # echo $retval
-
+  peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 8
   # manually delete
   sudo rm -f /srv/cvmfs/$CVMFS_TEST_REPO/$(make_path $nested_ctlg_hash)
-  retval=$(peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash")
-  [[ $retval =~ "not found" ]] || return 9
+  echo "    Check if file was really removed"
+  peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" && return 9
 
   # check local catalog caching is unavailable
   echo "*** Try to add random file in subdirectory of delete nested catalog"

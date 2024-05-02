@@ -162,7 +162,7 @@ CommitProcessor::Result CommitProcessor::Process(
            manifest->catalog_hash().ToString(false).c_str());
 
 
-  std::string local_cache_dir_ = "";
+  std::string local_cache_dir_;
   if (params.use_local_cache) {
     local_cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
   }

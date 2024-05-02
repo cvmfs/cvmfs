@@ -1285,11 +1285,11 @@ void WritableCatalogManager::CatalogUploadCallback(
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
-  SyncLock();
-
-  if (useLocalCache()) {
+  if (UseLocalCache()) {
     CopyCatalogToLocalCache(result);
   }
+
+  SyncLock();
 
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
@@ -1443,7 +1443,7 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
           result.local_path.c_str(), result.return_code);
   }
 
-  if (useLocalCache()) {
+  if (UseLocalCache()) {
     CopyCatalogToLocalCache(result);
   }
 

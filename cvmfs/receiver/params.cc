@@ -60,7 +60,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   }
 
   std::string use_local_cache_str;
-  if (parser.GetValue("CVMFS_SERVER_CATALOG_CACHE", &use_local_cache_str)) {
+  if (parser.GetValue("CVMFS_SERVER_USE_CATALOG_CACHE", &use_local_cache_str)) {
     params->use_local_cache = parser.IsOn(use_local_cache_str);
   } else {
     params->use_local_cache = false;

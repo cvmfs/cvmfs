@@ -35,11 +35,9 @@ SimpleCatalogManager::SimpleCatalogManager(
     const bool success = MakeCacheDirectories(local_cache_dir_, 0755);
 
     if (!success) {
-      LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
-              "Failure during creation of local cache directory for server."
-              "Continue, but no local cache will be used.");
-      local_cache_dir_ = "";
-      copy_to_tmp_dir_ = false;
+      PANIC(kLogStderr,
+            "Failure during creation of local cache directory for server. "
+            "Local cache directory: %s", local_cache_dir_.c_str());
     }
   } else {
     copy_to_tmp_dir_ = false;
@@ -68,6 +66,7 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
 
   const bool retval = CopyPath2File(cache_path, fcatalog);
   if (!retval) {
+    unlink(tmp_path.c_str());
     PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
   }
   (void) fclose(fcatalog);
@@ -98,18 +97,18 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
 
   FILE *fcatalog;
 
-  if (useLocalCache()) {
-    std::string tmp_path = local_cache_dir_ + "/"
+  if (UseLocalCache()) {
+    std::string cache_path = local_cache_dir_ + "/"
                            + effective_hash.MakePathWithoutSuffix();
 
-    ctlg_context->SetSqlitePath(tmp_path);
+    ctlg_context->SetSqlitePath(cache_path);
 
     // catalog is cached in "cache_dir/" + standard cvmfs file hierarchy
-    if (FileExists(tmp_path.c_str())) {
+    if (FileExists(cache_path.c_str())) {
       if (!copy_to_tmp_dir_) {
         return kLoadNew;
       } else {  // for writable catalog create copy in dir_temp_
-        const std::string cache_path = tmp_path;
+        std::string tmp_path;
 
         tmp_path = CopyCatalogToTempFile(cache_path);
         ctlg_context->SetSqlitePath(tmp_path);
@@ -117,23 +116,16 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
         return kLoadNew;
       }
     }
-
-    // file not cached yet
-    // open file to download into "cache_dir/" + standard cvmfs file hierarchy
-    fcatalog = fopen(ctlg_context->sqlite_path().c_str(), "w");
-    if (!fcatalog) {
-      PANIC(kLogStderr, "failed to create file in cache.server when loading %s",
-                        url.c_str());
-    }
-  } else {  // no local cache; just create a random tmp file for download
-    std::string tmp_path;
-    fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
-    if (!fcatalog) {
-      PANIC(kLogStderr, "failed to create temp file when loading %s",
-                        url.c_str());
-    }
-    ctlg_context->SetSqlitePath(tmp_path);
   }
+
+  // not in local cache; just create a random tmp file for download
+  std::string tmp_path;
+  fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
+  if (!fcatalog) {
+    PANIC(kLogStderr, "failed to create temp file when loading %s",
+                      url.c_str());
+  }
+  ctlg_context->SetSqlitePath(tmp_path);
 
   cvmfs::FileSink filesink(fcatalog);
   download::JobInfo download_catalog(&url, true, false,
@@ -142,16 +134,24 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   fclose(fcatalog);
 
   if (retval != download::kFailOk) {
-    unlink(ctlg_context->GetSqlitePathPtr()->c_str());
+    unlink(tmp_path.c_str());
     PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)",
                       url.c_str(), retval, download::Code2Ascii(retval));
   }
 
-  // for writable catalog make copy in dir_temp_ that can be modified
-  if (useLocalCache() && copy_to_tmp_dir_) {
-    const std::string cache_path = ctlg_context->sqlite_path();
-    const std::string tmp_path = CopyCatalogToTempFile(cache_path);
-    ctlg_context->SetSqlitePath(tmp_path);
+  // for local cache make an atomic rename call to make the file available
+  // in the local cache
+  if (UseLocalCache()) {
+    const std::string cache_path = local_cache_dir_ + "/"
+                                    + effective_hash.MakePathWithoutSuffix();
+    rename(tmp_path.c_str(), cache_path.c_str());
+    ctlg_context->SetSqlitePath(cache_path);
+
+    // for writable catalog make an extra copy that can be modified
+    if (copy_to_tmp_dir_) {
+      const std::string new_tmp_path = CopyCatalogToTempFile(cache_path);
+      ctlg_context->SetSqlitePath(new_tmp_path);
+    }
   }
 
   return kLoadNew;

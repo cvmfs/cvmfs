@@ -14,8 +14,6 @@
 #include <string>
 
 #include "catalog_mgr.h"
-#include "util/logging.h"
-#include "util/posix.h"
 
 namespace download {
 class DownloadManager;
@@ -64,7 +62,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
 
-  bool useLocalCache() { return !local_cache_dir_.empty(); }
+  bool UseLocalCache() { return !local_cache_dir_.empty(); }
 
   std::string                local_cache_dir_;  // absolute path to local cache
                                                 // directory
