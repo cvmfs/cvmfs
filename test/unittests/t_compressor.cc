@@ -7,9 +7,9 @@
 #include <cstdlib>  // for rand()
 
 #include "c_file_sandbox.h"
+#include "compression/compression.h"
 #include "compression/input_mem.h"
 #include "compression/input_path.h"
-#include "compression/compression.h"
 #include "network/sink.h"
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
@@ -24,6 +24,7 @@ namespace zlib {
 class T_Compressor : public FileSandbox {
  public:
   T_Compressor() : FileSandbox(std::string(sandbox_path)) {}
+
  protected:
   virtual void SetUp() {
     CreateSandbox();

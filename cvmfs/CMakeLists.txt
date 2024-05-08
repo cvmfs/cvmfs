@@ -59,6 +59,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        clientctx.cc
        compression/compression.cc
        compression/echo.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -143,6 +144,7 @@ if (BUILD_CVMFS)
   add_executable (cvmfs_fsck
                   compression/compression.cc
                   compression/echo.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
@@ -507,12 +509,15 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache_posix.cc
                   compression/compression.cc
                   compression/echo.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
                   compression/zlib.cc
                   fd_refcount_mgr.cc
                   manifest.cc
+                  network/sink_file.cc
+                  network/sink_path.cc
                   quota.cc
   )
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
@@ -590,6 +595,7 @@ if (BUILD_SERVER)
        clientctx.cc
        compression/compression.cc
        compression/echo.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -739,6 +745,7 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        compression/compression.cc
        compression/echo.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -854,6 +861,7 @@ if (BUILD_SERVER)
        backoff.cc
        compression/compression.cc
        compression/echo.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -1046,6 +1054,7 @@ if(BUILD_RECEIVER)
        catalog_mgr_rw.cc
        compression/compression.cc
        compression/echo.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -1213,6 +1222,7 @@ if (BUILD_PRELOADER)
                   catalog_sql.cc
                   compression/compression.cc
                   compression/echo.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
@@ -1241,6 +1251,8 @@ if (BUILD_PRELOADER)
                   network/s3fanout.cc
                   network/sink_file.cc
                   network/sink_mem.cc
+           
+        
                   network/sink_path.cc
                   options.cc
                   pack.cc

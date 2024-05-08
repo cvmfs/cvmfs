@@ -41,6 +41,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
 #include "util/smalloc.h"
@@ -223,28 +224,24 @@ static void Store(
 
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string &dest_path, const bool compress) {
+                        const std::string &dest_path,
+                        zlib::Compressor *compress) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
 
-  zlib::Compressor *compressor;
-  if (compress) {
-    compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
-  } else {
-    compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-  }
   zlib::InputMem in_mem(buffer, size);
   cvmfs::FileSink out_f(ftmp, true);
 
-  zlib::StreamStates retval = compressor->CompressStream(&in_mem, &out_f);
+  zlib::StreamStates retval = compress->CompressStream(&in_mem, &out_f);
   assert(retval == zlib::kStreamEnd);
 
   Store(tmp_file, dest_path, true);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const shash::Any &dest_hash, const bool compress) {
+                        const shash::Any &dest_hash,
+                        zlib::Compressor *compress) {
   StoreBuffer(buffer, size, MakePath(dest_hash), compress);
 }
 
@@ -508,6 +505,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   manifest::ManifestEnsemble ensemble;
   shash::Any meta_info_hash;
   string meta_info;
+
+  UniquePtr<zlib::Compressor>
+                    compressor(zlib::Compressor::Construct(zlib::kZlibDefault));
+  UniquePtr<zlib::Compressor>
+                          cp(zlib::Compressor::Construct(zlib::kNoCompression));
 
   // Option parsing
   if (args.find('c') != args.end())
@@ -831,7 +833,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!Peek(ensemble.manifest->certificate())) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
-                  ensemble.manifest->certificate(), true);
+                  ensemble.manifest->certificate(), compressor.weak_ref());
     }
     if (reflog != NULL &&
         !reflog->AddCertificate(ensemble.manifest->certificate())) {
@@ -841,7 +843,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
-      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+      StoreBuffer(info, meta_info.size(), meta_info_hash,
+                  compressor.weak_ref());
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
@@ -895,12 +898,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
-                    ".cvmfswhitelist.pkcs7", false);
+                    ".cvmfswhitelist.pkcs7", cp.weak_ref());
       }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                  ".cvmfswhitelist", false);
+                  ".cvmfswhitelist", cp.weak_ref());
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                  ".cvmfspublished", false);
+                  ".cvmfspublished", cp.weak_ref());
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());

@@ -248,11 +248,15 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   uint64_t processed_size;
   std::vector<uint64_t> chunk_offsets;
   std::vector<shash::Any> chunk_checksums;
-  zlib::Compressor *compressor = zlib::Compressor::Construct(compression_alg_);
+  // TODO(heretherebedragons) if i see it correctly the Recurse() function is
+  // sharing the single thread here that also runs main() - if yes we should
+  // make the compressor a class-wide variable
+  UniquePtr<zlib::Compressor>
+                      compressor(zlib::Compressor::Construct(compression_alg_));
 
   bool retval =
-      ChecksumFdWithChunks(fd, compressor, &processed_size, &file_hash,
-                           &chunk_offsets, &chunk_checksums);
+      ChecksumFdWithChunks(fd, compressor.weak_ref(), &processed_size,
+                           &file_hash, &chunk_offsets, &chunk_checksums);
 
   if (!input_file_is_stdin) {
     close(fd);

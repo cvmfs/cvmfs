@@ -14,7 +14,9 @@
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
 #include "compression/compression.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
+#include "network/sink_path.h"
 #include "swissknife_history.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -34,6 +36,7 @@ CommandMigrate::CommandMigrate() :
   root_catalog_(NULL)
 {
   atomic_init32(&catalogs_processed_);
+  copy_ = zlib::Compressor::Construct(zlib::kNoCompression);
 }
 
 
@@ -331,10 +334,13 @@ bool CommandMigrate::UpdateUndoTags(
   time_t timestamp,
   shash::Any *history_hash)
 {
-  string filename_old = history_upstream_->filename();
-  string filename_new = filename_old + ".new";
-  bool retval = CopyPath2Path(filename_old, filename_new);
-  if (!retval) return false;
+  string filename_new = history_upstream_->filename() + ".new";
+
+  zlib::InputPath in_path(history_upstream_->filename());
+  cvmfs::PathSink out_path(filename_new);
+  if (copy_->CompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
+    return false;
+  }
   UniquePtr<history::SqliteHistory> history(
     history::SqliteHistory::OpenWritable(filename_new));
   history->TakeDatabaseFileOwnership();
@@ -342,7 +348,7 @@ bool CommandMigrate::UpdateUndoTags(
   history::History::Tag tag_trunk;
   bool exists = history->GetByName(CommandTag::kHeadTag, &tag_trunk);
   if (exists) {
-    retval = history->Remove(CommandTag::kHeadTag);
+    bool retval = history->Remove(CommandTag::kHeadTag);
     if (!retval) return false;
 
     history::History::Tag tag_trunk_previous = tag_trunk;

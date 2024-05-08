@@ -21,11 +21,6 @@ struct Any;
 class ContextPtr;
 }
 
-bool CopyPath2Path(const std::string &src, const std::string &dest);
-bool CopyPath2File(const std::string &src, FILE *fdest);
-bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
-                  const std::string &path);
-
 namespace zlib {
 
 const unsigned kZChunk = 16384;
@@ -107,9 +102,6 @@ void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
 void DecompressFini(z_stream *strm);
 
-StreamStates CompressZStream2Null(
-  const void *buf, const int64_t size, const bool eof,
-  z_stream *strm, shash::ContextPtr *hash_context);
 StreamStates DecompressZStream2File(const void *buf, const int64_t size,
                                     z_stream *strm, FILE *f);
 StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
@@ -117,10 +109,6 @@ StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
 
 bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
-bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
-bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t* size = NULL);
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 bool DecompressPath2File(const std::string &src, FILE *fdest);
 

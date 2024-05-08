@@ -105,8 +105,13 @@ bool CommandFileStats::Run(ObjectFetcherT *object_fetcher)
 void CommandFileStats::CatalogCallback(
   const CatalogTraversalData<catalog::Catalog> &data) {
   int32_t num = atomic_read32(&num_downloaded_);
-  string out_path =  tmp_db_path_ + StringifyInt(num + 1) + ".db";
-  assert(CopyPath2Path(data.catalog->database_path(), out_path));
+
+  // TODO(heretherebedragons) should we make the compressor a class var?
+  UniquePtr<zlib::Compressor>
+                          cp(zlib::Compressor::Construct(zlib::kNoCompression));
+  zlib::InputPath in_path(data.catalog->database_path());
+  cvmfs::PathSink out_path(tmp_db_path_ + StringifyInt(num + 1) + ".db");
+  assert(cp->CompressStream(&in_path, &out_path) == zlib::kStreamEnd);
   atomic_inc32(&num_downloaded_);
 }
 

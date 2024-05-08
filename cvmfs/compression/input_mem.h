@@ -18,6 +18,7 @@ class InputMem : public InputAbstract {
   virtual ~InputMem();
   virtual bool NextChunk();
   virtual bool IsValid();
+  virtual bool Reset();
 
  private:
   const unsigned char *src_;

@@ -31,6 +31,7 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
   ${CVMFS_SOURCE_DIR}/compression/echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
   ${CVMFS_SOURCE_DIR}/compression/input_file.cc
   ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
   ${CVMFS_SOURCE_DIR}/compression/input_path.cc

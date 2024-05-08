@@ -20,6 +20,7 @@
 #include "network/sink_file.h"
 #include "statistics.h"
 #include "util/file_guard.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/prng.h"
 
@@ -434,7 +435,8 @@ TEST_F(T_Download, LocalFile2Sink) {
     rnd_buf[i] = prng.Next(2147483647);
   shash::Any checksum(shash::kMd5);
 
-  zlib::Compressor *compress = zlib::Compressor::Construct(zlib::kZlibDefault);
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf),
                         size * sizeof(uint32_t));
   cvmfs::FileSink out_f(fdest, true);

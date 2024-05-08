@@ -198,12 +198,11 @@ string CommandCheck::FetchPath(const string &path) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    // TODO(heretherebedragons) want to have a globally available 
-    //   copy compressor?
-    zlib::Compressor *copy = zlib::Compressor::Construct(zlib::kNoCompression);
+    UniquePtr<zlib::Compressor>
+                          cp(zlib::Compressor::Construct(zlib::kNoCompression));
     zlib::InputPath input(url);
     cvmfs::FileSink output(f);
-    zlib::StreamStates retval = copy->CompressStream(&input, &output);
+    zlib::StreamStates retval = cp->CompressStream(&input, &output);
     if (retval != zlib::kStreamEnd) {
       PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }

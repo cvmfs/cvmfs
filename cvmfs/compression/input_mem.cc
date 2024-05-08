@@ -55,4 +55,14 @@ bool InputMem::IsValid() {
   return src_ != NULL;
 }
 
+bool InputMem::Reset() {
+  if (IsValid()) {
+    idx_ = -1ul;
+    chunk_size_ = 0;
+    has_chunk_left_ = true;
+    return true;
+  }
+  return false;
+}
+
 }  // namespace zlib

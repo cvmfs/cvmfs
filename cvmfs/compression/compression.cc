@@ -30,77 +30,6 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 
-
-using namespace std;  // NOLINT
-
-
-static bool CopyFile2File(FILE *fsrc, FILE *fdest) {
-  unsigned char buf[1024];
-  rewind(fsrc);
-  rewind(fdest);
-
-  size_t have;
-  do {
-    have = fread(buf, 1, 1024, fsrc);
-    if (fwrite(buf, 1, have, fdest) != have)
-      return false;
-  } while (have == 1024);
-  return true;
-}
-
-bool CopyPath2File(const std::string &src, FILE *fdest) {
-  int retval = -1;
-  platform_stat64 info;
-
-  FILE *fsrc = fopen(src.c_str(), "r");
-  if (!fsrc) goto file_copy_final;
-
-  if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
-  retval = platform_fstat(fileno(fsrc), &info);
-  retval |= fchmod(fileno(fdest), info.st_mode);
-
- file_copy_final:
-  if (fsrc) fclose(fsrc);
-  return retval == 0;
-}
-
-
-bool CopyPath2Path(const string &src, const string &dest) {
-  FILE *fsrc = NULL;
-  FILE *fdest = NULL;
-  int retval = -1;
-  platform_stat64 info;
-
-  fsrc = fopen(src.c_str(), "r");
-  if (!fsrc) goto file_copy_final;
-
-  fdest = fopen(dest.c_str(), "w");
-  if (!fdest) goto file_copy_final;
-
-  if (!CopyFile2File(fsrc, fdest)) goto file_copy_final;
-  retval = platform_fstat(fileno(fsrc), &info);
-  retval |= fchmod(fileno(fdest), info.st_mode);
-
- file_copy_final:
-  if (fsrc) fclose(fsrc);
-  if (fdest) fclose(fdest);
-  return retval == 0;
-}
-
-
-bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
-                  const string &path)
-{
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
-  if (fd < 0)
-    return false;
-
-  int written = write(fd, buffer, buffer_size);
-  close(fd);
-
-  return (written >=0) && (unsigned(written) == buffer_size);
-}
-
 namespace zlib {
 
 const unsigned kBufferSize = 32768;
@@ -164,35 +93,6 @@ void CompressFini(z_stream *strm) {
 void DecompressFini(z_stream *strm) {
   (void)inflateEnd(strm);
 }
-
-
-StreamStates CompressZStream2Null(
-  const void *buf,
-  const int64_t size,
-  const bool eof,
-  z_stream *strm,
-  shash::ContextPtr *hash_context)
-{
-  unsigned char out[kZChunk];
-  int z_ret;
-
-  strm->avail_in = size;
-  strm->next_in = static_cast<unsigned char *>(const_cast<void *>(buf));
-  // Run deflate() on input until output buffer not full, finish
-  // compression if all of source has been read in
-  do {
-    strm->avail_out = kZChunk;
-    strm->next_out = out;
-    z_ret = deflate(strm, eof ? Z_FINISH : Z_NO_FLUSH);  // no bad return value
-    if (z_ret == Z_STREAM_ERROR)
-      return kStreamDataError;
-    size_t have = kZChunk - strm->avail_out;
-    shash::Update(out, have, *hash_context);
-  } while (strm->avail_out == 0);
-
-  return (z_ret == Z_STREAM_END ? kStreamEnd : kStreamContinue);
-}
-
 
 StreamStates DecompressZStream2Sink(
   const void *buf,
@@ -277,7 +177,7 @@ StreamStates DecompressZStream2File(
   return (z_ret == Z_STREAM_END ? kStreamEnd : kStreamContinue);
 }
 
-bool DecompressPath2Path(const string &src, const string &dest) {
+bool DecompressPath2Path(const std::string &src, const std::string &dest) {
   FILE *fsrc = NULL;
   FILE *fdest = NULL;
   int result = false;
@@ -294,130 +194,6 @@ bool DecompressPath2Path(const string &src, const string &dest) {
   if (fsrc) fclose(fsrc);
   if (fdest) fclose(fdest);
   return result;
-}
-
-
-bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
-  int z_ret = 0;
-  int flush = 0;
-  bool result = -1;
-  unsigned have;
-  z_stream strm;
-  unsigned char in[kZChunk];
-  unsigned char out[kZChunk];
-  shash::ContextPtr hash_context(compressed_hash->algorithm);
-
-  CompressInit(&strm);
-  hash_context.buffer = alloca(hash_context.size);
-  shash::Init(hash_context);
-
-  // Compress until end of file
-  do {
-    strm.avail_in = fread(in, 1, kZChunk, fsrc);
-    if (ferror(fsrc)) goto compress_file2null_final;
-
-    flush = feof(fsrc) ? Z_FINISH : Z_NO_FLUSH;
-    strm.next_in = in;
-
-    // Run deflate() on input until output buffer not full, finish
-    // compression if all of source has been read in
-    do {
-      strm.avail_out = kZChunk;
-      strm.next_out = out;
-      z_ret = deflate(&strm, flush);  // no bad return value
-      if (z_ret == Z_STREAM_ERROR)
-        goto compress_file2null_final;  // state not clobbered
-      have = kZChunk - strm.avail_out;
-      shash::Update(out, have, hash_context);
-    } while (strm.avail_out == 0);
-
-    // Done when last data in file processed
-  } while (flush != Z_FINISH);
-
-  // stream will be complete
-  if (z_ret != Z_STREAM_END) goto compress_file2null_final;
-
-  shash::Final(hash_context, compressed_hash);
-  result = true;
-
-  // Clean up and return
- compress_file2null_final:
-  CompressFini(&strm);
-  LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
-           result);
-  return result;
-}
-
-
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t *processed_bytes) {
-  int z_ret = 0;
-  int flush = 0;
-  bool result = false;
-  unsigned have;
-  z_stream strm;
-  unsigned char in[kZChunk];
-  unsigned char out[kZChunk];
-  off_t cksum_bytes = 0;
-  shash::ContextPtr hash_context(compressed_hash->algorithm);
-
-  CompressInit(&strm);
-  hash_context.buffer = alloca(hash_context.size);
-  shash::Init(hash_context);
-
-  // Compress until end of file
-  do {
-    ssize_t bytes_read = read(fd_src, in, kZChunk);
-    if (bytes_read < 0) {
-      if (errno == EINTR) {continue;}
-      goto compress_fd2null_final;
-    }
-    cksum_bytes += bytes_read;
-    strm.avail_in = bytes_read;
-
-    flush = (static_cast<size_t>(bytes_read) < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
-    strm.next_in = in;
-
-    // Run deflate() on input until output buffer not full, finish
-    // compression if all of source has been read in
-    do {
-      strm.avail_out = kZChunk;
-      strm.next_out = out;
-      z_ret = deflate(&strm, flush);  // no bad return value
-      if (z_ret == Z_STREAM_ERROR)
-        goto compress_fd2null_final;  // state not clobbered
-      have = kZChunk - strm.avail_out;
-      shash::Update(out, have, hash_context);
-    } while (strm.avail_out == 0);
-
-    // Done when last data in file processed
-  } while (flush != Z_FINISH);
-
-  // stream will be complete
-  if (z_ret != Z_STREAM_END) goto compress_fd2null_final;
-
-  shash::Final(hash_context, compressed_hash);
-  if (processed_bytes) {
-    *processed_bytes = cksum_bytes;
-  }
-  result = true;
-
-  // Clean up and return
- compress_fd2null_final:
-  CompressFini(&strm);
-  LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
-           result);
-  return result;
-}
-
-
-bool CompressPath2Null(const string &src, shash::Any *compressed_hash) {
-  FILE *fsrc = fopen(src.c_str(), "r");
-  if (fsrc == NULL)
-    return false;
-  bool retval = CompressFile2Null(fsrc, compressed_hash);
-  fclose(fsrc);
-  return retval;
 }
 
 bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
@@ -447,7 +223,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
 }
 
 
-bool DecompressPath2File(const string &src, FILE *fdest) {
+bool DecompressPath2File(const std::string &src, FILE *fdest) {
   FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc)
     return false;

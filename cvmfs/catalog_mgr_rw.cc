@@ -19,6 +19,7 @@
 #include "compression/compression.h"
 #include "compression/input_path.h"
 #include "manifest.h"
+#include "network/sink_null.h"
 #include "network/sink_path.h"
 #include "statistics.h"
 #include "upload.h"
@@ -155,7 +156,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
 
-  zlib::Compressor *compress = zlib::Compressor::Construct(zlib::kZlibDefault);
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputPath in_path(file_path);
   cvmfs::PathSink out_path(file_path_compressed);
   zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path,
@@ -1432,15 +1434,19 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
   CatalogInfo root_catalog_info;
   WritableCatalogList::const_iterator i = catalogs_to_snapshot.begin();
   const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
+
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   for (; i != iend; ++i) {
     FinalizeCatalog(*i, stop_for_tweaks);
 
     // Compress and upload catalog
     shash::Any hash_catalog(spooler_->GetHashAlgorithm(),
                             shash::kSuffixCatalog);
-    if (!zlib::CompressPath2Null((*i)->database_path(),
-                                 &hash_catalog))
-    {
+    zlib::InputPath input((*i)->database_path());
+    cvmfs::NullSink out_null;
+    if (compress->CompressStream(&input, &out_null, &hash_catalog)
+        != zlib::kStreamEnd) {
       PANIC(kLogStderr, "could not compress catalog %s",
             (*i)->mountpoint().ToString().c_str());
     }
