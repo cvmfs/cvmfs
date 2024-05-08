@@ -186,19 +186,19 @@ int main(int argc, char *argv[]) {
              in_it1(reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
                    sizeof(gCernIt1PublicKey));
     cvmfs::PathSink out_it1(cern_pk_it1_path);
-    assert(compress->CompressStream(in_it1, out_it1) == zlib::kStreamEnd);
+    assert(compress->CompressStream(&in_it1, &out_it1) == zlib::kStreamEnd);
 
     zlib::InputMem
              in_it4(reinterpret_cast<const unsigned char*>(gCernIt4PublicKey),
                    sizeof(gCernIt4PublicKey));
     cvmfs::PathSink out_it4(cern_pk_it4_path);
-    assert(compress->CompressStream(in_it4, out_it4) == zlib::kStreamEnd);
+    assert(compress->CompressStream(&in_it4, &out_it4) == zlib::kStreamEnd);
 
     zlib::InputMem
              in_it5(reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
                    sizeof(gCernIt5PublicKey));
     cvmfs::PathSink out_it5(cern_pk_it5_path);
-    assert(compress->CompressStream(in_it5, out_it5) == zlib::kStreamEnd);
+    assert(compress->CompressStream(&in_it5, &out_it5) == zlib::kStreamEnd);
 
     char path_separator = ':';
     args['k'].Reset(new string(cern_pk_it1_path + path_separator +
