@@ -13,7 +13,7 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "util/pointer.h"
@@ -233,6 +233,7 @@ class CacheManager : SingleCopy {
    * Never NULL but defaults to NoopQuotaManager.
    */
   QuotaManager *quota_mgr_;
+  UniquePtr<zlib::Compressor> compress_;
 
  private:
   static const unsigned kStateVersion = 0;

@@ -10,11 +10,16 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/compression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "reflog.h"
 #include "util/posix.h"
 
@@ -346,7 +351,9 @@ class LocalObjectFetcher :
   LocalObjectFetcher(const std::string &base_path,
                      const std::string &temp_dir)
     : BaseTN(temp_dir)
-    , base_path_(base_path) {}
+    , base_path_(base_path) {
+    copy_ = zlib::Compressor::Construct(zlib::kNoCompression);
+  }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
@@ -402,9 +409,27 @@ class LocalObjectFetcher :
     }
 
     // decompress or copy the requested object file
-    const bool success = (decompress)
-      ? zlib::DecompressPath2File(source, f)
-      : CopyPath2File(source, f);
+    // TODO(heretherebedragons) for later..
+    // zlib::Decompressor compressor;
+    // if (decompress) {
+    //   decompress = zlib::Decompressor::Construct(zlib::kZlibDefault);
+    // } else {
+    //   decompress = zlib::Decompressor::Construct(zlib::kNoCompression);
+    // }
+    // InputPath input = InputPath(in_path);
+    // FileSink output = FileSink(f, true);
+    // remove the fclose(f);
+
+    bool success;
+
+    if (decompress) {
+      success = zlib::DecompressPath2File(source, f);
+    } else {
+      zlib::InputPath in_path = zlib::InputPath(source);
+      cvmfs::FileSink out_path = cvmfs::FileSink(f);
+      success =
+               (copy_->CompressStream(&in_path, &out_path) == zlib::kStreamEnd);
+    }
     fclose(f);
 
     // check the decompression success and remove the temporary file otherwise
@@ -431,6 +456,7 @@ class LocalObjectFetcher :
 
  private:
   const std::string base_path_;
+  UniquePtr<zlib::Compressor> copy_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>

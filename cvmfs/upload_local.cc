@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "util/logging.h"
 #include "util/posix.h"
 

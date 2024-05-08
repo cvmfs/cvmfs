@@ -70,8 +70,8 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     // If possible, make progress on deflate.
     unsigned char *cur_out_buf = out_buf;
     size_t avail_out = zlib::kZChunk;
-    compressor->Deflate(flush, &cur_in_buf, &avail_in, &cur_out_buf,
-                        &avail_out);
+    compressor->CompressStream(flush, &cur_in_buf, &avail_in, &cur_out_buf,
+                               &avail_out);
     if (do_chunk) {
       shash::Update(out_buf, avail_out, chunk_hash_context);
       if (generate_bulk_hash_)
@@ -248,11 +248,15 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   uint64_t processed_size;
   std::vector<uint64_t> chunk_offsets;
   std::vector<shash::Any> chunk_checksums;
-  zlib::Compressor *compressor = zlib::Compressor::Construct(compression_alg_);
+  // TODO(heretherebedragons) if i see it correctly the Recurse() function is
+  // sharing the single thread here that also runs main() - if yes we should
+  // make the compressor a class-wide variable
+  UniquePtr<zlib::Compressor>
+                      compressor(zlib::Compressor::Construct(compression_alg_));
 
   bool retval =
-      ChecksumFdWithChunks(fd, compressor, &processed_size, &file_hash,
-                           &chunk_offsets, &chunk_checksums);
+      ChecksumFdWithChunks(fd, compressor.weak_ref(), &processed_size,
+                           &file_hash, &chunk_offsets, &chunk_checksums);
 
   if (!input_file_is_stdin) {
     close(fd);

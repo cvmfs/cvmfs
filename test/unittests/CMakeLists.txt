@@ -38,7 +38,13 @@ if (BUILD_LIBCVMFS_CACHE)
                   ${CVMFS_SOURCE_DIR}/cache.cc
                   ${CVMFS_SOURCE_DIR}/cache_extern.cc
                   ${CVMFS_SOURCE_DIR}/cache_transport.cc
-                  ${CVMFS_SOURCE_DIR}/compression.cc
+                  ${CVMFS_SOURCE_DIR}/compression/compression.cc
+                  ${CVMFS_SOURCE_DIR}/compression/echo.cc
+                  ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+                  ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+                  ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+                  ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+                  ${CVMFS_SOURCE_DIR}/compression/zlib.cc
                   ${CVMFS_SOURCE_DIR}/manifest.cc
                   ${CVMFS_SOURCE_DIR}/quota.cc
   )
@@ -157,7 +163,13 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
        ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
        ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
-       ${CVMFS_SOURCE_DIR}/compression.cc
+       ${CVMFS_SOURCE_DIR}/compression/compression.cc
+       ${CVMFS_SOURCE_DIR}/compression/echo.cc
+       ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+       ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+       ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+       ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+       ${CVMFS_SOURCE_DIR}/compression/zlib.cc
        ${CVMFS_SOURCE_DIR}/directory_entry.cc
        ${CVMFS_SOURCE_DIR}/gateway_util.cc
        ${CVMFS_SOURCE_DIR}/globals.cc
@@ -309,7 +321,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_catalog_virtual.cc
   t_chunk_detectors.cc
   t_clientctx.cc
-  t_compression.cc
   t_compressor.cc
   t_dirtab.cc
   t_dns.cc
@@ -421,7 +432,13 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
   ${CVMFS_SOURCE_DIR}/clientctx.cc
-  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression/echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+  ${CVMFS_SOURCE_DIR}/compression/zlib.cc
   ${CVMFS_SOURCE_DIR}/cvmfs_suid_util.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/duplex_fuse.cc

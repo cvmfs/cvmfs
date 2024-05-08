@@ -20,11 +20,16 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression.h"
+#include "compression/compression.h"
+#include "compression/echo.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
@@ -193,9 +198,13 @@ string CommandCheck::FetchPath(const string &path) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    bool retval = CopyPath2File(url, f);
-    if (!retval) {
-      PANIC(kLogStderr, "failed to read %s", url.c_str());
+    UniquePtr<zlib::Compressor>
+                          cp(zlib::Compressor::Construct(zlib::kNoCompression));
+    zlib::InputPath input(url);
+    cvmfs::FileSink output(f);
+    zlib::StreamStates retval = cp->CompressStream(&input, &output);
+    if (retval != zlib::kStreamEnd) {
+      PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }
   }
 

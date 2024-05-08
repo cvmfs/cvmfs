@@ -57,7 +57,13 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_mgr_client.cc
        catalog_sql.cc
        clientctx.cc
-       compression.cc
+       compression/compression.cc
+       compression/echo.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/zlib.cc
        directory_entry.cc
        duplex_fuse.cc
        fd_refcount_mgr.cc
@@ -136,7 +142,13 @@ if (BUILD_CVMFS)
   # /usr/bin/cvmfs_fsck
   #
   add_executable (cvmfs_fsck
-                  compression.cc
+                  compression/compression.cc
+                  compression/echo.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/zlib.cc
                   cvmfs_fsck.cc
                   statistics.cc
   )
@@ -495,9 +507,17 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache_plugin/cvmfs_cache_posix.cc
                   cache.cc
                   cache_posix.cc
-                  compression.cc
+                  compression/compression.cc
+                  compression/echo.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/zlib.cc
                   fd_refcount_mgr.cc
                   manifest.cc
+                  network/sink_file.cc
+                  network/sink_path.cc
                   quota.cc
   )
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")
@@ -573,7 +593,13 @@ if (BUILD_SERVER)
        catalog_rw.cc
        catalog_virtual.cc
        clientctx.cc
-       compression.cc
+       compression/compression.cc
+       compression/echo.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/zlib.cc
        directory_entry.cc
        file_chunk.cc
        gateway_util.cc
@@ -717,7 +743,13 @@ if (BUILD_SERVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_virtual.cc
-       compression.cc
+       compression/compression.cc
+       compression/echo.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/zlib.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -827,7 +859,13 @@ if (BUILD_SERVER)
   #
   set (CVMFS_PUBLISH_SOURCES
        backoff.cc
-       compression.cc
+       compression/compression.cc
+       compression/echo.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/zlib.cc
        directory_entry.cc
        manifest.cc
        network/dns.cc
@@ -1014,7 +1052,13 @@ if(BUILD_RECEIVER)
        catalog_sql.cc
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
-       compression.cc
+       compression/compression.cc
+       compression/echo.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/zlib.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -1176,7 +1220,13 @@ if (BUILD_PRELOADER)
                   backoff.cc
                   catalog.cc
                   catalog_sql.cc
-                  compression.cc
+                  compression/compression.cc
+                  compression/echo.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/zlib.cc
                   gateway_util.cc
                   globals.cc
                   history_sql.cc
@@ -1201,6 +1251,8 @@ if (BUILD_PRELOADER)
                   network/s3fanout.cc
                   network/sink_file.cc
                   network/sink_mem.cc
+           
+        
                   network/sink_path.cc
                   options.cc
                   pack.cc
