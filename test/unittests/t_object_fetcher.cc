@@ -10,7 +10,7 @@
 #include <string>
 
 #include "catalog_sql.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "shortstring.h"

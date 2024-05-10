@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"

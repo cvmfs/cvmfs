@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "network/download.h"

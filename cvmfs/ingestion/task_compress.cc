@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 
