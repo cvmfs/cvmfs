@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/signature.h"
 #include "network/download.h"
 #include "statistics.h"

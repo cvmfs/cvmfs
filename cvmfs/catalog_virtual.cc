@@ -9,7 +9,7 @@
 #include <cstdlib>
 
 #include "catalog_mgr_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "history.h"
 #include "swissknife_history.h"
 #include "swissknife_sync.h"

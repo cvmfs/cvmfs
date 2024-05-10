@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "catalog.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
