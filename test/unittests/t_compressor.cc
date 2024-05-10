@@ -73,15 +73,17 @@ TEST_F(T_Compressor, CompressionSinkMem2Mem) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
 
   // Compress the output
-  unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
+  // unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
 
-  zlib::InputMem in(input, str_test_string.size(), 16384);
+  zlib::InputMem in(reinterpret_cast<const unsigned char*>(
+                                                       str_test_string.c_str()),
+                    str_test_string.size(), 16384);
   cvmfs::MemSink out(0);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
 
-  ASSERT_EQ(res, zlib::kStreamEnd);
-  ASSERT_GT(out.pos(), 0U);
+  EXPECT_EQ(res, zlib::kStreamEnd);
+  EXPECT_GT(out.pos(), 0U);
 
   // Decompress it, check if it's still the same
   char *decompress_buf;
@@ -90,7 +92,10 @@ TEST_F(T_Compressor, CompressionSinkMem2Mem) {
     reinterpret_cast<void **>(&decompress_buf), &decompress_size);
 
   // Check if the string is the same as the beginning
-  ASSERT_EQ(0, strcmp(decompress_buf, test_string));
+  // (decompress_buf is not null terminated --> only compared within size)
+  EXPECT_EQ(str_test_string.size(), decompress_size);
+  EXPECT_EQ(0, strncmp(decompress_buf, str_test_string.c_str(),
+                       str_test_string.size()));
 
   free(decompress_buf);
 }
