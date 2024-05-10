@@ -75,7 +75,7 @@ TEST_F(T_Compressor, CompressionSinkMem2Mem) {
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
 
-  InputMem in(input, str_test_string.size(), 16384);
+  zlib::InputMem in(input, str_test_string.size(), 16384);
   cvmfs::MemSink out(500);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
@@ -110,7 +110,7 @@ TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
     input[i] = letters[rand() % 26];
   }
 
-  InputMem in(input, in_size, chunk_size);
+  zlib::InputMem in(input, in_size, chunk_size);
   cvmfs::MemSink out(in_size);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
@@ -151,7 +151,7 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
   FILE *in_f = CreateTempFile(sandbox_path, 0600, "w+", &in_path);
   fwrite(in_buf, 1, in_size, in_f);
   fclose(in_f);
-  InputPath input = InputPath(in_path, chunk_size);
+  zlib::InputPath input(in_path, chunk_size);
 
   std::string out_path;
   FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
@@ -207,7 +207,7 @@ TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {
     input[i] = letters[rand() % 26];
   }
 
-  InputMem in(input, in_size, chunk_size);
+  zlib::InputMem in(input, in_size, chunk_size);
   cvmfs::MemSink out(in_size);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
@@ -238,7 +238,7 @@ TEST_F(T_Compressor, EchoCompressionSinkPath2PathLarge) {
   FILE *in_f = CreateTempFile(sandbox_path, 0600, "w+", &in_path);
   fwrite(in_buf, 1, in_size, in_f);
   fclose(in_f);
-  InputPath input = InputPath(in_path, chunk_size);
+  zlib::InputPath input(in_path, chunk_size);
 
   std::string out_path;
   FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
