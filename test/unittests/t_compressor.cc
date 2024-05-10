@@ -7,9 +7,9 @@
 #include <cstdlib>  // for rand()
 
 #include "c_file_sandbox.h"
+#include "compression/compression.h"
 #include "compression/input_mem.h"
 #include "compression/input_path.h"
-#include "compression/compression.h"
 #include "network/sink.h"
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
@@ -24,6 +24,7 @@ namespace zlib {
 class T_Compressor : public FileSandbox {
  public:
   T_Compressor() : FileSandbox(std::string(sandbox_path)) {}
+
  protected:
   virtual void SetUp() {
     CreateSandbox();
@@ -74,8 +75,8 @@ TEST_F(T_Compressor, CompressionSinkMem2Mem) {
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
 
-  InputMem in = InputMem(input, str_test_string.size(), 16384);
-  cvmfs::MemSink out = cvmfs::MemSink(500);
+  InputMem in(input, str_test_string.size(), 16384);
+  cvmfs::MemSink out(500);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
 
@@ -109,8 +110,8 @@ TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
     input[i] = letters[rand() % 26];
   }
 
-  InputMem in = InputMem(input, in_size, chunk_size);
-  cvmfs::MemSink out = cvmfs::MemSink(in_size);
+  InputMem in(input, in_size, chunk_size);
+  cvmfs::MemSink out(in_size);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
 
@@ -156,7 +157,7 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
   FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
   fclose(out_f);
 
-  cvmfs::PathSink out = cvmfs::PathSink(out_path);
+  cvmfs::PathSink out(out_path);
 
   // Compress the output
   zlib::StreamStates res = compressor->CompressStream(&input, &out);
@@ -206,8 +207,8 @@ TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {
     input[i] = letters[rand() % 26];
   }
 
-  InputMem in = InputMem(input, in_size, chunk_size);
-  cvmfs::MemSink out = cvmfs::MemSink(in_size);
+  InputMem in(input, in_size, chunk_size);
+  cvmfs::MemSink out(in_size);
 
   zlib::StreamStates res = compressor->CompressStream(&in, &out);
 
@@ -243,7 +244,7 @@ TEST_F(T_Compressor, EchoCompressionSinkPath2PathLarge) {
   FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
   fclose(out_f);
 
-  cvmfs::PathSink out = cvmfs::PathSink(out_path);
+  cvmfs::PathSink out(out_path);
 
   // Compress the output
   zlib::StreamStates res = compressor->CompressStream(&input, &out);
