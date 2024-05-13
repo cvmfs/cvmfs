@@ -1288,7 +1288,6 @@ void WritableCatalogManager::CatalogUploadCallback(
   }
 
   SyncLock();
-
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
     // them for processing (continuation) if the 'dirty children count' == 0

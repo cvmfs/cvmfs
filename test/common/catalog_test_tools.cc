@@ -449,8 +449,8 @@ bool CatalogTestTool::DirSpecAtRootHash(const shash::Any& root_hash,
                                         DirSpec* spec) {
   perf::Statistics stats;
   UniquePtr<catalog::WritableCatalogManager> catalog_mgr(
-          CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
-                          spooler_.weak_ref(), download_manager(), &stats));
+      CreateCatalogMgr(root_hash, "file://" + stratum0_, temp_dir_,
+                       spooler_.weak_ref(), download_manager(), &stats));
 
   if (!catalog_mgr.IsValid()) {
     return false;

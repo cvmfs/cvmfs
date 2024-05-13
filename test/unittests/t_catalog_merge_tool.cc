@@ -163,7 +163,6 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_FALSE(output_spec.Item("dir/dir"));
 }
 
-
 TEST_F(T_CatalogMergeTool, Symlink) {
   // we start by creating a simple structure
   // .

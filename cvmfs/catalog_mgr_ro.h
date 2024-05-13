@@ -62,7 +62,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
 
-  bool UseLocalCache() { return !dir_cache_.empty(); }
+  bool UseLocalCache() const { return !dir_cache_.empty(); }
 
   std::string                dir_cache_;  // absolute path to local cache
                                                 // directory
