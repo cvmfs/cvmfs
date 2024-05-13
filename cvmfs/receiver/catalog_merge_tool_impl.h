@@ -71,7 +71,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
         params.use_autocatalogs, params.max_weight, params.min_weight,
-        local_cache_dir_);
+        cache_dir_);
     output_catalog_mgr_->Init();
   }
 

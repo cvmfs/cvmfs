@@ -1232,8 +1232,8 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
 
 /**
  * Copy catalog to local cache.server
- * Must be an atomic write into the local_cache_dir
- * As such: create a temporary copy in local_cache_dir/txn and then do a 
+ * Must be an atomic write into the cache_dir
+ * As such: create a temporary copy in cache_dir/txn and then do a 
  * `rename` (which is atomic) to the actual cache path
  * 
  * @returns true on success, otherwise false
@@ -1241,24 +1241,22 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
 bool WritableCatalogManager::CopyCatalogToLocalCache(
                                           const upload::SpoolerResult &result) {
   std::string tmp_catalog_path;
-  const std::string cache_catalog_path = local_cache_dir_ + "/"
+  const std::string cache_catalog_path = dir_cache_ + "/"
                                   + result.content_hash.MakePathWithoutSuffix();
-  FILE *fcatalog = CreateTempFile(local_cache_dir_ + "/txn/catalog", 0666,
-                                                      "w", &tmp_catalog_path);
+  FILE *fcatalog = CreateTempFile(dir_cache_ + "/txn/catalog", 0666,
+                                                        "w", &tmp_catalog_path);
   if (!fcatalog) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogStderr,
+    PANIC(kLogDebug | kLogStderr,
                                "Creating file for temporary catalog failed: %s",
                                tmp_catalog_path.c_str());
-    return false;
   }
   CopyPath2File(result.local_path.c_str(), fcatalog);
   (void) fclose(fcatalog);
 
   if (rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str()) != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogStderr,
+    PANIC(kLogDebug | kLogStderr,
                          "Failed to copy catalog from %s to cache %s",
                          result.local_path.c_str(), cache_catalog_path.c_str());
-    return false;
   }
   return true;
 }

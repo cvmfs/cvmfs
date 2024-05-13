@@ -733,13 +733,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('G') != args.end()) {
-    // parser just for the IsOn() func
-    const SimpleOptionsParser parser = SimpleOptionsParser(
-                           new DefaultOptionsTemplateManager(params.repo_name));
-    if (parser.IsOn(*args.find('G')->second)) {
-      params.local_cache_dir =
-                       "/var/spool/cvmfs/" + params.repo_name + "/cache.server";
-    }
+    params.cache_dir = "/var/spool/cvmfs/" + params.repo_name + "/cache.server";
   }
 
   const bool upload_statsdb = (args.count('I') > 0);
@@ -817,7 +811,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
          spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
          params.nested_kcatalog_limit, params.root_kcatalog_limit,
          params.file_mbyte_limit, statistics(), params.is_balanced,
-         params.max_weight, params.min_weight, params.local_cache_dir);
+         params.max_weight, params.min_weight, params.cache_dir);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);

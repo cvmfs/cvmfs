@@ -24,7 +24,7 @@ SimpleCatalogManager::SimpleCatalogManager(
                        const std::string           &dir_cache,
                        const bool                  copy_to_tmp_dir)
                      : AbstractCatalogManager<Catalog>(statistics)
-                     , local_cache_dir_(dir_cache)
+                     , dir_cache_(dir_cache)
                      , copy_to_tmp_dir_(copy_to_tmp_dir)
                      , base_hash_(base_hash)
                      , stratum0_(stratum0)
@@ -32,12 +32,12 @@ SimpleCatalogManager::SimpleCatalogManager(
                      , download_manager_(download_manager)
                      , manage_catalog_files_(manage_catalog_files) {
   if (!dir_cache.empty()) {
-    const bool success = MakeCacheDirectories(local_cache_dir_, 0755);
+    const bool success = MakeCacheDirectories(dir_cache_, 0755);
 
     if (!success) {
       PANIC(kLogStderr,
             "Failure during creation of local cache directory for server. "
-            "Local cache directory: %s", local_cache_dir_.c_str());
+            "Local cache directory: %s", dir_cache_.c_str());
     }
   } else {
     copy_to_tmp_dir_ = false;
@@ -98,7 +98,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   FILE *fcatalog;
 
   if (UseLocalCache()) {
-    std::string cache_path = local_cache_dir_ + "/"
+    std::string cache_path = dir_cache_ + "/"
                            + effective_hash.MakePathWithoutSuffix();
 
     ctlg_context->SetSqlitePath(cache_path);
@@ -142,7 +142,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   // for local cache make an atomic rename call to make the file available
   // in the local cache
   if (UseLocalCache()) {
-    const std::string cache_path = local_cache_dir_ + "/"
+    const std::string cache_path = dir_cache_ + "/"
                                     + effective_hash.MakePathWithoutSuffix();
     rename(tmp_path.c_str(), cache_path.c_str());
     ctlg_context->SetSqlitePath(cache_path);

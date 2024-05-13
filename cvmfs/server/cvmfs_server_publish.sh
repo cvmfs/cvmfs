@@ -199,7 +199,6 @@ cvmfs_server_publish() {
         -Z $compression_alg                            \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
-        -G $CVMFS_SERVER_USE_CATALOG_CACHE                 \
         $(get_follow_http_redirects_flag)              \
         $(get_swissknife_proxy)                        \
         $authz_file                                    \
@@ -239,6 +238,9 @@ cvmfs_server_publish() {
     fi
     if [ "x$CVMFS_AUTOCATALOGS_MIN_WEIGHT" != "x" ]; then
       sync_command="$sync_command -M $CVMFS_AUTOCATALOGS_MIN_WEIGHT"
+    fi
+    if [ "x$CVMFS_SERVER_USE_CATALOG_CACHE" = "xtrue" ]; then
+      sync_command="$sync_command -G"
     fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"

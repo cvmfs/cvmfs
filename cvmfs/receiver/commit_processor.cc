@@ -162,9 +162,9 @@ CommitProcessor::Result CommitProcessor::Process(
            manifest->catalog_hash().ToString(false).c_str());
 
 
-  std::string local_cache_dir_;
+  std::string cache_dir_;
   if (params.use_local_cache) {
-    local_cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
+    cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
   }
 
   const std::string spooler_temp_dir =
@@ -185,7 +185,7 @@ CommitProcessor::Result CommitProcessor::Process(
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
                  server_tool->download_manager(), manifest.weak_ref(),
-                 statistics_, local_cache_dir_);
+                 statistics_, cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");

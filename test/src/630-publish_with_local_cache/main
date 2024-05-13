@@ -40,9 +40,8 @@ cvmfs_run_test() {
   ### add C flag at the end to hash to find proper file
   nested_ctlg_hash="${nested_ctlg_hash}C"
   peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 3
-  # manually delete
-  sudo rm -f /srv/cvmfs/$CVMFS_TEST_REPO/$(make_path $nested_ctlg_hash)
-  echo "    Check if file was really removed"
+  delete_hash_from_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash"
+  # echo "    Check if file was really removed"
   peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" && return 5
 
   # check local catalog caching availability
@@ -77,9 +76,7 @@ cvmfs_run_test() {
   ### add C flag at the end to hash to find proper file
   nested_ctlg_hash="${nested_ctlg_hash}C"
   peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" || return 8
-  # manually delete
-  sudo rm -f /srv/cvmfs/$CVMFS_TEST_REPO/$(make_path $nested_ctlg_hash)
-  echo "    Check if file was really removed"
+  delete_hash_from_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash"
   peek_backend "$CVMFS_TEST_REPO" "$nested_ctlg_hash" && return 9
 
   # check local catalog caching is unavailable

@@ -27,7 +27,7 @@ struct SyncParameters {
       : spooler(NULL),
         union_fs_type("aufs"),
         to_delete(""),
-        local_cache_dir(""),
+        cache_dir(""),
         print_changeset(false),
         dry_run(false),
         mucatalogs(false),
@@ -79,7 +79,7 @@ struct SyncParameters {
   std::string tar_file;
   std::string base_directory;
   std::string to_delete;
-  std::string local_cache_dir;
+  std::string cache_dir;
   bool print_changeset;
   bool dry_run;
   bool mucatalogs;
@@ -293,12 +293,12 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('S',
                                     "virtual directory options "
                                     "[snapshots, remove]"));
+
+
     r.push_back(
-        Parameter::Optional('G', "Use persistent caching for all catalogs "
+        Parameter::Switch('G', "Use persistent caching for all catalogs "
                                  "used during the publishing process"
                                  " Warning: No automatic garbage collection!"));
-
-
     r.push_back(Parameter::Switch('d',
                                   "pause publishing to allow for catalog "
                                   "tweaks"));

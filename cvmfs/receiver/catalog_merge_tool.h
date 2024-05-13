@@ -42,7 +42,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(""),
-        local_cache_dir_(""),
+        cache_dir_(""),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(NULL),
@@ -61,7 +61,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    perf::Statistics* statistics)
       : CatalogDiffTool<RoCatalogMgr>(old_catalog_mgr, new_catalog_mgr),
         repo_path_(repo_path),
-        local_cache_dir_(""),
+        cache_dir_(""),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
@@ -78,13 +78,13 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
                    download::DownloadManager* download_manager,
                    manifest::Manifest* manifest,
                    perf::Statistics* statistics,
-                   const std::string& local_cache_dir)
+                   const std::string& cache_dir)
       : CatalogDiffTool<RoCatalogMgr>(repo_path,
                                       old_root_hash, new_root_hash,
                                       temp_dir_prefix, download_manager,
-                                      local_cache_dir),
+                                      cache_dir),
         repo_path_(repo_path),
-        local_cache_dir_(local_cache_dir),
+        cache_dir_(cache_dir),
         lease_path_(lease_path),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
@@ -118,7 +118,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
   bool CreateNewManifest(std::string* new_manifest_path);
 
   std::string repo_path_;
-  const std::string local_cache_dir_;  // path if local cache repo if used
+  const std::string cache_dir_;  // path if local cache is used, otherwise empty
 
   PathString lease_path_;
   std::string temp_dir_prefix_;

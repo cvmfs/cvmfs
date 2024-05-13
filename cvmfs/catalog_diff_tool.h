@@ -26,7 +26,7 @@ class CatalogDiffTool {
       : repo_path_(""),
         temp_dir_prefix_(""),
         download_manager_(NULL),
-        local_cache_dir_(""),
+        cache_dir_(""),
         old_catalog_mgr_(old_catalog_mgr),
         new_catalog_mgr_(new_catalog_mgr),
         needs_setup_(false) {}
@@ -36,13 +36,13 @@ class CatalogDiffTool {
                   const shash::Any& new_root_hash,
                   const std::string& temp_dir_prefix,
                   download::DownloadManager* download_manager,
-                  const std::string& local_cache_dir = "")
+                  const std::string& cache_dir = "")
       : repo_path_(repo_path),
         old_root_hash_(old_root_hash),
         new_root_hash_(new_root_hash),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
-        local_cache_dir_(local_cache_dir),
+        cache_dir_(cache_dir),
         old_raii_temp_dir_(),
         new_raii_temp_dir_(),
         old_catalog_mgr_(),
@@ -122,7 +122,7 @@ class CatalogDiffTool {
                                    const shash::Any& root_hash,
                                    download::DownloadManager* download_manager,
                                    perf::Statistics* stats,
-                                   const std::string& local_cache_dir);
+                                   const std::string& cache_dir);
 
   void DiffRec(const PathString& path);
 
@@ -132,7 +132,7 @@ class CatalogDiffTool {
   std::string temp_dir_prefix_;
 
   download::DownloadManager* download_manager_;
-  const std::string local_cache_dir_;  // path if local caching of catalogs
+  const std::string cache_dir_;  // path if local caching of catalogs
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;

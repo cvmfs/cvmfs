@@ -1735,6 +1735,18 @@ delete_from_backend() {
   cvmfs_swissknife remove -o $remote_path -r $(get_backend_spooler)
 }
 
+# removes the file given by its hash from the backend storage of a CVMFS repository
+#
+# @param repository    the repository name to uploaded into
+# @param content_hash  hash of the file
+delete_hash_from_backend() {
+  local repo_name="$1"
+  local content_hash="$2"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife remove -o $(make_path $content_hash) -r $(get_backend_spooler)
+}
+
 
 # uploads a random file into the backend storage of a CVMFS repository
 #
