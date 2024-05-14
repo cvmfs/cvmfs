@@ -11,11 +11,13 @@ namespace zlib {
 
 class InputMem : public InputAbstract {
  public:
+  InputMem(const unsigned char *src, const size_t src_size);
   InputMem(const unsigned char *src, const size_t src_size,
            const size_t max_chunk_size, bool is_owner = false);
   virtual ~InputMem();
   virtual bool NextChunk();
   virtual bool IsValid();
+  virtual bool Reset();
 
  private:
   const unsigned char *src_;

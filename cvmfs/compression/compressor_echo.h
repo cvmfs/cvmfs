@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_COMPRESSION_ECHO_H_
-#define CVMFS_COMPRESSION_ECHO_H_
+#ifndef CVMFS_COMPRESSION_COMPRESSOR_ECHO_H_
+#define CVMFS_COMPRESSION_COMPRESSOR_ECHO_H_
 
 #include <errno.h>
 #include <stdint.h>
@@ -41,4 +41,4 @@ class EchoCompressor: public Compressor {
 
 }  // namespace zlib
 
-#endif  // CVMFS_COMPRESSION_ECHO_H_
+#endif  // CVMFS_COMPRESSION_COMPRESSOR_ECHO_H_
