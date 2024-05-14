@@ -81,16 +81,16 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual StreamStates CompressStream(InputAbstract *input,
-                                   cvmfs::Sink *output) { return kStreamError; }
-  virtual StreamStates CompressStream(InputAbstract *input,
-                               cvmfs::Sink *output, shash::Any *compressed_hash)
-                               { return kStreamError; }
+  virtual StreamStates CompressStream(InputAbstract * /*input*/,
+                               cvmfs::Sink */*output*/) { return kStreamError; }
+  virtual StreamStates CompressStream(InputAbstract */*input*/,
+                       cvmfs::Sink */*output*/, shash::Any */*compressed_hash*/)
+                                                        { return kStreamError; }
   virtual bool CompressStream(const bool flush,
                               unsigned char **inbuf, size_t *inbufsize,
                               unsigned char **outbuf, size_t *outbufsize) = 0;
   virtual bool ResetStream() { return false; }
-  virtual size_t CompressUpperBound(const size_t bytes) { return 0; }
+  virtual size_t CompressUpperBound(const size_t /*bytes*/) { return 0; }
 
   virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor* Clone() = 0;
