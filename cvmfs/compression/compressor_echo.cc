@@ -1,14 +1,9 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This is a wrapper around zlib.  It provides
- * a set of functions to conveniently compress and decompress stuff.
- * Almost all of the functions return true on success, otherwise false.
- *
- * TODO: think about code deduplication
  */
 
-#include "echo.h"
+#include "compressor_echo.h"
 
 #include <alloca.h>
 #include <stdlib.h>

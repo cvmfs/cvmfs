@@ -20,8 +20,8 @@
 #include <iostream>
 
 #include "cvmfs_config.h"
-#include "echo.h"
-#include "zlib.h"
+#include "compressor_echo.h"
+#include "compressor_zlib.h"
 
 #include "crypto/hash.h"
 #include "util/exception.h"
