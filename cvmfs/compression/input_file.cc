@@ -11,14 +11,14 @@ InputFile::InputFile(const FILE* src, const size_t max_chunk_size,
                      const bool is_owner) :
                                   InputAbstract(is_owner, max_chunk_size, NULL),
                                   src_(src) {
-  if (IsValid()) {
+  if (InputFile::IsValid()) {
     chunk_ = static_cast<unsigned char*>(smalloc(max_chunk_size_));
     has_chunk_left_ = true;
   }
 }
 
 InputFile::~InputFile() {
-  if (IsValid()) {
+  if (InputFile::IsValid()) {
     free(chunk_);
 
     if (is_owner_) {

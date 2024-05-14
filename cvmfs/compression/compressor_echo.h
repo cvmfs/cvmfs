@@ -26,7 +26,7 @@ class EchoCompressor: public Compressor {
   virtual StreamStates CompressStream(InputAbstract *input,
                                       cvmfs::Sink *output,
                                       shash::Any *compressed_hash);
-  bool CompressStream(const bool flush,
+  bool CompressStream(const bool /*flush*/,
                       unsigned char **inbuf, size_t *inbufsize,
                       unsigned char **outbuf, size_t *outbufsize);
   virtual size_t CompressUpperBound(const size_t bytes);

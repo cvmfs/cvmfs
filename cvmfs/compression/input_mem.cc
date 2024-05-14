@@ -23,7 +23,7 @@ InputMem::InputMem(const unsigned char* src, const size_t src_size,
 }
 
 InputMem::~InputMem() {
-  if (IsValid() && is_owner_) {
+  if (InputMem::IsValid() && is_owner_) {
       // we need to ignore "const" here
       free(const_cast<unsigned char*>(src_));
   }
