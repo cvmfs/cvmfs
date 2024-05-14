@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_COMPRESSION_ZLIB_H_
-#define CVMFS_COMPRESSION_ZLIB_H_
+#ifndef CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
+#define CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
 
 #include <errno.h>
 #include <stdint.h>
@@ -44,4 +44,4 @@ class ZlibCompressor: public Compressor {
 
 }  // namespace zlib
 
-#endif  // CVMFS_COMPRESSION_ZLIB_H_
+#endif  // CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_

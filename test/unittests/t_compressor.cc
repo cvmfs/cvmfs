@@ -138,6 +138,37 @@ TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
   free(input);
 }
 
+TEST_F(T_Compressor, CompressionSinkMemNull2Mem) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+
+  size_t chunk_size = 8000;
+  size_t in_size = 0;
+
+  zlib::InputMem in(NULL, in_size, chunk_size);
+  cvmfs::MemSink out(0);
+
+  zlib::StreamStates res = compressor->CompressStream(&in, &out);
+
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(out.pos(), 0U);
+
+  shash::Any file_hash(shash::kSha1);
+  shash::HashMem(out.data(), out.pos(), &file_hash);
+
+  EXPECT_EQ(file_hash.ToString(),
+            "e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78");
+
+  // Decompress it, check if it's still the same
+  char *decompress_buf;
+  uint64_t decompress_size;
+  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos(),
+    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
+
+  EXPECT_EQ(in_size, decompress_size);
+
+  free(decompress_buf);
+}
+
 // Also tests Input_File and SinkFile because *Path uses it under the hood
 TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
@@ -195,6 +226,36 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
 
   free(decompress_buf);
   free(in_buf);
+}
+
+TEST_F(T_Compressor, CompressionSinkPathNull2Mem) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+
+  size_t in_size = 0;
+
+  zlib::InputPath in(GetEmptyFile());
+  cvmfs::MemSink out(0);
+
+  zlib::StreamStates res = compressor->CompressStream(&in, &out);
+
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(out.pos(), 0U);
+
+  shash::Any file_hash(shash::kSha1);
+  shash::HashMem(out.data(), out.pos(), &file_hash);
+
+  EXPECT_EQ(file_hash.ToString(),
+            "e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78");
+
+  // Decompress it, check if it's still the same
+  char *decompress_buf;
+  uint64_t decompress_size;
+  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos(),
+    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
+
+  EXPECT_EQ(in_size, decompress_size);
+
+  free(decompress_buf);
 }
 
 TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {

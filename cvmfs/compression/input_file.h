@@ -16,6 +16,7 @@ class InputFile : public InputAbstract {
   virtual ~InputFile();
   virtual bool NextChunk();
   virtual bool IsValid();
+  virtual bool Reset();
 
  private:
   const FILE *src_;

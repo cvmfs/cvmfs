@@ -15,6 +15,7 @@ namespace zlib {
 
 class InputPath : public InputAbstract {
  public:
+  explicit InputPath(const std::string& path);
   InputPath(const std::string& path, const size_t max_chunk_size);
   virtual ~InputPath() { }
 
@@ -22,7 +23,10 @@ class InputPath : public InputAbstract {
   virtual unsigned char* chunk() const { return input_file_->chunk(); }
   virtual bool NextChunk() { return input_file_->NextChunk(); }
   virtual bool IsValid() { return input_file_->IsValid(); }
+  virtual bool Reset() { return input_file_->Reset(); }
   virtual bool has_chunk_left() const { return input_file_->has_chunk_left(); }
+
+  std::string path() const {return path_; }
 
  private:
   std::string path_;

@@ -51,6 +51,14 @@ bool InputFile::IsValid() {
   return src_ != NULL;
 }
 
-
+bool InputFile::Reset() {
+  if (IsValid()) {
+    fseek(const_cast<FILE*>(src_), 0L, SEEK_SET);
+    chunk_size_ = 0;
+    has_chunk_left_ = true;
+    return true;
+  }
+  return false;
+}
 
 }  // namespace zlib

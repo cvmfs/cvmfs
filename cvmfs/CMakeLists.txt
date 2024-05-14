@@ -60,6 +60,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        compression/compression.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -144,6 +145,7 @@ if (BUILD_CVMFS)
                   compression/compression.cc
                   compression/compressor_echo.cc
                   compression/compressor_zlib.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
@@ -508,6 +510,7 @@ if (BUILD_LIBCVMFS_CACHE)
                   compression/compression.cc
                   compression/compressor_echo.cc
                   compression/compressor_zlib.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
@@ -591,6 +594,7 @@ if (BUILD_SERVER)
        compression/compression.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -740,6 +744,7 @@ if (BUILD_SERVER)
        compression/compression.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -855,6 +860,7 @@ if (BUILD_SERVER)
        compression/compression.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -1047,6 +1053,7 @@ if(BUILD_RECEIVER)
        compression/compression.cc
        compression/compressor_echo.cc
        compression/compressor_zlib.cc
+       compression/input_cache.cc
        compression/input_file.cc
        compression/input_mem.cc
        compression/input_path.cc
@@ -1214,6 +1221,7 @@ if (BUILD_PRELOADER)
                   compression/compression.cc
                   compression/compressor_echo.cc
                   compression/compressor_zlib.cc
+                  compression/input_cache.cc
                   compression/input_file.cc
                   compression/input_mem.cc
                   compression/input_path.cc
