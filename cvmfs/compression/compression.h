@@ -62,7 +62,7 @@ enum Algorithms {
  */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  public:
-  explicit Compressor(const Algorithms & /* alg */) { }
+  explicit Compressor(const Algorithms & /* alg */) : kZChunk(16384) { }
   virtual ~Compressor() { }
   /**
    * Deflate function.  The arguments and returns closely match the input and
@@ -98,7 +98,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   static void RegisterPlugins();
 
  protected:
-  const unsigned kZChunk = 16384;
+  const unsigned kZChunk;
 };
 
 

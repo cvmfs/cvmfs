@@ -23,6 +23,7 @@ class InputAbstract {
   virtual ~InputAbstract() { }
   virtual bool NextChunk() = 0;
   virtual bool IsValid() = 0;
+  virtual bool Reset() = 0;
 
   virtual bool has_chunk_left() const { return has_chunk_left_;  }
   virtual size_t max_chunk_size() const { return max_chunk_size_; }
