@@ -46,7 +46,7 @@ bool EchoCompressor::CompressStream(
   unsigned char **inbuf, size_t *inbufsize,
   unsigned char **outbuf, size_t *outbufsize)
 {
-  size_t bytes_to_copy = min(*outbufsize, *inbufsize);
+  const size_t bytes_to_copy = min(*outbufsize, *inbufsize);
   memcpy(*outbuf, *inbuf, bytes_to_copy);
   const bool done = (bytes_to_copy == *inbufsize);
 
@@ -69,8 +69,8 @@ StreamStates EchoCompressor::CompressStream(InputAbstract *input,
       return kStreamIOError;
     }
 
-    size_t have = input->chunk_size();
-    int64_t written = output->Write(input->chunk(), have);
+    const size_t have = input->chunk_size();
+    const int64_t written = output->Write(input->chunk(), have);
 
     if (written != static_cast<int64_t>(have)) {
       is_healthy_ = false;
@@ -99,8 +99,8 @@ StreamStates EchoCompressor::CompressStream(InputAbstract *input,
       return kStreamIOError;
     }
 
-    size_t have = input->chunk_size();
-    int64_t written = output->Write(input->chunk(), have);
+    const size_t have = input->chunk_size();
+    const int64_t written = output->Write(input->chunk(), have);
 
     if (written != static_cast<int64_t>(have)) {
       is_healthy_ = false;

@@ -87,7 +87,7 @@ bool ZlibCompressor::CompressStream(const bool flush,
 
 
 ZlibCompressor::~ZlibCompressor() {
-  int retcode = deflateEnd(&stream_);
+  const int retcode = deflateEnd(&stream_);
   assert(retcode == Z_OK);
 }
 
@@ -129,8 +129,8 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamDataError;
       }
-      size_t have = kZChunk - stream_.avail_out;
-      int64_t written = output->Write(out, have);
+      const size_t have = kZChunk - stream_.avail_out;
+      const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
         deflateEnd(&stream_);
@@ -190,8 +190,8 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
         is_healthy_ = false;
         return kStreamDataError;
       }
-      size_t have = kZChunk - stream_.avail_out;
-      int64_t written = output->Write(out, have);
+      const size_t have = kZChunk - stream_.avail_out;
+      const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
         deflateEnd(&stream_);

@@ -35,7 +35,7 @@ class NullSink : public Sink {
    * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
-  virtual int64_t Write(const void *buf, uint64_t sz)
+  virtual int64_t Write(const void */*buf*/, uint64_t sz)
                       { dropped_bytes_ += sz; return static_cast<int64_t>(sz); }
 
   /**
