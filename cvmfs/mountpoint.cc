@@ -1877,6 +1877,8 @@ MountPoint::MountPoint(
   , fixed_catalog_(false)
   , enforce_acls_(false)
   , cache_symlinks_(false)
+  , cache_bypass_(false)
+  , max_retry_time_(0)
   , fuse_expire_entry_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
@@ -2034,8 +2036,20 @@ bool MountPoint::SetupBehavior() {
   {
     cache_symlinks_ = true;
   }
+  if (options_mgr_->GetValue("CVMFS_CACHE_BYPASS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    cache_bypass_ = true;
+  }
 
-
+  unsigned max_retry_time = kDefaultMaxTime;
+  if (options_mgr_->GetValue("CVMFS_MAX_RETRY_TIME", &optarg))
+  {
+    max_retry_time = String2Uint64(optarg);
+  }
+  max_retry_time_ = max_retry_time;
+  download_mgr_->SetMaxRetryTime(max_retry_time);
+  external_download_mgr_->SetMaxRetryTime(max_retry_time);
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
     talk_socket_path_ = optarg;

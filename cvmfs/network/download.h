@@ -205,6 +205,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+  void SetMaxRetryTime(const unsigned max_retry_time);
   void SetMaxIpaddrPerProxy(unsigned limit);
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
@@ -217,6 +218,17 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+
+  std::string GetNextExternalProxy(const std::string &url,
+                                   const std::string &current_proxy,
+                                   size_t off);
+  std::string GetHost();
+  CURLM *GetCurlShare() { return curl_share_; }
+  std::string EscapeUrl(const std::string &url);
+  const std::vector<std::string> GetHttpTracingHeader() const { return http_tracing_headers_; }
+  perf::Counter *n_proxy_failover() { return counters_->n_proxy_failover; }
+  unsigned int GetMaxRetries() { return opt_max_retries_; }
+
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -271,6 +283,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   std::set<CURL *> *pool_handles_inuse_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
+  CURLSH *curl_share_;
+  pthread_mutex_t curl_share_locks_[CURL_LOCK_DATA_LAST];
   HeaderLists *header_lists_;
   curl_slist *default_headers_;
   char *user_agent_;
@@ -292,6 +306,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   unsigned opt_timeout_direct_;
   unsigned opt_low_speed_limit_;
   unsigned opt_max_retries_;
+  unsigned opt_max_retry_time_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;
   bool enable_info_header_;

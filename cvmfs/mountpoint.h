@@ -517,6 +517,8 @@ class MountPoint : SingleCopy, public BootFactory {
   bool has_membership_req() { return has_membership_req_; }
   bool enforce_acls() { return enforce_acls_; }
   bool cache_symlinks() { return cache_symlinks_; }
+  bool cache_bypass() { return cache_bypass_; }
+  uint64_t max_retry_time() { return max_retry_time_; }
   bool fuse_expire_entry() { return fuse_expire_entry_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
@@ -582,6 +584,8 @@ class MountPoint : SingleCopy, public BootFactory {
   static const unsigned kDefaultRetries = 1;
   static const unsigned kDefaultBackoffInitMs = 2000;
   static const unsigned kDefaultBackoffMaxMs = 10000;
+  static const unsigned kDefaultMaxTime = 10800;
+  
   /**
    * Memory buffer sizes for an activated tracer
    */
@@ -663,6 +667,8 @@ class MountPoint : SingleCopy, public BootFactory {
   bool fixed_catalog_;
   bool enforce_acls_;
   bool cache_symlinks_;
+  bool cache_bypass_;
+  uint64_t max_retry_time_;
   bool fuse_expire_entry_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;

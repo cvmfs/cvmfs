@@ -1090,6 +1090,17 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     }
   }  // end !sharding
 
+  // Patch: limit the retry forever
+  /*
+  if (sharding_policy_.IsValid() && try_again && opt_max_retry_time_ > 0) {
+    uint64_t end_time = platform_monotonic_time();
+    if (info->num_retries() > 0 &&
+        end_time - info->start_time() > opt_max_retry_time_) {
+      try_again = false;
+    }
+  }
+  */
+
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
   if (info->proxy() != "DIRECT") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
@@ -1724,9 +1735,25 @@ DownloadManager::~DownloadManager() {
   // old destructor
   pthread_mutex_destroy(lock_options_);
   pthread_mutex_destroy(lock_synchronous_mode_);
+  for (size_t i = 0; i < CURL_LOCK_DATA_LAST; i++) {
+    pthread_mutex_destroy(&curl_share_locks_[i]);
+  }
   free(lock_options_);
   free(lock_synchronous_mode_);
 }
+
+static void curl_share_lock_cb(CURL *handle, curl_lock_data data,
+                    curl_lock_access access, void *userptr) {
+  pthread_mutex_t *locks = static_cast<pthread_mutex_t*>(userptr);
+  pthread_mutex_lock(&locks[data]);
+}
+
+static void curl_share_unlock_cb(CURL *handle, curl_lock_data data, void *userptr) {
+  pthread_mutex_t *locks = static_cast<pthread_mutex_t*>(userptr);
+  pthread_mutex_unlock(&locks[data]);
+}
+
+
 
 void DownloadManager::InitHeaders() {
   // User-Agent
@@ -1767,6 +1794,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_timeout_direct_(10),
                   opt_low_speed_limit_(1024),
                   opt_max_retries_(0),
+		  opt_max_retry_time_(0),
                   opt_backoff_init_ms_(0),
                   opt_backoff_max_ms_(0),
                   enable_info_header_(false),
@@ -1804,6 +1832,11 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
           reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
+    for (size_t i = 0; i < CURL_LOCK_DATA_LAST; i++) {
+    retval = pthread_mutex_init(&curl_share_locks_[i], NULL);
+    assert(retval == 0);
+  }
+
 
   retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -1818,6 +1851,16 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
+
+  curl_share_ = curl_share_init();
+  assert(curl_share_ != NULL);
+  assert(curl_share_setopt(curl_share_, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS) == CURLSHE_OK);
+  assert(curl_share_setopt(curl_share_, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT) == CURLSHE_OK);
+  assert(curl_share_setopt(curl_share_, CURLSHOPT_LOCKFUNC, curl_share_lock_cb) == CURLSHE_OK);
+  assert(curl_share_setopt(curl_share_, CURLSHOPT_UNLOCKFUNC, curl_share_unlock_cb) == CURLSHE_OK);
+  assert(curl_share_setopt(curl_share_, CURLSHOPT_USERDATA,
+                           static_cast<void *>(curl_share_locks_)) == CURLSHE_OK);
+
 
   prng_.InitLocaltime();
 
@@ -2927,6 +2970,12 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
   opt_backoff_max_ms_ = backoff_max_ms;
 }
 
+void DownloadManager::SetMaxRetryTime(const unsigned max_retry_time)
+{
+  MutexLockGuard m(lock_options_);
+  opt_max_retry_time_ = max_retry_time;
+}
+
 
 void DownloadManager::SetMaxIpaddrPerProxy(unsigned limit) {
   MutexLockGuard m(lock_options_);
@@ -3004,6 +3053,7 @@ DownloadManager *DownloadManager::Clone(
   clone->opt_timeout_direct_ = opt_timeout_direct_;
   clone->opt_low_speed_limit_ = opt_low_speed_limit_;
   clone->opt_max_retries_ = opt_max_retries_;
+  clone->opt_max_retry_time_ = opt_max_retry_time_;
   clone->opt_backoff_init_ms_ = opt_backoff_init_ms_;
   clone->opt_backoff_max_ms_ = opt_backoff_max_ms_;
   clone->enable_info_header_ = enable_info_header_;

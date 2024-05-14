@@ -202,6 +202,292 @@ struct FuseState {
 };
 
 
+static bool GetPathForInode(const fuse_ino_t ino, PathString *path);
+
+struct proxy_response {
+  char *buffer;
+  size_t size;
+  size_t bytes;
+  size_t calls;
+  int error;
+};
+
+// Make sure the start(inclusize)-end(inclusive) stays within a boundry. Return the end.
+static size_t range_limit(size_t start, size_t end, size_t boundry) {
+  if (boundry == 0) {
+    return end;
+  }
+
+  size_t end_max = start + boundry;
+  end_max = (end_max / boundry) * boundry;
+
+  if (end >= end_max) {
+    end = end_max - 1;
+  }
+
+  return end;
+}
+
+static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+  struct proxy_response *response = static_cast<struct proxy_response*>(userdata);
+
+  if (response->error) {
+    return 0;
+  }
+
+  // libcurl says size is always 1
+  if (size != 1) {
+    nmemb *= size;
+  }
+
+  if (nmemb > response->size - response->bytes) {
+    response->error = 1;
+    return 0;
+  }
+
+  memcpy(response->buffer + response->bytes, ptr, nmemb);
+  response->bytes += nmemb;
+  response->calls++;
+  assert(response->bytes <= response->size);
+
+  return nmemb;
+}
+
+
+static void cvmfs_read_bypass(fuse_req_t req, fuse_ino_t ino, size_t size, off_t offs,
+                              struct fuse_file_info *fi, catalog::DirectoryEntry &dirent)
+{
+	  // Check bounds
+  if (offs < 0 || (size_t)offs >= dirent.size() || size == 0) {
+    fuse_reply_buf(req, NULL, 0);
+    return;
+  }
+  if (offs + size > dirent.size()) {
+    size = dirent.size() - offs;
+  }
+
+  // Ranges are inclusive
+  size_t off = (size_t)offs;
+  size_t off_max = off + size - 1;
+  constexpr size_t off_boundry = 24 * 1024 * 1024;
+  unsigned int off_tries = 0;
+
+  PathString path;
+  bool path_found = GetPathForInode(ino, &path);
+  if(!path_found) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_bypass(%lu) path not found", ino);
+    fuse_reply_err(req, EIO);
+    perf::Inc(file_system_->n_eio_total());
+    return;
+  }
+
+  // TODO eventially we want to move to a zero-copy read via the fuse splice API
+
+  struct proxy_response response;
+  memset(&response, 0, sizeof(response));
+  response.size = size;
+  response.buffer = (char*)smalloc(response.size);
+  if (!response.buffer) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_proxy(%s) malloc failed", path.ToString().c_str());
+    fuse_reply_err(req, EIO);
+    perf::Inc(file_system_->n_eio_total());
+    return;
+  }
+
+  download::DownloadManager *mgr = mount_point_->external_download_mgr();
+  string url = mgr->GetHost() + path.ToString();
+  string proxy = mgr->GetNextExternalProxy(path.ToString(), "", off);
+
+  CURL *curl = curl_easy_init();
+  CURLSH *curl_share = mgr->GetCurlShare();
+
+  if (!curl) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_proxy(%s) curl_easy_init failed", path.ToString().c_str());
+    fuse_reply_err(req, EIO);
+    perf::Inc(file_system_->n_eio_total());
+    return;
+  }
+
+  unsigned proxy_timeout, direct_timeout;
+    mgr->GetTimeout(&proxy_timeout, &direct_timeout);
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, proxy_timeout);
+
+  if (curl_easy_setopt(curl, CURLOPT_SHARE, curl_share) != CURLE_OK) {
+    LogCvmfs(kLogCvmfs, kLogSyslogWarn, "cvmfs_read_bypass(%s) CURLOPT_SHARE failed", path.ToString().c_str());
+  }
+
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "cvmfs Fuse " VERSION " bypass");
+  curl_easy_setopt(curl, CURLOPT_MAXCONNECTS, 500);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1);
+  curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+  curl_easy_setopt(curl, CURLOPT_URL, mgr->EscapeUrl(url).c_str());
+
+  // Tracing headers
+  char hbuf[256];
+  struct curl_slist *slist = NULL;
+
+  string path_escaped = mgr->EscapeUrl(path.ToString());
+  snprintf(hbuf, sizeof(hbuf), "cvmfs-info: %s", path_escaped.c_str());
+  slist = curl_slist_append(slist, hbuf);
+
+  uid_t uid;
+  gid_t gid;
+  pid_t pid;
+  InterruptCue *ic;
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  ctx->Get(&uid, &gid, &pid, &ic);
+  snprintf(hbuf, sizeof(hbuf), "X-CVMFS-UID: %u", uid);
+  slist = curl_slist_append(slist, hbuf);
+  snprintf(hbuf, sizeof(hbuf), "X-CVMFS-GID: %u", gid);
+  slist = curl_slist_append(slist, hbuf);
+  snprintf(hbuf, sizeof(hbuf), "X-CVMFS-PID: %d", pid);
+  slist = curl_slist_append(slist, hbuf);
+
+  const std::vector<std::string> tracing_headers = mgr->GetHttpTracingHeader();
+  for (size_t i = 0; i < tracing_headers.size(); i++) {
+    slist = curl_slist_append(slist, tracing_headers[i].c_str());
+  }
+
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
+
+  // Max retry time in seconds, defaults to 3 hours
+  uint64_t tstart = platform_monotonic_time();
+  uint64_t tmax = mount_point_->max_retry_time();
+
+  char range_buf[100];
+  bool done = false, retry, error = false;
+  unsigned int retries = 0;
+  unsigned int max_retries = mgr->GetMaxRetries();
+  long response_code = -1;
+  while (!done && !error) {
+    // Make sure we stay within a boundry
+    size_t off_end = range_limit(off, off_max, off_boundry);
+    snprintf(range_buf, sizeof(range_buf), "%zu-%zu", off, off_end);
+    curl_easy_setopt(curl, CURLOPT_RANGE, range_buf);
+
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_bypass(%s, %zu, %zu/%zu) proxy: %s",
+      path.ToString().c_str(), off, off_end - off + 1, size, proxy.c_str());
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+
+    off_tries++;
+    retry = false;
+
+    // These curl error codes are retried (see download.cc)
+    switch (res) {
+      case CURLE_COULDNT_RESOLVE_PROXY:
+      case CURLE_COULDNT_RESOLVE_HOST:
+      case CURLE_OPERATION_TIMEDOUT:
+      case CURLE_PARTIAL_FILE:
+      case CURLE_GOT_NOTHING:
+      case CURLE_RECV_ERROR:
+      case CURLE_COULDNT_CONNECT:
+        retry = true;
+        break;
+      case CURLE_WRITE_ERROR:
+        error = true;
+        break;
+      default:
+        break;
+    }
+
+    // All HTTP errors are marked for retry
+    if (response_code >= 400) {
+      retry = true;
+    }
+
+    // Do not retry these errors
+    if (response_code == 404 || response.error) {
+      error = true;
+    }
+
+    // We reached the end
+    if (response_code == 416) {
+      done = true;
+    }
+
+    // Too many retries
+    if (retries > max_retries) {
+      done = true;
+    }
+    uint64_t tend = platform_monotonic_time();
+    if (retries > 0 && tend - tstart > tmax) {
+      done = true;
+    }
+
+    if (done || error) {
+      break;
+    }
+
+    if (retry) {
+      proxy = mgr->GetNextExternalProxy(path.ToString(), proxy, off);
+      curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+
+      LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_bypass(%s) curl error (%d, %d) new proxy: %s",
+        path.ToString().c_str(), res, response_code, proxy.c_str());
+
+      perf::Inc(mgr->n_proxy_failover());
+
+      retries++;
+      if (retries > 10) {
+        SafeSleepMs(2000);
+      } else if (retries > 3) {
+        SafeSleepMs(250);
+      }
+    } else {
+      off = off_end + 1;
+      if (off <= off_max) {
+        // Still more left
+        off_end = range_limit(off, off_max, off_boundry);
+        snprintf(range_buf, sizeof(range_buf), "%zu-%zu", off, off_end);
+        curl_easy_setopt(curl, CURLOPT_RANGE, range_buf);
+
+        proxy = mgr->GetNextExternalProxy(path.ToString(), "", off);
+        curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+      } else {
+        done = true;
+      }
+    }
+  }
+
+  curl_slist_free_all(slist);
+  curl_easy_cleanup(curl);
+
+  // Not enough bytes
+  if (response.bytes < size) {
+    error = true;
+  }
+
+  int response_error = 1;
+  if (!error && !response.error) {
+    response_error = fuse_reply_buf(req, response.buffer, response.bytes);
+  }
+  if (response_error) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_bypass(%s) fuse_reply_buf error %d",
+      path.ToString().c_str(), response_error);
+    fuse_reply_err(req, EIO);
+    perf::Inc(file_system_->n_eio_total());
+
+    free(response.buffer);
+    response.buffer = NULL;
+
+    return;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_read_bypass(%s) %d response, %zu bytes in %zu calls %u boundries %u retries",
+    path.ToString().c_str(), response_code, response.bytes, response.calls, off_tries, retries);
+
+  free(response.buffer);
+  response.buffer = NULL;
+
+  return;
+}
+
+
 /**
  * Atomic increase of the open files counter. If we use a non-refcounted
  * POSIX cache manager, check for open fd overflow.  Return false if too many
@@ -1370,6 +1656,21 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     return;
   }
 #endif
+
+  // Patch: short circuit zero length files
+  catalog::DirectoryEntry dirent;
+  bool dirent_found = GetDirentForInode(ino, &dirent);
+  if (dirent_found && dirent.size() == 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "short circuiting zero length file");
+    fuse_reply_buf(req, NULL, 0);
+    return;
+  }
+
+  // Patch: cache bypass read
+  if (dirent_found && dirent.IsExternalFile() && mount_point_->cache_bypass()) {
+    cvmfs_read_bypass(req, ino, size, off, fi, dirent);
+    return;
+  }
 
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
