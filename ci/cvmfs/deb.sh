@@ -63,6 +63,7 @@ if [ x"$(lsb_release -sc)" = x"bullseye" -o \
      x"$(lsb_release -sc)" = x"buster" -o \
      x"$(lsb_release -sc)" = x"bookworm" -o \
      x"$(lsb_release -sc)" = x"focal" -o \
+     x"$(lsb_release -sc)" = x"noble" -o \
      x"$(lsb_release -sc)" = x"jammy" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
   sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
