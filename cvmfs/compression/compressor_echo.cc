@@ -42,7 +42,7 @@ Compressor* EchoCompressor::Clone() {
 
 
 bool EchoCompressor::CompressStream(
-  const bool flush,
+  const bool /*flush*/,
   unsigned char **inbuf, size_t *inbufsize,
   unsigned char **outbuf, size_t *outbufsize)
 {
