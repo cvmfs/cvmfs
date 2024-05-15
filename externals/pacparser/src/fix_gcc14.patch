@@ -1,19 +1,14 @@
 --- src/spidermonkey/js/src/jsapi.c.orig	2024-05-15 14:01:45.398981462 +0200
-+++ src/spidermonkey/js/src/jsapi.c	2024-05-15 14:01:37.356888195 +0200
-@@ -90,11 +90,17 @@
- #include "jsiter.h"
- #endif
- 
-+#ifdef __GNUC__
-+#if __GNUC__ > 13
-+#define JS_ADDRESSOF_VA_LIST(ap) ((va_list *)(ap))
-+#endif
-+#else
- #ifdef HAVE_VA_LIST_AS_ARRAY
- #define JS_ADDRESSOF_VA_LIST(ap) ((va_list *)(ap))
++++ src/spidermonkey/js/src/jsapi.c	2024-05-15 14:33:53.037555914 +0200
+@@ -95,6 +95,12 @@
  #else
  #define JS_ADDRESSOF_VA_LIST(ap) (&(ap))
  #endif
++#ifdef __GNUC__
++#if __GNUC__ > 13
++#undef JS_ADDRESSOF_VA_LIST(ap)
++#define JS_ADDRESSOF_VA_LIST(ap) ((va_list *)(ap))
++#endif
 +#endif
  
  #if defined(JS_PARANOID_REQUEST) && defined(JS_THREADSAFE)
