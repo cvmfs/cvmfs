@@ -12,6 +12,10 @@ InputMem::InputMem(const unsigned char *src, const size_t src_size) :
                                   src_(src), src_size_(src_size) {
   idx_ = -1;
   has_chunk_left_ = true;
+
+  if (src_ == NULL) {
+    src_size = 0;
+  }
 }
 
 InputMem::InputMem(const unsigned char* src, const size_t src_size,
@@ -20,6 +24,10 @@ InputMem::InputMem(const unsigned char* src, const size_t src_size,
                                   src_(src), src_size_(src_size) {
   idx_ = -1;
   has_chunk_left_ = true;
+
+  if (src_ == NULL) {
+    src_size = 0;
+  }
 }
 
 InputMem::~InputMem() {
