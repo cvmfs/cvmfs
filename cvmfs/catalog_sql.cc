@@ -222,6 +222,14 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
       return false;
     }
 
+    SqlCatalog sql_upgrade2(*this, "ALTER TABLE bind_mountpoints "
+                                  "ADD algorithm INTEGER;");
+    if (!sql_upgrade2.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade bind_mountpoints "
+                                       "to revision 2.7");
+      return false;
+    }
+
     set_schema_revision(7);
     if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision "
@@ -258,7 +266,8 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
-    "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
+    "algorithm INTEGER, CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")
+                                                                  .Execute()  &&
   // Bind mountpoints and nested catalogs are almost the same. We put them in
   // separate tables to
   //   - not confuse previous client versions, which would crash on bind
@@ -268,7 +277,8 @@ bool CatalogDatabase::CreateEmptyDatabase() {
   //   - don't walk into bind mountpoints in catalog traversal (e.g. GC)
   SqlCatalog(*this,
     "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
-    "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&
+    "algorithm INTEGER, CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")
+                                                                  .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
@@ -968,7 +978,7 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
     "SELECT '', '', 0, 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_7 =
     "SELECT path, sha1, size, algorithm FROM nested_catalogs "
-    "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
+    "UNION ALL SELECT path, sha1, size, algorithm FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_4 =
     "SELECT path, sha1, size, 0 FROM nested_catalogs "
     "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";

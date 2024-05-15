@@ -502,17 +502,20 @@ void WritableCatalog::MoveFileChunksToNested(
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
                                           const shash::Any content_hash,
-                                          const uint64_t size)
+                                          const uint64_t size,
+                                          const zlib::Algorithms algorithm)
 {
   const string hash_string = (!content_hash.IsNull()) ?
                              content_hash.ToString() : "";
 
-  SqlCatalog stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
-                              "VALUES (:p, :sha1, :size);");
+  SqlCatalog stmt(database(),
+                    "INSERT INTO nested_catalogs (path, sha1, size, algorithm) "
+                    "VALUES (:p, :sha1, :size, :algorithm);");
   bool retval =
     stmt.BindText(1, mountpoint) &&
     stmt.BindText(2, hash_string) &&
     stmt.BindInt64(3, size) &&
+    stmt.BindInt64(4, algorithm) &&
     stmt.Execute();
   assert(retval);
 
@@ -532,18 +535,18 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
  * not universally handled: in Partition and MergeIntoParent, bind mountpoint
  * handling is missing!
  */
-void WritableCatalog::InsertBindMountpoint(
-  const string &mountpoint,
-  const shash::Any content_hash,
-  const uint64_t size)
-{
+void WritableCatalog::InsertBindMountpoint(const string &mountpoint,
+                                           const shash::Any content_hash,
+                                           const uint64_t size,
+                                           const zlib::Algorithms algorithm) {
   SqlCatalog stmt(database(),
-     "INSERT INTO bind_mountpoints (path, sha1, size) "
-     "VALUES (:p, :sha1, :size);");
+     "INSERT INTO bind_mountpoints (path, sha1, size, algorithm) "
+     "VALUES (:p, :sha1, :size, :algorithm);");
   bool retval =
      stmt.BindText(1, mountpoint) &&
      stmt.BindText(2, content_hash.ToString()) &&
      stmt.BindInt64(3, size) &&
+     stmt.BindInt64(4, algorithm) &&
      stmt.Execute();
   assert(retval);
 }
@@ -620,7 +623,8 @@ void WritableCatalog::RemoveBindMountpoint(const std::string &mountpoint) {
 void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
                                           const shash::Any    &hash,
                                           const uint64_t       size,
-                                          const DeltaCounters &child_counters) {
+                                          const DeltaCounters &child_counters,
+                                          const zlib::Algorithms algorithm ) {
   MutexLockGuard guard(lock_);
   SetDirty();
 
@@ -628,13 +632,14 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
 
   const string hash_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size  "
-                     "WHERE path = :path;";
+                     "algorithm = :algorithm WHERE path = :path;";
   SqlCatalog stmt(database(), sql);
 
   bool retval =
     stmt.BindText(1, hash_str) &&
     stmt.BindInt64(2, size) &&
-    stmt.BindText(3, path) &&
+    stmt.BindInt64(3, algorithm) &&
+    stmt.BindText(4, path) &&
     stmt.Execute();
 
   ResetNestedCatalogCacheUnprotected();
