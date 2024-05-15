@@ -17,6 +17,10 @@
 
 namespace zlib {
 
+/**
+ * EchoCompressor is a compressor that just plainly copies data (like 'echo').
+ * It that does not do any kind of compression.
+ */
 class EchoCompressor: public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);

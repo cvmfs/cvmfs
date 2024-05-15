@@ -17,6 +17,9 @@
 
 namespace zlib {
 
+/**
+ * Zlib wrapper for compression.
+ */
 class ZlibCompressor: public Compressor {
  public:
   explicit ZlibCompressor(const Algorithms &alg);
@@ -39,7 +42,7 @@ class ZlibCompressor: public Compressor {
 
  private:
   z_stream stream_;
-  bool is_healthy_;
+  bool is_healthy_;  // ZStream is healthy
 };
 
 }  // namespace zlib
