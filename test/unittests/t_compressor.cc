@@ -383,7 +383,7 @@ TEST_F(T_Compressor, CompressionLong) {
 
   EXPECT_GT(rounds, 1U);
   EXPECT_GT(compress_pos, 0U);
-  ASSERT_EQ(0U, remaining);
+  EXPECT_EQ(0U, remaining);
 
   // Decompress it, check if it's still the same
   char *decompress_buf;

@@ -12,7 +12,7 @@ namespace zlib {
 InputCache::InputCache(CacheManager *mgr, const int fd, const size_t buf_size) :
                                               InputAbstract(true, buf_size),
                                               mgr_(mgr), fd_(fd) {
-  if (IsValid()) {
+  if (InputCache::IsValid()) {
     has_chunk_left_ = true;
     idx_ = 0;
     chunk_ = static_cast<unsigned char*>(smalloc(max_chunk_size_));
@@ -22,7 +22,7 @@ InputCache::InputCache(CacheManager *mgr, const int fd, const size_t buf_size) :
 }
 
 InputCache::~InputCache() {
-  if (IsValid()) {
+  if (InputCache::IsValid()) {
     free(chunk_);
   }
 }
