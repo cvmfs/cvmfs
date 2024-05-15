@@ -79,6 +79,11 @@ if [ x"$(lsb_release -sc)" = x"bookworm" ]; then
   sed -i -e "s/python-dev/python3-dev/g" debian/control
   sed -i -e "s/python-setuptools/python3-setuptools/g" debian/control
 fi
+# Depend on python3-* instead of python-* on Ubuntu 24.04
+if [ x"$(lsb_release -sc)" = x"noble" ]; then
+  sed -i -e "s/python-dev/python3-dev/g" debian/control
+  sed -i -e "s/python-setuptools/python3-setuptools/g" debian/control
+fi
 # The cvmfs-gateway requires a go compiler
 if ! go version >/dev/null 2>&1; then
   cat debian/control | awk '/#GATEWAY-BEGIN/{flag=1;next}/#GATEWAY-END/{flag=0;next}!flag' > debian/control.tmp
