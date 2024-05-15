@@ -181,6 +181,7 @@ build_lib() {
       patch_external "pacparser" "fix_cflags.patch"
       patch_external "pacparser" "fix_c99.patch"
       patch_external "pacparser" "fix_git_dependency.patch"
+      patch_external "pacparser" "fix_python_setuptools.patch"
       do_build "pacparser"
       ;;
     zlib)
