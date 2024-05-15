@@ -9,13 +9,37 @@
 
 namespace zlib {
 
+/**
+ * Read-only data source: allows chunked reading of a file given by a FILE*
+ */
 class InputFile : public InputAbstract {
  public:
   InputFile(const FILE* src, const size_t max_chunk_size,
             const bool is_owner = false);
   virtual ~InputFile();
+
+  /**
+   * Does all necessary processing to get the next chunk, so that chunk() and
+   * chunk_size() are in valid states.
+   *
+   * @note empty data sources should also be correctly supported with returning
+   *       for the very first call of NextChunk() true, setting chunk_size = 0,
+   *       and it is ok if chunk() is returning NULL.
+   *
+   * @returns true on success
+   *          false otherwise
+   */
   virtual bool NextChunk();
+  /**
+   * Data source is a valid source
+   */
   virtual bool IsValid();
+  /**
+   * Resets the reading progress of the source, the next call to NextChunk()
+   * will start reading from the beginning.
+   *
+   * @note Reset does not work for empty sources.
+   */
   virtual bool Reset();
 
  private:
