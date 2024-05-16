@@ -631,7 +631,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
   child_counters.PopulateToParent(&delta_counters_);
 
   const string hash_str = hash.ToString();
-  const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size  "
+  const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size,  "
                      "algorithm = :algorithm WHERE path = :path;";
   SqlCatalog stmt(database(), sql);
 
