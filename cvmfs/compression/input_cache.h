@@ -43,10 +43,8 @@ class InputCache : public InputAbstract {
    */
   virtual bool IsValid();
   /**
-   * Resets the reading progress of the source, the next call to NextChunk()
+   * Resets the reading progress of a valid source. The next call to NextChunk()
    * will start reading from the beginning.
-   *
-   * @note Reset does not work for empty sources.
    */
   virtual bool Reset();
 

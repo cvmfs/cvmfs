@@ -40,8 +40,6 @@ class InputMem : public InputAbstract {
   /**
    * Resets the reading progress of the source, the next call to NextChunk()
    * will start reading from the beginning.
-   *
-   * @note Reset does not work for empty sources.
    */
   virtual bool Reset();
 
