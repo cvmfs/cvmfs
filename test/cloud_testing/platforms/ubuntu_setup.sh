@@ -73,7 +73,11 @@ install_deb $GATEWAY_PACKAGE
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
 install_from_repo apache2                || die "fail (installing apache2)"
-install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+if [ "x$ubuntu_release" != "xnoble" ]; then
+  install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+else
+  install_from_repo libapache2-mod-wsgi-py3    || die "fail (installing libapache2-mod-wsgi-py3)"
+fi
 install_from_repo default-jre            || die "fail (installing default-jre)"
 install_from_repo apache2                || die "fail (installing apache2)"
 sudo service apache2 restart > /dev/null || die "fail (restarting apache)"
