@@ -10,11 +10,9 @@ namespace zlib {
 InputMem::InputMem(const unsigned char *src, const size_t src_size) :
                                   InputAbstract(false, 16384),
                                   src_(src), src_size_(src_size) {
-  idx_ = -1;
-  has_chunk_left_ = true;
-
-  if (src_ == NULL) {
-    src_size = 0;
+  if (InputMem::IsValid()) {
+    idx_ = -1;
+    has_chunk_left_ = true;
   }
 }
 
@@ -22,11 +20,9 @@ InputMem::InputMem(const unsigned char* src, const size_t src_size,
                    size_t max_chunk_size, bool is_owner) :
                                   InputAbstract(is_owner, max_chunk_size),
                                   src_(src), src_size_(src_size) {
-  idx_ = -1;
-  has_chunk_left_ = true;
-
-  if (src_ == NULL) {
-    src_size = 0;
+  if (InputMem::IsValid()) {
+    idx_ = -1;
+    has_chunk_left_ = true;
   }
 }
 
@@ -63,10 +59,9 @@ bool InputMem::NextChunk() {
 }
 
 bool InputMem::IsValid() {
-  return src_ != NULL;
+  return src_ != NULL || (src_ == NULL && src_size_ == 0);
 }
 
-// TODO(heretherebedragons) should we support Reset() for NULL buffers?
 bool InputMem::Reset() {
   if (IsValid()) {
     idx_ = -1ul;

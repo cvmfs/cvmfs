@@ -44,7 +44,7 @@ bool InputCache::NextChunk() {
 }
 
 bool InputCache::IsValid() {
-  return fd_ >= 0;
+  return fd_ >= 0 && mgr_ != NULL;
 }
 
 bool InputCache::Reset() {
