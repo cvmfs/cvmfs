@@ -82,8 +82,7 @@ if [ x"$(lsb_release -sc)" = x"bookworm" ]; then
 fi
 # Depend on python3-* instead of python-* on Ubuntu 24.04
 if [ x"$(lsb_release -sc)" = x"noble" ]; then
-  sed -i -e "s/python-dev/python3-dev/g" debian/control
-  sed -i -e "s/python-setuptools/python3-setuptools/g" debian/control
+  sed -i -e "s/python/python3/g" debian/control
 fi
 # The cvmfs-gateway requires a go compiler
 if ! go version >/dev/null 2>&1; then

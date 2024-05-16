@@ -108,7 +108,6 @@ install_from_repo trickle || die "fail (installing trickle)"
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
-install_from_repo python-dev   || die "fail (installing python-dev)"
 install_from_repo python3-dev   || die "fail (installing python3-dev)"
 install_from_repo python3-setuptools || die "fail (installing python3-setuptools)"
 
@@ -116,7 +115,12 @@ install_from_repo libz-dev     || die "fail (installing libz-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 # make sure the python command is available
 if [ "x$ubuntu_release" = "xfocal" ]; then
+install_from_repo python-dev   || die "fail (installing python-dev)"
 install_from_repo python-is-python2 || "fail (installing python-is-python2)"
+fi
+# make sure the python command is available
+if [ "x$ubuntu_release" = "xbionic" ]; then
+install_from_repo python-dev   || die "fail (installing python-dev)"
 fi
 
 install_from_repo acl || die "fail (installing acl)"
