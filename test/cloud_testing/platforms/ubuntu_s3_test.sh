@@ -24,11 +24,12 @@ CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 # Hardlinks do not work with overlayfs
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
+  # Azurite doesn't install on 16.04 and 24.04, skip it
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
+
 if [ "x$ubuntu_release" = "xxenial" ]; then
   # Ubuntu 16.04 has no fuse-overlayfs
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
-  # Azurite doesn't install on 16.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
 fi
 
 if [ "x$ubuntu_release" = "xbionic" ]; then
