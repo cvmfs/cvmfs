@@ -10,7 +10,7 @@
 #include <map>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "history.h"
 
