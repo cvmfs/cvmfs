@@ -32,6 +32,8 @@ namespace catalog {
  */
 
 // ChangeLog
+// In most cases: DO NOT ADD A NEW VERSION HERE!
+//                INSTEAD CHANGE kLatestSchemaRevision BELOW
 // 2.5 (Jun 26 2013 - Git: e79baec22c6abd6ddcdf8f8d7d33921027a052ab)
 //     * add (backward compatible) schema revision - see below
 //     * add statistics counters for chunked files
@@ -78,7 +80,17 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //   5 --> 6: (Jul 01 2021):
 //            * Add kFlagDirectIo
 //   6 --> 7: (Apr 2024):
-//            * add (compression) algorithm column to nested_catalogs table
+//            * add flags column to tables: nested_catalogs & bind_mountpoints
+//              (not designed to be a bit-wise flag)
+//              first usage: keep track of compression algorithm used by catalog
+//              if any new usage is added: range guards will be needed and new
+//              INSERT statements in catalog_rw.cc
+//
+// NOTE FOR ADDING NEW FEATURES:
+// Increase kLatestSchemaRevision. For ideas of how to integrate changes have a
+// look at LiveSchemaUpgradeIfNecessary(), update all SQL statements and add new 
+// Getters (if needed), update t_catalog_sql unittest
+// 
 const unsigned CatalogDatabase::kLatestSchemaRevision = 7;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -215,7 +227,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (6 --> 7)");
 
     SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs "
-                                  "ADD algorithm INTEGER;");
+                                  "ADD flags INTEGER;");
     if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs "
                                        "to revision 2.7");
@@ -223,7 +235,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
 
     SqlCatalog sql_upgrade2(*this, "ALTER TABLE bind_mountpoints "
-                                  "ADD algorithm INTEGER;");
+                                  "ADD flags INTEGER;");
     if (!sql_upgrade2.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade bind_mountpoints "
                                        "to revision 2.7");
@@ -266,7 +278,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
-    "algorithm INTEGER, CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")
+    "flags INTEGER, CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")
                                                                   .Execute()  &&
   // Bind mountpoints and nested catalogs are almost the same. We put them in
   // separate tables to
@@ -277,7 +289,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
   //   - don't walk into bind mountpoints in catalog traversal (e.g. GC)
   SqlCatalog(*this,
     "CREATE TABLE bind_mountpoints (path TEXT, sha1 TEXT, size INTEGER, "
-    "algorithm INTEGER, CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")
+    "flags INTEGER, CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")
                                                                   .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
@@ -911,8 +923,8 @@ SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
   static const char *stmt_0_9 =
     "SELECT '', 0, 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_7 =
-    "SELECT sha1, size, algorithm FROM nested_catalogs WHERE path=:path "
-    "UNION ALL SELECT sha1, size, algorithm "
+    "SELECT sha1, size, flags FROM nested_catalogs WHERE path=:path "
+    "UNION ALL SELECT sha1, size, flags "
     "FROM bind_mountpoints WHERE path=:path;";
   static const char *stmt_2_5_ge_4 =
     "SELECT sha1, size FROM nested_catalogs WHERE path=:path "
@@ -977,8 +989,8 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
   static const char *stmt_0_9 =
     "SELECT '', '', 0, 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_7 =
-    "SELECT path, sha1, size, algorithm FROM nested_catalogs "
-    "UNION ALL SELECT path, sha1, size, algorithm FROM bind_mountpoints;";
+    "SELECT path, sha1, size, flags FROM nested_catalogs "
+    "UNION ALL SELECT path, sha1, size, flags FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_4 =
     "SELECT path, sha1, size, 0 FROM nested_catalogs "
     "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
@@ -1043,7 +1055,7 @@ SqlOwnNestedCatalogListing::SqlOwnNestedCatalogListing(
   static const char *stmt_0_9 =
     "SELECT '', '', 0, 0 FROM nested_catalogs;";
   static const char *stmt_2_5_ge_7 =
-    "SELECT path, sha1, size, algorithm FROM nested_catalogs;";
+    "SELECT path, sha1, size, flags FROM nested_catalogs;";
   static const char *stmt_2_5_ge_1 =
     "SELECT path, sha1, size, 0 FROM nested_catalogs;";
   // Internally converts NULL to 0 for size

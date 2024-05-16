@@ -498,6 +498,7 @@ void WritableCatalog::MoveFileChunksToNested(
  *        object of mountpoint
  * @param content_hash can be set to safe a content hash together with the
  *        reference
+ * @param algorithm the algorithm used to compress the catalog. (default: zlib)
  */
 void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                                           Catalog *attached_reference,
@@ -509,8 +510,8 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
                              content_hash.ToString() : "";
 
   SqlCatalog stmt(database(),
-                    "INSERT INTO nested_catalogs (path, sha1, size, algorithm) "
-                    "VALUES (:p, :sha1, :size, :algorithm);");
+                    "INSERT INTO nested_catalogs (path, sha1, size, flags) "
+                    "VALUES (:p, :sha1, :size, :flags);");
   bool retval =
     stmt.BindText(1, mountpoint) &&
     stmt.BindText(2, hash_string) &&
@@ -540,8 +541,8 @@ void WritableCatalog::InsertBindMountpoint(const string &mountpoint,
                                            const uint64_t size,
                                            const zlib::Algorithms algorithm) {
   SqlCatalog stmt(database(),
-     "INSERT INTO bind_mountpoints (path, sha1, size, algorithm) "
-     "VALUES (:p, :sha1, :size, :algorithm);");
+     "INSERT INTO bind_mountpoints (path, sha1, size, flags) "
+     "VALUES (:p, :sha1, :size, :flags);");
   bool retval =
      stmt.BindText(1, mountpoint) &&
      stmt.BindText(2, content_hash.ToString()) &&
@@ -632,7 +633,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string   &path,
 
   const string hash_str = hash.ToString();
   const string sql = "UPDATE nested_catalogs SET sha1 = :sha1, size = :size,  "
-                     "algorithm = :algorithm WHERE path = :path;";
+                     "flags = :flags WHERE path = :path;";
   SqlCatalog stmt(database(), sql);
 
   bool retval =

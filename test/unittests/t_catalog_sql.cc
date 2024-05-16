@@ -29,7 +29,7 @@ static void RevertToRevision6(catalog::CatalogDatabase *db) {
     if (sql_schema.RetrieveType(0) == SQLITE_TEXT)
       indexes_sql += sql_schema.RetrieveString(0) + "; ";
   }
-  string table_sql_r1 = ReplaceAll(table_sql, "algorithm INTEGER,", "");
+  string table_sql_r1 = ReplaceAll(table_sql, "flags INTEGER,", "");
   ASSERT_NE(table_sql_r1, table_sql);
   table_sql_r1 = ReplaceAll(table_sql_r1, "CREATE TABLE nested_catalogs ",
                             "CREATE TABLE nested_catalogs_r0 ");
@@ -56,7 +56,7 @@ static void RevertToRevision6(catalog::CatalogDatabase *db) {
     if (sql_schema2.RetrieveType(0) == SQLITE_TEXT)
       indexes_sql2 += sql_schema2.RetrieveString(0) + "; ";
   }
-  string table_sql2_r1 = ReplaceAll(table_sql2, "algorithm INTEGER,", "");
+  string table_sql2_r1 = ReplaceAll(table_sql2, "flags INTEGER,", "");
   ASSERT_NE(table_sql2_r1, table_sql2);
   table_sql2_r1 = ReplaceAll(table_sql2_r1, "CREATE TABLE bind_mountpoints ",
                             "CREATE TABLE bind_mountpoints_r0 ");
@@ -251,7 +251,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     ASSERT_TRUE(sql1.FetchRow());
     EXPECT_EQ(0, sql1.RetrieveInt(0));
     sqlite::Sql sql2(db->sqlite_db(),
-                     "SELECT COUNT(algorithm) FROM nested_catalogs");
+                     "SELECT COUNT(flags) FROM nested_catalogs");
     ASSERT_TRUE(sql2.FetchRow());
     EXPECT_EQ(0, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
