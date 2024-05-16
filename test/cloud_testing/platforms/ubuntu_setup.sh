@@ -76,6 +76,7 @@ install_from_repo apache2                || die "fail (installing apache2)"
 if [ "x$ubuntu_release" != "xnoble" ]; then
   install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
 else
+  install_from_repo python-is-python3 || die "fail (installing python-is-python3)"
   install_from_repo libapache2-mod-wsgi-py3    || die "fail (installing libapache2-mod-wsgi-py3)"
 fi
 install_from_repo default-jre            || die "fail (installing default-jre)"
@@ -106,8 +107,6 @@ fi
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
 
-# traffic shaping
-install_from_repo trickle || die "fail (installing trickle)"
 
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
