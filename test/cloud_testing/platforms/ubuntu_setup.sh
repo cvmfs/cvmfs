@@ -155,10 +155,12 @@ fi
 
 disable_systemd_rate_limit
 
+if [ "x$ubuntu_release" != "xnoble" ]; then
 # setting up the AUFS kernel module
-echo -n "loading AUFS kernel module..."
-sudo modprobe aufs || die "fail"
-echo "done"
+  echo -n "loading AUFS kernel module..."
+  sudo modprobe aufs || die "fail"
+  echo "done"
+fi
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
