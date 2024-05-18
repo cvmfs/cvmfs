@@ -23,6 +23,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/056-lowspeedlimit                        \
                                  src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \

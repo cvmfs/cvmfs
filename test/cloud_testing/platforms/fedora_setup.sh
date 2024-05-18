@@ -48,8 +48,6 @@ install_from_repo sqlite
 install_from_repo bzip2
 install_from_repo fuse-overlayfs
 
-# traffic shaping
-install_from_repo trickle
 
 # install build dependencies for `libcvmfs`
 install_from_repo openssl-devel
