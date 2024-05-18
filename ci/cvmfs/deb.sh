@@ -73,7 +73,7 @@ else
 fi
 # Depend on python3-dev instead of python-dev on Ubuntu 22.04
 if [ x"$(lsb_release -sc)" = x"jammy" ]; then
-  sed -i -e "s/python-dev/python3-dev/g" debian/control
+  sed -i -e "s/python/python3/g" debian/control
 fi
 # Depend on python3-* instead of python-* on debian12
 if [ x"$(lsb_release -sc)" = x"bookworm" ]; then
