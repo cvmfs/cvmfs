@@ -155,7 +155,7 @@ fi
 
 disable_systemd_rate_limit
 
-if [ "x$ubuntu_release" != "xnoble" ]; then
+if [ "x$ubuntu_release" == "xfocal" ] || [ "x$ubuntu_release" == "xbionic" ]; then
 # setting up the AUFS kernel module
   echo -n "loading AUFS kernel module..."
   sudo modprobe aufs || die "fail"
