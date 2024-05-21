@@ -1,0 +1,14 @@
+--- src/pymod/setup.py.orig	2024-05-15 11:15:49.697581088 +0200
++++ src/pymod/setup.py	2024-05-15 11:16:09.389770287 +0200
+@@ -123,8 +123,8 @@
+         )
+ 
+ 
+-@patch("setuptools._distutils.cygwinccompiler.get_msvcr")
+-def main(patched_func):
++#@patch("setuptools._distutils.cygwinccompiler.get_msvcr")
++def main():
+     python_home = os.path.dirname(sys.executable)
+ 
+     extra_objects = []
+
