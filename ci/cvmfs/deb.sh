@@ -63,6 +63,7 @@ if [ x"$(lsb_release -sc)" = x"bullseye" -o \
      x"$(lsb_release -sc)" = x"buster" -o \
      x"$(lsb_release -sc)" = x"bookworm" -o \
      x"$(lsb_release -sc)" = x"focal" -o \
+     x"$(lsb_release -sc)" = x"noble" -o \
      x"$(lsb_release -sc)" = x"jammy" ]; then
   sed -i -e "s/^Build-Depends:/Build-Depends: libfuse3-dev,/g" debian/control
   sed -i -e "s/^Recommends:/Recommends: cvmfs-fuse3,/g" debian/control
@@ -72,12 +73,15 @@ else
 fi
 # Depend on python3-dev instead of python-dev on Ubuntu 22.04
 if [ x"$(lsb_release -sc)" = x"jammy" ]; then
-  sed -i -e "s/python-dev/python3-dev/g" debian/control
+  sed -i -e "s/python/python3/g" debian/control
 fi
 # Depend on python3-* instead of python-* on debian12
 if [ x"$(lsb_release -sc)" = x"bookworm" ]; then
-  sed -i -e "s/python-dev/python3-dev/g" debian/control
-  sed -i -e "s/python-setuptools/python3-setuptools/g" debian/control
+  sed -i -e "s/python/python3/g" debian/control
+fi
+# Depend on python3-* instead of python-* on Ubuntu 24.04
+if [ x"$(lsb_release -sc)" = x"noble" ]; then
+  sed -i -e "s/python/python3/g" debian/control
 fi
 # The cvmfs-gateway requires a go compiler
 if ! go version >/dev/null 2>&1; then
