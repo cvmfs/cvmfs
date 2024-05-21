@@ -65,6 +65,29 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   explicit Compressor(const Algorithms & /* alg */) : kZChunk(16384) { }
   virtual ~Compressor() { }
   /**
+   * Compression function.
+   * Takes a read-only data source, compresses the data and writes the result to
+   * a given sink. 
+   * 
+   * Must be able to handle empty sources and just write the compression frame
+   * where applicable.
+   * 
+   * @return kStreamEnd if successful
+   *         StreamState Error value if failure
+   */
+  // TODO(heretherebedragons) make pure virtual when everything uses compressor
+  // TODO(heretherebedragons) maybe rename it just to Compress()?
+  virtual StreamStates CompressStream(InputAbstract * /*input*/,
+                               cvmfs::Sink */*output*/) { return kStreamError; }
+  /**
+   *  Same like CompressStream() but also calculates the hash based on the
+   *  compressed output.
+   */
+  // TODO(heretherebedragons) make pure virtual when everything uses compressor
+  virtual StreamStates CompressStream(InputAbstract */*input*/,
+                       cvmfs::Sink */*output*/, shash::Any */*compressed_hash*/)
+                                                        { return kStreamError; }
+  /**
    * Deflate function.  The arguments and returns closely match the input and
    * output of the zlib deflate function.
    * Input:
@@ -81,17 +104,19 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual StreamStates CompressStream(InputAbstract * /*input*/,
-                               cvmfs::Sink */*output*/) { return kStreamError; }
-  virtual StreamStates CompressStream(InputAbstract */*input*/,
-                       cvmfs::Sink */*output*/, shash::Any */*compressed_hash*/)
-                                                        { return kStreamError; }
+  // TODO(heretherebedragons) remove! when everything is replaced to use the
+  // compressor
   virtual bool CompressStream(const bool flush,
                               unsigned char **inbuf, size_t *inbufsize,
                               unsigned char **outbuf, size_t *outbufsize) = 0;
+  /**
+   * Reset stream to perform compression on a new, independent input
+   */
   virtual bool ResetStream() { return false; }
   virtual size_t CompressUpperBound(const size_t /*bytes*/) { return 0; }
 
+  // TODO(heretherebedragons) will be deprecated and replaced by
+  // CompressUpperBound when everything uses compressors
   virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor* Clone() = 0;
 

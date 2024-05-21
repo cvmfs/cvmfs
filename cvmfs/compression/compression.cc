@@ -30,7 +30,6 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 
-
 using namespace std;  // NOLINT
 
 
