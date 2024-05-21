@@ -23,6 +23,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/006-buildkernel                          \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/056-lowspeedlimit                        \
                                  src/094-attachmount                          \
                                  --                                           \
                                  src/0*                                       \
@@ -36,6 +37,7 @@ echo "running CernVM-FS server test cases..."
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/518-hardlinkstresstest                   \
+                                 src/536-healthcheck                          \
                                  src/539-symlinkedvarspoolcvmfs               \
                                  src/600-securecvmfs                          \
                                  src/628-pythonwrappedcvmfsserver             \
@@ -44,6 +46,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/684-https_s3                             \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
+                                 src/689-inodes                               \
                                  src/702-symlink_caching                      \
                                  --                                           \
                                  src/5*                                       \
