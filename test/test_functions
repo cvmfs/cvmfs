@@ -151,7 +151,7 @@ stat_wrapper() {
 
 # Find the service binary (or detect systemd)
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || ! [ -d /run/systemd/system ]; then
+if ! ps -p 1 -o comm= > /dev/null 2>&1 || ! [ -d /run/systemd/system ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
