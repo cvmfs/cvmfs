@@ -8,6 +8,7 @@
 
 #include "c_file_sandbox.h"
 #include "compression/compression.h"
+#include "compression/decompression.h"
 #include "compression/input_mem.h"
 #include "compression/input_path.h"
 #include "network/sink.h"
@@ -135,6 +136,51 @@ TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
   ASSERT_EQ(0, memcmp(decompress_buf, input, in_size));
 
   free(decompress_buf);
+  free(input);
+}
+
+TEST_F(T_Compressor, CompressionAndDecompressionSinkMem2MemLarge) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+
+  // Compress the output
+  const size_t in_size = 16384;
+  const size_t chunk_size = 8000;
+
+  const char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *input = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    input[i] = letters[rand() % 26];
+  }
+
+  zlib::InputMem in(input, in_size, chunk_size);
+  cvmfs::MemSink out(in_size);
+
+  const zlib::StreamStates res = compressor->CompressStream(&in, &out);
+
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(out.pos(), 0U);
+
+  // Decompress in chunks
+  zlib::InputMem compress1(out.data(), out.pos() / 2);
+
+  size_t size_rest = out.pos() / 2 + out.pos() % 2;
+  zlib::InputMem compress2(out.data() + out.pos() / 2, size_rest);
+
+  UniquePtr<Decompressor>
+                decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
+  cvmfs::MemSink decompress_out(0);
+  EXPECT_EQ(decompressor->DecompressStream(&compress1, &decompress_out),
+                                                         zlib::kStreamContinue);
+  EXPECT_EQ(decompressor->DecompressStream(&compress2, &decompress_out),
+                                                              zlib::kStreamEnd);
+
+
+  // Check if the data is the same as the beginning
+  EXPECT_EQ(in_size, decompress_out.pos());
+  ASSERT_EQ(0, memcmp(decompress_out.data(), input, in_size));
+
   free(input);
 }
 

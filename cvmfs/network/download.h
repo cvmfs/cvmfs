@@ -18,7 +18,7 @@
 
 #include "gtest/gtest_prod.h"
 
-#include "compression/compression.h"
+#include "compression/decompression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/dns.h"

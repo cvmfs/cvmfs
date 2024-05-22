@@ -10,6 +10,7 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/decompression.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
