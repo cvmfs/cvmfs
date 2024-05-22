@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [devel,master]
+      branches: [devel]
   pull_request:
-    branches: [devel,master]
 
 jobs:
   docker:
