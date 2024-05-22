@@ -77,6 +77,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        manifest_fetch.cc
        monitor.cc
        mountpoint.cc
+       network/direct_download.cc
        network/dns.cc
        network/download.cc
        network/jobinfo.cc

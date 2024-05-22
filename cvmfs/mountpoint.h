@@ -41,6 +41,7 @@ class Uuid;
 }
 namespace download {
 class DownloadManager;
+class DirectDownload;
 }
 namespace glue {
 class InodeTracker;
@@ -504,6 +505,7 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
   }
+  download::DirectDownload *direct_download() { return direct_download_; }
   file_watcher::FileWatcher* resolv_conf_watcher() {
     return resolv_conf_watcher_;
   }
@@ -518,6 +520,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls() { return enforce_acls_; }
   bool cache_symlinks() { return cache_symlinks_; }
   bool fuse_expire_entry() { return fuse_expire_entry_; }
+  bool external_direct() { return external_direct_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -639,6 +642,7 @@ class MountPoint : SingleCopy, public BootFactory {
   signature::SignatureManager *signature_mgr_;
   download::DownloadManager *download_mgr_;
   download::DownloadManager *external_download_mgr_;
+  download::DirectDownload *direct_download_;
   cvmfs::Fetcher *fetcher_;
   cvmfs::Fetcher *external_fetcher_;
   catalog::InodeAnnotation *inode_annotation_;
@@ -664,6 +668,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls_;
   bool cache_symlinks_;
   bool fuse_expire_entry_;
+  bool external_direct_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 

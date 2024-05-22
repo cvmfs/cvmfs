@@ -157,6 +157,7 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
        ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
        ${CVMFS_SOURCE_DIR}/catalog_virtual.cc
+       ${CVMFS_SOURCE_DIR}/clientctx.cc
        ${CVMFS_SOURCE_DIR}/compression/compression.cc
        ${CVMFS_SOURCE_DIR}/directory_entry.cc
        ${CVMFS_SOURCE_DIR}/gateway_util.cc
@@ -177,6 +178,7 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/malloc_arena.cc
        ${CVMFS_SOURCE_DIR}/manifest.cc
        ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+       ${CVMFS_SOURCE_DIR}/network/direct_download.cc
        ${CVMFS_SOURCE_DIR}/network/dns.cc
        ${CVMFS_SOURCE_DIR}/network/download.cc
        ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
@@ -458,6 +460,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
   ${CVMFS_SOURCE_DIR}/monitor.cc
   ${CVMFS_SOURCE_DIR}/mountpoint.cc
+  ${CVMFS_SOURCE_DIR}/network/direct_download.cc
   ${CVMFS_SOURCE_DIR}/network/dns.cc
   ${CVMFS_SOURCE_DIR}/network/download.cc
   ${CVMFS_SOURCE_DIR}/network/jobinfo.cc

@@ -52,6 +52,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/direct_download.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"
@@ -2177,6 +2178,21 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_DIRECT", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    external_direct_ = true;
+    direct_download_ = new download::DirectDownload(
+      perf::StatisticsTemplate("direct-download", statistics_));
+
+    if (options_mgr_->GetValue("CVMFS_DIRECT_BOUNDRY", &optarg)) {
+      uint64_t boundry = String2Uint64(optarg);
+      if (boundry > 0) {
+        direct_download_->SetBoundry(boundry);
+      }
+    }
+  }
 
   return true;
 }
