@@ -50,7 +50,7 @@
 #include <set>
 #include <utility>
 
-#include "compression/compression.h"
+#include "compression/decompression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "interrupt.h"

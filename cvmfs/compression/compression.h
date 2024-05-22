@@ -5,6 +5,7 @@
 #ifndef CVMFS_COMPRESSION_COMPRESSION_H_
 #define CVMFS_COMPRESSION_COMPRESSION_H_
 
+
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@
 #include "duplex_zlib.h"
 #include "input_abstract.h"
 #include "network/sink.h"
+#include "util.h"
 #include "util/plugin.h"
 
 namespace shash {
@@ -31,22 +33,6 @@ bool CopyPath2Mem(const std::string &path,
                   unsigned char **buffer, unsigned *buffer_size);
 
 namespace zlib {
-
-const unsigned kZChunk = 16384;
-
-enum StreamStates {
-  kStreamDataError = 0,
-  kStreamIOError,
-  kStreamContinue,
-  kStreamEnd,
-  kStreamError,
-};
-
-// Do not change order of algorithms.  Used as flags in the catalog
-enum Algorithms {
-  kZlibDefault = 0,
-  kNoCompression,
-};
 
 /**
  * Abstract Compression class which is inherited by implementations of
@@ -126,28 +112,16 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   const unsigned kZChunk;
 };
 
-
-Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
-std::string AlgorithmName(const zlib::Algorithms alg);
-
-
 void CompressInit(z_stream *strm);
-void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
-void DecompressFini(z_stream *strm);
 
 StreamStates CompressZStream2Null(
   const void *buf, const int64_t size, const bool eof,
   z_stream *strm, shash::ContextPtr *hash_context);
-StreamStates DecompressZStream2File(const void *buf, const int64_t size,
-                                    z_stream *strm, FILE *f);
-StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
-                                    z_stream *strm, cvmfs::Sink *sink);
 
 bool CompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressPath2Path(const std::string &src, const std::string &dest,
                        shash::Any *compressed_hash);
-bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
 bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
 bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
@@ -157,8 +131,6 @@ bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,
                        shash::Any *compressed_hash);
-bool DecompressFile2File(FILE *fsrc, FILE *fdest);
-bool DecompressPath2File(const std::string &src, FILE *fdest);
 
 bool CompressMem2File(const unsigned char *buf, const size_t size,
                       FILE *fdest, shash::Any *compressed_hash);
@@ -166,8 +138,6 @@ bool CompressMem2File(const unsigned char *buf, const size_t size,
 // User of these functions has to free out_buf, if successful
 bool CompressMem2Mem(const void *buf, const int64_t size,
                      void **out_buf, uint64_t *out_size);
-bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
 
