@@ -30,7 +30,8 @@ jobs:
 
       - name: Install CVMFS
         run: |
-          sudo installer -pkg ./build/cvmfs-*.pkg -target /
+          export CVMFS_PACKAGE=$(ls ${GITHUB_WORKSPACE}/build/pkg_result/cvmfs-*.pkg)
+          sudo installer -pkg ${CVMFS_PACKAGE} -target /
 
       - name: Setup CVMFS
         run: |
