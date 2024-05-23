@@ -25,7 +25,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
-          ./ci/build_package.sh ${GITHUB_WORKSPACE} ./build cvmfs
+          ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
           
 
       - name: Install CVMFS
