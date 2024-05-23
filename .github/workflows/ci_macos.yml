@@ -19,10 +19,6 @@ jobs:
           wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.38/fuse-t-macos-installer-1.0.38.pkg
           sudo installer -pkg fuse-t-macos-installer-1.0.38.pkg -target /
 
-      - name: Check Fuse Headers 
-        run: |
-          cd /
-          find . -name fuse.h
 
 
       - name: Build CVMFS
