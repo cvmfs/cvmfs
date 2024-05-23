@@ -57,6 +57,7 @@ class T_Compressor : public FileSandbox {
   char *test_string, *ptr_test_string;
   std::string str_test_string;
   UniquePtr<Compressor> compressor;
+  UniquePtr<Decompressor> decompressor;
   unsigned char *buf;
   size_t buf_size;
   size_t size_input;
@@ -72,6 +73,7 @@ const char T_Compressor::sandbox_path[] = "./cvmfs_ut_compressor";
 
 TEST_F(T_Compressor, CompressionSinkMem2Mem) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
 
   // Compress the output
   // unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
@@ -86,61 +88,23 @@ TEST_F(T_Compressor, CompressionSinkMem2Mem) {
   EXPECT_EQ(res, zlib::kStreamEnd);
   EXPECT_GT(out.pos(), 0U);
 
-  // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  DecompressMem2Mem(out.data(), static_cast<int64_t>(out.pos()),
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
+  zlib::InputMem compress(out.data(), out.pos());
 
-  // Check if the string is the same as the beginning
+  cvmfs::MemSink decompress_out(0);
+  EXPECT_EQ(decompressor->DecompressStream(&compress, &decompress_out),
+                                                              zlib::kStreamEnd);
+
+
+  // Check if the data is the same as the beginning
   // (decompress_buf is not null terminated --> only compared within size)
-  EXPECT_EQ(str_test_string.size(), decompress_size);
-  EXPECT_EQ(0, strncmp(decompress_buf, str_test_string.c_str(),
-                       str_test_string.size()));
-
-  free(decompress_buf);
+  EXPECT_EQ(str_test_string.size(), decompress_out.pos());
+  ASSERT_EQ(0, memcmp(decompress_out.data(), str_test_string.c_str(),
+                                                       str_test_string.size()));
 }
 
-TEST_F(T_Compressor, CompressionSinkMem2MemLarge) {
+TEST_F(T_Compressor, CompressionAndSplitDecompressionSinkMem2MemLarge) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
-
-  // Compress the output
-  const size_t in_size = 16384;
-  const size_t chunk_size = 8000;
-
-  const char letters[] = "abcdefghijklmnopqrstuvwxyz";
-  unsigned char *input = static_cast<unsigned char *>(smalloc(in_size));
-
-  // random filling of letters
-  for (size_t i = 0; i < in_size; i++) {
-    input[i] = letters[rand() % 26];
-  }
-
-  zlib::InputMem in(input, in_size, chunk_size);
-  cvmfs::MemSink out(in_size);
-
-  const zlib::StreamStates res = compressor->CompressStream(&in, &out);
-
-  ASSERT_EQ(res, zlib::kStreamEnd);
-  ASSERT_GT(out.pos(), 0U);
-
-  // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos(),
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
-
-  EXPECT_EQ(in_size, decompress_size);
-
-  // Check if the string is the same as the beginning
-  ASSERT_EQ(0, memcmp(decompress_buf, input, in_size));
-
-  free(decompress_buf);
-  free(input);
-}
-
-TEST_F(T_Compressor, CompressionAndDecompressionSinkMem2MemLarge) {
-  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
 
   // Compress the output
   const size_t in_size = 16384;
@@ -164,12 +128,9 @@ TEST_F(T_Compressor, CompressionAndDecompressionSinkMem2MemLarge) {
 
   // Decompress in chunks
   zlib::InputMem compress1(out.data(), out.pos() / 2);
-
   size_t size_rest = out.pos() / 2 + out.pos() % 2;
   zlib::InputMem compress2(out.data() + out.pos() / 2, size_rest);
 
-  UniquePtr<Decompressor>
-                decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
   cvmfs::MemSink decompress_out(0);
   EXPECT_EQ(decompressor->DecompressStream(&compress1, &decompress_out),
                                                          zlib::kStreamContinue);
@@ -179,13 +140,14 @@ TEST_F(T_Compressor, CompressionAndDecompressionSinkMem2MemLarge) {
 
   // Check if the data is the same as the beginning
   EXPECT_EQ(in_size, decompress_out.pos());
-  ASSERT_EQ(0, memcmp(decompress_out.data(), input, in_size));
+  EXPECT_EQ(0, memcmp(decompress_out.data(), input, in_size));
 
   free(input);
 }
 
 TEST_F(T_Compressor, CompressionSinkMemNull2Mem) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
 
   const size_t chunk_size = 8000;
   const size_t in_size = 0;
@@ -205,19 +167,19 @@ TEST_F(T_Compressor, CompressionSinkMemNull2Mem) {
             "e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78");
 
   // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos(),
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
+  zlib::InputMem compress(out.data(), out.pos());
+  cvmfs::MemSink decompress_out(0);
+  EXPECT_EQ(decompressor->DecompressStream(&compress, &decompress_out),
+                                                              zlib::kStreamEnd);
 
-  EXPECT_EQ(in_size, decompress_size);
-
-  free(decompress_buf);
+  EXPECT_EQ(in_size, decompress_out.pos());
 }
 
 // Also tests Input_File and SinkFile because *Path uses it under the hood
 TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
+
   const size_t in_size = 16384 * 3ul;  // larger than decomp buffer size (32 KB)
   const size_t chunk_size = 8000;
 
@@ -251,11 +213,15 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
                      CreateTempFile(sandbox_path, 0600, "w+", &decompress_path);
   fclose(decompress_f);
 
-  // Decompress it, check if it's still the same
-  EXPECT_TRUE(DecompressPath2Path(out_path, decompress_path));
+
+  // Check if the data is the same as the beginning
+  zlib::InputPath compress(out_path);
+  cvmfs::PathSink decompress_out(decompress_path);
+  EXPECT_EQ(decompressor->DecompressStream(&compress, &decompress_out),
+                                                              zlib::kStreamEnd);
+
 
   decompress_f = fopen(decompress_path.c_str(), "rb");
-
   // get file sizes; read decompressed file into buffer
   fseek(decompress_f, 0L, SEEK_END);
   const size_t decompress_size = ftell(decompress_f);
@@ -276,6 +242,7 @@ TEST_F(T_Compressor, CompressionSinkPath2PathLarge) {
 
 TEST_F(T_Compressor, CompressionSinkPathNull2Mem) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
 
   const size_t in_size = 0;
 
@@ -294,14 +261,12 @@ TEST_F(T_Compressor, CompressionSinkPathNull2Mem) {
             "e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78");
 
   // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  EXPECT_TRUE(DecompressMem2Mem(out.data(), out.pos(),
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size));
+  zlib::InputMem compress(out.data(), out.pos());
+  cvmfs::MemSink decompress_out(0);
+  EXPECT_EQ(decompressor->DecompressStream(&compress, &decompress_out),
+                                                              zlib::kStreamEnd);
 
-  EXPECT_EQ(in_size, decompress_size);
-
-  free(decompress_buf);
+  EXPECT_EQ(in_size, decompress_out.pos());
 }
 
 TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {
@@ -323,6 +288,34 @@ TEST_F(T_Compressor, EchoCompressionSinkMem2MemLarge) {
   cvmfs::MemSink out(in_size);
 
   const zlib::StreamStates res = compressor->CompressStream(&in, &out);
+
+  EXPECT_EQ(res, zlib::kStreamEnd);
+
+  // Check if decompressed content is equal to original one
+  EXPECT_EQ(0, memcmp(out.data(), input, in_size));
+
+  free(input);
+}
+
+TEST_F(T_Compressor, EchoDecompressionSinkMem2MemLarge) {
+  decompressor = zlib::Decompressor::Construct(zlib::kNoCompression);
+
+  // Compress the output
+  const size_t in_size = 16384;
+  const size_t chunk_size = 8000;
+
+  const char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *input = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    input[i] = letters[rand() % 26];
+  }
+
+  zlib::InputMem in(input, in_size, chunk_size);
+  cvmfs::MemSink out(in_size);
+
+  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
 
   EXPECT_EQ(res, zlib::kStreamEnd);
 
@@ -381,6 +374,57 @@ TEST_F(T_Compressor, EchoCompressionSinkPath2PathLarge) {
   free(out_buf);
   free(in_buf);
 }
+
+// Also tests Input_File and SinkFile because *Path uses it under the hood
+TEST_F(T_Compressor, EchoDecompressionSinkPath2PathLarge) {
+  decompressor = zlib::Decompressor::Construct(zlib::kNoCompression);
+  const size_t in_size = 16384 * 3ul;  // larger than decomp buffer size (32 KB)
+  const size_t chunk_size = 8000;
+
+  const char letters[] = "abcdefghijklmnopqrstuvwxyz";
+  unsigned char *in_buf = static_cast<unsigned char *>(smalloc(in_size));
+
+  // random filling of letters
+  for (size_t i = 0; i < in_size; i++) {
+    in_buf[i] = letters[rand() % 26];
+  }
+
+  std::string in_path;
+  FILE *in_f = CreateTempFile(sandbox_path, 0600, "w+", &in_path);
+  fwrite(in_buf, 1, in_size, in_f);
+  fclose(in_f);
+  zlib::InputPath input(in_path, chunk_size);
+
+  std::string out_path;
+  FILE *out_f = CreateTempFile(sandbox_path, 0600, "w+", &out_path);
+  fclose(out_f);
+
+  cvmfs::PathSink out(out_path);
+
+  // Compress the output
+  const zlib::StreamStates res = decompressor->DecompressStream(&input, &out);
+
+  EXPECT_EQ(res, zlib::kStreamEnd);
+
+  out_f = fopen(out_path.c_str(), "rb");
+
+  // get file sizes; read decompressed file into buffer
+  fseek(out_f, 0L, SEEK_END);
+  const size_t out_size = ftell(out_f);
+
+  unsigned char *out_buf = static_cast<unsigned char*>(smalloc(out_size));
+  fseek(out_f, 0L, SEEK_SET);
+  EXPECT_GT(fread(out_buf, 1, out_size, out_f), 0ul);
+  fclose(out_f);
+
+  // Check if decompressed content is equal to original one
+  EXPECT_EQ(in_size, out_size);
+  EXPECT_EQ(0, memcmp(out_buf, in_buf, in_size));
+
+  free(out_buf);
+  free(in_buf);
+}
+
 
 
 TEST_F(T_Compressor, Compression) {

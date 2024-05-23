@@ -1,26 +1,12 @@
 /**
  * This file is part of the CernVM File System.
- *
  */
 
 #include "decompressor_zlib.h"
 
-#include <alloca.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-
-#include <algorithm>
 #include <cassert>
-#include <cstring>
 
-#include "cvmfs_config.h"
 #include "decompression.h"
-#include "util/exception.h"
-#include "util/logging.h"
-#include "util/platform.h"
-#include "util/posix.h"
-
-using namespace std;  // NOLINT
 
 namespace zlib {
 

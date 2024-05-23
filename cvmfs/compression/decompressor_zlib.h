@@ -5,15 +5,8 @@
 #ifndef CVMFS_COMPRESSION_DECOMPRESSOR_ZLIB_H_
 #define CVMFS_COMPRESSION_DECOMPRESSOR_ZLIB_H_
 
-#include <errno.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string>
-
 #include "decompression.h"
 #include "duplex_zlib.h"
-#include "network/sink.h"
-#include "util/plugin.h"
 
 namespace zlib {
 
@@ -26,8 +19,23 @@ class ZlibDecompressor: public Decompressor {
   explicit ZlibDecompressor(const Algorithms &alg);
   ~ZlibDecompressor();
 
+  /**
+   * Compression function.
+   * Takes a read-only data source, compresses the data and writes the result to
+   * a given sink.
+   *
+   * Must be able to handle empty sources and just write the compression frame
+   * where applicable.
+   *
+   * @return kStreamEnd if successful and compression stream finished
+   *         kStreamContinue if successful and compression stream is unfinished
+   *         StreamState Error value if failure
+   */
   virtual StreamStates DecompressStream(InputAbstract *input,
                                                            cvmfs::Sink *output);
+  /**
+   * Reset stream to perform decompression on a new, independent input
+   */
   virtual bool Reset();
   Decompressor* Clone();
   static bool WillHandle(const zlib::Algorithms &alg);

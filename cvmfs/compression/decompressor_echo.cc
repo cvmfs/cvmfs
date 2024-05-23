@@ -1,13 +1,8 @@
 /**
  * This file is part of the CernVM File System.
- *
  */
 
 #include "decompressor_echo.h"
-
-#include "decompression.h"
-
-using namespace std;  // NOLINT
 
 namespace zlib {
 
