@@ -7,7 +7,7 @@
 # set include fuse headers include directory
 # hardcoding this due to misplacement of fuse.h on installing FUSE-T
 # in comparison to macFUSE 
-# (the latter places fuse.h in /usr/local/include but the former )
+# (the latter places fuse.h in /usr/local/include but the former in /usr/local/include/fuse)
 SET (MACOS_FUSE_INCLUDE_DIR /usr/local/include)
 
 # find FUSE-T lib as the primary lib
