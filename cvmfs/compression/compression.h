@@ -5,7 +5,6 @@
 #ifndef CVMFS_COMPRESSION_COMPRESSION_H_
 #define CVMFS_COMPRESSION_COMPRESSION_H_
 
-
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
