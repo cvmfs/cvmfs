@@ -1573,7 +1573,7 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2) on Linux or with fuse-t
+  # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
   if [ x"$sys_arch" = x"Darwin" ]; then
     mount -t $fuse_fs_type | grep "fuse-t"
   else
