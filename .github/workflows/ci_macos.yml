@@ -15,8 +15,8 @@ jobs:
 
       - name: Install Fuse-t and dependencies
         run: |
-          python3 -m pip3 install --upgrade pip
-          python3 -m pip3 install setuptools --upgrade
+          python3 -m pip install --upgrade pip
+          python3 -m pip install setuptools --upgrade
           wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.38/fuse-t-macos-installer-1.0.38.pkg
           sudo installer -pkg fuse-t-macos-installer-1.0.38.pkg -target /
 
