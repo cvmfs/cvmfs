@@ -1,0 +1,60 @@
+name: CI_MacOS
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  macos_build_and_test:
+    name: "macos_build_and_test"
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Fuse-t
+          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.38/fuse-t-macos-installer-1.0.38.pkg
+          sudo installer -pkg fuse-t-macos-installer-1.0.38.pkg -target /
+
+      - name: Build CVMFS
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          mkdir -p build
+          ./ci/build_package.sh ${GITHUB_WORKSPACE} ./build cvmfs
+          
+
+      - name: Install CVMFS
+        run: |
+          sudo installer -pkg ./build/cvmfs-*.pkg -target /
+
+      - name: Setup CVMFS
+        run: |
+          # / is readonly on macos 11+ - do 'synthetic firmlink' to create /cvmfs
+          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
+          sudo chown root:wheel /etc/synthetic.conf
+          sudo chmod a+r /etc/synthetic.conf
+          # apfs.util seems to return non-zero error codes also on success
+          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
+          sudo cvmfs_config setup
+          sudo cvmfs_config chksetup || exit 1
+
+      - name: Run Tests
+        run: |
+          echo "TBD"
+
+      - name: Archive logs
+        if: ${{ always () }}
+        run: |
+          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
+          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
+
+      - name: Upload logs as artifact
+        if: ${{ always () }}
+        uses: actions/upload-artifact@v3
+        with: 
+          name: CVMFS test logs
+          path: |
+              /tmp/cvmfs-client-test.log
+              /tmp/cvmfs-server-test.log
+
