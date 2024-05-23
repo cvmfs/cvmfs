@@ -44,13 +44,8 @@
 
   #if CVMFS_USE_LIBFUSE == 2
     #define FUSE_USE_VERSION 26
-  #if __APPLE__
-    #include <fuse_lowlevel.h>
-    #include <fuse_opt.h>
-  #else 
     #include <fuse/fuse_lowlevel.h>
     #include <fuse/fuse_opt.h>
-  #endif
     #if(FUSE_VERSION < 28)
       #include <cstdlib>
       extern "C" {

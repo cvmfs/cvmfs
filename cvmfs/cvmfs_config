@@ -61,7 +61,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="macfuse"
+    fuse_fs_type="nfs"
     ;;
 
   * )
@@ -1260,11 +1260,7 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ]; then
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^fuse-t
-        else
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
-        fi
+        df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
         if [ $? -ne 0 ]; then
           echo "Failed!"
           RETVAL=1
@@ -1573,8 +1569,12 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2)
-  mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  # /usr/local/bin/cvmfs2) on Linux or with fuse-t
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    mount -t $fuse_fs_type | grep "fuse-t"
+  else
+    mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  fi
 }
 
 
@@ -1793,14 +1793,12 @@ check_dev_fuse() {
     Darwin )
       # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
       return 0 ;;
-      
     * )
      echo "Architecture $sys_arch is not supported"
      exit 1 ;;
   esac
 
   return_code=0
-
   if [ ! -c $charDevice ]; then
     if [ x"$sys_arch" = x"Linux" ]; then
       echo "Error: character device $charDevice does not exist"
