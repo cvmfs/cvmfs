@@ -5,15 +5,7 @@
 #ifndef CVMFS_COMPRESSION_COMPRESSOR_ECHO_H_
 #define CVMFS_COMPRESSION_COMPRESSOR_ECHO_H_
 
-#include <errno.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string>
-
 #include "compression.h"
-#include "duplex_zlib.h"
-#include "network/sink.h"
-#include "util/plugin.h"
 
 namespace zlib {
 

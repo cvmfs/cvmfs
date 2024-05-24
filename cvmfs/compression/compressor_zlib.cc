@@ -3,25 +3,15 @@
  *
  */
 
-
 #include "compressor_zlib.h"
 
 #include <alloca.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 
 #include <algorithm>
 #include <cassert>
-#include <cstring>
 
-#include "cvmfs_config.h"
-#include "compression.h"
 #include "crypto/hash.h"
-#include "util/exception.h"
-#include "util/logging.h"
-#include "util/platform.h"
-#include "util/posix.h"
-#include "util/smalloc.h"
 
 using namespace std;  // NOLINT
 
