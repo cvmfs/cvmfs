@@ -69,6 +69,7 @@ static string MkFqrn(const string &repository) {
 }
 
 static bool IsFuseTInstalled() {
+  return true;
   string fuseTComponentsPaths[] = { "/usr/local/bin/go-nfsv4", 
                                           "/usr/local/lib/libfuse-t.dylib",
                                            "/usr/local/lib/libfuse-t.a" };
