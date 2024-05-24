@@ -40,6 +40,8 @@ class DirectDownload {
  private:
 
   uint64_t RangeBoundry(uint64_t start, uint64_t end);
+  std::string GetProxy(download::DownloadManager *mgr, const std::string &path,
+    const std::string &current_proxy, uint64_t offset);
   const char *StripAuth(const char *url);
 
   CURLSH *curl_share_;

@@ -74,6 +74,26 @@ uint64_t DirectDownload::RangeBoundry(uint64_t start, uint64_t end) {
   return end;
 }
 
+string DirectDownload::GetProxy(download::DownloadManager *mgr, const string &path,
+  const string &current_proxy, uint64_t offset)
+{
+  string proxy;
+
+  shash::Any hash(shash::kMd5);
+  if (mgr->sharding_policy_.UseCount() > 0) {
+    proxy = mgr->sharding_policy_->GetNextProxy(&path, current_proxy, offset);
+  } else {
+    shash::Any hash(shash::kMd5);
+    HashString(path, &hash);
+    DownloadManager::ProxyInfo *proxyinfo = mgr->ChooseProxyUnlocked(&hash);
+    if (proxyinfo && (proxyinfo->url != "DIRECT")) {
+      proxy = proxyinfo->url;
+    }
+  }
+
+  return proxy;
+}
+
 static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
   DirectResponse *response = static_cast<DirectResponse*>(userdata);
 
@@ -118,7 +138,6 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
     return;
   }
 
-  //string host = (*opt_host_chain_)[opt_host_chain_current_];
   vector<string> host_chain;
   unsigned current_host = 0;
   mgr->GetHostInfo(&host_chain, NULL, &current_host);
@@ -128,8 +147,9 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
     perf::Inc(n_eio);
     return;
   }
+
   string url = host_chain[current_host] + path;
-  string proxy;
+  string proxy = GetProxy(mgr, path, "", offset);
 
   CURL *curl = curl_easy_init();
 
@@ -198,6 +218,7 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
   bool done = false, retry, error = false;
   unsigned int retries = 0;
   unsigned int max_retries = mgr->opt_max_retries_;
+  unsigned int backoff_sleep = 0;
   long response_code = -1;
   while (!done && !error) {
     // Make sure we stay within a boundry
@@ -258,21 +279,26 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
     }
 
     if (retry) {
-      //proxy = next proxy;
-      curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+      if (proxy.length() > 0) {
+        proxy = GetProxy(mgr, path, "", offset);
+        curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+      }
 
       LogCvmfs(kLogDownload, kLogDebug, "direct read(%s) curl error (%d, %ld) new proxy: %s",
         path.c_str(), res, response_code, StripAuth(proxy.c_str()));
 
       perf::Inc(mgr->counters_->n_proxy_failover);
 
-      // TODO fix this
       retries++;
-      if (retries > 10) {
-        SafeSleepMs(2000);
-      } else if (retries > 3) {
-        SafeSleepMs(250);
+      if (backoff_sleep == 0) {
+        backoff_sleep = mgr->prng_.Next(mgr->opt_backoff_init_ms_ + 1);
+      } else {
+        backoff_sleep *= 2;
       }
+      if (backoff_sleep > mgr->opt_backoff_max_ms_) {
+        backoff_sleep = mgr->opt_backoff_max_ms_;
+      }
+      SafeSleepMs(backoff_sleep);
     } else {
       offset = offset_end + 1;
       if (offset <= offset_max) {
@@ -281,8 +307,10 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
         snprintf(range_buf, sizeof(range_buf), "%lu-%lu", offset, offset_end);
         curl_easy_setopt(curl, CURLOPT_RANGE, range_buf);
 
-        //proxy = next proxy;
-        curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+        if (proxy.length() > 0) {
+          proxy = GetProxy(mgr, path, "", offset);
+          curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+        }
       } else {
         done = true;
       }
@@ -292,18 +320,13 @@ void DirectDownload::Read(Read_f read_f, Error_f error_f, void *priv, download::
   curl_slist_free_all(slist);
   curl_easy_cleanup(curl);
 
-  // Not enough bytes
-  if (response.bytes < size) {
-    error = true;
-  }
-
   int response_error = 1;
   if (!error && !response.error) {
     response_error = read_f(priv, response.buffer, response.bytes);
   }
   if (response_error) {
-    LogCvmfs(kLogDownload, kLogDebug, "direct read(%s) read_f error %d",
-      path.c_str(), response_error);
+    LogCvmfs(kLogDownload, kLogDebug, "direct read(%s) read_f error %d, %ld response, %zu bytes",
+      path.c_str(), response_error, response_code, response.bytes);
     error_f(priv, EIO);
     perf::Inc(n_eio);
 
