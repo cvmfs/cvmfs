@@ -53,7 +53,7 @@ enum Algorithms {
  * compression engines such as zlib.
  *
  * In order to add a new compression method, you simply need to add a new class
- * which is a sub-class of the Compressor.  The subclass needs to implement the
+ * which is a sub-class of the Compressor. The subclass needs to implement the
  * Deflate, DeflateBound, Clone, and WillHandle functions.  For information on
  * the WillHandle function, read up on the PolymorphicConstruction class.
  * The new sub-class must be listed in the implementation of the
