@@ -993,7 +993,7 @@ SqlNestedCatalogListing::SqlNestedCatalogListing(
     "UNION ALL SELECT path, sha1, size, flags FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_4 =
     "SELECT path, sha1, size, 0 FROM nested_catalogs "
-    "UNION ALL SELECT path, sha1, size FROM bind_mountpoints;";
+    "UNION ALL SELECT path, sha1, size, 0 FROM bind_mountpoints;";
   static const char *stmt_2_5_ge_1_lt_4 =
     "SELECT path, sha1, size, 0 FROM nested_catalogs;";
   // Internally converts NULL to 0 for size
