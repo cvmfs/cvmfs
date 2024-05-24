@@ -13,6 +13,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Debug output 
+        run: |
+          csrutil status
+          sw_vers 
+
       - name: Install Fuse-t and dependencies
         run: |
           brew install python-setuptools
