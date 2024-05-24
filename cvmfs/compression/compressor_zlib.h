@@ -5,15 +5,8 @@
 #ifndef CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
 #define CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
 
-#include <errno.h>
-#include <stdint.h>
-#include <stdio.h>
-
-#include <string>
-
-#include "compression/compression.h"
-#include "compression/input_abstract.h"
-#include "network/sink.h"
+#include "compression.h"
+#include "duplex_zlib.h"
 
 namespace zlib {
 

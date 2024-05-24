@@ -5,24 +5,12 @@
 
 #include "compressor_echo.h"
 
-#include <alloca.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 
 #include <algorithm>
 #include <cassert>
-#include <cstring>
 
-#include "cvmfs_config.h"
-#include "compression.h"
 #include "crypto/hash.h"
-#include "util/exception.h"
-#include "util/logging.h"
-#include "util/platform.h"
-#include "util/posix.h"
-#include "util/smalloc.h"
-
-using namespace std;  // NOLINT
 
 namespace zlib {
 
@@ -46,7 +34,7 @@ bool EchoCompressor::CompressStream(
   unsigned char **inbuf, size_t *inbufsize,
   unsigned char **outbuf, size_t *outbufsize)
 {
-  const size_t bytes_to_copy = min(*outbufsize, *inbufsize);
+  const size_t bytes_to_copy = std::min(*outbufsize, *inbufsize);
   memcpy(*outbuf, *inbuf, bytes_to_copy);
   const bool done = (bytes_to_copy == *inbufsize);
 

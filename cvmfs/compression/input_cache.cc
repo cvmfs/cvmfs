@@ -2,9 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
+#include "input_cache.h"
+
 #include <cstdlib>
 
-#include "input_cache.h"
 #include "util/smalloc.h"
 
 namespace zlib {

@@ -2,9 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include <cstdlib>
 #include "input_mem.h"
 
+#include <cstdlib>
 namespace zlib {
 
 InputMem::InputMem(const unsigned char *src, const size_t src_size) :
