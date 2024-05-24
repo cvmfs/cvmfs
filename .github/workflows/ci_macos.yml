@@ -26,6 +26,16 @@ jobs:
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
+
+      - name: Setup firmlinks
+        run: |
+          # / is readonly on macos 11+ - do 'synthetic firmlink' to create /cvmfs
+          sudo zsh -c 'echo -e "cvmfs\tUsers/Shared/cvmfs\n#comment\n" > /etc/synthetic.conf'
+          sudo chown root:wheel /etc/synthetic.conf
+          sudo chmod a+r /etc/synthetic.conf
+          # apfs.util seems to return non-zero error codes also on success
+          sudo /System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util -t || true
+
           
 
       - name: Install CVMFS
