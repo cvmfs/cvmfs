@@ -70,6 +70,8 @@ else
   CVMFS_TEST_DOCKER=no
 fi
 
+sys_arch=$(uname)
+
 die() {
   echo -e $1 >&2
   exit 1
@@ -550,7 +552,11 @@ cvmfs_umount() {
 
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
-      sudo umount /cvmfs/$r > /dev/null 2>&1
+      if [ "$sys_arch" = "Darwin" ]; then
+        sudo umount -f /cvmfs/$r > /dev/null 2>&1
+      else 
+        sudo umount /cvmfs/$r > /dev/null 2>&1
+      fi
       result=$?
       times=$(( $times - 1 ))
       if [ $result -ne 0 ] && [ $times -gt 0 ]; then
