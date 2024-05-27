@@ -8,13 +8,16 @@
 # hardcoding this due to misplacement of fuse.h on installing FUSE-T
 # in comparison to macFUSE 
 # (the latter places fuse.h in /usr/local/include but the former in /usr/local/include/fuse)
-SET (MACOS_FUSE_INCLUDE_DIR /usr/local/include)
+FIND_PATH (MACOS_FUSE_INCLUDE_DIR fuse.h
+        /usr/include
+        /usr/local/include/fuse
+)
 
 # find FUSE-T lib as the primary lib
 SET(MACOS_FUSE_LIB_NAMES fuse-t)
 FIND_LIBRARY(MACOS_FUSE_LIBRARY 
         NAMES ${MACOS_FUSE_LIB_NAMES} 
-        PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH
+        PATHS /usr/lib /usr/local/lib
 )
 
 # check if lib was found and include is present
