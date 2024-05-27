@@ -61,13 +61,44 @@ jobs:
 
       - name: Run Tests
         run: |
-          echo "TBD"
+          sudo launchctl limit maxfiles 65536 65536 \
+          export CVMFS_PLATFORM_NAME="macos"
+          export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          export CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
+          cd $GITHUB_WORKSPACE/test
+          ./run.sh /tmp/cvmfs-client-test.log -o /tmp/cvmfs-client-test.xunit.xml \
+                                -x src/004-davinci                              \
+                                   src/005-asetup                               \
+                                   src/006-buildkernel                          \
+                                   src/007-testjobs                             \
+                                   src/008-default_domain                       \
+                                   src/016-dnsunreachable                       \
+                                   src/017-dnstimeout                           \
+                                   src/024-reload-during-asetup                 \
+                                   src/039-reloadalarm                          \
+                                   src/040-aliencache                           \
+                                   src/045-oasis                                \
+                                   src/052-roundrobindns                        \
+                                   src/050-configrepo                           \
+                                   src/055-ownership                            \
+                                   src/056-lowspeedlimit                        \
+                                   src/057-parallelmakecache                    \
+                                   src/061-systemdnokill                        \
+                                   src/074-oom                                  \
+                                   src/081-shrinkwrap                           \
+                                   src/082-shrinkwrap-cms                       \
+                                   src/083-suid                                 \
+                                   src/084-premounted                           \
+                                   src/088-watchdog                             \
+                                   src/089-external_cache_plugin                \
+                                   src/094-attachmount                          \
+                                   src/095-fuser                                \
+                                   src/102-reusefd                              \
+                                   src/103-reloadcachemgr                       \
+                                   --                                           \
+                                   src/0*                                       \
+                                   src/1*
 
-      - name: Archive logs
-        if: ${{ always () }}
-        run: |
-          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
-          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
 
       - name: Upload logs as artifact
         if: ${{ always () }}
