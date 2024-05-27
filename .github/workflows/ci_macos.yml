@@ -11,12 +11,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Debug output 
         run: |
           csrutil status
           sw_vers 
+          brew install coreutils
+          sudo ln -s /usr/local/bin/gtimeout /usr/local/bin/timeout
+          which timeout
 
       - name: Install Fuse-t and dependencies
         run: |
@@ -102,7 +105,7 @@ jobs:
 
       - name: Upload logs as artifact
         if: ${{ always () }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with: 
           name: CVMFS test logs
           path: |
