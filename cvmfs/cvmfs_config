@@ -2122,7 +2122,7 @@ canonicalize_path() {
       echo $(readlink -f "$path_name")
       ;;
     Darwin )
-      echo $(/usr/local/bin/greadlink -f "$path_name")
+      echo $(greadlink -f "$path_name")
       ;;
   esac
 }
