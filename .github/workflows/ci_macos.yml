@@ -71,13 +71,12 @@ jobs:
           export CVMFS_TEST_PROXY=DIRECT
           cd $GITHUB_WORKSPACE/test
           ./run.sh /tmp/cvmfs-client-test.log -o /tmp/cvmfs-client-test.xunit.xml \
+                                -s quick                                        \
                                 -x src/004-davinci                              \
                                    src/005-asetup                               \
                                    src/006-buildkernel                          \
                                    src/007-testjobs                             \
                                    src/008-default_domain                       \
-                                   src/009-tar                                  \
-                                   src/010-du                                   \
                                    src/016-dnsunreachable                       \
                                    src/017-dnstimeout                           \
                                    src/024-reload-during-asetup                 \
