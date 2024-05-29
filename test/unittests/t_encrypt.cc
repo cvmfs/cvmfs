@@ -146,6 +146,8 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   string empty;
   string dummy = "Hello, World!";
   string dummy2 = k->ToBase64();
+  string dummy3 = "0123456789ABCDEF";  // AES block size
+  string dummy4(1000, 'x');
   string ciphertext;
   string ciphertext_two;
   string plaintext;
@@ -172,6 +174,18 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
   EXPECT_TRUE(retval);
   EXPECT_EQ(dummy2, plaintext);
+
+  retval = cipher.Encrypt(dummy3, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(dummy3, plaintext);
+
+  retval = cipher.Encrypt(dummy4, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(dummy4, plaintext);
 
   retval = Cipher::Decrypt(ciphertext.substr(0, 1), *k, &plaintext);
   EXPECT_EQ("", plaintext);
