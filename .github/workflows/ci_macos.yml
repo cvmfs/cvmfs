@@ -19,6 +19,7 @@ jobs:
           sw_vers 
           brew install coreutils
           sudo ln -s /usr/local/bin/gtimeout /usr/local/bin/timeout
+          sudo ln -s /opt/homebrew/bin/greadlink /usr/local/bin/greadlink
           which timeout
           which greadlink
 
