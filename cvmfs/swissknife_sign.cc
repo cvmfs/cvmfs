@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "manifest.h"

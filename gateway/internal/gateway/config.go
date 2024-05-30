@@ -12,6 +12,10 @@ import (
 type Config struct {
 	// Port used by the HTTP frontend
 	Port int `mapstructure:"port"`
+	// Port used by pprof
+	PProfPort int `mapstructure:"pprof_port"`
+	// If PProfPort is already in use, allow to use ports up to this value
+	PProfPortRangeMax int `mapstructure:"pprof_port_range_max"`
 	// MaxLeaseTime is the maximum lease duration in seconds
 	MaxLeaseTime time.Duration `mapstructure:"max_lease_time"`
 	// LogLevel sets the logging level
@@ -36,6 +40,8 @@ func ReadConfig() (*Config, error) {
 	pflag.StringVar(&configFile, "user_config_file", "/etc/cvmfs/gateway/user.json", "config file with user modifiable settings")
 	pflag.String("access_config_file", "/etc/cvmfs/gateway/repo.json", "repository access configuration file")
 	pflag.Int("port", 4929, "HTTP frontend port")
+	pflag.Int("pprof_port", 6060, "pprof port on localhost")
+	pflag.Int("pprof_port_range_max", 6260, "pprof port on localhost")
 	pflag.Int("max_lease_time", 7200, "maximum lease time in seconds")
 	pflag.String("log_level", "info", "log level (debug|info|warn|error|fatal|panic)")
 	pflag.Bool("log_timestamps", false, "enable timestamps in logging output")

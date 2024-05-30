@@ -6,7 +6,7 @@ SSL_VERSION=3.5.3
 CRYPTO_VERSION=3.5.3
 CARES_VERSION=1.18.1
 CURL_VERSION=7.86.0
-PACPARSER_VERSION=1.4.2
+PACPARSER_VERSION=1.4.3
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -181,6 +181,8 @@ build_lib() {
       patch_external "pacparser" "fix_cflags.patch"
       patch_external "pacparser" "fix_c99.patch"
       patch_external "pacparser" "fix_git_dependency.patch"
+      patch_external "pacparser" "fix_python_setuptools.patch"
+      patch_external "pacparser" "fix_gcc14.patch"
       do_build "pacparser"
       ;;
     zlib)
@@ -206,12 +208,6 @@ build_lib() {
         do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
         patch_external "googletest"     "cmake_compatibility.patch"
         do_build "googletest"
-      ;;
-    ipaddress)
-      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
-        do_extract "ipaddress" "ipaddress-${IPADDRESS_VERSION}.tar.gz"
-        do_build "ipaddress"
-      fi
       ;;
     maxminddb)
       if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
@@ -269,11 +265,12 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf sqlite3 vjson sha3 libarchive"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest maxminddb protobuf sqlite3 vjson sha3 libarchive"
 
 if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
     missing_libs="$missing_libs googlebench"
 fi
+
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"

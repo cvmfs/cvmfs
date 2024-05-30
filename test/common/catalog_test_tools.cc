@@ -10,7 +10,7 @@
 #include <sstream>
 
 #include "catalog_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "options.h"
