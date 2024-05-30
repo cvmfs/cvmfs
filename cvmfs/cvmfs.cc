@@ -661,24 +661,19 @@ static void cvmfs_forget(
     return;
   }
 
-  fuse_remounter_->fence()->Enter();
-  ino = mount_point_->catalog_mgr()->MangleInode(ino);
-  // This has been seen to deadlock on the debug log mutex on SL5.  Problem of
-  // old kernel/fuse?
-#if CVMFS_USE_LIBCVMFS == 2
-  LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %u",
-           uint64_t(ino), nlookup);
-#else
+  // Ensure that we don't need to call catalog_mgr()->MangleInode(ino)
+  assert(ino > mount_point_->catalog_mgr()->kInodeOffset);
+
   LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
            uint64_t(ino), nlookup);
-#endif
+
   if (!file_system_->IsNfsSource()) {
     bool removed =
       mount_point_->inode_tracker()->GetVfsPutRaii().VfsPut(ino, nlookup);
     if (removed)
       mount_point_->page_cache_tracker()->GetEvictRaii().Evict(ino);
   }
-  fuse_remounter_->fence()->Leave();
+
   fuse_reply_none(req);
 }
 
@@ -697,7 +692,6 @@ static void cvmfs_forget_multi(
     return;
   }
 
-  fuse_remounter_->fence()->Enter();
   {
     glue::InodeTracker::VfsPutRaii vfs_put_raii =
       mount_point_->inode_tracker()->GetVfsPutRaii();
@@ -708,16 +702,16 @@ static void cvmfs_forget_multi(
         continue;
       }
 
-      uint64_t ino = mount_point_->catalog_mgr()->MangleInode(forgets[i].ino);
+      // Ensure that we don't need to call catalog_mgr()->MangleInode(ino)
+      assert(forgets[i].ino > mount_point_->catalog_mgr()->kInodeOffset);
       LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
-               ino, forgets[i].nlookup);
+               forgets[i].ino, forgets[i].nlookup);
 
-      bool removed = vfs_put_raii.VfsPut(ino, forgets[i].nlookup);
+      bool removed = vfs_put_raii.VfsPut(forgets[i].ino, forgets[i].nlookup);
       if (removed)
-        evict_raii.Evict(ino);
+        evict_raii.Evict(forgets[i].ino);
     }
   }
-  fuse_remounter_->fence()->Leave();
 
   fuse_reply_none(req);
 }
