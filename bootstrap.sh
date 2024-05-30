@@ -209,12 +209,6 @@ build_lib() {
         patch_external "googletest"     "cmake_compatibility.patch"
         do_build "googletest"
       ;;
-    ipaddress)
-      if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
-        do_extract "ipaddress" "ipaddress-${IPADDRESS_VERSION}.tar.gz"
-        do_build "ipaddress"
-      fi
-      ;;
     maxminddb)
       if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
         do_extract "maxminddb" "MaxMind-DB-Reader-python-${MAXMINDDB_VERSION}.tar.gz"
@@ -273,7 +267,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest ipaddress maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive"
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"

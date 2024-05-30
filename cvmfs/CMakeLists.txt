@@ -970,11 +970,6 @@ if (BUILD_SERVER)
       PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
     )
     install(
-      FILES        ${EXTERNALS_INSTALL_LOCATION}/ipaddress.py
-      DESTINATION  "/usr/share/cvmfs-server/webapi"
-      PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
-    )
-    install(
       FILES        webapi/cvmfs_api.py webapi/cvmfs_geo.py
       DESTINATION  "/usr/share/cvmfs-server/webapi"
       PERMISSIONS  OWNER_READ GROUP_READ WORLD_READ
