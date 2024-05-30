@@ -221,10 +221,8 @@ build_lib() {
       do_build "protobuf"
       ;;
     googlebench)
-      if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
         do_copy "googlebench"
         do_build "googlebench"
-      fi
       ;;
     sqlite3)
       do_copy "sqlite3"
@@ -251,7 +249,7 @@ build_lib() {
       patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
-    go)
+    golang)
       if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
         do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
         do_build "go"
@@ -267,13 +265,18 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest maxminddb protobuf googlebench sqlite3 vjson sha3 libarchive"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest maxminddb protobuf sqlite3 vjson sha3 libarchive"
+
+if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
+    missing_libs="$missing_libs googlebench"
+fi
+
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
 fi
 if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-    missing_libs="$missing_libs go"
+    missing_libs="$missing_libs golang"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
