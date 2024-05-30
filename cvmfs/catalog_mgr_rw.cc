@@ -41,9 +41,10 @@ WritableCatalogManager::WritableCatalogManager(
   perf::Statistics          *statistics,
   bool                       is_balanceable,
   unsigned                   max_weight,
-  unsigned                   min_weight)
+  unsigned                   min_weight,
+  const                      std::string &dir_cache)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
-      statistics)
+      statistics, false, dir_cache, true /* copy to tmpdir */)
   , spooler_(spooler)
   , enforce_limits_(enforce_limits)
   , nested_kcatalog_limit_(nested_kcatalog_limit)
@@ -1229,6 +1230,36 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
   spooler_->ProcessCatalog(catalog->database_path());
 }
 
+/**
+ * Copy catalog to local cache.server
+ * Must be an atomic write into the cache_dir
+ * As such: create a temporary copy in cache_dir/txn and then do a 
+ * `rename` (which is atomic) to the actual cache path
+ * 
+ * @returns true on success, otherwise false
+ */
+bool WritableCatalogManager::CopyCatalogToLocalCache(
+                                          const upload::SpoolerResult &result) {
+  std::string tmp_catalog_path;
+  const std::string cache_catalog_path = dir_cache_ + "/"
+                                  + result.content_hash.MakePathWithoutSuffix();
+  FILE *fcatalog = CreateTempFile(dir_cache_ + "/txn/catalog", 0666,
+                                                        "w", &tmp_catalog_path);
+  if (!fcatalog) {
+    PANIC(kLogDebug | kLogStderr,
+                               "Creating file for temporary catalog failed: %s",
+                               tmp_catalog_path.c_str());
+  }
+  CopyPath2File(result.local_path.c_str(), fcatalog);
+  (void) fclose(fcatalog);
+
+  if (rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str()) != 0) {
+    PANIC(kLogDebug | kLogStderr,
+                         "Failed to copy catalog from %s to cache %s",
+                         result.local_path.c_str(), cache_catalog_path.c_str());
+  }
+  return true;
+}
 
 void WritableCatalogManager::CatalogUploadCallback(
                           const upload::SpoolerResult &result,
@@ -1251,6 +1282,10 @@ void WritableCatalogManager::CatalogUploadCallback(
 
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
+
+  if (UseLocalCache()) {
+    CopyCatalogToLocalCache(result);
+  }
 
   SyncLock();
   if (catalog->HasParent()) {
@@ -1404,6 +1439,11 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
     PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
           result.local_path.c_str(), result.return_code);
   }
+
+  if (UseLocalCache()) {
+    CopyCatalogToLocalCache(result);
+  }
+
   unlink(result.local_path.c_str());
 }
 
