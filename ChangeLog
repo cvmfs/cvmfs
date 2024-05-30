@@ -1,4 +1,5 @@
 2.12.0:
+  * [client] Close page cache tracker entry if cvmfs_open() fails (#3588)
   * [gw] Cache catalogs for cvmfs_receiver (#3431)
   * [client] Remove unnecessary remount fence in forget callback (#3591)
   * [server] Remove external package ipaddress (drops python 2 support) (#3607)
