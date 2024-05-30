@@ -1315,6 +1315,12 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       if (file_system_->cache_mgr()->Close(fd) == 0)
         perf::Dec(file_system_->no_open_files());
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
+      // not returning an fd, so close the page cache tracker entry if required
+      if (!dirent.IsDirectIo()) {
+        fuse_remounter_->fence()->Enter();
+        mount_point_->page_cache_tracker()->Close(ino);
+        fuse_remounter_->fence()->Leave();
+      }
       fuse_reply_err(req, EMFILE);
       return;
     }
@@ -1322,6 +1328,13 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   // fd < 0
+  // the download has failed. Close the page cache tracker entry if required
+  if (!dirent.IsDirectIo()) {
+    fuse_remounter_->fence()->Enter();
+    mount_point_->page_cache_tracker()->Close(ino);
+    fuse_remounter_->fence()->Leave();
+  }
+
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
            "failed to open inode: %" PRIu64 ", CAS key %s, error code %d",
            uint64_t(ino), dirent.checksum().ToString().c_str(), errno);
