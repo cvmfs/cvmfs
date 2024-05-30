@@ -418,7 +418,7 @@ class AbstractUploader
  protected:
   /**
    * Used by concrete implementations when they use callbacks where it's not
-   * already forseen, e.g. S3Uploader::Peek().
+   * already foreseen, e.g. S3Uploader::Peek().
    */
   void IncJobsInFlight() {
     ++jobs_in_flight_;
