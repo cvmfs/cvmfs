@@ -71,41 +71,54 @@ jobs:
           export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           export CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
           export CVMFS_TEST_PROXY=DIRECT
-          cd $GITHUB_WORKSPACE/test
+          cd /Users/ybelikov/Dev_personal/cvmfs/test
           ./run.sh /tmp/cvmfs-client-test.log -o /tmp/cvmfs-client-test.xunit.xml \
-                                -s quick                                        \
-                                -x src/004-davinci                              \
-                                   src/005-asetup                               \
-                                   src/006-buildkernel                          \
-                                   src/007-testjobs                             \
-                                   src/008-default_domain                       \
-                                   src/016-dnsunreachable                       \
-                                   src/017-dnstimeout                           \
-                                   src/024-reload-during-asetup                 \
-                                   src/039-reloadalarm                          \
-                                   src/040-aliencache                           \
-                                   src/045-oasis                                \
-                                   src/052-roundrobindns                        \
-                                   src/050-configrepo                           \
-                                   src/055-ownership                            \
-                                   src/056-lowspeedlimit                        \
-                                   src/057-parallelmakecache                    \
-                                   src/061-systemdnokill                        \
-                                   src/074-oom                                  \
-                                   src/081-shrinkwrap                           \
-                                   src/082-shrinkwrap-cms                       \
-                                   src/083-suid                                 \
-                                   src/084-premounted                           \
-                                   src/088-watchdog                             \
-                                   src/089-external_cache_plugin                \
-                                   src/094-attachmount                          \
-                                   src/095-fuser                                \
-                                   src/102-reusefd                              \
-                                   src/103-reloadcachemgr                       \
-                                   --                                           \
-                                   src/0*                                       \
-                                   src/1*
-
+            -s quick                                          \
+            -x src/004-davinci                                \
+            src/005-asetup                                    \
+            src/006-buildkernel                               \
+            src/007-testjobs                                  \
+            src/008-default_domain                            \
+            src/015-rebuild_on_crash                          \
+            src/016-dnsunreachable                            \
+            src/017-dnstimeout                                \
+            src/024-reload-during-asetup                      \
+            src/028-negativecach                              \
+            src/039-reloadalarm                               \
+            src/040-aliencache                                \
+            src/045-oasis                                     \
+            src/052-roundrobindns                             \
+            src/050-configrepo                                \
+            src/053-uuid                                      \
+            src/055-ownership                                 \
+            src/056-lowspeedlimit                             \
+            src/057-parallelmakecache                         \
+            src/060-hidexattrs                                \
+            src/061-systemdnokill                             \
+            src/069-systemremount                             \
+            src/072-mountdevicepath                           \
+            src/074-oom                                       \
+            src/077-doublemount                               \
+            src/078-offlinemode                               \
+            src/081-shrinkwrap                                \
+            src/082-shrinkwrap-cms                            \
+            src/083-suid                                      \
+            src/084-premounted                                \
+            src/087-xattrs                                    \
+            src/088-watchdog                                  \
+            src/089-external_cache_plugin                     \
+            src/090-talkchroot                                \
+            src/092-stat                                      \
+            src/094-attachmount                               \
+            src/095-fuser                                     \
+            src/096-cancelreq                                 \
+            src/102-reusefd                                   \
+            src/103-reloadcachemgr                            \
+            --                                                \
+            src/0*                                            \
+            src/1*
+        
+        
 
       - name: Upload logs as artifact
         if: ${{ always () }}

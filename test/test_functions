@@ -109,7 +109,13 @@ get_xattr() {
   local extended_attr="$1"
   local path="$2"
   if running_on_osx; then
-    xattr -p user.$extended_attr "$path"
+    # For some reason xattr -p may work after xattr -l
+    if xattr -l "$path"; then
+      xattr -p "user.$extended_attr" "$path"
+    else
+      echo "Error: Attribute user.$extended_attr not found on $path" >> /tmp/cvmfs-integration.log 
+      return 1
+    fi
   else
     attr -qg $extended_attr "$path"
   fi
@@ -525,6 +531,7 @@ cvmfs_mount() {
 
   if running_on_osx; then
     cvmfs_mount_direct $repositories
+    sleep 2
   fi
   if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
     cvmfs_mount_direct $repositories
@@ -2443,6 +2450,7 @@ try_automount() {
   local repo=$1
   if running_on_osx; then
     mount | grep "$repo" || sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
+    sleep 1
   else
     ls /cvmfs/${repo}
   fi
