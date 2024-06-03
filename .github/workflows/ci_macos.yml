@@ -79,11 +79,14 @@ jobs:
             src/006-buildkernel                               \
             src/007-testjobs                                  \
             src/008-default_domain                            \
+            src/011-rmemptyfilesrebuild                       \
             src/015-rebuild_on_crash                          \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
             src/024-reload-during-asetup                      \
-            src/028-negativecach                              \
+            src/028-negativecache                              \
+            src/032-workspace                                 \
+            src/037-strictmount                               \
             src/039-reloadalarm                               \
             src/040-aliencache                                \
             src/045-oasis                                     \
@@ -95,6 +98,7 @@ jobs:
             src/057-parallelmakecache                         \
             src/060-hidexattrs                                \
             src/061-systemdnokill                             \
+            src/066-killall                                   \
             src/069-systemremount                             \
             src/072-mountdevicepath                           \
             src/074-oom                                       \
@@ -108,10 +112,13 @@ jobs:
             src/088-watchdog                                  \
             src/089-external_cache_plugin                     \
             src/090-talkchroot                                \
+            src/091-defaultconfigrepo                         \
+            src/091-talksocket                                \
             src/092-stat                                      \
             src/094-attachmount                               \
             src/095-fuser                                     \
             src/096-cancelreq                                 \
+            src/097-statfs
             src/102-reusefd                                   \
             src/103-reloadcachemgr                            \
             --                                                \
