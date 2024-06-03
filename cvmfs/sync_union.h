@@ -118,6 +118,14 @@ class SyncUnion {
   virtual bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const = 0;
 
   /**
+   * OverlayFS when mounted with redirect_dir option
+   * allows renaming of directories (via rename() or mv) 
+   * But on sole renaming it creates empty directory in the scratch area 
+   * with trusted.overlay.redirect xattr that preserves the old name of a directory
+   */
+  virtual bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const = 0;
+
+  /**
    * Checks if given file is supposed to be whiteout.
    * These files indicate that a specific file has been deleted.
    * @param filename the filename to check

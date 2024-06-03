@@ -252,6 +252,27 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   SyncUnlock();
 }
 
+void WritableCatalogManager::UpdateDirectory(const std::string &old_path, 
+                                            const std::string &new_path) {
+  
+  const string old_relative_path = MakeRelativePath(old_path);
+  const string new_relative_path = MakeRelativePath(new_path);
+  string new_parent_path, new_directory_name;
+  SplitPath(old_relative_path, &new_parent_path, &new_directory_name);
+  SyncLock();
+  WritableCatalog* catalog;
+  DirectoryEntry entry;
+  if (!FindCatalog(old_relative_path, &catalog, &entry)) 
+  {
+      LogCvmfs(kLogCatalog, kLogStderr,
+          "no catalog with path: %s was found",
+          old_relative_path.c_str()); 
+    PANIC("Unable to found parent catalog");
+  }
+  entry.name_.Assign(NameString(new_directory_name));
+  catalog->RefreshEntry(entry, old_path, new_path);
+  SyncUnlock();
+}
 
 /**
  * Remove the given directory from the catalogs.
@@ -475,7 +496,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   const string parent_path = MakeRelativePath(parent_directory);
   string directory_path = parent_path + "/";
   directory_path.append(entry.name().GetChars(), entry.name().GetLength());
-
+  LogCvmfs(kLogUnionFs, kLogStdout, "Adding directory: %s", directory_path.c_str());
   SyncLock();
   WritableCatalog *catalog;
   DirectoryEntry parent_entry;
@@ -492,7 +513,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   parent_entry.set_linkcount(parent_entry.linkcount() + 1);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
-    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
+    LogCvmfs(kLogCatalog, kLogStdout, "updating transition point %s",
              parent_path.c_str());
     WritableCatalog *parent_catalog =
       reinterpret_cast<WritableCatalog *>(catalog->parent());
@@ -542,7 +563,8 @@ void WritableCatalogManager::AddFile(
       PANIC(kLogStderr, "file at %s is larger than %u megabytes (%u).",
             file_path.c_str(), file_mbyte_limit_, mbytes);
   }
-
+  LogCvmfs(kLogCatalog, kLogStdout, "Adding entry to CATALOG: %s", catalog->database_path().c_str()); 
+  
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
   SyncUnlock();
 }

@@ -76,7 +76,7 @@ class WritableCatalog : public Catalog {
   void IncLinkcount(const std::string &path_within_group, const int delta);
   void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
   void RemoveFileChunks(const std::string &entry_path);
-
+ 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
   void MergeIntoParent();
@@ -122,6 +122,12 @@ class WritableCatalog : public Catalog {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
+  void RefreshEntry(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash);
+  inline void RefreshEntry(const DirectoryEntry &entry, const std::string &old_path, const std::string &new_path)
+  {
+    RefreshEntry(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
+  }
+
   inline void AddEntry(
     const DirectoryEntry &entry,
     const XattrList &xattrs,
@@ -152,6 +158,7 @@ class WritableCatalog : public Catalog {
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
+  SqlDirentNameUpdate *sql_update_name_;
   SqlChunkInsert      *sql_chunk_insert_;
   SqlChunksRemove     *sql_chunks_remove_;
   SqlChunksCount      *sql_chunks_count_;

@@ -32,7 +32,7 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
     const SyncItemType entry_type) const {
   SharedPtr<SyncItem> entry = SharedPtr<SyncItem>(
       new SyncItemNative(relative_parent_path, filename, this, entry_type));
-
+  LogCvmfs(kLogUnionFs, kLogStdout, "Relative parent path: %s, filename: %s", relative_parent_path.c_str(), filename.c_str());
   PreprocessSyncItem(entry);
   if (entry_type == kItemFile) {
     entry->SetExternalData(mediator_->IsExternalData());
@@ -46,12 +46,23 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
 
 void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
   if (IsWhiteoutEntry(entry)) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem: %s", entry->GetRelativePath().c_str());
     entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
   }
 
-  if (entry->IsDirectory() && IsOpaqueDirectory(entry)) {
+  if (!entry->IsDirectory())
+  {
+    return;
+  }
+
+  if (IsOpaqueDirectory(entry)) {
     entry->MarkAsOpaqueDirectory();
   }
+  else if (IsRenamedDirectory(entry)) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "BBBBBBBBBBBBBBBBBBB");
+    entry->MarkAsRenamedDirectory();
+  }
+
 }
 
 bool SyncUnion::IgnoreFilePredicate(const std::string &parent_dir,
@@ -68,12 +79,25 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
-  if (entry->IsNew()) {
+  if (entry->IsNew() && !entry->IsRenamedDirectory()) {
     mediator_->Add(entry);
     // Recursion stops here. All content of new directory
     // is added later by the SyncMediator
     return false;
-  } else {                             // directory already existed...
+  } 
+  else if (entry->IsRenamedDirectory()) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "AAAAAAAAAAAAAAAAAAAAa");
+    XattrList* list = XattrList::CreateFromFile(entry->GetScratchPath());
+    vector<string> keys = list->ListKeys();
+    for (vector<string>::const_iterator it = keys.cbegin(); it != keys.cend(); ++it)
+    {
+      LogCvmfs(kLogUnionFs, kLogStdout, "Xattr key for %s is %s", entry->GetScratchPath().c_str(), (*it).c_str());  
+    }
+    LogCvmfs(kLogUnionFs, kLogStdout, "Detected renamed directory: %s", entry->GetScratchPath().c_str());
+    mediator_->UpdateDirectory(entry);
+    return false;
+  } 
+  else {                             // directory already existed...
     if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
       return false;  // <-- replace does not need any further recursion
@@ -117,7 +141,7 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
   if (entry->IsWhiteout()) {
-    mediator_->Remove(entry);
+    // mediator_->Remove(entry);
   } else {
     if (entry->IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",

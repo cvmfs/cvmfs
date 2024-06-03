@@ -62,6 +62,10 @@ bool SyncUnionAufs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
   return FileExists(directory->GetScratchPath() + "/.wh..wh..opq");
 }
 
+bool SyncUnionAufs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  return false;
+}
+
 string SyncUnionAufs::UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const {
   const std::string &filename = entry->filename();
   return filename.substr(whiteout_prefix_.length());

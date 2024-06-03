@@ -32,6 +32,7 @@ class SyncUnionAufs : public SyncUnion {
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
+  bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const; 
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
 
  private:

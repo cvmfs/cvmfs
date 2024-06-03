@@ -29,6 +29,7 @@ SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
   opaque_(false),
+  renamed_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
@@ -50,6 +51,7 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
+  renamed_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
@@ -151,6 +153,12 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 void SyncItem::MarkAsOpaqueDirectory() {
   assert(IsDirectory());
   opaque_ = true;
+}
+
+void SyncItem::MarkAsRenamedDirectory() {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a renamed: %s", filename_.c_str());
+  assert(IsDirectory());
+  renamed_ = true;
 }
 
 

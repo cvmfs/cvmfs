@@ -551,6 +551,7 @@ void SyncMediator::AddDirectoryRecursively(SharedPtr<SyncItem> entry) {
   traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
   traversal.fn_new_fifo      = &SyncMediator::AddFifoCallback;
   traversal.fn_new_socket    = &SyncMediator::AddSocketCallback;
+  LogCvmfs(kLogUnionFs, kLogCvmfs, "On AddDirectoryRecursively. SyncItem scratch path: %s", entry->GetScratchPath().c_str());
   traversal.Recurse(entry->GetScratchPath());
 }
 
@@ -812,6 +813,7 @@ void SyncMediator::PublishHardlinksCallback(
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::CreateNestedCatalog. Adding directory: %s", directory->GetUnionPath().c_str());
   reporter_->OnAdd(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
@@ -926,9 +928,11 @@ void SyncDiffReporter::ModifyImpl(const std::string &path) {
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddFile. Adding %s", entry->GetUnionPath().c_str());
   reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
-  if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
+  if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) 
+  {
     assert(!entry->HasGraftMarker());
     // Symlinks and special files are completely stored in the catalog
     XattrList *xattrs = &default_xattrs_;
@@ -940,7 +944,9 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
                               entry->relative_parent_path());
     if (xattrs != &default_xattrs_)
       free(xattrs);
-  } else if (entry->HasGraftMarker() && !params_->dry_run) {
+  } 
+  else if (entry->HasGraftMarker() && !params_->dry_run) 
+  {
     if (entry->IsValidGraft()) {
       // Graft files are added to catalog immediately.
       if (entry->IsChunkedGraft()) {
@@ -964,11 +970,16 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
             " file.  Aborting publish.",
             entry->GetRelativePath().c_str());
     }
-  } else if (entry->relative_parent_path().empty() &&
-             entry->IsCatalogMarker()) {
+  } 
+  else if (entry->relative_parent_path().empty() &&
+             entry->IsCatalogMarker())            
+  {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
-  } else if (!params_->dry_run) {
+  } 
+  else if (!params_->dry_run) 
+  {
     {
+      LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddFile. Not in dry run");
       // Push the file to the spooler, remember the entry for the path
       MutexLockGuard m(&lock_file_queue_);
       file_queue_[entry->GetUnionPath()] = entry;
@@ -1019,7 +1030,7 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
           ".cvmfsbundles is reserved for bundles specification files",
           entry->GetUnionPath().c_str());
   }
-
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Adding %s", entry->GetUnionPath().c_str());
   reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   perf::Inc(counters_->n_directories_added);
@@ -1030,14 +1041,17 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
       xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
       assert(xattrs);
     }
+    LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Not in dry run");
     catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                    entry->relative_parent_path());
-    if (xattrs != &default_xattrs_)
+    if (xattrs != &default_xattrs_) {
       free(xattrs);
+    }
   }
 
   if (entry->HasCatalogMarker() &&
       !catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Creating nested catalog");
     CreateNestedCatalog(entry);
   }
 }
@@ -1061,6 +1075,25 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   }
 
   perf::Inc(counters_->n_directories_removed);
+}
+
+
+/**
+ * Update single directory entry without the content
+ */
+void SyncMediator::UpdateDirectory(SharedPtr<SyncItem> entry) {
+  //reporter_->OnUpdateDirectory(entry->GetUnionPath())
+  XattrList* xattr_list = XattrList::CreateFromFile(entry->GetScratchPath());
+  assert(xattr_list);
+  std::string old_name;
+  
+  if (!xattr_list->Get("trusted.overlay.redirect", &old_name)) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "A directory: %s was marked as renamed but we failed ot obtain an old name", entry->GetScratchPath().c_str());
+  }
+  LogCvmfs(kLogUnionFs, kLogStderr, "A directory: %s was marked as renamed and we obtain an old name %s", entry->GetScratchPath().c_str(), old_name.c_str()) ;
+  const std::string old_path = entry->relative_parent_path() + "/" + old_name;
+  const std::string new_path = entry->GetRelativePath(); 
+  catalog_manager_->UpdateDirectory(old_path, new_path);
 }
 
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {

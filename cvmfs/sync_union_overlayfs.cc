@@ -152,24 +152,24 @@ void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
 
 void SyncUnionOverlayfs::Traverse() {
   assert(this->IsInitialized());
-
   FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
 
+  // Preprocess renamed files
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_block_dev = &SyncUnionOverlayfs::ProcessBlockDevice;
   traversal.fn_new_fifo = &SyncUnionOverlayfs::ProcessFifo;
   traversal.fn_new_socket = &SyncUnionOverlayfs::ProcessSocket;
   traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
+  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
 
-  LogCvmfs(kLogUnionFs, kLogVerboseMsg,
+  LogCvmfs(kLogUnionFs, kLogStdout,
            "OverlayFS starting traversal "
            "recursion for scratch_path=[%s]",
-           scratch_path().c_str());
+           scratch_path().c_str());  
   traversal.Recurse(scratch_path());
 }
 
@@ -285,6 +285,19 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
   }
   return is_opaque;
 }
+
+bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  const std::string path = directory->GetScratchPath();
+  return DirectoryExists(path) && IsRenamedDirPath(path);
+}
+
+bool SyncUnionOverlayfs::IsRenamedDirPath(const std::string &path) const {
+  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect");
+  if (is_renamed) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has redirect attribute", path.c_str());
+  }
+  return is_renamed;
+} 
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(
     SharedPtr<SyncItem> entry) const {

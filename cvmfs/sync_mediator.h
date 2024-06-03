@@ -117,6 +117,7 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
+  virtual void UpdateDirectory(SharedPtr<SyncItem> entry) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -160,6 +161,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
+  void UpdateDirectory(SharedPtr<SyncItem> entry);
   void Clone(const std::string from, const std::string to);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);

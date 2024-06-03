@@ -35,6 +35,7 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_unlink_(NULL),
   sql_touch_(NULL),
   sql_update_(NULL),
+  sql_update_name_(NULL),
   sql_chunk_insert_(NULL),
   sql_chunks_remove_(NULL),
   sql_chunks_count_(NULL),
@@ -95,6 +96,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_unlink_        = new SqlDirentUnlink     (database());
   sql_touch_         = new SqlDirentTouch      (database());
   sql_update_        = new SqlDirentUpdate     (database());
+  sql_update_name_   = new SqlDirentNameUpdate (database());
   sql_chunk_insert_  = new SqlChunkInsert      (database());
   sql_chunks_remove_ = new SqlChunksRemove     (database());
   sql_chunks_count_  = new SqlChunksCount      (database());
@@ -147,7 +149,7 @@ void WritableCatalog::AddEntry(
 {
   SetDirty();
 
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
+  LogCvmfs(kLogCatalog, kLogStdout, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
                                         mountpoint().c_str());
 
@@ -252,13 +254,25 @@ void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
 void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
                                   const shash::Md5 &path_hash) {
   SetDirty();
-
+  
   bool retval =
     sql_update_->BindPathHash(path_hash) &&
     sql_update_->BindDirent(entry)       &&
     sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();
+}
+
+void WritableCatalog::RefreshEntry(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash)
+{
+  SetDirty();
+  LogCvmfs(kLogCatalog, kLogStdout, "Updating directory name");
+  bool retval = 
+    sql_update_name_->BindPathsHashes(old_path_hash, new_path_hash) &&
+    sql_update_name_->BindDirent(entry) &&
+    sql_update_name_->Execute();
+  assert(retval);
+  sql_update_name_->Reset(); 
 }
 
 void WritableCatalog::AddFileChunk(const std::string &entry_path,

@@ -461,6 +461,16 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 //------------------------------------------------------------------------------
 
+class SqlDirentNameUpdate : public SqlDirentWrite {
+ public:
+  explicit SqlDirentNameUpdate(const CatalogDatabase &database);
+  bool BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash);
+  bool BindDirent(const DirectoryEntry &entry);
+};
+
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
 
 class SqlDirentUnlink : public SqlCatalog {
  public:

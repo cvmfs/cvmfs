@@ -84,6 +84,7 @@ class SyncItem {
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
+  inline bool IsRenamedDirectory() const { return IsDirectory() && renamed_; }
 
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
@@ -152,6 +153,7 @@ class SyncItem {
 
   void MarkAsWhiteout(const std::string &actual_filename);
   void MarkAsOpaqueDirectory();
+  void MarkAsRenamedDirectory();
 
   /**
    * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
@@ -290,6 +292,7 @@ class SyncItem {
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
+  bool renamed_;                      /**< SyncUnion marked thus as a renamed directory */
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */

@@ -40,6 +40,7 @@ class SyncUnionOverlayfs : public SyncUnion {
 
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
+  bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;
 
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
@@ -52,6 +53,7 @@ class SyncUnionOverlayfs : public SyncUnion {
 
  private:
   bool IsOpaqueDirPath(const std::string &path) const;
+  bool IsRenamedDirPath(const std::string &path) const;
 
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
