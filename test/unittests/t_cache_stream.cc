@@ -6,7 +6,7 @@
 
 #include <cache_posix.h>
 #include <cache_stream.h>
-#include <compression.h>
+#include <compression/compression.h>
 #include <crypto/hash.h>
 #include <network/download.h>
 #include <statistics.h>

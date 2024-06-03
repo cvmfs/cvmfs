@@ -239,6 +239,9 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_AUTOCATALOGS_MIN_WEIGHT" != "x" ]; then
       sync_command="$sync_command -M $CVMFS_AUTOCATALOGS_MIN_WEIGHT"
     fi
+    if [ "x$CVMFS_SERVER_USE_CATALOG_CACHE" = "xtrue" ]; then
+      sync_command="$sync_command -G"
+    fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
     fi

@@ -2,7 +2,7 @@ set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 
 add_executable(s3benchmark
                test/stress/s3benchmark.cc
-               ${CVMFS_SOURCE_DIR}/compression.cc
+               ${CVMFS_SOURCE_DIR}/compression/compression.cc
                ${CVMFS_SOURCE_DIR}/gateway_util.cc
                ${CVMFS_SOURCE_DIR}/json_document.cc
                ${CVMFS_SOURCE_DIR}/network/dns.cc

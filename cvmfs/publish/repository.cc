@@ -691,7 +691,8 @@ void Publisher::ConstructSyncManagers() {
       statistics_,
       settings_.transaction().use_catalog_autobalance(),
       settings_.transaction().autobalance_max_weight(),
-      settings_.transaction().autobalance_min_weight());
+      settings_.transaction().autobalance_min_weight(),
+      "");
     catalog_mgr_->Init();
   }
 

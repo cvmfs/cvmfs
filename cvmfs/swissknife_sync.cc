@@ -143,13 +143,13 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       catalog::WritableCatalogManager::CreateRepository(
           dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
   if (!manifest.IsValid()) {
-    PrintError("Failed to create new repository");
+    PrintError("Swissknife Sync: Failed to create new repository");
     return 1;
   }
 
   UniquePtr<manifest::Reflog> reflog(CreateEmptyReflog(dir_temp, repo_name));
   if (!reflog.IsValid()) {
-    PrintError("Failed to create fresh Reflog");
+    PrintError("Swissknife Sync: Failed to create fresh Reflog");
     return 1;
   }
 
@@ -162,7 +162,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   spooler->WaitForUpload();
   unlink(reflog_path.c_str());
   if (spooler->GetNumberOfErrors()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload reflog");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Swissknife Sync: Failed to upload reflog");
     return 4;
   }
   assert(!reflog_chksum_path.empty());
@@ -174,7 +174,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
 
   if (!manifest->Export(manifest_path)) {
-    PrintError("Failed to create new repository");
+    PrintError("Swissknife Sync: Failed to create new repository");
     return 5;
   }
 
@@ -189,7 +189,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   if (args.find('a') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('a')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("unknown hash algorithm");
+      PrintError("Swissknife Sync: Unknown hash algorithm");
       return 1;
     }
   }
@@ -201,7 +201,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
   spooler->WaitForUpload();
 
   if (spooler->GetNumberOfErrors() > 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload %s", source.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr, "Swissknife Sync: failed to upload %s",
+                                      source.c_str());
     return 1;
   }
 
@@ -221,15 +222,17 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
   const bool success = spooler->Peek(file_to_peek);
 
   if (spooler->GetNumberOfErrors() > 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to peek for %s",
+    LogCvmfs(kLogCatalog, kLogStderr, "Swissknife Sync: failed to peek for %s",
              file_to_peek.c_str());
     return 2;
   }
   if (!success) {
-    LogCvmfs(kLogCatalog, kLogStdout, "%s not found", file_to_peek.c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "Swissknife Sync: %s not found",
+                                      file_to_peek.c_str());
     return 1;
   }
-  LogCvmfs(kLogCatalog, kLogStdout, "%s available", file_to_peek.c_str());
+  LogCvmfs(kLogCatalog, kLogStdout, "Swissknife Sync: %s available",
+                                    file_to_peek.c_str());
 
   delete spooler;
 
@@ -248,7 +251,7 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   spooler->WaitForUpload();
 
   if (spooler->GetNumberOfErrors() > 0) {
-    LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
+    LogCvmfs(kLogCatalog, kLogStderr, "Swissknife Sync: failed to delete %s",
              file_to_delete.c_str());
     return 1;
   }
@@ -271,19 +274,22 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // check if there is a dirtab file
   if (!FileExists(dirtab_file)) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg,
-             "Didn't find a dirtab at '%s'. Skipping...", dirtab_file.c_str());
+                   "Swissknife Sync: Didn't find a dirtab at '%s'. Skipping...",
+                   dirtab_file.c_str());
     return 0;
   }
 
   // parse dirtab file
   catalog::Dirtab *dirtab = catalog::Dirtab::Create(dirtab_file);
   if (!dirtab->IsValid()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
-             dirtab_file.c_str());
+    LogCvmfs(kLogCatalog, kLogStderr,
+                         "Swissknife Sync: Invalid or not readable dirtab '%s'",
+                         dirtab_file.c_str());
     return 1;
   }
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %lu rules in dirtab '%s'",
-           dirtab->RuleCount(), dirtab_file.c_str());
+  LogCvmfs(kLogCatalog, kLogVerboseMsg,
+                              "Swissknife Sync: Found %lu rules in dirtab '%s'",
+                              dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
   const bool auto_manage_catalog_files = true;
@@ -385,17 +391,20 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
 
     if (glob_retval == 0) {
       // found some candidates... filtering by cvmfs catalog structure
-      LogCvmfs(kLogCatalog, kLogDebug, "Found %lu entries for pathspec (%s)",
-               glob_res.gl_pathc, glob_string.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug,
+                         "Swissknife Sync: Found %lu entries for pathspec (%s)",
+                         glob_res.gl_pathc, glob_string.c_str());
       FilterCandidatesFromGlobResult(dirtab, glob_res.gl_pathv,
                                      glob_res.gl_pathc, catalog_manager,
                                      nested_catalog_candidates);
     } else if (glob_retval == GLOB_NOMATCH) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "WARNING: cannot apply pathspec %s",
-               glob_string.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                           "Swissknife Sync: WARNING: cannot apply pathspec %s",
+                           glob_string.c_str());
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to run glob matching (%s)",
-               glob_string.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                            "Swissknife Sync: Failed to run glob matching (%s)",
+                            glob_string.c_str());
     }
 
     globfree(&glob_res);
@@ -417,6 +426,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
     if (lstat_retval != 0) {
       LogCvmfs(kLogCatalog, kLogDebug | kLogStderr | kLogSyslogErr,
+               "Swissknife Sync: "
                "Error in processing .cvmfsdirtab: cannot access %s (%d)",
                candidate.c_str(), errno);
       abort();
@@ -425,7 +435,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     if (!S_ISDIR(candidate_info.st_mode)) {
       // The GLOB_ONLYDIR flag is only a hint, non-directories can still be
       // returned
-      LogCvmfs(kLogCatalog, kLogDebug,
+      LogCvmfs(kLogCatalog, kLogDebug, "Swissknife Sync: "
                "The '%s' dirtab entry does not point to a directory "
                "but to a file or a symbolic link",
                candidate_rel.c_str());
@@ -441,8 +451,9 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
 
     // check that the path isn't excluded in the dirtab
     if (dirtab.IsOpposing(candidate_rel)) {
-      LogCvmfs(kLogCatalog, kLogDebug, "Candidate '%s' is excluded by dirtab",
-               candidate_rel.c_str());
+      LogCvmfs(kLogCatalog, kLogDebug,
+                        "Swissknife Sync: Candidate '%s' is excluded by dirtab",
+                        candidate_rel.c_str());
       continue;
     }
 
@@ -454,14 +465,14 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
         candidate_rel, catalog::kLookupDefault, &dirent);
     if (!lookup_success) {
       LogCvmfs(kLogCatalog, kLogDebug,
-               "Didn't find '%s' in catalogs, could "
+               "Swissknife Sync: Didn't find '%s' in catalogs, could "
                "be a new directory and nested catalog.",
                candidate_rel.c_str());
       nested_catalog_candidates->push_back(candidate);
     } else if (!dirent.IsNestedCatalogMountpoint() &&
                !dirent.IsNestedCatalogRoot()) {
       LogCvmfs(kLogCatalog, kLogDebug,
-               "Found '%s' in catalogs but is not a "
+               "Swissknife Sync: Found '%s' in catalogs but is not a "
                "nested catalog yet.",
                candidate_rel.c_str());
       nested_catalog_candidates->push_back(candidate);
@@ -476,13 +487,13 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
       if (DirectoryExists(scratch_dir_ + candidate_rel) &&
           !FileExists(union_dir_ + candidate_rel + "/.cvmfscatalog")) {
         LogCvmfs(kLogCatalog, kLogStdout,
-                 "WARNING: '%s' should be a nested "
+                 "Swissknife Sync: WARNING: '%s' should be a nested "
                  "catalog according to the dirtab. "
                  "Recreating...",
                  candidate_rel.c_str());
         nested_catalog_candidates->push_back(candidate);
       } else {
-        LogCvmfs(kLogCatalog, kLogDebug,
+        LogCvmfs(kLogCatalog, kLogDebug, "Swissknife Sync: "
                  "Found '%s' in catalogs and it already is a nested catalog.",
                  candidate_rel.c_str());
       }
@@ -512,7 +523,7 @@ bool swissknife::CommandApplyDirtab::CreateCatalogMarkers(
     const int fd = open(marker_path.c_str(), O_CREAT, mode);
     if (fd < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Failed to create nested catalog marker "
+               "Swissknife Sync: Failed to create nested catalog marker "
                "at '%s' (errno: %d)",
                marker_path.c_str(), errno);
       success = false;
@@ -522,8 +533,9 @@ bool swissknife::CommandApplyDirtab::CreateCatalogMarkers(
 
     // inform the user if requested
     if (verbose_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Auto-creating nested catalog in %s",
-               k->c_str());
+      LogCvmfs(kLogCvmfs, kLogStdout,
+                          "Swissknife Sync: Auto-creating nested catalog in %s",
+                          k->c_str());
     }
   }
 
@@ -616,8 +628,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     bool retval = catalog::VirtualCatalog::ParseActions(
         *args.find('S')->second, &params.virtual_dir_actions);
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "invalid virtual catalog options: %s",
-               args.find('S')->second->c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                         "Swissknife Sync: Invalid virtual catalog options: %s",
+                          args.find('S')->second->c_str());
       return 1;
     }
   }
@@ -625,7 +638,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     unsigned log_level =
         1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Swissknife Sync: invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
@@ -639,7 +652,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
     if (!ReadFileChunkingArgs(args, &params)) {
-      PrintError("Failed to read file chunk size values");
+      PrintError("Swissknife Sync: Failed to read file chunk size values");
       return 2;
     }
   }
@@ -650,7 +663,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("unknown hash algorithm");
+      PrintError("Swissknife Sync: Unknown hash algorithm");
       return 1;
     }
   }
@@ -679,7 +692,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('v') != args.end()) {
     sanitizer::IntegerSanitizer sanitizer;
     if (!sanitizer.IsValid(*args.find('v')->second)) {
-      PrintError("invalid revision number");
+      PrintError("Swissknife Sync: Invalid revision number");
       return 1;
     }
     params.manual_revision = String2Uint64(*args.find('v')->second);
@@ -717,6 +730,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('J') != args.end()) {
     params.repo_tag.SetDescription(*args.find('J')->second);
+  }
+
+  if (args.find('G') != args.end()) {
+    params.cache_dir = "/var/spool/cvmfs/" + params.repo_name + "/cache.server";
   }
 
   const bool upload_statsdb = (args.count('I') > 0);
@@ -790,23 +807,24 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string old_root_hash = manifest->catalog_hash().ToString(true);
 
   catalog::WritableCatalogManager catalog_manager(
-      params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(),
-      download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
-      params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
-      params.is_balanced, params.max_weight, params.min_weight);
+         params.base_hash, params.stratum0, params.dir_temp,
+         spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+         params.nested_kcatalog_limit, params.root_kcatalog_limit,
+         params.file_mbyte_limit, statistics(), params.is_balanced,
+         params.max_weight, params.min_weight, params.cache_dir);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
-  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  LogCvmfs(kLogPublish, kLogStdout, "Swissknife Sync: Processing changes...");
 
   // Should be before the synchronization starts to avoid race of GetTTL with
   // other sqlite operations
   if ((params.ttl_seconds > 0) &&
       ((params.ttl_seconds != catalog_manager.GetTTL()) ||
        !catalog_manager.HasExplicitTTL())) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %" PRIu64 "s",
-             params.ttl_seconds);
+    LogCvmfs(kLogCvmfs, kLogStdout,
+                      "Swissknife Sync: Setting repository TTL to %" PRIu64 "s",
+                      params.ttl_seconds);
     catalog_manager.SetTTL(params.ttl_seconds);
   }
 
@@ -820,14 +838,15 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       sync = new publish::SyncUnionAufs(&mediator, params.dir_rdonly,
                                         params.dir_union, params.dir_scratch);
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "unknown union file system: %s",
-               params.union_fs_type.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                               "Swissknife Sync: unknown union file system: %s",
+                               params.union_fs_type.c_str());
       return 3;
     }
 
     if (!sync->Initialize()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Initialization of the synchronisation "
+               "Swissknife Sync: Initialization of the synchronisation "
                "engine failed");
       return 4;
     }
@@ -842,13 +861,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "Adding contents of authz file %s to"
+             "Swissknife Sync: Adding contents of authz file %s to"
              " root catalog.",
              params.authz_file.c_str());
     int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unable to open authz file (%s)"
+               "Swissknife Sync: Unable to open authz file (%s)"
                "from the publication process: %s",
                params.authz_file.c_str(), strerror(errno));
       return 7;
@@ -859,8 +878,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     close(fd);
 
     if (!read_successful) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
-               params.authz_file.c_str(), strerror(errno));
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                          "Swissknife Sync: Failed to read authz file (%s): %s",
+                          params.authz_file.c_str(), strerror(errno));
       return 8;
     }
 
@@ -868,7 +888,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {
-    PrintError("something went wrong during sync");
+    PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
@@ -884,12 +904,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager.GetRootCatalog()->revision()));
 
   // finalize the spooler
-  LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                             "Swissknife Sync: Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                              "Swissknife Sync: Exporting repository manifest");
 
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
@@ -899,7 +921,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
-    PrintError("Failed to commit transaction.");
+    PrintError("Swissknife Sync: Failed to commit transaction.");
     if (!params.dry_run) {
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
@@ -919,7 +941,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
-    PrintError("Failed to create new repository");
+    PrintError("Swissknife Sync: Failed to create new repository");
     return 6;
   }
 

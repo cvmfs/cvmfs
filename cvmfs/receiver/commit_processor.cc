@@ -12,7 +12,7 @@
 #include "catalog_merge_tool.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
@@ -161,10 +161,16 @@ CommitProcessor::Result CommitProcessor::Process(
            lease_path.c_str(),
            manifest->catalog_hash().ToString(false).c_str());
 
+
+  std::string cache_dir_;
+  if (params.use_local_cache) {
+    cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
+  }
+
   const std::string spooler_temp_dir =
-      GetSpoolerTempDir(params.spooler_configuration);
+                                GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
+  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0755, true));
   const std::string temp_dir_root =
       spooler_temp_dir + "/receiver/commit_processor";
 
@@ -179,7 +185,7 @@ CommitProcessor::Result CommitProcessor::Process(
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
                  server_tool->download_manager(), manifest.weak_ref(),
-                 statistics_);
+                 statistics_, cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
