@@ -71,7 +71,7 @@ jobs:
           export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           export CVMFS_TEST_CLASS_NAME=ClientIntegrationTests
           export CVMFS_TEST_PROXY=DIRECT
-          cd /Users/ybelikov/Dev_personal/cvmfs/test
+          cd $GITHUB_WORKSPACE/test
           ./run.sh /tmp/cvmfs-client-test.log -o /tmp/cvmfs-client-test.xunit.xml \
             -s quick                                          \
             -x src/004-davinci                                \
