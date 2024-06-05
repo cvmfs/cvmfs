@@ -119,6 +119,8 @@ jobs:
             src/095-fuser                                     \
             src/096-cancelreq                                 \
             src/097-statfs                                    \
+            src/099-http_tracing                              \
+            src/100-reload-switch-debug                       \
             src/102-reusefd                                   \
             src/103-reloadcachemgr                            \
             src/104-concurrent_mounts                         \
