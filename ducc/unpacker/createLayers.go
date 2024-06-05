@@ -102,7 +102,7 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 			task.SetTaskCompleted(nil, db.TASK_RESULT_SKIPPED)
 			return
 		}
-		task.Log(nil, db.LOG_SEVERITY_DEBUG, "Image %s is not yet in CVMFS. Proceeding with ingestion", image.GetSimpleName())
+		task.Log(nil, db.LOG_SEVERITY_DEBUG, fmt.Sprintf("Image %s is not yet in CVMFS. Proceeding with ingestion", image.GetSimpleName()))
 		once.Do(func() { cvmfs.Unlock(cvmfsRepo) })
 
 		// Start creating the individual layers
