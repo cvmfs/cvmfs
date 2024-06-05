@@ -84,7 +84,7 @@ jobs:
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
             src/024-reload-during-asetup                      \
-            src/028-negativecache                              \
+            src/028-negativecache                             \
             src/032-workspace                                 \
             src/037-strictmount                               \
             src/039-reloadalarm                               \
@@ -118,9 +118,11 @@ jobs:
             src/094-attachmount                               \
             src/095-fuser                                     \
             src/096-cancelreq                                 \
-            src/097-statfs
+            src/097-statfs                                    \
             src/102-reusefd                                   \
             src/103-reloadcachemgr                            \
+            src/104-concurrent_mounts                         \
+            src/406-ducc-webhook-notifications                \
             --                                                \
             src/0*                                            \
             src/1*
