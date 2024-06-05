@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+  "os"
 	"sync"
 	"time"
 
@@ -422,6 +423,12 @@ func AppendLogToTaskByID(tx *sql.Tx, taskID TaskID, severity LogSeverity, messag
 // Log adds a log entry to the task.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
 func (t *Task) Log(tx *sql.Tx, severity LogSeverity, message string) error {
+  // convenience debug log: by setting an env var let the daemon
+  // dump all logs to stdout
+  if os.Getenv("CVMFS_DUCC_DEBUG") != "" {
+    fmt.Printf("%s\n", message)
+  }
+
 	ownTx := false
 	if tx == nil {
 		ownTx = true
