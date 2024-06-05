@@ -11,7 +11,7 @@ import (
 	"github.com/rubyist/lockfile"
 )
 
-var lockDirectory = filepath.Join(config.TempDir, "repo_locks")
+var lockDirectory = config.LockDir
 
 var locksMap = make(map[string]*sync.Mutex)
 var locksFile = make(map[string]lockfile.Locker)
@@ -26,7 +26,7 @@ func GetLock(CVMFSRepo string) {
 	}
 	f := locksFile[CVMFSRepo]
 	if f == nil {
-		file, err := os.OpenFile(filepath.Join(lockDirectory, CVMFSRepo+".lock"), os.O_CREATE|os.O_RDWR, 0666)
+		file, err := os.OpenFile(filepath.Join(lockDirectory, "cvmfs_ducc_" +  CVMFSRepo + ".lock"), os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error in opening the FS lock file:  %s", err)
 			os.Exit(1)

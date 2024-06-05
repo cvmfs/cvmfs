@@ -16,6 +16,7 @@ const MIN_UPDATEINTERVAL = 5 * time.Minute
 const DEFAULT_WEBHOOKENABLED = false
 
 var TempDir string = filepath.Join(os.TempDir(), "cvmfs", "ducc")
+var LockDir string = filepath.Join(, "/var", "lock")
 var DownloadsDir string = filepath.Join(TempDir, "downloads")
 
 const CVMFS_CHAINS_DIR = ".chains"
