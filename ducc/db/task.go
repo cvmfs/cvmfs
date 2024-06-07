@@ -24,6 +24,8 @@ const taskLogQueryQs string = "?, ?, ?"
 type TaskID = uuid.UUID
 type TaskType string
 
+var serialMutex sync.Mutex
+
 const (
 	TASK_UPDATE_WISH  TaskType = "UPDATE_WISH"
 	TASK_UPDATE_IMAGE TaskType = "UPDATE IMAGE"
@@ -547,6 +549,11 @@ func (t *Task) WaitForStart() bool {
 // It will broadcast on the task CV, so any goroutine waiting on the CV will be woken up.
 // If a tx is provided, it will be used to query the database. No commit or rollback will be performed.
 func (tPtr TaskPtr) Start(tx *sql.Tx) (TaskStatus, error) {
+
+	if os.Getenv("CVMFS_DUCC_FORCE_SERIAL") != "" {
+		serialMutex.Lock()
+		defer serialMutex.Unlock()
+	}
 	tPtr.cv.L.Lock()
 	defer tPtr.cv.L.Unlock()
 	if tPtr.task.Status != TASK_STATUS_NONE {

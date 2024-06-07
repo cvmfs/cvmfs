@@ -10,6 +10,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,7 +94,7 @@ func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, 
 		cvmfs.GetLock(cvmfsRepo)
 		once := sync.Once{}
 		defer once.Do(func() { cvmfs.Unlock(cvmfsRepo) })
-		alreadyConverted, err := imageAlreadyImported(cvmfsRepo, manifest.ManifestDigest, image.GetSimpleName())
+		alreadyConverted, err := imageAlreadyImported(cvmfsRepo, manifest, image.GetSimpleName())
 		if err != nil {
 			task.LogFatal(nil, fmt.Sprintf("Failed to check if image is already imported: %s", err.Error()))
 			return
@@ -477,7 +479,7 @@ func storeLayerInfo(CVMFSRepo string, compressedLayerDigest digest.Digest, r uti
 	return
 }
 
-func imageAlreadyImported(cvmfsRepo string, newManifestDigest digest.Digest, imageName string) (bool, error) {
+func imageAlreadyImported(cvmfsRepo string, newManifest registry.ManifestWithBytesAndDigest, imageName string) (bool, error) {
 	path := filepath.Join("/cvmfs", cvmfsRepo, ".metadata", imageName, "manifest.json")
 
 	manifestStat, err := os.Stat(path)
@@ -488,17 +490,18 @@ func imageAlreadyImported(cvmfsRepo string, newManifestDigest digest.Digest, ima
 		return false, fmt.Errorf("manifest is not a regular file")
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		printErrorChain(err)
-		return false, fmt.Errorf("failed to open manifest.json: %w", err)
-	}
-	defer file.Close()
-	digest, err := digest.SHA256.FromReader(file)
+	// wrangle manifests in a compatible form with the legacy ones found on unpacked.cern.ch
+	// The digest calculated here is NOT the manifest digest
+	var re = regexp.MustCompile(`\s+`)
+	b, err := os.ReadFile(path)
+	s := strings.ToLower(re.ReplaceAllString(string(b),  ""))
+	oldDigest := digest.SHA256.FromString(s)
+	newManifestDigestString := strings.ToLower(re.ReplaceAllString(string(newManifest.ManifestBytes), ""))
+	newManifestDigest := digest.SHA256.FromString(newManifestDigestString)
 	if err != nil {
 		return false, fmt.Errorf("failed to calculate digest of manifest.json: %w", err)
 	}
-	return digest == newManifestDigest, nil
+	return oldDigest == newManifestDigest, nil
 }
 
 func printErrorChain(err error) {

@@ -281,14 +281,18 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 			task.Log(nil, db.LOG_SEVERITY_DEBUG, "Public symlink not up to date, creating new")
 			success, err := cvmfs.WithinTransactionNew(cvmfsRepo, func() error {
 				if err := os.MkdirAll(path.Dir(publicSymlinkPath), config.DirPermision); err != nil {
-					task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink directory: %s", err))
-					return err
+					task.Log(nil, db.LOG_SEVERITY_WARN, fmt.Sprintf("Could not create public flat symlink directory: %s", err))
+					//return err
 				}
 				relativePath, err := filepath.Rel(path.Dir(publicSymlinkPath), privatePath)
 				if err != nil {
 					task.LogFatal(nil, fmt.Sprintf("Failed to create relative path for public flat symlink: %s", err))
 					return err
 				}
+				if _, err := os.Lstat(publicSymlinkPath); err == nil {
+					 os.Remove(publicSymlinkPath)
+				}
+
 				if err := os.Symlink(relativePath, publicSymlinkPath); err != nil {
 					task.LogFatal(nil, fmt.Sprintf("Failed to create public flat symlink: %s", err))
 					return err
@@ -374,14 +378,18 @@ func createSingularityFiles(image db.Image, manifest registry.ManifestWithBytesA
 				return err
 			}
 			// Finally, we create the public flat symlink
+
 			relativePath, err := filepath.Rel(path.Dir(publicSymlinkPath), privatePath)
 			if err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Error creating symlink to .flat directory. Could not get relative path: %s", err))
 				return err
 			}
+			if _, err := os.Lstat(publicSymlinkPath); err == nil {
+				  os.Remove(publicSymlinkPath)
+			}
 			if err := os.Symlink(relativePath, publicSymlinkPath); err != nil {
 				task.Log(nil, db.LOG_SEVERITY_ERROR, fmt.Sprintf("Failed to create symlink to .flat direcotry: %s", err))
-				return err
+				//return err
 			}
 			return nil
 		},
@@ -627,7 +635,6 @@ func checkChainLink(chainLink ChainLink, cvmfsRepo string) (exists bool, dirty b
 }
 
 func GenerateChainFromManifest(m v1.Manifest) Chain {
-	// TODO: Make sure new chain id function is backwards compatible with old one
 	chain := make([]ChainLink, len(m.Layers))
 
 	for i, layer := range m.Layers {
@@ -638,10 +645,10 @@ func GenerateChainFromManifest(m v1.Manifest) Chain {
 
 		if i == 0 {
 			link.PreviousLegacyChainDigest = ""
-			link.LegacyChainDigest = link.LayerDigest
+			link.LegacyChainDigest = digest.FromString("sha256:"+link.LayerDigest.Encoded())
 		} else {
 			link.PreviousLegacyChainDigest = chain[i-1].LegacyChainDigest
-			link.LegacyChainDigest = digest.FromString(fmt.Sprintf("%s %s", link.PreviousLegacyChainDigest.Encoded(), link.LayerDigest.Encoded()))
+			link.LegacyChainDigest = digest.FromString(fmt.Sprintf("sha256:%s sha256:%s", link.PreviousLegacyChainDigest.Encoded(), link.LayerDigest.Encoded()))
 		}
 
 		chain[i] = link

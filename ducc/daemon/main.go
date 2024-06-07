@@ -212,6 +212,7 @@ func Run(ctx context.Context, done chan<- any) error {
 
 		// Set the object as busy, and start the task
 		operations.IncrementObjectUseCount(objectID)
+		// TODO: add override to execute serially
 		go func() {
 			taskPtr.Start(nil)
 			taskPtr.WaitUntilDone()
@@ -286,7 +287,7 @@ func restoreUnfinishedTriggers(tx *sql.Tx) error {
 			op := TriggeredUpdateWishOperation{
 				wish:              wish,
 				trigger:           trigger,
-				forceUpdateImages: true, // TODO: Restore forceUpdateImages state. For now, we always force update
+				forceUpdateImages: false, // TODO: Restore forceUpdateImages state. For now, we always force update
 			}
 			operations.Schedule(&op, wish.ID.String(), UPDATE_WISH_ACTION, trigger.Timestamp)
 		case DELETE_WISH_ACTION:
