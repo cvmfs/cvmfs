@@ -50,6 +50,12 @@ func DirtyChainPath(cvmfsRepo string, legacyChainDigest digest.Digest) string {
 }
 
 func CreateFlat(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+  alreadyConverted, err := imageAlreadyImported(cvmfsRepo, manifest, image.GetSimpleName())
+  if alreadyConverted {
+    fmt.Printf("Image %s is already imported\n", image.GetSimpleName()))
+    return db.NullTaskPtr(), nil
+  }
+
 	titleStr := fmt.Sprintf("Create flat image for %s in %s", image.GetSimpleName(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_FLAT, titleStr)
 	if err != nil {

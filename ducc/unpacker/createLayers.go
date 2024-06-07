@@ -53,6 +53,11 @@ func BacklinkPath(cvmfsRepo string, compressedLayerDigest digest.Digest) string 
 }
 
 func CreateLayers(image db.Image, manifest registry.ManifestWithBytesAndDigest, cvmfsRepo string) (db.TaskPtr, error) {
+	alreadyConverted, err := imageAlreadyImported(cvmfsRepo, manifest, image.GetSimpleName())
+	if alreadyConverted {
+		fmt.Printf("Image %s is already imported\n", image.GetSimpleName()))
+		return db.NullTaskPtr(), nil
+	}
 	titleStr := fmt.Sprintf("Ingest layers for %s to %s", image.GetSimpleName(), cvmfsRepo)
 	task, ptr, err := db.CreateTask(nil, db.TASK_CREATE_LAYERS, titleStr)
 	if err != nil {
