@@ -102,6 +102,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_chunks_count_  = new SqlChunksCount      (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
+  sql_listing_       = new SqlListing          (database());
 }
 
 
@@ -112,11 +113,13 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_touch_;
   delete sql_update_;
+  delete sql_update_name_;
   delete sql_chunk_insert_;
   delete sql_chunks_remove_;
   delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
+  delete sql_listing_;
 }
 
 
@@ -267,12 +270,30 @@ void WritableCatalog::RefreshEntry(const DirectoryEntry &entry, const shash::Md5
 {
   SetDirty();
   LogCvmfs(kLogCatalog, kLogStdout, "Updating directory name");
+
+  // bool retval = sql_listing_->BindPathHash(old_path_hash);
+  // string debugTable = sql_listing_->DebugResultTable();
+  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE]: %s", debugTable.c_str());
+  // sql_listing_->Reset();
+  
   bool retval = 
     sql_update_name_->BindPathsHashes(old_path_hash, new_path_hash) &&
     sql_update_name_->BindDirent(entry) &&
     sql_update_name_->Execute();
   assert(retval);
+  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE AFTER UPDATE]: %s", sql_update_name_->DebugResultTable().c_str());
   sql_update_name_->Reset(); 
+
+
+  // retval = sql_listing_->BindPathHash(new_path_hash);
+  // debugTable = sql_listing_->DebugResultTable();
+  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE NEW PATH HASH]: %s", debugTable.c_str());
+  // sql_listing_->Reset();  
+
+  // retval = sql_listing_->BindPathHash(old_path_hash);
+  // debugTable = sql_listing_->DebugResultTable();
+  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE OLD PATH HASH]: %s", debugTable.c_str());
+  // sql_listing_->Reset();  
 }
 
 void WritableCatalog::AddFileChunk(const std::string &entry_path,

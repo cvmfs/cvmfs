@@ -224,12 +224,11 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i = attrs.begin();
   std::vector<std::string>::const_iterator iend = attrs.end();
-  LogCvmfs(kLogCvmfs, kLogDebug, "Attrs:");
   for (; i != iend; ++i) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
+     LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
+    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %sA", i->c_str());
   }
-
-  return xattrs.IsValid() && xattrs->Has(attr_name);
+  return xattrs->Has(attr_name);
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
@@ -287,6 +286,7 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Testing whether a directory is renamed!");
   const std::string path = directory->GetScratchPath();
   return DirectoryExists(path) && IsRenamedDirPath(path);
 }

@@ -271,7 +271,31 @@ void WritableCatalogManager::UpdateDirectory(const std::string &old_path,
     PANIC("Unable to found parent catalog");
   }
   entry.name_.Assign(NameString(new_directory_name));
-  catalog->RefreshEntry(entry, old_path, new_path);
+  DirectoryEntryList list1;
+  catalog->ListingPath(PathString(old_relative_path), &list1);
+  LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 1])");
+  for (DirectoryEntryList::iterator it = list1.begin(); it != list1.cend(); ++it)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 1]: %s", (*it).GetFullPath("/dir") .c_str());
+  }
+  
+  
+  catalog->RefreshEntry(entry, old_relative_path, new_relative_path);
+  DirectoryEntryList list2;
+  catalog->ListingPath(PathString(old_relative_path), &list2);
+
+  DirectoryEntryList list3;
+  catalog->ListingPath(PathString(new_relative_path), &list3);
+  for (DirectoryEntryList::iterator it = list2.begin(); it != list2.cend(); ++it)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 2]: %s", (*it).GetFullPath("/dir").c_str());
+  }
+
+  for (DirectoryEntryList::iterator it = list3.begin(); it != list3.cend(); ++it)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 3]: %s", (*it).GetFullPath("/dir").c_str());
+  }
+
   SyncUnlock();
 }
 

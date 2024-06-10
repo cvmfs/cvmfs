@@ -1112,7 +1112,7 @@ SqlDirentNameUpdate::SqlDirentNameUpdate(const CatalogDatabase &database) {
 //            1             2             3               4
     "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks, "
 //          5             6                  7                8
-    "uid = :uid, gid = :gid, md5path_1 = :md5_1, md5path_2 = :md5_2"
+    "uid = :uid, gid = :gid, md5path_1 = :md5_1, md5path_2 = :md5_2 "
 //          9           10                  11            12
     "WHERE (md5path_1 = :md5_3) AND (md5path_2 = :md5_4);");
 //                     13                       14

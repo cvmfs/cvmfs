@@ -52,6 +52,7 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
 
   if (!entry->IsDirectory())
   {
+    LogCvmfs(kLogCvmfs, kLogStdout, "An entry is not a directory!");
     return;
   }
 
@@ -80,6 +81,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
   if (entry->IsNew() && !entry->IsRenamedDirectory()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Is renamed directory: %d", entry->IsRenamedDirectory());
     mediator_->Add(entry);
     // Recursion stops here. All content of new directory
     // is added later by the SyncMediator

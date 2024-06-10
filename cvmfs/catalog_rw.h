@@ -164,6 +164,7 @@ class WritableCatalog : public Catalog {
   SqlChunksCount      *sql_chunks_count_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
+  SqlListing          *sql_listing_;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 
