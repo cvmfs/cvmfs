@@ -269,31 +269,13 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
 void WritableCatalog::RefreshEntry(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash)
 {
   SetDirty();
-  LogCvmfs(kLogCatalog, kLogStdout, "Updating directory name");
-
-  // bool retval = sql_listing_->BindPathHash(old_path_hash);
-  // string debugTable = sql_listing_->DebugResultTable();
-  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE]: %s", debugTable.c_str());
-  // sql_listing_->Reset();
-  
+  LogCvmfs(kLogCatalog, kLogStdout, "Updating directory. Old hash: %s, new hash: %s", old_path_hash.ToString().c_str(), new_path_hash.ToString().c_str()); 
   bool retval = 
     sql_update_name_->BindPathsHashes(old_path_hash, new_path_hash) &&
     sql_update_name_->BindDirent(entry) &&
     sql_update_name_->Execute();
   assert(retval);
-  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE AFTER UPDATE]: %s", sql_update_name_->DebugResultTable().c_str());
-  sql_update_name_->Reset(); 
-
-
-  // retval = sql_listing_->BindPathHash(new_path_hash);
-  // debugTable = sql_listing_->DebugResultTable();
-  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE NEW PATH HASH]: %s", debugTable.c_str());
-  // sql_listing_->Reset();  
-
-  // retval = sql_listing_->BindPathHash(old_path_hash);
-  // debugTable = sql_listing_->DebugResultTable();
-  // LogCvmfs(kLogCatalog, kLogStdout, "[TABLE BEFORE UPDATE OLD PATH HASH]: %s", debugTable.c_str());
-  // sql_listing_->Reset();  
+  sql_update_name_->Reset();  
 }
 
 void WritableCatalog::AddFileChunk(const std::string &entry_path,

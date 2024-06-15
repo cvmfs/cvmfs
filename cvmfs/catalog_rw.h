@@ -125,6 +125,7 @@ class WritableCatalog : public Catalog {
   void RefreshEntry(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash);
   inline void RefreshEntry(const DirectoryEntry &entry, const std::string &old_path, const std::string &new_path)
   {
+    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry with name: %s. Old path: %s, new path: %s", entry.name().c_str(), old_path.c_str(), new_path.c_str());
     RefreshEntry(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
   }
 
