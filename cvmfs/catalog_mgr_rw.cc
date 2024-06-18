@@ -228,52 +228,29 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
 
 void WritableCatalogManager::UpdateDirectory(const std::string &old_path,
                                              const std::string &new_path) {
+  
   const string old_relative_path = MakeRelativePath(old_path);
   const string new_relative_path = MakeRelativePath(new_path);
-  const string parent_path = GetParentPath(old_path);
+  const string parent_path = GetParentPath(old_relative_path);
   string new_parent_path, new_directory_name;
-  SplitPath(old_relative_path, &new_parent_path, &new_directory_name);
+  SplitPath(new_relative_path, &new_parent_path, &new_directory_name);
   SyncLock();
-  WritableCatalog *catalog;
-  DirectoryEntry entry;
-
-  if (!FindCatalog(old_relative_path, &catalog, &entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
-             old_relative_path.c_str());
-    PANIC("Unable to found old path catalog");
-  }
-
   WritableCatalog *parent_catalog;
   DirectoryEntry parent_entry;
-
+  DirectoryEntry target_entry;
   if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
-             old_relative_path.c_str());
+             parent_path.c_str());
     PANIC("Unable to found parent path catalog");
   }
-
-  entry.name_.Assign(NameString(new_directory_name));
-
-  DirectoryEntryList list1;
-  catalog->ListingPath(PathString(old_relative_path), &list1);
-  LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 1])");
-  for (DirectoryEntryList::iterator it = list1.begin(); it != list1.cend();
-       ++it) {
-    LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 1]: %s",
-             (*it).GetFullPath("/dir").c_str());
+  if (!parent_catalog->LookupPath(PathString(old_relative_path), &target_entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "no entry with path: %s was found",
+             old_relative_path.c_str());
+    PANIC("Unable to found child path entry");
   }
-
-  catalog->RefreshEntry(entry, old_relative_path, new_relative_path);
-  // catalog->UpdateEntry(parent_entry, parent_path);
-
-  DirectoryEntryList list2;
-  catalog->ListingPath(PathString(old_relative_path), &list2);
-  for (DirectoryEntryList::iterator it = list2.begin(); it != list2.cend();
-       ++it) {
-    LogCvmfs(kLogCatalog, kLogStdout, "[LISTING 2]: %s",
-             (*it).GetFullPath("/dir").c_str());
-  }
-
+  target_entry.name_.Assign(NameString(new_directory_name));
+  parent_catalog->RefreshEntry(target_entry, old_relative_path, new_relative_path);
+  parent_catalog->UpdateEntry(parent_entry, parent_path);
   SyncUnlock();
 }
 
