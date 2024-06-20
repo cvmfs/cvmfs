@@ -149,6 +149,9 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   }
 }
 
+void SyncItem::MarkAsMetadataOnlyEntry() {
+  metadata_only_ = true;
+}
 
 void SyncItem::MarkAsOpaqueDirectory() {
   assert(IsDirectory());

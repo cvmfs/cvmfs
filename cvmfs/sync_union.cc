@@ -50,6 +50,11 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
     entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
   }
 
+  if (IsMetadataOnlyEntry(entry)) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem: %s", entry->GetRelativePath().c_str());
+    entry->MarkAsMetadataOnlyEntry();
+  }
+
   if (!entry->IsDirectory())
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "An entry is not a directory!");
@@ -60,7 +65,6 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
     entry->MarkAsOpaqueDirectory();
   }
   else if (IsRenamedDirectory(entry)) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "BBBBBBBBBBBBBBBBBBB");
     entry->MarkAsRenamedDirectory();
   }
 
@@ -80,15 +84,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
-  if (entry->IsNew() && !entry->IsRenamedDirectory()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Is renamed directory: %d", entry->IsRenamedDirectory());
-    mediator_->Add(entry);
-    // Recursion stops here. All content of new directory
-    // is added later by the SyncMediator
-    return false;
-  } 
-  else if (entry->IsRenamedDirectory()) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "AAAAAAAAAAAAAAAAAAAAa");
+  if (entry->IsRenamedDirectory()) {
     XattrList* list = XattrList::CreateFromFile(entry->GetScratchPath());
     vector<string> keys = list->ListKeys();
     for (vector<string>::const_iterator it = keys.cbegin(); it != keys.cend(); ++it)
@@ -98,15 +94,21 @@ bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
     LogCvmfs(kLogUnionFs, kLogStdout, "Detected renamed directory: %s", entry->GetScratchPath().c_str());
     mediator_->UpdateDirectory(entry);
     return false;
+  }
+  if (entry->IsNew()) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Is renamed directory: %d", entry->IsRenamedDirectory());
+    mediator_->Add(entry);
+    // Recursion stops here. All content of new directory
+    // is added later by the SyncMediator
+    return false;
   } 
-  else {                             // directory already existed...
-    if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
-      mediator_->Replace(entry);
-      return false;  // <-- replace does not need any further recursion
-    } else {  // directory was just changed internally... only touch needed
-      mediator_->Touch(entry);
-      return true;
-    }
+  // directory already existed...
+  if (entry->IsOpaqueDirectory()) {  // was directory completely overwritten?
+    mediator_->Replace(entry);
+    return false;  // <-- replace does not need any further recursion
+  } else {  // directory was just changed internally... only touch needed
+    mediator_->Touch(entry);
+    return true;
   }
 }
 

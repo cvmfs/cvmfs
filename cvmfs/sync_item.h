@@ -86,6 +86,7 @@ class SyncItem {
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
   inline bool IsRenamedDirectory() const { return IsDirectory() && renamed_; }
 
+  inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
@@ -152,6 +153,7 @@ class SyncItem {
   std::string GetScratchPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
+  void MarkAsMetadataOnlyEntry();
   void MarkAsOpaqueDirectory();
   void MarkAsRenamedDirectory();
 
@@ -292,7 +294,8 @@ class SyncItem {
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
-  bool renamed_;                      /**< SyncUnion marked thus as a renamed directory */
+  bool renamed_;                      /**< SyncUnion marked this as a renamed directory */
+  bool metadata_only_;                /**< SyncUnion marked this as a metadata only file (no copy-up performed; 0-sized file with metadata) */
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */

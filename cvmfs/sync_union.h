@@ -120,8 +120,10 @@ class SyncUnion {
   /**
    * OverlayFS when mounted with redirect_dir option
    * allows renaming of directories (via rename() or mv) 
-   * But on sole renaming it creates empty directory in the scratch area 
+   * But creates an empty directory in the scratch area on sole renaming  
    * with trusted.overlay.redirect xattr that preserves the old name of a directory
+   * @param directory entry
+   * @return true if a directory is renamed, otherwise false
    */
   virtual bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const = 0;
 
@@ -132,6 +134,15 @@ class SyncUnion {
    * @return true if filename seems to be whiteout otherwise false
    */
   virtual bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const = 0;
+
+  /**
+   * Checks if a given file is a 0-sized file with updated metadata.
+   * Applicable on mounting OverlayFS with metacopy feature being turned on.
+   * @param entry the filesystem entry to check
+   * @return true if an entry has trusted.overlay.metacopy xattr, false otherwise 
+   */
+  virtual bool IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const = 0;
+
 
   /**
    * Union file systems may use some special files for bookkeeping.

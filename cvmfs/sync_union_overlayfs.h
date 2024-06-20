@@ -39,6 +39,7 @@ class SyncUnionOverlayfs : public SyncUnion {
   void PreprocessSyncItem(SharedPtr<SyncItem> entry) const;
 
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+  bool IsMetadataOnlyEntry(SharedPtr<SyncItem> directory) const; 
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;

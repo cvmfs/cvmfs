@@ -319,6 +319,10 @@ bool SyncUnionTarball::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   return false;
 }
 
+bool SyncUnionTarball::IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const {
+  return false;
+}
+
 bool SyncUnionTarball::IsRenamedDirectory(SharedPtr<SyncItem> entry) const {
   return false;
 }

@@ -60,6 +60,7 @@ class SyncUnionTarball : public SyncUnion {
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+  bool IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const;
   bool IsRenamedDirectory(SharedPtr<SyncItem> entry) const;
 
  private:

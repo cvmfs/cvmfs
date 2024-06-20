@@ -225,7 +225,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   std::vector<std::string>::const_iterator i = attrs.begin();
   std::vector<std::string>::const_iterator iend = attrs.end();
   for (; i != iend; ++i) {
-     LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
+    LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
     LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %sA", i->c_str());
   }
   return xattrs->Has(attr_name);
@@ -254,6 +254,15 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   if (is_symlink_whiteout) return true;
 
   return false;
+}
+ 
+bool SyncUnionOverlayfs::IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const {
+  const std::string entry_path = entry->GetScratchPath();
+  bool is_metadata_only = HasXattr(entry_path, "trusted.overlay.metacopy");
+  if (is_metadata_only) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has metadata only attribute", entry_path.c_str());
+  }
+  return is_metadata_only; 
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
