@@ -108,4 +108,8 @@ bool ZlibDecompressor::Reset() {
   }
 }
 
+std::string ZlibDecompressor::Describe() {
+  return "ZlibDecompressor (default)";
+}
+
 }  // namespace zlib

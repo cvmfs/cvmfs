@@ -9,9 +9,13 @@
 #include <string>
 
 #include "compression/compression.h"
+#include "compression/decompression.h"
+#include "compression/input_mem.h"
 #include "history_sqlite.h"
+#include "network/sink_path.h"
 #include "testutil.h"
 #include "util/prng.h"
+#include "util/pointer.h"
 
 using history::History;
 using history::SqliteHistory;
@@ -222,28 +226,15 @@ class T_History : public ::testing::Test {
   void UnpackHistory(const std::string &base64, const std::string &dest) const {
     ASSERT_EQ(0u, base64.length() % 4);
     std::string  decoded;
-    char        *unpacked;
-    uint64_t     unpacked_size;
     ASSERT_TRUE(Debase64(base64, &decoded)) << "failed to decode base64";
-    ASSERT_TRUE(zlib::DecompressMem2Mem(
-                   decoded.data(),
-                   decoded.size(),
-                   reinterpret_cast<void**>(&unpacked),
-                   &unpacked_size)) << "failed to decompress";
-    WriteFile(dest, std::string(unpacked, unpacked_size));
-    free(unpacked);
-  }
-
-  void WriteFile(const std::string &path, const std::string &content) const {
-    FILE *f = fopen(path.c_str(), "w+");
-    ASSERT_NE(static_cast<FILE*>(NULL), f)
-      << "failed to open. errno: " << errno;
-    const size_t bytes_written = fwrite(content.data(), 1, content.length(), f);
-    ASSERT_EQ(bytes_written, content.length())
-      << "failed to write. errno: " << errno;
-
-    const int retval = fclose(f);
-    ASSERT_EQ(0, retval) << "failed to close. errno: " << errno;
+    UniquePtr<zlib::Decompressor>
+                decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
+    zlib::InputMem decoded_ro(reinterpret_cast<unsigned char*>(decoded.data()),
+                              decoded.size());
+    cvmfs::PathSink unpacked(dest);
+    zlib::StreamStates res =
+                         decompressor->DecompressStream(&decoded_ro, &unpacked);
+    ASSERT_EQ(res, zlib::kStreamEnd)  << "failed to decompress";
   }
 
   bool CheckListing(const TagVector &lhs, const TagVector &rhs) const {

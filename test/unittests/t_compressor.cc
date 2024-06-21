@@ -440,15 +440,13 @@ TEST_F(T_Compressor, Compression) {
   ASSERT_EQ(0U, size_input);
 
   // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  DecompressMem2Mem(buf, buf_size,
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
-
-  // Check if the string is the same as the beginning
-  ASSERT_EQ(0, strcmp(decompress_buf, test_string));
-
-  free(decompress_buf);
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  zlib::InputMem in(buf, buf_size);
+  cvmfs::MemSink out(0);
+  zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
+  EXPECT_EQ(res, zlib::kStreamEnd);
+  EXPECT_EQ(out.pos(), strlen(test_string) + 1);
+  EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
 }
 
 
@@ -476,16 +474,16 @@ TEST_F(T_Compressor, CompressionLong) {
   EXPECT_EQ(0U, remaining);
 
   // Decompress it, check if it's still the same
-  char *decompress_buf;
-  uint64_t decompress_size;
-  bool retval = DecompressMem2Mem(compress_buf, compress_pos,
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
-  EXPECT_EQ(true, retval);
-  EXPECT_EQ(decompress_size, static_cast<uint64_t>(long_size));
-  EXPECT_EQ(0, memcmp(decompress_buf, long_string, long_size));
+  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  zlib::InputMem in(reinterpret_cast<unsigned char*>(compress_buf),
+                            compress_pos);
+  cvmfs::MemSink out(0);
+  zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
+  EXPECT_EQ(res, zlib::kStreamEnd);
+  EXPECT_EQ(out.pos(), static_cast<uint64_t>(long_size));
+  EXPECT_EQ(0, memcmp(out.data(), long_string, long_size));
 
   delete[] compress_buf;
-  free(decompress_buf);
 }
 
 

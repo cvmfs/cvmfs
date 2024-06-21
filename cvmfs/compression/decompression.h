@@ -65,26 +65,13 @@ class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
   virtual bool Reset() { return false; }
 
   virtual Decompressor* Clone() = 0;
+  virtual std::string Describe() = 0;
 
   static void RegisterPlugins();
 
  protected:
   const unsigned kZChunk;
 };
-
-void DecompressInit(z_stream *strm);
-void DecompressFini(z_stream *strm);
-
-StreamStates DecompressZStream2File(const void *buf, const int64_t size,
-                                    z_stream *strm, FILE *f);
-StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
-                                    z_stream *strm, cvmfs::Sink *sink);
-
-bool DecompressPath2Path(const std::string &src, const std::string &dest);
-bool DecompressFile2File(FILE *fsrc, FILE *fdest);
-bool DecompressPath2File(const std::string &src, FILE *fdest);
-bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
 

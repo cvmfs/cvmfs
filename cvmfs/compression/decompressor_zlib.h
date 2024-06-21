@@ -5,6 +5,8 @@
 #ifndef CVMFS_COMPRESSION_DECOMPRESSOR_ZLIB_H_
 #define CVMFS_COMPRESSION_DECOMPRESSOR_ZLIB_H_
 
+#include <string>
+
 #include "decompression.h"
 #include "duplex_zlib.h"
 
@@ -38,6 +40,7 @@ class ZlibDecompressor: public Decompressor {
    */
   virtual bool Reset();
   Decompressor* Clone();
+  virtual std::string Describe();
   static bool WillHandle(const zlib::Algorithms &alg);
 
  private:

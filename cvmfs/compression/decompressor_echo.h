@@ -5,6 +5,8 @@
 #ifndef CVMFS_COMPRESSION_DECOMPRESSOR_ECHO_H_
 #define CVMFS_COMPRESSION_DECOMPRESSOR_ECHO_H_
 
+#include <string>
+
 #include "decompression.h"
 
 namespace zlib {
@@ -36,6 +38,7 @@ class EchoDecompressor: public Decompressor {
    */
   virtual bool Reset() { is_healthy_ = true; return true; }
   virtual Decompressor* Clone();
+  virtual std::string Describe();
   static bool WillHandle(const zlib::Algorithms &alg);
 
  private:

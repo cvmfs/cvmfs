@@ -25,12 +25,17 @@
 
 #include "catalog.h"
 #include "compression/compression.h"
+#include "compression/decompression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
@@ -118,7 +123,7 @@ bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
 bool                 inspect_existing_catalogs = false;
 manifest::Reflog    *reflog = NULL;
-
+UniquePtr<zlib::Decompressor> decomp_zlib;
 }  // anonymous namespace
 
 
@@ -196,13 +201,13 @@ static void Store(
         PANIC(kLogStderr, "Failed to create temporary file '%s'",
               remote_path.c_str());
       }
-      int retval = zlib::DecompressPath2File(local_path, fdest);
-      if (!retval) {
+      zlib::InputPath in_p(local_path);
+      cvmfs::FileSink out_f(fdest, true);
+      if (decomp_zlib->DecompressStream(&in_p, &out_f) != zlib::kStreamEnd) {
         PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
               remote_path.c_str());
       }
-      fclose(fdest);
-      retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      int retval = rename(tmp_dest.c_str(), remote_path.c_str());
       assert(retval == 0);
       unlink(local_path.c_str());
     }
@@ -413,11 +418,15 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
       goto pull_cleanup;
     }
   }
-  retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
-  if (!retval) {
+
+  {  // anonymous namespace to prevent crosses initialization due to gotos
+  zlib::InputPath in_path(file_catalog_vanilla);
+  cvmfs::PathSink out_path(file_catalog);
+  if (decomp_zlib->DecompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
     LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
     goto pull_cleanup;
+  }
   }
   if (path.empty() && reflog != NULL) {
     if (!reflog->AddCatalog(catalog_hash)) {
@@ -576,6 +585,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
+
+  decomp_zlib = zlib::Decompressor::Construct(zlib::kZlibDefault);
 
   const bool     follow_redirects = false;
   const unsigned max_pool_handles = num_parallel+1;
@@ -740,8 +751,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";
-    retval = zlib::DecompressPath2Path(history_path, history_db_path);
-    assert(retval);
+    zlib::InputPath in_path(history_path);
+    cvmfs::PathSink out_path(history_db_path);
+    zlib::StreamStates ret = decomp_zlib->DecompressStream(&in_path, &out_path);
+    assert(ret == zlib::kStreamEnd);
     history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
