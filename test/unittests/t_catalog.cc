@@ -467,9 +467,9 @@ TEST_F(T_Catalog, AttachSchema09) {
   bool retval = Debase64(kCatalogNa61Schema09, &catalog_debase);
   ASSERT_TRUE(retval);
 
-  zlib::InputMem catalog_in(
-                        reinterpret_cast<unsigned char*>(catalog_debase.data()),
-                        catalog_debase.length());
+  zlib::InputMem catalog_in(reinterpret_cast<unsigned char*>(
+                              const_cast<char*>(catalog_debase.data())),
+                            catalog_debase.length());
   std::string temp_path;
   FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
   EXPECT_TRUE(f != NULL);
@@ -519,9 +519,9 @@ TEST_F(T_Catalog, AttachSchema10) {
   bool retval = Debase64(kCatalogNa61Schema10, &catalog_debase);
   ASSERT_TRUE(retval);
 
-  zlib::InputMem catalog_in(
-                        reinterpret_cast<unsigned char*>(catalog_debase.data()),
-                        catalog_debase.length());
+  zlib::InputMem catalog_in(reinterpret_cast<unsigned char*>(
+                              const_cast<char*>(catalog_debase.data())),
+                            catalog_debase.length());
   std::string temp_path;
   FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
   EXPECT_TRUE(f != NULL);
