@@ -229,7 +229,8 @@ class T_History : public ::testing::Test {
     ASSERT_TRUE(Debase64(base64, &decoded)) << "failed to decode base64";
     UniquePtr<zlib::Decompressor>
                 decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
-    zlib::InputMem decoded_ro(reinterpret_cast<unsigned char*>(decoded.data()),
+    zlib::InputMem decoded_ro(reinterpret_cast<unsigned char*>(
+                                const_cast<char*>(decoded.data())),
                               decoded.size());
     cvmfs::PathSink unpacked(dest);
     zlib::StreamStates res =
