@@ -475,8 +475,7 @@ TEST_F(T_Compressor, CompressionLong) {
 
   // Decompress it, check if it's still the same
   decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
-  zlib::InputMem in(reinterpret_cast<unsigned char*>(compress_buf),
-                            compress_pos);
+  zlib::InputMem in(compress_buf, compress_pos);
   cvmfs::MemSink out(0);
   zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
   EXPECT_EQ(res, zlib::kStreamEnd);
