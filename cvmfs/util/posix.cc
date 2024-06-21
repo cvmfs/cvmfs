@@ -522,10 +522,11 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 /**
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
-void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
+void ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
   ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
+  unsigned waittime_ms = 1;
   const unsigned max_backoff_ms = 256;
   do {
     // When the writer is not connected, this takes ~200-300ns per call as per
@@ -538,8 +539,10 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
     if ((i > 3000) && (num_bytes == 0)) {
       // The BackoffThrottle would pull in too many dependencies
       SafeSleepMs(backoff_ms);
+      waittime_ms += backoff_ms;
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
+  if (timeout_ms != 0 && waittime_ms > timeout_ms) return;
   } while (num_bytes == 0);
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }

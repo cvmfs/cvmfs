@@ -84,6 +84,11 @@ class PosixQuotaManager : public QuotaManager {
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
 
+  void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
+  void StoreCacheMgrPid(pid_t pid_);
+  pid_t GetCacheMgrPid();
+
+
  private:
   /**
    * Loaded catalogs are pinned in the LRU and have to be treated differently.
@@ -310,6 +315,13 @@ class PosixQuotaManager : public QuotaManager {
    * will be performed in a detached, asynchronous process.
    */
   bool async_delete_;
+
+
+  /**
+   * Record pid of current cache manager in order to check if its process
+   * disappeared.
+   */
+  pid_t cachemgr_pid_;
 
   /**
    * Keeps track of the number of cleanups over time.  Use by

@@ -136,7 +136,7 @@ bool PosixQuotaManager::Cleanup(const uint64_t leave_size) {
   cmd.return_pipe = pipe_cleanup[1];
 
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_cleanup[0], &result, sizeof(result));
+  ManagedReadHalfPipe(pipe_cleanup[0], &result, sizeof(result));
   CloseReturnPipe(pipe_cleanup);
 
   return result;
@@ -288,6 +288,10 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
+
+    quota_mgr->StoreCacheMgrPid(quota_mgr->GetPid());
+    LogCvmfs(kLogQuota, kLogDebug, "current cache manager pid  %d", quota_mgr->GetCacheMgrPid());
+
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
     quota_mgr->initialized_ = true;
     Nonblock2Block(quota_mgr->pipe_lru_[1]);
@@ -358,8 +362,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   preserve_filedes.insert(2);
   preserve_filedes.insert(pipe_boot[1]);
   preserve_filedes.insert(pipe_handshake[0]);
-
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
+  pid_t newcachemgr_pid;
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false, false, true, &newcachemgr_pid);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -368,6 +372,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return NULL;
   }
+  LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", newcachemgr_pid );
 
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
@@ -408,6 +413,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
 
   Nonblock2Block(quota_mgr->pipe_lru_[1]);
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
+  quota_mgr->StoreCacheMgrPid(newcachemgr_pid);
   quota_mgr->protocol_revision_ = kProtocolRevision;
 
   UnlockFile(fd_lockfile);
@@ -565,7 +571,7 @@ vector<string> PosixQuotaManager::DoList(const CommandType list_command) {
 
   int length;
   do {
-    ReadHalfPipe(pipe_list[0], &length, sizeof(length));
+    ManagedReadHalfPipe(pipe_list[0], &length, sizeof(length));
     if (length > 0) {
       ReadPipe(pipe_list[0], description_buffer, length);
       result.push_back(string(description_buffer, length));
@@ -595,6 +601,7 @@ uint64_t PosixQuotaManager::GetCapacity() {
 
 void PosixQuotaManager::GetLimits(uint64_t *limit, uint64_t *cleanup_threshold)
 {
+
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
 
@@ -602,7 +609,7 @@ void PosixQuotaManager::GetLimits(uint64_t *limit, uint64_t *cleanup_threshold)
   cmd.command_type = kLimits;
   cmd.return_pipe = pipe_limits[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
+  ManagedReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
   ReadPipe(pipe_limits[0], cleanup_threshold, sizeof(*cleanup_threshold));
   CloseReturnPipe(pipe_limits);
 }
@@ -646,7 +653,7 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
   uint32_t revision;
-  ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+  ManagedReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
   CloseReturnPipe(pipe_revision);
   return revision;
 }
@@ -663,7 +670,7 @@ void PosixQuotaManager::GetSharedStatus(uint64_t *gauge, uint64_t *pinned) {
   cmd.command_type = kStatus;
   cmd.return_pipe = pipe_status[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_status[0], gauge, sizeof(*gauge));
+  ManagedReadHalfPipe(pipe_status[0], gauge, sizeof(*gauge));
   ReadPipe(pipe_status[0], pinned, sizeof(*pinned));
   CloseReturnPipe(pipe_status);
 }
@@ -696,7 +703,7 @@ uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
   cmd.size = period_s;
   cmd.return_pipe = pipe_cleanup_rate[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
+  ManagedReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
   CloseReturnPipe(pipe_cleanup_rate);
 
   return cleanup_rate;
@@ -948,6 +955,7 @@ vector<string> PosixQuotaManager::ListVolatile() {
  * Entry point for the shared cache manager process
  */
 int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
+	
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
@@ -1504,7 +1512,7 @@ bool PosixQuotaManager::Pin(
   cmd.return_pipe = pipe_reserve[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   bool result;
-  ReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
+  ManagedReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
   CloseReturnPipe(pipe_reserve);
 
   if (!result) return false;
@@ -1820,7 +1828,7 @@ void PosixQuotaManager::RegisterBackChannel(
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
     char success;
-    ReadHalfPipe(back_channel[0], &success, sizeof(success));
+    ManagedReadHalfPipe(back_channel[0], &success, sizeof(success));
     // At this point, the named FIFO is unlinked, so don't use CloseReturnPipe
     if (success != 'S') {
       PANIC(kLogDebug | kLogSyslogErr,
@@ -1849,7 +1857,7 @@ void PosixQuotaManager::Remove(const shash::Any &hash) {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
   bool success;
-  ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
+  ManagedReadHalfPipe(pipe_remove[0], &success, sizeof(success));
   CloseReturnPipe(pipe_remove);
 
   unlink((cache_dir_ + "/" + hash.MakePathWithoutSuffix()).c_str());
@@ -1921,4 +1929,20 @@ void PosixQuotaManager::UnregisterBackChannel(
   } else {
     ClosePipe(back_channel);
   }
+}
+
+void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
+  unsigned timeout_ms = 100;
+  do {
+  ReadHalfPipe(fd, buf, nbyte, timeout_ms);
+  } while (getpgid(cachemgr_pid_) >= 0);
+
+}
+
+void PosixQuotaManager::StoreCacheMgrPid(pid_t pid_) {
+  cachemgr_pid_ = pid_;
+}
+
+pid_t PosixQuotaManager::GetCacheMgrPid() {
+  return cachemgr_pid_;
 }
