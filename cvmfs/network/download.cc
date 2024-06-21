@@ -51,6 +51,7 @@
 #include <utility>
 
 #include "compression/decompression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "interrupt.h"
@@ -263,30 +264,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
                   num_bytes, info->hash_context());
   }
 
-  if (info->compressed()) {
-    zlib::StreamStates retval =
-      zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                   info->GetZstreamPtr(), info->sink());
-    if (retval == zlib::kStreamDataError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-                                     "(id %" PRId64 ") failed to decompress %s",
-                                     info->id(), info->url()->c_str());
-      info->SetErrorCode(kFailBadData);
-      return 0;
-    } else if (retval == zlib::kStreamIOError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-                            "(id %" PRId64 ") decompressing %s, local IO error",
-                            info->id(), info->url()->c_str());
-      info->SetErrorCode(kFailLocalIO);
-      return 0;
-    }
-  } else {
-    int64_t written = info->sink()->Write(ptr, num_bytes);
-    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-      LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
-              "Failed to perform write of %zu bytes to sink %s with errno %ld",
-              info->id(), num_bytes, info->sink()->Describe().c_str(), written);
-    }
+  zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(ptr), num_bytes);
+  if (!info->DecompressToSink(&in_mem)) {
+    return 0;
   }
 
   return num_bytes;
@@ -954,9 +934,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   } else {
     info->SetNocache(false);
   }
-  if (info->compressed()) {
-    zlib::DecompressInit(info->GetZstreamPtr());
-  }
+  info->ResetDecompression();
   if (info->expected_hash()) {
     assert(info->hash_context().buffer != NULL);
     shash::Init(info->hash_context());
@@ -1592,9 +1570,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     if (info->expected_hash()) {
       shash::Init(info->hash_context());
     }
-    if (info->compressed()) {
-      zlib::DecompressInit(info->GetZstreamPtr());
-    }
+    info->ResetDecompression();
 
     if (sharding_policy_.UseCount() > 0) {  // sharding policy
       ReleaseCredential(info);
@@ -1665,9 +1641,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->SetErrorCode(kFailLocalIO);
   }
 
-  if (info->compressed())
-    zlib::DecompressFini(info->GetZstreamPtr());
-
+  info->ResetDecompression();
   if (info->headers()) {
     header_lists_->PutList(info->headers());
     info->SetHeaders(NULL);

@@ -11,12 +11,17 @@
 
 #include "catalog.h"
 #include "compression/decompression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "reflog.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 
 /**
@@ -347,7 +352,10 @@ class LocalObjectFetcher :
   LocalObjectFetcher(const std::string &base_path,
                      const std::string &temp_dir)
     : BaseTN(temp_dir)
-    , base_path_(base_path) {}
+    , base_path_(base_path) {
+    copy_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+    decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
@@ -403,10 +411,18 @@ class LocalObjectFetcher :
     }
 
     // decompress or copy the requested object file
-    const bool success = (decompress)
-      ? zlib::DecompressPath2File(source, f)
-      : CopyPath2File(source, f);
-    fclose(f);
+    zlib::InputPath in_path(source);
+    cvmfs::FileSink out_file(f, true);
+    zlib::Decompressor *decomp;
+
+    if (decompress) {
+      decomp = decomp_zlib_.weak_ref();
+    } else {
+      decomp = copy_.weak_ref();
+    }
+
+    const bool success = (decomp->DecompressStream(&in_path, &out_file)
+                                                           == zlib::kStreamEnd);
 
     // check the decompression success and remove the temporary file otherwise
     if (!success) {
@@ -432,6 +448,8 @@ class LocalObjectFetcher :
 
  private:
   const std::string base_path_;
+  UniquePtr<zlib::Decompressor> copy_;
+  UniquePtr<zlib::Decompressor> decomp_zlib_;
 };
 
 template <class CatalogT, class HistoryT, class ReflogT>

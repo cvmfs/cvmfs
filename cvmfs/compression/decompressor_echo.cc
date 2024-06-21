@@ -45,4 +45,8 @@ StreamStates EchoDecompressor::DecompressStream(InputAbstract *input,
   return kStreamEnd;
 }
 
+std::string EchoDecompressor::Describe() {
+  return "EchoDecompressor (no compression)";
+}
+
 }  // namespace zlib

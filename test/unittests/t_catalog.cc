@@ -10,7 +10,11 @@
 #include "catalog.h"
 #include "catalog_rw.h"
 #include "compression/compression.h"
+#include "compression/decompression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
+#include "network/sink_mem.h"
+#include "network/sink_path.h"
 #include "shortstring.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -463,13 +467,9 @@ TEST_F(T_Catalog, AttachSchema09) {
   bool retval = Debase64(kCatalogNa61Schema09, &catalog_debase);
   ASSERT_TRUE(retval);
 
-  void *catalog_binary;
-  uint64_t catalog_size;
-  retval = zlib::DecompressMem2Mem(
-    catalog_debase.data(), catalog_debase.length(),
-    &catalog_binary, &catalog_size);
-  ASSERT_TRUE(retval);
-
+  zlib::InputMem catalog_in(
+                        reinterpret_cast<unsigned char*>(catalog_debase.data()),
+                        catalog_debase.length());
   std::string temp_path;
   FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
   EXPECT_TRUE(f != NULL);
@@ -477,10 +477,14 @@ TEST_F(T_Catalog, AttachSchema09) {
     free(catalog);
     return;
   }
-  retval = SafeWrite(fileno(f), catalog_binary, catalog_size);
-  free(catalog_binary);
   fclose(f);
-  EXPECT_TRUE(retval);
+  cvmfs::PathSink out(temp_path);
+
+  UniquePtr<zlib::Decompressor> 
+                decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
+  const zlib::StreamStates res = decompressor->
+                                            DecompressStream(&catalog_in, &out);
+  EXPECT_EQ(res, zlib::kStreamEnd);
 
   WritableCatalog *catalog =
     WritableCatalog::AttachFreely("", temp_path, shash::Any());
@@ -515,13 +519,9 @@ TEST_F(T_Catalog, AttachSchema10) {
   bool retval = Debase64(kCatalogNa61Schema10, &catalog_debase);
   ASSERT_TRUE(retval);
 
-  void *catalog_binary;
-  uint64_t catalog_size;
-  retval = zlib::DecompressMem2Mem(
-    catalog_debase.data(), catalog_debase.length(),
-    &catalog_binary, &catalog_size);
-  ASSERT_TRUE(retval);
-
+  zlib::InputMem catalog_in(
+                        reinterpret_cast<unsigned char*>(catalog_debase.data()),
+                        catalog_debase.length());
   std::string temp_path;
   FILE *f = CreateTempFile("cvmfs_ut_legacy", 0666, "w+", &temp_path);
   EXPECT_TRUE(f != NULL);
@@ -529,10 +529,14 @@ TEST_F(T_Catalog, AttachSchema10) {
     free(catalog);
     return;
   }
-  retval = SafeWrite(fileno(f), catalog_binary, catalog_size);
-  free(catalog_binary);
   fclose(f);
-  EXPECT_TRUE(retval);
+  cvmfs::PathSink out(temp_path);
+
+  UniquePtr<zlib::Decompressor> 
+                decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
+  const zlib::StreamStates res = decompressor->
+                                            DecompressStream(&catalog_in, &out);
+  EXPECT_EQ(res, zlib::kStreamEnd);
 
   WritableCatalog *catalog =
     WritableCatalog::AttachFreely("", temp_path, shash::Any());

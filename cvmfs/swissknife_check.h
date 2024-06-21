@@ -9,9 +9,11 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/decompression.h"
 #include "crypto/hash.h"
 #include "smallhash.h"
 #include "swissknife.h"
+#include "util/pointer.h"
 
 namespace download {
 class DownloadManager;
@@ -98,6 +100,7 @@ class CommandCheck : public Command {
   bool        no_duplicates_map_;
   bool        is_remote_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
+  UniquePtr<zlib::Decompressor> decomp_zlib_;
 };
 
 }  // namespace swissknife
