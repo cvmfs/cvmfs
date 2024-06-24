@@ -1935,7 +1935,7 @@ void PosixQuotaManager::UnregisterBackChannel(
 }
 
 void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
-  unsigned timeout_ms = 100;
+  unsigned timeout_ms = 1000;
   do {
   ReadHalfPipe(fd, buf, nbyte, timeout_ms);
   } while (getpgid(cachemgr_pid_) >= 0);
