@@ -43,38 +43,40 @@ bool JobInfo::IsFileNotFound() {
 }
 
 void JobInfo::SetDecompressor(const DecompressorType decompressor_type) {
-  if (decompressor_type != decompressor_type_) {
+  if (decompressor_type_ != decompressor_type) {
     decompressor_type_ = decompressor_type;
-
-    if (decomp_.IsValid()) {
-      decomp_.Destroy();
-    }
 
     switch (decompressor_type_) {
       case kCreateNone:
-        return;
+        active_decomp_ = NULL;
       break;
       case kCreateZlib:
-        decomp_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+        if (!decomp_zlib_.IsValid()) {
+          decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+        }
+        active_decomp_ = decomp_zlib_.weak_ref();
       break;
       case kCreateEcho:
-        decomp_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+        if (!decomp_echo_.IsValid()) {
+          decomp_echo_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+        }
+        active_decomp_ = decomp_echo_.weak_ref();
       break;
     }
   }
 }
 
 bool JobInfo::ResetDecompression() {
-  if (!decomp_.IsValid()) {
+  if (active_decomp_ == NULL) {
     return true;
   }
-  return decomp_->Reset();
+  return active_decomp_->Reset();
 }
 
 bool JobInfo::DecompressToSink(zlib::InputAbstract *in) {
-  assert(decomp_.IsValid());
+  assert(active_decomp_ != NULL);
 
-  const zlib::StreamStates ret = decomp_->DecompressStream(in, sink_);
+  const zlib::StreamStates ret = active_decomp_->DecompressStream(in, sink_);
 
   switch (ret) {
     case zlib::kStreamEnd:
@@ -84,25 +86,25 @@ bool JobInfo::DecompressToSink(zlib::InputAbstract *in) {
     case zlib::kStreamDataError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                             "(id %" PRId64 ") %s failed for input %s: bad data",
-                            id_, decomp_->Describe().c_str(), url_->c_str());
+                            id_, active_decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailBadData);
     break;
     case zlib::kStreamIOError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                       "(id %" PRId64 ") %s failed for input %s: local IO error",
-                      id_, decomp_->Describe().c_str(), url_->c_str());
+                      id_, active_decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailLocalIO);
     break;
     case zlib::kStreamError:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                     "(id %" PRId64 ") %s failed for input %s: unhealthy status",
-                    id_, decomp_->Describe().c_str(), url_->c_str());
+                    id_, active_decomp_->Describe().c_str(), url_->c_str());
       SetErrorCode(kFailLocalIO);
     break;
     default:
       LogCvmfs(kLogDownload, kLogSyslogErr,
                     "(id %" PRId64 ") %s failed for input %s: unknown error %d",
-                    id_, decomp_->Describe().c_str(), url_->c_str(), ret);
+                    id_, active_decomp_->Describe().c_str(), url_->c_str(), ret);
       SetErrorCode(kFailLocalIO);
   }
 
@@ -147,6 +149,7 @@ void JobInfo::Init(const DecompressorType decompressor_type) {
   allow_failure_ = false;
 
   decompressor_type_ = kCreateNone;
+  active_decomp_ = NULL;
   SetDecompressor(decompressor_type);
 }
 
