@@ -1540,6 +1540,7 @@ PosixQuotaManager::PosixQuotaManager(
   , workspace_dir_()  // initialized in body
   , fd_lock_cachedb_(-1)
   , async_delete_(true)
+  , cachemanager_pid_(0)
   , database_(NULL)
   , stmt_touch_(NULL)
   , stmt_unpin_(NULL)
