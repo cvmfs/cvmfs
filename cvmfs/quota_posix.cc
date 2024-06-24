@@ -1939,6 +1939,7 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   bool result = false;
   do {
     result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
+    // try only as long as the cachemgr is still alive
   } while (!result && getpgid(cachemgr_pid_) >= 0);
 
 }
