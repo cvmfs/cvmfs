@@ -522,7 +522,7 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 /**
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
-void ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
+bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
   ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
@@ -542,9 +542,9 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
       waittime_ms += backoff_ms;
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
-  if (timeout_ms != 0 && waittime_ms > timeout_ms) return;
+  if (timeout_ms != 0 && waittime_ms > timeout_ms) return false;
   } while (num_bytes == 0);
-  assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+  return ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
 
 

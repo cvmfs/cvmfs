@@ -1936,9 +1936,10 @@ void PosixQuotaManager::UnregisterBackChannel(
 
 void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   unsigned timeout_ms = 1000;
+  bool result = false;
   do {
-    ReadHalfPipe(fd, buf, nbyte, timeout_ms);
-  } while (getpgid(cachemgr_pid_) >= 0);
+    result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
+  } while (!result && getpgid(cachemgr_pid_) >= 0);
 
 }
 
