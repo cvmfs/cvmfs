@@ -601,7 +601,6 @@ uint64_t PosixQuotaManager::GetCapacity() {
 
 void PosixQuotaManager::GetLimits(uint64_t *limit, uint64_t *cleanup_threshold)
 {
-
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
 

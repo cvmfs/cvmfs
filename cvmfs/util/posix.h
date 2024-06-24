@@ -91,7 +91,7 @@ CVMFS_EXPORT int ConnectTcpEndpoint(const std::string &ipv4_address,
 CVMFS_EXPORT void MakePipe(int pipe_fd[2]);
 CVMFS_EXPORT void WritePipe(int fd, const void *buf, size_t nbyte);
 CVMFS_EXPORT void ReadPipe(int fd, void *buf, size_t nbyte);
-CVMFS_EXPORT void ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms=0);
+CVMFS_EXPORT void ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms = 0);
 CVMFS_EXPORT void ClosePipe(int pipe_fd[2]);
 CVMFS_EXPORT bool DiffTree(const std::string &path_a,
                            const std::string &path_b);
