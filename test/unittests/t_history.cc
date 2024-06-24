@@ -227,13 +227,13 @@ class T_History : public ::testing::Test {
     ASSERT_EQ(0u, base64.length() % 4);
     std::string  decoded;
     ASSERT_TRUE(Debase64(base64, &decoded)) << "failed to decode base64";
-    UniquePtr<zlib::Decompressor>
+    const UniquePtr<zlib::Decompressor>
                 decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
     zlib::InputMem decoded_ro(reinterpret_cast<unsigned char*>(
                                 const_cast<char*>(decoded.data())),
                               decoded.size());
     cvmfs::PathSink unpacked(dest);
-    zlib::StreamStates res =
+    const zlib::StreamStates res =
                          decompressor->DecompressStream(&decoded_ro, &unpacked);
     ASSERT_EQ(res, zlib::kStreamEnd)  << "failed to decompress";
   }
