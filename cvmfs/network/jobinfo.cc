@@ -14,7 +14,11 @@ atomic_int64 JobInfo::next_uuid = 0;
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
-  Init(c);
+  if (c) {
+    Init(kCreateZlib);
+  } else {
+    Init(kCreateEcho);
+  }
 
   url_ = u;
   probe_hosts_ = ph;
@@ -23,7 +27,7 @@ JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
 }
 
 JobInfo::JobInfo(const std::string *u, const bool ph) {
-  Init(false);
+  Init(kCreateNone);
 
   url_ = u;
   probe_hosts_ = ph;
@@ -38,17 +42,25 @@ bool JobInfo::IsFileNotFound() {
   return http_code_ == 404;
 }
 
-void JobInfo::SetCompressed(bool compressed) {
-  compressed_ = compressed;
+void JobInfo::SetDecompressor(const DecompressorType decompressor_type) {
+  if (decompressor_type != decompressor_type_) {
+    decompressor_type_ = decompressor_type;
 
-  if (decomp_.IsValid()) {
-    decomp_.Destroy();
-  }
+    if (decomp_.IsValid()) {
+      decomp_.Destroy();
+    }
 
-  if (compressed_) {
-    decomp_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
-  } else {
-    decomp_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+    switch (decompressor_type_) {
+      case kCreateNone:
+        return;
+      break;
+      case kCreateZlib:
+        decomp_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+      break;
+      case kCreateEcho:
+        decomp_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+      break;
+    }
   }
 }
 
@@ -97,7 +109,7 @@ bool JobInfo::DecompressToSink(zlib::InputAbstract *in) {
   return false;
 }
 
-void JobInfo::Init(const bool compressed) {
+void JobInfo::Init(const DecompressorType decompressor_type) {
   id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
@@ -134,7 +146,8 @@ void JobInfo::Init(const bool compressed) {
 
   allow_failure_ = false;
 
-  SetCompressed(compressed);
+  decompressor_type_ = kCreateNone;
+  SetDecompressor(decompressor_type);
 }
 
 }  // namespace download
