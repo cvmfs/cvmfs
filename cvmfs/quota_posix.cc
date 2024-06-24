@@ -364,7 +364,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   preserve_filedes.insert(pipe_handshake[0]);
   pid_t newcachemgr_pid;
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
-                       /*drop_credentials*/ false, 
+                       /*drop_credentials*/ false,
                        /*clear_env*/ false,
                        /*double_fork*/  true,
                        &newcachemgr_pid);
@@ -1937,7 +1937,7 @@ void PosixQuotaManager::UnregisterBackChannel(
 void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   unsigned timeout_ms = 1000;
   do {
-  ReadHalfPipe(fd, buf, nbyte, timeout_ms);
+    ReadHalfPipe(fd, buf, nbyte, timeout_ms);
   } while (getpgid(cachemgr_pid_) >= 0);
 
 }
