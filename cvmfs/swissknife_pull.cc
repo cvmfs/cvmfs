@@ -207,7 +207,7 @@ static void Store(
         PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
               remote_path.c_str());
       }
-      int retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      const int retval = rename(tmp_dest.c_str(), remote_path.c_str());
       assert(retval == 0);
       unlink(local_path.c_str());
     }
@@ -753,7 +753,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const std::string history_db_path = history_path + ".uncompressed";
     zlib::InputPath in_path(history_path);
     cvmfs::PathSink out_path(history_db_path);
-    zlib::StreamStates ret = decomp_zlib->DecompressStream(&in_path, &out_path);
+    const zlib::StreamStates ret
+                           = decomp_zlib->DecompressStream(&in_path, &out_path);
     assert(ret == zlib::kStreamEnd);
     history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {

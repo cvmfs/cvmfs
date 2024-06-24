@@ -480,7 +480,7 @@ TEST_F(T_Catalog, AttachSchema09) {
   fclose(f);
   cvmfs::PathSink out(temp_path);
 
-  UniquePtr<zlib::Decompressor> 
+  const UniquePtr<zlib::Decompressor> 
                 decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
   const zlib::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);
@@ -532,7 +532,7 @@ TEST_F(T_Catalog, AttachSchema10) {
   fclose(f);
   cvmfs::PathSink out(temp_path);
 
-  UniquePtr<zlib::Decompressor> 
+  const UniquePtr<zlib::Decompressor> 
                 decompressor(zlib::Decompressor::Construct(zlib::kZlibDefault));
   const zlib::StreamStates res = decompressor->
                                             DecompressStream(&catalog_in, &out);

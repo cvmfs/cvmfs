@@ -17,7 +17,7 @@ ZlibDecompressor::ZlibDecompressor(const zlib::Algorithms &alg) :
   stream_.opaque   = Z_NULL;
   stream_.next_in  = Z_NULL;
   stream_.avail_in = 0;
-  int retval = inflateInit(&stream_);
+  const int retval = inflateInit(&stream_);
   assert(retval == 0);
 
   is_healthy_ = true;
@@ -69,14 +69,16 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
       z_ret = inflate(&stream_, Z_NO_FLUSH);
       switch (z_ret) {
         case Z_NEED_DICT:
-          z_ret = Z_DATA_ERROR;  // and fall through
+          // z_ret = Z_DATA_ERROR;  // and fall through (z_ret not being used)
         case Z_STREAM_ERROR:
         case Z_DATA_ERROR:
           is_healthy_ = false;
           return kStreamDataError;
+        break;
         case Z_MEM_ERROR:
           is_healthy_ = false;
           return kStreamIOError;
+        break;
       }
       const size_t have = kZChunk - stream_.avail_out;
       const int64_t written = output->Write(out, have);

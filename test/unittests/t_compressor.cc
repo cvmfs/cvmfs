@@ -477,7 +477,7 @@ TEST_F(T_Compressor, CompressionLong) {
   decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(compress_buf, compress_pos);
   cvmfs::MemSink out(0);
-  zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
+  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
   EXPECT_EQ(res, zlib::kStreamEnd);
   EXPECT_EQ(out.pos(), static_cast<uint64_t>(long_size));
   EXPECT_EQ(0, memcmp(out.data(), long_string, long_size));

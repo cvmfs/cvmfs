@@ -62,7 +62,7 @@ bool JobInfo::ResetDecompression() {
 bool JobInfo::DecompressToSink(zlib::InputAbstract *in) {
   assert(decomp_.IsValid());
 
-  zlib::StreamStates ret = decomp_->DecompressStream(in, sink_);
+  const zlib::StreamStates ret = decomp_->DecompressStream(in, sink_);
 
   switch (ret) {
     case zlib::kStreamEnd:
