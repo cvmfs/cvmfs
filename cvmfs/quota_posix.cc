@@ -363,7 +363,11 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   preserve_filedes.insert(pipe_boot[1]);
   preserve_filedes.insert(pipe_handshake[0]);
   pid_t newcachemgr_pid;
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false, false, true, &newcachemgr_pid);
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
+                       /*drop_credentials*/ false, 
+                       /*clear_env*/ false,
+                       /*double_fork*/  true,
+                       &newcachemgr_pid);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
