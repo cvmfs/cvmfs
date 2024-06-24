@@ -37,6 +37,12 @@ enum DataTubeAction {
   kActionDecompress
 };
 
+enum DecompressorType {
+  kCreateNone,
+  kCreateZlib,
+  kCreateEcho
+};
+
 /**
  * Wrapper for the data tube to transfer data from CallbackCurlData() that is
  * executed in MainDownload() Thread to Fetch() called by a fuse thread
@@ -84,7 +90,7 @@ class JobInfo {
   const std::string *extra_info_;
 
   // decompression
-  bool compressed_;    // must ONLY be changed by using SetCompressed()
+  DecompressorType decompressor_type_;  // ONLY change using SetDecompressor()
   cvmfs::Sink *sink_;
   UniquePtr<zlib::Decompressor> decomp_;
 
@@ -115,7 +121,7 @@ class JobInfo {
 
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
   // Replace Init() with JobInfo() that is called by the other constructors
-  void Init(bool compressed);
+  void Init(const DecompressorType decompressor_type);
 
  public:
   /**
@@ -165,7 +171,7 @@ class JobInfo {
   /**
    * Writes data to sink using the decompressor. Depending on the decompressor,
    * it might or might not decompress data before writing.
-   * 
+   *
    * @returns true   on successful write (kStreamEnd or kStreamContinue)
    *          false  on any error
    */
@@ -185,7 +191,7 @@ class JobInfo {
   Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
-  bool compressed() const { return compressed_; }
+  bool decompressor_type() const { return decompressor_type_; }
   bool probe_hosts() const { return probe_hosts_; }
   bool head_request() const { return head_request_; }
   bool follow_redirects() const { return follow_redirects_; }
@@ -225,7 +231,7 @@ class JobInfo {
 
 
   void SetUrl(const std::string *url) { url_ = url; }
-  void SetCompressed(bool compressed);
+  void SetDecompressor(const DecompressorType decompressor_type);
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
   void SetHeadRequest(bool head_request) { head_request_ = head_request; }
   void SetFollowRedirects(bool follow_redirects)
@@ -274,7 +280,7 @@ class JobInfo {
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 
   // needed for fetch.h ThreadLocalStorage
-  JobInfo() { Init(false); }
+  JobInfo() { Init(kCreateNone); }
 };  // JobInfo
 
 }  // namespace download
