@@ -92,7 +92,9 @@ class JobInfo {
   // decompression
   DecompressorType decompressor_type_;  // ONLY change using SetDecompressor()
   cvmfs::Sink *sink_;
-  UniquePtr<zlib::Decompressor> decomp_;
+  zlib::Decompressor *active_decomp_;
+  UniquePtr<zlib::Decompressor> decomp_zlib_;
+  UniquePtr<zlib::Decompressor> decomp_echo_;
 
   // Allow byte ranges to be specified.
   off_t range_offset_;
