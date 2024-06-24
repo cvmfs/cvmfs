@@ -85,8 +85,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint32_t GetProtocolRevision();
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
-  void StoreCacheMgrPid(pid_t pid_);
-  pid_t GetCacheMgrPid();
+  void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_;};
 
 
  private:

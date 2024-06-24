@@ -1943,11 +1943,3 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   } while (!result && getpgid(cachemgr_pid_) >= 0);
 
 }
-
-void PosixQuotaManager::StoreCacheMgrPid(pid_t pid_) {
-  cachemgr_pid_ = pid_;
-}
-
-pid_t PosixQuotaManager::GetCacheMgrPid() {
-  return cachemgr_pid_;
-}
