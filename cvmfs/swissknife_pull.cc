@@ -425,6 +425,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
   if (decomp_zlib->DecompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
     LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
+    decomp_zlib->Reset();
     goto pull_cleanup;
   }
   }

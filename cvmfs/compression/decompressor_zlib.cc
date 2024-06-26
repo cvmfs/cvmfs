@@ -93,7 +93,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
   output->Flush();
 
   if (z_ret == Z_STREAM_END) {
-    inflateReset(&stream_);
+    Reset();
     return kStreamEnd;
   } else {
     return kStreamContinue;

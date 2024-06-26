@@ -201,6 +201,7 @@ int Fetcher::Fetch(
            download::Code2Ascii(tls->download_job.error_code()));
   cache_mgr_->AbortTxn(txn);
   backoff_throttle_->Throttle();
+  assert(tls->download_job.ResetDecompression());
   SignalWaitingThreads(-EIO, object.id, tls);
   return -EIO;
 }

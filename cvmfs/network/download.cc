@@ -934,7 +934,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   } else {
     info->SetNocache(false);
   }
-  info->ResetDecompression();
+  // info->ResetDecompression();
   if (info->expected_hash()) {
     assert(info->hash_context().buffer != NULL);
     shash::Init(info->hash_context());
