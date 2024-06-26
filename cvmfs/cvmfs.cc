@@ -96,6 +96,7 @@
 #include "monitor.h"
 #include "mountpoint.h"
 #include "network/download.h"
+#include "network/direct_download.h"
 #include "nfs_maps.h"
 #include "notification_client.h"
 #include "options.h"
@@ -1176,7 +1177,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
 
   glue::PageCacheTracker::OpenDirectives open_directives;
-  if (!dirent.IsChunkedFile()) {
+  if (mount_point_->external_direct() && dirent.IsExternalFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "external file %s will be direct (open() skipped)",
+             path.c_str());
+    fuse_remounter_->fence()->Leave();
+    fi->fh = 0;
+    SetBit(download::DirectDownload::kBitDirectDownload, &fi->fh);
+    fuse_reply_open(req, fi);
+    return;
+  } else if (!dirent.IsChunkedFile()) {
     if (dirent.IsDirectIo()) {
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
@@ -1357,6 +1367,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 }
 
 
+static int cvmfs_read_reply(void *priv, const char *buf, size_t size)
+{
+  return fuse_reply_buf(static_cast<fuse_req_t>(priv), buf, size);
+}
+
+static int cvmfs_read_error(void *priv, int error)
+{
+  return fuse_reply_err(static_cast<fuse_req_t>(priv), error);
+}
+
 /**
  * Redirected to pread into cache.
  */
@@ -1378,20 +1398,36 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   }
 #endif
 
-  // Get data chunk (<=128k guaranteed by Fuse)
-  char *data = static_cast<char *>(alloca(size));
-  unsigned int overall_bytes_fetched = 0;
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  FuseInterruptCue ic(&req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
+  if (TestBit(download::DirectDownload::kBitDirectDownload, abs_fd)) {
+    PathString path;
+    bool found = GetPathForInode(ino, &path);
+    if (!found) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "EIO (09) on <unknown inode> external direct");
+      perf::Inc(file_system_->n_eio_total());
+      perf::Inc(file_system_->n_eio_09());
+      fuse_reply_err(req, EIO);
+      return;
+    }
+    mount_point_->direct_download()->Read(cvmfs_read_reply, cvmfs_read_error, req,
+      mount_point_->external_download_mgr(), path.ToString(), off, size);
+    return;
+  }
+
+  // Get data chunk (<=128k guaranteed by Fuse)
+  char *data = static_cast<char *>(alloca(size));
+  unsigned int overall_bytes_fetched = 0;
+
   // Do we have a a chunked file?
   if (fd < 0) {
-    const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
-    FuseInterruptCue ic(&req);
-    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
-
     const uint64_t chunk_handle = abs_fd;
     uint64_t unique_inode;
     ChunkFd chunk_fd;
@@ -1551,6 +1587,12 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
   int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
+
+  if (TestBit(download::DirectDownload::kBitDirectDownload, abs_fd)) {
+    fuse_reply_err(req, 0);
+    return;
+  }
+
   if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
     mount_point_->page_cache_tracker()->Close(ino);
   }

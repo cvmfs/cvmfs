@@ -52,6 +52,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/direct_download.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"
@@ -265,6 +266,8 @@ void FileSystem::CreateStatistics() {
      "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
   n_eio_08_ =  statistics_->Register("eio.08",
      "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_09_ =  statistics_->Register("eio.09",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -427,6 +430,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_eio_06_(NULL)
   , n_eio_07_(NULL)
   , n_eio_08_(NULL)
+  , n_eio_09_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -610,6 +614,7 @@ void FileSystem::ResetErrorCounters() {
   n_eio_06_->Set(0);
   n_eio_07_->Set(0);
   n_eio_08_->Set(0);
+  n_eio_09_->Set(0);
 }
 
 
@@ -2177,6 +2182,21 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
     proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
+
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_DIRECT", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    external_direct_ = true;
+    direct_download_ = new download::DirectDownload(
+      perf::StatisticsTemplate("direct-download", statistics_));
+
+    if (options_mgr_->GetValue("CVMFS_DIRECT_BOUNDRY", &optarg)) {
+      uint64_t boundry = String2Uint64(optarg);
+      if (boundry > 0) {
+        direct_download_->SetBoundry(boundry);
+      }
+    }
+  }
 
   return true;
 }

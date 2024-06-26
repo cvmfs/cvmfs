@@ -117,6 +117,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
   FRIEND_TEST(T_Download, EscapeUrl);
+  friend class DirectDownload;
 
  public:
   struct ProxyInfo {

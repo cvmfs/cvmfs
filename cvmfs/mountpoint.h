@@ -41,6 +41,7 @@ class Uuid;
 }
 namespace download {
 class DownloadManager;
+class DirectDownload;
 }
 namespace glue {
 class InodeTracker;
@@ -244,6 +245,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_eio_06() { return n_eio_06_; }
   perf::Counter *n_eio_07() { return n_eio_07_; }
   perf::Counter *n_eio_08() { return n_eio_08_; }
+  perf::Counter *n_eio_09() { return n_eio_09_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -352,6 +354,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_eio_06_;
   perf::Counter *n_eio_07_;
   perf::Counter *n_eio_08_;
+  perf::Counter *n_eio_09_;
   IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 
@@ -504,6 +507,7 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
   }
+  download::DirectDownload *direct_download() { return direct_download_; }
   file_watcher::FileWatcher* resolv_conf_watcher() {
     return resolv_conf_watcher_;
   }
@@ -518,6 +522,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls() { return enforce_acls_; }
   bool cache_symlinks() { return cache_symlinks_; }
   bool fuse_expire_entry() { return fuse_expire_entry_; }
+  bool external_direct() { return external_direct_; }
   catalog::InodeAnnotation *inode_annotation() {
     return inode_annotation_;
   }
@@ -639,6 +644,7 @@ class MountPoint : SingleCopy, public BootFactory {
   signature::SignatureManager *signature_mgr_;
   download::DownloadManager *download_mgr_;
   download::DownloadManager *external_download_mgr_;
+  download::DirectDownload *direct_download_;
   cvmfs::Fetcher *fetcher_;
   cvmfs::Fetcher *external_fetcher_;
   catalog::InodeAnnotation *inode_annotation_;
@@ -664,6 +670,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls_;
   bool cache_symlinks_;
   bool fuse_expire_entry_;
+  bool external_direct_;
   std::string repository_tag_;
   std::vector<std::string> blacklist_paths_;
 
