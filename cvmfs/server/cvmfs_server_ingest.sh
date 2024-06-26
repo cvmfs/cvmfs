@@ -287,6 +287,10 @@ cvmfs_server_ingest() {
     ingest_command="$ingest_command -C true"
   fi
 
+  if [ "x$CVMFS_ENABLE_MTIME_NS" = "xtrue" ]; then
+    ingest_command="$ingest_command -j"
+  fi
+
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then
     ingest_command="$ingest_command -+stats"
   fi

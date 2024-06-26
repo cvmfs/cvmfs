@@ -73,10 +73,17 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
   echo "checking nanosecond timestamps"
-  echo "entry information of $repo_dir/file:"
+  echo "entry information of $repo_dir/file (expect unknown nanosecond timestamps by default):"
   stat $repo_dir/file || return 40
   local mtime_ns=$(stat -c%y $repo_dir/file | cut -d. -f2 | awk '{print $1}')
-  [ $mtime_ns -ne 0 ] || return 41
+  [ $mtime_ns -eq 0 ] || return 41
+  echo "CVMFS_ENABLE_MTIME_NS=true" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
+  start_transaction $CVMFS_TEST_REPO || return $?
+  touch $repo_dir/file || return 42
+  publish_repo $CVMFS_TEST_REPO || return $?
+  stat $repo_dir/file || return 43
+  mtime_ns=$(stat -c%y $repo_dir/file | cut -d. -f2 | awk '{print $1}')
+  [ $mtime_ns -ne 0 ] || return 44
 
   echo "*** Maximum repository name with 60 characters (CVM-1173)"
   CVMFS_TEST500_LONG_REPONAME=testrepo.osg-software-2580-el7-cvmfs-stratum-0.novalocal.crt

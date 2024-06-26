@@ -41,6 +41,7 @@ cvmfs_run_test() {
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+  echo "CVMFS_ENABLE_MTIME_NS=true" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
 
   # ============================================================================
 
