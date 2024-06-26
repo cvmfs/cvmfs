@@ -239,8 +239,13 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent(
   }
 
   if (enable_mtime_ns) {
+#ifdef __APPLE__
+    dirent.mtime_ns_ = static_cast<int32_t>(
+      this->GetUnionStat().st_mtimespec.tv_nsec);
+#else
     dirent.mtime_ns_ = static_cast<int32_t>(
       this->GetUnionStat().st_mtim.tv_nsec);
+#endif
   }
 
   return dirent;

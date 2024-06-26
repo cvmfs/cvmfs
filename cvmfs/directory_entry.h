@@ -201,9 +201,15 @@ class DirectoryEntryBase {
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;
     if (HasMtimeNs()) {
+#ifdef __APPLE__
+      s.st_atimespec.tv_nsec = mtime_ns_;
+      s.st_mtimespec.tv_nsec = mtime_ns_;
+      s.st_ctimespec.tv_nsec = mtime_ns_;
+#else
       s.st_atim.tv_nsec = mtime_ns_;
       s.st_mtim.tv_nsec = mtime_ns_;
       s.st_ctim.tv_nsec = mtime_ns_;
+#endif
     }
     return s;
   }

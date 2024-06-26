@@ -120,7 +120,11 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_rdev = entry_stat->st_rdev;
   tar_stat_.st_size = entry_stat->st_size;
   tar_stat_.st_mtime = entry_stat->st_mtime;
+#ifdef __APPLE__
+  tar_stat_.st_mtimespec.tv_nsec = entry_stat->st_mtimespec.tv_nsec;
+#else
   tar_stat_.st_mtim.tv_nsec = entry_stat->st_mtim.tv_nsec;
+#endif
   tar_stat_.st_nlink = entry_stat->st_nlink;
 
   if (IsDirectory()) {
@@ -168,7 +172,12 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent(
   }
 
   if (enable_mtime_ns) {
+#ifdef __APPLE__
+    dirent.mtime_ns_ =
+      static_cast<int32_t>(this->tar_stat_.st_mtimespec.tv_nsec);
+#else
     dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
+#endif
   }
 
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||
