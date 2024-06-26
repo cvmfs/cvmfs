@@ -29,7 +29,9 @@ class SyncItemDummyCatalog : public SyncItem {
     return expected_type == kItemFile;
   }
 
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const {
+  catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool /* enable_mtime_ns */) const
+  {
     catalog::DirectoryEntryBase dirent;
     std::string name(".cvmfscatalog");
     dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;

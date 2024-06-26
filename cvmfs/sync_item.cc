@@ -22,8 +22,6 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
-bool SyncItem::g_enable_mtime_ns = false;
-
 SyncItem::SyncItem() :
   rdonly_type_(static_cast<SyncItemType>(0)),
   graft_size_(-1),
@@ -203,7 +201,9 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent(
+  bool enable_mtime_ns) const
+{
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
@@ -238,7 +238,7 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
   }
 
-  if (g_enable_mtime_ns) {
+  if (enable_mtime_ns) {
     dirent.mtime_ns_ = static_cast<int32_t>(
       this->GetUnionStat().st_mtim.tv_nsec);
   }

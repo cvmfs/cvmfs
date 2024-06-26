@@ -132,7 +132,9 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   return tar_stat_;
 }
 
-catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent(
+  bool enable_mtime_ns) const
+{
   assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;
@@ -165,7 +167,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
     dirent.size_ = makedev(major(tar_stat_.st_rdev), minor(tar_stat_.st_rdev));
   }
 
-  if (g_enable_mtime_ns) {
+  if (enable_mtime_ns) {
     dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
   }
 
