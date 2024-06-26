@@ -118,6 +118,7 @@ class AbstractSyncMediator {
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
   virtual void UpdateDirectory(SharedPtr<SyncItem> entry) = 0;
+  // virtual void UpdateDirectoryRecursively(SharedPtr<SyncItem> entry) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -162,6 +163,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
   void UpdateDirectory(SharedPtr<SyncItem> entry);
+  // void UpdateDirectoryRecursively(SharedPtr<SyncItem> entry);
   void Clone(const std::string from, const std::string to);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
@@ -240,8 +242,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
                          const std::string &file_name);
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
-
-  void UpdateDirectoryRecursively(SharedPtr<SyncItem> entry);
 
   SharedPtr<SyncItem> CreateSyncItem(const std::string &relative_parent_path,
                                      const std::string &filename,

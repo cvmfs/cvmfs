@@ -129,6 +129,16 @@ class WritableCatalog : public Catalog {
     RefreshEntry(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
   }
 
+
+  void RefreshParent(const shash::Md5 &old_parent_path_hash, const shash::Md5 &new_parent_path_hash, const shash::Md5 &new_path_hash);
+  inline void RefreshParent(const std::string &old_parent_path, const std::string &new_parent_path, const std::string &new_path)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry children with name: %s. Old path: %s, new parent path: %s", new_path.c_str(), 
+                                                                                                                  old_parent_path.c_str(),
+                                                                                                                  new_parent_path.c_str());
+    RefreshParent(shash::Md5(shash::AsciiPtr(old_parent_path)), shash::Md5(shash::AsciiPtr(new_parent_path)), shash::Md5(shash::AsciiPtr(new_path)));
+  }
+
   inline void AddEntry(
     const DirectoryEntry &entry,
     const XattrList &xattrs,
@@ -160,6 +170,7 @@ class WritableCatalog : public Catalog {
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
   SqlDirentNameUpdate *sql_update_name_;
+  SqlParentUpdate     *sql_parent_update_;
   SqlChunkInsert      *sql_chunk_insert_;
   SqlChunksRemove     *sql_chunks_remove_;
   SqlChunksCount      *sql_chunks_count_;

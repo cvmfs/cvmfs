@@ -1095,7 +1095,13 @@ void SyncMediator::UpdateDirectory(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogStderr, "A directory: %s was marked as renamed and we obtain an old name: %s. Relative parent path: %s, Old path: %s", entry->GetScratchPath().c_str(), old_name.c_str(), entry->GetRelativePath().c_str(), old_path.c_str());
   const std::string new_path = entry->GetRelativePath();
   catalog_manager_->UpdateDirectory(old_path, new_path);
-}  
+  
+}
+
+// void SyncMediator::UpdateDirectoryRecursively(SharedPtr<SyncItem> entry) {
+//   FileSystemTraversal<SyncMediator> traversal(this, entry->GetScratchPath(), old_name, true);
+//   traversal.fn_enter_dir = 
+// }
 
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
   reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(),

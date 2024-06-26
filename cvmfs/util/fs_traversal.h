@@ -105,6 +105,15 @@ class FileSystemTraversal {
     Init();
   }
 
+  FileSystemTraversal(T *delegate,
+                      const std::string &relative_to_directory,
+                      const std::string &old_directory_name,
+                      const bool recurse)
+  {
+    FileSystemTraversal(delegate, relative_to_directory, recurse);
+    old_directory_name_ = old_directory_name; 
+  }
+
   /**
    * Start the recursion.
    * @param dir_path The directory to start the recursion at
@@ -134,7 +143,7 @@ class FileSystemTraversal {
   /** dir_path in callbacks will be relative to this directory */
   std::string relative_to_directory_;
   bool recurse_;
-
+  std::string old_directory_name_ = "";
 
   void Init() {
   }

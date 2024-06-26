@@ -235,23 +235,50 @@ void WritableCatalogManager::UpdateDirectory(const std::string &old_path,
   string new_parent_path, new_directory_name;
   SplitPath(new_relative_path, &new_parent_path, &new_directory_name);
   SyncLock();
-  WritableCatalog *parent_catalog;
-  DirectoryEntry parent_entry;
-  DirectoryEntry target_entry;
+  WritableCatalog *parent_catalog, *target_catalog;
+  DirectoryEntry parent_entry, target_entry;
   if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
              parent_path.c_str());
     PANIC("Unable to found parent path catalog");
   }
+
+  if (!FindCatalog(old_relative_path, &target_catalog, &target_entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
+             parent_path.c_str());
+    PANIC("Unable to found parent path catalog");
+  }
+
   if (!parent_catalog->LookupPath(PathString(old_relative_path), &target_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "no entry with path: %s was found",
              old_relative_path.c_str());
     PANIC("Unable to found child path entry");
   }
+  RefreshParent(old_relative_path, new_relative_path);
   target_entry.name_.Assign(NameString(new_directory_name));
-  parent_catalog->RefreshEntry(target_entry, old_relative_path, new_relative_path);
+  parent_catalog->RefreshEntry(target_entry, old_relative_path, new_relative_path);  
   parent_catalog->UpdateEntry(parent_entry, parent_path);
   SyncUnlock();
+}
+
+// All paths should be passed without trailing filesystem path delimiter (e. g. "/")
+void WritableCatalogManager::RefreshParent(const std::string &old_path, 
+                                           const std::string &new_path) {
+  DirectoryEntryList listing;
+  Listing(old_path, &listing);
+  for (unsigned i = 0; i < listing.size(); ++i) {
+    if (listing[i].IsDirectory()) {
+      RefreshParent(listing[i].GetFullPath(old_path), listing[i].GetFullPath(new_path));
+      WritableCatalog *parent_catalog;
+      DirectoryEntry parent_entry;
+      if (!FindCatalog(old_path, &parent_catalog, &parent_entry)) {
+        LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
+                old_path.c_str());
+        PANIC("Unable to found parent path catalog");
+      }
+      parent_catalog->RefreshParent(old_path, new_path, listing[i].GetFullPath(new_path));
+    }
+  }
 }
 
 /**

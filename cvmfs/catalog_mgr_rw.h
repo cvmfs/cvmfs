@@ -114,6 +114,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const XattrList &xattrs,
                       const std::string &directory_path);
   void UpdateDirectory(const std::string &old_path, const std::string &new_path);
+  void RefreshParent(const std::string &entry_path, 
+                     const std::string &old_parent_path);
+
   void RemoveDirectory(const std::string &directory_path);
 
 

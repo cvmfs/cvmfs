@@ -1101,10 +1101,6 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 
 //------------------------------------------------------------------------------
 
-
-
-//------------------------------------------------------------------------------
-
 SqlDirentNameUpdate::SqlDirentNameUpdate(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),
     "UPDATE catalog "
@@ -1128,6 +1124,31 @@ bool SqlDirentNameUpdate::BindDirent(const DirectoryEntry &entry) {
 
 //------------------------------------------------------------------------------
 
+
+SqlParentUpdate::SqlParentUpdate(const CatalogDatabase &database) {
+  DeferredInit(database.sqlite_db(),
+      "UPDATE catalog "
+      "SET md5path_1 = :md5_1, md5path_2 = :md5_2, "
+  //           1                        2
+      "parent_1 = :p1, parent_2 = :p2 "
+  //           3             4          
+      "WHERE (parent_1 = :p3) AND (parent_2 = :p4);");
+  //                     5                      6
+}
+
+bool SqlParentUpdate::BindPathHash(const shash::Md5 &pathHash) {
+  return BindMd5(1, 2, pathHash);
+}
+
+bool SqlParentUpdate::BindParentHashes(const shash::Md5 oldParentHash, const shash::Md5 &newParentHash) {
+  return BindMd5(3, 4, newParentHash) && BindMd5(5, 6, oldParentHash);
+}
+
+bool SqlParentUpdate::BindDirent(const DirectoryEntry &entry) {
+  return true;
+}
+
+//------------------------------------------------------------------------------
 
 SqlDirentUnlink::SqlDirentUnlink(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),

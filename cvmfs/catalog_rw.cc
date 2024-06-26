@@ -97,6 +97,7 @@ void WritableCatalog::InitPreparedStatements() {
   sql_touch_         = new SqlDirentTouch      (database());
   sql_update_        = new SqlDirentUpdate     (database());
   sql_update_name_   = new SqlDirentNameUpdate (database());
+  sql_parent_update_ = new SqlParentUpdate     (database());
   sql_chunk_insert_  = new SqlChunkInsert      (database());
   sql_chunks_remove_ = new SqlChunksRemove     (database());
   sql_chunks_count_  = new SqlChunksCount      (database());
@@ -114,6 +115,7 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_touch_;
   delete sql_update_;
   delete sql_update_name_;
+  delete sql_parent_update_;
   delete sql_chunk_insert_;
   delete sql_chunks_remove_;
   delete sql_chunks_count_;
@@ -275,7 +277,21 @@ void WritableCatalog::RefreshEntry(const DirectoryEntry &entry, const shash::Md5
     sql_update_name_->BindDirent(entry) &&
     sql_update_name_->Execute();
   assert(retval);
-  sql_update_name_->Reset();  
+  sql_update_name_->Reset();
+}
+
+void WritableCatalog::RefreshParent(const shash::Md5 &old_parent_path_hash, const shash::Md5 &new_parent_path_hash, const shash::Md5 &new_path_hash) {
+  SetDirty();
+  LogCvmfs(kLogCatalog, kLogStdout, "Refreshing parent. Parent hash: %s, old hash: %s, new hash: %s", 
+                                          new_parent_path_hash.ToString().c_str(), 
+                                          old_parent_path_hash.ToString().c_str(), 
+                                          new_path_hash.ToString().c_str());
+  
+  bool retval = sql_parent_update_->BindParentHashes(old_parent_path_hash, new_parent_path_hash) &&
+                sql_parent_update_->BindPathHash(new_path_hash) &&
+                sql_parent_update_->Execute();
+  assert(retval);
+  sql_parent_update_->Reset();
 }
 
 void WritableCatalog::AddFileChunk(const std::string &entry_path,
