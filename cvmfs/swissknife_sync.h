@@ -36,6 +36,7 @@ struct SyncParameters {
         ignore_xdir_hardlinks(false),
         stop_for_catalog_tweaks(false),
         include_xattrs(false),
+        enable_mtime_ns(false),
         external_data(false),
         direct_io(false),
         voms_authz(false),
@@ -88,6 +89,7 @@ struct SyncParameters {
   bool ignore_xdir_hardlinks;
   bool stop_for_catalog_tweaks;
   bool include_xattrs;
+  bool enable_mtime_ns;
   bool external_data;
   bool direct_io;
   bool voms_authz;
