@@ -431,6 +431,7 @@ class LocalObjectFetcher :
                source.c_str(), file_path->c_str(), errno);
       unlink(file_path->c_str());
       file_path->clear();
+      decomp->Reset();
       return BaseTN::kFailDecompression;
     }
 

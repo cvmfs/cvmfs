@@ -698,6 +698,7 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   zlib::InputPath in_path(source);
   cvmfs::PathSink out_path(dest);
   if (decomp_zlib_->DecompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
+    assert(decomp_zlib_->Reset());
     return "";
   }
   return dest;
