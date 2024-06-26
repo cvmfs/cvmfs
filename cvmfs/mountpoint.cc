@@ -266,6 +266,8 @@ void FileSystem::CreateStatistics() {
      "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
   n_eio_08_ =  statistics_->Register("eio.08",
      "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_09_ =  statistics_->Register("eio.09",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -428,6 +430,7 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_eio_06_(NULL)
   , n_eio_07_(NULL)
   , n_eio_08_(NULL)
+  , n_eio_09_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -611,6 +614,7 @@ void FileSystem::ResetErrorCounters() {
   n_eio_06_->Set(0);
   n_eio_07_->Set(0);
   n_eio_08_->Set(0);
+  n_eio_09_->Set(0);
 }
 
 

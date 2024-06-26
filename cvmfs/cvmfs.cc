@@ -1402,14 +1402,19 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   FuseInterruptCue ic(&req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
-  if (TestBit(download::DirectDownload::kBitDirectDownload, fi->fh)) {
+  int64_t fd = static_cast<int64_t>(fi->fh);
+  uint64_t abs_fd = (fd < 0) ? -fd : fd;
+  ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
+
+  if (TestBit(download::DirectDownload::kBitDirectDownload, abs_fd)) {
     PathString path;
     bool found = GetPathForInode(ino, &path);
     if (!found) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "EIO (08) on <unknown inode> external direct");
+             "EIO (09) on <unknown inode> external direct");
       perf::Inc(file_system_->n_eio_total());
-      perf::Inc(file_system_->n_eio_08());
+      perf::Inc(file_system_->n_eio_09());
+      fuse_reply_err(req, EIO);
       return;
     }
     mount_point_->direct_download()->Read(cvmfs_read_reply, cvmfs_read_error, req,
@@ -1420,10 +1425,6 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
-
-  int64_t fd = static_cast<int64_t>(fi->fh);
-  uint64_t abs_fd = (fd < 0) ? -fd : fd;
-  ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
   // Do we have a a chunked file?
   if (fd < 0) {
@@ -1584,14 +1585,14 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   }
 #endif
 
-  if (TestBit(download::DirectDownload::kBitDirectDownload, fi->fh)) {
-    perf::Dec(file_system_->no_open_files());
+  int64_t fd = static_cast<int64_t>(fi->fh);
+  uint64_t abs_fd = (fd < 0) ? -fd : fd;
+
+  if (TestBit(download::DirectDownload::kBitDirectDownload, abs_fd)) {
     fuse_reply_err(req, 0);
     return;
   }
 
-  int64_t fd = static_cast<int64_t>(fi->fh);
-  uint64_t abs_fd = (fd < 0) ? -fd : fd;
   if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
     mount_point_->page_cache_tracker()->Close(ino);
   }
