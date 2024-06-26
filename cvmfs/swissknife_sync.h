@@ -255,7 +255,7 @@ class CommandSync : public Command {
     return "Pushes changes from scratch area back to the repository.";
   }
   virtual ParameterList GetParams() const {
-    // unused characters: j, J, 1-9, all special characters but @
+    // unused characters: J, 1-9, all special characters but @
     ParameterList r;
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
@@ -307,6 +307,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch('g', "ignore special files"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
+    r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
     r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('n', "create new repository"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));

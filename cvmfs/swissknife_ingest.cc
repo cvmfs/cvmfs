@@ -56,6 +56,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('O') != args.end()) {
     params.generate_legacy_bulk_chunks = true;
   }
+  if (args.find('j') != args.end()) {
+    params.enable_mtime_ns = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);

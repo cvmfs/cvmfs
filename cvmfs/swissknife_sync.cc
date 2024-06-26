@@ -622,6 +622,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('V') != args.end()) params.voms_authz = true;
   if (args.find('F') != args.end()) params.authz_file = *args.find('F')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
+  if (args.find('j') != args.end()) params.enable_mtime_ns = true;
   if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('W') != args.end()) params.direct_io = true;
   if (args.find('S') != args.end()) {
