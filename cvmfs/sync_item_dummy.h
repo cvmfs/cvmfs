@@ -72,7 +72,8 @@ class SyncItemDummyDir : public SyncItemNative {
   friend class SyncUnionTarball;
 
  public:
-  catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool enable_mtime_ns) const;
   SyncItemType GetScratchFiletype() const;
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
@@ -109,7 +110,9 @@ class SyncItemDummyDir : public SyncItemNative {
                                    S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 };
 
-catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent(
+  bool /* enable_mtime_ns */) const
+{
   catalog::DirectoryEntryBase dirent;
 
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
