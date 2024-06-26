@@ -150,7 +150,6 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
   dirent.gid_ = this->tar_stat_.st_gid;
   dirent.size_ = this->tar_stat_.st_size;
   dirent.mtime_ = this->tar_stat_.st_mtime;
-  dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
   dirent.checksum_ = this->GetContentHash();
   dirent.is_external_file_ = this->IsExternalData();
   dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
@@ -164,6 +163,10 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(major(tar_stat_.st_rdev), minor(tar_stat_.st_rdev));
+  }
+
+  if (g_enable_mtime_ns) {
+    dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
   }
 
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||

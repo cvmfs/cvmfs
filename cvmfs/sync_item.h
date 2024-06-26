@@ -58,6 +58,19 @@ class SyncItem {
   // SyncUnionTarball can create SyncItemTar and SyncItemDummyDir.
 
  public:
+  /**
+   * Publishing can globally turn on/off support for nanosecond timestamps.
+   * If turned off, directory entries from the changeset will have the
+   * ns timestamp unset (-1), and as a result the corresponding value in the
+   * catalog will be set to NULL. False by default.
+   *
+   * TODO(jblomer): once we have support for multiple paralle publish context
+   * within the same process, using libcvmfs_server, we need a more
+   * sophisticated mechanism than a global toggle for this setting.
+   * For the moment, it is simple and effective.
+   */
+  static bool g_enable_mtime_ns;
+
   SyncItem();
   virtual ~SyncItem();
 
