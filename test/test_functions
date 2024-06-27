@@ -70,6 +70,10 @@ else
   CVMFS_TEST_DOCKER=no
 fi
 
+echo "temporary overwrite of CVMFS_SERVER_URL in /etc/cvmfs/domain.d/cern.ch.local due to RAL being unreliable"
+sudo sh -c "echo CVMFS_SERVER_URL=\"http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs-s1bnl.opensciencegrid.org/cvmfs/@fqrn@;http://cvmfs-s1fnal.opensciencegrid.org/cvmfs/@fqrn@\" > /etc/cvmfs/domain.d/cern.ch.local" || return 100
+cat /etc/cvmfs/domain.d/cern.ch.local
+
 die() {
   echo -e $1 >&2
   exit 1
@@ -458,6 +462,7 @@ cvmfs_clean() {
   sudo rm -f /etc/cvmfs/default.local                    || return 102
   sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
+  sudo sh -c "rm -f /etc/cvmfs/domain.d/cern.ch.local"   || return 106
 
   wait_for_umount || return 99
 
