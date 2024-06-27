@@ -2845,8 +2845,8 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Report any change in proxy usage
   string new_proxy = JoinStrings(opt_proxies_, "|");
-  string curr_host = "Current host: "
-                                  + (*opt_host_chain_)[opt_host_chain_current_];
+  string curr_host = "Current host: " + (opt_host_chain_ ?
+                              (*opt_host_chain_)[opt_host_chain_current_] : "");
   if (new_proxy != old_proxy) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
            "(manager '%s') switching proxy from %s to %s. Reason: %s [%s]",
