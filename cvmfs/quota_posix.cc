@@ -289,7 +289,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
 
-    quota_mgr->StoreCacheMgrPid(quota_mgr->GetPid());
+    quota_mgr->SetCacheMgrPid(quota_mgr->GetPid());
     LogCvmfs(kLogQuota, kLogDebug, "current cache manager pid  %d", quota_mgr->GetCacheMgrPid());
 
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
