@@ -117,8 +117,7 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
-  virtual void UpdateDirectory(SharedPtr<SyncItem> entry) = 0;
-  // virtual void UpdateDirectoryRecursively(SharedPtr<SyncItem> entry) = 0;
+  virtual void RenameDirectory(SharedPtr<SyncItem> entry) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -162,8 +161,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
-  void UpdateDirectory(SharedPtr<SyncItem> entry);
-  // void UpdateDirectoryRecursively(SharedPtr<SyncItem> entry);
+  void RenameDirectory(SharedPtr<SyncItem> entry);
   void Clone(const std::string from, const std::string to);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
@@ -295,6 +293,8 @@ class SyncMediator : public virtual AbstractSyncMediator {
   SyncItemList file_queue_;
 
   HardlinkGroupList hardlink_queue_;
+
+  std::set<std::string> renamed_dirs_;
 
   const SyncParameters *params_;
   mutable unsigned int changed_items_;

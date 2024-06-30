@@ -122,21 +122,40 @@ class WritableCatalog : public Catalog {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
-  void RefreshEntry(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash);
-  inline void RefreshEntry(const DirectoryEntry &entry, const std::string &old_path, const std::string &new_path)
+  void RenameDirectory(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash);
+  inline void RenameDirectory(const DirectoryEntry &entry, const std::string &old_path, const std::string &new_path)
   {
     LogCvmfs(kLogCatalog, kLogStdout, "Updating entry with name: %s. Old path: %s, new path: %s", entry.name().c_str(), old_path.c_str(), new_path.c_str());
-    RefreshEntry(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
+    RenameDirectory(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
   }
 
 
-  void RefreshParent(const shash::Md5 &old_parent_path_hash, const shash::Md5 &new_parent_path_hash, const shash::Md5 &new_path_hash);
-  inline void RefreshParent(const std::string &old_parent_path, const std::string &new_parent_path, const std::string &new_path)
+  void UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash,
+                                 const shash::Md5 &new_parent_path_hash,
+                                 const shash::Md5 &old_path_hash,
+                                 const shash::Md5 &new_path_hash);
+  inline void UpdateParentDirectoryPath(const std::string &old_parent_path, 
+                                        const std::string &new_parent_path,
+                                        const std::string &old_path,
+                                        const std::string &new_path)
   {
-    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry children with name: %s. Old path: %s, new parent path: %s", new_path.c_str(), 
+    LogCvmfs(kLogCatalog, kLogStdout, "Updating new entry with name: %s. Old parent path: %s, new parent path: %s", new_path.c_str(), 
                                                                                                                   old_parent_path.c_str(),
                                                                                                                   new_parent_path.c_str());
-    RefreshParent(shash::Md5(shash::AsciiPtr(old_parent_path)), shash::Md5(shash::AsciiPtr(new_parent_path)), shash::Md5(shash::AsciiPtr(new_path)));
+    shash::Md5 old_parent_path_hash = shash::Md5(shash::AsciiPtr(old_parent_path));
+    shash::Md5 new_parent_path_hash = shash::Md5(shash::AsciiPtr(new_parent_path));
+    shash::Md5 old_path_hash = shash::Md5(shash::AsciiPtr(old_path));
+    shash::Md5 new_path_hash = shash::Md5(shash::AsciiPtr(new_path));
+
+    LogCvmfs(kLogCatalog, kLogStdout, "Old parent path hash: %s", old_parent_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "New parent path hash: %s", old_parent_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "Old path hash: %s", old_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "New path hash: %s", new_path_hash.ToString().c_str());
+
+    UpdateParentDirectoryPath(old_parent_path_hash,
+                              new_parent_path_hash, 
+                              old_path_hash,
+                              new_path_hash);
   }
 
   inline void AddEntry(
@@ -169,7 +188,7 @@ class WritableCatalog : public Catalog {
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
-  SqlDirentNameUpdate *sql_update_name_;
+  SqlDirentRename     *sql_rename_directory_;
   SqlParentUpdate     *sql_parent_update_;
   SqlChunkInsert      *sql_chunk_insert_;
   SqlChunksRemove     *sql_chunks_remove_;

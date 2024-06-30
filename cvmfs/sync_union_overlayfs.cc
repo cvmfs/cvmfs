@@ -152,9 +152,12 @@ void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
 
 void SyncUnionOverlayfs::Traverse() {
   assert(this->IsInitialized());
-  FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
 
-  // Preprocess renamed files
+  // Preprocess renamed directories
+  FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
+  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessRenamedDirectory;
+  traversal.Recurse(scratch_path());
+
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
@@ -219,6 +222,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  LogCvmfs(kLogUnionFs, kLogStdout, "Testing attributes: %s for: %s", path.c_str(), attr_name.c_str());
   assert(xattrs.IsValid());
 
   std::vector<std::string> attrs = xattrs->ListKeys();

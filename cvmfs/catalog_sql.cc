@@ -1101,7 +1101,7 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 
 //------------------------------------------------------------------------------
 
-SqlDirentNameUpdate::SqlDirentNameUpdate(const CatalogDatabase &database) {
+SqlDirentRename::SqlDirentRename(const CatalogDatabase &database) {
   DeferredInit(database.sqlite_db(),
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -1114,11 +1114,11 @@ SqlDirentNameUpdate::SqlDirentNameUpdate(const CatalogDatabase &database) {
 //                     13                       14
 }
 
-bool SqlDirentNameUpdate::BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash) {
+bool SqlDirentRename::BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash) {
   return BindMd5(11, 12, newPathHash) && BindMd5(13, 14, oldPathHash);
 }
 
-bool SqlDirentNameUpdate::BindDirent(const DirectoryEntry &entry) {
+bool SqlDirentRename::BindDirent(const DirectoryEntry &entry) {
   return BindDirentFields(1, 8, 2, 3, 4, 5, 6, 7, 9, 10, entry);
 }
 
@@ -1132,16 +1132,16 @@ SqlParentUpdate::SqlParentUpdate(const CatalogDatabase &database) {
   //           1                        2
       "parent_1 = :p1, parent_2 = :p2 "
   //           3             4          
-      "WHERE (parent_1 = :p3) AND (parent_2 = :p4);");
-  //                     5                      6
+      "WHERE (md5path_1 = :md5_3) AND (md5path_2 = :md5_4) AND (parent_1 = :p3) AND (parent_2 = :p4);");
+  //                     5                      6                    7                   8
 }
 
-bool SqlParentUpdate::BindPathHash(const shash::Md5 &pathHash) {
-  return BindMd5(1, 2, pathHash);
+bool SqlParentUpdate::BindPathsHashes(const shash::Md5 &newPathHash, const shash::Md5 &oldPathHash) {
+  return BindMd5(1, 2, newPathHash) && BindMd5(5, 6, oldPathHash);
 }
 
 bool SqlParentUpdate::BindParentHashes(const shash::Md5 oldParentHash, const shash::Md5 &newParentHash) {
-  return BindMd5(3, 4, newParentHash) && BindMd5(5, 6, oldParentHash);
+  return BindMd5(3, 4, newParentHash) && BindMd5(7, 8, oldParentHash);
 }
 
 bool SqlParentUpdate::BindDirent(const DirectoryEntry &entry) {

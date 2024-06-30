@@ -44,30 +44,29 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
   return entry;
 }
 
-void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
+void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const { 
   if (IsWhiteoutEntry(entry)) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem: %s", entry->GetRelativePath().c_str());
+    LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem. Mark as a whiteout: %s", entry->GetRelativePath().c_str());
     entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
-  }
+  } else {
+    // if (IsMetadataOnlyEntry(entry)) {
+    //   LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem. Metadata-only filesystem entry: %s", entry->GetRelativePath().c_str());
+    //   entry->MarkAsMetadataOnlyEntry();
+    // }
+    if (!entry->IsDirectory())
+    {
+      LogCvmfs(kLogCvmfs, kLogStdout, "An entry is not a directory!");
+      return;
+    }
 
-  if (IsMetadataOnlyEntry(entry)) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem: %s", entry->GetRelativePath().c_str());
-    entry->MarkAsMetadataOnlyEntry();
+    if (IsOpaqueDirectory(entry)) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Opaque directory detected: %s", entry->GetRelativePath().c_str());
+      entry->MarkAsOpaqueDirectory();
+    }
+    else if (IsRenamedDirectory(entry)) {
+      entry->MarkAsRenamedDirectory();
+    }
   }
-
-  if (!entry->IsDirectory())
-  {
-    LogCvmfs(kLogCvmfs, kLogStdout, "An entry is not a directory!");
-    return;
-  }
-
-  if (IsOpaqueDirectory(entry)) {
-    entry->MarkAsOpaqueDirectory();
-  }
-  else if (IsRenamedDirectory(entry)) {
-    entry->MarkAsRenamedDirectory();
-  }
-
 }
 
 bool SyncUnion::IgnoreFilePredicate(const std::string &parent_dir,
@@ -84,19 +83,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
-  if (entry->IsRenamedDirectory()) {
-    XattrList* list = XattrList::CreateFromFile(entry->GetScratchPath());
-    vector<string> keys = list->ListKeys();
-    for (vector<string>::const_iterator it = keys.cbegin(); it != keys.cend(); ++it)
-    {
-      LogCvmfs(kLogUnionFs, kLogStdout, "Xattr key for %s is %s", entry->GetScratchPath().c_str(), (*it).c_str());  
-    }
-    LogCvmfs(kLogUnionFs, kLogStdout, "Detected renamed directory: %s", entry->GetScratchPath().c_str());
-    mediator_->UpdateDirectory(entry);
-    return false;
-  }
-  if (entry->IsNew()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Is renamed directory: %d", entry->IsRenamedDirectory());
+  if (entry->IsNew() && !entry->IsRenamedDirectory()) {
     mediator_->Add(entry);
     // Recursion stops here. All content of new directory
     // is added later by the SyncMediator
@@ -145,7 +132,7 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
   if (entry->IsWhiteout()) {
-    // mediator_->Remove(entry);
+    mediator_->Remove(entry);
   } else {
     if (entry->IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
@@ -208,4 +195,25 @@ void SyncUnion::ProcessSocket(const std::string &parent_dir,
   ProcessFile(entry);
 }
 
+bool SyncUnion::ProcessRenamedDirectory(const std::string &parent_dir, const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessRenamedDirectory(%s, %s)",
+           parent_dir.c_str(), filename.c_str());
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemDir);
+  if (!entry->IsRenamedDirectory()) {
+    return false;
+  }
+  return ProcessRenamedDirectory(entry);
+}
+
+bool SyncUnion::ProcessRenamedDirectory(SharedPtr<SyncItem> entry) {
+  XattrList* list = XattrList::CreateFromFile(entry->GetScratchPath());
+  vector<string> keys = list->ListKeys();
+  for (vector<string>::const_iterator it = keys.cbegin(); it != keys.cend(); ++it)
+  {
+    LogCvmfs(kLogUnionFs, kLogStdout, "Xattr key for %s is %s", entry->GetScratchPath().c_str(), (*it).c_str());  
+  }
+  LogCvmfs(kLogUnionFs, kLogStdout, "Detected renamed directory: %s", entry->GetScratchPath().c_str());
+  mediator_->RenameDirectory(entry);
+  return false;
+}
 }  // namespace publish

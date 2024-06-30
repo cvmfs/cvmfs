@@ -226,7 +226,7 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   SyncUnlock();
 }
 
-void WritableCatalogManager::UpdateDirectory(const std::string &old_path,
+void WritableCatalogManager::RenameDirectory(const std::string &old_path,
                                              const std::string &new_path) {
   
   const string old_relative_path = MakeRelativePath(old_path);
@@ -235,49 +235,40 @@ void WritableCatalogManager::UpdateDirectory(const std::string &old_path,
   string new_parent_path, new_directory_name;
   SplitPath(new_relative_path, &new_parent_path, &new_directory_name);
   SyncLock();
-  WritableCatalog *parent_catalog, *target_catalog;
+  WritableCatalog *parent_catalog;
   DirectoryEntry parent_entry, target_entry;
   if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
              parent_path.c_str());
     PANIC("Unable to found parent path catalog");
   }
-
-  if (!FindCatalog(old_relative_path, &target_catalog, &target_entry)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
-             parent_path.c_str());
-    PANIC("Unable to found parent path catalog");
-  }
-
   if (!parent_catalog->LookupPath(PathString(old_relative_path), &target_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "no entry with path: %s was found",
              old_relative_path.c_str());
     PANIC("Unable to found child path entry");
   }
-  RefreshParent(old_relative_path, new_relative_path);
+  UpdateSubdirectoriesPaths(old_relative_path, new_relative_path);
   target_entry.name_.Assign(NameString(new_directory_name));
-  parent_catalog->RefreshEntry(target_entry, old_relative_path, new_relative_path);  
-  parent_catalog->UpdateEntry(parent_entry, parent_path);
+  parent_catalog->RenameDirectory(target_entry, old_relative_path, new_relative_path);  
   SyncUnlock();
 }
 
-// All paths should be passed without trailing filesystem path delimiter (e. g. "/")
-void WritableCatalogManager::RefreshParent(const std::string &old_path, 
-                                           const std::string &new_path) {
+void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_parent_path, 
+                                                       const std::string &new_parent_path) {
   DirectoryEntryList listing;
-  Listing(old_path, &listing);
+  Listing(old_parent_path, &listing);
+  WritableCatalog *parent_catalog;
+  DirectoryEntry parent_entry;
   for (unsigned i = 0; i < listing.size(); ++i) {
     if (listing[i].IsDirectory()) {
-      RefreshParent(listing[i].GetFullPath(old_path), listing[i].GetFullPath(new_path));
-      WritableCatalog *parent_catalog;
-      DirectoryEntry parent_entry;
-      if (!FindCatalog(old_path, &parent_catalog, &parent_entry)) {
+      UpdateSubdirectoriesPaths(listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
+      if (!FindCatalog(old_parent_path, &parent_catalog, &parent_entry)) {
         LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
-                old_path.c_str());
+                old_parent_path.c_str());
         PANIC("Unable to found parent path catalog");
       }
-      parent_catalog->RefreshParent(old_path, new_path, listing[i].GetFullPath(new_path));
     }
+    parent_catalog->UpdateParentDirectoryPath(old_parent_path, new_parent_path, listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
   }
 }
 

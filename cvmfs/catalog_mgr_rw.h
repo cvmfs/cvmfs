@@ -113,9 +113,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void TouchDirectory(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
                       const std::string &directory_path);
-  void UpdateDirectory(const std::string &old_path, const std::string &new_path);
-  void RefreshParent(const std::string &entry_path, 
-                     const std::string &old_parent_path);
+  
+  void RenameDirectory(const std::string &old_path, const std::string &new_path);
 
   void RemoveDirectory(const std::string &directory_path);
 
@@ -199,6 +198,9 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void FinalizeCatalog(WritableCatalog *catalog,
                        const bool stop_for_tweaks);
   void ScheduleCatalogProcessing(WritableCatalog *catalog);
+
+  void UpdateSubdirectoriesPaths(const std::string &old_path, 
+                            const std::string &new_path);
 
   void GetModifiedCatalogLeafs(WritableCatalogList *result) const {
     const bool dirty = GetModifiedCatalogLeafsRecursively(GetRootCatalog(),

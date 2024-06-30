@@ -194,6 +194,7 @@ class SyncUnion {
   virtual bool ProcessDirectory(const std::string &parent_dir,
                                 const std::string &dir_name);
   virtual bool ProcessDirectory(SharedPtr<SyncItem> entry);
+
   virtual bool ProcessUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
   /**
@@ -249,11 +250,17 @@ class SyncUnion {
   void ProcessSocket(const std::string &parent_dir,
                      const std::string &filename);
 
+  bool ProcessRenamedDirectory(const std::string &parent_dir, 
+                               const std::string &filename);
+
+  bool ProcessRenamedDirectory(SharedPtr<SyncItem> entry);
+
   /**
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
   void ProcessFile(SharedPtr<SyncItem> entry);
+
 
  private:
   bool initialized_;

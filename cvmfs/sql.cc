@@ -43,7 +43,7 @@ bool Sql::Execute() {
   LazyInit();
   last_error_code_ = sqlite3_step(statement_);
   if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug, "SQL query failed - SQLite: %d - %s",
+    LogCvmfs(kLogSql, kLogStdout, "SQL query failed - SQLite: %d - %s",
              GetLastError(), GetLastErrorMsg().c_str());
   }
   return Successful();

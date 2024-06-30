@@ -228,9 +228,17 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
  * Remove an entry from the repository. Directories will be recursively removed.
  */
 void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Remove directory: %s. Relative path: %s", entry->GetScratchPath().c_str(), entry->GetRelativePath().c_str());
   EnsureAllowed(entry);
 
-  if (entry->WasDirectory()) {
+  if (entry->WasDirectory() /*&& renamed_dirs_.find("/" + entry->GetRelativePath()) == renamed_dirs_.end()*/) {
+    string directory = "/" + entry->GetRelativePath();
+    LogCvmfs(kLogUnionFs, kLogStdout, "Check the path on being renamed: %s", directory.c_str());
+    bool exists = renamed_dirs_.find(directory) != renamed_dirs_.end();
+    LogCvmfs(kLogUnionFs, kLogStdout, "Is dir exists: %u", exists);
+    if (exists) {
+      return;
+    }    
     RemoveDirectoryRecursively(entry);
     return;
   }
@@ -1081,7 +1089,7 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
 /**
  * Update single directory entry without the content
  */
-void SyncMediator::UpdateDirectory(SharedPtr<SyncItem> entry) {
+void SyncMediator::RenameDirectory(SharedPtr<SyncItem> entry) {
   //reporter_->OnUpdateDirectory(entry->GetUnionPath())
   XattrList* xattr_list = XattrList::CreateFromFile(entry->GetScratchPath());
   assert(xattr_list);
@@ -1094,14 +1102,12 @@ void SyncMediator::UpdateDirectory(SharedPtr<SyncItem> entry) {
   const std::string old_path = entry->relative_parent_path() + (entry->relative_parent_path() == "" ? old_name : "/" + old_name);
   LogCvmfs(kLogUnionFs, kLogStderr, "A directory: %s was marked as renamed and we obtain an old name: %s. Relative parent path: %s, Old path: %s", entry->GetScratchPath().c_str(), old_name.c_str(), entry->GetRelativePath().c_str(), old_path.c_str());
   const std::string new_path = entry->GetRelativePath();
-  catalog_manager_->UpdateDirectory(old_path, new_path);
+  string path = "/" + old_path;
+  LogCvmfs(kLogUnionFs, kLogStdout, "Adding renamed dir to the set: %s", path.c_str());
+  renamed_dirs_.insert(path);
+  catalog_manager_->RenameDirectory(old_path, new_path);
   
 }
-
-// void SyncMediator::UpdateDirectoryRecursively(SharedPtr<SyncItem> entry) {
-//   FileSystemTraversal<SyncMediator> traversal(this, entry->GetScratchPath(), old_name, true);
-//   traversal.fn_enter_dir = 
-// }
 
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
   reporter_->OnModify(entry->GetUnionPath(), catalog::DirectoryEntry(),

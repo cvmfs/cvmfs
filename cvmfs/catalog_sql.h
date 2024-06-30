@@ -462,9 +462,9 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 //------------------------------------------------------------------------------
 
-class SqlDirentNameUpdate : public SqlDirentWrite {
+class SqlDirentRename : public SqlDirentWrite {
  public:
-  explicit SqlDirentNameUpdate(const CatalogDatabase &database);
+  explicit SqlDirentRename(const CatalogDatabase &database);
   bool BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash);
   bool BindDirent(const DirectoryEntry &entry);
 };
@@ -477,7 +477,7 @@ class SqlParentUpdate : public SqlDirentWrite {
  public:
   explicit SqlParentUpdate(const CatalogDatabase &database);
   bool BindDirent(const DirectoryEntry &entry);
-  bool BindPathHash(const shash::Md5 &newPathHash);
+  bool BindPathsHashes(const shash::Md5 &newPathHash, const shash::Md5 &oldPathHash);
   bool BindParentHashes(const shash::Md5 oldParentHash, const shash::Md5 &newParentHash);
 };
 

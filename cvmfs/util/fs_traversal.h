@@ -119,16 +119,6 @@ class FileSystemTraversal {
    * @param dir_path The directory to start the recursion at
    */
   void Recurse(const std::string &dir_path) const {
-    assert(fn_enter_dir != NULL ||
-           fn_leave_dir != NULL ||
-           fn_new_file != NULL ||
-           fn_new_symlink != NULL ||
-           fn_new_dir_prefix != NULL ||
-           fn_new_block_dev != NULL ||
-           fn_new_character_dev != NULL ||
-           fn_new_fifo != NULL ||
-           fn_new_socket != NULL);
-
     assert(relative_to_directory_.length() == 0 ||
            dir_path.substr(0, relative_to_directory_.length()) ==
              relative_to_directory_);
