@@ -161,11 +161,11 @@ string XattrList::ListKeysPosix(const string &merge_with) const {
 bool XattrList::Set(const string &key, const string &value) {
   if (key.empty())
     return false;
-  if (key.length() > 256)
+  if (key.length() > 255)
     return false;
   if (key.find('\0') != string::npos)
     return false;
-  if (value.length() > 256)
+  if (value.length() >= 64 * 1024)
     return false;
 
   map<string, string>::iterator iter = xattrs_.find(key);

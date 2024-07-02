@@ -81,9 +81,9 @@ TEST_F(T_Xattr, CreateFromFile) {
 #ifndef __APPLE__
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test2", "value2"));
   string long_string = "user." + string(250, 'x');
-  string too_long_string = "user." + string(300, 'x');
+  string very_long_string = "user." + string(1000, 'x');
   ASSERT_TRUE(platform_setxattr(tmp_path, long_string, long_string));
-  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test3", too_long_string));
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.large", very_long_string));
   UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file3.IsValid());
   EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
@@ -226,9 +226,10 @@ TEST_F(T_Xattr, Set) {
   EXPECT_EQ("", value);
 
   // Invalid operations
-  string longstring(257, 'a');
-  EXPECT_FALSE(default_list.Set(longstring, "value"));
-  EXPECT_FALSE(default_list.Set("key", longstring));
+  string longkey(256, 'a');
+  string longvalue(64 * 1024 + 1, 'a');
+  EXPECT_FALSE(default_list.Set(longkey, "value"));
+  EXPECT_FALSE(default_list.Set("key", longvalue));
   string nullstring(1, '\0');
   EXPECT_FALSE(default_list.Set(nullstring, "value"));
 
@@ -300,21 +301,21 @@ TEST_F(T_Xattr, SerializeBlacklist) {
 
 TEST_F(T_Xattr, Limits) {
   XattrList large_list;
-  string large_value(256, 'a');
-  for (unsigned i = 0; i < 256; ++i) {
+  string large_value(64 * 1024 - 1, 'a');
+  for (unsigned i = 0; i < 255; ++i) {
     char hex[4];
     snprintf(hex, sizeof(hex), "%02x", i);
     string large_key(128, hex[0]);
-    large_key += string(128, hex[1]);
+    large_key += string(127, hex[1]);
     EXPECT_TRUE(large_list.Set(large_key, large_value));
   }
-  EXPECT_EQ(256U, large_list.ListKeys().size());
-  for (unsigned i = 0; i < 256; ++i) {
+  EXPECT_EQ(255U, large_list.ListKeys().size());
+  for (unsigned i = 0; i < 255; ++i) {
     string value;
     char hex[4];
     snprintf(hex, sizeof(hex), "%02x", i);
     string large_key(128, hex[0]);
-    large_key += string(128, hex[1]);
+    large_key += string(127, hex[1]);
     EXPECT_TRUE(large_list.Get(large_key, &value));
     EXPECT_EQ(large_value, value);
   }
