@@ -81,12 +81,12 @@ TEST_F(T_Xattr, CreateFromFile) {
 #ifndef __APPLE__
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test2", "value2"));
   string long_string = "user." + string(250, 'x');
-  string very_long_string = "user." + string(1000, 'x');
+  string very_long_string = string(1000, 'y');
   ASSERT_TRUE(platform_setxattr(tmp_path, long_string, long_string));
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.large", very_long_string));
   UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file3.IsValid());
-  EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
+  EXPECT_EQ(default_attrs + 4, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
   EXPECT_TRUE(from_file3->Has("user.test"));
   EXPECT_EQ("value", value);
@@ -96,6 +96,9 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_TRUE(from_file3->Get(long_string, &value));
   EXPECT_TRUE(from_file3->Has(long_string));
   EXPECT_EQ(long_string, value);
+  EXPECT_TRUE(from_file3->Has("user.large"));
+  EXPECT_TRUE(from_file3->Get("user.large", &value));
+  EXPECT_EQ(very_long_string, value);
 #endif
 }
 
