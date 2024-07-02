@@ -18,7 +18,8 @@
 
 using namespace std;  // NOLINT
 
-const uint8_t XattrList::kVersion = 1;
+const uint8_t XattrList::kVersionSmall = 1;
+const uint8_t XattrList::kVersionBig = 2;  // As of cvmfs 2.12
 
 /**
  * Converts all the extended attributes of path into a XattrList.  Attributes
@@ -76,7 +77,7 @@ XattrList *XattrList::Deserialize(
     return NULL;
   XattrHeader header;
   memcpy(&header, inbuf, sizeof(header));
-  if (header.version != kVersion)
+  if (!IsSupportedVersion(header.version))
     return NULL;
   unsigned pos = sizeof(header);
   for (unsigned i = 0; i < header.num_xattrs; ++i) {

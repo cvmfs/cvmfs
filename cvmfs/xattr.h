@@ -19,16 +19,22 @@
  *
  * First application of the extended attributes is security.capability in order
  * to support POSIX file capabilities.  Cvmfs' support for custom extended
- * attributes is limited to 256 attributes, with names <= 256 characters and
- * values <= 256 bytes.  Thus there is no need for big endian/little endian
- * conversion.  The name must not be the empty string and must not contain the
+ * attributes is limited to 256 attributes, with names <= 255 characters and
+ * values <= 64k bytes. Note that values > 255 characters require cvmfs
+ * version >= 2.12.  Earlier versions will ignore big attributes.
+ * Attribute names must not be the empty string and must not contain the
  * zero character.  There are no restrictions on the content.
  */
 class XattrList {
  public:
-  static const uint8_t kVersion;
+  static const uint8_t kVersionSmall;  ///< Version 1, key and value < 255 chars
+  static const uint8_t kVersionBig;    ///< Version 2, value up to 64k chars
 
-  XattrList() : version_(kVersion) { }
+  static bool IsSupportedVersion(uint8_t v) {
+    return v == kVersionSmall || v == kVersionBig;
+  }
+
+  XattrList() : version_(kVersionSmall) { }
   static XattrList *CreateFromFile(const std::string &path);
 
   std::vector<std::string> ListKeys() const;
@@ -49,9 +55,9 @@ class XattrList {
 
  private:
   struct XattrHeader {
-    XattrHeader() : version(kVersion), num_xattrs(0) { }
+    XattrHeader() : version(kVersionSmall), num_xattrs(0) { }
     explicit XattrHeader(const uint8_t num_xattrs) :
-      version(kVersion),
+      version(kVersionSmall),
       num_xattrs(num_xattrs)
     { }
     uint8_t version;

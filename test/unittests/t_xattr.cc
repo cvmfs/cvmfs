@@ -142,7 +142,7 @@ TEST_F(T_Xattr, DeserializeInvalid) {
   buf[0] = 255;
   UniquePtr<XattrList> xl2(XattrList::Deserialize(buf, size));
   EXPECT_FALSE(xl2.IsValid());
-  buf[0] = XattrList::kVersion;
+  buf[0] = XattrList::kVersionSmall;
 
   UniquePtr<XattrList> xl3(XattrList::Deserialize(buf, 3));
   EXPECT_FALSE(xl3.IsValid());
