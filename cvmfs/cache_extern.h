@@ -68,7 +68,6 @@ class ExternalCacheManager : public CacheManager {
 
   virtual int Open(const LabeledObject &object);
   virtual int64_t GetSize(int fd);
-  virtual bool     SetLimit(uint64_t limit) { return false;}
   virtual int Close(int fd);
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
   virtual int Dup(int fd);
