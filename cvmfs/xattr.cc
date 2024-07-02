@@ -340,9 +340,9 @@ uint32_t XattrList::XattrEntrySerializer::Deserialize(
   if (bufsize < key->size() + value->size())
     return 0;
 
-  memcpy(key->data(), from, key->size());
+  memcpy(const_cast<char *>(key->data()), from, key->size());
   from += key->size();
-  memcpy(value->data(), from, value->size());
+  memcpy(const_cast<char *>(value->data()), from, value->size());
 
   return GetHeaderSize() + key->size() + value->size();
 }
