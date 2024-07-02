@@ -34,7 +34,6 @@ class XattrList {
     return v == kVersionSmall || v == kVersionBig;
   }
 
-  XattrList() : version_(kVersionSmall) { }
   static XattrList *CreateFromFile(const std::string &path);
 
   std::vector<std::string> ListKeys() const;
@@ -50,8 +49,6 @@ class XattrList {
                  const std::vector<std::string> *blacklist = NULL) const;
   static XattrList *Deserialize(const unsigned char *inbuf,
                                 const unsigned size);
-
-  uint8_t version() { return version_; }
 
  private:
   struct XattrHeader {
@@ -76,7 +73,6 @@ class XattrList {
     char data[512];
   };
 
-  uint8_t version_;
   std::map<std::string, std::string> xattrs_;
 };
 
