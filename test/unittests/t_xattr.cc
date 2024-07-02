@@ -279,6 +279,29 @@ TEST_F(T_Xattr, SerializeNull) {
   EXPECT_EQ(0U, size);
 }
 
+// Lists of small attributes should be serialized in the version 1 format,
+// digestable for old clients
+TEST_F(T_Xattr, SerializeCompat) {
+  XattrList list;
+  list.Set("key", "value");
+
+  unsigned char *buf;
+  unsigned size;
+
+  list.Serialize(&buf, &size);
+  EXPECT_TRUE(buf != NULL);
+  EXPECT_GT(size, 0u);
+
+  EXPECT_EQ(1, buf[0]);
+
+  XattrList *verify = XattrList::Deserialize(buf, size);
+  EXPECT_EQ(1u, verify->ListKeys().size());
+  string value;
+  EXPECT_TRUE(verify->Get("key", &value));
+  EXPECT_EQ("value", value);
+  delete verify;
+}
+
 
 TEST_F(T_Xattr, SerializeBlacklist) {
   std::vector<std::string> blacklist;
