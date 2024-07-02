@@ -228,7 +228,6 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
 
 void WritableCatalogManager::RenameDirectory(const std::string &old_path,
                                              const std::string &new_path) {
-  
   const string old_relative_path = MakeRelativePath(old_path);
   const string new_relative_path = MakeRelativePath(new_path);
   const string parent_path = GetParentPath(old_relative_path);
@@ -262,11 +261,11 @@ void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_pa
   for (unsigned i = 0; i < listing.size(); ++i) {
     if (listing[i].IsDirectory()) {
       UpdateSubdirectoriesPaths(listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
-      if (!FindCatalog(old_parent_path, &parent_catalog, &parent_entry)) {
-        LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
-                old_parent_path.c_str());
-        PANIC("Unable to found parent path catalog");
-      }
+    }
+    if (!FindCatalog(old_parent_path, &parent_catalog, &parent_entry)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
+              old_parent_path.c_str());
+      PANIC("Unable to found parent path catalog");
     }
     parent_catalog->UpdateParentDirectoryPath(old_parent_path, new_parent_path, listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
   }
