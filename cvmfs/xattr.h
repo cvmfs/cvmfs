@@ -60,6 +60,20 @@ class XattrList {
     uint8_t version;
     uint8_t num_xattrs;
   };
+
+  class XattrEntrySerializer {
+   public:
+    explicit XattrEntrySerializer(uint8_t version);
+    uint32_t GetHeaderSize() const { return version_ == kVersionBig ? 3 : 2; }
+    uint32_t Serialize(const std::string &key, const std::string &value,
+                       unsigned char *to);
+    uint32_t Deserialize(const unsigned char *from, uint32_t bufsize,
+                         std::string *key, std::string *value);
+
+   private:
+     uint8_t version_;
+  };
+
   struct XattrEntry {
     XattrEntry(const std::string &key, const std::string &value);
     XattrEntry() : len_key(0), len_value(0) { }

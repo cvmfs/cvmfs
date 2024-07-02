@@ -21,7 +21,7 @@ class T_Xattr : public ::testing::Test {
   virtual void SetUp() {
     default_list.Set("keya", "valuea");
     default_list.Set("keyb", "valueb");
-    default_list.Set("large", std::string(10, 'x'));
+    default_list.Set("large", std::string(1000, 'x'));
     default_list.Set("empty_key", "");
   }
 
@@ -143,10 +143,11 @@ TEST_F(T_Xattr, DeserializeInvalid) {
   UniquePtr<XattrList> xl1(XattrList::Deserialize(buf, 0));
   EXPECT_FALSE(xl1.IsValid());
 
+  uint8_t version = buf[0];
   buf[0] = 255;
   UniquePtr<XattrList> xl2(XattrList::Deserialize(buf, size));
   EXPECT_FALSE(xl2.IsValid());
-  buf[0] = XattrList::kVersionSmall;
+  buf[0] = version;
 
   UniquePtr<XattrList> xl3(XattrList::Deserialize(buf, 3));
   EXPECT_FALSE(xl3.IsValid());
