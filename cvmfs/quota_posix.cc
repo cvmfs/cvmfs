@@ -717,6 +717,31 @@ void PosixQuotaManager::GetSharedStatus(uint64_t *gauge, uint64_t *pinned) {
   CloseReturnPipe(pipe_status);
 }
 
+bool PosixQuotaManager::SetSharedLimit(uint64_t limit) {
+  int pipe_set_limit[2];
+  bool result;
+  MakeReturnPipe(pipe_set_limit);
+
+  LruCommand cmd;
+  cmd.command_type = kSetLimit;
+  cmd.size = limit;
+  cmd.return_pipe = pipe_set_limit[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ReadHalfPipe(pipe_set_limit[0], &result, sizeof(result));
+  CloseReturnPipe(pipe_set_limit);
+  return result;
+}
+
+
+bool PosixQuotaManager::SetLimit( uint64_t size) {
+  if (!spawned_) {
+     limit_ = size;
+     cleanup_threshold_ = size/2;
+     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", limit_, cleanup_threshold_ ); 
+     return true;
+  }
+  return SetSharedLimit(size);
+}
 
 uint64_t PosixQuotaManager::GetSize() {
   if (!spawned_) return gauge_;
@@ -1178,6 +1203,20 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       uint64_t period_s = size;  // use the size field to transmit the period
       uint64_t rate = quota_mgr->cleanup_recorder_.GetNoTicks(period_s);
       WritePipe(return_pipe, &rate, sizeof(rate));
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    if (command_type == kSetLimit) {
+      int return_pipe =
+        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      quota_mgr->limit_ = size; // use the size field to transmit the size
+      quota_mgr->cleanup_threshold_ = size/2;
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", quota_mgr->limit_, quota_mgr->cleanup_threshold_ );
+      bool ret = true;
+      WritePipe(return_pipe, &ret, sizeof(ret));
       quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }
