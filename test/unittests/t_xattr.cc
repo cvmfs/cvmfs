@@ -21,6 +21,7 @@ class T_Xattr : public ::testing::Test {
   virtual void SetUp() {
     default_list.Set("keya", "valuea");
     default_list.Set("keyb", "valueb");
+    default_list.Set("large", std::string(10, 'x'));
     default_list.Set("empty_key", "");
   }
 
@@ -113,7 +114,7 @@ TEST_F(T_Xattr, Deserialize) {
   UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
   ASSERT_TRUE(xattr_list.IsValid());
-  EXPECT_EQ(3U, xattr_list->ListKeys().size());
+  EXPECT_EQ(default_list.ListKeys().size(), xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keya", &value));
   EXPECT_TRUE(xattr_list->Has("keya"));
@@ -193,10 +194,11 @@ TEST_F(T_Xattr, Get) {
 TEST_F(T_Xattr, ListKeys) {
   XattrList empty;
   EXPECT_TRUE(empty.ListKeys().empty());
-  ASSERT_EQ(3U, default_list.ListKeys().size());
+  ASSERT_EQ(4U, default_list.ListKeys().size());
   EXPECT_EQ("empty_key", default_list.ListKeys()[0]);
   EXPECT_EQ("keya", default_list.ListKeys()[1]);
   EXPECT_EQ("keyb", default_list.ListKeys()[2]);
+  EXPECT_EQ("large", default_list.ListKeys()[3]);
 }
 
 
@@ -208,10 +210,10 @@ TEST_F(T_Xattr, ListKeysPosix) {
   const char expect1[] = "user.a\0user.b\0keya\0";
   EXPECT_EQ(string(expect1, sizeof(expect1)-1),
             empty.ListKeysPosix(existing_list));
-  const char expect2[] = "empty_key\0keya\0keyb\0";
+  const char expect2[] = "empty_key\0keya\0keyb\0large\0";
   EXPECT_EQ(string(expect2, sizeof(expect2)-1),
             default_list.ListKeysPosix(""));
-  const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0";
+  const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0large\0";
   EXPECT_EQ(string(expect3, sizeof(expect3)-1),
             default_list.ListKeysPosix(existing_list));
 }
@@ -290,12 +292,13 @@ TEST_F(T_Xattr, SerializeBlacklist) {
   UniquePtr<XattrList> xattr_list(XattrList::Deserialize(buf, size));
   free(buf);
   ASSERT_TRUE(xattr_list.IsValid());
-  EXPECT_EQ(1U, xattr_list->ListKeys().size());
+  EXPECT_EQ(default_list.ListKeys().size() - 2, xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keyb", &value));
   EXPECT_EQ("valueb", value);
 
   blacklist.push_back("keyb");
+  blacklist.push_back("large");
   default_list.Serialize(&buf, &size, &blacklist);
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buf);
