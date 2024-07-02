@@ -1208,7 +1208,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     }
 
     if (command_type == kSetLimit) {
-      int return_pipe =
+      const int return_pipe =
         quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
