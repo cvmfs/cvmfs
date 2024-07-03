@@ -37,6 +37,20 @@ def clear_and_reload_autofs():
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       (std_out, stderr) = doit.communicate()
 
+def getUlimit():
+  doit = subprocess.Popen("ulimit -n",
+                          universal_newlines=True, shell=True,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  (std_out, stderr) = doit.communicate()
+  return std_out
+
+def getShowConfig():
+  doit = subprocess.Popen("cvmfs_config showconfig",
+                          universal_newlines=True, shell=True,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  (std_out, stderr) = doit.communicate()
+  return std_out
+
 def getCVMFSVersion():
   doit = subprocess.Popen("attr -g version /cvmfs/cvmfs-config.cern.ch/",
                           universal_newlines=True, shell=True,

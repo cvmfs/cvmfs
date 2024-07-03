@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-from functools import partial
 import datetime as dt
 from collections import defaultdict
 import os
-import numpy as np
 
 from util_benchmark import benchmark_cmds
 from util_benchmark import benchmark_time
@@ -50,7 +48,11 @@ from util_benchmark import benchmark_read_params
 
 if __name__ == "__main__":
 
+  print("Start benchmark")
+
   config = benchmark_read_params.getConfig()
+
+  print("Config read")
 
   for run in config.keys():
     if not "run" in run:
@@ -97,26 +99,20 @@ if __name__ == "__main__":
         ## 3) loop over commands
         for cmd_name in config[run]["commands"]:
           partial_cmd = config["avail_cmds"][cmd_name]
-          print("\n")
-          print("*** CVMFS:", cvmfs_version, cvmfs_build_dir)
-          print("*** Client_config:", client_config)
-          print("*** Command name:", cmd_name)
-          print("***", partial_cmd)
-
           partial_cmd["time"] = time_command
 
           print("*** preloading proxy cache...")
           benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
           print("    ...done")
 
+          benchmark_out.writeStats(config, run, cvmfs_build_dir, client_config,
+                                   cmd_name, cvmfs_version, "stats",
+                                   benchmark_cvmfs.getShowConfig(),
+                                   benchmark_cvmfs.getUlimit(), True)
+
           ## 4) loop over number of threads
           for num_threads in config[run]["num_threads"]:
-            print("")
-            print("*** Num threads:", num_threads)
-
-            cache_setups = [["cold_cache", benchmark_time.wipe_cache],
-                            ["warm_cache", benchmark_time.wipe_kernel_cache],
-                            ["hot_cache", ""]]
+            print("\n*** Num threads:", num_threads, run, )
 
             # dictionaries holding the results
             start_times = defaultdict()
@@ -124,59 +120,20 @@ if __name__ == "__main__":
             all_cvmfs_raw_dict = defaultdict()
             all_dict_tracing = defaultdict()
 
+            cache_setups = [["cold_cache", benchmark_time.wipe_cache],
+                            ["warm_cache", benchmark_time.wipe_kernel_cache],
+                            ["hot_cache", ""]]
             ## 4a) time each command in each cache_setup (cold, warm, hot)
             for cache_setup in cache_setups:
-              cache_label = cache_setup[0]
-              cache_setup_func = cache_setup[1]
-
-              print("    ", cache_label)
-
-              start_times[cache_label] = dt.datetime.now()
-              if callable(cache_setup_func):
-                dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-                      benchmark_time.timeme(setup=cache_setup_func,
-                                            arg_setup=config[run]["use_cvmfs"],
-                                            stmt=partial(benchmark_time.do_thing,
-                                                        partial_cmd, num_threads),
-                                            repeat=config[run]["repetitions"])
-              else:
-                dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-                      benchmark_time.timeme(stmt=partial(benchmark_time.do_thing,
-                                                        partial_cmd, num_threads),
-                                            repeat=config[run]["repetitions"])
-
-              all_data[cache_label] = dict_cache
-              if config[run]["cvmfs_save_raw_results"] == True:
-                all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
-              all_dict_tracing[cache_label] = dict_tracing
-
-              print("Average real time for all repetitions for", cache_label,
-                    "in sec:", np.average(all_data[cache_label]["real"]))
-
+              benchmark_time.runBenchmark(config, run, client_config, cmd_name,
+                                 num_threads, cache_setup, start_times,
+                                 all_data, all_cvmfs_raw_dict, all_dict_tracing)
 
             print("Complete run time (incl. loop overhead) in sec: ",
-                  (dt.datetime.now() - start_times[cache_setups[0][0]]).total_seconds())
-
-
-            # set output name: auto-increment so not to overwrite old results
-            # outname = getOutname(cvmfs_build_dir, name, option, num_threads)
-            outname = benchmark_cmds.getOutname(cvmfs_build_dir,
-                                 cmd_name, client_config,
-                                 num_threads, cvmfs_version,
-                                 config[run]["out_name_replacement_of_version"])
-            final_outname = benchmark_out.getOutnameWithNextNumber(
-                                            config[run]["out_dirname"], outname)
-
-            print("Final outname:", config[run]["out_dirname"] + "/" + final_outname)
+                  (dt.datetime.now() - start_times[cache_setups[0][0]])
+                                                               .total_seconds())
 
             ## 4b) write data
-            benchmark_out.writeResults(config[run]["out_dirname"], final_outname,
-                                       all_data, cmd_name,
-                                       cvmfs_version, num_threads)
-            if config[run]["use_cvmfs"] == True:
-              benchmark_out.writeResultsInternalRaw(config[run]["out_dirname"],
-                                                    final_outname,
-                                                    all_cvmfs_raw_dict)
-              benchmark_out.writeResultsTracing(config[run]["out_dirname"],
-                                                final_outname,
-                                                all_dict_tracing)
+            benchmark_out.writeAllResults(config, run, cvmfs_build_dir,
+                            client_config, cmd_name, num_threads, cvmfs_version,
+                            all_data, all_cvmfs_raw_dict, all_dict_tracing)

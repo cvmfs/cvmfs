@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
+from functools import partial
+import datetime as dt
 import subprocess
 import time
 import tqdm
 from collections import defaultdict
 import os
-
+import numpy as np
 
 dict_time_format = {
   "user": "%U",
@@ -26,6 +28,34 @@ dict_time_format = {
   "fs_out": "%O",
   "signals": "%k"
 }
+
+def runBenchmark(config, run, client_config, cmd_name, num_threads, cache_setup,
+                 start_times, all_data, all_cvmfs_raw_dict, all_dict_tracing):
+  cache_label = cache_setup[0]
+  cache_setup_func = cache_setup[1]
+  partial_cmd = config["avail_cmds"][cmd_name]
+
+  print("    ", cache_label, config["avail_cmds"][cmd_name], client_config)
+
+  start_times[cache_label] = dt.datetime.now()
+  if callable(cache_setup_func):
+    dict_cache, dict_full_cvmfs_internals, dict_tracing = \
+              timeme(setup=cache_setup_func, arg_setup=config[run]["use_cvmfs"],
+                    stmt=partial(do_thing, partial_cmd, num_threads),
+                    repeat=config[run]["repetitions"])
+  else:
+    dict_cache, dict_full_cvmfs_internals, dict_tracing = \
+                        timeme(stmt=partial(do_thing, partial_cmd, num_threads),
+                              repeat=config[run]["repetitions"])
+
+  all_data[cache_label] = dict_cache
+  if config[run]["cvmfs_save_raw_results"] == True:
+    all_cvmfs_raw_dict[cache_label] = dict_full_cvmfs_internals
+  all_dict_tracing[cache_label] = dict_tracing
+
+  print("Average real time for all repetitions for", cache_label,
+        "in sec:", np.average(all_data[cache_label]["real"]))
+
 
 def getTimeFormat():
   time_format = '"\n'
