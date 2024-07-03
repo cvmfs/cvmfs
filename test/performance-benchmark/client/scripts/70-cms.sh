@@ -1,3 +1,4 @@
+#!/bin/bash
 workdir=$1
 mkdir -p $workdir
 cd $workdir

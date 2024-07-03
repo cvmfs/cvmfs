@@ -36,9 +36,9 @@ def getOutname(cvmfs_build_dir, cmd_name, client_config_list,
 
   return outname
 
-def getOutnameWithNextNumber(outdir, outname):
+def getOutnameWithNextNumber(outdir, outname, ending=".csv"):
   # find next increment number
-  files = glob.glob(outdir + outname + "[0-9]*.csv")
+  files = glob.glob(outdir + outname + "[0-9]*" + ending)
   new_num = len(files)
 
   return outname + str(new_num)
@@ -46,8 +46,8 @@ def getOutnameWithNextNumber(outdir, outname):
 
 def writeStats(config, run, cvmfs_build_dir, client_config, cmd_name,
                cvmfs_version, file_extra, cvmfs_show_config,
-               ulimit, print_to_screen: bool):
-  partial_cmd = config["avail_cmds"][cmd_name]
+               ulimit, uname, print_to_screen: bool):
+  cmd = config["avail_cmds"][cmd_name]["command"]
   out_name_replacement_of_version = config[run]["out_name_replacement_of_version"]
   outdir = config[run]["out_dirname"]
   file_extra = "config"
@@ -55,14 +55,15 @@ def writeStats(config, run, cvmfs_build_dir, client_config, cmd_name,
   base_out = getOutname(cvmfs_build_dir, cmd_name, client_config,
                cvmfs_version, out_name_replacement_of_version, file_extra)
 
-  out_name = getOutnameWithNextNumber(outdir, base_out)
+  out_name = getOutnameWithNextNumber(outdir, base_out, ".txt")
 
   stat_str = "%s" %datetime.now()
+  stat_str += "\nUname: " + uname
   stat_str += "\nUlimit: " + ulimit
   stat_str += "\nCVMFS: " + cvmfs_version + " " + cvmfs_build_dir
-  stat_str += "\nClient_config: " + client_config
+  stat_str += "\nClient_config: " + ','.join(client_config)
   stat_str += "\nCommand name: " + cmd_name
-  stat_str += "\n" + partial_cmd
+  stat_str += "\n" + cmd
 
   if print_to_screen:
     print(stat_str)
@@ -70,7 +71,9 @@ def writeStats(config, run, cvmfs_build_dir, client_config, cmd_name,
   stat_str += "\n\n" + cvmfs_show_config
   stat_str += "\n"
 
-  with open(out_name + ".txt", "w") as f:
+
+
+  with open(outdir + out_name + ".txt", "w") as f:
     f.write(stat_str)
 
 def writeAllResults(config, run, cvmfs_build_dir, client_config, cmd_name,

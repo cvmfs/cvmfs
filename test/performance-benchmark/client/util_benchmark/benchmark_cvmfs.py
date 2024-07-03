@@ -28,11 +28,12 @@ def clear_and_mount_direct(repos):
 
 def clear_and_reload_autofs():
       # also works for broken autofs in EL9
-      doit = subprocess.Popen(  "sudo systemctl stop autofs; "
+      doit = subprocess.Popen(  "sudo cvmfs_config killall; "
+                              + "sudo systemctl stop autofs; "
                               + "sudo cvmfs_config killall; "
-                              + "sudo cvmfs_config wipecache; "
                               + "sudo systemctl start autofs; "
-                              + "sudo cvmfs_config reload",
+                              + "sudo cvmfs_config reload; "
+                              + "sudo cvmfs_config wipecache",
                               universal_newlines=True, shell=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       (std_out, stderr) = doit.communicate()
@@ -44,12 +45,23 @@ def getUlimit():
   (std_out, stderr) = doit.communicate()
   return std_out
 
-def getShowConfig():
-  doit = subprocess.Popen("cvmfs_config showconfig",
+def getUname():
+  doit = subprocess.Popen("uname -a",
                           universal_newlines=True, shell=True,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   (std_out, stderr) = doit.communicate()
   return std_out
+
+def getShowConfig(partial_cmd):
+  str_showconfig = ""
+  for repo in partial_cmd["repos"]:
+    doit = subprocess.Popen("sudo cvmfs_config showconfig " + repo,
+                            universal_newlines=True, shell=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (std_out, stderr) = doit.communicate()
+    str_showconfig += "\n" + std_out
+
+  return str_showconfig
 
 def getCVMFSVersion():
   doit = subprocess.Popen("attr -g version /cvmfs/cvmfs-config.cern.ch/",

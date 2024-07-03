@@ -35,7 +35,7 @@ def runBenchmark(config, run, client_config, cmd_name, num_threads, cache_setup,
   cache_setup_func = cache_setup[1]
   partial_cmd = config["avail_cmds"][cmd_name]
 
-  print("    ", cache_label, config["avail_cmds"][cmd_name], client_config)
+  print("    ", cache_label, partial_cmd["command"], client_config)
 
   start_times[cache_label] = dt.datetime.now()
   if callable(cache_setup_func):
@@ -107,9 +107,9 @@ def preloadProxy(command, num_threads):
 
       for i in range(num_threads):
         doit.append(subprocess.Popen(
-                        command["time"] + " " + command["command"] + " " + str(i),
-                        universal_newlines=True, shell=True,
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+                      command["time"] + " " + command["command"] + " " + str(i),
+                      universal_newlines=True, shell=True,
+                      stdout=subprocess.PIPE, stderr=subprocess.PIPE))
 
       for ele in doit:
         (stdout, stderr) = ele.communicate()
@@ -118,8 +118,8 @@ def preloadProxy(command, num_threads):
         if error_code != 0:
           print("Failure while executing statement during preloadProxy",
                 command["command"], "error", error_code)
-          print(stderr)
-          print(stdout)
+        print(stderr)
+        print(stdout)
 
 
 

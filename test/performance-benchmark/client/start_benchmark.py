@@ -73,6 +73,7 @@ if __name__ == "__main__":
     for cvmfs_build_dir in config[run]["cvmfs_build_dirs"]:
       # install cvmfs version build in directory $cvmfs_build_dir
       if cvmfs_build_dir.lower() != "rpm":
+        print("Installing CVMFS", cvmfs_build_dir)
         benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
 
       ## 2) loop over different client configs (needs a remount of mountpoint,
@@ -89,6 +90,7 @@ if __name__ == "__main__":
             benchmark_cvmfs.clear_and_reload_autofs()
           else: # version no autofs
             benchmark_cvmfs.clear_and_mount_direct(repos)
+          print("CVMFS mount points cleared")
 
           # get cvmfs version
           #print("get cvmfs version")
@@ -107,8 +109,9 @@ if __name__ == "__main__":
 
           benchmark_out.writeStats(config, run, cvmfs_build_dir, client_config,
                                    cmd_name, cvmfs_version, "stats",
-                                   benchmark_cvmfs.getShowConfig(),
-                                   benchmark_cvmfs.getUlimit(), True)
+                                   benchmark_cvmfs.getShowConfig(partial_cmd),
+                                   benchmark_cvmfs.getUlimit(),
+                                   benchmark_cvmfs.getUname(), True)
 
           ## 4) loop over number of threads
           for num_threads in config[run]["num_threads"]:

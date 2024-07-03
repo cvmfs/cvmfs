@@ -1,3 +1,4 @@
+#!/bin/bash
 . /cvmfs/sft.cern.ch/lcg/views/LCG_103/x86_64-centos9-gcc12-opt/setup.sh
 TF_CPP_MIN_LOG_LEVEL=3 python3 -c "import numpy as np; import tensorflow as tf"
 
