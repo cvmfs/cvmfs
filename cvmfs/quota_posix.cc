@@ -270,6 +270,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   string workspace_dir;
   ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
 
+  pid_t new_cachemgr_pid;
+
   // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(workspace_dir + "/lock_cachemgr");
   if (fd_lockfile < 0) {
@@ -288,9 +290,15 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
+    const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
+    int result = read(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+    quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
+    if (result == 0) {
+      LogCvmfs(kLogQuota, kLogDebug, "could not read cache manager pid from lockfile");
+      return NULL;
+    }
+    close(fd_lockfile_rw);
 
-    quota_mgr->SetCacheMgrPid(quota_mgr->GetPid());
-    LogCvmfs(kLogQuota, kLogDebug, "current cache manager pid  %d", quota_mgr->GetCacheMgrPid());
 
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
     quota_mgr->initialized_ = true;
@@ -362,12 +370,11 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   preserve_filedes.insert(2);
   preserve_filedes.insert(pipe_boot[1]);
   preserve_filedes.insert(pipe_handshake[0]);
-  pid_t newcachemgr_pid;
   retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
                        /*drop_credentials*/ false,
                        /*clear_env*/ false,
                        /*double_fork*/  true,
-                       &newcachemgr_pid);
+                       &new_cachemgr_pid);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -376,8 +383,16 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return NULL;
   }
-  LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", newcachemgr_pid );
+  LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid );
+  quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
+  const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
+  int result = write(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+  if (result == -1) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "could not write cache manager pid to lockfile");
+  }
 
+  close(fd_lockfile_rw);
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
   close(pipe_handshake[0]);
@@ -417,7 +432,6 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
 
   Nonblock2Block(quota_mgr->pipe_lru_[1]);
   LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
-  quota_mgr->StoreCacheMgrPid(newcachemgr_pid);
   quota_mgr->protocol_revision_ = kProtocolRevision;
 
   UnlockFile(fd_lockfile);
@@ -1540,7 +1554,7 @@ PosixQuotaManager::PosixQuotaManager(
   , workspace_dir_()  // initialized in body
   , fd_lock_cachedb_(-1)
   , async_delete_(true)
-  , cachemanager_pid_(0)
+  , cachemgr_pid_(0)
   , database_(NULL)
   , stmt_touch_(NULL)
   , stmt_unpin_(NULL)
