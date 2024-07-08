@@ -466,6 +466,7 @@ class SqlDirentRename : public SqlDirentWrite {
  public:
   explicit SqlDirentRename(const CatalogDatabase &database);
   bool BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash);
+  bool BindParentPathHash(const shash::Md5 &newParentPathHash);
   bool BindDirent(const DirectoryEntry &entry);
 };
 

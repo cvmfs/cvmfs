@@ -39,6 +39,8 @@ enum SyncItemType {
   kItemUnknown,
 };
 
+const char kPathSeparator = '/';
+
 class SyncUnion;
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
@@ -85,7 +87,7 @@ class SyncItem {
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
   inline bool IsRenamedDirectory() const { return IsDirectory() && renamed_; }
-
+  inline bool IsAlreadyProcessed() const { return already_processed_; }
   inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
@@ -151,11 +153,13 @@ class SyncItem {
   std::string GetRdOnlyPath() const;
   std::string GetUnionPath() const;
   std::string GetScratchPath() const;
+  std::string GetPreviousPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
   void MarkAsMetadataOnlyEntry();
   void MarkAsOpaqueDirectory();
   void MarkAsRenamedDirectory();
+  void MarkAsAlreadyProcessed();
 
   /**
    * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
@@ -300,10 +304,11 @@ class SyncItem {
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
-
+  bool already_processed_;
   bool external_data_;
   bool direct_io_;
   std::string relative_parent_path_;
+  std::string previous_path_;
 
   /**
    * Chunklist from graft. Not initialized by default to save memory.

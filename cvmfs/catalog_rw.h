@@ -122,13 +122,22 @@ class WritableCatalog : public Catalog {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
-  void RenameDirectory(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash);
-  inline void RenameDirectory(const DirectoryEntry &entry, const std::string &old_path, const std::string &new_path)
-  {
-    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry with name: %s. Old path: %s, new path: %s", entry.name().c_str(), old_path.c_str(), new_path.c_str());
-    RenameDirectory(entry, shash::Md5(shash::AsciiPtr(old_path)), shash::Md5(shash::AsciiPtr(new_path)));
-  }
+  void RenameDirectory(const DirectoryEntry &entry, 
+                       const shash::Md5 &new_parent_path_hash,
+                       const shash::Md5 &old_path_hash,
+                       const shash::Md5 &new_path_hash);
 
+  inline void RenameDirectory(const DirectoryEntry &entry,  
+                              const std::string &new_parent_path,
+                              const std::string &old_path,
+                              const std::string &new_path)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry with name: %s. Old path: %s, new path: %s. New parent path: %s",
+                                      entry.name().c_str(), old_path.c_str(), new_path.c_str(), new_parent_path.c_str());
+    RenameDirectory(entry, shash::Md5(shash::AsciiPtr(new_parent_path)),
+                           shash::Md5(shash::AsciiPtr(old_path)), 
+                           shash::Md5(shash::AsciiPtr(new_path)));
+  }
 
   void UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash,
                                  const shash::Md5 &new_parent_path_hash,
@@ -139,9 +148,6 @@ class WritableCatalog : public Catalog {
                                         const std::string &old_path,
                                         const std::string &new_path)
   {
-    LogCvmfs(kLogCatalog, kLogStdout, "Updating new entry with name: %s. Old parent path: %s, new parent path: %s", new_path.c_str(), 
-                                                                                                                  old_parent_path.c_str(),
-                                                                                                                  new_parent_path.c_str());
     shash::Md5 old_parent_path_hash = shash::Md5(shash::AsciiPtr(old_parent_path));
     shash::Md5 new_parent_path_hash = shash::Md5(shash::AsciiPtr(new_parent_path));
     shash::Md5 old_path_hash = shash::Md5(shash::AsciiPtr(old_path));

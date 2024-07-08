@@ -294,8 +294,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   HardlinkGroupList hardlink_queue_;
 
-  std::set<std::string> renamed_dirs_;
-
   const SyncParameters *params_;
   mutable unsigned int changed_items_;
 

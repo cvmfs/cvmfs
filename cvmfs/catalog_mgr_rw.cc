@@ -228,10 +228,10 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
 
 void WritableCatalogManager::RenameDirectory(const std::string &old_path,
                                              const std::string &new_path) {
-  const string old_relative_path = MakeRelativePath(old_path);
-  const string new_relative_path = MakeRelativePath(new_path);
-  const string parent_path = GetParentPath(old_relative_path);
-  string new_parent_path, new_directory_name;
+  const string old_relative_path = MakeRelativePath(old_path); // /dir/subdir1
+  const string new_relative_path = MakeRelativePath(new_path); // /dir_1/subdir3
+  const string parent_path = GetParentPath(old_relative_path); // /dir
+  string new_parent_path, new_directory_name; // /dir_1 subdir3
   SplitPath(new_relative_path, &new_parent_path, &new_directory_name);
   SyncLock();
   WritableCatalog *parent_catalog;
@@ -248,12 +248,13 @@ void WritableCatalogManager::RenameDirectory(const std::string &old_path,
   }
   UpdateSubdirectoriesPaths(old_relative_path, new_relative_path);
   target_entry.name_.Assign(NameString(new_directory_name));
-  parent_catalog->RenameDirectory(target_entry, old_relative_path, new_relative_path);  
+  parent_catalog->RenameDirectory(target_entry, new_parent_path, old_relative_path, new_relative_path);  
   SyncUnlock();
 }
 
 void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_parent_path, 
                                                        const std::string &new_parent_path) {
+  // /dir/subdir1 /dir/subdir3
   DirectoryEntryList listing;
   Listing(old_parent_path, &listing);
   WritableCatalog *parent_catalog;

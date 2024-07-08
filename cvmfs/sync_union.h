@@ -30,7 +30,7 @@
 #ifndef CVMFS_SYNC_UNION_H_
 #define CVMFS_SYNC_UNION_H_
 
-#include <set>
+#include <unordered_set>
 #include <string>
 
 #include "sync_item.h"
@@ -162,7 +162,9 @@ class SyncUnion {
   std::string rdonly_path_;
   std::string scratch_path_;
   std::string union_path_;
-
+  std::unordered_set<std::string> renamed_directories_;
+  std::unordered_set<std::string> previous_directories_paths_;
+  std::unordered_set<std::string> whiteous_in_renamed_dirs;
   AbstractSyncMediator *mediator_;
 
   /**

@@ -1108,14 +1108,18 @@ SqlDirentRename::SqlDirentRename(const CatalogDatabase &database) {
 //            1             2             3               4
     "flags = :flags, name = :name, symlink = :symlink, hardlinks = :hardlinks, "
 //          5             6                  7                8
-    "uid = :uid, gid = :gid, md5path_1 = :md5_1, md5path_2 = :md5_2 "
-//          9           10                  11            12
+    "uid = :uid, gid = :gid, md5path_1 = :md5_1, md5path_2 = :md5_2, parent_1 = :p1, parent_2 = :p2 "
+//          9           10             11                12                13            14
     "WHERE (md5path_1 = :md5_3) AND (md5path_2 = :md5_4);");
-//                     13                       14
+//                     15                       16
 }
 
 bool SqlDirentRename::BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash) {
-  return BindMd5(11, 12, newPathHash) && BindMd5(13, 14, oldPathHash);
+  return BindMd5(11, 12, newPathHash) && BindMd5(15, 16, oldPathHash);
+}
+
+bool SqlDirentRename::BindParentPathHash(const shash::Md5 &newParentPathHash) {
+  return BindMd5(13, 14, newParentPathHash);
 }
 
 bool SqlDirentRename::BindDirent(const DirectoryEntry &entry) {

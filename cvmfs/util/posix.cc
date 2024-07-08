@@ -105,6 +105,16 @@ std::string MakeCanonicalPath(const std::string &path) {
   }
 }
 
+std::string StripLeadingPathSeparator(const std::string &path) {
+  if (path.length() == 0) return path;
+  if (path == "/") return "";
+  if (path[0] == '/')
+  {
+    return path.substr(1, path.length()-1);
+  }
+  return path;
+}
+
 /**
  * Return both the file and directory name for a given path.
  *

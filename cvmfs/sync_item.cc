@@ -34,6 +34,7 @@ SyncItem::SyncItem() :
   has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  already_processed_(false),
   external_data_(false),
   direct_io_(false),
   graft_chunklist_(NULL),
@@ -56,6 +57,7 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  already_processed_(false),
   external_data_(false),
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
@@ -162,9 +164,20 @@ void SyncItem::MarkAsRenamedDirectory() {
   LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a renamed: %s", filename_.c_str());
   assert(IsDirectory());
   renamed_ = true;
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
+  string previous_path;
+  xattrs->Get("trusted.overlay.redirect", &previous_path);
+  LogCvmfs(kLogUnionFs, kLogStdout, "[RENAMED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
+                                                     previous_path.c_str(), 
+                                                     GetParentPath(previous_path).c_str(),
+                                                     relative_parent_path_.c_str());
+  previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
+                                                 : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
 }
 
-
+void SyncItem::MarkAsAlreadyProcessed() {
+  already_processed_ = true;
+}
 unsigned int SyncItem::GetRdOnlyLinkcount() const {
   StatRdOnly();
   return rdonly_stat_.stat.st_nlink;
@@ -250,6 +263,9 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   return dirent;
 }
 
+std::string SyncItem::GetPreviousPath() const {
+  return previous_path_;
+}
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?

@@ -45,10 +45,20 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
 }
 
 void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const { 
-  if (IsWhiteoutEntry(entry)) {
+  if (IsWhiteoutEntry(entry)) 
+  {
+    if (previous_directories_paths_.find(entry->GetRelativePath()) != previous_directories_paths_.end()) {
+      LogCvmfs(kLogUnionFs, kLogStdout, "[RENAMED WHITEOUT] PreprocessSyncItem." 
+                                        "Detected a whiteout which a renamed dir: %s", 
+                                         entry->GetRelativePath().c_str());
+      entry->MarkAsAlreadyProcessed();
+      return;
+    }
     LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem. Mark as a whiteout: %s", entry->GetRelativePath().c_str());
     entry->MarkAsWhiteout(UnwindWhiteoutFilename(entry));
-  } else {
+  } 
+  else 
+  {
     // if (IsMetadataOnlyEntry(entry)) {
     //   LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem. Metadata-only filesystem entry: %s", entry->GetRelativePath().c_str());
     //   entry->MarkAsMetadataOnlyEntry();
@@ -58,12 +68,13 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
       LogCvmfs(kLogCvmfs, kLogStdout, "An entry is not a directory!");
       return;
     }
-
-    if (IsOpaqueDirectory(entry)) {
+    if (IsOpaqueDirectory(entry))
+    {
       LogCvmfs(kLogCvmfs, kLogStdout, "Opaque directory detected: %s", entry->GetRelativePath().c_str());
       entry->MarkAsOpaqueDirectory();
     }
-    else if (IsRenamedDirectory(entry)) {
+    else if (IsRenamedDirectory(entry))
+    {
       entry->MarkAsRenamedDirectory();
     }
   }
@@ -131,6 +142,11 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
+  if (entry->IsAlreadyProcessed()) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "file [%s] is already processed",
+               entry->filename().c_str())
+    return;
+  }
   if (entry->IsWhiteout()) {
     mediator_->Remove(entry);
   } else {
@@ -200,20 +216,16 @@ bool SyncUnion::ProcessRenamedDirectory(const std::string &parent_dir, const std
            parent_dir.c_str(), filename.c_str());
   SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename, kItemDir);
   if (!entry->IsRenamedDirectory()) {
-    return false;
+    return true;
   }
   return ProcessRenamedDirectory(entry);
 }
 
 bool SyncUnion::ProcessRenamedDirectory(SharedPtr<SyncItem> entry) {
-  XattrList* list = XattrList::CreateFromFile(entry->GetScratchPath());
-  vector<string> keys = list->ListKeys();
-  for (vector<string>::const_iterator it = keys.cbegin(); it != keys.cend(); ++it)
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Xattr key for %s is %s", entry->GetScratchPath().c_str(), (*it).c_str());  
-  }
   LogCvmfs(kLogUnionFs, kLogStdout, "Detected renamed directory: %s", entry->GetScratchPath().c_str());
   mediator_->RenameDirectory(entry);
-  return false;
+  renamed_directories_.insert(entry->GetRelativePath());
+  previous_directories_paths_.insert(entry->GetPreviousPath());
+  return true;
 }
 }  // namespace publish

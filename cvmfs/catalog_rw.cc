@@ -269,12 +269,16 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
   sql_update_->Reset();
 }
 
-void WritableCatalog::RenameDirectory(const DirectoryEntry &entry, const shash::Md5 &old_path_hash, const shash::Md5 &new_path_hash)
+void WritableCatalog::RenameDirectory(const DirectoryEntry &entry, 
+                                      const shash::Md5 &new_parent_path_hash, 
+                                      const shash::Md5 &old_path_hash, 
+                                      const shash::Md5 &new_path_hash)
 {
   SetDirty();
   LogCvmfs(kLogCatalog, kLogStdout, "Updating directory. Old hash: %s, new hash: %s", old_path_hash.ToString().c_str(), new_path_hash.ToString().c_str()); 
   bool retval = 
     sql_rename_directory_->BindPathsHashes(old_path_hash, new_path_hash) &&
+    sql_rename_directory_->BindParentPathHash(new_parent_path_hash) &&
     sql_rename_directory_->BindDirent(entry) &&
     sql_rename_directory_->Execute();
   assert(retval);
@@ -284,11 +288,8 @@ void WritableCatalog::RenameDirectory(const DirectoryEntry &entry, const shash::
 void WritableCatalog::UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash, 
                                                 const shash::Md5 &new_parent_path_hash,
                                                 const shash::Md5 &old_path_hash, 
-                                                const shash::Md5 &new_path_hash) {
-  LogCvmfs(kLogCatalog, kLogStdout, "Updating paths for old entry");                                                
-  SetDirty();
-  LogCvmfs(kLogCatalog, kLogStdout, "After SetDirty");                                                
-
+                                                const shash::Md5 &new_path_hash) {                                        
+  SetDirty();                                             
   LogCvmfs(kLogCatalog, kLogStdout, "Refreshing parent. Parent hash: %s, old hash: %s, new hash: %s", 
                                           new_parent_path_hash.ToString().c_str(), 
                                           old_parent_path_hash.ToString().c_str(), 

@@ -174,6 +174,7 @@ void SyncUnionOverlayfs::Traverse() {
            "recursion for scratch_path=[%s]",
            scratch_path().c_str());  
   traversal.Recurse(scratch_path());
+  previous_directories_paths_.clear();
 }
 
 /**
@@ -225,13 +226,13 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   LogCvmfs(kLogUnionFs, kLogStdout, "Testing attributes: %s for: %s", path.c_str(), attr_name.c_str());
   assert(xattrs.IsValid());
 
-  std::vector<std::string> attrs = xattrs->ListKeys();
-  std::vector<std::string>::const_iterator i = attrs.begin();
-  std::vector<std::string>::const_iterator iend = attrs.end();
-  for (; i != iend; ++i) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
-    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %sA", i->c_str());
-  }
+  // std::vector<std::string> attrs = xattrs->ListKeys();
+  // std::vector<std::string>::const_iterator i = attrs.begin();
+  // std::vector<std::string>::const_iterator iend = attrs.end();
+  // for (; i != iend; ++i) {
+  //   LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
+  //   LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %sA", i->c_str());
+  // }
   return xattrs->Has(attr_name);
 }
 
