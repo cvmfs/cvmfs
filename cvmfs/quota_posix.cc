@@ -1950,7 +1950,7 @@ void PosixQuotaManager::UnregisterBackChannel(
 }
 
 void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
-  const unsigned timeout_ms = 2000;
+  const unsigned timeout_ms = 3000;
   bool result = false;
   do {
     result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
