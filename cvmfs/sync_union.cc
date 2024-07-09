@@ -144,7 +144,7 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
            entry->filename().c_str());
   if (entry->IsAlreadyProcessed()) {
     LogCvmfs(kLogUnionFs, kLogStdout, "file [%s] is already processed",
-               entry->filename().c_str())
+               entry->filename().c_str());
     return;
   }
   if (entry->IsWhiteout()) {
