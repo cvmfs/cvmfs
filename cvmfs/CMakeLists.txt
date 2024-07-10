@@ -87,6 +87,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        quota.cc
        quota_posix.cc
        resolv_conf_event_handler.cc
+       ring_buffer.cc
        sanitizer.cc
        sql.cc
        sqlitemem.cc

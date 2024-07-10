@@ -485,6 +485,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/reflog_sql.cc
   ${CVMFS_SOURCE_DIR}/repository_tag.cc
   ${CVMFS_SOURCE_DIR}/resolv_conf_event_handler.cc
+  ${CVMFS_SOURCE_DIR}/ring_buffer.cc
   ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/server_tool.cc
   ${CVMFS_SOURCE_DIR}/session_context.cc
