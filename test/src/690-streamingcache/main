@@ -127,8 +127,10 @@ cvmfs_run_test() {
   purge_disk_cache
   cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
     --debug || return 90
+  sudo cvmfs_talk -p $talk_socket host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data/nosuchurl"
   sudo cvmfs_talk -p $talk_socket external host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data/nosuchurl"
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo && return 91
+  sudo cvmfs_talk -p $talk_socket host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}"
   sudo cvmfs_talk -p $talk_socket external host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data"
 
 
