@@ -362,6 +362,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_relaxed_path_filter.cc
   t_s3fanout.cc
   t_resolv_conf_event_handler.cc
+  t_ring_buffer.cc
   t_sanitizer.cc
   t_session_context.cc
   t_session_token.cc
