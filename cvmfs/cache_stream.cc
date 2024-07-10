@@ -10,6 +10,7 @@
 #include <cstring>
 #include <string>
 
+#include "clientctx.h"
 #include "network/download.h"
 #include "network/sink.h"
 #include "quota.h"
@@ -115,6 +116,14 @@ int64_t StreamingCacheManager::Stream(
   download_job.SetExtraInfo(&info.label.path);
   download_job.SetRangeOffset(info.label.range_offset);
   download_job.SetRangeSize(static_cast<int64_t>(info.label.size));
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  if (ctx->IsSet()) {
+    ctx->Get(download_job.GetUidPtr(),
+             download_job.GetGidPtr(),
+             download_job.GetPidPtr(),
+             download_job.GetInterruptCuePtr());
+  }
+
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code() != download::kFailOk) {
