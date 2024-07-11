@@ -1954,6 +1954,7 @@ void PosixQuotaManager::UnregisterBackChannel(
 void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
   const unsigned timeout_ms = cachemgr_pid_ ? 1000 : 0;
   bool result = false;
+  Block2Nonblock(fd);
   do {
     result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
     // try only as long as the cachemgr is still alive
