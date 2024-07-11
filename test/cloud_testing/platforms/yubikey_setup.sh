@@ -4,6 +4,8 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+sudo dnf -y remove cvmfs* || true
+
 
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
