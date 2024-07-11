@@ -526,8 +526,10 @@ bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
   ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
-  uint64_t timestamp = platform_monotonic_time_ns();
-  uint64_t duration_ms;
+  uint64_t duration_ms = 0;
+  uint64_t timestamp = 0;
+  if (timeout_ms != 0) 
+    timestamp = platform_monotonic_time_ns();
 
   const unsigned max_backoff_ms = 256;
   do {
@@ -543,9 +545,11 @@ bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
       SafeSleepMs(backoff_ms);
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
-
-  duration_ms = (platform_monotonic_time_ns() - timestamp) / 1000;
-  if (timeout_ms != 0 && duration_ms  > timeout_ms) return false;
+  if (timeout_ms != 0) {
+    duration_ms = (platform_monotonic_time_ns() - timestamp) / 1000;
+    if (duration_ms  > timeout_ms)
+        return false;
+  }
   } while (num_bytes == 0);
   return ((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
