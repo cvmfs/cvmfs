@@ -14,7 +14,9 @@
 #include "network/download.h"
 #include "network/sink.h"
 #include "quota.h"
+#include "statistics.h"
 #include "util/mutex.h"
+#include "util/platform.h"
 #include "util/smalloc.h"
 
 
@@ -99,7 +101,33 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 
 }  // anonymous namespace
 
+
 const size_t StreamingCacheManager::kDefaultBufferSize = 64 * 1024 * 1024;
+
+
+StreamingCacheManager::Counters::Counters(perf::Statistics *statistics) {
+  sz_transferred_bytes = statistics->Register(
+    "streaming_cache_mgr.sz_transferred_bytes",
+    "Number of bytes downloaded by the streaming cache manager");
+  sz_transfer_ms = statistics->Register(
+    "streaming_cache_mgr.sz_transfer_ms",
+    "Time spent downloading data by the streaming cache manager");
+  n_downloads = statistics->Register(
+    "streaming_cache_mgr.n_downloads", "Number of objects requested remotely");
+  n_buffer_hits = statistics->Register(
+    "streaming_cache_mgr.n_buffer_hits",
+    "Number of requests served from the buffer");
+  n_buffer_evicts = statistics->Register(
+    "streaming_cache_mgr.n_buffer_evicts",
+    "Number of objects evicted from the buffer");
+  n_buffer_objects = statistics->Register(
+    "streaming_cache_mgr.n_buffer_objects", "Number of objects in the buffer");
+  n_buffer_obstacles = statistics->Register(
+    "streaming_cache_mgr.n_buffer_obstacles",
+    "Number of objects that could not be stored in the buffer "
+    "(e.g., too large)");
+}
+
 
 download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
   const FdInfo &info)
@@ -108,6 +136,7 @@ download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
     return external_download_mgr_;
   return regular_download_mgr_;
 }
+
 
 int64_t StreamingCacheManager::Stream(
   const FdInfo &info,
@@ -121,6 +150,7 @@ int64_t StreamingCacheManager::Stream(
     MutexLockGuard _(lock_buffer_);
     RingBuffer::ObjectHandle_t handle;
     if (buffered_objects_.Lookup(info.object_id, &handle)) {
+      perf::Inc(counters_->n_buffer_hits);
       buffer_->CopySlice(handle, size, offset + sizeof(shash::Any), buf);
       return buffer_->GetObjectSize(handle) - sizeof(shash::Any);
     }
@@ -133,6 +163,8 @@ int64_t StreamingCacheManager::Stream(
   {
     nbytes_in_buffer = sizeof(shash::Any) + info.label.size;
     object = reinterpret_cast<unsigned char *>(smalloc(nbytes_in_buffer));
+  } else {
+    perf::Inc(counters_->n_buffer_obstacles);
   }
 
   StreamingSink sink(buf, size, offset,
@@ -158,7 +190,15 @@ int64_t StreamingCacheManager::Stream(
              download_job.GetInterruptCuePtr());
   }
 
-  SelectDownloadManager(info)->Fetch(&download_job);
+  {
+    uint64_t timestamp = platform_monotonic_time_ns();
+    SelectDownloadManager(info)->Fetch(&download_job);
+    perf::Xadd(counters_->sz_transfer_ms,
+               (platform_monotonic_time_ns() - timestamp) / (1000 * 1000));
+  }
+
+  perf::Inc(counters_->n_downloads);
+  perf::Xadd(counters_->sz_transferred_bytes, sink.GetNBytesStreamed());
 
   if (download_job.error_code() != download::kFailOk) {
     free(object);
@@ -175,13 +215,15 @@ int64_t StreamingCacheManager::Stream(
       shash::Any deleted_hash;
       buffer_->CopySlice(deleted_handle, sizeof(shash::Any), 0, &deleted_hash);
       buffered_objects_.Erase(deleted_hash);
+      perf::Inc(counters_->n_buffer_evicts);
+      perf::Dec(counters_->n_buffer_objects);
     }
     RingBuffer::ObjectHandle_t handle =
       buffer_->PushFront(object, nbytes_in_buffer);
     buffered_objects_.Insert(info.object_id, handle);
-
-    free(object);
+    perf::Inc(counters_->n_buffer_objects);
   }
+  free(object);
 
   return sink.GetNBytesStreamed();
 }
@@ -192,11 +234,13 @@ StreamingCacheManager::StreamingCacheManager(
   CacheManager *cache_mgr,
   download::DownloadManager *regular_download_mgr,
   download::DownloadManager *external_download_mgr,
-  size_t buffer_size)
+  size_t buffer_size,
+  perf::Statistics *statistics)
   : cache_mgr_(cache_mgr)
   , regular_download_mgr_(regular_download_mgr)
   , external_download_mgr_(external_download_mgr)
   , fd_table_(max_open_fds, FdInfo())
+  , counters_(new Counters(statistics))
 {
   lock_fd_table_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));

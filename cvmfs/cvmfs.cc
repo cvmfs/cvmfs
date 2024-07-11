@@ -2841,7 +2841,8 @@ static bool RestoreState(const int fd_progress,
                                 cvmfs::file_system_->cache_mgr(),
                                 cvmfs::mount_point_->download_mgr(),
                                 cvmfs::mount_point_->external_download_mgr(),
-                                StreamingCacheManager::kDefaultBufferSize);
+                                StreamingCacheManager::kDefaultBufferSize,
+                                cvmfs::file_system_->statistics());
         fixup_root_fd = new_cache_mgr->PlantFd(old_root_fd);
         cvmfs::file_system_->ReplaceCacheManager(new_cache_mgr);
         cvmfs::mount_point_->fetcher()->ReplaceCacheManager(new_cache_mgr);

@@ -1178,8 +1178,8 @@ bool FileSystem::TriageCacheMgr() {
     size_t buffer_size = StreamingCacheManager::kDefaultBufferSize;
     if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE_BUFFER", &optarg))
       buffer_size = String2Uint64(optarg);
-    cache_mgr_ =
-      new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL, buffer_size);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL,
+                                           buffer_size, statistics_);
   }
 
   return true;
