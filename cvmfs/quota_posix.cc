@@ -291,7 +291,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
-    int result = read(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+    int result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
     if (result == 0) {
       LogCvmfs(kLogQuota, kLogDebug, "could not read cache manager pid from lockfile");
@@ -386,7 +386,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid );
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
-  int result = write(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+  int result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
   if (result == -1) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
              "could not write cache manager pid to lockfile");
