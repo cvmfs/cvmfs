@@ -48,6 +48,14 @@ class RingBuffer : SingleCopy {
    */
   void CopyObject(ObjectHandle_t handle, void *to) const;
 
+  /**
+   * Copies a sub range of the object
+   */
+  void CopySlice(ObjectHandle_t handle, size_t size, size_t offset,
+                 void *to) const;
+
+  size_t GetMaxObjectSize() const { return total_size_ - sizeof(size_t); }
+
   size_t total_size() const { return total_size_; }
   size_t free_space() const { return free_space_; }
 

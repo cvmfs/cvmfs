@@ -8,6 +8,7 @@
 
 #include "ring_buffer.h"
 #include "util/pointer.h"
+#include "util/prng.h"
 
 class T_RingBuffer : public ::testing::Test {
  protected:
@@ -43,8 +44,15 @@ TEST_F(T_RingBuffer, Basics) {
 }
 
 TEST_F(T_RingBuffer, Wrap) {
-  unsigned buf[kSize / 3 / sizeof(int)];
-  memset(buf, 0, kSize / 3);
+  Prng prng;
+  prng.InitSeed(137);
+
+  const size_t N = kSize / 3 / sizeof(unsigned);
+
+  unsigned buf[N];
+  for (unsigned i = 0; i < N; ++i) {
+    buf[i] = i;
+  }
 
   RingBuffer::ObjectHandle_t objects[2];
   objects[0] = ring->PushFront(buf, kSize / 3);
@@ -54,10 +62,23 @@ TEST_F(T_RingBuffer, Wrap) {
   for (unsigned i = 2; i < 1000; ++i) {
     EXPECT_EQ(kSize / 3, ring->GetObjectSize(objects[i % 2]));
 
-    unsigned verify[kSize / 3 / sizeof(int)];
+    unsigned verify[N];
     ring->CopyObject(objects[i % 2], verify);
-
     EXPECT_EQ(2 * ((i - 2) / 2) + (i % 2), verify[0]);
+    for (unsigned j = 0; j < 100; ++j) {
+      unsigned begin = prng.Next(N);
+      const unsigned num = prng.Next(N - begin + 1);
+      ring->CopySlice(objects[i % 2], num * sizeof(unsigned),
+                      begin * sizeof(unsigned), verify);
+      const size_t offset = begin;
+      while (begin < num) {
+        if (begin != 0) {
+          EXPECT_EQ(begin, verify[begin - offset]);
+        }
+        begin++;
+      }
+    }
+
     EXPECT_EQ(objects[i % 2], ring->RemoveBack());
 
     buf[0] = 2 * (i / 2) + (i % 2);
