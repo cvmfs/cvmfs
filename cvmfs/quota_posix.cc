@@ -656,7 +656,7 @@ pid_t PosixQuotaManager::GetPid() {
   cmd.command_type = kPid;
   cmd.return_pipe = pipe_pid[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_pid[0], &result, sizeof(result));
+  ManagedReadHalfPipe(pipe_pid[0], &result, sizeof(result));
   CloseReturnPipe(pipe_pid);
   return result;
 }
