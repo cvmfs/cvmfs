@@ -7,11 +7,11 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
-reinstall_rpm "$CONFIG_PACKAGES"
-reinstall_rpm $LIBS_PACKAGE
-reinstall_rpm $CLIENT_PACKAGE
-reinstall_rpm $SERVER_PACKAGE
-reinstall_rpm $DEVEL_PACKAGE
+install_rpm "$CONFIG_PACKAGES"
+install_rpm $LIBS_PACKAGE
+install_rpm $CLIENT_PACKAGE
+install_rpm $SERVER_PACKAGE
+install_rpm $DEVEL_PACKAGE
 
 #NOTE: the yubikey machine is now setup to run tests on bare metal and does not need setup. 
 # This is the setup used to initially setup the machine:

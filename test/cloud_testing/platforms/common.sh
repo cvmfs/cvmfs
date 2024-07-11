@@ -225,26 +225,6 @@ check_package_manager_response() {
   return $retcode
 }
 
-reinstall_rpm() {
-  local rpm_files="$1"
-  local yum_output
-
-  for this_rpm in $rpm_files; do
-    local rpm_name=$(rpm_name_string $this_rpm)
-
-
-    # install the RPM
-    echo -n "Installing RPM '$rpm_name' ... "
-    if which dnf > /dev/null 2>&1; then
-      yum_output=$(sudo dnf --allowerasing -y reinstall --nogpgcheck $this_rpm 2>&1)
-      check_package_manager_response $? "DNF" "$yum_output"
-    else
-      yum_output=$(sudo yum -y reinstall --nogpgcheck $this_rpm 2>&1)
-      check_package_manager_response $? "Yum" "$yum_output"
-    fi
-  done
-}
-
 
 install_rpm() {
   local rpm_files="$1"
