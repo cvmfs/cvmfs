@@ -22,17 +22,23 @@ namespace {
 
 class StreamingSink : public cvmfs::Sink {
  public:
-  StreamingSink(void *buf, uint64_t size, uint64_t offset)
+  StreamingSink(void *buf, uint64_t size, uint64_t offset,
+                unsigned char *object)
     : Sink(false /* is_owner */)
     , pos_(0)
     , window_buf_(buf)
     , window_size_(size)
     , window_offset_(offset)
+    , object_(object)
   { }
 
   virtual ~StreamingSink() {}
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
+    if (object_) {
+      memcpy(object_ + pos_, buf, sz);
+    }
+
     uint64_t old_pos = pos_;
     pos_ += sz;
 
@@ -83,10 +89,17 @@ class StreamingSink : public cvmfs::Sink {
   void *window_buf_;
   uint64_t window_size_;
   uint64_t window_offset_;
+  unsigned char *object_;
 };  // class StreamingSink
+
+static inline uint32_t hasher_any(const shash::Any &key) {
+  return *const_cast<uint32_t *>(
+             reinterpret_cast<const uint32_t *>(key.digest) + 1);
+}
 
 }  // anonymous namespace
 
+const size_t StreamingCacheManager::kDefaultBufferSize = 64 * 1024 * 1024;
 
 download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
   const FdInfo &info)
@@ -102,7 +115,28 @@ int64_t StreamingCacheManager::Stream(
   uint64_t size,
   uint64_t offset)
 {
-  StreamingSink sink(buf, size, offset);
+  // Note: objects stored in the ring buffer are prepended by their hash
+
+  {
+    MutexLockGuard _(lock_buffer_);
+    RingBuffer::ObjectHandle_t handle;
+    if (buffered_objects_.Lookup(info.object_id, &handle)) {
+      buffer_->CopySlice(handle, size, offset + sizeof(shash::Any), buf);
+      return buffer_->GetObjectSize(handle) - sizeof(shash::Any);
+    }
+  }
+
+  unsigned char *object = NULL;
+  size_t nbytes_in_buffer = 0;
+  if ((info.label.size != CacheManager::kSizeUnknown) &&
+      (info.label.size + sizeof(shash::Any) <= buffer_->GetMaxObjectSize()))
+  {
+    nbytes_in_buffer = sizeof(shash::Any) + info.label.size;
+    object = reinterpret_cast<unsigned char *>(smalloc(nbytes_in_buffer));
+  }
+
+  StreamingSink sink(buf, size, offset,
+                     object ? (object + sizeof(shash::Any)) : NULL);
   std::string url;
   if (info.label.IsExternal()) {
     url = info.label.path;
@@ -127,7 +161,26 @@ int64_t StreamingCacheManager::Stream(
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code() != download::kFailOk) {
+    free(object);
     return -EIO;
+  }
+
+  if (object) {
+    memcpy(object, &info.object_id, sizeof(shash::Any));
+    MutexLockGuard _(lock_buffer_);
+    while (!buffer_->HasSpaceFor(nbytes_in_buffer)) {
+      RingBuffer::ObjectHandle_t deleted_handle = buffer_->RemoveBack();
+      // As long as we don't add any new objects, the deleted_handle can still
+      // be accessed
+      shash::Any deleted_hash;
+      buffer_->CopySlice(deleted_handle, sizeof(shash::Any), 0, &deleted_hash);
+      buffered_objects_.Erase(deleted_hash);
+    }
+    RingBuffer::ObjectHandle_t handle =
+      buffer_->PushFront(object, nbytes_in_buffer);
+    buffered_objects_.Insert(info.object_id, handle);
+
+    free(object);
   }
 
   return sink.GetNBytesStreamed();
@@ -138,7 +191,8 @@ StreamingCacheManager::StreamingCacheManager(
   unsigned max_open_fds,
   CacheManager *cache_mgr,
   download::DownloadManager *regular_download_mgr,
-  download::DownloadManager *external_download_mgr)
+  download::DownloadManager *external_download_mgr,
+  size_t buffer_size)
   : cache_mgr_(cache_mgr)
   , regular_download_mgr_(regular_download_mgr)
   , external_download_mgr_(external_download_mgr)
@@ -151,9 +205,18 @@ StreamingCacheManager::StreamingCacheManager(
 
   delete quota_mgr_;
   quota_mgr_ = cache_mgr_->quota_mgr();
+
+  buffer_ = new RingBuffer(buffer_size);
+  buffered_objects_.Init(16, shash::Any(), hasher_any);
+  lock_buffer_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(lock_buffer_, NULL);
+  assert(retval == 0);
 }
 
 StreamingCacheManager::~StreamingCacheManager() {
+  pthread_mutex_destroy(lock_buffer_);
+  free(lock_buffer_);
   pthread_mutex_destroy(lock_fd_table_);
   free(lock_fd_table_);
   quota_mgr_ = NULL;  // gets deleted by cache_mgr_

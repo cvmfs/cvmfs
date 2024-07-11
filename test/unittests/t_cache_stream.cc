@@ -35,7 +35,7 @@ class T_StreamingCacheManager : public ::testing::Test {
       PosixCacheManager::Create("cache", true /* alien_cache */);
     backing_cache_ref_ = backing_cache_.weak_ref();
     streaming_cache_ = new StreamingCacheManager(
-      32, backing_cache_.Release(), download_mgr_.weak_ref(), NULL);
+      32, backing_cache_.Release(), download_mgr_.weak_ref(), NULL, 1000);
 
     EXPECT_TRUE(MkdirDeep("data", 0700));
     EXPECT_TRUE(MakeCacheDirectories("data", 0700));

@@ -12,6 +12,8 @@
 #include "cache.h"
 #include "crypto/hash.h"
 #include "fd_table.h"
+#include "ring_buffer.h"
+#include "smallhash.h"
 #include "util/pointer.h"
 
 namespace download {
@@ -24,10 +26,12 @@ class DownloadManager;
  */
 class StreamingCacheManager : public CacheManager {
  public:
+  static const size_t kDefaultBufferSize;
   StreamingCacheManager(unsigned max_open_fds,
                         CacheManager *cache_mgr,
                         download::DownloadManager *regular_download_mgr,
-                        download::DownloadManager *external_download_mgr);
+                        download::DownloadManager *external_download_mgr,
+                        size_t buffer_size);
   virtual ~StreamingCacheManager();
 
   // In the files system / mountpoint initialization, we create the cache
@@ -138,6 +142,12 @@ class StreamingCacheManager : public CacheManager {
 
   pthread_mutex_t *lock_fd_table_;
   FdTable<FdInfo> fd_table_;
+
+  /// A small in-memory cache to avoid frequent re-downloads if multiple blocks
+  /// from the same chunk are read
+  UniquePtr<RingBuffer> buffer_;
+  SmallHashDynamic<shash::Any, RingBuffer::ObjectHandle_t> buffered_objects_;
+  pthread_mutex_t *lock_buffer_;
 };  // class StreamingCacheManager
 
 #endif  // CVMFS_CACHE_STREAM_H_
