@@ -26,6 +26,21 @@
 
 using namespace std;  // NOLINT
 
+void FuseRemounter::WaitForPauseReadlink() {
+  assert(atomic_read32(&pause_readlink_) == 0);
+  atomic_inc32(&pause_readlink_);
+
+  for (int32_t i = 0; i < 10; i++) {
+    if (IsPausedReadlink()) {
+      break;
+    }
+    SafeSleepMs(10);
+  }
+  // just in case no readlink request was performed, make sure it is paused
+  // --> sadly this does not work as it can run into a deadlock in the loop in
+  //     cvmfs_readlink
+  // PauseReadlink();
+}
 
 FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (mountpoint_->catalog_mgr()->GetRootHash() == root_hash)
@@ -38,6 +53,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (atomic_cas32(&drainout_mode_, 0, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
+    WaitForPauseReadlink();
     invalidator_handle_.Reset();
     invalidator_->InvalidateInodes(&invalidator_handle_);
     atomic_inc32(&drainout_mode_);
@@ -92,6 +108,7 @@ FuseRemounter::Status FuseRemounter::Check() {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
                  "draining out meta-data caches");
+        WaitForPauseReadlink();
         invalidator_handle_.Reset();
         invalidator_->InvalidateInodes(&invalidator_handle_);
         atomic_inc32(&drainout_mode_);
@@ -175,6 +192,7 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
       catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
+  atomic_init32(&pause_readlink_);
   atomic_init32(&drainout_mode_);
   atomic_init32(&maintenance_mode_);
   atomic_init32(&critical_section_);
@@ -355,5 +373,6 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     SetAlarm(mountpoint_->GetEffectiveTtlSec());
   }
 
+  atomic_write32(&pause_readlink_, 0);
   LeaveCriticalSection();
 }
