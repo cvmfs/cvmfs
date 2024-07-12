@@ -130,7 +130,7 @@ func (fs *Filesystem) Unmount(ctx context.Context, mountpoint string) error {
 		err := fmt.Errorf("Trying to unmount mountpoint that does not seems mounted: %s", mountpoint)
 		log.G(ctx).WithError(err).Error("Layer does not seems mounted.")
 	}
-	return syscall.Unmount(mountpoint, syscall.MNT_FORCE)
+	return syscall.Unmount(mountpoint, 0)
 }
 
 func (fs *Filesystem) UnmountAll(ctx context.Context) {
@@ -145,7 +145,7 @@ func (fs *Filesystem) UnmountAll(ctx context.Context) {
 	log.G(ctx).WithField("layers", m).Info("Unmounting the layers")
 	for _, mountpoint := range m {
 		log.G(ctx).WithField("layer", mountpoint).Info("Unmounting the layer")
-		if err := syscall.Unmount(mountpoint, syscall.MNT_FORCE); err != nil {
+		if err := syscall.Unmount(mountpoint, 0); err != nil {
 			log.G(context.TODO()).WithError(err).WithField("mountpoint", mountpoint).Error("Error in unmounting before to exit")
 		}
 	}
