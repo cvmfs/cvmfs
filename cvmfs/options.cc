@@ -373,10 +373,19 @@ bool OptionsManager::IsDefined(const std::string &key) {
 }
 
 
-bool OptionsManager::GetValue(const string &key, string *value) const {
+bool OptionsManager::GetValue(const string &key, string *value,
+                              const vector<char> &delims) const {
   map<string, ConfigValue>::const_iterator iter = config_.find(key);
   if (iter != config_.end()) {
-    *value = iter->second.value;
+    if (delims.empty()) {
+      *value = iter->second.value;
+    } else {
+      *value = "";
+      vector<string> values = SplitString(iter->second.value, delims);
+      for (unsigned i = 0; i < values.size(); ++i) {
+        *value += Trim(values[i]) + delims[0];
+      }
+    }
     return true;
   }
   *value = "";

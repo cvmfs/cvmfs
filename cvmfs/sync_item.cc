@@ -325,7 +325,10 @@ void SyncItem::CheckGraft() {
     if (!trimmed_line.size()) {continue;}
     if (trimmed_line[0] == '#') {continue;}
 
-    std::vector<std::string> info = SplitStringBounded(2, trimmed_line, '=');
+    std::vector<char> delims;
+    delims.push_back('=');
+    std::vector<std::string> info =
+        SplitStringBounded(2, trimmed_line, delims);
 
     if (info.size() != 2) {
       LogCvmfs(kLogFsTraversal, kLogWarning, "Invalid line in graft file: %s",

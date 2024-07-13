@@ -202,6 +202,19 @@ TYPED_TEST(T_Options, SetValue) {
   EXPECT_TRUE(options_manager.GetValue("UNKNOWN_BEFORE", &arg));
   EXPECT_EQ("information", arg);
 
+  options_manager.SetValue(
+      "CVMFS_HTTP_PROXY",
+      "http://p1.site.example.org:3128| http://p2.site.example.org:3128; "
+      "http://p3.region.example.org:3128| http://p4.region.example.org:3128");
+  vector<char> delims;
+  delims.push_back(';');
+  delims.push_back('|');
+  EXPECT_TRUE(options_manager.GetValue("CVMFS_HTTP_PROXY", &arg, delims));
+  EXPECT_EQ(
+      "http://p1.site.example.org:3128;http://p2.site.example.org:3128;http://"
+      "p3.region.example.org:3128;http://p4.region.example.org:3128;",
+      arg);
+
   EXPECT_TRUE(options_manager.IsDefined("CVMFS_SERVER_URL"));
   options_manager.UnsetValue("CVMFS_SERVER_URL");
   EXPECT_FALSE(options_manager.IsDefined("CVMFS_SERVER_URL"));

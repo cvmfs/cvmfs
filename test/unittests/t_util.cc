@@ -1354,26 +1354,32 @@ TEST_F(T_Util, SplitString) {
   string str1 = "the string that will be cut in peaces";
   string str2 = "my::string:by:colons";
   vector<string> result;
+  vector<char> delims1, delims2, delims3, delims4;
 
-  result = SplitStringBounded(1, str1, ' ');
+  delims1.push_back(' ');
+  result = SplitStringBounded(1, str1, delims1);
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitStringBounded(2, str1, ' ');
+  delims2.push_back(' ');
+  result = SplitStringBounded(2, str1, delims2);
   EXPECT_EQ(2u, result.size());
   EXPECT_EQ("the", result[0]);
   EXPECT_EQ("string that will be cut in peaces", result[1]);
 
-  result = SplitStringBounded(200, str1, ';');
+  delims3.push_back(';');
+  result = SplitStringBounded(200, str1, delims3);
   EXPECT_EQ(1u, result.size());
   EXPECT_EQ(str1, result[0]);
 
-  result = SplitStringBounded(200, str2, ':');
+  delims4.push_back(':');
+  result = SplitStringBounded(200, str2, delims4);
   EXPECT_EQ(5u, result.size());
   EXPECT_EQ("", result[1]);
-  EXPECT_EQ(SplitStringBounded(5, str2, ':'),
-            SplitStringBounded(5000, str2, ':'));
+  EXPECT_EQ(SplitStringBounded(5, str2, delims4),
+            SplitStringBounded(5000, str2, delims4));
 }
+
 
 TEST_F(T_Util, JoinStrings) {
   vector<string> result;
