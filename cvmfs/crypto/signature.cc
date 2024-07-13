@@ -74,6 +74,8 @@ SignatureManager::SignatureManager() {
   x509_lookup_ = NULL;
   int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
+  retval = pthread_mutex_init(&lock_certificate_, NULL);
+  assert(retval == 0);
 }
 
 
@@ -243,6 +245,8 @@ void SignatureManager::UnloadPrivateMasterKey() {
  * \return True on success, false otherwise
  */
 bool SignatureManager::LoadCertificatePath(const string &file_pem) {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (certificate_) {
     X509_free(certificate_);
     certificate_ = NULL;
@@ -272,6 +276,8 @@ bool SignatureManager::LoadCertificatePath(const string &file_pem) {
 bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
                                           const unsigned buffer_size)
 {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (certificate_) {
     X509_free(certificate_);
     certificate_ = NULL;
@@ -407,6 +413,7 @@ std::vector<std::string> SignatureManager::GetActivePubkeysAsVector() const {
 }
 
 std::string SignatureManager::GetCertificate() const {
+  // only used in publishing pathway, no need to lock on lock_certificate_
   if (!certificate_) return "";
 
   BIO *bp = BIO_new(BIO_s_mem());
@@ -489,6 +496,8 @@ void SignatureManager::GenerateMasterKeyPair() {
  * Creates a new RSA key pair (private key) and a self-signed certificate
  */
 void SignatureManager::GenerateCertificate(const std::string &cn) {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   UnloadPrivateKey();
   UnloadCertificate();
   int retval;
@@ -613,6 +622,8 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
 shash::Any SignatureManager::HashCertificate(
   const shash::Algorithms hash_algorithm)
 {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   shash::Any result;
   if (!certificate_)
     return result;
@@ -679,6 +690,8 @@ shash::Any SignatureManager::MkFromFingerprint(const std::string &fingerprint) {
  * \return Some human-readable information about the loaded certificate.
  */
 string SignatureManager::Whois() {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (!certificate_) return "No certificate loaded";
 
   string result;
@@ -702,6 +715,8 @@ string SignatureManager::Whois() {
 bool SignatureManager::WriteCertificateMem(unsigned char **buffer,
                                            unsigned *buffer_size)
 {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   BIO *mem = BIO_new(BIO_s_mem());
   if (!mem) return false;
   if (!PEM_write_bio_X509(mem, certificate_)) {
@@ -724,6 +739,8 @@ bool SignatureManager::WriteCertificateMem(unsigned char **buffer,
  * \return True, if private key and certificate match, false otherwise.
  */
 bool SignatureManager::KeysMatch() {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (!certificate_ || !private_key_)
     return false;
 
@@ -746,6 +763,8 @@ bool SignatureManager::KeysMatch() {
  * Verifies the currently loaded certificate against the trusted CA chain.
  */
 bool SignatureManager::VerifyCaChain() {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (!certificate_)
     return false;
 
@@ -853,6 +872,8 @@ bool SignatureManager::Verify(const unsigned char *buffer,
                               const unsigned char *signature,
                               const unsigned signature_size)
 {
+  MutexLockGuard lock_guard(&lock_certificate_);
+
   if (!certificate_) return false;
 
   bool result = false;
