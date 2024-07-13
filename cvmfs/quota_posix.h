@@ -174,6 +174,17 @@ class PosixQuotaManager : public QuotaManager {
   };
 
   /**
+   * Used for batch queries in DoCleanup()
+   */
+  struct EvictCandidate {
+    uint64_t size;
+    uint64_t acseq;
+    shash::Any hash;
+    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
+      : size(s), acseq(a), hash(h) {}
+  };
+
+  /**
    * Maximum page cache per thread (Bytes).
    */
   static const unsigned kSqliteMemPerThread = 2*1024*1024;
@@ -183,6 +194,11 @@ class PosixQuotaManager : public QuotaManager {
    * as sqlite commands.
    */
   static const unsigned kCommandBufferSize = 32;
+
+  /**
+   * Batch size for database operations during DoCleanup()
+   */
+  static const unsigned kEvictBatchSize = 1000;
 
   /**
    * Make sure that the amount of data transferred through the RPC pipe is
@@ -208,6 +224,7 @@ class PosixQuotaManager : public QuotaManager {
   void CloseDatabase();
   bool Contains(const std::string &hash_str);
   bool DoCleanup(const uint64_t leave_size);
+  bool EmptyTrash(const std::vector<std::string> &trash);
 
   void MakeReturnPipe(int pipe[2]);
   int BindReturnPipe(int pipe_wronly);
@@ -326,6 +343,7 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_lru_;
   sqlite3_stmt *stmt_size_;
   sqlite3_stmt *stmt_rm_;
+  sqlite3_stmt *stmt_rm_batch_;
   sqlite3_stmt *stmt_list_;
   sqlite3_stmt *stmt_list_pinned_;  /**< Loaded catalogs are pinned. */
   sqlite3_stmt *stmt_list_catalogs_;
