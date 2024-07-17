@@ -2448,9 +2448,16 @@ purge_disk_cache() {
 
 try_automount() {
   local repo=$1
+  local retval
   if running_on_osx; then
-    mount | grep "$repo" || sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
-    sleep 1
+    if mount | grep "$repo"; then
+      retval=0
+    else
+      sudo mount -t cvmfs $repo /cvmfs/$repo >/dev/null 2>&1
+      retval=$?
+    fi
+    sleep 3
+    return $retval
   else
     ls /cvmfs/${repo}
   fi

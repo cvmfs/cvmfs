@@ -86,7 +86,6 @@ jobs:
             src/024-reload-during-asetup                      \
             src/028-negativecache                             \
             src/032-workspace                                 \
-            src/037-strictmount                               \
             src/039-reloadalarm                               \
             src/040-aliencache                                \
             src/045-oasis                                     \
