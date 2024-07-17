@@ -818,9 +818,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
-  while (mount_point_->cache_symlinks()
-         && fuse_remounter_->IsPausedReadlink()) {
-    SafeSleepMs(100);
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->WaitAndIncreaseReadlinkCnt();
   }
 
   HighPrecisionTimer guard_timer(file_system_->hist_fs_readlink());
@@ -840,22 +839,17 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   TraceInode(Tracer::kEventReadlink, ino, "readlink()");
   fuse_remounter_->fence()->Leave();
 
-  if (mount_point_->cache_symlinks()
-      && fuse_remounter_->RequestPauseReadlink()) {
-    fuse_remounter_->PauseReadlink();
-  }
-
   if (!found) {
     ReplyNegative(dirent, req);
-    return;
-  }
-
-  if (!dirent.IsLink()) {
+  } else if (!dirent.IsLink()) {
     fuse_reply_err(req, EINVAL);
-    return;
+  } else {
+    fuse_reply_readlink(req, dirent.symlink().c_str());
   }
 
-  fuse_reply_readlink(req, dirent.symlink().c_str());
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->DecreaseReadlinkCnt();
+  }
 }
 
 

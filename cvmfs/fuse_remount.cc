@@ -26,20 +26,47 @@
 
 using namespace std;  // NOLINT
 
-void FuseRemounter::WaitForPauseReadlink() {
-  assert(atomic_read32(&pause_readlink_) == 0);
-  atomic_inc32(&pause_readlink_);
-
-  for (int32_t i = 0; i < 10; i++) {
-    if (IsPausedReadlink()) {
-      break;
-    }
-    SafeSleepMs(10);
+void FuseRemounter::WaitAndIncreaseReadlinkCnt() {
+  while (atomic_read32(&cnt_readlink_) < 0) {
+    SafeSleepMs(100);
   }
-  // just in case no readlink request was performed, make sure it is paused
-  // --> sadly this does not work as it can run into a deadlock in the loop in
-  //     cvmfs_readlink
-  // PauseReadlink();
+
+  int32_t old_val;
+  int32_t new_val;
+  do {
+    old_val = atomic_read32(&cnt_readlink_);
+    new_val = old_val > 0 ? old_val + 1 : old_val - 1;
+  } while (!atomic_cas32(&cnt_readlink_, old_val, new_val));
+}
+
+void FuseRemounter::DecreaseReadlinkCnt() {
+  int32_t old_val;
+  int32_t new_val;
+  do {
+    old_val = atomic_read32(&cnt_readlink_);
+    new_val = old_val > 0 ? old_val - 1 : old_val + 1;
+  } while (!atomic_cas32(&cnt_readlink_, old_val, new_val));
+}
+
+void FuseRemounter::RequestStopReadlink() {
+  int32_t old_val;
+  int32_t new_val;
+  do {
+    old_val = atomic_read32(&cnt_readlink_);
+    new_val = old_val > 0 ? -old_val : old_val;
+  } while (!atomic_cas32(&cnt_readlink_, old_val, new_val));
+}
+
+void FuseRemounter::WaitForStopReadlink() {
+  while (atomic_read32(&cnt_readlink_) != -1) {
+    SafeSleepMs(100);
+  }
+}
+
+void FuseRemounter::RestartReadlink() {
+  while (!atomic_cas32(&cnt_readlink_, -1, 1)) {
+    SafeSleepMs(100);
+  }
 }
 
 FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
@@ -53,7 +80,6 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (atomic_cas32(&drainout_mode_, 0, 1)) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
-    WaitForPauseReadlink();
     invalidator_handle_.Reset();
     invalidator_->InvalidateInodes(&invalidator_handle_);
     atomic_inc32(&drainout_mode_);
@@ -108,7 +134,6 @@ FuseRemounter::Status FuseRemounter::Check() {
         LogCvmfs(kLogCvmfs, kLogDebug,
                  "new catalog revision available, "
                  "draining out meta-data caches");
-        WaitForPauseReadlink();
         invalidator_handle_.Reset();
         invalidator_->InvalidateInodes(&invalidator_handle_);
         atomic_inc32(&drainout_mode_);
@@ -192,7 +217,8 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
       catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
-  atomic_init32(&pause_readlink_);
+  atomic_init32(&cnt_readlink_);
+  atomic_write32(&cnt_readlink_, 1);
   atomic_init32(&drainout_mode_);
   atomic_init32(&maintenance_mode_);
   atomic_init32(&critical_section_);
@@ -330,6 +356,9 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
 
+  RequestStopReadlink();
+  WaitForStopReadlink();
+
   // No new inserts into caches
   mountpoint_->inode_cache()->Pause();
   mountpoint_->path_cache()->Pause();
@@ -373,6 +402,6 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     SetAlarm(mountpoint_->GetEffectiveTtlSec());
   }
 
-  atomic_write32(&pause_readlink_, 0);
+  RestartReadlink();
   LeaveCriticalSection();
 }

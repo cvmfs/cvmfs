@@ -64,29 +64,29 @@ class FuseRemounter : SingleCopy {
   bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
   bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
 
-  /**
-   * True if readlink requests are paused (for more see WaitForPauseReadlink())
-   */
-  bool IsPausedReadlink() { return atomic_read32(&pause_readlink_) == 2; }
-  /**
-   * Requests to pause readlinks
-   * Requested by FuseRemounter, checked by cvmfs_readlink in cvmfs.cc
-   */
-  bool RequestPauseReadlink() { return atomic_read32(&pause_readlink_) == 1; }
-  /**
-   * Pauses any further the readlink requests.
-   * 
-   * Called by cvmfs_readlink at the end of the execution to block any new 
-   * requests
-   */
-  bool PauseReadlink() { return atomic_cas32(&pause_readlink_, 1, 2); }
-
   Fence *fence() { return fence_; }
   time_t catalogs_valid_until() { return catalogs_valid_until_; }
 
   void InvalidateDentry(uint64_t parent_ino, const NameString &name) {
     invalidator_->InvalidateDentry(parent_ino, name);
   }
+
+  /**
+   * Registers that a new readlink request has been made and increases the
+   * counter cnt_readlink_.
+   * If it is requested to pause readlink requests, wait until it is unpaused.
+   * 
+   * Increase is adjusted depending if pause readlink is active or not.
+   * Used in cvmfs_readlink (cvmfs.cc); see cnt_readlink_ for more
+   */
+  void WaitAndIncreaseReadlinkCnt();
+  /**
+   * Readlink request has finished. Decreases the counter cnt_readlink_.
+   * Value is adjusted based on if readlinks are paused or not.
+   * 
+   * see cnt_readlink_ for more
+   */
+  void DecreaseReadlinkCnt();
 
  private:
   static void *MainRemountTrigger(void *data);
@@ -102,16 +102,25 @@ class FuseRemounter : SingleCopy {
   void SetOfflineMode(bool value);
 
   /**
-   * Waits for readlink requests to be paused.
-   * 
-   * Before eviction of kernel caches is possible, the readlink requests must be
-   * finished and paused to prevent mismatch of dentry and inode when a new
-   * catalog revision is loaded. This is only a problem when symlink caching is
-   * being used and a high frequency of readlink requests is executed during the
-   * revision update. However, in that case, corrupted symlinks can be returned
-   * if readlink requests are not paused before.
+   * Requests to pause/stop readlink requests
+   * see cnt_readlink_ for more
    */
-  void WaitForPauseReadlink();
+  void RequestStopReadlink();
+  /**
+   * After RequestStopReadlink() has been invoked, wait for all ongoing readlink
+   * requests to stop.
+   * see cnt_readlink_ for more
+   */
+  void WaitForStopReadlink();
+  /**
+   * Restarts the processing of readlink requests. 
+   * see cnt_readlink_ for more
+   * 
+   * @note This call will block infinitely unless cnt_readlink_ is in the mode
+   *       "stop readlink requests" and all ongoing readlink requests were
+  *        processed (cnt_readlink_ == -1)
+   */
+  void RestartReadlink();
 
   MountPoint *mountpoint_;  ///< Not owned
   cvmfs::InodeGenerationInfo *inode_generation_info_;  ///< Not owned
@@ -148,6 +157,39 @@ class FuseRemounter : SingleCopy {
    * TODO(jblomer): access to this field should be locked
    */
   time_t catalogs_valid_until_;
+
+  /**
+   * Counter for how many cvmfs_readlink requests are currently being performed.
+   * (see cvmfs.cc)
+   * 
+   * Before eviction of kernel caches is possible, the readlink requests must be
+   * finished and paused to prevent mismatch of dentry and inode when a new
+   * catalog revision is loaded. This is only a problem when symlink caching is
+   * being used and a high frequency of readlink requests is executed during the
+   * revision update. However, in that case, corrupted symlinks can be returned
+   * if readlink requests are not paused before.
+   * 
+   * The counter works the following:
+   * - counter == 1 or -1: no readlink request ongoing
+   * - counter > 1: readlink requests ongoing, no stop requested
+   * - counter < -1: readlink requests ongoing, stop requested
+   * 
+   * Usage:
+   * cvmfs_readlink() (cvmfs.cc):
+   *   WaitAndIncreaseReadlinkCnt()
+   *   DoStuff()
+   *   DecreaseReadlinkCnt()
+   * 
+   * TryFinish() (fuse_remount.cc):
+   *   Fence()
+   *   RequestStopReadlink()
+   *   WaitForStopReadlink()
+   *   DoAllOtherStuff()
+   *   RestartReadlink()
+   *   LeaveCriticalSection()
+   */
+  atomic_int32 cnt_readlink_;
+
   /**
    * In drainout mode, the fuse module sets the timeout of meta data replies to
    * zero.  If supported by Fuse, the FuseInvalidator will evict all active
@@ -159,7 +201,6 @@ class FuseRemounter : SingleCopy {
    * actual move into drainout mode.
    */
   atomic_int32 drainout_mode_;
-  atomic_int32 pause_readlink_;
   /**
    * in maintenance mode, cache timeout is 0 and catalogs are not reloaded.
    * Maintenance mode is entered when the fuse module gets reloaded.
