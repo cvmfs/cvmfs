@@ -2,80 +2,22 @@
 ## explicit
 # github.com/Microsoft/go-winio v0.4.11
 ## explicit
-github.com/Microsoft/go-winio
 # github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5
 ## explicit
 # github.com/containerd/continuity v0.0.0-20181203112020-004b46473808
 ## explicit
-github.com/containerd/continuity/devices
-github.com/containerd/continuity/driver
-github.com/containerd/continuity/fs
-github.com/containerd/continuity/pathdriver
-github.com/containerd/continuity/syscallx
-github.com/containerd/continuity/sysx
 # github.com/docker/distribution v2.7.1+incompatible
 ## explicit
-github.com/docker/distribution
-github.com/docker/distribution/digestset
-github.com/docker/distribution/reference
 # github.com/docker/docker v0.0.0-20190123164140-de86ba27fbea
 ## explicit
-github.com/docker/docker/api
-github.com/docker/docker/api/types
-github.com/docker/docker/api/types/blkiodev
-github.com/docker/docker/api/types/container
-github.com/docker/docker/api/types/events
-github.com/docker/docker/api/types/filters
-github.com/docker/docker/api/types/image
-github.com/docker/docker/api/types/mount
-github.com/docker/docker/api/types/network
-github.com/docker/docker/api/types/registry
-github.com/docker/docker/api/types/strslice
-github.com/docker/docker/api/types/swarm
-github.com/docker/docker/api/types/swarm/runtime
-github.com/docker/docker/api/types/time
-github.com/docker/docker/api/types/versions
-github.com/docker/docker/api/types/volume
-github.com/docker/docker/client
-github.com/docker/docker/daemon/graphdriver
-github.com/docker/docker/dockerversion
-github.com/docker/docker/errdefs
-github.com/docker/docker/image
-github.com/docker/docker/layer
-github.com/docker/docker/oci
-github.com/docker/docker/oci/caps
-github.com/docker/docker/pkg/archive
-github.com/docker/docker/pkg/chrootarchive
-github.com/docker/docker/pkg/containerfs
-github.com/docker/docker/pkg/fileutils
-github.com/docker/docker/pkg/idtools
-github.com/docker/docker/pkg/ioutils
-github.com/docker/docker/pkg/longpath
-github.com/docker/docker/pkg/mount
-github.com/docker/docker/pkg/parsers/kernel
-github.com/docker/docker/pkg/plugingetter
-github.com/docker/docker/pkg/plugins
-github.com/docker/docker/pkg/plugins/transport
-github.com/docker/docker/pkg/pools
-github.com/docker/docker/pkg/reexec
-github.com/docker/docker/pkg/stringid
-github.com/docker/docker/pkg/symlink
-github.com/docker/docker/pkg/system
-github.com/docker/docker/pkg/useragent
-github.com/docker/docker/plugin/v2
 # github.com/docker/go-connections v0.4.0
 ## explicit
-github.com/docker/go-connections/nat
-github.com/docker/go-connections/sockets
-github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.3.3
 ## explicit
-github.com/docker/go-units
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
-github.com/gogo/protobuf/proto
-# github.com/google/go-cmp v0.2.0
-## explicit
+# github.com/google/go-cmp v0.5.8
+## explicit; go 1.13
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
@@ -88,40 +30,34 @@ github.com/google/uuid
 github.com/inconshreveable/mousetrap
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1
 ## explicit
-github.com/konsorten/go-windows-terminal-sequences
 # github.com/mattn/go-runewidth v0.0.4
 ## explicit
 github.com/mattn/go-runewidth
 # github.com/mattn/go-shellwords v1.0.3
 ## explicit
-github.com/mattn/go-shellwords
+# github.com/mattn/go-sqlite3 v1.14.17
+## explicit; go 1.16
+github.com/mattn/go-sqlite3
 # github.com/olekukonko/tablewriter v0.0.1
 ## explicit
 github.com/olekukonko/tablewriter
 # github.com/opencontainers/go-digest v1.0.0-rc1
 ## explicit
 github.com/opencontainers/go-digest
-# github.com/opencontainers/image-spec v1.0.1
+# github.com/opencontainers/image-spec v1.0.2
 ## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
 # github.com/opencontainers/runc v0.0.8
 ## explicit
-github.com/opencontainers/runc/libcontainer/configs
-github.com/opencontainers/runc/libcontainer/devices
-github.com/opencontainers/runc/libcontainer/system
-github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.0.1
 ## explicit
-github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.3.1
 ## explicit; go 1.13
 # github.com/otiai10/copy v1.3.0
 ## explicit; go 1.14
-github.com/otiai10/copy
 # github.com/pkg/errors v0.8.1
 ## explicit
-github.com/pkg/errors
 # github.com/pkg/xattr v0.4.3
 ## explicit; go 1.14
 github.com/pkg/xattr
@@ -130,7 +66,6 @@ github.com/pkg/xattr
 github.com/rubyist/lockfile
 # github.com/sirupsen/logrus v1.3.0
 ## explicit
-github.com/sirupsen/logrus
 # github.com/spf13/cobra v0.0.3
 ## explicit
 github.com/spf13/cobra
@@ -139,28 +74,19 @@ github.com/spf13/cobra
 github.com/spf13/pflag
 # github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 ## explicit
-github.com/syndtr/gocapability/capability
 # github.com/vbatts/tar-split v0.11.1
 ## explicit
-github.com/vbatts/tar-split/archive/tar
-github.com/vbatts/tar-split/tar/asm
-github.com/vbatts/tar-split/tar/storage
 # golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 ## explicit; go 1.11
-golang.org/x/crypto/ssh/terminal
+# golang.org/x/exp v0.0.0-20230809094429-853ea248256d
+## explicit; go 1.20
 # golang.org/x/net v0.0.0-20201021035429-f5854403a974
 ## explicit; go 1.11
-golang.org/x/net/internal/socks
-golang.org/x/net/proxy
 # golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 ## explicit
-golang.org/x/sync/errgroup
 # golang.org/x/sys v0.1.0
 ## explicit; go 1.17
-golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
-golang.org/x/sys/windows
-golang.org/x/sys/windows/registry
 # golang.org/x/time v0.0.0-20181108054448-85acf8d2951c
 ## explicit
 # google.golang.org/grpc v1.18.0

@@ -1,0 +1,59 @@
+{
+    "ResponseCode": 200,
+    "Headers": {
+        "Content-Type": [
+            "application/json"
+        ]
+    },
+    "Body": [
+        {
+            "id": "b0877660-18bb-4c5c-9af5-a8cd886ebded",
+            "url": "https://registry/repository:tag",
+            "registryScheme": "https",
+            "registryHost": "registry",
+            "repository": "repository",
+            "tag": "tag",
+            "digest": "",
+            "wishes": [
+                {
+                    "id": "3b971878-56d7-4cf3-8efc-cea93cdfdecc",
+                    "url": "https://registry/repository:tag"
+                },
+                {
+                    "id": "b7748fed-c394-408d-a36a-ac0d74972b6f",
+                    "url": "https://registry/repository:tag"
+                }
+            ]
+        },
+        {
+            "id": "af0d2f66-638a-44df-bf10-85d984a36385",
+            "url": "https://registry/repository2:latest",
+            "registryScheme": "https",
+            "registryHost": "registry",
+            "repository": "repository2",
+            "tag": "latest",
+            "digest": "",
+            "wishes": [
+                {
+                    "id": "9663d5a2-85c0-419a-8d05-677051ee4d8c",
+                    "url": "https://registry/repository2:*"
+                }
+            ]
+        },
+        {
+            "id": "a01ff3c1-645e-44d8-ab44-38eccbc80957",
+            "url": "https://registry/repository2:debug",
+            "registryScheme": "https",
+            "registryHost": "registry",
+            "repository": "repository2",
+            "tag": "debug",
+            "digest": "",
+            "wishes": [
+                {
+                    "id": "9663d5a2-85c0-419a-8d05-677051ee4d8c",
+                    "url": "https://registry/repository2:*"
+                }
+            ]
+        }
+    ]
+}
