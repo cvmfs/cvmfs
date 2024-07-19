@@ -291,7 +291,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
-    ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+    const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
     if ((result < 0) || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
       LogCvmfs(kLogQuota, kLogDebug | kLogSysLogError,
@@ -1961,7 +1961,8 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
     result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
     // try only as long as the cachemgr is still alive
   } while (!result && getpgid(cachemgr_pid_) >= 0);
-  if (!result)
+  if (!result) {
     PANIC(kLogStderr, "Error: quota manager could not read from cachemanager pipe");
+  }
 
 }
