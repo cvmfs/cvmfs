@@ -390,8 +390,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
   const bool result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
   if (!result) {
-    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-             "could not write cache manager pid to lockfile");
+    PANIC(kLogSyslogErr, "could not write cache manager pid to lockfile");
   }
 
   close(fd_lockfile_rw);
