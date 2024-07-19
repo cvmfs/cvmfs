@@ -293,7 +293,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
     ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
-    if (result < (ssize_t) sizeof(new_cachemgr_pid)) {
+    if ((result < 0) || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
       LogCvmfs(kLogQuota, kLogDebug | kLogSysLogError,
                "could not read cache manager pid from lockfile");
       UnlockFile(fd_lockfile);
