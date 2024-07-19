@@ -545,11 +545,11 @@ bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
       SafeSleepMs(backoff_ms);
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
-  if (timeout_ms != 0) {
-    duration_ms = (platform_monotonic_time_ns() - timestamp) / 1000;
-    if (duration_ms  > timeout_ms)
+    if (timeout_ms != 0) {
+      duration_ms = (platform_monotonic_time_ns() - timestamp) / 1000;
+      if (duration_ms  > timeout_ms)
         return false;
-  }
+    }
   } while (num_bytes == 0);
   if (timeout_ms == 0)
     assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
