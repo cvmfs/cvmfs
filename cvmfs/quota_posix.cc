@@ -646,6 +646,9 @@ pid_t PosixQuotaManager::GetPid() {
   if (!shared_ || !spawned_) {
     return getpid();
   }
+  if (cachemgr_pid_) {
+    return cachemgr_pid_;
+  }
 
   pid_t result;
   int pipe_pid[2];
@@ -655,7 +658,7 @@ pid_t PosixQuotaManager::GetPid() {
   cmd.command_type = kPid;
   cmd.return_pipe = pipe_pid[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ManagedReadHalfPipe(pipe_pid[0], &result, sizeof(result));
+  ReadHalfPipe(pipe_pid[0], &result, sizeof(result));
   CloseReturnPipe(pipe_pid);
   return result;
 }
