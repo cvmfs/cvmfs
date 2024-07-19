@@ -546,7 +546,7 @@ bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
     if (timeout_ms != 0) {
-      duration_ms = (platform_monotonic_time_ns() - timestamp) / (1000 * 1000);
+      duration_ms = (platform_monotonic_time_ns() - timestamp) / (1000UL * 1000UL);
       if (duration_ms  > timeout_ms)
         return false;
     }
