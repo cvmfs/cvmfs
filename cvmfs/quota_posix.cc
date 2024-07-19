@@ -294,7 +294,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
     if ((result < 0) || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSysLogError,
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                "could not read cache manager pid from lockfile");
       UnlockFile(fd_lockfile);
       delete quota_mgr;
