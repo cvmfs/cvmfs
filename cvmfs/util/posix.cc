@@ -1860,7 +1860,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
                  const bool             drop_credentials,
                  const bool             clear_env,
                  const bool             double_fork,
-                       pid_t           *child_pid)
+                       pid_t           *child_pid,
+                 const bool daemonize)
 {
   assert(command_line.size() >= 1);
 
@@ -1908,6 +1909,10 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
     // Double fork to disconnect from parent
     if (double_fork) {
+      if (daemonize) {
+        int retval = setsid();
+        assert(retval != -1);
+      }
       pid_grand_child = fork();
       assert(pid_grand_child >= 0);
       if (pid_grand_child != 0) _exit(0);

@@ -185,7 +185,8 @@ CVMFS_EXPORT bool ManagedExec(const std::vector<std::string> &command_line,
                               const bool drop_credentials,
                               const bool clear_env = false,
                               const bool double_fork = true,
-                              pid_t *child_pid = NULL);
+                              pid_t *child_pid = NULL,
+                              const bool daemonize = false);
 CVMFS_EXPORT bool CloseAllFildes(const std::set<int> &preserve_fildes);
 
 CVMFS_EXPORT void SafeSleepMs(const unsigned ms);

@@ -362,23 +362,40 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
-  // ignore foreground in order to reliably get pid from exec
+  // do not propagate foreground in order to reliably get pid from exec
+  // instead, daemonize right in the call to ManagedExec
   command_line.push_back(StringifyInt(true)); //foreground
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
 
   set<int> preserve_filedes;
-  preserve_filedes.insert(0);
-  preserve_filedes.insert(1);
-  preserve_filedes.insert(2);
+  map<int, int> map_filedes;
+  
+  int null_read = 0;
+  int null_write = 0;
+
+  if (foreground) {
+    preserve_filedes.insert(0);
+    preserve_filedes.insert(1);
+    preserve_filedes.insert(2);
+  } else {
+    null_read = open("/dev/null", O_RDONLY);
+    null_write = open("/dev/null", O_WRONLY);
+    map_filedes[null_read] = 0;  // Reading end of pipe_stdin
+    map_filedes[null_write] = 1;  // Writing end of pipe_stdout
+    map_filedes[null_write] = 2;  // Writing end of pipe_stderr
+  }
   preserve_filedes.insert(pipe_boot[1]);
   preserve_filedes.insert(pipe_handshake[0]);
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
+
+
+  retval = ManagedExec(command_line, preserve_filedes, map_filedes,
                        /*drop_credentials*/ false,
                        /*clear_env*/ false,
                        /*double_fork*/  true,
-                       &new_cachemgr_pid);
+                       &new_cachemgr_pid,
+                       !foreground);
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -387,6 +404,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return NULL;
   }
+  if (null_read) close(null_read);
+  if (null_write) close(null_write);
   LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid);
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
