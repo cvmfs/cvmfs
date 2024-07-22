@@ -65,6 +65,7 @@ WritableCatalogManager::WritableCatalogManager(
   assert(retval == 0);
 }
 
+
 WritableCatalogManager::~WritableCatalogManager() {
   pthread_mutex_destroy(sync_lock_);
   free(sync_lock_);
@@ -598,6 +599,7 @@ void WritableCatalogManager::AddFile(
   SyncUnlock();
 }
 
+
 void WritableCatalogManager::AddChunkedFile(
   const DirectoryEntryBase  &entry,
   const XattrList           &xattrs,
@@ -626,6 +628,7 @@ void WritableCatalogManager::AddChunkedFile(
   }
   SyncUnlock();
 }
+
 
 /**
  * Add a hardlink group to the catalogs.
@@ -713,6 +716,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   SyncUnlock();
 }
 
+
 void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
   const string relative_path = MakeRelativePath(remove_path);
 
@@ -727,6 +731,7 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
   catalog->IncLinkcount(relative_path, -1);
   SyncUnlock();
 }
+
 
 /**
  * Update entry meta data (mode, owner, ...).
@@ -786,6 +791,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
 
   SyncUnlock();
 }
+
 
 /**
  * Create a new nested catalog.  Includes moving all entries belonging there
@@ -878,6 +884,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   SyncUnlock();
 }
 
+
 /**
  * Remove a nested catalog
  *
@@ -925,6 +932,7 @@ void WritableCatalogManager::RemoveNestedCatalog(const string &mountpoint,
   DetachCatalog(nested_catalog);
   SyncUnlock();
 }
+
 
 /**
  * Swap in a new nested catalog
@@ -1042,6 +1050,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   SyncUnlock();
 }
 
+
 /**
  * Checks if a nested catalog starts at this path.  The path must be valid.
  */
@@ -1060,15 +1069,18 @@ bool WritableCatalogManager::IsTransitionPoint(const string &mountpoint) {
   return result;
 }
 
+
 void WritableCatalogManager::PrecalculateListings() {
   // TODO(jblomer): meant for micro catalogs
 }
+
 
 void WritableCatalogManager::SetTTL(const uint64_t new_ttl) {
   SyncLock();
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetTTL(new_ttl);
   SyncUnlock();
 }
+
 
 bool WritableCatalogManager::SetVOMSAuthz(const std::string &voms_authz) {
   bool result;
@@ -1078,6 +1090,7 @@ bool WritableCatalogManager::SetVOMSAuthz(const std::string &voms_authz) {
   SyncUnlock();
   return result;
 }
+
 
 bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
                                     const uint64_t       manual_revision,
