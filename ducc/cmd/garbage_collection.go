@@ -124,7 +124,7 @@ var garbageCollectionCmd = &cobra.Command{
 
 		llog(l.Log()).WithFields(log.Fields{"num. of path to delete": len(pathsToDelete)}).Info("Ready to delete paths")
 
-    commands, _ := lib.ConstructDeleteCommands(pathsToDelete, deleteBatch, CVMFSRepo)
+		commands, _ := lib.ConstructDeleteCommands(pathsToDelete, deleteBatch, CVMFSRepo)
 
 		if dryRun {
 			fmt.Printf("Dry run for garbage collection\n")
