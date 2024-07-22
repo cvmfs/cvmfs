@@ -70,6 +70,7 @@ class FuseInvalidator : SingleCopy {
   ~FuseInvalidator();
   void Spawn();
   void InvalidateInodes(Handle *handle);
+  void InvalidateInodesAndDentries(Handle *handle);
 
   void InvalidateDentry(uint64_t parent_ino, const NameString &name);
 
@@ -82,6 +83,40 @@ class FuseInvalidator : SingleCopy {
                 glue::DentryTracker *dentry_tracker,
                 void **fuse_channel_or_session,
                 bool fuse_notify_invalidation);
+
+  /**
+   * For MacOS. MacOS has no fuse invalidate, as such just wait for timeout of the
+   * kernel cache to 
+   */
+  void ClearCacheByTimeout(Handle *handle);
+  /**
+   * Invalidates a single dentry. 
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS.
+   */
+  void DoInvalidateDentry();
+      /**
+   * Invalidates all inodes tracked by inode_tracker_.
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS, use ClearCacheByTimeout()
+   * instead
+   */
+  void DoInvalidateInodes(Handle *handle);
+    /**
+   * Invalidates all inodes tracked by dentry_tracker_.
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS, use ClearCacheByTimeout()
+   * instead
+   */
+  void DoInvalidateDentries();
+
+
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
    */

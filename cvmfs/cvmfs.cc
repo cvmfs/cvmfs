@@ -818,16 +818,16 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
-  if (mount_point_->cache_symlinks()) {
-    fuse_remounter_->WaitAndIncreaseReadlinkCnt();
-  }
-
   HighPrecisionTimer guard_timer(file_system_->hist_fs_readlink());
 
   perf::Inc(file_system_->n_fs_readlink());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->WaitAndIncreaseReadlinkCnt();
+  }
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
@@ -2560,8 +2560,9 @@ static int AltProcessFlavor(int argc, char **argv) {
 static bool MaintenanceMode(const int fd_progress) {
   SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
   string msg_progress = "Draining out kernel caches (";
-  if (FuseInvalidator::HasFuseNotifyInval())
-    msg_progress += "up to ";
+#ifndef __APPLE__
+    msg_progress += "up to ";  // linux can evict, macos has to wait for timeout
+#endif
   msg_progress += StringifyInt(static_cast<int>(
                                cvmfs::mount_point_->kcache_timeout_sec())) +
                   "s)\n";

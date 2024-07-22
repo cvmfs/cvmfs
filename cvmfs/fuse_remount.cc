@@ -81,7 +81,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
-    invalidator_->InvalidateInodes(&invalidator_handle_);
+    invalidator_->InvalidateInodesAndDentries(&invalidator_handle_);
     atomic_inc32(&drainout_mode_);
     // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
   } else {
@@ -135,7 +135,7 @@ FuseRemounter::Status FuseRemounter::Check() {
                  "new catalog revision available, "
                  "draining out meta-data caches");
         invalidator_handle_.Reset();
-        invalidator_->InvalidateInodes(&invalidator_handle_);
+        invalidator_->InvalidateInodesAndDentries(&invalidator_handle_);
         atomic_inc32(&drainout_mode_);
         // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
       } else {
@@ -198,7 +198,7 @@ void FuseRemounter::EnterMaintenanceMode() {
 
   // Flush caches before reload of fuse module
   invalidator_handle_.Reset();
-  invalidator_->InvalidateInodes(&invalidator_handle_);
+  invalidator_->InvalidateInodesAndDentries(&invalidator_handle_);
   invalidator_handle_.WaitFor();
 }
 
@@ -358,6 +358,12 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
 
   RequestStopReadlink();
   WaitForStopReadlink();
+
+  // Reset inodes again, just to make sure
+  // (Contrary to dentry, inodes dont have a modifiable timeout)
+  invalidator_handle_.Reset();
+  invalidator_->InvalidateInodes(&invalidator_handle_);
+  invalidator_handle_.WaitFor();
 
   // No new inserts into caches
   mountpoint_->inode_cache()->Pause();
