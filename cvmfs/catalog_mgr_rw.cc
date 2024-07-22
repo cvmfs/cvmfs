@@ -29,31 +29,38 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 WritableCatalogManager::WritableCatalogManager(
-    const shash::Any &base_hash, const std::string &stratum0,
-    const string &dir_temp, upload::Spooler *spooler,
-    download::DownloadManager *download_manager, bool enforce_limits,
-    const unsigned nested_kcatalog_limit, const unsigned root_kcatalog_limit,
-    const unsigned file_mbyte_limit, perf::Statistics *statistics,
-    bool is_balanceable, unsigned max_weight, unsigned min_weight,
-    const std::string &dir_cache)
-    : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
-                           statistics, false, dir_cache,
-                           true /* copy to tmpdir */),
-      spooler_(spooler),
-      enforce_limits_(enforce_limits),
-      nested_kcatalog_limit_(nested_kcatalog_limit),
-      root_kcatalog_limit_(root_kcatalog_limit),
-      file_mbyte_limit_(file_mbyte_limit),
-      is_balanceable_(is_balanceable),
-      max_weight_(max_weight),
-      min_weight_(min_weight),
-      balance_weight_(max_weight / 2) {
+  const shash::Any          &base_hash,
+  const std::string         &stratum0,
+  const string              &dir_temp,
+  upload::Spooler           *spooler,
+  download::DownloadManager *download_manager,
+  bool                       enforce_limits,
+  const unsigned             nested_kcatalog_limit,
+  const unsigned             root_kcatalog_limit,
+  const unsigned             file_mbyte_limit,
+  perf::Statistics          *statistics,
+  bool                       is_balanceable,
+  unsigned                   max_weight,
+  unsigned                   min_weight,
+  const                      std::string &dir_cache)
+  : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
+      statistics, false, dir_cache, true /* copy to tmpdir */)
+  , spooler_(spooler)
+  , enforce_limits_(enforce_limits)
+  , nested_kcatalog_limit_(nested_kcatalog_limit)
+  , root_kcatalog_limit_(root_kcatalog_limit)
+  , file_mbyte_limit_(file_mbyte_limit)
+  , is_balanceable_(is_balanceable)
+  , max_weight_(max_weight)
+  , min_weight_(min_weight)
+  , balance_weight_(max_weight / 2)
+{
   sync_lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(sync_lock_, NULL);
   assert(retval == 0);
   catalog_processing_lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(catalog_processing_lock_, NULL);
   assert(retval == 0);
 }
@@ -65,6 +72,8 @@ WritableCatalogManager::~WritableCatalogManager() {
   free(catalog_processing_lock_);
 }
 
+
+
 /**
  * This method is virtual in AbstractCatalogManager.  It returns a new catalog
  * structure in the form the different CatalogManagers need it.
@@ -74,16 +83,21 @@ WritableCatalogManager::~WritableCatalogManager() {
  * @param parent_catalog the parent of the catalog stub to create
  * @return a pointer to the catalog stub structure created
  */
-Catalog *WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
-                                               const shash::Any &catalog_hash,
-                                               Catalog *parent_catalog) {
-  return new WritableCatalog(mountpoint.ToString(), catalog_hash,
+Catalog* WritableCatalogManager::CreateCatalog(
+  const PathString &mountpoint,
+  const shash::Any &catalog_hash,
+  Catalog          *parent_catalog)
+{
+  return new WritableCatalog(mountpoint.ToString(),
+                             catalog_hash,
                              parent_catalog);
 }
+
 
 void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
   catalog->TakeDatabaseFileOwnership();
 }
+
 
 /**
  * This method is invoked if we create a completely new repository.
@@ -92,8 +106,11 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-    const string &dir_temp, const bool volatile_content,
-    const std::string &voms_authz, upload::Spooler *spooler) {
+  const string      &dir_temp,
+  const bool         volatile_content,
+  const std::string &voms_authz,
+  upload::Spooler   *spooler)
+{
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
 
@@ -102,22 +119,25 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   // A newly created catalog always needs a root entry
   // we create and configure this here
   DirectoryEntry root_entry;
-  root_entry.inode_ = DirectoryEntry::kInvalidInode;
-  root_entry.mode_ = 16877;
-  root_entry.size_ = 4096;
-  root_entry.mtime_ = time(NULL);
-  root_entry.uid_ = getuid();
-  root_entry.gid_ = getgid();
-  root_entry.checksum_ = shash::Any(hash_algorithm);
-  root_entry.linkcount_ = 2;
+  root_entry.inode_             = DirectoryEntry::kInvalidInode;
+  root_entry.mode_              = 16877;
+  root_entry.size_              = 4096;
+  root_entry.mtime_             = time(NULL);
+  root_entry.uid_               = getuid();
+  root_entry.gid_               = getgid();
+  root_entry.checksum_          = shash::Any(hash_algorithm);
+  root_entry.linkcount_         = 2;
   string root_path = "";
 
   // Create the database schema and the initial root entry
   {
     UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(file_path));
     if (!new_clg_db.IsValid() ||
-        !new_clg_db->InsertInitialValues(root_path, volatile_content,
-                                         voms_authz, root_entry)) {
+        !new_clg_db->InsertInitialValues(root_path,
+                                         volatile_content,
+                                         voms_authz,
+                                         root_entry))
+    {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
                file_path.c_str());
       return NULL;
@@ -132,8 +152,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   }
   string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
-  bool retval =
-      zlib::CompressPath2Path(file_path, file_path_compressed, &hash_catalog);
+  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
+                                        &hash_catalog);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
              file_path.c_str());
@@ -145,7 +165,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   // Create manifest
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
-      new manifest::Manifest(hash_catalog, catalog_size, "");
+    new manifest::Manifest(hash_catalog, catalog_size, "");
   if (!voms_authz.empty()) {
     manifest->set_has_alt_catalog_path(true);
   }
@@ -164,6 +184,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   return manifest;
 }
 
+
 /**
  * Retrieve the catalog containing the given path.
  * Other than AbstractCatalogManager::FindCatalog() this mounts nested
@@ -175,36 +196,42 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
  * @param dirent  is set to looked up DirectoryEntry for 'path' if non-NULL
  * @return        true if catalog was found
  */
-bool WritableCatalogManager::FindCatalog(const string &path,
+bool WritableCatalogManager::FindCatalog(const string     &path,
                                          WritableCatalog **result,
-                                         DirectoryEntry *dirent) {
+                                         DirectoryEntry   *dirent) {
   const PathString ps_path(path);
 
-  Catalog *best_fit = AbstractCatalogManager<Catalog>::FindCatalog(ps_path);
+  Catalog *best_fit =
+    AbstractCatalogManager<Catalog>::FindCatalog(ps_path);
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
   bool retval =
-      MountSubtree(ps_path, best_fit, true /* is_listable */, &catalog);
-  if (!retval) return false;
+    MountSubtree(ps_path, best_fit, true /* is_listable */, &catalog);
+  if (!retval)
+    return false;
 
   catalog::DirectoryEntry dummy;
   if (NULL == dirent) {
     dirent = &dummy;
   }
   bool found = catalog->LookupPath(ps_path, dirent);
-  if (!found || !catalog->IsWritable()) return false;
+  if (!found || !catalog->IsWritable())
+    return false;
 
   *result = static_cast<WritableCatalog *>(catalog);
   return true;
 }
 
+
 WritableCatalog *WritableCatalogManager::GetHostingCatalog(
-    const std::string &path) {
+  const std::string &path)
+{
   WritableCatalog *result = NULL;
   bool retval = FindCatalog(MakeRelativePath(path), &result, NULL);
   if (!retval) return NULL;
   return result;
 }
+
 
 /**
  * Remove the given file from the catalogs.
@@ -225,6 +252,7 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
   catalog->RemoveEntry(file_path);
   SyncUnlock();
 }
+
 
 void WritableCatalogManager::RenameDirectory(const std::string &old_path,
                                              const std::string &new_path) {
@@ -252,6 +280,7 @@ void WritableCatalogManager::RenameDirectory(const std::string &old_path,
   SyncUnlock();
 }
 
+
 void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_parent_path, 
                                                        const std::string &new_parent_path) {
   // /dir/subdir1 /dir/subdir3
@@ -271,6 +300,7 @@ void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_pa
     parent_catalog->UpdateParentDirectoryPath(old_parent_path, new_parent_path, listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
   }
 }
+
 
 /**
  * Remove the given directory from the catalogs.
@@ -297,7 +327,7 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
              parent_path.c_str());
     WritableCatalog *parent_catalog =
-        reinterpret_cast<WritableCatalog *>(catalog->parent());
+      reinterpret_cast<WritableCatalog *>(catalog->parent());
     parent_entry.set_is_nested_catalog_mountpoint(true);
     parent_entry.set_is_nested_catalog_root(false);
     parent_catalog->UpdateEntry(parent_entry, parent_path);
@@ -348,6 +378,7 @@ void WritableCatalogManager::Clone(const std::string destination,
   this->AddFile(destination_dirent, empty_xattrs, destination_dirname);
 }
 
+
 /**
  * Copies an entire directory tree from the existing from_dir to the
  * non-existing to_dir. The destination's parent directory must exist. On the
@@ -355,7 +386,8 @@ void WritableCatalogManager::Clone(const std::string destination,
  * for their path hash fields.
  */
 void WritableCatalogManager::CloneTree(const std::string &from_dir,
-                                       const std::string &to_dir) {
+                                       const std::string &to_dir)
+{
   // Sanitize input paths
   if (from_dir.empty() || to_dir.empty())
     PANIC(kLogStderr, "clone tree from or to root impossible");
@@ -393,17 +425,21 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
           to_dir.c_str());
   }
 
-  CloneTreeImpl(PathString(from_dir), GetParentPath(to_dir),
+  CloneTreeImpl(PathString(from_dir),
+                GetParentPath(to_dir),
                 NameString(GetFileName(to_dir)));
 }
+
 
 /**
  * Called from CloneTree(), assumes that from_dir and to_dir are sufficiently
  * sanitized
  */
-void WritableCatalogManager::CloneTreeImpl(const PathString &source_dir,
-                                           const std::string &dest_parent_dir,
-                                           const NameString &dest_name) {
+void WritableCatalogManager::CloneTreeImpl(
+  const PathString &source_dir,
+  const std::string &dest_parent_dir,
+  const NameString &dest_name)
+{
   LogCvmfs(kLogCatalog, kLogDebug, "cloning %s --> %s/%s", source_dir.c_str(),
            dest_parent_dir.c_str(), dest_name.ToString().c_str());
   PathString relative_source(MakeRelativePath(source_dir.ToString()));
@@ -427,10 +463,12 @@ void WritableCatalogManager::CloneTreeImpl(const PathString &source_dir,
   AddDirectory(dest_dirent, xattrs, dest_parent_dir);
 
   std::string dest_dir = dest_parent_dir;
-  if (!dest_dir.empty()) dest_dir.push_back('/');
+  if (!dest_dir.empty())
+    dest_dir.push_back('/');
   dest_dir += dest_name.ToString();
   if (source_dirent.IsNestedCatalogRoot() ||
-      source_dirent.IsNestedCatalogMountpoint()) {
+      source_dirent.IsNestedCatalogMountpoint())
+  {
     CreateNestedCatalog(dest_dir);
   }
 
@@ -461,8 +499,8 @@ void WritableCatalogManager::CloneTreeImpl(const PathString &source_dir,
     if (ls[i].IsChunkedFile()) {
       FileChunkList chunks;
       std::string relative_sub_path = MakeRelativePath(sub_path.ToString());
-      retval = ListFileChunks(PathString(relative_sub_path),
-                              ls[i].hash_algorithm(), &chunks);
+      retval = ListFileChunks(
+        PathString(relative_sub_path), ls[i].hash_algorithm(), &chunks);
       assert(retval);
       AddChunkedFile(ls[i], xattrs, dest_dir, chunks);
     } else {
@@ -470,6 +508,7 @@ void WritableCatalogManager::CloneTreeImpl(const PathString &source_dir,
     }
   }
 }
+
 
 /**
  * Add a new directory to the catalogs.
@@ -480,12 +519,12 @@ void WritableCatalogManager::CloneTreeImpl(const PathString &source_dir,
  */
 void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
                                           const XattrList &xattrs,
-                                          const std::string &parent_directory) {
+                                          const std::string &parent_directory)
+{
   const string parent_path = MakeRelativePath(parent_directory);
   string directory_path = parent_path + "/";
   directory_path.append(entry.name().GetChars(), entry.name().GetLength());
-  LogCvmfs(kLogUnionFs, kLogStdout, "Adding directory: %s",
-           directory_path.c_str());
+
   SyncLock();
   WritableCatalog *catalog;
   DirectoryEntry parent_entry;
@@ -496,21 +535,23 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 
   DirectoryEntry fixed_hardlink_count(entry);
   fixed_hardlink_count.set_linkcount(2);
-  catalog->AddEntry(fixed_hardlink_count, xattrs, directory_path, parent_path);
+  catalog->AddEntry(fixed_hardlink_count, xattrs,
+                    directory_path, parent_path);
 
   parent_entry.set_linkcount(parent_entry.linkcount() + 1);
   catalog->UpdateEntry(parent_entry, parent_path);
   if (parent_entry.IsNestedCatalogRoot()) {
-    LogCvmfs(kLogCatalog, kLogStdout, "updating transition point %s",
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating transition point %s",
              parent_path.c_str());
     WritableCatalog *parent_catalog =
-        reinterpret_cast<WritableCatalog *>(catalog->parent());
+      reinterpret_cast<WritableCatalog *>(catalog->parent());
     parent_entry.set_is_nested_catalog_mountpoint(true);
     parent_entry.set_is_nested_catalog_root(false);
     parent_catalog->UpdateEntry(parent_entry, parent_path);
   }
   SyncUnlock();
 }
+
 
 /**
  * Add a new file to the catalogs.
@@ -519,11 +560,13 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
  *                         file to be created
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
-                                     const XattrList &xattrs,
-                                     const std::string &parent_directory) {
+void WritableCatalogManager::AddFile(
+  const DirectoryEntry &entry,
+  const XattrList      &xattrs,
+  const std::string    &parent_directory) 
+{
   const string parent_path = MakeRelativePath(parent_directory);
-  const string file_path = entry.GetFullPath(parent_path);
+  const string file_path   = entry.GetFullPath(parent_path);
 
   SyncLock();
   WritableCatalog *catalog;
@@ -556,10 +599,12 @@ void WritableCatalogManager::AddFile(const DirectoryEntry &entry,
   SyncUnlock();
 }
 
-void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
-                                            const XattrList &xattrs,
-                                            const std::string &parent_directory,
-                                            const FileChunkList &file_chunks) {
+void WritableCatalogManager::AddChunkedFile(
+  const DirectoryEntryBase &entry,
+  const XattrList &xattrs,
+  const std::string &parent_directory,
+  const FileChunkList &file_chunks) 
+{
   assert(file_chunks.size() > 0);
 
   DirectoryEntry full_entry(entry);
@@ -568,7 +613,7 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
   AddFile(full_entry, xattrs, parent_directory);
 
   const string parent_path = MakeRelativePath(parent_directory);
-  const string file_path = entry.GetFullPath(parent_path);
+  const string file_path   = entry.GetFullPath(parent_path);
 
   SyncLock();
   WritableCatalog *catalog;
@@ -591,8 +636,11 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
  * @return true on success, false otherwise
  */
 void WritableCatalogManager::AddHardlinkGroup(
-    const DirectoryEntryBaseList &entries, const XattrList &xattrs,
-    const std::string &parent_directory, const FileChunkList &file_chunks) {
+  const DirectoryEntryBaseList &entries,
+  const XattrList &xattrs,
+  const std::string &parent_directory,
+  const FileChunkList &file_chunks) 
+{
   assert(entries.size() >= 1);
   assert(file_chunks.IsEmpty() || entries[0].IsRegular());
   if (entries.size() == 1) {
@@ -623,7 +671,8 @@ void WritableCatalogManager::AddHardlinkGroup(
     if (enforce_limits_)
       PANIC(kLogStderr, "hard link at %s is larger than %u megabytes (%u)",
             (parent_path + entries[0].name().ToString()).c_str(),
-            file_mbyte_limit_, mbytes);
+            file_mbyte_limit_, 
+            mbytes);
   }
 
   SyncLock();
@@ -643,8 +692,8 @@ void WritableCatalogManager::AddHardlinkGroup(
 
   // Add the file entries to the catalog
   for (DirectoryEntryBaseList::const_iterator i = entries.begin(),
-                                              iEnd = entries.end();
-       i != iEnd; ++i) {
+                                              iEnd = entries.end(); i != iEnd; ++i)
+  {
     string file_path = parent_path + "/";
     file_path.append(i->name().GetChars(), i->name().GetLength());
 
@@ -690,7 +739,8 @@ void WritableCatalogManager::ShrinkHardlinkGroup(const string &remove_path) {
  */
 void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
                                             const XattrList &xattrs,
-                                            const std::string &directory_path) {
+                                            const std::string &directory_path) 
+{
   assert(entry.IsDirectory());
 
   const string entry_path = MakeRelativePath(directory_path);
