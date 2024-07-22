@@ -124,25 +124,7 @@ var garbageCollectionCmd = &cobra.Command{
 
 		llog(l.Log()).WithFields(log.Fields{"num. of path to delete": len(pathsToDelete)}).Info("Ready to delete paths")
 
-		// we send 50 folder to deletion at the time
-		commandPrefix := []string{"cvmfs_server", "ingest"}
-		commands := make([][]string, 0)
-		command := commandPrefix
-		j := 0
-		for i, path := range pathsToDelete {
-			j = i
-			if i%deleteBatch == 0 && i > 0 {
-				command = append(command, CVMFSRepo)
-				commands = append(commands, command)
-				command = commandPrefix
-				continue
-			}
-			command = append(command, "--delete", path)
-		}
-		if j%deleteBatch != 0 && j > 0 {
-			command = append(command, CVMFSRepo)
-			commands = append(commands, command)
-		}
+    commands, _ := lib.ConstructDeleteCommands(pathsToDelete, deleteBatch, CVMFSRepo)
 
 		if dryRun {
 			fmt.Printf("Dry run for garbage collection\n")
