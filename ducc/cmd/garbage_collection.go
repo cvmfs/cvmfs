@@ -20,11 +20,16 @@ const (
 )
 
 var (
+	gracePeriod int
+)
+
+var (
 	dryRun bool
 )
 
 func init() {
 	garbageCollectionCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Dry run the garbage collection")
+	garbageCollectionCmd.Flags().IntVar(&gracePeriod, "grace-period", 0, "Grace period for which to keep unused path (days)")
 	rootCmd.AddCommand(garbageCollectionCmd)
 }
 
@@ -97,9 +102,9 @@ var garbageCollectionCmd = &cobra.Command{
 				return false
 			}
 			modTime := stat.ModTime()
-			thirtyDays := 30 * 24 * time.Hour
-			if modTime.Add(thirtyDays).After(today) {
-				llog(l.Log()).WithFields(log.Fields{"path": path, "grace period": "30 days", "path mod time": modTime}).Warning("Path still in its grace period")
+			gracePeriodInHours := time.Duration(gracePeriod) * 24 * time.Hour
+			if modTime.Add(gracePeriodInHours).After(today) {
+				llog(l.Log()).WithFields(log.Fields{"path": path, "grace period [days]": gracePeriod, "path mod time": modTime}).Warning("Path still in its grace period")
 				return false
 			}
 			return true
