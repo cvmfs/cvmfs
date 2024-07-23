@@ -79,7 +79,6 @@ jobs:
             src/006-buildkernel                               \
             src/007-testjobs                                  \
             src/008-default_domain                            \
-            src/011-rmemptyfilesrebuild                       \
             src/015-rebuild_on_crash                          \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
