@@ -109,12 +109,9 @@ get_xattr() {
   local extended_attr="$1"
   local path="$2"
   if running_on_osx; then
-    # For some reason xattr -p may work after xattr -l
-    if xattr -l "$path"; then
+    # For some reason xattr -p sometimes works after xattr -l
+    if $(xattr -l "$path" > /dev/null 2>&1); then
       xattr -p "user.$extended_attr" "$path"
-    else
-      echo "Error: Attribute user.$extended_attr not found on $path" >> /tmp/cvmfs-integration.log 
-      return 1
     fi
   else
     attr -qg $extended_attr "$path"
@@ -485,9 +482,11 @@ cvmfs_mount_direct() {
   repositories=$1
   eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
   if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    echo "Show config mount $CVMFS_CONFIG_REPOSITORY" >> "/tmp/cvmfs-integration.log"
     _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
   fi
   for i in $(echo "$repositories" | tr "," " "); do
+    echo "manual mount $i" >> "/tmp/cvmfs-integration.log"
     _cvmfs_mount_manually "$i" || return 102
   done
 }
@@ -531,7 +530,6 @@ cvmfs_mount() {
 
   if running_on_osx; then
     cvmfs_mount_direct $repositories
-    sleep 2
   fi
   if [ "x$cvmfs_test_autofs_on_startup" = "xfalse" ]; then
     cvmfs_mount_direct $repositories
@@ -548,6 +546,9 @@ _cvmfs_mount_manually() {
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository" 2>/dev/null || sudo mkdir -p "/cvmfs/$repository"
   sudo mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
+  if running_on_osx; then 
+    sleep 3
+  fi
 }
 
 
