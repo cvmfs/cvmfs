@@ -171,6 +171,8 @@ CVMFS_EXPORT
 int WaitForChild(pid_t pid,
                  const std::vector<int> &sig_ok = std::vector<int>());
 CVMFS_EXPORT void Daemonize();
+CVMFS_EXPORT bool ExecAsDaemon(const std::vector<std::string> &command_line,
+                               pid_t *child_pid = NULL);
 CVMFS_EXPORT bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
 CVMFS_EXPORT bool ExecuteBinary(int *fd_stdin,
                                 int *fd_stdout,
@@ -185,8 +187,7 @@ CVMFS_EXPORT bool ManagedExec(const std::vector<std::string> &command_line,
                               const bool drop_credentials,
                               const bool clear_env = false,
                               const bool double_fork = true,
-                              pid_t *child_pid = NULL,
-                              const bool daemonize = false);
+                              pid_t *child_pid = NULL);
 CVMFS_EXPORT bool CloseAllFildes(const std::set<int> &preserve_fildes);
 
 CVMFS_EXPORT void SafeSleepMs(const unsigned ms);

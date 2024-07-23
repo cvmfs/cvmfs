@@ -1632,6 +1632,61 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   return -1;
 }
 
+/**
+ * Exec a command as a daemon.
+ */
+
+bool ExecAsDaemon(const std::vector<std::string>  &command_line,
+                       pid_t           *child_pid) {
+  assert(command_line.size() >= 1);
+
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    pid_t pid_grand_child;
+
+    const char *argv[command_line.size() + 1];
+    for (unsigned i = 0; i < command_line.size(); ++i)
+      argv[i] = command_line[i].c_str();
+    argv[command_line.size()] = NULL;
+    int retval = setsid();
+    assert(retval != -1);
+    pid_grand_child = fork();
+    assert(pid_grand_child >= 0);
+    if (pid_grand_child != 0){
+
+      if (child_pid != NULL) *child_pid = pid_grand_child;
+      _exit(0);
+    } else {
+      int null_read = open("/dev/null", O_RDONLY);
+      int null_write = open("/dev/null", O_WRONLY);
+      assert((null_read >= 0) && (null_write >= 0));
+      retval = dup2(null_read, 0);
+      assert(retval == 0);
+      retval = dup2(null_write, 1);
+      assert(retval == 1);
+      retval = dup2(null_write, 2);
+      assert(retval == 2);
+      close(null_read);
+      close(null_write);
+
+
+      execvp(command_line[0].c_str(), const_cast<char **>(argv));
+    }
+  }
+  int statloc;
+  waitpid(pid, &statloc, 0);
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "exec'd as daemon %s (PID: %d)",
+           command_line[0].c_str(),
+           static_cast<int>(pid));
+  return true;
+
+}
+
+
+
+
 
 /**
  * Makes a daemon.  The daemon() call is deprecated on OS X
@@ -1860,8 +1915,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
                  const bool             drop_credentials,
                  const bool             clear_env,
                  const bool             double_fork,
-                       pid_t           *child_pid,
-                 const bool daemonize)
+                       pid_t           *child_pid)
 {
   assert(command_line.size() >= 1);
 
@@ -1909,10 +1963,6 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
     // Double fork to disconnect from parent
     if (double_fork) {
-      if (daemonize) {
-        int retval = setsid();
-        assert(retval != -1);
-      }
       pid_grand_child = fork();
       assert(pid_grand_child >= 0);
       if (pid_grand_child != 0) _exit(0);
