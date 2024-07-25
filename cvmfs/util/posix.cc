@@ -1640,6 +1640,7 @@ bool ExecAsDaemon(const std::vector<std::string>  &command_line,
                        pid_t           *child_pid) {
   assert(command_line.size() >= 1);
 
+  Pipe<kPipeDetachedChild> pipe_fork;
   pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
@@ -1651,11 +1652,12 @@ bool ExecAsDaemon(const std::vector<std::string>  &command_line,
     argv[command_line.size()] = NULL;
     int retval = setsid();
     assert(retval != -1);
+
     pid_grand_child = fork();
     assert(pid_grand_child >= 0);
-    if (pid_grand_child != 0){
 
-      if (child_pid != NULL) *child_pid = pid_grand_child;
+    if (pid_grand_child != 0){
+      pipe_fork.Write<pid_t>(pid_grand_child);
       _exit(0);
     } else {
       int null_read = open("/dev/null", O_RDONLY);
@@ -1670,16 +1672,22 @@ bool ExecAsDaemon(const std::vector<std::string>  &command_line,
       close(null_read);
       close(null_write);
 
-
       execvp(command_line[0].c_str(), const_cast<char **>(argv));
+
+      pipe_fork.CloseWriteFd();
     }
   }
   int statloc;
   waitpid(pid, &statloc, 0);
+  pid_t buf_child_pid = 0;
+  pipe_fork.Read(&buf_child_pid);
+  if (child_pid != NULL)
+    *child_pid = buf_child_pid;
+  pipe_fork.CloseReadFd();
 
   LogCvmfs(kLogCvmfs, kLogDebug, "exec'd as daemon %s (PID: %d)",
            command_line[0].c_str(),
-           static_cast<int>(pid));
+           static_cast<int>(*child_pid));
   return true;
 
 }
