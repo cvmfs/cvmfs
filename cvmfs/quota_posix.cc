@@ -293,14 +293,22 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
     const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
+
     if ((result < 0) || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-               "could not read cache manager pid from lockfile");
-      UnlockFile(fd_lockfile);
-      delete quota_mgr;
-      return NULL;
+      if (result != 0) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                 "could not read cache manager pid from lockfile");
+        UnlockFile(fd_lockfile);
+        delete quota_mgr;
+        return NULL;
+      } else {
+        // support reload from old versions of the cache manager
+        // lock file is empty in this case, try a plain ReadHalfPipe to get pid
+        quota_mgr->SetCacheMgrPid(quota_mgr->GetPid());
+      }
+    } else {
+      quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
     }
-    quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
 
 
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
