@@ -84,6 +84,10 @@ class PosixQuotaManager : public QuotaManager {
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
 
+  void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
+  void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_;};
+
+
  private:
   /**
    * Loaded catalogs are pinned in the LRU and have to be treated differently.
@@ -172,6 +176,12 @@ class PosixQuotaManager : public QuotaManager {
       return result;
     }
   };
+
+  /**
+   * Magic number to make reading PIDs from lockfiles more robust and versionable
+   */
+
+  static const unsigned kLockFileMagicNumber = 142857;
 
   /**
    * Maximum page cache per thread (Bytes).
@@ -310,6 +320,13 @@ class PosixQuotaManager : public QuotaManager {
    * will be performed in a detached, asynchronous process.
    */
   bool async_delete_;
+
+
+  /**
+   * Record pid of current cache manager in order to check if its process
+   * disappeared.
+   */
+  pid_t cachemgr_pid_;
 
   /**
    * Keeps track of the number of cleanups over time.  Use by
