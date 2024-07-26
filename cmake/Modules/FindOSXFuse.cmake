@@ -4,14 +4,11 @@
 # MACOS_FUSE_LIBRARIES   - List of libraries when using FUSE-T
 # MACOS_FUSE_FOUND       - True if either FUSE-T is found.
 
-# set include fuse headers include directory
+# set fuse headers include directory
 # hardcoding this due to misplacement of fuse.h on installing FUSE-T
 # in comparison to macFUSE 
 # (the latter places fuse.h in /usr/local/include but the former in /usr/local/include/fuse)
-FIND_PATH (MACOS_FUSE_INCLUDE_DIR fuse.h
-        /usr/include
-        /usr/local/include/fuse
-)
+SET (MACOS_FUSE_INCLUDE_DIR /usr/local/include)
 
 # find FUSE-T lib as the primary lib
 SET(MACOS_FUSE_LIB_NAMES fuse-t)
