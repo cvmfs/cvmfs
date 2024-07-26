@@ -178,6 +178,12 @@ class PosixQuotaManager : public QuotaManager {
   };
 
   /**
+   * Magic number to make reading PIDs from lockfiles more robust and versionable
+   */
+
+  static const unsigned kLockFileMagicNumber = 142857;
+
+  /**
    * Maximum page cache per thread (Bytes).
    */
   static const unsigned kSqliteMemPerThread = 2*1024*1024;

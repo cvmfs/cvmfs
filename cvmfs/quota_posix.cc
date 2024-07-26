@@ -291,10 +291,13 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
+    unsigned lockfile_magicnumber = 0;
+    const ssize_t result_mn = SafeRead(fd_lockfile_rw, &lockfile_magicnumber, sizeof(lockfile_magicnumber));
     const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
 
-    if ((result < 0) || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
+    if ((lockfile_magicnumber != kLockFileMagicNumber) || (result < 0) || (result_mn < 0)
+         || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
       if (result != 0) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                  "could not read cache manager pid from lockfile");
@@ -404,8 +407,10 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid);
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
   const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
+  const unsigned magic_number = PosixQuotaManager::kLockFileMagicNumber;
+  const bool result_mn = SafeWrite(fd_lockfile_rw, &magic_number, sizeof(magic_number));
   const bool result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
-  if (!result) {
+  if (!result || !result_mn) {
     PANIC(kLogSyslogErr, "could not write cache manager pid to lockfile");
   }
 
