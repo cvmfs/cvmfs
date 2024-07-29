@@ -19,6 +19,8 @@
   * [client] Refactoring of file catalog reloads (#3156)
 
 2.11.4:
+  * [client] Fix streaming cache mgr with secure repos (#3631) 
+  * [client] Fix handling of network errors in streaming cache mgr (#3630)
   * [client] Add timeout to ReadHalfPipe (#3614)
 
 2.11.3:
