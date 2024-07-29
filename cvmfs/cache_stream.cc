@@ -252,12 +252,14 @@ int64_t StreamingCacheManager::Pread(
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->Pread(info.fd_in_cache_mgr, buf, size, offset);
 
-  uint64_t nbytes_streamed = Stream(info, buf, size, offset);
-  if (nbytes_streamed < offset)
+  int64_t nbytes_streamed = Stream(info, buf, size, offset);
+  if (nbytes_streamed < 0)
+    return nbytes_streamed;
+  if (static_cast<uint64_t>(nbytes_streamed) < offset)
     return 0;
-  if (nbytes_streamed > (offset + size))
-    return static_cast<int64_t>(size);
-  return static_cast<int64_t>(nbytes_streamed - offset);
+  if (static_cast<uint64_t>(nbytes_streamed) > (offset + size))
+    return size;
+  return nbytes_streamed - offset;
 }
 
 int StreamingCacheManager::Readahead(int fd) {
