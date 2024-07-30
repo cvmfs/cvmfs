@@ -90,7 +90,6 @@ jobs:
             src/045-oasis                                     \
             src/052-roundrobindns                             \
             src/050-configrepo                                \
-            src/053-uuid                                      \
             src/055-ownership                                 \
             src/056-lowspeedlimit                             \
             src/057-parallelmakecache                         \
@@ -98,7 +97,6 @@ jobs:
             src/061-systemdnokill                             \
             src/066-killall                                   \
             src/069-systemremount                             \
-            src/072-mountdevicepath                           \
             src/074-oom                                       \
             src/077-doublemount                               \
             src/078-offlinemode                               \

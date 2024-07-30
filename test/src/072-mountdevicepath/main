@@ -33,6 +33,9 @@ cvmfs_run_test() {
   # mount the private repository
   echo "*** mounting manually"
   sudo mount -t cvmfs $fqrn $(pwd)/mnt || return 10
+  if running_on_osx; then
+    sleep 3
+  fi
   CVMFS_TEST072_MOUNTPOINT="$(pwd)/mnt"
   trap cleanup EXIT HUP INT TERM
   ls mnt || return 11
