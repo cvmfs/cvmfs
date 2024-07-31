@@ -72,7 +72,7 @@ cvmfs_run_test() {
 
   if running_on_osx; then 
     #expanding expected max timeout as we sleep for 3 seconds after a mount with FUSE-T
-    local expected_max=12000
+    local expected_max=20000
   else
     local expected_max=6000  
   fi
