@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# use archive, see https://linux.web.cern.ch/els7/
+sed -i 's#http://linuxsoft.cern.ch/epel/7/#http://linuxsoft.cern.ch/internal/archive/epel/7/#g' /etc/yum.repos.d/epel.repo
+
 # source the common platform independent functionality and option parsing
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh

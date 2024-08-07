@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# use archive, see https://linux.web.cern.ch/els7/
+sed -i 's#http://linuxsoft.cern.ch/epel/7/#http://linuxsoft.cern.ch/internal/archive/epel/7/#g' /etc/yum.repos.d/epel.repo
+
+
 export CVMFS_PLATFORM_NAME="centos7-x86_64_S3"
 export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
