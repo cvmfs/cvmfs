@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # use archive, see https://linux.web.cern.ch/els7/
-sed -i 's#http://linuxsoft.cern.ch/epel/7/#http://linuxsoft.cern.ch/internal/archive/epel/7/#g' /etc/yum.repos.d/epel.repo
+sudo sed -i 's#http://linuxsoft.cern.ch/epel/7/#http://linuxsoft.cern.ch/internal/archive/epel/7/#g' /etc/yum.repos.d/epel.repo || die "fail (patching epel mirror)"
+
 
 
 # source the common platform independent functionality and option parsing
