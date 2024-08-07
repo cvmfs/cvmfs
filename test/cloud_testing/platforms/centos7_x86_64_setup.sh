@@ -1,8 +1,5 @@
 #!/bin/sh
 
-
-
-
 # source the common platform independent functionality and option parsing
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh

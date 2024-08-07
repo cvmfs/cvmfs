@@ -1,7 +1,5 @@
 #!/bin/sh
 
-
-
 export CVMFS_PLATFORM_NAME="centos7-x86_64_S3"
 export CVMFS_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
