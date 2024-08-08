@@ -550,3 +550,9 @@ TEST_F(T_QuotaManager, Touch) {
   quota_mgr_->Cleanup(1);
   EXPECT_EQ("a\n", PrintStringVector(quota_mgr_->List()));
 }
+
+TEST_F(T_QuotaManager, SetLimit) {
+  quota_mgr_->SetLimit(100);
+  uint64_t limit = quota_mgr_->GetCapacity();
+  EXPECT_EQ(100ul, limit);
+}
