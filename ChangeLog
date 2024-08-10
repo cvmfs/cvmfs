@@ -18,6 +18,14 @@
   * [server] Ingest Tarball now with modifiyable ownership (#3362)
   * [client] Refactoring of file catalog reloads (#3156)
 
+2.11.4:
+  * [client] Fix streaming cache mgr with secure repos (#3631) 
+  * [client] Fix handling of network errors in streaming cache mgr (#3630)
+  * [client] Add timeout to ReadHalfPipe (#3614)
+
+2.11.3:
+ * [server] Update method of downloading the MaxMind GeoIP (#3566)
+
 2.11.2:
   * [client] Fix mount helper race condition causing spurious directories (#3430)
   * [client] Suppress CVMFS_NFILES check for refcounted cache manager (#3426)

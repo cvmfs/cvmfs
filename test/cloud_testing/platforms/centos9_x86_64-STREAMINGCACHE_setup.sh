@@ -35,8 +35,8 @@ install_from_repo wget
 install_from_repo openssl-devel
 
 # Migration test needs lsb_release
-echo "install lsb_release..."
-install_from_repo redhat-lsb-core
+#echo "install lsb_release..."
+#install_from_repo redhat-lsb-core
 
 sudo ln -s /usr/bin/python3 /usr/bin/python || true
 

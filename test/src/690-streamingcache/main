@@ -36,6 +36,8 @@ cvmfs_run_test() {
     sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
   mkdir -p ${repo_dir}/external                                           || return 6
   cat /dev/urandom | head -c $((1000*1000*25)) > ${repo_dir}/external/foo || return 7
+  local external_md5=$(cat ${repo_dir}/external/foo | cvmfs_publish hash -a md5)
+  echo "*** MD5 hash of ${repo_dir}/external/foo is $external_md5"
   if ! running_on_s3; then
     echo "CVMFS_EXTERNAL_DATA=true" | \
       sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
@@ -67,7 +69,7 @@ cvmfs_run_test() {
                  "$CVMFS_TEST_REPO" \
                  "$(get_repo_url $CVMFS_TEST_REPO)" \
                  "" \
-                 "CVMFS_STREAMING_CACHE=yes\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 10
+                 "CVMFS_STREAMING_CACHE=yes\nCVMFS_EXTERNAL_URL=http://localhost/cvmfs/${CVMFS_TEST_REPO}/data\nCVMFS_EXTERNAL_HTTP_PROXY=DIRECT" || return 10
   local talk_socket="$(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO"
   local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
   echo "$cache_instance"
@@ -81,6 +83,11 @@ cvmfs_run_test() {
   local is_external=$(get_xattr external_file $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo)
   running_on_s3 || [ x"$is_external" = "x1" ] || return 42
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 43
+  local verify_md5=$(cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo | cvmfs_publish hash -a md5)
+  if [ "x$external_md5" != "x$verify_md5" ]; then
+    echo "*** MD5 mismatch for $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo"
+    return 49
+  fi
   sudo cvmfs_talk -p $talk_socket cache list | tee cache_list
   cat cache_list | grep foo && return 44
 
@@ -100,7 +107,8 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p $talk_socket cache list
   sudo cvmfs_talk -p $talk_socket cache list catalogs
 
-  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 50
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
+    --debug || return 50
   ls -lR $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/
   cat $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 51
   md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo || return 52
@@ -109,10 +117,22 @@ cvmfs_run_test() {
   ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
   local pid_helper=$!
 
-  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 61
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
+    --debug || return 61
   kill -USR1 $pid_helper
   wait $pid_helper || return 62
   diff small $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small || return 63
+
+  echo "*** test forwarding of download errors"
+  purge_disk_cache
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
+    --debug || return 90
+  sudo cvmfs_talk -p $talk_socket host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data/nosuchurl"
+  sudo cvmfs_talk -p $talk_socket external host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data/nosuchurl"
+  md5sum $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/external/foo && return 91
+  sudo cvmfs_talk -p $talk_socket host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}"
+  sudo cvmfs_talk -p $talk_socket external host set "http://localhost/cvmfs/${CVMFS_TEST_REPO}/data"
+
 
   echo "*** ignore changing from streaming to non-streaming"
   local config=$(sudo cvmfs_talk -p $talk_socket parameters | \
@@ -121,7 +141,8 @@ cvmfs_run_test() {
   echo "CVMFS_STREAMING_CACHE=no" >> $config
   ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
   pid_helper=$!
-  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 70
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
+    --debug || return 70
   sudo cvmfs_talk -p $talk_socket parameters
   sudo cvmfs_talk -p $talk_socket cache instance
   kill -USR1 $pid_helper
@@ -143,7 +164,8 @@ cvmfs_run_test() {
   echo "CVMFS_STREAMING_CACHE=yes" >> $config
   ./openwaitprint $CVMFS_TEST_690_PRIVATE_MOUNTPOINT/internal/small > small &
   pid_helper=$!
-  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO || return 82
+  cvmfs2 __RELOAD__ $(get_cache_directory $CVMFS_TEST_690_PRIVATE_MOUNTPOINT)/cvmfs.$CVMFS_TEST_REPO \
+    --debug || return 82
   sudo cvmfs_talk -p $talk_socket parameters
   sudo cvmfs_talk -p $talk_socket cache instance
   kill -USR1 $pid_helper
