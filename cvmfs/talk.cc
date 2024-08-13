@@ -259,6 +259,7 @@ void *TalkManager::MainResponder(void *data) {
             talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
         } else {
           if(quota_mgr->SetLimit(size * 1024*1024)) {
+              file_system->options_mgr()->SetValueFromTalk("CVMFS_QUOTA_LIMIT", StringifyUint(size));
               talk_mgr->Answer(con_fd, "OK\n");
           } else {
               talk_mgr->Answer(con_fd, "Limit not reset\n");
