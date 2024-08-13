@@ -249,13 +249,13 @@ void *TalkManager::MainResponder(void *data) {
           talk_mgr->Answer(con_fd, StringifyInt(rate) + "\n");
         }
       }
-    } else if (line.substr(0, 15) == "cache set limit") {
-      if (line.length()<16) {
-        talk_mgr->Answer(con_fd, "Usage: cache set limit <MB>\n");
+    } else if (line.substr(0, 15) == "cache limit set") {
+      if (line.length() < 16) {
+        talk_mgr->Answer(con_fd, "Usage: cache limit set <MB>\n");
       } else {
         QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
         const uint64_t size = String2Uint64(line.substr(16));
-        if ( size < 1000 ) {
+        if (size < 1000) {
             talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
         } else {
           if(quota_mgr->SetLimit(size * 1024*1024)) {
