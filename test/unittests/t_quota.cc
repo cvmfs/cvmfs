@@ -553,6 +553,6 @@ TEST_F(T_QuotaManager, Touch) {
 
 TEST_F(T_QuotaManager, SetLimit) {
   quota_mgr_->SetLimit(100);
-  uint64_t limit = quota_mgr_->GetCapacity();
+  const uint64_t limit = quota_mgr_->GetCapacity();
   EXPECT_EQ(100ul, limit);
 }
