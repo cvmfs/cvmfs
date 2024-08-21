@@ -569,6 +569,51 @@ TEST_F(T_Util, ReadHalfPipe) {
   ClosePipe(fd);
 }
 
+namespace {
+
+struct ReadHalfPipeInfo {
+  int fd;
+  int length;
+  void *dst;
+};
+
+static void *MainReadHalfPipe(void *data) {
+  ReadHalfPipeInfo *info = reinterpret_cast<ReadHalfPipeInfo *>(data);
+  bool retval;
+  do {
+    retval = ReadHalfPipe(info->fd, info->dst, info->length, 10);
+  } while (retval == false);
+  return NULL;
+}
+
+}  // anonymous namespace
+
+TEST_F(T_Util, ReadHalfPipeTimeout) {
+  int fd[2];
+  void *buffer_output = scalloc(20, sizeof(char));
+  MakePipe(fd);
+
+  int size = to_write.length();
+
+  ReadHalfPipeInfo info;
+  info.fd = fd[0];
+  info.length = size;
+  info.dst = buffer_output;
+  pthread_t thread_read;
+  int retval = pthread_create(&thread_read, NULL, MainReadHalfPipe, &info);
+  assert(retval == 0);
+
+  SafeSleepMs(250);
+  EXPECT_EQ(size, write(fd[1], to_write.data(), size));
+
+  pthread_join(thread_read, NULL);
+
+  EXPECT_EQ(0,
+    memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
+  free(buffer_output);
+  ClosePipe(fd);
+}
+
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
   UniquePtr<void> buffer_output(scalloc(20, sizeof(char)));
