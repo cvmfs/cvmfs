@@ -593,7 +593,7 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
   void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
 
-  int size = to_write.length();
+  const int size = static_cast<int>(to_write.length());
 
   ReadHalfPipeInfo info;
   info.fd = fd[0];
