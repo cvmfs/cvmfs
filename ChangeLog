@@ -1,4 +1,5 @@
 2.11.5:
+  * [client] Fix ReadHalfPipe for reads larger than the timeout  (#3652)
 
 2.11.4:
   * [client] Fix streaming cache mgr with secure repos (#3631)
