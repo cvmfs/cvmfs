@@ -66,7 +66,15 @@ bool SyncUnionAufs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
   return FileExists(directory->GetScratchPath() + "/.wh..wh..opq");
 }
 
+bool SyncUnionAufs::IsUpdatedFile(SharedPtr<SyncItem> entry) const {
+  return false;
+}
+
 bool SyncUnionAufs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  return false;
+}
+
+bool SyncUnionAufs::IsMarkedDirectory(SharedPtr<SyncItem> directory) const {
   return false;
 }
 

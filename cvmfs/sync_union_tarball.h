@@ -62,6 +62,8 @@ class SyncUnionTarball : public SyncUnion {
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
   bool IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const;
   bool IsRenamedDirectory(SharedPtr<SyncItem> entry) const;
+  bool IsMarkedDirectory(SharedPtr<SyncItem> directory) const;
+  bool IsUpdatedFile(SharedPtr<SyncItem> entry) const;
 
  private:
   struct archive *src;

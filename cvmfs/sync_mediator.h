@@ -117,7 +117,7 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
-  virtual void RenameDirectory(SharedPtr<SyncItem> entry) = 0;
+  virtual void RenameDirectory(const std::string& previous, const std::string& current) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -161,7 +161,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
-  void RenameDirectory(SharedPtr<SyncItem> entry);
+  void RenameDirectory(const std::string& previous, const std::string& current);
   void Clone(const std::string from, const std::string to);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
@@ -191,6 +191,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void AddDirectory(SharedPtr<SyncItem> entry);
   void RemoveDirectory(SharedPtr<SyncItem> entry);
+  void RemoveDirectory(const std::string& directory_path);
   void TouchDirectory(SharedPtr<SyncItem> entry);
 
   void CreateNestedCatalog(SharedPtr<SyncItem> directory);

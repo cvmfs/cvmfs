@@ -75,20 +75,22 @@ class SyncItem {
            (GetRdOnlyFiletype() == GetScratchFiletype()) &&
            (GetUnionFiletype() == GetScratchFiletype());
   }
-  inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
-  inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
-  inline bool IsFifo()            const { return IsType(kItemFifo);            }
-  inline bool IsSocket()          const { return IsType(kItemSocket);          }
-  inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
-  inline bool IsExternalData()    const { return external_data_;               }
-  inline bool IsDirectIo()        const { return direct_io_;                   }
+  inline bool IsCharacterDevice()   const { return IsType(kItemCharacterDevice); }
+  inline bool IsBlockDevice()       const { return IsType(kItemBlockDevice);     }
+  inline bool IsFifo()              const { return IsType(kItemFifo);            }
+  inline bool IsSocket()            const { return IsType(kItemSocket);          }
+  inline bool IsGraftMarker()       const { return IsType(kItemMarker);          }
+  inline bool IsExternalData()      const { return external_data_;               }
+  inline bool IsDirectIo()          const { return direct_io_;                   }
 
-  inline bool IsWhiteout()        const { return whiteout_;                    }
-  inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
-  inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
-  inline bool IsRenamedDirectory() const { return IsDirectory() && renamed_; }
-  inline bool IsAlreadyProcessed() const { return already_processed_; }
+  inline bool IsWhiteout()          const { return whiteout_;                    }
+  inline bool IsCatalogMarker()     const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsOpaqueDirectory()   const { return IsDirectory() && opaque_;     }
+  inline bool IsRenamedDirectory()  const { return IsDirectory() && renamed_; }
+  inline bool IsMarkedDirectory()   const  { return IsDirectory() && marked_directory_; }
+  inline bool IsAlreadyProcessed()  const { return already_processed_; }
   inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
+  inline bool IsUpdatedFile()       const { return updated_file_; }
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
@@ -150,6 +152,8 @@ class SyncItem {
       relative_parent_path_ + (filename_.empty() ? "" : ("/" + filename_));
   }
 
+
+  std::string GetCatalogPath() const;
   std::string GetRdOnlyPath() const;
   std::string GetUnionPath() const;
   std::string GetScratchPath() const;
@@ -160,6 +164,8 @@ class SyncItem {
   void MarkAsOpaqueDirectory();
   void MarkAsRenamedDirectory();
   void MarkAsAlreadyProcessed();
+  void MarkAsUpdatedFile();
+  void MarkAsMarkedDirectory();
 
   /**
    * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
@@ -306,6 +312,8 @@ class SyncItem {
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
   bool already_processed_;
   bool external_data_;
+  bool updated_file_;
+  bool marked_directory_;
   bool direct_io_;
   std::string relative_parent_path_;
   std::string previous_path_;

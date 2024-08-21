@@ -59,6 +59,8 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   graft_marker_present_(false),
   already_processed_(false),
   external_data_(false),
+  updated_file_(false),
+  marked_directory_(false),
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
@@ -130,7 +132,6 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
-
   // Find the entry in the repository
   StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
 
@@ -155,6 +156,10 @@ void SyncItem::MarkAsMetadataOnlyEntry() {
   metadata_only_ = true;
 }
 
+void SyncItem::MarkAsUpdatedFile() {
+  updated_file_ = true;
+}
+
 void SyncItem::MarkAsOpaqueDirectory() {
   assert(IsDirectory());
   opaque_ = true;
@@ -163,7 +168,6 @@ void SyncItem::MarkAsOpaqueDirectory() {
 void SyncItem::MarkAsRenamedDirectory() {
   LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a renamed: %s", filename_.c_str());
   assert(IsDirectory());
-  renamed_ = true;
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
   string previous_path;
   xattrs->Get("trusted.overlay.redirect", &previous_path);
@@ -173,11 +177,28 @@ void SyncItem::MarkAsRenamedDirectory() {
                                                      relative_parent_path_.c_str());
   previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
                                                  : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
+  renamed_ = true;
 }
 
 void SyncItem::MarkAsAlreadyProcessed() {
   already_processed_ = true;
 }
+
+void SyncItem::MarkAsMarkedDirectory() {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a marked: %s", filename_.c_str());
+  assert(IsDirectory());
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
+  string previous_path;
+  xattrs->Get("user.cvmfs.previous_path", &previous_path);
+  LogCvmfs(kLogUnionFs, kLogStdout, "[MARKED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
+                                                     previous_path.c_str(), 
+                                                     GetParentPath(previous_path).c_str(),
+                                                     relative_parent_path_.c_str());
+  previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
+                                                 : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
+  marked_directory_ = true;
+}
+
 unsigned int SyncItem::GetRdOnlyLinkcount() const {
   StatRdOnly();
   return rdonly_stat_.stat.st_nlink;
@@ -264,12 +285,25 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
 }
 
 std::string SyncItem::GetPreviousPath() const {
-  return previous_path_;
+  return previous_path_.empty() ? GetRelativePath() : previous_path_;
 }
 
 std::string SyncItem::GetRdOnlyPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
+  const std::string parent_entry_scratch_path = union_engine_->scratch_path() + kPathSeparator + relative_parent_path_;
+  LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Parent path: %s", parent_entry_scratch_path.c_str());
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(parent_entry_scratch_path));
+  if (xattrs.IsValid()) 
+  {
+    if (xattrs->Has("user.cvmfs.previous_path")) 
+    {
+      std::string previous_entry_path = ""; 
+      assert(xattrs->Get("user.cvmfs.previous_path", &previous_entry_path));
+      LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Obtained previous path: %s", previous_entry_path.c_str());
+      return union_engine_->rdonly_path() + previous_entry_path + kPathSeparator + filename_;
+    }
+  }
   return union_engine_->rdonly_path() + relative_path;
 }
 
@@ -277,6 +311,25 @@ std::string SyncItem::GetUnionPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->union_path() + relative_path;
+}
+
+std::string SyncItem::GetCatalogPath() const {
+    // const std::string parent_entry_scratch_path = union_engine_->rdonly_path() + kPathSeparator + relative_parent_path_;
+    // LogCvmfs(kLogUnionFs, kLogStdout, "[GET CATALOG PATH] Parent path: %s", parent_entry_scratch_path.c_str());
+    // UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(parent_entry_scratch_path));
+    // if (xattrs.IsValid()) 
+    // {
+    //   if (xattrs->Has("user.cvmfs.previous_path")) 
+    //   {
+    //     std::string catalog_parent_entry_path = ""; 
+    //     assert(xattrs->Get("user.cvmfs.previous_path", &catalog_parent_entry_path));
+    //     const std::string catalog_path = catalog_parent_entry_path + kPathSeparator + filename_;
+    //     return catalog_path;
+    //   }
+    // }
+    const std::string relative_path = GetRelativePath().empty() ?
+                               "" : "/" + GetRelativePath();
+    return relative_path;
 }
 
 std::string SyncItem::GetScratchPath() const {

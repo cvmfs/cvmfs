@@ -327,6 +327,14 @@ bool SyncUnionTarball::IsRenamedDirectory(SharedPtr<SyncItem> entry) const {
   return false;
 }
 
+bool SyncUnionTarball::IsMarkedDirectory(SharedPtr<SyncItem> directory) const {
+  return false;
+}
+
+bool SyncUnionTarball::IsUpdatedFile(SharedPtr<SyncItem> entry) const {
+  return false;
+}
+
 /* Tar files are not necessarily traversed in order from root to leave.
  * So it may happens that we are expanding the file `/a/b/c.txt` without
  * having created yet the directory `/a/b/`.

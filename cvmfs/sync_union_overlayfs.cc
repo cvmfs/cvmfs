@@ -153,10 +153,29 @@ void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
 void SyncUnionOverlayfs::Traverse() {
   assert(this->IsInitialized());
 
+  // (YBelikov) Probably I have to stick to 4-step traversal
+  // otherwise it is impossible to handle all the mess in the scratch area properly 
+  // 1. Segregate whiteouts left after rename and rm, mark renamed subdirectories with xattr 
+  // that points to its previous path
+  // 2. Skip rename whiteouts and deals with rm-whiteouts, remove them from the catalog
   // Preprocess renamed directories
+  // 3. Proceed to renaming
+  // 4. Update the rest of entries
+  
   FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessRenamedDirectory;
   traversal.Recurse(scratch_path());
+  traversal.fn_new_dir_prefix = NULL; //&SyncUnionOverlayfs::ProcessRenamedDirectory;
+
+  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.Recurse(scratch_path());
+
+  for (std::map<std::string, std::string>::const_iterator it = renamed_directories_.cbegin();  
+                                                       it != renamed_directories_.cend(); 
+                                                       ++it)
+  {
+    mediator_->RenameDirectory(it->second, it->first);
+  }
 
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
@@ -165,7 +184,7 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_new_fifo = &SyncUnionOverlayfs::ProcessFifo;
   traversal.fn_new_socket = &SyncUnionOverlayfs::ProcessSocket;
   traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
-  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.fn_new_character_dev = NULL; //&SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
 
@@ -174,7 +193,7 @@ void SyncUnionOverlayfs::Traverse() {
            "recursion for scratch_path=[%s]",
            scratch_path().c_str());  
   traversal.Recurse(scratch_path());
-  previous_directories_paths_.clear();
+  renamed_directories_.clear();
 }
 
 /**
@@ -300,7 +319,6 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
-  LogCvmfs(kLogUnionFs, kLogStdout, "Testing whether a directory is renamed!");
   const std::string path = directory->GetScratchPath();
   return DirectoryExists(path) && IsRenamedDirPath(path);
 }
@@ -311,7 +329,33 @@ bool SyncUnionOverlayfs::IsRenamedDirPath(const std::string &path) const {
     LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has redirect attribute", path.c_str());
   }
   return is_renamed;
+}
+
+bool SyncUnionOverlayfs::IsMarkedDirectory(SharedPtr<SyncItem> directory) const {
+  const std::string path = directory->GetScratchPath();
+  return DirectoryExists(path) && IsMarkedDirPath(path);
+}
+
+bool SyncUnionOverlayfs::IsMarkedDirPath(const std::string &path) const {
+bool is_marked = HasXattr(path.c_str(), "user.cvmfs.previous_path");
+  if (is_marked) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] directory has marked directory attribute", path.c_str());
+  }
+  return is_marked;
+}
+
+bool SyncUnionOverlayfs::IsUpdatedFile(SharedPtr<SyncItem> entry) const {
+  const std::string path = entry->GetScratchPath();
+  return FileExists(path) && IsUpdatedFilePath(path);
 } 
+
+bool SyncUnionOverlayfs::IsUpdatedFilePath(const std::string &path) const {
+  bool is_updated = HasXattr(path.c_str(), "user.cvmfs.content_update_only");
+  if (is_updated) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has updated file attribute", path.c_str());
+  }
+  return is_updated;
+}
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(
     SharedPtr<SyncItem> entry) const {
