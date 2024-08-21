@@ -600,7 +600,8 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
   info.length = size;
   info.dst = buffer_output;
   pthread_t thread_read;
- const int retval = pthread_create(&thread_read, NULL, MainReadHalfPipe, &info);
+  const int retval =
+    pthread_create(&thread_read, NULL, MainReadHalfPipe, &info);
   assert(retval == 0);
 
   SafeSleepMs(250);
