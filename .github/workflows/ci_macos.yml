@@ -82,6 +82,7 @@ jobs:
             src/008-default_domain                            \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
+            src/015-rebuild_on_crash                          \
             src/024-reload-during-asetup                      \
             src/028-negativecache                             \
             src/039-reloadalarm                               \
