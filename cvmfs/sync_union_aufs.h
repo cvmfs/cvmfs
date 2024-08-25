@@ -35,7 +35,6 @@ class SyncUnionAufs : public SyncUnion {
                            const std::string &filename);
   bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const;
   bool IsMarkedDirectory(SharedPtr<SyncItem> directory) const;
-  bool IsUpdatedFile(SharedPtr<SyncItem> entry) const;
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
 
  private:

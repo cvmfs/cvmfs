@@ -165,18 +165,19 @@ void SyncUnionOverlayfs::Traverse() {
   FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessRenamedDirectory;
   traversal.Recurse(scratch_path());
-  traversal.fn_new_dir_prefix = NULL; //&SyncUnionOverlayfs::ProcessRenamedDirectory;
+  traversal.fn_new_dir_prefix = NULL;
 
   traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.Recurse(scratch_path());
+  traversal.fn_new_character_dev = NULL;
 
   for (std::map<std::string, std::string>::const_iterator it = renamed_directories_.cbegin();  
                                                        it != renamed_directories_.cend(); 
                                                        ++it)
   {
+    // Probably we should deal with nested catalogs here in a separate case
     mediator_->RenameDirectory(it->second, it->first);
   }
-
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
@@ -184,7 +185,6 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_new_fifo = &SyncUnionOverlayfs::ProcessFifo;
   traversal.fn_new_socket = &SyncUnionOverlayfs::ProcessSocket;
   traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
-  traversal.fn_new_character_dev = NULL; //&SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
 
@@ -194,6 +194,7 @@ void SyncUnionOverlayfs::Traverse() {
            scratch_path().c_str());  
   traversal.Recurse(scratch_path());
   renamed_directories_.clear();
+  previous_directories_paths_.clear();
 }
 
 /**
@@ -245,13 +246,13 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   LogCvmfs(kLogUnionFs, kLogStdout, "Testing attributes: %s for: %s", path.c_str(), attr_name.c_str());
   assert(xattrs.IsValid());
 
-  // std::vector<std::string> attrs = xattrs->ListKeys();
-  // std::vector<std::string>::const_iterator i = attrs.begin();
-  // std::vector<std::string>::const_iterator iend = attrs.end();
-  // for (; i != iend; ++i) {
-  //   LogCvmfs(kLogCvmfs, kLogDebug, "====================================");
-  //   LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %sA", i->c_str());
-  // }
+  std::vector<std::string> attrs = xattrs->ListKeys();
+  std::vector<std::string>::const_iterator i = attrs.begin();
+  std::vector<std::string>::const_iterator iend = attrs.end();
+  LogCvmfs(kLogCvmfs, kLogDebug, "Attrs:");
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
+  }
   return xattrs->Has(attr_name);
 }
 
@@ -342,19 +343,6 @@ bool is_marked = HasXattr(path.c_str(), "user.cvmfs.previous_path");
     LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] directory has marked directory attribute", path.c_str());
   }
   return is_marked;
-}
-
-bool SyncUnionOverlayfs::IsUpdatedFile(SharedPtr<SyncItem> entry) const {
-  const std::string path = entry->GetScratchPath();
-  return FileExists(path) && IsUpdatedFilePath(path);
-} 
-
-bool SyncUnionOverlayfs::IsUpdatedFilePath(const std::string &path) const {
-  bool is_updated = HasXattr(path.c_str(), "user.cvmfs.content_update_only");
-  if (is_updated) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has updated file attribute", path.c_str());
-  }
-  return is_updated;
 }
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(

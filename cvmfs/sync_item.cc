@@ -313,25 +313,6 @@ std::string SyncItem::GetUnionPath() const {
   return union_engine_->union_path() + relative_path;
 }
 
-std::string SyncItem::GetCatalogPath() const {
-    // const std::string parent_entry_scratch_path = union_engine_->rdonly_path() + kPathSeparator + relative_parent_path_;
-    // LogCvmfs(kLogUnionFs, kLogStdout, "[GET CATALOG PATH] Parent path: %s", parent_entry_scratch_path.c_str());
-    // UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(parent_entry_scratch_path));
-    // if (xattrs.IsValid()) 
-    // {
-    //   if (xattrs->Has("user.cvmfs.previous_path")) 
-    //   {
-    //     std::string catalog_parent_entry_path = ""; 
-    //     assert(xattrs->Get("user.cvmfs.previous_path", &catalog_parent_entry_path));
-    //     const std::string catalog_path = catalog_parent_entry_path + kPathSeparator + filename_;
-    //     return catalog_path;
-    //   }
-    // }
-    const std::string relative_path = GetRelativePath().empty() ?
-                               "" : "/" + GetRelativePath();
-    return relative_path;
-}
-
 std::string SyncItem::GetScratchPath() const {
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();

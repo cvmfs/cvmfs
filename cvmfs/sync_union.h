@@ -139,16 +139,6 @@ class SyncUnion {
   virtual bool IsMarkedDirectory(SharedPtr<SyncItem> directory) const = 0;
 
   /**
-   * OverlayFS when mounted with redirect_dir option
-   * allows renaming of directories (via rename() or mv) 
-   * But creates an empty directory in the scratch area on sole renaming  
-   * with trusted.overlay.redirect xattr that preserves the old name of a directory
-   * @param directory entry
-   * @return true if a directory is renamed, otherwise false
-   */
-  virtual bool IsUpdatedFile(SharedPtr<SyncItem> entry) const = 0;
-
-  /**
    * Checks if given file is supposed to be whiteout.
    * These files indicate that a specific file has been deleted.
    * @param filename the filename to check
@@ -181,14 +171,13 @@ class SyncUnion {
   bool IsInScratchArea(const std::string& dir) const {
     return renamed_directories_.find(dir) != renamed_directories_.end();
   }
-  
+
   virtual bool SupportsHardlinks() const { return false; }
 
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
   std::string union_path_;
-  // std::unordered_set<std::string> renamed_directories_;
   std::unordered_set<std::string> previous_directories_paths_;
   std::map<std::string, std::string> renamed_directories_;
   AbstractSyncMediator *mediator_;
@@ -277,22 +266,14 @@ class SyncUnion {
    */
   void ProcessSocket(const std::string &parent_dir,
                      const std::string &filename);
-  
-  void ProcessUpdatedFile(const std::string& parent_dir,
-                          const std::string& filename);
-
-  void ProcessCharactedDeviceInRenamedDir(const std::string& parent_dir,
-                                          const std::string& filename);
-  bool ProcessSubdirectoryInReadonlyDir(const std::string& parent_dir, 
-                                        const std::string& filename);
-
-  bool ProcessSubdirectoryInRenamedDir(const std::string& parent_dir,
-                                       const std::string& filename);
 
   bool ProcessRenamedDirectory(const std::string &parent_dir, 
                                const std::string &filename);
 
   bool ProcessRenamedDirectory(SharedPtr<SyncItem> entry);
+
+  bool ProcessRenamedDirectorySubdirCallback(const std::string& parent_dir,
+                                       const std::string& filename);
 
   bool IsAlreadyProcessed(SharedPtr<SyncItem> entry) const;
 
