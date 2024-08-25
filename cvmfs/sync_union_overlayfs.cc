@@ -325,24 +325,11 @@ bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const
 }
 
 bool SyncUnionOverlayfs::IsRenamedDirPath(const std::string &path) const {
-  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect");
+  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect") || HasXattr(path.c_str(), "user.cvmfs.previous_path");
   if (is_renamed) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has redirect attribute", path.c_str());
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has previous path attribute", path.c_str());
   }
   return is_renamed;
-}
-
-bool SyncUnionOverlayfs::IsMarkedDirectory(SharedPtr<SyncItem> directory) const {
-  const std::string path = directory->GetScratchPath();
-  return DirectoryExists(path) && IsMarkedDirPath(path);
-}
-
-bool SyncUnionOverlayfs::IsMarkedDirPath(const std::string &path) const {
-bool is_marked = HasXattr(path.c_str(), "user.cvmfs.previous_path");
-  if (is_marked) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] directory has marked directory attribute", path.c_str());
-  }
-  return is_marked;
 }
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(

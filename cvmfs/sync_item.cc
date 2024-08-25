@@ -60,7 +60,6 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   already_processed_(false),
   external_data_(false),
   updated_file_(false),
-  marked_directory_(false),
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
@@ -170,7 +169,10 @@ void SyncItem::MarkAsRenamedDirectory() {
   assert(IsDirectory());
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
   string previous_path;
-  xattrs->Get("trusted.overlay.redirect", &previous_path);
+  if (!xattrs->Get("trusted.overlay.redirect", &previous_path)) 
+  {
+    xattrs->Get("user.cvmfs.previous_path", &previous_path);
+  }
   LogCvmfs(kLogUnionFs, kLogStdout, "[RENAMED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
                                                      previous_path.c_str(), 
                                                      GetParentPath(previous_path).c_str(),
@@ -182,21 +184,6 @@ void SyncItem::MarkAsRenamedDirectory() {
 
 void SyncItem::MarkAsAlreadyProcessed() {
   already_processed_ = true;
-}
-
-void SyncItem::MarkAsMarkedDirectory() {
-  LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a marked: %s", filename_.c_str());
-  assert(IsDirectory());
-  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
-  string previous_path;
-  xattrs->Get("user.cvmfs.previous_path", &previous_path);
-  LogCvmfs(kLogUnionFs, kLogStdout, "[MARKED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
-                                                     previous_path.c_str(), 
-                                                     GetParentPath(previous_path).c_str(),
-                                                     relative_parent_path_.c_str());
-  previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
-                                                 : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
-  marked_directory_ = true;
 }
 
 unsigned int SyncItem::GetRdOnlyLinkcount() const {

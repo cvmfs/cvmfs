@@ -87,7 +87,6 @@ class SyncItem {
   inline bool IsCatalogMarker()     const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory()   const { return IsDirectory() && opaque_;     }
   inline bool IsRenamedDirectory()  const { return IsDirectory() && renamed_; }
-  inline bool IsMarkedDirectory()   const  { return IsDirectory() && marked_directory_; }
   inline bool IsAlreadyProcessed()  const { return already_processed_; }
   inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
   inline bool IsUpdatedFile()       const { return updated_file_; }
@@ -313,7 +312,6 @@ class SyncItem {
   bool already_processed_;
   bool external_data_;
   bool updated_file_;
-  bool marked_directory_;
   bool direct_io_;
   std::string relative_parent_path_;
   std::string previous_path_;

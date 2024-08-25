@@ -1029,8 +1029,6 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
     LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's relative path");
     filepath = entry->GetRelativePath();
   }
-
-
   reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
     if (handle_hardlinks_ && entry->GetRdOnlyLinkcount() > 1) {
@@ -1129,7 +1127,7 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   if (union_engine_->IsInScratchArea(parent_path))
   {
     LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's previous path");
-    directory_path = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename()); //entry->GetPreviousPath();  
+    directory_path = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename());
   }
   else 
   {
@@ -1159,11 +1157,6 @@ void SyncMediator::RenameDirectory(const string& previous_path, const string& cu
                                       "we obtain an old relative path: %s.", 
                                       current_path.c_str(), 
                                       previous_path.c_str());
-  
-  // LogCvmfs(kLogUnionFs, kLogStdout, "[CURRENT DIR] Adding renamed dir to the set: %s", 
-  //                                                                                 entry->GetRelativePath().c_str());
-  // LogCvmfs(kLogUnionFs, kLogStdout, "[PREVIOUS DIR] Adding prevous dir path to the set: %s", 
-                                                                                  // entry->GetPreviousPath().c_str());
   catalog_manager_->RenameDirectory(previous_path, current_path);
 }
 

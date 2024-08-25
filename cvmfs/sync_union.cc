@@ -72,10 +72,6 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
       LogCvmfs(kLogCvmfs, kLogStdout, "Opaque directory detected: %s", entry->GetRelativePath().c_str());
       entry->MarkAsOpaqueDirectory();
     }
-    else if (IsMarkedDirectory(entry)) 
-    {
-      entry->MarkAsMarkedDirectory();
-    }
     else if (IsRenamedDirectory(entry))
     {
       entry->MarkAsRenamedDirectory();
@@ -97,9 +93,6 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 bool SyncUnion::ProcessDirectory(SharedPtr<SyncItem> entry) {
-  if (entry->IsMarkedDirectory()) {
-    return true;
-  }
   if (entry->IsNew() && !entry->IsRenamedDirectory()) {
     // Currently the approach fails when the file inside the renamed directory was updated
     // We have a situation when /renamed_dir and /renamed_dir/touched_file.txt end up in a scratch area
