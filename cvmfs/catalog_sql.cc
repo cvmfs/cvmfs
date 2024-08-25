@@ -223,7 +223,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
-    " xattr BLOB, "
+    " xattr BLOB, bundleid INTEGER, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
   SqlCatalog(*this,
     "CREATE INDEX idx_catalog_parent "
@@ -250,7 +250,10 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "CONSTRAINT pk_bind_mountpoints PRIMARY KEY (path));")        .Execute()  &&
   SqlCatalog(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
-    "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
+    "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute()  &&
+  SqlCatalog(*this,
+    "CREATE TABLE bundles (bundleid INTEGER, hash BLOB, size INTEGER, "
+    "CONSTRAINT pk_bundles PRIMARY KEY (bundleid));")             .Execute();
 
   if (!retval) {
     PrintSqlError("failed to create catalog database tables.");
@@ -1035,10 +1038,10 @@ SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
     "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
-    "mtime, flags, name, symlink, uid, gid, xattr) "
-    // 9,     10    11     12     13   14   15
+    "mtime, flags, name, symlink, uid, gid, xattr, bundleid) "
+    // 9,     10    11     12     13   14   15        16
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink, :uid, :gid, :xattr);");
+    " :flags, :name, :symlink, :uid, :gid, :xattr, null);");
 }
 
 
@@ -1409,4 +1412,4 @@ XattrList SqlLookupXattrs::GetXattrs() {
   return *xattrs;
 }
 
-}  // namespace catalog
+}  // namespace catalog 
