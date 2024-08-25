@@ -86,10 +86,9 @@ class SyncItem {
   inline bool IsWhiteout()          const { return whiteout_;                    }
   inline bool IsCatalogMarker()     const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory()   const { return IsDirectory() && opaque_;     }
-  inline bool IsRenamedDirectory()  const { return IsDirectory() && renamed_; }
+  inline bool IsRenamedDirectory()  const { return IsDirectory() && renamed_directory_; }
   inline bool IsAlreadyProcessed()  const { return already_processed_; }
   inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
-  inline bool IsUpdatedFile()       const { return updated_file_; }
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
@@ -151,8 +150,6 @@ class SyncItem {
       relative_parent_path_ + (filename_.empty() ? "" : ("/" + filename_));
   }
 
-
-  std::string GetCatalogPath() const;
   std::string GetRdOnlyPath() const;
   std::string GetUnionPath() const;
   std::string GetScratchPath() const;
@@ -163,7 +160,6 @@ class SyncItem {
   void MarkAsOpaqueDirectory();
   void MarkAsRenamedDirectory();
   void MarkAsAlreadyProcessed();
-  void MarkAsUpdatedFile();
   void MarkAsMarkedDirectory();
 
   /**
@@ -303,7 +299,7 @@ class SyncItem {
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
-  bool renamed_;                      /**< SyncUnion marked this as a renamed directory */
+  bool renamed_directory_;                      /**< SyncUnion marked this as a renamed directory */
   bool metadata_only_;                /**< SyncUnion marked this as a metadata only file (no copy-up performed; 0-sized file with metadata) */
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
@@ -311,7 +307,6 @@ class SyncItem {
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
   bool already_processed_;
   bool external_data_;
-  bool updated_file_;
   bool direct_io_;
   std::string relative_parent_path_;
   std::string previous_path_;

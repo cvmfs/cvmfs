@@ -1022,7 +1022,7 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
       LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]. Parent dir doesn't have an xattr", filepath.c_str());
     }
     LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's previous path");
-    filepath = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename()); //entry->GetPreviousPath();  
+    filepath = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename());  
   }
   else 
   {

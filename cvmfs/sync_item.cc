@@ -29,7 +29,7 @@ SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
   opaque_(false),
-  renamed_(false),
+  renamed_directory_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
@@ -52,14 +52,13 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
-  renamed_(false),
+  renamed_directory_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
   already_processed_(false),
   external_data_(false),
-  updated_file_(false),
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
   graft_chunklist_(NULL),
@@ -155,10 +154,6 @@ void SyncItem::MarkAsMetadataOnlyEntry() {
   metadata_only_ = true;
 }
 
-void SyncItem::MarkAsUpdatedFile() {
-  updated_file_ = true;
-}
-
 void SyncItem::MarkAsOpaqueDirectory() {
   assert(IsDirectory());
   opaque_ = true;
@@ -179,7 +174,7 @@ void SyncItem::MarkAsRenamedDirectory() {
                                                      relative_parent_path_.c_str());
   previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
                                                  : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
-  renamed_ = true;
+  renamed_directory_ = true;
 }
 
 void SyncItem::MarkAsAlreadyProcessed() {
