@@ -157,10 +157,6 @@ class SyncUnion {
 
   bool IsInitialized() const { return initialized_; }
 
-  bool IsInScratchArea(const std::string& dir) const {
-    return renamed_directories_.find(dir) != renamed_directories_.end();
-  }
-
   std::string GetPreviousPath(const std::string &current_path) const
   {
     std::map<std::string, std::string>::const_iterator target_elt_iterator = renamed_directories_.find(current_path);

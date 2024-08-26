@@ -153,14 +153,16 @@ void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
 void SyncUnionOverlayfs::Traverse() {
   assert(this->IsInitialized());
 
-  // (YBelikov) Probably I have to stick to 4-step traversal
+  // (YBelikov) Stick to 3-step traversal
   // otherwise it is impossible to handle all the mess in the scratch area properly 
-  // 1. Segregate whiteouts left after rename and rm, mark renamed subdirectories with xattr 
-  // that points to its previous path
-  // 2. Skip rename whiteouts and deals with rm-whiteouts, remove them from the catalog
-  // Preprocess renamed directories
-  // 3. Proceed to renaming
-  // 4. Update the rest of entries
+  // 1. Segregate whiteouts left after mv and rm utils invokation, put renamed subdirectories and their previous paths 
+  // in a map that stores <current path, previous path> pairs
+  // 2. Skip rename(2) or mv(1) whiteouts and deal with rm-whiteouts: remove them from the catalog before renaming entries in a catalog db
+  // This step is such because after renaming catalog entries, 
+  // removal of directories (what requires traversal of a corrsesponding entry in a rdonly layer)
+  // becomes way trickier to handle; it is an untrivial task to map a readonly path entries to an updated catalog
+  // on RemoveDirectoryRecursively (since there are no more entries in a catalog with the relative paths = to relative paths in rdonly)
+  // 3. Iterate over a map of renamed directories and update catalog entries that match map values (previous path) with map keys (current union path)  
   
   FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessRenamedDirectory;
@@ -175,7 +177,7 @@ void SyncUnionOverlayfs::Traverse() {
                                                        it != renamed_directories_.cend(); 
                                                        ++it)
   {
-    // Probably we should deal with nested catalogs here in a separate case
+    //TODO(YBelikov): deal with nested catalogs
     mediator_->RenameDirectory(it->second, it->first);
   }
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;

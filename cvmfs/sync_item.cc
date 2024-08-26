@@ -165,7 +165,7 @@ void SyncItem::MarkAsRenamedDirectory() {
   string previous_path;
   if (!xattrs->Get("trusted.overlay.redirect", &previous_path)) 
   {
-    xattrs->Get("user.cvmfs.previous_path", &previous_path);
+    PANIC(kLogStderr, "Unable to obtain redirect dir attribute from the renamed entry");
   }
   LogCvmfs(kLogUnionFs, kLogStdout, "[RENAMED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
                                                      previous_path.c_str(), 
@@ -271,6 +271,14 @@ std::string SyncItem::GetPreviousPath() const {
 }
 
 std::string SyncItem::GetCatalogPath() const {
+  // Putting stat info in a temporary variable that 
+  // holds an actual entry type in a scratch area
+  // For whiteouts we determine deleted entry type but
+  // for some reason assign scratch area entry type property 
+  // to the determined deleted type 
+  // scratch_type_ = deleted_type;
+  // Currently I am not sure how to modify that safely other than
+  // handle this specifically here
   EntryStat info;
   StatGeneric(GetScratchPath(), &info, true);
   if (info.GetSyncItemType() == kItemDir)
