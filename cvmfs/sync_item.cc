@@ -105,7 +105,6 @@ SyncItemType SyncItemNative::GetScratchFiletype() const {
     PANIC(kLogStderr, "[WARNING] Failed to stat() '%s' in scratch. (errno: %s)",
           GetRelativePath().c_str(), scratch_stat_.error_code);
   }
-
   return GetGenericFiletype(scratch_stat_);
 }
 
@@ -221,6 +220,7 @@ IngestionSource *SyncItemNative::CreateIngestionSource() const {
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
                            const bool     refresh) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Stat path: [%s]", path.c_str());                         
   if (info->obtained && !refresh) return;
   int retval = platform_lstat(path.c_str(), &info->stat);
   info->error_code = (retval != 0) ? errno : 0;
@@ -270,26 +270,34 @@ std::string SyncItem::GetPreviousPath() const {
   return previous_path_.empty() ? GetRelativePath() : previous_path_;
 }
 
-std::string SyncItem::GetRdOnlyPath() const {
-  const string relative_path = GetRelativePath().empty() ?
-                               "" : "/" + GetRelativePath();
-  const std::string parent_entry_scratch_path = union_engine_->scratch_path() + kPathSeparator + relative_parent_path_;
-  LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Parent path: %s", parent_entry_scratch_path.c_str());
-  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(parent_entry_scratch_path));
-  if (xattrs.IsValid()) 
+std::string SyncItem::GetCatalogPath() const {
+  EntryStat info;
+  StatGeneric(GetScratchPath(), &info, true);
+  if (info.GetSyncItemType() == kItemDir)
   {
-    if (xattrs->Has("user.cvmfs.previous_path")) 
-    {
-      std::string previous_entry_path = ""; 
-      assert(xattrs->Get("user.cvmfs.previous_path", &previous_entry_path));
-      LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Obtained previous path: %s", previous_entry_path.c_str());
-      return union_engine_->rdonly_path() + previous_entry_path + kPathSeparator + filename_;
-    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "[GET CATAlOG PATH]. Entry is a directory: [%s]", GetRelativePath().c_str());
+    return GetPreviousPath();
   }
-  return union_engine_->rdonly_path() + relative_path;
+  string previous_parent_path = union_engine_->GetPreviousPath(relative_parent_path_);
+  LogCvmfs(kLogCvmfs, kLogStdout, "[GET CATAlOG PATH]. Parent path: [%s]. Previous parent path: [%s]", 
+                                                                    relative_parent_path_.c_str(), 
+                                                                    previous_parent_path.c_str());
+  if (previous_parent_path.empty())
+  {
+    return GetRelativePath();
+  }
+  const std::string previous_entry_path = previous_parent_path + kPathSeparator + filename_;
+  return previous_entry_path;
 }
 
-std::string SyncItem::GetUnionPath() const {
+std::string SyncItem::GetRdOnlyPath() const {
+  const string catalog_path = kPathSeparator + GetCatalogPath();
+  const string catalog_rdonly_path = union_engine_->rdonly_path() + catalog_path;
+  LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Catalog path: %s. Rdonly path: [%s]", catalog_path.c_str(), catalog_rdonly_path.c_str());
+  return union_engine_->rdonly_path() + catalog_path;
+}
+
+std::string SyncItem::GetUnionPath() const {  
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->union_path() + relative_path;

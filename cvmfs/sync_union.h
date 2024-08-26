@@ -161,6 +161,16 @@ class SyncUnion {
     return renamed_directories_.find(dir) != renamed_directories_.end();
   }
 
+  std::string GetPreviousPath(const std::string &current_path) const
+  {
+    std::map<std::string, std::string>::const_iterator target_elt_iterator = renamed_directories_.find(current_path);
+    if (target_elt_iterator == renamed_directories_.cend())
+    {
+      return "";
+    }
+    return (*target_elt_iterator).second;
+  }
+
   virtual bool SupportsHardlinks() const { return false; }
 
  protected:
@@ -262,7 +272,7 @@ class SyncUnion {
   bool ProcessRenamedDirectory(SharedPtr<SyncItem> entry);
 
   bool ProcessRenamedDirectorySubdirCallback(const std::string& parent_dir,
-                                       const std::string& filename);
+                                             const std::string& filename);
 
   bool IsAlreadyProcessed(SharedPtr<SyncItem> entry) const;
 

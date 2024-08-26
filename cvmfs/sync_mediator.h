@@ -191,7 +191,6 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void AddDirectory(SharedPtr<SyncItem> entry);
   void RemoveDirectory(SharedPtr<SyncItem> entry);
-  void RemoveDirectory(const std::string& directory_path);
   void TouchDirectory(SharedPtr<SyncItem> entry);
 
   void CreateNestedCatalog(SharedPtr<SyncItem> directory);

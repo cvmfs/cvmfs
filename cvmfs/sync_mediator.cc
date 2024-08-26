@@ -1000,41 +1000,18 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
-  string filepath = entry->GetRelativePath();
+  // Since removal is currently performed on the 2nd traversal BEFORE
+  // any updates of the catalog to avoid uncertainties happenning after renaming
+  // manipulate the so-called catalog path which provides the entry path as it is presented in
+  // catalog database (may be different from the actual path of the entry if a whiteout is nested in a renamed directory)
+  string filepath = entry->GetCatalogPath();
   LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]", entry->GetRelativePath().c_str());
-  
-  // Catalog path = relative path
-  string parent_path = GetParentPath(filepath);
-  if (union_engine_->IsInScratchArea(parent_path))
-  {
-    UniquePtr<XattrList> parent_xattrs(XattrList::CreateFromFile(union_engine_->scratch_path() + kPathSeparator + parent_path));
-    LogCvmfs(kLogUnionFs, kLogStdout, "Removing file. Obtained parent xattrs");
-    string previous_parent_path = "";
-    if (parent_xattrs->Has("user.cvmfs.previous_path")) 
-    {
-      if (parent_xattrs->Get("user.cvmfs.previous_path", &previous_parent_path))
-      {
-        LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]. Obtained previous parent path: [%s]", filepath.c_str(), previous_parent_path.c_str());  
-      }
-    }
-    else 
-    {
-      LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]. Parent dir doesn't have an xattr", filepath.c_str());
-    }
-    LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's previous path");
-    filepath = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename());  
-  }
-  else 
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's relative path");
-    filepath = entry->GetRelativePath();
-  }
   reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
     if (handle_hardlinks_ && entry->GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry->GetUnionPath().c_str());
-      catalog_manager_->ShrinkHardlinkGroup(entry->GetPreviousPath());
+      catalog_manager_->ShrinkHardlinkGroup(entry->GetRelativePath());
     }  
     catalog_manager_->RemoveFile(filepath);
   }
@@ -1084,56 +1061,15 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   }
 }
 
-
-void SyncMediator::RemoveDirectory(const std::string& directory_path) {
-  // if (catalog_manager_->IsTransitionPoint(directory_path)) {
-  //   RemoveNestedCatalog(entry);
-  // }
-
-  // reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
-  if (!params_->dry_run) {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory entry [%s]", directory_path.c_str());
-    catalog_manager_->RemoveDirectory(directory_path);
-  }
-
-  perf::Inc(counters_->n_directories_removed);
-}
-
 /**
  * this method deletes a single directory entry! Make sure to empty it
  * before you call this method or simply use
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
-  std::string directory_path = entry->GetRelativePath();
+  std::string directory_path = entry->GetCatalogPath();
   
   LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory [%s]", entry->GetRelativePath().c_str());
-  // Catalog path = relative path
-  string parent_path = GetParentPath(directory_path);
-  
-  UniquePtr<XattrList> parent_xattrs(XattrList::CreateFromFile(union_engine_->scratch_path() + kPathSeparator + parent_path));
-  string previous_parent_path = "";
-  if (parent_xattrs->Has("user.cvmfs.previous_path")) 
-  {
-    if (parent_xattrs->Get("user.cvmfs.previous_path", &previous_parent_path))
-    {
-      LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory [%s]. Obtained previous path: [%s]", directory_path.c_str(), previous_parent_path.c_str());  
-    }
-  }
-  else 
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory [%s]. Parent dir doesn't have an xattr", directory_path.c_str());
-  }
-  if (union_engine_->IsInScratchArea(parent_path))
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's previous path");
-    directory_path = StripLeadingPathSeparator(previous_parent_path + kPathSeparator + entry->filename());
-  }
-  else 
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "Getting directory's relative path");
-    directory_path = entry->GetRelativePath();
-  }
   
   if (catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);

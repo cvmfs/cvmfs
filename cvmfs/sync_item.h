@@ -154,6 +154,7 @@ class SyncItem {
   std::string GetUnionPath() const;
   std::string GetScratchPath() const;
   std::string GetPreviousPath() const;
+  std::string GetCatalogPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
   void MarkAsMetadataOnlyEntry();
@@ -253,12 +254,13 @@ class SyncItem {
 
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
+      LogCvmfs(kLogCvmfs, kLogStdout, "SyncItem type. IS_DIR: [%d], IS_CHR: [%d]", S_ISDIR(stat.st_mode), S_ISCHR(stat.st_mode));
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       if (S_ISDIR(stat.st_mode)) return kItemDir;
       if (S_ISFIFO(stat.st_mode)) return kItemFifo;
       if (S_ISSOCK(stat.st_mode)) return kItemSocket;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       return kItemUnknown;
     }

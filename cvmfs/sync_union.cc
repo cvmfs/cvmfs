@@ -74,6 +74,7 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
     }
     else if (IsRenamedDirectory(entry))
     {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Renamed directory detected: %s", entry->GetRelativePath().c_str());
       entry->MarkAsRenamedDirectory();
     }
   }
@@ -275,22 +276,9 @@ bool SyncUnion::ProcessRenamedDirectory(const std::string &parent_dir, const std
 bool SyncUnion::ProcessRenamedDirectory(SharedPtr<SyncItem> entry) {
   LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR] Detected renamed directory: %s", entry->GetScratchPath().c_str());  
   const std::string previous_path = kPathSeparator + entry->GetPreviousPath();
-  UniquePtr<XattrList> renamed_entry_xattrs(XattrList::CreateFromFile(entry->GetScratchPath()));
-  if (!renamed_entry_xattrs.IsValid()) 
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR] Unable to create xattr list for renamed entry: [%s]", entry->GetScratchPath().c_str());
-    return false;
-  }
-  if (!platform_setxattr(entry->GetScratchPath(), "user.cvmfs.previous_path", previous_path))
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[FIRST TRAVERSAL] Marking an entry [%s] with old path [%s] failed. Error: %s", entry->GetScratchPath().c_str(), 
-                                                                                                    previous_path.c_str(), 
-                                                                                                    strerror(errno));
-    return false;                                                              
-  }
-
-  LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR] Marked an entry [%s] with old path [%s]", entry->GetScratchPath().c_str(), previous_path.c_str());
-  
+  LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR] APPEND renamed dir info to a map. Relative path: [%s]. Previous path: [%s]", 
+                                                                                              entry->GetRelativePath().c_str(), 
+                                                                                              entry->GetPreviousPath().c_str());
   renamed_directories_[entry->GetRelativePath()] = entry->GetPreviousPath();
   previous_directories_paths_.insert(entry->GetPreviousPath());
   // Mark entries nested in the renamed directories in the scratch area
@@ -305,30 +293,18 @@ bool SyncUnion::ProcessRenamedDirectory(SharedPtr<SyncItem> entry) {
 
 bool SyncUnion::ProcessRenamedDirectorySubdirCallback(const string& parent_dir,
                                                       const string& filename) {
-  UniquePtr<XattrList> parent_xattrs(XattrList::CreateFromFile(parent_dir));
-  if (!parent_xattrs.IsValid()) 
+  const string current_entry_path = parent_dir + kPathSeparator + filename;
+  UniquePtr<XattrList> current_entry_xattrs(XattrList::CreateFromFile(current_entry_path));
+  if (current_entry_xattrs->Has("trusted.overlay.redirect")) 
   {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIRECTORY] Unable to create xattr list for entry: [%s]", parent_dir.c_str());
-  }
-  if (parent_xattrs->Has("trusted.overlay.redirect"))
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIRECTORY] skip renamed subdirectory: [%s]", parent_dir.c_str())
     return false;
   }
-  string parent_directory_previous_path = "";
-  if (!parent_xattrs->Get("user.cvmfs.previous_path", &parent_directory_previous_path))
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIRECTORY] unable to get previous path of the parent entry: [%s]",
-                                                                                                parent_directory_previous_path.c_str());
-  }
-  const string current_entry_path = parent_dir + kPathSeparator + filename;
-  const string relative_previous_entry_path = parent_directory_previous_path + kPathSeparator + filename; 
-  LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIRECTORY] Marking an entry [%s] with previous path [%s]", 
-                                     current_entry_path.c_str(), relative_previous_entry_path.c_str());                                                                  
-  if (!platform_setxattr(current_entry_path, "user.cvmfs.previous_path", relative_previous_entry_path))
-  {
-    LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIRECTORY] Marking an entry with old path failed: %s. Error: %s", current_entry_path.c_str(), strerror(errno));
-  }
+  const string previous_parent_path = renamed_directories_[parent_dir];
+  const string previous_entry_path = previous_entry_path + kPathSeparator + filename;
+  LogCvmfs(kLogUnionFs, kLogStdout, "[PROCESS RENAMED DIR SUBDIR] APPEND renamed dir info to a map. Relative path: [%s]. Previous path: [%s]", 
+                                                                                              current_entry_path.c_str(), 
+                                                                                              previous_entry_path.c_str());
+  renamed_directories_[current_entry_path] = previous_entry_path;
   return true;
 }
 

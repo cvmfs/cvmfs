@@ -325,7 +325,7 @@ bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const
 }
 
 bool SyncUnionOverlayfs::IsRenamedDirPath(const std::string &path) const {
-  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect") || HasXattr(path.c_str(), "user.cvmfs.previous_path");
+  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect");
   if (is_renamed) {
     LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has previous path attribute", path.c_str());
   }
