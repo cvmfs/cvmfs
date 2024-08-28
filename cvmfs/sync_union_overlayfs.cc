@@ -180,6 +180,8 @@ void SyncUnionOverlayfs::Traverse() {
     //TODO(YBelikov): deal with nested catalogs
     mediator_->RenameDirectory(it->second, it->first);
   }
+  renamed_directories_.clear();
+  previous_directories_paths_.clear();
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
