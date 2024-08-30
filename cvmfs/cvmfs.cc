@@ -826,10 +826,12 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
   if (mount_point_->cache_symlinks()) {
-    fuse_remounter_->WaitAndIncreaseReadlinkCnt();
+    fuse_remounter_->WaitReadlinkCnt();
   }
-
   fuse_remounter_->fence()->Enter();
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->IncreaseReadlinkCnt();
+  }
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %" PRIu64,
            uint64_t(ino));
@@ -837,6 +839,9 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventReadlink, ino, "readlink()");
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->DecreaseReadlinkCnt();
+  }
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
@@ -847,9 +852,6 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
     fuse_reply_readlink(req, dirent.symlink().c_str());
   }
 
-  if (mount_point_->cache_symlinks()) {
-    fuse_remounter_->DecreaseReadlinkCnt();
-  }
 }
 
 

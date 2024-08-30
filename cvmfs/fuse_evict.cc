@@ -107,6 +107,21 @@ void FuseInvalidator::InvalidateInodesAndDentries(Handle *handle) {
   WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
 }
 
+void FuseInvalidator::InvalidateInodesNoEvictAndDentries(Handle *handle) {
+  assert(handle != NULL);
+  char c = 'X';
+  WritePipe(pipe_ctrl_[1], &c, 1);
+  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+}
+
+void FuseInvalidator::InvalidateDentries(Handle *handle) {
+  assert(handle != NULL);
+  char c = 'D';
+  WritePipe(pipe_ctrl_[1], &c, 1);
+  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+}
+
+
 void FuseInvalidator::InvalidateInodes(Handle *handle) {
   assert(handle != NULL);
   char c = 'I';
@@ -158,6 +173,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         ClearCacheByTimeout(handle);
 #else
         invalidator->DoInvalidateInodes(handle);
+        invalidator->evict_list_.Clear(); 
 #endif
         handle->SetDone();
       break;
@@ -167,7 +183,6 @@ void *FuseInvalidator::MainInvalidator(void *data) {
         ClearCacheByTimeout(handle);
 #else
         invalidator->DoInvalidateDentries();
-        invalidator->evict_list_.Clear();
 #endif
         handle->SetDone();
       break;
@@ -176,9 +191,20 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 #ifdef __APPLE__
         ClearCacheByTimeout(handle);
 #else
-        invalidator->DoInvalidateInodes(handle);
         invalidator->DoInvalidateDentries();
+        invalidator->DoInvalidateInodes(handle);
         invalidator->evict_list_.Clear();
+#endif
+        handle->SetDone();
+      break;
+      case 'X':  // invalidate all both: inodes (do not delete evict list)
+                 // and dentries
+        ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
+#ifdef __APPLE__
+        ClearCacheByTimeout(handle);
+#else
+        invalidator->DoInvalidateDentries();
+        invalidator->DoInvalidateInodes(handle);
 #endif
         handle->SetDone();
       break;
@@ -286,8 +312,9 @@ void FuseInvalidator::DoInvalidateInodes(Handle *handle) {
 }
 
 void FuseInvalidator::DoInvalidateDentries() {
-  // Do the dentry tracker last to increase the effectiveness of pruning
-  dentry_tracker_->Prune();
+  // Do not do any prune. Can create deadlocks and give back broken symlinks
+  // during catalog reload
+
   // Copy and empty the dentry tracker in a single atomic operation
   glue::DentryTracker *dentries_copy = dentry_tracker_->Move();
   glue::DentryTracker::Cursor dentry_cursor = dentries_copy->BeginEnumerate();
@@ -305,8 +332,7 @@ void FuseInvalidator::DoInvalidateDentries() {
   // must be libfuse >= 3.16, otherwise the signature is wrong and it
   // will fail building
   // mount_point can only be NULL for unittests
-  if (mount_point_->fuse_expire_entry() &&
-      mount_point_ != NULL) {
+  if (mount_point_->fuse_expire_entry() && mount_point_ != NULL) {
     notify_func = &fuse_lowlevel_notify_expire_entry;
   }
 #endif

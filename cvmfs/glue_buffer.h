@@ -869,11 +869,13 @@ class DentryTracker {
     Lock();
     entries_.PushBack(Entry(now + timeout_s, inode_parent, name));
     statistics_.num_insert++;
-    DoPrune(now);
+    // do not delete "now". 1 sec granularity is too inaccurate
+    DoPrune(now - 1);  
     Unlock();
   }
 
   void Prune();
+  size_t Size() { return entries_.size(); }
   /**
    * The nentry tracker is only needed for active cache eviction and can
    * otherwise ignore new entries.

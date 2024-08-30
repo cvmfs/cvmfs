@@ -69,9 +69,39 @@ class FuseInvalidator : SingleCopy {
                   bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
+  /**
+   * Requests to asynchronously invalidate all inodes saved in inode_tracker
+   * and clears the inode_tracker.
+   */
   void InvalidateInodes(Handle *handle);
+  /**
+   * Requests to asynchronously invalidate or expire all dentries saved in
+   * dentry_tracker and clears the dentry_tracker. 
+   */
+  void InvalidateDentries(Handle *handle);
+  /**
+   * Requests to asynchronously first invalidate inodes and then invalidate
+   * dentries. IsDone() will only return true if both actions were performed.
+   */
   void InvalidateInodesAndDentries(Handle *handle);
+  /**
+   * Like InvalidateInodesAndDentries() but does not delete the temporary list
+   * of "to-be-deleted inodes" (evict_list_). Next call to any form of
+   * InvalidateInodes() will appened their new inodes to the old list and then
+   * deletes old + new inodes.
+   * 
+   * This is useful for the fuse_remount where you first want to delete all
+   * inodes and dentries, perform the reload, and then because of possible
+   * race conditions want to make sure that all inodes (before and after the
+   * reload) are invalidated again.
+   */
+  void InvalidateInodesNoEvictAndDentries(Handle *handle);
 
+  /**
+   * Invalidates a single dentry.
+   * 
+   * @note Expire is not supported, and the dentry_tracker is not updated.
+   */
   void InvalidateDentry(uint64_t parent_ino, const NameString &name);
 
  private:
