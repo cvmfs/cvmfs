@@ -79,7 +79,8 @@ class FuseRemounter : SingleCopy {
    * Increase is adjusted depending if pause readlink is active or not.
    * Used in cvmfs_readlink (cvmfs.cc); see cnt_readlink_ for more
    */
-  void WaitAndIncreaseReadlinkCnt();
+  void WaitReadlinkCnt();
+  void IncreaseReadlinkCnt();
   /**
    * Readlink request has finished. Decreases the counter cnt_readlink_.
    * Value is adjusted based on if readlinks are paused or not.

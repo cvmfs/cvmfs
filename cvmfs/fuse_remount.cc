@@ -16,6 +16,7 @@
 #include "backoff.h"
 #include "catalog_mgr_client.h"
 #include "fuse_inode_gen.h"
+#include "glue_buffer.h"
 #include "lru_md.h"
 #include "mountpoint.h"
 #include "statistics.h"
@@ -26,11 +27,13 @@
 
 using namespace std;  // NOLINT
 
-void FuseRemounter::WaitAndIncreaseReadlinkCnt() {
+void FuseRemounter::WaitReadlinkCnt() {
   while (atomic_read32(&cnt_readlink_) < 0) {
-    SafeSleepMs(100);
+    SafeSleepMs(500);
   }
+}
 
+void FuseRemounter::IncreaseReadlinkCnt() {
   int32_t old_val;
   int32_t new_val;
   do {
@@ -81,7 +84,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
     // As of this point, fuse callbacks return zero as cache timeout
     LogCvmfs(kLogCvmfs, kLogDebug, "chroot, draining out meta-data caches");
     invalidator_handle_.Reset();
-    invalidator_->InvalidateInodesAndDentries(&invalidator_handle_);
+    invalidator_->InvalidateInodesNoEvictAndDentries(&invalidator_handle_);
     atomic_inc32(&drainout_mode_);
     // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
   } else {
@@ -135,7 +138,7 @@ FuseRemounter::Status FuseRemounter::Check() {
                  "new catalog revision available, "
                  "draining out meta-data caches");
         invalidator_handle_.Reset();
-        invalidator_->InvalidateInodesAndDentries(&invalidator_handle_);
+        invalidator_->InvalidateInodesNoEvictAndDentries(&invalidator_handle_);
         atomic_inc32(&drainout_mode_);
         // drainout_mode_ == 2, IsInDrainoutMode is now 'true'
       } else {
@@ -357,24 +360,17 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
   LogCvmfs(kLogCvmfs, kLogDebug, "caches drained out, applying new catalog");
 
   RequestStopReadlink();
-  WaitForStopReadlink();
 
-  // Reset inodes again, just to make sure
-  // (Contrary to dentry, inodes dont have a modifiable timeout)
-  invalidator_handle_.Reset();
-  invalidator_->InvalidateInodes(&invalidator_handle_);
-  invalidator_handle_.WaitFor();
-
-  // No new inserts into caches
+  // Ensure that all Fuse callbacks left the catalog query code
+  fence_->Drain();
   mountpoint_->inode_cache()->Pause();
   mountpoint_->path_cache()->Pause();
   mountpoint_->md5path_cache()->Pause();
+
   mountpoint_->inode_cache()->Drop();
   mountpoint_->path_cache()->Drop();
   mountpoint_->md5path_cache()->Drop();
 
-  // Ensure that all Fuse callbacks left the catalog query code
-  fence_->Drain();
   catalog::LoadReturn retval;
   if (root_hash.IsNull()) {
     retval = mountpoint_->catalog_mgr()->Remount();
@@ -386,11 +382,11 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
       mountpoint_->inode_annotation()->GetGeneration();
   }
   mountpoint_->ReEvaluateAuthz();
-  fence_->Open();
-
   mountpoint_->inode_cache()->Resume();
   mountpoint_->path_cache()->Resume();
   mountpoint_->md5path_cache()->Resume();
+
+  fence_->Open();
 
   atomic_xadd32(&drainout_mode_, -2);  // 2 --> 0, end of drainout mode
 
@@ -408,6 +404,16 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     SetAlarm(mountpoint_->GetEffectiveTtlSec());
   }
 
+  // do not remove sleep or change order. this reduces corruption of reading 
+  // symlinks. Inodes cannot be evicted while POSIX lock is active as such it
+  // must be after RestartReadlink()
+  SafeSleepMs(300);
+  invalidator_handle_.Reset();
+  invalidator_->InvalidateDentries(&invalidator_handle_);
+  invalidator_handle_.WaitFor();
   RestartReadlink();
+  invalidator_handle_.Reset();
+  invalidator_->InvalidateInodes(&invalidator_handle_);
+  invalidator_handle_.WaitFor();
   LeaveCriticalSection();
 }
