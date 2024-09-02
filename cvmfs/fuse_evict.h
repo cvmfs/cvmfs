@@ -87,7 +87,7 @@ class FuseInvalidator : SingleCopy {
   /**
    * Like InvalidateInodesAndDentries() but does not delete the temporary list
    * of "to-be-deleted inodes" (evict_list_). Next call to any form of
-   * InvalidateInodes() will appened their new inodes to the old list and then
+   * InvalidateInodes() will append their new inodes to the old list and then
    * deletes old + new inodes.
    * 
    * This is useful for the fuse_remount where you first want to delete all
