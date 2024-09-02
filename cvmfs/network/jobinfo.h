@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "compression/compression.h"
+#include "compression/decompression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/network_errors.h"
@@ -35,6 +35,12 @@ enum DataTubeAction {
   kActionStop = 0,
   kActionContinue,
   kActionDecompress
+};
+
+enum DecompressorType {
+  kCreateNone,
+  kCreateZlib,
+  kCreateEcho
 };
 
 /**
@@ -71,7 +77,6 @@ class JobInfo {
   /// to be decompressed in Fetch() instead of MainDownload()
   UniquePtr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
-  bool compressed_;
   bool probe_hosts_;
   bool head_request_;
   bool follow_redirects_;
@@ -81,9 +86,15 @@ class JobInfo {
   gid_t gid_;
   void *cred_data_;  // Per-transfer credential data
   InterruptCue *interrupt_cue_;
-  cvmfs::Sink *sink_;
   const shash::Any *expected_hash_;
   const std::string *extra_info_;
+
+  // decompression
+  DecompressorType decompressor_type_;  // ONLY change using SetDecompressor()
+  cvmfs::Sink *sink_;
+  zlib::Decompressor *active_decomp_;
+  UniquePtr<zlib::Decompressor> decomp_zlib_;
+  UniquePtr<zlib::Decompressor> decomp_echo_;
 
   // Allow byte ranges to be specified.
   off_t range_offset_;
@@ -96,7 +107,6 @@ class JobInfo {
   char *tracing_header_pid_;
   char *tracing_header_gid_;
   char *tracing_header_uid_;
-  z_stream zstream_;
   shash::ContextPtr hash_context_;
   std::string proxy_;
   bool nocache_;
@@ -113,7 +123,7 @@ class JobInfo {
 
   // TODO(heretherebedragons) c++11 allows to delegate constructors (N1986)
   // Replace Init() with JobInfo() that is called by the other constructors
-  void Init();
+  void Init(const DecompressorType decompressor_type);
 
  public:
   /**
@@ -155,11 +165,24 @@ class JobInfo {
    */
   bool IsFileNotFound();
 
+  /**
+   * Resets current decompression stream without changing the decompression
+   * type. Useful when retrying a download.
+   */
+  bool ResetDecompression();
+  /**
+   * Writes data to sink using the decompressor. Depending on the decompressor,
+   * it might or might not decompress data before writing.
+   *
+   * @returns true   on successful write (kStreamEnd or kStreamContinue)
+   *          false  on any error
+   */
+  bool DecompressToSink(zlib::InputAbstract *in);
+
   pid_t *GetPidPtr() { return &pid_; }
   uid_t *GetUidPtr() { return &uid_; }
   gid_t *GetGidPtr() { return &gid_; }
   InterruptCue **GetInterruptCuePtr() { return &interrupt_cue_; }
-  z_stream *GetZstreamPtr() { return &zstream_; }
   Failures *GetErrorCodePtr() { return &error_code_; }
   void **GetCredDataPtr() { return &cred_data_; }
   curl_slist **GetHeadersPtr() { return &headers_; }
@@ -170,7 +193,7 @@ class JobInfo {
   Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
-  bool compressed() const { return compressed_; }
+  bool decompressor_type() const { return decompressor_type_; }
   bool probe_hosts() const { return probe_hosts_; }
   bool head_request() const { return head_request_; }
   bool follow_redirects() const { return follow_redirects_; }
@@ -193,7 +216,6 @@ class JobInfo {
   char *tracing_header_pid() const { return tracing_header_pid_; }
   char *tracing_header_gid() const { return tracing_header_gid_; }
   char *tracing_header_uid() const { return tracing_header_uid_; }
-  z_stream zstream() const { return zstream_; }
   shash::ContextPtr hash_context() const { return hash_context_; }
   std::string proxy() const { return proxy_; }
   bool nocache() const { return nocache_; }
@@ -211,7 +233,7 @@ class JobInfo {
 
 
   void SetUrl(const std::string *url) { url_ = url; }
-  void SetCompressed(bool compressed) { compressed_ = compressed; }
+  void SetDecompressor(const DecompressorType decompressor_type);
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
   void SetHeadRequest(bool head_request) { head_request_ = head_request; }
   void SetFollowRedirects(bool follow_redirects)
@@ -242,7 +264,6 @@ class JobInfo {
                                   { tracing_header_gid_ = tracing_header_gid; };
   void SetTracingHeaderUid(char *tracing_header_uid)
                                   { tracing_header_uid_ = tracing_header_uid; };
-  void SetZstream(z_stream zstream) { zstream_ = zstream; }
   void SetHashContext(shash::ContextPtr hash_context)
                                                { hash_context_ = hash_context; }
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
@@ -261,7 +282,7 @@ class JobInfo {
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 
   // needed for fetch.h ThreadLocalStorage
-  JobInfo() { Init(); }
+  JobInfo() { Init(kCreateNone); }
 };  // JobInfo
 
 }  // namespace download
