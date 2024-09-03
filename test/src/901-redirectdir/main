@@ -8,57 +8,57 @@ produce_initial_files_in() {
   local working_dir=$1
 
   pushdir $working_dir
-  mkdir  contains_directories
-  mkidr  contains_directories/dir_1
-  mkdir  contains_directories/dir_2
-  mkdir  contains_directories/dir_3
-  mkdir  contains_directories/dir_1/subdir_with_files
-  mkdir  contains_directories/dir_2/subdir_with_nested_dir
-  mkdir  contains_directories/dir_3/subdir_nothing
+  mkdir  root_dir
+  mkdir  root_dir/dir_1
+  mkdir  root_dir/dir_2
+  mkdir  root_dir/dir_3
+  mkdir  root_dir/dir_1/contains_files
+  mkdir  root_dir/dir_2/contains_dirs
+  mkdir  root_dir/dir_3/contains_nothing
   
-  echo "test 1" > contains_directories/dir_1/subdir_with_files/file_1
-  echo "test 2" > contains_directories/dir_1/subdir_with_files/file_2
-  echo "test 3" > contains_directories/dir_1/subdir_with_files/file_3
-  echo "test 4" > contains_directories/dir_1/subdir_with_files/file_4
+  echo "test 1" > root_dir/dir_1/contains_files/file_1
+  echo "test 2" > root_dir/dir_1/contains_files/file_2
+  echo "test 3" > root_dir/dir_1/contains_files/file_3
+  echo "test 4" > root_dir/dir_1/contains_files/file_4
   
-  mkdir contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_1
-  mkdir contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_2
-  mkdir contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_3
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_1
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_2
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_3
+  echo "hi!" > root_dir/dir_2/contains_dirs/nested_dir_3/file
 
   popdir
 }
 
-move_on_upper_level_and_back {
+move_on_upper_level_and_back() {
   local working_dir=$1
 
   pushdir $working_dir
   
-  mv contains_directories/dir_3/subdir_nothing contains_directories/dir_nothing
-  mv contains_directories/subdir_nothing contains_directories/dir_3/dir_nothing
+  mv root_dir/dir_3/contains_nothing root_dir/dir_nothing
+  mv root_dir/dir_nothing root_dir/dir_3/contains_nothing
 
   popdir
 }
 
-move_subdir_with_files_and_update_content() {
+move_contains_files_and_update_content() {
   local working_dir=$1
 
   pushdir $working_dir
-
-  mv contains_directories/dir_1/subdir_with_files contains_directories/subdir_with_files_renamed
-  echo "Update content in file_1" > contains_directories/subdir_with_files_renamed/file_1
-  echo "Update content in file_3" > contains_directories/subdir_with_files_renamed/file_3
+  mv root_dir/dir_1/contains_files root_dir/contains_files_renamed
+  echo "Update content in file_1" > root_dir/contains_files_renamed/file_1
+  echo "Update content in file_3" > root_dir/contains_files_renamed/file_3
 
   popdir
 }
 
-update_content_and_move() {
+update_content_and_move_contains_files() {
   local working_dir=$1
 
   pushdir $working_dir
 
-  echo "Update content in file_2" > contains_directories/subdir_with_files_renamed/file_2
-  echo "Update content in file_4" > contains_directories/subdir_with_files_renamed/file_4
-  mv contains_directories/subdir_with_files_renamed contains_directories/dir_1/subdir_with_files
+  echo "Update content in file_2" > root_dir/contains_files_renamed/file_2
+  echo "Update content in file_4" > root_dir/contains_files_renamed/file_4
+  mv root_dir/contains_files_renamed root_dir/dir_1/contains_files
   popdir
 }
 
@@ -67,16 +67,16 @@ move_directory_and_add_file() {
 
   pushdir $working_dir
 
-  mv contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_1 contains_directories/sub_subdir_1_renamed
-  echo "Something" > contains_directories/sub_subdir_1_renamed/something
+  mv root_dir/dir_2/contains_dirs/nested_dir_1 root_dir/nested_dir_1_renamed
+  echo "Something" > root_dir/nested_dir_1_renamed/something
   popdir
 }
 
 move_directory_and_remove_file() {
   local working_dir=$1
   pushdir $working_dir
-  mv contains_directories/sub_subdir_1_renamed contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_1
-  rm -f contains_directories/dir_2/subdir_with_nested_dir/sub_subdir_1/file_1/something
+  mv root_dir/nested_dir_1_renamed root_dir/dir_2/contains_dirs/nested_dir_1
+  rm -f root_dir/dir_2/contains_dirs/nested_dir_1/file_1/something
   mv contains_many_entries contains_many_entries_renamed
 }
 
@@ -84,17 +84,17 @@ move_directory_and_remove_file() {
 move_parent_and_child_dirs_and_add_file() {
   local working_dir=$1
   pushdir $working_dir
-  mv contains_directories/dir2 contains_directories/dir2_renamed
-  mv contains_directories/dir2_renamed/subdir_with_nested_dir/sub_subdir_1 contains_directories/dir2_renamed/subdir_with_nested_dir/sub_subdir_1_renamed
-  echo "Some text" > contains_directories/dir2_renamed/subdir_with_nested_dir/sub_subdir_1_renamed/test
+  mv root_dir/dir2 root_dir/dir2_renamed
+  mv root_dir/dir2_renamed/contains_dirs/nested_dir_1 root_dir/dir2_renamed/contains_dirs/nested_dir_1_renamed
+  echo "Some text" > root_dir/dir2_renamed/contains_dirs/nested_dir_1_renamed/test
 }
 
 move_parent_and_child_dirs_and_update_file() {
   local working_dir=$1
   pushdir $working_dir
-  mv contains_directories/dir2_renamed contains_directories/dir2
-  mv contains_directories/dir2/subdir_with_nested_dir/sub_subdir_1_renamed contains_directories/dir2/subdir_with_nested_dir/sub_subdir_1
-  echo "Updated text" > contains_directories/dir2/subdir_with_nested_dir/sub_subdir_1/test
+  mv root_dir/dir2_renamed root_dir/dir2
+  mv root_dir/dir2/contains_dirs/nested_dir_1_renamed root_dir/dir2/contains_dirs/nested_dir_1
+  echo "Updated text" > root_dir/dir2/contains_dirs/nested_dir_1/test
 }
 
 cvmfs_run_test() {
@@ -133,11 +133,11 @@ cvmfs_run_test() {
   echo "*** 2 starting transaction to edit repository (2)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "*** 2 putting a new file in dir and rename dir"
-  add_file_and_rename_parent $repo_dir || return 5
+  echo "*** 2 moving empty directory back and forth in the repo"
+  move_on_upper_level_and_back $repo_dir || return 5
 
   echo "*** 2 doing exactly the same in the scratch space for comparison"
-  add_file_and_rename_parent $reference_dir || return 6
+  move_on_upper_level_and_back $reference_dir || return 6
 
   echo "*** 2 creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -155,11 +155,11 @@ cvmfs_run_test() {
   echo "*** 3 starting transaction to edit repository (3)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "*** 3 removing a file from dir and renaming dir"
-  remove_file_and_rename_parent $repo_dir || return 7
+  echo "*** 3 moving a directory with files and update content for a part of the nested files"
+  move_contains_files_and_update_content $repo_dir || return 7
 
   echo "*** 3 doing exactly the same in the scratch space for comparison"
-  remove_file_and_rename_parent $reference_dir || return 8
+  move_contains_files_and_update_content $reference_dir || return 8
 
   echo "*** 3 creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -173,15 +173,16 @@ cvmfs_run_test() {
 #
 # ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 #
+# 
 
   echo "*** 4 starting transaction to edit repository (4)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "*** 4 removing an empty directory in dir and renaming dir"
-  remove_empty_directory_and_rename_parent $repo_dir || return 8
+  echo "*** 4 updating a part of nested files in a directory and moving it"
+  update_content_and_move_contains_files $repo_dir || return 8
 
   echo "*** 4 doing exactly the same in the scratch space for comparison"
-  remove_empty_directory_and_rename_parent $reference_dir || return 9
+  update_content_and_move_contains_files $reference_dir || return 9
 
   echo "*** 4 creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -199,11 +200,11 @@ cvmfs_run_test() {
   echo "*** 5 starting transaction to edit repository (5)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "*** 5 removing a non-empty directory in dir and rename dir"
-  remove_directory_and_rename_parent $repo_dir || return 10
+  echo "*** 5 moving an empty directory and creating a file in it"
+  move_directory_and_add_file $repo_dir || return 10
 
   echo "*** 5 doing exactly the same in the scratch space for comparison"
-  remove_directory_and_rename_parent $reference_dir || return 11
+  move_directory_and_add_file $reference_dir || return 11
 
   echo "*** 5 creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -221,11 +222,11 @@ cvmfs_run_test() {
   echo "*** 6 starting transaction to edit repository (6)"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "*** 6 removing an entry among others in dir and rename dir"
-  remove_directory_among_many_entries_and_rename_parent $repo_dir || return 12
+  echo "*** 6 moving a directory and it's child subdirectory and adding a file in the subdir"
+  move_parent_and_child_dirs_and_add_file $repo_dir || return 12
 
   echo "*** 6 doing exactly the same in the scratch space for comparison"
-  remove_directory_among_many_entries_and_rename_parent $reference_dir || return 13
+  move_parent_and_child_dirs_and_add_file $reference_dir || return 13
 
   echo "*** 6 creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -234,6 +235,28 @@ cvmfs_run_test() {
   compare_directories $repo_dir $reference_dir || return $?
 
   echo "*** 6 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 7 starting transaction to edit repository (7)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 7 moving a directory and it's child subdirectory and updating a file in the subdir"
+  move_parent_and_child_dirs_and_update_file $repo_dir || return 12
+
+  echo "*** 7 doing exactly the same in the scratch space for comparison"
+  move_parent_and_child_dirs_and_update_file $reference_dir || return 13
+
+  echo "*** 7 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 7 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 7 check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
 
   return 0
