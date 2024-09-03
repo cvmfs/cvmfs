@@ -25,6 +25,7 @@ CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
 CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 CVMFS_TEST_GEO_LICENSE_KEY=${CVMFS_TEST_GEO_LICENSE_KEY:=}
+CVMFS_TEST_GEO_ACCOUNT_ID=${CVMFS_TEST_GEO_ACCOUNT_ID:=}
 
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
@@ -58,6 +59,9 @@ fi
 
 if [ ! -z "$CVMFS_TEST_GEO_LICENSE_KEY" ]; then
   echo "CVMFS_GEO_LICENSE_KEY=$CVMFS_TEST_GEO_LICENSE_KEY" | sudo tee /etc/cvmfs/server.local > /dev/null
+fi
+if [ ! -z "$CVMFS_TEST_GEO_ACCOUNT_ID" ]; then
+  echo "CVMFS_GEO_ACCOUNT_ID=$CVMFS_TEST_GEO_ACCOUNT_ID" | sudo tee -a /etc/cvmfs/server.local > /dev/null
 fi
 
 if [ -f /.dockerinit ]; then
@@ -147,7 +151,7 @@ stat_wrapper() {
 
 # Find the service binary (or detect systemd)
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || ! [ -d /run/systemd/system ]; then
+if ! ps -p 1 -o comm= > /dev/null 2>&1 || ! [ -d /run/systemd/system ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -1729,6 +1733,18 @@ delete_from_backend() {
 
   load_repo_config $repo_name
   cvmfs_swissknife remove -o $remote_path -r $(get_backend_spooler)
+}
+
+# removes the file given by its hash from the backend storage of a CVMFS repository
+#
+# @param repository    the repository name to uploaded into
+# @param content_hash  hash of the file
+delete_hash_from_backend() {
+  local repo_name="$1"
+  local content_hash="$2"
+
+  load_repo_config $repo_name
+  cvmfs_swissknife remove -o $(make_path $content_hash) -r $(get_backend_spooler)
 }
 
 

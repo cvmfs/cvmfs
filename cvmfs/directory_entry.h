@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "bigvector.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "util/platform.h"

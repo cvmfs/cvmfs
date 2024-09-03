@@ -28,7 +28,6 @@ class CommandLetter : public Command {
     r.push_back(Parameter::Optional('p', "password for the private key"));
     r.push_back(Parameter::Switch('v', "verify text"));
     r.push_back(Parameter::Optional('m', "max age (seconds)"));
-    r.push_back(Parameter::Optional('z', "trusted certificate dir(s)"));
     r.push_back(Parameter::Optional('r', "repository url"));
     r.push_back(Parameter::Switch('e', "Erlang mode (stay active)"));
     r.push_back(Parameter::Optional('t', "text to sign or verify"));

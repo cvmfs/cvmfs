@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "cache_posix.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "quota_posix.h"
 #include "testutil.h"
@@ -341,7 +341,7 @@ TEST_F(T_QuotaManager, CreateShared) {
     PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5, false));
 
   // Forking fails
-  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5, false));
+  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5, true));
   EXPECT_EQ(0, unlink((tmp_path_ + "/cachemgr").c_str()));
 
   // TODO(jblomer): test fork logic (requires changes to __cachemgr__ execve)

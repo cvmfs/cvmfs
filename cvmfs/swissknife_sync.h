@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "repository_tag.h"
 #include "swissknife.h"
 #include "upload.h"
@@ -27,6 +27,7 @@ struct SyncParameters {
       : spooler(NULL),
         union_fs_type("aufs"),
         to_delete(""),
+        cache_dir(""),
         print_changeset(false),
         dry_run(false),
         mucatalogs(false),
@@ -74,11 +75,11 @@ struct SyncParameters {
   std::string spooler_definition;
   std::string union_fs_type;
   std::string public_keys;
-  std::string trusted_certs;
   std::string authz_file;
   std::string tar_file;
   std::string base_directory;
   std::string to_delete;
+  std::string cache_dir;
   bool print_changeset;
   bool dry_run;
   bool mucatalogs;
@@ -252,6 +253,7 @@ class CommandSync : public Command {
     return "Pushes changes from scratch area back to the repository.";
   }
   virtual ParameterList GetParams() const {
+    // unused characters: j, J, 1-9, all special characters but @
     ParameterList r;
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
@@ -273,7 +275,6 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('0', "number of upload tasks"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
-    r.push_back(Parameter::Optional('C', "trusted certificates"));
     r.push_back(Parameter::Optional('F', "Authz file listing (default: none)"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(
@@ -293,6 +294,11 @@ class CommandSync : public Command {
                                     "virtual directory options "
                                     "[snapshots, remove]"));
 
+
+    r.push_back(
+        Parameter::Switch('G', "Use persistent caching for all catalogs "
+                                 "used during the publishing process"
+                                 " Warning: No automatic garbage collection!"));
     r.push_back(Parameter::Switch('d',
                                   "pause publishing to allow for catalog "
                                   "tweaks"));

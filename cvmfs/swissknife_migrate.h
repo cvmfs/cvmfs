@@ -21,6 +21,7 @@
 #include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
+#include "util/future.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 

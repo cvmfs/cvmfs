@@ -59,7 +59,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:d:l:S:G:" option; do
+while getopts "t:s:c:d:l:S:G:K:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -81,6 +81,9 @@ while getopts "t:s:c:d:l:S:G:" option; do
       ;;
     G)
       export CVMFS_TEST_GEO_LICENSE_KEY="$OPTARG"
+      ;;
+    K)
+      export CVMFS_TEST_GEO_ACCOUNT_ID="$OPTARG"
       ;;
     ?)
       shift $(($OPTIND-2))

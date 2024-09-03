@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/network_errors.h"

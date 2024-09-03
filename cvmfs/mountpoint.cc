@@ -1596,14 +1596,6 @@ bool MountPoint::CreateSignatureManager() {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
 
-  if (options_mgr_->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
-    if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {
-      boot_error_ = "failed to load trusted certificates";
-      boot_status_ = loader::kFailSignature;
-      return false;
-    }
-  }
-
   return true;
 }
 
@@ -2133,7 +2125,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string optarg;
   external_download_mgr_ =
     download_mgr_->Clone(perf::StatisticsTemplate("download-external",
-      statistics_));
+      statistics_), "external");
 
   unsigned timeout;
   unsigned timeout_direct;

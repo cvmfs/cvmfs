@@ -6,7 +6,7 @@
 
 #include <fcntl.h>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 
 TEST(T_Compression, CompressFd2Null) {

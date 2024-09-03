@@ -95,7 +95,7 @@ class DiffReporter : public publish::DiffListener {
       if (!entry.IsDirectory()) {
         LogCvmfs(kLogCvmfs, kLogStdout, " +%" PRIu64, entry.size());
       } else {
-        LogCvmfs(kLogCvmfs, kLogStdout, "");
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",

@@ -97,7 +97,6 @@ cvmfs_server_rollback() {
     $(get_swissknife_proxy)                                    \
     -t ${spool_dir}/tmp                                        \
     -p /etc/cvmfs/keys/${name}.pub                             \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs         \
     -f $name                                                   \
     -r $upstream                                               \
     -m ${spool_dir}/tmp/manifest                               \

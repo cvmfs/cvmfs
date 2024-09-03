@@ -82,6 +82,9 @@ double StopWatch::GetTime() const {
 namespace {
 
 static unsigned int CountDigits(uint64_t n) {
+  if (n == 0) {
+    return 1;
+  }
   return static_cast<unsigned int>(floor(log10(static_cast<double>(n)))) + 1;
 }
 
@@ -114,7 +117,7 @@ unsigned int Log2Histogram::GetQuantile(float n) {
   // now we iterate through all the bins
   // note that we _exclude_ the overflow bin
   unsigned int i = 0;
-  for (i = 1; 1 <= this->bins_.size() - 1; i++) {
+  for (i = 1; i <= this->bins_.size() - 1; i++) {
     unsigned int bin_value =
       static_cast<unsigned int>(atomic_read32(&(this->bins_[i])));
     if (pivot <= bin_value) {
@@ -123,6 +126,9 @@ unsigned int Log2Histogram::GetQuantile(float n) {
       break;
     }
     pivot -= bin_value;
+  }
+  if (i >= this->bins_.size()) {
+    return this->boundary_values_[this->bins_.size() - 1];
   }
   // now i stores the index of the bin corresponding to the requested quantile
   // and normalized_pivot is the element we want inside the bin
@@ -149,7 +155,8 @@ std::string Log2Histogram::ToString() {
                                 CountDigits(boundary_values_[i] / 2));
     max_right_boundary_count = std::max(max_right_boundary_count,
                                 CountDigits(boundary_values_[i] - 1));
-    max_value_count = std::max(max_value_count, CountDigits(this->bins_[i]));
+    max_value_count = std::max(max_value_count,
+                                CountDigits(atomic_read32(&(this->bins_[i]))));
     max_bins = std::max(max_bins, static_cast<unsigned int>(
                         atomic_read32(&(this->bins_[i]))));
     total_sum_of_bins +=

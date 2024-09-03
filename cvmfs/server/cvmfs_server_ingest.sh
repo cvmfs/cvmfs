@@ -85,7 +85,7 @@ cvmfs_server_ingest() {
   # error: cannot keep ownership while also requesting other user/group
   if { [ x"$user" != "x" ] || [ x"$group" != "x" ]; } && [ $keep_ownership = true ]; then
     die "You cannot provide both: either provide user (-u)/group (-g) or keep the ownership (-k) of the tarball"
-  fi  
+  fi
 
 
   # error: group also needs user
@@ -215,8 +215,6 @@ cvmfs_server_ingest() {
 
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
-
-  local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
 
   local tag_command="$(__swissknife_cmd dbg) tag_edit \
     -r $upstream                                      \

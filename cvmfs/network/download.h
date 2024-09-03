@@ -18,7 +18,7 @@
 
 #include "gtest/gtest_prod.h"
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/dns.h"
@@ -156,13 +156,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static const unsigned kProxyMapScale = 16;
 
   DownloadManager(const unsigned max_pool_handles,
-                  const perf::StatisticsTemplate &statistics);
+                  const perf::StatisticsTemplate &statistics,
+                  const std::string &name = "standard");
   ~DownloadManager();
 
   static int ParseHttpCode(const char digits[3]);
 
   void Spawn();
-  DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
+  DownloadManager *Clone(const perf::StatisticsTemplate &statistics,
+                         const std::string &cloned_name);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -349,7 +351,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Sorted list of currently active proxy URLs (for log messages)
    */
-  std::vector<std::string> opt_proxy_urls_;
+  std::vector<std::string> opt_proxies_;
   /**
    * Shard requests across multiple proxies via consistent hashing
    */
@@ -381,6 +383,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Used in sharding policy && Interrupted()
    */
   std::string fqrn_;
+
+  /**
+   * Name of the download manager (default is "standard")
+   */
+  std::string name_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

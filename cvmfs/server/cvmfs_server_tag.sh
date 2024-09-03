@@ -98,7 +98,6 @@ cvmfs_server_tag() {
       $(get_swissknife_proxy)                                \
       -t ${CVMFS_SPOOL_DIR}/tmp                              \
       -p /etc/cvmfs/keys/${name}.pub                         \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs     \
       -f $name"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
@@ -117,7 +116,6 @@ cvmfs_server_tag() {
       $(get_swissknife_proxy)                                   \
       -t ${CVMFS_SPOOL_DIR}/tmp                                 \
       -p /etc/cvmfs/keys/${name}.pub                            \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs        \
       -f $name                                                  \
       -n $tag_name"
     if [ $machine_readable -ne 0 ]; then
@@ -152,7 +150,6 @@ cvmfs_server_tag() {
       -o ${new_manifest}~                                \
       -e $hash_algorithm                                 \
       -Z ${CVMFS_COMPRESSION_ALGORITHM-default}          \
-      -C /etc/cvmfs/repositories.d/${name}/trusted_certs \
       -N $name                                           \
       -K $CVMFS_PUBLIC_KEY                               \
       $(get_swissknife_proxy)                            \
@@ -175,7 +172,6 @@ cvmfs_server_tag() {
       -w $CVMFS_STRATUM0                                         \
       -t ${CVMFS_SPOOL_DIR}/tmp                                  \
       -p /etc/cvmfs/keys/${name}.pub                             \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs         \
       -f $name                                                   \
       -r $CVMFS_UPSTREAM_STORAGE                                 \
       -m $new_manifest                                           \
@@ -213,7 +209,6 @@ cvmfs_server_tag() {
       $(get_swissknife_proxy)                            \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
       -f $name                                           \
       -r $CVMFS_UPSTREAM_STORAGE                         \
       -m $new_manifest                                   \

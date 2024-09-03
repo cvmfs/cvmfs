@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+      branches: [devel]
+  pull_request:
+
+jobs:
+  docker:
+    name: "Docker"
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Build image
+        run: |
+          cd test/common/container
+          docker compose up --build -d cvmfs-dev
+
+      - name: Build CVMFS
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "cmake -S /home/sftnight/cvmfs -B /tmp/cvmfs-build -D EXTERNALS_PREFIX=/tmp/cvmfs-ext -D BUILD_SHRINKWRAP=ON"
+
+      - name: Install CVMFS
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "cd /tmp/cvmfs-build && make && sudo make install"
+
+      - name: Setup CVMFS
+        run: |
+          docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config setup"
+          docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config chksetup" || exit 1
+
+      - name: Run Tests
+        run: |
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "cd /home/sftnight/cvmfs/test/common/container && CVMFS_TEST_PROXY=DIRECT bash test.sh"
+
+      - name: Archive logs
+        if: ${{ always () }}
+        run: |
+          docker cp cvmfs-dev:/tmp/cvmfs-client-test.log /tmp/cvmfs-client-test.log
+          docker cp cvmfs-dev:/tmp/cvmfs-server-test.log /tmp/cvmfs-server-test.log
+
+      - name: Upload logs as artifact
+        if: ${{ always () }}
+        uses: actions/upload-artifact@v3
+        with: 
+          name: CVMFS test logs
+          path: |
+              /tmp/cvmfs-client-test.log
+              /tmp/cvmfs-server-test.log
+

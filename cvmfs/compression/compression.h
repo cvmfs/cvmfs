@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_COMPRESSION_H_
-#define CVMFS_COMPRESSION_H_
+#ifndef CVMFS_COMPRESSION_COMPRESSION_H_
+#define CVMFS_COMPRESSION_COMPRESSION_H_
 
 #include <errno.h>
 #include <stdint.h>
@@ -169,4 +169,4 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
 
 }  // namespace zlib
 
-#endif  // CVMFS_COMPRESSION_H_
+#endif  // CVMFS_COMPRESSION_COMPRESSION_H_

@@ -54,7 +54,7 @@ void Usage() {
     for (unsigned j = 0; j < command_list[i]->GetName().length(); ++j) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "-");
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "");
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
              command_list[i]->GetDescription().c_str());
     swissknife::ParameterList params = command_list[i]->GetParams();
@@ -65,12 +65,12 @@ void Usage() {
                  params[j].key(), params[j].description().c_str());
         if (params[j].optional())
           LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " (optional)");
-        LogCvmfs(kLogCvmfs, kLogStdout, "");
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
       }
     }  // Parameter list
   }  // Command list
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
 }
 
 
