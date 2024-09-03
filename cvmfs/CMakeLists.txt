@@ -58,6 +58,16 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
        catalog_sql.cc
        clientctx.cc
        compression/compression.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/decompression.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_zlib.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        duplex_fuse.cc
        fd_refcount_mgr.cc
@@ -137,6 +147,16 @@ if (BUILD_CVMFS)
   #
   add_executable (cvmfs_fsck
                   compression/compression.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/decompression.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_zlib.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   cvmfs_fsck.cc
                   statistics.cc
   )
@@ -496,6 +516,16 @@ if (BUILD_LIBCVMFS_CACHE)
                   cache.cc
                   cache_posix.cc
                   compression/compression.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/decompression.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_zlib.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   fd_refcount_mgr.cc
                   manifest.cc
                   quota.cc
@@ -574,6 +604,16 @@ if (BUILD_SERVER)
        catalog_virtual.cc
        clientctx.cc
        compression/compression.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/decompression.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_zlib.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        file_chunk.cc
        gateway_util.cc
@@ -718,6 +758,16 @@ if (BUILD_SERVER)
        catalog_mgr_rw.cc
        catalog_virtual.cc
        compression/compression.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/decompression.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_zlib.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -828,6 +878,16 @@ if (BUILD_SERVER)
   set (CVMFS_PUBLISH_SOURCES
        backoff.cc
        compression/compression.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/decompression.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_zlib.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        manifest.cc
        network/dns.cc
@@ -1010,6 +1070,16 @@ if(BUILD_RECEIVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        compression/compression.cc
+       compression/compressor_echo.cc
+       compression/compressor_zlib.cc
+       compression/decompression.cc
+       compression/decompressor_echo.cc
+       compression/decompressor_zlib.cc
+       compression/input_cache.cc
+       compression/input_file.cc
+       compression/input_mem.cc
+       compression/input_path.cc
+       compression/util.cc
        directory_entry.cc
        gateway_util.cc
        globals.cc
@@ -1172,6 +1242,16 @@ if (BUILD_PRELOADER)
                   catalog.cc
                   catalog_sql.cc
                   compression/compression.cc
+                  compression/compressor_echo.cc
+                  compression/compressor_zlib.cc
+                  compression/decompression.cc
+                  compression/decompressor_echo.cc
+                  compression/decompressor_zlib.cc
+                  compression/input_cache.cc
+                  compression/input_file.cc
+                  compression/input_mem.cc
+                  compression/input_path.cc
+                  compression/util.cc
                   gateway_util.cc
                   globals.cc
                   history_sql.cc

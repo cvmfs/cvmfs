@@ -106,7 +106,7 @@ class PathSink : public Sink {
    */
   virtual std::string Describe();
 
-  const std::string path() { return path_; }
+  const std::string path() const { return path_; }
 
  private:
   FILE *file_;  // owned by sink_
