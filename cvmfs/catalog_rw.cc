@@ -272,8 +272,7 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
 void WritableCatalog::RenameDirectory(const DirectoryEntry &entry, 
                                       const shash::Md5 &new_parent_path_hash, 
                                       const shash::Md5 &old_path_hash, 
-                                      const shash::Md5 &new_path_hash)
-{
+                                      const shash::Md5 &new_path_hash) {
   SetDirty();
   LogCvmfs(kLogCatalog, kLogStdout, "Updating directory. Old hash: %s, new hash: %s", old_path_hash.ToString().c_str(), new_path_hash.ToString().c_str()); 
   bool retval = 

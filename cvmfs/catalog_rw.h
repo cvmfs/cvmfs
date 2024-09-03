@@ -126,7 +126,6 @@ class WritableCatalog : public Catalog {
                        const shash::Md5 &new_parent_path_hash,
                        const shash::Md5 &old_path_hash,
                        const shash::Md5 &new_path_hash);
-
   inline void RenameDirectory(const DirectoryEntry &entry,  
                               const std::string &new_parent_path,
                               const std::string &old_path,
@@ -142,12 +141,11 @@ class WritableCatalog : public Catalog {
   void UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash,
                                  const shash::Md5 &new_parent_path_hash,
                                  const shash::Md5 &old_path_hash,
-                                 const shash::Md5 &new_path_hash);
+                                 const shash::Md5 &new_path_hash); 
   inline void UpdateParentDirectoryPath(const std::string &old_parent_path, 
                                         const std::string &new_parent_path,
                                         const std::string &old_path,
-                                        const std::string &new_path)
-  {
+                                        const std::string &new_path) {
     shash::Md5 old_parent_path_hash = shash::Md5(shash::AsciiPtr(old_parent_path));
     shash::Md5 new_parent_path_hash = shash::Md5(shash::AsciiPtr(new_parent_path));
     shash::Md5 old_path_hash = shash::Md5(shash::AsciiPtr(old_path));

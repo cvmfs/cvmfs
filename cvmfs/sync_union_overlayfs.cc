@@ -197,8 +197,6 @@ void SyncUnionOverlayfs::Traverse() {
            "recursion for scratch_path=[%s]",
            scratch_path().c_str());  
   traversal.Recurse(scratch_path());
-  renamed_directories_.clear();
-  previous_directories_paths_.clear();
 }
 
 /**

@@ -1084,10 +1084,6 @@ void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
   perf::Inc(counters_->n_directories_removed);
 }
 
-
-/**
- * Update single directory entry without the content
- */
 void SyncMediator::RenameDirectory(const string& previous_path, const string& current_path) {
     LogCvmfs(kLogUnionFs, kLogStderr, "[RENAME DIR] A directory: %s was marked as renamed and " 
                                       "we obtain an old relative path: %s.", 
