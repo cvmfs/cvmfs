@@ -61,7 +61,7 @@ class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
   /**
    * Reset stream to perform decompression on a new, independent input
    */
-  virtual bool Reset() { return false; }
+  virtual bool Reset() = 0;
 
   virtual Decompressor* Clone() = 0;
   virtual std::string Describe() = 0;

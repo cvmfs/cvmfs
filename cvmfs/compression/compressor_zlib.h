@@ -13,7 +13,7 @@ namespace zlib {
 /**
  * Zlib wrapper for compression.
  */
-class ZlibCompressor: public Compressor {
+class ZlibCompressor : public Compressor {
  public:
   explicit ZlibCompressor(const Algorithms &alg);
   ZlibCompressor(const ZlibCompressor &other);
@@ -27,10 +27,10 @@ class ZlibCompressor: public Compressor {
   virtual bool CompressStream(const bool flush,
                                 unsigned char **inbuf, size_t *inbufsize,
                                 unsigned char **outbuf, size_t *outbufsize);
+  virtual bool Reset();
   virtual size_t CompressUpperBound(const size_t bytes);
-  virtual size_t DeflateBound(const size_t bytes)
-                                           { return CompressUpperBound(bytes); }
   Compressor* Clone();
+  virtual std::string Describe();
   static bool WillHandle(const zlib::Algorithms &alg);
 
  private:

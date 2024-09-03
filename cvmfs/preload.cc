@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
 
   // Copy dirtab file
   if (retval == 0) {
-    UniquePtr<zlib::Compressor> copy
-                            = zlib::Compressor::Construct(zlib::kNoCompression);
+    UniquePtr<zlib::Compressor>
+                        copy(zlib::Compressor::Construct(zlib::kNoCompression));
     zlib::InputPath in_path(dirtab);
     cvmfs::PathSink out_path(dirtab_in_cache);
     zlib::StreamStates ret = copy->CompressStream(&in_path, &out_path);

@@ -51,19 +51,17 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    * @return kStreamEnd if successful
    *         StreamState Error value if failure
    */
-  // TODO(heretherebedragons) make pure virtual when everything uses compressor
   // TODO(heretherebedragons) maybe rename it just to Compress()?
-  virtual StreamStates CompressStream(InputAbstract * /*input*/,
-                               cvmfs::Sink */*output*/) { return kStreamError; }
+  virtual StreamStates CompressStream(InputAbstract * input,
+                                      cvmfs::Sink *output) = 0;
   /**
    *  Same like CompressStream() but also calculates the hash based on the
    *  compressed output.
    */
-  // TODO(heretherebedragons) make pure virtual when everything uses compressor
-  virtual StreamStates CompressStream(InputAbstract */*input*/,
-                       cvmfs::Sink */*output*/, shash::Any */*compressed_hash*/)
-                                                        { return kStreamError; }
-  /**
+  virtual StreamStates CompressStream(InputAbstract *input,
+                          cvmfs::Sink *output, shash::Any *compressed_hash) = 0;
+
+    /**
    * Deflate function.  The arguments and returns closely match the input and
    * output of the zlib deflate function.
    * Input:
@@ -88,13 +86,11 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   /**
    * Reset stream to perform compression on a new, independent input
    */
-  virtual bool ResetStream() { return false; }
-  virtual size_t CompressUpperBound(const size_t /*bytes*/) { return 0; }
+  virtual bool Reset() = 0;
+  virtual size_t CompressUpperBound(const size_t bytes) = 0;
 
-  // TODO(heretherebedragons) will be deprecated and replaced by
-  // CompressUpperBound when everything uses compressors
-  virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor* Clone() = 0;
+  virtual std::string Describe() = 0;
 
   static void RegisterPlugins();
 

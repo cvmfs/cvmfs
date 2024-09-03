@@ -26,9 +26,10 @@ class EchoCompressor: public Compressor {
                       unsigned char **inbuf, size_t *inbufsize,
                       unsigned char **outbuf, size_t *outbufsize);
   virtual size_t CompressUpperBound(const size_t bytes);
-  virtual size_t DeflateBound(const size_t bytes) {
-                                             return CompressUpperBound(bytes); }
+  virtual bool Reset() { is_healthy_ = true; return true; }
   Compressor* Clone();
+  virtual std::string Describe();
+
   static bool WillHandle(const zlib::Algorithms &alg);
 
  private:

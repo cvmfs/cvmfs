@@ -109,4 +109,8 @@ size_t EchoCompressor::CompressUpperBound(const size_t bytes) {
   return (bytes == 0) ? 1 : bytes;
 }
 
+std::string EchoCompressor::Describe() {
+  return "EchoCompressor (no compression)";
+}
+
 }  // namespace zlib

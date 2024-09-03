@@ -206,4 +206,18 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
   }
 }
 
+bool ZlibCompressor::Reset() {
+  if (deflateReset(&stream_) == Z_OK) {
+    is_healthy_ = true;
+    return true;
+  } else {
+    is_healthy_ = false;
+    return false;
+  }
+}
+
+std::string ZlibCompressor::Describe() {
+  return "ZlibCompressor (default)";
+}
+
 }  // namespace zlib
