@@ -15,8 +15,10 @@
 
 #include "catalog_mgr.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "network/sink_mem.h"
 #include "util/logging.h"
 
 
@@ -35,14 +37,16 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
   // file is in the repository!  It is currently done by the sync_mediator.
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
-  void *empty_compressed;
-  uint64_t sz_empty_compressed;
-  bool retval = zlib::CompressMem2Mem(
-    NULL, 0, &empty_compressed, &sz_empty_compressed);
-  assert(retval);
-  shash::HashMem(static_cast<unsigned char *>(empty_compressed),
-                 sz_empty_compressed, &file_hash);
-  free(empty_compressed);
+
+  UniquePtr<zlib::Compressor>
+                    compressor(zlib::Compressor::Construct(zlib::kZlibDefault));
+
+  zlib::InputMem in(NULL, 0);
+  cvmfs::MemSink empty_compressed(0);
+  assert(compressor->CompressStream(&in, &empty_compressed)
+                                                           == zlib::kStreamEnd);
+
+  shash::HashMem(empty_compressed.data(), empty_compressed.pos(), &file_hash);
 
   DirectoryEntryBase deb;
   deb.name_ = NameString(name);

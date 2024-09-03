@@ -11,8 +11,11 @@
 
 #include "catalog_rw.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "network/sink_file.h"
+#include "network/sink_null.h"
 #include "options.h"
 #include "testutil.h"
 #include "util/posix.h"
@@ -511,11 +514,19 @@ void CatalogTestTool::CreateHistory(
     ASSERT_TRUE(history->Insert(tag));
   }
   history_hash->suffix = shash::kSuffixHistory;
-  ASSERT_TRUE(zlib::CompressPath2Null(history_path, history_hash));
-  ASSERT_TRUE(
-    zlib::CompressPath2Path(
-      history_path,
-      repo_path_ + "/data/" + history_hash->MakePath()));
+
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+  zlib::InputPath input(history_path);
+  cvmfs::NullSink out_null;
+  // TODO(heretherebedragons) for what do we need the hash here?
+  EXPECT_EQ(compress->CompressStream(&input, &out_null, history_hash),
+            zlib::kStreamEnd);
+
+  zlib::InputPath in_path(history_path);
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + history_hash->MakePath());
+  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path);
+  EXPECT_EQ(retval, zlib::kStreamEnd);
 }
 
 
@@ -665,11 +676,20 @@ void CatalogTestTool::CreateKeys(
   ASSERT_TRUE(SafeWriteToFile(key, repo_path_ + "/testrepo.key", 0600));
 
   hash_cert->suffix = shash::kSuffixCertificate;
-  ASSERT_TRUE(
-    zlib::CompressPath2Null(repo_path_ + "/testrepo.crt", hash_cert));
-  ASSERT_TRUE(
-    zlib::CompressPath2Path(repo_path_ + "/testrepo.crt",
-                            repo_path_ + "/data/" + hash_cert->MakePath()));
+
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+  zlib::InputPath in_path(repo_path_ + "/testrepo.crt");
+  cvmfs::NullSink out_null;
+  // TODO(heretherebedragons) for what do we need the hash here?
+  EXPECT_EQ(compress->CompressStream(&in_path, &out_null, hash_cert),
+            zlib::kStreamEnd);
+
+
+  zlib::InputPath in_path2(repo_path_ + "/testrepo.crt");
+  cvmfs::PathSink out_path(repo_path_ + "/data/" + hash_cert->MakePath());
+  zlib::StreamStates retval = compress->CompressStream(&in_path2, &out_path);
+  EXPECT_EQ(retval, zlib::kStreamEnd);
 
   *public_key = repo_path_ + string("/testrepo.pub");
 }

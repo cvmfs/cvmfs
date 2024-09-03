@@ -55,10 +55,9 @@ class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
    *         kStreamContinue if successful and compression stream is unfinished
    *         StreamState Error value if failure
    */
-  // TODO(heretherebedragons) make pure virtual when everything uses compressor
-  // TODO(heretherebedragons) maybe rename it just to Compress()?
-  virtual StreamStates DecompressStream(InputAbstract * /*input*/,
-                               cvmfs::Sink */*output*/) { return kStreamError; }
+  // TODO(heretherebedragons) maybe rename it just to Decompress()?
+  virtual StreamStates DecompressStream(InputAbstract *input,
+                                        cvmfs::Sink *output) = 0;
   /**
    * Reset stream to perform decompression on a new, independent input
    */

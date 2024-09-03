@@ -22,15 +22,6 @@ struct Any;
 class ContextPtr;
 }
 
-bool CopyPath2Path(const std::string &src, const std::string &dest);
-bool CopyPath2File(const std::string &src, FILE *fdest);
-bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
-                  const std::string &path);
-bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
-                  FILE *fdest);
-bool CopyPath2Mem(const std::string &path,
-                  unsigned char **buffer, unsigned *buffer_size);
-
 namespace zlib {
 
 /**
@@ -110,33 +101,6 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  protected:
   const unsigned kZChunk;
 };
-
-void CompressInit(z_stream *strm);
-void CompressFini(z_stream *strm);
-
-StreamStates CompressZStream2Null(
-  const void *buf, const int64_t size, const bool eof,
-  z_stream *strm, shash::ContextPtr *hash_context);
-
-bool CompressPath2Path(const std::string &src, const std::string &dest);
-bool CompressPath2Path(const std::string &src, const std::string &dest,
-                       shash::Any *compressed_hash);
-
-bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
-bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t* size = NULL);
-bool CompressFile2File(FILE *fsrc, FILE *fdest);
-bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
-bool CompressPath2File(const std::string &src, FILE *fdest,
-                       shash::Any *compressed_hash);
-
-bool CompressMem2File(const unsigned char *buf, const size_t size,
-                      FILE *fdest, shash::Any *compressed_hash);
-
-// User of these functions has to free out_buf, if successful
-bool CompressMem2Mem(const void *buf, const int64_t size,
-                     void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
 

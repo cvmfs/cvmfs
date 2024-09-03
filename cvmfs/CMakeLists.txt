@@ -528,6 +528,8 @@ if (BUILD_LIBCVMFS_CACHE)
                   compression/util.cc
                   fd_refcount_mgr.cc
                   manifest.cc
+                  network/sink_path.cc
+                  network/sink_file.cc
                   quota.cc
   )
   set_target_properties (cvmfs_cache_posix PROPERTIES COMPILE_FLAGS "-DDEBUGMSG")

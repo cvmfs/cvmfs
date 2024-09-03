@@ -12,6 +12,7 @@
 
 #include "c_mock_uploader.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
@@ -114,6 +115,7 @@ class T_Ingestion : public ::testing::Test {
   TubeConsumerGroup<DummyItem> task_group_;
   IngestionMockUploader *uploader_;
   ItemAllocator allocator_;
+  UniquePtr<zlib::Compressor> compressor_;
 };
 
 
@@ -524,15 +526,17 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   b1->MakeStop();
   tube_in.EnqueueBack(b1);
 
-  void *ptr_zlib_null;
-  uint64_t sz_zlib_null;
-  EXPECT_TRUE(zlib::CompressMem2Mem(NULL, 0, &ptr_zlib_null, &sz_zlib_null));
+  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputMem in(NULL, 0);
+  cvmfs::MemSink zlib_null(0);
+  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_null);
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(zlib_null.pos(), 0U);
 
   BlockItem *item_data = tube_out->PopFront();
   EXPECT_EQ(BlockItem::kBlockData, item_data->type());
-  EXPECT_EQ(sz_zlib_null, item_data->size());
-  EXPECT_EQ(0, memcmp(item_data->data(), ptr_zlib_null, sz_zlib_null));
-  free(ptr_zlib_null);
+  EXPECT_EQ(zlib_null.pos(), item_data->size());
+  EXPECT_EQ(0, memcmp(item_data->data(), zlib_null.data(), zlib_null.pos()));
   EXPECT_EQ(1, item_data->tag());
   EXPECT_EQ(&file_null, item_data->file_item());
   EXPECT_EQ(&chunk_null, item_data->chunk_item());
@@ -567,7 +571,6 @@ TEST_F(T_Ingestion, TaskCompress) {
   EXPECT_EQ(0U, size % block_size);
   BlockItem block_raw(42, &allocator_);
   block_raw.MakeData(size);
-  unsigned char *buf = reinterpret_cast<unsigned char *>(smalloc(size));
 
   // File does not exist
   FileItem file_large(new FileIngestionSource(std::string("./large")));
@@ -592,15 +595,15 @@ TEST_F(T_Ingestion, TaskCompress) {
   b_stop->MakeStop();
   tube_in.EnqueueBack(b_stop);
 
-  void *ptr_zlib_large = NULL;
-  uint64_t sz_zlib_large = 0;
-  EXPECT_TRUE(zlib::CompressMem2Mem(
-    block_raw.data(), block_raw.size(),
-    &ptr_zlib_large, &sz_zlib_large));
-  free(buf);
+  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputMem in(block_raw.data(), block_raw.size());
+  cvmfs::MemSink zlib_large(0);
+  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_large);
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(zlib_large.pos(), 0U);
 
   unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
-    smalloc(sz_zlib_large));
+                                                     smalloc(zlib_large.pos()));
   unsigned read_pos = 0;
 
   BlockItem *b = NULL;
@@ -610,7 +613,7 @@ TEST_F(T_Ingestion, TaskCompress) {
     EXPECT_EQ(1, b->tag());
     EXPECT_EQ(&file_large, b->file_item());
     EXPECT_EQ(&chunk_large, b->chunk_item());
-    EXPECT_LE(read_pos + b->size(), sz_zlib_large);
+    EXPECT_LE(read_pos + b->size(), zlib_large.pos());
     if (b->size() > 0) {
       memcpy(ptr_read_large + read_pos, b->data(), b->size());
       read_pos += b->size();
@@ -620,11 +623,10 @@ TEST_F(T_Ingestion, TaskCompress) {
   delete b;
   EXPECT_EQ(0U, tube_out->size());
 
-  EXPECT_EQ(sz_zlib_large, read_pos);
-  EXPECT_EQ(0, memcmp(ptr_zlib_large, ptr_read_large, sz_zlib_large));
+  EXPECT_EQ(zlib_large.pos(), read_pos);
+  EXPECT_EQ(0, memcmp(zlib_large.data(), ptr_read_large, zlib_large.pos()));
 
   free(ptr_read_large);
-  free(ptr_zlib_large);
   task_group.Terminate();
 }
 
@@ -814,14 +816,17 @@ TEST_F(T_Ingestion, PipelineNull) {
                          true);
   pipeline_zlib->WaitFor();
   EXPECT_EQ(1U, uploader_->results.size());
-  void *compressed_null = NULL;
-  uint64_t sz_compressed_null;
-  EXPECT_TRUE(
-    zlib::CompressMem2Mem(NULL, 0, &compressed_null, &sz_compressed_null));
+
+
+  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  zlib::InputMem in(NULL, 0);
+  cvmfs::MemSink zlib_null(0);
+  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_null);
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  ASSERT_GT(zlib_null.pos(), 0U);
+
   shash::Any hash_compressed_null(spooler_definition.hash_algorithm);
-  shash::HashMem(reinterpret_cast<unsigned char *>(compressed_null),
-                 sz_compressed_null, &hash_compressed_null);
-  free(compressed_null);
+  shash::HashMem(zlib_null.data(), zlib_null.pos(), &hash_compressed_null);
   EXPECT_EQ(hash_compressed_null, uploader_->results[0].computed_hash);
 }
 

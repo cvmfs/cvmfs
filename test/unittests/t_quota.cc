@@ -13,7 +13,9 @@
 
 #include "cache_posix.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
+#include "network/sink_path.h"
 #include "quota_posix.h"
 #include "testutil.h"
 #include "util/algorithm.h"
@@ -502,7 +504,12 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
   CreateFile(tmp_path_ + "/" + hashes_[0].MakePath(), 0600);
   CreateFile(tmp_path_ + "/" + hashes_[1].MakePath(), 0600);
   unsigned char buf = 'x';
-  EXPECT_TRUE(CopyMem2Path(&buf, 1, tmp_path_ + "/" + hashes_[1].MakePath()));
+
+  UniquePtr<zlib::Compressor>
+                        copy(zlib::Compressor::Construct(zlib::kNoCompression));
+  zlib::InputMem in_mem(&buf, 1);
+  cvmfs::PathSink out_path(tmp_path_ + "/" + hashes_[1].MakePath());
+  EXPECT_TRUE(copy->CompressStream(&in_mem, &out_path) == zlib::kStreamEnd);
   quota_mgr_ =
     PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
   ASSERT_TRUE(quota_mgr_ != NULL);

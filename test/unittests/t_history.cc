@@ -14,8 +14,8 @@
 #include "history_sqlite.h"
 #include "network/sink_path.h"
 #include "testutil.h"
-#include "util/prng.h"
 #include "util/pointer.h"
+#include "util/prng.h"
 
 using history::History;
 using history::SqliteHistory;

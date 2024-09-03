@@ -9,6 +9,7 @@
 #include <string>
 
 #include "catalog.h"
+#include "compression/compression.h"
 #include "compression/decompression.h"
 #include "crypto/hash.h"
 #include "smallhash.h"
@@ -101,6 +102,7 @@ class CommandCheck : public Command {
   bool        is_remote_;
   SmallHashDynamic<shash::Any, char> duplicates_map_;
   UniquePtr<zlib::Decompressor> decomp_zlib_;
+  UniquePtr<zlib::Compressor> copy_;
 };
 
 }  // namespace swissknife

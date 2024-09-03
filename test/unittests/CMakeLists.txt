@@ -329,7 +329,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_catalog_virtual.cc
   t_chunk_detectors.cc
   t_clientctx.cc
-  t_compression.cc
   t_compressor.cc
   t_dirtab.cc
   t_dns.cc

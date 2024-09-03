@@ -12,12 +12,15 @@
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
 #include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "crypto/hash.h"
 #include "interrupt.h"
 #include "network/download.h"
 #include "network/sink.h"
+#include "network/sink_file.h"
 #include "statistics.h"
 #include "util/file_guard.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/prng.h"
 
@@ -431,10 +434,14 @@ TEST_F(T_Download, LocalFile2Sink) {
   for (unsigned i = 0; i < N; ++i)
     rnd_buf[i] = prng.Next(2147483647);
   shash::Any checksum(shash::kMd5);
-  EXPECT_TRUE(
-    zlib::CompressMem2File(reinterpret_cast<const unsigned char *>(rnd_buf),
-                           size, fdest, &checksum));
-  fclose(fdest);
+
+  UniquePtr<zlib::Compressor>
+                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+  zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
+  cvmfs::FileSink out_f(fdest, true);
+
+  EXPECT_EQ(compress->CompressStream(&in_mem, &out_f, &checksum),
+            zlib::kStreamEnd);
 
   TestSink test_sink2;
   JobInfo info2(&url, true /* compressed */, false /* probe hosts */,

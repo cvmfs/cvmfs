@@ -9,8 +9,9 @@
 #include <cstdlib>
 
 #include "catalog_mgr_rw.h"
-#include "compression/compression.h"
+#include "compression/input_mem.h"
 #include "history.h"
+#include "network/sink_mem.h"
 #include "swissknife_history.h"
 #include "swissknife_sync.h"
 #include "util/logging.h"
@@ -72,14 +73,13 @@ void VirtualCatalog::CreateNestedCatalogMarker() {
   // file is in the repository!  It is currently done by the sync_mediator.
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
-  void *empty_compressed;
-  uint64_t sz_empty_compressed;
-  bool retval = zlib::CompressMem2Mem(
-    NULL, 0, &empty_compressed, &sz_empty_compressed);
-  assert(retval);
-  shash::HashMem(static_cast<unsigned char *>(empty_compressed),
-                 sz_empty_compressed, &file_hash);
-  free(empty_compressed);
+
+  zlib::InputMem in(NULL, 0);
+  cvmfs::MemSink empty_compressed(0);
+  assert(compressor->CompressStream(&in, &empty_compressed)
+                                                           == zlib::kStreamEnd);
+  shash::HashMem(empty_compressed.data(), empty_compressed.pos(), &file_hash);
+
   entry_marker.name_ = NameString(".cvmfscatalog");
   entry_marker.mode_ = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
   entry_marker.checksum_ = file_hash;
@@ -332,13 +332,13 @@ void VirtualCatalog::RemoveSnapshot(TagId tag) {
 }
 
 
-VirtualCatalog::VirtualCatalog(
-  manifest::Manifest *m,
-  download::DownloadManager *d,
-  catalog::WritableCatalogManager *c,
-  SyncParameters *p)
-  : catalog_mgr_(c)
-  , assistant_(d, m, p->stratum0, p->dir_temp)
-{ }
+VirtualCatalog::VirtualCatalog(manifest::Manifest *m,
+                               download::DownloadManager *d,
+                               catalog::WritableCatalogManager *c,
+                               SyncParameters *p)
+                               : catalog_mgr_(c)
+                               , assistant_(d, m, p->stratum0, p->dir_temp) {
+  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+}
 
 }  // namespace catalog

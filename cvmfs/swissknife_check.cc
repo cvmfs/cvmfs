@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression/compression.h"
+#include "compression/input_file.h"
 #include "compression/input_path.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
@@ -56,6 +56,7 @@ CommandCheck::CommandCheck()
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
   decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  copy_ = zlib::Compressor::Construct(zlib::kNoCompression);
 }
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
@@ -197,9 +198,11 @@ string CommandCheck::FetchPath(const string &path) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    bool retval = CopyPath2File(url, f);
-    if (!retval) {
-      PANIC(kLogStderr, "failed to read %s", url.c_str());
+    zlib::InputPath input(url);
+    cvmfs::FileSink output(f);
+    zlib::StreamStates retval = copy_->CompressStream(&input, &output);
+    if (retval != zlib::kStreamEnd) {
+      PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }
   }
 

@@ -7,9 +7,11 @@
 #include <string>
 #include <vector>
 
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "swissknife_assistant.h"
+#include "util/pointer.h"
 
 namespace catalog {
 class WritableCatalogManager;
@@ -42,6 +44,7 @@ class VirtualCatalog {
 
  private:
   static const char *kSnapshotDirectory;
+  UniquePtr<zlib::Compressor> compressor;
 
   struct TagId {
     TagId() { }

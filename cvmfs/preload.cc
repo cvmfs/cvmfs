@@ -11,8 +11,11 @@
 #include <string>
 
 #include "compression/compression.h"
+#include "compression/input_mem.h"
+#include "compression/input_path.h"
 #include "crypto/signature.h"
 #include "network/download.h"
+#include "network/sink_path.h"
 #include "statistics.h"
 #include "swissknife.h"
 #include "swissknife_pull.h"
@@ -175,17 +178,28 @@ int main(int argc, char *argv[]) {
   string cern_pk_it4_path  = cern_pk_base_path + "/cern-it4.cern.ch.pub";
   string cern_pk_it5_path  = cern_pk_base_path + "/cern-it5.cern.ch.pub";
   bool keys_created = false;
+  UniquePtr<zlib::Compressor>
+                    compress(zlib::Compressor::Construct(zlib::kNoCompression));
   if (args.find('k') == args.end()) {
     keys_created = true;
-    assert(CopyMem2Path(
-      reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
-      sizeof(gCernIt1PublicKey), cern_pk_it1_path));
-    assert(CopyMem2Path(
-      reinterpret_cast<const unsigned char*>(gCernIt4PublicKey),
-      sizeof(gCernIt4PublicKey), cern_pk_it4_path));
-    assert(CopyMem2Path(
-      reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
-      sizeof(gCernIt5PublicKey), cern_pk_it5_path));
+    zlib::InputMem
+             in_it1(reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
+                   sizeof(gCernIt1PublicKey));
+    cvmfs::PathSink out_it1(cern_pk_it1_path);
+    assert(compress->CompressStream(&in_it1, &out_it1) == zlib::kStreamEnd);
+
+    zlib::InputMem
+             in_it4(reinterpret_cast<const unsigned char*>(gCernIt4PublicKey),
+                   sizeof(gCernIt4PublicKey));
+    cvmfs::PathSink out_it4(cern_pk_it4_path);
+    assert(compress->CompressStream(&in_it4, &out_it4) == zlib::kStreamEnd);
+
+    zlib::InputMem
+             in_it5(reinterpret_cast<const unsigned char*>(gCernIt5PublicKey),
+                   sizeof(gCernIt5PublicKey));
+    cvmfs::PathSink out_it5(cern_pk_it5_path);
+    assert(compress->CompressStream(&in_it5, &out_it5) == zlib::kStreamEnd);
+
     char path_separator = ':';
     args['k'].Reset(new string(cern_pk_it1_path + path_separator +
                            cern_pk_it4_path + path_separator +
@@ -203,7 +217,16 @@ int main(int argc, char *argv[]) {
 
   // Copy dirtab file
   if (retval == 0) {
-    CopyPath2Path(dirtab, dirtab_in_cache);
+    UniquePtr<zlib::Compressor> copy
+                            = zlib::Compressor::Construct(zlib::kNoCompression);
+    zlib::InputPath in_path(dirtab);
+    cvmfs::PathSink out_path(dirtab_in_cache);
+    zlib::StreamStates ret = copy->CompressStream(&in_path, &out_path);
+    if (ret != zlib::kStreamEnd) {
+      PANIC(kLogStderr | kLogSyslogErr,
+                          "Failure to copy dirtab from %s to %s: error %d",
+                          dirtab.c_str(), dirtab_in_cache.c_str(), ret);
+    }
   }
 
   // Create cache uuid if not present

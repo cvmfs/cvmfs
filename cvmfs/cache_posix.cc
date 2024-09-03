@@ -49,12 +49,15 @@
 #include <map>
 #include <vector>
 
+#include "compression/compression.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_path.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -171,8 +174,17 @@ int PosixCacheManager::CommitTxn(void *txn) {
                "size check failure for %s, expected %lu, got %lu",
                transaction->id.ToString().c_str(),
                transaction->expected_size, transaction->size);
-      CopyPath2Path(transaction->tmp_path,
-                    cache_path_ + "/quarantaine/" + transaction->id.ToString());
+
+      UniquePtr<zlib::Compressor>
+                        copy(zlib::Compressor::Construct(zlib::kNoCompression));
+      zlib::InputPath in_path(transaction->tmp_path);
+      cvmfs::PathSink
+           out_path(cache_path_ + "/quarantaine/" + transaction->id.ToString());
+      if (copy->CompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+                               "copying file %s to %s failed",
+                               in_path.path().c_str(), out_path.path().c_str());
+      }
       unlink(transaction->tmp_path.c_str());
       transaction->~Transaction();
       atomic_dec32(&no_inflight_txns_);

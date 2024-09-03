@@ -27,6 +27,7 @@
 #include "compression/compression.h"
 #include "compression/decompression.h"
 #include "compression/input_file.h"
+#include "compression/input_mem.h"
 #include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
@@ -44,6 +45,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
 #include "util/smalloc.h"
@@ -124,6 +126,8 @@ string              *preload_cachedir = NULL;
 bool                 inspect_existing_catalogs = false;
 manifest::Reflog    *reflog = NULL;
 UniquePtr<zlib::Decompressor> decomp_zlib;
+UniquePtr<zlib::Compressor> comp_zlib;
+UniquePtr<zlib::Compressor> copy;
 }  // anonymous namespace
 
 
@@ -226,24 +230,24 @@ static void Store(
 
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string &dest_path, const bool compress) {
+                        const std::string &dest_path,
+                        zlib::Compressor *compress) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval;
-  if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
-    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
-  } else {
-    retval = CopyMem2File(buffer, size, ftmp);
-  }
-  assert(retval);
-  fclose(ftmp);
+
+  zlib::InputMem in_mem(buffer, size);
+  cvmfs::FileSink out_f(ftmp, true);
+
+  zlib::StreamStates retval = compress->CompressStream(&in_mem, &out_f);
+  assert(retval == zlib::kStreamEnd);
+
   Store(tmp_file, dest_path, true);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const shash::Any &dest_hash, const bool compress) {
+                        const shash::Any &dest_hash,
+                        zlib::Compressor *compress) {
   StoreBuffer(buffer, size, MakePath(dest_hash), compress);
 }
 
@@ -428,7 +432,7 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
     decomp_zlib->Reset();
     goto pull_cleanup;
   }
-  }
+  }   // end anonymous namespace
   if (path.empty() && reflog != NULL) {
     if (!reflog->AddCatalog(catalog_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to add catalog to Reflog.");
@@ -588,6 +592,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&chunk_queue);
 
   decomp_zlib = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  comp_zlib = zlib::Compressor::Construct(zlib::kZlibDefault);
+  copy = zlib::Compressor::Construct(zlib::kNoCompression);
 
   const bool     follow_redirects = false;
   const unsigned max_pool_handles = num_parallel+1;
@@ -840,7 +846,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!Peek(ensemble.manifest->certificate())) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
-                  ensemble.manifest->certificate(), true);
+                  ensemble.manifest->certificate(), comp_zlib.weak_ref());
     }
     if (reflog != NULL &&
         !reflog->AddCertificate(ensemble.manifest->certificate())) {
@@ -850,7 +856,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
-      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+      StoreBuffer(info, meta_info.size(), meta_info_hash,
+                  comp_zlib.weak_ref());
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
@@ -904,12 +911,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
-                    ".cvmfswhitelist.pkcs7", false);
+                    ".cvmfswhitelist.pkcs7", copy.weak_ref());
       }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                  ".cvmfswhitelist", false);
+                  ".cvmfswhitelist", copy.weak_ref());
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                  ".cvmfspublished", false);
+                  ".cvmfspublished", copy.weak_ref());
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());
