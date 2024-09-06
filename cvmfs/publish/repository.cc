@@ -562,7 +562,7 @@ void Publisher::OnUploadWhitelist(const upload::SpoolerResult &result) {
 
 void Publisher::CreateDirectoryAsOwner(const std::string &path, int mode)
 {
-  bool rvb = MkdirDeep(path, mode);
+  const bool rvb = MkdirDeep(path, mode);
   if (!rvb) throw EPublish("cannot create directory " + path);
   int rvi = chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
   if (rvi != 0) throw EPublish("cannot set ownership on directory " + path);
