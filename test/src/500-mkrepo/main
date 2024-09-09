@@ -49,13 +49,13 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  check_mountpoint_permissions || return 121
+  check_mountpoint_permissions ${repo_dir} || return 121
 
   echo "start and abort transaction to check permissions"
   start_transaction $CVMFS_TEST_REPO || return 123
   abort_transaction $CVMFS_TEST_REPO || return 124
 
-  check_mountpoint_permissions || return 125
+  check_mountpoint_permissions ${repo_dir} || return 125
 
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
