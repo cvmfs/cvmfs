@@ -578,7 +578,7 @@ void Publisher::InitSpoolArea() {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().scratch_dir(),
                          kDefaultDirMode);
   CreateDirectoryAsOwner(settings_.transaction().spool_area().ovl_work_dir(),
-                         kDefaultDirMode);
+                         kPrivateDirMode);
 
   // On a managed node, the mount points are already mounted
   if (!DirectoryExists(settings_.transaction().spool_area().readonly_mnt())) {
