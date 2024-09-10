@@ -51,7 +51,7 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
 
   zlib::InputCache input(this, fd, 4096);
   cvmfs::NullSink out_null;
-  zlib::StreamStates retval = compress_->CompressStream(&input, &out_null, id);
+  zlib::StreamStates retval = compress_->Compress(&input, &out_null, id);
 
   if (retval != zlib::kStreamEnd) {
     return -EINVAL;

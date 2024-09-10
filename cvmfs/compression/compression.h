@@ -14,6 +14,7 @@
 #include "duplex_zlib.h"
 #include "input_abstract.h"
 #include "network/sink.h"
+#include "network/sink_mem.h"
 #include "util.h"
 #include "util/plugin.h"
 
@@ -51,15 +52,13 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    * @return kStreamEnd if successful
    *         StreamState Error value if failure
    */
-  // TODO(heretherebedragons) maybe rename it just to Compress()?
-  virtual StreamStates CompressStream(InputAbstract * input,
-                                      cvmfs::Sink *output) = 0;
+  virtual StreamStates Compress(InputAbstract * input, cvmfs::Sink *output) = 0;
   /**
-   *  Same like CompressStream() but also calculates the hash based on the
+   *  Same like Compress() but also calculates the hash based on the
    *  compressed output.
    */
-  virtual StreamStates CompressStream(InputAbstract *input,
-                          cvmfs::Sink *output, shash::Any *compressed_hash) = 0;
+  virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
+                                shash::Any *compressed_hash) = 0;
 
     /**
    * Deflate function.  The arguments and returns closely match the input and
@@ -80,9 +79,8 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    */
   // TODO(heretherebedragons) remove! when everything is replaced to use the
   // compressor
-  virtual bool CompressStream(const bool flush,
-                              unsigned char **inbuf, size_t *inbufsize,
-                              unsigned char **outbuf, size_t *outbufsize) = 0;
+  virtual StreamStates CompressStream(InputAbstract *input,
+                                  cvmfs::MemSink *output, const bool flush) = 0;
   /**
    * Reset stream to perform compression on a new, independent input
    */

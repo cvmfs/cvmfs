@@ -5,6 +5,8 @@
 #ifndef CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
 #define CVMFS_COMPRESSION_COMPRESSOR_ZLIB_H_
 
+#include <string>
+
 #include "compression.h"
 #include "duplex_zlib.h"
 
@@ -19,14 +21,14 @@ class ZlibCompressor : public Compressor {
   ZlibCompressor(const ZlibCompressor &other);
   ~ZlibCompressor();
 
+  virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output);
+  virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
+                                shash::Any *compressed_hash);
   virtual StreamStates CompressStream(InputAbstract *input,
-                                      cvmfs::Sink *output);
-  virtual StreamStates CompressStream(InputAbstract *input,
-                                      cvmfs::Sink *output,
-                                      shash::Any *compressed_hash);
-  virtual bool CompressStream(const bool flush,
-                                unsigned char **inbuf, size_t *inbufsize,
-                                unsigned char **outbuf, size_t *outbufsize);
+                                      cvmfs::MemSink *output, const bool flush);
+  bool CompressStreamOld(const bool flush,
+                      unsigned char **inbuf, size_t *inbufsize,
+                      unsigned char **outbuf, size_t *outbufsize);
   virtual bool Reset();
   virtual size_t CompressUpperBound(const size_t bytes);
   Compressor* Clone();

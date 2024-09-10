@@ -509,9 +509,8 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
                         copy(zlib::Compressor::Construct(zlib::kNoCompression));
   zlib::InputMem in_mem(&buf, 1);
   cvmfs::PathSink out_path(tmp_path_ + "/" + hashes_[1].MakePath());
-  EXPECT_TRUE(copy->CompressStream(&in_mem, &out_path) == zlib::kStreamEnd);
-  quota_mgr_ =
-    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
+  EXPECT_TRUE(copy->Compress(&in_mem, &out_path) == zlib::kStreamEnd);
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
   // The empty file was removed during rebuild

@@ -43,8 +43,7 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
 
   zlib::InputMem in(NULL, 0);
   cvmfs::MemSink empty_compressed(0);
-  assert(compressor->CompressStream(&in, &empty_compressed)
-                                                           == zlib::kStreamEnd);
+  assert(compressor->Compress(&in, &empty_compressed) == zlib::kStreamEnd);
 
   shash::HashMem(empty_compressed.data(), empty_compressed.pos(), &file_hash);
 

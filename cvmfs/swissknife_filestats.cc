@@ -108,10 +108,10 @@ void CommandFileStats::CatalogCallback(
 
   // TODO(heretherebedragons) should we make the compressor a class var?
   UniquePtr<zlib::Compressor>
-                          cp(zlib::Compressor::Construct(zlib::kNoCompression));
+                   comp_copy(zlib::Compressor::Construct(zlib::kNoCompression));
   zlib::InputPath in_path(data.catalog->database_path());
   cvmfs::PathSink out_path(tmp_db_path_ + StringifyInt(num + 1) + ".db");
-  assert(cp->CompressStream(&in_path, &out_path) == zlib::kStreamEnd);
+  assert(comp_copy->Compress(&in_path, &out_path) == zlib::kStreamEnd);
   atomic_inc32(&num_downloaded_);
 }
 

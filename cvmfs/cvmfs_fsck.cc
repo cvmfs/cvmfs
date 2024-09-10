@@ -185,8 +185,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
     shash::Any hash(expected_hash.algorithm);
     zlib::InputFile input(fdopen(fd_src, "r"), true);
     cvmfs::NullSink out_null;
-    if (compress->CompressStream(&input, &out_null, &hash) 
-                                                          != zlib::kStreamEnd) {
+    if (compress->Compress(&input, &out_null, &hash) != zlib::kStreamEnd) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());
       atomic_inc32(&g_num_err_operational);

@@ -13,13 +13,14 @@
 #include <cstdio>
 #include <vector>
 
+#include "compression/compressor_zlib.h"
 #include "crypto/hash.h"
 #include "util/fs_traversal.h"
 #include "util/platform.h"
 #include "util/posix.h"
 
 bool swissknife::CommandGraft::ChecksumFdWithChunks(
-    int fd, zlib::Compressor *compressor, uint64_t *file_size,
+    int fd, zlib::ZlibCompressor *compressor, uint64_t *file_size,
     shash::Any *file_hash, std::vector<uint64_t> *chunk_offsets,
     std::vector<shash::Any> *chunk_checksums) {
   if (!compressor || !file_size || !file_hash) {
@@ -52,7 +53,7 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
   }
 
   bool flush = 0;
-  do {
+  do {  // TODO TODO
     bytes_read = read(fd, cur_in_buf + avail_in, in_buf_size);
     if (-1 == bytes_read) {
       if (errno == EINTR) {
@@ -70,7 +71,7 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
     // If possible, make progress on deflate.
     unsigned char *cur_out_buf = out_buf;
     size_t avail_out = zlib::kZChunk;
-    compressor->CompressStream(flush, &cur_in_buf, &avail_in, &cur_out_buf,
+    compressor->CompressStreamOld(flush, &cur_in_buf, &avail_in, &cur_out_buf,
                                &avail_out);
     if (do_chunk) {
       shash::Update(out_buf, avail_out, chunk_hash_context);
@@ -255,8 +256,9 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                       compressor(zlib::Compressor::Construct(compression_alg_));
 
   bool retval =
-      ChecksumFdWithChunks(fd, compressor.weak_ref(), &processed_size,
-                           &file_hash, &chunk_offsets, &chunk_checksums);
+      ChecksumFdWithChunks(fd,
+                 static_cast<zlib::ZlibCompressor*>(compressor.weak_ref()),
+                 &processed_size, &file_hash, &chunk_offsets, &chunk_checksums);
 
   if (!input_file_is_stdin) {
     close(fd);

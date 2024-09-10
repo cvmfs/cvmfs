@@ -472,7 +472,7 @@ TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
 
   zlib::InputPath in_path(tmp_path_ + "/quarantaine/" + rnd_hash.ToString());
   cvmfs::MemSink out_mem(0);
-  EXPECT_EQ(copy_->CompressStream(&in_path, &out_mem), zlib::kStreamEnd);
+  EXPECT_EQ(copy_->Compress(&in_path, &out_mem), zlib::kStreamEnd);
   EXPECT_EQ(1U, out_mem.pos());
   EXPECT_EQ(content, out_mem.data()[0]);
 }
@@ -609,7 +609,7 @@ TEST_F(T_CacheManager, Create) {
 
   zlib::InputPath in_path(tmp_path_ + "/" + hash_null_.MakePath());
   cvmfs::PathSink out_path(path + "/cvmfscatalog.cache");
-  EXPECT_EQ(copy_->CompressStream(&in_path, &out_path), zlib::kStreamEnd);
+  EXPECT_EQ(copy_->Compress(&in_path, &out_path), zlib::kStreamEnd);
   EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
 }
 
@@ -729,7 +729,7 @@ TEST_F(T_CacheManager, Rename) {
 
   zlib::InputPath in_path(path_one);
   cvmfs::PathSink out_path(path_null);
-  EXPECT_EQ(copy_->CompressStream(&in_path, &out_path), zlib::kStreamEnd);
+  EXPECT_EQ(copy_->Compress(&in_path, &out_path), zlib::kStreamEnd);
   cache_mgr_->rename_workaround_ = PosixCacheManager::kRenameLink;
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));

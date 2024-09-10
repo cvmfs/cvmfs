@@ -47,7 +47,7 @@ class T_Fetcher : public ::testing::Test {
 
     zlib::InputMem in_x(&x, 1);
     cvmfs::MemSink buf1(0);
-    EXPECT_TRUE(compress->CompressStream(&in_x, &buf1) == zlib::kStreamEnd);
+    EXPECT_TRUE(compress->Compress(&in_x, &buf1) == zlib::kStreamEnd);
 
     shash::HashMem(buf1.data(), buf1.pos() + 1, &hash_regular_);
     shash::HashMem(&x, 1, &hash_uncompressed_);
@@ -57,39 +57,39 @@ class T_Fetcher : public ::testing::Test {
 
     zlib::InputMem in_reg(buf1.data(), buf1.pos() + 1);
     cvmfs::PathSink out_reg(src_path_ + "/" + hash_regular_.MakePath());
-    EXPECT_TRUE(copy->CompressStream(&in_reg, &out_reg) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_reg, &out_reg) == zlib::kStreamEnd);
 
     in_x.Reset();
     cvmfs::PathSink out_unc(src_path_ + "/" + hash_uncompressed_.MakePath());
-    EXPECT_TRUE(copy->CompressStream(&in_x, &out_unc) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_x, &out_unc) == zlib::kStreamEnd);
 
     EXPECT_TRUE(in_reg.Reset());
     cvmfs::PathSink out_tmp(tmp_path_ + "/altpath");
-    EXPECT_TRUE(copy->CompressStream(&in_reg, &out_tmp) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_reg, &out_tmp) == zlib::kStreamEnd);
 
     EXPECT_TRUE(in_reg.Reset());
     cvmfs::PathSink out_alt(tmp_path_ + "/reg");
-    EXPECT_TRUE(copy->CompressStream(&in_reg, &out_alt) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_reg, &out_alt) == zlib::kStreamEnd);
 
     zlib::InputMem in_y(&y, 1);
     cvmfs::MemSink buf2(0);
-    EXPECT_TRUE(compress->CompressStream(&in_y, &buf2) == zlib::kStreamEnd);
+    EXPECT_TRUE(compress->Compress(&in_y, &buf2) == zlib::kStreamEnd);
     shash::HashMem(buf2.data(), buf2.pos() + 1, &hash_catalog_);
     MkdirDeep(GetParentPath(src_path_ + "/" + hash_catalog_.MakePath()), 0700);
 
     zlib::InputMem in_mem(buf2.data(), buf2.pos() + 1);
     cvmfs::PathSink out_path(src_path_ + "/" + hash_catalog_.MakePath());
-    EXPECT_TRUE(copy->CompressStream(&in_mem, &out_path) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_mem, &out_path) == zlib::kStreamEnd);
 
     zlib::InputMem in_z(&z, 1);
     cvmfs::MemSink buf3(0);
-    EXPECT_TRUE(compress->CompressStream(&in_z, &buf3) == zlib::kStreamEnd);
+    EXPECT_TRUE(compress->Compress(&in_z, &buf3) == zlib::kStreamEnd);
     shash::HashMem(buf3.data(), buf3.pos() + 1, &hash_cert_);
     MkdirDeep(GetParentPath(src_path_ + "/" + hash_cert_.MakePath()), 0700);
 
     zlib::InputMem in_cert(buf3.data(), buf3.pos() + 1);
     cvmfs::PathSink out_cert(src_path_ + "/" + hash_cert_.MakePath());
-    EXPECT_TRUE(copy->CompressStream(&in_cert, &out_cert) == zlib::kStreamEnd);
+    EXPECT_TRUE(copy->Compress(&in_cert, &out_cert) == zlib::kStreamEnd);
 
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);

@@ -161,8 +161,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputPath in_path(file_path);
   cvmfs::PathSink out_path(file_path_compressed);
-  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path,
-                                                       &hash_catalog);
+  zlib::StreamStates retval = compress->Compress(&in_path, &out_path,
+                                                                 &hash_catalog);
   if (retval != zlib::kStreamEnd) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
              file_path.c_str());
@@ -1487,8 +1487,8 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
                             shash::kSuffixCatalog);
     zlib::InputPath input((*i)->database_path());
     cvmfs::NullSink out_null;
-    if (compress->CompressStream(&input, &out_null, &hash_catalog)
-        != zlib::kStreamEnd) {
+    if (compress->Compress(&input, &out_null, &hash_catalog)
+                                                          != zlib::kStreamEnd) {
       PANIC(kLogStderr, "could not compress catalog %s",
             (*i)->mountpoint().ToString().c_str());
     }

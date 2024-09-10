@@ -520,12 +520,12 @@ void CatalogTestTool::CreateHistory(
   zlib::InputPath input(history_path);
   cvmfs::NullSink out_null;
   // TODO(heretherebedragons) for what do we need the hash here?
-  EXPECT_EQ(compress->CompressStream(&input, &out_null, history_hash),
+  EXPECT_EQ(compress->Compress(&input, &out_null, history_hash),
             zlib::kStreamEnd);
 
   zlib::InputPath in_path(history_path);
   cvmfs::PathSink out_path(repo_path_ + "/data/" + history_hash->MakePath());
-  zlib::StreamStates retval = compress->CompressStream(&in_path, &out_path);
+  zlib::StreamStates retval = compress->Compress(&in_path, &out_path);
   EXPECT_EQ(retval, zlib::kStreamEnd);
 }
 
@@ -682,13 +682,13 @@ void CatalogTestTool::CreateKeys(
   zlib::InputPath in_path(repo_path_ + "/testrepo.crt");
   cvmfs::NullSink out_null;
   // TODO(heretherebedragons) for what do we need the hash here?
-  EXPECT_EQ(compress->CompressStream(&in_path, &out_null, hash_cert),
+  EXPECT_EQ(compress->Compress(&in_path, &out_null, hash_cert),
             zlib::kStreamEnd);
 
 
   zlib::InputPath in_path2(repo_path_ + "/testrepo.crt");
   cvmfs::PathSink out_path(repo_path_ + "/data/" + hash_cert->MakePath());
-  zlib::StreamStates retval = compress->CompressStream(&in_path2, &out_path);
+  zlib::StreamStates retval = compress->Compress(&in_path2, &out_path);
   EXPECT_EQ(retval, zlib::kStreamEnd);
 
   *public_key = repo_path_ + string("/testrepo.pub");

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "compression/compression.h"
+#include "compression/compressor_zlib.h"
 #include "crypto/hash.h"
 #include "swissknife.h"
 #include "util/string.h"
@@ -54,7 +55,7 @@ class CommandGraft : public Command {
                    const std::string &dir_name);
 
   bool ChecksumFdWithChunks(int fd,
-                            zlib::Compressor *compressor,
+                            zlib::ZlibCompressor *compressor,
                             uint64_t *file_size,
                             shash::Any *file_hash,
                             std::vector<uint64_t> *chunk_offsets,

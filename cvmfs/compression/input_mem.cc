@@ -39,6 +39,7 @@ bool InputMem::NextChunk() {
     return false;
   }
 
+  // set idx for new chunk
   chunk_size_ = max_chunk_size_;
   if (idx_ == -1ul) {
     idx_ = 0;
@@ -46,7 +47,8 @@ bool InputMem::NextChunk() {
     idx_ += max_chunk_size_;
   }
 
-  if (src_size_ - idx_ <= max_chunk_size_) {
+  // check if last chunk
+  if (src_size_ - idx_ < max_chunk_size_) {
     has_chunk_left_ = false;
     chunk_size_ = src_size_ - idx_;
   }
@@ -54,6 +56,7 @@ bool InputMem::NextChunk() {
   // just moving pointer as "moving window". no need to create a copy
   // we need to ignore "const" to be able to use InputAbstract protected vars
   chunk_ = const_cast<unsigned char*>(src_) + idx_;
+  idx_inside_chunk_ = 0;
 
   return true;
 }
@@ -66,6 +69,7 @@ bool InputMem::Reset() {
   if (IsValid()) {
     idx_ = -1ul;
     chunk_size_ = 0;
+    idx_inside_chunk_ = 0;
     has_chunk_left_ = true;
     return true;
   }

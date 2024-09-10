@@ -605,7 +605,7 @@ class T_ObjectFetcher : public ::testing::Test {
     zlib::InputPath in_path(tmp_path);
     cvmfs::PathSink out_path(txn_path);
     zlib::StreamStates retval =
-                    compress->CompressStream(&in_path, &out_path, content_hash);
+                          compress->Compress(&in_path, &out_path, content_hash);
     EXPECT_EQ(retval, zlib::kStreamEnd) << "failed to compress file " <<
                                            tmp_path << " to " << txn_path;
     InsertIntoStorage(txn_path, *content_hash);

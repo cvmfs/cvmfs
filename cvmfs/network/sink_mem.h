@@ -121,6 +121,9 @@ class MemSink : public Sink {
   size_t pos() { return pos_; }
   unsigned char* data() { return data_; }
 
+  bool SetPos(size_t pos) { if (pos <= size_) { pos_ = pos; return true; }
+                            return false; }
+
   /**
    * Do not download files larger than 1M into memory.
    */

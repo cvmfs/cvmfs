@@ -440,8 +440,7 @@ TEST_F(T_Download, LocalFile2Sink) {
   zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
   cvmfs::FileSink out_f(fdest, true);
 
-  EXPECT_EQ(compress->CompressStream(&in_mem, &out_f, &checksum),
-            zlib::kStreamEnd);
+  EXPECT_EQ(compress->Compress(&in_mem, &out_f, &checksum), zlib::kStreamEnd);
 
   TestSink test_sink2;
   JobInfo info2(&url, true /* compressed */, false /* probe hosts */,

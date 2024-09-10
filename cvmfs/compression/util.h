@@ -17,6 +17,7 @@ enum StreamStates {
   kStreamContinue,
   kStreamEnd,
   kStreamError,
+  kStreamOutBufFull,  // output buffer full: needs handling but no fatal error
 };
 
 // Do not change order of algorithms. Used as flags in the catalog

@@ -24,7 +24,7 @@ class T_StreamingCacheManager : public ::testing::Test {
                          reinterpret_cast<const unsigned char*>(content.data()),
                          content.length());
     cvmfs::MemSink out_mem(0);
-    zlib::StreamStates retval = compress->CompressStream(&in_mem, &out_mem);
+    zlib::StreamStates retval = compress->Compress(&in_mem, &out_mem);
     EXPECT_EQ(retval, zlib::kStreamEnd);
 
     std::string zipped_data(reinterpret_cast<char *>(out_mem.data()),

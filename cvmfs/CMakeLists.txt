@@ -158,6 +158,7 @@ if (BUILD_CVMFS)
                   compression/input_path.cc
                   compression/util.cc
                   cvmfs_fsck.cc
+                  network/sink_mem.cc
                   statistics.cc
   )
   target_link_libraries (cvmfs_fsck

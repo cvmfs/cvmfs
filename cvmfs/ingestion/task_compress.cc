@@ -8,6 +8,8 @@
 #include <cstdlib>
 
 #include "compression/compression.h"
+#include "compression/input_mem.h"
+#include "network/sink_mem.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 
@@ -23,8 +25,7 @@ void TaskCompress::Process(BlockItem *input_block) {
   zlib::Compressor *compressor = input_block->chunk_item()->GetCompressor();
   const int64_t tag = input_block->tag();
   const bool flush = input_block->type() == BlockItem::kBlockStop;
-  unsigned char *input_data = input_block->data();
-  size_t remaining_in_input = input_block->size();
+  zlib::InputMem in_comp(input_block->data(), input_block->size());
 
   BlockItem *output_block = NULL;
   if (!tag_map_.Lookup(tag, &output_block)) {
@@ -36,19 +37,18 @@ void TaskCompress::Process(BlockItem *input_block) {
     tag_map_.Insert(tag, output_block);
   }
 
-  bool done = false;
+  cvmfs::MemSink out_comp;
+  zlib::StreamStates ret_compress;
   do {
-    unsigned char *output_data = output_block->data() + output_block->size();
     assert(!output_block->IsFull());
-    size_t remaining_in_output =
-      output_block->capacity() - output_block->size();
+    out_comp.Adopt(output_block->capacity(), output_block->size(),
+                   output_block->data(), false);
 
-    done = compressor->CompressStream(flush, &input_data, &remaining_in_input,
-                                      &output_data, &remaining_in_output);
-    // remaining_in_output is now number of consumed bytes
-    output_block->set_size(output_block->size() + remaining_in_output);
+    ret_compress = compressor->CompressStream(&in_comp, &out_comp, flush);
+    output_block->set_size(out_comp.pos());
 
-    if (output_block->IsFull()) {
+    if (ret_compress == zlib::kStreamOutBufFull) {
+      assert(output_block->IsFull());
       tubes_out_->Dispatch(output_block);
       output_block = new BlockItem(tag, allocator_);
       output_block->SetFileItem(input_block->file_item());
@@ -56,7 +56,7 @@ void TaskCompress::Process(BlockItem *input_block) {
       output_block->MakeData(kCompressedBlockSize);
       tag_map_.Insert(tag, output_block);
     }
-  } while ((remaining_in_input > 0) || (flush && !done));
+  } while (ret_compress != zlib::kStreamEnd);
 
   if (flush) {
     input_block->chunk_item()->ReleaseCompressor();

@@ -529,7 +529,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
-  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_null);
+  const zlib::StreamStates res = compressor_->Compress(&in, &zlib_null);
   ASSERT_EQ(res, zlib::kStreamEnd);
   ASSERT_GT(zlib_null.pos(), 0U);
 
@@ -598,7 +598,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(block_raw.data(), block_raw.size());
   cvmfs::MemSink zlib_large(0);
-  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_large);
+  const zlib::StreamStates res = compressor_->Compress(&in, &zlib_large);
   ASSERT_EQ(res, zlib::kStreamEnd);
   ASSERT_GT(zlib_large.pos(), 0U);
 
@@ -821,7 +821,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
-  const zlib::StreamStates res = compressor_->CompressStream(&in, &zlib_null);
+  const zlib::StreamStates res = compressor_->Compress(&in, &zlib_null);
   ASSERT_EQ(res, zlib::kStreamEnd);
   ASSERT_GT(zlib_null.pos(), 0U);
 

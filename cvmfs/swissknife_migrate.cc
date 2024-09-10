@@ -338,7 +338,7 @@ bool CommandMigrate::UpdateUndoTags(
 
   zlib::InputPath in_path(history_upstream_->filename());
   cvmfs::PathSink out_path(filename_new);
-  if (copy_->CompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
+  if (copy_->Compress(&in_path, &out_path) != zlib::kStreamEnd) {
     return false;
   }
   UniquePtr<history::SqliteHistory> history(

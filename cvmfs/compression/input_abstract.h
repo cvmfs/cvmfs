@@ -32,7 +32,8 @@ class InputAbstract {
                                                 has_chunk_left_(false),
                                                 max_chunk_size_(max_chunk_size),
                                                 chunk_(chunk),
-                                                chunk_size_(0) { }
+                                                chunk_size_(0),
+                                                idx_inside_chunk_(0) { }
 
  public:
   virtual ~InputAbstract() { }
@@ -80,12 +81,19 @@ class InputAbstract {
    */
   virtual unsigned char* chunk() const { return chunk_; }
 
+  // TODO TODO check if condition is correct or off-by-one error
+  virtual bool HasInputLeftInChunk() const
+             { return idx_inside_chunk_ < chunk_size_ - 1 && chunk_size_ != 0; }
+  virtual void SetIdxInsideChunk(const size_t idx) { idx_inside_chunk_ = idx; }
+  virtual size_t GetIdxInsideChunk() const { return idx_inside_chunk_; }
+
  protected:
   const bool is_owner_;  // Input class is owner of the data source
   bool has_chunk_left_;
   const size_t max_chunk_size_;
   unsigned char *chunk_;
   size_t chunk_size_;  // must be <= max_chunk_size_
+  size_t idx_inside_chunk_;
 };
 
 }  // namespace zlib

@@ -29,25 +29,25 @@ Compressor* EchoCompressor::Clone() {
 }
 
 
-bool EchoCompressor::CompressStream(
-  const bool /*flush*/,
-  unsigned char **inbuf, size_t *inbufsize,
-  unsigned char **outbuf, size_t *outbufsize)
-{
-  const size_t bytes_to_copy = std::min(*outbufsize, *inbufsize);
-  memcpy(*outbuf, *inbuf, bytes_to_copy);
-  const bool done = (bytes_to_copy == *inbufsize);
+// bool EchoCompressor::CompressStream(
+//   const bool /*flush*/,
+//   unsigned char **inbuf, size_t *inbufsize,
+//   unsigned char **outbuf, size_t *outbufsize)
+// {
+//   const size_t bytes_to_copy = std::min(*outbufsize, *inbufsize);
+//   memcpy(*outbuf, *inbuf, bytes_to_copy);
+//   const bool done = (bytes_to_copy == *inbufsize);
 
-  // Update the return variables
-  *inbuf += bytes_to_copy;
-  *outbufsize = bytes_to_copy;
-  *inbufsize -= bytes_to_copy;
+//   // Update the return variables
+//   *inbuf += bytes_to_copy;
+//   *outbufsize = bytes_to_copy;
+//   *inbufsize -= bytes_to_copy;
 
-  return done;
-}
+//   return done;
+// }
 
-StreamStates EchoCompressor::CompressStream(InputAbstract *input,
-                                            cvmfs::Sink *output) {
+StreamStates EchoCompressor::Compress(InputAbstract *input,
+                                      cvmfs::Sink *output) {
   if (!is_healthy_) {
     return kStreamError;
   }
@@ -71,9 +71,8 @@ StreamStates EchoCompressor::CompressStream(InputAbstract *input,
 }
 
 // not sure if this makes sense to even have this function available?
-StreamStates EchoCompressor::CompressStream(InputAbstract *input,
-                                            cvmfs::Sink *output,
-                                            shash::Any *compressed_hash) {
+StreamStates EchoCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
+                                      shash::Any *compressed_hash) {
   if (!is_healthy_) {
     return kStreamError;
   }
