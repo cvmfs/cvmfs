@@ -130,7 +130,7 @@ TEST_F(T_Compressor, CompressionAndSplitDecompressionSinkMem2MemLarge) {
 
   // Decompress in chunks
   zlib::InputMem compress1(out.data(), out.pos() / 2);
-  size_t size_rest = out.pos() / 2 + out.pos() % 2;
+  const size_t size_rest = out.pos() / 2 + out.pos() % 2;
   zlib::InputMem compress2(out.data() + out.pos() / 2, size_rest);
 
   cvmfs::MemSink decompress_out(0);
@@ -437,7 +437,7 @@ TEST_F(T_Compressor, CompressionNewBigEnough) {
   cvmfs::MemSink out_mem;
   out_mem.Adopt(buf_size, 0, buf, false);
 
-  zlib::StreamStates ret =
+  const zlib::StreamStates ret =
                        zlib_compressor->CompressStream(&in_mem, &out_mem, true);
 
   ASSERT_EQ(ret, zlib::kStreamEnd);
@@ -447,7 +447,7 @@ TEST_F(T_Compressor, CompressionNewBigEnough) {
   decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(buf, buf_size);
   cvmfs::MemSink out(0);
-  zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
+  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
   EXPECT_EQ(res, zlib::kStreamEnd);
   EXPECT_EQ(out.pos(), strlen(test_string) + 1);
   EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
@@ -462,7 +462,7 @@ TEST_F(T_Compressor, Compression) {
 
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
-  bool deflate_finished = zlib_compressor->CompressStreamOld(
+  const bool deflate_finished = zlib_compressor->CompressStreamOld(
                                     true, &input, &size_input, &buf, &buf_size);
 
   ASSERT_TRUE(deflate_finished);
@@ -473,7 +473,7 @@ TEST_F(T_Compressor, Compression) {
   decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(buf, buf_size);
   cvmfs::MemSink out(0);
-  zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
+  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
   EXPECT_EQ(res, zlib::kStreamEnd);
   EXPECT_EQ(out.pos(), strlen(test_string) + 1);
   EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
@@ -574,7 +574,7 @@ TEST_F(T_Compressor, CompressionLongNewOutbufTooSmallMultiInput) {
   EXPECT_GT(rounds, 1U);
   EXPECT_GT(compress_pos, 0U);
 
-  unsigned compress_pos_first = compress_pos;
+  const unsigned compress_pos_first = compress_pos;
   rounds = 0;
   zlib::InputMem in_mem2(in_buf2, in_size2, chunk_size, false);
   cvmfs::MemSink out_mem2;

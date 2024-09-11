@@ -22,10 +22,10 @@ class EchoCompressor: public Compressor {
   virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
                                 shash::Any *compressed_hash);
   virtual StreamStates CompressStream(InputAbstract *input,
-                                cvmfs::MemSink *output, const bool flush)
-                                { return kStreamError; };
+                                cvmfs::MemSink *output, const bool flush);
   virtual size_t CompressUpperBound(const size_t bytes);
-  virtual bool Reset() { is_healthy_ = true; return true; }
+  virtual bool Reset()
+                      { is_healthy_ = true; output_full_ = false; return true; }
   Compressor* Clone();
   virtual std::string Describe();
 
@@ -33,6 +33,7 @@ class EchoCompressor: public Compressor {
 
  private:
   bool is_healthy_;
+  bool output_full_;
 };
 
 }  // namespace zlib

@@ -40,9 +40,9 @@ class T_Fetcher : public ::testing::Test {
     unsigned char y = 'y';
     unsigned char z = 'z';
 
-    UniquePtr<zlib::Compressor>
+    const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
-    UniquePtr<zlib::Compressor>
+    const UniquePtr<zlib::Compressor>
                         copy(zlib::Compressor::Construct(zlib::kNoCompression));
 
     zlib::InputMem in_x(&x, 1);

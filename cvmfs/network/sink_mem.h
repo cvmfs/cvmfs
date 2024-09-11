@@ -29,6 +29,7 @@ class MemSink : public Sink {
   MemSink() : Sink(true), size_(0), pos_(0),
               data_(NULL), max_size_(kMaxMemSize) { }
   explicit MemSink(size_t size);
+  MemSink(size_t size, size_t max_size);
   virtual ~MemSink() { FreeData(); }
 
   /**

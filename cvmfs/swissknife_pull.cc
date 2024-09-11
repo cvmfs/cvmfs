@@ -239,7 +239,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   zlib::InputMem in_mem(buffer, size);
   cvmfs::FileSink out_f(ftmp, true);
 
-  zlib::StreamStates retval = compress->Compress(&in_mem, &out_f);
+  const zlib::StreamStates retval = compress->Compress(&in_mem, &out_f);
   assert(retval == zlib::kStreamEnd);
 
   Store(tmp_file, dest_path, true);

@@ -505,7 +505,7 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
   CreateFile(tmp_path_ + "/" + hashes_[1].MakePath(), 0600);
   unsigned char buf = 'x';
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                         copy(zlib::Compressor::Construct(zlib::kNoCompression));
   zlib::InputMem in_mem(&buf, 1);
   cvmfs::PathSink out_path(tmp_path_ + "/" + hashes_[1].MakePath());

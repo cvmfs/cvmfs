@@ -334,7 +334,7 @@ bool CommandMigrate::UpdateUndoTags(
   time_t timestamp,
   shash::Any *history_hash)
 {
-  string filename_new = history_upstream_->filename() + ".new";
+  const string filename_new = history_upstream_->filename() + ".new";
 
   zlib::InputPath in_path(history_upstream_->filename());
   cvmfs::PathSink out_path(filename_new);

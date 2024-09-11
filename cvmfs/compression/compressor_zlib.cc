@@ -90,7 +90,7 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
       return kStreamIOError;
     }
 
-    size_t avail_in = input->chunk_size() - input->GetIdxInsideChunk();
+    const size_t avail_in = input->chunk_size() - input->GetIdxInsideChunk();
     stream_.avail_in = avail_in;
     stream_.next_in = input->chunk() + input->GetIdxInsideChunk();
 
@@ -98,7 +98,7 @@ StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
       flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
     }
 
-    size_t avail_out = output->size() - output->pos();
+    const size_t avail_out = output->size() - output->pos();
     stream_.avail_out = avail_out;
     stream_.next_out = output->data() + output->pos();
 

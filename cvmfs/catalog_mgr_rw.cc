@@ -157,11 +157,11 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputPath in_path(file_path);
   cvmfs::PathSink out_path(file_path_compressed);
-  zlib::StreamStates retval = compress->Compress(&in_path, &out_path,
+  const zlib::StreamStates retval = compress->Compress(&in_path, &out_path,
                                                                  &hash_catalog);
   if (retval != zlib::kStreamEnd) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
@@ -1477,7 +1477,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
   WritableCatalogList::const_iterator i = catalogs_to_snapshot.begin();
   const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   for (; i != iend; ++i) {
     FinalizeCatalog(*i, stop_for_tweaks);

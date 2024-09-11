@@ -597,15 +597,16 @@ TEST_F(T_Ingestion, TaskCompress) {
 
   compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(block_raw.data(), block_raw.size());
-  cvmfs::MemSink zlib_large(0);
+  cvmfs::MemSink zlib_large(0,
+                            compressor_->CompressUpperBound(block_raw.size()));
   const zlib::StreamStates res = compressor_->Compress(&in, &zlib_large);
   ASSERT_EQ(res, zlib::kStreamEnd);
   ASSERT_GT(zlib_large.pos(), 0U);
 
   unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
                                                      smalloc(zlib_large.pos()));
-  unsigned read_pos = 0;
 
+  unsigned read_pos = 0;
   BlockItem *b = NULL;
   do {
     delete b;

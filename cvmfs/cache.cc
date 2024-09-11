@@ -43,7 +43,7 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
   unsigned char buf[10];
   // TODO(heretherebedragons) if it is ok to accept a generic IO error from the
   // compressor then we do not need this extra write (e.g. -EIO)
-  int check_read = Pread(fd, buf, 10, 0);
+  const int64_t check_read = Pread(fd, buf, 10, 0);
 
   if (check_read < 0) {
     return check_read;
@@ -51,7 +51,7 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
 
   zlib::InputCache input(this, fd, 4096);
   cvmfs::NullSink out_null;
-  zlib::StreamStates retval = compress_->Compress(&input, &out_null, id);
+  const zlib::StreamStates retval = compress_->Compress(&input, &out_null, id);
 
   if (retval != zlib::kStreamEnd) {
     return -EINVAL;

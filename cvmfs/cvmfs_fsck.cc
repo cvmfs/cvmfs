@@ -142,7 +142,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
   string relative_path;
   string hash_name;
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
 
   while (GetNextFile(&relative_path, &hash_name)) {

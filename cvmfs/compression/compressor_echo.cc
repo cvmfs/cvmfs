@@ -16,6 +16,7 @@ namespace zlib {
 
 EchoCompressor::EchoCompressor(const zlib::Algorithms &alg) : Compressor(alg) {
   is_healthy_ = true;
+  output_full_ = false;
 }
 
 
@@ -28,6 +29,37 @@ Compressor* EchoCompressor::Clone() {
   return new EchoCompressor(zlib::kNoCompression);
 }
 
+StreamStates EchoCompressor::CompressStream(InputAbstract *input,
+                                cvmfs::MemSink *output, const bool /*flush*/) {
+  if (!is_healthy_) {
+    return kStreamError;
+  }
+
+  do {
+    // TODO TODO replace with input->HasInputLeftInChunk()
+    if (input->GetIdxInsideChunk() < input->chunk_size()
+        && input->chunk_size() != 0) {
+      // still stuff to process in the current chunk
+    } else if (!input->NextChunk() && !output_full_) {
+      return kStreamIOError;
+    }
+
+    const size_t have = input->chunk_size();
+    const int64_t written = output->Write(input->chunk(), have);
+
+    input->SetIdxInsideChunk(input->GetIdxInsideChunk() + written);
+    if (written != static_cast<int64_t>(have)) {
+      output_full_ = true;
+      return kStreamOutBufFull;
+    }
+
+  // TODO TODO replace with input->HasInputLeftInChunk()
+  } while (input->has_chunk_left()
+          || (input->GetIdxInsideChunk() < input->chunk_size()
+              && input->chunk_size() != 0));
+  output_full_ = false;
+  return kStreamEnd;
+}
 
 // bool EchoCompressor::CompressStream(
 //   const bool /*flush*/,

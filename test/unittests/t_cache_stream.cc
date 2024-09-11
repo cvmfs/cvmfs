@@ -18,16 +18,16 @@
 class T_StreamingCacheManager : public ::testing::Test {
  protected:
   void StageFile(const std::string &content, shash::Any *hash) {
-    UniquePtr<zlib::Compressor>
+    const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
     zlib::InputMem in_mem(
                          reinterpret_cast<const unsigned char*>(content.data()),
                          content.length());
     cvmfs::MemSink out_mem(0);
-    zlib::StreamStates retval = compress->Compress(&in_mem, &out_mem);
+    const zlib::StreamStates retval = compress->Compress(&in_mem, &out_mem);
     EXPECT_EQ(retval, zlib::kStreamEnd);
 
-    std::string zipped_data(reinterpret_cast<char *>(out_mem.data()),
+    const std::string zipped_data(reinterpret_cast<char *>(out_mem.data()),
                             out_mem.pos() + 1);
     HashString(zipped_data, hash);
     EXPECT_TRUE(SafeWriteToFile(zipped_data, "data/" + hash->MakePath(), 0600));

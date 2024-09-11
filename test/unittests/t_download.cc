@@ -434,7 +434,7 @@ TEST_F(T_Download, LocalFile2Sink) {
     rnd_buf[i] = prng.Next(2147483647);
   shash::Any checksum(shash::kMd5);
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
   cvmfs::FileSink out_f(fdest, true);

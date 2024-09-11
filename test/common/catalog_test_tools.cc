@@ -515,7 +515,7 @@ void CatalogTestTool::CreateHistory(
   }
   history_hash->suffix = shash::kSuffixHistory;
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputPath input(history_path);
   cvmfs::NullSink out_null;
@@ -525,7 +525,7 @@ void CatalogTestTool::CreateHistory(
 
   zlib::InputPath in_path(history_path);
   cvmfs::PathSink out_path(repo_path_ + "/data/" + history_hash->MakePath());
-  zlib::StreamStates retval = compress->Compress(&in_path, &out_path);
+  const zlib::StreamStates retval = compress->Compress(&in_path, &out_path);
   EXPECT_EQ(retval, zlib::kStreamEnd);
 }
 
@@ -677,7 +677,7 @@ void CatalogTestTool::CreateKeys(
 
   hash_cert->suffix = shash::kSuffixCertificate;
 
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compress(zlib::Compressor::Construct(zlib::kZlibDefault));
   zlib::InputPath in_path(repo_path_ + "/testrepo.crt");
   cvmfs::NullSink out_null;
@@ -688,7 +688,7 @@ void CatalogTestTool::CreateKeys(
 
   zlib::InputPath in_path2(repo_path_ + "/testrepo.crt");
   cvmfs::PathSink out_path(repo_path_ + "/data/" + hash_cert->MakePath());
-  zlib::StreamStates retval = compress->Compress(&in_path2, &out_path);
+  const zlib::StreamStates retval = compress->Compress(&in_path2, &out_path);
   EXPECT_EQ(retval, zlib::kStreamEnd);
 
   *public_key = repo_path_ + string("/testrepo.pub");

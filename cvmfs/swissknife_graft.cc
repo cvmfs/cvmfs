@@ -252,7 +252,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   // TODO(heretherebedragons) if i see it correctly the Recurse() function is
   // sharing the single thread here that also runs main() - if yes we should
   // make the compressor a class-wide variable
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                       compressor(zlib::Compressor::Construct(compression_alg_));
 
   bool retval =

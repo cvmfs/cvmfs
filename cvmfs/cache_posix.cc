@@ -175,7 +175,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
                transaction->id.ToString().c_str(),
                transaction->expected_size, transaction->size);
 
-      UniquePtr<zlib::Compressor>
+      const UniquePtr<zlib::Compressor>
                         copy(zlib::Compressor::Construct(zlib::kNoCompression));
       zlib::InputPath in_path(transaction->tmp_path);
       cvmfs::PathSink

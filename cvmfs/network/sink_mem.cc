@@ -18,6 +18,11 @@ MemSink::MemSink(size_t size) : Sink(true), size_(size),
   data_ = static_cast<unsigned char *>(smalloc(size));
 }
 
+MemSink::MemSink(size_t size, size_t max_size) : Sink(true), size_(size),
+                                pos_(0), max_size_(max_size) {
+  data_ = static_cast<unsigned char *>(smalloc(size));
+}
+
 /**
  * Appends data to the sink
  * If the sink is too small and

@@ -200,7 +200,7 @@ string CommandCheck::FetchPath(const string &path) {
   } else {
     zlib::InputPath input(url);
     cvmfs::FileSink output(f);
-    zlib::StreamStates retval = copy_->Compress(&input, &output);
+    const zlib::StreamStates retval = copy_->Compress(&input, &output);
     if (retval != zlib::kStreamEnd) {
       PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }

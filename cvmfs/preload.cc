@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
   string cern_pk_it4_path  = cern_pk_base_path + "/cern-it4.cern.ch.pub";
   string cern_pk_it5_path  = cern_pk_base_path + "/cern-it5.cern.ch.pub";
   bool keys_created = false;
-  UniquePtr<zlib::Compressor>
+  const UniquePtr<zlib::Compressor>
                     compress(zlib::Compressor::Construct(zlib::kNoCompression));
   if (args.find('k') == args.end()) {
     keys_created = true;
@@ -217,11 +217,11 @@ int main(int argc, char *argv[]) {
 
   // Copy dirtab file
   if (retval == 0) {
-    UniquePtr<zlib::Compressor>
+    const UniquePtr<zlib::Compressor>
                         copy(zlib::Compressor::Construct(zlib::kNoCompression));
     zlib::InputPath in_path(dirtab);
     cvmfs::PathSink out_path(dirtab_in_cache);
-    zlib::StreamStates ret = copy->Compress(&in_path, &out_path);
+    const zlib::StreamStates ret = copy->Compress(&in_path, &out_path);
     if (ret != zlib::kStreamEnd) {
       PANIC(kLogStderr | kLogSyslogErr,
                           "Failure to copy dirtab from %s to %s: error %d",
