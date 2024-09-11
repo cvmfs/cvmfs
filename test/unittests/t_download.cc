@@ -127,12 +127,11 @@ TEST_F(T_Download, LocalFile) {
   string src_path = GetAbsolutePath(GetSmallFile());
   string src_url = "file://" + src_path;
 
-  cvmfs::FileSink filesink(fdest);
+  cvmfs::FileSink filesink(fdest, true);
   JobInfo info(&src_url, false /* compressed */, false /* probe hosts */,
                NULL, &filesink);
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code(), kFailOk);
-  fclose(fdest);
 }
 
 TEST_F(T_Download, RemoteFile) {

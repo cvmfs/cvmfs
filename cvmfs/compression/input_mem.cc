@@ -48,7 +48,7 @@ bool InputMem::NextChunk() {
   }
 
   // check if last chunk
-  if (src_size_ - idx_ < max_chunk_size_) {
+  if (src_size_ - idx_ <= max_chunk_size_) {
     has_chunk_left_ = false;
     chunk_size_ = src_size_ - idx_;
   }
