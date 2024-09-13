@@ -17,6 +17,8 @@ namespace zlib {
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if ((algorithm_option == "default") || (algorithm_option == "zlib"))
     return kZlibDefault;
+  if (algorithm_option == "zstd")
+    return kZstdDefault;
   if (algorithm_option == "none")
     return kNoCompression;
   PANIC(kLogStderr, "unknown compression algorithms: %s",
@@ -31,6 +33,9 @@ std::string AlgorithmName(const zlib::Algorithms alg) {
       break;
     case kNoCompression:
       return "none";
+      break;
+    case kZstdDefault:
+      return "zstd";
       break;
     // Purposely did not add a 'default' statement here: this will
     // cause the compiler to generate a warning if a new algorithm

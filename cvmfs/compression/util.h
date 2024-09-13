@@ -24,6 +24,7 @@ enum StreamStates {
 enum Algorithms {
   kZlibDefault = 0,
   kNoCompression,
+  kZstdDefault,
 };
 
 const unsigned kZChunk = 16384;

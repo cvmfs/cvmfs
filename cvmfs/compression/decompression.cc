@@ -6,10 +6,12 @@
 
 #include "decompressor_echo.h"
 #include "decompressor_zlib.h"
+#include "decompressor_zstd.h"
 namespace zlib {
 
 void Decompressor::RegisterPlugins() {
   RegisterPlugin<ZlibDecompressor>();
+  RegisterPlugin<ZstdDecompressor>();
   RegisterPlugin<EchoDecompressor>();
 }
 

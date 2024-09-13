@@ -41,9 +41,11 @@ if (BUILD_LIBCVMFS_CACHE)
                   ${CVMFS_SOURCE_DIR}/compression/compression.cc
                   ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
                   ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+                  ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompression.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
                   ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+                  ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
                   ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
                   ${CVMFS_SOURCE_DIR}/compression/input_file.cc
                   ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
@@ -61,6 +63,7 @@ if (BUILD_LIBCVMFS_CACHE)
                          cvmfs_util
                          ${GTEST_LIBRARIES}
                          ${ZLIB_LIBRARIES}
+                         ${ZSTD_LIBRARIES}
                          ${RT_LIBRARY}
                          ${PROTOBUF_LITE_LIBRARY}
                          pthread
@@ -170,9 +173,11 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/compression/compression.cc
        ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
        ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+       ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
        ${CVMFS_SOURCE_DIR}/compression/decompression.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
        ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+       ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
        ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
        ${CVMFS_SOURCE_DIR}/compression/input_file.cc
        ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
@@ -242,6 +247,7 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
+        ${ZSTD_LIBRARIES}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
@@ -443,9 +449,11 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
   ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
   ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
   ${CVMFS_SOURCE_DIR}/compression/decompression.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
   ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
   ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
   ${CVMFS_SOURCE_DIR}/compression/input_file.cc
   ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
@@ -572,6 +580,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${OPENSSL_LIBRARIES}
       ${SQLITE3_LIBRARY}
       ${ZLIB_LIBRARIES}
+      ${ZSTD_LIBRARIES}
       ${UUID_LIBRARIES}
       ${PACPARSER_LIBRARIES}
       ${VJSON_LIBRARIES}

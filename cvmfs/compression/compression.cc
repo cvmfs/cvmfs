@@ -22,6 +22,7 @@
 #include "cvmfs_config.h"
 #include "compressor_echo.h"
 #include "compressor_zlib.h"
+#include "compressor_zstd.h"
 
 #include "crypto/hash.h"
 #include "util/exception.h"
@@ -34,6 +35,7 @@ namespace zlib {
 
 void Compressor::RegisterPlugins() {
   RegisterPlugin<ZlibCompressor>();
+  RegisterPlugin<ZstdCompressor>();
   RegisterPlugin<EchoCompressor>();
 }
 
