@@ -294,18 +294,22 @@ TEST_F(T_CacheManager, ChecksumFd) {
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
-  EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
+  // changed for zstd
+  EXPECT_EQ("fb2e51cbd24e286dd066bd419d77cd772967e384", hash.ToString());
   cache_mgr_->Close(fd);
 
   fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_one_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+
+  // will fail: still zlib
   EXPECT_EQ("0bbd725a1003cd41b89b209f70e514f12f2a1062", hash.ToString());
   cache_mgr_->Close(fd);
 
   fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_page_));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  // will fail: still zlib
   EXPECT_EQ("54b34b84872a06a373967f68726e29353d3fe7b2", hash.ToString());
   cache_mgr_->Close(fd);
 }

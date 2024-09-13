@@ -19,7 +19,7 @@ class T_StreamingCacheManager : public ::testing::Test {
  protected:
   void StageFile(const std::string &content, shash::Any *hash) {
     const UniquePtr<zlib::Compressor>
-                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+                      compress(zlib::Compressor::Construct(zlib::kZstdDefault));
     zlib::InputMem in_mem(
                          reinterpret_cast<const unsigned char*>(content.data()),
                          content.length());

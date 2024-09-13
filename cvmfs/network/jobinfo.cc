@@ -52,7 +52,7 @@ void JobInfo::SetDecompressor(const DecompressorType decompressor_type) {
       break;
       case kCreateZlib:
         if (!decomp_zlib_.IsValid()) {
-          decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+          decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZstdDefault);
         }
         active_decomp_ = decomp_zlib_.weak_ref();
       break;

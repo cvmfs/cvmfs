@@ -55,7 +55,7 @@ CommandCheck::CommandCheck()
                             , is_remote_(false) {
   const shash::Any hash_null;
   duplicates_map_.Init(16, hash_null, hasher_any);
-  decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZstdDefault);
   copy_ = zlib::Compressor::Construct(zlib::kNoCompression);
 }
 

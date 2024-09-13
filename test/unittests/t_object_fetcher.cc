@@ -601,7 +601,7 @@ class T_ObjectFetcher : public ::testing::Test {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
 
     const UniquePtr<zlib::Compressor>
-                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+                      compress(zlib::Compressor::Construct(zlib::kZstdDefault));
     zlib::InputPath in_path(tmp_path);
     cvmfs::PathSink out_path(txn_path);
     const zlib::StreamStates retval =

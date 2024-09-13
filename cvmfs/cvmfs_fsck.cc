@@ -143,7 +143,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
   string hash_name;
 
   const UniquePtr<zlib::Compressor>
-                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+                      compress(zlib::Compressor::Construct(zlib::kZstdDefault));
 
   while (GetNextFile(&relative_path, &hash_name)) {
     const string path = *g_cache_dir + "/" + relative_path;

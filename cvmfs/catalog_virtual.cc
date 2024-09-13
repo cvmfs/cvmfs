@@ -337,7 +337,7 @@ VirtualCatalog::VirtualCatalog(manifest::Manifest *m,
                                SyncParameters *p)
                                : catalog_mgr_(c)
                                , assistant_(d, m, p->stratum0, p->dir_temp) {
-  compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor = zlib::Compressor::Construct(zlib::kZstdDefault);
 }
 
 }  // namespace catalog

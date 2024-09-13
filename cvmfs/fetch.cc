@@ -166,7 +166,7 @@ int Fetcher::Fetch(
              tls->download_job.GetInterruptCuePtr());
   }
   tls->download_job.SetDecompressor(
-                            object.label.zip_algorithm == zlib::kZlibDefault ?
+                            object.label.zip_algorithm == zlib::kZstdDefault ?
                                  download::kCreateZlib : download::kCreateEcho);
   tls->download_job.SetRangeOffset(object.label.range_offset);
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));

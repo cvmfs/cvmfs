@@ -339,7 +339,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
   delete item_stop;
 
   FileItem file_null_legacy(new FileIngestionSource(std::string("/dev/null")),
-                            1024, 2048, 4096, zlib::kZlibDefault, shash::kSha1,
+                            1024, 2048, 4096, zlib::kZstdDefault, shash::kSha1,
                             shash::kSuffixNone, true, true);
   file_null_legacy.set_size(0);
   BlockItem *b3 = new BlockItem(3, &allocator_);
@@ -526,7 +526,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
   b1->MakeStop();
   tube_in.EnqueueBack(b1);
 
-  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor_ = zlib::Compressor::Construct(zlib::kZstdDefault);
   zlib::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
   const zlib::StreamStates res = compressor_->Compress(&in, &zlib_null);
@@ -595,7 +595,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   b_stop->MakeStop();
   tube_in.EnqueueBack(b_stop);
 
-  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor_ = zlib::Compressor::Construct(zlib::kZstdDefault);
   zlib::InputMem in(block_raw.data(), block_raw.size());
   cvmfs::MemSink zlib_large(0,
                             compressor_->CompressUpperBound(block_raw.size()));
@@ -807,7 +807,7 @@ TEST_F(T_Ingestion, PipelineNull) {
 
   uploader_->ClearResults();
 
-  spooler_definition.compression_alg = zlib::kZlibDefault;
+  spooler_definition.compression_alg = zlib::kZstdDefault;
   spooler_definition.hash_algorithm = shash::kShake128;
   UniquePtr<IngestionPipeline> pipeline_zlib(
       new IngestionPipeline(uploader_, spooler_definition));
@@ -819,7 +819,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   EXPECT_EQ(1U, uploader_->results.size());
 
 
-  compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
+  compressor_ = zlib::Compressor::Construct(zlib::kZstdDefault);
   zlib::InputMem in(NULL, 0);
   cvmfs::MemSink zlib_null(0);
   const zlib::StreamStates res = compressor_->Compress(&in, &zlib_null);

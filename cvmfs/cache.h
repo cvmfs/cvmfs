@@ -95,7 +95,7 @@ class CacheManager : SingleCopy {
   struct Label {
     Label() : flags(0)
             , size(kSizeUnknown)
-            , zip_algorithm(zlib::kZlibDefault)
+            , zip_algorithm(zlib::kZstdDefault)
             , range_offset(-1)
     {}
 

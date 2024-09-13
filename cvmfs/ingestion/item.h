@@ -38,7 +38,7 @@ class FileItem : SingleCopy {
     uint64_t min_chunk_size = 4 * 1024 * 1024,
     uint64_t avg_chunk_size = 8 * 1024 * 1024,
     uint64_t max_chunk_size = 16 * 1024 * 1024,
-    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+    zlib::Algorithms compression_algorithm = zlib::kZstdDefault,
     shash::Algorithms hash_algorithm = shash::kSha1,
     shash::Suffix hash_suffix = shash::kSuffixNone,
     bool may_have_chunks = true,

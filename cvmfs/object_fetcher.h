@@ -354,7 +354,7 @@ class LocalObjectFetcher :
     : BaseTN(temp_dir)
     , base_path_(base_path) {
     copy_ = zlib::Decompressor::Construct(zlib::kNoCompression);
-    decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+    decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZstdDefault);
   }
 
   using BaseTN::FetchManifest;  // un-hiding convenience overload

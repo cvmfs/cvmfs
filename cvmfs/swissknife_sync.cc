@@ -135,7 +135,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
-                                     zlib::kZlibDefault);
+                                     zlib::kZstdDefault);
   UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   assert(spooler.IsValid());
 

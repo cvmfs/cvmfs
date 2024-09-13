@@ -68,7 +68,7 @@ class ChunkJob {
   ChunkJob()
     : suffix(shash::kSuffixNone)
     , hash_algorithm(shash::kAny)
-    , compression_alg(zlib::kZlibDefault) {}
+    , compression_alg(zlib::kZstdDefault) {}
 
   ChunkJob(const shash::Any &hash, zlib::Algorithms compression_alg)
     : suffix(hash.suffix)
@@ -296,7 +296,7 @@ static void *MainWorker(void *data) {
       }
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
+            (compression_alg == zlib::kZstdDefault) ? true : false);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -591,8 +591,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
 
-  decomp_zlib = zlib::Decompressor::Construct(zlib::kZlibDefault);
-  comp_zlib = zlib::Compressor::Construct(zlib::kZlibDefault);
+  decomp_zlib = zlib::Decompressor::Construct(zlib::kZstdDefault);
+  comp_zlib = zlib::Compressor::Construct(zlib::kZstdDefault);
   copy = zlib::Compressor::Construct(zlib::kNoCompression);
 
   const bool     follow_redirects = false;

@@ -424,6 +424,8 @@ TEST_F(T_Download, LocalFile2Sink) {
   EXPECT_EQ(1, pread(test_sink.fd, &buf, 1, 0));
   EXPECT_EQ('1', buf);
 
+  std::cerr << "A" << std::endl;
+
   rewind(fdest);
   Prng prng;
   prng.InitLocaltime();
@@ -435,23 +437,31 @@ TEST_F(T_Download, LocalFile2Sink) {
   shash::Any checksum(shash::kMd5);
 
   const UniquePtr<zlib::Compressor>
-                      compress(zlib::Compressor::Construct(zlib::kZlibDefault));
+                      compress(zlib::Compressor::Construct(zlib::kZstdDefault));
   zlib::InputMem in_mem(reinterpret_cast<unsigned char*>(rnd_buf), size);
   cvmfs::FileSink out_f(fdest, true);
 
+  std::cerr << "B" << std::endl;
+
   EXPECT_EQ(compress->Compress(&in_mem, &out_f, &checksum), zlib::kStreamEnd);
+
+  std::cerr << "C" << std::endl;
 
   TestSink test_sink2;
   JobInfo info2(&url, true /* compressed */, false /* probe hosts */,
                 &checksum /* expected hash */, &test_sink2);
   download_mgr.Fetch(&info2);
+
+  std::cerr << "d" << std::endl;
   EXPECT_EQ(info2.error_code(), kFailOk);
   EXPECT_EQ(size, GetFileSize(test_sink2.path));
 
   uint32_t validation[N];
+  std::cerr << "1" << std::endl;
   EXPECT_EQ(static_cast<int>(size),
     pread(test_sink2.fd, &validation, size, 0));
   EXPECT_EQ(0, memcmp(validation, rnd_buf, size));
+  std::cerr << "2" << std::endl;
 }
 
 
