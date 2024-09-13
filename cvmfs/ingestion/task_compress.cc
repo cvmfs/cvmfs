@@ -56,7 +56,7 @@ void TaskCompress::Process(BlockItem *input_block) {
       output_block->MakeData(kCompressedBlockSize);
       tag_map_.Insert(tag, output_block);
     }
-  } while (ret_compress != zlib::kStreamEnd);
+  } while (ret_compress != zlib::kStreamEnd && ret_compress != zlib::kStreamContinue);
 
   if (flush) {
     input_block->chunk_item()->ReleaseCompressor();
