@@ -216,7 +216,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
         is_healthy_ = false;
         return kStreamDataError;
       }
-      const size_t have = zstd_chunk_ - remaining;
+      const size_t have = outBuffer.pos;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
@@ -225,8 +225,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
         return kStreamIOError;
       }
       shash::Update(out, have, hash_context);
-    } while (inBuffer.pos < inBuffer.size
-             || !(mode == ZSTD_e_end && remaining == 0));
+    } while (inBuffer.pos < inBuffer.size);
   } while (mode != ZSTD_e_end);
 
   output->Flush();
