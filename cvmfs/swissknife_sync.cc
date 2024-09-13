@@ -580,6 +580,7 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   string start_time = GetGMTimestamp();
+  uint64_t start_monotonic_time = platform_monotonic_time_ns();
 
   // Spawn monitoring process (watchdog)
   std::string watchdog_dir = "/tmp";
@@ -890,6 +891,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (!mediator.Commit(manifest.weak_ref())) {
     PrintError("Swissknife Sync: Something went wrong during sync");
     if (!params.dry_run) {
+      uint64_t end_monotonic_time = (platform_monotonic_time_ns()
+                                    - start_monotonic_time);
+      start_time = StringifyUint(end_monotonic_time);
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
         stats_db->UploadStatistics(params.spooler);
@@ -923,6 +927,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                          params.repo_tag)) {
     PrintError("Swissknife Sync: Failed to commit transaction.");
     if (!params.dry_run) {
+      uint64_t end_monotonic_time = (platform_monotonic_time_ns()
+                                    - start_monotonic_time);
+      start_time = StringifyUint(end_monotonic_time);
       stats_db->StorePublishStatistics(this->statistics(), start_time, false);
       if (upload_statsdb) {
         stats_db->UploadStatistics(params.spooler);
@@ -932,6 +939,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!params.dry_run) {
+    uint64_t end_monotonic_time = (platform_monotonic_time_ns()
+                                    - start_monotonic_time);
+    start_time = StringifyUint(end_monotonic_time);
     stats_db->StorePublishStatistics(this->statistics(), start_time, true);
     if (upload_statsdb) {
       stats_db->UploadStatistics(params.spooler);
