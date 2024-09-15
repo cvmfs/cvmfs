@@ -1,0 +1,20 @@
+# TODO we will want to use another proxy
+CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"
+
+CVMFS_MAX_TTL=5
+CVMFS_CACHE_SYMLINKS=yes
+
+# cache in shared memory
+CVMFS_CACHE_BASE=/dev/shm/cvmfs-cache
+CVMFS_QUOTA_LIMIT=1GB
+
+# so the signature validation is till done, but acommodating the fact that the synthetically produced data will not validate
+_CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES=yes 
+
+# changes required for FUSE 3.16
+CVMFS_FUSE3_MAX_THREADS=64 
+# see https://github.com/cvmfs/cvmfs/issues/3479
+CVMFS_FUSE3_MIN_THREADS=16  
+
+
+CVMFS_CACHE_BYPASS=yes
