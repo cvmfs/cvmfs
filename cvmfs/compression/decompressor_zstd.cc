@@ -84,7 +84,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
   output->Flush();
 
   if (z_ret == 0) {
-    Reset();
+    // Reset();
     return kStreamEnd;
   } else {
     // z_ret != 0 means that ZSTD_decompressStream did not end on a frame, but

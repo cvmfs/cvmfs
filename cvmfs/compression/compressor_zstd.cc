@@ -84,7 +84,7 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
                               input->GetIdxInsideChunk()};
 
     if (!input->has_chunk_left()) {
-      mode = (flush) ? ZSTD_e_end : ZSTD_e_flush;
+      mode = (flush) ? ZSTD_e_end : ZSTD_e_continue;
     }
 
     ZSTD_outBuffer outBuffer = {output->data(), output->size(), output->pos()};
@@ -108,14 +108,6 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
   } while (input->has_chunk_left()
           || (input->GetIdxInsideChunk() < input->chunk_size()
               && input->chunk_size() != 0));
-
-  compress_stream_outbuf_full_ = false;
-  if (mode == ZSTD_e_flush) {
-    return kStreamContinue;
-  }
-
-  // mode == ZSTD_e_end
-  Reset();
   return kStreamEnd;
 }
 
@@ -126,8 +118,7 @@ ZstdCompressor::~ZstdCompressor() {
 
 
 size_t ZstdCompressor::CompressUpperBound(const size_t bytes) {
-  // Call zlib's deflate bound
-  return ZSTD_COMPRESSBOUND(bytes);
+  return ZSTD_compressBound(bytes);
 }
 
 // ZSTDLIB_API size_t ZSTD_CStreamInSize(void);

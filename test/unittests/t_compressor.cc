@@ -806,8 +806,10 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmallMultiInput) {
   unsigned compress_pos = 0;
   unsigned rounds = 0;
 
-  const size_t in_size = 16384 * 3ul;  // larger than decomp buffer size (32 KB)
-  const size_t in_size2 = 16384 * 2ul;  // larger than decomp buffer size
+  // for in_size: must be larger than internal buffer to force write to output.
+  // Suggested block size is 65k by zstd
+  const size_t in_size = 16384 * 9ul;  
+  const size_t in_size2 = 16384 * 9ul;  // larger than decomp buffer size
   const size_t chunk_size = 8000;
 
   const char letters[] = "abcdefghijklmnopqrstuvwxyz";
@@ -832,7 +834,7 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmallMultiInput) {
 
 
   zlib::StreamStates ret = zlib::kStreamError;
-  while (ret != zlib::kStreamContinue) {
+  while (ret != zlib::kStreamEnd) {
     // Compress the output in multiple stages
     out_mem.Adopt(buf_size, 0, buf, false);
 

@@ -16,7 +16,7 @@ namespace zlib {
  */
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if ((algorithm_option == "default") || (algorithm_option == "zlib"))
-    return kZlibDefault;
+    return kZstdDefault;  // TODO TODO just for testing!!!!! CHANGE IT BACK
   if (algorithm_option == "zstd")
     return kZstdDefault;
   if (algorithm_option == "none")
@@ -29,7 +29,7 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
 std::string AlgorithmName(const zlib::Algorithms alg) {
   switch (alg) {
     case kZlibDefault:
-      return "zlib";
+      return "zstd";  // TODO TODO just for testing!!!!! CHANGE IT BACK
       break;
     case kNoCompression:
       return "none";
