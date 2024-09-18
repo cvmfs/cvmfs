@@ -551,7 +551,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
   SyncUnlock();
 }
 
-
 /**
  * Add a new file to the catalogs.
  * @param entry a DirectoryEntry structure describing the new file
@@ -562,7 +561,7 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 void WritableCatalogManager::AddFile(
   const DirectoryEntry  &entry,
   const XattrList       &xattrs,
-  const std::string     &parent_directory) 
+  const std::string     &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
   const string file_path   = entry.GetFullPath(parent_path);
@@ -603,7 +602,7 @@ void WritableCatalogManager::AddChunkedFile(
   const DirectoryEntryBase  &entry,
   const XattrList           &xattrs,
   const std::string         &parent_directory,
-  const FileChunkList       &file_chunks) 
+  const FileChunkList       &file_chunks)
 {
   assert(file_chunks.size() > 0);
 
@@ -672,8 +671,7 @@ void WritableCatalogManager::AddHardlinkGroup(
     if (enforce_limits_)
       PANIC(kLogStderr, "hard link at %s is larger than %u megabytes (%u)",
             (parent_path + entries[0].name().ToString()).c_str(),
-            file_mbyte_limit_, 
-            mbytes);
+            file_mbyte_limit_, mbytes);
   }
 
   SyncLock();
@@ -768,7 +766,8 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
   // first check if we really have a nested catalog transition point
   catalog::DirectoryEntry potential_transition_point;
   PathString transition_path(entry_path.data(), entry_path.length());
-  bool retval = catalog->LookupPath(transition_path, &potential_transition_point);
+  bool retval = catalog->LookupPath(transition_path,
+                                    &potential_transition_point);
   assert(retval);
   if (potential_transition_point.IsNestedCatalogMountpoint()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg,
@@ -818,16 +817,18 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   // Create the database schema and the initial root entry
   // for the new nested catalog
-  const string database_file_path = CreateTempPath(dir_temp() + "/catalog", 0666);
+  const string database_file_path = CreateTempPath(dir_temp() + "/catalog",
+                                                   0666);
   const bool volatile_content = false;
   CatalogDatabase *new_catalog_db = CatalogDatabase::Create(database_file_path);
   assert(NULL != new_catalog_db);
   // Note we do not set the external_data bit for nested catalogs
   bool retval =
-          new_catalog_db->InsertInitialValues(nested_root_path, volatile_content,
-                                              "",  // At this point, only root
-                                                  // catalog gets VOMS authz
-                                              new_root_entry);
+           new_catalog_db->InsertInitialValues(nested_root_path,
+                                               volatile_content,
+                                               "",  // At this point, only root
+                                                    // catalog gets VOMS authz
+                                               new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directly from an open
   // database to remove this indirection
@@ -867,7 +868,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
     wr_new_catalog->ListOwnNestedCatalogs();
   DeltaCounters fix_subtree_counters;
   for (Catalog::NestedCatalogList::const_iterator i = grand_nested.begin(),
-       iEnd = grand_nested.end(); i != iEnd; ++i) 
+       iEnd = grand_nested.end(); i != iEnd; ++i)
   {
     WritableCatalog *grand_catalog;
     retval = FindCatalog(i->mountpoint.ToString(), &grand_catalog);
@@ -972,7 +973,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     WritableCatalogList list;
     if (GetModifiedCatalogLeafsRecursively(old_attached_catalog, &list)) {
       SyncUnlock();
-      PANIC(kLogStderr, 
+      PANIC(kLogStderr,
             "failed to swap nested catalog '%s': already modified",
             nested_root_path.c_str());
     }
@@ -984,8 +985,8 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
     // version and get counters.
     shash::Any old_hash;
     uint64_t old_size;
-    const bool old_found =
-        parent->FindNested(nested_root_ps, &old_hash, &old_size);
+    const bool old_found = parent->FindNested(nested_root_ps, &old_hash,
+                                              &old_size);
     if (!old_found) {
       SyncUnlock();
       PANIC(kLogStderr,
@@ -1023,7 +1024,8 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
           nested_root_path.c_str());
   }
   if (dirent.HasXattrs()) {
-    const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps, &xattrs);
+    const bool xattrs_found = new_catalog->LookupXattrsPath(nested_root_ps,
+                                                            &xattrs);
     if (!xattrs_found) {
       SyncUnlock();
       PANIC(kLogStderr,
@@ -1043,7 +1045,8 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   parent->TouchEntry(dirent, xattrs, nested_root_path);
 
   // Update counters
-  DeltaCounters delta = Counters::Diff(old_counters, new_catalog->GetCounters());
+  DeltaCounters delta = Counters::Diff(old_counters,
+                                       new_catalog->GetCounters());
   delta.PopulateToParent(&parent->delta_counters_);
 
   SyncUnlock();
