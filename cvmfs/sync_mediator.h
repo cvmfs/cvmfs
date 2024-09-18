@@ -117,6 +117,7 @@ class AbstractSyncMediator {
   virtual void Touch(SharedPtr<SyncItem> entry) = 0;
   virtual void Remove(SharedPtr<SyncItem> entry) = 0;
   virtual void Replace(SharedPtr<SyncItem> entry) = 0;
+  virtual void RenameDirectory(const std::string& previous, const std::string& current) = 0;
   virtual void Clone(const std::string from, const std::string to) = 0;
 
   virtual void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) = 0;
@@ -160,6 +161,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   void Touch(SharedPtr<SyncItem> entry);
   void Remove(SharedPtr<SyncItem> entry);
   void Replace(SharedPtr<SyncItem> entry);
+  void RenameDirectory(const std::string& previous, const std::string& current);
   void Clone(const std::string from, const std::string to);
 
   void AddUnmaterializedDirectory(SharedPtr<SyncItem> entry);
@@ -186,7 +188,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(SharedPtr<SyncItem> entry);
   void RemoveFile(SharedPtr<SyncItem> entry);
-
+  void UpdateMetadata(SharedPtr<SyncItem> entry);
   void AddDirectory(SharedPtr<SyncItem> entry);
   void RemoveDirectory(SharedPtr<SyncItem> entry);
   void TouchDirectory(SharedPtr<SyncItem> entry);
@@ -238,6 +240,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
                          const std::string &file_name);
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
+
   SharedPtr<SyncItem> CreateSyncItem(const std::string &relative_parent_path,
                                      const std::string &filename,
                                      const SyncItemType entry_type) const;

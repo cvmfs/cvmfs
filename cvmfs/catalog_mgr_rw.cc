@@ -254,6 +254,53 @@ void WritableCatalogManager::RemoveFile(const std::string &path) {
 }
 
 
+void WritableCatalogManager::RenameDirectory(const std::string &old_path,
+                                             const std::string &new_path) {
+  const string old_relative_path = MakeRelativePath(old_path); 
+  const string new_relative_path = MakeRelativePath(new_path);
+  const string parent_path = GetParentPath(old_relative_path);
+  string new_parent_path, new_directory_name;
+  SplitPath(new_relative_path, &new_parent_path, &new_directory_name);
+  SyncLock();
+  WritableCatalog *parent_catalog;
+  DirectoryEntry parent_entry, target_entry;
+  if (!FindCatalog(parent_path, &parent_catalog, &parent_entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
+             parent_path.c_str());
+    PANIC("Unable to found parent path catalog");
+  }
+  if (!parent_catalog->LookupPath(PathString(old_relative_path), &target_entry)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "no entry with path: %s was found",
+             old_relative_path.c_str());
+    PANIC("Unable to found child path entry");
+  }
+  UpdateSubdirectoriesPaths(old_relative_path, new_relative_path);
+  target_entry.name_.Assign(NameString(new_directory_name));
+  parent_catalog->RenameDirectory(target_entry, new_parent_path, old_relative_path, new_relative_path);  
+  SyncUnlock();
+}
+
+
+void WritableCatalogManager::UpdateSubdirectoriesPaths(const std::string &old_parent_path, 
+                                                       const std::string &new_parent_path) {
+  DirectoryEntryList listing;
+  Listing(old_parent_path, &listing);
+  WritableCatalog *parent_catalog;
+  DirectoryEntry parent_entry;
+  for (unsigned i = 0; i < listing.size(); ++i) {
+    if (listing[i].IsDirectory()) {
+      UpdateSubdirectoriesPaths(listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
+    }
+    if (!FindCatalog(old_parent_path, &parent_catalog, &parent_entry)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "no catalog with path: %s was found",
+              old_parent_path.c_str());
+      PANIC("Unable to found parent path catalog");
+    }
+    parent_catalog->UpdateParentDirectoryPath(old_parent_path, new_parent_path, listing[i].GetFullPath(old_parent_path), listing[i].GetFullPath(new_parent_path));
+  }
+}
+
+
 /**
  * Remove the given directory from the catalogs.
  * @param directory_path the full path to the directory to be removed
@@ -543,6 +590,8 @@ void WritableCatalogManager::AddFile(
       PANIC(kLogStderr, "file at %s is larger than %u megabytes (%u).",
             file_path.c_str(), file_mbyte_limit_, mbytes);
   }
+  LogCvmfs(kLogCatalog, kLogStdout, "Adding entry to CATALOG: %s",
+           catalog->database_path().c_str());
 
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
   SyncUnlock();
@@ -618,8 +667,7 @@ void WritableCatalogManager::AddHardlinkGroup(
              "Please remove the file or increase the limit.",
              enforce_limits_ ? "FATAL" : "WARNING",
              (parent_path + entries[0].name().ToString()).c_str(),
-             file_mbyte_limit_,
-             mbytes);
+             file_mbyte_limit_, mbytes);
     if (enforce_limits_)
       PANIC(kLogStderr, "hard link at %s is larger than %u megabytes (%u)",
             (parent_path + entries[0].name().ToString()).c_str(),

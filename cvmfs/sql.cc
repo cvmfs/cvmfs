@@ -42,12 +42,10 @@ Sql::~Sql() {
 bool Sql::Execute() {
   LazyInit();
   last_error_code_ = sqlite3_step(statement_);
-#ifdef DEBUGMSG
   if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug, "SQL query failed - SQLite: %d - %s",
+    LogCvmfs(kLogSql, kLogStdout, "SQL query failed - SQLite: %d - %s",
              GetLastError(), GetLastErrorMsg().c_str());
   }
-#endif
   return Successful();
 }
 
@@ -145,7 +143,7 @@ bool Sql::Init(const char *statement) {
                                         NULL);
 
   if (!Successful()) {
-    LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
+    LogCvmfs(kLogSql, kLogStdout, "failed to prepare statement '%s' (%d: %s)",
              statement, GetLastError(), sqlite3_errmsg(database_));
     return false;
   }

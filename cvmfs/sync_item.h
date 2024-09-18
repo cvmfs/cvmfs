@@ -39,6 +39,8 @@ enum SyncItemType {
   kItemUnknown,
 };
 
+const char kPathSeparator = '/';
+
 class SyncUnion;
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
@@ -73,18 +75,20 @@ class SyncItem {
            (GetRdOnlyFiletype() == GetScratchFiletype()) &&
            (GetUnionFiletype() == GetScratchFiletype());
   }
-  inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
-  inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
-  inline bool IsFifo()            const { return IsType(kItemFifo);            }
-  inline bool IsSocket()          const { return IsType(kItemSocket);          }
-  inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
-  inline bool IsExternalData()    const { return external_data_;               }
-  inline bool IsDirectIo()        const { return direct_io_;                   }
+  inline bool IsCharacterDevice()   const { return IsType(kItemCharacterDevice); }
+  inline bool IsBlockDevice()       const { return IsType(kItemBlockDevice);     }
+  inline bool IsFifo()              const { return IsType(kItemFifo);            }
+  inline bool IsSocket()            const { return IsType(kItemSocket);          }
+  inline bool IsGraftMarker()       const { return IsType(kItemMarker);          }
+  inline bool IsExternalData()      const { return external_data_;               }
+  inline bool IsDirectIo()          const { return direct_io_;                   }
 
-  inline bool IsWhiteout()        const { return whiteout_;                    }
-  inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
-  inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
-
+  inline bool IsWhiteout()          const { return whiteout_;                    }
+  inline bool IsCatalogMarker()     const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsOpaqueDirectory()   const { return IsDirectory() && opaque_;     }
+  inline bool IsRenamedDirectory()  const { return IsDirectory() && renamed_directory_; }
+  inline bool IsAlreadyProcessed()  const { return already_processed_; }
+  inline bool IsMetadataOnlyEntry() const { return metadata_only_; }
   inline bool IsSpecialFile()     const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
@@ -149,9 +153,15 @@ class SyncItem {
   std::string GetRdOnlyPath() const;
   std::string GetUnionPath() const;
   std::string GetScratchPath() const;
+  std::string GetPreviousPath() const;
+  std::string GetCatalogPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
+  void MarkAsMetadataOnlyEntry();
   void MarkAsOpaqueDirectory();
+  void MarkAsRenamedDirectory();
+  void MarkAsAlreadyProcessed();
+  void MarkAsMarkedDirectory();
 
   /**
    * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
@@ -244,12 +254,13 @@ class SyncItem {
 
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
+      LogCvmfs(kLogCvmfs, kLogStdout, "SyncItem type. IS_DIR: [%d], IS_CHR: [%d]", S_ISDIR(stat.st_mode), S_ISCHR(stat.st_mode));
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       if (S_ISDIR(stat.st_mode)) return kItemDir;
       if (S_ISFIFO(stat.st_mode)) return kItemFifo;
       if (S_ISSOCK(stat.st_mode)) return kItemSocket;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
       return kItemUnknown;
     }
@@ -290,14 +301,17 @@ class SyncItem {
 
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
+  bool renamed_directory_;                      /**< SyncUnion marked this as a renamed directory */
+  bool metadata_only_;                /**< SyncUnion marked this as a metadata only file (no copy-up performed; 0-sized file with metadata) */
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
-
+  bool already_processed_;
   bool external_data_;
   bool direct_io_;
   std::string relative_parent_path_;
+  std::string previous_path_;
 
   /**
    * Chunklist from graft. Not initialized by default to save memory.

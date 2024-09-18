@@ -29,10 +29,12 @@ SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
   opaque_(false),
+  renamed_directory_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  already_processed_(false),
   external_data_(false),
   direct_io_(false),
   graft_chunklist_(NULL),
@@ -50,10 +52,12 @@ SyncItem::SyncItem(const std::string  &relative_parent_path,
   union_engine_(union_engine),
   whiteout_(false),
   opaque_(false),
+  renamed_directory_(false),
   masked_hardlink_(false),
   has_catalog_marker_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  already_processed_(false),
   external_data_(false),
   direct_io_(false),
   relative_parent_path_(relative_parent_path),
@@ -101,7 +105,6 @@ SyncItemType SyncItemNative::GetScratchFiletype() const {
     PANIC(kLogStderr, "[WARNING] Failed to stat() '%s' in scratch. (errno: %s)",
           GetRelativePath().c_str(), scratch_stat_.error_code);
   }
-
   return GetGenericFiletype(scratch_stat_);
 }
 
@@ -126,7 +129,6 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   // Mark the file as whiteout entry and strip the whiteout prefix
   whiteout_ = true;
   filename_ = actual_filename;
-
   // Find the entry in the repository
   StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
 
@@ -147,12 +149,36 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   }
 }
 
+void SyncItem::MarkAsMetadataOnlyEntry() {
+  metadata_only_ = true;
+}
 
 void SyncItem::MarkAsOpaqueDirectory() {
   assert(IsDirectory());
   opaque_ = true;
 }
 
+void SyncItem::MarkAsRenamedDirectory() {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Marking entry as a renamed: %s", filename_.c_str());
+  assert(IsDirectory());
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(GetScratchPath()));
+  string previous_path;
+  if (!xattrs->Get("trusted.overlay.redirect", &previous_path)) 
+  {
+    PANIC(kLogStderr, "Unable to obtain redirect dir attribute from the renamed entry");
+  }
+  LogCvmfs(kLogUnionFs, kLogStdout, "[RENAMED ENTRY] Previous path: %s || Previous parent: %s || Current relative parent path: %s", 
+                                                     previous_path.c_str(), 
+                                                     GetParentPath(previous_path).c_str(),
+                                                     relative_parent_path_.c_str());
+  previous_path_ = IsAbsolutePath(previous_path) ? StripLeadingPathSeparator(previous_path) 
+                                                 : StripLeadingPathSeparator(relative_parent_path_ + kPathSeparator + previous_path);
+  renamed_directory_ = true;
+}
+
+void SyncItem::MarkAsAlreadyProcessed() {
+  already_processed_ = true;
+}
 
 unsigned int SyncItem::GetRdOnlyLinkcount() const {
   StatRdOnly();
@@ -194,6 +220,7 @@ IngestionSource *SyncItemNative::CreateIngestionSource() const {
 void SyncItem::StatGeneric(const string  &path,
                            EntryStat     *info,
                            const bool     refresh) {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Stat path: [%s]", path.c_str());                         
   if (info->obtained && !refresh) return;
   int retval = platform_lstat(path.c_str(), &info->stat);
   info->error_code = (retval != 0) ? errno : 0;
@@ -239,14 +266,46 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
   return dirent;
 }
 
-
-std::string SyncItem::GetRdOnlyPath() const {
-  const string relative_path = GetRelativePath().empty() ?
-                               "" : "/" + GetRelativePath();
-  return union_engine_->rdonly_path() + relative_path;
+std::string SyncItem::GetPreviousPath() const {
+  return previous_path_.empty() ? GetRelativePath() : previous_path_;
 }
 
-std::string SyncItem::GetUnionPath() const {
+std::string SyncItem::GetCatalogPath() const {
+  // Putting stat info in a temporary variable that 
+  // holds an actual entry type in a scratch area
+  // For whiteouts we determine deleted entry type but
+  // for some reason assign scratch area entry type property 
+  // to the determined deleted type 
+  // scratch_type_ = deleted_type;
+  // Currently I am not sure how to modify that safely other than
+  // handle this specifically here
+  EntryStat info;
+  StatGeneric(GetScratchPath(), &info, true);
+  if (info.GetSyncItemType() == kItemDir)
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout, "[GET CATAlOG PATH]. Entry is a directory: [%s]", GetRelativePath().c_str());
+    return GetPreviousPath();
+  }
+  string previous_parent_path = union_engine_->GetPreviousPath(relative_parent_path_);
+  LogCvmfs(kLogCvmfs, kLogStdout, "[GET CATAlOG PATH]. Parent path: [%s]. Previous parent path: [%s]", 
+                                                                    relative_parent_path_.c_str(), 
+                                                                    previous_parent_path.c_str());
+  if (previous_parent_path.empty())
+  {
+    return GetRelativePath();
+  }
+  const std::string previous_entry_path = previous_parent_path + kPathSeparator + filename_;
+  return previous_entry_path;
+}
+
+std::string SyncItem::GetRdOnlyPath() const {
+  const string catalog_path = kPathSeparator + GetCatalogPath();
+  const string catalog_rdonly_path = union_engine_->rdonly_path() + catalog_path;
+  LogCvmfs(kLogUnionFs, kLogStdout, "[GET ENTRY RDONLY LAYER PATH] Catalog path: %s. Rdonly path: [%s]", catalog_path.c_str(), catalog_rdonly_path.c_str());
+  return union_engine_->rdonly_path() + catalog_path;
+}
+
+std::string SyncItem::GetUnionPath() const {  
   const string relative_path = GetRelativePath().empty() ?
                                "" : "/" + GetRelativePath();
   return union_engine_->union_path() + relative_path;

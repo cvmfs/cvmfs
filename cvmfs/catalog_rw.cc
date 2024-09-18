@@ -35,6 +35,7 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_unlink_(NULL),
   sql_touch_(NULL),
   sql_update_(NULL),
+  sql_rename_directory_(NULL),
   sql_chunk_insert_(NULL),
   sql_chunks_remove_(NULL),
   sql_chunks_count_(NULL),
@@ -95,11 +96,14 @@ void WritableCatalog::InitPreparedStatements() {
   sql_unlink_        = new SqlDirentUnlink     (database());
   sql_touch_         = new SqlDirentTouch      (database());
   sql_update_        = new SqlDirentUpdate     (database());
+  sql_rename_directory_   = new SqlDirentRename (database());
+  sql_parent_update_ = new SqlParentUpdate     (database());
   sql_chunk_insert_  = new SqlChunkInsert      (database());
   sql_chunks_remove_ = new SqlChunksRemove     (database());
   sql_chunks_count_  = new SqlChunksCount      (database());
   sql_max_link_id_   = new SqlMaxHardlinkGroup (database());
   sql_inc_linkcount_ = new SqlIncLinkcount     (database());
+  sql_listing_       = new SqlListing          (database());
 }
 
 
@@ -110,11 +114,14 @@ void WritableCatalog::FinalizePreparedStatements() {
   delete sql_unlink_;
   delete sql_touch_;
   delete sql_update_;
+  delete sql_rename_directory_;
+  delete sql_parent_update_;
   delete sql_chunk_insert_;
   delete sql_chunks_remove_;
   delete sql_chunks_count_;
   delete sql_max_link_id_;
   delete sql_inc_linkcount_;
+  delete sql_listing_;
 }
 
 
@@ -147,12 +154,13 @@ void WritableCatalog::AddEntry(
 {
   SetDirty();
 
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
+  LogCvmfs(kLogCatalog, kLogStdout, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
                                         mountpoint().c_str());
 
   shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
+  LogCvmfs(kLogCatalog, kLogStdout, "Add entry with path: %s", path_hash.ToString().c_str());
   DirectoryEntry effective_entry(entry);
   effective_entry.set_has_xattrs(!xattrs.IsEmpty());
 
@@ -252,13 +260,45 @@ void WritableCatalog::TouchEntry(const DirectoryEntryBase &entry,
 void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
                                   const shash::Md5 &path_hash) {
   SetDirty();
-
+  
   bool retval =
     sql_update_->BindPathHash(path_hash) &&
     sql_update_->BindDirent(entry)       &&
     sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();
+}
+
+void WritableCatalog::RenameDirectory(const DirectoryEntry &entry, 
+                                      const shash::Md5 &new_parent_path_hash, 
+                                      const shash::Md5 &old_path_hash, 
+                                      const shash::Md5 &new_path_hash) {
+  SetDirty();
+  LogCvmfs(kLogCatalog, kLogStdout, "Updating directory. Old hash: %s, new hash: %s", old_path_hash.ToString().c_str(), new_path_hash.ToString().c_str()); 
+  bool retval = 
+    sql_rename_directory_->BindPathsHashes(old_path_hash, new_path_hash) &&
+    sql_rename_directory_->BindParentPathHash(new_parent_path_hash) &&
+    sql_rename_directory_->BindDirent(entry) &&
+    sql_rename_directory_->Execute();
+  assert(retval);
+  sql_rename_directory_->Reset();
+}
+
+void WritableCatalog::UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash, 
+                                                const shash::Md5 &new_parent_path_hash,
+                                                const shash::Md5 &old_path_hash, 
+                                                const shash::Md5 &new_path_hash) {                                        
+  SetDirty();                                             
+  LogCvmfs(kLogCatalog, kLogStdout, "Refreshing parent. Parent hash: %s, old hash: %s, new hash: %s", 
+                                          new_parent_path_hash.ToString().c_str(), 
+                                          old_parent_path_hash.ToString().c_str(), 
+                                          new_path_hash.ToString().c_str());
+  
+  bool retval = sql_parent_update_->BindParentHashes(old_parent_path_hash, new_parent_path_hash) &&
+                sql_parent_update_->BindPathsHashes(new_path_hash, old_path_hash) &&
+                sql_parent_update_->Execute();
+  assert(retval);
+  sql_parent_update_->Reset();
 }
 
 void WritableCatalog::AddFileChunk(const std::string &entry_path,

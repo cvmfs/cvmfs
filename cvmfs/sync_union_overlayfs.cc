@@ -153,12 +153,38 @@ void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
 void SyncUnionOverlayfs::Traverse() {
   assert(this->IsInitialized());
 
+  // (YBelikov) Stick to 3-step traversal
+  // otherwise it is impossible to handle all the mess in the scratch area properly 
+  // 1. Segregate whiteouts left after mv and rm utils invokation, put renamed subdirectories and their previous paths 
+  // in a map that stores <current path, previous path> pairs
+  // 2. Skip rename(2) or mv(1) whiteouts and deal with rm-whiteouts: remove them from the catalog before renaming entries in a catalog db
+  // This step is such because after renaming catalog entries, 
+  // removal of directories (what requires traversal of a corrsesponding entry in a rdonly layer)
+  // becomes way trickier to handle; it is an untrivial task to map a readonly path entries to an updated catalog
+  // on RemoveDirectoryRecursively (since there are no more entries in a catalog with the relative paths = to relative paths in rdonly)
+  // 3. Iterate over a map of renamed directories and update catalog entries that match map values (previous path) with map keys (current union path)  
+  
   FileSystemTraversal<SyncUnionOverlayfs> traversal(this, scratch_path(), true);
+  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessRenamedDirectory;
+  traversal.Recurse(scratch_path());
+  traversal.fn_new_dir_prefix = NULL;
 
+  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.Recurse(scratch_path());
+  traversal.fn_new_character_dev = NULL;
+
+  for (std::map<std::string, std::string>::const_iterator it = renamed_directories_.cbegin();  
+                                                       it != renamed_directories_.cend(); 
+                                                       ++it)
+  {
+    //TODO(YBelikov): deal with nested catalogs
+    mediator_->RenameDirectory(it->second, it->first);
+  }
+  renamed_directories_.clear();
+  previous_directories_paths_.clear();
   traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
   traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
   traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_new_character_dev = &SyncUnionOverlayfs::ProcessCharacterDevice;
   traversal.fn_new_block_dev = &SyncUnionOverlayfs::ProcessBlockDevice;
   traversal.fn_new_fifo = &SyncUnionOverlayfs::ProcessFifo;
   traversal.fn_new_socket = &SyncUnionOverlayfs::ProcessSocket;
@@ -166,10 +192,10 @@ void SyncUnionOverlayfs::Traverse() {
   traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
   traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
 
-  LogCvmfs(kLogUnionFs, kLogVerboseMsg,
+  LogCvmfs(kLogUnionFs, kLogStdout,
            "OverlayFS starting traversal "
            "recursion for scratch_path=[%s]",
-           scratch_path().c_str());
+           scratch_path().c_str());  
   traversal.Recurse(scratch_path());
 }
 
@@ -219,6 +245,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  LogCvmfs(kLogUnionFs, kLogStdout, "Testing attributes: %s for: %s", path.c_str(), attr_name.c_str());
   assert(xattrs.IsValid());
 
   std::vector<std::string> attrs = xattrs->ListKeys();
@@ -228,8 +255,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   for (; i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
   }
-
-  return xattrs.IsValid() && xattrs->Has(attr_name);
+  return xattrs->Has(attr_name);
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
@@ -255,6 +281,15 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   if (is_symlink_whiteout) return true;
 
   return false;
+}
+ 
+bool SyncUnionOverlayfs::IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const {
+  const std::string entry_path = entry->GetScratchPath();
+  bool is_metadata_only = HasXattr(entry_path, "trusted.overlay.metacopy");
+  if (is_metadata_only) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has metadata only attribute", entry_path.c_str());
+  }
+  return is_metadata_only; 
 }
 
 bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
@@ -284,6 +319,19 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
              path.c_str());
   }
   return is_opaque;
+}
+
+bool SyncUnionOverlayfs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  const std::string path = directory->GetScratchPath();
+  return DirectoryExists(path) && IsRenamedDirPath(path);
+}
+
+bool SyncUnionOverlayfs::IsRenamedDirPath(const std::string &path) const {
+  bool is_renamed = HasXattr(path.c_str(), "trusted.overlay.redirect");
+  if (is_renamed) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "OverlayFS [%s] has previous path attribute", path.c_str());
+  }
+  return is_renamed;
 }
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(

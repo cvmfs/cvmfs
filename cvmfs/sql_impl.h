@@ -163,7 +163,7 @@ bool Database<DerivedT>::DatabaseRaiiWrapper::Close() {
   const int result = sqlite3_close(sqlite_db);
 
   if (result != SQLITE_OK) {
-    LogCvmfs(kLogSql, kLogDebug,
+    LogCvmfs(kLogSql, kLogStdout,
              "failed to close SQLite database '%s' (%d - %s)",
              filename().c_str(), result,
              delegate_->GetLastErrorMsg().c_str());
