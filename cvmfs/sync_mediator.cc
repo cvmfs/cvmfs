@@ -1004,7 +1004,7 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
   // any updates of the catalog to avoid uncertainties happenning after renaming
   // manipulate the so-called catalog path which provides the entry path as it is presented in
   // catalog database (may be different from the actual path of the entry if a whiteout is nested in a renamed directory)
-  string filepath = entry->GetCatalogPath();
+  const string filepath = entry->GetCatalogPath();
   LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]", entry->GetRelativePath().c_str());
   reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
@@ -1023,6 +1023,12 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
     perf::Inc(counters_->n_files_removed);
   }
   perf::Xadd(counters_->sz_removed_bytes, entry->GetRdOnlySize());
+}
+
+void SyncMediator::UpdateMetadata(SharedPtr<SyncItem> entry) {
+  const string filepath = entry->GetCatalogPath();
+  LogCvmfs(kLogUnionFs, kLogStdout, "Updating metadata for file in a path: [%s]", filepath.c_str());
+  catalog_manager_->UpdateMetadata(filepath);
 }
 
 void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {

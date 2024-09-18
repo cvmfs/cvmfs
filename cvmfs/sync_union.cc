@@ -46,9 +46,11 @@ SharedPtr<SyncItem> SyncUnion::CreateSyncItem(
 }
 
 void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const { 
-  // Incorrectly to say already processed here, but leave for simplicity
   if (IsWhiteoutEntry(entry)) 
   {
+    // Incorrectly to say already processed here, but leave for simplicity
+    // Mark whiteout entries that should not be processes as removed files
+    // (leftouts from renamings when redirect_dir=on)
     if (IsAlreadyProcessed(entry))
     {
       LogCvmfs(kLogUnionFs, kLogStdout, "[ALREADY PROCESSED] PreprocessSyncItem. " 
@@ -62,10 +64,10 @@ void SyncUnion::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
   }
   else 
   {
-    // if (IsMetadataOnlyEntry(entry)) {
-    //   LogCvmfs(kLogUnionFs, kLogStdout, "PreprocessSyncItem. Metadata-only filesystem entry: %s", entry->GetRelativePath().c_str());
-    //   entry->MarkAsMetadataOnlyEntry();
-    // }
+    if (IsMetadataOnlyEntry(entry)) {
+      LogCvmfs(kLogUnionFs, kLogStdout, "Metadata-only entry detected: %s", entry->GetRelativePath().c_str());
+      entry->MarkAsMetadataOnlyEntry();
+    }
     
     if (IsOpaqueDirectory(entry))
     {
@@ -207,7 +209,11 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
       // Modify a mediator so it recalculates only content hash 
       mediator_->Add(entry);
       return;
-  } 
+  }
+  if (entry->IsMetadataOnlyEntry()) {
+    mediator_->UpdateMetadata(entry);
+    return;
+  }
     
   LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",

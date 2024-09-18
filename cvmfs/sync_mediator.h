@@ -188,7 +188,7 @@ class SyncMediator : public virtual AbstractSyncMediator {
   // Called after figuring out the type of a path (file, symlink, dir)
   void AddFile(SharedPtr<SyncItem> entry);
   void RemoveFile(SharedPtr<SyncItem> entry);
-
+  void UpdateMetadata(SharedPtr<SyncItem> entry);
   void AddDirectory(SharedPtr<SyncItem> entry);
   void RemoveDirectory(SharedPtr<SyncItem> entry);
   void TouchDirectory(SharedPtr<SyncItem> entry);
