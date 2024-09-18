@@ -1,0 +1,263 @@
+#!/bin/bash
+
+vmfs_test_name="redirect_dir directories renames test"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+produce_initial_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+  mkdir  root_dir
+  mkdir  root_dir/dir_1
+  mkdir  root_dir/dir_2
+  mkdir  root_dir/dir_3
+  mkdir  root_dir/dir_1/contains_files
+  mkdir  root_dir/dir_2/contains_dirs
+  mkdir  root_dir/dir_3/contains_nothing
+  
+  echo "test 1" > root_dir/dir_1/contains_files/file_1
+  echo "test 2" > root_dir/dir_1/contains_files/file_2
+  echo "test 3" > root_dir/dir_1/contains_files/file_3
+  echo "test 4" > root_dir/dir_1/contains_files/file_4
+  
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_1
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_2
+  mkdir root_dir/dir_2/contains_dirs/nested_dir_3
+  echo "hi!" > root_dir/dir_2/contains_dirs/nested_dir_3/file
+
+  popdir
+}
+
+move_on_upper_level_and_back() {
+  local working_dir=$1
+
+  pushdir $working_dir
+  
+  mv root_dir/dir_3/contains_nothing root_dir/dir_nothing
+  mv root_dir/dir_nothing root_dir/dir_3/contains_nothing
+
+  popdir
+}
+
+move_contains_files_and_update_content() {
+  local working_dir=$1
+
+  pushdir $working_dir
+  mv root_dir/dir_1/contains_files root_dir/contains_files_renamed
+  echo "Update content in file_1" > root_dir/contains_files_renamed/file_1
+  echo "Update content in file_3" > root_dir/contains_files_renamed/file_3
+
+  popdir
+}
+
+update_content_and_move_contains_files() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "Update content in file_2" > root_dir/contains_files_renamed/file_2
+  echo "Update content in file_4" > root_dir/contains_files_renamed/file_4
+  mv root_dir/contains_files_renamed root_dir/dir_1/contains_files
+  popdir
+}
+
+move_directory_and_add_file() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mv root_dir/dir_2/contains_dirs/nested_dir_1 root_dir/nested_dir_1_renamed
+  echo "Something" > root_dir/nested_dir_1_renamed/something
+  popdir
+}
+
+move_directory_and_remove_file() {
+  local working_dir=$1
+  pushdir $working_dir
+  mv root_dir/nested_dir_1_renamed root_dir/dir_2/contains_dirs/nested_dir_1
+  rm -f root_dir/dir_2/contains_dirs/nested_dir_1/file_1/something
+  mv contains_many_entries contains_many_entries_renamed
+}
+
+
+move_parent_and_child_dirs_and_add_file() {
+  local working_dir=$1
+  pushdir $working_dir
+  mv root_dir/dir2 root_dir/dir2_renamed
+  mv root_dir/dir2_renamed/contains_dirs/nested_dir_1 root_dir/dir2_renamed/contains_dirs/nested_dir_1_renamed
+  echo "Some text" > root_dir/dir2_renamed/contains_dirs/nested_dir_1_renamed/test
+}
+
+move_parent_and_child_dirs_and_update_file() {
+  local working_dir=$1
+  pushdir $working_dir
+  mv root_dir/dir2_renamed root_dir/dir2
+  mv root_dir/dir2/contains_dirs/nested_dir_1_renamed root_dir/dir2/contains_dirs/nested_dir_1
+  echo "Updated text" > root_dir/dir2/contains_dirs/nested_dir_1/test
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "*** 1 create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** 1 starting transaction to edit repository (1)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 1 putting some stuff in the new repository"
+  produce_initial_files_in $repo_dir || return 3
+
+  echo "*** 1 putting exactly the same stuff in the scratch space for comparison"
+  produce_initial_files_in $reference_dir || return 4
+
+  echo "*** 1 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 1 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 1 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 2 starting transaction to edit repository (2)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 2 moving empty directory back and forth in the repo"
+  move_on_upper_level_and_back $repo_dir || return 5
+
+  echo "*** 2 doing exactly the same in the scratch space for comparison"
+  move_on_upper_level_and_back $reference_dir || return 6
+
+  echo "*** 2 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 2 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 2 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 3 starting transaction to edit repository (3)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 3 moving a directory with files and update content for a part of the nested files"
+  move_contains_files_and_update_content $repo_dir || return 7
+
+  echo "*** 3 doing exactly the same in the scratch space for comparison"
+  move_contains_files_and_update_content $reference_dir || return 8
+
+  echo "*** 3 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 3 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 3 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+# 
+
+  echo "*** 4 starting transaction to edit repository (4)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 4 updating a part of nested files in a directory and moving it"
+  update_content_and_move_contains_files $repo_dir || return 8
+
+  echo "*** 4 doing exactly the same in the scratch space for comparison"
+  update_content_and_move_contains_files $reference_dir || return 9
+
+  echo "*** 4 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 4 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 4 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 5 starting transaction to edit repository (5)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 5 moving an empty directory and creating a file in it"
+  move_directory_and_add_file $repo_dir || return 10
+
+  echo "*** 5 doing exactly the same in the scratch space for comparison"
+  move_directory_and_add_file $reference_dir || return 11
+
+  echo "*** 5 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 5 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 5 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 6 starting transaction to edit repository (6)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 6 moving a directory and it's child subdirectory and adding a file in the subdir"
+  move_parent_and_child_dirs_and_add_file $repo_dir || return 12
+
+  echo "*** 6 doing exactly the same in the scratch space for comparison"
+  move_parent_and_child_dirs_and_add_file $reference_dir || return 13
+
+  echo "*** 6 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 6 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 6 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "*** 7 starting transaction to edit repository (7)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "*** 7 moving a directory and it's child subdirectory and updating a file in the subdir"
+  move_parent_and_child_dirs_and_update_file $repo_dir || return 12
+
+  echo "*** 7 doing exactly the same in the scratch space for comparison"
+  move_parent_and_child_dirs_and_update_file $reference_dir || return 13
+
+  echo "*** 7 creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "*** 7 compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "*** 7 check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}

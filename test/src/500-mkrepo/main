@@ -27,6 +27,11 @@ produce_files_in() {
 	popdir
 }
 
+check_mountpoint_permissions() {
+  local permission=$(stat --printf %a $1)
+  [ "x${permission}" = "x755" ] || return 121
+}
+
 cleanup() {
   if [ "x$CVMFS_TEST500_LONG_REPONAME" != "x" ]; then
     destroy_repo testrepo.osg-software-2580-el7-cvmfs-stratum-0.novalocal.crt
@@ -44,6 +49,14 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  check_mountpoint_permissions ${repo_dir} || return 121
+
+  echo "start and abort transaction to check permissions"
+  start_transaction $CVMFS_TEST_REPO || return 123
+  abort_transaction $CVMFS_TEST_REPO || return 124
+
+  check_mountpoint_permissions ${repo_dir} || return 125
+
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
@@ -56,6 +69,7 @@ cvmfs_run_test() {
   sleep 2
   abort_transaction $CVMFS_TEST_REPO || return 31
   wait $pid_txn || return 32
+
 
   echo "putting some stuff in the new repository"
   produce_files_in $repo_dir || return 3

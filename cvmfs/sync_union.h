@@ -30,7 +30,7 @@
 #ifndef CVMFS_SYNC_UNION_H_
 #define CVMFS_SYNC_UNION_H_
 
-#include <set>
+#include <unordered_set>
 #include <string>
 
 #include "sync_item.h"
@@ -118,12 +118,31 @@ class SyncUnion {
   virtual bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const = 0;
 
   /**
+   * OverlayFS when mounted with redirect_dir option
+   * allows renaming of directories (via rename() or mv) 
+   * But creates an empty directory in the scratch area on sole renaming  
+   * with trusted.overlay.redirect xattr that preserves the old name of a directory
+   * @param directory entry
+   * @return true if a directory is renamed, otherwise false
+   */
+  virtual bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const = 0;
+
+  /**
    * Checks if given file is supposed to be whiteout.
    * These files indicate that a specific file has been deleted.
    * @param filename the filename to check
    * @return true if filename seems to be whiteout otherwise false
    */
   virtual bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const = 0;
+
+  /**
+   * Checks if a given file is a 0-sized file with updated metadata.
+   * Applicable on mounting OverlayFS with metacopy feature being turned on.
+   * @param entry the filesystem entry to check
+   * @return true if an entry has trusted.overlay.metacopy xattr, false otherwise 
+   */
+  virtual bool IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const = 0;
+
 
   /**
    * Union file systems may use some special files for bookkeeping.
@@ -137,13 +156,25 @@ class SyncUnion {
                                    const std::string &filename);
 
   bool IsInitialized() const { return initialized_; }
+
+  std::string GetPreviousPath(const std::string &current_path) const
+  {
+    std::map<std::string, std::string>::const_iterator target_elt_iterator = renamed_directories_.find(current_path);
+    if (target_elt_iterator == renamed_directories_.cend())
+    {
+      return "";
+    }
+    return (*target_elt_iterator).second;
+  }
+
   virtual bool SupportsHardlinks() const { return false; }
 
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
   std::string union_path_;
-
+  std::unordered_set<std::string> previous_directories_paths_;
+  std::map<std::string, std::string> renamed_directories_;
   AbstractSyncMediator *mediator_;
 
   /**
@@ -175,6 +206,7 @@ class SyncUnion {
   virtual bool ProcessDirectory(const std::string &parent_dir,
                                 const std::string &dir_name);
   virtual bool ProcessDirectory(SharedPtr<SyncItem> entry);
+
   virtual bool ProcessUnmaterializedDirectory(SharedPtr<SyncItem> entry);
 
   /**
@@ -230,11 +262,23 @@ class SyncUnion {
   void ProcessSocket(const std::string &parent_dir,
                      const std::string &filename);
 
+  bool ProcessRenamedDirectory(const std::string &parent_dir, 
+                               const std::string &filename);
+
+  bool ProcessRenamedDirectory(SharedPtr<SyncItem> entry);
+
+  bool ProcessRenamedDirectorySubdirCallback(const std::string& parent_dir,
+                                             const std::string& filename);
+
+  bool IsAlreadyProcessed(SharedPtr<SyncItem> entry) const;
+
   /**
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
   void ProcessFile(SharedPtr<SyncItem> entry);
+
+
 
  private:
   bool initialized_;

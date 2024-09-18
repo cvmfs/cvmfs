@@ -105,21 +105,20 @@ class FileSystemTraversal {
     Init();
   }
 
+  FileSystemTraversal(T *delegate,
+                      const std::string &relative_to_directory,
+                      const std::string &old_directory_name,
+                      const bool recurse)
+  {
+    FileSystemTraversal(delegate, relative_to_directory, recurse);
+    old_directory_name_ = old_directory_name; 
+  }
+
   /**
    * Start the recursion.
    * @param dir_path The directory to start the recursion at
    */
   void Recurse(const std::string &dir_path) const {
-    assert(fn_enter_dir != NULL ||
-           fn_leave_dir != NULL ||
-           fn_new_file != NULL ||
-           fn_new_symlink != NULL ||
-           fn_new_dir_prefix != NULL ||
-           fn_new_block_dev != NULL ||
-           fn_new_character_dev != NULL ||
-           fn_new_fifo != NULL ||
-           fn_new_socket != NULL);
-
     assert(relative_to_directory_.length() == 0 ||
            dir_path.substr(0, relative_to_directory_.length()) ==
              relative_to_directory_);
@@ -134,7 +133,7 @@ class FileSystemTraversal {
   /** dir_path in callbacks will be relative to this directory */
   std::string relative_to_directory_;
   bool recurse_;
-
+  std::string old_directory_name_ = "";
 
   void Init() {
   }
@@ -184,39 +183,39 @@ class FileSystemTraversal {
               (path + "/" + dit->d_name).c_str(), errno);
       }
       if (S_ISDIR(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing directory %s/%s",
                  path.c_str(), dit->d_name);
         if (Notify(fn_new_dir_prefix, path, dit->d_name) && recurse_) {
           DoRecursion(path, dit->d_name);
         }
         Notify(fn_new_dir_postfix, path, dit->d_name);
       } else if (S_ISREG(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing regular file %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing regular file %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_file, path, dit->d_name);
       } else if (S_ISLNK(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing symlink %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_symlink, path, dit->d_name);
       } else if (S_ISSOCK(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing socket %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing socket %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
       } else if (S_ISBLK(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing block-device %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing block-device %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_block_dev, path, dit->d_name);
       } else if (S_ISCHR(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing character-device "
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing character-device "
                                                   "%s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_character_dev, path, dit->d_name);
       } else if (S_ISFIFO(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing FIFO %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "passing FIFO %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_fifo, path, dit->d_name);
       } else {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "unknown file type %s/%s",
+        LogCvmfs(kLogFsTraversal, kLogStdout, "unknown file type %s/%s",
                  path.c_str(), dit->d_name);
       }
     }

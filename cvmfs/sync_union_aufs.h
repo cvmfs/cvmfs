@@ -29,9 +29,11 @@ class SyncUnionAufs : public SyncUnion {
 
  protected:
   bool IsWhiteoutEntry(SharedPtr<SyncItem> entry) const;
+  bool IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const;
   bool IsOpaqueDirectory(SharedPtr<SyncItem> directory) const;
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
+  bool IsRenamedDirectory(SharedPtr<SyncItem> directory) const;
   std::string UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const;
 
  private:

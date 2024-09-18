@@ -76,7 +76,7 @@ class WritableCatalog : public Catalog {
   void IncLinkcount(const std::string &path_within_group, const int delta);
   void AddFileChunk(const std::string &entry_path, const FileChunk &chunk);
   void RemoveFileChunks(const std::string &entry_path);
-
+ 
   // Creation and removal of catalogs
   void Partition(WritableCatalog *new_nested_catalog);
   void MergeIntoParent();
@@ -122,6 +122,46 @@ class WritableCatalog : public Catalog {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
+  void RenameDirectory(const DirectoryEntry &entry, 
+                       const shash::Md5 &new_parent_path_hash,
+                       const shash::Md5 &old_path_hash,
+                       const shash::Md5 &new_path_hash);
+  inline void RenameDirectory(const DirectoryEntry &entry,  
+                              const std::string &new_parent_path,
+                              const std::string &old_path,
+                              const std::string &new_path)
+  {
+    LogCvmfs(kLogCatalog, kLogStdout, "Updating entry with name: %s. Old path: %s, new path: %s. New parent path: %s",
+                                      entry.name().c_str(), old_path.c_str(), new_path.c_str(), new_parent_path.c_str());
+    RenameDirectory(entry, shash::Md5(shash::AsciiPtr(new_parent_path)),
+                           shash::Md5(shash::AsciiPtr(old_path)), 
+                           shash::Md5(shash::AsciiPtr(new_path)));
+  }
+
+  void UpdateParentDirectoryPath(const shash::Md5 &old_parent_path_hash,
+                                 const shash::Md5 &new_parent_path_hash,
+                                 const shash::Md5 &old_path_hash,
+                                 const shash::Md5 &new_path_hash); 
+  inline void UpdateParentDirectoryPath(const std::string &old_parent_path, 
+                                        const std::string &new_parent_path,
+                                        const std::string &old_path,
+                                        const std::string &new_path) {
+    shash::Md5 old_parent_path_hash = shash::Md5(shash::AsciiPtr(old_parent_path));
+    shash::Md5 new_parent_path_hash = shash::Md5(shash::AsciiPtr(new_parent_path));
+    shash::Md5 old_path_hash = shash::Md5(shash::AsciiPtr(old_path));
+    shash::Md5 new_path_hash = shash::Md5(shash::AsciiPtr(new_path));
+
+    LogCvmfs(kLogCatalog, kLogStdout, "Old parent path hash: %s", old_parent_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "New parent path hash: %s", old_parent_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "Old path hash: %s", old_path_hash.ToString().c_str());
+    LogCvmfs(kLogCatalog, kLogStdout, "New path hash: %s", new_path_hash.ToString().c_str());
+
+    UpdateParentDirectoryPath(old_parent_path_hash,
+                              new_parent_path_hash, 
+                              old_path_hash,
+                              new_path_hash);
+  }
+
   inline void AddEntry(
     const DirectoryEntry &entry,
     const XattrList &xattrs,
@@ -152,11 +192,14 @@ class WritableCatalog : public Catalog {
   SqlDirentUnlink     *sql_unlink_;
   SqlDirentTouch      *sql_touch_;
   SqlDirentUpdate     *sql_update_;
+  SqlDirentRename     *sql_rename_directory_;
+  SqlParentUpdate     *sql_parent_update_;
   SqlChunkInsert      *sql_chunk_insert_;
   SqlChunksRemove     *sql_chunks_remove_;
   SqlChunksCount      *sql_chunks_count_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
   SqlIncLinkcount     *sql_inc_linkcount_;
+  SqlListing          *sql_listing_;
 
   bool dirty_;  /**< Indicates if the catalog has been changed */
 

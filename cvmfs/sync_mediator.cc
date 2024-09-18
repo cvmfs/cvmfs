@@ -228,9 +228,10 @@ void SyncMediator::Touch(SharedPtr<SyncItem> entry) {
  * Remove an entry from the repository. Directories will be recursively removed.
  */
 void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
+  LogCvmfs(kLogUnionFs, kLogStdout, "Remove entry: %s. Relative path: %s", entry->GetScratchPath().c_str(), entry->GetRelativePath().c_str());
   EnsureAllowed(entry);
 
-  if (entry->WasDirectory()) {
+  if (entry->WasDirectory()) {    
     RemoveDirectoryRecursively(entry);
     return;
   }
@@ -551,6 +552,7 @@ void SyncMediator::AddDirectoryRecursively(SharedPtr<SyncItem> entry) {
   traversal.fn_new_block_dev = &SyncMediator::AddBlockDeviceCallback;
   traversal.fn_new_fifo      = &SyncMediator::AddFifoCallback;
   traversal.fn_new_socket    = &SyncMediator::AddSocketCallback;
+  LogCvmfs(kLogUnionFs, kLogCvmfs, "On AddDirectoryRecursively. SyncItem scratch path: %s", entry->GetScratchPath().c_str());
   traversal.Recurse(entry->GetScratchPath());
 }
 
@@ -643,9 +645,8 @@ void SyncMediator::RemoveDirectoryRecursively(SharedPtr<SyncItem> entry) {
   traversal.fn_new_fifo      = &SyncMediator::RemoveFifoCallback;
   traversal.fn_new_socket    = &SyncMediator::RemoveSocketCallback;
   traversal.Recurse(entry->GetRdOnlyPath());
-
   // The given directory was emptied recursively and can now itself be deleted
-  RemoveDirectory(entry);
+   RemoveDirectory(entry);
 }
 
 
@@ -812,6 +813,7 @@ void SyncMediator::PublishHardlinksCallback(
 
 void SyncMediator::CreateNestedCatalog(SharedPtr<SyncItem> directory) {
   const std::string notice = "Nested catalog at " + directory->GetUnionPath();
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::CreateNestedCatalog. Adding directory: %s", directory->GetUnionPath().c_str());
   reporter_->OnAdd(notice, catalog::DirectoryEntry());
 
   if (!params_->dry_run) {
@@ -926,9 +928,11 @@ void SyncDiffReporter::ModifyImpl(const std::string &path) {
 }
 
 void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddFile. Adding %s", entry->GetUnionPath().c_str());
   reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
-  if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) {
+  if ((entry->IsSymlink() || entry->IsSpecialFile()) && !params_->dry_run) 
+  {
     assert(!entry->HasGraftMarker());
     // Symlinks and special files are completely stored in the catalog
     XattrList *xattrs = &default_xattrs_;
@@ -940,7 +944,9 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
                               entry->relative_parent_path());
     if (xattrs != &default_xattrs_)
       free(xattrs);
-  } else if (entry->HasGraftMarker() && !params_->dry_run) {
+  } 
+  else if (entry->HasGraftMarker() && !params_->dry_run) 
+  {
     if (entry->IsValidGraft()) {
       // Graft files are added to catalog immediately.
       if (entry->IsChunkedGraft()) {
@@ -964,11 +970,16 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
             " file.  Aborting publish.",
             entry->GetRelativePath().c_str());
     }
-  } else if (entry->relative_parent_path().empty() &&
-             entry->IsCatalogMarker()) {
+  } 
+  else if (entry->relative_parent_path().empty() &&
+             entry->IsCatalogMarker())            
+  {
     PANIC(kLogStderr, "Error: nested catalog marker in root directory");
-  } else if (!params_->dry_run) {
+  } 
+  else if (!params_->dry_run) 
+  {
     {
+      LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddFile. Not in dry run");
       // Push the file to the spooler, remember the entry for the path
       MutexLockGuard m(&lock_file_queue_);
       file_queue_[entry->GetUnionPath()] = entry;
@@ -989,15 +1000,20 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
 }
 
 void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
+  // Since removal is currently performed on the 2nd traversal BEFORE
+  // any updates of the catalog to avoid uncertainties happenning after renaming
+  // manipulate the so-called catalog path which provides the entry path as it is presented in
+  // catalog database (may be different from the actual path of the entry if a whiteout is nested in a renamed directory)
+  const string filepath = entry->GetCatalogPath();
+  LogCvmfs(kLogUnionFs, kLogStdout, "Removing file [%s]", entry->GetRelativePath().c_str());
   reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
-
   if (!params_->dry_run) {
     if (handle_hardlinks_ && entry->GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry->GetUnionPath().c_str());
       catalog_manager_->ShrinkHardlinkGroup(entry->GetRelativePath());
-    }
-    catalog_manager_->RemoveFile(entry->GetRelativePath());
+    }  
+    catalog_manager_->RemoveFile(filepath);
   }
 
   // Counting nr of removed files and removed bytes
@@ -1007,6 +1023,12 @@ void SyncMediator::RemoveFile(SharedPtr<SyncItem> entry) {
     perf::Inc(counters_->n_files_removed);
   }
   perf::Xadd(counters_->sz_removed_bytes, entry->GetRdOnlySize());
+}
+
+void SyncMediator::UpdateMetadata(SharedPtr<SyncItem> entry) {
+  const string filepath = entry->GetCatalogPath();
+  LogCvmfs(kLogUnionFs, kLogStdout, "Updating metadata for file in a path: [%s]", filepath.c_str());
+  catalog_manager_->UpdateMetadata(filepath);
 }
 
 void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
@@ -1019,7 +1041,7 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
           ".cvmfsbundles is reserved for bundles specification files",
           entry->GetUnionPath().c_str());
   }
-
+  LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Adding %s", entry->GetUnionPath().c_str());
   reporter_->OnAdd(entry->GetUnionPath(), catalog::DirectoryEntry());
 
   perf::Inc(counters_->n_directories_added);
@@ -1030,18 +1052,20 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
       xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
       assert(xattrs);
     }
+    LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Not in dry run");
     catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
                                    entry->relative_parent_path());
-    if (xattrs != &default_xattrs_)
+    if (xattrs != &default_xattrs_) {
       free(xattrs);
+    }
   }
 
   if (entry->HasCatalogMarker() &&
       !catalog_manager_->IsTransitionPoint(entry->GetRelativePath())) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "On SyncMediator::AddDirectory. Creating nested catalog");
     CreateNestedCatalog(entry);
   }
 }
-
 
 /**
  * this method deletes a single directory entry! Make sure to empty it
@@ -1049,18 +1073,29 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
  * SyncMediator::RemoveDirectoryRecursively instead.
  */
 void SyncMediator::RemoveDirectory(SharedPtr<SyncItem> entry) {
-  const std::string directory_path = entry->GetRelativePath();
-
+  std::string directory_path = entry->GetCatalogPath();
+  
+  LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory [%s]", entry->GetRelativePath().c_str());
+  
   if (catalog_manager_->IsTransitionPoint(directory_path)) {
     RemoveNestedCatalog(entry);
   }
 
   reporter_->OnRemove(entry->GetUnionPath(), catalog::DirectoryEntry());
   if (!params_->dry_run) {
+    LogCvmfs(kLogUnionFs, kLogStdout, "Removing directory entry [%s]", directory_path.c_str());
     catalog_manager_->RemoveDirectory(directory_path);
   }
 
   perf::Inc(counters_->n_directories_removed);
+}
+
+void SyncMediator::RenameDirectory(const string& previous_path, const string& current_path) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "[RENAME DIR] A directory: %s was marked as renamed and " 
+                                      "we obtain an old relative path: %s.", 
+                                      current_path.c_str(), 
+                                      previous_path.c_str());
+  catalog_manager_->RenameDirectory(previous_path, current_path);
 }
 
 void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {

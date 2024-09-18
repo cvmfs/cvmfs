@@ -67,6 +67,7 @@ struct CVMFS_EXPORT LsofEntry {
 };
 
 CVMFS_EXPORT std::string MakeCanonicalPath(const std::string &path);
+CVMFS_EXPORT std::string StripLeadingPathSeparator(const std::string &path);
 CVMFS_EXPORT std::string GetParentPath(const std::string &path);
 CVMFS_EXPORT std::string GetFileName(const std::string &path);
 CVMFS_EXPORT void SplitPath(const std::string &path,

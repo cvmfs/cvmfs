@@ -58,8 +58,16 @@ bool SyncUnionAufs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
          whiteout_prefix_;
 }
 
+bool SyncUnionAufs::IsMetadataOnlyEntry(SharedPtr<SyncItem> entry) const {
+  return false;
+}
+
 bool SyncUnionAufs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
   return FileExists(directory->GetScratchPath() + "/.wh..wh..opq");
+}
+
+bool SyncUnionAufs::IsRenamedDirectory(SharedPtr<SyncItem> directory) const {
+  return false;
 }
 
 string SyncUnionAufs::UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const {

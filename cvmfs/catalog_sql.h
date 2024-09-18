@@ -140,6 +140,7 @@ class SqlCatalog : public sqlite::Sql {
   {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
+    LogCvmfs(kLogCatalog, kLogStdout, "Binding md5. Low: %ld, High: %ld", low, high);
     const bool retval = BindInt64(idx_high, static_cast<int64_t>(high)) &&
                         BindInt64(idx_low, static_cast<int64_t>(low));
     return retval;
@@ -461,6 +462,27 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 //------------------------------------------------------------------------------
 
+class SqlDirentRename : public SqlDirentWrite {
+ public:
+  explicit SqlDirentRename(const CatalogDatabase &database);
+  bool BindPathsHashes(const shash::Md5 &oldPathHash, const shash::Md5 &newPathHash);
+  bool BindParentPathHash(const shash::Md5 &newParentPathHash);
+  bool BindDirent(const DirectoryEntry &entry);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlParentUpdate : public SqlDirentWrite {
+ public:
+  explicit SqlParentUpdate(const CatalogDatabase &database);
+  bool BindDirent(const DirectoryEntry &entry);
+  bool BindPathsHashes(const shash::Md5 &newPathHash, const shash::Md5 &oldPathHash);
+  bool BindParentHashes(const shash::Md5 oldParentHash, const shash::Md5 &newParentHash);
+};
+
+//------------------------------------------------------------------------------
 
 class SqlDirentUnlink : public SqlCatalog {
  public:
