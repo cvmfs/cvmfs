@@ -28,8 +28,8 @@ jobs:
       - name: Install Fuse-t and dependencies
         run: |
           brew install python-setuptools
-          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.38/fuse-t-macos-installer-1.0.38.pkg
-          sudo installer -pkg fuse-t-macos-installer-1.0.38.pkg -target /
+          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.41/fuse-t-macos-installer-1.0.41.pkg
+          sudo installer -pkg fuse-t-macos-installer-1.0.41.pkg -target /
           ls /usr/local/include
 
       - name: Build CVMFS
