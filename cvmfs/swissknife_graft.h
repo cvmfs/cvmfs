@@ -54,7 +54,7 @@ class CommandGraft : public Command {
   bool DirCallback(const std::string &relative_path,
                    const std::string &dir_name);
 
-  bool ChecksumFdWithChunks(int fd,
+  bool ChecksumFdWithChunks(const std::string &input_file,
                             zlib::ZlibCompressor *compressor,
                             uint64_t *file_size,
                             shash::Any *file_hash,

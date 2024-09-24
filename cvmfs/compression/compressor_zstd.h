@@ -27,9 +27,6 @@ class ZstdCompressor : public Compressor {
                                 shash::Any *compressed_hash);
   virtual StreamStates CompressStream(InputAbstract *input,
                                       cvmfs::MemSink *output, const bool flush);
-  bool CompressStreamOld(const bool flush,
-                      unsigned char **inbuf, size_t *inbufsize,
-                      unsigned char **outbuf, size_t *outbufsize);
   virtual bool Reset();
   virtual size_t CompressUpperBound(const size_t bytes);
   Compressor* Clone();
@@ -39,7 +36,6 @@ class ZstdCompressor : public Compressor {
  private:
   ZSTD_CCtx *stream_;
   bool is_healthy_;  // ZStream is healthy
-  size_t zstd_chunk_;
   bool compress_stream_outbuf_full_;
 };
 

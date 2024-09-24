@@ -27,8 +27,6 @@ enum Algorithms {
   kZstdDefault,
 };
 
-const unsigned kZChunk = 16384;
-
 /**
  * Aborts if string doesn't match any of the algorithms.
  */

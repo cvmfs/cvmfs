@@ -41,7 +41,8 @@ namespace zlib {
  */
 class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
  public:
-  explicit Decompressor(const Algorithms & /* alg */) : kZChunk(16384) { }
+  explicit Decompressor(const Algorithms & /*alg*/) : kZChunk_(16384) { }
+  Decompressor(const Algorithms & /*alg*/, size_t zchunk) : kZChunk_(zchunk) { }
   virtual ~Decompressor() { }
   /**
    * Compression function.
@@ -62,6 +63,7 @@ class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
    * Reset stream to perform decompression on a new, independent input
    */
   virtual bool Reset() = 0;
+  virtual size_t kZChunk() const { return kZChunk_; }
 
   virtual Decompressor* Clone() = 0;
   virtual std::string Describe() = 0;
@@ -69,7 +71,7 @@ class Decompressor : public PolymorphicConstruction<Decompressor, Algorithms> {
   static void RegisterPlugins();
 
  protected:
-  const unsigned kZChunk;
+  const size_t kZChunk_;
 };
 
 }  // namespace zlib

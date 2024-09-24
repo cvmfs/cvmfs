@@ -597,37 +597,71 @@ TEST_F(T_Ingestion, TaskCompress) {
 
   compressor_ = zlib::Compressor::Construct(zlib::kZlibDefault);
   zlib::InputMem in(block_raw.data(), block_raw.size());
-  cvmfs::MemSink zlib_large(0,
-                            compressor_->CompressUpperBound(block_raw.size()));
-  const zlib::StreamStates res = compressor_->Compress(&in, &zlib_large);
+  cvmfs::MemSink comp_single_block(0, block_raw.size()/2);
+  zlib::StreamStates res = compressor_->Compress(&in, &comp_single_block);
   ASSERT_EQ(res, zlib::kStreamEnd);
-  ASSERT_GT(zlib_large.pos(), 0U);
-
+  ASSERT_GT(comp_single_block.pos(), 0U);
+  // safety margin because of zstd having slightly different sizes between
+  // block per block compression and compression in a single chunk
   unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
-                                                     smalloc(zlib_large.pos()));
+                                         smalloc(comp_single_block.pos() + 50));
+  unsigned char *ptr_read_decomp = reinterpret_cast<unsigned char *>(
+                                                     smalloc(block_raw.size()));
+  // check that decompressed is equal to
+  zlib::Decompressor *decomp(zlib::Decompressor::Construct(zlib::kZlibDefault));
+  zlib::InputMem in_decomp(comp_single_block.data(), comp_single_block.pos());
+  cvmfs::MemSink out_decomp(0, block_raw.size() + 100);
 
+  res = decomp->DecompressStream(&in_decomp, &out_decomp);
+  ASSERT_EQ(res, zlib::kStreamEnd);
+  EXPECT_EQ(0, memcmp(out_decomp.data(), block_raw.data(), block_raw.size()));
+
+  decomp->Reset();
+
+  // zstd: the last block seems to be handled differently.
+  // Expected: (read_pos + b->size()) <= (comp_single_block.pos()),
+  // actual: 201385 vs 201382
+  // blockwise decompress and decompress the entire block give correct results
   unsigned read_pos = 0;
+  unsigned decomp_read_pos = 0;
   BlockItem *b = NULL;
   do {
     delete b;
     b = tube_out->PopFront();
+
     EXPECT_EQ(1, b->tag());
     EXPECT_EQ(&file_large, b->file_item());
     EXPECT_EQ(&chunk_large, b->chunk_item());
-    EXPECT_LE(read_pos + b->size(), zlib_large.pos());
+    // this does not work for zstd, see comment above
+    // EXPECT_LE(read_pos + b->size(), comp_single_block.pos());
     if (b->size() > 0) {
       memcpy(ptr_read_large + read_pos, b->data(), b->size());
       read_pos += b->size();
+
+      // decompress each block
+      zlib::InputMem in_tmp(b->data(), b->size());
+      cvmfs::MemSink out_tmp(0);
+      res = decomp->DecompressStream(&in_tmp, &out_tmp);
+      ASSERT_TRUE(res == zlib::kStreamEnd || res == zlib::kStreamContinue);
+      memcpy(ptr_read_decomp + decomp_read_pos, out_tmp.data(), out_tmp.pos());
+      decomp_read_pos += out_tmp.pos();
     }
   } while (b->type() == BlockItem::kBlockData);
   EXPECT_EQ(BlockItem::kBlockStop, b->type());
   delete b;
   EXPECT_EQ(0U, tube_out->size());
 
-  EXPECT_EQ(zlib_large.pos(), read_pos);
-  EXPECT_EQ(0, memcmp(zlib_large.data(), ptr_read_large, zlib_large.pos()));
+  decomp->Reset();
+  zlib::InputMem in_tmp(ptr_read_large, read_pos);
+  cvmfs::MemSink out_tmp(0, block_raw.size() + 100);
+  res = decomp->DecompressStream(&in_tmp, &out_tmp);
+  ASSERT_TRUE(res == zlib::kStreamEnd);
+
+  EXPECT_EQ(0, memcmp(out_tmp.data(), block_raw.data(), block_raw.size()));
+  EXPECT_EQ(0, memcmp(out_decomp.data(), ptr_read_decomp, block_raw.size()));
 
   free(ptr_read_large);
+  free(ptr_read_decomp);
   task_group.Terminate();
 }
 

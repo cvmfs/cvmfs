@@ -48,30 +48,6 @@ Compressor* ZlibCompressor::Clone() {
   return other;
 }
 
-bool ZlibCompressor::CompressStreamOld(const bool flush,
-                                   unsigned char **inbuf, size_t *inbufsize,
-                                   unsigned char **outbuf, size_t *outbufsize) {
-  // Adding compression
-  stream_.avail_in = *inbufsize;
-  stream_.next_in = *inbuf;
-  const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
-  int retcode = 0;
-
-  stream_.avail_out = *outbufsize;
-  stream_.next_out = *outbuf;
-
-  // Deflate in zlib!
-  retcode = deflate(&stream_, flush_int);
-  assert(retcode == Z_OK || retcode == Z_STREAM_END);
-
-  *outbufsize -= stream_.avail_out;
-  *inbuf = stream_.next_in;
-  *inbufsize = stream_.avail_in;
-
-  return (flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0)
-         || (flush_int == Z_FINISH  && retcode == Z_STREAM_END);
-}
-
 StreamStates ZlibCompressor::CompressStream(InputAbstract *input,
                                      cvmfs::MemSink *output, const bool flush) {
   if (!is_healthy_) {
@@ -145,7 +121,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
     return kStreamError;
   }
 
-  unsigned char out[kZChunk];
+  unsigned char out[kZChunk_];
   int z_ret;
   int flush = Z_NO_FLUSH;
 
@@ -162,7 +138,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
 
     // Run deflate() on input until output buffer has no space left
     do {
-      stream_.avail_out = kZChunk;
+      stream_.avail_out = kZChunk_;
       stream_.next_out = out;
 
       z_ret = deflate(&stream_, flush);
@@ -171,7 +147,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input,
         is_healthy_ = false;
         return kStreamDataError;
       }
-      const size_t have = kZChunk - stream_.avail_out;
+      const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {
@@ -201,7 +177,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
     return kStreamError;
   }
 
-  unsigned char out[kZChunk];
+  unsigned char out[kZChunk_];
   int z_ret;
   int flush = Z_NO_FLUSH;
 
@@ -222,7 +198,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
 
     // Run deflate() on input until output buffer has no space left
     do {
-      stream_.avail_out = kZChunk;
+      stream_.avail_out = kZChunk_;
       stream_.next_out = out;
 
       z_ret = deflate(&stream_, flush);
@@ -231,7 +207,7 @@ StreamStates ZlibCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
         is_healthy_ = false;
         return kStreamDataError;
       }
-      const size_t have = kZChunk - stream_.avail_out;
+      const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
       if (written != static_cast<int64_t>(have)) {

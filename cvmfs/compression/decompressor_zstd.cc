@@ -11,11 +11,10 @@
 namespace zlib {
 
 ZstdDecompressor::ZstdDecompressor(const zlib::Algorithms &alg) :
-                                                             Decompressor(alg) {
+                                      Decompressor(alg, ZSTD_DStreamOutSize()) {
   stream_ = ZSTD_createDCtx();
   assert(stream_ != NULL);
   is_healthy_ = true;
-  zstd_chunk_ = ZSTD_DStreamOutSize();
 }
 
 ZstdDecompressor::~ZstdDecompressor() {
@@ -48,7 +47,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
     return kStreamError;
   }
 
-  unsigned char out[zstd_chunk_];
+  unsigned char out[kZChunk_];
   size_t z_ret;
 
   do {
@@ -60,7 +59,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
 
     // Run deflate() on input until output buffer has no space left
     do {
-      ZSTD_outBuffer outBuffer = {out, zstd_chunk_, 0};
+      ZSTD_outBuffer outBuffer = {out, kZChunk_, 0};
 
       z_ret = ZSTD_decompressStream(stream_, &outBuffer, &inBuffer);
       if (ZSTD_isError(z_ret)) {
@@ -84,7 +83,7 @@ StreamStates ZstdDecompressor::DecompressStream(InputAbstract *input,
   output->Flush();
 
   if (z_ret == 0) {
-    Reset();
+    // Reset();
     return kStreamEnd;
   } else {
     // z_ret != 0 means that ZSTD_decompressStream did not end on a frame, but

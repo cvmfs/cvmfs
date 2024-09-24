@@ -674,33 +674,6 @@ TEST_F(T_Compressor, CompressionNewBigEnough) {
   EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
 }
 
-
-
-
-TEST_F(T_Compressor, Compression) {
-  zlib_compressor = static_cast<
-        zlib::ZlibCompressor*>(zlib::Compressor::Construct(zlib::kZlibDefault));
-
-  // Compress the output
-  unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
-  const bool deflate_finished = zlib_compressor->CompressStreamOld(
-                                    true, &input, &size_input, &buf, &buf_size);
-
-  ASSERT_TRUE(deflate_finished);
-  ASSERT_GT(buf_size, 0U);
-  ASSERT_EQ(0U, size_input);
-
-  // Decompress it, check if it's still the same
-  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
-  zlib::InputMem in(buf, buf_size);
-  cvmfs::MemSink out(0);
-  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
-  EXPECT_EQ(res, zlib::kStreamEnd);
-  EXPECT_EQ(out.pos(), strlen(test_string) + 1);
-  EXPECT_EQ(0, memcmp(out.data(), test_string, strlen(test_string) + 1));
-}
-
-
 TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmall) {
   compressor = zlib::Compressor::Construct(zlib::kZstdDefault);
   unsigned compress_pos = 0;
@@ -806,8 +779,10 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmallMultiInput) {
   unsigned compress_pos = 0;
   unsigned rounds = 0;
 
-  const size_t in_size = 16384 * 3ul;  // larger than decomp buffer size (32 KB)
-  const size_t in_size2 = 16384 * 2ul;  // larger than decomp buffer size
+  // for in_size: must be larger than internal buffer to force write to output.
+  // Suggested block size is 65k by zstd
+  const size_t in_size = 16384 * 9ul;
+  const size_t in_size2 = 16384 * 9ul;  // larger than decomp buffer size
   const size_t chunk_size = 8000;
 
   const char letters[] = "abcdefghijklmnopqrstuvwxyz";
@@ -832,7 +807,7 @@ TEST_F(T_Compressor, ZstdCompressionLongNewOutbufTooSmallMultiInput) {
 
 
   zlib::StreamStates ret = zlib::kStreamError;
-  while (ret != zlib::kStreamContinue) {
+  while (ret != zlib::kStreamEnd) {
     // Compress the output in multiple stages
     out_mem.Adopt(buf_size, 0, buf, false);
 
@@ -910,7 +885,7 @@ TEST_F(T_Compressor, CompressionLongNewOutbufTooSmallMultiInput) {
   cvmfs::MemSink out_mem;
 
   zlib::StreamStates ret = zlib::kStreamError;
-  while (ret != zlib::kStreamEnd) {  // TODO TODO that should be kStreamContinue
+  while (ret != zlib::kStreamEnd) {
     // Compress the output in multiple stages
     out_mem.Adopt(buf_size, 0, buf, false);
 
@@ -954,43 +929,6 @@ TEST_F(T_Compressor, CompressionLongNewOutbufTooSmallMultiInput) {
   EXPECT_EQ(out.pos(), in_size + in_size2);
   EXPECT_EQ(0, memcmp(out.data(), in_buf, in_size));
   EXPECT_EQ(0, memcmp(out.data() + in_size, in_buf2, in_size2));
-
-  delete[] compress_buf;
-}
-
-TEST_F(T_Compressor, CompressionLong) {
-  zlib_compressor = static_cast<zlib::ZlibCompressor*>(
-                               zlib::Compressor::Construct(zlib::kZlibDefault));
-  unsigned char *compress_buf =
-    new unsigned char[zlib_compressor->CompressUpperBound(long_size)];
-  unsigned compress_pos = 0;
-  bool deflate_finished = false;
-  unsigned char *input = long_string;
-  size_t remaining = long_size;
-  unsigned rounds = 0;
-
-  while (!deflate_finished) {
-    // Compress the output in multiple stages
-    deflate_finished =
-                zlib_compressor->CompressStreamOld(
-                                     true, &input, &remaining, &buf, &buf_size);
-    memcpy(compress_buf + compress_pos, buf, buf_size);
-    compress_pos += buf_size;
-    rounds++;
-  }
-
-  EXPECT_GT(rounds, 1U);
-  EXPECT_GT(compress_pos, 0U);
-  EXPECT_EQ(0U, remaining);
-
-  // Decompress it, check if it's still the same
-  decompressor = zlib::Decompressor::Construct(zlib::kZlibDefault);
-  zlib::InputMem in(compress_buf, compress_pos);
-  cvmfs::MemSink out(0);
-  const zlib::StreamStates res = decompressor->DecompressStream(&in, &out);
-  EXPECT_EQ(res, zlib::kStreamEnd);
-  EXPECT_EQ(out.pos(), static_cast<uint64_t>(long_size));
-  EXPECT_EQ(0, memcmp(out.data(), long_string, long_size));
 
   delete[] compress_buf;
 }
@@ -1076,51 +1014,5 @@ TEST_F(T_Compressor, CompressionLongNew) {
 
   delete[] compress_buf;
 }
-
-// CompressStreamOld not implemented for EchoCompression
-// TEST_F(T_Compressor, EchoCompression) {
-//   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-
-//   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
-//   bool deflate_finished =
-//               (static_cast<zlib::EchoCompressor*>(compressor.weak_ref()))->
-//                CompressStreamOld(true, &input, &size_input, &buf, &buf_size);
-
-//   ASSERT_TRUE(deflate_finished);
-//   ASSERT_GT(buf_size, 0U);
-//   ASSERT_EQ(size_input, (size_t)0);
-
-//   // Make sure the compressed data is exactly the same as the
-//   // input.
-//   ASSERT_EQ(0, strcmp(reinterpret_cast<char *>(buf), test_string));
-// }
-
-
-// TEST_F(T_Compressor, EchoCompressionLong) {
-//   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
-//   UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
-//     smalloc(compressor->CompressUpperBound(long_size))));
-//   unsigned compress_pos = 0;
-//   bool deflate_finished = false;
-//   unsigned char *input = long_string;
-//   size_t remaining = long_size;
-//   unsigned rounds = 0;
-
-//   while (!deflate_finished) {
-//     // Compress the output in multiple stages
-//     deflate_finished = static_cast<zlib::EchoCompressor*>(compressor)->
-//                 CompressStreamOld(true, &input, &remaining, &buf, &buf_size);
-//     memcpy(compress_buf.weak_ref() + compress_pos, buf, buf_size);
-//     compress_pos += buf_size;
-//     rounds++;
-//   }
-
-//   EXPECT_GT(rounds, 1U);
-//   EXPECT_GT(compress_pos, 0U);
-//   ASSERT_EQ(0U, remaining);
-
-//   EXPECT_EQ(compress_pos, long_size);
-//   EXPECT_EQ(0, memcmp(compress_buf.weak_ref(), long_string, long_size));
-// }
 
 }  // end namespace zlib

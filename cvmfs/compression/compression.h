@@ -39,7 +39,8 @@ namespace zlib {
  */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  public:
-  explicit Compressor(const Algorithms & /* alg */) : kZChunk(16384) { }
+  explicit Compressor(const Algorithms & /*alg*/) : kZChunk_(16384) { }
+  Compressor(const Algorithms & /*alg*/, size_t zchunk) : kZChunk_(zchunk) { }
   virtual ~Compressor() { }
   /**
    * Compression function.
@@ -86,6 +87,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    */
   virtual bool Reset() = 0;
   virtual size_t CompressUpperBound(const size_t bytes) = 0;
+  virtual size_t kZChunk() const { return kZChunk_; }
 
   virtual Compressor* Clone() = 0;
   virtual std::string Describe() = 0;
@@ -93,7 +95,7 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   static void RegisterPlugins();
 
  protected:
-  const unsigned kZChunk;
+  const size_t kZChunk_;
 };
 
 }  // namespace zlib

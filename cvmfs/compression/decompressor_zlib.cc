@@ -50,7 +50,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
     return kStreamError;
   }
 
-  unsigned char out[kZChunk];
+  unsigned char out[kZChunk_];
   int z_ret;
 
   do {
@@ -63,7 +63,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
 
     // Run deflate() on input until output buffer has no space left
     do {
-      stream_.avail_out = kZChunk;
+      stream_.avail_out = kZChunk_;
       stream_.next_out = out;
 
       z_ret = inflate(&stream_, Z_NO_FLUSH);
@@ -80,7 +80,7 @@ StreamStates ZlibDecompressor::DecompressStream(InputAbstract *input,
           return kStreamIOError;
         break;
       }
-      const size_t have = kZChunk - stream_.avail_out;
+      const size_t have = kZChunk_ - stream_.avail_out;
       const int64_t written = output->Write(out, have);
 
       if ((written < 0) || written != static_cast<int64_t>(have)) {

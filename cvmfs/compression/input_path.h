@@ -30,6 +30,7 @@ class InputPath : public InputAbstract {
   virtual bool has_chunk_left() const { return input_file_->has_chunk_left(); }
   virtual size_t chunk_size() const { return input_file_->chunk_size(); }
   virtual unsigned char* chunk() const { return input_file_->chunk(); }
+  virtual size_t bytes_read() const { return input_file_->bytes_read(); }
 
   std::string path() const {return path_; }
 

@@ -33,7 +33,8 @@ class InputAbstract {
                                                 max_chunk_size_(max_chunk_size),
                                                 chunk_(chunk),
                                                 chunk_size_(0),
-                                                idx_inside_chunk_(0) { }
+                                                idx_inside_chunk_(0),
+                                                bytes_read_(0) { }
 
  public:
   virtual ~InputAbstract() { }
@@ -81,6 +82,13 @@ class InputAbstract {
    */
   virtual unsigned char* chunk() const { return chunk_; }
 
+  /**
+   * Total bytes read so far (including current chunk).
+   * Includes the current chunk that might not have been processed yet by the
+   * user.
+   */
+  virtual size_t bytes_read() const { return bytes_read_; }
+
   // TODO TODO check if condition is correct or off-by-one error
   virtual bool HasInputLeftInChunk() const
              { return idx_inside_chunk_ < chunk_size_ - 1 && chunk_size_ != 0; }
@@ -94,6 +102,7 @@ class InputAbstract {
   unsigned char *chunk_;
   size_t chunk_size_;  // must be <= max_chunk_size_
   size_t idx_inside_chunk_;
+  size_t bytes_read_;
 };
 
 }  // namespace zlib

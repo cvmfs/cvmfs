@@ -23,13 +23,13 @@ bool ZstdCompressor::WillHandle(const zlib::Algorithms &alg) {
 }
 
 
-ZstdCompressor::ZstdCompressor(const Algorithms &alg) : Compressor(alg) {
+ZstdCompressor::ZstdCompressor(const Algorithms &alg) :
+                                        Compressor(alg, ZSTD_CStreamOutSize()) {
   stream_ = ZSTD_createCCtx();
   ZSTD_CCtx_setParameter(stream_, ZSTD_c_compressionLevel, 3);
   ZSTD_CCtx_setParameter(stream_, ZSTD_c_checksumFlag, 1);
   is_healthy_ = true;
   compress_stream_outbuf_full_ = false;
-  zstd_chunk_ = ZSTD_CStreamOutSize();
 }
 
 
@@ -84,7 +84,7 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
                               input->GetIdxInsideChunk()};
 
     if (!input->has_chunk_left()) {
-      mode = (flush) ? ZSTD_e_end : ZSTD_e_flush;
+      mode = (flush) ? ZSTD_e_end : ZSTD_e_continue;
     }
 
     ZSTD_outBuffer outBuffer = {output->data(), output->size(), output->pos()};
@@ -108,14 +108,6 @@ StreamStates ZstdCompressor::CompressStream(InputAbstract *input,
   } while (input->has_chunk_left()
           || (input->GetIdxInsideChunk() < input->chunk_size()
               && input->chunk_size() != 0));
-
-  compress_stream_outbuf_full_ = false;
-  if (mode == ZSTD_e_flush) {
-    return kStreamContinue;
-  }
-
-  // mode == ZSTD_e_end
-  Reset();
   return kStreamEnd;
 }
 
@@ -126,8 +118,7 @@ ZstdCompressor::~ZstdCompressor() {
 
 
 size_t ZstdCompressor::CompressUpperBound(const size_t bytes) {
-  // Call zlib's deflate bound
-  return ZSTD_COMPRESSBOUND(bytes);
+  return ZSTD_compressBound(bytes);
 }
 
 // ZSTDLIB_API size_t ZSTD_CStreamInSize(void);
@@ -141,7 +132,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input,
     return kStreamError;
   }
 
-  unsigned char out[zstd_chunk_];
+  unsigned char out[kZChunk_];
   ZSTD_EndDirective mode = ZSTD_e_continue;
 
   do {
@@ -157,7 +148,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input,
     size_t remaining;
     // Run deflate() on input until output buffer has no space left
     do {
-      ZSTD_outBuffer outBuffer = {out, zstd_chunk_, 0};
+      ZSTD_outBuffer outBuffer = {out, kZChunk_, 0};
 
       remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
       if (ZSTD_isError(remaining)) {
@@ -188,7 +179,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
     return kStreamError;
   }
 
-  unsigned char out[zstd_chunk_];
+  unsigned char out[kZChunk_];
   ZSTD_EndDirective mode = ZSTD_e_continue;
 
   shash::ContextPtr hash_context(compressed_hash->algorithm);
@@ -208,7 +199,7 @@ StreamStates ZstdCompressor::Compress(InputAbstract *input, cvmfs::Sink *output,
     size_t remaining;
     // Run deflate() on input until output buffer has no space left
     do {
-      ZSTD_outBuffer outBuffer = {out, zstd_chunk_, 0};
+      ZSTD_outBuffer outBuffer = {out, kZChunk_, 0};
 
       remaining = ZSTD_compressStream2(stream_, &outBuffer, &inBuffer, mode);
       if (ZSTD_isError(remaining)) {

@@ -58,6 +58,8 @@ bool InputMem::NextChunk() {
   chunk_ = const_cast<unsigned char*>(src_) + idx_;
   idx_inside_chunk_ = 0;
 
+  bytes_read_ = idx_;
+
   return true;
 }
 

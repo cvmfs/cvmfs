@@ -14,26 +14,50 @@
 #include <vector>
 
 #include "compression/compressor_zlib.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
+#include "network/sink_null.h"
 #include "util/fs_traversal.h"
 #include "util/platform.h"
 #include "util/posix.h"
 
 bool swissknife::CommandGraft::ChecksumFdWithChunks(
-    int fd, zlib::ZlibCompressor *compressor, uint64_t *file_size,
-    shash::Any *file_hash, std::vector<uint64_t> *chunk_offsets,
-    std::vector<shash::Any> *chunk_checksums) {
+              const std::string &input_file, zlib::ZlibCompressor *compressor,
+              uint64_t *file_size, shash::Any *file_hash,
+              std::vector<uint64_t> *chunk_offsets,
+              std::vector<shash::Any> *chunk_checksums) {
   if (!compressor || !file_size || !file_hash) {
     return false;
   }
   *file_size = 0;
   shash::Any chunk_hash(hash_alg_);
-  ssize_t bytes_read;
-  unsigned char in_buf[zlib::kZChunk];
-  unsigned char *cur_in_buf = in_buf;
-  size_t in_buf_size = zlib::kZChunk;
-  unsigned char out_buf[zlib::kZChunk];
-  size_t avail_in = 0;
+  zlib::InputPath in_path(input_file);
+  if (!in_path.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failure when opening file %s: %s",
+              input_file.c_str(), strerror(errno));
+    return false;
+  }
+
+  bool do_chunk = chunk_size_ > 0;
+  // no chunked files
+  if (!do_chunk) {
+    cvmfs::NullSink out_null;
+
+    zlib::StreamStates ret = compressor->Compress(&in_path, &out_null,
+                                                                     file_hash);
+    if (ret != zlib::kStreamEnd) {
+      return false;
+    }
+
+    *file_size = in_path.bytes_read();
+    return true;
+  }
+
+  // chunked files begin here
+  if (!chunk_offsets || !chunk_checksums) {
+    return false;
+  }
+  chunk_offsets->push_back(0);
 
   // Initialize the file and per-chunk checksums
   shash::ContextPtr file_hash_context(hash_alg_);
@@ -44,79 +68,52 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
   chunk_hash_context.buffer = alloca(chunk_hash_context.size);
   shash::Init(chunk_hash_context);
 
-  bool do_chunk = chunk_size_ > 0;
-  if (do_chunk) {
-    if (!chunk_offsets || !chunk_checksums) {
-      return false;
-    }
-    chunk_offsets->push_back(0);
-  }
+  unsigned char* out_buf[compressor->kZChunk()];
+  cvmfs::MemSink out_comp;
+  zlib::StreamStates ret_compress;
+  do {
+    out_comp.Adopt(compressor->kZChunk(), 0,
+                              reinterpret_cast<unsigned char*>(out_buf), false);
 
-  bool flush = 0;
-  do {  // TODO TODO
-    bytes_read = read(fd, cur_in_buf + avail_in, in_buf_size);
-    if (-1 == bytes_read) {
-      if (errno == EINTR) {
-        continue;
-      }
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failure when reading file: %s",
-               strerror(errno));
-      return false;
-    }
-    *file_size += bytes_read;
-    avail_in += bytes_read;
+    ret_compress = compressor->CompressStream(&in_path, &out_comp, true);
 
-    flush = (static_cast<size_t>(bytes_read) < in_buf_size);
+    assert(ret_compress == zlib::kStreamOutBufFull
+        || ret_compress == zlib::kStreamEnd
+        || ret_compress == zlib::kStreamContinue);
 
-    // If possible, make progress on deflate.
-    unsigned char *cur_out_buf = out_buf;
-    size_t avail_out = zlib::kZChunk;
-    compressor->CompressStreamOld(flush, &cur_in_buf, &avail_in, &cur_out_buf,
-                               &avail_out);
-    if (do_chunk) {
-      shash::Update(out_buf, avail_out, chunk_hash_context);
-      if (generate_bulk_hash_)
-        shash::Update(out_buf, avail_out, file_hash_context);
-    } else {
-      shash::Update(out_buf, avail_out, file_hash_context);
+    // finished or outbuffer full
+    shash::Update(out_comp.data(), out_comp.pos(), chunk_hash_context);
+    if (generate_bulk_hash_) {
+      shash::Update(out_comp.data(), out_comp.pos(), file_hash_context);
     }
 
-    if (!avail_in) {
-      // All bytes are consumed; set the buffer back to the beginning.
-      cur_in_buf = in_buf;
-      in_buf_size = zlib::kZChunk;
-    } else {
-      in_buf_size = zlib::kZChunk - (cur_in_buf - in_buf) - avail_in;
-    }
-
-    // Start a new hash if current one is above threshold
-    if (do_chunk && (*file_size - chunk_offsets->back() >= chunk_size_)) {
+    if (ret_compress == zlib::kStreamOutBufFull) {
       shash::Final(chunk_hash_context, &chunk_hash);
       chunk_offsets->push_back(*file_size);
       chunk_checksums->push_back(chunk_hash);
       shash::Init(chunk_hash_context);
     }
-  } while (!flush);
+  } while (ret_compress != zlib::kStreamEnd
+           && ret_compress != zlib::kStreamContinue);
 
   shash::Final(file_hash_context, file_hash);
-  if (do_chunk) {
-    shash::Final(chunk_hash_context, &chunk_hash);
-    chunk_checksums->push_back(chunk_hash);
-  }
+  shash::Final(chunk_hash_context, &chunk_hash);
+  chunk_checksums->push_back(chunk_hash);
+
+  *file_size = in_path.bytes_read();
 
   // Zero-size chunks are not allowed; except if there is only one chunk
-  if (do_chunk && (chunk_offsets->back() == *file_size) &&
-      (chunk_offsets->size() > 1))
-  {
+  if ((chunk_offsets->back() == *file_size) && (chunk_offsets->size() > 1)) {
     chunk_offsets->pop_back();
     chunk_checksums->pop_back();
   }
 
-  if (do_chunk && !generate_bulk_hash_)
+  if (!generate_bulk_hash_) {
     file_hash->SetNull();
+  }
 
   // Do not chunk a file if it is under threshold.
-  if (do_chunk && (chunk_offsets->size() == 1)) {
+  if ((chunk_offsets->size() == 1)) {
     *file_hash = (*chunk_checksums)[0];
     chunk_offsets->clear();
     chunk_checksums->clear();
@@ -256,7 +253,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                       compressor(zlib::Compressor::Construct(compression_alg_));
 
   bool retval =
-      ChecksumFdWithChunks(fd,
+      ChecksumFdWithChunks(input_file,
                  static_cast<zlib::ZlibCompressor*>(compressor.weak_ref()),
                  &processed_size, &file_hash, &chunk_offsets, &chunk_checksums);
 

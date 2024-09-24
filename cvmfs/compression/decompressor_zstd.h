@@ -48,7 +48,6 @@ class ZstdDecompressor: public Decompressor {
  private:
   ZSTD_DCtx *stream_;
   bool is_healthy_;
-  size_t zstd_chunk_;
 };
 
 }  // namespace zlib

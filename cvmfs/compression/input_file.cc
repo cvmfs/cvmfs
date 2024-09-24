@@ -44,6 +44,8 @@ bool InputFile::NextChunk() {
     }
   }
 
+  bytes_read_ += chunk_size_;
+
   return true;
 }
 
@@ -56,6 +58,7 @@ bool InputFile::Reset() {
     fseek(const_cast<FILE*>(src_), 0L, SEEK_SET);
     chunk_size_ = 0;
     has_chunk_left_ = true;
+    bytes_read_ = 0;
     return true;
   }
   return false;
