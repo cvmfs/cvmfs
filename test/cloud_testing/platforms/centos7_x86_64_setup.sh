@@ -90,6 +90,7 @@ install_from_repo perl
 # building preloader
 install_from_repo cmake
 install_from_repo zlib-devel
+install_from_repo libzstd-devel
 install_from_repo libattr-devel
 install_from_repo openssl-devel
 install_from_repo libuuid-devel
