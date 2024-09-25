@@ -59,6 +59,7 @@ install_from_repo cmake
 install_from_repo patch
 install_from_repo zlib-devel
 install_from_repo libzstd-devel
+install_from_repo cmake  # for zstd
 install_from_repo libattr-devel
 install_from_repo python-devel
 install_from_repo unzip

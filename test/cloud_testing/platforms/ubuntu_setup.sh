@@ -115,6 +115,7 @@ install_from_repo python3-dev   || die "fail (installing python3-dev)"
 install_from_repo python3-setuptools || die "fail (installing python3-setuptools)"
 
 install_from_repo libz-dev     || die "fail (installing libz-dev)"
+install_from_repo libzstd-dev  || die "fail (installing libzstd-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 # make sure the python command is available
 if [ "x$ubuntu_release" = "xfocal" ]; then
