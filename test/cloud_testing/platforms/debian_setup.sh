@@ -109,6 +109,7 @@ install_from_repo python3-dev   || die "fail (installing python3-dev)"
 install_from_repo python-dev-is-python3   || die "fail (installing python-dev-is-python3)"
 install_from_repo python-is-python3   || die "fail (installing python-is-python3)"
 install_from_repo libz-dev     || die "fail (installing libz-dev)"
+install_from_repo libzstd-dev  || die "fail (installing libzstd-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 
 install_from_repo acl || die "fail (installing acl)"

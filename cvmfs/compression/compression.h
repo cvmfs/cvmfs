@@ -12,7 +12,10 @@
 #include <string>
 
 #include "duplex_zlib.h"
+#include "input_abstract.h"
 #include "network/sink.h"
+#include "network/sink_mem.h"
+#include "util.h"
 #include "util/plugin.h"
 
 namespace shash {
@@ -20,38 +23,14 @@ struct Any;
 class ContextPtr;
 }
 
-bool CopyPath2Path(const std::string &src, const std::string &dest);
-bool CopyPath2File(const std::string &src, FILE *fdest);
-bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
-                  const std::string &path);
-bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
-                  FILE *fdest);
-bool CopyPath2Mem(const std::string &path,
-                  unsigned char **buffer, unsigned *buffer_size);
-
 namespace zlib {
-
-const unsigned kZChunk = 16384;
-
-enum StreamStates {
-  kStreamDataError = 0,
-  kStreamIOError,
-  kStreamContinue,
-  kStreamEnd,
-};
-
-// Do not change order of algorithms.  Used as flags in the catalog
-enum Algorithms {
-  kZlibDefault = 0,
-  kNoCompression,
-};
 
 /**
  * Abstract Compression class which is inherited by implementations of
  * compression engines such as zlib.
  *
  * In order to add a new compression method, you simply need to add a new class
- * which is a sub-class of the Compressor.  The subclass needs to implement the
+ * which is a sub-class of the Compressor. The subclass needs to implement the
  * Deflate, DeflateBound, Clone, and WillHandle functions.  For information on
  * the WillHandle function, read up on the PolymorphicConstruction class.
  * The new sub-class must be listed in the implementation of the
@@ -60,9 +39,29 @@ enum Algorithms {
  */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  public:
-  explicit Compressor(const Algorithms & /* alg */) { }
+  explicit Compressor(const Algorithms & /*alg*/) : kZChunk_(16384) { }
+  Compressor(const Algorithms & /*alg*/, size_t zchunk) : kZChunk_(zchunk) { }
   virtual ~Compressor() { }
   /**
+   * Compression function.
+   * Takes a read-only data source, compresses the data and writes the result to
+   * a given sink. 
+   * 
+   * Must be able to handle empty sources and just write the compression frame
+   * where applicable.
+   * 
+   * @return kStreamEnd if successful
+   *         StreamState Error value if failure
+   */
+  virtual StreamStates Compress(InputAbstract * input, cvmfs::Sink *output) = 0;
+  /**
+   *  Same like Compress() but also calculates the hash based on the
+   *  compressed output.
+   */
+  virtual StreamStates Compress(InputAbstract *input, cvmfs::Sink *output,
+                                shash::Any *compressed_hash) = 0;
+
+    /**
    * Deflate function.  The arguments and returns closely match the input and
    * output of the zlib deflate function.
    * Input:
@@ -79,93 +78,25 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual bool Deflate(const bool flush,
-                       unsigned char **inbuf, size_t *inbufsize,
-                       unsigned char **outbuf, size_t *outbufsize) = 0;
-
+  // TODO(heretherebedragons) remove! when everything is replaced to use the
+  // compressor
+  virtual StreamStates CompressStream(InputAbstract *input,
+                                  cvmfs::MemSink *output, const bool flush) = 0;
   /**
-   * Return an upper bound on the number of bytes required in order to compress
-   * an input number of bytes.
-   * Returns: Upper bound on the number of bytes required to compress.
+   * Reset stream to perform compression on a new, independent input
    */
-  virtual size_t DeflateBound(const size_t bytes) = 0;
+  virtual bool Reset() = 0;
+  virtual size_t CompressUpperBound(const size_t bytes) = 0;
+  virtual size_t kZChunk() const { return kZChunk_; }
+
   virtual Compressor* Clone() = 0;
+  virtual std::string Describe() = 0;
 
   static void RegisterPlugins();
+
+ protected:
+  const size_t kZChunk_;
 };
-
-
-class ZlibCompressor: public Compressor {
- public:
-  explicit ZlibCompressor(const Algorithms &alg);
-  ZlibCompressor(const ZlibCompressor &other);
-  ~ZlibCompressor();
-
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
-               unsigned char **outbuf, size_t *outbufsize);
-  size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
-  static bool WillHandle(const zlib::Algorithms &alg);
-
- private:
-  z_stream stream_;
-};
-
-
-class EchoCompressor: public Compressor {
- public:
-  explicit EchoCompressor(const Algorithms &alg);
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
-               unsigned char **outbuf, size_t *outbufsize);
-  size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
-  static bool WillHandle(const zlib::Algorithms &alg);
-};
-
-
-Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
-std::string AlgorithmName(const zlib::Algorithms alg);
-
-
-void CompressInit(z_stream *strm);
-void DecompressInit(z_stream *strm);
-void CompressFini(z_stream *strm);
-void DecompressFini(z_stream *strm);
-
-StreamStates CompressZStream2Null(
-  const void *buf, const int64_t size, const bool eof,
-  z_stream *strm, shash::ContextPtr *hash_context);
-StreamStates DecompressZStream2File(const void *buf, const int64_t size,
-                                    z_stream *strm, FILE *f);
-StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
-                                    z_stream *strm, cvmfs::Sink *sink);
-
-bool CompressPath2Path(const std::string &src, const std::string &dest);
-bool CompressPath2Path(const std::string &src, const std::string &dest,
-                       shash::Any *compressed_hash);
-bool DecompressPath2Path(const std::string &src, const std::string &dest);
-
-bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
-bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t* size = NULL);
-bool CompressFile2File(FILE *fsrc, FILE *fdest);
-bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
-bool CompressPath2File(const std::string &src, FILE *fdest,
-                       shash::Any *compressed_hash);
-bool DecompressFile2File(FILE *fsrc, FILE *fdest);
-bool DecompressPath2File(const std::string &src, FILE *fdest);
-
-bool CompressMem2File(const unsigned char *buf, const size_t size,
-                      FILE *fdest, shash::Any *compressed_hash);
-
-// User of these functions has to free out_buf, if successful
-bool CompressMem2Mem(const void *buf, const int64_t size,
-                     void **out_buf, uint64_t *out_size);
-bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, uint64_t *out_size);
 
 }  // namespace zlib
 

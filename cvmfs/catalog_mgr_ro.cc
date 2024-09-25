@@ -6,7 +6,9 @@
 #include "catalog_mgr_ro.h"
 
 #include "compression/compression.h"
+#include "compression/input_path.h"
 #include "network/download.h"
+#include "network/sink_file.h"
 #include "util/exception.h"
 #include "util/posix.h"
 
@@ -39,6 +41,8 @@ SimpleCatalogManager::SimpleCatalogManager(
             "Failure during creation of local cache directory for server. "
             "Local cache directory: %s", dir_cache_.c_str());
     }
+    copy_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+
   } else {
     copy_to_tmp_dir_ = false;
   }
@@ -64,12 +68,15 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
                       cache_path.c_str());
   }
 
-  const bool retval = CopyPath2File(cache_path, fcatalog);
+  zlib::InputPath in_path(cache_path);
+  cvmfs::FileSink out_file(fcatalog, true);
+
+  const bool retval = (copy_->DecompressStream(&in_path, &out_file)
+                                                           == zlib::kStreamEnd);
   if (!retval) {
     unlink(tmp_path.c_str());
     PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
   }
-  (void) fclose(fcatalog);
 
   return tmp_path;
 }

@@ -20,11 +20,14 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression/compression.h"
+#include "compression/input_file.h"
+#include "compression/input_path.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "reflog.h"
 #include "sanitizer.h"
 #include "shortstring.h"
@@ -47,11 +50,13 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false)
-    , no_duplicates_map_(false)
-    , is_remote_(false) {
-    const shash::Any hash_null;
-    duplicates_map_.Init(16, hash_null, hasher_any);
+                            : check_chunks_(false)
+                            , no_duplicates_map_(false)
+                            , is_remote_(false) {
+  const shash::Any hash_null;
+  duplicates_map_.Init(16, hash_null, hasher_any);
+  decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZlibDefault);
+  copy_ = zlib::Compressor::Construct(zlib::kNoCompression);
 }
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
@@ -193,9 +198,11 @@ string CommandCheck::FetchPath(const string &path) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    bool retval = CopyPath2File(url, f);
-    if (!retval) {
-      PANIC(kLogStderr, "failed to read %s", url.c_str());
+    zlib::InputPath input(url);
+    cvmfs::FileSink output(f);
+    const zlib::StreamStates retval = copy_->Compress(&input, &output);
+    if (retval != zlib::kStreamEnd) {
+      PANIC(kLogStderr, "failed to read %s - error %d", url.c_str(), retval);
     }
   }
 
@@ -691,9 +698,12 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
 string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
-  if (!zlib::DecompressPath2Path(source, dest))
+  zlib::InputPath in_path(source);
+  cvmfs::PathSink out_path(dest);
+  if (decomp_zlib_->DecompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
+    assert(decomp_zlib_->Reset());
     return "";
-
+  }
   return dest;
 }
 

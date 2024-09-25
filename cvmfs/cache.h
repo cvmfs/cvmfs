@@ -233,6 +233,7 @@ class CacheManager : SingleCopy {
    * Never NULL but defaults to NoopQuotaManager.
    */
   QuotaManager *quota_mgr_;
+  UniquePtr<zlib::Compressor> compress_;
 
  private:
   static const unsigned kStateVersion = 0;

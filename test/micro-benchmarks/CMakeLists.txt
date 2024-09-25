@@ -19,6 +19,18 @@ set (CVMFS_UBENCHMARKS_SOURCES
   # dependencies
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/compression/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/compressor_zstd.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompression.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_echo.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_zlib.cc
+  ${CVMFS_SOURCE_DIR}/compression/decompressor_zstd.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_cache.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_file.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_mem.cc
+  ${CVMFS_SOURCE_DIR}/compression/input_path.cc
+  ${CVMFS_SOURCE_DIR}/compression/util.cc
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
@@ -64,6 +76,7 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${SHA3_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
+                                ${ZSTD_LIBRARIES}
                                 ${RT_LIBRARY}
                                 pthread dl)
 
