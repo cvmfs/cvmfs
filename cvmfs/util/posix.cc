@@ -522,10 +522,15 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 /**
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
-void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
+bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
   ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
+  uint64_t duration_ms = 0;
+  uint64_t timestamp = 0;
+  if (timeout_ms != 0)
+    timestamp = platform_monotonic_time_ns();
+
   const unsigned max_backoff_ms = 256;
   do {
     // When the writer is not connected, this takes ~200-300ns per call as per
@@ -540,8 +545,14 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
       SafeSleepMs(backoff_ms);
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
+    if ((timeout_ms != 0) && (num_bytes == 0)) {
+      duration_ms = (platform_monotonic_time_ns() - timestamp) / (1000UL * 1000UL);
+      if (duration_ms  > timeout_ms)
+        return false;
+    }
   } while (num_bytes == 0);
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+  return true;
 }
 
 
@@ -1620,6 +1631,69 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     return 0;
   return -1;
 }
+
+/**
+ * Exec a command as a daemon.
+ */
+
+bool ExecAsDaemon(const std::vector<std::string>  &command_line,
+                       pid_t           *child_pid) {
+  assert(command_line.size() >= 1);
+
+  Pipe<kPipeDetachedChild> pipe_fork;
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    pid_t pid_grand_child;
+
+    const char *argv[command_line.size() + 1];
+    for (unsigned i = 0; i < command_line.size(); ++i)
+      argv[i] = command_line[i].c_str();
+    argv[command_line.size()] = NULL;
+    int retval = setsid();
+    assert(retval != -1);
+
+    pid_grand_child = fork();
+    assert(pid_grand_child >= 0);
+
+    if (pid_grand_child != 0){
+      pipe_fork.Write<pid_t>(pid_grand_child);
+      _exit(0);
+    } else {
+      int null_read = open("/dev/null", O_RDONLY);
+      int null_write = open("/dev/null", O_WRONLY);
+      assert((null_read >= 0) && (null_write >= 0));
+      retval = dup2(null_read, 0);
+      assert(retval == 0);
+      retval = dup2(null_write, 1);
+      assert(retval == 1);
+      retval = dup2(null_write, 2);
+      assert(retval == 2);
+      close(null_read);
+      close(null_write);
+
+      execvp(command_line[0].c_str(), const_cast<char **>(argv));
+
+      pipe_fork.CloseWriteFd();
+    }
+  }
+  int statloc;
+  waitpid(pid, &statloc, 0);
+  pid_t buf_child_pid = 0;
+  pipe_fork.Read(&buf_child_pid);
+  if (child_pid != NULL)
+    *child_pid = buf_child_pid;
+  pipe_fork.CloseReadFd();
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "exec'd as daemon %s (PID: %d)",
+           command_line[0].c_str(),
+           static_cast<int>(*child_pid));
+  return true;
+
+}
+
+
+
 
 
 /**

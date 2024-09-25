@@ -1,4 +1,5 @@
 2.12.0:
+  * [server] Create scratch dir with consistent permissions (#3660)
   * [client] Better logging for host/proxies (#3617)
   * [client] Close page cache tracker entry if cvmfs_open() fails (#3588)
   * [gw] Cache catalogs for cvmfs_receiver (#3431)
@@ -17,6 +18,17 @@
   * [client] Add paging to xattr (#3355)
   * [server] Ingest Tarball now with modifiyable ownership (#3362)
   * [client] Refactoring of file catalog reloads (#3156)
+
+2.11.5:
+  * [client] Fix ReadHalfPipe for reads larger than the timeout  (#3653)
+
+2.11.4:
+  * [client] Fix streaming cache mgr with secure repos (#3631) 
+  * [client] Fix handling of network errors in streaming cache mgr (#3630)
+  * [client] Add timeout to ReadHalfPipe (#3614)
+
+2.11.3:
+ * [server] Update method of downloading the MaxMind GeoIP (#3566)
 
 2.11.2:
   * [client] Fix mount helper race condition causing spurious directories (#3430)

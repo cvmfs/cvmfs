@@ -10,6 +10,7 @@
 #include <cstring>
 #include <string>
 
+#include "clientctx.h"
 #include "network/download.h"
 #include "network/sink.h"
 #include "quota.h"
@@ -115,6 +116,14 @@ int64_t StreamingCacheManager::Stream(
   download_job.SetExtraInfo(&info.label.path);
   download_job.SetRangeOffset(info.label.range_offset);
   download_job.SetRangeSize(static_cast<int64_t>(info.label.size));
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  if (ctx->IsSet()) {
+    ctx->Get(download_job.GetUidPtr(),
+             download_job.GetGidPtr(),
+             download_job.GetPidPtr(),
+             download_job.GetInterruptCuePtr());
+  }
+
   SelectDownloadManager(info)->Fetch(&download_job);
 
   if (download_job.error_code() != download::kFailOk) {
@@ -252,12 +261,14 @@ int64_t StreamingCacheManager::Pread(
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->Pread(info.fd_in_cache_mgr, buf, size, offset);
 
-  uint64_t nbytes_streamed = Stream(info, buf, size, offset);
-  if (nbytes_streamed < offset)
+  int64_t nbytes_streamed = Stream(info, buf, size, offset);
+  if (nbytes_streamed < 0)
+    return nbytes_streamed;
+  if (static_cast<uint64_t>(nbytes_streamed) < offset)
     return 0;
-  if (nbytes_streamed > (offset + size))
-    return static_cast<int64_t>(size);
-  return static_cast<int64_t>(nbytes_streamed - offset);
+  if (static_cast<uint64_t>(nbytes_streamed) > (offset + size))
+    return size;
+  return nbytes_streamed - offset;
 }
 
 int StreamingCacheManager::Readahead(int fd) {
