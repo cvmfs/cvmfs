@@ -564,7 +564,11 @@ cvmfs_umount() {
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
       if [ "$sys_arch" = "Darwin" ]; then
-        sudo umount -f /cvmfs/$r > /dev/null 2>&1
+        if [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+          sudo umount -f /cvmfs/$r 2>/dev/null
+        else
+          sudo umount /cvmfs/$r 2>/dev/null
+        fi
       else 
         sudo umount /cvmfs/$r > /dev/null 2>&1
       fi
