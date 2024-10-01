@@ -913,8 +913,12 @@ minpidof() {
 }
 
 
+# Return true if systemd is to be used, that is, if neither the service
+# command nor the supervisorctl command has been located.  Note that
+# the service command is only looked for if systemctl is missing, but
+# the supervisorctl command will take precedence over systemctl.
 is_systemd() {
-  [ x"$SERVICE_BIN" = x"false" ]
+  [ x"$SERVICE_BIN" = x"false" ] && [ x"$SUPERVISOR_BIN" = x"false" ]
 }
 
 

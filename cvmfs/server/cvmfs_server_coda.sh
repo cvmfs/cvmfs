@@ -79,6 +79,10 @@ else # RedHat based
   APACHE_WSGI_MODPKG="mod_wsgi"
 fi
 
+SUPERVISOR_BIN="false"
+if [ -f /bin/supervisorctl ]; then
+  SUPERVISOR_BIN=/bin/supervisorctl
+fi
 SERVICE_BIN="false"
 if [ ! -f /bin/systemctl ]; then
   if cvmfs_sys_file_is_executable /sbin/service ; then
