@@ -86,20 +86,16 @@ static bool IsFuseTInstalled() {
 }
 
 static bool CheckFuse() {
-#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
+#ifdef __APPLE__
   bool is_fuse_t_installed = IsFuseTInstalled();
   if (!is_fuse_t_installed) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "FUSE-T installation check failed. FUSE not loaded"); 
+    LogCvmfs(kLogCvmfs, kLogStderr, "FUSE-T installation check failed"); 
   }
   return is_fuse_t_installed;
-#else 
+#else
   string fuse_device;
   int retval;
-#ifdef __APPLE__
-  fuse_device = "/dev/macfuse0";
-#else 
   fuse_device = "/dev/fuse";
-#endif
   platform_stat64 info;
   retval = platform_stat(fuse_device.c_str(), &info);
   if ((retval != 0) || !S_ISCHR(info.st_mode)) {

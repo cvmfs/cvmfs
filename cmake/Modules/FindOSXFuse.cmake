@@ -8,44 +8,34 @@
 # hardcoding this due to misplacement of fuse.h on installing FUSE-T
 # in comparison to macFUSE 
 # (the latter places fuse.h in /usr/local/include but the former in /usr/local/include/fuse)
-set (MACOS_FUSE_INCLUDE_DIR /usr/local/include)
-if (USE_MACFUSE_KEXT) 
-        # find lib
-        set (OSXFUSE_NAMES osxfuse.2 osxfuse)
-        find_library(MACOS_FUSE_LIBRARY
-                NAMES ${OSXFUSE_NAMES}
-                PATHS /usr/lib /usr/local/lib
-                        NO_DEFAULT_PATH
-        )
-else()
-        # find FUSE-T lib as the primary lib
-        set (MACOS_FUSE_LIB_NAMES fuse-t)
-        find_library(MACOS_FUSE_LIBRARY 
-                NAMES ${MACOS_FUSE_LIB_NAMES} 
-                PATHS /usr/lib /usr/local/lib
-        )
-endif()
+SET (MACOS_FUSE_INCLUDE_DIR /usr/local/include)
 
+# find FUSE-T lib as the primary lib
+SET(MACOS_FUSE_LIB_NAMES fuse-t)
+FIND_LIBRARY(MACOS_FUSE_LIBRARY 
+        NAMES ${MACOS_FUSE_LIB_NAMES} 
+        PATHS /usr/lib /usr/local/lib
+)
 
 # check if lib was found and include is present
-if (MACOS_FUSE_INCLUDE_DIR AND MACOS_FUSE_LIBRARY)
-        set (MACOS_FUSE_FOUND TRUE)
-        set (MACOS_FUSE_LIBRARIES ${MACOS_FUSE_LIBRARY})
-else()
-        set (MACOS_FUSE_FOUND FALSE)
-        unset (MACOS_FUSE_LIBRARIES)
-endif()
+IF (MACOS_FUSE_INCLUDE_DIR AND MACOS_FUSE_LIBRARY)
+        SET (MACOS_FUSE_FOUND TRUE)
+        SET (MACOS_FUSE_LIBRARIES ${MACOS_FUSE_LIBRARY})
+ELSE (MACOS_FUSE_INCLUDE_DIR AND MACOS_FUSE_LIBRARY)
+        SET (MACOS_FUSE_FOUND FALSE)
+        SET (MACOS_FUSE_LIBRARIES)
+ENDIF (MACOS_FUSE_INCLUDE_DIR AND MACOS_FUSE_LIBRARY)
 
 # let world know the results
-if (MACOS_FUSE_FOUND)
-        if (NOT MACOS_FUSE_FIND_QUIETLY)
-                message(STATUS "Found FUSE library for macOS: ${MACOS_FUSE_LIBRARY}. fuse.h include directory: ${MACOS_FUSE_INCLUDE_DIR}")
-        endif()
-else ()
-        if (MACOS_FUSE_FIND_QUIETLY)
-                message(STATUS "Looked for FUSE library named ${MACOS_FUSE_LIB_NAMES}.")
-                message(FATAL_ERROR "Could NOT find FUSE library")
-        endif()
-endif()
+IF (MACOS_FUSE_FOUND)
+        IF (NOT MACOS_FUSE_FIND_QUIETLY)
+                MESSAGE(STATUS "Found FUSE-T library for macOS: ${MACOS_FUSE_LIBRARY}. fuse.h include directory: ${MACOS_FUSE_INCLUDE_DIR}")
+        ENDIF (NOT MACOS_FUSE_FIND_QUIETLY)
+ELSE (MACOS_FUSE_FOUND)
+        IF (MACOS_FUSE_FIND_QUIETLY)
+                MESSAGE(STATUS "Looked for FUSE-T library named ${MACOS_FUSE_LIB_NAMES}.")
+                MESSAGE(FATAL_ERROR "Could NOT find FUSE-T library")
+        ENDIF (MACOS_FUSE_FIND_QUIETLY)
+ENDIF (MACOS_FUSE_FOUND)
 
 mark_as_advanced (MACOS_FUSE_INCLUDE_DIR MACOS_FUSE_LIBRARIES)

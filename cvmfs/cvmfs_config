@@ -61,7 +61,7 @@ case $sys_arch in
 
   Darwin )
     fuser="/usr/bin/fuser"
-    fuse_fs_type="macfuse"
+    fuse_fs_type="nfs"
     ;;
 
   * )
@@ -470,14 +470,11 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
-    if ! check_fuse_t_installation; then
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    # Check that all required components for fuse-t are presented
+    check_fuse_t_installation
+    if [ $? -ne 0 ]; then
       echo "Error: FUSE-T is not installed."
-      num_errors=$(($num_errors+1))
-    fi
-  elif [ x"$sys_arch" = x"Darwin" ]; then
-    if [ ! -d /Library/Filesystems/macfuse.fs ]; then
-      echo "Error: macFUSE is missing."
       num_errors=$(($num_errors+1))
     fi
   fi
@@ -1266,9 +1263,9 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+        if [ "$sys_arch" = "Darwin" ]; then
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^fuse-t
-        else 
+        else
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
         fi
         if [ $? -ne 0 ]; then
@@ -1346,11 +1343,7 @@ cvmfs_umount() {
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
     if [ "$sys_arch" = "Darwin" ]; then
-      if [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
-        umount -f /cvmfs/$r 2>/dev/null
-      else
-        umount /cvmfs/$r 2>/dev/null
-      fi
+      umount -f $umount_options $m 2>/dev/null
     else 
       umount $umount_options $m 2>/dev/null
     fi
@@ -1588,8 +1581,8 @@ waitfor() {
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
   # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
-  if [ x"$sys_arch" = x"Darwin" ] && [ -z CVMFS_USE_MACFUSE_KEXT ]; then
-    mount -t "nfs" | grep "fuse-t"
+  if [ x"$sys_arch" = x"Darwin" ]; then
+    mount -t $fuse_fs_type | grep "fuse-t"
   else
     mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
   fi
@@ -1809,23 +1802,18 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      if [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
       # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
-        exit 0
-      fi
-      charDevice=/dev/macfuse ;;
+      return 0 ;;
     * )
      echo "Architecture $sys_arch is not supported"
      exit 1 ;;
   esac
+
   return_code=0
   if [ ! -c $charDevice ]; then
     if [ x"$sys_arch" = x"Linux" ]; then
       echo "Error: character device $charDevice does not exist"
       return_code=$(($return_code+1))
-    elif [ x"$sys_arch" = x"Darwin" ]; then
-      echo -n "Warning: character device $charDevice does not exist. "
-      echo "Please make sure that macFUSE is installed."
     fi
   else
     if ! runascvmfsuser "test -r $charDevice"; then
