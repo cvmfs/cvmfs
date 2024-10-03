@@ -19,7 +19,7 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
-CVMFS_CONFIG_PACKAGE="cvmfs-config-default-2.1-1.noarch.rpm"
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default-2.2-1.noarch.rpm"
 
 rpm_infra_dirs="BUILD RPMS SOURCES SRPMS TMP"
 rpm_src_dir="${CVMFS_SOURCE_LOCATION}/packaging/rpm"
