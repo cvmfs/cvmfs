@@ -1,3 +1,9 @@
+cvmfs-config-default (2.2-1) lucid; urgency=low
+
+  * Remove the ASGC Taiwan stratum 1 from the egi and opensciencegrid domains.  Note that the list of stratum 1s is normally overriden by the configuration repository so this only affects cases where the configuration repository is not available.
+
+ -- Dave Dykstra <dwd@fnal.gov>  Tue, 24 Sep 2024 14:30:22 +0200
+
 cvmfs-config-default (2.1-1) lucid; urgency=low
 
   * During reload/mount: fallback to local config repo if remote repo is unavailable
