@@ -1343,7 +1343,11 @@ cvmfs_umount() {
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
     if [ "$sys_arch" = "Darwin" ]; then
-      umount -f $umount_options $m 2>/dev/null
+      if [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+        umount $umount_options $m 2>/dev/null
+      else
+        umount -f $umount_options $m 2>/dev/null
+      fi
     else 
       umount $umount_options $m 2>/dev/null
     fi
