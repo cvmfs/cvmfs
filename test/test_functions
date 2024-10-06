@@ -563,14 +563,9 @@ cvmfs_umount() {
 
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
-      if [ "$sys_arch" = "Darwin" ]; then
-        if [ "$CVMFS_USE_MACFUSE_KEXT" = "yes" ]; then
-          echo "AAAA" >> /tmp/cvmfs-debug.log 
-          sudo umount /cvmfs/$r 2>/dev/null
-        else
-          sudo umount -f /cvmfs/$r 2>/dev/null
-        fi
-      else 
+      if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+        sudo umount -f /cvmfs/$r 2>/dev/null
+      else
         sudo umount /cvmfs/$r > /dev/null 2>&1
       fi
       result=$?

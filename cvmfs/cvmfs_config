@@ -470,7 +470,8 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+  local macfuse_enabled=$(is_macfuse_enabled)
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! $macfuse_enabled ]; then
     if ! check_fuse_t_installation; then
       echo "Error: FUSE-T is not installed."
       num_errors=$(($num_errors+1))
@@ -1266,7 +1267,7 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        if [ "$sys_arch" = "Darwin" ] && [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+        if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^fuse-t
         else 
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
@@ -1345,16 +1346,11 @@ cvmfs_umount() {
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    if [ "$sys_arch" = "Darwin" ]; then
-      if [ "$CVMFS_USE_MACFUSE_KEXT" = "yes" ]; then
-        umount $umount_options $m 2>/dev/null
-      else
-        umount -f $umount_options $m 2>/dev/null
-      fi
-    else 
+    if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+      umount -f $umount_options $m 2>/dev/null
+    else
       umount $umount_options $m 2>/dev/null
     fi
-
     if [ $? -ne 0 ]; then
       RETVAL=1
       if [ "x$silent" = "x" ]; then
@@ -1589,7 +1585,7 @@ waitfor() {
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
   # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
-  if [ x"$sys_arch" = x"Darwin" ] && [ "x$CVMFS_USE_MACFUSE_KEXT" != "yes" ]; then
+  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
     mount -t "nfs" | grep "fuse-t"
   else
     mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
@@ -1801,6 +1797,23 @@ check_fuse_t_installation() {
   return 0
 }
 
+is_macfuse_enabled() {
+  if [ x"$CVMFS_USE_MACFUSE_KEXT" = x ]; then
+    return 1
+  fi
+  local value=$(echo "$CVMFS_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
+  case "$value" in
+    yes|on|1|true)
+      return 0 ;;
+    no|off|0|false)
+      return 1 ;;
+    *)
+      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_USE_MACFUSE_KEXT"
+      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
+      return 1 ;;
+  esac
+}
+
 check_dev_fuse() {
   local charDevice
   local return_code
@@ -1810,7 +1823,7 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      if [ -z "$CVMFS_USE_MACFUSE_KEXT" ]; then
+      if ! is_macfuse_enabled; then
       # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
         exit 0
       fi
