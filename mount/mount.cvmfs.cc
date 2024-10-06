@@ -68,6 +68,7 @@ static string MkFqrn(const string &repository) {
   return repository;
 }
 
+#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
 static bool IsFuseTInstalled() {
   return true;
   string fuseTComponentsPaths[] = { "/usr/local/bin/go-nfsv4", 
@@ -84,6 +85,7 @@ static bool IsFuseTInstalled() {
   }
   return true;
 }
+#endif
 
 static bool CheckFuse() {
 #if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)

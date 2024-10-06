@@ -10,7 +10,7 @@
 # `export CVMFS_TEST_SRVDEBUG=startup` - for interactive debugging with gdb
 
 CVMFS_SERVER_APACHE_RELOAD_IS_RESTART=true
-
+CVMFS_TEST_USE_MACFUSE_KEXT=${CVMFS_TEST_USE_MACFUSE_KEXT:=no}
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
@@ -458,8 +458,8 @@ wait_for_umount() {
 }
 
 cvmfs_clean() {
-  sudo cvmfs_config umount > /dev/null                   || return 100
-  sudo sh -c "rm -rf /var/lib/cvmfs/*"                   || return 101
+  sudo env CVMFS_USE_MACFUSE_KEXT="$CVMFS_TEST_USE_MACFUSE_KEXT" cvmfs_config umount > /dev/null  || return 100
+  sudo sh -c "rm -rf /var/lib/cvmfs/*"                  || return 101
   sudo rm -f /etc/cvmfs/default.local                    || return 102
   sudo sh -c "rm -f /etc/cvmfs/config.d/*.local"         || return 104
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET" || return 105
@@ -504,6 +504,7 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo CVMFS_USE_MACFUSE_KEXT=$CVMFS_TEST_USE_MACFUSE_KEXT >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
   if running_on_osx ; then
     sudo sh -c 'echo "CVMFS_MAGIC_XATTRS_VISIBILITY=ALWAYS" >> /etc/cvmfs/default.local' || return 100
