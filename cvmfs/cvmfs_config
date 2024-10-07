@@ -1232,9 +1232,6 @@ cvmfs_reload() {
     fi
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
       kill -s USR1 $(cat $pidfile)
-      if [ x"$sys_arch" = x"Darwin" ]; then 
-        sleep 15
-      fi
       rm -f $pidfile
     done
   fi

@@ -422,6 +422,23 @@ is_macos() {
   [ x"$(uname)" = x"Darwin" ]
 }
 
+is_macfuse_enabled() {
+  if [ x"$CVMFS_TEST_USE_MACFUSE_KEXT" = x ]; then
+    return 1
+  fi
+  local value=$(echo "$CVMFS_TEST_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
+  case "$value" in
+    yes|on|1|true)
+      return 0 ;;
+    no|off|0|false)
+      return 1 ;;
+    *)
+      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_TEST_USE_MACFUSE_KEXT"
+      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
+      return 1 ;;
+  esac
+}
+
 
 get_number_of_cpu_cores() {
   if is_linux; then
@@ -551,7 +568,6 @@ _cvmfs_mount_manually() {
     sleep 3
   fi
 }
-
 
 cvmfs_umount() {
   if [ x$PARROT_ENABLED = "xTRUE" ]; then
