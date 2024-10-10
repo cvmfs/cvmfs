@@ -30,3 +30,12 @@ externals/build_*/
 externals/.decompressionDone
 externals_build
 externals_install
+
+
+test/performance-benchmark/client/data
+test/performance-benchmark/client/results
+test/performance-benchmark/client/util_*/__pycache__
+CMakeFiles/3.22.1
+CMakeFiles/cmake.check_cache
+CMakeFiles/CMakeError.log
+CMakeFiles/CMakeOutput.log
