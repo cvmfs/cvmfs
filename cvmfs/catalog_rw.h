@@ -84,16 +84,19 @@ class WritableCatalog : public Catalog {
 
   // Nested catalog references
   void InsertNestedCatalog(const std::string &mountpoint,
-                           Catalog *attached_reference,
-                           const shash::Any content_hash,
-                           const uint64_t size);
+                         Catalog *attached_reference,
+                         const shash::Any content_hash,
+                         const uint64_t size,
+                         const zlib::Algorithms algorithm = zlib::kZlibDefault);
   void InsertBindMountpoint(const std::string &mountpoint,
-                            const shash::Any content_hash,
-                            const uint64_t size);
+                         const shash::Any content_hash,
+                         const uint64_t size,
+                         const zlib::Algorithms algorithm = zlib::kZlibDefault);
   void UpdateNestedCatalog(const std::string   &path,
-                           const shash::Any    &hash,
-                           const uint64_t       size,
-                           const DeltaCounters &child_counters);
+                         const shash::Any    &hash,
+                         const uint64_t       size,
+                         const DeltaCounters &child_counters,
+                         const zlib::Algorithms algorithm = zlib::kZlibDefault);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
   void RemoveBindMountpoint(const std::string &mountpoint);

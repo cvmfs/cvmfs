@@ -401,6 +401,7 @@ class SqlNestedCatalogLookup : public SqlCatalog {
   bool BindSearchPath(const PathString &path);
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
+  zlib::Algorithms GetAlgorithm() const;
 };
 
 
@@ -416,6 +417,7 @@ class SqlNestedCatalogListing : public SqlCatalog {
   PathString GetPath() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
+  zlib::Algorithms GetAlgorithm() const;
 };
 
 
@@ -431,6 +433,7 @@ class SqlOwnNestedCatalogListing : public SqlCatalog {
   PathString GetPath() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
+  zlib::Algorithms GetAlgorithm() const;
 };
 
 
