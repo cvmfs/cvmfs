@@ -82,7 +82,6 @@ jobs:
             src/008-default_domain                            \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
-            src/015-rebuild_on_crash                          \
             src/024-reload-during-asetup                      \
             src/028-negativecache                             \
             src/039-reloadalarm                               \
@@ -90,7 +89,6 @@ jobs:
             src/045-oasis                                     \
             src/052-roundrobindns                             \
             src/050-configrepo                                \
-            src/053-uuid                                      \
             src/055-ownership                                 \
             src/056-lowspeedlimit                             \
             src/057-parallelmakecache                         \
