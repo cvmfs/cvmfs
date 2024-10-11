@@ -36,6 +36,7 @@ struct SyncParameters {
         ignore_xdir_hardlinks(false),
         stop_for_catalog_tweaks(false),
         include_xattrs(false),
+        enable_mtime_ns(false),
         external_data(false),
         direct_io(false),
         voms_authz(false),
@@ -88,6 +89,7 @@ struct SyncParameters {
   bool ignore_xdir_hardlinks;
   bool stop_for_catalog_tweaks;
   bool include_xattrs;
+  bool enable_mtime_ns;
   bool external_data;
   bool direct_io;
   bool voms_authz;
@@ -253,7 +255,7 @@ class CommandSync : public Command {
     return "Pushes changes from scratch area back to the repository.";
   }
   virtual ParameterList GetParams() const {
-    // unused characters: j, J, 1-9, all special characters but @
+    // unused characters: J, 1-9, all special characters but @
     ParameterList r;
     r.push_back(Parameter::Mandatory('b', "base hash"));
     r.push_back(Parameter::Mandatory('c', "r/o volume"));
@@ -305,6 +307,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch('g', "ignore special files"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
+    r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
     r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('n', "create new repository"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));

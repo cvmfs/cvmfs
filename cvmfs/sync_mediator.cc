@@ -757,13 +757,13 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
 
   if (result.IsChunked()) {
     catalog_manager_->AddChunkedFile(
-      item.CreateBasicCatalogDirent(),
+      item.CreateBasicCatalogDirent(params_->enable_mtime_ns),
       *xattrs,
       item.relative_parent_path(),
       result.file_chunks);
   } else {
     catalog_manager_->AddFile(
-      item.CreateBasicCatalogDirent(),
+      item.CreateBasicCatalogDirent(params_->enable_mtime_ns),
       *xattrs,
       item.relative_parent_path());
   }
@@ -936,8 +936,10 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
       xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
       assert(xattrs);
     }
-    catalog_manager_->AddFile(entry->CreateBasicCatalogDirent(), *xattrs,
-                              entry->relative_parent_path());
+    catalog_manager_->AddFile(
+      entry->CreateBasicCatalogDirent(params_->enable_mtime_ns),
+      *xattrs,
+      entry->relative_parent_path());
     if (xattrs != &default_xattrs_)
       free(xattrs);
   } else if (entry->HasGraftMarker() && !params_->dry_run) {
@@ -945,11 +947,13 @@ void SyncMediator::AddFile(SharedPtr<SyncItem> entry) {
       // Graft files are added to catalog immediately.
       if (entry->IsChunkedGraft()) {
         catalog_manager_->AddChunkedFile(
-            entry->CreateBasicCatalogDirent(), default_xattrs_,
-            entry->relative_parent_path(), *(entry->GetGraftChunks()));
+            entry->CreateBasicCatalogDirent(params_->enable_mtime_ns),
+            default_xattrs_,
+            entry->relative_parent_path(),
+            *(entry->GetGraftChunks()));
       } else {
         catalog_manager_->AddFile(
-            entry->CreateBasicCatalogDirent(),
+            entry->CreateBasicCatalogDirent(params_->enable_mtime_ns),
             default_xattrs_,  // TODO(bbockelm): For now, use default xattrs
                               // on grafted files.
             entry->relative_parent_path());
@@ -1030,8 +1034,9 @@ void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
       xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
       assert(xattrs);
     }
-    catalog_manager_->AddDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
-                                   entry->relative_parent_path());
+    catalog_manager_->AddDirectory(
+      entry->CreateBasicCatalogDirent(params_->enable_mtime_ns), *xattrs,
+      entry->relative_parent_path());
     if (xattrs != &default_xattrs_)
       free(xattrs);
   }
@@ -1075,8 +1080,9 @@ void SyncMediator::TouchDirectory(SharedPtr<SyncItem> entry) {
       xattrs = XattrList::CreateFromFile(entry->GetUnionPath());
       assert(xattrs);
     }
-    catalog_manager_->TouchDirectory(entry->CreateBasicCatalogDirent(), *xattrs,
-                                     directory_path);
+    catalog_manager_->TouchDirectory(
+      entry->CreateBasicCatalogDirent(params_->enable_mtime_ns), *xattrs,
+      directory_path);
     if (xattrs != &default_xattrs_) free(xattrs);
   }
 
@@ -1135,7 +1141,8 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),
        iEnd = group.hardlinks.end(); i != iEnd; ++i)
   {
-    hardlinks.push_back(i->second->CreateBasicCatalogDirent());
+    hardlinks.push_back(
+      i->second->CreateBasicCatalogDirent(params_->enable_mtime_ns));
   }
   XattrList *xattrs = &default_xattrs_;
   if (params_->include_xattrs) {

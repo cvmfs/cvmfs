@@ -120,6 +120,11 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   tar_stat_.st_rdev = entry_stat->st_rdev;
   tar_stat_.st_size = entry_stat->st_size;
   tar_stat_.st_mtime = entry_stat->st_mtime;
+#ifdef __APPLE__
+  tar_stat_.st_mtimespec.tv_nsec = entry_stat->st_mtimespec.tv_nsec;
+#else
+  tar_stat_.st_mtim.tv_nsec = entry_stat->st_mtim.tv_nsec;
+#endif
   tar_stat_.st_nlink = entry_stat->st_nlink;
 
   if (IsDirectory()) {
@@ -131,7 +136,9 @@ platform_stat64 SyncItemTar::GetStatFromTar() const {
   return tar_stat_;
 }
 
-catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent(
+  bool enable_mtime_ns) const
+{
   assert(obtained_tar_stat_);
 
   catalog::DirectoryEntryBase dirent;
@@ -162,6 +169,15 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent() const {
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(major(tar_stat_.st_rdev), minor(tar_stat_.st_rdev));
+  }
+
+  if (enable_mtime_ns) {
+#ifdef __APPLE__
+    dirent.mtime_ns_ =
+      static_cast<int32_t>(this->tar_stat_.st_mtimespec.tv_nsec);
+#else
+    dirent.mtime_ns_ = static_cast<int32_t>(this->tar_stat_.st_mtim.tv_nsec);
+#endif
   }
 
   assert(dirent.IsRegular() || dirent.IsDirectory() || dirent.IsLink() ||

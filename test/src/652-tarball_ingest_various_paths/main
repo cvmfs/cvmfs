@@ -26,7 +26,8 @@ produce_tarball() {
 
   echo "*** Generating a tarball in $tarball_name"
   # the -P option create a tarball with a leading slash
-  tar -Pcvf $tarball_name $(pwd)/tarball_foo
+  # the -H posix option creates nanosecond precision timestamps
+  tar -H posix -Pcvf $tarball_name $(pwd)/tarball_foo
 
   rm -rf tarball_foo
 }
@@ -40,6 +41,7 @@ cvmfs_run_test() {
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+  echo "CVMFS_ENABLE_MTIME_NS=true" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
 
   # ============================================================================
 
@@ -232,6 +234,12 @@ cvmfs_run_test() {
   if [ $file_size -eq 5120 ]; then
     echo "*** It compare well"
   fi
+
+  echo "checking nanosecond timestamps"
+  echo "entry information of $file:"
+  stat $file || return 50
+  local mtime_ns=$(stat -c%y $file | cut -d. -f2 | awk '{print $1}')
+  [ $mtime_ns -ne 0 ] || return 51
 
   echo "*** ingesting empty tarball with nested catalog"
   cat $script_location/layer.tar | cvmfs_server ingest --base_dir layer -c --tar_file - $CVMFS_TEST_REPO || return 42

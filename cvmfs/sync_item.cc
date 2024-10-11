@@ -201,7 +201,9 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
+catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent(
+  bool enable_mtime_ns) const
+{
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
@@ -234,6 +236,16 @@ catalog::DirectoryEntryBase SyncItemNative::CreateBasicCatalogDirent() const {
 
   if (this->IsCharacterDevice() || this->IsBlockDevice()) {
     dirent.size_ = makedev(GetRdevMajor(), GetRdevMinor());
+  }
+
+  if (enable_mtime_ns) {
+#ifdef __APPLE__
+    dirent.mtime_ns_ = static_cast<int32_t>(
+      this->GetUnionStat().st_mtimespec.tv_nsec);
+#else
+    dirent.mtime_ns_ = static_cast<int32_t>(
+      this->GetUnionStat().st_mtim.tv_nsec);
+#endif
   }
 
   return dirent;

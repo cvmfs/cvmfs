@@ -859,7 +859,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 6;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 7;
 
 
 template<class DerivedT>
@@ -1106,7 +1106,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "         IFNULL(hardlink_group_id, 0) << 32 | "
     "         COALESCE(hardlinks.linkcount, dir_linkcounts.linkcount, 1) "
     "           AS hardlinks, "
-    "         hash, size, mode, mtime, "
+    "         hash, size, mode, mtime, NULL, " // set empty mtimens
     "         flags, name, symlink, "
     "         :uid, "
     "         :gid, "

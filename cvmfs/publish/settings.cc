@@ -87,6 +87,10 @@ void SettingsTransaction::SetEnforceLimits(bool value) {
   enforce_limits_ = value;
 }
 
+void SettingsTransaction::SetEnableMtimeNs(bool value) {
+  enable_mtime_ns_ = value;
+}
+
 void SettingsTransaction::SetLimitNestedCatalogKentries(unsigned value) {
   limit_nested_catalog_kentries_ = value;
 }
@@ -557,6 +561,10 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
   }
   if (options_mgr_.GetValue("CVMFS_ENFORCE_LIMITS", &arg)) {
     settings_publisher->GetTransaction()->SetEnforceLimits(
+        options_mgr_.IsOn(arg));
+  }
+  if (options_mgr_.GetValue("CVMFS_ENABLE_MTIME_NS", &arg)) {
+    settings_publisher->GetTransaction()->SetEnableMtimeNs(
         options_mgr_.IsOn(arg));
   }
   if (options_mgr_.GetValue("CVMFS_NESTED_KCATALOG_LIMIT", &arg)) {

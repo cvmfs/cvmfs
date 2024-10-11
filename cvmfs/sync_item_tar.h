@@ -22,7 +22,8 @@ class SyncItemTar : public SyncItem {
   friend class SyncUnionTarball;
 
  public:
-  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool enable_mtime_ns) const;
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
   virtual SyncItemType GetScratchFiletype() const;

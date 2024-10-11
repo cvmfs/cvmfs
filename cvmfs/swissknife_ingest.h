@@ -46,6 +46,7 @@ class Ingest : public Command {
           "uid of new owner of the ingested data (-1 for keep tarball owner)"));
     r.push_back(Parameter::Optional('G',
           "gid of new owner of the ingested data (-1 for keep tarball owner)"));
+    r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
 
     return r;
   }

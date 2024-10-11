@@ -656,6 +656,7 @@ if (BUILD_SERVER)
        swissknife_sync.cc
        swissknife_zpipe.cc
        sync_item.cc
+       sync_item_dummy.cc
        sync_item_tar.cc
        sync_mediator.cc
        sync_union.cc
@@ -769,6 +770,7 @@ if (BUILD_SERVER)
        swissknife_assistant.cc
        swissknife_lease_curl.cc
        sync_item.cc
+       sync_item_dummy.cc
        sync_item_tar.cc
        sync_mediator.cc
        sync_union.cc
