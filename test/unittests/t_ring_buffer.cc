@@ -37,7 +37,7 @@ TEST_F(T_RingBuffer, Basics) {
   EXPECT_EQ(0u, ring->RemoveBack());
   EXPECT_EQ(kSize, ring->free_space());
 
-  RingBuffer::ObjectHandle_t handle_null = ring->PushFront(NULL, 0);
+  const RingBuffer::ObjectHandle_t handle_null = ring->PushFront(NULL, 0);
   EXPECT_NE(RingBuffer::kInvalidObjectHandle, handle_null);
   EXPECT_EQ(0U, ring->GetObjectSize(handle_null));
   EXPECT_EQ(kSize - sizeof(size_t), ring->free_space());
