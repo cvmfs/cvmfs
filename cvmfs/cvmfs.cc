@@ -1195,6 +1195,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fuse_remounter_->fence()->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
+      perf::Inc(file_system_->n_emfile());
       return;
     }
 
@@ -1322,6 +1323,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         fuse_remounter_->fence()->Leave();
       }
       fuse_reply_err(req, EMFILE);
+      perf::Inc(file_system_->n_emfile());
       return;
     }
     assert(false);
@@ -1340,6 +1342,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
            uint64_t(ino), dirent.checksum().ToString().c_str(), errno);
   if (errno == EMFILE) {
     fuse_reply_err(req, EMFILE);
+    perf::Inc(file_system_->n_emfile());
     return;
   }
 
