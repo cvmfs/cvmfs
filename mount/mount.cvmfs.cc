@@ -68,19 +68,38 @@ static string MkFqrn(const string &repository) {
   return repository;
 }
 
+#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
+static bool IsFuseTInstalled() {
+  return true;
+  string fuseTComponentsPaths[] = { "/usr/local/bin/go-nfsv4", 
+                                          "/usr/local/lib/libfuse-t.dylib",
+                                           "/usr/local/lib/libfuse-t.a" };
+  const int pathsNumber = sizeof(fuseTComponentsPaths) / sizeof(fuseTComponentsPaths[0]);
+  platform_stat64 info;
+  for (int idx = 0; idx < pathsNumber; ++idx) {
+    bzero(&info, sizeof(platform_stat64));
+    int retval = platform_stat(fuseTComponentsPaths[idx].c_str(), &info);
+    if ((retval != 0) || !S_ISREG(info.st_mode)) {
+      return false;
+    }
+  }
+  return true;
+}
+#endif
 
 static bool CheckFuse() {
+#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
+  bool is_fuse_t_installed = IsFuseTInstalled();
+  if (!is_fuse_t_installed) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "FUSE-T installation check failed. FUSE not loaded"); 
+  }
+  return is_fuse_t_installed;
+#else 
   string fuse_device;
   int retval;
 #ifdef __APPLE__
-  retval = system("/Library/Filesystems/macfuse.fs/Contents/Resources/"
-                  "load_macfuse");
-  if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading macFUSE");
-    return false;
-  }
   fuse_device = "/dev/macfuse0";
-#else
+#else 
   fuse_device = "/dev/fuse";
 #endif
   platform_stat64 info;
@@ -90,6 +109,7 @@ static bool CheckFuse() {
     return false;
   }
   return true;
+#endif
 }
 
 

@@ -70,7 +70,13 @@ cvmfs_run_test() {
 
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local || retval=12
 
-  local expected_max=6000
+  if running_on_osx; then 
+    #expanding expected max timeout as we sleep for 3 seconds after a mount with FUSE-T
+    local expected_max=20000
+  else
+    local expected_max=6000  
+  fi
+
   if [ $milliseconds -gt $expected_max ]; then
     echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1

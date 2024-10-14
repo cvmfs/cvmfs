@@ -17,11 +17,6 @@
     <conclusion file="conclusion.rtf" mime-type="text/richtext" />
     <license file="license.txt" mime-type="text/plain" />
     <os-version min="10.14" />
-
-    <required-bundles description="CernVM-FS depends on macFUSE to be installed on the system. Available here: https://osxfuse.github.io/" all="false">
-        <bundle id="com.github.osxfuse.pkg.Core" path="/Library/Filesystems/macfuse.fs" search="true" />
-    </required-bundles>
-
     <title>CernVM-FS</title>
     <welcome file="welcome.rtf" mime-type="text/richtext" />
 </installer-gui-script>
