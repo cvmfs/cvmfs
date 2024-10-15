@@ -825,7 +825,13 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   FuseInterruptCue ic(&req);
   ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
 
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->WaitReadlinkCnt();
+  }
   fuse_remounter_->fence()->Enter();
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->IncreaseReadlinkCnt();
+  }
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on inode: %" PRIu64,
            uint64_t(ino));
@@ -833,19 +839,19 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventReadlink, ino, "readlink()");
+  if (mount_point_->cache_symlinks()) {
+    fuse_remounter_->DecreaseReadlinkCnt();
+  }
   fuse_remounter_->fence()->Leave();
 
   if (!found) {
     ReplyNegative(dirent, req);
-    return;
-  }
-
-  if (!dirent.IsLink()) {
+  } else if (!dirent.IsLink()) {
     fuse_reply_err(req, EINVAL);
-    return;
+  } else {
+    fuse_reply_readlink(req, dirent.symlink().c_str());
   }
 
-  fuse_reply_readlink(req, dirent.symlink().c_str());
 }
 
 
@@ -2559,8 +2565,9 @@ static int AltProcessFlavor(int argc, char **argv) {
 static bool MaintenanceMode(const int fd_progress) {
   SendMsg2Socket(fd_progress, "Entering maintenance mode\n");
   string msg_progress = "Draining out kernel caches (";
-  if (FuseInvalidator::HasFuseNotifyInval())
-    msg_progress += "up to ";
+#ifndef __APPLE__
+    msg_progress += "up to ";  // linux can evict, macos has to wait for timeout
+#endif
   msg_progress += StringifyInt(static_cast<int>(
                                cvmfs::mount_point_->kcache_timeout_sec())) +
                   "s)\n";

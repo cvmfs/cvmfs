@@ -69,8 +69,39 @@ class FuseInvalidator : SingleCopy {
                   bool fuse_notify_invalidation);
   ~FuseInvalidator();
   void Spawn();
+  /**
+   * Requests to asynchronously invalidate all inodes saved in inode_tracker
+   * and clears the inode_tracker.
+   */
   void InvalidateInodes(Handle *handle);
+  /**
+   * Requests to asynchronously invalidate or expire all dentries saved in
+   * dentry_tracker and clears the dentry_tracker. 
+   */
+  void InvalidateDentries(Handle *handle);
+  /**
+   * Requests to asynchronously first invalidate inodes and then invalidate
+   * dentries. IsDone() will only return true if both actions were performed.
+   */
+  void InvalidateInodesAndDentries(Handle *handle);
+  /**
+   * Like InvalidateInodesAndDentries() but does not delete the temporary list
+   * of "to-be-deleted inodes" (evict_list_). Next call to any form of
+   * InvalidateInodes() will append their new inodes to the old list and then
+   * deletes old + new inodes.
+   * 
+   * This is useful for the fuse_remount where you first want to delete all
+   * inodes and dentries, perform the reload, and then because of possible
+   * race conditions want to make sure that all inodes (before and after the
+   * reload) are invalidated again.
+   */
+  void InvalidateInodesNoEvictAndDentries(Handle *handle);
 
+  /**
+   * Invalidates a single dentry.
+   * 
+   * @note Expire is not supported, and the dentry_tracker is not updated.
+   */
   void InvalidateDentry(uint64_t parent_ino, const NameString &name);
 
  private:
@@ -82,6 +113,40 @@ class FuseInvalidator : SingleCopy {
                 glue::DentryTracker *dentry_tracker,
                 void **fuse_channel_or_session,
                 bool fuse_notify_invalidation);
+
+  /**
+   * For MacOS. MacOS has no fuse invalidate, as such just wait for timeout of the
+   * kernel cache to 
+   */
+  void ClearCacheByTimeout(Handle *handle);
+  /**
+   * Invalidates a single dentry. 
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS.
+   */
+  void DoInvalidateDentry();
+      /**
+   * Invalidates all inodes tracked by inode_tracker_.
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS, use ClearCacheByTimeout()
+   * instead
+   */
+  void DoInvalidateInodes(Handle *handle);
+    /**
+   * Invalidates all inodes tracked by dentry_tracker_.
+   * Information which dentry should be invalidated is communicated via the
+   * pipe pipe_ctrl_.
+   * 
+   * This function should not be called for MacOS, use ClearCacheByTimeout()
+   * instead
+   */
+  void DoInvalidateDentries();
+
+
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
    */
