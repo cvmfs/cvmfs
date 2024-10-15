@@ -44,6 +44,7 @@
 #include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
+#include "lru_md.h"
 #include "monitor.h"
 #include "mountpoint.h"
 #include "network/download.h"
@@ -499,6 +500,18 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "open catalogs") {
       talk_mgr->Answer(con_fd, mount_point->catalog_mgr()->PrintHierarchy());
+    } else if (line == "drop metadata caches") {
+      // For testing
+      mount_point->inode_cache()->Pause();
+      mount_point->path_cache()->Pause();
+      mount_point->md5path_cache()->Pause();
+      mount_point->inode_cache()->Drop();
+      mount_point->path_cache()->Drop();
+      mount_point->md5path_cache()->Drop();
+      mount_point->inode_cache()->Resume();
+      mount_point->path_cache()->Resume();
+      mount_point->md5path_cache()->Resume();
+      talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "internal affairs") {
       int current;
       int highwater;
