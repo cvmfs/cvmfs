@@ -586,7 +586,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!this->InitVerifyingSignatureManager(master_keys)) {
+  if (!this->InitSignatureManager(master_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize CVMFS signatures");
     return 1;
   } else {
