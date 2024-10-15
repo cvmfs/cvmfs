@@ -130,7 +130,8 @@ string StringifyLocalTime(const time_t seconds) {
   const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char buffer[26];
-  snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s", timestamp.tm_mday,
+  (void)/* cast to void ignores return and placates clang-tidy */
+   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s", timestamp.tm_mday,
            months[timestamp.tm_mon], timestamp.tm_year + 1900,
            timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec, timestamp.tm_zone);
 

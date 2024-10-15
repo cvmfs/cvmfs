@@ -1272,8 +1272,8 @@ TEST_F(T_Util, StringifyDouble) {
 }
 
 TEST_F(T_Util, StringifyTime) {
-  time_t now = time(NULL);
-  time_t other = 1263843;
+  const time_t now = time(NULL);
+  const time_t other = 1263843;
 
   EXPECT_EQ(GetTimeString(now, true), StringifyTime(now, true));
   EXPECT_EQ(GetTimeString(now, false), StringifyTime(now, false));
@@ -1282,7 +1282,7 @@ TEST_F(T_Util, StringifyTime) {
 }
 
 TEST_F(T_Util, StringifyLocalTime) {
-  time_t other = 1263843;
+  const time_t other = 1263843;
   setenv("TZ", "US/Pacific", true);
   EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
   unsetenv("TZ");
