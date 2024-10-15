@@ -287,13 +287,13 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(repo_name);
-  if (stats_db != NULL) {
-    if (!stats_db->StorePublishStatistics(statistics_, start_time_, true)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-        "Could not store publish statistics");
-    }
-    if (params.upload_stats_db) {
+  if (params.upload_stats_db) {
+    StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(repo_name);
+    if (stats_db != NULL) {
+      if (!stats_db->StorePublishStatistics(statistics_, start_time_, true)) {
+        LogCvmfs(kLogReceiver, kLogSyslogErr,
+          "Could not store publish statistics");
+      }
       upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny);
       upload::Spooler *spooler = upload::Spooler::Construct(sd);
       if (!stats_db->UploadStatistics(spooler)) {
@@ -301,10 +301,8 @@ CommitProcessor::Result CommitProcessor::Process(
           "Could not upload statistics DB to upstream storage");
       }
       delete spooler;
-    }
-    delete stats_db;
-
-  } else {
+      delete stats_db;
+    } else {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not open statistics DB");
   }
 
