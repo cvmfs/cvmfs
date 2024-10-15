@@ -10,6 +10,7 @@
 #include <map>
 #include <string>
 
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "history.h"
 
@@ -56,6 +57,7 @@ class Manifest {
   Manifest(const shash::Any &catalog_hash,
            const uint64_t catalog_size,
            const shash::Md5 &root_path,
+           const zlib::Algorithms compression_algo,
            const uint32_t ttl,
            const uint64_t revision,
            const shash::Any &micro_catalog_hash,
@@ -70,6 +72,7 @@ class Manifest {
   : catalog_hash_(catalog_hash)
   , catalog_size_(catalog_size)
   , root_path_(root_path)
+  , compression_algorithm_(compression_algo)
   , ttl_(ttl)
   , revision_(revision)
   , micro_catalog_hash_(micro_catalog_hash)
@@ -90,6 +93,8 @@ class Manifest {
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 
+  void set_compression_algorithm(const zlib::Algorithms algo)
+                                              { compression_algorithm_ = algo; }
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
   void set_certificate(const shash::Any &certificate) {
@@ -129,6 +134,8 @@ class Manifest {
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
   shash::Md5 root_path() const { return root_path_; }
+  zlib::Algorithms compression_algorithm() const
+                                              { return compression_algorithm_; }
   shash::Any catalog_hash() const { return catalog_hash_; }
   uint64_t catalog_size() const { return catalog_size_; }
   shash::Any certificate() const { return certificate_; }
@@ -154,6 +161,7 @@ class Manifest {
   shash::Any catalog_hash_;
   uint64_t catalog_size_;
   shash::Md5 root_path_;
+  zlib::Algorithms compression_algorithm_;
   uint32_t ttl_;
   uint64_t revision_;
   shash::Any micro_catalog_hash_;

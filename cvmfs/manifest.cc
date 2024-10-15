@@ -134,6 +134,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   bool has_alt_catalog_path = false;
   shash::Any meta_info;
   shash::Any reflog_hash;
+  zlib::Algorithms algo = zlib::kZlibDefault;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -160,11 +161,16 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('Y')) != content.end()) {
     reflog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   }
+  // while mandatory, old repos dont have this in their manifest
+  if ((iter = content.find('K')) != content.end()) {
+    algo = zlib::ParseCompressionAlgorithm(iter->second);
+  }
 
-  return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
-                      micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, garbage_collectable,
-                      has_alt_catalog_path, meta_info, reflog_hash);
+  return new Manifest(catalog_hash, catalog_size, root_path, algo, ttl,
+                      revision, micro_catalog_hash, repository_name,
+                      certificate, history, publish_timestamp,
+                      garbage_collectable, has_alt_catalog_path, meta_info,
+                      reflog_hash);
 }
 
 
@@ -174,6 +180,7 @@ Manifest::Manifest(const shash::Any &catalog_hash,
   : catalog_hash_(catalog_hash)
   , catalog_size_(catalog_size)
   , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
+  , compression_algorithm_(zlib::kZlibDefault)
   , ttl_(catalog::Catalog::kDefaultTTL)
   , revision_(0)
   , publish_timestamp_(0)
@@ -193,7 +200,8 @@ string Manifest::ExportString() const {
     "D" + StringifyInt(ttl_) + "\n" +
     "S" + StringifyInt(revision_) + "\n" +
     "G" + StringifyBool(garbage_collectable_) + "\n" +
-    "A" + StringifyBool(has_alt_catalog_path_) + "\n";
+    "A" + StringifyBool(has_alt_catalog_path_) + "\n" +
+    "K" + zlib::AlgorithmName(compression_algorithm_) + "\n";;
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
