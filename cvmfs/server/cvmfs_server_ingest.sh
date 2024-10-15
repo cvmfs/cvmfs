@@ -418,7 +418,7 @@ cvmfs_server_ingest() {
   fi
 
   # check again for open file descriptors (potential race condition)
-  if has_file_descriptors_on_mount_point $name && \
+  if  [ "$CVMFS_SKIP_FD_CHECK" != "true" ] &&  has_file_descriptors_on_mount_point $name && \
      [ $use_fd_fallback -ne 1 ]; then
     file_descriptor_warning $name
     echo "Forcing remount of already committed repository revision"
