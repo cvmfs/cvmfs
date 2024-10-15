@@ -1,0 +1,48 @@
+#!/bin/bash
+
+cvmfs_test_name="Browsing with the streaming cache manager"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "*** mount alice.cern.ch"
+  cvmfs_mount alice.cern.ch "CVMFS_AUTO_UPDATE=false" || return 1
+
+  local root_hash=$(get_xattr root_hash /cvmfs/alice.cern.ch/)
+  echo "*** root hash is $root_hash"
+
+  local nfiles=100
+  find /cvmfs/alice.cern.ch -type f -size +100k -size -10M | head -n $nfiles \
+    > filelist || return 10
+
+  echo "*** Checksuming reference file set"
+  cat filelist | while read LINE; do
+    md5sum $LINE >> md5ref
+  done || return 20
+
+  sudo cvmfs_config wipecache
+  echo "*** Unmounting alice.cern.ch"
+  cvmfs_umount alice.cern.ch
+  echo "*** Remounting alice.cern.ch with streaming cache manager"
+  cvmfs_mount alice.cern.ch \
+    "CVMFS_STREAMING_CACHE=yes" \
+    "CVMFS_ROOT_HASH=$root_hash" || return 1
+
+  sudo cvmfs_talk -i alice.cern.ch cache instance
+  sudo cvmfs_talk -i alice.cern.ch internal affairs | grep ^streaming_cache_mgr
+
+  echo "*** Checksuming with streaming cache mgr"
+  cat filelist | while read LINE; do
+    md5sum $LINE >> md5streaming
+  done || return 30
+
+  diff md5streaming md5ref || return 40
+
+  sudo cvmfs_talk -i alice.cern.ch internal affairs | grep ^streaming_cache_mgr
+  local nreqs=$(sudo cvmfs_talk -i alice.cern.ch internal affairs | \
+    grep ^streaming_cache_mgr.n_downloads | cut -d\| -f2)
+  [ $nreqs -gt 1 ] || return 50
+
+  return 0
+}

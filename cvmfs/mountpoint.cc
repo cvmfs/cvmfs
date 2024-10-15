@@ -1179,7 +1179,11 @@ bool FileSystem::TriageCacheMgr() {
     unsigned nfiles = kDefaultNfiles;
     if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
       nfiles = String2Uint64(optarg);
-    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL);
+    size_t buffer_size = StreamingCacheManager::kDefaultBufferSize;
+    if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE_BUFFER_SIZE", &optarg))
+      buffer_size = String2Uint64(optarg);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL,
+                                           buffer_size, statistics_);
   }
 
   return true;
