@@ -8,8 +8,7 @@
  * TODO: think about code deduplication
  */
 
-#include "cvmfs_config.h"
-#include "compression/compression.h"
+#include "compression.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -18,6 +17,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <iostream>
+
+#include "cvmfs_config.h"
+#include "compressor_echo.h"
+#include "compressor_zlib.h"
 
 #include "crypto/hash.h"
 #include "util/exception.h"
@@ -798,7 +802,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
                        void **out_buf, uint64_t *out_size)
 {
   unsigned char out[kZChunk];
-  int z_ret;
+  int z_ret = Z_ERRNO;
   z_stream strm;
   int64_t pos = 0;
   uint64_t alloc_size = kZChunk;
@@ -808,7 +812,7 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
   *out_size = 0;
 
   do {
-    strm.avail_in = (kZChunk > (size-pos)) ? size-pos : kZChunk;
+    strm.avail_in = ((size-pos) < kZChunk) ? size-pos : kZChunk;
     strm.next_in = ((unsigned char *)buf)+pos;
 
     // Run inflate() on input until output buffer not full
@@ -858,125 +862,6 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
 void Compressor::RegisterPlugins() {
   RegisterPlugin<ZlibCompressor>();
   RegisterPlugin<EchoCompressor>();
-}
-
-
-//------------------------------------------------------------------------------
-
-
-bool ZlibCompressor::WillHandle(const zlib::Algorithms &alg) {
-  return alg == kZlibDefault;
-}
-
-
-ZlibCompressor::ZlibCompressor(const Algorithms &alg)
-  : Compressor(alg)
-{
-  stream_.zalloc   = Z_NULL;
-  stream_.zfree    = Z_NULL;
-  stream_.opaque   = Z_NULL;
-  stream_.next_in  = Z_NULL;
-  stream_.avail_in = 0;
-  const int zlib_retval = deflateInit(&stream_, Z_DEFAULT_COMPRESSION);
-  assert(zlib_retval == 0);
-}
-
-
-Compressor* ZlibCompressor::Clone() {
-  ZlibCompressor* other = new ZlibCompressor(zlib::kZlibDefault);
-  assert(stream_.avail_in == 0);
-  // Delete the other stream
-  int retcode = deflateEnd(&other->stream_);
-  assert(retcode == Z_OK);
-  retcode = deflateCopy(const_cast<z_streamp>(&other->stream_), &stream_);
-  assert(retcode == Z_OK);
-  return other;
-}
-
-bool ZlibCompressor::Deflate(
-  const bool flush,
-  unsigned char **inbuf, size_t *inbufsize,
-  unsigned char **outbuf, size_t *outbufsize)
-{
-  // Adding compression
-  stream_.avail_in = *inbufsize;
-  stream_.next_in = *inbuf;
-  const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
-  int retcode = 0;
-
-  // TODO(jblomer) Figure out what exactly behaves differently with zlib 1.2.10
-  // if ((*inbufsize == 0) && !flush)
-  //   return true;
-
-  stream_.avail_out = *outbufsize;
-  stream_.next_out = *outbuf;
-
-  // Deflate in zlib!
-  retcode = deflate(&stream_, flush_int);
-  assert(retcode == Z_OK || retcode == Z_STREAM_END);
-
-  *outbufsize -= stream_.avail_out;
-  *inbuf = stream_.next_in;
-  *inbufsize = stream_.avail_in;
-
-  return (flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0)
-         || (flush_int == Z_FINISH  && retcode == Z_STREAM_END);
-}
-
-
-ZlibCompressor::~ZlibCompressor() {
-  int retcode = deflateEnd(&stream_);
-  assert(retcode == Z_OK);
-}
-
-
-size_t ZlibCompressor::DeflateBound(const size_t bytes) {
-  // Call zlib's deflate bound
-  return deflateBound(&stream_, bytes);
-}
-
-
-//------------------------------------------------------------------------------
-
-
-EchoCompressor::EchoCompressor(const zlib::Algorithms &alg):
-  Compressor(alg)
-{
-}
-
-
-bool EchoCompressor::WillHandle(const zlib::Algorithms &alg) {
-  return alg == kNoCompression;
-}
-
-
-Compressor* EchoCompressor::Clone() {
-  return new EchoCompressor(zlib::kNoCompression);
-}
-
-
-bool EchoCompressor::Deflate(
-  const bool flush,
-  unsigned char **inbuf, size_t *inbufsize,
-  unsigned char **outbuf, size_t *outbufsize)
-{
-  size_t bytes_to_copy = min(*outbufsize, *inbufsize);
-  memcpy(*outbuf, *inbuf, bytes_to_copy);
-  const bool done = (bytes_to_copy == *inbufsize);
-
-  // Update the return variables
-  *inbuf += bytes_to_copy;
-  *outbufsize = bytes_to_copy;
-  *inbufsize -= bytes_to_copy;
-
-  return done;
-}
-
-
-size_t EchoCompressor::DeflateBound(const size_t bytes) {
-  // zero bytes as an upper bound is no good because some callers want to
-  // allocate buffers according to this value
-  return (bytes == 0) ? 1 : bytes;
 }
 
 }  // namespace zlib
