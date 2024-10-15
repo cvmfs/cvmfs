@@ -68,13 +68,13 @@ func ProcessRequest(logfile_name string, file_name string, repository_name strin
 
 // TODO: we could instead use the cvmfs module from ducc
 func DeletePathsInRepo(repository_name string, paths_to_delete []string) (err error) {
-  _, err := exec.Command("sudo", "cvmfs_server", "transaction", repository_name).Output()
+  _, err = exec.Command("sudo", "cvmfs_server", "transaction", repository_name).Output()
   if err != nil {
     log.Fatal(err)
   }
   for _, p := range paths_to_delete {
     if strings.HasPrefix(p, "/cvmfs/") {
-      out, rmErr := exec.Command("sudo", "rm", "-rf", p).Output()
+      _, rmErr := exec.Command("sudo", "rm", "-rf", p).Output()
       if rmErr != nil {
         _, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
         log.Fatal(rmErr)
@@ -84,9 +84,9 @@ func DeletePathsInRepo(repository_name string, paths_to_delete []string) (err er
       log.Fatalln("Refusing to remove path outside of /cvmfs: ", p)
     }
   }
-  _, pubErr = exec.Command("sudo", "cvmfs_server", "publish", repository_name).Output()
-  if err != nil {
-    out, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+  _, pubErr := exec.Command("sudo", "cvmfs_server", "publish", repository_name).Output()
+  if pubErr != nil {
+    _, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
     log.Fatal(pubErr)
   }
   return nil
@@ -120,7 +120,9 @@ func ExecDucc(msg string, logfile_name string, repository_name string) {
           }
        } else if action == "delete" {
           fmt.Printf("[DUCC garbage collection n.%d for %s started...]\n", nOfE, image)
-          _ := DeletePathsInRepo(repository_name, []string{image_path, image_manifest})
+          image_path := "/cvmfs/" + repository_name + "/" + image
+          image_manifest := "/cvmfs/" + repository_name + "/.metadata/" + image
+          DeletePathsInRepo(repository_name, []string{image_path, image_manifest})
           _, gcErr := exec.Command("sudo", "cvmfs_ducc", "garbage-collection", "--grace-period", "0", "-n", lf_name, repository_name).Output()
           if gcErr != nil {
             log.Fatal(gcErr)
