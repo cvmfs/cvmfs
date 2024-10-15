@@ -1281,6 +1281,13 @@ TEST_F(T_Util, StringifyTime) {
   EXPECT_EQ(GetTimeString(other, false), StringifyTime(other, false));
 }
 
+TEST_F(T_Util, StringifyLocalTime) {
+  time_t other = 1263843;
+  setenv("TZ", "US/Pacific", true);
+  EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
+  unsetenv("TZ");
+}
+
 TEST_F(T_Util, RfcTimestamp) {
   char *curr_locale = setlocale(LC_TIME, NULL);
   const char *format = "%a, %e %h %Y %H:%M:%S %Z";

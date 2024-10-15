@@ -476,7 +476,7 @@ void LogBufferXattr::FinalizeValue() {
       itr->message.resize(kMaxLogLine);
       itr->message += " <snip>";
     }
-    result += "[" + StringifyTime(itr->timestamp, true /* UTC */) + " UTC] " +
+    result += "[" + StringifyLocalTime(itr->timestamp) + "] " +
               itr->message + "\n";
   }
   result_pages_.push_back(result);
