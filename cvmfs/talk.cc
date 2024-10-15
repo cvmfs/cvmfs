@@ -266,6 +266,10 @@ void *TalkManager::MainResponder(void *data) {
           }
         }
       }
+    } else if (line == "cache limit get") {
+      std::string limit_from_options;
+      file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT", &limit_from_options);
+            talk_mgr->Answer(con_fd, limit_from_options + "\n");
     } else if (line.substr(0, 7) == "cleanup") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
       if (!quota_mgr->HasCapability(QuotaManager::kCapShrink)) {
