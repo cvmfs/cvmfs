@@ -66,6 +66,33 @@ func ProcessRequest(logfile_name string, file_name string, repository_name strin
     }
 }
 
+// TODO: we could instead use the cvmfs module from ducc
+func DeletePathsInRepo(repository_name string, paths_to_delete []string) (err error) {
+  _, err = exec.Command("sudo", "cvmfs_server", "transaction", repository_name).Output()
+  if err != nil {
+    log.Fatal(err)
+  }
+  for _, p := range paths_to_delete {
+    if strings.HasPrefix(p, "/cvmfs/") {
+      _, rmErr := exec.Command("sudo", "rm", "-rf", p).Output()
+      if rmErr != nil {
+        _, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+        log.Fatal(rmErr)
+      }
+    } else {
+      _, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+      log.Fatalln("Refusing to remove path outside of /cvmfs: ", p)
+    }
+  }
+  _, pubErr := exec.Command("sudo", "cvmfs_server", "publish", repository_name).Output()
+  if pubErr != nil {
+    _, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+    log.Fatal(pubErr)
+  }
+  return nil
+}
+
+
 func ExecDucc(msg string, logfile_name string, repository_name string) {
 
     msg_split := strings.Split(msg, "|")
@@ -75,70 +102,84 @@ func ExecDucc(msg string, logfile_name string, repository_name string) {
     ima_split := strings.Split(image, "/")
     dkrepo := ima_split[len(ima_split)-1]
 
-    if action == "push" {
+    nOfE := 0
+    repeat := true
 
-        nOfE := 0
-        repeat := true
-        lf_name := ""
+    for repeat {
+       nOfE++
+       repeat = false
+       currentTime := time.Now()
+       timestamp := currentTime.Format("060102-150405")
+       lf_name := logfile_name + "_" + dkrepo + "_" + timestamp
 
-        for repeat {
-          nOfE++
-          repeat = false
-          currentTime := time.Now()
-          timestamp := currentTime.Format("060102-150405")
-          lf_name = logfile_name + "_" + dkrepo + "_" + timestamp
+       if action == "push" {
           fmt.Printf("[DUCC conversion n.%d for %s started...]\n", nOfE, image)
-
           _, err := exec.Command("sudo", "cvmfs_ducc", "convert-single-image", "-n", lf_name, "-p", image, repository_name, "--skip-thin-image", "--skip-podman").Output()
           if err != nil {
             log.Fatal(err)
           }
-
-          // Open the JSON file for reading
-          _, chmodErr := exec.Command("sudo", "chmod", "0755", lf_name).Output()
-          if chmodErr != nil {
-                fmt.Println("Error executing chmod:", chmodErr)
-                return
+       } else if action == "delete" {
+          fmt.Printf("[DUCC garbage collection n.%d for %s started...]\n", nOfE, image)
+          image_path := "/cvmfs/" + repository_name + "/" + image
+          image_manifest := "/cvmfs/" + repository_name + "/.metadata/" + image
+          DeletePathsInRepo(repository_name, []string{image_path, image_manifest})
+          _, gcErr := exec.Command("sudo", "cvmfs_ducc", "garbage-collection", "--grace-period", "0", "-n", lf_name, repository_name).Output()
+          if gcErr != nil {
+            log.Fatal(gcErr)
           }
+       }
+       // Open the JSON file for reading
+       _, chmodErr := exec.Command("sudo", "chmod", "0755", lf_name).Output()
+       if chmodErr != nil {
+             fmt.Println("Error executing chmod:", chmodErr)
+             return
+       }
 
-          file, fileErr := os.Open(lf_name)
-          if err != nil {
-                fmt.Println("Error opening file:", fileErr)
-                return
-          }
-          defer file.Close()
+       file, fileErr := os.Open(lf_name)
+       if fileErr != nil {
+             fmt.Println("Error opening file:", fileErr)
+             return
+       }
+       defer file.Close()
 
-          // Create a scanner to read the file line by line
-          scanner := bufio.NewScanner(file)
+       // Create a scanner to read the file line by line
+       scanner := bufio.NewScanner(file)
 
-          // Loop through each line in the file
-          for scanner.Scan() {
+       // Loop through each line in the file
+       for scanner.Scan() {
 
-                line := scanner.Text()
-                // Parse the line as a JSON object
-                var data map[string]interface{}
-                if err := json.Unmarshal([]byte(line), &data); err != nil {
-                        fmt.Printf("Error parsing JSON: %v\n", err)
-                        continue
-                }
+             line := scanner.Text()
+             // Parse the line as a JSON object
+             var data map[string]interface{}
+             if err := json.Unmarshal([]byte(line), &data); err != nil {
+                     fmt.Printf("Error parsing JSON: %v\n", err)
+                     continue
+             }
 
                 // Check if "status" is "error"
-                status, exists := data["status"]
-                if exists && status == "error" {
-                        // Perform some action when "status" is "error"
-                        fmt.Printf("[DUCC conversion n.%d failed for layer %s]\n", nOfE, data["layer"])
-                        repeat = true
-                        break;
-                }
-          }
+             status, exists := data["status"]
+             if exists && status == "error" {
+                   // Perform some action when "status" is "error"
+                   if action == "push" {
+                     fmt.Printf("[DUCC conversion n.%d failed for layer %s]\n", nOfE, data["layer"])
+                   } else if action =="delete" {
+                     fmt.Printf("[DUCC garbage collection n.%d failed]\n", nOfE)
+                   }
+                   repeat = true
+                   break;
+             }
+       }
 
-          if err := scanner.Err(); err != nil {
-                fmt.Println("Error reading file:", err)
-          }
+       if err := scanner.Err(); err != nil {
+             fmt.Println("Error reading file:", err)
+       }
 
-        }
+    }
 
+    if action == "push" {
         fmt.Printf("[DUCC conversion n.%d completed 'ok']\n", nOfE)
+    } else if action =="delete" {
+        fmt.Printf("[DUCC garbage collection n.%d completed 'ok']\n", nOfE)
     }
 }
 
