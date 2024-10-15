@@ -13,6 +13,8 @@
 
 #include <string>
 
+#include "compression/decompression.h"
+
 #include "catalog_mgr.h"
 
 namespace download {
@@ -70,15 +72,16 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
                                                 // cache directory:
                                                 // for writeable catalogs a copy
                                                 // must be created in dir_temp_
+  UniquePtr<zlib::Decompressor>  copy_;
 
  private:
   std::string CopyCatalogToTempFile(const std::string &cache_path);
 
-  shash::Any                 base_hash_;
-  std::string                stratum0_;
-  std::string                dir_temp_;
-  download::DownloadManager *download_manager_;
-  const bool                 manage_catalog_files_;
+  shash::Any                     base_hash_;
+  std::string                    stratum0_;
+  std::string                    dir_temp_;
+  download::DownloadManager     *download_manager_;
+  const bool                     manage_catalog_files_;
 };  // class SimpleCatalogManager
 
 }  // namespace catalog

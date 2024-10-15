@@ -402,6 +402,8 @@ class CommandMigrate : public Command {
   atomic_int32           catalogs_processed_;
   bool                   has_committed_new_revision_;
 
+  UniquePtr<zlib::Compressor> copy_;
+
   uid_t                  uid_;
   gid_t                  gid_;
 

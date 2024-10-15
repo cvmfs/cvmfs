@@ -54,7 +54,7 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
   params.stratum0 = "file://" + stratum0;
   params.spooler_configuration = "local," + temp_dir + "," + stratum0;
   params.hash_alg = shash::kSha1;
-  params.compression_alg = zlib::kZlibDefault;
+  params.compression_alg = zlib::kZstdDefault;
   params.generate_legacy_bulk_chunks = false;
   params.use_file_chunking = true;
   params.min_chunk_size = 4194304;

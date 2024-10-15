@@ -37,7 +37,7 @@ struct SpoolerDefinition {
   SpoolerDefinition(
       const std::string& definition_string,
       const shash::Algorithms hash_algorithm,
-      const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+      const zlib::Algorithms compression_algorithm = zlib::kZstdDefault,
       const bool generate_legacy_bulk_chunks = false,
       const bool use_file_chunking = false,
       const size_t min_file_chunk_size = 0,

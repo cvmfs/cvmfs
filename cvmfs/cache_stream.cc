@@ -109,7 +109,7 @@ int64_t StreamingCacheManager::Stream(
   } else {
     url = "/data/" + info.object_id.MakePath();
   }
-  bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
+  bool is_zipped = info.label.zip_algorithm == zlib::kZstdDefault;
 
   download::JobInfo download_job(&url, is_zipped, true /* probe_hosts */,
                                  &info.object_id, &sink);

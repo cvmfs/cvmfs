@@ -51,7 +51,7 @@ class T_IngestionStress : public FileSandbox {
 
   ExpectedHashString GetEmptyFileBulkHash(
     const shash::Suffix suffix = shash::kSuffixNone) const {
-    return std::make_pair("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", suffix);
+    return std::make_pair("fb2e51cbd24e286dd066bd419d77cd772967e384", suffix);
   }
 
   ExpectedHashString GetSmallFileBulkHash(

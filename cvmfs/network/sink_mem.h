@@ -29,6 +29,7 @@ class MemSink : public Sink {
   MemSink() : Sink(true), size_(0), pos_(0),
               data_(NULL), max_size_(kMaxMemSize) { }
   explicit MemSink(size_t size);
+  MemSink(size_t size, size_t max_size);
   virtual ~MemSink() { FreeData(); }
 
   /**
@@ -120,6 +121,9 @@ class MemSink : public Sink {
   size_t size() { return size_; }
   size_t pos() { return pos_; }
   unsigned char* data() { return data_; }
+
+  bool SetPos(size_t pos) { if (pos <= size_) { pos_ = pos; return true; }
+                            return false; }
 
   /**
    * Do not download files larger than 1M into memory.

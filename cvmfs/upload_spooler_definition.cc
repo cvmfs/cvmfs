@@ -76,7 +76,7 @@ SpoolerDefinition::SpoolerDefinition(
 
 SpoolerDefinition SpoolerDefinition::Dup2DefaultCompression() const {
   SpoolerDefinition result(*this);
-  result.compression_alg = zlib::kZlibDefault;
+  result.compression_alg = zlib::kZstdDefault;
   return result;
 }
 

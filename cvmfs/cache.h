@@ -95,7 +95,7 @@ class CacheManager : SingleCopy {
   struct Label {
     Label() : flags(0)
             , size(kSizeUnknown)
-            , zip_algorithm(zlib::kZlibDefault)
+            , zip_algorithm(zlib::kZstdDefault)
             , range_offset(-1)
     {}
 
@@ -233,6 +233,7 @@ class CacheManager : SingleCopy {
    * Never NULL but defaults to NoopQuotaManager.
    */
   QuotaManager *quota_mgr_;
+  UniquePtr<zlib::Compressor> compress_;
 
  private:
   static const unsigned kStateVersion = 0;

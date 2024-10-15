@@ -25,12 +25,18 @@
 
 #include "catalog.h"
 #include "compression/compression.h"
+#include "compression/decompression.h"
+#include "compression/input_file.h"
+#include "compression/input_mem.h"
+#include "compression/input_path.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "network/download.h"
+#include "network/sink_file.h"
+#include "network/sink_path.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
@@ -39,6 +45,7 @@
 #include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/shared_ptr.h"
 #include "util/smalloc.h"
@@ -61,7 +68,7 @@ class ChunkJob {
   ChunkJob()
     : suffix(shash::kSuffixNone)
     , hash_algorithm(shash::kAny)
-    , compression_alg(zlib::kZlibDefault) {}
+    , compression_alg(zlib::kZstdDefault) {}
 
   ChunkJob(const shash::Any &hash, zlib::Algorithms compression_alg)
     : suffix(hash.suffix)
@@ -118,7 +125,9 @@ bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
 bool                 inspect_existing_catalogs = false;
 manifest::Reflog    *reflog = NULL;
-
+UniquePtr<zlib::Decompressor> decomp_zlib;
+UniquePtr<zlib::Compressor> comp_zlib;
+UniquePtr<zlib::Compressor> copy;
 }  // anonymous namespace
 
 
@@ -196,13 +205,13 @@ static void Store(
         PANIC(kLogStderr, "Failed to create temporary file '%s'",
               remote_path.c_str());
       }
-      int retval = zlib::DecompressPath2File(local_path, fdest);
-      if (!retval) {
+      zlib::InputPath in_p(local_path);
+      cvmfs::FileSink out_f(fdest, true);
+      if (decomp_zlib->DecompressStream(&in_p, &out_f) != zlib::kStreamEnd) {
         PANIC(kLogStderr, "Failed to preload %s to %s", local_path.c_str(),
               remote_path.c_str());
       }
-      fclose(fdest);
-      retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      const int retval = rename(tmp_dest.c_str(), remote_path.c_str());
       assert(retval == 0);
       unlink(local_path.c_str());
     }
@@ -221,24 +230,24 @@ static void Store(
 
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string &dest_path, const bool compress) {
+                        const std::string &dest_path,
+                        zlib::Compressor *compress) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
-  int retval;
-  if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
-    retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
-  } else {
-    retval = CopyMem2File(buffer, size, ftmp);
-  }
-  assert(retval);
-  fclose(ftmp);
+
+  zlib::InputMem in_mem(buffer, size);
+  cvmfs::FileSink out_f(ftmp, true);
+
+  const zlib::StreamStates retval = compress->Compress(&in_mem, &out_f);
+  assert(retval == zlib::kStreamEnd);
+
   Store(tmp_file, dest_path, true);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const shash::Any &dest_hash, const bool compress) {
+                        const shash::Any &dest_hash,
+                        zlib::Compressor *compress) {
   StoreBuffer(buffer, size, MakePath(dest_hash), compress);
 }
 
@@ -287,7 +296,7 @@ static void *MainWorker(void *data) {
       }
       fclose(fchunk);
       Store(tmp_file, chunk_hash,
-            (compression_alg == zlib::kZlibDefault) ? true : false);
+            (compression_alg == zlib::kZstdDefault) ? true : false);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -413,12 +422,17 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
       goto pull_cleanup;
     }
   }
-  retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
-  if (!retval) {
+
+  {  // anonymous namespace to prevent crosses initialization due to gotos
+  zlib::InputPath in_path(file_catalog_vanilla);
+  cvmfs::PathSink out_path(file_catalog);
+  if (decomp_zlib->DecompressStream(&in_path, &out_path) != zlib::kStreamEnd) {
     LogCvmfs(kLogCvmfs, kLogStderr, "decompression failure (file %s, hash %s)",
              file_catalog_vanilla.c_str(), catalog_hash.ToString().c_str());
+    decomp_zlib->Reset();
     goto pull_cleanup;
   }
+  }   // end anonymous namespace
   if (path.empty() && reflog != NULL) {
     if (!reflog->AddCatalog(catalog_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to add catalog to Reflog.");
@@ -576,6 +590,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
+
+  decomp_zlib = zlib::Decompressor::Construct(zlib::kZstdDefault);
+  comp_zlib = zlib::Compressor::Construct(zlib::kZstdDefault);
+  copy = zlib::Compressor::Construct(zlib::kNoCompression);
 
   const bool     follow_redirects = false;
   const unsigned max_pool_handles = num_parallel+1;
@@ -740,8 +758,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";
-    retval = zlib::DecompressPath2Path(history_path, history_db_path);
-    assert(retval);
+    zlib::InputPath in_path(history_path);
+    cvmfs::PathSink out_path(history_db_path);
+    const zlib::StreamStates ret
+                           = decomp_zlib->DecompressStream(&in_path, &out_path);
+    assert(ret == zlib::kStreamEnd);
     history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
@@ -825,7 +846,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!Peek(ensemble.manifest->certificate())) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
-                  ensemble.manifest->certificate(), true);
+                  ensemble.manifest->certificate(), comp_zlib.weak_ref());
     }
     if (reflog != NULL &&
         !reflog->AddCertificate(ensemble.manifest->certificate())) {
@@ -835,7 +856,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     if (!meta_info_hash.IsNull()) {
       const unsigned char *info = reinterpret_cast<const unsigned char *>(
         meta_info.data());
-      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
+      StoreBuffer(info, meta_info.size(), meta_info_hash,
+                  comp_zlib.weak_ref());
       if (reflog != NULL && !reflog->AddMetainfo(meta_info_hash)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add metainfo to Reflog.");
         goto fini;
@@ -889,12 +911,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
-                    ".cvmfswhitelist.pkcs7", false);
+                    ".cvmfswhitelist.pkcs7", copy.weak_ref());
       }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                  ".cvmfswhitelist", false);
+                  ".cvmfswhitelist", copy.weak_ref());
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                  ".cvmfspublished", false);
+                  ".cvmfspublished", copy.weak_ref());
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());

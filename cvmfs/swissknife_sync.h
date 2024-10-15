@@ -43,7 +43,7 @@ struct SyncParameters {
         virtual_dir_actions(0),
         ignore_special_files(false),
         branched_catalog(false),
-        compression_alg(zlib::kZlibDefault),
+        compression_alg(zlib::kZstdDefault),
         enforce_limits(false),
         nested_kcatalog_limit(0),
         root_kcatalog_limit(0),

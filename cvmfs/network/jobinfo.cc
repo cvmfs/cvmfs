@@ -3,6 +3,9 @@
  */
 
 #include "jobinfo.h"
+
+#include <inttypes.h>
+
 #include "util/string.h"
 
 namespace download {
@@ -11,17 +14,20 @@ atomic_int64 JobInfo::next_uuid = 0;
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
-  Init();
+  if (c) {
+    Init(kCreateZlib);
+  } else {
+    Init(kCreateEcho);
+  }
 
   url_ = u;
-  compressed_ = c;
   probe_hosts_ = ph;
   expected_hash_ = h;
   sink_ = s;
 }
 
 JobInfo::JobInfo(const std::string *u, const bool ph) {
-  Init();
+  Init(kCreateNone);
 
   url_ = u;
   probe_hosts_ = ph;
@@ -36,11 +42,79 @@ bool JobInfo::IsFileNotFound() {
   return http_code_ == 404;
 }
 
-void JobInfo::Init() {
+void JobInfo::SetDecompressor(const DecompressorType decompressor_type) {
+  if (decompressor_type_ != decompressor_type) {
+    decompressor_type_ = decompressor_type;
+
+    switch (decompressor_type_) {
+      case kCreateNone:
+        active_decomp_ = NULL;
+      break;
+      case kCreateZlib:
+        if (!decomp_zlib_.IsValid()) {
+          decomp_zlib_ = zlib::Decompressor::Construct(zlib::kZstdDefault);
+        }
+        active_decomp_ = decomp_zlib_.weak_ref();
+      break;
+      case kCreateEcho:
+        if (!decomp_echo_.IsValid()) {
+          decomp_echo_ = zlib::Decompressor::Construct(zlib::kNoCompression);
+        }
+        active_decomp_ = decomp_echo_.weak_ref();
+      break;
+    }
+  }
+}
+
+bool JobInfo::ResetDecompression() {
+  if (active_decomp_ == NULL) {
+    return true;
+  }
+  return active_decomp_->Reset();
+}
+
+bool JobInfo::DecompressToSink(zlib::InputAbstract *in) {
+  assert(active_decomp_ != NULL);
+
+  const zlib::StreamStates ret = active_decomp_->DecompressStream(in, sink_);
+
+  switch (ret) {
+    case zlib::kStreamEnd:
+    case zlib::kStreamContinue:
+      return true;
+    break;
+    case zlib::kStreamDataError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                            "(id %" PRId64 ") %s failed for input %s: bad data",
+                            id_, active_decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailBadData);
+    break;
+    case zlib::kStreamIOError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                      "(id %" PRId64 ") %s failed for input %s: local IO error",
+                      id_, active_decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailLocalIO);
+    break;
+    case zlib::kStreamError:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                    "(id %" PRId64 ") %s failed for input %s: unhealthy status",
+                    id_, active_decomp_->Describe().c_str(), url_->c_str());
+      SetErrorCode(kFailLocalIO);
+    break;
+    default:
+      LogCvmfs(kLogDownload, kLogSyslogErr,
+                    "(id %" PRId64 ") %s failed for input %s: unknown error %d",
+                    id_, active_decomp_->Describe().c_str(), url_->c_str(), ret);
+      SetErrorCode(kFailLocalIO);
+  }
+
+  return false;
+}
+
+void JobInfo::Init(const DecompressorType decompressor_type) {
   id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
-  compressed_ = false;
   probe_hosts_ = false;
   head_request_ = false;
   follow_redirects_ = false;
@@ -74,7 +148,9 @@ void JobInfo::Init() {
 
   allow_failure_ = false;
 
-  memset(&zstream_, 0, sizeof(zstream_));
+  decompressor_type_ = kCreateNone;
+  active_decomp_ = NULL;
+  SetDecompressor(decompressor_type);
 }
 
 }  // namespace download
