@@ -17,6 +17,7 @@
 #include <libkern/OSAtomic.h>
 #endif  //  defined(__MAC_OS_X_VERSION_MIN_REQUIRED) &&
         //  __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#include <libkern/OSByteOrder.h>
 #include <mach-o/dyld.h>
 #include <mach/mach.h>  // NOLINT
 #include <mach/mach_time.h>
@@ -308,6 +309,14 @@ inline uint64_t platform_memsize() {
   rc = sysctl(mib, 2, &ramsize, &len, NULL, 0);
   assert(rc == 0);
   return ramsize;
+}
+
+inline uint16_t platform_htole16(uint16_t host_16bits) {
+  return OSSwapHostToLittleInt16(host_16bits);
+}
+
+inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
+  return OSSwapLittleToHostInt16(little_endian_16bits);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

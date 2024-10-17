@@ -8,6 +8,7 @@ cvmfs_test_suites="quick"
 
 verify_xattrs() {
   local attr1=$(attr -qg foo /cvmfs/$CVMFS_TEST_REPO/xattr)
+  local attr5=$(attr -qg large /cvmfs/$CVMFS_TEST_REPO/xattr)
   # local attr2=$(attr -qg x /cvmfs/$CVMFS_TEST_REPO/link)
   local attr3=$(attr -qg foo2 /cvmfs/$CVMFS_TEST_REPO/dir/xattr)
   local attr4=$(attr -qg baz /cvmfs/$CVMFS_TEST_REPO/dir)
@@ -24,6 +25,9 @@ verify_xattrs() {
     return 23
   fi
   setcap -q -v "cap_chown=ep" /cvmfs/$CVMFS_TEST_REPO/dir/capabilities || return 24
+  if [ "a$attr5" != "a$(printf 'x%.0s' {1..1000})" ]; then
+    return 25
+  fi
 
   return 0
 }
@@ -53,6 +57,7 @@ cvmfs_run_test() {
   touch /cvmfs/$CVMFS_TEST_REPO/dir/capabilities
 
   attr -s foo -V bar /cvmfs/$CVMFS_TEST_REPO/xattr || return 10
+  attr -s large -V $(printf 'x%.0s' {1..1000}) /cvmfs/$CVMFS_TEST_REPO/xattr || return 15
   # attr -s x -V Y /cvmfs/$CVMFS_TEST_REPO/link || return 11
   attr -s foo2 -V bar2 /cvmfs/$CVMFS_TEST_REPO/dir/xattr || return 12
   attr -s baz -V BAZ /cvmfs/$CVMFS_TEST_REPO/dir || return 13
