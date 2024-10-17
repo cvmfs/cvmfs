@@ -181,6 +181,24 @@ func FindLeaseByToken(ctx context.Context, tx *sql.Tx, token string) (*Lease, er
 	return &lease, nil
 }
 
+func RefreshLeaseByToken(ctx context.Context, tx *sql.Tx, token string, expiration int64) (int64, error) {
+	t0 := time.Now()
+
+	res, err := tx.ExecContext(
+		ctx,
+		"update lease set Expiration = ? where Token = ?;", expiration, token)
+	if err != nil {
+		return 0, fmt.Errorf("query failed: %w", err)
+	}
+
+	gw.LogC(ctx, "lease_entity", gw.LogDebug).
+		Str("operation", "refresh_by_token").
+		Dur("task_dt", time.Since(t0)).
+		Msgf("success")
+
+	return res.RowsAffected()
+}
+
 func DeleteAllExpiredLeases(ctx context.Context, tx *sql.Tx) error {
 	t0 := time.Now()
 
