@@ -1272,13 +1272,27 @@ TEST_F(T_Util, StringifyDouble) {
 }
 
 TEST_F(T_Util, StringifyTime) {
-  time_t now = time(NULL);
-  time_t other = 1263843;
+  const time_t now = time(NULL);
+  const time_t other = 1263843;
 
   EXPECT_EQ(GetTimeString(now, true), StringifyTime(now, true));
   EXPECT_EQ(GetTimeString(now, false), StringifyTime(now, false));
   EXPECT_EQ(GetTimeString(other, true), StringifyTime(other, true));
   EXPECT_EQ(GetTimeString(other, false), StringifyTime(other, false));
+}
+
+TEST_F(T_Util, StringifyLocalTime) {
+  struct stat tmpbuf;
+  if(stat("/usr/share/zoneinfo", &tmpbuf)) {
+    // TODO(vvolkl): use GTEST_SKIP once externals are updated
+    printf("Skipping test, no tzdata available.\n");
+  } else {
+    const time_t other = 1263843;
+    setenv("TZ", "America/Los_Angeles", true);
+    tzset();
+    EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
+    unsetenv("TZ");
+  }
 }
 
 TEST_F(T_Util, RfcTimestamp) {

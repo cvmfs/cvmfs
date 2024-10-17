@@ -120,6 +120,24 @@ string StringifyTime(const time_t seconds, const bool utc) {
   return string(buffer);
 }
 
+/**
+ * Converts seconds since UTC 0 into something like 12 Sep 14:59:37 CDT
+ */
+string StringifyLocalTime(const time_t seconds) {
+  struct tm timestamp;
+  localtime_r(&seconds, &timestamp);
+
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  char buffer[26];
+  (void)/* cast to void ignores return and placates clang-tidy */
+   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s", timestamp.tm_mday,
+           months[timestamp.tm_mon], timestamp.tm_year + 1900,
+           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec, timestamp.tm_zone);
+
+  return string(buffer);
+}
+
 
 /**
  * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
