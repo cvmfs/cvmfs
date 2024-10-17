@@ -1287,8 +1287,9 @@ TEST_F(T_Util, StringifyLocalTime) {
     // TODO(vvolkl): use GTEST_SKIP once externals are updated
     printf("Skipping test, no tzdata available.\n");
   } else {
-  const time_t other = 1263843;
+    const time_t other = 1263843;
     setenv("TZ", "America/Los_Angeles", true);
+    tzset();
     EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
     unsetenv("TZ");
   }
