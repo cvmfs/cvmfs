@@ -1284,7 +1284,7 @@ TEST_F(T_Util, StringifyTime) {
 TEST_F(T_Util, StringifyLocalTime) {
   struct stat tmpbuf;
   if(stat("/usr/share/zoneinfo", &tmpbuf)) {
-    // TODO: use GTEST_SKIP once externals are updated
+    // TODO(vvolkl): use GTEST_SKIP once externals are updated
     printf("Skipping test, no tzdata available.\n");
   } else {
   const time_t other = 1263843;
