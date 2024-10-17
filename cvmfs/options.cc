@@ -469,6 +469,12 @@ string OptionsManager::Dump() {
   return result;
 }
 
+void OptionsManager::SetValueFromTalk(const string &key, const string &value) {
+  ConfigValue config_value;
+  config_value.source = "cvmfs_talk";
+  config_value.value = value;
+  PopulateParameter(key, config_value);
+}
 
 void OptionsManager::SetValue(const string &key, const string &value) {
   ConfigValue config_value;

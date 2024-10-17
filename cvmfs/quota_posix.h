@@ -78,6 +78,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
+  virtual bool     SetLimit(uint64_t limit);
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn();
@@ -122,6 +123,7 @@ class PosixQuotaManager : public QuotaManager {
     // as of protocol revision 2
     kListVolatile,
     kCleanupRate,
+    kSetLimit,
   };
 
   /**
@@ -237,6 +239,7 @@ class PosixQuotaManager : public QuotaManager {
                 const std::string &description, const CommandType command_type);
   std::vector<std::string> DoList(const CommandType list_command);
   void GetSharedStatus(uint64_t *gauge, uint64_t *pinned);
+  bool SetSharedLimit(uint64_t limit);
   void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
   static void ParseDirectories(const std::string cache_workspace,
