@@ -255,37 +255,51 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
-  if (num_bytes == 0)
+  if (num_bytes == 0) {
     return 0;
-
-  if (info->expected_hash()) {
-    shash::Update(reinterpret_cast<unsigned char *>(ptr),
-                  num_bytes, info->hash_context());
   }
 
-  if (info->compressed()) {
-    zlib::StreamStates retval =
-      zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                   info->GetZstreamPtr(), info->sink());
-    if (retval == zlib::kStreamDataError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-                                     "(id %" PRId64 ") failed to decompress %s",
-                                     info->id(), info->url()->c_str());
-      info->SetErrorCode(kFailBadData);
-      return 0;
-    } else if (retval == zlib::kStreamIOError) {
-      LogCvmfs(kLogDownload, kLogSyslogErr,
-                            "(id %" PRId64 ") decompressing %s, local IO error",
-                            info->id(), info->url()->c_str());
-      info->SetErrorCode(kFailLocalIO);
+  if (info->parallel_dwnld_coord()) {
+    if (info->stop_data_download()) {
       return 0;
     }
+    DataTubeElement *ele = info->parallel_dwnld_coord()->GetUnusedElement();
+    assert(num_bytes <= info->parallel_dwnld_coord()->buffer_size());
+    memcpy(ele->data, ptr, num_bytes);
+    ele->size = num_bytes;
+    ele->action = kActionData;
+    info->GetDataTubePtr()->EnqueueBack(ele);
   } else {
-    int64_t written = info->sink()->Write(ptr, num_bytes);
-    if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
-      LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
+    if (info->expected_hash()) {
+      shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                    num_bytes, info->hash_context());
+    }
+
+    if (info->compressed()) {
+      const zlib::StreamStates retval =
+        zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
+                                    info->GetZstreamPtr(), info->sink());
+      if (retval == zlib::kStreamDataError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr,
+                                     "(id %" PRId64 ") failed to decompress %s",
+                                     info->id(), info->url()->c_str());
+        info->SetErrorCode(kFailBadData);
+        return 0;
+      } else if (retval == zlib::kStreamIOError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr,
+                            "(id %" PRId64 ") decompressing %s, local IO error",
+                            info->id(), info->url()->c_str());
+        info->SetErrorCode(kFailLocalIO);
+        return 0;
+      }
+    } else {
+      const int64_t written = info->sink()->Write(ptr, num_bytes);
+      if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+        LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") "
               "Failed to perform write of %zu bytes to sink %s with errno %ld",
               info->id(), num_bytes, info->sink()->Describe().c_str(), written);
+        return 0;
+      }
     }
   }
 
@@ -385,6 +399,23 @@ const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
 
+void DownloadManager::InitParallelDownload(int64_t parallel_dwld_min_buffers,
+                                       int64_t parallel_dwld_max_buffers,
+                                       int64_t parallel_dwld_inflight_buffers) {
+  assert(!parallel_dwnld_coord_.IsValid());
+  if (parallel_dwld_min_buffers < 0 || parallel_dwld_max_buffers < 0
+      || parallel_dwld_inflight_buffers < 1) {
+    use_parallel_download_ = false;
+    return;
+  }
+  parallel_dwnld_coord_ = new ParallelDownloadCoordinator(
+                                      parallel_dwld_min_buffers,
+                                      parallel_dwld_max_buffers,
+                                      parallel_dwld_inflight_buffers,
+                                      static_cast<size_t>(CURL_MAX_WRITE_SIZE));
+  use_parallel_download_ = true;
+}
+
 bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
       ((input >= 'A') && (input <= 'Z')) ||
@@ -424,8 +455,9 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
       escaped.push_back(escaped_char[0]);
     }
   }
-  LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") escaped %s to %s",
-                                      jobinfo_id, url.c_str(), escaped.c_str());
+  LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
+                                    "escaped %s to %s", name_.c_str(),
+                                    jobinfo_id, url.c_str(), escaped.c_str());
 
   return escaped;
 }
@@ -587,7 +619,84 @@ void *DownloadManager::MainDownload(void *data) {
   int still_running = 0;
   struct timeval timeval_start, timeval_stop;
   gettimeofday(&timeval_start, NULL);
+
+  // used for parallel_download
+  // vector of jobinfo elements that are considered finished from CURL pov
+  // but data processing in Fetch() might not be finished yet. Processing must
+  // be finished before being able to call VerifyAndFinalize()
+  std::vector<TupelJobDone> vec_curl_done;
   while (true) {
+    // Check if transfers that are completed have finished their data processing
+    if (download_mgr->use_parallel_download_) {
+      for (size_t i = 0; i < vec_curl_done.size(); ++i) {
+        JobInfo *info = vec_curl_done[i].info;
+        CURL *easy_handle = vec_curl_done[i].easy_handle;
+
+        DataTubeElement *ele = info->GetCmdTubePtr()->TryPopFront();
+        // data processing done
+        if (ele != NULL) {
+          bool download_finished = false;  // download is completely finished
+          bool remove_job = false;  // remove job from vec_curl_done
+          switch (ele->action) {
+            case kActionCheckRepeat:
+            {
+              // we do this here because there is some locking going on
+              // needed for rebalancing the proxies
+              const bool should_repeat =
+                                       download_mgr->ShouldRepeatDownload(info);
+
+              if (should_repeat) {
+                DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+                ele->action = kActionShouldRetry;
+                info->GetDataTubePtr()->EnqueueBack(ele);
+              } else {
+                download_finished = true;
+              }
+            }
+            break;
+            case kActionRetry:
+              curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
+              curl_multi_socket_action(download_mgr->curl_multi_,
+                                        CURL_SOCKET_TIMEOUT,
+                                        0,
+                                        &still_running);
+              remove_job = true;
+            break;
+            case kActionDownloadDone:
+              download_finished = true;
+              remove_job = true;
+            break;
+            default:
+            PANIC(kLogSyslogErr | kLogDebug, "(manager %s - id %" PRId64 ") "
+                          "FAILURE - Unknown DataTube Element Action: %d",
+                          download_mgr->name_.c_str(), info->id(), ele->action);
+          }
+
+          // download is finished, release CURL resources and inform Fetch()
+          if (download_finished) {
+            // Return easy handle into pool and write result back
+            download_mgr->ReleaseCurlHandle(easy_handle);
+
+            if (info->IsValidDataTube()) {
+              DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+              ele->action = kActionStop;
+              info->GetDataTubePtr()->EnqueueBack(ele);
+            }
+            info->GetPipeJobResultPtr()->
+                                  Write<download::Failures>(info->error_code());
+          }
+
+          if (remove_job) {
+            vec_curl_done.erase(vec_curl_done.begin()
+                                + static_cast<int64_t>(i));
+            --i;
+          }
+        }
+      }
+    }
+
     int timeout;
     if (still_running) {
       /* NOTE: The following might degrade the performance for many small files
@@ -601,7 +710,11 @@ void *DownloadManager::MainDownload(void *data) {
       */
       timeout = 1;
     } else {
-      timeout = -1;
+      if (download_mgr->use_parallel_download_) {
+        timeout = 1;
+      } else {
+        timeout = -1;
+      }
       gettimeofday(&timeval_stop, NULL);
       int64_t delta = static_cast<int64_t>(
         1000 * DiffTimeSeconds(timeval_start, timeval_stop));
@@ -693,6 +806,21 @@ void *DownloadManager::MainDownload(void *data) {
                                   redir_count);
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
+
+        // let's notify that CURL is done and queue the job up to wait its
+        // data processing to be finished.
+        if (info->parallel_dwnld_coord()) {
+          DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+          memcpy(ele->data, &curl_error, sizeof(int));
+          ele->size = sizeof(int);
+          ele->action = kActionEndOfData;
+          info->GetDataTubePtr()->EnqueueBack(ele);
+
+          vec_curl_done.push_back(TupelJobDone(info, easy_handle));
+          continue;
+        }
+
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
           curl_multi_add_handle(download_mgr->curl_multi_, easy_handle);
           curl_multi_socket_action(download_mgr->curl_multi_,
@@ -703,8 +831,12 @@ void *DownloadManager::MainDownload(void *data) {
           // Return easy handle into pool and write result back
           download_mgr->ReleaseCurlHandle(easy_handle);
 
-          DataTubeElement *ele = new DataTubeElement(kActionStop);
-          info->GetDataTubePtr()->EnqueueBack(ele);
+          if (info->parallel_dwnld_coord()) {
+            DataTubeElement *ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+            ele->action = kActionStop;
+            info->GetDataTubePtr()->EnqueueBack(ele);
+          }
           info->GetPipeJobResultPtr()->
                                   Write<download::Failures>(info->error_code());
         }
@@ -923,6 +1055,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
   info->SetCurlHandle(handle);
   info->SetErrorCode(kFailOk);
+  info->SetStopDataDownload(false);
   info->SetHttpCode(-1);
   info->SetFollowRedirects(follow_redirects_);
   info->SetNumUsedProxies(1);
@@ -1367,11 +1500,46 @@ void DownloadManager::ReleaseCredential(JobInfo *info) {
 
 /**
  * Checks the result of a curl download and implements the failure logic, such
- * as changing the proxy server.  Takes care of cleanup.
+ * as changing the proxy server. Takes care of cleanup.
  *
- * \return true if another download should be performed, false otherwise
+ * This is the combined function used when the downloads and/or the callbacks
+ * are sequentially processed (use_parallel_download_ = false).
+ *
+ * Otherwise, in case of parallel processing of downloads, where the fuse-thread
+ * e.g. performs the decompression the 3 functions are executed the following:
+ * - VerifyDownloadSuccess() in Fetch() [fuse-thread]
+ * - ShouldRepeatDownload() in MainDownload() due to locking
+ * - ShouldRetry in Fetch() [fuse-thread]
+ *
+ * If any of those functions report back that the download should be stopped
+ * (because of successful download or retry not permitted), that specific
+ * function will take care of the cleanup.
+ *
+ * @returns true if another download should be performed, false otherwise
  */
 bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
+  if (!VerifyDownloadSuccess(curl_error, info)) {
+    if (ShouldRepeatDownload(info)) {
+      return ShouldRetry(info);
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Step 1/3 for checking if the CURL download was successful.
+ * (Please check VerifyAndFinalize() for more explanation)
+ *
+ * Determines if an error occurred during the download and if yes, sets the
+ * error code accordingly in the jobinfo object.
+ *
+ * @note If the download was successful, it takes care of cleanup.
+ *
+ * @returns true if download was successful without any errors, otherwise false
+ */
+bool DownloadManager::VerifyDownloadSuccess(const int curl_error,
+                                                                JobInfo *info) {
   LogCvmfs(kLogDownload, kLogDebug, "(manager '%s' - id %" PRId64 ") "
                            "Verify downloaded url %s, proxy %s (curl error %d)",
                            name_.c_str(), info->id(), info->url()->c_str(),
@@ -1478,76 +1646,98 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
   }
 
+  if (info->error_code() == kFailOk) {
+    FinalizeDownload(info);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Step 2/3 for checking if the CURL download was successful.
+ * (Please check VerifyAndFinalize() for more explanation)
+ *
+ * Checks if an unsuccessful download should be repeated. Implements failure
+ * logic. Might rebalance proxies if needed.
+ *
+ * @note This function should only be called, if the download has failed.
+ * @note If the download should not be repeated, it takes care of cleanup.
+ *
+ * @returns true if the download should be repeated, otherwise false
+ */
+bool DownloadManager::ShouldRepeatDownload(JobInfo *info) {
+  assert(info->error_code() != kFailOk);
   std::vector<std::string> *host_chain = opt_host_chain_;
 
   // Determination if download should be repeated
   bool try_again = false;
   bool same_url_retry = CanRetry(info);
-  if (info->error_code() != kFailOk) {
-    MutexLockGuard m(lock_options_);
-    if (info->error_code() == kFailBadData) {
-      if (!info->nocache()) {
-        try_again = true;
-      } else {
-        // Make it a host failure
-        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                       "(manager '%s' - id %" PRId64 ") "
-                       "data corruption with no-cache header, try another host",
-                       name_.c_str(), info->id());
 
-        info->SetErrorCode(kFailHostHttp);
-      }
-    }
-    if ( same_url_retry || (
-         ( (info->error_code() == kFailHostResolve) ||
-           IsHostTransferError(info->error_code()) ||
-           (info->error_code() == kFailHostHttp)) &&
-         info->probe_hosts() &&
-         host_chain && (info->num_used_hosts() < host_chain->size()))
-       )
-    {
+  MutexLockGuard m(lock_options_);
+  if (info->error_code() == kFailBadData) {
+    if (!info->nocache()) {
       try_again = true;
-    }
-    if ( same_url_retry || (
-         ( (info->error_code() == kFailProxyResolve) ||
-           IsProxyTransferError(info->error_code()) ||
-           (info->error_code() == kFailProxyHttp)) )
-       )
-    {
-      if (sharding_policy_.UseCount() > 0) {  // sharding policy
-       try_again = true;
-       same_url_retry = false;
-      } else {  // no sharding
-        try_again = true;
-        // If all proxies failed, do a next round with the next host
-        if (!same_url_retry && (info->num_used_proxies() >= opt_num_proxies_)) {
-          // Check if this can be made a host fail-over
-          if (info->probe_hosts() &&
-              host_chain &&
-              (info->num_used_hosts() < host_chain->size()))
-          {
-            // reset proxy group if not already performed by other handle
-            if (opt_proxy_groups_) {
-              if ((opt_proxy_groups_current_ > 0) ||
-                  (opt_proxy_groups_current_burned_ > 0))
-              {
-                opt_proxy_groups_current_ = 0;
-                opt_timestamp_backup_proxies_ = 0;
-                RebalanceProxiesUnlocked("reset proxies for host failover");
-              }
-            }
+    } else {
+      // Make it a host failure
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                "(manager '%s' - id %" PRId64 ") "
+                "data corruption with no-cache header, try another host",
+                name_.c_str(), info->id());
 
-            // Make it a host failure
-            LogCvmfs(kLogDownload, kLogDebug,
-                       "(manager '%s' - id %" PRId64 ") make it a host failure",
-                       name_.c_str(), info->id());
-            info->SetNumUsedProxies(1);
-            info->SetErrorCode(kFailHostAfterProxy);
-          } else {
-            if (failover_indefinitely_) {
-              // Instead of giving up, reset the num_used_proxies counter,
-              // switch proxy and try again
-              LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+      info->SetErrorCode(kFailHostHttp);
+    }
+  }
+  if ( same_url_retry || (
+        ( (info->error_code() == kFailHostResolve) ||
+          IsHostTransferError(info->error_code()) ||
+          (info->error_code() == kFailHostHttp)) &&
+        info->probe_hosts() &&
+        host_chain && (info->num_used_hosts() < host_chain->size()))
+      )
+  {
+    try_again = true;
+  }
+  if ( same_url_retry || (
+        ( (info->error_code() == kFailProxyResolve) ||
+          IsProxyTransferError(info->error_code()) ||
+          (info->error_code() == kFailProxyHttp)) )
+      )
+  {
+    if (sharding_policy_.UseCount() > 0) {  // sharding policy
+      try_again = true;
+      same_url_retry = false;
+    } else {  // no sharding
+      try_again = true;
+      // If all proxies failed, do a next round with the next host
+      if (!same_url_retry && (info->num_used_proxies() >= opt_num_proxies_)) {
+        // Check if this can be made a host fail-over
+        if (info->probe_hosts() &&
+            host_chain &&
+            (info->num_used_hosts() < host_chain->size()))
+        {
+          // reset proxy group if not already performed by other handle
+          if (opt_proxy_groups_) {
+            if ((opt_proxy_groups_current_ > 0) ||
+                (opt_proxy_groups_current_burned_ > 0))
+            {
+              opt_proxy_groups_current_ = 0;
+              opt_timestamp_backup_proxies_ = 0;
+              RebalanceProxiesUnlocked("reset proxies for host failover");
+            }
+          }
+
+          // Make it a host failure
+          LogCvmfs(kLogDownload, kLogDebug,
+                      "(manager '%s' - id %" PRId64 ") make it a host failure",
+                      name_.c_str(), info->id());
+          info->SetNumUsedProxies(1);
+          info->SetErrorCode(kFailHostAfterProxy);
+        } else {
+          if (failover_indefinitely_) {
+            // Instead of giving up, reset the num_used_proxies counter,
+            // switch proxy and try again
+            LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                    "(manager '%s' - id %" PRId64 ") "
                    "VerifyAndFinalize() would fail the download here. "
                    "Instead switch proxy and retry download. "
@@ -1560,105 +1750,143 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                    host_chain ?
                       host_chain->size() : -1, static_cast<int>(same_url_retry),
                    info->num_used_proxies(), opt_num_proxies_);
-              info->SetNumUsedProxies(1);
-              RebalanceProxiesUnlocked(
-                                     "download failed - failover indefinitely");
-              try_again = !Interrupted(fqrn_, info);
-            } else {
-              try_again = false;
-            }
-          }
-        }  // Make a proxy failure a host failure
-      }  // Proxy failure assumed
-    }  // end !sharding
-  }
-
-  if (try_again) {
-    LogCvmfs(kLogDownload, kLogDebug, "(manager '%s' - id %" PRId64 ") "
-                              "Trying again on same curl handle, same url: %d, "
-                              "error code %d no-cache %d",
-                              name_.c_str(), info->id(), same_url_retry,
-                              info->error_code(), info->nocache());
-    // Reset internal state and destination
-    if (info->sink() != NULL && info->sink()->Reset() != 0) {
-      info->SetErrorCode(kFailLocalIO);
-      goto verify_and_finalize_stop;
-    }
-    if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
-      info->SetErrorCode(kFailCanceled);
-      goto verify_and_finalize_stop;
-    }
-
-    if (info->expected_hash()) {
-      shash::Init(info->hash_context());
-    }
-    if (info->compressed()) {
-      zlib::DecompressInit(info->GetZstreamPtr());
-    }
-
-    if (sharding_policy_.UseCount() > 0) {  // sharding policy
-      ReleaseCredential(info);
-      SetUrlOptions(info);
-    } else {  // no sharding policy
-      SetRegularCache(info);
-
-      // Failure handling
-      bool switch_proxy = false;
-      bool switch_host = false;
-      switch (info->error_code()) {
-        case kFailBadData:
-          SetNocache(info);
-          break;
-        case kFailProxyResolve:
-        case kFailProxyHttp:
-          switch_proxy = true;
-          break;
-        case kFailHostResolve:
-        case kFailHostHttp:
-        case kFailHostAfterProxy:
-          switch_host = true;
-          break;
-        default:
-          if (IsProxyTransferError(info->error_code())) {
-            if (same_url_retry) {
-              Backoff(info);
-            } else {
-              switch_proxy = true;
-            }
-          } else if (IsHostTransferError(info->error_code())) {
-            if (same_url_retry) {
-              Backoff(info);
-            } else {
-              switch_host = true;
-            }
+            info->SetNumUsedProxies(1);
+            RebalanceProxiesUnlocked("download failed - failover indefinitely");
+            try_again = !Interrupted(fqrn_, info);
           } else {
-            // No other errors expected when retrying
-            PANIC(NULL);
+            try_again = false;
           }
-      }
-      if (switch_proxy) {
-        ReleaseCredential(info);
-        SwitchProxy(info);
-        info->SetNumUsedProxies(info->num_used_proxies() + 1);
-        SetUrlOptions(info);
-      }
-      if (switch_host) {
-        ReleaseCredential(info);
-        SwitchHost(info);
-        info->SetNumUsedHosts(info->num_used_hosts() + 1);
-        SetUrlOptions(info);
-      }
-    }  // end !sharding
+        }
+      }  // Make a proxy failure a host failure
+    }  // Proxy failure assumed
+  }  // end !sharding
 
-    if (failover_indefinitely_) {
-      // try again, breaking if there's a cvmfs reload happening and we are in a
-      // proxy failover. This will EIO the call application.
-      return !Interrupted(fqrn_, info);
-    }
-    return true;  // try again
+  if (!try_again) {
+    FinalizeDownload(info);
   }
+
+  return try_again;
+}
+
+/**
+ * Step 3/3 for checking if the CURL download was successful.
+ * (Please check VerifyAndFinalize() for more explanation)
+ *
+ * Checks if a failed download should be retried and implements failure logic,
+ * e.g. changing proxies.
+ *
+ * @note This function should only be called, if the download has failed and
+ *       ShouldRepeatDownload() returned "true".
+ *
+ * @note If the download should not be repeated, it takes care of cleanup.
+ *
+ * @returns true if the download should be repeated, otherwise false
+ */
+bool DownloadManager::ShouldRetry(JobInfo *info) {
+  assert(info->error_code() != kFailOk);
+  bool same_url_retry = CanRetry(info);
+  LogCvmfs(kLogDownload, kLogDebug, "(manager '%s' - id %" PRId64 ") "
+                         "Trying again on same curl handle, same url: %d, "
+                         "error code %d no-cache %d", name_.c_str(), info->id(),
+                         same_url_retry, info->error_code(), info->nocache());
+  // Reset internal state and destination
+  if (info->sink() != NULL && info->sink()->Reset() != 0) {
+    info->SetErrorCode(kFailLocalIO);
+    goto verify_and_finalize_stop;
+  }
+  if (info->interrupt_cue() && info->interrupt_cue()->IsCanceled()) {
+    info->SetErrorCode(kFailCanceled);
+    goto verify_and_finalize_stop;
+  }
+
+  if (info->expected_hash()) {
+    shash::Init(info->hash_context());
+  }
+  if (info->compressed()) {
+    zlib::DecompressInit(info->GetZstreamPtr());
+  }
+
+  if (sharding_policy_.UseCount() > 0) {  // sharding policy
+    ReleaseCredential(info);
+    SetUrlOptions(info);
+  } else {  // no sharding policy
+    SetRegularCache(info);
+
+    // Failure handling
+    bool switch_proxy = false;
+    bool switch_host = false;
+    switch (info->error_code()) {
+      case kFailBadData:
+        SetNocache(info);
+        break;
+      case kFailProxyResolve:
+      case kFailProxyHttp:
+        switch_proxy = true;
+        break;
+      case kFailHostResolve:
+      case kFailHostHttp:
+      case kFailHostAfterProxy:
+        switch_host = true;
+        break;
+      default:
+        if (IsProxyTransferError(info->error_code())) {
+          if (same_url_retry) {
+            Backoff(info);
+          } else {
+            switch_proxy = true;
+          }
+        } else if (IsHostTransferError(info->error_code())) {
+          if (same_url_retry) {
+            Backoff(info);
+          } else {
+            switch_host = true;
+          }
+        } else {
+          // No other errors expected when retrying
+          PANIC(NULL);
+        }
+    }
+    if (switch_proxy) {
+      ReleaseCredential(info);
+      SwitchProxy(info);
+      info->SetNumUsedProxies(info->num_used_proxies() + 1);
+      SetUrlOptions(info);
+    }
+    if (switch_host) {
+      ReleaseCredential(info);
+      SwitchHost(info);
+      info->SetNumUsedHosts(info->num_used_hosts() + 1);
+      SetUrlOptions(info);
+    }
+  }  // end !sharding
+
+  if (failover_indefinitely_) {
+    // try again, breaking if there's a cvmfs reload happening and we are in a
+    // proxy failover. This will EIO the call application.
+    const bool interrupted = Interrupted(fqrn_, info);
+    if (!interrupted) {
+      info->SetStopDataDownload(false);
+    }
+    return !interrupted;
+  }
+  info->SetStopDataDownload(false);
+  return true;  // try again
 
  verify_and_finalize_stop:
+  // Finalize, flush destination file
+  FinalizeDownload(info);
+  return false;  // stop transfer and return to Fetch()
+}
+
+/**
+ * Finalizes all resources after a download is declared finished.
+ * This includes flushing all remaining data to the destination file.
+ *
+ * This is a helper function used by the functions that checking if the
+ * CURL download was successful: VerifyDownloadSuccess(), ShouldRepeatDownload()
+ * and ShouldRetry().
+ */
+void DownloadManager::FinalizeDownload(JobInfo* info) {
   // Finalize, flush destination file
   ReleaseCredential(info);
   if (info->sink() != NULL && info->sink()->Flush() != 0) {
@@ -1672,8 +1900,6 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     header_lists_->PutList(info->headers());
     info->SetHeaders(NULL);
   }
-
-  return false;  // stop transfer and return to Fetch()
 }
 
 DownloadManager::~DownloadManager() {
@@ -1689,6 +1915,10 @@ DownloadManager::~DownloadManager() {
     }
     health_check_.Reset();
   }
+
+  // TODO(heretherebedragons) is this an issue if JobInfo elements
+  // are still alive?
+  parallel_dwnld_coord_.Destroy();
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     // Shutdown I/O thread
@@ -1763,7 +1993,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   watch_fds_size_(0),
                   watch_fds_inuse_(0),
                   watch_fds_max_(4 * max_pool_handles),
-                  opt_timeout_proxy_(5),
+                  opt_timeout_proxy_(1),
                   opt_timeout_direct_(10),
                   opt_low_speed_limit_(1024),
                   opt_max_retries_(0),
@@ -1792,7 +2022,9 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   opt_timestamp_backup_host_(0),
                   opt_host_reset_after_(0),
                   credentials_attachment_(NULL),
-                  counters_(new Counters(statistics))
+                  counters_(new Counters(statistics)),
+                  use_parallel_download_(false),
+                  parallel_dwnld_coord_(NULL)
 {
   atomic_init32(&multi_threaded_);
 
@@ -1860,6 +2092,7 @@ void DownloadManager::Spawn() {
 Failures DownloadManager::Fetch(JobInfo *info) {
   assert(info != NULL);
   assert(info->url() != NULL);
+  info->SetStopDataDownload(false);
 
   Failures result;
   result = PrepareDownloadDestination(info);
@@ -1906,23 +2139,109 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     if (!info->IsValidPipeJobResults()) {
       info->CreatePipeJobResults();
     }
-    if (!info->IsValidDataTube()) {
-      info->CreateDataTube();
+    if (use_parallel_download_ && !info->IsValidDataTube()) {
+      info->SetupParallelDownload(parallel_dwnld_coord_.weak_ref());
     }
 
     // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
     //          info->wait_at[0], info->wait_at[1]);
     pipe_jobs_->Write<JobInfo*>(info);
 
-    do {
-      DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
+    if (use_parallel_download_) {
+      bool is_running = true;
+      do {
+        DataTubeElement* ele = info->GetDataTubePtr()->PopFront();
 
-      if (ele->action == kActionStop) {
-        delete ele;
-        break;
-      }
-      // TODO(heretherebedragons) add compression
-    } while (true);
+        switch (ele->action) {
+          case kActionStop:
+            is_running = false;
+          break;
+          case kActionEndOfData:
+          {
+            const int curl_error = *ele->data;
+            const bool success = VerifyDownloadSuccess(curl_error, info);
+
+            DataTubeElement *out_ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+
+            if (success) {
+              out_ele->action = kActionDownloadDone;
+            } else {
+              out_ele->action = kActionCheckRepeat;
+            }
+            info->GetCmdTubePtr()->EnqueueBack(out_ele);
+          }
+          break;
+          case kActionShouldRetry:
+          {
+            const bool retry = ShouldRetry(info);
+
+            DataTubeElement *out_ele = info->parallel_dwnld_coord()->
+                                                             GetUnusedElement();
+            if (retry) {
+              out_ele->action = kActionRetry;
+            } else {
+              out_ele->action = kActionDownloadDone;
+            }
+            info->GetCmdTubePtr()->EnqueueBack(out_ele);
+          }
+          break;
+          case kActionData:
+          {
+            // quick escape
+            if (info->stop_data_download()) {
+              break;
+            }
+
+            char *ptr = ele->data;
+            const size_t num_bytes = ele->size;
+            if (info->expected_hash()) {
+              shash::Update(reinterpret_cast<unsigned char *>(ptr),
+                            num_bytes, info->hash_context());
+            }
+
+            if (info->compressed()) {
+              const zlib::StreamStates retval =
+                zlib::DecompressZStream2Sink(ptr,
+                                           static_cast<int64_t>(num_bytes),
+                                           info->GetZstreamPtr(), info->sink());
+              if (retval == zlib::kStreamDataError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
+                      "(manager '%s' - id %" PRId64 ") failed to decompress %s",
+                      name_.c_str(), info->id(), info->url()->c_str());
+                info->SetErrorCode(kFailBadData);
+                info->SetStopDataDownload(true);
+              } else if (retval == zlib::kStreamIOError) {
+                LogCvmfs(kLogDownload, kLogSyslogErr,
+                          "(manager '%s' - id %" PRId64 ") "
+                          "decompressing %s, local IO error",
+                          name_.c_str(), info->id(), info->url()->c_str());
+                info->SetErrorCode(kFailLocalIO);
+                info->SetStopDataDownload(true);
+              }
+            } else {
+              const int64_t written = info->sink()->Write(ptr, num_bytes);
+              if (written < 0 || static_cast<uint64_t>(written) != num_bytes) {
+                LogCvmfs(kLogDownload, kLogDebug,
+                                     "(manager '%s' - id %" PRId64 ") "
+                                     "Failed to perform write of %zu bytes "
+                                     "to sink %s with errno %ld",
+                                     name_.c_str(), info->id(), num_bytes,
+                                     info->sink()->Describe().c_str(), written);
+                info->SetErrorCode(kFailLocalIO);
+                info->SetStopDataDownload(true);
+              }
+            }
+          }
+          break;
+          default:
+            PANIC(kLogSyslogErr | kLogDebug, "(manager '%s' - id %" PRId64 ") "
+                               " FAILURE - Unknown DataTube Element Action: %d",
+                               name_.c_str(), info->id(), ele->action);
+        }
+        info->parallel_dwnld_coord()->PutElementToReuse(ele);
+      } while (is_running);
+    }  // end use_parallel_download_
 
     info->GetPipeJobResultPtr()->Read<download::Failures>(&result);
     // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
@@ -2358,8 +2677,8 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
                               name_.c_str(),
                               dns::ExtractHost(host_chain_shuffled[i]).c_str());
         // remove new line at end of "order"
-        LogCvmfs(kLogDownload, kLogDebug, "order is %s",
-                                  Trim(order, true /* trim_newline */).c_str());
+        LogCvmfs(kLogDownload, kLogDebug, "(manager '%s') order is %s",
+                   name_.c_str(), Trim(order, true /* trim_newline */).c_str());
         success = true;
         break;
       }
@@ -3035,6 +3354,12 @@ DownloadManager *DownloadManager::Clone(
   clone->sharding_policy_ = sharding_policy_;
   clone->failover_indefinitely_ = failover_indefinitely_;
   clone->fqrn_ = fqrn_;
+
+  if (use_parallel_download_) {
+    clone->InitParallelDownload(parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->min_buffers(),
+                                parallel_dwnld_coord_->inflight_buffers());
+  }
 
   return clone;
 }

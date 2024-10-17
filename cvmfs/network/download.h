@@ -25,6 +25,7 @@
 #include "network/health_check.h"
 #include "network/jobinfo.h"
 #include "network/network_errors.h"
+#include "network/parallel_download_coordinator.h"
 #include "network/sharding_policy.h"
 #include "network/sink.h"
 #include "ssl.h"
@@ -34,6 +35,7 @@
 #include "util/pointer.h"
 #include "util/prng.h"
 #include "util/shared_ptr.h"
+#include "util/tube.h"
 
 class InterruptCue;
 
@@ -217,6 +219,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool SetShardingPolicy(const ShardingPolicySelector type);
   void SetFailoverIndefinitely();
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
+  void InitParallelDownload(int64_t parallel_dwld_min_buffers,
+                            int64_t parallel_dwld_max_buffers,
+                            int64_t parallel_dwld_inflight_buffers);
+  ParallelDownloadCoordinator *GetParallelDwnldCoordPtr() {
+                                      return parallel_dwnld_coord_.weak_ref(); }
 
   unsigned num_hosts() {
     if (opt_host_chain_) return opt_host_chain_->size();
@@ -226,6 +233,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   dns::IpPreference opt_ip_preference() const {
     return opt_ip_preference_;
   }
+
+  bool use_parallel_download() const { return use_parallel_download_; }
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
@@ -252,7 +261,13 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
   void SetRegularCache(JobInfo *info);
+
+  bool VerifyDownloadSuccess(const int curl_error, JobInfo *info);
+  bool ShouldRepeatDownload(JobInfo *info);
+  bool ShouldRetry(JobInfo *info);
+  void FinalizeDownload(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
+
   void InitHeaders();
   void CloneProxyConfig(DownloadManager *clone);
 
@@ -442,6 +457,14 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  /**
+   * Parallel download: Allows the fuse-thread that calls Fetch() to perform
+   * the decompression instead of within the sequentially executed
+   * CallbackCurlData()
+   */
+  bool use_parallel_download_;
+  UniquePtr<ParallelDownloadCoordinator > parallel_dwnld_coord_;
 };  // DownloadManager
 
 }  // namespace download
