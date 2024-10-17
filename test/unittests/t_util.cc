@@ -1282,10 +1282,16 @@ TEST_F(T_Util, StringifyTime) {
 }
 
 TEST_F(T_Util, StringifyLocalTime) {
+  struct stat tmpbuf;
+  if(stat("/usr/share/zoneinfo", &tmpbuf)) {
+    // TODO: use GTEST_SKIP once externals are updated
+    printf("Skipping test, no tzdata available.\n");
+  } else {
   const time_t other = 1263843;
-  setenv("TZ", "US/Pacific", true);
-  EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
-  unsetenv("TZ");
+    setenv("TZ", "America/Los_Angeles", true);
+    EXPECT_EQ(StringifyLocalTime(other), "15 Jan 1970 07:04:03 PST");
+    unsetenv("TZ");
+  }
 }
 
 TEST_F(T_Util, RfcTimestamp) {
