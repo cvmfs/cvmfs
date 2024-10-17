@@ -36,29 +36,20 @@ echo "over the container's default /etc/cvmfs and bind mount a host location"
 echo "for the cache over /var/lib/cvmfs"
 echo "==================================================================================="
 
-CONFIG=/etc/cvmfs/default.d/95-container-local.conf
-
-echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" > $CONFIG
 
 if [ -z "$CVMFS_HTTP_PROXY" -a -z "$CVMFS_CLIENT_PROFILE" ]; then
   echo "[ERR] CVMFS_HTTP_PROXY environment variable required" | tee -a $BOOT_LOG
   exit 1
 fi
-if [ -n "$CVMFS_HTTP_PROXY" ]; then
-  echo "[INF] using CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" | tee -a $BOOT_LOG
-  echo "CVMFS_HTTP_PROXY='$CVMFS_HTTP_PROXY'" >> $CONFIG
-fi
-if [ -n "$CVMFS_CLIENT_PROFILE" ]; then
-  echo "[INF] using CVMFS_CLIENT_PROFILE='$CVMFS_CLIENT_PROFILE'" | tee -a $BOOT_LOG
-  echo "CVMFS_CLIENT_PROFILE='$CVMFS_CLIENT_PROFILE'" >> $CONFIG
-fi
 
-if [ ! -z "$CVMFS_QUOTA_LIMIT" ]; then
-  echo "[INF] using CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" | tee -a $BOOT_LOG
-  echo "CVMFS_QUOTA_LIMIT='$CVMFS_QUOTA_LIMIT'" >> $CONFIG
-fi
+CONFIG=/etc/cvmfs/default.d/95-container-local.conf
 
-# TODO(jblomer): add all CVMFS_* environment variables to $CONFIG
+#  add all CVMFS_* environment variables to $CONFIG
+env | grep -E  '^CVMFS_.+=.+$' |  while IFS= read -r line; do
+  echo "[INF] using $line" | tee -a $BOOT_LOG
+  echo "$line" >> $CONFIG
+done
+
 
 # Gracefully unmount on container exit to avoid the error message
 # "transport endpoint not connected" on /cvmfs/* directories
