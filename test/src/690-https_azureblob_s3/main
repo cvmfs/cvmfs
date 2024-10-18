@@ -1,0 +1,134 @@
+#
+# Test for running CVMFS against an Azure S3 implementation
+#
+# In this test we create our own Azurite blob service.
+# require az-cli and azurite to be installed, see $platform_setup.sh
+# keys are hard-coded dev keys in azurite, so safe to have in code
+
+cvmfs_test_name="Azure blob on azurite over https"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "*** cleaning up"
+  sudo cvmfs_server rmfs -f azurite.cvmfs.io
+  if [ -f azurite_pid ]; then
+    sudo kill -9 $(cat azurite_pid)
+  fi
+}
+
+create_azurite_config() {
+  tee cvmfs_azurite.conf > /dev/null << EOF
+CVMFS_S3_HOST=127.0.0.1:10000
+CVMFS_S3_ACCESS_KEY=devstoreaccount1
+CVMFS_S3_SECRET_KEY=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+CVMFS_S3_BUCKET=devstoreaccount1/test
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_FLAVOR=azure
+CVMFS_S3_USE_HTTPS=true
+EOF
+  tee 127.0.0.1-key.pem > /dev/null << EOF
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDBP+LmSf6ZI8rX
+TJMU82eXmnQIhcw1ocnAV/aiGCBv0iKZB1x9+6VBNPjscxKzXFZt3bSrqeQlt5Ov
+81+DyIdC4EGVJBrJZJ3TtcBBA8rEBnw4lpQgcuxBofYgCDdPAl+HN0i9apLtrSst
+tATaF1A6IMeoh99IbYZv3t1JJlI5EVO/6pivf2Wxx/rn5kP4Xz7BdElPcnEDl9St
+pgbH2k8PVBsa/gTg6GiiTRrw8vfI31Uy3+ROv4M/b5nbU99LoklTWFWaosMjIoh7
+e/ujlOfIocKk/kXUaEX4vBfs65F3nnXC+XmqP8Qjhl9v29MGSdV3jizWyTFmzMgR
+YY4W3QsPAgMBAAECggEAXjALIP7TjkQ5qvHxhfaUePmYsEa2HzW5pXu6A4sK1DVx
+E3DZDbZG9x8ga+4yISVSIr46PqjRP+jXnJxb41krQ9cVX+F3BM17dyJQj9+PRjd6
++AG8NIyOxfZwhXA7tNCNStQRKfD1p84NC3uAGePfAFXVujhvBVgMfB39cJey34jN
++Lj1foK3Ok8xaW87io0ZHW0NUuVbe4IuZiAvN2x2mShv+P4Mxjbw+Oos9OqPEoUL
++d6nlzUUEgsbHuExSwdM4jv1c5l0Lv2fQLCK/1SqoneW5IGdu21YeWMbeZxDNOyv
+njG1bFjkF3NwmHByhjEMHE3GnA5KHXpKzzGwWhCKEQKBgQDEp4T1ujaC8Jf+anSz
+/M2wkuJznPGUR2UxE4IZSGuTWLdn3LigraDobXAzgZk49l4JbiNpZcZfpusGqFbY
+iQIxIW39zQL+0seNIjjl33yRkjRuTTjZJVWwZ3BaLnPIB+aqnTX/LNgx51ZvdPgF
+DjFrW8FqDp8mz4swCKiIU/zz2wKBgQD7kVQpxEg/J2a+Z4rx02UHhIQfuEjOPOnu
+mX6X48borYgHl7qhOIXojolIELwl2TAvW5CIZD9N0sYoE77IwhNcMab1mMTgN4cn
+7Eg7nJHzEFcaME23uTnz0AE/TRSbysu+0GoOMndbOH0BNlVQiWLZ2jGf1wQVTNR/
+cxqDzLXF3QKBgAN4APxkoHmGzOeL8SsLloU60gvABPLcn4hSE8VmZZ9fvTxzxD3x
+UhlHdOczrgQ3NEluS+mcBffB9ftUFNQU9pjvQgVsDFV6WlK++8nyOzxGG+6mJg6O
+fghyiqTMlPY+TW9M/prVq6qVrgyhP463RV/janH4eA4zMv1R6ccd1CRpAoGBAMlo
+w09lPMqDSzkqQQ33x61LJVUYAAJOtqQ29Cm7TadAN+aMTfmB/YQBilvOOjS7PF7O
+Glt4l05BcDDqDhdBeqqXfiqnkwhIrMcD35kKc7d835+yCKcNfx567GS328YXiSRO
+THrtYK4B/eMYkxmVxTTSAmUMitJa3s7jYtke7nFpAoGAT8GCaiB4ztvaCGlm+W6b
+Ll8Ic2JQzy9t/pA4KvrdY/DLo+s9Hdz34kNtF+3UWPAq08LQlYC10ZHtEx3FKlBA
+S+xcyudCwPkDcb5K+dzq+DlO9rS4S61nPvnnF/oVTWzRTjb40bt//g+ynViRkmBA
+RZVtxI4OxZGPfARfxcDqBes=
+-----END PRIVATE KEY-----
+EOF
+  tee 127.0.0.1.pem > /dev/null << EOF
+-----BEGIN CERTIFICATE-----
+MIIEJTCCAo2gAwIBAgIQQqBSdbT/YTmzmYOlhkdpczANBgkqhkiG9w0BAQsFADBz
+MR4wHAYDVQQKExVta2NlcnQgZGV2ZWxvcG1lbnQgQ0ExJDAiBgNVBAsMG2hwY2Fk
+bWluQGN2bWZzIChDbG91ZCBVc2VyKTErMCkGA1UEAwwibWtjZXJ0IGhwY2FkbWlu
+QGN2bWZzIChDbG91ZCBVc2VyKTAeFw0yMjA5MTQwODQwMDhaFw0yNDEyMTQwODQw
+MDhaME8xJzAlBgNVBAoTHm1rY2VydCBkZXZlbG9wbWVudCBjZXJ0aWZpY2F0ZTEk
+MCIGA1UECwwbaHBjYWRtaW5AY3ZtZnMgKENsb3VkIFVzZXIpMIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwT/i5kn+mSPK10yTFPNnl5p0CIXMNaHJwFf2
+ohggb9IimQdcffulQTT47HMSs1xWbd20q6nkJbeTr/Nfg8iHQuBBlSQayWSd07XA
+QQPKxAZ8OJaUIHLsQaH2IAg3TwJfhzdIvWqS7a0rLbQE2hdQOiDHqIffSG2Gb97d
+SSZSORFTv+qYr39lscf65+ZD+F8+wXRJT3JxA5fUraYGx9pPD1QbGv4E4Ohook0a
+8PL3yN9VMt/kTr+DP2+Z21PfS6JJU1hVmqLDIyKIe3v7o5TnyKHCpP5F1GhF+LwX
+7OuRd551wvl5qj/EI4Zfb9vTBknVd44s1skxZszIEWGOFt0LDwIDAQABo1kwVzAO
+BgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHwYDVR0jBBgwFoAU
+RmiVMyp8gq4b26Xbx5CwFu+GjlEwDwYDVR0RBAgwBocEfwAAATANBgkqhkiG9w0B
+AQsFAAOCAYEAsyGaqeMvn4gHZ2P2Bz8c4WL5IoP7XGh2rceeMCqBFhHAT4mQP2z9
+LFYXMp9on4Fi737XfEkw8XcFA2oUZ4XKlrWB1gU34pBP6PljblI/j9FLqQHlhukq
+ohlooWcaXK3ww5Eer0mFrq846ObyO2y3YbFtsUqDNjTf9+50Embf1rD6hppX4jBO
+L1lfuHjsiq6Tu6rJHfWlKMS9ggNMG2w4UvDbcl9roqa4Fc/cpX8ATmZMMDrDT3Mj
+eRUJ4g5Gcxk1gJj6wY7Jfv9zlGteh/hzq7bx1rDcdUrK29GyBx1cjohlSmRVXnJ3
+Jm5ZGp+gaWx+JBg/GK7z3nqSYst5lkpZfuPmX+IF3B8IQKP7x3n13TIXVKzfOfsI
+fPdoZFNwJaNjX2XinZvHkgw1V8T9GMXflda8V6O6Cj1cN5HL55mWuCokAfLJT0Gf
+kIS0UVjowvU5XonPw4XDt5bmnx5UEp4/buzGDDzUw+YwrHzphCLc4kYv/FaDK3IN
+o8wrWm2uwPUw
+-----END CERTIFICATE-----
+EOF
+}
+
+start_azurite() {
+  echo "*** create azurite configuration"
+  create_azurite_config || return 20
+
+  echo "*** start azurite"
+  azurite_command="sudo azurite --debug azurite.txt --cert 127.0.0.1.pem --key 127.0.0.1-key.pem --loose --skipApiVersionCheck --location ./"
+  local azurite_pid=$(run_background_service "$azurite_command")
+  echo $azurite_pid > azurite_pid
+  echo "*** Azurite PID is $azurite_pid"
+  if [ "x$azurite_pid" = "x" ]; then
+    return 10
+  fi
+
+  sleep 5
+
+  echo "*** create the container and we make it public"
+  export AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=anycontent
+  az storage container create --name 'test' --connection-string 'DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=https://127.0.0.1:10000/devstoreaccount1;' --public-access blob || exit 21
+}
+
+cvmfs_run_test() {
+  if ! running_on_s3; then
+    echo "not running, since s3 tests are blocked"
+    return 1
+  fi
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** setup azurite"
+  start_azurite || return 20
+
+  echo "*** create repository"
+  sudo cvmfs_server mkfs \
+    -o root \
+    -s cvmfs_azurite.conf \
+    -w https://127.0.0.1:10000/devstoreaccount1/test  \
+    azurite.cvmfs.io || return 40
+
+  echo "*** poke around the new repository"
+  sudo cvmfs_server transaction azurite.cvmfs.io || return 50
+  sudo touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
+  sudo cvmfs_server publish azurite.cvmfs.io || return 52
+  sudo ls /cvmfs/azurite.cvmfs.io/miaomiao || return 53
+
+  return 0
+}
