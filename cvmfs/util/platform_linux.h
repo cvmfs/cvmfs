@@ -11,6 +11,7 @@
 #include <sys/xattr.h>
 
 #include <dirent.h>
+#include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -349,6 +350,14 @@ inline uint64_t platform_realtime_ns() {
 inline uint64_t platform_memsize() {
   return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
          static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+}
+
+inline uint16_t platform_htole16(uint16_t host_16bits) {
+  return htole16(host_16bits);
+}
+
+inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
+  return le16toh(little_endian_16bits);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

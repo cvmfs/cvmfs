@@ -18,7 +18,8 @@
 
 using namespace std;  // NOLINT
 
-const uint8_t XattrList::kVersion = 1;
+const uint8_t XattrList::kVersionSmall = 1;
+const uint8_t XattrList::kVersionBig = 2;  // As of cvmfs 2.12
 
 /**
  * Converts all the extended attributes of path into a XattrList.  Attributes
@@ -50,15 +51,27 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
 
   // Retrieve extended attribute values
   XattrList *result = new XattrList();
-  char value[256];
+  char value_smallbuf[255];
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    ssize_t sz_value =
-      platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
-    if (sz_value < 0)
-      continue;
-    result->Set(keys[i], string(value, sz_value));
+
+    char *buffer = value_smallbuf;
+    size_t sz_buffer = 255;
+    ssize_t sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer,
+                                          sz_buffer);
+    while ((sz_value < 0) && (errno == ERANGE)) {
+      if (buffer != value_smallbuf)
+        free(buffer);
+      sz_buffer *= 2;
+      buffer = reinterpret_cast<char *>(smalloc(sz_buffer));
+      sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), buffer,
+                                    sz_buffer);
+    }
+    if (sz_value >= 0)
+      result->Set(keys[i], string(buffer, sz_value));
+    if (buffer != value_smallbuf)
+        free(buffer);
   }
   return result;
 }
@@ -76,25 +89,28 @@ XattrList *XattrList::Deserialize(
     return NULL;
   XattrHeader header;
   memcpy(&header, inbuf, sizeof(header));
-  if (header.version != kVersion)
+  if (!IsSupportedVersion(header.version))
     return NULL;
-  unsigned pos = sizeof(header);
+
+  XattrEntrySerializer entry_serializer(header.version);
+  unsigned char *bufpos = const_cast<unsigned char *>(inbuf);
+  unsigned remain = size;
+  bufpos += sizeof(XattrHeader);
+  remain -= sizeof(XattrHeader);
+
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
-    XattrEntry entry;
-    unsigned size_preamble = sizeof(entry.len_key) + sizeof(entry.len_value);
-    if (size - pos < size_preamble)
+    std::string key;
+    std::string value;
+    uint32_t nbytes =
+      entry_serializer.Deserialize(bufpos, remain, &key, &value);
+    if (nbytes == 0)
       return NULL;
-    memcpy(&entry, inbuf + pos, size_preamble);
-    if (size - pos < entry.GetSize())
-      return NULL;
-    if (entry.GetSize() == size_preamble)
-      return NULL;
-    pos += size_preamble;
-    memcpy(entry.data, inbuf + pos, entry.GetSize() - size_preamble);
-    pos += entry.GetSize() - size_preamble;
-    bool retval = result->Set(entry.GetKey(), entry.GetValue());
+    bool retval = result->Set(key, value);
     if (!retval)
       return NULL;
+
+    remain -= nbytes;
+    bufpos += nbytes;
   }
   return result.Release();
 }
@@ -160,11 +176,11 @@ string XattrList::ListKeysPosix(const string &merge_with) const {
 bool XattrList::Set(const string &key, const string &value) {
   if (key.empty())
     return false;
-  if (key.length() > 256)
+  if (key.length() > 255)
     return false;
   if (key.find('\0') != string::npos)
     return false;
-  if (value.length() > 256)
+  if (value.length() >= 64 * 1024)
     return false;
 
   map<string, string>::iterator iter = xattrs_.find(key);
@@ -204,13 +220,27 @@ void XattrList::Serialize(
     return;
   }
 
-  XattrHeader header(xattrs_.size());
-  uint32_t packed_size = sizeof(header);
+  XattrHeader header;
+  *size = sizeof(header);
 
-  // Determine size of the buffer (allocate space for max num of attributes)
-  XattrEntry *entries = reinterpret_cast<XattrEntry *>(
-    smalloc(header.num_xattrs * sizeof(XattrEntry)));
-  unsigned ientries = 0;
+  for (map<string, string>::const_iterator it_att = xattrs_.begin(),
+       it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
+  {
+    *size += it_att->first.length();
+    *size += it_att->second.length();
+    if (it_att->second.length() > 255)
+      header.version = kVersionBig;
+  }
+
+  XattrEntrySerializer entry_serializer(header.version);
+  *size += xattrs_.size() * entry_serializer.GetHeaderSize();
+  *outbuf = reinterpret_cast<unsigned char *>(smalloc(*size));
+  unsigned char *bufpos = *outbuf;
+
+  // We copy the header at the end when we know the actual number of entries
+  bufpos += sizeof(header);
+
+  header.num_xattrs = 0;
   for (map<string, string>::const_iterator it_att = xattrs_.begin(),
        it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
   {
@@ -227,37 +257,95 @@ void XattrList::Serialize(
       }
       if (skip) continue;
     }
-    /*entries[ientries] =*/
-    new (entries + ientries) XattrEntry(it_att->first, it_att->second);
-    packed_size += entries[ientries].GetSize();
-    ientries++;
+
+    bufpos += entry_serializer.Serialize(it_att->first, it_att->second, bufpos);
+    header.num_xattrs++;
   }
 
   // We might have skipped all attributes
-  if (ientries == 0) {
-    free(entries);
+  if (header.num_xattrs == 0) {
+    free(*outbuf);
     *size = 0;
     *outbuf = NULL;
-    return;
+  } else {
+    memcpy(*outbuf, &header, sizeof(header));
   }
-
-  // Copy data into buffer
-  header.num_xattrs = ientries;
-  *size = packed_size;
-  *outbuf = reinterpret_cast<unsigned char *>(smalloc(packed_size));
-  memcpy(*outbuf, &header, sizeof(header));
-  unsigned pos = sizeof(header);
-  for (unsigned i = 0; i < header.num_xattrs; ++i) {
-    memcpy(*outbuf + pos, &entries[i], entries[i].GetSize());
-    pos += entries[i].GetSize();
-  }
-
-  free(entries);
 }
 
 
 //------------------------------------------------------------------------------
 
+XattrList::XattrEntrySerializer::XattrEntrySerializer(uint8_t version)
+  : version_(version)
+{
+  assert(version_ == kVersionSmall || version_ == kVersionBig);
+}
+
+uint32_t XattrList::XattrEntrySerializer::Serialize(
+  const std::string &key, const std::string &value, unsigned char *to)
+{
+  assert(key.size() < 256);
+  assert(value.size() < ((version_ == kVersionSmall) ? 256 : 64 * 1024));
+
+  const uint8_t len_key = key.size();
+  memcpy(to, &len_key, 1);
+  to += 1;
+
+  if (version_ == kVersionSmall) {
+    const uint8_t len_value = value.size();
+    memcpy(to, &len_value, 1);
+    to += 1;
+  } else {
+    assert(version_ == kVersionBig);
+    const uint16_t len_value = platform_htole16(value.size());
+    memcpy(to, &len_value, 2);
+    to += 2;
+  }
+
+  memcpy(to, key.data(), key.size());
+  to += key.size();
+  memcpy(to, value.data(), value.size());
+  to += value.size();
+
+  return GetHeaderSize() + key.size() + value.size();
+}
+
+uint32_t XattrList::XattrEntrySerializer::Deserialize(
+  const unsigned char *from, uint32_t bufsize,
+  std::string *key, std::string *value)
+{
+  if (bufsize < GetHeaderSize())
+    return 0;
+  bufsize -= GetHeaderSize();
+
+  uint8_t len_key;
+  memcpy(&len_key, from, 1);
+  key->resize(len_key);
+  from += 1;
+
+  if (version_ == kVersionSmall) {
+    uint8_t len_value;
+    memcpy(&len_value, from, 1);
+    value->resize(len_value);
+    from += 1;
+  } else {
+    assert(version_ == kVersionBig);
+    uint16_t len_value;
+    memcpy(&len_value, from, 2);
+    value->resize(platform_le16toh(len_value));
+    from += 2;
+  }
+
+
+  if (bufsize < key->size() + value->size())
+    return 0;
+
+  memcpy(const_cast<char *>(key->data()), from, key->size());
+  from += key->size();
+  memcpy(const_cast<char *>(value->data()), from, value->size());
+
+  return GetHeaderSize() + key->size() + value->size();
+}
 
 string XattrList::XattrEntry::GetKey() const {
   if (len_key == 0)
