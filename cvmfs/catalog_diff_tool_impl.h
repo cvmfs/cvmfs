@@ -103,6 +103,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     return;
   }
 
+  LogCvmfs(kLogReceiver, kLogDebug, "DiffRec: recursing into %s",
+           path.ToString().c_str());
+
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
   old_catalog_mgr_->Listing(path, &old_listing);
@@ -159,15 +162,16 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
 
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
+      bool recurse = new_entry.IsDirectory();
       if (IsReportablePath(new_path)) {
         FileChunkList chunks;
         if (new_entry.IsChunkedFile()) {
           new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                            &chunks);
         }
-        ReportAddition(new_path, new_entry, xattrs, chunks);
+        recurse &= ReportAddition(new_path, new_entry, xattrs, chunks);
       }
-      if (new_entry.IsDirectory()) {
+      if (recurse) {
         DiffRec(new_path);
       }
       continue;
@@ -212,17 +216,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
       if (!recurse) continue;
     }
 
-    if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
-      if (old_entry.IsDirectory()) {
-        DiffRec(old_path);
-      } else if (new_entry.IsDirectory()) {
-        DiffRec(new_path);
-      }
-      continue;
+    if (old_entry.IsDirectory() || new_entry.IsDirectory()) {
+      DiffRec(old_path);
     }
-
-    // Recursion
-    DiffRec(old_path);
   }
 }
 

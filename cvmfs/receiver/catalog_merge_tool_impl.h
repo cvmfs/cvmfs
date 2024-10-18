@@ -108,7 +108,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
@@ -117,9 +117,25 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
 
   if (entry.IsDirectory()) {
-    output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     if (entry.IsNestedCatalogMountpoint()) {
-      output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+      // Install the provided nested catalog in the output catalog manager
+      RoCatalogMgr *new_catalog_mgr =
+        CatalogDiffTool<RoCatalogMgr>::GetNewCatalogMgr();
+      PathString mountpoint;
+      shash::Any nested_hash;
+      uint64_t nested_size;
+      const bool found = new_catalog_mgr->LookupNested(
+        path, &mountpoint, &nested_hash, &nested_size);
+      if (!found || !nested_size) {
+        PANIC(kLogSyslogErr,
+              "CatalogMergeTool - nested catalog %s not found. Aborting",
+              rel_path.c_str());
+      }
+      output_catalog_mgr_->GraftNestedCatalog(rel_path.ToString(),
+                                              nested_hash, nested_size);
+      return false;
+    } else {
+      output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     }
     perf::Inc(counters_->n_directories_added);
   } else if (entry.IsRegular() || entry.IsLink()) {
@@ -141,6 +157,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     }
     perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
+  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
