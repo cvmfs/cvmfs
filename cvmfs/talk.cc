@@ -249,6 +249,27 @@ void *TalkManager::MainResponder(void *data) {
           talk_mgr->Answer(con_fd, StringifyInt(rate) + "\n");
         }
       }
+    } else if (line.substr(0, 15) == "cache limit set") {
+      if (line.length() < 16) {
+        talk_mgr->Answer(con_fd, "Usage: cache limit set <MB>\n");
+      } else {
+        QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
+        const uint64_t size = String2Uint64(line.substr(16));
+        if (size < 1000) {
+            talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
+        } else {
+          if(quota_mgr->SetLimit(size * 1024*1024)) {
+              file_system->options_mgr()->SetValueFromTalk("CVMFS_QUOTA_LIMIT", StringifyUint(size));
+              talk_mgr->Answer(con_fd, "OK\n");
+          } else {
+              talk_mgr->Answer(con_fd, "Limit not reset\n");
+          }
+        }
+      }
+    } else if (line == "cache limit get") {
+      std::string limit_from_options;
+      file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT", &limit_from_options);
+            talk_mgr->Answer(con_fd, limit_from_options + "\n");
     } else if (line.substr(0, 7) == "cleanup") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
       if (!quota_mgr->HasCapability(QuotaManager::kCapShrink)) {

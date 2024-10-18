@@ -186,6 +186,12 @@ class OptionsManager {
   void SetValue(const std::string &key, const std::string &value);
 
   /**
+   * Artificially inject values in the option manager, marking
+     cvmfs_talk as the source.
+   */
+  void SetValueFromTalk(const std::string &key, const std::string &value);
+
+  /**
    * Purge a value from the parameter map.  Used in unit tests.
    */
   void UnsetValue(const std::string &key);
