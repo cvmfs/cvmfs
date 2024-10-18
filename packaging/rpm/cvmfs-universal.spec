@@ -708,7 +708,7 @@ systemctl daemon-reload
 %endif
 
 %changelog
-* Wed Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
+* Tue Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
 - Rename registry-webhook.py to registry_webhook.py to allow imports
 * Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
 - Make cvmfs-libs a dependency of the cvmfs package
