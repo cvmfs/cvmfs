@@ -12,10 +12,16 @@
 #include "cache.h"
 #include "crypto/hash.h"
 #include "fd_table.h"
+#include "ring_buffer.h"
+#include "smallhash.h"
 #include "util/pointer.h"
 
 namespace download {
 class DownloadManager;
+}
+namespace perf {
+class Counter;
+class Statistics;
 }
 
 /**
@@ -24,10 +30,26 @@ class DownloadManager;
  */
 class StreamingCacheManager : public CacheManager {
  public:
+  static const size_t kDefaultBufferSize;
+
+  struct Counters {
+    perf::Counter *sz_transferred_bytes;
+    perf::Counter *sz_transfer_ms;
+    perf::Counter *n_downloads;
+    perf::Counter *n_buffer_hits;
+    perf::Counter *n_buffer_evicts;
+    perf::Counter *n_buffer_objects;
+    perf::Counter *n_buffer_obstacles;
+
+    explicit Counters(perf::Statistics *statistics);
+  };
+
   StreamingCacheManager(unsigned max_open_fds,
                         CacheManager *cache_mgr,
                         download::DownloadManager *regular_download_mgr,
-                        download::DownloadManager *external_download_mgr);
+                        download::DownloadManager *external_download_mgr,
+                        size_t buffer_size,
+                        perf::Statistics *statistics);
   virtual ~StreamingCacheManager();
 
   // In the files system / mountpoint initialization, we create the cache
@@ -88,6 +110,8 @@ class StreamingCacheManager : public CacheManager {
   // root catalog fd, that has been already opened in the backing cache manager
   int PlantFd(int fd_in_cache_mgr);
 
+  const Counters &counters() const { return *counters_; }
+
  protected:
   virtual void *DoSaveState();
   virtual int DoRestoreState(void *data);
@@ -138,6 +162,14 @@ class StreamingCacheManager : public CacheManager {
 
   pthread_mutex_t *lock_fd_table_;
   FdTable<FdInfo> fd_table_;
+
+  /// A small in-memory cache to avoid frequent re-downloads if multiple blocks
+  /// from the same chunk are read
+  UniquePtr<RingBuffer> buffer_;
+  SmallHashDynamic<shash::Any, RingBuffer::ObjectHandle_t> buffered_objects_;
+  pthread_mutex_t *lock_buffer_;
+
+  UniquePtr<Counters> counters_;
 };  // class StreamingCacheManager
 
 #endif  // CVMFS_CACHE_STREAM_H_
