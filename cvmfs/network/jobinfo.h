@@ -99,6 +99,7 @@ class JobInfo {
   z_stream zstream_;
   shash::ContextPtr hash_context_;
   std::string proxy_;
+  std::string link_;
   bool nocache_;
   Failures error_code_;
   int http_code_;
@@ -196,6 +197,7 @@ class JobInfo {
   z_stream zstream() const { return zstream_; }
   shash::ContextPtr hash_context() const { return hash_context_; }
   std::string proxy() const { return proxy_; }
+  std::string link() const { return link_; }
   bool nocache() const { return nocache_; }
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
@@ -246,6 +248,7 @@ class JobInfo {
   void SetHashContext(shash::ContextPtr hash_context)
                                                { hash_context_ = hash_context; }
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
+  void SetLink(const std::string &link) { link_ = link; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }

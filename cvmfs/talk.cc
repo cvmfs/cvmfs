@@ -96,6 +96,24 @@ TalkManager *TalkManager::Create(
 }
 
 
+string TalkManager::FormatMetalinkInfo(download::DownloadManager *download_mgr)
+{
+  vector<string> metalink_chain;
+  unsigned active_metalink;
+
+  download_mgr->GetMetalinkInfo(&metalink_chain, &active_metalink);
+  if (metalink_chain.size() == 0)
+    return "No metalinks defined\n";
+
+  string metalink_str;
+  for (unsigned i = 0; i < metalink_chain.size(); ++i) {
+    metalink_str += "  [" + StringifyInt(i) + "] " + metalink_chain[i];
+  }
+  metalink_str += "Active metalink " + StringifyInt(active_metalink) + ": " +
+              metalink_chain[active_metalink] + "\n";
+  return metalink_str;
+}
+
 string TalkManager::FormatHostInfo(download::DownloadManager *download_mgr) {
   vector<string> host_chain;
   vector<int> rtt;
@@ -407,6 +425,10 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->download_mgr()->SetDnsServer(host);
         talk_mgr->Answer(con_fd, "OK\n");
       }
+    } else if (line == "external metalink info") {
+      string external_metalink_info =
+        talk_mgr->FormatMetalinkInfo(mount_point->external_download_mgr());
+      talk_mgr->Answer(con_fd, external_metalink_info);
     } else if (line == "external host info") {
       string external_host_info =
         talk_mgr->FormatHostInfo(mount_point->external_download_mgr());
@@ -423,12 +445,23 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       else
         talk_mgr->Answer(con_fd, "Failed\n");
+    } else if (line == "external metalink switch") {
+      mount_point->external_download_mgr()->SwitchMetalink();
+      talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "external host switch") {
       mount_point->external_download_mgr()->SwitchHost();
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "host switch") {
       mount_point->download_mgr()->SwitchHost();
       talk_mgr->Answer(con_fd, "OK\n");
+    } else if (line.substr(0, 21) == "external metalink set") {
+      if (line.length() < 23) {
+        talk_mgr->Answer(con_fd, "Usage: external metalink set <URL>\n");
+      } else {
+        const std::string host = line.substr(22);
+        mount_point->external_download_mgr()->SetMetalinkChain(host);
+        talk_mgr->Answer(con_fd, "OK\n");
+      }
     } else if (line.substr(0, 17) == "external host set") {
       if (line.length() < 19) {
         talk_mgr->Answer(con_fd, "Usage: external host set <URL>\n");
