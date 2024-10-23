@@ -104,10 +104,12 @@ class JobInfo {
   Failures error_code_;
   int http_code_;
   unsigned char num_used_proxies_;
+  unsigned char num_used_metalinks_;
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
   unsigned backoff_ms_;
-  unsigned int current_host_chain_index_;
+  int current_metalink_chain_index_;
+  int current_host_chain_index_;
 
   // Don't fail-over proxies on download errors. default = false
   bool allow_failure_;
@@ -202,11 +204,13 @@ class JobInfo {
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
   unsigned char num_used_proxies() const { return num_used_proxies_; }
+  unsigned char num_used_metalinks() const { return num_used_metalinks_; }
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
   unsigned backoff_ms() const { return backoff_ms_; }
-  unsigned int current_host_chain_index() const {
-                                             return current_host_chain_index_; }
+  int current_metalink_chain_index() const {
+                                         return current_metalink_chain_index_; }
+  int current_host_chain_index() const { return current_host_chain_index_; }
 
   bool allow_failure() const { return allow_failure_; }
   int64_t id() const { return id_; }
@@ -254,11 +258,15 @@ class JobInfo {
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies)
                                        { num_used_proxies_ = num_used_proxies; }
+  void SetNumUsedMetalinks(unsigned char num_used_metalinks)
+                                   { num_used_metalinks_ = num_used_metalinks; }
   void SetNumUsedHosts(unsigned char num_used_hosts)
                                            { num_used_hosts_ = num_used_hosts; }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
-  void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
+  void SetCurrentMetalinkChainIndex(int current_metalink_chain_index)
+               { current_metalink_chain_index_ = current_metalink_chain_index; }
+  void SetCurrentHostChainIndex(int current_host_chain_index)
                        { current_host_chain_index_ = current_host_chain_index; }
 
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }

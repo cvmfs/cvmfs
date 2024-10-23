@@ -251,6 +251,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     return 0;
   }
 
+  unsigned num_metalinks() {
+    if (opt_metalink_.chain) return opt_metalink_.chain->size();
+    return 0;
+  }
+
   dns::IpPreference opt_ip_preference() const {
     return opt_ip_preference_;
   }
@@ -286,7 +291,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void InitHeaders();
   void CloneProxyConfig(DownloadManager *clone);
   void CheckHostInfoReset(const std::string typ, HostInfo &info,
-                          JobInfo *jobinfo);
+                          JobInfo *jobinfo, time_t &now);
 
   bool EscapeUrlChar(unsigned char input, char output[3]);
   std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
@@ -341,10 +346,10 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
 
   // Metalink
   HostInfo opt_metalink_;
+  time_t opt_metalink_timestamp_link_;
 
   // Host list
   HostInfo opt_host_;
-
   /**
    * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
    * .cvmfschecksum in ms. -1 is unprobed, -2 is error.

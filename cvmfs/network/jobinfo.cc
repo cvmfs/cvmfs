@@ -67,10 +67,12 @@ void JobInfo::Init() {
   error_code_ = kFailOther;
   http_code_ = -1;
   num_used_proxies_ = 0;
+  num_used_metalinks_ = 0;
   num_used_hosts_ = 0;
   num_retries_ = 0;
   backoff_ms_ = 0;
-  current_host_chain_index_ = 0;
+  current_metalink_chain_index_ = -1;
+  current_host_chain_index_ = -1;
 
   allow_failure_ = false;
 

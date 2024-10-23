@@ -107,7 +107,7 @@ string TalkManager::FormatMetalinkInfo(download::DownloadManager *download_mgr)
 
   string metalink_str;
   for (unsigned i = 0; i < metalink_chain.size(); ++i) {
-    metalink_str += "  [" + StringifyInt(i) + "] " + metalink_chain[i];
+    metalink_str += "  [" + StringifyInt(i) + "] " + metalink_chain[i] + "\n";
   }
   metalink_str += "Active metalink " + StringifyInt(active_metalink) + ": " +
               metalink_chain[active_metalink] + "\n";

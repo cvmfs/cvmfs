@@ -2146,6 +2146,8 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
     external_download_mgr_->SetMetalinkChain(optarg);  
     // host chain will be set later when the metalink server is contacted
     external_download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    external_download_mgr_->EnableRedirects();
   } else if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
     external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
