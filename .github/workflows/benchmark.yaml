@@ -28,16 +28,71 @@ jobs:
           wget https://github.com/containerd/nerdctl/releases/download/v$VERSION/nerdctl-full-$VERSION-linux-amd64.tar.gz
           sudo tar Cxzvvf /usr/local nerdctl-full-$VERSION-linux-amd64.tar.gz
           sudo systemctl enable --now containerd
-
-      - name: Install cvmfs
+      
+      - name: Install cvmfs dependencies
         run: |
-          sudo apt install lsb-release -y
-          if [ ! -f /tmp/cvmfs-release-latest_all.deb ]; then
-              wget https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest_all.deb -O /tmp/cvmfs-release-latest_all.deb
-          fi
-          sudo dpkg -i /tmp/cvmfs-release-latest_all.deb
-          sudo apt update
-          sudo apt install -y cvmfs
+          sudo apt-get -y update && sudo apt-get -y upgrade
+          sudo apt-get -y install \
+              autotools-dev \
+              build-essential \
+              make \
+              cmake \
+              cpio \
+              debhelper \
+              devscripts \
+              gdb \
+              gcc \
+              g++ \
+              git \
+              golang \
+              attr \
+              autofs \
+              libattr1-dev \
+              libcap-dev \
+              libffi-dev \
+              libfuse-dev \
+              libfuse3-dev \
+              libssl-dev \
+              pkg-config \
+              python3-dev \
+              python3-setuptools \
+              ruby \
+              ruby-dev \
+              rubygems \
+              unzip \
+              uuid-dev \
+              valgrind \
+              zlib1g-dev
+          
+          sudo sed -i /etc/apt/sources.list -e 's/main$/main universe/'
+          sudo apt-get -y update
+
+          sudo apt-get -y install \
+              autoconf \
+              bison \
+              doxygen \
+              graphviz \
+              gsfonts \
+              flex \
+              libhesiod-dev \
+              libkrb5-dev \
+              libldap2-dev \
+              libsasl2-dev \
+              libxml2-dev \
+              sssd-common
+
+          pip install setuptools
+
+      - name: Build cvmfs
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DBUILD_SNAPSHOTTER=ON
+          make
+          sudo make install
+
+      - name: Configure cvmfs
+        run: |
           sudo cvmfs_config setup
           sudo sh -c "echo "CVMFS_HTTP_PROXY=DIRECT" > /etc/cvmfs/default.local"
           sudo sh -c "echo "CVMFS_DEBUGLOG=/tmp/cvmfs.log" >> /etc/cvmfs/default.local"
@@ -47,13 +102,10 @@ jobs:
           sudo mkdir -p /cvmfs/unpacked.cern.ch
           sudo mount -t cvmfs unpacked.cern.ch /cvmfs/unpacked.cern.ch
 
-      - name: Install cvmfs-snapshotter
+      - name: Configure cvmfs-snapshotter
         run: |
-          cd snapshotter
-          go mod tidy
-          go build -o cvmfs_snapshotter
-          sudo cp cvmfs_snapshotter /usr/local/bin/cvmfs_snapshotter
-          sudo cp script/config/etc/systemd/system/cvmfs-snapshotter.service /etc/systemd/system/
+          sudo cp build/snapshotter/cvmfs_snapshotter /usr/local/bin/cvmfs_snapshotter
+          sudo cp snapshotter/script/config/etc/systemd/system/cvmfs-snapshotter.service /etc/systemd/system/
           sudo mkdir -p /etc/containerd-cvmfs-grpc && sudo touch /etc/containerd-cvmfs-grpc/config.toml
           sudo tee /etc/containerd/config.toml > /dev/null <<EOL
           version = 2
