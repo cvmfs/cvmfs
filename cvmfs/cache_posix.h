@@ -73,7 +73,7 @@ class PosixCacheManager : public CacheManager {
     const std::string &cache_path,
     const bool alien_cache,
     const RenameWorkarounds rename_workaround = kRenameNormal,
-    const bool do_refcount = false);
+    const bool do_refcount = true);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 

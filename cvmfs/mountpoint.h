@@ -265,7 +265,7 @@ class FileSystem : SingleCopy, public BootFactory {
     PosixCacheSettings() :
       is_shared(false), is_alien(false), is_managed(false),
       avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
-      quota_limit(0), do_refcount(false)
+      quota_limit(0), do_refcount(true)
       { }
     bool is_shared;
     bool is_alien;

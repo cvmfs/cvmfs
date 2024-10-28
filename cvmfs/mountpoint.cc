@@ -301,9 +301,9 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_REFCOUNT", instance),
                              &optarg)
-      && options_mgr_->IsOn(optarg))
+      && options_mgr_->IsOff(optarg))
   {
-    settings.do_refcount = true;
+    settings.do_refcount = false;
   }
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
