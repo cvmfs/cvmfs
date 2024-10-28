@@ -1234,7 +1234,7 @@ cvmfs_reload() {
       kill -s USR1 $(cat $pidfile)
       rm -f $pidfile
       if [ x"$sys_arch" = x"Darwin" ]; then
-        sleep 30
+        sleep 90
       fi
     done
   fi
