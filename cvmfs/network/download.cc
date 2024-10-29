@@ -226,7 +226,14 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     // This is metalink info
     LogCvmfs(kLogDownload, kLogDebug, "(id %" PRId64 ") %s",
                                       info->id(), header_line.c_str());
-    info->SetLink(header_line.substr(5));
+    std::string link = info->link();
+    if (link.size() != 0) {
+      // multiple LINK headers are allowed
+      link = link + ", " + header_line.substr(5);
+    } else {
+      link = header_line.substr(5);
+    }
+    info->SetLink(link);
   } else if (HasPrefix(header_line, "X-SQUID-ERROR:", true)) {
     // Reinterpret host error as proxy error
     if (info->error_code() == kFailHostHttp) {
@@ -1009,7 +1016,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
 }
 
 void DownloadManager::CheckHostInfoReset(
-    std::string typ,
+    const std::string &typ,
     HostInfo &info,
     JobInfo *jobinfo,
     time_t &now)
@@ -1399,6 +1406,81 @@ void DownloadManager::ReleaseCredential(JobInfo *info) {
 }
 
 
+/* Sort links based on the "pri=" parameter */
+static bool sortlinks(const std::string &s1, const std::string s2) {
+  const size_t pos1 = s1.find("; pri=");
+  const size_t pos2 = s2.find("; pri=");
+  int pri1, pri2;
+  if ((pos1 != std::string::npos) &&
+      (pos2 != std::string::npos) &&
+      (sscanf(s1.substr(pos1+6).c_str(), "%d", &pri1) == 1) &&
+      (sscanf(s2.substr(pos2+6).c_str(), "%d", &pri2) == 1)) {
+    return pri1 < pri2;
+  }
+  return false;
+}
+
+/**
+ * Parses Link header and uses it to set a new host chain.
+ * See rfc6249.
+ */
+void DownloadManager::ProcessLink(JobInfo *info) {
+
+  std::vector<std::string> links = SplitString(info->link(), ',');
+  if (info->link().find("; pri=") != std::string::npos)
+    std::sort(links.begin(), links.end(), sortlinks);
+
+  std::vector<std::string> host_list;
+
+  std::vector<std::string>::const_iterator il = links.begin();
+  for (; il != links.end(); ++il) {
+    const std::string &link = *il;
+    if ((link.find("; rel=duplicate") == std::string::npos) &&
+        (link.find("; rel=\"duplicate\"") == std::string::npos)) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "skipping link '%s' because it does not contain rel=duplicate",
+        link.c_str());
+      continue;
+    }
+    // ignore depth= field since there's nothing useful we can do with it
+
+    size_t start = link.find('<');
+    if (start == std::string::npos) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "skipping link '%s' because it does not have a left angle bracket",
+        link.c_str());
+      continue;
+    }
+
+    start++;
+    if ((link.substr(start, 7) != "http://") &&
+        (link.substr(start, 8) != "https://")) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "skipping link '%s' of unrecognized url protocol", link.c_str());
+      continue;
+    }
+
+    size_t end = link.find('/', start+8);
+    if (end == std::string::npos)
+      end = link.find('>');
+    if (end == std::string::npos) {
+      LogCvmfs(kLogDownload, kLogDebug,
+        "skipping link '%s' because no slash in url and no right angle bracket",
+        link.c_str());
+      continue;
+    }
+    const std::string host = link.substr(start, end-start);
+    LogCvmfs(kLogDownload, kLogDebug, "adding linked host '%s'", host.c_str());
+    host_list.push_back(host);
+  }
+
+  if (host_list.size() > 0) {
+    SetHostChain(host_list);
+    opt_metalink_timestamp_link_ = time(NULL);
+  }
+}
+
+
 /**
  * Checks the result of a curl download and implements the failure logic, such
  * as changing the proxy server.  Takes care of cleanup.
@@ -1411,6 +1493,21 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
                            name_.c_str(), info->id(), info->url()->c_str(),
                            info->proxy().c_str(), curl_error);
   UpdateStatistics(info->curl_handle());
+
+  bool was_metalink;
+  std::string typ;
+  if (info->current_metalink_chain_index() >= 0) {
+    was_metalink = true;
+    typ = "metalink";
+    if (info->link() != "") {
+      // process Link header whether or not the redirected URL got an error
+      ProcessLink(info);
+    }
+  } else {
+    was_metalink = false;
+    typ = "host";
+  }
+
 
   // Verification and error classification
   switch (curl_error) {
@@ -1512,18 +1609,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
   }
 
-  bool was_metalink;
-  std::string typ;
   std::vector<std::string> *host_chain;
   unsigned char num_used_hosts;
-  if (info->current_metalink_chain_index() >= 0) {
-    was_metalink = true;
-    typ = "metalink";
+  if (was_metalink) {
     host_chain = opt_metalink_.chain;
     num_used_hosts = info->num_used_metalinks();
   } else {
-    was_metalink = false;
-    typ = "host";
     host_chain = opt_host_.chain;
     num_used_hosts = info->num_used_hosts();
   }
@@ -1580,7 +1671,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
               {
                 opt_proxy_groups_current_ = 0;
                 opt_timestamp_backup_proxies_ = 0;
-                std::string msg = "reset proxies for " + typ + " failover";
+                const std::string msg =
+                  "reset proxies for " + typ + " failover";
                 RebalanceProxiesUnlocked(msg);
               }
             }
@@ -1924,6 +2016,9 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->GetHashContextPtr()->size = shash::GetContextSize(algorithm);
     info->GetHashContextPtr()->buffer = alloca(info->hash_context().size);
   }
+
+  // In case JobInfo object is being reused
+  info->SetLink("");
 
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
@@ -2286,7 +2381,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
  * the current host is identical to the one used by jobinfo, otherwise another
  * transfer has already done the switch.
  */
-void DownloadManager::SwitchHostInfo(const std::string typ,
+void DownloadManager::SwitchHostInfo(const std::string &typ,
                                      HostInfo &info,
                                      JobInfo *jobinfo) {
   MutexLockGuard m(lock_options_);
@@ -2297,10 +2392,11 @@ void DownloadManager::SwitchHostInfo(const std::string typ,
 
   if (jobinfo) {
     unsigned lastused;
-    if (typ == "host")
+    if (typ == "host") {
       lastused = jobinfo->current_host_chain_index();
-    else
+    } else {
       lastused = jobinfo->current_metalink_chain_index();
+    }
     if (lastused != info.current) {
       LogCvmfs(kLogDownload, kLogDebug,
                "(manager '%s' - id %" PRId64 ")"
@@ -2321,7 +2417,7 @@ void DownloadManager::SwitchHostInfo(const std::string typ,
   }
   info_id += ")";
 
-  string old_host = (*info.chain)[info.current];
+  const std::string old_host = (*info.chain)[info.current];
   info.current = (info.current + 1) % info.chain->size();
   if (typ == "host") {
     perf::Inc(counters_->n_host_failover);
@@ -3153,6 +3249,7 @@ DownloadManager *DownloadManager::Clone(
   clone->proxy_template_direct_ = proxy_template_direct_;
   clone->proxy_template_forced_ = proxy_template_forced_;
   clone->opt_proxy_groups_reset_after_ = opt_proxy_groups_reset_after_;
+  clone->opt_metalink_.reset_after = opt_metalink_.reset_after;
   clone->opt_host_.reset_after = opt_host_.reset_after;
   clone->credentials_attachment_ = credentials_attachment_;
   clone->ssl_certificate_store_ = ssl_certificate_store_;

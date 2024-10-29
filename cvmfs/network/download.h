@@ -127,7 +127,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     HostInfo() { }
     HostInfo(
         std::vector<std::string> *chain,
-        const unsigned current,
+        const int current,
         const time_t timestamp_backup,
         const unsigned reset_after)
       : chain(chain)
@@ -269,7 +269,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
-  void SwitchHostInfo(std::string typ, HostInfo &info, JobInfo *jobinfo);
+  void SwitchHostInfo(const std::string &typ, HostInfo &info, JobInfo *jobinfo);
   void SwitchMetalink(JobInfo *info);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
@@ -287,10 +287,11 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
   void SetRegularCache(JobInfo *info);
+  void ProcessLink(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
   void CloneProxyConfig(DownloadManager *clone);
-  void CheckHostInfoReset(const std::string typ, HostInfo &info,
+  void CheckHostInfoReset(const std::string &typ, HostInfo &info,
                           JobInfo *jobinfo, time_t &now);
 
   bool EscapeUrlChar(unsigned char input, char output[3]);
@@ -344,7 +345,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_http_tracing_;
   std::vector<std::string> http_tracing_headers_;
 
-  // Metalink
+  // Metalink list
   HostInfo opt_metalink_;
   time_t opt_metalink_timestamp_link_;
 

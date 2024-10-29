@@ -1421,7 +1421,13 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetFailoverIndefinitely();
   }
 
-  if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
+    download_mgr_->SetMetalinkChain(optarg);  
+    // host chain will be set later when the metalink server is contacted
+    download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    download_mgr_->EnableRedirects();
+  } else if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(optarg);
   }
 
