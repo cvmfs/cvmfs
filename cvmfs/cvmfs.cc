@@ -1278,6 +1278,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     assert(retval);
 
     fi->fh = chunk_tables->next_handle;
+    CVMFS_TEST_INJECT_BARRIER("_CVMFS_TEST_BARRIER_OPEN_CHUNKED");
     if (dirent.IsDirectIo()) {
       open_directives = mount_point_->page_cache_tracker()->OpenDirect();
     } else {
