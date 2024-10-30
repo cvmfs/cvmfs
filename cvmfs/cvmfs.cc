@@ -1326,9 +1326,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       // not returning an fd, so close the page cache tracker entry if required
       if (!dirent.IsDirectIo()) {
-        fuse_remounter_->fence()->Enter();
+        assert(!open_directives.direct_io);
         mount_point_->page_cache_tracker()->Close(ino);
-        fuse_remounter_->fence()->Leave();
       }
       fuse_reply_err(req, EMFILE);
       perf::Inc(file_system_->n_emfile());
@@ -1340,9 +1339,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   // fd < 0
   // the download has failed. Close the page cache tracker entry if required
   if (!dirent.IsDirectIo()) {
-    fuse_remounter_->fence()->Enter();
+    assert(!open_directives.direct_io);
     mount_point_->page_cache_tracker()->Close(ino);
-    fuse_remounter_->fence()->Leave();
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
