@@ -317,8 +317,6 @@ void PageCacheTracker::InitLock() {
 PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   uint64_t inode, const shash::Any &hash, const struct stat &info)
 {
-  assert(inode == info.st_ino);
-
   OpenDirectives open_directives;
   // Old behavior: always flush page cache on open
   if (!is_active_)
@@ -446,7 +444,6 @@ void PageCacheTracker::Close(uint64_t inode) {
             "invalid inode in page cache tracker: inode %" PRIu64
             ", replacing %" PRIu64, inode_update, inode);
     }
-    assert(retval);
     entry_update.idx_stat = entry.idx_stat;
     map_.Insert(inode_update, entry_update);
     entry.idx_stat = -1;
