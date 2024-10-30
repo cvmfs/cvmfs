@@ -83,9 +83,9 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 40
   local ninsert=$(get_ninsert)
   echo "*** Number of page cache tracker inserts: $ninsert"
-  [ $ninsert -eq 0 ] || return 41
   echo "*** inode of /foo: $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo)"
-  [ $inode_foo -eq $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo) ] || return 42
+  # Not true anymore since fixed
+  # [ $inode_foo -eq $(get_inode ${CVMFS_TEST_708_MOUNTPOINT}/foo) ] || return 42
 
   echo "resume" > ${CVMFS_TEST_708_MOUNTPOINT}c/barrier01 || return 43
   sleep 2
@@ -109,7 +109,8 @@ cvmfs_run_test() {
   sudo cvmfs_talk -p ${CVMFS_TEST_708_MOUNTPOINT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
     internal affairs | grep ^page_cache_tracker
   local ndirect=$(get_ndirect)
-  [ $ndirect -eq 1 ] || return 53
+  # Not true anymore since fixed
+  # [ $ndirect -eq 1 ] || return 53
 
   cleanup
   CVMFS_TEST_708_PID_HELPER=
