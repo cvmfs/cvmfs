@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Repreoducer for https://github.com/cvmfs/cvmfs/issues/3481
+# Reproducer for https://github.com/cvmfs/cvmfs/issues/3481
 
 cvmfs_test_name="Test inode management when files change"
 cvmfs_test_autofs_on_startup=false
