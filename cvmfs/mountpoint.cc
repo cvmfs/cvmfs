@@ -1530,6 +1530,45 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
+  // parallel decompression
+  int64_t parallel_dwld_min_buffers = -1;
+  int64_t parallel_dwld_max_buffers = -1;
+  int64_t parallel_dwld_inflight_buffers = -1;
+
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MIN_BUFFERS", &optarg)) {
+    parallel_dwld_min_buffers = String2Int64(optarg);
+    if (parallel_dwld_min_buffers < 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+          "Ignoring CVMFS_PARALLEL_DOWNLOAD_MIN_BUFFERS as it must be >= 0. "
+          "Value given %s.", optarg.c_str());
+      parallel_dwld_min_buffers = -1;
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_MAX_BUFFERS", &optarg)) {
+    parallel_dwld_max_buffers = String2Int64(optarg);
+    if (parallel_dwld_max_buffers < 0) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+          "Ignoring CVMFS_PARALLEL_DOWNLOAD_MAX_BUFFERS as it must be >= 0. "
+          "Value given %s", optarg.c_str());
+      parallel_dwld_max_buffers = -1;
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_PARALLEL_DOWNLOAD_INFLIGHT_BUFFERS",
+                             &optarg)) {
+    parallel_dwld_inflight_buffers = String2Int64(optarg);
+    if (parallel_dwld_inflight_buffers < 1) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+         "Ignoring CVMFS_PARALLEL_DOWNLOAD_INFLIGHT_BUFFERS as it must be >= 1."
+         " Value given %s", optarg.c_str());
+      parallel_dwld_inflight_buffers = -1;
+    }
+  }
+  download_mgr_->InitParallelDownload(parallel_dwld_min_buffers,
+                                      parallel_dwld_max_buffers,
+                                      parallel_dwld_inflight_buffers);
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
