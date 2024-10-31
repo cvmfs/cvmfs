@@ -1213,6 +1213,7 @@ cvmfs_reload() {
           rm -rf "$dir" && \
             mkdir -p "$dir" && \
             chown $CVMFS_USER "$dir"
+            sleep 15
           if [ $? -ne 0 ]; then
             echo "Failed!"
             RETVAL=1
@@ -1233,9 +1234,6 @@ cvmfs_reload() {
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
       kill -s USR1 $(cat $pidfile)
       rm -f $pidfile
-      if [ x"$sys_arch" = x"Darwin" ]; then
-        sleep 90
-      fi
     done
   fi
   wait
@@ -1268,7 +1266,7 @@ cvmfs_probe() {
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
         if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
-          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^fuse-t
+          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
         else 
           df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
         fi
