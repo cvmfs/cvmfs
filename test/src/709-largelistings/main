@@ -1,0 +1,46 @@
+#!/bin/bash
+cvmfs_test_name="Large directory listings"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_709_MOUNTPOINT=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_709_MOUNTPOINT ]; then
+    sudo umount $CVMFS_TEST_709_MOUNTPOINT
+    rmdir $CVMFS_TEST_709_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "*** create repository structure"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  for n in 10000 20000 40000 80000; do
+     echo "*** create $n files in a directory"
+     mkdir /cvmfs/$CVMFS_TEST_REPO/$n
+     for i in $(seq 1 $n); do
+       touch /cvmfs/$CVMFS_TEST_REPO/$n/$i
+     done
+  done
+  cvmfs_server publish $CVMFS_TEST_REPO || return 3
+
+  echo "*** setup cleanup handler"
+  trap cleanup EXIT HUP INT TERM || return 10
+
+  echo "*** create pure cvmfs mountpoint of the new repository"
+  mkdir mnt
+  CVMFS_TEST_709_MOUNTPOINT="$(pwd)/mnt"
+  do_non_debug_local_mount "$CVMFS_TEST_709_MOUNTPOINT" \
+                           "$CVMFS_TEST_REPO" \
+                           "$(get_repo_url $CVMFS_TEST_REPO)"
+
+  for n in 10000 20000 40000 80000; do
+    time ls -la "$CVMFS_TEST_709_MOUNTPOINT/$n/" > /dev/null
+  done
+
+  return 0
+}
