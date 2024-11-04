@@ -305,13 +305,7 @@ endif (NOT MACOSX)
 look_for_required_include_files (${REQUIRED_HEADERS})
 look_for_optional_include_files (${OPTIONAL_HEADERS})
 
-#
-# configure the config.h.in file
-#
-configure_file (
-  "${CMAKE_SOURCE_DIR}/config_cmake.h.in"
-  "${CMAKE_BINARY_DIR}/cvmfs_config.h"
-)
+
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
 
