@@ -21,6 +21,9 @@ set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 12)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+add_compile_definitions(CVMFS_PATCH_LEVEL="${CernVM-FS_VERSION_PATCH}")
+
 
 #
 # set the path where cmake looks for additional modules
