@@ -59,11 +59,18 @@ CVMFS_INFLUX_METRIC_NAME=cvmfs_client_counters"
                       | awk '{split($0,a,"md5_path_cache.n_miss="); split(a[2],b,","); print b[1]}')
 
   # static value: 1 unique value in absolute and delta value must be 0
+  echo "Check results"
+  echo "Static value"
+  echo "   1 unique value in absolute"
   [ "$count_static_absolute" -eq "1" ] || return 11
+  echo "   delta value must be 0"
   [ "$check_delta_static" -eq "0" ] || return 12
 
   # dynamic value: 2 unique values in absolute and delta value must NOT be 0
+  echo "Dynamic value"
+  echo "   2 unique values in absolute"
   [ "$count_dynamic_absolute" -eq "2" ] || return 21
+  echo "   delta value must NOT be 0"
   [ "$check_delta_dynamic" -eq "0" ] && return 22
 
   echo "   ... Success"

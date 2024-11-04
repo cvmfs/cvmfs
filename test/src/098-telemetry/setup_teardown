@@ -15,7 +15,10 @@ test098_unmount() {
 cleanup() {
   echo "cleanup $cvmfs_test_name"
   if [ "x$CVMFS_TEST_098_TMPFILE" != "x" ]; then
+    echo ""
+    echo ""
+    echo "Log content:"
+    cat $CVMFS_TEST_098_TMPFILE
     rm $CVMFS_TEST_098_TMPFILE
   fi
 }
-
