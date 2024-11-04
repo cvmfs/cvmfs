@@ -618,7 +618,7 @@ TEST_F(T_CacheManager, Dup) {
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
-  EXPECT_NE(fd, fd_dup);
+  EXPECT_EQ(fd, fd_dup);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd_dup));
 }

@@ -463,7 +463,7 @@ TEST_F(T_Fetcher, SignalWaitingThreads) {
   ReadPipe(tls_pipe[0], &fd_return1, sizeof(fd_return1));
   ReadPipe(tls_pipe[0], &fd_return2, sizeof(fd_return2));
   EXPECT_EQ(-1, fd_return0);
-  EXPECT_NE(fd, fd_return1);
+  EXPECT_EQ(fd, fd_return1);
   EXPECT_EQ(0, cache_mgr_->Close(fd_return1));
   EXPECT_EQ(-EBADF, fd_return2);
 
