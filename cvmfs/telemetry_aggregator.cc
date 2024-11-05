@@ -75,19 +75,6 @@ void TelemetryAggregator::ManuallyUpdateSelectedCounters() {
   if (!mount_point_) {
     return;
   }
-  // Manually setting the values of the ShortString counters
-  mount_point_->statistics()->Lookup("pathstring.n_instances")->
-                                               Set(PathString::num_instances());
-  mount_point_->statistics()->Lookup("pathstring.n_overflows")->
-                                               Set(PathString::num_overflows());
-  mount_point_->statistics()->Lookup("namestring.n_instances")->
-                                               Set(NameString::num_instances());
-  mount_point_->statistics()->Lookup("namestring.n_overflows")->
-                                               Set(NameString::num_overflows());
-  mount_point_->statistics()->Lookup("linkstring.n_instances")->
-                                               Set(LinkString::num_instances());
-  mount_point_->statistics()->Lookup("linkstring.n_overflows")->
-                                               Set(LinkString::num_overflows());
 
   // Manually setting the inode tracker numbers
   glue::InodeTracker::Statistics inode_stats =
