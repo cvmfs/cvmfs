@@ -18,9 +18,12 @@
 #include <vector>
 
 #include "gtest/gtest_prod.h"
+#include "mountpoint.h"
 #include "options.h"
 #include "statistics.h"
 #include "util/single_copy.h"
+
+class MountPoint;
 
 namespace perf {
 
@@ -55,6 +58,7 @@ class TelemetryAggregator : SingleCopy {
   static TelemetryAggregator* Create(Statistics* statistics,
                                      int send_rate,
                                      OptionsManager *options_mgr,
+                                     MountPoint* mount_point,
                                      const std::string &fqrn,
                                      const TelemetrySelector type);
   virtual ~TelemetryAggregator();
@@ -67,6 +71,7 @@ class TelemetryAggregator : SingleCopy {
  protected:
   Statistics* statistics_;
   const int send_rate_sec_;
+  MountPoint* mount_point_;
   int pipe_terminate_[2];
   pthread_t thread_telemetry_;
   std::string fqrn_;
@@ -94,9 +99,10 @@ class TelemetryAggregator : SingleCopy {
    * Must always be called in the constructor of the custom telemetry classes.
   */
   TelemetryAggregator(Statistics* statistics, int send_rate_sec,
-                      const std::string &fqrn) :
+                      MountPoint* mount_point, const std::string &fqrn) :
                       statistics_(statistics),
                       send_rate_sec_(send_rate_sec),
+                      mount_point_(mount_point),
                       fqrn_(fqrn),
                       is_zombie_(true),
                       timestamp_(0) {
@@ -112,6 +118,13 @@ class TelemetryAggregator : SingleCopy {
    * Needs to be implemented in the custom telemetry class.
   */
   virtual void PushMetrics() = 0;
+
+ private:
+  /**
+   * Some counters must be manually set to get the current value.
+   * Copied from talk.cc:MainResponder()
+   */
+  void ManuallyUpdateSelectedCounters();
 };
 
 }  // namespace perf
