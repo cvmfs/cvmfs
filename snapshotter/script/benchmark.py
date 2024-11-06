@@ -142,7 +142,7 @@ if __name__ == "__main__":
     ]
 
     snapshotter = "cvmfs-snapshotter"
-    num_runs = 2
+    num_runs = 5
     username = os.getenv("CVMFS_BENCHMARKS_USERNAME")
     password = os.getenv("CVMFS_BENCHMARKS_PASSWORD")
     server_url = os.getenv("CVMFS_BENCHMARKS_SERVER_URL")
