@@ -6,6 +6,12 @@ import json
 import sys
 import logging
 import statistics
+import os
+import requests
+from requests.auth import HTTPBasicAuth
+
+from datetime import datetime
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +45,7 @@ def run_benchmark(iteration, image, snapshotter, task):
     )
 
     logging.info(f"Run stdout: {result.stdout}")
-    logging.info(f"Run stderr: {result.stderr}") 
+    logging.info(f"Run stderr: {result.stderr}")
 
     output = result.stdout
 
@@ -80,6 +86,40 @@ def run_benchmark(iteration, image, snapshotter, task):
 def cleanup(image):
     subprocess.run(["bash", "flush_cache.sh", image], check=True)
 
+def parse_commit_date(commit_timestamp):
+    date_formats = [
+        "%Y-%m-%dT%H:%M:%S%z",  
+        "%Y-%m-%d %H:%M:%S %z", 
+    ]
+
+    for fmt in date_formats:
+        try:
+            commit_date = datetime.strptime(commit_timestamp, fmt)
+            return commit_date.isoformat()
+        except ValueError:
+            continue
+    
+    raise ValueError(f"Time data '{commit_timestamp}' does not match any known format.")
+
+
+
+def upload_benchmarks(benchmark_results, server_url, username, password):
+    logging.info(f"Uploading benchmark results to {server_url}")
+    response = requests.post(
+        f"{server_url}/snapshotter-benchmark",
+        json=benchmark_results,
+        auth=HTTPBasicAuth(username, password),
+    )
+
+    if response.status_code == 200:
+        logging.info(
+            f"Upload completed successfully. Results at: {server_url}/snapshotter-benchmark"
+        )
+    else:
+        logging.error(
+            f"Upload failed with status code {response.status_code}: {response.text}"
+        )
+
 
 if __name__ == "__main__":
     data = [
@@ -91,14 +131,27 @@ if __name__ == "__main__":
                 r"python -c 'import ROOT; print(\"done\")'",
                 "python /opt/root/tutorials/pyroot/fillrandom.py",
             ],
-        }
+        },
+        {
+            "image": "docker.io/library/python:3.9",
+            "tasks": [
+                "/bin/bash",
+                r"python -c 'print(\"done\")'",
+            ],
+        },
     ]
 
     snapshotter = "cvmfs-snapshotter"
+    num_runs = 2
+    username = os.getenv("CVMFS_BENCHMARKS_USERNAME")
+    password = os.getenv("CVMFS_BENCHMARKS_PASSWORD")
+    server_url = os.getenv("CVMFS_BENCHMARKS_SERVER_URL")
+    job_url = os.getenv("JOB_URL")
+    commit_hash = os.getenv("COMMIT_HASH")
+    commit_timestamp = os.getenv("COMMIT_TIMESTAMP")
+    commit_date = parse_commit_date(commit_timestamp)
+
     results = []
-
-    num_runs = 5
-
     for entry in data:
         image, tasks = entry["image"], entry["tasks"]
         for task in tasks:
@@ -134,11 +187,13 @@ if __name__ == "__main__":
                     "total_time_mean": statistics.mean(total_times),
                     "total_time_median": statistics.median(total_times),
                     "total_time_stddev": statistics.stdev(total_times),
+                    "job_url": job_url,
+                    "commit_hash": commit_hash,
+                    "commit_date": commit_date,
                 }
             )
 
     logging.info("Benchmark results:")
     logging.info(json.dumps(results, indent=4))
 
-    with open("benchmark_results.json", "w") as f:
-        json.dump(results, f, indent=4)
+    upload_benchmarks(results, server_url, username, password)

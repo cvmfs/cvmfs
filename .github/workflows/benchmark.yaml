@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - devel
-  pull_request:
-    branches:
-      - devel
 
 jobs:
   snapshotter:
@@ -28,7 +25,7 @@ jobs:
           wget https://github.com/containerd/nerdctl/releases/download/v$VERSION/nerdctl-full-$VERSION-linux-amd64.tar.gz
           sudo tar Cxzvvf /usr/local nerdctl-full-$VERSION-linux-amd64.tar.gz
           sudo systemctl enable --now containerd
-      
+
       - name: Install cvmfs dependencies
         run: |
           sudo apt-get -y update && sudo apt-get -y upgrade
@@ -63,7 +60,7 @@ jobs:
               uuid-dev \
               valgrind \
               zlib1g-dev
-          
+
           sudo sed -i /etc/apt/sources.list -e 's/main$/main universe/'
           sudo apt-get -y update
 
@@ -81,7 +78,7 @@ jobs:
               libxml2-dev \
               sssd-common
 
-          pip install setuptools
+          pip install setuptools requests
 
       - name: Build cvmfs
         run: |
@@ -100,6 +97,8 @@ jobs:
 
           sudo systemctl stop autofs
           sudo mkdir -p /cvmfs/unpacked.cern.ch
+          sudo mkdir -p /cvmfs/cvmfs-config.cern.ch
+          sudo mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
           sudo mount -t cvmfs unpacked.cern.ch /cvmfs/unpacked.cern.ch
 
       - name: Configure cvmfs-snapshotter
@@ -131,7 +130,14 @@ jobs:
               exit 1
           fi
 
-      - name: Run benchmark
+      - name: Run benchmarks
+        env:
+          CVMFS_BENCHMARKS_USERNAME: ${{ secrets.CVMFS_BENCHMARKS_USERNAME }}
+          CVMFS_BENCHMARKS_PASSWORD: ${{ secrets.CVMFS_BENCHMARKS_PASSWORD }}
+          CVMFS_BENCHMARKS_SERVER_URL: ${{ secrets.CVMFS_BENCHMARKS_SERVER_URL }}
+          JOB_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_HASH: ${{ github.sha }}
+          COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
           cd snapshotter/script
           python3 benchmark.py
