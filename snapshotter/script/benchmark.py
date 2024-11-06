@@ -106,14 +106,14 @@ def parse_commit_date(commit_timestamp):
 def upload_benchmarks(benchmark_results, server_url, username, password):
     logging.info(f"Uploading benchmark results to {server_url}")
     response = requests.post(
-        f"{server_url}/snapshotter-benchmark",
+        f"{server_url}/snapshotter",
         json=benchmark_results,
         auth=HTTPBasicAuth(username, password),
     )
 
     if response.status_code == 200:
         logging.info(
-            f"Upload completed successfully. Results at: {server_url}/snapshotter-benchmark"
+            f"Upload completed successfully. Results at: {server_url}/snapshotter"
         )
     else:
         logging.error(
