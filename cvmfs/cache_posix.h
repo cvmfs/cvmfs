@@ -140,7 +140,7 @@ class PosixCacheManager : public CacheManager {
   };
 
   PosixCacheManager(const std::string &cache_path, const bool alien_cache,
-                    const bool do_refcount = false)
+                    const bool do_refcount = true)
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
