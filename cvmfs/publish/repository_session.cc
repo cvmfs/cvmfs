@@ -39,7 +39,7 @@ enum LeaseReply {
 };
 
 static CURL* PrepareCurl(const std::string& method) {
-  const char* user_agent_string = "cvmfs/" VERSION;
+  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
 
   CURL* h_curl = curl_easy_init();
   assert(h_curl != NULL);

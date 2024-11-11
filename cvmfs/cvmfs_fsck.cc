@@ -76,7 +76,7 @@ static void Usage() {
            "  -p try to fix automatically\n"
            "  -f force rebuild of managed cache db on next mount\n"
            "  -j number of concurrent integrity check worker threads\n",
-           VERSION);
+           CVMFS_VERSION);
 }
 
 

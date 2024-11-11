@@ -277,7 +277,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 //------------------------------------------------------------------------------
 
 int CommandVersion::Main(const ArgumentList &args) {
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", CVMFS_VERSION);
   return 0;
 }
 

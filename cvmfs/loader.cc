@@ -178,7 +178,7 @@ static void Usage(const string &exename) {
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
-    PACKAGE_VERSION, exename.c_str());
+    CVMFS_VERSION, exename.c_str());
 }
 
 /**
@@ -381,7 +381,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       exit(0);
     case KEY_VERSION:
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS version %s\n",
-               PACKAGE_VERSION);
+               CVMFS_VERSION);
       exit(0);
     case KEY_FOREGROUND:
       foreground_ = true;
@@ -779,7 +779,7 @@ int FuseMain(int argc, char *argv[]) {
 #endif
   }
   loader_exports_ = new LoaderExports();
-  loader_exports_->loader_version = PACKAGE_VERSION;
+  loader_exports_->loader_version = CVMFS_VERSION;
   loader_exports_->boot_time = time(NULL);
   loader_exports_->program_name = argv[0];
   loader_exports_->foreground = foreground_;

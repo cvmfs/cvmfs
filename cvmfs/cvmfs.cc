@@ -2984,7 +2984,7 @@ static void FreeSavedState(const int fd_progress,
 
 static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports = new loader::CvmfsExports();
-  g_cvmfs_exports->so_version = PACKAGE_VERSION;
+  g_cvmfs_exports->so_version = CVMFS_VERSION;
   g_cvmfs_exports->fnAltProcessFlavor = AltProcessFlavor;
   g_cvmfs_exports->fnInit = Init;
   g_cvmfs_exports->fnSpawn = Spawn;

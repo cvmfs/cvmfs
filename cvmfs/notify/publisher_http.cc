@@ -41,7 +41,7 @@ PublisherHTTP::PublisherHTTP(const std::string& server_url)
 PublisherHTTP::~PublisherHTTP() {}
 
 bool PublisherHTTP::Publish(const std::string& msg, const std::string& topic) {
-  const char* user_agent_string = "cvmfs/" VERSION;
+  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
 
   CURL* h_curl = curl_easy_init();
 

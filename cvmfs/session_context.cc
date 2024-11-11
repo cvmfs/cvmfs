@@ -356,7 +356,7 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
 
   std::string reply;
   curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
-  curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "cvmfs/" VERSION);
+  curl_easy_setopt(h_curl, CURLOPT_USERAGENT, "cvmfs/" CVMFS_VERSION);
   curl_easy_setopt(h_curl, CURLOPT_MAXREDIRS, 50L);
   curl_easy_setopt(h_curl, CURLOPT_CUSTOMREQUEST, "POST");
   curl_easy_setopt(h_curl, CURLOPT_URL, (api_url_ + "/payloads").c_str());
