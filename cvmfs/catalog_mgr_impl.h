@@ -9,7 +9,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 
 #include <cassert>
 #include <string>

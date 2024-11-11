@@ -4,7 +4,7 @@
 
 #include "swissknife_lease_curl.h"
 
-#include "cvmfs_config.h"
+
 
 #include "crypto/hash.h"
 #include "gateway_util.h"

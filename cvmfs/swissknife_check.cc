@@ -6,7 +6,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "swissknife_check.h"
 
 #include <inttypes.h>

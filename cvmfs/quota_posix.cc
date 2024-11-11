@@ -15,7 +15,7 @@
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "quota_posix.h"
 
 #include <dirent.h>

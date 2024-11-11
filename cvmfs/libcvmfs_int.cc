@@ -9,7 +9,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 
 #include <sys/xattr.h>
-#include "cvmfs_config.h"
+
 #include "libcvmfs_int.h"
 
 #include <dirent.h>

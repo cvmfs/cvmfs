@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"

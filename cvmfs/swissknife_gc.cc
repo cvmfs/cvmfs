@@ -5,7 +5,7 @@
  * outdated and/or unneeded data objects.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_gc.h"
 
 #include <string>

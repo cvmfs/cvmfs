@@ -11,7 +11,7 @@
 #include <cerrno>
 #include <utility>
 
-#include "cvmfs_config.h"
+
 #include "s3fanout.h"
 #include "upload_facility.h"
 #include "util/concurrency.h"

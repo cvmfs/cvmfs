@@ -8,7 +8,7 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 
 #include <dirent.h>
 #include <errno.h>

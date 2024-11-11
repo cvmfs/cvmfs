@@ -4,7 +4,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "glue_buffer.h"
 
 #include <errno.h>

@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "cvmfs_config.h"
+
 
 #include "monitor.h"
 #include "swissknife.h"

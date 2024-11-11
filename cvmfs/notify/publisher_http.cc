@@ -6,7 +6,7 @@
 
 #include "duplex_curl.h"
 
-#include "cvmfs_config.h"
+
 
 #include "util/logging.h"
 #include "util/string.h"

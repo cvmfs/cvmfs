@@ -12,7 +12,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 #include "loader.h"
 
 #include <dlfcn.h>

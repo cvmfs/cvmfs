@@ -10,7 +10,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "cvmfs_config.h"
+
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/concurrency.h"

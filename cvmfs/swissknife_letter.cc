@@ -4,7 +4,7 @@
  * This tool signs a CernVM-FS manifest with an X.509 certificate.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_letter.h"
 
 #include <inttypes.h>

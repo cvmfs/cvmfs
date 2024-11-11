@@ -10,7 +10,7 @@
 #endif
 
 #include "string.h"
-#include "cvmfs_config.h"
+
 
 #include <errno.h>
 #include <fcntl.h>

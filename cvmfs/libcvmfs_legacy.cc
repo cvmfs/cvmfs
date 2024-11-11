@@ -5,7 +5,7 @@
  * counterparts.
  */
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 
 #include <cstdio>

@@ -4,7 +4,7 @@
  * Provides input data sanitizer in the form of whitelist of character ranges.
  */
 
-#include "cvmfs_config.h"
+
 #include "sanitizer.h"
 
 #include <cassert>

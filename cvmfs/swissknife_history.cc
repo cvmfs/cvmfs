@@ -3,7 +3,7 @@
  */
 
 #include "swissknife_history.h"
-#include "cvmfs_config.h"
+
 
 #include <algorithm>
 #include <cassert>

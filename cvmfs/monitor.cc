@@ -8,7 +8,7 @@
  * Also, it handles getting and setting the maximum number of file descriptors.
  */
 
-#include "cvmfs_config.h"
+
 #include "monitor.h"
 
 #include <errno.h>

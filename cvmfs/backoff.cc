@@ -4,7 +4,7 @@
  * Exponential backoff (sleep) with cutoff.
  */
 
-#include "cvmfs_config.h"
+
 #include "backoff.h"
 
 #include <ctime>

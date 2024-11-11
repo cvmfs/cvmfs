@@ -16,7 +16,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 #include "talk.h"
 
 #include <errno.h>

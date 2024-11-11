@@ -3,7 +3,7 @@
  */
 
 #include "upload_local.h"
-#include "cvmfs_config.h"
+
 
 #include <errno.h>
 

@@ -8,7 +8,7 @@
 #include <limits>
 
 #include "curl/curl.h"
-#include "cvmfs_config.h"
+
 #include "gateway_util.h"
 #include "json_document.h"
 #include "json_document_write.h"

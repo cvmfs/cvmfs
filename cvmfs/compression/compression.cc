@@ -8,7 +8,7 @@
  * TODO: think about code deduplication
  */
 
-#include "cvmfs_config.h"
+
 #include "compression/compression.h"
 
 #include <alloca.h>

@@ -5,7 +5,7 @@
 #define _FILE_OFFSET_BITS 64
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs_cache.h"
 
 #include <unistd.h>
