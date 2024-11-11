@@ -1245,6 +1245,16 @@ is_stratum0_garbage_collectable() {
 
 # checks if a manifest is present
 #
+# @param url  the url of the repository to be checked
+# @return      0 if it is empty
+is_empty_repository_from_url() {
+  local url=$1
+  [ x"$(get_repo_info_from_url "$url" -e)" = x"yes" ]
+}
+
+
+# checks if a manifest is present
+#
 # @param name  the name of the repository to be checked
 # @return      0 if it is empty
 is_empty_repository() {

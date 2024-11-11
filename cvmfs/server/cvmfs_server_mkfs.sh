@@ -204,6 +204,8 @@ cvmfs_server_mkfs() {
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
+  is_empty_repository_from_url $stratum0 ||
+      die "A manifest already exists at this url. Did you mean to use cvmfs_server import?"
   check_upstream_validity $upstream
   if [ $unionfs = "aufs" ]; then
     check_aufs                      || die "aufs kernel module missing"
