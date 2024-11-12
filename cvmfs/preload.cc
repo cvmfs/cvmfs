@@ -24,7 +24,7 @@
 
 using namespace std;  // NOLINT
 
-const char *kVersion = VERSION;
+const char *kVersion = CVMFS_VERSION;
 const int kDefaultPreloaderTimeout = 10;
 const int kDefaultPreloaderRetries = 2;
 
