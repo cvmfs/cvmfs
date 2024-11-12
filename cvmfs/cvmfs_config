@@ -952,7 +952,7 @@ cvmfs_stat() {
   local active=0
   for mountpoint in $mounted_repos
   do
-    cd $mountpoint || exit 32
+    cd $mountpoint 2>/dev/null || continue
     local this_fqrn
     get_attr fqrn; this_fqrn=$attr_value
     if [ "$this_fqrn" = "$fqrn" ]; then
