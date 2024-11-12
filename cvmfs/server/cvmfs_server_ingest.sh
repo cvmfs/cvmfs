@@ -31,6 +31,9 @@ cvmfs_server_ingest() {
   # if we use the gateway we cannot easily accept multiple deletion
   local multiple_delete=0
 
+  local name_from_absolute_arg=""
+  local name_from_absolute_arg2=""
+
   while [ "$2" != "" ]; do
     case $1 in
       -b | --base_dir )
@@ -64,8 +67,40 @@ cvmfs_server_ingest() {
     shift
   done
 
+  # deal with absolute/relative paths
+  case x"$base_dir" in
+      x/cvmfs/*) 
+        echo "Warning: interpreting the base_dir as absolute path. Remove leading slash to get a relative path to the mountpoint"
+        name_from_absolute_arg=$(echo $base_dir | cut -d'/' -f3)
+        base_dir=$(echo $base_dir | cut -d'/' -f 4-)
+  esac
+  for to_delete_path in $(echo $to_delete | sed "s/:/ /g"); do
+    case x"$to_delete_path" in
+        x/cvmfs/*) 
+          echo "Warning: interpreting the base_dir as absolute path. Remove leading slash to get a relative path to the mountpoint"
+          name_from_absolute_arg2=$(echo $to_delete_path | cut -d'/' -f3)
+          to_delete=$(echo $to_delete_path | cut -d'/' -f 4-)
+          if [ ! x$name_from_absolute_arg = "x" ] ; then
+            if [ ! x$name_from_absolute_arg = x$name_from_absolute_arg2 ] ; then
+              die "Cannot use different repositories in same transaction: $name_from_absolute_arg2, $name_from_absolute_arg"
+            fi
+          fi
+          name_from_absolute_arg=$name_from_absolute_arg2
+    esac
+  done
+
   name=$1
   name=$(echo $name | cut -d'/' -f1)
+
+  if [ x"$name" = "x" ] ; then
+    name=$name_from_absolute_arg
+  fi
+  echo "Info: transaction on repository $name"
+
+  if [ x"$name" = "x" ] ; then
+
+    die "Please provide a repository name, as positional argument or via an absolute path on /cvmfs given to -b"
+  fi
 
   if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] ; then
     die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar and -d \$TO_DELETE to provide what to delete from the repository"
@@ -97,7 +132,7 @@ cvmfs_server_ingest() {
   if [ x"$user" != "x" ]; then
     uid=$(id -u "$user")
 
-    if [[ x"$uid" = xi* ]]; then
+    if [ x"$uid" = xi* ]; then
       die "User set but no valid user name given"
     fi
   fi
@@ -118,7 +153,7 @@ cvmfs_server_ingest() {
     uid=$(id -u "$CVMFS_USER")
     gid=$(id -g "$CVMFS_USER")
 
-    if [[ x"$uid" = xi* ]]; then
+    if [ x"$uid" = xi* ]; then
       die "Default CVMFS_USER $CVMFS_USER for the repo does not exist"
     fi
   fi
