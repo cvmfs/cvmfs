@@ -96,7 +96,7 @@ void Usage() {
         " -j --threads     Number of concurrent copy threads [default:2*CPUs]\n"
         " -p --stat-period Frequency of stat prints, 0 disables [default:10]\n"
         " -g --gc          Perform garbage collection on destination\n",
-           VERSION);
+           CVMFS_VERSION);
 }
 
 }  // anonymous namespace
