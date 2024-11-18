@@ -80,19 +80,18 @@ else # RedHat based
 fi
 
 SUPERVISOR_BIN="false"
-if [ -f /bin/supervisorctl ]; then
-  SUPERVISOR_BIN=/bin/supervisorctl
-fi
 SERVICE_BIN="false"
 if [ ! -f /bin/systemctl ]; then
-  if cvmfs_sys_file_is_executable /sbin/service ; then
+  if [ -f /bin/supervisorctl ]; then
+    SUPERVISOR_BIN=/bin/supervisorctl
+  elif cvmfs_sys_file_is_executable /sbin/service ; then
     SERVICE_BIN="/sbin/service"
   elif cvmfs_sys_file_is_executable /usr/sbin/service ; then
     SERVICE_BIN="/usr/sbin/service" # Ubuntu
   elif cvmfs_sys_file_is_executable /sbin/rc-service ; then
     SERVICE_BIN="/sbin/rc-service" # OpenRC
   else
-    die "Neither systemd nor service binary detected"
+    die "Neither systemd, supervisord nor service binary detected"
   fi
 fi
 
