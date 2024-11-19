@@ -37,6 +37,9 @@ if [ "x$ubuntu_release" = "xbionic" ]; then
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
 fi
 
+# test assumes local srv storage
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/691-metalink"
+
 export CVMFS_TEST_UNIONFS=overlayfs
 
 cd ${SOURCE_DIRECTORY}/test
