@@ -1130,13 +1130,13 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (info->probe_hosts()) {
     if (CheckMetalinkChain(now)) {
       url_prefix = (*opt_metalink_.chain)[opt_metalink_.current];
-      info->SetCurrentMetalinkChainIndex(opt_metalink_.current);
+      info->SetCurrentMetalinkChainIndex(static_cast<int>(opt_metalink_.current));
       LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
                       "reading from metalink %d",
                       name_.c_str(), info->id(), opt_metalink_.current);
     } else if (opt_host_.chain) {
       url_prefix = (*opt_host_.chain)[opt_host_.current];
-      info->SetCurrentHostChainIndex(opt_host_.current);
+      info->SetCurrentHostChainIndex(static_cast<int>(opt_host_.current));
       LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
                       "reading from host %d",
                       name_.c_str(), info->id(), opt_host_.current);
@@ -1403,7 +1403,7 @@ void DownloadManager::ReleaseCredential(JobInfo *info) {
 
 
 /* Sort links based on the "pri=" parameter */
-static bool sortlinks(const std::string &s1, const std::string s2) {
+static bool sortlinks(const std::string &s1, const std::string &s2) {
   const size_t pos1 = s1.find("; pri=");
   const size_t pos2 = s2.find("; pri=");
   int pri1, pri2;
@@ -2227,7 +2227,7 @@ void DownloadManager::SetMetalinkChain(const string &metalink_list) {
 
 void DownloadManager::SetMetalinkChain(
     const std::vector<std::string> &metalink_list) {
-  MutexLockGuard m(lock_options_);
+  const MutexLockGuard m(lock_options_);
   opt_metalink_.timestamp_backup = 0;
   delete opt_metalink_.chain;
   opt_metalink_.current = 0;
@@ -2248,7 +2248,7 @@ void DownloadManager::SetMetalinkChain(
 void DownloadManager::GetMetalinkInfo(vector<string> *metalink_chain,
                                   unsigned *current_metalink)
 {
-  MutexLockGuard m(lock_options_);
+  const MutexLockGuard m(lock_options_);
   if (opt_metalink_.chain) {
     if (current_metalink) {*current_metalink = opt_metalink_.current;}
     if (metalink_chain) {*metalink_chain = *opt_metalink_.chain;}
@@ -3064,7 +3064,7 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
 
   // Report any change in proxy usage
   string new_proxy = JoinStrings(opt_proxies_, "|");
-  string curr_host = "Current host: " + (opt_host_.chain ?
+  const string curr_host = "Current host: " + (opt_host_.chain ?
                               (*opt_host_.chain)[opt_host_.current] : "");
   if (new_proxy != old_proxy) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
@@ -3135,7 +3135,7 @@ void DownloadManager::SetProxyGroupResetDelay(const unsigned seconds) {
 
 void DownloadManager::SetMetalinkResetDelay(const unsigned seconds)
 {
-  MutexLockGuard m(lock_options_);
+  const MutexLockGuard m(lock_options_);
   opt_metalink_.reset_after = seconds;
   if (opt_metalink_.reset_after == 0)
     opt_metalink_.timestamp_backup = 0;
