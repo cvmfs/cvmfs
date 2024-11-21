@@ -1130,13 +1130,13 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (info->probe_hosts()) {
     if (CheckMetalinkChain(now)) {
       url_prefix = (*opt_metalink_.chain)[opt_metalink_.current];
-      info->SetCurrentMetalinkChainIndex(static_cast<int>(opt_metalink_.current));
+      info->SetCurrentMetalinkChainIndex(opt_metalink_.current);
       LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
                       "reading from metalink %d",
                       name_.c_str(), info->id(), opt_metalink_.current);
     } else if (opt_host_.chain) {
       url_prefix = (*opt_host_.chain)[opt_host_.current];
-      info->SetCurrentHostChainIndex(static_cast<int>(opt_host_.current));
+      info->SetCurrentHostChainIndex(opt_host_.current);
       LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
                       "reading from host %d",
                       name_.c_str(), info->id(), opt_host_.current);
@@ -2388,7 +2388,7 @@ void DownloadManager::SwitchHostInfo(const std::string &typ,
   }
 
   if (jobinfo) {
-    unsigned lastused;
+    int lastused;
     if (typ == "host") {
       lastused = jobinfo->current_host_chain_index();
     } else {

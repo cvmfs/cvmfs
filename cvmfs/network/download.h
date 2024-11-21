@@ -136,7 +136,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
       , reset_after(reset_after)
     { }
     std::vector<std::string> *chain;
-    unsigned current;
+    int current;
     time_t timestamp_backup;
     unsigned reset_after;
   };
