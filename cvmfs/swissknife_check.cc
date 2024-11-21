@@ -128,16 +128,18 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.name().c_str(), b.name().c_str());
     retval = false;
   }
-  if (diffs & Difference::kUid) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)",
-             a.uid(), b.uid(), a.name().c_str(), b.name().c_str());
-    retval = false;
-  }
-  if (diffs & Difference::kGid) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)",
-             a.gid(), b.gid(), a.name().c_str(), b.name().c_str());
-    retval = false;
-  }
+  if (!is_transition_point) {
+      if (diffs & Difference::kUid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)",
+                 a.uid(), b.uid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+      if (diffs & Difference::kGid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)",
+                 a.gid(), b.gid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+    }
 
   return retval;
 }
