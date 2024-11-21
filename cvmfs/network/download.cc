@@ -1128,11 +1128,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_.c_str());
 
   if (info->probe_hosts()) {
-    if (opt_metalink_.chain &&
-        ((opt_metalink_timestamp_link_ == 0) ||
-         (static_cast<int64_t>((now == 0) ? time(NULL) : now) >
-          static_cast<int64_t>(opt_metalink_timestamp_link_ +
-                              opt_metalink_.reset_after)))) {
+    if (CheckMetalinkChain(now)) {
       url_prefix = (*opt_metalink_.chain)[opt_metalink_.current];
       info->SetCurrentMetalinkChainIndex(opt_metalink_.current);
       LogCvmfs(kLogDownload, kLogDebug, "(manager %s - id %" PRId64 ") "
@@ -1921,6 +1917,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
                   ignore_signature_failures_(false),
                   enable_http_tracing_(false),
                   opt_metalink_(NULL, 0, 0, 0),
+                  opt_metalink_timestamp_link_(0),
                   opt_host_(NULL, 0, 0, 0),
                   opt_host_chain_rtt_(NULL),
                   opt_proxy_groups_(NULL),
@@ -2453,8 +2450,17 @@ void DownloadManager::SwitchMetalink(JobInfo *info) {
   SwitchHostInfo("metalink", opt_metalink_, info);
 }
 
+
 void DownloadManager::SwitchMetalink() {
   SwitchMetalink(NULL);
+}
+
+bool DownloadManager::CheckMetalinkChain(time_t now) {
+  return (opt_metalink_.chain &&
+         ((opt_metalink_timestamp_link_ == 0) ||
+          (static_cast<int64_t>((now == 0) ? time(NULL) : now) >
+           static_cast<int64_t>(opt_metalink_timestamp_link_ +
+                               opt_metalink_.reset_after))));
 }
 
 

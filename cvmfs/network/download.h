@@ -203,6 +203,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void GetMetalinkInfo(std::vector<std::string> *metalink_chain,
                        unsigned *current_metalink);
   void SwitchMetalink();
+  bool CheckMetalinkChain(const time_t now);
   void SetHostChain(const std::string &host_list);
   void SetHostChain(const std::vector<std::string> &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
