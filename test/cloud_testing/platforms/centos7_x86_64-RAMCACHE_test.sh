@@ -35,6 +35,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/097-statfs                               \
                                  src/102-reusefd                              \
                                  src/103-reloadcachemgr                       \
+                                 src/105-streaming-cache                      \
                                  --                                           \
                                  src/0*                                       \
                                  src/1*                                       \

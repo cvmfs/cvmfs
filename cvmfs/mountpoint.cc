@@ -2073,6 +2073,7 @@ bool MountPoint::SetupBehavior() {
       telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
                                                         telemetry_send_rate_sec,
                                                         options_mgr_,
+                                                        this,
                                                         fqrn_,
                                                         perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
