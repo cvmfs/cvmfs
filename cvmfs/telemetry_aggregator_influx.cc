@@ -24,8 +24,10 @@ namespace perf {
 TelemetryAggregatorInflux::TelemetryAggregatorInflux(Statistics* statistics,
                                                     int send_rate_sec,
                                                     OptionsManager *options_mgr,
+                                                    MountPoint* mount_point,
                                                     const std::string &fqrn) :
-                      TelemetryAggregator(statistics, send_rate_sec, fqrn),
+                      TelemetryAggregator(statistics, send_rate_sec,
+                                          mount_point, fqrn),
                       influx_extra_fields_(""), influx_extra_tags_(""),
                       socket_fd_(-1), res_(NULL) {
   int params = 0;
@@ -100,7 +102,7 @@ TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
 /**
  * Creates a string in the influx data format containing the absolute values
  * of the counters. Counters are only included if their absolute value is > 0.
- * 
+ *
  * Influx dataformat
  * ( https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/ )
  * Syntax
@@ -149,12 +151,12 @@ std::string TelemetryAggregatorInflux::MakePayload() {
 
 /**
  * Creates a string in the influx data format containing the delta between
- * 2 measurements of the same counter. Counters are only included if their 
+ * 2 measurements of the same counter. Counters are only included if their
  * absolute value is > 0 (delta can be 0).
- * 
- * NOTE: As influx_extra_fields_ are static, they are excluded of this 
+ *
+ * NOTE: As influx_extra_fields_ are static, they are excluded of this
  *       delta format
- * 
+ *
  * Influx dataformat
  * ( https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/ )
  * Syntax
