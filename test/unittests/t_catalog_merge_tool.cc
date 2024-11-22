@@ -127,8 +127,9 @@ TEST_F(T_CatalogMergeTool, CRUD) {
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;
+  shash::Any output_manifest_hash;
   uint64_t final_rev;
-  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &final_rev));
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &output_manifest_hash, &final_rev));
   EXPECT_EQ(2U, final_rev);
 
   UniquePtr<manifest::Manifest> output_manifest(
