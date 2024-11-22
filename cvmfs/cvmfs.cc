@@ -576,7 +576,6 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   path.Assign(parent_path);
   path.Append("/", 1);
   path.Append(name, strlen(name));
-  mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()");
   live_inode = GetDirentForPath(path, &dirent);
   if (live_inode == 0) {
     if (dirent.GetSpecial() == catalog::kDirentNegative)
@@ -586,6 +585,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   }
 
  lookup_reply_positive:
+  mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()");
   if (!file_system_->IsNfsSource()) {
     if (live_inode > 1) {
       // live inode is stale (open file), we replace it
@@ -620,6 +620,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   return;
 
  lookup_reply_negative:
+  mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()-NOTFOUND");
   // Will be a no-op if there is no fuse cache eviction
   mount_point_->dentry_tracker()->Add(parent_fuse, name, uint64_t(timeout));
   fuse_remounter_->fence()->Leave();
@@ -629,6 +630,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   return;
 
  lookup_reply_error:
+  mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()-NOTFOUND");
   fuse_remounter_->fence()->Leave();
 
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (01) on %s", name);
