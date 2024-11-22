@@ -2415,7 +2415,7 @@ void DownloadManager::SwitchHostInfo(const std::string &typ,
   info_id += ")";
 
   const std::string old_host = (*info.chain)[info.current];
-  info.current = (info.current + 1) % info.chain->size();
+  info.current = (info.current + 1) % static_cast<int>(info.chain->size());
   if (typ == "host") {
     perf::Inc(counters_->n_host_failover);
   } else {
