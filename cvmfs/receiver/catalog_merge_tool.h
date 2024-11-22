@@ -95,7 +95,7 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 
   virtual ~CatalogMergeTool() {}
 
-  bool Run(const Params& params, std::string* new_manifest_path,
+  bool Run(const Params& params, std::string* new_manifest_path, shash::Any* new_manifest_hash,
            uint64_t *final_rev);
 
  protected:

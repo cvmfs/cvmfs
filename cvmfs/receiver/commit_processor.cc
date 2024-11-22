@@ -197,7 +197,8 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   std::string new_manifest_path;
-  if (!merge_tool.Run(params, &new_manifest_path, final_revision)) {
+  shash::Any new_manifest_hash;
+  if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash, final_revision)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;
@@ -248,13 +249,10 @@ CommitProcessor::Result CommitProcessor::Process(
                lease_path.c_str());
   }
 
-  const UniquePtr<manifest::Manifest> manifest_new(
-    manifest::Manifest::LoadFile(new_manifest_path));
-  assert(manifest_new.IsValid());
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, new root hash: %s",
            lease_path.c_str(),
-           manifest_new->catalog_hash().ToString(false).c_str());
+           new_manifest_hash.ToString(false).c_str());
 
   // Ensure CVMFS_ROOT_HASH is not set in
   // /var/spool/cvmfs/<REPO_NAME>/client.local
