@@ -487,9 +487,7 @@ restorecon -R /var/lib/cvmfs
 %if 0%{?systemd_autofs_patch}
 /usr/bin/systemctl daemon-reload
 %endif
-if [ -d /var/run/cvmfs ]; then
-  /usr/bin/cvmfs_config reload
-fi
+/usr/bin/systemctl cvmfs-reload
 :
 
 %post libs
@@ -616,6 +614,7 @@ systemctl daemon-reload
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
+%{_unitdir}/cvmfs-reload.service
 
 %files libs
 %defattr(-,root,root)

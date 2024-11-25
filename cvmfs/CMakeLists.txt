@@ -359,6 +359,13 @@ if (BUILD_CVMFS)
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif ()
+  # Systemd service unit for reloads after package upgrades
+  install (
+    FILES pkg/cvmfs-reload.service
+    DESTINATION /usr/lib/systemd/system
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
 endif (BUILD_CVMFS)
 
 
