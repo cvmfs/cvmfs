@@ -120,7 +120,7 @@ void Repository::Diff(const std::string &from, const std::string &to,
   DiffForwarder diff_forwarder(mgr_from, mgr_to, diff_listener);
   if (!diff_forwarder.Init())
     throw EPublish("cannot initialize difference engine");
-  diff_forwarder.Run(PathString());
+  diff_forwarder.Run(PathString(), PathString());
 }
 
 }  // namespace publish

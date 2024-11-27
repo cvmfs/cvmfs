@@ -75,7 +75,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
     output_catalog_mgr_->Init();
   }
 
-  bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
+  bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""), lease_path_);
 
   ret &= CreateNewManifest(new_manifest_path);
   *new_manifest_hash = manifest_->catalog_hash();
