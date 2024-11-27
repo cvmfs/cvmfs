@@ -71,9 +71,9 @@ do_extract() {
 
   cd $externals_build_dir
   if [ $archive_format = ".tar.bz2" ]; then
-    tar xvfj "$library_dir/$library_archive"
+    tar --no-same-owner -jxvf "$library_dir/$library_archive"
   else
-    tar xvfz "$library_dir/$library_archive"
+    tar --no-same-owner -zxvf "$library_dir/$library_archive"
   fi
   mv $library_decompressed_dir $dest_dir
   cd $cdir
@@ -91,7 +91,7 @@ do_extract_go() {
   print_hint "Extracting $library_archive"
 
   cd $externals_build_dir
-  tar xvf "$library_dir/$library_archive"
+  tar --no-same-owner -xvf "$library_dir/$library_archive"
   mv go $dest_dir
   cd $cdir
   cp -r $library_dir/src/* $dest_dir
