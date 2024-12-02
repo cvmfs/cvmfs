@@ -1,0 +1,2 @@
+usr/bin/cvmfs_snapshotter
+usr/lib/systemd/system/cvmfs-snapshotter.service

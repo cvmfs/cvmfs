@@ -24,11 +24,13 @@
   %if "%{?_arch}" != "aarch64"
     %define build_gateway 1
     %define build_ducc 1
+    %define build_snapshotter 1
   %endif
 %endif
 %if 0%{?sle15}
   %define build_gateway 1
   %define build_ducc 1
+  %define build_snapshotter 1
 %endif
 
 
@@ -295,6 +297,15 @@ BuildRequires: %{cvmfs_go} >= 1.11.4
 Daemon to automatically unpack and expose containers images into CernVM-FS
 %endif
 
+%if 0%{?build_snapshotter}
+%package snapshotter
+Summary: cvmfs-snapshotter: Lazy loading of containerd layers from CVMFS
+Group: Application/System
+BuildRequires: %{cvmfs_go} >= 1.11.4
+%description snapshotter
+A containerd snapshotter inspired by StarGZ that gives instant container startup
+%endif
+
 %prep
 %setup -q
 
@@ -329,6 +340,10 @@ BUILD_DUCC=no
 %if 0%{?build_ducc}
 BUILD_DUCC=yes
 %endif
+BUILD_SNAPSHOTTER=no
+%if 0%{?build_snapshotter}
+BUILD_SNAPSHOTTER=yes
+%endif
 
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -341,6 +356,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_UNITTESTS=yes \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
+  -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
@@ -708,7 +724,16 @@ systemctl daemon-reload
 /usr/libexec/cvmfs/ducc/registry_webhook.py*
 %endif
 
+%if 0%{?build_snapshotter}
+%files snapshotter
+%{_bindir}/cvmfs_snapshotter
+%{_unitdir}/cvmfs_snapshotter.service
+%dir %{_sysconfdir}/cvmfs/config.d
+%endif
+
 %changelog
+* Mon Dec 2 2024 Valentin Volkl <vavolkl@cern.ch> - 2.12
+- Add cvmfs-snapshotter package
 * Tue Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
 - Rename registry-webhook.py to registry_webhook.py to allow imports
 * Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
