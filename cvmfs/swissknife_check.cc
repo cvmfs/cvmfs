@@ -728,7 +728,12 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   catalog::Catalog *catalog =
                    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
+  if (catalog_file_size <= 0) {
+
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error downloading catalog %s at %s %s",
+             catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str() );
+    assert(catalog_file_size > 0);
+  }
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
