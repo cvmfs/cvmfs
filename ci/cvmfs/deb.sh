@@ -58,6 +58,7 @@ dch -v $cvmfs_version -M "bumped upstream version number"
 DEBUILD_ARGS=""
 if [ x"$CVMFS_LINT_PKG" = x ]; then
   DEBUILD_ARGS="--no-lintian"
+fi
 DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} --prepend-path=/usr/local/go/bin \
   -us -uc
 cd ${CVMFS_RESULT_LOCATION}
