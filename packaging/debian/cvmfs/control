@@ -65,6 +65,15 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests
  HTTP File System for Distributing Software to CernVM.
 
+Package: cvmfs-fuse3
+Architecture: i386 amd64 armhf arm64
+#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
+Depends: fuse3, libfuse3-3, cvmfs (= ${binary:Version})
+#Multi-Arch: same   (preparation for multiarch support)
+Homepage: http://cernvm.cern.ch
+Description: CernVM File System fuse3 libraries
+ Shared libraries implementing the CernVM-FS fuse module based on libfuse3
+
 #GATEWAY-BEGIN
 Package: cvmfs-gateway
 Architecture: amd64
