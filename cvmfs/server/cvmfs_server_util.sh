@@ -1304,6 +1304,13 @@ Supported Commands:
   merge-stats     [-o output db file]
                   <db_file_1> <db_file_2>
                   Merge tables from two database files.
+  enter           [-w stratum0 url] [-c path to cvmfs2 binary] 
+                  [-C path to extra client config] [-r run as root]
+                  [-k keep session after shell exits] [-t open a transaction] 
+                  [-l remove session but keep logs after shell exits] 
+                  [-x path to repository configuration]
+                  <fully qualified repository name> [-- <command> <params>]
+                  Open an ephemeral namespace to publish content
 "
 
 
