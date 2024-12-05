@@ -507,7 +507,7 @@ rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
 %posttrans
-/usr/bin/systemctl cvmfs-reload
+systemctl cvmfs-reload
 
 
 %preun
