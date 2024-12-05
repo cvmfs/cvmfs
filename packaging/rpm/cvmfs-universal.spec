@@ -506,8 +506,6 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-%posttrans
-systemctl cvmfs-reload
 
 
 %preun
@@ -547,6 +545,10 @@ if [ $1 -eq 0 ]; then
    [ -f /var/lock/subsys/autofs ] && /sbin/service autofs reload >/dev/null
    rmdir /cvmfs
 fi
+if [ $1 -ge 1 ] ; then
+   systemctl start cvmfs-reload.service > /dev/null
+fi
+:
 
 %if 0%{?selinux_cvmfs}
 if [ $1 -eq 0 ]; then
