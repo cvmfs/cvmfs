@@ -484,7 +484,8 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
-/usr/bin/systemctl daemon-reload
+systemctl daemon-reload
+systemctl cvmfs-reload
 :
 
 %post libs
@@ -506,8 +507,6 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-%posttrans
-systemctl cvmfs-reload
 
 
 %preun
