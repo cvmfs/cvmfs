@@ -484,10 +484,8 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
-%if 0%{?systemd_autofs_patch}
-/usr/bin/systemctl daemon-reload
-%endif
-/usr/bin/systemctl cvmfs-reload
+systemctl daemon-reload
+systemctl start cvmfs-reload.service
 :
 
 %post libs
@@ -509,10 +507,7 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-%if 0%{?build_gateway}
-%post gateway
-systemctl daemon-reload
-%endif
+
 
 %preun
 if [ $1 = 0 ] ; then
