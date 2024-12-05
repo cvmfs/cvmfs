@@ -636,7 +636,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   mount_point_->tracer()->Trace(Tracer::kEventLookup, path, "lookup()-NOTFOUND");
   fuse_remounter_->fence()->Leave();
 
-  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "EIO (01) on %s", name);
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+                                        "EIO (01): lookup failed for %s", name);
   perf::Inc(file_system_->n_eio_total());
   perf::Inc(file_system_->n_eio_01());
 
@@ -739,7 +740,7 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
     const char * link = dirent.symlink().c_str();
 
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-       "EIO (02) name=%s symlink=%s",
+       "EIO (02): CVMFS-specific metadata not found for name=%s symlink=%s",
        name ? name: "<unset>",
        link ? link: "<unset>");
 
@@ -953,7 +954,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_listing.Clear();  // Buffer is shared, empty manually
 
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-         "EIO (03) on %s", path.c_str());
+         "EIO (03): failed to open directory at %s", path.c_str());
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_03());
     fuse_reply_err(req, EIO);
@@ -1231,8 +1232,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       {
         fuse_remounter_->fence()->Leave();
         LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr,
-           "EIO (04) file %s is marked as 'chunked', but no chunks found.",
-           path.c_str());
+               "EIO (04): failed to open file %s. "
+               "It is marked as 'chunked', but no chunks found.", path.c_str());
         perf::Inc(file_system_->n_eio_total());
         perf::Inc(file_system_->n_eio_04());
         fuse_reply_err(req, EIO);
@@ -1346,6 +1347,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
            "failed to open inode: %" PRIu64 ", CAS key %s, error code %d",
            uint64_t(ino), dirent.checksum().ToString().c_str(), errno);
   if (errno == EMFILE) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
     fuse_reply_err(req, EMFILE);
     perf::Inc(file_system_->n_emfile());
     return;
@@ -1356,7 +1358,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   mount_point_->file_system()->io_error_info()->AddIoError();
   if (EIO == errno  || EIO == -fd) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-        "EIO (06) on %s", path.c_str() );
+        "EIO (06): Failed to open file %s", path.c_str() );
     perf::Inc(file_system_->n_eio_total());
     perf::Inc(file_system_->n_eio_06());
   }
@@ -1457,7 +1459,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           chunk_tables->Unlock();
 
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-              "EIO (05) on %s", chunks.path.ToString().c_str() );
+                         "EIO (05): Failed to fetch chunk %d from file %s",
+                         chunk_idx, chunks.path.ToString().c_str());
           perf::Inc(file_system_->n_eio_total());
           perf::Inc(file_system_->n_eio_05());
           fuse_reply_err(req, EIO);
@@ -1488,7 +1491,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunk_tables->Unlock();
         if ( EIO == errno || EIO == -bytes_fetched ) {
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "EIO (07) on %s", chunks.path.ToString().c_str() );
+             "EIO (07): Failed to read chunk %d from file %s",
+             chunks.path.ToString().c_str() );
           perf::Inc(file_system_->n_eio_total());
           perf::Inc(file_system_->n_eio_07());
         }
@@ -1515,12 +1519,13 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ( EIO == errno || EIO == -nbytes ) {
         PathString path;
         bool found = GetPathForInode(ino, &path);
-        if ( found ) {
+        if (found) {
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "EIO (08) on %s", path.ToString().c_str() );
+                  "EIO (08): Failed to read file %s", path.ToString().c_str());
         } else {
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "EIO (08) on <unknown inode>");
+                  "EIO (08): Failed to read from %s - <unknown inode>",
+                  path.ToString().c_str() );
         }
         perf::Inc(file_system_->n_eio_total());
         perf::Inc(file_system_->n_eio_08());

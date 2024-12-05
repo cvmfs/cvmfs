@@ -250,23 +250,25 @@ void FileSystem::CreateStatistics() {
   n_eio_total_ =  statistics_->Register("eio.total",
      "EIO returned to calling process. Sum of individual eio counters");
   n_eio_01_ =  statistics_->Register("eio.01",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+     "EIO returned by cvmfs.cc:cvmfs_lookup() - lookup failed");
   n_eio_02_ =  statistics_->Register("eio.02",
-     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+     "EIO returned by cvmfs.cc:ReplyNegative() "
+     "- CVMFS-specific metadata not found");
   n_eio_03_ =  statistics_->Register("eio.03",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+     "EIO returned by cvmfs.cc:cvmfs_opendir() - failed to open directory ");
   n_eio_04_ =  statistics_->Register("eio.04",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+     "EIO returned by cvmfs.cc:cvmfs_open() "
+     "- chunked file does not have any chunks");
   n_eio_05_ =  statistics_->Register("eio.05",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to fetch chunk");
   n_eio_06_ =  statistics_->Register("eio.06",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+     "EIO returned by cvmfs.cc:cvmfs_open() - failed to open file");
   n_eio_07_ =  statistics_->Register("eio.07",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to read chunk");
   n_eio_08_ =  statistics_->Register("eio.08",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to read file");
   n_emfile_ =  statistics_->Register("eio.emfile",
-     "EMFILE returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EMFILE returned by cvmfs.cc:cvmfs_read(): too many open files");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -1426,7 +1428,7 @@ bool MountPoint::CreateDownloadManagers() {
   }
 
   if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
-    download_mgr_->SetMetalinkChain(optarg);  
+    download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     download_mgr_->SetHostChain("");
     // metalink requires redirects
@@ -2154,7 +2156,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
-    external_download_mgr_->SetMetalinkChain(optarg);  
+    external_download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     external_download_mgr_->SetHostChain("");
     // metalink requires redirects
