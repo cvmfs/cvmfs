@@ -1294,15 +1294,15 @@ cvmfs_config_fsck() {
       continue
     fi
 
-    # this hardcodes the hash for the (legitimately) empty file - if anything about compression or hashing changes,
-    # this needs to be updated
-    for zeroed_file in $(find $dir -empty -wholename "$dir/[a-z0-9][a-z0-9]/*" ! -name ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78); do
-      echo "WARNING: unexpected zero-byte file $zeroed_file -  Moving it to quarantaine."
-      mv $zeroed_file $dir/quarantaine
-      retval=1
-    done
-
-    if [ "x$1" != "x-q" ]; then
+    if [ "x$1" = "x-q" ]; then
+      # this hardcodes the hash for the (legitimately) empty file - if anything about compression or hashing changes,
+      # this needs to be updated
+      for zeroed_file in $(find $dir -empty -wholename "$dir/[a-z0-9][a-z0-9]/*" ! -name ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78); do
+        echo "WARNING: unexpected zero-byte file $zeroed_file -  Moving it to quarantaine."
+        mv $zeroed_file $dir/quarantaine
+        retval=1
+      done
+    else
       echo "CernVM-FS fsck on $dir"
       cvmfs_fsck $@ $dir
       retval=$(($? + $retval))
