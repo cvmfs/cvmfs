@@ -1,3 +1,10 @@
+
+2.12.2:
+  * [client] Add cvmfs_config fsck -q(uick) to check for zeroed files in cache (#3726)
+
+2.12.1:
+  * [rpm] bugfix for reload service after rpm upgrades (#3725)
+
 2.12.0:
   * [client] FUSE-T support for macOS (#3587)
   * [server] Add metalink support (#3683)
