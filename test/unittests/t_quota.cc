@@ -58,11 +58,22 @@ class T_QuotaManager : public ::testing::Test {
                                 false);
     ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
 
-    for (unsigned i = 0; i < 8; ++i) {
+    for (unsigned i = 0; i < 50002; ++i) {
       hashes_.push_back(shash::Any(shash::kSha1));
-      hashes_[i].digest[0] = i;
+      EncodeInHash(i, &hashes_[i]);
     }
     prng_.InitLocaltime();
+  }
+
+  void EncodeInHash(int value, shash::Any *hash) {
+    assert(value < (1 << 16));
+    hash->digest[0] = value / 256;
+    hash->digest[1] = value % 256;
+  }
+
+  int DecodeFromHash(const shash::Any &hash) {
+    return static_cast<int>(hash.digest[1]) +
+           static_cast<int>(hash.digest[0]) * 256;
   }
 
   virtual void TearDown() {
@@ -79,6 +90,14 @@ class T_QuotaManager : public ::testing::Test {
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
     EXPECT_EQ(used_fds_, GetNoUsedFds());
+  }
+
+  string StringifyIntLeadingZeros(unsigned value) {
+    string result = StringifyInt(value);
+    int n_leading_zeros = (result.length() >= 10) ? 0 : (10u - result.length());
+    if (n_leading_zeros == 0)
+      return result;
+    return string(n_leading_zeros, '0') + result;
   }
 
   string PrintStringVector(const vector<string> &lines) {
@@ -202,18 +221,20 @@ TEST_F(T_QuotaManager, Cleanup) {
 TEST_F(T_QuotaManager, CleanupLru) {
   unsigned N = hashes_.size();
   vector<shash::Any> shuffled_hashes = Shuffle(hashes_, &prng_);
-  for (unsigned i = 0; i < N; ++i)
+  for (unsigned i = 0; i < N; ++i) {
     quota_mgr_->Insert(shuffled_hashes[i], 1,
-                       StringifyInt(shuffled_hashes[i].digest[0]));
-  for (unsigned i = 0; i < N; ++i)
+      StringifyIntLeadingZeros(DecodeFromHash(shuffled_hashes[i])));
+  }
+  for (unsigned i = 0; i < N; ++i) {
     quota_mgr_->Touch(hashes_[i]);
+  }
 
   EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
   vector<string> remaining = quota_mgr_->List();
   EXPECT_EQ(N/2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
-    EXPECT_EQ(StringifyInt(N/2 + i), remaining[i]);
+    EXPECT_EQ(StringifyIntLeadingZeros(N/2 + i), remaining[i]);
   }
 }
 
@@ -234,10 +255,10 @@ TEST_F(T_QuotaManager, CleanupTouchPinnedOnExit) {
 TEST_F(T_QuotaManager, CleanupVolatile) {
   unsigned N = hashes_.size();
   for (unsigned i = 0; i < N-2; ++i)
-    quota_mgr_->Insert(hashes_[i], 1, StringifyInt(i));
+    quota_mgr_->Insert(hashes_[i], 1, StringifyIntLeadingZeros(i));
   // Two last ones are volatile
   for (unsigned i = N-2; i < N; ++i)
-    quota_mgr_->InsertVolatile(hashes_[i], 1, StringifyInt(i));
+    quota_mgr_->InsertVolatile(hashes_[i], 1, StringifyIntLeadingZeros(i));
 
   // Remove one out of two volatile entries
   EXPECT_TRUE(quota_mgr_->Cleanup(N-1));
@@ -245,9 +266,9 @@ TEST_F(T_QuotaManager, CleanupVolatile) {
   EXPECT_EQ(N-1, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < N-2; ++i) {
-    EXPECT_EQ(StringifyInt(i), remaining[i]);
+    EXPECT_EQ(StringifyIntLeadingZeros(i), remaining[i]);
   }
-  EXPECT_EQ(StringifyInt(N-1), remaining[N-2]);
+  EXPECT_EQ(StringifyIntLeadingZeros(N-1), remaining[N-2]);
 
   // Remove half of the entries, volatile entries first
   EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
@@ -255,7 +276,7 @@ TEST_F(T_QuotaManager, CleanupVolatile) {
   EXPECT_EQ(N/2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
-    EXPECT_EQ(StringifyInt(N/2 + i - 2), remaining[i]);
+    EXPECT_EQ(StringifyIntLeadingZeros(N/2 + i - 2), remaining[i]);
   }
 }
 
