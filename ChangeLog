@@ -1,4 +1,7 @@
 
+2.12.3:
+  * [client] Don't commit empty certificates to cache (#3728)
+
 2.12.2:
   * [client] Add cvmfs_config fsck -q(uick) to check for zeroed files in cache (#3726)
 
