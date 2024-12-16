@@ -317,12 +317,14 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
           CacheManager::Label label;
           label.path = repo_name_;
           label.flags |= CacheManager::kLabelCertificate;
-          fetcher_->cache_mgr()->CommitFromMem(
-                CacheManager::LabeledObject(ctlg_context->manifest_ensemble()->
-                                                        manifest->certificate(),
-                                            label),
-                                  ctlg_context->manifest_ensemble()->cert_buf,
-                                  ctlg_context->manifest_ensemble()->cert_size);
+          if (ctlg_context->manifest_ensemble()->cert_size > 0) {
+            fetcher_->cache_mgr()->CommitFromMem(
+                  CacheManager::LabeledObject(ctlg_context->manifest_ensemble()->
+                                                          manifest->certificate(),
+                                              label),
+                                    ctlg_context->manifest_ensemble()->cert_buf,
+                                    ctlg_context->manifest_ensemble()->cert_size);
+          }
           fetcher_->cache_mgr()->StoreBreadcrumb(
                                   *ctlg_context->manifest_ensemble()->manifest);
       }
