@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-      branches: [devel]
+      branches: ['devel', 'cvmfs*']
   pull_request:
+      branches: ['devel', 'cvmfs*']
 
 jobs:
   docker:

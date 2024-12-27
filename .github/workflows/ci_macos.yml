@@ -2,7 +2,9 @@ name: CI_MacOS
 
 on:
   push:
+    branches: ['devel', 'cvmfs*']
   pull_request:
+    branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 jobs:
   macos_build_and_test:
