@@ -1,0 +1,85 @@
+name: cpp-linter
+on:
+  pull_request:
+    paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', '**.cmake']
+  push:
+    branches: [devel, cvmfs*]
+    paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', '**.cmake']
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Clang version
+        shell: bash
+        run: |
+          echo "CLANG_VERSION=18" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/cache/restore@v4
+        id: cachedeb-restore
+        with:
+          path: /tmp/cvmfs-build-deps_2.1.0_all.deb
+          key: ${{ runner.os }}-${{ hashFiles('**/packaging/debian/cvmfs/control') }}
+      - name: Generate build-dep metapackage
+        if: steps.cachedeb-restore.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_2.1.0_all.deb /tmp
+      - uses: actions/cache/save@v4
+        if: steps.cachedeb-restore.outputs.cache-hit != 'true'
+        id: cachedeb-save
+        with:
+          path: /tmp/cvmfs-build-deps_2.1.0_all.deb
+          key: ${{ runner.os }}-${{ hashFiles('**/packaging/debian/cvmfs/control') }}
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /tmp/cvmfs-build-deps_2.1.0_all.deb
+      - name: Hash Externals
+        id: get-externals-hash
+        run: |
+          ls 
+          echo "hash=$(ls -Rs externals | sha1sum)" >> $GITHUB_OUTPUT
+        shell: bash
+      - uses: actions/cache/restore@v4
+        id: cache-externals-restore
+        with:
+          path: externals_install
+          key: ${{ runner.os }}-${{ steps.get-externals-hash.outputs.hash }}
+      - name: Generate compilation database
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - uses: actions/cache/save@v4
+        if: steps.cache-externals-restore.outputs.cache-hit != 'true'
+        id: cache-externals-save
+        with:
+          path: externals_install
+          key: ${{ runner.os }}-${{ steps.get-externals-hash.outputs.hash }}
+      - name: Install LLVM
+        run: |
+          wget  https://apt.llvm.org/llvm.sh
+          sudo chmod +x llvm.sh
+          sudo ./llvm.sh all
+        shell: bash
+      - name: Run clang-tidy-diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::add-matcher::.github/scripts/clang_matcher.json" 
+          git diff -U0  HEAD HEAD~ | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  -path ./build -p1 | tee clang-tidy.out
+          echo "::remove-matcher owner=clang::"
+        shell: bash
+      - name: Generate Summary
+        if: ${{ success() || failure() }}
+        run: |
+          echo '### Clang-Tidy Summary ' >> $GITHUB_STEP_SUMMARY
+          echo ' ' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat clang-tidy.out | sed -e 's/\x1b\[[0-9;]*m//g' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        shell: bash
+
+
+
