@@ -1,6 +1,6 @@
 [cernvm]
 name=CernVM packages
-baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/
+baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1
 enabled=1
@@ -8,7 +8,7 @@ protect=1
 
 [cernvm-config]
 name=CernVM-FS extra config packages
-baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/
+baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1
 enabled=0
@@ -16,7 +16,7 @@ protect=1
 
 [cernvm-testing]
 name=CernVM testing packages
-baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/
+baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1
 enabled=0
