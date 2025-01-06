@@ -203,11 +203,14 @@ cvmfs_server_mkfs() {
   fi
 
   # sanity checks
+  local upstream_type=$(get_upstream_type $upstream)
   check_repository_existence $name  && die "The repository $name already exists"
-  is_empty_repository_from_url $stratum0 ||
-      die "Error: A manifest already exists at this url: $stratum0/.cvmfspublished .\n 
-          Delete it manually and retry to force the creation of a new repository in this non-empty
-          storage. \n\n If you meant to setup a new stratum0 for this existing repository, use cvmfs_server import."
+  if [ x"$upstream_type" != xgw ]; then
+         is_empty_repository_from_url $stratum0 ||
+             die "Error: A manifest already exists at this url: $stratum0/.cvmfspublished .\n
+                 Delete it manually and retry to force the creation of a new repository in this non-empty
+                 storage. \n\n If you meant to setup a new stratum0 for this existing repository, use cvmfs_server import."
+  fi
   check_upstream_validity $upstream
   if [ $unionfs = "aufs" ]; then
     check_aufs                      || die "aufs kernel module missing"
@@ -229,7 +232,6 @@ cvmfs_server_mkfs() {
   # check if the keychain for the repository to create is already in place
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
-  local upstream_type=$(get_upstream_type $upstream)
   local keys="${name}.crt ${name}.pub"
   if [ x"$upstream_type" = xgw ]; then
       keys="$keys ${name}.gw"
