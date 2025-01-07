@@ -1295,9 +1295,14 @@ cvmfs_config_fsck() {
     fi
 
     if [ "x$1" = "x-q" ]; then
-      # this hardcodes the hash for the (legitimately) empty file - if anything about compression or hashing changes,
-      # this needs to be updated
-      for zeroed_file in $(find $dir -empty -wholename "$dir/[a-z0-9][a-z0-9]/*" ! -name ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78); do
+      # hardcode hashes for the (legitimately) empty file:
+      # SHA1: full hash of empty file: e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78
+      ignore_empty_hashes=" ! -name ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78 "
+      # RMD160: full hash of empty file: fcdb20b894f31f1306d56294c049ca7293dde0fc
+      ignore_empty_hashes="$ignore_empty_hashes ! -name db20b894f31f1306d56294c049ca7293dde0fc-rmd160 "
+      # SHAKE128: full hash of empty file: 28d94b83b7229b331fc601362b8e272e02665122
+      ignore_empty_hashes="$ignore_empty_hashes ! -name d94b83b7229b331fc601362b8e272e02665122-shake128 "
+      for zeroed_file in $(find $dir -empty -wholename "$dir/[a-z0-9][a-z0-9]/*" ${ignore_empty_hashes}); do
         echo "WARNING: unexpected zero-byte file $zeroed_file -  Moving it to quarantaine."
         mv $zeroed_file $dir/quarantaine
         retval=1

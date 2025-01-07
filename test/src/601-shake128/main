@@ -9,6 +9,7 @@ produce_files_in() {
 
   echo foo > foo
   echo bar > bar
+  touch empty_file
   mkdir -p nested/foo/bar
   touch nested/.cvmfscatalog
 
@@ -92,8 +93,10 @@ cvmfs_run_test() {
   echo "mount the Stratum1 repository on a local mountpoint"
   do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 14; }
 
+  sudo cvmfs_config fsck -q || return 15
+
   echo "clean up"
-  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 15; }
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 16; }
   sudo cvmfs_server rmfs -f $replica_name
 
   return 0
