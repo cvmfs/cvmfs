@@ -28,8 +28,8 @@ PathSink::PathSink(const std::string &destination_path) : Sink(true),
  *          Failure = -errno
  */
 int PathSink::Purge() {
-  int ret = sink_->Purge();
-  int ret2 = unlink(path_.c_str());
+  const int ret = sink_->Purge();
+  const int ret2 = unlink(path_.c_str());
 
   if (ret != 0) {
     return ret;
