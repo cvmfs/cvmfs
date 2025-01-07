@@ -1,6 +1,6 @@
 Name:           cvmfs-release
-Version:        3
-Release:        2
+Version:        4
+Release:        1
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -17,7 +17,27 @@ Source2:        cernvm.repo
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildArch:     noarch
+
+%if 0%{?rhel}
 Requires:      redhat-release >= 5
+%endif
+
+%if 0%{?suse_version}
+%if 0%{?is_opensuse}
+Requires:      openSUSE-release
+%else
+Requires:      sles-release
+%endif
+%endif
+
+%if 0%{?amzn}
+Requires:      system-release
+%endif
+
+%if 0%{?fedora}
+Requires:      fedora-release-common
+%endif
+
 
 %description
 This package contains the yum configuration for the CernVM File System packages.
@@ -52,9 +72,30 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) /etc/yum.repos.d/*
 /etc/pki/rpm-gpg/*
 
+%post
+. /etc/os-release
+if  [[ "$ID_LIKE" == *"suse"* ]]; then
+mv /etc/yum.repos.d/cernvm.repo /etc/zypp/repos.d
+sed -i 's/EL/suse/g' /etc/zypp/repos.d/cernvm.repo
+sed -i 's/releasever/releasever_major/g' /etc/zypp/repos.d/cernvm.repo
+fi
+if  [[ "$ID" == "amzn" ]]; then
+if  [[ "$VERSION" == "2" ]]; then
+sed -i 's/$releasever/7/g' /etc/yum.repos.d/cernvm.repo
+elif  [[ "$VERSION" == "2023" ]]; then
+sed -i 's/$releasever/9/g' /etc/yum.repos.d/cernvm.repo
+fi
+fi
+if  [[ "$ID" == "fedora" ]]; then
+sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
+fi
+
 
 %changelog
-* Tue Jul 08 2022 Jakob Blomer <jblomer@cern.ch> - 3-2
+* Sat Jan 04 2025 Valentin Volkl <vavolkl@cern.ch> - 4-1
+- Add second url as mirror
+- Add support for fedora, suse, amzn (equiv to centos7/9)
+* Fri Jul 08 2022 Jakob Blomer <jblomer@cern.ch> - 3-2
 - Update S3 repository mirror URL
 * Tue Jul 05 2022 Jakob Blomer <jblomer@cern.ch> - 3-1
 - Set repository URL to S3 mirror
