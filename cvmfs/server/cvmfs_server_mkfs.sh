@@ -101,6 +101,7 @@ cvmfs_server_mkfs() {
   local keys_import_location
   local external_data=false
   local require_masterkeycard=0
+  local ignore_manifest_overwrite=0
 
   local configure_apache=1
   local voms_authz=""
@@ -108,7 +109,7 @@ cvmfs_server_mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:" option; do
+  while getopts "Xw:u:o:mf:vgG:a:zs:k:pRV:Z:x:I" option; do
     case $option in
       X)
         external_data=true
@@ -164,6 +165,9 @@ cvmfs_server_mkfs() {
       x)
         proxy_url=$OPTARG
       ;;
+      I)
+        ignore_manifest_overwrite=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command mkfs: Unrecognized option: $1"
@@ -203,11 +207,17 @@ cvmfs_server_mkfs() {
   fi
 
   # sanity checks
+  local upstream_type=$(get_upstream_type $upstream)
   check_repository_existence $name  && die "The repository $name already exists"
-  is_empty_repository_from_url $stratum0 ||
-      die "Error: A manifest already exists at this url: $stratum0/.cvmfspublished .\n 
-          Delete it manually and retry to force the creation of a new repository in this non-empty
-          storage. \n\n If you meant to setup a new stratum0 for this existing repository, use cvmfs_server import."
+  # if upstream is a gateway, we expect the repository to not be empty.
+  if [ x"$upstream_type" != xgw ]; then
+      if [ $ignore_manifest_overwrite -eq 0 ]; then
+         is_empty_repository_from_url $stratum0 ||
+             die "Error: A manifest already exists at this url: $stratum0/.cvmfspublished .\n
+                 Delete it manually or use cvmfs_server  mkfs -I  to force the creation of a new repository in this non-empty
+                 storage. \n\n If you meant to setup a new stratum0 for this existing repository, use cvmfs_server import."
+      fi
+  fi
   check_upstream_validity $upstream
   if [ $unionfs = "aufs" ]; then
     check_aufs                      || die "aufs kernel module missing"
@@ -229,7 +239,6 @@ cvmfs_server_mkfs() {
   # check if the keychain for the repository to create is already in place
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
-  local upstream_type=$(get_upstream_type $upstream)
   local keys="${name}.crt ${name}.pub"
   if [ x"$upstream_type" = xgw ]; then
       keys="$keys ${name}.gw"
