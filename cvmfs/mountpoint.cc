@@ -77,8 +77,8 @@
 using namespace std;  // NOLINT
 
 
-bool FileSystem::g_alive = false;
-const char *FileSystem::kDefaultCacheBase = "/var/lib/cvmfs";
+bool FileSystem::g_alive                         = false;
+const char *FileSystem::kDefaultCacheBase        = "/var/lib/cvmfs";
 const char *FileSystem::kDefaultCacheMgrInstance = "default";
 
 
@@ -101,7 +101,6 @@ int64_t FileSystem::IoErrorInfo::count() { return counter_->Get(); }
 time_t FileSystem::IoErrorInfo::timestamp_last() { return timestamp_last_; }
 
 
-
 /**
  * A cache instance name is part of a bash parameter and can only contain
  * certain characters.
@@ -111,8 +110,8 @@ bool FileSystem::CheckInstanceName(const std::string &instance) {
     return false;
   sanitizer::CacheInstanceSanitizer instance_sanitizer;
   if (!instance_sanitizer.IsValid(instance)) {
-    boot_error_ = "invalid instance name (" + instance + "), " +
-                  "only characters a-z, A-Z, 0-9, _ are allowed";
+    boot_error_ = "invalid instance name (" + instance + "), "
+                  + "only characters a-z, A-Z, 0-9, _ are allowed";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -124,17 +123,16 @@ bool FileSystem::CheckInstanceName(const std::string &instance) {
  * Not all possible combinations of cache flags / modes are valid.
  */
 bool FileSystem::CheckPosixCacheSettings(
-  const FileSystem::PosixCacheSettings &settings)
-{
+    const FileSystem::PosixCacheSettings &settings) {
   if (settings.is_alien && settings.is_shared) {
-    boot_error_ = "Failure: shared local disk cache and alien cache mutually "
-                  "exclusive. Please turn off shared local disk cache.";
+    boot_error_  = "Failure: shared local disk cache and alien cache mutually "
+                   "exclusive. Please turn off shared local disk cache.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
   if (settings.is_alien && settings.is_managed) {
-    boot_error_ = "Failure: quota management and alien cache mutually "
-                  "exclusive. Please turn off quota limit.";
+    boot_error_  = "Failure: quota management and alien cache mutually "
+                   "exclusive. Please turn off quota limit.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
@@ -149,8 +147,8 @@ bool FileSystem::CheckPosixCacheSettings(
   }
 
   if (settings.cache_base_defined && settings.cache_dir_defined) {
-    boot_error_ =
-      "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
+    boot_error_  = "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually "
+                   "exclusive";
     boot_status_ = loader::kFailOptions;
     return false;
   }
@@ -164,8 +162,7 @@ bool FileSystem::CheckPosixCacheSettings(
  * method.
  */
 FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
-  UniquePtr<FileSystem>
-    file_system(new FileSystem(fs_info));
+  UniquePtr<FileSystem> file_system(new FileSystem(fs_info));
 
   file_system->SetupGlobalEnvironmentParams();
 
@@ -182,7 +179,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
 
   // Redirect SQlite temp directory to workspace (global variable)
   unsigned length_tempdir = file_system->workspace_.length() + 1;
-  sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
+  sqlite3_temp_directory  = static_cast<char *>(sqlite3_malloc(length_tempdir));
   snprintf(sqlite3_temp_directory,
            length_tempdir,
            "%s",
@@ -193,10 +190,9 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   file_system->SetupUuid();
   if (!file_system->SetupNfsMaps())
     return file_system.Release();
-  bool retval = sqlite::RegisterVfsRdOnly(
-    file_system->cache_mgr_,
-    file_system->statistics_,
-    sqlite::kVfsOptDefault);
+  bool retval = sqlite::RegisterVfsRdOnly(file_system->cache_mgr_,
+                                          file_system->statistics_,
+                                          sqlite::kVfsOptDefault);
   assert(retval);
   file_system->has_custom_sqlitevfs_ = true;
 
@@ -219,73 +215,77 @@ void FileSystem::CreateStatistics() {
   statistics_->Register("linkstring.n_overflows", "Number of overflows");
 
   // Callback counters
-  n_fs_open_ = statistics_->Register("cvmfs.n_fs_open",
-                                     "Overall number of file open operations");
-  n_fs_dir_open_ = statistics_->Register("cvmfs.n_fs_dir_open",
-                   "Overall number of directory open operations");
-  n_fs_lookup_ = statistics_->Register("cvmfs.n_fs_lookup",
-                                       "Number of lookups");
+  n_fs_open_     = statistics_->Register("cvmfs.n_fs_open",
+                                         "Overall number of file open operations");
+  n_fs_dir_open_ = statistics_->Register(
+      "cvmfs.n_fs_dir_open", "Overall number of directory open operations");
+  n_fs_lookup_          = statistics_->Register("cvmfs.n_fs_lookup",
+                                                "Number of lookups");
   n_fs_lookup_negative_ = statistics_->Register("cvmfs.n_fs_lookup_negative",
                                                 "Number of negative lookups");
   n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
-  n_fs_stat_stale_ = statistics_->Register("cvmfs.n_fs_stat_stale",
-    "Number of stats for stale (open, meanwhile changed) regular files");
-  n_fs_statfs_ = statistics_->Register("cvmfs.n_fs_statfs",
-                                       "Overall number of statsfs calls");
-  n_fs_statfs_cached_ = statistics_->Register("cvmfs.n_fs_statfs_cached",
-                "Number of statsfs calls that accessed the cached statfs info");
+  n_fs_stat_stale_ = statistics_->Register(
+      "cvmfs.n_fs_stat_stale",
+      "Number of stats for stale (open, meanwhile changed) regular files");
+  n_fs_statfs_        = statistics_->Register("cvmfs.n_fs_statfs",
+                                              "Overall number of statsfs calls");
+  n_fs_statfs_cached_ = statistics_->Register(
+      "cvmfs.n_fs_statfs_cached",
+      "Number of statsfs calls that accessed the cached statfs info");
   n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
-  n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
-                                         "Number of links read");
-  n_fs_forget_ = statistics_->Register("cvmfs.n_fs_forget",
-                                       "Number of inode forgets");
-  n_fs_inode_replace_ = statistics_->Register("cvmfs.n_fs_inode_replace",
-    "Number of stale inodes that got replaced by an up-to-date version");
+  n_fs_readlink_      = statistics_->Register("cvmfs.n_fs_readlink",
+                                              "Number of links read");
+  n_fs_forget_        = statistics_->Register("cvmfs.n_fs_forget",
+                                              "Number of inode forgets");
+  n_fs_inode_replace_ = statistics_->Register(
+      "cvmfs.n_fs_inode_replace",
+      "Number of stale inodes that got replaced by an up-to-date version");
   no_open_files_ = statistics_->Register("cvmfs.no_open_files",
                                          "Number of currently opened files");
-  no_open_dirs_ = statistics_->Register("cvmfs.no_open_dirs",
-                  "Number of currently opened directories");
-  io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
-                                                  "Number of I/O errors"));
-  n_eio_total_ =  statistics_->Register("eio.total",
-     "EIO returned to calling process. Sum of individual eio counters");
-  n_eio_01_ =  statistics_->Register("eio.01",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
-  n_eio_02_ =  statistics_->Register("eio.02",
-     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
-  n_eio_03_ =  statistics_->Register("eio.03",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
-  n_eio_04_ =  statistics_->Register("eio.04",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
-  n_eio_05_ =  statistics_->Register("eio.05",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
-  n_eio_06_ =  statistics_->Register("eio.06",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
-  n_eio_07_ =  statistics_->Register("eio.07",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
-  n_eio_08_ =  statistics_->Register("eio.08",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
-  n_emfile_ =  statistics_->Register("eio.emfile",
-     "EMFILE returned to calling process. cvmfs.cc:cvmfs_read()");
+  no_open_dirs_  = statistics_->Register(
+      "cvmfs.no_open_dirs", "Number of currently opened directories");
+  io_error_info_.SetCounter(
+      statistics_->Register("cvmfs.n_io_error", "Number of I/O errors"));
+  n_eio_total_ = statistics_->Register(
+      "eio.total",
+      "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ = statistics_->Register(
+      "eio.01", "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ = statistics_->Register(
+      "eio.02", "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ = statistics_->Register(
+      "eio.03", "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ = statistics_->Register(
+      "eio.04", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ = statistics_->Register(
+      "eio.05", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ = statistics_->Register(
+      "eio.06", "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ = statistics_->Register(
+      "eio.07", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ = statistics_->Register(
+      "eio.08", "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_emfile_ = statistics_->Register(
+      "eio.emfile",
+      "EMFILE returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
-  if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     HighPrecisionTimer::g_is_enabled = true;
   }
 
-  hist_fs_lookup_ = new Log2Histogram(30);
-  hist_fs_forget_ = new Log2Histogram(30);
+  hist_fs_lookup_       = new Log2Histogram(30);
+  hist_fs_forget_       = new Log2Histogram(30);
   hist_fs_forget_multi_ = new Log2Histogram(30);
-  hist_fs_getattr_ = new Log2Histogram(30);
-  hist_fs_readlink_ = new Log2Histogram(30);
-  hist_fs_opendir_ = new Log2Histogram(30);
-  hist_fs_releasedir_ = new Log2Histogram(30);
-  hist_fs_readdir_ = new Log2Histogram(30);
-  hist_fs_open_ = new Log2Histogram(30);
-  hist_fs_read_ = new Log2Histogram(30);
-  hist_fs_release_ = new Log2Histogram(30);
+  hist_fs_getattr_      = new Log2Histogram(30);
+  hist_fs_readlink_     = new Log2Histogram(30);
+  hist_fs_opendir_      = new Log2Histogram(30);
+  hist_fs_releasedir_   = new Log2Histogram(30);
+  hist_fs_readdir_      = new Log2Histogram(30);
+  hist_fs_open_         = new Log2Histogram(30);
+  hist_fs_read_         = new Log2Histogram(30);
+  hist_fs_release_      = new Log2Histogram(30);
 }
 
 
@@ -294,36 +294,31 @@ void FileSystem::CreateStatistics() {
  * sanity is in a separate method.
  */
 FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
-  const string &instance
-) {
+    const string &instance) {
   string optarg;
   PosixCacheSettings settings;
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_REFCOUNT", instance),
                              &optarg)
-      && options_mgr_->IsOff(optarg))
-  {
+      && options_mgr_->IsOff(optarg)) {
     settings.do_refcount = false;
   }
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+      && options_mgr_->IsOn(optarg)) {
     settings.is_shared = true;
   }
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_MODE", instance),
                              &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+      && options_mgr_->IsOn(optarg)) {
     settings.avoid_rename = true;
   }
 
   if (type_ == kFsFuse)
     settings.quota_limit = kDefaultQuotaLimit;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_QUOTA_LIMIT", instance),
-                             &optarg))
-  {
+                             &optarg)) {
     settings.quota_limit = String2Int64(optarg) * 1024 * 1024;
   }
   if (settings.quota_limit > 0)
@@ -331,9 +326,8 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
 
   settings.cache_path = kDefaultCacheBase;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_BASE", instance),
-                             &optarg))
-  {
-    settings.cache_path = MakeCanonicalPath(optarg);
+                             &optarg)) {
+    settings.cache_path         = MakeCanonicalPath(optarg);
     settings.cache_base_defined = true;
   }
   if (settings.is_shared) {
@@ -345,15 +339,13 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   // CheckCacheMode makes sure that CVMFS_CACHE_DIR and CVMFS_CACHE_BASE are
   // not set at the same time.
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_DIR", instance),
-                             &optarg))
-  {
+                             &optarg)) {
     settings.cache_dir_defined = true;
-    settings.cache_path = optarg;
+    settings.cache_path        = optarg;
   }
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_ALIEN", instance),
-                             &optarg))
-  {
-    settings.is_alien = true;
+                             &optarg)) {
+    settings.is_alien   = true;
     settings.cache_path = optarg;
   }
   // We already changed the cwd to the workspace
@@ -366,9 +358,8 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   // set otherwise
   settings.workspace = settings.cache_path;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_WORKSPACE", instance),
-                             &optarg) ||
-      options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg))
-  {
+                             &optarg)
+      || options_mgr_->GetValue("CVMFS_WORKSPACE", &optarg)) {
     // Used for the shared quota manager
     settings.workspace = optarg;
   }
@@ -380,18 +371,17 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
 bool FileSystem::DetermineNfsMode() {
   string optarg;
 
-  if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_NFS_SOURCE", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     nfs_mode_ |= kNfsMaps;
     if (options_mgr_->GetValue("CVMFS_NFS_SHARED", &optarg)) {
-      nfs_mode_ |= kNfsMapsHa;
-      nfs_maps_dir_ = optarg;
+      nfs_mode_     |= kNfsMapsHa;
+      nfs_maps_dir_  = optarg;
     }
   }
 
   if ((type_ == kFsLibrary) && (nfs_mode_ != kNfsNone)) {
-    boot_error_ = "Failure: libcvmfs does not support NFS export.";
+    boot_error_  = "Failure: libcvmfs does not support NFS export.";
     boot_status_ = loader::kFailOptions;
     return false;
   }
@@ -400,56 +390,54 @@ bool FileSystem::DetermineNfsMode() {
 
 
 FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
-  : name_(fs_info.name)
-  , exe_path_(fs_info.exe_path)
-  , type_(fs_info.type)
-  , options_mgr_(fs_info.options_mgr)
-  , wait_workspace_(fs_info.wait_workspace)
-  , foreground_(fs_info.foreground)
-  , n_fs_open_(NULL)
-  , n_fs_dir_open_(NULL)
-  , n_fs_lookup_(NULL)
-  , n_fs_lookup_negative_(NULL)
-  , n_fs_stat_(NULL)
-  , n_fs_stat_stale_(NULL)
-  , n_fs_statfs_(NULL)
-  , n_fs_statfs_cached_(NULL)
-  , n_fs_read_(NULL)
-  , n_fs_readlink_(NULL)
-  , n_fs_forget_(NULL)
-  , n_fs_inode_replace_(NULL)
-  , no_open_files_(NULL)
-  , no_open_dirs_(NULL)
-  , n_eio_total_(NULL)
-  , n_eio_01_(NULL)
-  , n_eio_02_(NULL)
-  , n_eio_03_(NULL)
-  , n_eio_04_(NULL)
-  , n_eio_05_(NULL)
-  , n_eio_06_(NULL)
-  , n_eio_07_(NULL)
-  , n_eio_08_(NULL)
-  , n_emfile_(NULL)
-  , statistics_(NULL)
-  , fd_workspace_lock_(-1)
-  , found_previous_crash_(false)
-  , nfs_mode_(kNfsNone)
-  , cache_mgr_(NULL)
-  , uuid_cache_(NULL)
-  , nfs_maps_(NULL)
-  , has_custom_sqlitevfs_(false)
-{
+    : name_(fs_info.name)
+    , exe_path_(fs_info.exe_path)
+    , type_(fs_info.type)
+    , options_mgr_(fs_info.options_mgr)
+    , wait_workspace_(fs_info.wait_workspace)
+    , foreground_(fs_info.foreground)
+    , n_fs_open_(NULL)
+    , n_fs_dir_open_(NULL)
+    , n_fs_lookup_(NULL)
+    , n_fs_lookup_negative_(NULL)
+    , n_fs_stat_(NULL)
+    , n_fs_stat_stale_(NULL)
+    , n_fs_statfs_(NULL)
+    , n_fs_statfs_cached_(NULL)
+    , n_fs_read_(NULL)
+    , n_fs_readlink_(NULL)
+    , n_fs_forget_(NULL)
+    , n_fs_inode_replace_(NULL)
+    , no_open_files_(NULL)
+    , no_open_dirs_(NULL)
+    , n_eio_total_(NULL)
+    , n_eio_01_(NULL)
+    , n_eio_02_(NULL)
+    , n_eio_03_(NULL)
+    , n_eio_04_(NULL)
+    , n_eio_05_(NULL)
+    , n_eio_06_(NULL)
+    , n_eio_07_(NULL)
+    , n_eio_08_(NULL)
+    , n_emfile_(NULL)
+    , statistics_(NULL)
+    , fd_workspace_lock_(-1)
+    , found_previous_crash_(false)
+    , nfs_mode_(kNfsNone)
+    , cache_mgr_(NULL)
+    , uuid_cache_(NULL)
+    , nfs_maps_(NULL)
+    , has_custom_sqlitevfs_(false) {
   assert(!g_alive);
   g_alive = true;
-  g_uid = geteuid();
-  g_gid = getegid();
+  g_uid   = geteuid();
+  g_gid   = getegid();
 
   string optarg;
-  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SERVER_MODE",
-                                         kDefaultCacheMgrInstance),
-                             &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue(
+          MkCacheParm("CVMFS_CACHE_SERVER_MODE", kDefaultCacheMgrInstance),
+          &optarg)
+      && options_mgr_->IsOn(optarg)) {
     g_raw_symlinks = true;
   }
 }
@@ -503,13 +491,13 @@ FileSystem::~FileSystem() {
 
 bool FileSystem::LockWorkspace() {
   path_workspace_lock_ = workspace_ + "/lock." + name_;
-  fd_workspace_lock_ = TryLockFile(path_workspace_lock_);
+  fd_workspace_lock_   = TryLockFile(path_workspace_lock_);
   if (fd_workspace_lock_ >= 0)
     return true;
 
   if (fd_workspace_lock_ == -1) {
-    boot_error_ = "could not acquire workspace lock (" +
-                 StringifyInt(errno) + ")";
+    boot_error_ = "could not acquire workspace lock (" + StringifyInt(errno)
+                  + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -523,8 +511,8 @@ bool FileSystem::LockWorkspace() {
 
   fd_workspace_lock_ = LockFile(path_workspace_lock_);
   if (fd_workspace_lock_ < 0) {
-    boot_error_ = "could not acquire workspace lock (" +
-                   StringifyInt(errno) + ")";
+    boot_error_ = "could not acquire workspace lock (" + StringifyInt(errno)
+                  + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -532,12 +520,10 @@ bool FileSystem::LockWorkspace() {
 }
 
 
-void FileSystem::LogSqliteError(
-  void *user_data __attribute__((unused)),
-  int sqlite_extended_error,
-  const char *message)
-{
-  int log_dest = kLogDebug;
+void FileSystem::LogSqliteError(void *user_data __attribute__((unused)),
+                                int sqlite_extended_error,
+                                const char *message) {
+  int log_dest     = kLogDebug;
   int sqlite_error = sqlite_extended_error & 0xFF;
   switch (sqlite_error) {
     case SQLITE_INTERNAL:
@@ -557,8 +543,8 @@ void FileSystem::LogSqliteError(
     default:
       break;
   }
-  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)",
-           message, sqlite_extended_error);
+  LogCvmfs(kLogCvmfs, log_dest, "SQlite3: %s (%d)", message,
+           sqlite_extended_error);
 }
 
 
@@ -567,32 +553,26 @@ void FileSystem::LogSqliteError(
  * the instance name such that CVMFS_CACHE_FOO_BAR becomes
  * CVMFS_CACHE_<INSTANCE>_FOO_BAR
  */
-string FileSystem::MkCacheParm(
-  const string &generic_parameter,
-  const string &instance)
-{
+string FileSystem::MkCacheParm(const string &generic_parameter,
+                               const string &instance) {
   assert(HasPrefix(generic_parameter, "CVMFS_CACHE_", false));
 
   if (instance == kDefaultCacheMgrInstance) {
     // Compatibility parameter names
-    if ((generic_parameter == "CVMFS_CACHE_SHARED") &&
-        !options_mgr_->IsDefined(generic_parameter))
-    {
+    if ((generic_parameter == "CVMFS_CACHE_SHARED")
+        && !options_mgr_->IsDefined(generic_parameter)) {
       return "CVMFS_SHARED_CACHE";
     }
-    if ((generic_parameter == "CVMFS_CACHE_ALIEN") &&
-        !options_mgr_->IsDefined(generic_parameter))
-    {
+    if ((generic_parameter == "CVMFS_CACHE_ALIEN")
+        && !options_mgr_->IsDefined(generic_parameter)) {
       return "CVMFS_ALIEN_CACHE";
     }
-    if ((generic_parameter == "CVMFS_CACHE_SERVER_MODE") &&
-        !options_mgr_->IsDefined(generic_parameter))
-    {
+    if ((generic_parameter == "CVMFS_CACHE_SERVER_MODE")
+        && !options_mgr_->IsDefined(generic_parameter)) {
       return "CVMFS_SERVER_CACHE_MODE";
     }
-    if ((generic_parameter == "CVMFS_CACHE_QUOTA_LIMIT") &&
-        !options_mgr_->IsDefined(generic_parameter))
-    {
+    if ((generic_parameter == "CVMFS_CACHE_QUOTA_LIMIT")
+        && !options_mgr_->IsDefined(generic_parameter)) {
       return "CVMFS_QUOTA_LIMIT";
     }
     return generic_parameter;
@@ -622,7 +602,7 @@ void FileSystem::ResetErrorCounters() {
  */
 CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   if (constructed_instances_.find(instance) != constructed_instances_.end()) {
-    boot_error_ = "circular cache definition: " + instance;
+    boot_error_  = "circular cache definition: " + instance;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
@@ -646,8 +626,8 @@ CacheManager *FileSystem::SetupCacheMgr(const string &instance) {
   } else if (instance_type == "external") {
     return SetupExternalCacheMgr(instance);
   } else {
-    boot_error_ = "invalid cache manager type for '" + instance +  "':" +
-      instance_type;
+    boot_error_ = "invalid cache manager type for '" + instance
+                  + "':" + instance_type;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
@@ -661,30 +641,28 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
     nfiles = String2Uint64(optarg);
   vector<string> cmd_line;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_CMDLINE", instance),
-      &optarg))
-  {
+                             &optarg)) {
     cmd_line = SplitString(optarg, ',');
   }
 
   if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_LOCATOR", instance),
-      &optarg))
-  {
-    boot_error_ = MkCacheParm("CVMFS_CACHE_LOCATOR", instance) + " missing";
+                              &optarg)) {
+    boot_error_  = MkCacheParm("CVMFS_CACHE_LOCATOR", instance) + " missing";
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
 
   UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
-    ExternalCacheManager::CreatePlugin(optarg, cmd_line));
+      ExternalCacheManager::CreatePlugin(optarg, cmd_line));
   if (!plugin_handle->IsValid()) {
-    boot_error_ = plugin_handle->error_msg();
+    boot_error_  = plugin_handle->error_msg();
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
   ExternalCacheManager *cache_mgr = ExternalCacheManager::Create(
-    plugin_handle->fd_connection(), nfiles, name_ + ":" + instance);
+      plugin_handle->fd_connection(), nfiles, name_ + ":" + instance);
   if (cache_mgr == NULL) {
-    boot_error_ = "failed to create external cache manager for " + instance;
+    boot_error_  = "failed to create external cache manager for " + instance;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
@@ -698,14 +676,14 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
-    settings.cache_path,
-    settings.is_alien,
-    settings.avoid_rename ? PosixCacheManager::kRenameLink
-                          : PosixCacheManager::kRenameNormal,
-    settings.do_refcount));
+      settings.cache_path,
+      settings.is_alien,
+      settings.avoid_rename ? PosixCacheManager::kRenameLink
+                            : PosixCacheManager::kRenameNormal,
+      settings.do_refcount));
   if (!cache_mgr.IsValid()) {
-    boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
-                  settings.cache_path + ": " + strerror(errno);
+    boot_error_ = "Failed to setup posix cache '" + instance + "' in "
+                  + settings.cache_path + ": " + strerror(errno);
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
@@ -731,10 +709,9 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
   }
   uint64_t sz_cache_bytes;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SIZE", instance),
-                             &optarg))
-  {
+                             &optarg)) {
     if (HasSuffix(optarg, "%", false)) {
-      sz_cache_bytes = platform_memsize() * String2Uint64(optarg)/100;
+      sz_cache_bytes = platform_memsize() * String2Uint64(optarg) / 100;
     } else {
       sz_cache_bytes = String2Uint64(optarg) * 1024 * 1024;
     }
@@ -743,28 +720,28 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
   }
   MemoryKvStore::MemoryAllocator alloc = MemoryKvStore::kMallocHeap;
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_MALLOC", instance),
-                             &optarg))
-  {
+                             &optarg)) {
     if (optarg == "libc") {
       alloc = MemoryKvStore::kMallocLibc;
     } else if (optarg == "heap") {
       alloc = MemoryKvStore::kMallocHeap;
     } else {
-      boot_error_ = "Failure: unknown malloc " +
-                    MkCacheParm("CVMFS_CACHE_MALLOC", instance) + "=" + optarg;
+      boot_error_ = "Failure: unknown malloc "
+                    + MkCacheParm("CVMFS_CACHE_MALLOC", instance) + "="
+                    + optarg;
       boot_status_ = loader::kFailOptions;
       return NULL;
     }
   }
-  sz_cache_bytes = RoundUp8(std::max(static_cast<uint64_t>(40 * 1024 * 1024),
-                                     sz_cache_bytes));
+  sz_cache_bytes = RoundUp8(
+      std::max(static_cast<uint64_t>(40 * 1024 * 1024), sz_cache_bytes));
   RamCacheManager *cache_mgr = new RamCacheManager(
-        sz_cache_bytes,
-        nfiles,
-        alloc,
-        perf::StatisticsTemplate("cache." + instance, statistics_));
+      sz_cache_bytes,
+      nfiles,
+      alloc,
+      perf::StatisticsTemplate("cache." + instance, statistics_));
   if (cache_mgr == NULL) {
-    boot_error_ = "failed to create ram cache manager for " + instance;
+    boot_error_  = "failed to create ram cache manager for " + instance;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
@@ -776,9 +753,8 @@ CacheManager *FileSystem::SetupRamCacheMgr(const string &instance) {
 CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
   string optarg;
   if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_UPPER", instance),
-                              &optarg))
-  {
-    boot_error_ = MkCacheParm("CVMFS_CACHE_UPPER", instance) + " missing";
+                              &optarg)) {
+    boot_error_  = MkCacheParm("CVMFS_CACHE_UPPER", instance) + " missing";
     boot_status_ = loader::kFailOptions;
     return NULL;
   }
@@ -787,9 +763,8 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
     return NULL;
 
   if (!options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_LOWER", instance),
-                              &optarg))
-  {
-    boot_error_ = MkCacheParm("CVMFS_CACHE_LOWER", instance) + " missing";
+                              &optarg)) {
+    boot_error_  = MkCacheParm("CVMFS_CACHE_LOWER", instance) + " missing";
     boot_status_ = loader::kFailOptions;
     return NULL;
   }
@@ -797,18 +772,17 @@ CacheManager *FileSystem::SetupTieredCacheMgr(const string &instance) {
   if (!lower.IsValid())
     return NULL;
 
-  CacheManager *tiered =
-    TieredCacheManager::Create(upper.Release(), lower.Release());
+  CacheManager *tiered = TieredCacheManager::Create(upper.Release(),
+                                                    lower.Release());
   if (tiered == NULL) {
-    boot_error_ = "Failed to setup tiered cache manager " + instance;
+    boot_error_  = "Failed to setup tiered cache manager " + instance;
     boot_status_ = loader::kFailCacheDir;
     return NULL;
   }
   if (options_mgr_->GetValue(
-        MkCacheParm("CVMFS_CACHE_LOWER_READONLY", instance), &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
-    static_cast<TieredCacheManager*>(tiered)->SetLowerReadOnly();
+          MkCacheParm("CVMFS_CACHE_LOWER_READONLY", instance), &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    static_cast<TieredCacheManager *>(tiered)->SetLowerReadOnly();
   }
   return tiered;
 }
@@ -825,8 +799,8 @@ bool FileSystem::SetupCrashGuard() {
   }
   retval = open(path_crash_guard_.c_str(), O_RDONLY | O_CREAT, 0600);
   if (retval < 0) {
-    boot_error_ = "could not open running sentinel (" +
-                  StringifyInt(errno) + ")";
+    boot_error_ = "could not open running sentinel (" + StringifyInt(errno)
+                  + ")";
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -841,7 +815,7 @@ bool FileSystem::SetupCwd() {
     // accessible and it brings speed later on.
     int retval = chdir(workspace_.c_str());
     if (retval != 0) {
-      boot_error_ = "workspace " + workspace_ + " is unavailable";
+      boot_error_  = "workspace " + workspace_ + " is unavailable";
       boot_status_ = loader::kFailCacheDir;
       return false;
     }
@@ -870,9 +844,8 @@ void FileSystem::SetupGlobalEnvironmentParams() {
 }
 
 
-void FileSystem::SetupLoggingStandalone(
-  const OptionsManager &options_mgr, const std::string &prefix)
-{
+void FileSystem::SetupLoggingStandalone(const OptionsManager &options_mgr,
+                                        const std::string &prefix) {
   SetupGlobalEnvironmentParams();
 
   string optarg;
@@ -904,8 +877,8 @@ bool FileSystem::SetupNfsMaps() {
 
   string no_nfs_sentinel;
   if (cache_mgr_->id() == kPosixCacheManager) {
-    PosixCacheManager *posix_cache_mgr =
-        reinterpret_cast<PosixCacheManager *>(cache_mgr_);
+    PosixCacheManager *posix_cache_mgr = reinterpret_cast<PosixCacheManager *>(
+        cache_mgr_);
     no_nfs_sentinel = posix_cache_mgr->cache_path() + "/no_nfs_maps." + name_;
     if (!IsNfsSource()) {
       // Might be a read-only cache
@@ -915,7 +888,7 @@ bool FileSystem::SetupNfsMaps() {
     }
   } else {
     if (IsNfsSource()) {
-      boot_error_ = "NFS source only works with POSIX cache manager.";
+      boot_error_  = "NFS source only works with POSIX cache manager.";
       boot_status_ = loader::kFailNfsMaps;
       return false;
     }
@@ -925,25 +898,25 @@ bool FileSystem::SetupNfsMaps() {
   assert(cache_mgr_->id() == kPosixCacheManager);
   assert(IsNfsSource());
   if (!no_nfs_sentinel.empty() && FileExists(no_nfs_sentinel)) {
-    boot_error_ = "Cache was used without NFS maps before. "
-                  "It has to be wiped out.";
+    boot_error_  = "Cache was used without NFS maps before. "
+                   "It has to be wiped out.";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
 
   // nfs maps need to be protected by workspace lock
-  PosixCacheManager *posix_cache_mgr =
-        reinterpret_cast<PosixCacheManager *>(cache_mgr_);
+  PosixCacheManager *posix_cache_mgr = reinterpret_cast<PosixCacheManager *>(
+      cache_mgr_);
   if (posix_cache_mgr->cache_path() != workspace_) {
-    boot_error_ = "Cache directory and workspace must be identical for "
-                  "NFS export";
+    boot_error_  = "Cache directory and workspace must be identical for "
+                   "NFS export";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
 
   string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
   if (!MkdirDeep(inode_cache_dir, 0700)) {
-    boot_error_ = "Failed to initialize NFS maps";
+    boot_error_  = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
@@ -951,20 +924,20 @@ bool FileSystem::SetupNfsMaps() {
   // TODO(jblomer): make this a manager class
   if (IsHaNfsSource()) {
     nfs_maps_ = NfsMapsSqlite::Create(
-      inode_cache_dir,
-      catalog::ClientCatalogManager::kInodeOffset + 1,
-      found_previous_crash_,
-      statistics_);
+        inode_cache_dir,
+        catalog::ClientCatalogManager::kInodeOffset + 1,
+        found_previous_crash_,
+        statistics_);
   } else {
     nfs_maps_ = NfsMapsLeveldb::Create(
-      inode_cache_dir,
-      catalog::ClientCatalogManager::kInodeOffset + 1,
-      found_previous_crash_,
-      statistics_);
+        inode_cache_dir,
+        catalog::ClientCatalogManager::kInodeOffset + 1,
+        found_previous_crash_,
+        statistics_);
   }
 
   if (nfs_maps_ == NULL) {
-    boot_error_ = "Failed to initialize NFS maps";
+    boot_error_  = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
     return false;
   }
@@ -973,8 +946,8 @@ bool FileSystem::SetupNfsMaps() {
   if (options_mgr_->GetValue("CVMFS_NFS_INTERLEAVED_INODES", &optarg)) {
     vector<string> tokens = SplitString(optarg, '%');
     if (tokens.size() != 2) {
-      boot_error_ =
-        "invalid format for CVMFS_NFS_INTERLEAVED_INODES: " + optarg;
+      boot_error_ = "invalid format for CVMFS_NFS_INTERLEAVED_INODES: "
+                    + optarg;
       boot_status_ = loader::kFailNfsMaps;
       return false;
     }
@@ -991,12 +964,10 @@ bool FileSystem::SetupNfsMaps() {
 
 
 bool FileSystem::SetupPosixQuotaMgr(
-  const FileSystem::PosixCacheSettings &settings,
-  CacheManager *cache_mgr
-) {
+    const FileSystem::PosixCacheSettings &settings, CacheManager *cache_mgr) {
   assert(settings.quota_limit >= 0);
   int64_t quota_threshold = settings.quota_limit / 2;
-  string cache_workspace = settings.cache_path;
+  string cache_workspace  = settings.cache_path;
   if (settings.cache_path != settings.workspace) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
              "using workspace %s to protect cache database in %s",
@@ -1006,25 +977,23 @@ bool FileSystem::SetupPosixQuotaMgr(
   PosixQuotaManager *quota_mgr;
 
   if (settings.is_shared) {
-    quota_mgr = PosixQuotaManager::CreateShared(
-                  exe_path_,
-                  cache_workspace,
-                  settings.quota_limit,
-                  quota_threshold,
-                  foreground_);
+    quota_mgr = PosixQuotaManager::CreateShared(exe_path_,
+                                                cache_workspace,
+                                                settings.quota_limit,
+                                                quota_threshold,
+                                                foreground_);
     if (quota_mgr == NULL) {
-      boot_error_ = "Failed to initialize shared lru cache";
+      boot_error_  = "Failed to initialize shared lru cache";
       boot_status_ = loader::kFailQuota;
       return false;
     }
   } else {
-    quota_mgr = PosixQuotaManager::Create(
-                  cache_workspace,
-                  settings.quota_limit,
-                  quota_threshold,
-                  found_previous_crash_);
+    quota_mgr = PosixQuotaManager::Create(cache_workspace,
+                                          settings.quota_limit,
+                                          quota_threshold,
+                                          found_previous_crash_);
     if (quota_mgr == NULL) {
-      boot_error_ = "Failed to initialize lru cache";
+      boot_error_  = "Failed to initialize lru cache";
       boot_status_ = loader::kFailQuota;
       return false;
     }
@@ -1037,7 +1006,7 @@ bool FileSystem::SetupPosixQuotaMgr(
              quota_mgr->GetSize(), quota_mgr->GetCapacity());
     if (!quota_mgr->Cleanup(quota_threshold)) {
       delete quota_mgr;
-      boot_error_ = "Failed to clean up cache";
+      boot_error_  = "Failed to clean up cache";
       boot_status_ = loader::kFailQuota;
       return false;
     }
@@ -1078,17 +1047,16 @@ bool FileSystem::SetupWorkspace() {
   workspace_ = kDefaultCacheBase;
   if (options_mgr_->GetValue("CVMFS_CACHE_BASE", &optarg))
     workspace_ = MakeCanonicalPath(optarg);
-  if (options_mgr_->GetValue("CVMFS_SHARED_CACHE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_SHARED_CACHE", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     workspace_ += "/shared";
   } else {
     workspace_ += "/" + name_;
   }
   if (options_mgr_->GetValue("CVMFS_CACHE_DIR", &optarg)) {
     if (options_mgr_->IsDefined("CVMFS_CACHE_BASE")) {
-      boot_error_ =
-        "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually exclusive";
+      boot_error_  = "'CVMFS_CACHE_BASE' and 'CVMFS_CACHE_DIR' are mutually "
+                     "exclusive";
       boot_status_ = loader::kFailOptions;
       return false;
     }
@@ -1102,7 +1070,7 @@ bool FileSystem::SetupWorkspace() {
   // permission now to 0770 to avoid a race when fixing it later
   const int mode = 0770;
   if (!MkdirDeep(workspace_, mode, false)) {
-    boot_error_ = "cannot create workspace directory " + workspace_;
+    boot_error_  = "cannot create workspace directory " + workspace_;
     boot_status_ = loader::kFailCacheDir;
     return false;
   }
@@ -1134,10 +1102,9 @@ void FileSystem::SetupUuid() {
  * cache in order to properly unravel the file system stack on shutdown.
  */
 void FileSystem::TearDown2ReadOnly() {
-  if ((cache_mgr_ != NULL) &&
-      (cache_mgr_->id() == kPosixCacheManager)) {
-    PosixCacheManager *posix_cache_mgr =
-      reinterpret_cast<PosixCacheManager *>(cache_mgr_);
+  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == kPosixCacheManager)) {
+    PosixCacheManager *posix_cache_mgr = reinterpret_cast<PosixCacheManager *>(
+        cache_mgr_);
     posix_cache_mgr->TearDown2ReadOnly();
   }
 
@@ -1160,9 +1127,8 @@ void FileSystem::ReplaceCacheManager(CacheManager *new_cache_mgr) {
 bool FileSystem::TriageCacheMgr() {
   cache_mgr_instance_ = kDefaultCacheMgrInstance;
   string instance;
-  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &instance) &&
-      !instance.empty())
-  {
+  if (options_mgr_->GetValue("CVMFS_CACHE_PRIMARY", &instance)
+      && !instance.empty()) {
     if (!CheckInstanceName(instance))
       return false;
     cache_mgr_instance_ = instance;
@@ -1173,9 +1139,8 @@ bool FileSystem::TriageCacheMgr() {
     return false;
 
   std::string optarg;
-  if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     unsigned nfiles = kDefaultNfiles;
     if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
       nfiles = String2Uint64(optarg);
@@ -1194,7 +1159,7 @@ bool FileSystem::TriageCacheMgr() {
 
 
 const char *MountPoint::kDefaultAuthzSearchPath = "/usr/libexec/cvmfs/authz";
-const char *MountPoint::kDefaultBlacklist = "/etc/cvmfs/blacklist";
+const char *MountPoint::kDefaultBlacklist       = "/etc/cvmfs/blacklist";
 
 bool MountPoint::CheckBlacklists() {
   blacklist_paths_.clear();
@@ -1206,7 +1171,7 @@ bool MountPoint::CheckBlacklists() {
   bool append = false;
   if (FileExists(blacklist)) {
     if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
-      boot_error_ = "failed to load blacklist " + blacklist;
+      boot_error_  = "failed to load blacklist " + blacklist;
       boot_status_ = loader::kFailSignature;
       return false;
     }
@@ -1219,7 +1184,7 @@ bool MountPoint::CheckBlacklists() {
     blacklist_paths_.push_back(blacklist);
     if (FileExists(blacklist)) {
       if (!signature_mgr_->LoadBlacklist(blacklist, append)) {
-        boot_error_ = "failed to load blacklist from config repository";
+        boot_error_  = "failed to load blacklist from config repository";
         boot_status_ = loader::kFailSignature;
         return false;
       }
@@ -1258,32 +1223,26 @@ bool MountPoint::ReloadBlacklists() {
  * NOTE: This function should only be called before or within cvmfs_init().
  *
  */
-void MountPoint::DisableCacheSymlinks() {
-  cache_symlinks_ = false;
-}
+void MountPoint::DisableCacheSymlinks() { cache_symlinks_ = false; }
 
 /**
  * Instead of invalidate dentries, they should be expired.
  * Fixes issues with mount-on-top mounts and symlink caching.
  */
-void MountPoint::EnableFuseExpireEntry() {
-  fuse_expire_entry_ = true;
-}
+void MountPoint::EnableFuseExpireEntry() { fuse_expire_entry_ = true; }
 
 
 /**
  * The option_mgr parameter can be NULL, in which case the global option manager
  * from the file system is used.
  */
-MountPoint *MountPoint::Create(
-  const string &fqrn,
-  FileSystem *file_system,
-  OptionsManager *options_mgr)
-{
+MountPoint *MountPoint::Create(const string &fqrn,
+                               FileSystem *file_system,
+                               OptionsManager *options_mgr) {
   if (options_mgr == NULL)
     options_mgr = file_system->options_mgr();
-  UniquePtr<MountPoint> mountpoint(new MountPoint(
-    fqrn, file_system, options_mgr));
+  UniquePtr<MountPoint> mountpoint(
+      new MountPoint(fqrn, file_system, options_mgr));
 
   // At this point, we have a repository name, the type (fuse or library) and
   // an options manager (which can be the same than the FileSystem's one).
@@ -1297,11 +1256,12 @@ MountPoint *MountPoint::Create(
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
   if (file_system->cache_mgr()->id() == kStreamingCacheManager) {
-    StreamingCacheManager *streaming_cachemgr =
-      dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr());
+    StreamingCacheManager
+        *streaming_cachemgr = dynamic_cast<StreamingCacheManager *>(
+            file_system->cache_mgr());
     streaming_cachemgr->SetRegularDownloadManager(mountpoint->download_mgr());
     streaming_cachemgr->SetExternalDownloadManager(
-      mountpoint->external_download_mgr());
+        mountpoint->external_download_mgr());
   }
   if (!mountpoint->CreateResolvConfWatcher()) {
     return mountpoint.Release();
@@ -1332,15 +1292,10 @@ void MountPoint::CreateAuthz() {
     authz_search_path = optarg;
 
   authz_fetcher_ = new AuthzExternalFetcher(
-    fqrn_,
-    authz_helper,
-    authz_search_path,
-    options_mgr_);
+      fqrn_, authz_helper, authz_search_path, options_mgr_);
   assert(authz_fetcher_ != NULL);
 
-  authz_session_mgr_ = AuthzSessionManager::Create(
-    authz_fetcher_,
-    statistics_);
+  authz_session_mgr_ = AuthzSessionManager::Create(authz_fetcher_, statistics_);
   assert(authz_session_mgr_ != NULL);
 
   authz_attachment_ = new AuthzAttachment(authz_session_mgr_);
@@ -1364,27 +1319,25 @@ bool MountPoint::CreateCatalogManager() {
   if (root_hash.IsNull()) {
     retval = catalog_mgr_->Init();
   } else {
-    fixed_catalog_ = true;
-    bool alt_root_path =
-      options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
-      options_mgr_->IsOn(optarg);
+    fixed_catalog_     = true;
+    bool alt_root_path = options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg)
+                         && options_mgr_->IsOn(optarg);
     retval = catalog_mgr_->InitFixed(root_hash, alt_root_path);
   }
   if (!retval) {
-    boot_error_ = "Failed to initialize root file catalog";
+    boot_error_  = "Failed to initialize root file catalog";
     boot_status_ = loader::kFailCatalog;
     return false;
   }
 
   if (catalog_mgr_->IsRevisionBlacklisted()) {
-    boot_error_ = "repository revision blacklisted";
+    boot_error_  = "repository revision blacklisted";
     boot_status_ = loader::kFailRevisionBlacklisted;
     return false;
   }
 
-  if (options_mgr_->GetValue("CVMFS_AUTO_UPDATE", &optarg) &&
-      !options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_AUTO_UPDATE", &optarg)
+      && !options_mgr_->IsOn(optarg)) {
     fixed_catalog_ = true;
   }
 
@@ -1407,8 +1360,9 @@ bool MountPoint::CreateCatalogManager() {
 
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
-  download_mgr_ = new download::DownloadManager(kDefaultNumConnections,
-                             perf::StatisticsTemplate("download", statistics_));
+  download_mgr_ = new download::DownloadManager(
+      kDefaultNumConnections,
+      perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
   // must be set before proxy and host chains are being initialized
@@ -1420,13 +1374,13 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
-  if (options_mgr_->GetValue("CVMFS_FAILOVER_INDEFINITELY", &optarg) &&
-      options_mgr_->IsOn(optarg)) {
-      download_mgr_->SetFailoverIndefinitely();
+  if (options_mgr_->GetValue("CVMFS_FAILOVER_INDEFINITELY", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    download_mgr_->SetFailoverIndefinitely();
   }
 
   if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
-    download_mgr_->SetMetalinkChain(optarg);  
+    download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     download_mgr_->SetHostChain("");
     // metalink requires redirects
@@ -1439,8 +1393,9 @@ bool MountPoint::CreateDownloadManagers() {
       && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableIgnoreSignatureFailures();
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-      "Development option: Activate ignore signature failures during download. "
-      "DO NOT USE IN PRODUCTION");
+             "Development option: Activate ignore signature failures during "
+             "download. "
+             "DO NOT USE IN PRODUCTION");
   }
 
   SetupDnsTuning(download_mgr_);
@@ -1456,11 +1411,11 @@ bool MountPoint::CreateDownloadManagers() {
   if (options_mgr_->GetValue("CVMFS_HTTP_PROXY", &optarg))
     proxies = optarg;
   proxies = download::ResolveProxyDescription(
-    proxies,
-    file_system_->workspace() + "/proxies" + GetUniqFileSuffix(),
-    download_mgr_);
+      proxies,
+      file_system_->workspace() + "/proxies" + GetUniqFileSuffix(),
+      download_mgr_);
   if (proxies == "") {
-    boot_error_ = "failed to discover HTTP proxy servers";
+    boot_error_  = "failed to discover HTTP proxy servers";
     boot_status_ = loader::kFailWpad;
     return false;
   }
@@ -1470,8 +1425,8 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
-                    options_mgr_->IsOn(optarg);
+  bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg)
+                    && options_mgr_->IsOn(optarg);
   if (do_geosort) {
     download_mgr_->ProbeGeo();
   }
@@ -1485,25 +1440,26 @@ bool MountPoint::CreateDownloadManagers() {
     }
   }
 
-  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg) &&
-      options_mgr_->IsOn(optarg)) {
+  if (options_mgr_->GetValue("CVMFS_USE_SSL_SYSTEM_CA", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     download_mgr_->UseSystemCertificatePath();
   }
 
-  if (options_mgr_->GetValue("CVMFS_PROXY_SHARD", &optarg) &&
-      options_mgr_->IsOn(optarg)) {
+  if (options_mgr_->GetValue("CVMFS_PROXY_SHARD", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     download_mgr_->ShardProxies();
   }
 
   // configure http tracing header
-  if (options_mgr_->GetValue("CVMFS_HTTP_TRACING", &optarg) &&
-      options_mgr_->IsOn(optarg)) {
+  if (options_mgr_->GetValue("CVMFS_HTTP_TRACING", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableHTTPTracing();
     if (options_mgr_->GetValue("CVMFS_HTTP_TRACING_HEADERS", &optarg)) {
       if (optarg.size() > 1000) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-           "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given %ld )",
-           optarg.size());
+                 "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given "
+                 "%ld )",
+                 optarg.size());
       } else {
         std::vector<std::string> tokens = SplitString(optarg, '|');
         sanitizer::AlphaNumSanitizer sanitizer;
@@ -1515,20 +1471,23 @@ bool MountPoint::CreateDownloadManagers() {
 
           if (key_val.size() != 2) {
             LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-              "Http tracing header: Skipping current token part of "
-              "CVMFS_HTTP_TRACING_HEADERS! Invalid "
-              "<key:value> pair. Token: %s", token.c_str());
+                     "Http tracing header: Skipping current token part of "
+                     "CVMFS_HTTP_TRACING_HEADERS! Invalid "
+                     "<key:value> pair. Token: %s",
+                     token.c_str());
             continue;
           }
 
           std::string prefix = "X-CVMFS-";
-          std::string key = Trim(key_val[0]);
+          std::string key    = Trim(key_val[0]);
 
           if (!sanitizer.IsValid(key)) {
             LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
-            "Http tracing header: Skipping current token part of "
-            "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only alphanumeric keys "
-            "are allowed (a-z, A-Z, 0-9). Token: %s", token.c_str());
+                     "Http tracing header: Skipping current token part of "
+                     "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only "
+                     "alphanumeric keys "
+                     "are allowed (a-z, A-Z, 0-9). Token: %s",
+                     token.c_str());
             continue;
           }
 
@@ -1546,8 +1505,8 @@ bool MountPoint::CreateDownloadManagers() {
 bool MountPoint::CreateResolvConfWatcher() {
   std::string roaming_value;
   options_mgr_->GetValue("CVMFS_DNS_ROAMING", &roaming_value);
-  if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING") &&
-      options_mgr_->IsOn(roaming_value)) {
+  if (options_mgr_->IsDefined("CVMFS_DNS_ROAMING")
+      && options_mgr_->IsOn(roaming_value)) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "DNS roaming is enabled for this repository.");
     // Create a file watcher to update the DNS settings of the download
@@ -1555,8 +1514,8 @@ bool MountPoint::CreateResolvConfWatcher() {
     resolv_conf_watcher_ = file_watcher::FileWatcher::Create();
 
     if (resolv_conf_watcher_) {
-      ResolvConfEventHandler *handler =
-          new ResolvConfEventHandler(download_mgr_, external_download_mgr_);
+      ResolvConfEventHandler *handler = new ResolvConfEventHandler(
+          download_mgr_, external_download_mgr_);
       resolv_conf_watcher_->RegisterHandler("/etc/resolv.conf", handler);
     }
   } else {
@@ -1567,17 +1526,16 @@ bool MountPoint::CreateResolvConfWatcher() {
 }
 
 void MountPoint::CreateFetchers() {
-  fetcher_ = new cvmfs::Fetcher(
-    file_system_->cache_mgr(),
-    download_mgr_,
-    backoff_throttle_,
-    perf::StatisticsTemplate("fetch", statistics_));
+  fetcher_ = new cvmfs::Fetcher(file_system_->cache_mgr(),
+                                download_mgr_,
+                                backoff_throttle_,
+                                perf::StatisticsTemplate("fetch", statistics_));
 
   external_fetcher_ = new cvmfs::Fetcher(
-    file_system_->cache_mgr(),
-    external_download_mgr_,
-    backoff_throttle_,
-    perf::StatisticsTemplate("fetch-external", statistics_));
+      file_system_->cache_mgr(),
+      external_download_mgr_,
+      backoff_throttle_,
+      perf::StatisticsTemplate("fetch-external", statistics_));
 }
 
 
@@ -1593,19 +1551,19 @@ bool MountPoint::CreateSignatureManager() {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFilesBySuffix(optarg, ".pub"), ":");
   } else {
-    public_keys =
-      JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
+    public_keys = JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"),
+                              ":");
   }
 
   if (!signature_mgr_->LoadPublicRsaKeys(public_keys)) {
-    boot_error_ = "failed to load public key(s)";
+    boot_error_  = "failed to load public key(s)";
     boot_status_ = loader::kFailSignature;
     return false;
   }
 
   if (public_keys.size() > 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
-                                   public_keys.c_str());
+             public_keys.c_str());
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
@@ -1646,10 +1604,12 @@ void MountPoint::CreateStatistics() {
                         "overall number of evicted page cache entries");
   statistics_->Register("page_cache_tracker.n_open_direct",
                         "overall number of direct I/O open calls");
-  statistics_->Register("page_cache_tracker.n_open_flush",
-    "overall number of open calls where the file's page cache gets flushed");
-  statistics_->Register("page_cache_tracker.n_open_cached",
-    "overall number of open calls where the file's page cache is reused");
+  statistics_->Register(
+      "page_cache_tracker.n_open_flush",
+      "overall number of open calls where the file's page cache gets flushed");
+  statistics_->Register(
+      "page_cache_tracker.n_open_cached",
+      "overall number of open calls where the file's page cache is reused");
 }
 
 
@@ -1668,20 +1628,22 @@ void MountPoint::CreateTables() {
   if (options_mgr_->GetValue("CVMFS_MEMCACHE_SIZE", &optarg))
     mem_cache_size = String2Uint64(optarg) * 1024 * 1024;
 
-  const double memcache_unit_size =
-    (static_cast<double>(kInodeCacheFactor) * lru::Md5PathCache::GetEntrySize())
-    + lru::InodeCache::GetEntrySize() + lru::PathCache::GetEntrySize();
-  const unsigned memcache_num_units =
-    mem_cache_size / static_cast<unsigned>(memcache_unit_size);
+  const double memcache_unit_size = (static_cast<double>(kInodeCacheFactor)
+                                     * lru::Md5PathCache::GetEntrySize())
+                                    + lru::InodeCache::GetEntrySize()
+                                    + lru::PathCache::GetEntrySize();
+  const unsigned memcache_num_units = mem_cache_size
+                                      / static_cast<unsigned>(
+                                          memcache_unit_size);
   // Number of cache entries must be a multiple of 64
   const unsigned mask_64 = ~((1 << 6) - 1);
   inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64, statistics_);
-  path_cache_ = new lru::PathCache(memcache_num_units & mask_64, statistics_);
+  path_cache_  = new lru::PathCache(memcache_num_units & mask_64, statistics_);
   md5path_cache_ = new lru::Md5PathCache((memcache_num_units * 7) & mask_64,
                                          statistics_);
 
-  inode_tracker_ = new glue::InodeTracker();
-  dentry_tracker_ = new glue::DentryTracker();
+  inode_tracker_      = new glue::InodeTracker();
+  dentry_tracker_     = new glue::DentryTracker();
   page_cache_tracker_ = new glue::PageCacheTracker();
   if (file_system_->IsNfsSource())
     page_cache_tracker_->Disable();
@@ -1700,28 +1662,27 @@ bool MountPoint::CreateTracer() {
   tracer_ = new Tracer();
   if (options_mgr_->GetValue("CVMFS_TRACEFILE", &optarg)) {
     if (file_system_->type() != FileSystem::kFsFuse) {
-      boot_error_ = "tracer is only supported in the fuse module";
+      boot_error_  = "tracer is only supported in the fuse module";
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    string tracebuffer_file = optarg;
-    uint64_t tracebuffer_size = kTracerBufferSize;
+    string tracebuffer_file        = optarg;
+    uint64_t tracebuffer_size      = kTracerBufferSize;
     uint64_t tracebuffer_threshold = kTracerFlushThreshold;
 
     if (options_mgr_->GetValue("CVMFS_TRACEBUFFER", &optarg)) {
       tracebuffer_size = String2Uint64(optarg);
     }
-    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD",
-      &optarg)) {
+    if (options_mgr_->GetValue("CVMFS_TRACEBUFFER_THRESHOLD", &optarg)) {
       tracebuffer_threshold = String2Uint64(optarg);
     }
-    assert(tracebuffer_size <= INT_MAX
-      && tracebuffer_threshold <= INT_MAX);
+    assert(tracebuffer_size <= INT_MAX && tracebuffer_threshold <= INT_MAX);
     LogCvmfs(kLogCvmfs, kLogDebug,
-      "Initialising tracer with buffer size %" PRIu64 " and threshold %" PRIu64,
-      tracebuffer_size, tracebuffer_threshold);
+             "Initialising tracer with buffer size %" PRIu64
+             " and threshold %" PRIu64,
+             tracebuffer_size, tracebuffer_threshold);
     tracer_->Activate(tracebuffer_size, tracebuffer_threshold,
-      tracebuffer_file);
+                      tracebuffer_file);
   }
   return true;
 }
@@ -1734,9 +1695,8 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
     return true;
   }
 
-  if (!options_mgr_->IsDefined("CVMFS_REPOSITORY_TAG") &&
-      !options_mgr_->IsDefined("CVMFS_REPOSITORY_DATE"))
-  {
+  if (!options_mgr_->IsDefined("CVMFS_REPOSITORY_TAG")
+      && !options_mgr_->IsDefined("CVMFS_REPOSITORY_DATE")) {
     root_hash->SetNull();
     return true;
   }
@@ -1746,11 +1706,11 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
     return false;
   UnlinkGuard history_file(history_path);
   UniquePtr<history::History> tag_db(
-    history::SqliteHistory::Open(history_path));
+      history::SqliteHistory::Open(history_path));
   if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "failed to open history database (%s)", history_path.c_str());
-    boot_error_ = "failed to open history database";
+    boot_error_  = "failed to open history database";
     boot_status_ = loader::kFailHistory;
     return false;
   }
@@ -1763,27 +1723,26 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
     options_mgr_->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
     time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
     if (repository_utctime == 0) {
-      boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
-                    repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
+      boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: "
+                    + repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
       boot_status_ = loader::kFailHistory;
       return false;
     }
     retval = tag_db->GetByDate(repository_utctime, &tag);
     if (!retval) {
-      boot_error_ = "no repository state as early as utc timestamp " +
-                     StringifyTime(repository_utctime, true);
+      boot_error_ = "no repository state as early as utc timestamp "
+                    + StringifyTime(repository_utctime, true);
       boot_status_ = loader::kFailHistory;
       return false;
     }
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "time stamp %s UTC resolved to tag '%s'",
-             StringifyTime(repository_utctime, true).c_str(),
-             tag.name.c_str());
+             StringifyTime(repository_utctime, true).c_str(), tag.name.c_str());
     repository_tag_ = tag.name;
   } else {
     retval = tag_db->GetByName(repository_tag_, &tag);
     if (!retval) {
-      boot_error_ = "no such tag: " + repository_tag_;
+      boot_error_  = "no such tag: " + repository_tag_;
       boot_status_ = loader::kFailHistory;
       return false;
     }
@@ -1801,23 +1760,23 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   retval_mf = manifest::Fetch("", fqrn_, 0, NULL, signature_mgr_, download_mgr_,
                               &ensemble);
   if (retval_mf != manifest::kFailOk) {
-    boot_error_ = "Failed to fetch manifest";
+    boot_error_  = "Failed to fetch manifest";
     boot_status_ = loader::kFailHistory;
     return false;
   }
   shash::Any history_hash = ensemble.manifest->history();
   if (history_hash.IsNull()) {
-    boot_error_ = "No history";
+    boot_error_  = "No history";
     boot_status_ = loader::kFailHistory;
     return false;
   }
 
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
-  label.path = fqrn_;
+  label.path  = fqrn_;
   int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
-    boot_error_ = "failed to download history: " + StringifyInt(-fd);
+    boot_error_  = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;
     return false;
   }
@@ -1854,49 +1813,47 @@ string MountPoint::GetUniqFileSuffix() {
 }
 
 
-MountPoint::MountPoint(
-  const string &fqrn,
-  FileSystem *file_system,
-  OptionsManager *options_mgr)
-  : fqrn_(fqrn)
-  , uuid_(cvmfs::Uuid::Create(""))
-  , file_system_(file_system)
-  , options_mgr_(options_mgr)
-  , statistics_(NULL)
-  , telemetry_aggr_(NULL)
-  , authz_fetcher_(NULL)
-  , authz_session_mgr_(NULL)
-  , authz_attachment_(NULL)
-  , backoff_throttle_(NULL)
-  , signature_mgr_(NULL)
-  , download_mgr_(NULL)
-  , external_download_mgr_(NULL)
-  , fetcher_(NULL)
-  , external_fetcher_(NULL)
-  , inode_annotation_(NULL)
-  , catalog_mgr_(NULL)
-  , chunk_tables_(NULL)
-  , simple_chunk_tables_(NULL)
-  , inode_cache_(NULL)
-  , path_cache_(NULL)
-  , md5path_cache_(NULL)
-  , tracer_(NULL)
-  , inode_tracker_(NULL)
-  , dentry_tracker_(NULL)
-  , page_cache_tracker_(NULL)
-  , statfs_cache_(NULL)
-  , resolv_conf_watcher_(NULL)
-  , max_ttl_sec_(kDefaultMaxTtlSec)
-  , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
-  , fixed_catalog_(false)
-  , enforce_acls_(false)
-  , cache_symlinks_(false)
-  , fuse_expire_entry_(false)
-  , has_membership_req_(false)
-  , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
-  , talk_socket_uid_(0)
-  , talk_socket_gid_(0)
-{
+MountPoint::MountPoint(const string &fqrn,
+                       FileSystem *file_system,
+                       OptionsManager *options_mgr)
+    : fqrn_(fqrn)
+    , uuid_(cvmfs::Uuid::Create(""))
+    , file_system_(file_system)
+    , options_mgr_(options_mgr)
+    , statistics_(NULL)
+    , telemetry_aggr_(NULL)
+    , authz_fetcher_(NULL)
+    , authz_session_mgr_(NULL)
+    , authz_attachment_(NULL)
+    , backoff_throttle_(NULL)
+    , signature_mgr_(NULL)
+    , download_mgr_(NULL)
+    , external_download_mgr_(NULL)
+    , fetcher_(NULL)
+    , external_fetcher_(NULL)
+    , inode_annotation_(NULL)
+    , catalog_mgr_(NULL)
+    , chunk_tables_(NULL)
+    , simple_chunk_tables_(NULL)
+    , inode_cache_(NULL)
+    , path_cache_(NULL)
+    , md5path_cache_(NULL)
+    , tracer_(NULL)
+    , inode_tracker_(NULL)
+    , dentry_tracker_(NULL)
+    , page_cache_tracker_(NULL)
+    , statfs_cache_(NULL)
+    , resolv_conf_watcher_(NULL)
+    , max_ttl_sec_(kDefaultMaxTtlSec)
+    , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
+    , fixed_catalog_(false)
+    , enforce_acls_(false)
+    , cache_symlinks_(false)
+    , fuse_expire_entry_(false)
+    , has_membership_req_(false)
+    , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
+    , talk_socket_uid_(0)
+    , talk_socket_gid_(0) {
   int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
 }
@@ -1947,7 +1904,7 @@ MountPoint::~MountPoint() {
 
 void MountPoint::ReEvaluateAuthz() {
   string old_membership_req = membership_req_;
-  has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
+  has_membership_req_       = catalog_mgr_->GetVOMSAuthz(&membership_req_);
   if (old_membership_req != membership_req_) {
     authz_session_mgr_->ClearSessionCache();
     authz_attachment_->set_membership(membership_req_);
@@ -1968,8 +1925,8 @@ bool MountPoint::SetupBehavior() {
 
   if (options_mgr_->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
     // Can be negative and should then be interpreted as 0.0
-    kcache_timeout_sec_ =
-      std::max(0.0, static_cast<double>(String2Int64(optarg)));
+    kcache_timeout_sec_ = std::max(0.0,
+                                   static_cast<double>(String2Int64(optarg)));
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
@@ -1982,8 +1939,8 @@ bool MountPoint::SetupBehavior() {
            static_cast<int>(statfs_time_cache_valid));
   statfs_cache_ = new StatfsCache(statfs_time_cache_valid);
 
-  MagicXattrManager::EVisibility xattr_visibility =
-    MagicXattrManager::kVisibilityRootOnly;
+  MagicXattrManager::EVisibility
+      xattr_visibility = MagicXattrManager::kVisibilityRootOnly;
   if (options_mgr_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &optarg)) {
     if (options_mgr_->IsOn(optarg))
       xattr_visibility = MagicXattrManager::kVisibilityNever;
@@ -2010,8 +1967,8 @@ bool MountPoint::SetupBehavior() {
 
     for (size_t i = 0; i < tmp.size(); i++) {
       std::string trimmed = Trim(tmp[i]);
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "Privileged gid for xattr added: %s", trimmed.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "Privileged gid for xattr added: %s",
+               trimmed.c_str());
       protected_xattr_gids.insert(static_cast<gid_t>(String2Uint64(trimmed)));
     }
   }
@@ -2021,8 +1978,8 @@ bool MountPoint::SetupBehavior() {
 
     for (size_t i = 0; i < tmp.size(); i++) {
       std::string trimmed = Trim(tmp[i]);
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "Protected xattr added: %s", trimmed.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "Protected xattr added: %s",
+               trimmed.c_str());
       protected_xattrs.insert(trimmed);
     }
 
@@ -2030,25 +1987,22 @@ bool MountPoint::SetupBehavior() {
     if (protected_xattr_gids.count(0) < 1) {
       protected_xattr_gids.insert(0);
       LogCvmfs(kLogCvmfs, kLogDebug,
-              "Automatically added root to have access to protected xattrs.");
+               "Automatically added root to have access to protected xattrs.");
     }
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility,
-                                    protected_xattrs, protected_xattr_gids);
+  magic_xattr_mgr_ = new MagicXattrManager(
+      this, xattr_visibility, protected_xattrs, protected_xattr_gids);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+      && options_mgr_->IsOn(optarg)) {
     enforce_acls_ = true;
   }
 
   if (options_mgr_->GetValue("CVMFS_CACHE_SYMLINKS", &optarg)
-      && options_mgr_->IsOn(optarg))
-  {
+      && options_mgr_->IsOn(optarg)) {
     cache_symlinks_ = true;
   }
-
 
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
@@ -2057,7 +2011,7 @@ bool MountPoint::SetupBehavior() {
   if (options_mgr_->GetValue("CVMFS_TALK_OWNER", &optarg)) {
     bool retval = GetUidOf(optarg, &talk_socket_uid_, &talk_socket_gid_);
     if (!retval) {
-      boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
+      boot_error_  = "unknown owner of cvmfs_talk socket: " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
     }
@@ -2076,12 +2030,13 @@ bool MountPoint::SetupBehavior() {
         telemetry_send_rate_sec = kMinimumTelemetrySendRateSec;
       }
 
-      telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
-                                                        telemetry_send_rate_sec,
-                                                        options_mgr_,
-                                                        this,
-                                                        fqrn_,
-                                                        perf::kTelemetryInflux);
+      telemetry_aggr_ = perf::TelemetryAggregator::Create(
+          statistics_,
+          telemetry_send_rate_sec,
+          options_mgr_,
+          this,
+          fqrn_,
+          perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
                "Enable telemetry to report every %d seconds",
                telemetry_send_rate_sec);
@@ -2099,7 +2054,7 @@ bool MountPoint::SetupBehavior() {
 void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
   string optarg;
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
-  unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
+  unsigned dns_retries    = download::DownloadManager::kDnsDefaultRetries;
   if (options_mgr_->GetValue("CVMFS_DNS_TIMEOUT", &optarg))
     dns_timeout_ms = String2Uint64(optarg) * 1000;
   if (options_mgr_->GetValue("CVMFS_DNS_RETRIES", &optarg))
@@ -2138,9 +2093,8 @@ void MountPoint::SetupDnsTuning(download::DownloadManager *manager) {
 
 bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string optarg;
-  external_download_mgr_ =
-    download_mgr_->Clone(perf::StatisticsTemplate("download-external",
-      statistics_), "external");
+  external_download_mgr_ = download_mgr_->Clone(
+      perf::StatisticsTemplate("download-external", statistics_), "external");
 
   unsigned timeout;
   unsigned timeout_direct;
@@ -2154,7 +2108,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
-    external_download_mgr_->SetMetalinkChain(optarg);  
+    external_download_mgr_->SetMetalinkChain(optarg);
     // host chain will be set later when the metalink server is contacted
     external_download_mgr_->SetHostChain("");
     // metalink requires redirects
@@ -2184,11 +2138,11 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string proxies = "DIRECT";
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &optarg)) {
     proxies = download::ResolveProxyDescription(
-      optarg,
-      file_system_->workspace() + "/proxies-external" + GetUniqFileSuffix(),
-      external_download_mgr_);
+        optarg,
+        file_system_->workspace() + "/proxies-external" + GetUniqFileSuffix(),
+        external_download_mgr_);
     if (proxies == "") {
-      boot_error_ = "failed to discover external HTTP proxy servers";
+      boot_error_  = "failed to discover external HTTP proxy servers";
       boot_status_ = loader::kFailWpad;
       return false;
     }
@@ -2197,7 +2151,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &optarg))
     fallback_proxies = optarg;
   external_download_mgr_->SetProxyChain(
-    proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
+      proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
 
   return true;
 }
@@ -2208,7 +2162,7 @@ void MountPoint::SetupHttpTuning() {
 
   // TODO(jblomer): avoid double default settings
 
-  unsigned timeout = kDefaultTimeoutSec;
+  unsigned timeout        = kDefaultTimeoutSec;
   unsigned timeout_direct = kDefaultTimeoutSec;
   if (options_mgr_->GetValue("CVMFS_TIMEOUT", &optarg))
     timeout = String2Uint64(optarg);
@@ -2216,9 +2170,9 @@ void MountPoint::SetupHttpTuning() {
     timeout_direct = String2Uint64(optarg);
   download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  unsigned max_retries = kDefaultRetries;
+  unsigned max_retries  = kDefaultRetries;
   unsigned backoff_init = kDefaultBackoffInitMs;
-  unsigned backoff_max = kDefaultBackoffMaxMs;
+  unsigned backoff_max  = kDefaultBackoffMaxMs;
   if (options_mgr_->GetValue("CVMFS_MAX_RETRIES", &optarg))
     max_retries = String2Uint64(optarg);
   if (options_mgr_->GetValue("CVMFS_BACKOFF_INIT", &optarg))
@@ -2239,14 +2193,12 @@ void MountPoint::SetupHttpTuning() {
   if (options_mgr_->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
     download_mgr_->SetHostResetDelay(String2Uint64(optarg));
 
-  if (options_mgr_->GetValue("CVMFS_FOLLOW_REDIRECTS", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_FOLLOW_REDIRECTS", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableRedirects();
   }
-  if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_SEND_INFO_HEADER", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     download_mgr_->EnableInfoHeader();
   }
 }
@@ -2277,14 +2229,14 @@ bool MountPoint::SetupOwnerMaps() {
 
   if (options_mgr_->GetValue("CVMFS_UID_MAP", &optarg)) {
     if (!uid_map.Read(optarg)) {
-      boot_error_ = "failed to parse uid map " + optarg;
+      boot_error_  = "failed to parse uid map " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
     }
   }
   if (options_mgr_->GetValue("CVMFS_GID_MAP", &optarg)) {
     if (!gid_map.Read(optarg)) {
-      boot_error_ = "failed to parse gid map " + optarg;
+      boot_error_  = "failed to parse gid map " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
     }
@@ -2292,17 +2244,14 @@ bool MountPoint::SetupOwnerMaps() {
   catalog_mgr_->SetOwnerMaps(uid_map, gid_map);
 
   // TODO(jblomer): make local to catalog manager
-  if (options_mgr_->GetValue("CVMFS_CLAIM_OWNERSHIP", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_CLAIM_OWNERSHIP", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     g_claim_ownership = true;
   }
-  if (options_mgr_->GetValue("CVMFS_WORLD_READABLE", &optarg) &&
-      options_mgr_->IsOn(optarg))
-  {
+  if (options_mgr_->GetValue("CVMFS_WORLD_READABLE", &optarg)
+      && options_mgr_->IsOn(optarg)) {
     g_world_readable = true;
   }
-
 
 
   return true;

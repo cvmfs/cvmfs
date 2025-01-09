@@ -57,16 +57,16 @@ enum Failures {
 
 inline const char *Code2Ascii(const Failures error) {
   const char *texts[kFailNumEntries + 1];
-  texts[0] = "OK";
-  texts[1] = "unknown error";
-  texts[2] = "illegal options";
-  texts[3] = "permission denied";
-  texts[4] = "failed to mount";
-  texts[5] = "unable to init loader talk socket";
-  texts[6] = "cannot run FUSE event loop";
-  texts[7] = "failed to load shared library";
-  texts[8] = "incompatible library version";
-  texts[9] = "cache directory/plugin problem";
+  texts[0]  = "OK";
+  texts[1]  = "unknown error";
+  texts[2]  = "illegal options";
+  texts[3]  = "permission denied";
+  texts[4]  = "failed to mount";
+  texts[5]  = "unable to init loader talk socket";
+  texts[6]  = "cannot run FUSE event loop";
+  texts[7]  = "failed to load shared library";
+  texts[8]  = "incompatible library version";
+  texts[9]  = "cache directory/plugin problem";
   texts[10] = "peering problem";
   texts[11] = "NFS maps init failure";
   texts[12] = "quota init failure";
@@ -90,21 +90,21 @@ inline const char *Code2Ascii(const Failures error) {
 
 enum StateId {
   kStateUnknown = 0,
-  kStateOpenDirs,           // >= 2.1.4
-  kStateOpenChunks,         // >= 2.1.4, used as of 2.1.15
-  kStateGlueBuffer,         // >= 2.1.9
-  kStateInodeGeneration,    // >= 2.1.9
-  kStateOpenFilesCounter,   // >= 2.1.9
-  kStateGlueBufferV2,       // >= 2.1.10
-  kStateGlueBufferV3,       // >= 2.1.15
-  kStateGlueBufferV4,       // >= 2.1.20
-  kStateOpenChunksV2,       // >= 2.1.20
-  kStateOpenChunksV3,       // >= 2.2.0
-  kStateOpenChunksV4,       // >= 2.2.3
-  kStateOpenFiles,          // >= 2.4
-  kStateDentryTracker,      // >= 2.7 (renamed from kStateNentryTracker in 2.10)
-  kStatePageCacheTracker,   // >= 2.10
-  kStateFuse                // >= 2.11
+  kStateOpenDirs,          // >= 2.1.4
+  kStateOpenChunks,        // >= 2.1.4, used as of 2.1.15
+  kStateGlueBuffer,        // >= 2.1.9
+  kStateInodeGeneration,   // >= 2.1.9
+  kStateOpenFilesCounter,  // >= 2.1.9
+  kStateGlueBufferV2,      // >= 2.1.10
+  kStateGlueBufferV3,      // >= 2.1.15
+  kStateGlueBufferV4,      // >= 2.1.20
+  kStateOpenChunksV2,      // >= 2.1.20
+  kStateOpenChunksV3,      // >= 2.2.0
+  kStateOpenChunksV4,      // >= 2.2.3
+  kStateOpenFiles,         // >= 2.4
+  kStateDentryTracker,     // >= 2.7 (renamed from kStateNentryTracker in 2.10)
+  kStatePageCacheTracker,  // >= 2.10
+  kStateFuse               // >= 2.11
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -112,10 +112,10 @@ enum StateId {
 
 struct SavedState {
   SavedState() {
-    version = 1;
-    size = sizeof(SavedState);
+    version  = 1;
+    size     = sizeof(SavedState);
     state_id = kStateUnknown;
-    state = NULL;
+    state    = NULL;
   }
 
   uint32_t version;
@@ -128,8 +128,8 @@ typedef std::vector<SavedState *> StateList;
 
 struct LoadEvent {
   LoadEvent() {
-    version = 1;
-    size = sizeof(LoadEvent);
+    version   = 1;
+    size      = sizeof(LoadEvent);
     timestamp = 0;
   }
 
@@ -155,19 +155,17 @@ typedef std::vector<LoadEvent *> EventList;
  * CernVM-FS 2.8.2 --> Version 5, add device_id
  */
 struct LoaderExports {
-  LoaderExports() :
-    version(5),
-    size(sizeof(LoaderExports)),
-    boot_time(0),
-    foreground(false),
-    disable_watchdog(false),
-    simple_options_parsing(false),
-    fuse_channel_or_session(NULL)
-  { }
+  LoaderExports()
+      : version(5)
+      , size(sizeof(LoaderExports))
+      , boot_time(0)
+      , foreground(false)
+      , disable_watchdog(false)
+      , simple_options_parsing(false)
+      , fuse_channel_or_session(NULL) { }
 
   ~LoaderExports() {
-    for (unsigned i = 0; i < history.size(); ++i)
-      delete history[i];
+    for (unsigned i = 0; i < history.size(); ++i) delete history[i];
   }
 
   uint32_t version;
@@ -212,17 +210,17 @@ struct LoaderExports {
  */
 struct CvmfsExports {
   CvmfsExports() {
-    version = 1;
-    size = sizeof(CvmfsExports);
+    version            = 1;
+    size               = sizeof(CvmfsExports);
     fnAltProcessFlavor = NULL;
-    fnInit = NULL;
-    fnSpawn = NULL;
-    fnFini = NULL;
-    fnGetErrorMsg = NULL;
-    fnMaintenanceMode = NULL;
-    fnSaveState = NULL;
-    fnRestoreState = NULL;
-    fnFreeSavedState = NULL;
+    fnInit             = NULL;
+    fnSpawn            = NULL;
+    fnFini             = NULL;
+    fnGetErrorMsg      = NULL;
+    fnMaintenanceMode  = NULL;
+    fnSaveState        = NULL;
+    fnRestoreState     = NULL;
+    fnFreeSavedState   = NULL;
     memset(&cvmfs_operations, 0, sizeof(cvmfs_operations));
   }
 
