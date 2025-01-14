@@ -25,7 +25,7 @@ case "$1" in
         mkdir -p /cvmfs
         getent group cvmfs >/dev/null || getent passwd cvmfs > /dev/null || \
         adduser --system --group --no-create-home --home /cvmfs cvmfs
-        if [ -d /run/systemd/system ]
+        if [ -d /run/systemd/system ]; then
           systemctl daemon-reload
           systemctl start cvmfs-reload
         else
