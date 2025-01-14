@@ -26,7 +26,7 @@ if (CMAKE_VERSION VERSION_LESS "3.12.0")
   add_definitions(-DCVMFS_PATCH_LEVEL="0")
 else()
   add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
-  add_compile_definitions(CVMFS_PATCH_LEVEL="${CernVM-FS_VERSION_PATCH}")
+  add_compile_definitions(CVMFS_PATCH_LEVEL="0")
 endif()
 
 
