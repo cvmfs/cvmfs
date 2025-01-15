@@ -1,3 +1,7 @@
+2.12.5:
+  * [client] Revert CVMFS_PATCH_LEVEL to 0 for check_cvmfs.sh (#3750)
+  * [rpm] fix package install on wsl2 and other non-systemd platforms (#3749)
+
 2.12.4:
   * [client] Fix cvmfs_config fsck -q to work with rmd160, shake128 hashes (#3739)
   * [server] Fix mkfs overwrite-manifest check when upstream is gateway (#3740)
