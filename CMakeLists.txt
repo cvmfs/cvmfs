@@ -23,10 +23,10 @@ set (CernVM-FS_VERSION_PATCH 4)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 if (CMAKE_VERSION VERSION_LESS "3.12.0") 
   add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
-  add_definitions(-DCVMFS_PATCH_LEVEL="${CernVM-FS_VERSION_PATCH}")
+  add_definitions(-DCVMFS_PATCH_LEVEL="0")
 else()
   add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
-  add_compile_definitions(CVMFS_PATCH_LEVEL="${CernVM-FS_VERSION_PATCH}")
+  add_compile_definitions(CVMFS_PATCH_LEVEL="0")
 endif()
 
 
