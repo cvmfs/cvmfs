@@ -96,6 +96,7 @@ jobs:
             src/055-ownership                                 \
             src/056-lowspeedlimit                             \
             src/057-parallelmakecache                         \
+            src/059-fallbackproxy                             \
             src/060-hidexattrs                                \
             src/061-systemdnokill                             \
             src/069-systemremount                             \
