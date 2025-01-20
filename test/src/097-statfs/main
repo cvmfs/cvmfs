@@ -69,24 +69,40 @@ check_parameter_10sec() {
   test097_mount $TEST097_REPO "CVMFS_STATFS_CACHE_TIMEOUT=10"
   sudo cvmfs_config wipecache > /dev/null
   echo "   found in config file: `sudo cvmfs_talk parameters | grep "STATFS"`"
+  SECONDS=0
   local origSize=$(get_cachesize)
   fillCache
   local newSize=$(get_cachesize)
 
-  echo "   should be equal: $origSize and $newSize"
+  duration=$SECONDS
 
-  [ $origSize -eq $newSize ] || return 21
+  if ((duration < 10)); then
+      echo "   should be equal: $origSize and $newSize"
+      [ $origSize -eq $newSize ] || return 21
+  else
+     echo "   should have been equal: $origSize and $newSize"
+     echo "WARN: but could  not check within 10 sec, fillCache took $SECONDS seconds"
+  fi
+
+
 
   sleep 3
   local newSize1=$(get_cachesize)
 
-  echo "   should be equal: $origSize and $newSize1"
+  duration=$SECONDS
 
-  [ $origSize -eq $newSize1 ] || return 22
+  if ((duration < 10)); then
+      echo "   should be equal: $origSize and $newSize1"
+      [ $origSize -eq $newSize1 ] || return 22
 
-  local cachedCounter=$(sudo cvmfs_talk -i $TEST097_REPO internal affairs | grep "statfs_cached" | awk -F"|" '{print $2}')
+      local cachedCounter=$(sudo cvmfs_talk -i $TEST097_REPO internal affairs | grep "statfs_cached" | awk -F"|" '{print $2}')
 
-  [ "$cachedCounter" -ne "0" ] || return 23
+      [ "$cachedCounter" -ne "0" ] || return 23
+  else
+     echo "   should have been equal: $origSize and $newSize"
+     echo "WARN: but could  not check within 10 sec, fillCache took $SECONDS seconds"
+  fi
+
 
   sleep 8
   local newSize2=$(get_cachesize)
