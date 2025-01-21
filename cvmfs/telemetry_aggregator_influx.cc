@@ -179,8 +179,13 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
   for (std::map<std::string, int64_t>::iterator it
       = counters_.begin(), iEnd = counters_.end(); it != iEnd; it++) {
     int64_t value = it->second;
-    int64_t old_value = old_counters_.at(it->first);
     if (value != 0) {
+      int64_t old_value;
+      try {
+        old_value = old_counters_.at(it->first);
+      } catch(const std::out_of_range& ex) {
+        old_value = 0;
+      }
       if (add_token) {
         ret += ",";
       }
