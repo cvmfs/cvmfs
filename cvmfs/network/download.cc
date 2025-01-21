@@ -1946,8 +1946,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
 
-  // Use the default initialization, except for ssl as it is not required
-  retval = curl_global_init(CURL_GLOBAL_DEFAULT & ~CURL_GLOBAL_SSL);
+  retval = curl_global_init(CURL_GLOBAL_DEFAULT);
   assert(retval == CURLE_OK);
 
   InitHeaders();
