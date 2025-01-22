@@ -1946,7 +1946,7 @@ DownloadManager::DownloadManager(const unsigned max_pool_handles,
   retval = pthread_mutex_init(lock_synchronous_mode_, NULL);
   assert(retval == 0);
 
-  retval = curl_global_init(CURL_GLOBAL_DEFAULT);
+  retval = curl_global_init(CURL_GLOBAL_NOTHING);
   assert(retval == CURLE_OK);
 
   InitHeaders();
