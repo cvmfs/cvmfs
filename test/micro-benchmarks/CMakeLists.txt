@@ -4,6 +4,7 @@ set(CVMFS_UBENCHMARKS_FILES
   main.cc
 
   b_compression.cc
+  b_download.cc
   b_gluebuffer.cc
   b_hash.cc
   b_smallhash.cc
@@ -22,7 +23,16 @@ set (CVMFS_UBENCHMARKS_SOURCES
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/network/dns.cc
+  ${CVMFS_SOURCE_DIR}/network/download.cc
+  ${CVMFS_SOURCE_DIR}/network/jobinfo.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_file.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_mem.cc
+  ${CVMFS_SOURCE_DIR}/network/sink_path.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
   ${CVMFS_SOURCE_DIR}/shortstring.cc
+  ${CVMFS_SOURCE_DIR}/ssl.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
   ${CVMFS_SOURCE_DIR}/util/algorithm.cc
   ${CVMFS_SOURCE_DIR}/util/exception.cc
   ${CVMFS_SOURCE_DIR}/util/logging.cc
@@ -65,6 +75,9 @@ set (UBENCHMARKS_LINK_LIBRARIES ${GOOGLEBENCH_LIBRARIES}
                                 ${PROTOBUF_LITE_LIBRARY}
                                 ${ZLIB_LIBRARIES}
                                 ${RT_LIBRARY}
+                                ${CURL_LIBRARIES}
+                                ${OPENSSL_LIBRARIES}
+                                ${CARES_LIBRARIES}
                                 pthread dl)
 
 target_link_libraries (${PROJECT_UBENCHMARKS_NAME} ${UBENCHMARKS_LINK_LIBRARIES})
