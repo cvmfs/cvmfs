@@ -14,12 +14,18 @@ class BM_Download : public benchmark::Fixture {
 
   virtual void TearDown(const benchmark::State &st) {
   }
+  perf::Statistics *stats{nullptr};
 };
 
-
 BENCHMARK_DEFINE_F(BM_Download, DownloadManagerCtor)(benchmark::State &st) {
-  perf::Statistics stats;
-  download::DownloadManager * dlMan = new download::DownloadManager(1, perf::StatisticsTemplate("download", &stats));
+  while (st.KeepRunning()) {
+    // Clean up from the previous iteration (does nothing if it is the first iteration)
+    st.PauseTiming(); // Pause timing, because deleting and creating stats takes long and is not part of the test
+    delete stats;
+    stats = new perf::Statistics;
+    st.ResumeTiming();
+    download::DownloadManager(1, perf::StatisticsTemplate("download", stats));
+  }
   st.SetItemsProcessed(st.iterations());
 }
 
