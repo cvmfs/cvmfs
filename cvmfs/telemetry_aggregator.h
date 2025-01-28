@@ -28,7 +28,7 @@ class MountPoint;
 namespace perf {
 
 // Return values of telemetry classes (including custom classes)
-enum TelemetryReturn {
+enum TelemetryReturn : uint8_t {
   kTelemetrySuccess = 0,
   kTelemetryFailHostAddress,
   kTelemetryFailPort,
@@ -37,7 +37,7 @@ enum TelemetryReturn {
 };
 
 // List of available custom telemetry classes
-enum TelemetrySelector {
+enum TelemetrySelector : uint8_t {
   kTelemetryInflux
 };
 

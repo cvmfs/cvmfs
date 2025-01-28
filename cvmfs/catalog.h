@@ -263,7 +263,7 @@ class Catalog : SingleCopy {
    */
   static const shash::Md5 kMd5PathEmpty;
 
-  enum VomsAuthzStatus {
+  enum VomsAuthzStatus : uint8_t {
     kVomsUnknown,  // Not yet looked up
     kVomsNone,     // No voms_authz key in properties table
     kVomsPresent,  // voms_authz property available

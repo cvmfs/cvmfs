@@ -61,7 +61,7 @@ class Watchdog : SingleCopy {
   };
 
   struct ControlFlow {
-    enum Flags {
+    enum Flags : uint8_t {
       kProduceStacktrace = 0,
       kQuit,
       kSupervise,

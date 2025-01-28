@@ -21,7 +21,7 @@ class DirectoryEntry;
 class CatalogDatabase;
 
 struct LegacyMode {
-  enum Type {  // TODO(rmeusel): C++11 typed enum
+  enum Type : uint8_t {  // TODO(rmeusel): C++11 typed enum
     kNoLegacy,
     kNoSpecials,
     kNoExternals,

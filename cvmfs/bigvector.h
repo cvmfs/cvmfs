@@ -60,7 +60,7 @@ class BigVector {
   void PushBack(const Item &item) {
     if (size_ == capacity_)
       DoubleCapacity();
-    new (buffer_ + size_) Item(item);
+    new (buffer_ + size_) Item(item); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
     size_++;
   }
 
@@ -86,12 +86,12 @@ class BigVector {
 
   void DoubleCapacity() {
     Item *old_buffer = buffer_;
-    bool old_large_alloc = large_alloc_;
+    const bool old_large_alloc = large_alloc_;
 
     assert(capacity_ > 0);
     buffer_ = Alloc(capacity_ * 2);
     for (size_t i = 0; i < size_; ++i)
-      new (buffer_ + i) Item(old_buffer[i]);
+      new (buffer_ + i) Item(old_buffer[i]); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
 
     FreeBuffer(old_buffer, size_, old_large_alloc);
   }
@@ -104,7 +104,7 @@ class BigVector {
     if (static_cast<float>(size_) >= (0.25 * static_cast<float>(capacity_)))
       return;
 
-    bool old_large_alloc = large_alloc_;
+    const bool old_large_alloc = large_alloc_;
     Item *new_buffer = Alloc(0.5 * static_cast<float>(capacity_));
     for (size_t i = 0; i < size_; ++i)
       new (new_buffer + i) Item(buffer_[i]);
@@ -123,11 +123,11 @@ class BigVector {
 
  private:
   static const size_t kNumInit = 16;
-  static const size_t kMmapThreshold = 128*1024;
+  static const size_t kMmapThreshold = static_cast<const size_t>(128*1024);
 
   Item *Alloc(const size_t num_elements) {
     Item *result;
-    size_t num_bytes = sizeof(Item) * num_elements;
+    const size_t num_bytes = sizeof(Item) * num_elements; // NOLINT(bugprone-sizeof-expression)
     if (num_bytes >= kMmapThreshold) {
       result = static_cast<Item *>(smmap(num_bytes));
       large_alloc_ = true;
@@ -152,9 +152,9 @@ class BigVector {
 
     if (buf) {
       if (large) {
-        smunmap(buf);
+        smunmap(buf); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
       } else {
-        free(buf);
+        free(buf); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
       }
     }
   }

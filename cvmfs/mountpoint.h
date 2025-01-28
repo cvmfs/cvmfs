@@ -102,7 +102,7 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
 
  public:
-  enum Type {
+  enum Type : uint8_t {
     kFsFuse = 0,
     kFsLibrary
   };
@@ -448,7 +448,7 @@ class StatfsCache : SingleCopy {
     memset(&info_, 0, sizeof(info_));
     lock_ =
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-    int retval = pthread_mutex_init(lock_, NULL);
+    const int retval = pthread_mutex_init(lock_, NULL);
     assert(retval == 0);
   }
   ~StatfsCache() {
@@ -486,7 +486,7 @@ class MountPoint : SingleCopy, public BootFactory {
    * If catalog reload fails, try again in 3 minutes
    */
   static const unsigned kShortTermTTL = 180;
-  static const time_t kIndefiniteDeadline = time_t(-1);
+  static const time_t kIndefiniteDeadline = static_cast<time_t>(-1);
 
   static MountPoint *Create(const std::string &fqrn,
                             FileSystem *file_system,

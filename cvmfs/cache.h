@@ -21,7 +21,7 @@
 
 class QuotaManager;
 
-enum CacheManagerIds {
+enum CacheManagerIds : uint8_t {
   kUnknownCacheManager = 0,
   kPosixCacheManager,
   kRamCacheManager,
@@ -30,7 +30,7 @@ enum CacheManagerIds {
   kStreamingCacheManager,
 };
 
-enum CacheModes {
+enum CacheModes : uint8_t {
   kCacheReadWrite = 0,
   kCacheReadOnly,
 };
@@ -226,8 +226,8 @@ class CacheManager : SingleCopy {
 
   // Unless overwritten, Saving/Restoring states will crash the Fuse module
   virtual void *DoSaveState() { return NULL; }
-  virtual int DoRestoreState(void *data) { return false; }
-  virtual bool DoFreeState(void *data) { return false; }
+  virtual int DoRestoreState(void * /*data */) { return false; }
+  virtual bool DoFreeState(void * /* data */) { return false; }
 
   /**
    * Never NULL but defaults to NoopQuotaManager.

@@ -99,12 +99,12 @@ struct ChunkTables {
   pthread_mutex_t *Handle2Lock(const uint64_t handle) const;
 
   inline void Lock() {
-    int retval = pthread_mutex_lock(lock);
+    const int retval = pthread_mutex_lock(lock);
     assert(retval == 0);
   }
 
   inline void Unlock() {
-    int retval = pthread_mutex_unlock(lock);
+    const int retval = pthread_mutex_unlock(lock);
     assert(retval == 0);
   }
 
@@ -154,12 +154,12 @@ class SimpleChunkTables : SingleCopy {
 
  private:
   inline void Lock() {
-    int retval = pthread_mutex_lock(lock_);
+    const int retval = pthread_mutex_lock(lock_);
     assert(retval == 0);
   }
 
   inline void Unlock() {
-    int retval = pthread_mutex_unlock(lock_);
+    const int retval = pthread_mutex_unlock(lock_);
     assert(retval == 0);
   }
 

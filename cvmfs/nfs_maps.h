@@ -28,7 +28,7 @@ class NfsMaps : SingleCopy {
    * Ensures that NFS maps inodes have the form an+b so that we can have
    * non-overlapping inodes for independent repositories.
    */
-  virtual void SetInodeResidue(unsigned residue_class, unsigned remainder) {
+  virtual void SetInodeResidue(unsigned /* residue_class */, unsigned /* remainder */) {
     LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "Warning: interleaved inode mode unsupported");
   }

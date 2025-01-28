@@ -142,7 +142,7 @@ class LruCache : SingleCopy {
      */
     explicit MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
-      unsigned int num_bytes_bitmap = num_slots / 8;
+      const unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
       assert((num_slots % bits_per_block_) == 0);
       assert(num_slots >= 2*bits_per_block_);
@@ -253,7 +253,7 @@ class LruCache : SingleCopy {
     inline bool GetBit(const unsigned position) {
       assert(position < num_slots_);
       return ((bitmap_[position / bits_per_block_] &
-               (uint64_t(1) << (position % bits_per_block_))) != 0);
+               (static_cast<uint64_t>(1) << (position % bits_per_block_))) != 0);
     }
 
     /**
@@ -263,7 +263,7 @@ class LruCache : SingleCopy {
     inline void SetBit(const unsigned position) {
       assert(position < num_slots_);
       bitmap_[position / bits_per_block_] |=
-        uint64_t(1) << (position % bits_per_block_);
+        static_cast<uint64_t>(1) << (position % bits_per_block_);
     }
 
     /**
@@ -273,7 +273,7 @@ class LruCache : SingleCopy {
     inline void UnsetBit(const unsigned position) {
       assert(position < num_slots_);
       bitmap_[position / bits_per_block_] &=
-        ~(uint64_t(1) << (position % bits_per_block_));
+        ~(static_cast<uint64_t>(1) << (position % bits_per_block_));
     }
 
     unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
@@ -489,7 +489,7 @@ class LruCache : SingleCopy {
     inline T Pop(ListEntry<T> *popped_entry) {
       assert(!popped_entry->IsListHead());
 
-      ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
+      ListEntryContent<T> *popped = reinterpret_cast<ListEntryContent<T> *>(popped_entry);
       popped->RemoveFromList();
       T result = popped->content();
       allocator_->Destruct(static_cast<ConcreteListEntryContent*>(
@@ -510,7 +510,7 @@ class LruCache : SingleCopy {
            const Key       &empty_key,
            uint32_t (*hasher)(const Key &key),
            perf::StatisticsTemplate statistics) :
-    counters_(statistics),
+    counters_(std::move(statistics)),
     pause_(false),
     cache_gauge_(0),
     cache_size_(cache_size),
@@ -527,7 +527,7 @@ class LruCache : SingleCopy {
                   cache_.bytes_allocated());
 
 #ifdef LRU_CACHE_THREAD_SAFE
-    int retval = pthread_mutex_init(&lock_, NULL);
+    const int retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
 #endif
   }
@@ -597,7 +597,7 @@ class LruCache : SingleCopy {
     // Is not called from the client, only from the cache plugin
     assert(!pause_);
     CacheEntry entry;
-    bool retval = DoLookup(key, &entry);
+    const bool retval = DoLookup(key, &entry);
     assert(retval);
     perf::Inc(counters_.n_update);
     Touch(entry);
@@ -637,7 +637,7 @@ class LruCache : SingleCopy {
    * @param value (out) here the result is saved (not touch in case of miss)
    * @return true on successful lookup, false if key was not found
    */
-  virtual bool Lookup(const Key &key, Value *value, bool update_lru = true) {
+  virtual bool Lookup(const Key &key, Value *value, bool update_lru = true) { // NOLINT(google-default-arguments)
     bool found = false;
     Lock();
     if (pause_) {
@@ -752,7 +752,7 @@ class LruCache : SingleCopy {
     assert(filter_entry_);
     assert(!filter_entry_->IsListHead());
     *key = static_cast<ConcreteListEntryContent *>(filter_entry_)->content();
-    bool rc = this->DoLookup(*key, &entry);
+    const bool rc = this->DoLookup(*key, &entry);
     assert(rc);
     *value = entry.value;
   }

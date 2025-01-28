@@ -24,7 +24,7 @@ class DownloadManager;
 
 namespace manifest {
 
-enum Failures {
+enum Failures : uint8_t {
   kFailOk = 0,
   kFailLoad,
   kFailIncomplete,

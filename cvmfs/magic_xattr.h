@@ -20,7 +20,7 @@
 
 class MountPoint;
 
-enum MagicXattrFlavor {
+enum MagicXattrFlavor : uint8_t {
   kXattrBase = 0,
   kXattrWithHash,
   kXattrRegular,
@@ -29,7 +29,7 @@ enum MagicXattrFlavor {
   kXattrAuthz
 };
 
-enum MagicXattrMode {
+enum MagicXattrMode : uint8_t {
   kXattrMachineMode = 0,
   kXattrHumanMode
 };
@@ -71,7 +71,7 @@ class BaseMagicXattr {
 
  public:
   BaseMagicXattr() : is_protected_(false) {
-    int retval = pthread_mutex_init(&access_mutex_, NULL);
+    const int retval = pthread_mutex_init(&access_mutex_, NULL);
     assert(retval == 0);
   }
 
@@ -120,14 +120,14 @@ class BaseMagicXattr {
 
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
 
-  void Lock(PathString path, catalog::DirectoryEntry *dirent) {
-    int retval = pthread_mutex_lock(&access_mutex_);
+  void Lock(const PathString &path, catalog::DirectoryEntry *dirent) {
+    const int retval = pthread_mutex_lock(&access_mutex_);
     assert(retval == 0);
     path_ = path;
     dirent_ = dirent;
   }
   void Release() {
-    int retval = pthread_mutex_unlock(&access_mutex_);
+    const int retval = pthread_mutex_unlock(&access_mutex_);
     assert(retval == 0);
   }
 
@@ -165,7 +165,7 @@ class MagicXattrRAIIWrapper: public SingleCopy {
 
   inline explicit MagicXattrRAIIWrapper(
     BaseMagicXattr *ptr,
-    PathString path,
+    const PathString &path,
     catalog::DirectoryEntry *d)
     : ptr_(ptr)
   {
@@ -219,7 +219,7 @@ class SymlinkMagicXattr : public BaseMagicXattr {
  */
 class MagicXattrManager : public SingleCopy {
  public:
-  enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
+  enum EVisibility : uint8_t { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
 
   MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
                     const std::set<std::string> &protected_xattrs,

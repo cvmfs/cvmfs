@@ -231,7 +231,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     {
       invalidator->evict_list_.PushBack(inode);
     }
-    invalidator->inode_tracker_->EndEnumerate(&inode_cursor);
+    invalidator->inode_tracker_->EndEnumerate();
 
     unsigned i = 0;
     unsigned N = invalidator->evict_list_.size();

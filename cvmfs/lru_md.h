@@ -28,7 +28,7 @@ namespace lru {
 // Hash functions
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
@@ -43,7 +43,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
  public:
   explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode,
+      cache_size, static_cast<fuse_ino_t>(-1), hasher_inode,
       perf::StatisticsTemplate("inode_cache", statistics))
   {
   }
@@ -56,8 +56,8 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
     return result;
   }
 
-  bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent,
-              bool update_lru = true)
+  bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent, // NOLINT(google-default-arguments)
+              bool /* update_lru */ = true)
   {
     const bool result =
       LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
@@ -76,7 +76,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
   explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
-    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
+    LruCache<fuse_ino_t, PathString>(cache_size, static_cast<fuse_ino_t>(-1), hasher_inode,
       perf::StatisticsTemplate("path_cache", statistics))
   {
   }
@@ -89,8 +89,8 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
     return result;
   }
 
-  bool Lookup(const fuse_ino_t &inode, PathString *path,
-              bool update_lru = true)
+  bool Lookup(const fuse_ino_t &inode, PathString *path, // NOLINT(google-default-arguments)
+              bool /* update_lru */= true)
   {
     const bool found =
       LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
@@ -133,8 +133,8 @@ class Md5PathCache :
     return result;
   }
 
-  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent,
-              bool update_lru = true)
+  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent, // NOLINT(google-default-arguments)
+              bool /* update_lru */ = true)
   {
     const bool result =
       LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);

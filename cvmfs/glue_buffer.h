@@ -53,7 +53,7 @@ class InodeEx {
   static inline uint64_t ShiftMode(unsigned mode) { return (mode >> 12) & 017; }
 
  public:
-  enum EFileType {
+  enum EFileType : uint8_t {
     kUnknownType = 0,
     kRegular     = 010,
     kSymlink     = 012,
@@ -72,7 +72,7 @@ class InodeEx {
     : inode_ex_(inode | (ShiftMode(mode) << 60))
   { }
 
-  inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(15) << 60); }
+  inline uint64_t GetInode() const { return inode_ex_ & ~(static_cast<uint64_t>(15) << 60); }
   inline EFileType GetFileType() const {
     return static_cast<EFileType>(inode_ex_ >> 60);
   }
@@ -95,7 +95,7 @@ class InodeEx {
 
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const uint64_t &inode) {
@@ -151,7 +151,7 @@ class StringRef {
 class StringHeap : public SingleCopy {
  public:
   StringHeap() {
-    Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
+    Init(static_cast<uint64_t>(128*1024));  // 128kB (should be >= 64kB+2B which is largest string)
   }
 
   explicit StringHeap(const uint64_t minimum_size) {
@@ -163,7 +163,7 @@ class StringHeap : public SingleCopy {
     used_ = 0;
 
     // Initial bin: 128kB or smallest power of 2 >= minimum size
-    uint64_t pow2_size = 128 * 1024;
+    uint64_t pow2_size = static_cast<uint64_t>(128 * 1024);
     while (pow2_size < minimum_size)
       pow2_size *= 2;
     AddBin(pow2_size);
@@ -253,12 +253,12 @@ class PathStore {
     delete string_heap_;
   }
 
-  explicit PathStore(const PathStore &other);
+  PathStore(const PathStore &other);
   PathStore &operator= (const PathStore &other);
 
   void Insert(const shash::Md5 &md5path, const PathString &path) {
     PathInfo info;
-    bool found = map_.Lookup(md5path, &info);
+    const bool found = map_.Lookup(md5path, &info);
     if (found) {
       info.refcnt++;
       map_.Insert(md5path, info);
@@ -272,7 +272,7 @@ class PathStore {
       return;
     }
 
-    PathString parent_path = GetParentPath(path);
+    const PathString parent_path = GetParentPath(path);
     new_entry.parent = shash::Md5(parent_path.GetChars(),
                                   parent_path.GetLength());
     Insert(new_entry.parent, parent_path);
@@ -301,7 +301,7 @@ class PathStore {
 
   void Erase(const shash::Md5 &md5path) {
     PathInfo info;
-    bool found = map_.Lookup(md5path, &info);
+    const bool found = map_.Lookup(md5path, &info);
     if (!found)
       return;
 
@@ -311,7 +311,7 @@ class PathStore {
       string_heap_->RemoveString(info.name);
       if (string_heap_->GetUsage() < 0.75) {
         StringHeap *new_string_heap = new StringHeap(string_heap_->used());
-        shash::Md5 empty_path = map_.empty_key();
+        const shash::Md5 empty_path = map_.empty_key();
         for (unsigned i = 0; i < map_.capacity(); ++i) {
           if (map_.keys()[i] != empty_path) {
             (map_.values() + i)->name =
@@ -339,7 +339,7 @@ class PathStore {
   }
 
   bool Next(Cursor *cursor, shash::Md5 *parent, StringRef *name) {
-    shash::Md5 empty_key = map_.empty_key();
+    const shash::Md5 empty_key = map_.empty_key();
     while (cursor->idx < map_.capacity()) {
       if (map_.keys()[cursor->idx] == empty_key) {
         cursor->idx++;
@@ -385,14 +385,14 @@ class StatStore {
   int32_t Add(const struct stat &info) {
     // We don't support more that 2B open files
     assert(store_.size() < (1LU << 31));
-    int32_t index = static_cast<int>(store_.size());
+    const int32_t index = static_cast<int>(store_.size());
     store_.PushBack(info);
     return index;
   }
 
   // Note that that if the last element is removed, no swap has taken place
   uint64_t Erase(int32_t index) {
-    struct stat info_back = store_.At(store_.size() - 1);
+    const struct stat info_back = store_.At(store_.size() - 1);
     store_.Replace(index, info_back);
     store_.SetSize(store_.size() - 1);
     store_.ShrinkIfOversized();
@@ -416,13 +416,13 @@ class PathMap {
   }
 
   bool LookupPath(const shash::Md5 &md5path, PathString *path) {
-    bool found = path_store_.Lookup(md5path, path);
+    const bool found = path_store_.Lookup(md5path, path);
     return found;
   }
 
   uint64_t LookupInodeByPath(const PathString &path) {
     uint64_t inode;
-    bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
+    const bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
                              &inode);
     if (found) return inode;
     return 0;
@@ -430,7 +430,7 @@ class PathMap {
 
   uint64_t LookupInodeByMd5Path(const shash::Md5 &md5path) {
     uint64_t inode;
-    bool found = map_.Lookup(md5path, &inode);
+    const bool found = map_.Lookup(md5path, &inode);
     if (found) return inode;
     return 0;
   }
@@ -445,7 +445,7 @@ class PathMap {
   }
 
   void Erase(const shash::Md5 &md5path) {
-    bool found = map_.Contains(md5path);
+    const bool found = map_.Contains(md5path);
     if (found) {
       path_store_.Erase(md5path);
       map_.Erase(md5path);
@@ -484,7 +484,7 @@ class InodeExMap {
   }
 
   bool LookupMd5Path(InodeEx *inode_ex, shash::Md5 *md5path) {
-    bool found = map_.LookupEx(inode_ex, md5path);
+    const bool found = map_.LookupEx(inode_ex, md5path);
     return found;
   }
 
@@ -531,7 +531,7 @@ class InodeReferences {
 
   bool Put(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter;
-    bool found = map_.Lookup(inode, &refcounter);
+    const bool found = map_.Lookup(inode, &refcounter);
     if (!found) {
       // May happen if a retired inode is cleared, i.e. if a file with
       // outdated content is closed
@@ -567,7 +567,7 @@ class InodeReferences {
   }
 
   bool Next(Cursor *cursor, uint64_t *inode) {
-    uint64_t empty_key = map_.empty_key();
+    const uint64_t empty_key = map_.empty_key();
     while (cursor->idx < map_.capacity()) {
       if (map_.keys()[cursor->idx] == empty_key) {
         cursor->idx++;
@@ -621,12 +621,12 @@ class InodeTracker {
     ~VfsPutRaii() { tracker_->Unlock(); }
 
     bool VfsPut(const uint64_t inode, const uint32_t by) {
-      bool removed = tracker_->inode_references_.Put(inode, by);
+      const bool removed = tracker_->inode_references_.Put(inode, by);
       if (removed) {
         // TODO(jblomer): pop operation (Lookup+Erase)
         shash::Md5 md5path;
         InodeEx inode_ex(inode, InodeEx::kUnknownType);
-        bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
+        const bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
         if (!found) {
           PANIC(kLogSyslogErr | kLogDebug,
                 "inode tracker ref map and path map out of sync: %" PRIu64,
@@ -636,7 +636,7 @@ class InodeTracker {
         tracker_->path_map_.Erase(md5path);
         atomic_inc64(&tracker_->statistics_.num_removes);
       }
-      atomic_xadd64(&tracker_->statistics_.num_references, -int32_t(by));
+      atomic_xadd64(&tracker_->statistics_.num_references, -static_cast<int32_t>(by));
       return removed;
     }
 
@@ -674,17 +674,17 @@ class InodeTracker {
   Statistics GetStatistics() { return statistics_; }
 
   InodeTracker();
-  explicit InodeTracker(const InodeTracker &other);
+  InodeTracker(const InodeTracker &other);
   InodeTracker &operator= (const InodeTracker &other);
   ~InodeTracker();
 
   void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
                 const PathString &path)
   {
-    uint64_t inode = inode_ex.GetInode();
+    const uint64_t inode = inode_ex.GetInode();
     Lock();
-    bool is_new_inode = inode_references_.Get(inode, by);
-    shash::Md5 md5path = path_map_.Insert(path, inode);
+    const bool is_new_inode = inode_references_.Get(inode, by);
+    const shash::Md5 md5path = path_map_.Insert(path, inode);
     inode_ex_map_.Insert(inode_ex, md5path);
     Unlock();
 
@@ -718,7 +718,7 @@ class InodeTracker {
 
   uint64_t FindInode(const PathString &path) {
     Lock();
-    uint64_t inode = path_map_.LookupInodeByPath(path);
+    const uint64_t inode = path_map_.LookupInodeByPath(path);
     Unlock();
     atomic_inc64(&statistics_.num_hits_inode);
     return inode;
@@ -750,7 +750,7 @@ class InodeTracker {
     shash::Md5 md5path;
     InodeEx old_inode_ex(old_inode, InodeEx::kUnknownType);
     Lock();
-    bool found = inode_ex_map_.LookupMd5Path(&old_inode_ex, &md5path);
+    const bool found = inode_ex_map_.LookupMd5Path(&old_inode_ex, &md5path);
     if (found) {
       inode_references_.Replace(old_inode, new_inode.GetInode());
       path_map_.Replace(md5path, new_inode.GetInode());
@@ -770,14 +770,16 @@ class InodeTracker {
   bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name) {
     shash::Md5 parent_md5;
     StringRef name_ref;
-    bool result = path_map_.path_store()->Next(
+    const bool result = path_map_.path_store()->Next(
       &(cursor->csr_paths), &parent_md5, &name_ref);
     if (!result)
       return false;
-    if (parent_md5.IsNull())
+    if (parent_md5.IsNull()) {
       *inode_parent = 0;
-    else
+    }
+    else {
       *inode_parent = path_map_.LookupInodeByMd5Path(parent_md5);
+    }
     name->Assign(name_ref.data(), name_ref.length());
     return true;
   }
@@ -786,7 +788,7 @@ class InodeTracker {
     return inode_references_.Next(&(cursor->csr_inos), inode);
   }
 
-  void EndEnumerate(Cursor *cursor) {
+  void EndEnumerate() {
     Unlock();
   }
 
@@ -796,11 +798,11 @@ class InodeTracker {
   void InitLock();
   void CopyFrom(const InodeTracker &other);
   inline void Lock() const {
-    int retval = pthread_mutex_lock(lock_);
+    const int retval = pthread_mutex_lock(lock_);
     assert(retval == 0);
   }
   inline void Unlock() const {
-    int retval = pthread_mutex_unlock(lock_);
+    const int retval = pthread_mutex_unlock(lock_);
     assert(retval == 0);
   }
 
@@ -866,7 +868,7 @@ class DentryTracker {
     if (!is_active_) return;
     if (timeout_s == 0) return;
 
-    uint64_t now = platform_monotonic_time();
+    const uint64_t now = platform_monotonic_time();
     Lock();
     entries_.PushBack(Entry(now + timeout_s, inode_parent, name));
     statistics_.num_insert++;
@@ -895,11 +897,11 @@ class DentryTracker {
 
   void InitLock();
   inline void Lock() const {
-    int retval = pthread_mutex_lock(lock_);
+    const int retval = pthread_mutex_lock(lock_);
     assert(retval == 0);
   }
   inline void Unlock() const {
-    int retval = pthread_mutex_unlock(lock_);
+    const int retval = pthread_mutex_unlock(lock_);
     assert(retval == 0);
   }
 
@@ -1020,7 +1022,7 @@ class PageCacheTracker {
   Statistics GetStatistics() { return statistics_; }
 
   PageCacheTracker();
-  explicit PageCacheTracker(const PageCacheTracker &other);
+  PageCacheTracker(const PageCacheTracker &other);
   PageCacheTracker &operator= (const PageCacheTracker &other);
   ~PageCacheTracker();
 
@@ -1035,9 +1037,9 @@ class PageCacheTracker {
 
   bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info)
   {
-    MutexLockGuard guard(lock_);
+    const MutexLockGuard guard(lock_);
     Entry entry;
-    bool retval = map_.Lookup(inode, &entry);
+    const bool retval = map_.Lookup(inode, &entry);
     if (retval && (entry.nopen != 0)) {
       assert(entry.idx_stat >= 0);
       *hash = entry.hash;

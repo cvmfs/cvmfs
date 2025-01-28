@@ -52,7 +52,7 @@ class PosixQuotaManager : public QuotaManager {
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();
-  virtual bool HasCapability(Capabilities capability) { return true; }
+  virtual bool HasCapability(Capabilities /* capability */) { return true; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description);
@@ -93,7 +93,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Loaded catalogs are pinned in the LRU and have to be treated differently.
    */
-  enum FileTypes {
+  enum FileTypes : uint8_t {
     kFileRegular = 0,
     kFileCatalog,
   };
@@ -101,7 +101,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * List of RPCs that can be sent to the cache manager.
    */
-  enum CommandType {
+  enum CommandType : uint8_t {
     kTouch = 0,
     kInsert,
     kReserve,
@@ -172,7 +172,7 @@ class PosixQuotaManager : public QuotaManager {
     }
 
     shash::Any RetrieveHash() const {
-      uint64_t algo_flags = size >> (64-3);
+      const uint64_t algo_flags = size >> (64-3);
       shash::Any result(static_cast<shash::Algorithms>(algo_flags+1));
       memcpy(result.digest, digest, result.GetDigestSize());
       return result;

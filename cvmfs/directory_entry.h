@@ -45,7 +45,7 @@ template <class CatalogMgrT>
 class CatalogBalancer;
 typedef uint64_t inode_t;
 
-enum SpecialDirents {
+enum SpecialDirents : uint8_t {
   kDirentNormal = 0,
   kDirentNegative,
 };

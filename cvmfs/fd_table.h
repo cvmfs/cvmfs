@@ -86,7 +86,7 @@ class FdTable : SingleCopy {
     assert(open_fds_[next_fd].handle == invalid_handle_);
     open_fds_[next_fd] = FdWrapper(handle, fd_pivot_);
     ++fd_pivot_;
-    return next_fd;
+    return static_cast<int>(next_fd);
   }
 
   /**

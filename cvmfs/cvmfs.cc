@@ -754,7 +754,7 @@ void ReplyNegative(const catalog::DirectoryEntry &dirent,
  * Transform a cvmfs dirent into a struct stat.
  */
 void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
-                          struct fuse_file_info *fi) // NOLINT(misc-unused-parameters)
+                          struct fuse_file_info * /* fi */)
 {
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_getattr());
 
@@ -2022,7 +2022,7 @@ namespace {
 /**
  * Do after-daemon() initialization
  */
-void cvmfs_init(void *userdata, struct fuse_conn_info *conn) { // NOLINT(misc-unused-parameters)
+void cvmfs_init(void * /* userdata */, struct fuse_conn_info *conn) { // NOLINT(misc-unused-parameters)
   /*NOLINT(misc-include-cleaner)*/LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_init");
 
   // NFS support

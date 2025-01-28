@@ -46,7 +46,7 @@ const unsigned kLookupRawSymlink = 0b10;
 /**
  * Results upon loading a catalog file.
  */
-enum LoadReturn {
+enum LoadReturn : uint8_t {
   kLoadNew = 0,
   kLoadUp2Date,
   kLoadNoSpace,
@@ -63,7 +63,7 @@ enum LoadReturn {
  *                        stored within the CatalogContext object to retrieve
  *                        the root catalog from the right location
  */
-enum RootCatalogLocation {
+enum RootCatalogLocation : uint8_t {
   kCtlgNoLocationNeeded = 0,  // hash known, no location needed
   kCtlgLocationMounted,      // already loaded in mounted_catalogs_
   kCtlgLocationServer,
@@ -288,7 +288,7 @@ class AbstractCatalogManager : public SingleCopy {
 
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
-    ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
+    ReadLock(); const uint64_t r = inode_gauge_; Unlock(); return r;
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
@@ -397,19 +397,19 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevisionNoLock() const;
   uint64_t GetTimestampNoLock() const;
   inline void ReadLock() const {
-    int retval = pthread_rwlock_rdlock(rwlock_);
+    const int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
   }
   inline void WriteLock() const {
-    uint64_t timestamp = platform_monotonic_time_ns();
-    int retval = pthread_rwlock_wrlock(rwlock_);
+    const uint64_t timestamp = platform_monotonic_time_ns();
+    const int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
     perf::Inc(statistics_.n_write_lock);
-    uint64_t duration = platform_monotonic_time_ns() - timestamp;
-    perf::Xadd(statistics_.ns_write_lock, duration);
+    const uint64_t duration = platform_monotonic_time_ns() - timestamp;
+    perf::Xadd(statistics_.ns_write_lock, static_cast<int64_t>(duration));
   }
   inline void Unlock() const {
-    int retval = pthread_rwlock_unlock(rwlock_);
+    const int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
   virtual void EnforceSqliteMemLimit();

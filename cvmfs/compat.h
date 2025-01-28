@@ -28,7 +28,7 @@ namespace compat {
 
 namespace shash_v1 {
 
-enum Algorithms {
+enum Algorithms : uint8_t {
   kMd5 = 0,
   kSha1,
   kRmd160,
@@ -69,12 +69,12 @@ struct Digest {
 
     unsigned i;
     for (i = 0; i < kDigestSizes[algorithm]; ++i) {
-      char dgt1 = (unsigned)digest[i] / 16;
-      char dgt2 = (unsigned)digest[i] % 16;
+      char dgt1 = static_cast<unsigned>(digest[i] / 16);
+      char dgt2 = static_cast<unsigned>(digest[i] % 16);
       dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
       dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      result[i*2] = dgt1;
-      result[i*2+1] = dgt2;
+      result[static_cast<size_t>(i)*2] = dgt1;
+      result[static_cast<size_t>(i)*2+1] = dgt2;
     }
     unsigned pos = i*2;
     for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
@@ -85,18 +85,22 @@ struct Digest {
   }
 
   bool IsNull() const {
-    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
-      if (digest[i] != 0)
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
+      if (digest[i] != 0) {
         return false;
+      }
+    }
     return true;
   }
 
   bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return false;
-    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
-      if (this->digest[i] != other.digest[i])
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
+      if (this->digest[i] != other.digest[i]) {
         return false;
+      }
+    }
     return true;
   }
 
@@ -148,7 +152,7 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash);
 
 namespace shash_v2 {
 
-enum Algorithms {
+enum Algorithms : uint8_t {
   kMd5 = 0,
   kSha1,
   kRmd160,
@@ -231,20 +235,20 @@ class InodeContainer {
   InodeContainer() {
     assert(false);
   }
-  bool Add(const uint64_t inode, const uint64_t parent_inode,
-           const NameString &name)
+  bool Add(const uint64_t /* inode */, const uint64_t /* parent_inode */,
+           const NameString &/* name */)
   {
     assert(false); return false;
   }
-  bool Get(const uint64_t inode, const uint64_t parent_inode,
-           const NameString &name)
+  bool Get(const uint64_t /* inode */, const uint64_t /* parent_inode */,
+           const NameString & /* name */)
   {
     assert(false); return false;
   }
-  uint32_t Put(const uint64_t inode, const uint32_t by) {
+  uint32_t Put(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false); return false;
   }
-  bool ConstructPath(const uint64_t inode, PathString *path);
+  bool ConstructPath(const uint64_t inode, PathString * path);
   bool Contains(const uint64_t inode) {
     return map_.find(inode) != map_.end();
   }
@@ -276,28 +280,28 @@ class InodeTracker {
   Statistics GetStatistics() { return statistics_; }
 
   InodeTracker() { assert(false); }
-  explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker(const InodeTracker &/* other */) { assert(false); }
+  InodeTracker &operator= (const InodeTracker &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
   ~InodeTracker();
 
-  bool VfsGet(const uint64_t inode, const uint64_t parent_inode,
-              const NameString &name)
+  bool VfsGet(const uint64_t /* inode */, const uint64_t /* parent_inode */,
+              const NameString & /* name */)
   {
     assert(false); return false;
   }
-  bool VfsAdd(const uint64_t inode, const uint64_t parent_inode,
-              const NameString &name)
+  bool VfsAdd(const uint64_t /* inode */, const uint64_t /* parent_inode */,
+              const NameString & /* name */)
   {
     assert(false); return false;
   }
-  void VfsPut(const uint64_t inode, const uint32_t by) { assert(false); }
-  bool Find(const uint64_t inode, PathString *path) { assert(false); }
+  void VfsPut(const uint64_t /* inode */, const uint32_t /* by */) { assert(false); }
+  bool Find(const uint64_t /* inode */, PathString * /* path */) { assert(false); }
 
 // private:
   static const unsigned kVersion = 1;
 
   void InitLock() { assert(false); }
-  void CopyFrom(const InodeTracker &other) { assert(false); }
+  void CopyFrom(const InodeTracker & /* other */) { assert(false); }
   inline void Lock() const {
     // NOT NEEDED
   }
@@ -333,8 +337,8 @@ class SmallHashBase {
     delete[] keys_;
     delete[] values_;
   }
-  void Init(uint32_t expected_size, Key empty,
-            uint32_t (*hasher)(const Key &key))
+  void Init(uint32_t /* expected_size */, Key /* empty */,
+            uint32_t (* /* hasher */)(const Key &key))
   {
     assert(false);
   }
@@ -352,17 +356,17 @@ class SmallHashBase {
     const bool found = DoLookup(key, &bucket, &collisions);
     return found;
   }
-  void Insert(const Key &key, const Value &value) {
+  void Insert(const Key & /* key */, const Value & /* value */) {
     assert(false);
   }
-  void Erase(const Key &key) { assert(false); }
+  void Erase(const Key & /* key */) { assert(false); }
   void Clear() { assert(false); }
   uint64_t bytes_allocated() const { return bytes_allocated_; }
   static double GetEntrySize() {
     assert(false);
   }
-  void GetCollisionStats(uint64_t *num_collisions,
-                         uint32_t *max_collisions) const
+  void GetCollisionStats(uint64_t * /* num_collisions */,
+                         uint32_t * /* max_collisions */) const
   {
     assert(false);
   }
@@ -371,11 +375,11 @@ class SmallHashBase {
   uint32_t ScaleHash(const Key &key) const {
     double bucket = (double(hasher_(key)) * double(capacity_) /  // NOLINT
                      double((uint32_t)(-1)));  // NOLINT
-    return (uint32_t)bucket % capacity_;
+    return static_cast<uint32_t>(bucket) % capacity_;
   }
   void InitMemory() { assert(false); }
-  bool DoInsert(const Key &key, const Value &value,
-                const bool count_collisions)
+  bool DoInsert(const Key & /* key */, const Value & /* value */,
+                const bool /* count_collisions */)
   {
     assert(false);
   }
@@ -390,7 +394,7 @@ class SmallHashBase {
     }
     return false;
   }
-  void DoClear(const bool reset_capacity) {
+  void DoClear(const bool /* reset_capacity */) {
     assert(false);
   }
   // Methods for resizable version
@@ -425,12 +429,12 @@ public SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >
   SmallHashDynamic() : Base() {
     assert(false);
   }
-  explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()
+  SmallHashDynamic(const SmallHashDynamic<Key, Value> & /* other */) : Base()
   {
     assert(false);
   }
-  SmallHashDynamic<Key, Value> &operator= (
-    const SmallHashDynamic<Key, Value> &other)
+  SmallHashDynamic<Key, Value> &operator= ( //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+    const SmallHashDynamic<Key, Value> & /* other */)
   {
     assert(false);
   }
@@ -447,10 +451,10 @@ public SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >
   void ResetCapacity() { assert(false); }
 
  private:
-  void Migrate(const uint32_t new_capacity) {
+  void Migrate(const uint32_t /* new_capacity */) {
     assert(false);
   }
-  void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
+  void CopyFrom(const SmallHashDynamic<Key, Value> & /* other */) {
     assert(false);
   }
   uint32_t num_migrates_;
@@ -466,21 +470,21 @@ class PathMap {
   }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
     PathInfo value;
-    bool found = map_.Lookup(md5path, &value);
+    const bool found = map_.Lookup(md5path, &value);
     path->Assign(value.path);
     return found;
   }
   uint64_t LookupInode(const PathString &path) {
     PathInfo value;
-    bool found = map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()),
+    const bool found = map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()),
                              &value);
     if (found) return value.inode;
     return 0;
   }
-  shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
+  shash_v1::Md5 Insert(const PathString &path, const uint64_t /* inode */) { // NOLINT(misc-unused-parameters)
     assert(false);
   }
-  void Erase(const shash_v1::Md5 &md5path) {
+  void Erase(const shash_v1::Md5 &md5path) { // NOLINT(misc-unused-parameters)
     assert(false);
   }
   void Clear() { assert(false); }
@@ -501,13 +505,13 @@ class InodeMap {
     assert(false);
   }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+    const bool found = map_.Lookup(inode, md5path);
     return found;
   }
-  void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
+  void Insert(const uint64_t /* inode */, const shash_v1::Md5 &md5path) { // NOLINT(misc-unused-parameters)
     assert(false);
   }
-  void Erase(const uint64_t inode) {
+  void Erase(const uint64_t /* inode */) { // NOLINT(misc-unused-parameters)
     assert(false);
   }
   void Clear() { assert(false); }
@@ -521,10 +525,10 @@ class InodeReferences {
   InodeReferences() {
     assert(false);
   }
-  bool Get(const uint64_t inode, const uint32_t by) {
+  bool Get(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
-  bool Put(const uint64_t inode, const uint32_t by) {
+  bool Put(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -547,20 +551,20 @@ class InodeTracker {
   Statistics GetStatistics() { assert(false); }
 
   InodeTracker() { assert(false); }
-  explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker(const InodeTracker &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  InodeTracker &operator= (const InodeTracker &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  void VfsGetBy(const uint64_t /* inode */, const uint32_t /* by */, const PathString &/* path */)
   {
     assert(false);
   }
-  void VfsGet(const uint64_t inode, const PathString &path) {
+  void VfsGet(const uint64_t /* inode */, const PathString &/* path */) {
     assert(false);
   }
-  void VfsPut(const uint64_t inode, const uint32_t by) {
+  void VfsPut(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
   bool FindPath(const uint64_t inode, PathString *path) {
@@ -577,7 +581,7 @@ class InodeTracker {
     return found;
   }
 
-  uint64_t FindInode(const PathString &path) {
+  uint64_t FindInode(const PathString &/* path */) {
     assert(false);
   }
 
@@ -585,7 +589,7 @@ class InodeTracker {
   static const unsigned kVersion = 2;
 
   void InitLock() { assert(false); }
-  void CopyFrom(const InodeTracker &other) { assert(false); }
+  void CopyFrom(const InodeTracker &/* other */) { assert(false); }
   inline void Lock() const { assert(false); }
   inline void Unlock() const { assert(false); }
 
@@ -616,8 +620,8 @@ class StringRef {
     return sizeof(uint16_t) + length;
   }
   char *data() const { return reinterpret_cast<char *>(length_ + 1); }
-  static StringRef Place(const uint16_t length, const char *str,
-                         void *addr)
+  static StringRef Place(const uint16_t /* length */, const char */* str */,
+                         void */* addr */)
   {
     assert(false);
   }
@@ -628,8 +632,8 @@ class StringRef {
 class StringHeap : public SingleCopy {
  public:
   StringHeap() { assert(false); }
-  explicit StringHeap(const uint32_t minimum_size) { assert(false); }
-  void Init(const uint32_t minimum_size) { assert(false); }
+  explicit StringHeap(const uint32_t /* minimum_size */) { assert(false); }
+  void Init(const uint32_t /* minimum_size */) { assert(false); }
 
   ~StringHeap() {
     for (unsigned i = 0; i < bins_.size(); ++i) {
@@ -637,15 +641,15 @@ class StringHeap : public SingleCopy {
     }
   }
 
-  StringRef AddString(const uint16_t length, const char *str) {
+  StringRef AddString(const uint16_t /* length */, const char */* str */) {
     assert(false);
   }
-  void RemoveString(const StringRef str_ref) { assert(false); }
+  void RemoveString(const StringRef /* str_ref */) { assert(false); }
   double GetUsage() const { assert(false); }
   uint64_t used() const { assert(false); }
 
  private:
-  void AddBin(const uint64_t size) { assert(false); }
+  void AddBin(const uint64_t /* size */) { assert(false); }
 
   uint64_t size_;
   uint64_t used_;
@@ -661,10 +665,10 @@ class PathStore {
   ~PathStore() {
     delete string_heap_;
   }
-  explicit PathStore(const PathStore &other) { assert(false); }
-  PathStore &operator= (const PathStore &other) { assert(false); }
+  PathStore(const PathStore &/* other */) { assert(false); }
+  PathStore &operator= (const PathStore &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
 
-  void Insert(const shash_v1::Md5 &md5path, const PathString &path) {
+  void Insert(const shash_v1::Md5 &/* md5path */, const PathString &/* path */) {
     assert(false);
   }
 
@@ -685,7 +689,7 @@ class PathStore {
     return true;
   }
 
-  void Erase(const shash_v1::Md5 &md5path) { assert(false); }
+  void Erase(const shash_v1::Md5 &/* md5path */) { assert(false); }
   void Clear() { assert(false); }
 
 // private:
@@ -697,7 +701,7 @@ class PathStore {
     uint32_t refcnt;
     StringRef name;
   };
-  void CopyFrom(const PathStore &other) { assert(false); }
+  void CopyFrom(const PathStore &/* other */) { assert(false); }
   SmallHashDynamic<shash_v1::Md5, PathInfo> map_;
   StringHeap *string_heap_;
 };
@@ -709,14 +713,14 @@ class PathMap {
     assert(false);
   }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
-    bool found = path_store_.Lookup(md5path, path);
+    const bool found = path_store_.Lookup(md5path, path);
     return found;
   }
-  uint64_t LookupInode(const PathString &path) { assert(false); }
-  shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
+  uint64_t LookupInode(const PathString &/* path */) { assert(false); }
+  shash_v1::Md5 Insert(const PathString &/* path */, const uint64_t /* inode */) {
     assert(false);
   }
-  void Erase(const shash_v1::Md5 &md5path) {
+  void Erase(const shash_v1::Md5 &/* md5path */) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -731,13 +735,13 @@ class InodeMap {
     assert(false);
   }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+    const bool found = map_.Lookup(inode, md5path);
     return found;
   }
-  void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
+  void Insert(const uint64_t /* inode */, const shash_v1::Md5 &/* md5path */) {
     assert(false);
   }
-  void Erase(const uint64_t inode) {
+  void Erase(const uint64_t /* inode */) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -751,10 +755,10 @@ class InodeReferences {
   InodeReferences() {
     assert(false);
   }
-  bool Get(const uint64_t inode, const uint32_t by) {
+  bool Get(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
-  bool Put(const uint64_t inode, const uint32_t by) {
+  bool Put(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -777,20 +781,21 @@ class InodeTracker {
   Statistics GetStatistics() { assert(false); }
 
   InodeTracker() { assert(false); }
-  explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker(const InodeTracker &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  InodeTracker &operator= (const InodeTracker &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  void VfsGetBy(const uint64_t /* inode */, const uint32_t /* by */, const PathString &/* path */)
   {
     assert(false);
   }
-  void VfsGet(const uint64_t inode, const PathString &path) {
+  void VfsGet(const uint64_t /* inode */, const PathString &/* path */) {
     assert(false);
   }
-  void VfsPut(const uint64_t inode, const uint32_t by) {
+  void VfsPut(const uint64_t /* inode */, const uint32_t /* by */) {
     assert(false);
   }
   bool FindPath(const uint64_t inode, PathString *path) {
@@ -807,7 +812,7 @@ class InodeTracker {
     return found;
   }
 
-  uint64_t FindInode(const PathString &path) {
+  uint64_t FindInode(const PathString &/* path */) {
     assert(false);
   }
 
@@ -815,7 +820,7 @@ class InodeTracker {
   static const unsigned kVersion = 3;
 
   void InitLock() { assert(false); }
-  void CopyFrom(const InodeTracker &other) { assert(false); }
+  void CopyFrom(const InodeTracker &/* other */) { assert(false); }
   inline void Lock() const { assert(false); }
   inline void Unlock() const { assert(false); }
 
@@ -840,7 +845,7 @@ namespace chunk_tables {
 class FileChunk {
  public:
   FileChunk() { assert(false); }
-  FileChunk(const shash_v1::Any &hash, const off_t offset, const size_t size) {
+  FileChunk(const shash_v1::Any &/* hash */, const off_t /* offset */, const size_t /* size */) {
     assert(false);
   }
   inline const shash_v1::Any& content_hash() const { return content_hash_; }
@@ -855,7 +860,7 @@ class FileChunk {
 
 struct FileChunkReflist {
   FileChunkReflist() { assert(false); }
-  FileChunkReflist(BigVector<FileChunk> *l, const PathString &p) {
+  FileChunkReflist(BigVector<FileChunk> */* l */, const PathString &/* p */) {
     assert(false);
   }
   BigVector<FileChunk> *list;
@@ -865,12 +870,12 @@ struct FileChunkReflist {
 struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
-  ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
-  void CopyFrom(const ChunkTables &other) { assert(false); }
+  ChunkTables(const ChunkTables &/* other */) { assert(false); }
+  ChunkTables &operator= (const ChunkTables &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  void CopyFrom(const ChunkTables &/* other */) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }
-  pthread_mutex_t *Handle2Lock(const uint64_t handle) const { assert(false); }
+  pthread_mutex_t *Handle2Lock(const uint64_t /* handle */) const { assert(false); }
   inline void Lock() { assert(false); }
   inline void Unlock() { assert(false); }
 
@@ -899,7 +904,7 @@ namespace chunk_tables_v2 {
 class FileChunk {
  public:
   FileChunk() { assert(false); }
-  FileChunk(const shash_v2::Any &hash, const off_t offset, const size_t size) {
+  FileChunk(const shash_v2::Any &/* hash */, const off_t /* offset */, const size_t /* size */) {
     assert(false);
   }
   inline const shash_v2::Any& content_hash() const { return content_hash_; }
@@ -914,7 +919,7 @@ class FileChunk {
 
 struct FileChunkReflist {
   FileChunkReflist() { assert(false); }
-  FileChunkReflist(BigVector<FileChunk> *l, const PathString &p) {
+  FileChunkReflist(BigVector<FileChunk> */* l */, const PathString &/* p */) {
     assert(false);
   }
   BigVector<FileChunk> *list;
@@ -924,12 +929,12 @@ struct FileChunkReflist {
 struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
-  ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
-  void CopyFrom(const ChunkTables &other) { assert(false); }
+  ChunkTables(const ChunkTables &/* other */) { assert(false); }
+  ChunkTables &operator= (const ChunkTables &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  void CopyFrom(const ChunkTables &/* other */) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }
-  pthread_mutex_t *Handle2Lock(const uint64_t handle) const { assert(false); }
+  pthread_mutex_t *Handle2Lock(const uint64_t /* handle */) const { assert(false); }
   inline void Lock() { assert(false); }
   inline void Unlock() { assert(false); }
 
@@ -958,12 +963,12 @@ namespace chunk_tables_v3 {
 struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
-  ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
-  void CopyFrom(const ChunkTables &other) { assert(false); }
+  ChunkTables(const ChunkTables &/* other */) { assert(false); }
+  ChunkTables &operator= (const ChunkTables &/* other */) { assert(false); } //NOLINT(bugprone-unhandled-self-assignment,cert-oop54-cpp)
+  void CopyFrom(const ChunkTables &/* other */) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }
-  pthread_mutex_t *Handle2Lock(const uint64_t handle) const { assert(false); }
+  pthread_mutex_t *Handle2Lock(const uint64_t /* handle */) const { assert(false); }
   inline void Lock() { assert(false); }
   inline void Unlock() { assert(false); }
 

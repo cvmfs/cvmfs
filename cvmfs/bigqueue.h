@@ -24,7 +24,7 @@ class BigQueue {
   }
 
   explicit BigQueue(const size_t num_items) {
-    size_t min_items = kNumInit;
+    const size_t min_items = kNumInit;
     Alloc(std::max(num_items, min_items));
     size_ = 0;
   }
@@ -92,7 +92,7 @@ class BigQueue {
   }
 
   void Alloc(const size_t num_elements) {
-    size_t num_bytes = sizeof(Item) * num_elements;
+    const size_t num_bytes = sizeof(Item) * num_elements;
     buffer_ = static_cast<Item *>(smmap(num_bytes));
     capacity_ = num_elements;
     head_ = buffer_;
@@ -110,7 +110,7 @@ class BigQueue {
     assert(new_capacity > 0);
     assert(new_capacity >= size_);
 
-    size_t head_offset = GetHeadOffset();
+    const size_t head_offset = GetHeadOffset();
     Item *old_buffer = buffer_;
 
     Alloc(new_capacity);

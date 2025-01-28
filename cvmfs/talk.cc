@@ -761,7 +761,7 @@ void *TalkManager::MainResponder(void *data) {
       while (mount_point->inode_tracker()->NextInode(&cursor, &inode)) {
         result += StringifyInt(inode) + "\n";
       }
-      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      mount_point->inode_tracker()->EndEnumerate();
       talk_mgr->Answer(con_fd, result);
     } else if (line == "vfs entries") {
       string result;
@@ -775,7 +775,7 @@ void *TalkManager::MainResponder(void *data) {
         result += "<" + StringifyInt(inode_parent) + ">/" + name.ToString() +
                   "\n";
       }
-      mount_point->inode_tracker()->EndEnumerate(&cursor);
+      mount_point->inode_tracker()->EndEnumerate();
       talk_mgr->Answer(con_fd, result);
     } else if (line == "version") {
       const string version_str = string(CVMFS_VERSION) + " (CernVM-FS Fuse Module)\n" +
