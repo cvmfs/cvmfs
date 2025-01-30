@@ -1,6 +1,10 @@
 #!/bin/sh
 
 curl_ssl_config="--with-openssl"
+if [ x$BUILD_CURL_WITHOUT_SSL = x"true" ]; then
+  curl_ssl_config="--without-ssl"
+fi
+
 FIX_COMP=""
 LIBS=""
 if [ x"$(uname)" = x"Darwin" ]; then

@@ -206,6 +206,9 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SNAPSHOTTER)
       set(ENV{BUILD_SNAPSHOTTER} "true")
     endif()
+    if (BUILD_CURL_WITHOUT_SSL)
+      set(ENV{BUILD_CURL_NO_SSL} "true")
+    endif()
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -230,6 +233,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
+    set(ENV{BUILD_CURL_WITHOUT_SSL} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
