@@ -484,7 +484,7 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
-if  [ -d /run/systemd/system ]
+if  [ -d /run/systemd/system ]; then
   systemctl daemon-reload
   systemctl start cvmfs-reload.service
 else
