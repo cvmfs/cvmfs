@@ -1,9 +1,6 @@
 #!/bin/sh
 
 curl_ssl_config="--with-openssl"
-if [ x$BUILD_CURL_WITHOUT_SSL = x"true" ]; then
-  curl_ssl_config="--without-ssl"
-fi
 
 FIX_COMP=""
 LIBS=""
@@ -12,6 +9,10 @@ if [ x"$(uname)" = x"Darwin" ]; then
   FIX_COMP="CC=/usr/bin/clang CXX=/usr/bin/clang++"
   # On macOS, c-ares >= 1.16.1 uses libresolv for finding name servers
   LIBS="-lresolv"
+fi
+
+if [ x$NO_SSL_SUPPORT_EXPERIMENTAL = x"true" ]; then
+  curl_ssl_config="--without-ssl"
 fi
 
 sh configure $FIX_COMP CPPFLAGS="$CPPFLAGS -D_FILE_OFFSET_BITS=64" \

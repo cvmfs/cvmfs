@@ -206,9 +206,11 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SNAPSHOTTER)
       set(ENV{BUILD_SNAPSHOTTER} "true")
     endif()
-    if (BUILD_CURL_WITHOUT_SSL)
-      set(ENV{BUILD_CURL_NO_SSL} "true")
+    if (NO_SSL_SUPPORT_EXPERIMENTAL)
+      message(WARNING "SSL support for CURL has been disabled. This is an experimental feature, it might break CVMFS. Only use if you are absolutely certain this is correct.")
+      set(ENV{NO_SSL_SUPPORT_EXPERIMENTAL} "true")
     endif()
+    execute_process(COMMAND sed -i /ssl_support_disabled=/c\\\ \ ssl_support_disabled=${NO_SSL_SUPPORT_EXPERIMENTAL} ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_config)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -233,7 +235,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
-    set(ENV{BUILD_CURL_WITHOUT_SSL} "")
+    set(ENV{NO_SSL_SUPPORT_EXPERIMENTAL} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to

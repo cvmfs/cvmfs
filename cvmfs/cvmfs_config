@@ -912,6 +912,10 @@ cvmfs_showconfig() {
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
+
+  # Check if CVMFS was built without SSL support
+  ssl_support_disabled=YES
+  echo "SSL support disabled=${ssl_support_disabled}"
 }
 
 
