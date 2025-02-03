@@ -1082,13 +1082,17 @@ if(BUILD_RECEIVER)
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${SQLITE3_LIBRARY}
         ${VJSON_LIBRARIES}
-        ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARIES}
         ${RT_LIBRARY}
         ${LibArchive_LIBRARY}
         pthread
         dl
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL)
+    list(APPEND CVMFS_RECEIVER_LINK_LIBRARIES
+      ${OPENSSL_LIBRARIES}
+    )
+  endif()
   add_executable(cvmfs_receiver ${CVMFS_RECEIVER_SOURCES})
   set_target_properties (cvmfs_receiver PROPERTIES
     COMPILE_FLAGS "${CVMFS_RECEIVER_CFLAGS}"
