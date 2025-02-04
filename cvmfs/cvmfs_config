@@ -151,7 +151,7 @@ cvmfs_config_usage() {
   echo "  umount"
   echo "  wipecache"
   echo "  killall"
-  echo "  bugreport"
+  echo "  bugreport <timeout_in_sec_per_command (default = 120)>"
 }
 
 has_selinux() {
@@ -1454,6 +1454,13 @@ cvmfs_bugreport() {
   mkdir bugreport
   cd bugreport
 
+  local timeout_sec
+  if [ -z "$1" ]; then
+    timeout_sec=120  # 2min per command until it is killed
+  else
+    timeout_sec=$1
+  fi
+
   dist_default="/etc/cvmfs/default.d/*.conf"
   for file in /etc/cvmfs/default.conf $dist_default /etc/cvmfs/default.local
   do
@@ -1465,6 +1472,10 @@ cvmfs_bugreport() {
   echo "Gathering /etc/cvmfs"
   mkdir etc
   cp -r /etc/cvmfs etc/
+
+  echo "Gathering /var/run/cvmfs"
+  mkdir -p var/run/cvmfs
+  cp -r /var/run/cvmfs var/run/cvmfs
 
   echo "Gathering files in quarantaine"
   for repo in `ls "$CVMFS_CACHE_BASE"`
@@ -1523,11 +1534,25 @@ cvmfs_bugreport() {
 
   for cmd in "${commands[@]}"
    do
-     out="`echo $cmd | tr -Cd [:alnum:]`.stdout"
-     err="`echo $cmd | tr -Cd [:alnum:]`.stderr"
+      out="`echo $cmd | tr -Cd [:alnum:]`.stdout"
+      err="`echo $cmd | tr -Cd [:alnum:]`.stderr"
       echo "Gathering $cmd"
       echo "$cmd" > $out
-      $cmd >> $out 2>$err
+
+      case $sys_arch in
+        Linux )
+          timeout ${timeout_sec} $cmd >> $out 2>$err
+          if [ "$?" -eq "124" ]; then
+            # add some new lines so that the error stands in a new line
+            echo -e "\nERROR! Command '$cmd' killed by timeout of length: ${timeout_sec} seconds\n" \
+              | tee -a "$out" "$err"
+          fi
+        ;;
+        Darwin )
+          # base installation on mac does not have any "timeout" cmd
+          $cmd >> $out 2>$err
+        ;;
+      esac
    done
 
    cd ..
