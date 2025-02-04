@@ -256,7 +256,6 @@ if (BUILD_CVMFS)
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES
        ${CURL_LIBRARIES}
        ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-       ${OPENSSL_LIBRARIES}
        ${PACPARSER_LIBRARIES}
        ${SQLITE3_LIBRARY}
        ${ZLIB_LIBRARIES}
@@ -269,6 +268,11 @@ if (BUILD_CVMFS)
        pthread
        dl
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL) # SSL not disabled, so link OpenSSL
+    list(APPEND CVMFS_FUSE_LINK_LIBRARIES
+      ${OPENSSL_LIBRARIES}
+    )
+  endif()
   add_library (cvmfs_fuse SHARED ${CVMFS_FUSE_SOURCES})
   add_library (cvmfs_fuse_debug SHARED ${CVMFS_FUSE_SOURCES})
   add_dependencies (cvmfs_fuse cache.pb.generated)
@@ -411,7 +415,6 @@ if (BUILD_LIBCVMFS)
                          PUBLIC cvmfs_crypto
                                 cvmfs_util
                                 ${CARES_LDFLAGS}
-                                ${OPENSSL_LIBRARIES}
                          PRIVATE ${SQLITE3_LIBRARY}
                                  ${CURL_LIBRARIES}
                                  ${CARES_LIBRARIES}
@@ -421,6 +424,11 @@ if (BUILD_LIBCVMFS)
                                  ${VJSON_LIBRARIES}
                                  ${PROTOBUF_LITE_LIBRARY}
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL) # SSL not disabled, so link OpenSSL
+    target_link_libraries(cvmfs_client 
+                          PUBLIC ${OPENSSL_LIBRARIES}
+    )
+  endif()
 
   install (
     TARGETS      cvmfs_client
@@ -687,7 +695,6 @@ if (BUILD_SERVER)
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
         ${ZLIB_LIBRARIES}
-        ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
@@ -695,6 +702,15 @@ if (BUILD_SERVER)
         pthread
         dl
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL) # SSL not disabled, so link OpenSSL
+    list(APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
+      ${OPENSSL_LIBRARIES}
+    )
+  else() # SSL disabled, so use vendored library for functionality which would otherwise be taken form OpenSSL
+    list(APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
+      -l:libcrypto.a
+    )
+  endif()
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   target_link_libraries (cvmfs_swissknife
                          cvmfs_crypto
@@ -799,7 +815,6 @@ if (BUILD_SERVER)
   list (APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
-        ${OPENSSL_LIBRARIES}
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
@@ -809,6 +824,15 @@ if (BUILD_SERVER)
         pthread
         dl
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL) # SSL not disabled, so link OpenSSL
+    list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
+      ${OPENSSL_LIBRARIES}
+    )
+  else() # SSL disabled, so use vendored library for functionality which would otherwise be taken form OpenSSL
+    list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
+      -l:libcrypto.a
+    )
+  endif()
   add_library (cvmfs_server SHARED ${LIBCVMFS_SERVER_SOURCES})
   set_target_properties (cvmfs_server PROPERTIES
     VERSION ${CernVM-FS_VERSION_STRING}
@@ -1247,13 +1271,17 @@ if (BUILD_PRELOADER)
                         ${CURL_LIBRARIES}
                         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
                         ${ZLIB_LIBRARIES}
-                        ${OPENSSL_LIBRARIES}
                         ${RT_LIBRARY}
                         ${UUID_LIBRARIES}
                         ${VJSON_LIBRARIES}
                         pthread
                         dl
   )
+  if (NOT NO_SSL_SUPPORT_EXPERIMENTAL) # SSL not disabled, so link OpenSSL
+    target_link_libraries(cvmfs_preload_bin
+                          ${OPENSSL_LIBRARIES}
+    )
+  endif()
 
   #
   # Generate a bash self-extracting script for the cvmfs_preload target
