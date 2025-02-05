@@ -118,8 +118,8 @@ def preloadProxy(command, num_threads):
         if error_code != 0:
           print("Failure while executing statement during preloadProxy",
                 command["command"], "error", error_code)
-        print(stderr)
-        print(stdout)
+        #print(stderr)
+        #print(stdout)
 
 
 
@@ -199,8 +199,8 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
         if error_code != 0:
           print("Failure while executing statement ", command["command"],
                 "error", error_code)
-          print(stderr)
-          print(stdout)
+          #print(stderr)
+          #print(stdout)
 
         # /usr/bin/time returns in stderr
         time_results_str.append(stderr)

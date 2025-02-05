@@ -94,18 +94,21 @@ if __name__ == "__main__":
 
           # get cvmfs version
           #print("get cvmfs version")
+          #cvmfs_version = "2.12.0.0" #TODO TODO benchmark_cvmfs.getCVMFSVersion()
           cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
         else: # non-cvmfs cmd
           cvmfs_version = "0.0.0"
+        print("CVMFS version", cvmfs_version)
 
         ## 3) loop over commands
         for cmd_name in config[run]["commands"]:
           partial_cmd = config["avail_cmds"][cmd_name]
           partial_cmd["time"] = time_command
 
-          print("*** preloading proxy cache...")
-          benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
-          print("    ...done")
+          print("*** skip preload proxy")
+          #print("***", dt.datetime.now(), "preloading proxy cache...")
+          #benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
+          #print("    ", dt.datetime.now(), "...done")
 
           benchmark_out.writeStats(config, run, cvmfs_build_dir, client_config,
                                    cmd_name, cvmfs_version, "stats",
