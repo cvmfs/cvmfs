@@ -839,6 +839,12 @@ cvmfs_chksetup() {
     fi
   done
 
+  # Check if CVMFS was built without SSL support
+  ssl_support_disabled=
+  if [[ "x$ssl_support_disabled" = "xYES" ]]; then
+    echo "Warning: SSL support is disabled. This is experimental and might cause problems"
+  fi
+
   if [ $(($num_warnings+$num_errors)) -eq 0 ]; then
     echo "OK"
   fi
@@ -912,10 +918,6 @@ cvmfs_showconfig() {
       [ $short_output -eq 0 ] && echo "${var}="
     fi
   done <<< "$all_vars"
-
-  # Check if CVMFS was built without SSL support
-  ssl_support_disabled=YES
-  echo "SSL support disabled=${ssl_support_disabled}"
 }
 
 
