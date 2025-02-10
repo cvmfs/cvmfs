@@ -46,6 +46,60 @@ from util_benchmark import benchmark_read_params
 #
 ################################################################################
 
+def run_non_cvmfs(config, run, repos):
+  ## 1) we ignore cvmfs_build_dir as without sudo we cannot install anything
+  cvmfs_build_dir = "unprivileged"
+
+  ## 2) we ignore different client configs and reloading the client
+  #     as without sudo we cannot change it
+  client_config = [ "non_cvmfs" ]
+
+  ## At least we can get the version...
+  cvmfs_version = "0.0.0"
+  yield cvmfs_build_dir, client_config, cvmfs_version
+
+def run_cvmfs_unprivileged(config, run, repos):
+  ## 1) we ignore cvmfs_build_dir as without sudo we cannot install anything
+  cvmfs_build_dir = "unprivileged"
+
+  ## 2) we ignore different client configs and reloading the client
+  #     as without sudo we cannot change it
+  client_config = [ "unprivileged" ]
+
+  ## At least we can get the version...
+  cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
+  yield cvmfs_build_dir, client_config, cvmfs_version
+
+
+def run_cvmfs(config, run, repos):
+  ## 1) loop over different cvmfs versions in different dirs
+  for cvmfs_build_dir in config[run]["cvmfs_build_dirs"]:
+    # install cvmfs version build in directory $cvmfs_build_dir
+    if cvmfs_build_dir.lower() != "rpm":
+      print("Installing CVMFS", cvmfs_build_dir)
+      # benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
+
+    ## 2) loop over different client configs (needs a remount of mountpoint,
+    ##                                        reload is not enough!)
+    for client_config in config[run]["client_configs"]:
+      # run command using cmvfs
+      benchmark_cmds.setClientConfig("/etc/cvmfs/default.local", client_config,
+                                    config["avail_client_configs"])
+      print("\nCVMFS run -", "use autofs:",
+            "true" if config[run]["use_autofs"] else "false")
+
+      if config[run]["use_autofs"] == True:
+        benchmark_cvmfs.clear_and_reload_autofs()
+      else: # version no autofs
+        benchmark_cvmfs.clear_and_mount_direct(repos)
+      print("CVMFS mount points cleared")
+
+      # get cvmfs version
+      #cvmfs_version = "2.12.0.0" #TODO TODO benchmark_cvmfs.getCVMFSVersion()
+      cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
+      yield cvmfs_build_dir, client_config, cvmfs_version
+
+
 if __name__ == "__main__":
 
   print("Start benchmark")
@@ -58,9 +112,11 @@ if __name__ == "__main__":
     if not "run" in run:
       continue
 
-    if config[run]["use_cvmfs"] == True:
-      repos = benchmark_cmds.getReposToMount(config[run]["commands"],
-                                            config["avail_cmds"])
+    print("\n\n---------------------------------------------------")
+    print("---------------------------------------------------")
+    print("RUN", run)
+    print("---------------------------------------------------")
+
     # setup time command
     time_command = "/usr/bin/time -f " + benchmark_time.getTimeFormat()
 
@@ -68,78 +124,74 @@ if __name__ == "__main__":
     if os.path.isdir(config[run]["out_dirname"]) == False:
       os.makedirs(config[run]["out_dirname"])
 
+    if config[run]["use_cvmfs"] == True:
+      # list of repos needed to run in the commands + cvmfs-config.cern.ch
+      repos = benchmark_cmds.getReposToMount(config[run]["commands"],
+                                            config["avail_cmds"])
 
-    ## 1) loop over different cvmfs versions in different dirs
-    for cvmfs_build_dir in config[run]["cvmfs_build_dirs"]:
-      # install cvmfs version build in directory $cvmfs_build_dir
-      if cvmfs_build_dir.lower() != "rpm":
-        print("Installing CVMFS", cvmfs_build_dir)
-        benchmark_cvmfs.installCVMFS(cvmfs_build_dir)
+      if config[run]["unprivileged"] == True:
+        get_combos = run_cvmfs_unprivileged
+        cache_setups = [["hot_cache", ""]]
+      else:
+        get_combos = run_cvmfs
+        cache_setups = [["cold_cache", benchmark_time.wipe_cache],
+                        ["warm_cache", benchmark_time.wipe_kernel_cache],
+                        ["hot_cache", ""]]
+    else: # TODO add privileged/sudo support
+      repos = ""
+      get_combos = run_non_cvmfs
+      cache_setups = [["hot_cache", ""]]
 
-      ## 2) loop over different client configs (needs a remount of mountpoint,
-      ##                                        reload is not enough!)
-      for client_config in config[run]["client_configs"]:
-        # run command using cmvfs
+    for cvmfs_build_dir, client_config, cvmfs_version in get_combos(config, run, repos):
+      print("cvmfs_build_dir", cvmfs_build_dir)
+      print("client_config", client_config)
+      print("CVMFS version", cvmfs_version)
+      print("")
+
+      ## 3) loop over commands
+      for cmd_name in config[run]["commands"]:
+        partial_cmd = config["avail_cmds"][cmd_name]
+        partial_cmd["time"] = time_command
+
         if config[run]["use_cvmfs"] == True:
-          benchmark_cmds.setClientConfig("/etc/cvmfs/default.local", client_config,
-                                        config["avail_client_configs"])
-          print("\nCVMFS run -", "use autofs:",
-                "true" if config[run]["use_autofs"] else "false")
+          show_config = benchmark_cvmfs.getShowConfig(partial_cmd)
+          if partial_cmd["preload-proxy"] == True:
+            print("***", dt.datetime.now(), "preloading CVMFS proxy cache...")
+            benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
+            print("    ", dt.datetime.now(), "...done")
+          else:
+            print("*** skip preload CVMFS proxy")
+        else:
+          show_config = "No CVMFS used"
 
-          if config[run]["use_autofs"] == True:
-            benchmark_cvmfs.clear_and_reload_autofs()
-          else: # version no autofs
-            benchmark_cvmfs.clear_and_mount_direct(repos)
-          print("CVMFS mount points cleared")
+        benchmark_out.writeStats(config, run, cvmfs_build_dir, client_config,
+                                  cmd_name, cvmfs_version, "stats",
+                                  show_config,
+                                  benchmark_cvmfs.getUlimit(),
+                                  benchmark_cvmfs.getUname(), True)
 
-          # get cvmfs version
-          #print("get cvmfs version")
-          #cvmfs_version = "2.12.0.0" #TODO TODO benchmark_cvmfs.getCVMFSVersion()
-          cvmfs_version = benchmark_cvmfs.getCVMFSVersion()
-        else: # non-cvmfs cmd
-          cvmfs_version = "0.0.0"
-        print("CVMFS version", cvmfs_version)
+        ## 4) loop over number of threads
+        for num_threads in config[run]["num_threads"]:
+          print("\n*** Num threads:", num_threads, run, )
 
-        ## 3) loop over commands
-        for cmd_name in config[run]["commands"]:
-          partial_cmd = config["avail_cmds"][cmd_name]
-          partial_cmd["time"] = time_command
+          # dictionaries holding the results
+          start_times = defaultdict()
+          all_data = defaultdict()
+          all_cvmfs_raw_dict = defaultdict()
+          all_dict_tracing = defaultdict()
 
-          print("*** skip preload proxy")
-          #print("***", dt.datetime.now(), "preloading proxy cache...")
-          #benchmark_time.preloadProxy(partial_cmd, max(config[run]["num_threads"]))
-          #print("    ", dt.datetime.now(), "...done")
+          ## 4a) time each command in each cache_setup (cold, warm, hot)
+          for cache_setup in cache_setups:
+            benchmark_time.runBenchmark(config, run, client_config, cmd_name,
+                                num_threads, cache_setup, start_times,
+                                all_data, all_cvmfs_raw_dict, all_dict_tracing)
 
-          benchmark_out.writeStats(config, run, cvmfs_build_dir, client_config,
-                                   cmd_name, cvmfs_version, "stats",
-                                   benchmark_cvmfs.getShowConfig(partial_cmd),
-                                   benchmark_cvmfs.getUlimit(),
-                                   benchmark_cvmfs.getUname(), True)
+          print("Complete run time (incl. loop overhead) in sec: ",
+                (dt.datetime.now() - start_times[cache_setups[0][0]])
+                                                              .total_seconds())
 
-          ## 4) loop over number of threads
-          for num_threads in config[run]["num_threads"]:
-            print("\n*** Num threads:", num_threads, run, )
-
-            # dictionaries holding the results
-            start_times = defaultdict()
-            all_data = defaultdict()
-            all_cvmfs_raw_dict = defaultdict()
-            all_dict_tracing = defaultdict()
-
-            cache_setups = [["cold_cache", benchmark_time.wipe_cache],
-                            ["warm_cache", benchmark_time.wipe_kernel_cache],
-                            ["hot_cache", ""]]
-            ## 4a) time each command in each cache_setup (cold, warm, hot)
-            for cache_setup in cache_setups:
-              benchmark_time.runBenchmark(config, run, client_config, cmd_name,
-                                 num_threads, cache_setup, start_times,
-                                 all_data, all_cvmfs_raw_dict, all_dict_tracing)
-
-            print("Complete run time (incl. loop overhead) in sec: ",
-                  (dt.datetime.now() - start_times[cache_setups[0][0]])
-                                                               .total_seconds())
-
-            ## 4b) write data
-            benchmark_out.writeAllResults(config, run, cvmfs_build_dir,
-                            client_config, cmd_name, num_threads, cvmfs_version,
-                            all_data, all_cvmfs_raw_dict, all_dict_tracing)
+          ## 4b) write data
+          benchmark_out.writeAllResults(config, run, cvmfs_build_dir,
+                          client_config, cmd_name, num_threads, cvmfs_version,
+                          all_data, all_cvmfs_raw_dict, all_dict_tracing,
+                          cache_setups[0][0])

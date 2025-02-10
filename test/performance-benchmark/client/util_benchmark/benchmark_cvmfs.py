@@ -55,7 +55,7 @@ def getUname():
 def getShowConfig(partial_cmd):
   str_showconfig = ""
   for repo in partial_cmd["repos"]:
-    doit = subprocess.Popen("sudo cvmfs_config showconfig " + repo,
+    doit = subprocess.Popen("cvmfs_config showconfig " + repo,
                             universal_newlines=True, shell=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (std_out, stderr) = doit.communicate()

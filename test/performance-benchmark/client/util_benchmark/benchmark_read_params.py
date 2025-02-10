@@ -49,7 +49,8 @@ avail_cmds = {
   "tensorflow" : { "command": "./scripts/50-tensorflow.sh",
                    "repos": [ "sft.cern.ch" ] },
   "root" :       { "command": "./scripts/51-root.sh",
-                   "repos": [ "sft.cern.ch" ] },
+                   "repos": [ "sft.cern.ch" ],
+                   "preload-proxy": true },   // for CVMFS: preload CVMFS cache or not
 }
 """
 
@@ -128,6 +129,14 @@ def verifyCvmfsRun(config, run_name):
         file=sys.stderr)
       exit(22)
 
+    # preload proxy?
+    if (not "preload-proxy" in config["avail_cmds"][cmd].keys()):
+        config["avail_cmds"][cmd]["preload-proxy"] = True
+    elif (type(True) != type(config["avail_cmds"][cmd]["preload-proxy"])):
+      print('Section: "commands" "' + cmd + '": "preload-proxy" is not a boolean',
+            file=sys.stderr)
+      exit(22)
+
     if (not "send-thread-id" in config["avail_cmds"][cmd].keys()):
         config["avail_cmds"][cmd]["send-thread-id"] = False
     elif (type(True) != type(config["avail_cmds"][cmd]["send-thread-id"])):
@@ -179,6 +188,12 @@ def verifyYAML(config):
           print('Section: "' + key + '": "cvmfs_save_raw_results" is not a boolean',
                 file=sys.stderr)
           exit(22)
+      if (not "unprivileged" in config[key].keys()):
+        config[key]["unprivileged"] = False
+      elif (type(True) != type(config[key]["unprivileged"])):
+        print('Section: "' + key + '": "unprivileged" is not a boolean',
+              file=sys.stderr)
+        exit(22)
 
       if config[key]["use_cvmfs"] == True:
         verifyCvmfsRun(config, key)

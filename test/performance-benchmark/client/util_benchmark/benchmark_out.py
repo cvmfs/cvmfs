@@ -78,7 +78,8 @@ def writeStats(config, run, cvmfs_build_dir, client_config, cmd_name,
 
 def writeAllResults(config, run, cvmfs_build_dir, client_config, cmd_name,
                     num_threads, cvmfs_version,
-                    all_data, all_cvmfs_raw_dict, all_dict_tracing):
+                    all_data, all_cvmfs_raw_dict, all_dict_tracing,
+                    first_cache_label):
   # set output name: auto-increment so not to overwrite old results
   # outname = getOutname(cvmfs_build_dir, name, option, num_threads)
   outname = getOutname(cvmfs_build_dir,
@@ -91,21 +92,22 @@ def writeAllResults(config, run, cvmfs_build_dir, client_config, cmd_name,
 
   ## write data
   writeResults(config[run]["out_dirname"], final_outname, all_data, cmd_name,
-               cvmfs_version, num_threads)
+               cvmfs_version, num_threads, first_cache_label)
   if config[run]["use_cvmfs"] == True:
     writeResultsInternalRaw(config[run]["out_dirname"], final_outname,
                             all_cvmfs_raw_dict)
     writeResultsTracing(config[run]["out_dirname"], final_outname,
-                        all_dict_tracing)  
+                        all_dict_tracing)
 
 
-def writeResults(outdir, outname, data, cmd_label, cvmfs_version, num_threads):
+def writeResults(outdir, outname, data, cmd_label, cvmfs_version, num_threads,
+                first_cache_label):
   # Prepare Output
   cmd_label_dict = defaultdict()
   cvmfs_version_dict = defaultdict()
   threads_dict = defaultdict()
 
-  for key in data["cold_cache"].keys():
+  for key in data[first_cache_label].keys():
     cmd_label_dict[key] = cmd_label
     cvmfs_version_dict[key] = cvmfs_version
     threads_dict[key] = num_threads

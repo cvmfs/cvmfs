@@ -37,15 +37,19 @@ def runBenchmark(config, run, client_config, cmd_name, num_threads, cache_setup,
 
   print("    ", cache_label, partial_cmd["command"], client_config)
 
+  is_privileged = True
+  if config[run]["unprivileged"] == True:
+    is_privileged = False
+
   start_times[cache_label] = dt.datetime.now()
   if callable(cache_setup_func):
     dict_cache, dict_full_cvmfs_internals, dict_tracing = \
               timeme(setup=cache_setup_func, arg_setup=config[run]["use_cvmfs"],
-                    stmt=partial(do_thing, partial_cmd, num_threads),
+                    stmt=partial(do_thing, partial_cmd, num_threads, is_privileged),
                     repeat=config[run]["repetitions"])
   else:
     dict_cache, dict_full_cvmfs_internals, dict_tracing = \
-                        timeme(stmt=partial(do_thing, partial_cmd, num_threads),
+                        timeme(stmt=partial(do_thing, partial_cmd, num_threads, is_privileged),
                               repeat=config[run]["repetitions"])
 
   all_data[cache_label] = dict_cache
@@ -154,7 +158,7 @@ def timeme(stmt="", setup="", arg_setup=None, cleanup='', final_cleanup='', repe
   return dict_results, dict_full_cvmfs_internals, dict_tracing
 
 
-def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict_tracing):
+def do_thing(command, num_threads, is_privileged, dict_results, dict_full_cvmfs_internals, dict_tracing):
   # out = subprocess.check_output(command, shell=True)
   doit = []
   time_results_str = []
@@ -211,6 +215,10 @@ def do_thing(command, num_threads, dict_results, dict_full_cvmfs_internals, dict
       for key in dict_time_format.keys():
         if key == line.split(" ")[0]:
           dict_results[key].append(float(line.split(" ")[1].split("%")[0]))
+
+  # quick escape: unprivileged run
+  if is_privileged == False:
+    return dict_results, dict_full_cvmfs_internals, dict_tracing
 
   # internal affairs
   if "repos" in command.keys():

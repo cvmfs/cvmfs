@@ -27,7 +27,7 @@ avail_client_configs:
   trace: 'CVMFS_TRACEFILE=/tmp/cvmfs-benchmark_cvmfs-trace-@fqrn@.log'
 # (MAND)
 # commands that should be available
-# for commands using cvmfs: "repo" must be declared and contain all 
+# for commands using cvmfs: "repo" must be declared and contain all
 #                           cvmfs repos that particular command will access
 #                           (cvmfs-config.cern.ch is automatically added)
 # for commands not using cvmfs: "repo" is ignored, can or cannot be declared
@@ -51,13 +51,14 @@ avail_cmds:
     # optional: adds the <thread-id> (from 0 to num_threads - 1) as parameter to the command
     # default: false
     # e.g. for the 23rd thread call: ./scripts/80-randomread.sh 22
-    send-thread-id: true 
+    send-thread-id: true
+    preload-proxy: false  # do not preload cache as most likely the proxy cache is too small anyway
   sleep:
     command: "sleep 5"
     repos: []
   randomwrites:
     command: "dd if=/dev/urandom of=/dev/null bs=1M count=1200"
-  
+
 
 ################################################################################
 ##              Run options
@@ -68,15 +69,18 @@ avail_cmds:
 #
 # You can have different runs either using only
 # - commands using cvmfs
+# - commands using cvmfs unprivileged (non-sudo)
 # - commands not needing cvmfs
 # IT IS NOT POSSIBLE TO MIX CVMFS AND NON-CVMFS COMMANDS IN THE SAME RUN!
 #
 ################################################################################
+
+####################################################
 #
 # Example run commands that use cvmfs
 #
 ####################################################
-run-1:
+run-cvmfs-1:
   # Optional (default: true), as such can be omitted if running commands using cvmfs
   use_cvmfs: true
   # Optional (default: true), only in combination with cvmfs commands
@@ -110,10 +114,58 @@ run-1:
 
 ####################################################
 #
-# Example run commands that do not use cvmfs
+# Example run commands that use cvmfs in an unprivileged mode (non-sudo)
+#
+# Only benchmarking of "hot cache" is possible
+# and cvmfs internal_affairs metrics cannot be collected
 #
 ####################################################
-run-no-cvmfs-1:
+run-cvmfs-unprivileged-1:
+  # Optional (default: true), as such can be omitted if running commands using cvmfs
+  use_cvmfs: true
+  # Optional (default: false), run cvmfs in unpriveleged mode.
+  # Repos must be premounted or autofs must be used
+  unprivileged: true
+  # Optional (default: true), only in combination with cvmfs commands
+  # Toggles if cvmfs internal affairs should be written as raw output, or not
+  # (the normal results are "just" accumulations over cvmfs internal affairs)
+  # FOR UNPRIVILEGED RUN: NOT POSSIBLE, WILL BE IGNORED
+  cvmfs_save_raw_results: false
+  # (MAND) must be declared in avail_cmds
+  commands: ["tensorflow", "root"]
+  # (MAND) cvmfs build directories that should be used for the benchmarking
+  # if "rpm" is used, then the currently installed version is used
+  # FOR UNPRIVILEGED RUN: at least one entry is needed but will be ignored as
+  # no remount will be performed
+  cvmfs_build_dirs: ["rpm"]
+  # (MAND) must be declard in avail_client_configs, can declare multiple tuples
+  # FOR UNPRIVILEGED RUN: will be ignored
+  client_configs:
+    - ["default"]
+  # (MAND) how many processes of "command" shall be started in parallel
+  num_threads: [1, 64]
+  repetitions: 5   # if not given: defaults to 10
+  use_autofs: true # if not given: defaults to true
+                   # you must make sure beforehand that autofs is in the right status
+  out_dirname: "./mydata/here" # if not given: defaults to ./data/<run-name>
+                               #               here it would be: ./data/run-1/
+  out_name_replacement_of_version: # based on cvmfs_build_dirs name
+    "cvmfs-other/": "pr241"        # (make sure it is a unique part as it matches)
+                                   # for the entire cvmfs_build_dir string
+                                   # otherwise every match will be added
+  # the outnames will be the following for the 2 cvmfs_build_dirs
+  # ./mydata/here/tensorflow_2.11.0.0_default_symlink_64_0.csv
+  # ./mydata/here/tensorflow_2.11.0.0-pr241_default_symlink_64_0.csv
+
+####################################################
+#
+# Example run commands that do not use cvmfs
+#
+# Currently, all non-cvmfs commands are considered to be run UNPRIVILEGED
+# and are only run in "hot cache" mode (no clearing of kernel cache)
+#
+####################################################
+run-non-cvmfs-1:
   # (MAND)
   use_cvmfs: False
   # (MAND) must be declared in avail_cmds
