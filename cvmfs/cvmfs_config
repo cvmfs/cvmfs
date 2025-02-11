@@ -839,10 +839,11 @@ cvmfs_chksetup() {
     fi
   done
 
-  # Check if CVMFS was built without SSL support
+  # Check if CVMFS was built without SSL support (the following line is automatically substituded by CMake)
   ssl_support_disabled=
-  if [[ "x$ssl_support_disabled" = "xYES" ]]; then
+  if [[ "x$ssl_support_disabled" = "xtrue" ]]; then
     echo "Warning: SSL support is disabled. This is experimental and might cause problems"
+    num_warnings=$(($num_warnings+1))
   fi
 
   if [ $(($num_warnings+$num_errors)) -eq 0 ]; then
