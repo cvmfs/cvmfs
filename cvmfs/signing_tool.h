@@ -33,6 +33,7 @@ class SigningTool {
 
   Result Run(const std::string &manifest_path, const std::string &repo_url,
              const std::string &spooler_definition, const std::string &temp_dir,
+             std::string &final_root_hash,
              const std::string &certificate = "",
              const std::string &priv_key = "",
              const std::string &repo_name = "", const std::string &pwd = "",
@@ -43,7 +44,7 @@ class SigningTool {
              const bool bootstrap_shortcuts = false,
              const bool return_early = false,
              const std::vector<shash::Any> reflog_catalogs =
-              std::vector<shash::Any>());
+              std::vector<shash::Any>(), const bool remove_reflog=false, bool omit_manifest_upload = false );
 
  protected:
   void CertificateUploadCallback(const upload::SpoolerResult &result);

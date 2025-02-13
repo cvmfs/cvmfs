@@ -15,6 +15,9 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+CVMFS_EXPORT time_t tick(void); 
+CVMFS_EXPORT time_t tock(time_t tick, const char *str); 
+
 CVMFS_EXPORT
 void vLogCvmfs(const LogSource source, const int mask,
                const char *format, va_list variadic_list);

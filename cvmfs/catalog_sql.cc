@@ -345,6 +345,12 @@ bool CatalogDatabase::InsertInitialValues(
     PrintSqlError("failed to store creation timestamp in the new catalog.");
     return false;
   }
+  if (!this->SetProperty("last_modified_ns", static_cast<uint64_t>(platform_realtime_ns()))) {
+    PrintSqlError("failed to store creation timestamp ns in the new catalog.");
+    return false;
+  }
+
+
 
   // Commit initial filling transaction
   retval = CommitTransaction();

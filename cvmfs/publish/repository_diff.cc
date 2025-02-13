@@ -56,12 +56,13 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   }
   virtual ~DiffForwarder() {}
 
-  virtual void ReportAddition(const PathString& path,
+  virtual bool ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& /* xattrs */,
                               const FileChunkList& /* chunks */)
   {
     listener_->OnAdd(path.ToString(), entry);
+    return true;
   }
 
   virtual void ReportRemoval(const PathString& path,
@@ -120,7 +121,8 @@ void Repository::Diff(const std::string &from, const std::string &to,
   DiffForwarder diff_forwarder(mgr_from, mgr_to, diff_listener);
   if (!diff_forwarder.Init())
     throw EPublish("cannot initialize difference engine");
-  diff_forwarder.Run(PathString());
+  bool fast_path;
+  diff_forwarder.Run(PathString(), PathString(), &fast_path);
 }
 
 }  // namespace publish

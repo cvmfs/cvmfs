@@ -26,6 +26,7 @@ class CatalogDiffTool {
       : repo_path_(""),
         temp_dir_prefix_(""),
         download_manager_(NULL),
+        local_cache_dir_(NULL),
         old_catalog_mgr_(old_catalog_mgr),
         new_catalog_mgr_(new_catalog_mgr),
         needs_setup_(false) {}
@@ -33,12 +34,14 @@ class CatalogDiffTool {
   CatalogDiffTool(const std::string& repo_path, const shash::Any& old_root_hash,
                   const shash::Any& new_root_hash,
                   const std::string& temp_dir_prefix,
-                  download::DownloadManager* download_manager)
+                  download::DownloadManager* download_manager,
+                  const std::string& local_cache_dir = "")
       : repo_path_(repo_path),
         old_root_hash_(old_root_hash),
         new_root_hash_(new_root_hash),
         temp_dir_prefix_(temp_dir_prefix),
         download_manager_(download_manager),
+        local_cache_dir_(local_cache_dir),
         old_raii_temp_dir_(),
         new_raii_temp_dir_(),
         old_catalog_mgr_(),
@@ -49,7 +52,9 @@ class CatalogDiffTool {
 
   bool Init();
 
-  bool Run(const PathString& path);
+  bool Run(const PathString& path, const PathString& lease_path, bool *fast_path);
+
+  bool FastPathDiff(const PathString& lease_path);
 
  protected:
   /**
@@ -87,7 +92,15 @@ class CatalogDiffTool {
    */
   virtual bool IsReportablePath(const PathString& /* path */) { return true; }
 
-  virtual void ReportAddition(const PathString& path,
+  // Note that addition and modification can return false to indicate that
+  // the recursion stops. In the merge tool, this happens at nested catalog
+  // transition points:
+  //  - For a new directory that is a nested catalog, we don't need to recurse
+  //    further but just install that nested catalog in the parent
+  //  - When a nested catalog is replaced, we likewise do not need to recurse
+  //    further into the new nested catalog tree.
+
+  virtual bool ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,
                               const FileChunkList& chunks) = 0;
@@ -117,7 +130,8 @@ class CatalogDiffTool {
                                    const std::string& temp_dir,
                                    const shash::Any& root_hash,
                                    download::DownloadManager* download_manager,
-                                   perf::Statistics* stats);
+                                   perf::Statistics* stats,
+                                   const std::string& local_cache_dir);
 
   void DiffRec(const PathString& path);
 
@@ -127,6 +141,7 @@ class CatalogDiffTool {
   std::string temp_dir_prefix_;
 
   download::DownloadManager* download_manager_;
+  const std::string local_cache_dir_;
 
   perf::Statistics stats_old_;
   perf::Statistics stats_new_;

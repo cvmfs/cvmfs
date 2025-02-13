@@ -27,14 +27,15 @@ SigningTool::~SigningTool() {}
 SigningTool::Result SigningTool::Run(
     const std::string &manifest_path, const std::string &repo_url,
     const std::string &spooler_definition, const std::string &temp_dir,
+    std::string &final_root_hash,
     const std::string &certificate, const std::string &priv_key,
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
     const std::string &proxy,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
-    const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
+    const bool return_early, const std::vector<shash::Any> reflog_catalogs, const bool remove_reflog, bool omit_manifest_upload) {
   shash::Any reflog_hash;
-  if (reflog_chksum_path != "") {
+  if ( !remove_reflog && reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
       return kReflogChecksumMissing;
@@ -71,9 +72,9 @@ SigningTool::Result SigningTool::Run(
 
   // reflog_chksum_path wasn't given, the reflog checksum can possibly be
   // obtained from the manifest
-  if (reflog_chksum_path.empty()) {
+  if (!remove_reflog && reflog_chksum_path.empty()) {
     reflog_hash = manifest->reflog_hash();
-  }
+  } 
 
   // Connect to the spooler
   const upload::SpoolerDefinition sd(spooler_definition,
@@ -85,6 +86,7 @@ SigningTool::Result SigningTool::Run(
   }
 
   UniquePtr<manifest::Reflog> reflog;
+  if(!remove_reflog) {
   if (!reflog_hash.IsNull()) {
     reflog = server_tool_->FetchReflog(&object_fetcher, repo_name, reflog_hash);
     if (!reflog.IsValid()) {
@@ -98,6 +100,7 @@ SigningTool::Result SigningTool::Run(
                "no reflog hash specified but reflog is present");
       return kError;
     }
+  }
   }
 
   // From here on things are potentially put in backend storage
@@ -132,7 +135,7 @@ SigningTool::Result SigningTool::Run(
   }
 
   // Update Reflog database
-  if (reflog.IsValid()) {
+  if (!remove_reflog && reflog.IsValid()) {
     reflog->BeginTransaction();
 
     if (!reflog->AddCatalog(manifest->catalog_hash())) {
@@ -202,14 +205,21 @@ SigningTool::Result SigningTool::Run(
   manifest->set_certificate(certificate_hash);
   manifest->set_repository_name(repo_name);
   manifest->set_publish_timestamp(time(NULL));
+  manifest->set_publish_timestamp_ns(platform_realtime_ns());
   manifest->set_garbage_collectability(garbage_collectable);
   manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
   if (!metainfo_hash.IsNull()) {
     manifest->set_meta_info(metainfo_hash);
   }
-  if (!reflog_hash.IsNull()) {
+  if (!remove_reflog && !reflog_hash.IsNull()) {
     manifest->set_reflog_hash(reflog_hash);
+  } 
+  if(remove_reflog){ 
+    manifest->set_reflog_hash(shash::Any());
   }
+
+
+  final_root_hash = manifest->catalog_hash().ToString();
 
   std::string signed_manifest = manifest->ExportString();
   shash::Any published_hash(manifest->GetHashAlgorithm());
@@ -255,10 +265,18 @@ SigningTool::Result SigningTool::Run(
     return kError;
   }
 
+
+  if(omit_manifest_upload) { 
+     LogCvmfs(kLogCvmfs, kLogSyslog, "Not uploading manifest");
+     return kSuccess; 
+  }
+
   // Upload manifest
+  time_t t1=tick();
   spooler->UploadManifest(manifest_path);
   spooler->WaitForUpload();
-  unlink(manifest_path.c_str());
+  tock(t1, "WaitForUpload on manifest");
+  //unlink(manifest_path.c_str());
   if (spooler->GetNumberOfErrors()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
              spooler->GetNumberOfErrors());

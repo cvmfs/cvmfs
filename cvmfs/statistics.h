@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "util/algorithm.h"
 #include "util/atomic.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -48,6 +49,8 @@ class Counter {
 // perf::Func(Counter) is more clear to read in the code
 inline void Dec(class Counter *counter) { counter->Dec(); }
 inline void Inc(class Counter *counter) { counter->Inc(); }
+inline void Set(class Counter *counter, const int64_t value) { counter->Set(value); }
+inline int64_t Get(class Counter *counter) { return counter->Get(); }
 inline int64_t Xadd(class Counter *counter, const int64_t delta) {
   return counter->Xadd(delta);
 }
@@ -74,6 +77,8 @@ class Statistics {
   std::string PrintJSON();
   void SnapshotCounters(std::map<std::string, int64_t> *counters,
                         uint64_t *timestamp_ns);
+  void AddHistogram(Log2Histogram *hist) { histograms_.push_back(hist); }
+  std::vector<Log2Histogram *> GetHistograms() { return histograms_; }
 
  private:
   Statistics(const Statistics &other);
@@ -89,6 +94,7 @@ class Statistics {
   };
   std::map<std::string, CounterInfo *> counters_;
   mutable pthread_mutex_t *lock_;
+  std::vector<Log2Histogram *> histograms_;
 };
 
 

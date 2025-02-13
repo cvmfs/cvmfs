@@ -71,12 +71,15 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   LoadError LoadCatalog(const PathString  &mountpoint,
                         const shash::Any  &hash,
                         std::string       *catalog_path,
-                        shash::Any        *catalog_hash);
+                        shash::Any        *catalog_hash,
+                        uint64_t          *manifest_age);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
                                   catalog::Catalog *parent_catalog);
   void ActivateCatalog(catalog::Catalog *catalog);
+  virtual void StageNestedCatalogByHash(const shash::Any &hash,
+                                        const PathString &mountpoint);
 
  private:
   LoadError LoadCatalogCas(const shash::Any &hash,

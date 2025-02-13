@@ -563,6 +563,7 @@ if (BUILD_SERVER)
        backoff.cc
        catalog.cc
        catalog_counters.cc
+       catalog_downloader.cc
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_sql.cc
@@ -659,6 +660,7 @@ if (BUILD_SERVER)
        sync_union_aufs.cc
        sync_union_overlayfs.cc
        sync_union_tarball.cc
+       util/lease_path.cc
        upload.cc
        upload_facility.cc
        upload_gateway.cc
@@ -715,6 +717,7 @@ if (BUILD_SERVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_virtual.cc
+       catalog_downloader.cc
        compression.cc
        directory_entry.cc
        gateway_util.cc
@@ -1006,6 +1009,7 @@ if(BUILD_RECEIVER)
        receiver/receiver.cc
        receiver/session_token.cc
        backoff.cc
+       catalog_downloader.cc
        catalog.cc
        catalog_rw.cc
        catalog_counters.cc
@@ -1065,6 +1069,7 @@ if(BUILD_RECEIVER)
        upload_local.cc
        upload_s3.cc
        upload_spooler_definition.cc
+       util/lease_path.cc
        whitelist.cc
        xattr.cc
   )  # CVMFS_RECEIVER_SOURCES

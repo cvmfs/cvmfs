@@ -13,11 +13,14 @@
 namespace receiver {
 
 std::string GetSpoolerTempDir(const std::string& spooler_config);
+std::string GetSpoolerDestDir(const std::string& spooler_config);
 
 struct Params {
   std::string stratum0;
   std::string proxy;
   std::string spooler_configuration;
+  std::string spooler_configuration_fast_path;
+  bool use_local_cache;
   shash::Algorithms hash_alg;
   std::string hash_alg_str;
   zlib::Algorithms compression_alg;
@@ -35,6 +38,7 @@ struct Params {
   size_t max_weight;
   size_t min_weight;
   bool upload_stats_db;
+  bool save_stats;
 };
 
 bool GetParamsFromFile(const std::string& repo_name, Params* params);

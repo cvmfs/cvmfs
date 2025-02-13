@@ -14,10 +14,9 @@
 #include <string>
 
 #include "catalog_mgr.h"
-
-namespace download {
-class DownloadManager;
-}
+#include "util/logging.h"
+#include "util/posix.h"
+#include "network/download.h"
 
 namespace manifest {
 class Manifest;
@@ -27,9 +26,12 @@ namespace perf {
 class Statistics;
 }
 
+class TaskCatalogDownload;
+
 namespace catalog {
 
 class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
+ friend TaskCatalogDownload;
  public:
   SimpleCatalogManager(
     const shash::Any           &base_hash,
@@ -37,19 +39,16 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     const std::string          &dir_temp,
     download::DownloadManager  *download_manager,
     perf::Statistics           *statistics,
-    const bool                  manage_catalog_files = false)
-    : AbstractCatalogManager<Catalog>(statistics)
-    , base_hash_(base_hash)
-    , stratum0_(stratum0)
-    , dir_temp_(dir_temp)
-    , download_manager_(download_manager)
-    , manage_catalog_files_(manage_catalog_files) { }
+    const bool                  manage_catalog_files = false,
+    const std::string           &dir_cache = "",
+    const bool                  copy_to_tmp_dir = false);
 
  protected:
   virtual LoadError LoadCatalog(const PathString  &mountpoint,
                                 const shash::Any  &hash,
                                 std::string       *catalog_path,
-                                shash::Any        *catalog_hash);
+                                shash::Any        *catalog_hash,
+                                uint64_t *manifest_age);
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog           *parent_catalog);
@@ -68,7 +67,23 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
 
+  void EnableMultithreadDownload() {
+    download_manager_->Spawn();
+  }
+
+bool useLocalCache() { return !local_cache_dir_.empty(); }
+
+  std::string                local_cache_dir_;  // absolute path to local cache
+                                                // directory
+  bool                       copy_to_tmp_dir_;  // only relevant if using local
+                                                // cache directory:
+                                                // for writeable catalogs a copy
+                                                // must be created in dir_temp_
+
+
  private:
+  std::string CopyCatalogToTempFile(const std::string &cache_path);
+
   shash::Any                 base_hash_;
   std::string                stratum0_;
   std::string                dir_temp_;

@@ -398,6 +398,9 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
   }
 
+  const JSON* omit_manifest_upload_json =
+      JsonDocument::SearchInObject(req_json->root(), "omit_manifest_upload", JSON_INT);
+
   const JSON* lease_path_json =
       JsonDocument::SearchInObject(req_json->root(), "lease_path", JSON_STRING);
   const JSON* old_root_hash_json = JsonDocument::SearchInObject(
@@ -410,7 +413,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       req_json->root(), "tag_description", JSON_STRING);
 
   if (lease_path_json == NULL || old_root_hash_json == NULL ||
-      new_root_hash_json == NULL) {
+      new_root_hash_json == NULL || lease_path_json == NULL || omit_manifest_upload_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Missing fields in request.");
     return false;
@@ -426,6 +429,14 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   }
   uint64_t final_revision;
 
+  bool remove_reflog = false;
+
+  remove_reflog = getenv( "_CVMFS_DEVEL_REMOVE_REFLOG" );
+
+  LogCvmfs(
+        kLogReceiver, kLogSyslog,
+            "HandleCommit: Remove reflog %d", remove_reflog );
+
   // Here we use the path to commit the changes!
   UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
   proc->SetStatistics(&statistics, start_time);
@@ -435,15 +446,23 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       shash::HexPtr(new_root_hash_json->string_value));
   RepositoryTag repo_tag(tag_name_json->string_value,
                          tag_description_json->string_value);
+
+  bool omit_manifest_upload = omit_manifest_upload_json->int_value;
+
+  if(!getenv("_CVMFS_DEVEL_ELIDE_MANIFEST_UPLOADS_")) { omit_manifest_upload=false; }
+
+  std::string final_root_hash;
+
   CommitProcessor::Result res =
       proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
-                    repo_tag, &final_revision);
+                    repo_tag, &final_revision, final_root_hash, remove_reflog, omit_manifest_upload);
 
   JsonStringGenerator reply_input;
   switch (res) {
     case CommitProcessor::kSuccess:
       reply_input.Add("status", "ok");
       reply_input.Add("final_revision", static_cast<int>(final_revision));
+      reply_input.Add("root_hash", final_root_hash.c_str() );
       break;
     case CommitProcessor::kError:
       reply_input.Add("status", "error");

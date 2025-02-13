@@ -29,6 +29,9 @@
 #include "util/raii_temp_dir.h"
 #include "util/string.h"
 
+extern time_t g_dead_time;
+extern int g_fast_path_diff;
+
 namespace {
 
 PathString RemoveRepoName(const PathString& lease_path) {
@@ -101,7 +104,10 @@ CommitProcessor::~CommitProcessor() {}
 CommitProcessor::Result CommitProcessor::Process(
     const std::string& lease_path, const shash::Any& old_root_hash,
     const shash::Any& new_root_hash, const RepositoryTag& tag,
-    uint64_t *final_revision) {
+    uint64_t *final_revision, std::string &final_root_hash, bool remove_reflog, bool omit_manifest_upload) {
+
+  time_t t1 = tick();
+ 
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
   if (final_tag.HasGenericName()) {
@@ -110,10 +116,10 @@ CommitProcessor::Result CommitProcessor::Process(
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
-           "tag_name: %s, tag_description: %s",
+           "tag_name: %s, tag_description: %s omit_manifest_upload: %d",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
            new_root_hash.ToString(true).c_str(), final_tag.name().c_str(),
-           final_tag.description().c_str());
+           final_tag.description().c_str(), (int) omit_manifest_upload);
 
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
@@ -127,6 +133,13 @@ CommitProcessor::Result CommitProcessor::Process(
         "CommitProcessor - error: Could not get configuration parameters.");
     return kError;
   }
+
+  if(   omit_manifest_upload 
+     && getenv("_CVMFS_DEVEL_UPLOAD_FAST_PATH") 
+     && params.spooler_configuration_fast_path!="" ) {
+     params.spooler_configuration = params.spooler_configuration_fast_path;
+  }
+  LogCvmfs(kLogReceiver, kLogSyslog, "Using spooler configuration [%s]",  params.spooler_configuration.c_str());
 
   UniquePtr<ServerTool> server_tool(new ServerTool());
 
@@ -148,11 +161,19 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   shash::Any manifest_base_hash;
-  UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
-      params.stratum0, repo_name, manifest_base_hash));
 
-  // Current catalog from the gateway machine
-  if (!manifest.IsValid()) {
+  std::string cached_manifest_file =  "/var/spool/cvmfs/" + repo_name + "/cvmfs_receiver_last_manifest";
+  manifest::Manifest *manifest;
+  manifest = manifest::Manifest::LoadFile(cached_manifest_file);
+  if(!manifest) {
+    LogCvmfs(kLogReceiver, kLogSyslog, "No cached manifest - loading from remote" );
+    manifest = server_tool->FetchRemoteManifest(
+      params.stratum0, repo_name, manifest_base_hash);
+  } else {
+    LogCvmfs(kLogReceiver, kLogSyslog, "Using cached manifest" );
+  }
+
+  if (!manifest) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;
@@ -163,10 +184,15 @@ CommitProcessor::Result CommitProcessor::Process(
            lease_path.c_str(),
            manifest->catalog_hash().ToString(false).c_str());
 
+  std::string local_cache_dir_ = "";
+  if (params.use_local_cache) {
+    local_cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
+  }
+
   const std::string spooler_temp_dir =
       GetSpoolerTempDir(params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
-  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0666, true));
+  assert(MkdirDeep(spooler_temp_dir + "/receiver", 0755, true));
   const std::string temp_dir_root =
       spooler_temp_dir + "/receiver/commit_processor";
 
@@ -180,8 +206,8 @@ CommitProcessor::Result CommitProcessor::Process(
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest.weak_ref(),
-                 statistics_);
+                 server_tool->download_manager(), manifest,
+                 statistics_, local_cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Error: Could not initialize the catalog merge tool");
@@ -189,7 +215,8 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   std::string new_manifest_path;
-  if (!merge_tool.Run(params, &new_manifest_path, final_revision)) {
+  bool fast_path_diff;
+  if (!merge_tool.Run(params, &new_manifest_path, final_revision, &fast_path_diff)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;
@@ -200,16 +227,12 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
-  if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
+  if (final_tag.name() != "" && !CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
                     public_key, params.proxy)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Error creating tag: %s",
              final_tag.name().c_str());
     return kError;
   }
-
-  // We need to re-initialize the ServerTool component for signing
-  server_tool.Destroy();
-  server_tool = new ServerTool();
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, signing manifest",
@@ -217,15 +240,18 @@ CommitProcessor::Result CommitProcessor::Process(
 
   // Add C_N root catalog hash to reflog through SigningTool,
   // so garbage collector can later delete it.
+
+  time_t tmp = tick();
+  
   std::vector<shash::Any> reflog_catalogs;
   reflog_catalogs.push_back(new_root_hash);
 
   SigningTool signing_tool(server_tool.weak_ref());
   SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
-      temp_dir, certificate, private_key, repo_name, "", "",
+      temp_dir, final_root_hash, certificate, private_key, repo_name, "", "",
       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum", params.proxy,
-      params.garbage_collection, false, false, reflog_catalogs);
+      params.garbage_collection, false, false, reflog_catalogs, remove_reflog, omit_manifest_upload);
   switch (res) {
     case SigningTool::kReflogChecksumMissing:
       LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -245,67 +271,31 @@ CommitProcessor::Result CommitProcessor::Process(
                "CommitProcessor - lease_path: %s, success.",
                lease_path.c_str());
   }
+  tmp =tick() - tmp;
+  g_dead_time += tmp;
 
-  {
-    UniquePtr<ServerTool> server_tool(new ServerTool());
-
-    if (!server_tool->InitDownloadManager(true, params.proxy)) {
-      LogCvmfs(
-          kLogReceiver, kLogSyslogErr,
-          "CommitProcessor - error: Could not initialize the download manager");
-      return kError;
-    }
-
-    const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
-    const std::string trusted_certs =
-        "/etc/cvmfs/repositories.d/" + repo_name + "/trusted_certs";
-    if (!server_tool->InitVerifyingSignatureManager(public_key,
-                                                    trusted_certs)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - error: Could not initialize the signature "
-               "manager");
-      return kError;
-    }
-
-    shash::Any manifest_base_hash;
-    UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
-        params.stratum0, repo_name, manifest_base_hash));
-
-    LogCvmfs(kLogReceiver, kLogSyslog,
-             "CommitProcessor - lease_path: %s, new root hash: %s",
-             lease_path.c_str(),
-             manifest->catalog_hash().ToString(false).c_str());
-  }
 
   // Ensure CVMFS_ROOT_HASH is not set in
   // /var/spool/cvmfs/<REPO_NAME>/client.local
   const std::string fname = "/var/spool/cvmfs/" + repo_name + "/client.local";
-  if (truncate(fname.c_str(), 0) < 0) {
+  if (truncate(fname.c_str(), 0) < 0 && errno!=ENOENT) {
     LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not truncate %s\n",
              fname.c_str());
     return kError;
   }
 
-  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(repo_name);
-  if (stats_db != NULL) {
-    if (!stats_db->StorePublishStatistics(statistics_, start_time_, true)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-        "Could not store publish statistics");
-    }
-    if (params.upload_stats_db) {
-      upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny);
-      upload::Spooler *spooler = upload::Spooler::Construct(sd);
-      if (!stats_db->UploadStatistics(spooler)) {
-        LogCvmfs(kLogReceiver, kLogSyslogErr,
-          "Could not upload statistics DB to upstream storage");
-      }
-      delete spooler;
-    }
-    delete stats_db;
-
+  // copy the new_manifest to /var/spool in anticipation of the next instantiation
+  bool ret = rename( new_manifest_path.c_str(), cached_manifest_file.c_str() );
+  if(!ret) {
+    LogCvmfs(kLogReceiver, kLogSyslog, "Cached manifest for next run %s", cached_manifest_file.c_str());
   } else {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Could not open statistics DB");
+    LogCvmfs(kLogReceiver, kLogSyslog, "Failed to cache manifest for next run %d", errno );
   }
+  LogCvmfs(kLogReceiver, kLogSyslog, "Revision %lu hash %s", *final_revision, final_root_hash.c_str() );
+  float dead_time = g_dead_time / 1.e6;
+  char buf[100];
+  sprintf(buf, " dead time %0.3f ms %s %s", dead_time, omit_manifest_upload ? "omit_manifest" : "", fast_path_diff ? "fast-path" : "");
+  tock(t1, ("end-to-end time for " + lease_path + buf).c_str() );
 
   return kSuccess;
 }

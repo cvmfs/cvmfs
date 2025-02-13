@@ -71,7 +71,10 @@ struct Statistics {
   perf::Counter *n_lookup_xattrs;
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
+  perf::Counter *n_nested_attached;
+  perf::Counter *n_nested_attached_max;
   perf::Counter *n_detach_siblings;
+  perf::Counter *n_detach_nested;
   perf::Counter *catalog_revision;
 
   explicit Statistics(perf::Statistics *statistics) {
@@ -88,8 +91,14 @@ struct Statistics {
         "Number of listings");
     n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
         "Number of listings of nested catalogs");
+    n_nested_attached = statistics->Register("catalog_mgr.n_nested_attached",
+        "Current number of attached nested catalogs");
+    n_nested_attached_max = statistics->Register("catalog_mgr.n_nested_attached_max",
+        "Maximum number of concurrently attached nested catalogs");
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
+    n_detach_nested = statistics->Register("catalog_mgr.n_detach_nested",
+        "Number of times nested catalogs were detached as a result of cache cleanup");
     catalog_revision = statistics->Register("catalog_revision",
                                     "Revision number of the root file catalog");
   }
@@ -128,7 +137,7 @@ class AbstractCatalogManager : public SingleCopy {
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
-  LoadError Remount(const bool dry_run);
+  LoadError Remount(const bool dry_run, uint64_t *manifest_age=NULL);
   LoadError ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
@@ -177,11 +186,21 @@ class AbstractCatalogManager : public SingleCopy {
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
   uint64_t GetTTL() const;
+  uint64_t GetLastModified() const;
+  uint64_t GetLastModifiedNano() const;
   bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
   std::string PrintAllMemStatistics() const;
+
+  virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
+                                        const PathString & /*mountpoint*/)
+  { }
+  void StageNestedCatalog(const PathString &path, const CatalogT *parent,
+                          bool is_listable);
+
+
 
   /**
    * Get the inode number of the root DirectoryEntry
@@ -216,7 +235,7 @@ class AbstractCatalogManager : public SingleCopy {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
-                                shash::Any   *catalog_hash) = 0;
+                                shash::Any   *catalog_hash, uint64_t *manifest_age) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }

@@ -79,6 +79,12 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
     return kFailOk;
 
   // Load certificate
+  if (getenv("_CVMFS_DEVEL_NO_MANIFEST_SIGNATURE_CHECK_")) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Omitting manifest signature check" );
+    return kFailOk;   
+  } 
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "Making manifest signature check" );
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {

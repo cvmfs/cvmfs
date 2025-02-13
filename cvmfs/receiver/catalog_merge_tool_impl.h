@@ -9,7 +9,6 @@
 
 #include "catalog.h"
 #include "crypto/hash.h"
-#include "lease_path_util.h"
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
@@ -17,6 +16,7 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
+#include "util/lease_path.h"
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -52,7 +52,7 @@ namespace receiver {
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
-    const Params& params, std::string* new_manifest_path, uint64_t *final_rev) {
+    const Params& params, std::string* new_manifest_path, uint64_t *final_rev, bool *fast_path_diff) {
   UniquePtr<upload::Spooler> spooler;
   perf::StatisticsTemplate stats_tmpl("publish", statistics_);
   counters_ = new perf::FsCounters(stats_tmpl);
@@ -65,16 +65,17 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
         params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,
         "dummy_token", "dummy_key");
     spooler = upload::Spooler::Construct(definition, &stats_tmpl);
+    spooler.weak_ref()->Create();
     const std::string temp_dir = raii_temp_dir->dir();
     output_catalog_mgr_ = new RwCatalogMgr(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler.weak_ref(),
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
-        params.use_autocatalogs, params.max_weight, params.min_weight);
+        params.use_autocatalogs, params.max_weight, params.min_weight, local_cache_dir_);
     output_catalog_mgr_->Init();
   }
 
-  bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
+  bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""), lease_path_, fast_path_diff);
 
   ret &= CreateNewManifest(new_manifest_path);
 
@@ -107,7 +108,7 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::IsReportablePath(
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
-void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
+bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     const PathString& path, const catalog::DirectoryEntry& entry,
     const XattrList& xattrs, const FileChunkList& chunks) {
   const PathString rel_path = MakeRelative(path);
@@ -116,9 +117,25 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
       std::strchr(rel_path.c_str(), '/') ? GetParentPath(rel_path).c_str() : "";
 
   if (entry.IsDirectory()) {
-    output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     if (entry.IsNestedCatalogMountpoint()) {
-      output_catalog_mgr_->CreateNestedCatalog(std::string(rel_path.c_str()));
+      // Install the provided nested catalog in the output catalog manager
+      RoCatalogMgr *new_catalog_mgr =
+        CatalogDiffTool<RoCatalogMgr>::GetNewCatalogMgr();
+      PathString mountpoint;
+      shash::Any nested_hash;
+      uint64_t nested_size;
+      const bool found = new_catalog_mgr->LookupNested(
+        path, &mountpoint, &nested_hash, &nested_size);
+      if (!found || !nested_size) {
+        PANIC(kLogSyslogErr,
+              "CatalogMergeTool - nested catalog %s not found. Aborting",
+              rel_path.c_str());
+      }
+      output_catalog_mgr_->GraftNestedCatalog(rel_path.ToString(),
+                                              nested_hash, nested_size);
+      return false;
+    } else {
+      output_catalog_mgr_->AddDirectory(entry, xattrs, parent_path);
     }
     perf::Inc(counters_->n_directories_added);
   } else if (entry.IsRegular() || entry.IsLink()) {
@@ -140,6 +157,7 @@ void CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::ReportAddition(
     }
     perf::Xadd(counters_->sz_added_bytes, static_cast<int64_t>(entry.size()));
   }
+  return true;
 }
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>

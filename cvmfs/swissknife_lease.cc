@@ -84,7 +84,9 @@ int CommandLease::Main(const ArgumentList& args) {
     if (MakeAcquireRequest(key_id, secret, params.lease_path,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
-      LeaseReply rep = ParseAcquireReply(buffer, &session_token);
+      uint64_t current_revision=0;
+      std::string current_root_hash="";
+      LeaseReply rep = ParseAcquireReply(buffer, &session_token, &current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
           {

@@ -16,6 +16,12 @@ std::string GetSpoolerTempDir(const std::string& spooler_config) {
   assert(tokens.size() == 3);
   return tokens[1];
 }
+std::string GetSpoolerDestDir(const std::string& spooler_config) {
+  const std::vector<std::string> tokens = SplitString(spooler_config, ',');
+  assert(tokens.size() == 3);
+  return tokens[2];
+}
+
 
 bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   const std::string repo_config_file =
@@ -58,7 +64,18 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
       return false;
     }
   }
+  if (parser.IsDefined("CVMFS_UPSTREAM_STORAGE_FAST_PATH")) {
+    parser.GetValue("CVMFS_UPSTREAM_STORAGE_FAST_PATH",
+                    &params->spooler_configuration_fast_path);
+  }
 
+
+  std::string use_local_cache_str;
+  if (parser.GetValue("CVMFS_SERVER_CATALOG_CACHE", &use_local_cache_str)) {
+    params->use_local_cache = parser.IsOn(use_local_cache_str);
+  } else {
+    params->use_local_cache = false;
+  }
 
   std::string hash_algorithm_str;
   if (!parser.GetValue("CVMFS_HASH_ALGORITHM", &hash_algorithm_str)) {
@@ -170,6 +187,13 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->upload_stats_db = parser.IsOn(upload_stats_db_str);
   } else {
     params->upload_stats_db = false;
+  }
+
+  std::string save_stats_str;
+  if (parser.GetValue("CVMFS_GATEWAY_SAVE_STATS", &save_stats_str)) {
+    params->save_stats = parser.IsOn(save_stats_str);
+  } else {
+    params->save_stats = true;
   }
 
   return true;

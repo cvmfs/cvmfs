@@ -62,9 +62,9 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('R') != args.end()) {
     reflog_chksum_path = *args.find('R')->second;
   }
-
+  std::string final_root_hash;
   SigningTool signing_tool(this);
-  return signing_tool.Run(manifest_path, repo_url, spooler_definition, temp_dir,
+  return signing_tool.Run(manifest_path, repo_url, spooler_definition, temp_dir, final_root_hash,
                           certificate, priv_key, repo_name, pwd, meta_info,
                           reflog_chksum_path, proxy, garbage_collectable,
                           bootstrap_shortcuts, return_early);

@@ -76,6 +76,10 @@ class CatalogTraversalInfoShim {
   virtual uint64_t GetLastModified(const CatalogT *catalog) {
     return catalog->GetLastModified();
   }
+  virtual uint64_t GetLastModifiedNano(const CatalogT *catalog) {
+    return catalog->GetLastModifiedNano();
+  }
+
 };
 
 

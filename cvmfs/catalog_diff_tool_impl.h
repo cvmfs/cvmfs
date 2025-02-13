@@ -9,6 +9,7 @@
 #include <string>
 
 #include "catalog.h"
+#include "catalog_mgr.h"
 #include "crypto/hash.h"
 #include "network/download.h"
 #include "util/exception.h"
@@ -52,12 +53,14 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =
         OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
-                           old_root_hash_, download_manager_, &stats_old_);
+                           old_root_hash_, download_manager_, &stats_old_,
+                           local_cache_dir_);
 
     // New catalog from release manager machine (before lease)
     new_catalog_mgr_ =
         OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
-                           new_root_hash_, download_manager_, &stats_new_);
+                           new_root_hash_, download_manager_, &stats_new_,
+                           local_cache_dir_);
 
     if (!old_catalog_mgr_.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -74,9 +77,82 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
 }
 
 template <typename RoCatalogMgr>
-bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
-  DiffRec(path);
+bool CatalogDiffTool<RoCatalogMgr>::FastPathDiff(const PathString& lease_path_r) {
+  bool success = false;
 
+  catalog::DirectoryEntry old_dirent_parent;
+  catalog::DirectoryEntry old_dirent;
+  catalog::DirectoryEntry new_dirent;
+
+  bool has_old_dirent_parent;
+  bool has_old_dirent;
+  bool has_new_dirent;
+
+  PathString lease_path= PathString("/" + lease_path_r.ToString());
+  PathString lease_path_parent = GetParentPath(lease_path);
+
+  has_old_dirent_parent = old_catalog_mgr_->LookupPath( lease_path_parent, catalog::kLookupDefault, &old_dirent_parent);
+  has_old_dirent        = old_catalog_mgr_->LookupPath( lease_path, catalog::kLookupDefault, &old_dirent);
+  has_new_dirent        = new_catalog_mgr_->LookupPath( lease_path, catalog::kLookupDefault, &new_dirent);
+
+#if 0
+  LogCvmfs(kLogCvmfs, kLogSyslog, "lease_path_parent %s has_old_dirent_parent %d\n", lease_path_parent.c_str(), has_old_dirent_parent );
+  LogCvmfs(kLogCvmfs, kLogSyslog, "lease_path        %s has_old_dirent        %d\n", lease_path.c_str(), has_old_dirent);
+  LogCvmfs(kLogCvmfs, kLogSyslog, "lease_path        %s has_new_dirent        %d\n", lease_path.c_str(), has_new_dirent);
+
+  if (has_old_dirent_parent) LogCvmfs(kLogCvmfs, kLogSyslog, "old_parent isdir %d isnest %d", old_dirent_parent.IsDirectory(), old_dirent_parent.IsNestedCatalogMountpoint());
+  if (has_old_dirent) LogCvmfs(kLogCvmfs, kLogSyslog, "old isdir %d isnest %d", old_dirent.IsDirectory(), old_dirent.IsNestedCatalogMountpoint());
+  if (has_new_dirent) LogCvmfs(kLogCvmfs, kLogSyslog, "new isdir %d isnest %d", new_dirent.IsDirectory(), new_dirent.IsNestedCatalogMountpoint());
+#endif
+
+  if( !has_old_dirent_parent || !has_new_dirent) { return false; }
+
+  if(   has_old_dirent && old_dirent.IsDirectory() && old_dirent.IsNestedCatalogMountpoint() 
+      && new_dirent.IsDirectory() && new_dirent.IsNestedCatalogMountpoint() ) {
+     // switching from nested catalog to nested catalog
+      FileChunkList chunks;
+      XattrList xattrs;
+      if (new_dirent.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(lease_path, &xattrs);
+      }
+      LogCvmfs(kLogCvmfs, kLogSyslog, "Replacing existing nested catalog for directory %s", lease_path.c_str());
+
+      ReportModification(lease_path, old_dirent, new_dirent, xattrs, chunks);
+      success = true;
+  } else if (   !has_old_dirent && has_new_dirent 
+              && new_dirent.IsDirectory() && new_dirent.IsNestedCatalogMountpoint() ) {
+      // new nested catalog in a parent nested catalog
+      FileChunkList chunks;
+      XattrList xattrs;
+      if (new_dirent.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(lease_path, &xattrs);
+      }
+
+      LogCvmfs(kLogCvmfs, kLogSyslog, "Adding nested catalog for new directory %s", lease_path.c_str());
+      ReportAddition(lease_path, new_dirent, xattrs, chunks);
+      success = true;
+
+  }
+  return success;
+}
+
+template <typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path, const PathString& lease_path, bool *fast_path) {
+  bool fast_path_success = false;
+
+  // first try fast-path for addition of new nested catalog or switching of existing
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CatalogDiffTool::Run: path [%s] lease_path_ [%s]", path.c_str(), lease_path.c_str());
+  if( lease_path != PathString("") ) {
+    LogCvmfs(kLogCvmfs, kLogSyslog, "Trying fast-path diff");
+    fast_path_success = FastPathDiff(lease_path);
+    *fast_path=true;
+  }
+
+  if (!fast_path_success){
+    LogCvmfs(kLogCvmfs, kLogSyslog, "Doing slow-path diff");
+    DiffRec(path);
+    *fast_path=false;
+  }
   return true;
 }
 
@@ -84,9 +160,10 @@ template <typename RoCatalogMgr>
 RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
     const std::string& repo_path, const std::string& temp_dir,
     const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats) {
+    perf::Statistics* stats, const std::string& local_cache_dir) {
   RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
-                                       download_manager, stats, true);
+                                       download_manager, stats, true,
+                                       local_cache_dir);
   mgr->Init();
 
   return mgr;
@@ -99,6 +176,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     assert(!IsReportablePath(path));
     return;
   }
+
+  LogCvmfs(kLogReceiver, kLogDebug, "DiffRec: recursing into %s",
+           path.ToString().c_str());
 
   catalog::DirectoryEntryList old_listing;
   AppendFirstEntry(&old_listing);
@@ -149,22 +229,23 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     new_path.Truncate(length_after_truncate);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
-    XattrList xattrs;
-    if (new_entry.HasXattrs()) {
-      new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
-    }
 
     if (IsSmaller(new_entry, old_entry)) {
       i_to++;
+      bool recurse = new_entry.IsDirectory();
       if (IsReportablePath(new_path)) {
         FileChunkList chunks;
         if (new_entry.IsChunkedFile()) {
           new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                            &chunks);
         }
-        ReportAddition(new_path, new_entry, xattrs, chunks);
+        XattrList xattrs;
+        if (new_entry.HasXattrs()) {
+          new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
+        }
+        recurse &= ReportAddition(new_path, new_entry, xattrs, chunks);
       }
-      if (new_entry.IsDirectory()) {
+      if (recurse) {
         DiffRec(new_path);
       }
       continue;
@@ -182,6 +263,8 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     assert(old_path == new_path);
     i_from++;
     i_to++;
+
+    if (IsIgnoredPath(old_path)) continue;
 
     catalog::DirectoryEntryBase::Differences diff =
         old_entry.CompareTo(new_entry);
@@ -204,22 +287,19 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
+      XattrList xattrs;
+      if (new_entry.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(new_path, &xattrs);
+      }
+
       bool recurse =
         ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
       if (!recurse) continue;
     }
 
-    if (!old_entry.IsDirectory() || !new_entry.IsDirectory()) {
-      if (old_entry.IsDirectory()) {
-        DiffRec(old_path);
-      } else if (new_entry.IsDirectory()) {
-        DiffRec(new_path);
-      }
-      continue;
+    if (old_entry.IsDirectory() || new_entry.IsDirectory()) {
+      DiffRec(old_path);
     }
-
-    // Recursion
-    DiffRec(old_path);
   }
 }
 

@@ -15,11 +15,11 @@
  * the actual Catalog databases.
  *
  * The inode assignment is based on the fact that the number of entries in a
- * catalog do not change (expect on reload). As we do exactly that with the
+ * catalog do not change (except on reload). As we do exactly that with the
  * WritableCatalogManager here, inode numbers derived from WritableCatalogs
  * and the WritableCatalogManager may (and will) be screwed.  This is not an
  * issue in the current implementation, as they are not used in the syncing
- * process.  Just keep in mind.
+ * process. Just keep in mind.
  *
  * The WritableCatalogManager starts with a base repository (given by the
  * root hash), and downloads and uncompresses all required catalogs into
@@ -33,20 +33,22 @@
 #include <stdint.h>
 
 #include <map>
-#include <set>
+#include <list>
+#include <unordered_map>
+#include <unordered_set>
 #include <string>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
+#include "catalog_downloader.h"
 #include "file_chunk.h"
+#include "ingestion/pipeline.h"
 #include "upload_spooler_result.h"
 #include "util/concurrency.h"
 #include "xattr.h"
+#include "upload.h"
 
 class XattrList;
-namespace upload {
-class Spooler;
-}
 
 namespace download {
 class DownloadManager;
@@ -86,7 +88,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          perf::Statistics *statistics,
                          bool is_balanceable,
                          unsigned max_weight,
-                         unsigned min_weight);
+                         unsigned min_weight,
+                         const std::string &dir_cache = "");
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
@@ -130,6 +133,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                            const bool merge = true);
   void SwapNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
                          const uint64_t new_size);
+  void GraftNestedCatalog(const string &mountpoint, const shash::Any &new_hash,
+                          const uint64_t new_size);
   bool IsTransitionPoint(const std::string &mountpoint);
   WritableCatalog *GetHostingCatalog(const std::string &path);
 
@@ -153,6 +158,16 @@ class WritableCatalogManager : public SimpleCatalogManager {
                   "manager because it is not balanceable");
       }
   }
+
+  // JUMP
+  void LoadCatalogs(const std::string &base_path, const std::unordered_set<std::string> &dirs);
+  void SetupSingleCatalogUploadCallback();
+  void RemoveSingleCatalogUploadCallback();
+  void AddCatalogToQueue(const std::string &path);
+  void ScheduleReadyCatalogs();
+  bool LookupDirEntry(const std::string &path,
+                      const LookupOptions options,
+                      DirectoryEntry *dirent);
 
  protected:
   void EnforceSqliteMemLimit() { }
@@ -189,6 +204,15 @@ class WritableCatalogManager : public SimpleCatalogManager {
     bool                 stop_for_tweaks;
   };
 
+  // JUMP
+  struct CatalogDownloadContext {
+    const std::unordered_set<std::string> * dirs;
+  };
+
+  void CatalogDownloadCallback(const CatalogDownloadResult &result,
+                               const CatalogDownloadContext context);
+  void SingleCatalogUploadCallback(const upload::SpoolerResult &result);
+
   CatalogInfo SnapshotCatalogs(const bool stop_for_tweaks);
   void FinalizeCatalog(WritableCatalog *catalog,
                        const bool stop_for_tweaks);
@@ -204,6 +228,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   void CatalogUploadCallback(const upload::SpoolerResult &result,
                              const CatalogUploadContext   clg_upload_context);
+
+  bool CopyCatalogToLocalCache(const upload::SpoolerResult &result);
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
@@ -221,6 +247,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void CatalogUploadSerializedCallback(
     const upload::SpoolerResult &result,
     const CatalogUploadContext unused);
+  void CatalogHashSerializedCallback(
+    const CompressHashResult &result);
   CatalogInfo SnapshotCatalogsSerialized(const bool stop_for_tweaks);
   //****************************************************************************
 
@@ -233,6 +261,14 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   pthread_mutex_t                         *catalog_processing_lock_;
   std::map<std::string, WritableCatalog*>  catalog_processing_map_;
+  std::list<WritableCatalog*>              pending_catalogs_;
+
+  CatalogDownloadPipeline                  *catalog_download_pipeline_;
+  pthread_mutex_t                          *catalog_download_lock_;
+  std::unordered_map<std::string, Catalog*> catalog_download_map_;
+
+  pthread_mutex_t                   *catalog_hash_lock_; 
+  std::map<std::string, shash::Any>  catalog_hash_map_;
 
   // TODO(jblomer): catalog limits should become its own struct
   bool enforce_limits_;

@@ -11,7 +11,7 @@
 #include "util/logging.h"
 
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
-                             std::string *session_token) {
+                             std::string *session_token, uint64_t *current_revision, std::string &current_root_hash) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
@@ -30,6 +30,10 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
+        const JSON *rev  = JsonDocument::SearchInObject(reply->root(), "revision", JSON_INT); //TODO FIXME: make the json lib uint64 aware
+        if(rev!=NULL) { *current_revision = (uint64_t) rev->int_value; }
+        const JSON *hash = JsonDocument::SearchInObject(reply->root(), "root_hash", JSON_STRING);
+        if(hash!=NULL) { current_root_hash = hash->string_value; }
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
                  token->string_value);
         *session_token = token->string_value;
@@ -37,10 +41,10 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
       }
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
-          reply->root(), "time_remaining", JSON_INT);
+          reply->root(), "time_remaining", JSON_STRING);
       if (time_remaining != NULL) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %d s",
-                 time_remaining->int_value);
+        LogCvmfs(kLogCvmfs, kLogStdout, "Path busy. Time remaining = %s",
+                 time_remaining->string_value);
         return kLeaseReplyBusy;
       }
     } else if (status == "error") {

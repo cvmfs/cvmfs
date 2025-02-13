@@ -111,7 +111,8 @@ LoadError ClientCatalogManager::LoadCatalog(
   const PathString  &mountpoint,
   const shash::Any  &hash,
   std::string *catalog_path,
-  shash::Any *catalog_hash)
+  shash::Any *catalog_hash,
+  uint64_t *manifest_age)
 {
   string cvmfs_path = repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
@@ -225,9 +226,12 @@ LoadError ClientCatalogManager::LoadCatalog(
       return success_code;
     }
   }
-  if (!catalog_path)
+  if (!catalog_path) {
+    if(manifest_age) { 
+      *manifest_age = platform_realtime_ns() - manifest_->publish_timestamp_ns();
+    }
     return catalog::kLoadNew;
-
+  }
   // Load new catalog
   catalog::LoadError load_retval =
     LoadCatalogCas(ensemble.manifest->catalog_hash(),
@@ -248,6 +252,10 @@ LoadError ClientCatalogManager::LoadCatalog(
     CacheManager::LabeledObject(ensemble.manifest->certificate(), label),
     ensemble.cert_buf, ensemble.cert_size);
   fetcher_->cache_mgr()->StoreBreadcrumb(*ensemble.manifest);
+
+  if(manifest_age) { 
+    *manifest_age = platform_realtime_ns() - manifest_->publish_timestamp_ns();
+  }
   return catalog::kLoadNew;
 }
 
@@ -350,6 +358,23 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
     perf::Inc(catalog_mgr_->n_certificate_hits_);
   else
     perf::Inc(catalog_mgr_->n_certificate_misses_);
+}
+
+void ClientCatalogManager::StageNestedCatalogByHash(
+  const shash::Any &hash,
+  const PathString &mountpoint)
+{
+  string catalog_descr = "file catalog at " + repo_name_ + ":" +
+    string(mountpoint.GetChars(), mountpoint.GetLength()) +
+    " (" + hash.ToString() + ")";
+
+  assert(hash.suffix == shash::kSuffixCatalog);
+  CacheManager::Label label;
+  label.path = catalog_descr;
+  label.flags = CacheManager::kLabelCatalog;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
+  if (fd >= 0)
+    fetcher_->cache_mgr()->Close(fd);
 }
 
 }  // namespace catalog

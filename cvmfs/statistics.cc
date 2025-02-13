@@ -54,6 +54,7 @@ Statistics *Statistics::Fork() {
     atomic_inc32(&i->second->refcnt);
   }
   child->counters_ = counters_;
+  child->histograms_ = histograms_;
 
   return child;
 }
@@ -139,9 +140,9 @@ string Statistics::PrintJSON() {
 /**
  * Snapshot current state of the counters.
  * Elements will either be updated or inserted into the map.
- * 
+ *
  * Note: This function does NOT clear previous elements part of the map.
- * 
+ *
  * Returns map of the updated counters and the timestamp of the snapshot.
 */
 void Statistics::SnapshotCounters(

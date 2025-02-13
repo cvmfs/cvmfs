@@ -36,6 +36,8 @@
 
 using namespace std;  // NOLINT
 
+CVMFS_EXPORT bool g_log_with_time = false;
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
@@ -70,7 +72,8 @@ const char *module_names[] = {
     "utility",   "glue buffer", "history",      "unionfs",
     "pathspec",  "receiver",    "upload s3",    "upload http",
     "s3fanout",  "gc",          "dns",          "authz",
-    "reflog",    "kvstore",     "telemetry",    "curl"};
+    "reflog",    "kvstore",     "telemetry",    "curl",
+    "jump"};
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
@@ -466,10 +469,20 @@ void vLogCvmfs(const LogSource source, const int mask,
   }
 #endif
 
+  // Get timestamp
+  time_t rawtime;
+  time(&rawtime);
+  struct tm now;
+  localtime_r(&rawtime, &now);
+
   if (mask & kLogStdout) {
     pthread_mutex_lock(&lock_stdout);
     if (mask & kLogShowSource) printf("(%s) ", module_names[source]);
-    printf("%s", msg);
+    if (g_log_with_time) {
+      printf("[%04d-%02d-%02d %02d:%02d:%02d %s] %s", (now.tm_year) + 1900, (now.tm_mon) + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec , now.tm_zone,  msg);
+    } else {
+      printf("%s", msg);
+    }
     if (!(mask & kLogNoLinebreak)) printf("\n");
     fflush(stdout);
     pthread_mutex_unlock(&lock_stdout);
@@ -478,7 +491,11 @@ void vLogCvmfs(const LogSource source, const int mask,
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
     if (mask & kLogShowSource) fprintf(stderr, "(%s) ", module_names[source]);
-    fprintf(stderr, "%s", msg);
+    if (g_log_with_time) { 
+        fprintf(stderr, "[%04d-%02d-%02d %02d:%02d:%02d %s] %s", (now.tm_year) + 1900, (now.tm_mon) + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec , now.tm_zone,  msg);
+    } else {
+        fprintf(stderr, "%s", msg);
+    }
     if (!(mask & kLogNoLinebreak)) fprintf(stderr, "\n");
     fflush(stderr);
     pthread_mutex_unlock(&lock_stderr);
@@ -607,6 +624,20 @@ void LogShutdown() {
   SetLogMicroSyslog("");
   for (unsigned i = 0; i < kMaxCustomlog; ++i)
     SetLogCustomFile(i, "");
+}
+
+CVMFS_EXPORT
+time_t tick(void) {
+  return platform_monotonic_time_ns();
+}
+
+CVMFS_EXPORT
+time_t tock(time_t tick, const char *str) {
+  time_t t2 = platform_monotonic_time_ns();
+  time_t delta = t2 - tick;
+  float delta_ms =  delta /1.e6;
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "* Interval %s:  %.3f ms", str, delta_ms );
+  return t2;
 }
 
 

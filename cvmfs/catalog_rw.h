@@ -27,6 +27,7 @@ class XattrList;
 
 namespace swissknife {
 class CommandMigrate;
+class IngestSQL;
 }
 
 namespace catalog {
@@ -37,6 +38,7 @@ class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
   friend class swissknife::CommandMigrate;  // needed for catalog migrations
   friend class VirtualCatalog;  // needed for /.cvmfs creation
+  friend class swissknife::IngestSQL;
 
  public:
   WritableCatalog(const std::string &path,
@@ -143,6 +145,9 @@ class WritableCatalog : public Catalog {
   void set_dirty_children(const int count) {
     atomic_write32(&dirty_children_, count);
   }
+  int IncrementDirtyChildren() {
+    return atomic_xadd32(&dirty_children_, 1) + 1;
+  }
   int DecrementDirtyChildren() {
     return atomic_xadd32(&dirty_children_, -1) - 1;
   }
@@ -166,8 +171,12 @@ class WritableCatalog : public Catalog {
   mutable atomic_int32 dirty_children_;
 
   inline void SetDirty() {
-    if (!dirty_)
+    if (!dirty_) {
       Transaction();
+      if (HasParent()) {
+        this->GetWritableParent()->IncrementDirtyChildren();
+      }
+    }
     dirty_ = true;
   }
 

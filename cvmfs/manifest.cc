@@ -116,6 +116,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   shash::Any certificate;
   shash::Any history;
   uint64_t publish_timestamp = 0;
+  uint64_t publish_timestamp_ns = 0;
   bool garbage_collectable = false;
   bool has_alt_catalog_path = false;
   shash::Any meta_info;
@@ -136,6 +137,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
                            shash::kSuffixHistory);
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
+  if ((iter = content.find('P')) != content.end())
+    publish_timestamp_ns = String2Uint64(iter->second);
   if ((iter = content.find('G')) != content.end())
     garbage_collectable = (iter->second == "yes");
   if ((iter = content.find('A')) != content.end())
@@ -149,7 +152,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, garbage_collectable,
+                      history, publish_timestamp, publish_timestamp_ns, garbage_collectable,
                       has_alt_catalog_path, meta_info, reflog_hash);
 }
 
@@ -163,6 +166,7 @@ Manifest::Manifest(const shash::Any &catalog_hash,
   , ttl_(catalog::Catalog::kDefaultTTL)
   , revision_(0)
   , publish_timestamp_(0)
+  , publish_timestamp_ns_(0)
   , garbage_collectable_(false)
   , has_alt_catalog_path_(false)
 { }
@@ -196,6 +200,8 @@ string Manifest::ExportString() const {
   if (!reflog_hash_.IsNull()) {
     manifest += "Y" + reflog_hash_.ToString() + "\n";
   }
+  if (publish_timestamp_ns_ > 0)
+    manifest += "P" + StringifyInt(publish_timestamp_ns_) + "\n";
   // Reserved: Z -> for identification of channel tips
 
   return manifest;

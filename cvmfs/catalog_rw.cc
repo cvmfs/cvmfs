@@ -315,6 +315,7 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
  */
 void WritableCatalog::UpdateLastModified() {
   database().SetProperty("last_modified", static_cast<uint64_t>(time(NULL)));
+  database().SetProperty("last_modified_ns", static_cast<uint64_t>(platform_realtime_ns()));
 }
 
 
@@ -788,15 +789,19 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
   }
 
   if (needs_defragmentation) {
+#ifndef BUILD_INGESTSQL
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
              "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
              (IsRoot()) ? "/" : mountpoint().c_str(),
              ratio * 100.0,
              reason.c_str());
+#endif
     if (!db.Vacuum()) {
       PANIC(kLogStderr, "failed (SQLite: %s)", db.GetLastErrorMsg().c_str());
     }
+#ifndef BUILD_INGESTSQL
     LogCvmfs(kLogCatalog, kLogStdout, "done");
+#endif
   }
 }
 

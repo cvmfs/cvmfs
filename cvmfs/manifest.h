@@ -55,6 +55,7 @@ class Manifest {
            const shash::Any certificate,
            const shash::Any history,
            const uint64_t publish_timestamp,
+           const uint64_t publish_timestamp_ns,
            const bool garbage_collectable,
            const bool has_alt_catalog_path,
            const shash::Any &meta_info,
@@ -69,6 +70,7 @@ class Manifest {
   , certificate_(certificate)
   , history_(history)
   , publish_timestamp_(publish_timestamp)
+  , publish_timestamp_ns_(publish_timestamp_ns)
   , garbage_collectable_(garbage_collectable)
   , has_alt_catalog_path_(has_alt_catalog_path)
   , meta_info_(meta_info)
@@ -95,6 +97,9 @@ class Manifest {
   }
   void set_publish_timestamp(const uint32_t publish_timestamp) {
     publish_timestamp_ = publish_timestamp;
+  }
+  void set_publish_timestamp_ns(const uint64_t publish_timestamp_ns) {
+    publish_timestamp_ns_ = publish_timestamp_ns;
   }
   void set_catalog_size(const uint64_t catalog_size) {
     catalog_size_ = catalog_size;
@@ -126,6 +131,10 @@ class Manifest {
   shash::Any certificate() const { return certificate_; }
   shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
+  uint64_t publish_timestamp_ns() const { 
+    if ( publish_timestamp_ns_ > 0 ) {  return publish_timestamp_ns_; }
+    else { return publish_timestamp_ * 1000000000; }
+  }
   bool garbage_collectable() const { return garbage_collectable_; }
   bool has_alt_catalog_path() const { return has_alt_catalog_path_; }
   shash::Any meta_info() const { return meta_info_; }
@@ -153,6 +162,7 @@ class Manifest {
   shash::Any certificate_;
   shash::Any history_;
   uint64_t publish_timestamp_;
+  uint64_t publish_timestamp_ns_;
   bool garbage_collectable_;
 
   /**

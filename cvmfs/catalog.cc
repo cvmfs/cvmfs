@@ -531,10 +531,24 @@ uint64_t Catalog::GetRevision() const {
 }
 
 uint64_t Catalog::GetLastModified() const {
+  MutexLockGuard m(lock_);
   const std::string prop_name = "last_modified";
   return (database().HasProperty(prop_name))
     ? database().GetProperty<int>(prop_name)
     : 0u;
+}
+
+uint64_t Catalog::GetLastModifiedNano() const {
+  MutexLockGuard m(lock_);
+  const std::string prop_name    = "last_modified";
+  const std::string prop_name_ns = "last_modified_ns";
+  if(database().HasProperty(prop_name_ns)) { 
+    return  database().GetProperty<uint64_t>(prop_name_ns);
+  } else if (database().HasProperty(prop_name)) {
+    return  database().GetProperty<uint64_t>(prop_name) * 1000000000;
+  } else {
+    return 0;
+  }
 }
 
 
