@@ -6,6 +6,12 @@
 # General formatting rules: Please just use single word labels as both "-" and
 # "_" are used as separators in the filename. The layout is important as in the
 # visualization the setup is extracted from the filename.
+#
+# You can try out and run:
+# python3 start_benchmark.py -c example_config_run_tensorflow.yaml
+# followed by
+# python3 start_visualization.py -c example_config_visualize_tensorflow.yaml 
+
 
 #################################################
 ##              General options

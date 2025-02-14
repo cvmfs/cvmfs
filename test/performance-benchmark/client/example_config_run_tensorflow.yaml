@@ -1,0 +1,83 @@
+################################################################################
+#       CVMFS Benchmark - Example YAML config
+################################################################################
+# Mandatory parameters are marked with (MAND)
+#
+# General formatting rules: Please just use single word labels as both "-" and
+# "_" are used as separators in the filename. The layout is important as in the
+# visualization the setup is extracted from the filename.
+
+#################################################
+##              General options
+#################################################
+
+avail_client_configs:
+  default:
+    - 'CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"'
+    - 'CVMFS_AUTO_UPDATE=NO'
+    - 'CVMFS_QUOTA_LIMIT=10000'
+avail_cmds:
+  tensorflow-el9:
+    command: "./scripts/50-tensorflow.sh"
+    preload-proxy: false
+    repos: ["sft.cern.ch"]
+  tensorflow-ubuntu22:
+    command: "./scripts/501-tensorflow-ubuntu22.sh"
+    preload-proxy: false
+    repos: ["sft.cern.ch"]
+
+################################################################################
+##              Run options
+################################################################################
+# you can have multiple runs for different
+# command/build/client configs combinations
+# BUT they must always contain something with "run"
+#
+# You can have different runs either using only
+# - commands using cvmfs
+# - commands using cvmfs unprivileged (non-sudo)
+# - commands not needing cvmfs
+# IT IS NOT POSSIBLE TO MIX CVMFS AND NON-CVMFS COMMANDS IN THE SAME RUN!
+#
+################################################################################
+
+cvmfs-unprivileged-1:
+  use_cvmfs: true
+  unprivileged: true
+  cvmfs_save_raw_results: false
+  commands: ["tensorflow-ubuntu22"]
+  cvmfs_build_dirs: ["rpm"]
+  client_configs:
+    - ["default"]
+  num_threads: [2, 4]
+  repetitions: 5   
+  use_autofs: true
+  out_name_replacement_of_version: 
+    "rpm": "run1"        
+
+cvmfs-unprivileged-2:
+  use_cvmfs: true
+  unprivileged: true
+  cvmfs_save_raw_results: false
+  commands: ["tensorflow-ubuntu22"]
+  cvmfs_build_dirs: ["rpm"]
+  client_configs:
+    - ["default"]
+  num_threads: [2, 4]
+  repetitions: 5   
+  use_autofs: true
+  out_name_replacement_of_version: 
+    "rpm": "run2" 
+
+run-cvmfs-1:
+  use_cvmfs: true
+  cvmfs_save_raw_results: false
+  commands: ["tensorflow-ubuntu22"]
+  cvmfs_build_dirs: ["rpm"]
+  client_configs:
+    - ["default"]
+  num_threads: [2, 4]
+  repetitions: 5   
+  use_autofs: true
+  out_name_replacement_of_version: 
+    "rpm": "sudo" 
