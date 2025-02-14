@@ -216,6 +216,16 @@ def initConfig(config):
           config[key][label] += "/"
 
 
+class UniqueKeyLoader(yaml.SafeLoader):
+    def construct_mapping(self, node, deep=False):
+        mapping = set()
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise ValueError("Duplicate key found in YAML: " + key)
+            mapping.add(key)
+        return super().construct_mapping(node, deep)
+
 def getConfig():
   parsed_args = parse_arguments()
 
@@ -230,7 +240,12 @@ def getConfig():
   if (parsed_args.config_file):
     print("\nLoad config:", parsed_args.config_file, "\n")
     with open(parsed_args.config_file, 'r') as file:
-      config = yaml.safe_load(file)
+      try:
+        config = yaml.load(file, Loader=UniqueKeyLoader)
+      except ValueError as e:
+        print("Error while parsing config:", parsed_args.config_file)
+        print(e)
+        exit(4)
   else:
     print("No YAML config file given")
     exit(3)
