@@ -7,19 +7,29 @@
 # <cmd>_<version>-<custom version tag>_<client config 1>_.._<client config n>_<num threads>_<run>.csv
 #
 # e.g.: root_2.11.0.0-bisect_symlink_statfs_kernel_32_0.csv
+#
+# Note: In general plotting section specific parameters will overwrite global ones
+#
+# You can try out and run:
+# python3 start_benchmark.py -c example_config_run_tensorflow.yaml
+# followed by
+# python3 start_visualization.py -c example_config_visualize_tensorflow.yaml 
 
 #################################################
 ##              General options
 #################################################
-# (MAND) directory name of input (= out_dirname used in start_benchmark.py)
-in_dirname: ./data/loadctlg_cmp2/
+# (OPT) list of directories containing the input files
+# (= out_dirname used in start_benchmark.py)
+# IF NOT DEFINED IT MUST BE DEFINED IN A SPECIFIC PLOTTING SECTION
+global_in_dirname: - ./data/loadctlg_cmp2/
 # directory name of output (default: ./results)
-out_dirname: ./results/loadctlg_cmp2/
+# IF NOT DEFINED IT MUST BE DEFINED IN A SPECIFIC PLOTTING SECTION
+global_out_dirname: ./results/loadctlg_cmp2/
 # array of threads used in input (default: use all found)
-num_threads: [10, 32]
+global_num_threads: [10, 32]
 # (MAND) each combination of <version>-<custom version tag> as part of the
 #        filename created by start_benchmark.py needs a separate label
-cvmfs_build_name_labels:
+global_cvmfs_build_name_labels:
   "2.9.4.0": "2.9.4"
   "2.11.0.0-bisect": "2.11.0"
   "2.11.0.0": "2.11.0"
@@ -27,16 +37,63 @@ cvmfs_build_name_labels:
   "2.11.0.0-loadctlg": "load ctlg"
 # (MAND) each different client config used in start_benchmark.py as part of the
 #        filename needs a separate label
-client_config_labels:
+global_client_config_labels:
   "statfs_kernel": "Default"
   "symlink_statfs_kernel": "Symlink Caching"
   "symlink_statfs_kernel_trace": "Symlink Caching (T)"
+
+global_build_name_and_config_labels:
+  "2.11.3.0_default_kernel" : "Default"
+  "2.11.3.0_default_kernel_refcounted" : "Refcounted"
+
+##################################################
+##       Boxplot for cvmfs build and config comparison
+## (= comparison between different cvmfs versions)
+## -- The most useful of the boxplots --
+##################################################
+
+comparison_default_vs_refcounted:
+  # (MAND) type of plot: allowed values:
+  # cvmfs_build_comparison, client_config_comparison, client_and_config_comparison,
+  # scatter_plot, append_to_csv
+  type: "client_and_config_comparison"
+  # (MAND) either here or as global variable
+  # list of directories containing the input files
+  # (= out_dirname used in start_benchmark.py
+  in_dirname: 
+  - ./data/run-default_versions-May21-300GB-tensorflow-nofile536mio/
+  # (MAND) where to write the data to
+  out_dirname: ./results/cvm-perf101/chep24_default_vs_refcounted/
+  # array of threads used in input (default: use all found)
+  num_threads: [1, 141]
+  # build_name_and_config_labels:
+  # (MAND) (it is the file name created by the benchmark tool)
+  build_name_and_config: [
+    "2.11.3.0_default_kernel",
+    "2.11.3.0_default_kernel_refcounted",
+  ]
+  time_metrics: ["real"]
+  # internal_affairs_metrics: ["catalog_mgr.n_lookup_path"]
+  # (MAND) as internal_affairs_metrics is set
+  internal_affairs_repos: ["sft.cern.ch", "cms-ib.cern.ch"]
+  # Optionally can turn off the plot creation
+  plot: True
+  # If you just want the cold cache comparison. Default: False
+  only_plot_cold_cache: False
 
 ##################################################
 ##       Boxplot for cvmfs build comparison
 ## (= comparison between different cvmfs versions)
 ##################################################
-cvmfs_build_comparison:
+some_uuid_to_mark_a_plotting_section_but_with_no_further_use_other_than_that:
+  # (MAND) type of plot: allowed values:
+  # cvmfs_build_comparison, client_config_comparison, client_and_config_comparison,
+  # scatter_plot, append_to_csv
+  type: cvmfs_build_comparison
+  # (MAND) either here or as global variable
+  # list of directories containing the input files
+  # (= out_dirname used in start_benchmark.py
+  in_dirname: - ./data/run-root
   # (MAND) cvmfs build directories that should be compared within the same plot
   cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
   # (MAND) client config for which each a different comparison is created
@@ -60,7 +117,8 @@ cvmfs_build_comparison:
 ##        Boxplot for client config comparison
 ## (= comparison between different cvmfs client configs)
 ########################################################
-client_config_comparison:
+plot_client_config_comparison:
+  type: client_config_comparison
   # (MAND)
   cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
   # (MAND)
@@ -80,7 +138,8 @@ client_config_comparison:
 ##        Scatter plot of single file
 ## (= each repetition is a different measurement point)
 ########################################################
-scatter_plot:
+plot_my_scatter_plot:
+  type: "scatter_plot"
   # (Optional)
   cvmfs_build_names: ["2.11.0.0-bisect", "2.11.0.0-loadctlg"]
   # (Optional)
@@ -98,7 +157,8 @@ scatter_plot:
 ## each metric creates a new entry for
 ## cvmfs_build_names,client_configs-combo
 #########################################################
-append_to_csv:
+append_to_csv_1:
+  type: "append_to_csv"
   # (MAND) CSV outfile. if does not exist it is created,
   #        otherwise appended
   full_out_name: "./data/all_my_data.csv"

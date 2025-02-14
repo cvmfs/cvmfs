@@ -27,3 +27,23 @@ cache_colors_light = [newBlueLight, newOrangeLight, newRedLight]
 colors3_3 = [dark_blue, light_blue, cyan,
              dark_green, med_green, dark_yellow,
              dark_red, light_red, magenta]
+
+cache_colors_dict = {
+                    "cold_cache": newBlue,
+                    "warm_cache": newOrange,
+                    "hot_cache": newRed
+                    }
+
+cache_colors_multi_dict = { 0:  { "cold_cache": dark_blue,
+                                  "warm_cache": dark_green,
+                                  "hot_cache": dark_red
+                                },
+                            1:  { "cold_cache": light_blue,
+                                  "warm_cache": med_green,
+                                  "hot_cache": light_red
+                                },
+                            2:  { "cold_cache": cyan,
+                                  "warm_cache": dark_yellow,
+                                  "hot_cache": magenta
+                                }
+                            }

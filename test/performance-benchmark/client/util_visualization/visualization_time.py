@@ -5,13 +5,22 @@ measurement_label_dict = {
 "system": "System Time (s)",
 "real": "Real Time (s)",
 "user,system,real": "User, System and Real Time (s)",
+"cpu": "CPU Usage (%)",
 "page_faults_major": "#Page Faults: Major",
 "page_faults_minor": "#Page Faults: Minor",
 "page_faults_major, page_faults_minor": "#Page Faults: Major and Minor",
 "cpu": "CPU Usage (%)",
 "involuntary_swap": "#Involuntary Swaps",
 "voluntary_swap": "#Voluntary Swaps",
-"avg_mem_kb": "Average Total Memory Usage In KB"
+"avg_mem_kb": "Average Total Memory Usage In KB",
+"swap": "Swapped out of Main Memory (Count)",
+"nmax_resident_set_size_kb": "Max. Resident Set Size (KB)",
+"avg_resident_size_kb": "Avg. Resident Set Size (KB)",
+"socket_received": "#Socket Messages Received",
+"socket_send": "#Socket Messages Sent",
+"fs_in": "#File System Inputs",
+"fs_out": "#File System Outputs",
+"signals": "#Signals Delivered to Process"
 }
 
 measurement_cvmfs_internal_dict = {
@@ -83,7 +92,7 @@ measurement_cvmfs_internal_dict = {
   "inode_cache.n_update": "Inode cache: #Updates",
   "inode_cache.n_update_value": "Inode cache: #Value changes",
   "inode_cache.sz_allocated": "Inode cache: #Allocated bytes",
-  "inode_cache.sz_size": "Inode cache: Total size in bytes",
+  "inode_cache.sz_size": "Inode cache: Total size",
   "inode_tracker.n_hit_inode": "Inode cache: #Inode lookups",
   "inode_tracker.n_hit_path": "Inode cache: #Successful path lookups",
   "inode_tracker.n_insert": "Inode cache: #Accessed inodes",
@@ -102,7 +111,7 @@ measurement_cvmfs_internal_dict = {
   "md5_path_cache.n_update": "MD5 Path Cache: #Updates",
   "md5_path_cache.n_update_value": "MD5 Path Cache: #Value changes",
   "md5_path_cache.sz_allocated": "MD5 Path Cache: #Allocated bytes ",
-  "md5_path_cache.sz_size": "MD5 Path Cache: Total size in bytes", 
+  "md5_path_cache.sz_size": "MD5 Path Cache: Total size",
   "namestring.n_instances": "#Namestring instances",
   "namestring.n_overflows": "#Namestring overflows",
   "page_cache_tracker.n_insert": "Page Cache: #Added page cache entries",
@@ -120,7 +129,7 @@ measurement_cvmfs_internal_dict = {
   "path_cache.n_update": "Path Cache: #Updates",
   "path_cache.n_update_value": "Path Cache: #Value changes",
   "path_cache.sz_allocated": "Path Cache: #Allocated bytes ",
-  "path_cache.sz_size": "Path Cache: Total size in bytes",
+  "path_cache.sz_size": "Path Cache: Total size",
   "pathstring.n_instances": "#Pathstring instances",
   "pathstring.n_overflows": "#Pathstring overflows",
   "sqlite.n_access": "Sqlite: #Access() calls",
@@ -163,7 +172,7 @@ def getDistincBuilds(files):
   return set(builds)
 
 # filename layout
-# dir/my-command_version-tag_option1_option2_123.csv
+# dir/my-command_version-tag_option1_option2_123_123.csv
 def getDistinctClientConfigs(files):
   options = []
 
@@ -180,6 +189,23 @@ def getDistinctClientConfigs(files):
     options.append(tmp)
 
   return set(options)
+
+def getDistincConfigsAndBuilds(files):
+  builds = []
+
+  for filename in files:
+    #remove dir
+    tmp = str(filename.split("/")[-1])
+
+    # split at first occurences of _
+    tmp = tmp.split("_", 1)[1]
+
+    #split at last occurences of _
+    tmp = tmp.rsplit("_", 2)[0]
+
+    builds.append(tmp)
+
+  return set(builds)
 
 def getDistinctThreads(files):
   num_threads = []
