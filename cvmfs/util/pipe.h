@@ -23,7 +23,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Describes the functionality of a pipe used as a template parameter to
  * the Pipe class. This makes it clear in stack traces which pipe is blocking.
  */
-enum PipeType {
+enum PipeType : uint8_t{
   kPipeThreadTerminator = 0,  // pipe only used to signal a thread to stop
   kPipeWatchdog,
   kPipeWatchdogSupervisor,
@@ -37,7 +37,7 @@ enum PipeType {
 /**
  * Common signals used by pipes
  */
-enum PipeSignals {
+enum PipeSignals : uint8_t {
   kPipeTerminateSignal = 1
 };
 
@@ -209,7 +209,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * Creating a pipe should always succeed.
    */
   void MakePipe(int pipe_fd[2]) {
-    int retval = pipe(pipe_fd);
+    const int retval = pipe(pipe_fd);
     if (retval != 0) {
       PANIC(kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
     }

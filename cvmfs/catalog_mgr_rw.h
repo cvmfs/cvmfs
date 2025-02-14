@@ -29,18 +29,25 @@
 #ifndef CVMFS_CATALOG_MGR_RW_H_
 #define CVMFS_CATALOG_MGR_RW_H_
 
+#include <assert.h>
+#include <bits/pthreadtypes.h>
 #include <pthread.h>
 #include <stdint.h>
 
+#include <cstddef>
 #include <map>
-#include <set>
 #include <string>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
+#include "catalog_virtual.h"
+#include "crypto/hash.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
+#include "shortstring.h"
 #include "upload_spooler_result.h"
 #include "util/future.h"
+#include "util/logging.h"
 #include "xattr.h"
 
 class XattrList;
@@ -114,7 +121,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void Clone(const std::string from, const std::string to);
+  void Clone(const std::string &from, const std::string &to);
   void CloneTree(const std::string &from_dir, const std::string &to_dir);
 
   // Hardlink group handling
@@ -171,7 +178,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
  private:
   bool FindCatalog(const std::string  &path,
                    WritableCatalog   **result,
-                   DirectoryEntry     *dirent = NULL);
+                   DirectoryEntry     *dirent = nullptr);
   void DoBalance();
   void FixWeight(WritableCatalog *catalog);
 

@@ -18,7 +18,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-enum LogFacilities {
+enum LogFacilities : uint16_t {
   kLogDebug = 0x01,
   kLogStdout = 0x02,
   kLogStderr = 0x04,
@@ -55,7 +55,7 @@ struct CVMFS_EXPORT DefaultLogging {
   static LogFacilities error;  // default kLogStderr
 };
 
-enum LogFlags {
+enum LogFlags : uint16_t {
   kLogNoLinebreak = 0x200,
   kLogShowSource  = 0x400,
   kLogSensitive   = 0x800,  ///< Don't add the line to the memory log buffer
@@ -73,7 +73,7 @@ enum LogLevels {
  * Changes in this enum must be done in logging.cc as well!
  * (see const char *module_names[] = {....})
  */
-enum LogSource {
+enum LogSource : uint8_t {
   kLogCache = 1,
   kLogCatalog,
   kLogSql,

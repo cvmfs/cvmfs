@@ -31,7 +31,7 @@ class InterruptCue;
 
 namespace download {
 
-enum DataTubeAction {
+enum DataTubeAction : uint8_t {
   kActionStop = 0,
   kActionContinue,
   kActionDecompress

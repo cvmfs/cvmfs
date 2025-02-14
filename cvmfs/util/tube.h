@@ -50,7 +50,7 @@ class Tube : SingleCopy {
     Link *prev_;
   };
 
-  Tube() : limit_(uint64_t(-1)), size_(0) { Init(); }
+  Tube() : limit_(static_cast<uint64_t>(-1)), size_(0) { Init(); }
   explicit Tube(uint64_t limit) : limit_(limit), size_(0) {
     Init();
   }

@@ -131,7 +131,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
     std::string url;
   };
 
-  enum ProxySetModes {
+  enum ProxySetModes : uint8_t {
     kSetProxyRegular = 0,
     kSetProxyFallback,
     kSetProxyBoth,

@@ -86,7 +86,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 
   const int anonymous_fd = -1;
   const off_t offset = 0;
-  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
+  const size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
   unsigned char *mem = NULL;
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
@@ -114,8 +114,8 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 static inline void __attribute__((used)) smunmap(void *mem) {
   unsigned char *area = static_cast<unsigned char *>(mem);
   area = area - sizeof(size_t);
-  size_t pages = *(reinterpret_cast<size_t *>(area));
-  int retval = munmap(area-sizeof(size_t), pages*4096);
+  const size_t pages = *(reinterpret_cast<size_t *>(area));
+  const int retval = munmap(area-sizeof(size_t), pages*4096);
   // printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
   assert((retval == 0) && "Invalid umnmap");
 }
@@ -152,7 +152,7 @@ static inline void * __attribute__((used)) sxmmap(size_t size) {
  * Free memory acquired by sxmmap.
  */
 static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
-  int retval = munmap(mem, size);
+  const int retval = munmap(mem, size);
   assert((retval == 0) && "Invalid umnmap");
 }
 
@@ -162,7 +162,7 @@ static inline void __attribute__((used)) sxunmap(void *mem, size_t size) {
  * of 2MB.
  */
 static inline void * __attribute__((used)) sxmmap_align(size_t size) {
-  assert((size % (2 * 1024 * 1024)) == 0);
+  assert((size % static_cast<size_t>(2 * 1024 * 1024)) == 0);
   char *mem = NULL;
 #ifdef CVMFS_SUPPRESS_ASSERTS
   do {
@@ -172,10 +172,10 @@ static inline void * __attribute__((used)) sxmmap_align(size_t size) {
   } while (mem == MAP_FAILED);
 #endif
 
-  uintptr_t head = size - (uintptr_t(mem) % size);
+  const uintptr_t head = size - (reinterpret_cast<const uintptr_t>(mem) % size);
   sxunmap(mem, head);
   mem += head;
-  uintptr_t tail = size - head;
+  const uintptr_t tail = size - head;
   if (tail > 0)
     sxunmap(mem + size, tail);
   return mem;

@@ -12,14 +12,14 @@
 namespace download {
 
 // Return values of the sharding policy classes (including custom classes)
-enum ShardingPolicyReturn {
+enum ShardingPolicyReturn : uint8_t{
   kShardingPolicySucess = 0,
   kShardingPolicyProxySwitch,
   kShardingPolicyProxyFail
 };
 
 // List of available custom ShardingPolicy classes
-enum ShardingPolicySelector {
+enum ShardingPolicySelector : uint8_t {
   kShardingPolicyExternal
 };
 

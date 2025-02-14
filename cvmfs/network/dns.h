@@ -25,7 +25,7 @@ namespace dns {
 /**
  * Possible errors when trying to resolve a host name.
  */
-enum Failures {
+enum Failures : uint8_t {
   kFailOk = 0,
   kFailInvalidResolvers,
   kFailTimeout,
@@ -43,7 +43,7 @@ enum Failures {
 /**
  * Steers IP protocol selection.
  */
-enum IpPreference {
+enum IpPreference : uint8_t {
   // use system default, currently unused and mapped to IPv4
   kIpPreferSystem = 0,
   kIpPreferV4,

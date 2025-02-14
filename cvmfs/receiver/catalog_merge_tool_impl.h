@@ -5,18 +5,19 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 
+#include <assert.h>
+
 #include <string>
 
-#include "catalog.h"
-#include "crypto/hash.h"
-#include "lease_path_util.h"
-#include "manifest.h"
-#include "options.h"
-#include "upload.h"
+#include "directory_entry.h"
+#include "file_chunk.h" // NOLINT(misc-include-cleaner)
+#include "receiver/lease_path_util.h" // NOLINT(misc-include-cleaner)
+#include "receiver/params.h" // NOLINT(misc-include-cleaner)
+#include "shortstring.h"
+#include "upload.h" // NOLINT(misc-include-cleaner)
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/posix.h"
-#include "util/raii_temp_dir.h"
+#include "xattr.h" // NOLINT(misc-include-cleaner)
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;

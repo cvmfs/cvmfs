@@ -38,7 +38,7 @@ class Prng {
 
   void InitLocaltime() {
     struct timeval tv_now;
-    int retval = gettimeofday(&tv_now, NULL);
+    const int retval = gettimeofday(&tv_now, NULL);
     assert(retval == 0);
     state_ = tv_now.tv_usec;
   }
@@ -48,7 +48,7 @@ class Prng {
    */
   uint32_t Next(const uint64_t boundary) {
     state_ = a*state_ + c;
-    double scaled_val =
+    const double scaled_val =
       static_cast<double>(state_) * static_cast<double>(boundary) /
       static_cast<double>(18446744073709551616.0);
     return static_cast<uint32_t>(static_cast<uint64_t>(scaled_val) % boundary);
@@ -59,7 +59,7 @@ class Prng {
    */
   double NextDouble() {
     state_ = a*state_ + c;
-    double unit_val = static_cast<double>(state_) /
+    const double unit_val = static_cast<double>(state_) /
       static_cast<double>(18446744073709551616.0);
     return unit_val;
   }
@@ -70,7 +70,7 @@ class Prng {
    */
   double NextNormal() {
     double z, u1, u2;
-    double pi = atan(1) * 4;
+    const double pi = atan(1) * 4;
     u1 = NextDouble();
     u2 = NextDouble();
     z = sqrt(-2.0 * log(u1)) * cos(2 * pi * u2);

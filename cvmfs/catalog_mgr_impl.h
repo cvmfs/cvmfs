@@ -1093,7 +1093,7 @@ void AbstractCatalogManager<CatalogT>::DetachCatalog(CatalogT *catalog) {
     catalog->parent()->RemoveChild(catalog);
 
   ReleaseInodes(catalog->inode_range());
-  UnloadCatalog(catalog);
+  UnloadCatalog(catalog); // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
 
   // Delete catalog from internal lists
   typename CatalogList::iterator i;

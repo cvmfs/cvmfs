@@ -2,27 +2,48 @@
  * This file is part of the CernVM file system.
  */
 
-#define __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS // NOLINT(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp)
 
 #include "catalog_mgr_rw.h"
 
+#include <bits/pthreadtypes.h>
 #include <inttypes.h>
+#include <pthread.h>
+#include <time.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <string>
 
+#include "catalog.h"
 #include "catalog_balancer.h"
+#include "catalog_counters.h"
+#include "catalog_mgr.h"
+#include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
+#include "catalog_sql.h"
+#include "compression.h"
+#include "crypto/hash.h"
+#include "directory_entry.h"
+#include "file_chunk.h"
 #include "manifest.h"
+#include "shortstring.h"
 #include "statistics.h"
 #include "upload.h"
+#include "upload_spooler_result.h"
 #include "util/exception.h"
+#include "util/future.h"
+#include "util/mutex.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -111,9 +132,9 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   upload::Spooler   *spooler)
 {
   // Create a new root catalog at file_path
-  string file_path = dir_temp + "/new_root_catalog";
+  const string file_path = dir_temp + "/new_root_catalog";
 
-  shash::Algorithms hash_algorithm = spooler->GetHashAlgorithm();
+  const shash::Algorithms hash_algorithm = spooler->GetHashAlgorithm();
 
   // A newly created catalog always needs a root entry
   // we create and configure this here
@@ -126,11 +147,11 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.gid_               = getgid();
   root_entry.checksum_          = shash::Any(hash_algorithm);
   root_entry.linkcount_         = 2;
-  string root_path = "";
+  const string root_path = "";
 
   // Create the database schema and the initial root entry
   {
-    UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(file_path));
+    const UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(file_path));
     if (!new_clg_db.IsValid() ||
         !new_clg_db->InsertInitialValues(root_path,
                                          volatile_content,
@@ -144,14 +165,14 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   }
 
   // Compress root catalog;
-  int64_t catalog_size = GetFileSize(file_path);
+  const int64_t catalog_size = GetFileSize(file_path);
   if (catalog_size < 0) {
     unlink(file_path.c_str());
     return NULL;
   }
-  string file_path_compressed = file_path + ".compressed";
+  const string file_path_compressed = file_path + ".compressed";
   shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
-  bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
+  const bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogStderr, "compression of catalog '%s' failed",
@@ -162,7 +183,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   unlink(file_path.c_str());
 
   // Create manifest
-  const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
   if (!voms_authz.empty()) {
@@ -204,7 +224,7 @@ bool WritableCatalogManager::FindCatalog(const string     &path,
     AbstractCatalogManager<Catalog>::FindCatalog(ps_path);
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
-  bool retval =
+  const bool retval =
     MountSubtree(ps_path, best_fit, true /* is_listable */, &catalog);
   if (!retval)
     return false;
@@ -213,7 +233,7 @@ bool WritableCatalogManager::FindCatalog(const string     &path,
   if (NULL == dirent) {
     dirent = &dummy;
   }
-  bool found = catalog->LookupPath(ps_path, dirent);
+  const bool found = catalog->LookupPath(ps_path, dirent);
   if (!found || !catalog->IsWritable())
     return false;
 
@@ -226,7 +246,7 @@ WritableCatalog *WritableCatalogManager::GetHostingCatalog(
   const std::string &path)
 {
   WritableCatalog *result = NULL;
-  bool retval = FindCatalog(MakeRelativePath(path), &result, NULL);
+  const bool retval = FindCatalog(MakeRelativePath(path), &result, NULL);
   if (!retval) return NULL;
   return result;
 }
@@ -294,8 +314,8 @@ void WritableCatalogManager::RemoveDirectory(const std::string &path) {
  * repository
  * @return void
  */
-void WritableCatalogManager::Clone(const std::string destination,
-                                   const std::string source) {
+void WritableCatalogManager::Clone(const std::string &destination,
+                                   const std::string &source) {
   const std::string relative_source = MakeRelativePath(source);
 
   DirectoryEntry source_dirent;
@@ -310,7 +330,7 @@ void WritableCatalogManager::Clone(const std::string destination,
 
   // if the file is already there we remove it and we add it back
   DirectoryEntry check_dirent;
-  bool destination_already_present =
+  const bool destination_already_present =
       LookupPath(MakeRelativePath(destination), kLookupDefault, &check_dirent);
   if (destination_already_present) {
     this->RemoveFile(destination);
@@ -340,8 +360,9 @@ void WritableCatalogManager::CloneTree(const std::string &from_dir,
                                        const std::string &to_dir)
 {
   // Sanitize input paths
-  if (from_dir.empty() || to_dir.empty())
+  if (from_dir.empty() || to_dir.empty()) {
     PANIC(kLogStderr, "clone tree from or to root impossible");
+  }
 
   const std::string relative_source = MakeRelativePath(from_dir);
   const std::string relative_dest = MakeRelativePath(to_dir);
@@ -393,7 +414,7 @@ void WritableCatalogManager::CloneTreeImpl(
 {
   LogCvmfs(kLogCatalog, kLogDebug, "cloning %s --> %s/%s", source_dir.c_str(),
            dest_parent_dir.c_str(), dest_name.ToString().c_str());
-  PathString relative_source(MakeRelativePath(source_dir.ToString()));
+  const PathString relative_source(MakeRelativePath(source_dir.ToString()));
 
   DirectoryEntry source_dirent;
   bool retval = LookupPath(relative_source, kLookupDefault, &source_dirent);
@@ -449,7 +470,7 @@ void WritableCatalogManager::CloneTreeImpl(
 
     if (ls[i].IsChunkedFile()) {
       FileChunkList chunks;
-      std::string relative_sub_path = MakeRelativePath(sub_path.ToString());
+      const std::string relative_sub_path = MakeRelativePath(sub_path.ToString());
       retval = ListFileChunks(
         PathString(relative_sub_path), ls[i].hash_algorithm(), &chunks);
       assert(retval);
@@ -530,7 +551,7 @@ void WritableCatalogManager::AddFile(
   assert(entry.IsRegular() || !entry.IsExternalFile());
 
   // check if file is too big
-  unsigned mbytes = entry.size() / (1024 * 1024);
+  const unsigned mbytes = entry.size() / static_cast<uint64_t>(1024 * 1024);
   if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "%s: file at %s is larger than %u megabytes (%u). "
@@ -538,9 +559,10 @@ void WritableCatalogManager::AddFile(
              "Please remove the file or increase the limit.",
              enforce_limits_ ? "FATAL" : "WARNING", file_path.c_str(),
              file_mbyte_limit_, mbytes);
-    if (enforce_limits_)
+    if (enforce_limits_) {
       PANIC(kLogStderr, "file at %s is larger than %u megabytes (%u).",
             file_path.c_str(), file_mbyte_limit_, mbytes);
+      }
   }
 
   catalog->AddEntry(entry, xattrs, file_path, parent_path);
@@ -609,7 +631,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   const string parent_path = MakeRelativePath(parent_directory);
 
   // check if hard link is too big
-  unsigned mbytes = entries[0].size() / (1024 * 1024);
+  const unsigned mbytes = entries[0].size() / static_cast<uint64_t>(1024 * 1024);
   if ((file_mbyte_limit_ > 0) && (mbytes > file_mbyte_limit_)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "%s: hard link at %s is larger than %u megabytes (%u). "
@@ -619,10 +641,11 @@ void WritableCatalogManager::AddHardlinkGroup(
              (parent_path + entries[0].name().ToString()).c_str(),
              file_mbyte_limit_,
              mbytes);
-    if (enforce_limits_)
+    if (enforce_limits_) {
       PANIC(kLogStderr, "hard link at %s is larger than %u megabytes (%u)",
             (parent_path + entries[0].name().ToString()).c_str(),
             file_mbyte_limit_, mbytes);
+      }
   }
 
   SyncLock();
@@ -635,7 +658,7 @@ void WritableCatalogManager::AddHardlinkGroup(
 
   // Get a valid hardlink group id for the catalog the group will end up in
   // TODO(unknown): Compaction
-  uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
+  const uint32_t new_group_id = catalog->GetMaxLinkId() + 1;
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "hardlink group id %u issued",
            new_group_id);
   assert(new_group_id > 0);
@@ -716,7 +739,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
 
   // first check if we really have a nested catalog transition point
   catalog::DirectoryEntry potential_transition_point;
-  PathString transition_path(entry_path.data(), entry_path.length());
+  const PathString transition_path(entry_path.data(), entry_path.length());
   bool retval = catalog->LookupPath(transition_path,
                                     &potential_transition_point);
   assert(retval);
@@ -827,7 +850,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
     const Counters &grand_counters = grand_catalog->GetCounters();
     grand_counters.AddAsSubtree(&fix_subtree_counters);
   }
-  DeltaCounters save_counters = wr_new_catalog->delta_counters_;
+  const DeltaCounters save_counters = wr_new_catalog->delta_counters_;
   wr_new_catalog->delta_counters_ = fix_subtree_counters;
   wr_new_catalog->UpdateCounters();
   wr_new_catalog->delta_counters_ = save_counters;
@@ -944,7 +967,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
             "failed to swap nested catalog '%s': not found in parent",
             nested_root_path.c_str());
     }
-    UniquePtr<Catalog> old_free_catalog(
+    const UniquePtr<Catalog> old_free_catalog(
       LoadFreeCatalog(nested_root_ps, old_hash));
     if (!old_free_catalog.IsValid()) {
       SyncUnlock();
@@ -956,7 +979,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   }
 
   // Load freely attached new catalog
-  UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
+  const UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
     SyncUnlock();
     PANIC(kLogStderr,
@@ -996,7 +1019,7 @@ void WritableCatalogManager::SwapNestedCatalog(const string &mountpoint,
   parent->TouchEntry(dirent, xattrs, nested_root_path);
 
   // Update counters
-  DeltaCounters delta = Counters::Diff(old_counters,
+  const DeltaCounters delta = Counters::Diff(old_counters,
                                        new_catalog->GetCounters());
   delta.PopulateToParent(&parent->delta_counters_);
 
@@ -1026,7 +1049,7 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
   assert(!nested_root_path.empty());
 
   // Load freely attached new catalog
-  UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
+  const UniquePtr<Catalog> new_catalog(LoadFreeCatalog(nested_root_ps, new_hash));
   if (!new_catalog.IsValid()) {
     PANIC(kLogStderr,
           "failed to graft nested catalog '%s': failed to load new catalog",
@@ -1092,8 +1115,8 @@ void WritableCatalogManager::GraftNestedCatalog(const string &mountpoint,
     nested_root_path, NULL, new_hash, new_size);
 
   // Fix-up counters
-  Counters counters;
-  DeltaCounters delta = Counters::Diff(counters, new_catalog->GetCounters());
+  const Counters counters;
+  const DeltaCounters delta = Counters::Diff(counters, new_catalog->GetCounters());
   delta.PopulateToParent(&parent_catalog->delta_counters_);
 
   SyncUnlock();
@@ -1163,10 +1186,12 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
 
   // do the actual catalog snapshotting and upload
   CatalogInfo root_catalog_info;
-  if (getenv("_CVMFS_SERIALIZED_CATALOG_PROCESSING_") == NULL)
+  if (getenv("_CVMFS_SERIALIZED_CATALOG_PROCESSING_") == NULL) {
     root_catalog_info = SnapshotCatalogs(stop_for_tweaks);
-  else
+  }
+  else {
     root_catalog_info = SnapshotCatalogsSerialized(stop_for_tweaks);
+  }
   if (spooler_->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalogs");
     return false;
@@ -1237,7 +1262,7 @@ WritableCatalogManager::CatalogInfo WritableCatalogManager::SnapshotCatalogs(
   }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
-  CatalogInfo& root_catalog_info = root_catalog_info_future.Get();
+  const CatalogInfo& root_catalog_info = root_catalog_info_future.Get();
   spooler_->WaitForUpload();
 
   spooler_->UnregisterListeners();
@@ -1281,10 +1306,10 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   catalog->Commit();
 
   // check if catalog has too many entries
-  uint64_t catalog_limit = uint64_t(1000) *
-    uint64_t((catalog->IsRoot()
+  const uint64_t catalog_limit = static_cast<uint64_t>(1000) *
+    static_cast<uint64_t>(catalog->IsRoot()
               ? root_kcatalog_limit_
-              : nested_kcatalog_limit_));
+              : nested_kcatalog_limit_);
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
     LogCvmfs(kLogCatalog, kLogStderr,
@@ -1294,10 +1319,11 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
              enforce_limits_ ? "FATAL" : "WARNING",
              (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
              catalog_limit, catalog->GetCounters().GetSelfEntries());
-    if (enforce_limits_)
+    if (enforce_limits_) {
       PANIC(kLogStderr, "catalog at %s has more than %u entries (%u). ",
             (catalog->IsRoot() ? "/" : catalog->mountpoint().c_str()),
             catalog_limit, catalog->GetCounters().GetSelfEntries());
+      }
   }
 
   // allow for manual adjustments in the catalog
@@ -1305,7 +1331,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
     LogCvmfs(kLogCatalog, kLogStdout, "Allowing for tweaks in %s at %s "
                                       "(hit return to continue)",
              catalog->database_path().c_str(), catalog->mountpoint().c_str());
-    int read_char = getchar();
+    const int read_char = getchar();
     assert(read_char != EOF);
   }
 
@@ -1317,7 +1343,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
 void WritableCatalogManager::ScheduleCatalogProcessing(
                                                      WritableCatalog *catalog) {
   {
-    MutexLockGuard guard(catalog_processing_lock_);
+    const MutexLockGuard guard(catalog_processing_lock_);
     // register catalog object for WritableCatalogManager::CatalogUploadCallback
     catalog_processing_map_[catalog->database_path()] = catalog;
   }
@@ -1337,14 +1363,14 @@ void WritableCatalogManager::CatalogUploadCallback(
   // see WritableCatalogManager::ScheduleCatalogProcessing()
   WritableCatalog *catalog = NULL;
   {
-    MutexLockGuard guard(catalog_processing_lock_);
-    std::map<std::string, WritableCatalog*>::iterator c =
+    const MutexLockGuard guard(catalog_processing_lock_);
+    const std::map<std::string, WritableCatalog*>::iterator c =
       catalog_processing_map_.find(result.local_path);
     assert(c != catalog_processing_map_.end());
     catalog = c->second;
   }
 
-  uint64_t catalog_size = GetFileSize(result.local_path);
+  const uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
   SyncLock();
@@ -1444,11 +1470,11 @@ void WritableCatalogManager::FixWeight(WritableCatalog* catalog) {
              "Deleting an autogenerated catalog in '%s'",
              catalog->mountpoint().c_str());
     // Remove the .cvmfscatalog and .cvmfsautocatalog files first
-    string path = catalog->mountpoint().ToString();
+    const string path = catalog->mountpoint().ToString();
     catalog->RemoveEntry(path + "/.cvmfscatalog");
     catalog->RemoveEntry(path + "/.cvmfsautocatalog");
     // Remove the actual catalog
-    string catalog_path = catalog->mountpoint().ToString().substr(1);
+    const string catalog_path = catalog->mountpoint().ToString().substr(1);
     RemoveNestedCatalog(catalog_path);
   } else if (catalog->GetNumEntries() > max_weight_) {
     CatalogBalancer<WritableCatalogManager> catalog_balancer(this);
@@ -1493,7 +1519,7 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
 
 void WritableCatalogManager::CatalogUploadSerializedCallback(
   const upload::SpoolerResult &result,
-  const CatalogUploadContext unused)
+  const CatalogUploadContext /*unused*/)
 {
   if (result.return_code != 0) {
     PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
@@ -1533,7 +1559,7 @@ WritableCatalogManager::SnapshotCatalogsSerialized(
             (*i)->mountpoint().ToString().c_str());
     }
 
-    int64_t catalog_size = GetFileSize((*i)->database_path());
+    const int64_t catalog_size = GetFileSize((*i)->database_path());
     assert(catalog_size > 0);
 
     if ((*i)->HasParent()) {

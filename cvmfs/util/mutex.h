@@ -22,7 +22,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * TODO(jblomer): eventually replace this by C++11 typed enum
  */
 struct RAII_Polymorphism {
-  enum T {
+  enum T : uint8_t {
     None,
     ReadLock,
     WriteLock

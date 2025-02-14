@@ -33,7 +33,7 @@ namespace zlib {
 
 const unsigned kZChunk = 16384;
 
-enum StreamStates {
+enum StreamStates : uint8_t {
   kStreamDataError = 0,
   kStreamIOError,
   kStreamContinue,
@@ -41,7 +41,7 @@ enum StreamStates {
 };
 
 // Do not change order of algorithms.  Used as flags in the catalog
-enum Algorithms {
+enum Algorithms : uint8_t {
   kZlibDefault = 0,
   kNoCompression,
 };

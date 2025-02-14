@@ -63,7 +63,7 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
   if ((retval == 0) && S_ISREG(mtab_info.st_mode)) {
     // Lock the modification on /etc/mtab against concurrent
     // crash unmount handlers (removing the lock file would result in a race)
-    std::string lockfile = std::string(_PATH_MOUNTED) + ".cvmfslock";
+    const std::string lockfile = std::string(_PATH_MOUNTED) + ".cvmfslock";
     const int fd_lockfile = open(lockfile.c_str(), O_RDONLY | O_CREAT, 0600);
     if (fd_lockfile < 0) return false;
     int timeout = 10;
@@ -84,7 +84,7 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     }
 
     // Remove entry from /etc/mtab (create new file without entry)
-    std::string mntnew = std::string(_PATH_MOUNTED) + ".cvmfstmp";
+    const std::string mntnew = std::string(_PATH_MOUNTED) + ".cvmfstmp";
     FILE *fmntold = setmntent(_PATH_MOUNTED, "r");
     if (!fmntold) {
       flock(fd_lockfile, LOCK_UN);
@@ -127,13 +127,13 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     // We pickup these values only to silent warnings
   }
 
-  int flags = lazy ? MNT_DETACH : 0;
+  const int flags = lazy ? MNT_DETACH : 0;
   retval = umount2(mountpoint, flags);
   return retval == 0;
 }
 
 inline bool platform_umount_lazy(const char *mountpoint) {
-  int retval = umount2(mountpoint, MNT_DETACH);
+  const int retval = umount2(mountpoint, MNT_DETACH);
   return retval == 0;
 }
 
@@ -247,14 +247,14 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 // TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_setxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
-  int retval =
+  const int retval =
       setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
   return retval == 0;
 }
 
 inline bool platform_lsetxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
-  int retval =
+  const int retval =
       lsetxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
   return retval == 0;
 }
@@ -310,7 +310,7 @@ inline std::string platform_libname(const std::string &base_name) {
 
 inline std::string platform_getexepath() {
   char buf[PATH_MAX + 1];
-  ssize_t ret = readlink("/proc/self/exe", buf, PATH_MAX);
+  const ssize_t ret = readlink("/proc/self/exe", buf, PATH_MAX);
   if (ret > 0) {
     buf[ret] = '\0';
     return std::string(buf);
@@ -320,14 +320,14 @@ inline std::string platform_getexepath() {
 
 inline struct timespec platform_time_with_clock(int clock) {
   struct timespec tp;
-  int retval = clock_gettime(clock, &tp);
+  const int retval = clock_gettime(clock, &tp);
   assert(retval == 0);
   return tp;
 }
 
 inline uint64_t platform_monotonic_time() {
 #ifdef CLOCK_MONOTONIC_COARSE
-  struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC_COARSE);
+  const struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC_COARSE);
 #else
   struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
 #endif
@@ -335,13 +335,13 @@ inline uint64_t platform_monotonic_time() {
 }
 
 inline uint64_t platform_monotonic_time_ns() {
-  struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
+  const struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
   return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
                                static_cast<double>(tp.tv_nsec));
 }
 
 inline uint64_t platform_realtime_ns() {
-  struct timespec tp = platform_time_with_clock(CLOCK_REALTIME);
+  const struct timespec tp = platform_time_with_clock(CLOCK_REALTIME);
   return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
                                static_cast<double>(tp.tv_nsec));
 }

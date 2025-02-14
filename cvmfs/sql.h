@@ -97,7 +97,7 @@ class Sql;
 template <class DerivedT>
 class Database : SingleCopy {
  public:
-  enum OpenMode {
+  enum OpenMode : uint8_t {
     kOpenReadOnly,
     kOpenReadWrite,
   };

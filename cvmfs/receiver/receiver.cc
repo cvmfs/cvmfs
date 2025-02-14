@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include <cstddef>
+#include <cstdlib>
 #include <string>
 
 #include "cvmfs_config.h"
@@ -10,13 +12,16 @@
 #include "swissknife.h"
 #include "util/exception.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
 
 #include "reactor.h"
 
-static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
-static const char *kDefaultDebugLog = "/dev/null";
+namespace {
+  const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
+  const char *kDefaultDebugLog = "/dev/null";
+}
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
@@ -38,7 +43,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
                           const swissknife::ParameterList& params,
                           swissknife::ArgumentList* arguments) {
   // parse the command line arguments for the Command
-  optind = 1;
+  optind = 1; // NOLINT(misc-include-cleaner)
   std::string option_string = "";
 
   for (unsigned j = 0; j < params.size(); ++j) {
@@ -46,15 +51,15 @@ bool ReadCmdLineArguments(int argc, char** argv,
     if (!params[j].switch_only()) option_string.push_back(':');
   }
 
-  int c;
-  while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
+  char c;
+  while ((c = static_cast<char>(getopt(argc, argv, option_string.c_str()))) != -1) { // NOLINT(misc-include-cleaner)
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
         valid_option = true;
         (*arguments)[c].Reset();
         if (!params[j].switch_only()) {
-          (*arguments)[c].Reset(new std::string(optarg));
+          (*arguments)[c].Reset(new std::string(optarg)); // NOLINT(misc-include-cleaner)
         }
         break;
       }
@@ -131,8 +136,8 @@ int main(int argc, char** argv) {
                watchdog_out_dir.c_str());
       return 1;
     }
-    std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-    watchdog = Watchdog::Create(NULL);
+    const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+    watchdog = Watchdog::Create(nullptr);
     if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");

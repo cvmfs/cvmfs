@@ -38,7 +38,7 @@ namespace shash {
  * If algorithms are added, the protocol definition for external cache managers
  * needs to be updated, too.
  */
-enum Algorithms {
+enum Algorithms : uint8_t {
   kMd5 = 0,
   kSha1,
   kRmd160,
@@ -392,7 +392,7 @@ struct CVMFS_EXPORT Digest {
    * Get a partial digest for use when only 32 bits are required
    */
   uint32_t Partial32() const {
-    const uint32_t *partial = (const uint32_t *)digest;
+    const uint32_t *partial = reinterpret_cast<const uint32_t *>(digest);
     return ntohl(*partial);
   }
 

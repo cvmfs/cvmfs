@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <string>
 
+#include "util/logging.h"
 #include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -22,7 +23,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class UnlinkGuard : SingleCopy {
  public:
-  enum InitialState { kEnabled, kDisabled };
+  enum InitialState : uint8_t { kEnabled, kDisabled };
 
   inline UnlinkGuard() : enabled_(false) {}
   inline explicit UnlinkGuard(const std::string &path,
@@ -67,7 +68,14 @@ class FileGuard : SingleCopy {
  public:
   inline FileGuard() : file_(NULL) { }
   explicit inline FileGuard(FILE *file) : file_(file) { }
-  inline ~FileGuard() { if (file_ != NULL) fclose(file_); }
+  inline ~FileGuard() { 
+    if (file_ != NULL) {
+      const int ret = fclose(file_);
+      if (ret != 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "fileguard failed to close file");
+      }
+    }
+  }
   const FILE *file() const { return file_; }
 
  private:

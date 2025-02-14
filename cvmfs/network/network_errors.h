@@ -11,7 +11,7 @@ namespace download {
  * Possible return values.  Adjust ObjectFetcher error handling if new network
  * error conditions are added.
  */
-enum Failures {
+enum Failures : uint8_t {
   kFailOk = 0,
   kFailLocalIO,
   kFailBadUrl,
