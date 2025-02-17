@@ -151,7 +151,7 @@ cvmfs_config_usage() {
   echo "  umount"
   echo "  wipecache"
   echo "  killall"
-  echo "  bugreport <timeout_in_sec_per_command (default = 120)>"
+  echo "  bugreport <timeout_in_sec_per_command (default = 90)>"
 }
 
 has_selinux() {
@@ -1456,7 +1456,7 @@ cvmfs_bugreport() {
 
   local timeout_sec
   if [ -z "$1" ]; then
-    timeout_sec=120  # 2min per command until it is killed
+    timeout_sec=90  # default: 90sec per command until it is killed
   else
     timeout_sec=$1
   fi
@@ -1543,6 +1543,7 @@ cvmfs_bugreport() {
         Linux )
           timeout ${timeout_sec} $cmd >> $out 2>$err
           if [ "$?" -eq "124" ]; then
+            # write to stdout and into the files $out and $err
             # add some new lines so that the error stands in a new line
             echo -e "\nERROR! Command '$cmd' killed by timeout of length: ${timeout_sec} seconds\n" \
               | tee -a "$out" "$err"
