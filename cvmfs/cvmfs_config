@@ -1541,8 +1541,9 @@ cvmfs_bugreport() {
 
       case $sys_arch in
         Linux )
-          timeout ${timeout_sec} $cmd >> $out 2>$err
-          if [ "$?" -eq "124" ]; then
+          timeout -s 9 ${timeout_sec} $cmd >> $out 2>$err
+          ret="$?"
+          if [ "$ret" -eq "124" ] || [ "$ret" -eq "137" ]; then
             # write to stdout and into the files $out and $err
             # add some new lines so that the error stands in a new line
             echo -e "\nERROR! Command '$cmd' killed by timeout of length: ${timeout_sec} seconds\n" \
