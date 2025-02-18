@@ -16,6 +16,7 @@ Checks: -*
   ,-misc-no-recursion
   ,-misc-non-private-member-variables-in-classes
   ,performance-*
+  ,-performance-enum-size
   ,-performance-inefficient-string-concatenation
   ,portability-*
 WarningsAsErrors: '*'
