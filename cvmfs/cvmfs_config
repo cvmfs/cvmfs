@@ -1544,7 +1544,7 @@ cvmfs_bugreport() {
 
       case $sys_arch in
         Linux )
-          timeout -s 9 ${timeout_sec} $cmd >> $out 2>$err
+          timeout -s 9 ${timeout_sec} sh -c "$cmd >> $out 2>$err & wait"
           ret="$?"
           if [ "$ret" -eq "124" ] || [ "$ret" -eq "137" ]; then
             # write to stdout and into the files $out and $err
