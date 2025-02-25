@@ -245,6 +245,7 @@ Requires: lsof
 Requires: rsync
 Requires: usbutils
 Requires: sqlite
+Requires: tar
 %if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
