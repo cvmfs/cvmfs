@@ -51,6 +51,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/056-lowspeedlimit                        \
                                  src/084-premounted                           \
                                  src/094-attachmount                          \
                                  $CVMFS_EXCLUDE                               \

@@ -22,7 +22,8 @@ class SyncItemTar : public SyncItem {
   friend class SyncUnionTarball;
 
  public:
-  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool enable_mtime_ns) const;
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
   virtual SyncItemType GetScratchFiletype() const;
@@ -30,6 +31,10 @@ class SyncItemTar : public SyncItem {
   virtual void StatScratch(const bool refresh) const;
 
  protected:
+  SyncItemTar(const std::string &relative_parent_path,
+              const std::string &filename, struct archive *archive,
+              struct archive_entry *entry, Signal *read_archive_signal,
+              const SyncUnion *union_engine, const uid_t uid, const gid_t gid);
   SyncItemTar(const std::string &relative_parent_path,
               const std::string &filename, struct archive *archive,
               struct archive_entry *entry, Signal *read_archive_signal,
@@ -42,6 +47,8 @@ class SyncItemTar : public SyncItem {
   mutable platform_stat64 tar_stat_;
   mutable bool obtained_tar_stat_;
   Signal *read_archive_signal_;
+  const uid_t uid_;
+  const gid_t gid_;
 };
 
 }  // namespace publish

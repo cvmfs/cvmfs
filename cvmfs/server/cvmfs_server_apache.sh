@@ -21,6 +21,11 @@ request_apache_service() {
   local request_verb="$1"
   if is_systemd; then
     /bin/systemctl $request_verb ${APACHE_CONF}
+  elif [ x"$SUPERVISOR_BIN" != x"false" ]; then
+    if [ x"$request_verb" = x"reload" ]; then
+      request_verb="restart"
+    fi
+    $SUPERVISOR_BIN $request_verb ${APACHE_CONF}
   else
     $SERVICE_BIN $APACHE_CONF $request_verb
   fi

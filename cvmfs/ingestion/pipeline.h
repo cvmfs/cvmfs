@@ -7,14 +7,14 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/task.h"
-#include "ingestion/tube.h"
 #include "upload_spooler_result.h"
 #include "util/concurrency.h"
+#include "util/tube.h"
 
 namespace upload {
 class AbstractUploader;

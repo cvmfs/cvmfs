@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "exception.h"
 
 #include <cassert>
@@ -44,7 +44,7 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
   (void) mask;
   throw ECvmfsException(msg);
 #else
-  LogCvmfs(source, mask, msg);
+  LogCvmfs(source, mask, "%s", msg);
   abort();
 #endif
 }

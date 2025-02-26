@@ -5,7 +5,7 @@
  * outdated and/or unneeded data objects.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_list_reflog.h"
 
 #include "manifest.h"
@@ -55,7 +55,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
   const bool follow_redirects = false;
   const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
   if (!this->InitDownloadManager(follow_redirects, proxy) ||
-      !this->InitVerifyingSignatureManager(repo_keys)) {
+      !this->InitSignatureManager(repo_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 1;
   }
@@ -68,7 +68,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
                                download_manager(),
                                signature_manager());
     if (reflog_hash.IsNull()) {
-      manifest::Manifest *manifest;
+      manifest::Manifest *manifest = NULL;
       ObjectFetcherFailures::Failures failure;
       switch (failure = object_fetcher.FetchManifest(&manifest)) {
         case ObjectFetcherFailures::kFailOk:
@@ -79,6 +79,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
                     Code2Ascii(failure));
           return 1;
       }
+      delete manifest;
     }
     success = Run(&object_fetcher, repo_name, output_path, reflog_hash);
   } else {
@@ -150,7 +151,7 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
   // Clean up reflog file
   delete reflog;
 
-  LogCvmfs(kLogCvmfs, kLogStderr, "Number of objects: %lu", objects_->size());
+  LogCvmfs(kLogCvmfs, kLogStderr, "Number of objects: %u", objects_->size());
 
   if (output_path == "") {
     DumpObjects(stdout);

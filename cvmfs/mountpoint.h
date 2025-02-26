@@ -244,6 +244,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_eio_06() { return n_eio_06_; }
   perf::Counter *n_eio_07() { return n_eio_07_; }
   perf::Counter *n_eio_08() { return n_eio_08_; }
+  perf::Counter *n_emfile()  { return n_emfile_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -264,7 +265,7 @@ class FileSystem : SingleCopy, public BootFactory {
     PosixCacheSettings() :
       is_shared(false), is_alien(false), is_managed(false),
       avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
-      quota_limit(0), do_refcount(false)
+      quota_limit(0), do_refcount(true)
       { }
     bool is_shared;
     bool is_alien;
@@ -352,6 +353,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_eio_06_;
   perf::Counter *n_eio_07_;
   perf::Counter *n_eio_08_;
+  perf::Counter *n_emfile_;
   IoErrorInfo io_error_info_;
   perf::Statistics *statistics_;
 

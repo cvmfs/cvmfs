@@ -45,7 +45,7 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
       return 1;
     }
     if (config_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Scanning %u %s objects",
+      LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Scanning %lu %s objects",
                hashes.size(), PrintAuxType(aux_types[i]).c_str());
     }
 

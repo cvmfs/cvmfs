@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Negative cache and I/O errors"
 cvmfs_test_suites="quick"

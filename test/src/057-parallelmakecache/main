@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Concurrent creation of the cache directory"
 cvmfs_test_suites="quick"

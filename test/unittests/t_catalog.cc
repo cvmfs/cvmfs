@@ -9,7 +9,7 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "testutil.h"

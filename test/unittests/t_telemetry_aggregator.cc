@@ -19,6 +19,12 @@ using namespace std;  // NOLINT
 
 namespace perf {
 
+/**
+ * @note
+ * For all the following tests we will ignore the mountpoint as this adds
+ * another layer of complexity. Here it is more important to test the general
+ * function of the telemetry aggregator.
+ */
 class T_TelemetryAggregator : public ::testing::Test {
  protected:
   virtual void SetUp() {
@@ -66,6 +72,7 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
   perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
                                                    telemetry_send_rate_sec,
                                                    &options_manager_,
+                                                   NULL,
                                                    fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
@@ -95,6 +102,7 @@ TEST_F(T_TelemetryAggregator, FailCreate) {
   perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
                                                    telemetry_send_rate_sec,
                                                    &options_manager_,
+                                                   NULL,
                                                    fqrn_);
   EXPECT_TRUE(telemetry_influx.is_zombie_);
 }
@@ -107,6 +115,7 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
                                                    telemetry_send_rate_sec,
                                                    &options_manager_,
+                                                   NULL,
                                                    fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
@@ -140,6 +149,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
                                                    telemetry_send_rate_sec,
                                                    &options_manager_,
+                                                   NULL,
                                                    fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,

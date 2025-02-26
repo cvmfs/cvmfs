@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "cmd_enter.h"
 
 #include <dirent.h>
@@ -476,7 +476,7 @@ int CmdEnter::Main(const Options &options) {
   bool rvb;
 
   // We cannot have any capabilities or else we are not allowed to write
-  // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
+  // to /proc/self/setgroups and /proc/self/[u|g]id_map when creating a user
   // namespace
   Env::DropCapabilities();
 

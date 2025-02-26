@@ -69,9 +69,8 @@ class T_Fetcher : public ::testing::Test {
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
 
-    download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(8,
-      perf::StatisticsTemplate("test", &statistics_));
+    download_mgr_ = new download::DownloadManager(8,
+                                perf::StatisticsTemplate("test", &statistics_));
     download_mgr_->SetHostChain("file://" + tmp_path_);
 
     fetcher_ = new Fetcher(
@@ -85,7 +84,6 @@ class T_Fetcher : public ::testing::Test {
   virtual void TearDown() {
     delete fetcher_;
     delete external_fetcher_;
-    download_mgr_->Fini();
     delete download_mgr_;
     delete cache_mgr_;
     if (tmp_path_ != "")
@@ -465,7 +463,7 @@ TEST_F(T_Fetcher, SignalWaitingThreads) {
   ReadPipe(tls_pipe[0], &fd_return1, sizeof(fd_return1));
   ReadPipe(tls_pipe[0], &fd_return2, sizeof(fd_return2));
   EXPECT_EQ(-1, fd_return0);
-  EXPECT_NE(fd, fd_return1);
+  EXPECT_EQ(fd, fd_return1);
   EXPECT_EQ(0, cache_mgr_->Close(fd_return1));
   EXPECT_EQ(-EBADF, fd_return2);
 

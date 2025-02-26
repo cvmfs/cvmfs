@@ -451,15 +451,6 @@ TEST_F(T_MountPoint, UuidCache) {
 }
 
 
-TEST_F(T_MountPoint, QuotaMgr) {
-  // Fails because the unit test binary cannot become a quota manager process
-  options_mgr_.SetValue("CVMFS_SHARED_CACHE", "yes");
-  {
-    UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
-    EXPECT_EQ(loader::kFailQuota, fs->boot_status());
-  }
-}
-
 TEST_F(T_MountPoint, MountLatest) {
   CreateMiniRepository(&options_mgr_, &repo_path_);
   ASSERT_TRUE(HasSuffix(repo_path_, "repo", false));

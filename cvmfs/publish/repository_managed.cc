@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "publish/repository.h"
 
 #include <cstdio>
@@ -66,7 +66,7 @@ void Publisher::ManagedNode::ClearScratch() {
   int rvi = rename(scratch_dir.c_str(), (waste_dir + "/delete-me").c_str());
   if (rvi != 0) throw EPublish("cannot move scratch directory to wastebin");
 
-  publisher_->CreateDirectoryAsOwner(scratch_dir, kPrivateDirMode);
+  publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
 
   AlterMountpoint(kAlterScratchWipe, kLogSyslog);
 

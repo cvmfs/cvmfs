@@ -74,7 +74,7 @@ struct ManifestEnsemble {
     if (whitelist_buf) free(whitelist_buf);
     if (whitelist_pkcs7_buf) free(whitelist_pkcs7_buf);
   }
-  // Can be overwritte to fetch certificate from cache
+  // Can be overwritten to fetch certificate from cache
   virtual void FetchCertificate(const shash::Any &hash) {}
 
   Manifest *manifest;

@@ -8,7 +8,7 @@
  * Also, it handles getting and setting the maximum number of file descriptors.
  */
 
-#include "cvmfs_config.h"
+
 #include "monitor.h"
 
 #include <errno.h>
@@ -257,7 +257,7 @@ string Watchdog::ReportStacktrace() {
   string debug = "--\n";
   debug += "Signal: "    + StringifyInt(crash_data.signal);
   debug += ", errno: "   + StringifyInt(crash_data.sys_errno);
-  debug += ", version: " + string(VERSION);
+  debug += ", version: " + string(CVMFS_VERSION);
   debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
   debug += "Executable path: " + exe_path_ + "\n";
 

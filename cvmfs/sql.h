@@ -439,6 +439,11 @@ class Sql {
   double RetrieveDouble(const int idx_column) const {
     return sqlite3_column_double(statement_, idx_column);
   }
+  int RetrieveNullableInt(const int idx_column, const int val_null) const {
+    if (sqlite3_column_type(statement_, idx_column) == SQLITE_NULL)
+      return val_null;
+    return sqlite3_column_int(statement_, idx_column);
+  }
   int RetrieveInt(const int idx_column) const {
     return sqlite3_column_int(statement_, idx_column);
   }

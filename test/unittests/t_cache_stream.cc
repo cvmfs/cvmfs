@@ -6,7 +6,7 @@
 
 #include <cache_posix.h>
 #include <cache_stream.h>
-#include <compression.h>
+#include <compression/compression.h>
 #include <crypto/hash.h>
 #include <network/download.h>
 #include <statistics.h>
@@ -28,15 +28,15 @@ class T_StreamingCacheManager : public ::testing::Test {
 
   virtual void SetUp() {
     statistics_ = new perf::Statistics();
-    download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(16,
-      perf::StatisticsTemplate("download", statistics_.weak_ref()));
+    download_mgr_ = new download::DownloadManager(16,
+                  perf::StatisticsTemplate("download", statistics_.weak_ref()));
     download_mgr_->SetHostChain("file://" + GetCurrentWorkingDirectory());
     backing_cache_ =
       PosixCacheManager::Create("cache", true /* alien_cache */);
     backing_cache_ref_ = backing_cache_.weak_ref();
     streaming_cache_ = new StreamingCacheManager(
-      32, backing_cache_.Release(), download_mgr_.weak_ref(), NULL);
+      32, backing_cache_.Release(), download_mgr_.weak_ref(), NULL, 1000,
+      statistics_.weak_ref());
 
     EXPECT_TRUE(MkdirDeep("data", 0700));
     EXPECT_TRUE(MakeCacheDirectories("data", 0700));
@@ -47,7 +47,6 @@ class T_StreamingCacheManager : public ::testing::Test {
 
   virtual void TearDown() {
     streaming_cache_.Destroy();
-    download_mgr_->Fini();
     download_mgr_.Destroy();
     statistics_.Destroy();
   }
@@ -62,12 +61,39 @@ class T_StreamingCacheManager : public ::testing::Test {
   shash::Any hash_demo_;
 };
 
+
 TEST_F(T_StreamingCacheManager, Basics) {
+  CacheManager::LabeledObject labeled_obj(hash_demo_);
+  labeled_obj.label.size = demo_.length();
+
+  int fd = streaming_cache_->Open(labeled_obj);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, streaming_cache_->counters().n_downloads->Get());
+  EXPECT_EQ(static_cast<int64_t>(demo_.length()),
+            streaming_cache_->GetSize(fd));
+  EXPECT_EQ(1, streaming_cache_->counters().n_downloads->Get());
+  EXPECT_EQ(1, streaming_cache_->counters().n_buffer_objects->Get());
+  EXPECT_EQ(static_cast<int64_t>(demo_.length()),
+            streaming_cache_->counters().sz_transferred_bytes->Get());
+  char W = 0;
+  EXPECT_EQ(1, streaming_cache_->Pread(fd, &W, 1, 7));
+  EXPECT_EQ('W', W);
+  EXPECT_EQ(1, streaming_cache_->counters().n_buffer_hits->Get());
+  EXPECT_EQ(0, streaming_cache_->Close(fd));
+  EXPECT_EQ(-ENOENT, backing_cache_ref_->Open(labeled_obj));
+}
+
+
+TEST_F(T_StreamingCacheManager, UnknownSize) {
   CacheManager::LabeledObject labeled_obj(hash_demo_);
   int fd = streaming_cache_->Open(labeled_obj);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(static_cast<int64_t>(demo_.length()),
             streaming_cache_->GetSize(fd));
+  EXPECT_EQ(1, streaming_cache_->counters().n_downloads->Get());
+  EXPECT_EQ(1, streaming_cache_->counters().n_buffer_obstacles->Get());
+  EXPECT_EQ(static_cast<int64_t>(demo_.length()),
+            streaming_cache_->counters().sz_transferred_bytes->Get());
   char W = 0;
   EXPECT_EQ(1, streaming_cache_->Pread(fd, &W, 1, 7));
   EXPECT_EQ('W', W);

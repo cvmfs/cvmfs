@@ -96,7 +96,7 @@ cvmfs_server_gc() {
     fi
   done
 
-  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidded
+  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidden
   #       to run GC directly on the gateway
   # Check if the command is called on a repository gateway, and if so,
   # abort if there are any active leases

@@ -11,7 +11,7 @@
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "interrupt.h"
 #include "network/download.h"
@@ -36,22 +36,17 @@ namespace download {
 
 class T_Download : public FileSandbox {
  public:
-  T_Download() : FileSandbox(string(tmp_path) + "/server_dir") {}
+  T_Download() : FileSandbox(string(tmp_path) + "/server_dir"),
+                 download_mgr(8, perf::StatisticsTemplate("test", &statistics))
+                 {}
 
  protected:
   virtual void SetUp() {
-    download_mgr.Init(8,
-      perf::StatisticsTemplate("test", &statistics));
-
     CreateSandbox();
   }
 
   virtual void TearDown() {
     RemoveSandbox();
-  }
-
-  virtual ~T_Download() {
-    download_mgr.Fini();
   }
 
   FILE *CreateTemporaryFile(std::string *path) const {
@@ -159,7 +154,7 @@ TEST_F(T_Download, RemoteFile) {
 
 TEST_F(T_Download, Clone) {
   DownloadManager *download_mgr_cloned = download_mgr.Clone(
-    perf::StatisticsTemplate("x", &statistics));
+    perf::StatisticsTemplate("x", &statistics), "cloned");
 
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
@@ -177,12 +172,13 @@ TEST_F(T_Download, Clone) {
   ASSERT_EQ(info.error_code(), kFailOk);
   ASSERT_EQ(memsink.pos(), 1U);
   EXPECT_EQ(memsink.data()[0], '1');
-  download_mgr_cloned->Fini();
   delete download_mgr_cloned;
 
   // Don't crash
-  DownloadManager *dm = new DownloadManager();
-  download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics));
+  DownloadManager *dm = new DownloadManager(1,
+                                    perf::StatisticsTemplate("h", &statistics));
+  download_mgr_cloned = dm->Clone(perf::StatisticsTemplate("y", &statistics),
+                                  "cloned");
   delete dm;
   delete download_mgr_cloned;
 }
@@ -197,8 +193,7 @@ TEST_F(T_Download, Multiple) {
   string src_path = GetAbsolutePath(GetSmallFile());
   string src_url = "file://" + src_path;
 
-  DownloadManager second_mgr;
-  second_mgr.Init(8,
+  DownloadManager second_mgr(8,
     perf::StatisticsTemplate("second", &statistics));
 
   cvmfs::FileSink filesink(fdest);
@@ -211,7 +206,6 @@ TEST_F(T_Download, Multiple) {
   EXPECT_EQ(info.error_code(), kFailOk);
   EXPECT_EQ(info2.error_code(), kFailOk);
   fclose(fdest);
-  second_mgr.Fini();
 }
 
 
@@ -483,7 +477,8 @@ TEST_F(T_Download, StripDirect) {
 
 TEST_F(T_Download, ValidateGeoReply) {
   vector<uint64_t> geo_order;
-  EXPECT_FALSE(download_mgr.ValidateGeoReply("", geo_order.size(), &geo_order));
+  EXPECT_FALSE(download_mgr.ValidateGeoReply("", geo_order.size(),
+               &geo_order));
 
   geo_order.push_back(0);
   EXPECT_FALSE(
@@ -549,9 +544,9 @@ TEST_F(T_Download, ParseHttpCode) {
 }
 
 TEST_F(T_Download, EscapeUrl) {
-  std::string url = "http://ab0341.¡ÿϦ랝"; // c2a1 c3bf cfa6 eb9e9d
-  std::string correct = "http://ab0341.%C2%A1%C3%BF%CF%A6%EB%9E%9D";
-  std::string res = download_mgr.EscapeUrl(url);
+  const std::string url = "http://ab0341.¡ÿϦ랝"; // c2a1 c3bf cfa6 eb9e9d
+  const std::string correct = "http://ab0341.%C2%A1%C3%BF%CF%A6%EB%9E%9D";
+  const std::string res = download_mgr.EscapeUrl(0, url);
 
   EXPECT_TRUE(res == correct);
 }

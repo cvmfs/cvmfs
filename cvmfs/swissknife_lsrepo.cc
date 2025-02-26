@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_lsrepo.h"
 
 #include <string>
@@ -62,7 +62,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
     const std::string proxy = ((args.count('@') > 0) ?
                                *args.find('@')->second : "");
     if (!this->InitDownloadManager(follow_redirects, proxy) ||
-        !this->InitVerifyingSignatureManager(repo_keys)) {
+        !this->InitSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
     }

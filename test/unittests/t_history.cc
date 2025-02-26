@@ -8,7 +8,7 @@
 #include <map>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "history_sqlite.h"
 #include "testutil.h"
 #include "util/prng.h"

@@ -165,6 +165,9 @@ get_repository_name() {
 # loads the configuration for a specific repository
 load_repo_config() {
   local name=$1
+  if [ ! -e /etc/cvmfs/repositories.d/${name}/server.conf ]; then
+    die "Error: The repository $name does not exist."
+  fi
   . /etc/cvmfs/repositories.d/${name}/server.conf
   if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
     . /etc/cvmfs/repositories.d/${name}/client.conf
@@ -1045,7 +1048,6 @@ CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=${proxy_url:-DIRECT}
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
@@ -1241,6 +1243,16 @@ is_stratum0_garbage_collectable() {
   local name=$1
   load_repo_config $name
   [ x"$(get_repo_info_from_url $CVMFS_STRATUM0 -g)" = x"yes" ]
+}
+
+
+# checks if a manifest is present
+#
+# @param url  the url of the repository to be checked
+# @return      0 if it is empty
+is_empty_repository_from_url() {
+  local url=$1
+  [ x"$(get_repo_info_from_url "$url" -e)" = x"yes" ]
 }
 
 

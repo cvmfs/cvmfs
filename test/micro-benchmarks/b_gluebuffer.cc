@@ -50,7 +50,8 @@ class BM_InodeTracker : public benchmark::Fixture {
     assert(inodes_.size() == paths_.size());
 
     inode_tracker_ = new glue::InodeTracker();
-    inode_tracker_->VfsGet(kNumInodes + 1, PathString("/", 1));
+    inode_tracker_->VfsGet(glue::InodeEx(kNumInodes + 1, 0),
+                           PathString("/", 1));
   }
 
   virtual void TearDown(const benchmark::State &st) {
@@ -72,7 +73,7 @@ BENCHMARK_DEFINE_F(BM_InodeTracker, Get)(benchmark::State &st) {
   unsigned i = 0;
   while (st.KeepRunning()) {
     unsigned idx = i % kNumInodes;
-    inode_tracker_->VfsGet(inodes_[idx], paths_[idx]);
+    inode_tracker_->VfsGet(glue::InodeEx(inodes_[idx], 0), paths_[idx]);
     ++i;
   }
   st.SetItemsProcessed(st.iterations());
@@ -87,9 +88,9 @@ BENCHMARK_DEFINE_F(BM_InodeTracker, GetPut)(benchmark::State &st) {
   while (st.KeepRunning()) {
     unsigned idx = i % 5000;
     if (((i / 5000) % 2) == 0) {
-      inode_tracker_->VfsGet(inodes_[idx], paths_[idx]);
+      inode_tracker_->VfsGet(glue::InodeEx(inodes_[idx], 0), paths_[idx]);
     } else {
-      inode_tracker_->VfsPut(inodes_[idx], 1);
+      inode_tracker_->GetVfsPutRaii().VfsPut(inodes_[idx], 1);
     }
     ++i;
   }
@@ -101,13 +102,14 @@ BENCHMARK_REGISTER_F(BM_InodeTracker, GetPut)->Repetitions(3);
 BENCHMARK_DEFINE_F(BM_InodeTracker, FindPath)(benchmark::State &st) {
   unsigned size = st.range(0);
   for (unsigned i = 0; i < size; ++i)
-    inode_tracker_->VfsGet(inodes_[i], paths_[i]);
+    inode_tracker_->VfsGet(glue::InodeEx(inodes_[i], 0), paths_[i]);
 
   unsigned i = 0;
   PathString path;
   while (st.KeepRunning()) {
     unsigned idx = i % size;
-    bool retval = inode_tracker_->FindPath(inodes_[idx], &path);
+    glue::InodeEx inode_ex(inodes_[idx], 0);
+    const bool retval = inode_tracker_->FindPath(&inode_ex, &path);
     assert(retval == true);
     Escape(&path);
     ++i;
@@ -120,7 +122,7 @@ BENCHMARK_REGISTER_F(BM_InodeTracker, FindPath)->Repetitions(3)->Arg(10000);
 BENCHMARK_DEFINE_F(BM_InodeTracker, FindInode)(benchmark::State &st) {
   unsigned size = st.range(0);
   for (unsigned i = 0; i < size; ++i)
-    inode_tracker_->VfsGet(inodes_[i], paths_[i]);
+    inode_tracker_->VfsGet(glue::InodeEx(inodes_[i], 0), paths_[i]);
 
   unsigned i = 0;
   uint64_t inode;
@@ -138,7 +140,7 @@ BENCHMARK_REGISTER_F(BM_InodeTracker, FindInode)->Repetitions(3)->Arg(10000);
 BENCHMARK_DEFINE_F(BM_InodeTracker, Nadd)(benchmark::State &st) {
   unsigned size = st.range(0);
   while (st.KeepRunning()) {
-    glue::NentryTracker tracker;
+    glue::DentryTracker tracker;
     for (unsigned i = 0; i < size; ++i)
       tracker.Add(0, "libCore.so", 1000);
   }

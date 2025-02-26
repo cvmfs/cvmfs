@@ -12,9 +12,9 @@
 #include <cassert>
 #include <vector>
 
-#include "ingestion/tube.h"
 #include "util/exception.h"
 #include "util/single_copy.h"
+#include "util/tube.h"
 
 /**
  * Forward declaration of TubeConsumerGroup so that it can be used as a friend

@@ -1,0 +1,156 @@
+#!/bin/bash
+cvmfs_test_name="Catalog_mgr_client: LoadCatalog tests"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+source ./src/703-catalog_mgr_client/setup_teardown
+
+TEST703_PRIVATE_MOUNT=
+TEST703_PIDS=
+CVMFS_TEST_703_OSXMOUNTPOINT=
+
+
+get_root_hash() {
+  attr -g catalog_counters ${mntpnt}/ | grep catalog_hash | awk -F" " '{print $2}'
+}
+
+load_new_root_catalog() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+
+  oldRoot=$(get_root_hash)
+  add_some_tmp_file_to_repo
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync
+  newRoot=$(get_root_hash)
+
+  private_unmount
+
+  echo "   $oldRoot should not be equal $newRoot"
+
+  [ $oldRoot != $newRoot ] || return 10
+
+  echo "   ... success"
+}
+
+check_if_new_root_catalog() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+
+  # ls $mntpnt
+  local oldRevision=$(attr -q -g revision $mntpnt)
+
+
+  add_some_tmp_file_to_repo
+
+  echo "   New files were added to the repository."
+
+  local updateStatus=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync)
+
+  local newRevision=$(attr -q -g revision $mntpnt)
+
+  private_unmount
+
+  echo "   Revision $oldRevision should be smaller than $newRevision"
+
+  [ $oldRevision -lt $newRevision ] || return 20
+
+  echo "   ... success"
+}
+
+cache_evict_files_for_catalog() {
+  echo "   *** cache_evict_files_for_catalog"
+  
+  echo "   creating files"
+  # fill cache
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal01 bs=1024 count=4022 status=none 
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal02 bs=1024 count=4022 status=none
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal03 bs=1024 count=4022 status=none
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal04 bs=1024 count=2022 status=none
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal05 bs=512  count=500 status=none
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal06 bs=1024 count=1023 status=none
+  dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/normal07 bs=1024 count=1023 status=none
+  
+  for i in `seq 20`
+  do
+    dd if=/dev/urandom of=/cvmfs/$CVMFS_TEST_REPO/file$i.txt bs=256 count=200 status=none
+  done
+
+    for i in `seq 1000`
+  do
+    touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/file$i.txt
+  done
+
+  echo "   publish newly created files to repo"
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return $?
+
+  local mntpnt="$1"
+
+  private_mount $mntpnt
+ 
+  # wipecache does not work on private mounts
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cleanup 0
+
+  cat $mntpnt/normal01 > /dev/null
+  cat $mntpnt/normal02 > /dev/null
+  cat $mntpnt/normal03 > /dev/null
+  cat $mntpnt/normal04 > /dev/null
+  cat $mntpnt/normal05 > /dev/null
+  
+  cat $mntpnt/file1.txt > /dev/null
+  # ls $mntpnt
+
+  for i in `seq 18`
+   do
+     cat $mntpnt/file$i.txt > /dev/null
+   done 
+
+  local lc_oldCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | wc -l)
+  local lc_oldCacheCatalog=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list catalogs | wc -l )
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache size
+
+
+  ls $mntpnt/foo/bar > /dev/null
+  cat $mntpnt/foo/bar/bar2.txt > /dev/null
+
+  local lc_newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | wc -l)
+  local lc_newCacheCatalog=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list catalogs | wc -l)
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache size
+
+  echo "   File cache: should be $lc_oldCache (old) > $lc_newCache (new)"
+  echo "   Catalog cache: should be $lc_oldCacheCatalog (old) < $lc_newCacheCatalog (new)"
+
+  [ "$lc_oldCache" -gt  "$lc_newCache" ] || return 30
+  [ "$lc_oldCacheCatalog" -lt  "$lc_newCacheCatalog" ] || return 31
+
+
+  echo "   ... success"
+
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+  local config_file_path="${scratch_dir}/${CVMFS_TEST_REPO}.config.txt"
+ 
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  create_nested_repo
+
+  load_new_root_catalog ${mntpnt} || return $?
+  check_if_new_root_catalog ${mntpnt} || return $? 
+  cache_evict_files_for_catalog ${mntpnt} || return $?
+  # see test 674 for loading new catalog from aliencache
+
+  return 0
+}

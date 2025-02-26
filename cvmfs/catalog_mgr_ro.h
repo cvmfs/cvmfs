@@ -44,11 +44,8 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     const bool                  copy_to_tmp_dir = false);
 
  protected:
-  virtual LoadError LoadCatalog(const PathString  &mountpoint,
-                                const shash::Any  &hash,
-                                std::string       *catalog_path,
-                                shash::Any        *catalog_hash,
-                                uint64_t *manifest_age);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog           *parent_catalog);
@@ -71,15 +68,14 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     download_manager_->Spawn();
   }
 
-bool useLocalCache() { return !local_cache_dir_.empty(); }
+  bool UseLocalCache() const { return !dir_cache_.empty(); }
 
-  std::string                local_cache_dir_;  // absolute path to local cache
+  std::string                dir_cache_;  // absolute path to local cache
                                                 // directory
   bool                       copy_to_tmp_dir_;  // only relevant if using local
                                                 // cache directory:
                                                 // for writeable catalogs a copy
                                                 // must be created in dir_temp_
-
 
  private:
   std::string CopyCatalogToTempFile(const std::string &cache_path);

@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Test for running CVMFS agains a HTTPS S3 implementation
 #

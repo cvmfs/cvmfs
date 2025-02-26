@@ -30,6 +30,7 @@ CVMFS_EXPORT std::string StringifyUint(const uint64_t value);
 CVMFS_EXPORT std::string StringifyByteAsHex(const unsigned char value);
 CVMFS_EXPORT std::string StringifyDouble(const double value);
 CVMFS_EXPORT std::string StringifyTime(const time_t seconds, const bool utc);
+CVMFS_EXPORT std::string StringifyLocalTime(const time_t seconds);
 CVMFS_EXPORT std::string StringifyTimeval(const timeval value);
 CVMFS_EXPORT std::string RfcTimestamp();
 CVMFS_EXPORT std::string IsoTimestamp();

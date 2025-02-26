@@ -5,7 +5,7 @@
 #include "gtest/gtest.h"
 
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 

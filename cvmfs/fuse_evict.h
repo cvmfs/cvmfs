@@ -13,6 +13,7 @@
 #include "gtest/gtest_prod.h"
 #include "shortstring.h"
 #include "util/atomic.h"
+#include "util/concurrency.h"
 #include "util/single_copy.h"
 
 namespace glue {
@@ -64,6 +65,18 @@ class FuseInvalidator : SingleCopy {
     atomic_int32 *status_;
   };
 
+  struct Command {
+    virtual ~Command() {}
+  };
+  struct QuitCommand : public Command {};
+  struct InvalInodesCommand : public Command {
+    Handle *handle;
+  };
+  struct InvalDentryCommand : public Command {
+    uint64_t parent_ino;
+    NameString name;
+  };
+
   FuseInvalidator(MountPoint *mountpoint,
                   void **fuse_channel_or_session,
                   bool fuse_notify_invalidation);
@@ -107,7 +120,7 @@ class FuseInvalidator : SingleCopy {
    */
   void **fuse_channel_or_session_;
   bool spawned_;
-  int pipe_ctrl_[2];
+  Channel<Command> channel_;
   pthread_t thread_invalidator_;
   /**
    * An invalidation run can take some time.  Allow for early cancellation if

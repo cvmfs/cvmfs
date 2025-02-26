@@ -37,7 +37,7 @@ install(
 )
 
 install (
-    FILES webhook/registry-webhook.py
+    FILES webhook/registry_webhook.py
     DESTINATION ${CVMFS_LIBEXEC_DIR}/ducc
     PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 )

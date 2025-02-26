@@ -179,13 +179,13 @@ is_installed() {
 
 
 yum_install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
   sudo yum -y install --nogpgcheck $pkg_paths
 }
 
 
 dnf_install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
   sudo dnf -y install --nogpgcheck $pkg_paths
 }
 
@@ -225,7 +225,7 @@ yum_update_fallback() {
 
 
 install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
 
   if has_binary dnf; then
     dnf_install_packages "$pkg_paths"

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "wpad.h"
 
 #include <fcntl.h>
@@ -279,12 +279,11 @@ int MainResolveProxyDescription(int argc, char **argv) {
   string proxy_configuration = argv[2];
   string host_list = argv[3];
 
-  DownloadManager download_manager;
-  download_manager.Init(1, perf::StatisticsTemplate("pac", &statistics));
+  DownloadManager download_manager(1,
+                                  perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);
-  download_manager.Fini();
 
   LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
   return resolved_proxies == "";

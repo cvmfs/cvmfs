@@ -21,6 +21,14 @@ set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 12)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+if (CMAKE_VERSION VERSION_LESS "3.12.0") 
+  add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_definitions(-DCVMFS_PATCH_LEVEL="0")
+else()
+  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_compile_definitions(CVMFS_PATCH_LEVEL="0")
+endif()
+
 
 #
 # set the path where cmake looks for additional modules
@@ -104,7 +112,8 @@ if (MACOSX)
   set (CMAKE_INSTALL_LIBDIR "lib")
   set (CMAKE_MOUNT_INSTALL_BINDIR "${CMAKE_INSTALL_PREFIX}/sbin")
   set (CVMFS_LIBEXEC_DIR "libexec/cvmfs")
-  set (CMAKE_MACOSX_RPATH false)
+  set (CMAKE_MACOSX_RPATH true)
+  list( APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib )
 else (MACOSX) # --> Linux
   if (DEBIAN OR ARCHLINUX)
     if (ARCHLINUX)
@@ -304,13 +313,7 @@ endif (NOT MACOSX)
 look_for_required_include_files (${REQUIRED_HEADERS})
 look_for_optional_include_files (${OPTIONAL_HEADERS})
 
-#
-# configure the config.h.in file
-#
-configure_file (
-  "${CMAKE_SOURCE_DIR}/config_cmake.h.in"
-  "${CMAKE_BINARY_DIR}/cvmfs_config.h"
-)
+
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
 
@@ -422,8 +425,11 @@ endif ()
 if (BUILD_CVMFS)
   if (MACOSX)
     find_package (OSXFuse REQUIRED)
-    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OSXFUSE_INCLUDE_DIR})
-    set (FUSE_LIBRARIES ${OSXFUSE_LIBRARIES}) # just abstract the difference here... they are compatible
+    set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MACOS_FUSE_INCLUDE_DIR})
+    set (FUSE_LIBRARIES ${MACOS_FUSE_LIBRARIES}) # just abstract the difference here... they are compatible
+    if (USE_MACFUSE_KEXT)
+      add_definitions(-DUSE_MACFUSE_KEXT)
+    endif()
   else (MACOSX)
     find_package (FUSE REQUIRED)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${FUSE_INCLUDE_DIR})

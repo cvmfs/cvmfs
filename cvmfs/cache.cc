@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "cache.h"
 
 #include <alloca.h>
@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "network/download.h"

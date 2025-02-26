@@ -7,6 +7,8 @@
 
 namespace download {
 
+atomic_int64 JobInfo::next_uuid = 0;
+
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
          const shash::Any *h, cvmfs::Sink *s) {
   Init();
@@ -35,6 +37,7 @@ bool JobInfo::IsFileNotFound() {
 }
 
 void JobInfo::Init() {
+  id_ = atomic_xadd64(&next_uuid, 1);
   pipe_job_results = NULL;
   url_ = NULL;
   compressed_ = false;
@@ -63,11 +66,14 @@ void JobInfo::Init() {
   nocache_ = false;
   error_code_ = kFailOther;
   http_code_ = -1;
+  link_ = "";
   num_used_proxies_ = 0;
+  num_used_metalinks_ = 0;
   num_used_hosts_ = 0;
   num_retries_ = 0;
   backoff_ms_ = 0;
-  current_host_chain_index_ = 0;
+  current_metalink_chain_index_ = -1;
+  current_host_chain_index_ = -1;
 
   allow_failure_ = false;
 

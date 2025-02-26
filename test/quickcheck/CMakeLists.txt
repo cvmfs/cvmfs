@@ -38,7 +38,7 @@ set (CVMFS_QC_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
-  ${CVMFS_SOURCE_DIR}/compression.cc
+  ${CVMFS_SOURCE_DIR}/compression/compression.cc
   ${CVMFS_SOURCE_DIR}/crypto/hash.cc
   ${CVMFS_SOURCE_DIR}/crypto/signature.cc
   ${CVMFS_SOURCE_DIR}/directory_entry.cc

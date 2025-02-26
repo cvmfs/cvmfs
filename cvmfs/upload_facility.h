@@ -12,13 +12,13 @@
 
 #include "ingestion/ingestion_source.h"
 #include "ingestion/task.h"
-#include "ingestion/tube.h"
 #include "repository_tag.h"
 #include "statistics.h"
 #include "upload_spooler_definition.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
 #include "util/posix.h"
+#include "util/tube.h"
 
 namespace upload {
 
@@ -418,7 +418,7 @@ class AbstractUploader
  protected:
   /**
    * Used by concrete implementations when they use callbacks where it's not
-   * already forseen, e.g. S3Uploader::Peek().
+   * already foreseen, e.g. S3Uploader::Peek().
    */
   void IncJobsInFlight() {
     ++jobs_in_flight_;

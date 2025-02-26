@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "file_chunk.h"
 #include "ingestion/chunk_detector.h"

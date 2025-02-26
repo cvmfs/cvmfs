@@ -73,7 +73,12 @@ install_deb $GATEWAY_PACKAGE
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
 install_from_repo apache2                || die "fail (installing apache2)"
-install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+if [ "x$ubuntu_release" == "xnoble" ] || [ "x$ubuntu_release" == "xjammy" ]; then
+  install_from_repo python-is-python3 || die "fail (installing python-is-python3)"
+  install_from_repo libapache2-mod-wsgi-py3    || die "fail (installing libapache2-mod-wsgi-py3)"
+else
+  install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+fi
 install_from_repo default-jre            || die "fail (installing default-jre)"
 install_from_repo apache2                || die "fail (installing apache2)"
 sudo service apache2 restart > /dev/null || die "fail (restarting apache)"
@@ -102,13 +107,10 @@ fi
 install_from_repo bc                            || die "fail (installing bc)"
 install_from_repo tree                          || die "fail (installing tree)"
 
-# traffic shaping
-install_from_repo trickle || die "fail (installing trickle)"
 
 # install 'cvmfs_preload' build dependencies
 install_from_repo cmake        || die "fail (installing cmake)"
 install_from_repo libattr1-dev || die "fail (installing libattr1-dev)"
-install_from_repo python-dev   || die "fail (installing python-dev)"
 install_from_repo python3-dev   || die "fail (installing python3-dev)"
 install_from_repo python3-setuptools || die "fail (installing python3-setuptools)"
 
@@ -116,7 +118,12 @@ install_from_repo libz-dev     || die "fail (installing libz-dev)"
 install_from_repo libssl-dev   || die "fail (installing libssl-dev)"
 # make sure the python command is available
 if [ "x$ubuntu_release" = "xfocal" ]; then
+install_from_repo python-dev   || die "fail (installing python-dev)"
 install_from_repo python-is-python2 || "fail (installing python-is-python2)"
+fi
+# make sure the python command is available
+if [ "x$ubuntu_release" = "xbionic" ]; then
+install_from_repo python-dev   || die "fail (installing python-dev)"
 fi
 
 install_from_repo acl || die "fail (installing acl)"
@@ -145,21 +152,15 @@ else
   fi
 fi
 
-# Install azure-cli
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash || die "fail (installing azure-cli)"
-curl -fsSL https://deb.nodesource.com/setup_16.x | sudo bash -
-# Fix up sources list
-sudo sed -i -e 's/https/http/' /etc/apt/sources.list.d/nodesource.list
-sudo apt-get update
-install_from_repo nodejs || die "fail (installing nodejs)"
-sudo npm install -g azurite
 
 disable_systemd_rate_limit
 
+if [ "x$ubuntu_release" == "xfocal" ] || [ "x$ubuntu_release" == "xbionic" ]; then
 # setting up the AUFS kernel module
-echo -n "loading AUFS kernel module..."
-sudo modprobe aufs || die "fail"
-echo "done"
+  echo -n "loading AUFS kernel module..."
+  sudo modprobe aufs || die "fail"
+  echo "done"
+fi
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

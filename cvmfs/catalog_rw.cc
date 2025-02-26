@@ -267,8 +267,8 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
 
   shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
 
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %d "
-                                        "and chunk size: %d bytes",
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding chunk for %s from offset %ld "
+                                        "and chunk size: %ld bytes",
            entry_path.c_str(),
            chunk.offset(),
            chunk.offset() + chunk.size());

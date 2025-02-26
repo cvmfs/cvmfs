@@ -1,0 +1,128 @@
+#!/bin/bash
+
+# Reproducer for https://github.com/cvmfs/cvmfs/issues/3481
+
+cvmfs_test_name="Test inode management when files change"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST633_CORNERS_PRIVATE_MOUNT=
+TEST633_CORNERS_PIDS=
+
+private_mount() {
+  local mntpnt="$1"
+  TEST633_CORNERS_PRIVATE_MOUNT="$mntpnt"
+  do_local_mount "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_KCACHE_TIMEOUT=0\n_CVMFS_TEST_BARRIER_INODE_REPLACE=${mntpnt}c/barrier01" \
+                 "" || return 1
+}
+
+private_unmount() {
+  sudo umount $TEST633_CORNERS_PRIVATE_MOUNT
+  TEST633_CORNERS_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST633_CORNERS_PIDS" != "x" ]; then
+    kill -9 $TEST633_CORNERS_PIDS
+  fi
+  if [ "x$TEST633_CORNERS_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}
+
+get_inode() {
+  stat --format=%i $1
+}
+
+get_internal_counter() {
+  local name="$1"
+
+  sudo cvmfs_talk -p \
+    ${TEST633_CORNERS_PRIVATE_MOUNT}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO \
+    internal affairs | \
+    grep ^$name | head -n1 | \
+    cut -d \| -f2
+}
+
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  echo "*** compile helper utility"
+  gcc -std=c99 -Wall -o topen ${script_location}/topen.c || return 2
+
+  echo "*** set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local hello=/cvmfs/$CVMFS_TEST_REPO/hello
+  start_transaction $CVMFS_TEST_REPO || return 10
+  echo "Hello World" > $hello || return 12
+  publish_repo $CVMFS_TEST_REPO -v || return 13
+
+  local mntpnt="${scratch_dir}/private_mnt"
+  echo "*** mount private mount point"
+  private_mount $mntpnt || return 20
+
+  rm -f stop_topen
+
+  ./topen ${mntpnt}/hello > topen01.stdout 2> topen02.stderr &
+  local pid_topen01=$!
+  TEST633_CORNERS_PIDS="$TEST633_CORNERS_PIDS $pid_topen01"
+
+  local inode00=$(get_inode ${mntpnt}/hello)
+  echo "*** inode of original hello: $inode00"
+
+  start_transaction $CVMFS_TEST_REPO || return 30
+  echo "Hello World, modified" > $hello || return 31
+  publish_repo $CVMFS_TEST_REPO -v || return 32
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 33
+
+  echo "*** get two concurrent processes into the "replace inode" path"
+
+  echo "pause" > ${mntpnt}c/barrier01
+
+  get_inode ${mntpnt}/hello > inode01 &
+  local pid_lookup01=$!
+  TEST633_CORNERS_PIDS="$TEST633_CORNERS_PIDS $pid_lookup01"
+
+  get_inode ${mntpnt}/hello > inode02 &
+  local pid_lookup02=$!
+  TEST633_CORNERS_PIDS="$TEST633_CORNERS_PIDS $pid_lookup02"
+
+  sleep 3
+
+  echo "*** let one of them finish"
+  echo "resume one" > ${mntpnt}c/barrier01
+  sleep 3
+
+  echo "*** stop the reader, release the old inode"
+
+  touch stop_topen
+  wait $pid_topen01
+
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO drop metadata caches || return 50
+
+  echo "*** finish the second reader"
+
+  echo "resume" > ${mntpnt}c/barrier01
+  wait $pid_lookup01 $pid_lookup02
+  TEST633_CORNERS_PIDS=
+
+  echo "*** The two inodes:"
+  cat inode01
+  cat inode02
+
+  diff inode01 inode02 || return 60
+
+  return 0
+}

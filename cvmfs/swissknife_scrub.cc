@@ -5,7 +5,7 @@
 #define __STDC_FORMAT_MACROS
 
 #include "swissknife_scrub.h"
-#include "cvmfs_config.h"
+
 
 #include "util/fs_traversal.h"
 #include "util/logging.h"

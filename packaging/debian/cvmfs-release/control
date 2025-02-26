@@ -8,5 +8,4 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-release
 Architecture: all
-Depends: lsb-release
 Description: This package contains the apt configuration for the CernVM File System packages.

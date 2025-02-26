@@ -127,7 +127,6 @@ _migrate_2_1_7() {
     -t $temp_dir                                       \
     -o $new_manifest                                   \
     -k /etc/cvmfs/keys/$name.pub                       \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -s || die "fail! (migrating catalogs)"
   chown ${CVMFS_USER} $new_manifest
 

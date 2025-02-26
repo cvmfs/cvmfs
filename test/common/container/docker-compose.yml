@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+    cvmfs-dev:
+        image: registry.cern.ch/cvmfs-dev:latest
+        container_name: cvmfs-dev
+        hostname: cvmfs-dev
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-dev
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - var_spool_cvmfs:/var/spool/cvmfs
+            - ../../../:/home/sftnight/cvmfs
+
+volumes:
+    var_spool_cvmfs:
+

@@ -179,7 +179,7 @@ class Resolver : SingleCopy {
   /**
    * Cut off very large TTLs by default to 1 day.
    */
-  static const unsigned kDefaultMaxTtl = 84600;
+  static const unsigned kDefaultMaxTtl = 86400;
 
   Resolver(const bool ipv4_only,
            const unsigned retries,

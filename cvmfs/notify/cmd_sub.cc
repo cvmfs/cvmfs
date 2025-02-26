@@ -2,7 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef __STDC_FORMAT_MACROS
+// NOLINTNEXTLINE
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include "cmd_sub.h"
+
+#include <inttypes.h>
 
 #include "crypto/signature.h"
 #include "manifest.h"
@@ -33,14 +40,14 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       : notify::SubscriberSSE(server_url),
         repository_(repository),
         stats_(),
-        dl_mgr_(new download::DownloadManager()),
+        dl_mgr_(new download::DownloadManager(kMaxPoolHandles,
+                                perf::StatisticsTemplate("download", &stats_))),
         sig_mgr_(new signature::SignatureManager()),
         revision_(min_revision),
         continuous_(continuous),
         verbose_(verbose) {}
   virtual ~SwissknifeSubscriber() {
     sig_mgr_->Fini();
-    dl_mgr_->Fini();
   }
 
   bool Init() {
@@ -52,9 +59,6 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
                "SwissknifeSubscriber - could not parse configuration file");
       return false;
     }
-
-    dl_mgr_->Init(kMaxPoolHandles,
-                  perf::StatisticsTemplate("download", &stats_));
 
     std::string arg;
     if (options.GetValue("CVMFS_SERVER_URL", &arg)) {
@@ -111,8 +115,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
     bool triggered = false;
     if (new_revision > revision_) {
       LogCvmfs(kLogCvmfs, kLogInfo,
-               "SwissknifeSubscriber - repository %s is now at revision %lu.",
-               repo.c_str(), new_revision, revision_);
+               "SwissknifeSubscriber - repository %s is now at revision %"
+               PRIu64 ".", repo.c_str(), new_revision);
       if (verbose_) {
         LogCvmfs(kLogCvmfs, kLogInfo, "%s", msg_text.c_str());
       }

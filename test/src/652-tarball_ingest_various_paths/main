@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Ingest tarball to various subdirectories in the repository"
 cvmfs_test_autofs_on_startup=false
@@ -25,7 +26,8 @@ produce_tarball() {
 
   echo "*** Generating a tarball in $tarball_name"
   # the -P option create a tarball with a leading slash
-  tar -Pcvf $tarball_name $(pwd)/tarball_foo
+  # the -H posix option creates nanosecond precision timestamps
+  tar -H posix -Pcvf $tarball_name $(pwd)/tarball_foo
 
   rm -rf tarball_foo
 }
@@ -39,6 +41,7 @@ cvmfs_run_test() {
 
   echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+  echo "CVMFS_ENABLE_MTIME_NS=true" | sudo tee -a /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf
 
   # ============================================================================
 
@@ -232,9 +235,30 @@ cvmfs_run_test() {
     echo "*** It compare well"
   fi
 
+  echo "checking nanosecond timestamps"
+  echo "entry information of $file:"
+  stat $file || return 50
+  local mtime_ns=$(stat -c%y $file | cut -d. -f2 | awk '{print $1}')
+  [ $mtime_ns -ne 0 ] || return 51
+
   echo "*** ingesting empty tarball with nested catalog"
   cat $script_location/layer.tar | cvmfs_server ingest --base_dir layer -c --tar_file - $CVMFS_TEST_REPO || return 42
   ls /cvmfs/$CVMFS_TEST_REPO/layer/.cvmfscatalog || return 42
+
+  echo "*** ingesting absolute paths"
+
+  cvmfs_server ingest --base_dir /cvmfs/$CVMFS_TEST_REPO/absolute_path1  --tar_file $tarfile || return 43
+  ls /cvmfs/$CVMFS_TEST_REPO/absolute_path1/$(pwd)/tarball_foo || return 44
+
+  echo "*** delete with absolute paths"
+  cvmfs_server ingest -d /cvmfs/$CVMFS_TEST_REPO/absolute_path1/tarball_foo/a/1.txt || return 45
+  echo "*** delete with multiple absolute paths"
+  cvmfs_server ingest -d /cvmfs/$CVMFS_TEST_REPO/absolute_path1/tarball_foo/a/2.txt -d /cvmfs/$CVMFS_TEST_REPO/absolute_path1/tarball_foo/a/3.txt || return 46
+
+  echo "** check mismatches in repository name"
+  cvmfs_server ingest --base_dir /cvmfs/$CVMFS_TEST_REPO/absolute_path2  --tar_file $tarfile no.such.repository && return 47
+  cvmfs_server ingest --base_dir /cvmfs/no.such.repository/absolute_path2  --tar_file $tarfile  && return 48
+  cvmfs_server ingest -d /cvmfs/$CVMFS_TEST_REPO/absolute_path1/tarball_foo/a/b/2.txt -d /cvmfs/no.such.directory/absolute_path1/tarball_foo/a/b/3.txt && return 49
 
   return 0
 }

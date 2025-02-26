@@ -12,7 +12,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 #include "loader.h"
 
 #include <dlfcn.h>
@@ -127,6 +127,8 @@ string *mount_point_ = NULL;
 string *config_files_ = NULL;
 string *socket_path_ = NULL;
 string *usyslog_path_ = NULL;
+int fuse3_max_threads_ = 0;
+int fuse3_idle_threads_ = 0;
 uid_t uid_ = 0;
 gid_t gid_ = 0;
 bool single_threaded_ = false;
@@ -176,7 +178,7 @@ static void Usage(const string &exename) {
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
-    PACKAGE_VERSION, exename.c_str());
+    CVMFS_VERSION, exename.c_str());
 }
 
 /**
@@ -379,7 +381,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       exit(0);
     case KEY_VERSION:
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS version %s\n",
-               PACKAGE_VERSION);
+               CVMFS_VERSION);
       exit(0);
     case KEY_FOREGROUND:
       foreground_ = true;
@@ -777,7 +779,7 @@ int FuseMain(int argc, char *argv[]) {
 #endif
   }
   loader_exports_ = new LoaderExports();
-  loader_exports_->loader_version = PACKAGE_VERSION;
+  loader_exports_->loader_version = CVMFS_VERSION;
   loader_exports_->boot_time = time(NULL);
   loader_exports_->program_name = argv[0];
   loader_exports_->foreground = foreground_;
@@ -933,6 +935,30 @@ int FuseMain(int argc, char *argv[]) {
     return kFailLoaderTalk;
   }
 
+  // TODO(jblomer): we probably want to apply a default setting related to the
+  // number of cores.
+  if (options_manager->GetValue("CVMFS_FUSE3_MAX_THREADS", &parameter)) {
+    fuse3_max_threads_ = String2Int64(parameter);
+  }
+  if (options_manager->GetValue("CVMFS_FUSE3_IDLE_THREADS", &parameter)) {
+    fuse3_idle_threads_ = String2Int64(parameter);
+  }
+#ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+  if (fuse3_max_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: Fuse3 max_threads=%d", fuse3_max_threads_);
+  }
+  if (fuse3_idle_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: Fuse3 min_idle_threads=%d", fuse3_idle_threads_);
+  }
+#else
+  if (fuse3_max_threads_ || fuse3_idle_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: ignoring fuse3 thread settings (libfuse too old)");
+  }
+#endif
+
   // Options are not needed anymore
   delete options_manager;
   options_manager = NULL;
@@ -1085,8 +1111,24 @@ int FuseMain(int argc, char *argv[]) {
 #if CVMFS_USE_LIBFUSE == 2
     retval = fuse_session_loop_mt(session);
 #else
+#ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+    struct fuse_loop_config *fuse_loop_cfg = fuse_loop_cfg_create();
+
+    fuse_loop_cfg_set_clone_fd(fuse_loop_cfg, 1);
+
+    if (fuse3_max_threads_ > 0) {
+      fuse_loop_cfg_set_max_threads(fuse_loop_cfg, fuse3_max_threads_);
+    }
+    if (fuse3_idle_threads_ > 0) {
+      fuse_loop_cfg_set_idle_threads(fuse_loop_cfg, fuse3_idle_threads_);
+    }
+
+    retval = fuse_session_loop_mt(session, fuse_loop_cfg);
+    fuse_loop_cfg_destroy(fuse_loop_cfg);
+#else
     retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
-#endif
+#endif  // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+#endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
 

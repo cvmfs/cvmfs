@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/network_errors.h"
@@ -25,18 +25,51 @@
 #include "network/sink_mem.h"
 #include "network/sink_path.h"
 #include "util/pipe.h"
+#include "util/tube.h"
 
 class InterruptCue;
 
 namespace download {
+
+enum DataTubeAction {
+  kActionStop = 0,
+  kActionContinue,
+  kActionDecompress
+};
+
+/**
+ * Wrapper for the data tube to transfer data from CallbackCurlData() that is
+ * executed in MainDownload() Thread to Fetch() called by a fuse thread
+ *
+ * TODO(heretherebedragons): do we want to have a pool of those datatubeelements?
+ */
+struct DataTubeElement : SingleCopy {
+  char* data;
+  size_t size;
+  DataTubeAction action;
+
+  explicit DataTubeElement(DataTubeAction xact) :
+                                           data(NULL), size(0), action(xact) { }
+  DataTubeElement(char* mov_data, size_t xsize, DataTubeAction xact) :
+                                   data(mov_data), size(xsize), action(xact) { }
+
+  ~DataTubeElement() {
+    delete data;
+  }
+};
 
 /**
  * Contains all the information to specify a download job.
  */
 class JobInfo {
  private:
+  static atomic_int64 next_uuid;
+  int64_t id_;
   /// Pipe used for the return value
   UniquePtr<Pipe<kPipeDownloadJobsResults> > pipe_job_results;
+  /// Tube (bounded thread-safe queue) to transport data from CURL callback
+  /// to be decompressed in Fetch() instead of MainDownload()
+  UniquePtr<Tube<DataTubeElement> > data_tube_;
   const std::string *url_;
   bool compressed_;
   bool probe_hosts_;
@@ -66,14 +99,17 @@ class JobInfo {
   z_stream zstream_;
   shash::ContextPtr hash_context_;
   std::string proxy_;
+  std::string link_;
   bool nocache_;
   Failures error_code_;
   int http_code_;
   unsigned char num_used_proxies_;
+  unsigned char num_used_metalinks_;
   unsigned char num_used_hosts_;
   unsigned char num_retries_;
   unsigned backoff_ms_;
-  unsigned int current_host_chain_index_;
+  int current_metalink_chain_index_;
+  int current_host_chain_index_;
 
   // Don't fail-over proxies on download errors. default = false
   bool allow_failure_;
@@ -95,9 +131,8 @@ class JobInfo {
   JobInfo(const std::string *u, const bool ph);
 
   ~JobInfo() {
-    if (pipe_job_results.IsValid()) {
-      pipe_job_results.Destroy();
-    }
+    pipe_job_results.Destroy();
+    data_tube_.Destroy();
   }
 
   void CreatePipeJobResults() {
@@ -106,6 +141,15 @@ class JobInfo {
 
   bool IsValidPipeJobResults() {
     return pipe_job_results.IsValid();
+  }
+
+  void CreateDataTube() {
+    // TODO(heretherebedragons) change to weighted queue
+    data_tube_ = new Tube<DataTubeElement>(500);
+  }
+
+  bool IsValidDataTube() {
+    return data_tube_.IsValid();
   }
 
   /**
@@ -124,8 +168,9 @@ class JobInfo {
   curl_slist **GetHeadersPtr() { return &headers_; }
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
-  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultWeakRef() {
+  Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
                                            return pipe_job_results.weak_ref(); }
+  Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
   const std::string* url() const { return url_; }
   bool compressed() const { return compressed_; }
@@ -154,17 +199,21 @@ class JobInfo {
   z_stream zstream() const { return zstream_; }
   shash::ContextPtr hash_context() const { return hash_context_; }
   std::string proxy() const { return proxy_; }
+  std::string link() const { return link_; }
   bool nocache() const { return nocache_; }
   Failures error_code() const { return error_code_; }
   int http_code() const { return http_code_; }
   unsigned char num_used_proxies() const { return num_used_proxies_; }
+  unsigned char num_used_metalinks() const { return num_used_metalinks_; }
   unsigned char num_used_hosts() const { return num_used_hosts_; }
   unsigned char num_retries() const { return num_retries_; }
   unsigned backoff_ms() const { return backoff_ms_; }
-  unsigned int current_host_chain_index() const {
-                                             return current_host_chain_index_; }
+  int current_metalink_chain_index() const {
+                                         return current_metalink_chain_index_; }
+  int current_host_chain_index() const { return current_host_chain_index_; }
 
   bool allow_failure() const { return allow_failure_; }
+  int64_t id() const { return id_; }
 
 
   void SetUrl(const std::string *url) { url_ = url; }
@@ -203,16 +252,21 @@ class JobInfo {
   void SetHashContext(shash::ContextPtr hash_context)
                                                { hash_context_ = hash_context; }
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
+  void SetLink(const std::string &link) { link_ = link; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
   void SetNumUsedProxies(unsigned char num_used_proxies)
                                        { num_used_proxies_ = num_used_proxies; }
+  void SetNumUsedMetalinks(unsigned char num_used_metalinks)
+                                   { num_used_metalinks_ = num_used_metalinks; }
   void SetNumUsedHosts(unsigned char num_used_hosts)
                                            { num_used_hosts_ = num_used_hosts; }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
-  void SetCurrentHostChainIndex(unsigned int current_host_chain_index)
+  void SetCurrentMetalinkChainIndex(int current_metalink_chain_index)
+               { current_metalink_chain_index_ = current_metalink_chain_index; }
+  void SetCurrentHostChainIndex(int current_host_chain_index)
                        { current_host_chain_index_ = current_host_chain_index; }
 
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }

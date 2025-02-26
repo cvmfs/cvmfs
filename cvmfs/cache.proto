@@ -25,7 +25,8 @@ option optimize_for = LITE_RUNTIME;
 // # Protocol changelog
 // Version 1: First version
 //   2019-05-27: add breadcrumb handling
-
+// Version 2:
+//   2023-11-14: add (optional) revision to breadcrumb
 
 //------------------------------------------------------------------------------
 // # Enum definitions
@@ -104,6 +105,7 @@ message MsgBreadcrumb {
   required string fqrn      = 1;
   required MsgHash hash     = 2;
   required uint64 timestamp = 3;
+  optional uint64 revision  = 4;
 }
 
 

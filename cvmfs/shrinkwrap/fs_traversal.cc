@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
@@ -505,6 +505,12 @@ bool Sync(
             result = false;
           }
           break;
+        case S_IFIFO:
+           // Ignore pipe, but continue
+            LogCvmfs(kLogCvmfs, kLogStderr,
+              "Skipping pipe: %s",
+              src_entry);
+          break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
             "Encountered unknown file type '%d' for source file %s",
@@ -763,9 +769,8 @@ int GarbageCollect(struct fs_traversal *fs) {
   uint64_t start_time = platform_monotonic_time();
   int retval = fs->garbage_collector(fs->context_);
   uint64_t end_time = platform_monotonic_time();
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "Garbage collection took %d seconds.",
-  (end_time-start_time));
+  LogCvmfs(kLogCvmfs, kLogStdout, "Garbage collection took %lu seconds.",
+           (end_time-start_time));
   return retval;
 }
 

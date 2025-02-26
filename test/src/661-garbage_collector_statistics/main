@@ -1,3 +1,4 @@
+#!/bin/bash
 # This file
 cvmfs_test_name="Gather garbage collector statistics"
 cvmfs_test_autofs_on_startup=false

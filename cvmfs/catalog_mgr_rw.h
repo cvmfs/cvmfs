@@ -44,7 +44,7 @@
 #include "file_chunk.h"
 #include "ingestion/pipeline.h"
 #include "upload_spooler_result.h"
-#include "util/concurrency.h"
+#include "util/future.h"
 #include "xattr.h"
 #include "upload.h"
 
@@ -196,7 +196,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
     uint64_t     ttl;
     size_t       size;
     shash::Any   content_hash;
-    unsigned int revision;
+    uint64_t     revision;
   };
 
   struct CatalogUploadContext {

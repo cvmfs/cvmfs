@@ -1,3 +1,4 @@
+#!/bin/bash
 #!/bin/sh -x
 
 cvmfs_test_name="Test CVMFS over HTTPS with HTTP Bearer Authorization"
@@ -54,6 +55,14 @@ enable_resolv_conf() {
 
 cleanup() {
   echo "running cleanup()..."
+
+  for file in $(pwd)/secure_mnt.l*;
+  do
+    echo "***********PRINT DEBUGLOG: $file *****************"
+    sudo cat $file
+    echo "***********END PRINT DEBUGLOG $file *****************"
+  done
+
   enable_resolv_conf
   sudo umount ${TEST647_GRID_MOUNTPOINT}
   [ "x$TEST647_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
@@ -263,7 +272,8 @@ cvmfs_run_test() {
   disable_resolv_conf
   do_local_mount_as_root "$mntpnt"          \
                          "$CVMFS_TEST_REPO" \
-                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" || return 19
+                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" \
+                         || return 19
   enable_resolv_conf
 
   # Create a stupid simple bearer token
@@ -287,6 +297,19 @@ cvmfs_run_test() {
   local authz_attr=
   authz_attr="$(attr -qg authz $mntpnt)" || return 41
   [ x"$authz_attr" = x"scitoken%cvmfs:/cvmfs" ]   || return 42
+
+  echo "*** Check streaming cache mgr with authentication"
+  sudo umount $mntpnt
+  sudo rm -rf ${mntpnt}c
+  do_local_mount_as_root "${mntpnt}" \
+                         "$CVMFS_TEST_REPO" \
+                         "https://${TEST647_HOSTNAME}:8443/cvmfs/$CVMFS_TEST_REPO" \
+                         "" "CVMFS_STREAMING_CACHE=yes" \
+                         || return 50
+  echo "*** This should work"
+  sudo -u nobody /bin/sh -c "export _CONDOR_CREDS=${TEST647_CRED_DIR}; cat ${mntpnt}/hello_world" > /dev/null || return 51
+  echo "*** This should not work"
+  sudo -u nobody setsid /bin/sh -c "env && cat ${mntpnt}/hello_world" && return 52
 
   return 0
 }

@@ -42,6 +42,11 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
+    r.push_back(Parameter::Optional('U',
+          "uid of new owner of the ingested data (-1 for keep tarball owner)"));
+    r.push_back(Parameter::Optional('G',
+          "gid of new owner of the ingested data (-1 for keep tarball owner)"));
+    r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
 
     return r;
   }

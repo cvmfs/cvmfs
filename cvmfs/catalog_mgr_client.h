@@ -14,6 +14,7 @@
 
 #include "backoff.h"
 #include "crypto/hash.h"
+#include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 
@@ -47,6 +48,11 @@ namespace catalog {
  * be unpinned when the class is destructed.
  */
 class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
+  FRIEND_TEST(T_CatalogManagerClient, MountLatest);
+  FRIEND_TEST(T_CatalogManagerClient, LoadByHash);
+  FRIEND_TEST(T_CatalogManagerClient, LoadByHashNetworkFailure);
+  FRIEND_TEST(T_CatalogManagerClient, LoadRootCatalog);
+
   // Maintains certificate hit/miss counters
   friend class CachedManifestEnsemble;
 
@@ -57,6 +63,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool InitFixed(const shash::Any &root_hash, bool alternative_path);
 
   shash::Any GetRootHash();
+  std::string GetCatalogDescription(const PathString &mountpoint,
+                                    const shash::Any &hash);
 
   bool IsRevisionBlacklisted();
 
@@ -68,11 +76,10 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   int root_fd() const { return root_fd_; }
 
  protected:
-  LoadError LoadCatalog(const PathString  &mountpoint,
-                        const shash::Any  &hash,
-                        std::string       *catalog_path,
-                        shash::Any        *catalog_hash,
-                        uint64_t          *manifest_age);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context, uint64_t *manifest_age);
+  virtual void StageNestedCatalogByHash(const shash::Any &hash,
+                                        const PathString &mountpoint);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
@@ -82,7 +89,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
                                         const PathString &mountpoint);
 
  private:
-  LoadError LoadCatalogCas(const shash::Any &hash,
+  LoadReturn FetchCatalogByHash(const shash::Any &hash,
                            const std::string &name,
                            const std::string &alt_catalog_path,
                            std::string *catalog_path);
@@ -102,6 +109,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool offline_mode_;  /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
+  shash::Any fixed_root_catalog_;      /**< fixed root hash */
   bool fixed_alt_root_catalog_;  /**< fixed root hash but alternative url */
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;

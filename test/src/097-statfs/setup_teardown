@@ -1,3 +1,4 @@
+#!/bin/bash
 test097_mount() {
   local repo=$1
   local params=$2

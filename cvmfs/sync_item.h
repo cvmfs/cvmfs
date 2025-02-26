@@ -136,9 +136,15 @@ class SyncItem {
    * Generates a DirectoryEntry that can be directly stored into a catalog db.
    * Note: this sets the inode fields to kInvalidInode as well as the link
    *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
+   *
+   * If nanosecond timestamps are off, the directory entry will have a
+   * default initialized, negative nanosecond timestamp and as a result
+   * the corresponding field in the catalog table will be NULL.
+   *
    * @return  a DirectoryEntry structure to be written into a catalog
    */
-  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const = 0;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool enable_mtime_ns) const = 0;
 
   inline std::string GetRelativePath() const {
     return (relative_parent_path_.empty()) ?
@@ -323,7 +329,8 @@ typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
 
 class SyncItemNative : public SyncItem {
   friend class SyncUnion;
-  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
+  virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
+    bool enable_mtime_ns) const;
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void MakePlaceholderDirectory() const { assert(false); }
   virtual SyncItemType GetScratchFiletype() const;

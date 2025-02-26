@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "catalog_virtual.h"
 
 #include <algorithm>
@@ -9,7 +9,7 @@
 #include <cstdlib>
 
 #include "catalog_mgr_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "history.h"
 #include "swissknife_history.h"
 #include "swissknife_sync.h"

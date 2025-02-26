@@ -54,8 +54,8 @@ class GarbageCollector {
 
  public:
   struct Configuration {
-    static const unsigned int kFullHistory;
-    static const unsigned int kNoHistory;
+    static const uint64_t     kFullHistory;
+    static const uint64_t     kNoHistory;
     static const time_t       kNoTimestamp;
     static const shash::Any   kLatestHistoryDatabase;
 
@@ -77,7 +77,7 @@ class GarbageCollector {
     upload::AbstractUploader  *uploader;
     ObjectFetcherTN           *object_fetcher;
     ReflogTN                  *reflog;
-    unsigned int               keep_history_depth;
+    uint64_t                   keep_history_depth;
     time_t                     keep_history_timestamp;
     bool                       dry_run;
     bool                       verbose;
@@ -93,10 +93,10 @@ class GarbageCollector {
   void UseReflogTimestamps();
   bool Collect();
 
-  unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
-  unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
-  unsigned int condemned_objects_count() const { return condemned_objects_;  }
-  unsigned int duplicate_delete_requests() const {
+  uint64_t preserved_catalog_count() const { return preserved_catalogs_; }
+  uint64_t condemned_catalog_count() const { return condemned_catalogs_; }
+  uint64_t condemned_objects_count() const { return condemned_objects_;  }
+  uint64_t duplicate_delete_requests() const {
                                            return duplicate_delete_requests_;  }
   uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
@@ -158,28 +158,28 @@ class GarbageCollector {
    */
   uint64_t              oldest_trunk_catalog_;
   bool                  oldest_trunk_catalog_found_;
-  unsigned int          preserved_catalogs_;
+  uint64_t              preserved_catalogs_;
   /**
    * Number of catalogs in the reflog that are to be deleted (in fact, some of
    * them might not exist anymore).
    */
-  unsigned int          unreferenced_trees_;
+  uint64_t              unreferenced_trees_;
   /**
    * Number of root catalogs garbage collected, count grows as GC progresses
    */
-  unsigned int          condemned_trees_;
+  uint64_t              condemned_trees_;
   /**
    * Number of catalogs garbage collected, count grows as GC progresses
    */
-  unsigned int          condemned_catalogs_;
+  uint64_t              condemned_catalogs_;
   /**
    * Keeps track if the last status report issued, between 0 and 1
    */
   float                 last_reported_status_;
 
-  unsigned int          condemned_objects_;
+  uint64_t              condemned_objects_;
   uint64_t              condemned_bytes_;
-  unsigned int          duplicate_delete_requests_;
+  uint64_t              duplicate_delete_requests_;
 };
 
 #include "garbage_collector_impl.h"

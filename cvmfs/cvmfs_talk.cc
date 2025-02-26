@@ -153,6 +153,8 @@ static void Usage(const std::string &exe) {
     "  tracebuffer flush      flushes the trace buffer to disk         \n"
     "  cache instance         describes the active cache manager       \n"
     "  cache size             gets current size of file cache          \n"
+    "  cache limit get        gets current size limit of the file cache\n"
+    "  cache limit set <MB>   sets the max size limit of the file cache\n"
     "  cache list             gets files in cache                      \n"
     "  cache list pinned      gets pinned file catalogs in cache       \n"
     "  cache list catalogs    gets all file catalogs in cache          \n"

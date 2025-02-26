@@ -341,6 +341,7 @@ class ExternalQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
+  virtual bool     SetLimit(uint64_t limit) { return false;} // NOLINT
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn() { }

@@ -1,0 +1,55 @@
+#!/bin/bash
+create_nested_repo() {
+  echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/foo/bar
+  touch /cvmfs/$CVMFS_TEST_REPO/root1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/root2.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/.cvmfscatalog
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/foo1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/foo2.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/.cvmfscatalog
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar1.txt
+  touch /cvmfs/$CVMFS_TEST_REPO/foo/bar/bar2.txt
+  publish_repo $CVMFS_TEST_REPO || return 2
+  echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+}
+
+add_some_tmp_file_to_repo() {
+  echo "Adding some random file to the repo $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  local tmpfile="$(mktemp /cvmfs/$CVMFS_TEST_REPO/tmpfile.XXXXX)"
+  publish_repo $CVMFS_TEST_REPO || return 200
+}
+
+private_mount() {
+  local mntpnt="$1"
+  TEST707_PRIVATE_MOUNT="$mntpnt"
+
+  local mount_options="rw,system_mount,fsname=cvmfs2"
+
+  do_local_mount_as_root "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_SYSLOG_LEVEL=2
+CVMFS_AUTO_UPDATE=no" \
+                 || return 1
+}
+
+private_unmount() {
+  sudo umount $TEST707_PRIVATE_MOUNT
+  TEST707_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST707_PIDS" != "x" ]; then
+    sudo kill -9 $TEST707_PIDS
+  fi
+  if [ "x$TEST707_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}

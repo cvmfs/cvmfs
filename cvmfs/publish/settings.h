@@ -11,7 +11,7 @@
 #include <map>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "sync_union.h"
 #include "upload_spooler_definition.h"
@@ -166,6 +166,7 @@ class SettingsTransaction {
   void SetHashAlgorithm(const std::string &algorithm);
   void SetCompressionAlgorithm(const std::string &algorithm);
   void SetEnforceLimits(bool value);
+  void SetEnableMtimeNs(bool value);
   void SetLimitNestedCatalogKentries(unsigned value);
   void SetLimitRootCatalogKentries(unsigned value);
   void SetLimitFileSizeMb(unsigned value);
@@ -196,6 +197,7 @@ class SettingsTransaction {
   bool is_garbage_collectable() const { return is_garbage_collectable_(); }
   bool is_volatile() const { return is_volatile_(); }
   bool enforce_limits() const { return enforce_limits_(); }
+  bool enable_mtime_ns() const { return enable_mtime_ns_(); }
   unsigned limit_nested_catalog_kentries() const {
     return limit_nested_catalog_kentries_();
   }
@@ -245,6 +247,7 @@ class SettingsTransaction {
   Setting<bool> is_garbage_collectable_;
   Setting<bool> is_volatile_;
   Setting<bool> enforce_limits_;
+  Setting<bool> enable_mtime_ns_;
   Setting<unsigned> limit_nested_catalog_kentries_;
   Setting<unsigned> limit_root_catalog_kentries_;
   Setting<unsigned> limit_file_size_mb_;

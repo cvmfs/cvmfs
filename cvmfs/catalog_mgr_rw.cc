@@ -49,7 +49,7 @@ WritableCatalogManager::WritableCatalogManager(
   unsigned                   min_weight,
   const                      std::string &dir_cache)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
-      statistics, false, dir_cache, true)
+      statistics, false, dir_cache, true /* copy to tmpdir */)
   , spooler_(spooler)
   , enforce_limits_(enforce_limits)
   , nested_kcatalog_limit_(nested_kcatalog_limit)
@@ -1155,10 +1155,10 @@ bool WritableCatalogManager::Commit(const bool           stop_for_tweaks,
   if (manual_revision > 0) {
     const uint64_t revision = root_catalog->GetRevision();
     if (revision >= manual_revision) {
-      LogCvmfs(kLogCatalog, kLogStderr, "Manual revision (%d) must not be "
-                                        "smaller than the current root "
-                                        "catalog's (%d). Skipped!",
-                                        manual_revision, revision);
+      LogCvmfs(kLogCatalog, kLogStderr,
+               "Manual revision (%" PRIu64 ") must not be "
+               "smaller than the current root catalog's (%" PRIu64
+               "). Skipped!", manual_revision, revision);
     } else {
       // Gets incremented by FinalizeCatalog() afterwards!
       root_catalog->SetRevision(manual_revision - 1);
@@ -1410,7 +1410,7 @@ void WritableCatalogManager::FinalizeCatalog(WritableCatalog *catalog,
   if ((catalog_limit > 0) &&
       (catalog->GetCounters().GetSelfEntries() > catalog_limit)) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "%s: catalog at %s has more than %u entries (%u). "
+             "%s: catalog at %s has more than %lu entries (%lu). "
              "Large catalogs stress the CernVM-FS transport infrastructure. "
              "Please split it into nested catalogs or increase the limit.",
              enforce_limits_ ? "FATAL" : "WARNING",
@@ -1448,8 +1448,8 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
 
 /**
  * Copy catalog to local cache.server
- * Must be an atomic write into the local_cache_dir
- * As such: create a temporary copy in local_cache_dir/txn and then do a 
+ * Must be an atomic write into the cache_dir
+ * As such: create a temporary copy in cache_dir/txn and then do a 
  * `rename` (which is atomic) to the actual cache path
  * 
  * @returns true on success, otherwise false
@@ -1457,12 +1457,12 @@ void WritableCatalogManager::ScheduleCatalogProcessing(
 bool WritableCatalogManager::CopyCatalogToLocalCache(
                                           const upload::SpoolerResult &result) {
   std::string tmp_catalog_path;
-  const std::string cache_catalog_path = local_cache_dir_ + "/"
+  const std::string cache_catalog_path = dir_cache_ + "/"
                                   + result.content_hash.MakePathWithoutSuffix();
-  FILE *fcatalog = CreateTempFile(local_cache_dir_ + "/txn/catalog", 0666,
-                                                      "w", &tmp_catalog_path);
+  FILE *fcatalog = CreateTempFile(dir_cache_ + "/txn/catalog", 0666,
+                                                        "w", &tmp_catalog_path);
   if (!fcatalog) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogStderr,
+    PANIC(kLogDebug | kLogStderr,
                                "Creating file for temporary catalog failed: %s",
                                tmp_catalog_path.c_str());
     return false;
@@ -1471,14 +1471,13 @@ bool WritableCatalogManager::CopyCatalogToLocalCache(
   (void) fclose(fcatalog);
 
   if (rename(tmp_catalog_path.c_str(), cache_catalog_path.c_str()) != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogStderr,
+    PANIC(kLogDebug | kLogStderr,
                          "Failed to copy catalog from %s to cache %s",
                          result.local_path.c_str(), cache_catalog_path.c_str());
     return false;
   }
   return true;
 }
-
 
 void WritableCatalogManager::CatalogUploadCallback(
                           const upload::SpoolerResult &result,
@@ -1502,9 +1501,13 @@ void WritableCatalogManager::CatalogUploadCallback(
   uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
+  if (UseLocalCache()) {
+    CopyCatalogToLocalCache(result);
+  }
+
   SyncLock();
 
-  if (useLocalCache()) {
+  if (UseLocalCache()) {
     CopyCatalogToLocalCache(result);
   }
   if (catalog->HasParent()) {
@@ -1661,7 +1664,7 @@ void WritableCatalogManager::CatalogUploadSerializedCallback(
           result.local_path.c_str(), result.return_code);
   }
 
-  if (useLocalCache()) {
+  if (UseLocalCache()) {
     CopyCatalogToLocalCache(result);
   }
 

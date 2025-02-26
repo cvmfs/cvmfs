@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Read-only cache"
 cvmfs_test_suites="quick"

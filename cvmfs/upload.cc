@@ -3,7 +3,7 @@
  */
 
 #include "upload.h"
-#include "cvmfs_config.h"
+
 
 #include <vector>
 

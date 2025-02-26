@@ -15,7 +15,7 @@
 #include <string>
 
 #include "cache_posix.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "quota.h"
 #include "testutil.h"
@@ -218,6 +218,7 @@ class TestQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity() { return 100*1024*1024; }
   virtual uint64_t GetSize() { return size; }
   virtual uint64_t GetSizePinned() { return 0; }
+  virtual bool     SetLimit(uint64_t limit) { return false; } // NOLINT
   virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }
@@ -617,7 +618,7 @@ TEST_F(T_CacheManager, Dup) {
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_null_));
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
-  EXPECT_NE(fd, fd_dup);
+  EXPECT_EQ(fd, fd_dup);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd_dup));
 }

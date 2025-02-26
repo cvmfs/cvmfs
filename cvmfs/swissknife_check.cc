@@ -6,7 +6,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "swissknife_check.h"
 
 #include <inttypes.h>
@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "catalog_sql.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "file_chunk.h"
 #include "history_sqlite.h"
 #include "manifest.h"
@@ -82,12 +82,12 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     }
   }
   if (diffs & Difference::kLinkcount) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %u / %u",
              a.linkcount(), b.linkcount());
     retval = false;
   }
   if (diffs & Difference::kHardlinkGroup) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "hardlink groups differ: %u / %u",
              a.hardlink_group(), b.hardlink_group());
     retval = false;
   }
@@ -97,7 +97,7 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kMode) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %lu / %lu",
+    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %u / %u",
              a.mode(), b.mode());
     retval = false;
   }
@@ -128,6 +128,18 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.name().c_str(), b.name().c_str());
     retval = false;
   }
+  if (!is_transition_point) {
+      if (diffs & Difference::kUid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)",
+                 a.uid(), b.uid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+      if (diffs & Difference::kGid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)",
+                 a.gid(), b.gid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+    }
 
   return retval;
 }
@@ -285,7 +297,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
 
   bool result = true;
 
-  map<string, unsigned> initial_revisions;
+  map<string, uint64_t> initial_revisions;
   sanitizer::BranchSanitizer sanitizer;
   for (unsigned i = 0; i < branches.size(); ++i) {
     if (!sanitizer.IsValid(branches[i].branch)) {
@@ -300,7 +312,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
   // TODO(jblomer): same root hash implies same size and revision
   for (unsigned i = 0; i < tags.size(); ++i) {
     used_branches.insert(tags[i].branch);
-    map<string, unsigned>::const_iterator iter =
+    const map<string, uint64_t>::const_iterator iter =
       initial_revisions.find(tags[i].branch);
     if (iter == initial_revisions.end()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch %s in tag %s",
@@ -308,8 +320,8 @@ bool CommandCheck::InspectHistory(history::History *history) {
       result = false;
     } else {
       if (tags[i].revision < iter->second) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "invalid revision %u of tag %s",
-               tags[i].revision, tags[i].name.c_str());
+        LogCvmfs(kLogCvmfs, kLogStderr, "invalid revision %" PRIu64
+                 " of tag %s", tags[i].revision, tags[i].name.c_str());
         result = false;
       }
     }
@@ -517,8 +529,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
       // Right size of symbolic link?
       if (entries[i].size() != entries[i].symlink().GetLength()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; ",
-                 "expected %s, got %s", full_path.c_str(),
+        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; "
+                 "expected %u, got %lu", full_path.c_str(),
                  entries[i].symlink().GetLength(), entries[i].size());
         retval = false;
       }
@@ -611,7 +623,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
            const string chunk_path = "data/" + chunk_hash.MakePath();
            if (!Exists(chunk_path)) {
               LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                              "offset: %d | size: %d) missing",
+                       "offset: %ld | size: %lu) missing",
                        this_chunk.content_hash().ToStringWithSuffix().c_str(),
                        full_path.c_str(),
                        this_chunk.offset(),
@@ -625,7 +637,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       // is the aggregated chunk size equal to the actual file size?
       if (aggregated_file_size != entries[i].size()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "chunks of file %s produce a size "
-                                        "mismatch. Calculated %d bytes | %d "
+                                        "mismatch. Calculated %zu bytes | %lu "
                                         "bytes expected",
                  full_path.c_str(),
                  aggregated_file_size,
@@ -647,7 +659,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   // Check directory linkcount
   if (this_directory.linkcount() != num_subdirs + 2) {
     LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
-             "expected %lu, got %lu",
+             "expected %u, got %u",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
     retval = false;
   }
@@ -658,7 +670,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
   {
     if (i->second[0].linkcount() != i->second.size()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "hardlink linkcount wrong for %s, "
-               "expected %lu, got %lu",
+               "expected %lu, got %u",
                (path.ToString() + "/" + i->second[0].name().ToString()).c_str(),
                i->second.size(), i->second[0].linkcount());
       retval = false;
@@ -716,7 +728,12 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   catalog::Catalog *catalog =
                    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
+  if (catalog_file_size <= 0) {
+
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error downloading catalog %s at %s %s",
+             catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str() );
+    assert(catalog_file_size > 0);
+  }
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
@@ -934,7 +951,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string tag_name;
   string subtree_path = "";
   string pubkey_path = "";
-  string trusted_certs = "";
   string repo_name = "";
   string reflog_chksum_path = "";
 
@@ -959,8 +975,6 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     pubkey_path = *args.find('k')->second;
   if (DirectoryExists(pubkey_path))
     pubkey_path = JoinStrings(FindFilesBySuffix(pubkey_path, ".pub"), ":");
-  if (args.find('z') != args.end())
-    trusted_certs = *args.find('z')->second;
   if (args.find('N') != args.end())
     repo_name = *args.find('N')->second;
 
@@ -987,7 +1001,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    if (!this->InitVerifyingSignatureManager(pubkey_path, trusted_certs)) {
+    if (!this->InitSignatureManager(pubkey_path)) {
       return 1;
     }
   }

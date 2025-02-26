@@ -322,7 +322,7 @@ int posix_info(struct cvmcache_info *info) {
 int posix_breadcrumb_store(const char *fqrn,
                                   const cvmcache_breadcrumb *breadcrumb) {
   manifest::Breadcrumb bc(Chash2Cpphash(&breadcrumb->catalog_hash),
-                          breadcrumb->timestamp);
+                          breadcrumb->timestamp, breadcrumb->revision);
   if (!g_cache_mgr->StoreBreadcrumb(fqrn, bc)) {
     return CVMCACHE_STATUS_IOERR;
   }
@@ -337,6 +337,7 @@ int posix_breadcrumb_load(const char *fqrn,
   }
   breadcrumb->catalog_hash = Cpphash2Chash(bc.catalog_hash);
   breadcrumb->timestamp = bc.timestamp;
+  breadcrumb->revision = bc.revision;
   return CVMCACHE_STATUS_OK;
 }
 

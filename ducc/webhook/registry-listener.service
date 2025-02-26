@@ -1,0 +1,14 @@
+[Unit]
+Description=Registry Webhook File Listener Service
+After=network.target
+
+[Service]
+Type=simple
+User=almalinux
+EnvironmentFile=/home/almalinux/cvmfs/ducc/webhook/.env
+ExecStart=/usr/bin/go run ${PROJECT_PATH}/registry-listener.go -log_file ${LISTENER_LOGFILE} -notifications_file ${NOTIFICATIONS_FILE} -repository_name ${REPOSITORY_NAME}
+StandardOutput=journal
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

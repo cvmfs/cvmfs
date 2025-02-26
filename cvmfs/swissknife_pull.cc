@@ -10,7 +10,7 @@
 // NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "swissknife_pull.h"
 
 #include <inttypes.h>
@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "catalog.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
@@ -526,9 +526,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (DirectoryExists(master_keys))
     master_keys = JoinStrings(FindFilesBySuffix(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
-  string trusted_certs;
-  if (args.find('y') != args.end())
-    trusted_certs = *args.find('y')->second;
   if (args.find('n') != args.end())
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
@@ -589,18 +586,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!this->InitVerifyingSignatureManager(master_keys, trusted_certs)) {
+  if (!this->InitSignatureManager(master_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize CVMFS signatures");
     return 1;
   } else {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: using public key(s) %s",
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
-    if (!trusted_certs.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-               "CernVM-FS: using trusted certificates in %s",
-               JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
-    }
   }
 
   unsigned current_group;
@@ -766,7 +758,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Found %lu named snapshots",
              historic_tags.size());
     // TODO(jblomer): We should repliacte the previous history dbs, too,
     // in order to avoid races on fail-over between non-synchronized stratum 1s
@@ -904,7 +896,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", false);
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %u",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());
   }
 

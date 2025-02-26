@@ -1,0 +1,214 @@
+#!/bin/bash
+cvmfs_test_name="Breadcrumb: Different scenarios with missing revision"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+source ./src/707-breadcrumb_no_revision/setup_teardown
+
+TEST707_PRIVATE_MOUNT=
+TEST707_PIDS=
+CVMFS_TEST_707_OSXMOUNTPOINT=
+
+
+get_root_hash() {
+  attr -g catalog_counters "${mntpnt}/" | grep catalog_hash | awk -F" " '{print $2}'
+}
+
+breadcrumb_remove_revision() {
+  sudo cat "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO" | \
+      awk -F'R' '{print $1;}' | \
+      sudo tee "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO"
+}
+
+breadcrumb_remove_revision_replace_timestamp_with_now() {
+  local new_breadcrumb=$(sudo cat "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO" | \
+                         awk -F'T' '{print $1;}')
+
+  cur_time=$(date --date="+10 seconds" +%s)
+
+  new_breadcrumb+="T$cur_time"
+
+  echo "$new_breadcrumb" | sudo tee "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO"
+}
+
+breadcrumb_replace_revision_large() {
+  local new_breadcrumb=$(sudo cat "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO" | \
+                         awk -F'R' '{print $1;}')
+
+  new_breadcrumb+="R200"
+
+  echo "$new_breadcrumb" | sudo tee "${mntpnt}c/$CVMFS_TEST_REPO/cvmfschecksum.$CVMFS_TEST_REPO"
+}
+
+load_new_root_catalog() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount "$mntpnt"
+
+  oldRoot=$(get_root_hash)
+  add_some_tmp_file_to_repo
+
+  sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" remount sync
+  newRoot=$(get_root_hash)
+
+  private_unmount
+
+  echo "   $oldRoot should not be equal $newRoot"
+
+  [ "$oldRoot" != "$newRoot" ] || return 10
+
+  echo "   ... success (load_new_root_catalog)"
+}
+
+server_available() {
+  echo "   *** server_available"
+  local mntpnt="$1"
+
+  private_mount "$mntpnt"
+
+  # ls $mntpnt
+  local oldRevision
+  oldRevision=$(attr -q -g revision "$mntpnt")
+
+  add_some_tmp_file_to_repo
+  echo "   New files were added to the repository."
+
+  breadcrumb_remove_revision
+  echo "   Remove revision from breadcrumb."
+
+  local updateStatus
+  updateStatus=$(sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" remount sync)
+
+  local newRevision
+  newRevision=$(attr -q -g revision "$mntpnt")
+
+  private_unmount
+
+  echo "   Revision $oldRevision should be smaller than $newRevision"
+
+  [ "$oldRevision" -lt "$newRevision" ] || return 20
+
+  echo "   ... success (server_available)"
+}
+
+no_server() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount "$mntpnt"
+
+  # ls $mntpnt
+  local oldRevision
+  oldRevision=$(attr -q -g revision "$mntpnt")
+
+  add_some_tmp_file_to_repo
+  echo "   New files were added to the repository."
+
+  breadcrumb_remove_revision
+  echo "   Remove revision from breadcrumb."
+
+  sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" proxy set DIRECT
+  sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" host set http://127.0.0.1
+  echo "   Disable network connectivity"
+
+  local updateStatus
+  updateStatus=$(sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" remount sync)
+
+  local newRevision
+  newRevision=$(attr -q -g revision "$mntpnt")
+
+  private_unmount
+
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
+
+  [ "$oldRevision" -eq "$newRevision" ] || return 30
+
+  echo "   ... success (no_server)"
+}
+
+breadcrumb_timestamp_newer() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount "$mntpnt"
+
+  # ls $mntpnt
+  local oldRevision
+  oldRevision=$(attr -q -g revision "$mntpnt")
+
+  add_some_tmp_file_to_repo
+  echo "   New files were added to the repository."
+
+  sleep 2
+  breadcrumb_remove_revision_replace_timestamp_with_now
+  echo "   Breadcrumb has now a newer timestamp and no revision than remote"
+
+  local updateStatus
+  updateStatus=$(sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" remount sync)
+
+  local newRevision
+  newRevision=$(attr -q -g revision "$mntpnt")
+
+  private_unmount
+
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
+
+  [ "$oldRevision" -eq "$newRevision" ] || return 40
+
+  echo "   ... success (breadcrumb_timestamp_newer)"
+}
+
+breadcrumb_revision_large() {
+  echo "   *** load_new_root_catalog"
+  local mntpnt="$1"
+
+  private_mount "$mntpnt"
+
+  # ls $mntpnt
+  local oldRevision
+  oldRevision=$(attr -q -g revision "$mntpnt")
+
+  add_some_tmp_file_to_repo
+  echo "   New files were added to the repository."
+
+  sleep 3
+  breadcrumb_replace_revision_large
+  echo "   Breadcrumb has now a larger revision then remote"
+
+  local updateStatus
+  updateStatus=$(sudo cvmfs_talk -p "${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO" remount sync)
+
+  local newRevision
+  newRevision=$(attr -q -g revision "$mntpnt")
+
+  private_unmount
+
+  echo "   Old revision $oldRevision should be equal to new $newRevision"
+
+  [ "$oldRevision" -eq "$newRevision" ] || return 50
+
+  echo "   ... success (breadcrumb_revision_large)"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+  local config_file_path="${scratch_dir}/${CVMFS_TEST_REPO}.config.txt"
+
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  create_nested_repo
+
+  load_new_root_catalog ${mntpnt} || return $?
+  server_available ${mntpnt} || return $?
+  no_server ${mntpnt} || return $?
+  breadcrumb_timestamp_newer ${mntpnt} || return $?
+  breadcrumb_revision_large ${mntpnt} || return $?
+
+  return 0
+}

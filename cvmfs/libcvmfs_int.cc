@@ -9,7 +9,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 
 #include <sys/xattr.h>
-#include "cvmfs_config.h"
+
 #include "libcvmfs_int.h"
 
 #include <dirent.h>
@@ -49,7 +49,7 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
@@ -683,7 +683,7 @@ int64_t LibContext::Pread(
         offset_in_chunk);
 
       if (bytes_fetched < 0) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d (%s)",
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %ld (%s)",
                  bytes_fetched,
                  open_chunks.chunk_reflist.path.ToString().c_str());
         return -bytes_fetched;
@@ -721,19 +721,24 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadError retval =
-    mount_point_->catalog_mgr()->Remount(true /* dry_run */);
+  catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
+
   switch (retval) {
     case catalog::kLoadUp2Date:
       LogCvmfs(kLogCvmfs, kLogDebug, "catalog up to date");
       return 0;
 
     case catalog::kLoadNew:
-      retval = mount_point_->catalog_mgr()->Remount(false /* dry_run */);
-      if (retval != catalog::kLoadNew)
+      retval = mount_point_->catalog_mgr()->Remount();
+
+      if (retval != catalog::kLoadUp2Date && retval != catalog::kLoadNew) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                              "Remount requested to switch catalog but failed");
         return -1;
+      }
+
       mount_point_->ReEvaluateAuthz();
-      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
+      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %" PRIu64,
                mount_point_->catalog_mgr()->GetRevision());
       return 0;
 

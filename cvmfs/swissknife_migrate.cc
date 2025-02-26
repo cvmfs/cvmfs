@@ -13,7 +13,7 @@
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "swissknife_history.h"
 #include "util/concurrency.h"
@@ -67,7 +67,7 @@ ParameterList CommandMigrate::GetParams() const {
 
 
 static void Error(const std::string &message) {
-  LogCvmfs(kLogCatalog, kLogStderr, message.c_str());
+  LogCvmfs(kLogCatalog, kLogStderr, "%s", message.c_str());
 }
 
 
@@ -156,7 +156,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     const bool follow_redirects = false;
     const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
     if (!this->InitDownloadManager(follow_redirects, proxy) ||
-        !this->InitVerifyingSignatureManager(repo_keys)) {
+        !this->InitSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init repo connection");
       return 1;
     }
@@ -327,7 +327,7 @@ void CommandMigrate::UploadHistoryClosure(
 
 bool CommandMigrate::UpdateUndoTags(
   PendingCatalog *root_catalog,
-  unsigned revision,
+  uint64_t revision,
   time_t timestamp,
   shash::Any *history_hash)
 {
@@ -352,7 +352,6 @@ bool CommandMigrate::UpdateUndoTags(
 
     tag_trunk.root_hash = root_catalog->new_catalog_hash;
     tag_trunk.size = root_catalog->new_catalog_size;
-    tag_trunk.revision = root_catalog->new_catalog_size;
     tag_trunk.revision = revision;
     tag_trunk.timestamp = timestamp;
 
@@ -860,7 +859,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 6;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 7;
 
 
 template<class DerivedT>
@@ -1107,7 +1106,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "         IFNULL(hardlink_group_id, 0) << 32 | "
     "         COALESCE(hardlinks.linkcount, dir_linkcounts.linkcount, 1) "
     "           AS hardlinks, "
-    "         hash, size, mode, mtime, "
+    "         hash, size, mode, mtime, NULL, " // set empty mtimens
     "         flags, name, symlink, "
     "         :uid, "
     "         :gid, "

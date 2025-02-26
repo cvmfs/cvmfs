@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Test for running CVMFS against an Azure S3 implementation
 #

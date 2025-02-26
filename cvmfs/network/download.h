@@ -18,7 +18,7 @@
 
 #include "gtest/gtest_prod.h"
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
 #include "network/dns.h"
@@ -44,8 +44,9 @@ struct Counters {
   perf::Counter *sz_transfer_time;  // measured in milliseconds
   perf::Counter *n_requests;
   perf::Counter *n_retries;
-  perf::Counter *n_proxy_failover;
+  perf::Counter *n_metalink_failover;
   perf::Counter *n_host_failover;
+  perf::Counter *n_proxy_failover;
 
   explicit Counters(perf::StatisticsTemplate statistics) {
     sz_transferred_bytes = statistics.RegisterTemplated("sz_transferred_bytes",
@@ -55,10 +56,12 @@ struct Counters {
     n_requests = statistics.RegisterTemplated("n_requests",
         "Number of requests");
     n_retries = statistics.RegisterTemplated("n_retries", "Number of retries");
-    n_proxy_failover = statistics.RegisterTemplated("n_proxy_failover",
-        "Number of proxy failovers");
+    n_metalink_failover = statistics.RegisterTemplated("n_metalink_failover",
+        "Number of metalink failovers");
     n_host_failover = statistics.RegisterTemplated("n_host_failover",
         "Number of host failovers");
+    n_proxy_failover = statistics.RegisterTemplated("n_proxy_failover",
+        "Number of proxy failovers");
   }
 };  // Counters
 
@@ -119,6 +122,25 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   FRIEND_TEST(T_Download, EscapeUrl);
 
  public:
+  // HostInfo is used for both metalink and host
+  struct HostInfo {
+    HostInfo() { }
+    HostInfo(
+        std::vector<std::string> *chain,
+        const int current,
+        const time_t timestamp_backup,
+        const unsigned reset_after)
+      : chain(chain)
+      , current(current)
+      , timestamp_backup(timestamp_backup)
+      , reset_after(reset_after)
+    { }
+    std::vector<std::string> *chain;
+    int current;
+    time_t timestamp_backup;
+    unsigned reset_after;
+  };
+
   struct ProxyInfo {
     ProxyInfo() { }
     explicit ProxyInfo(const std::string &url) : url(url) { }
@@ -155,16 +177,16 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   static const unsigned kDnsDefaultTimeoutMs = 3000;
   static const unsigned kProxyMapScale = 16;
 
-  DownloadManager();
+  DownloadManager(const unsigned max_pool_handles,
+                  const perf::StatisticsTemplate &statistics,
+                  const std::string &name = "standard");
   ~DownloadManager();
 
   static int ParseHttpCode(const char digits[3]);
 
-  void Init(const unsigned max_pool_handles,
-            const perf::StatisticsTemplate &statistics);
-  void Fini();
   void Spawn();
-  DownloadManager *Clone(const perf::StatisticsTemplate &statistics);
+  DownloadManager *Clone(const perf::StatisticsTemplate &statistics,
+                         const std::string &cloned_name);
   Failures Fetch(JobInfo *info);
 
   void SetCredentialsAttachment(CredentialsAttachment *ca);
@@ -176,6 +198,12 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
+  void SetMetalinkChain(const std::string &metalink_list);
+  void SetMetalinkChain(const std::vector<std::string> &metalink_list);
+  void GetMetalinkInfo(std::vector<std::string> *metalink_chain,
+                       unsigned *current_metalink);
+  void SwitchMetalink();
+  bool CheckMetalinkChain(const time_t now);
   void SetHostChain(const std::string &host_list);
   void SetHostChain(const std::vector<std::string> &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
@@ -201,6 +229,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
+  void SetMetalinkResetDelay(const unsigned seconds);
   void SetHostResetDelay(const unsigned seconds);
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
@@ -219,7 +248,12 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void SetFqrn(const std::string &fqrn) { fqrn_ = fqrn; }
 
   unsigned num_hosts() {
-    if (opt_host_chain_) return opt_host_chain_->size();
+    if (opt_host_.chain) return opt_host_.chain->size();
+    return 0;
+  }
+
+  unsigned num_metalinks() {
+    if (opt_metalink_.chain) return opt_metalink_.chain->size();
     return 0;
   }
 
@@ -236,6 +270,8 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
+  void SwitchHostInfo(const std::string &typ, HostInfo &info, JobInfo *jobinfo);
+  void SwitchMetalink(JobInfo *info);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
   ProxyInfo *ChooseProxyUnlocked(const shash::Any *hash);
@@ -252,13 +288,15 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   void Backoff(JobInfo *info);
   void SetNocache(JobInfo *info);
   void SetRegularCache(JobInfo *info);
+  void ProcessLink(JobInfo *info);
   bool VerifyAndFinalize(const int curl_error, JobInfo *info);
   void InitHeaders();
-  void FiniHeaders();
   void CloneProxyConfig(DownloadManager *clone);
+  void CheckHostInfoReset(const std::string &typ, HostInfo &info,
+                          JobInfo *jobinfo, time_t &now);
 
   bool EscapeUrlChar(unsigned char input, char output[3]);
-  std::string EscapeUrl(const std::string &url);
+  std::string EscapeUrl(const int64_t jobinfo_id, const std::string &url);
   unsigned EscapeHeader(const std::string &header, char *escaped_buf,
                         size_t buf_size);
 
@@ -308,14 +346,17 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool enable_http_tracing_;
   std::vector<std::string> http_tracing_headers_;
 
+  // Metalink list
+  HostInfo opt_metalink_;
+  time_t opt_metalink_timestamp_link_;
+
   // Host list
-  std::vector<std::string> *opt_host_chain_;
+  HostInfo opt_host_;
   /**
    * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
    * .cvmfschecksum in ms. -1 is unprobed, -2 is error.
    */
   std::vector<int> *opt_host_chain_rtt_;
-  unsigned opt_host_chain_current_;
 
   // Proxy list
   std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
@@ -352,7 +393,7 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Sorted list of currently active proxy URLs (for log messages)
    */
-  std::vector<std::string> opt_proxy_urls_;
+  std::vector<std::string> opt_proxies_;
   /**
    * Shard requests across multiple proxies via consistent hashing
    */
@@ -361,17 +402,17 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   /**
    * Sharding policy deciding which proxy should be chosen for each download
    * request
-   * 
+   *
    * Sharding policy is shared between all download managers. As such shared
-   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * pointers are used to allow for proper clean-up afterwards in the destructor
    * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<ShardingPolicy> sharding_policy_;
   /**
    * Health check for the proxies
-   * 
+   *
    * Health check is shared between all download managers. As such shared
-   * pointers are used to allow for proper clean-up afterwards in Fini()
+   * pointers are used to allow for proper clean-up afterwards in the destructor
    * (We cannot assume the order in which the download managers are stopped)
    */
   SharedPtr<HealthCheck> health_check_;
@@ -381,8 +422,14 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool failover_indefinitely_;
   /**
    * Repo name. Needed for the re-try logic if a download was unsuccessful
-  */
+   * Used in sharding policy && Interrupted()
+   */
   std::string fqrn_;
+
+  /**
+   * Name of the download manager (default is "standard")
+   */
+  std::string name_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
@@ -416,14 +463,6 @@ class DownloadManager {  // NOLINT(clang-analyzer-optin.performance.Padding)
   time_t opt_timestamp_backup_proxies_;
   time_t opt_timestamp_failover_proxies_;  // failover within the same group
   unsigned opt_proxy_groups_reset_after_;
-
-  /**
-   * Similarly to proxy group reset, we'd also like to reset the host after a
-   * failover.  Host outages can last longer and might come with a separate
-   * reset delay.
-   */
-  time_t opt_timestamp_backup_host_;
-  unsigned opt_host_reset_after_;
 
   CredentialsAttachment *credentials_attachment_;
 

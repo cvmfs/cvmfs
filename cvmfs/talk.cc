@@ -16,7 +16,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 #include "talk.h"
 
 #include <errno.h>
@@ -44,6 +44,7 @@
 #include "fuse_remount.h"
 #include "glue_buffer.h"
 #include "loader.h"
+#include "lru_md.h"
 #include "monitor.h"
 #include "mountpoint.h"
 #include "network/download.h"
@@ -95,6 +96,24 @@ TalkManager *TalkManager::Create(
   return talk_manager.Release();
 }
 
+
+string TalkManager::FormatMetalinkInfo(download::DownloadManager *download_mgr)
+{
+  vector<string> metalink_chain;
+  unsigned active_metalink;
+
+  download_mgr->GetMetalinkInfo(&metalink_chain, &active_metalink);
+  if (metalink_chain.size() == 0)
+    return "No metalinks defined\n";
+
+  string metalink_str;
+  for (unsigned i = 0; i < metalink_chain.size(); ++i) {
+    metalink_str += "  [" + StringifyInt(i) + "] " + metalink_chain[i] + "\n";
+  }
+  metalink_str += "Active metalink " + StringifyInt(active_metalink) + ": " +
+              metalink_chain[active_metalink] + "\n";
+  return metalink_str;
+}
 
 string TalkManager::FormatHostInfo(download::DownloadManager *download_mgr) {
   vector<string> host_chain;
@@ -190,7 +209,7 @@ void *TalkManager::MainResponder(void *data) {
     if (buf[bytes_read-1] == '\0')
       bytes_read--;
     const string line = string(buf, bytes_read);
-    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %u)",
+    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %lu)",
              line.c_str(), line.length());
 
     if (line == "tracebuffer flush") {
@@ -249,6 +268,27 @@ void *TalkManager::MainResponder(void *data) {
           talk_mgr->Answer(con_fd, StringifyInt(rate) + "\n");
         }
       }
+    } else if (line.substr(0, 15) == "cache limit set") {
+      if (line.length() < 16) {
+        talk_mgr->Answer(con_fd, "Usage: cache limit set <MB>\n");
+      } else {
+        QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
+        const uint64_t size = String2Uint64(line.substr(16));
+        if (size < 1000) {
+            talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
+        } else {
+          if(quota_mgr->SetLimit(size * 1024*1024)) {
+              file_system->options_mgr()->SetValueFromTalk("CVMFS_QUOTA_LIMIT", StringifyUint(size));
+              talk_mgr->Answer(con_fd, "OK\n");
+          } else {
+              talk_mgr->Answer(con_fd, "Limit not reset\n");
+          }
+        }
+      }
+    } else if (line == "cache limit get") {
+      std::string limit_from_options;
+      file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT", &limit_from_options);
+            talk_mgr->Answer(con_fd, limit_from_options + "\n");
     } else if (line.substr(0, 7) == "cleanup") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
       if (!quota_mgr->HasCapability(QuotaManager::kCapShrink)) {
@@ -386,12 +426,21 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->download_mgr()->SetDnsServer(host);
         talk_mgr->Answer(con_fd, "OK\n");
       }
+    } else if (line == "external metalink info") {
+      const string external_metalink_info =
+        talk_mgr->FormatMetalinkInfo(mount_point->external_download_mgr());
+      talk_mgr->Answer(con_fd, external_metalink_info);
+    } else if (line == "metalink info") {
+      const string metalink_info =
+        talk_mgr->FormatMetalinkInfo(mount_point->download_mgr());
+      talk_mgr->Answer(con_fd, metalink_info);
     } else if (line == "external host info") {
-      string external_host_info =
+      const string external_host_info =
         talk_mgr->FormatHostInfo(mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_host_info);
     } else if (line == "host info") {
-      string host_info = talk_mgr->FormatHostInfo(mount_point->download_mgr());
+      const string host_info =
+        talk_mgr->FormatHostInfo(mount_point->download_mgr());
       talk_mgr->Answer(con_fd, host_info);
     } else if (line == "host probe") {
       mount_point->download_mgr()->ProbeHosts();
@@ -402,12 +451,34 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       else
         talk_mgr->Answer(con_fd, "Failed\n");
+    } else if (line == "external metalink switch") {
+      mount_point->external_download_mgr()->SwitchMetalink();
+      talk_mgr->Answer(con_fd, "OK\n");
+    } else if (line == "metalink switch") {
+      mount_point->download_mgr()->SwitchMetalink();
+      talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "external host switch") {
       mount_point->external_download_mgr()->SwitchHost();
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "host switch") {
       mount_point->download_mgr()->SwitchHost();
       talk_mgr->Answer(con_fd, "OK\n");
+    } else if (line.substr(0, 21) == "external metalink set") {
+      if (line.length() < 23) {
+        talk_mgr->Answer(con_fd, "Usage: external metalink set <URL>\n");
+      } else {
+        const std::string host = line.substr(22);
+        mount_point->external_download_mgr()->SetMetalinkChain(host);
+        talk_mgr->Answer(con_fd, "OK\n");
+      }
+    } else if (line.substr(0, 12) == "metalink set") {
+      if (line.length() < 14) {
+        talk_mgr->Answer(con_fd, "Usage: metalink set <URL>\n");
+      } else {
+        const std::string host = line.substr(13);
+        mount_point->download_mgr()->SetMetalinkChain(host);
+        talk_mgr->Answer(con_fd, "OK\n");
+      }
     } else if (line.substr(0, 17) == "external host set") {
       if (line.length() < 19) {
         talk_mgr->Answer(con_fd, "Usage: external host set <URL>\n");
@@ -499,6 +570,18 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line == "open catalogs") {
       talk_mgr->Answer(con_fd, mount_point->catalog_mgr()->PrintHierarchy());
+    } else if (line == "drop metadata caches") {
+      // For testing
+      mount_point->inode_cache()->Pause();
+      mount_point->path_cache()->Pause();
+      mount_point->md5path_cache()->Pause();
+      mount_point->inode_cache()->Drop();
+      mount_point->path_cache()->Drop();
+      mount_point->md5path_cache()->Drop();
+      mount_point->inode_cache()->Resume();
+      mount_point->path_cache()->Resume();
+      mount_point->md5path_cache()->Resume();
+      talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "internal affairs") {
       int current;
       int highwater;
@@ -695,7 +778,7 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->inode_tracker()->EndEnumerate(&cursor);
       talk_mgr->Answer(con_fd, result);
     } else if (line == "version") {
-      string version_str = string(VERSION) + " (CernVM-FS Fuse Module)\n" +
+      const string version_str = string(CVMFS_VERSION) + " (CernVM-FS Fuse Module)\n" +
         cvmfs::loader_exports_->loader_version + " (Loader)\n";
       talk_mgr->Answer(con_fd, version_str);
     } else if (line == "version patchlevel") {

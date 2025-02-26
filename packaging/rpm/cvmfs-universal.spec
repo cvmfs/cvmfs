@@ -165,7 +165,7 @@ Requires: util-linux
   %endif
 %endif
 Requires: cvmfs-config
-Requires: cvmfs-libs = %{version}
+Requires: cvmfs-libs = %{version}-%{release}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -194,7 +194,7 @@ Common utility libraries for CernVM-FS packages
 %package fuse3
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
-Requires: cvmfs = %{version}
+Requires: cvmfs = %{version}-%{release}
 Requires: fuse3
 Requires: fuse3-libs
 %description fuse3
@@ -204,7 +204,7 @@ Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %package devel
 Summary: CernVM-FS static client library
 Group: Applications/System
-Requires: cvmfs-libs = %{version}
+Requires: cvmfs-libs = %{version}-%{release}
 %description devel
 CernVM-FS static client library for pure user-space use
 
@@ -252,7 +252,7 @@ Requires: jq
 Requires(post): /usr/sbin/semanage
 Requires(postun): /usr/sbin/semanage
 %endif
-Requires: cvmfs-libs = %{version}
+Requires: cvmfs-libs = %{version}-%{release}
 
 Conflicts: cvmfs-server < 2.1
 
@@ -262,7 +262,7 @@ CernVM-FS tools to maintain Stratum 0/1 repositories
 %package shrinkwrap
 Summary: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
 Group: Application/System
-Requires: cvmfs-libs = %{version}
+Requires: cvmfs-libs = %{version}-%{release}
 %description shrinkwrap
 CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
 images.
@@ -270,7 +270,7 @@ images.
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
-Requires: cvmfs-libs = %{version}
+Requires: cvmfs-libs = %{version}-%{release}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
@@ -279,7 +279,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 Summary: CernVM-FS Repository Gateway
 Group: Application/System
 BuildRequires: %{cvmfs_go} >= 1.11.4
-Requires: cvmfs-server = %{version}, psmisc
+Requires: cvmfs-server = %{version}-%{release}, psmisc
 %description gateway
 The CernVM-FS repository gateway service enables multiple remote publishers
 to write to the same repository.
@@ -484,11 +484,13 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
-%if 0%{?systemd_autofs_patch}
-/usr/bin/systemctl daemon-reload
-%endif
-if [ -d /var/run/cvmfs ]; then
-  /usr/bin/cvmfs_config reload
+if  [ -d /run/systemd/system ]
+  systemctl daemon-reload
+  systemctl start cvmfs-reload.service
+else
+  if [ -d /var/run/cvmfs ]; then
+    /usr/bin/cvmfs_config reload
+  fi
 fi
 :
 
@@ -511,10 +513,7 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-%if 0%{?build_gateway}
-%post gateway
-systemctl daemon-reload
-%endif
+
 
 %preun
 if [ $1 = 0 ] ; then
@@ -616,6 +615,7 @@ systemctl daemon-reload
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
+%{_unitdir}/cvmfs-reload.service
 
 %files libs
 %defattr(-,root,root)
@@ -704,10 +704,12 @@ systemctl daemon-reload
 %files ducc
 %{_bindir}/cvmfs_ducc
 %{_unitdir}/cvmfs_ducc.service
-/usr/libexec/cvmfs/ducc/registry-webhook.py*
+/usr/libexec/cvmfs/ducc/registry_webhook.py*
 %endif
 
 %changelog
+* Tue Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
+- Rename registry-webhook.py to registry_webhook.py to allow imports
 * Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
 - Make cvmfs-libs a dependency of the cvmfs package
 * Mon May 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.10.0

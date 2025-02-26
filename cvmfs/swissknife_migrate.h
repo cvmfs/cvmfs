@@ -21,6 +21,7 @@
 #include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
+#include "util/future.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 
@@ -390,7 +391,7 @@ class CommandMigrate : public Command {
   void UploadHistoryClosure(const upload::SpoolerResult &result,
                             Future<shash::Any> *hash);
   bool UpdateUndoTags(PendingCatalog *root_catalog,
-                      unsigned revision,
+                      uint64_t revision,
                       time_t timestamp,
                       shash::Any *history_hash);
 

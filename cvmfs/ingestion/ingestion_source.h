@@ -71,7 +71,7 @@ class FileIngestionSource : public IngestionSource {
     ssize_t read = SafeRead(fd_, buffer, nbyte);
     if (read < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read the file: %s (%d)\n %s",
-               fd_, path_.c_str(), errno, strerror(errno));
+               path_.c_str(), errno, strerror(errno));
     }
     return read;
   }

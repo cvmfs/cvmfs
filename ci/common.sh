@@ -86,12 +86,10 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/COPYING            \
                       ${source_directory}/ChangeLog          \
                       ${source_directory}/INSTALL            \
-                      ${source_directory}/NEWS               \
                       ${source_directory}/README.md          \
                       ${source_directory}/add-ons            \
                       ${source_directory}/bootstrap.sh       \
                       ${source_directory}/cmake              \
-                      ${source_directory}/config_cmake.h.in  \
                       ${source_directory}/cvmfs              \
                       ${source_directory}/doc                \
                       ${source_directory}/externals          \
