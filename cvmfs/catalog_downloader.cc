@@ -8,7 +8,9 @@ void TaskCatalogDownload::Process(CatalogItem *input) {
   std::string catalog_path;
   shash::Any  catalog_hash;
   // will PANIC if download failed
-  catalog_mgr_->LoadCatalog(PathString("") /* not used */, *input->GetHash(), &catalog_path, &catalog_hash, NULL);
+  //catalog_mgr_->LoadCatalog(PathString("") /* not used */, *input->GetHash(), &catalog_path, &catalog_hash, NULL);
+  catalog::CatalogContext context(*input->GetHash(), PathString(catalog_path));
+  catalog_mgr_->LoadCatalogByHash(&context);
   NotifyListeners(CatalogDownloadResult(catalog_path, input->GetHash()->ToString()));
   tube_counter_->PopFront(); // pop after calling callback as callback could enqueue additional items
 }

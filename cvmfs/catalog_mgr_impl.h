@@ -127,7 +127,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::RemountDryrun() {
 }
 
 template <class CatalogT>
-LoadReturn AbstractCatalogManager<CatalogT>::Remount(uint64_t *manifest_age) {
+LoadReturn AbstractCatalogManager<CatalogT>::Remount() {
   LogCvmfs(kLogCatalog, kLogDebug, "remounting repositories");
   CatalogContext ctlg_context;
 
@@ -140,7 +140,7 @@ LoadReturn AbstractCatalogManager<CatalogT>::Remount(uint64_t *manifest_age) {
 
   WriteLock();
 
-  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context, manifest_age);
+  const LoadReturn load_error = LoadCatalogByHash(&ctlg_context);
 
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;

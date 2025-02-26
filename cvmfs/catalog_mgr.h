@@ -253,7 +253,7 @@ class AbstractCatalogManager : public SingleCopy {
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
   LoadReturn RemountDryrun();
-  LoadReturn Remount(uint64_t *manifest_age=NULL);
+  LoadReturn Remount();
   LoadReturn ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
@@ -311,9 +311,6 @@ class AbstractCatalogManager : public SingleCopy {
   std::string PrintHierarchy() const;
   std::string PrintAllMemStatistics() const;
 
-  virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
-                                        const PathString & /*mountpoint*/)
-  { }
   void StageNestedCatalog(const PathString &path, const CatalogT *parent,
                           bool is_listable);
 
@@ -356,7 +353,7 @@ class AbstractCatalogManager : public SingleCopy {
    * See class description of CatalogContext for more information.
    */
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result) = 0;
-  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context, uint64_t *manifest_age) = 0;
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }

@@ -162,12 +162,17 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   shash::Any manifest_base_hash;
-  const UniquePtr<manifest::Manifest> manifest_tgt(
-    server_tool->FetchRemoteManifest(
-      params.stratum0, repo_name, manifest_base_hash));
+  std::string cached_manifest_file =  "/var/spool/cvmfs/" + repo_name + "/cvmfs_receiver_last_manifest";
+  UniquePtr<manifest::Manifest> manifest{manifest::Manifest::LoadFile(cached_manifest_file)};
+  if(!manifest.IsValid()) {
+    LogCvmfs(kLogReceiver, kLogSyslog, "No cached manifest - loading from remote" );
+    manifest = server_tool->FetchRemoteManifest(
+      params.stratum0, repo_name, manifest_base_hash);
+  } else {
+    LogCvmfs(kLogReceiver, kLogSyslog, "Using cached manifest" );
+  }
 
-  // Current catalog from the gateway machine
-  if (!manifest_tgt.IsValid()) {
+  if (!manifest.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;
@@ -176,7 +181,7 @@ CommitProcessor::Result CommitProcessor::Process(
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, target root hash: %s",
            lease_path.c_str(),
-           manifest_tgt->catalog_hash().ToString(false).c_str());
+           manifest->catalog_hash().ToString(false).c_str());
 
 
   std::string cache_dir_;
@@ -206,7 +211,7 @@ CommitProcessor::Result CommitProcessor::Process(
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest_tgt.weak_ref(),
+                 server_tool->download_manager(), manifest.weak_ref(),
                  statistics_, cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,

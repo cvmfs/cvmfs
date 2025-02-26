@@ -76,14 +76,6 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
     params->use_local_cache = false;
   }
 
-
-  std::string use_local_cache_str;
-  if (parser.GetValue("CVMFS_SERVER_CATALOG_CACHE", &use_local_cache_str)) {
-    params->use_local_cache = parser.IsOn(use_local_cache_str);
-  } else {
-    params->use_local_cache = false;
-  }
-
   std::string hash_algorithm_str;
   if (!parser.GetValue("CVMFS_HASH_ALGORITHM", &hash_algorithm_str)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,

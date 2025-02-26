@@ -35,9 +35,11 @@ SimpleCatalogManager::SimpleCatalogManager(
     const bool success = MakeCacheDirectories(dir_cache_, 0755);
 
     if (!success) {
-      PANIC(kLogStderr,
-            "Failure during creation of local cache directory for server. "
-            "Local cache directory: %s", dir_cache_.c_str());
+      LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
+              "Failure during creation of local cache directory for server."
+              "Continue, but no local cache will be used.");
+      dir_cache_ = "";
+      copy_to_tmp_dir_ = false;
     }
   } else {
     copy_to_tmp_dir_ = false;
@@ -183,53 +185,4 @@ Catalog* SimpleCatalogManager::CreateCatalog(const PathString  &mountpoint,
   return new_catalog;
 }
 
-SimpleCatalogManager::SimpleCatalogManager(
-                       const shash::Any           &base_hash,
-                       const std::string          &stratum0,
-                       const std::string          &dir_temp,
-                       download::DownloadManager  *download_manager,
-                       perf::Statistics           *statistics,
-                       const bool                  manage_catalog_files,
-                       const std::string           &dir_cache,
-                       const bool                  copy_to_tmp_dir)
-                     : AbstractCatalogManager<Catalog>(statistics)
-                     , dir_cache_(dir_cache)
-                     , copy_to_tmp_dir_(copy_to_tmp_dir)
-                     , base_hash_(base_hash)
-                     , stratum0_(stratum0)
-                     , dir_temp_(dir_temp)
-                     , download_manager_(download_manager)
-                     , manage_catalog_files_(manage_catalog_files) {
-  if (!dir_cache.empty()) {
-    const bool success = MakeCacheDirectories(dir_cache_, 0755);
-
-    if (!success) {
-      LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
-              "Failure during creation of local cache directory for server."
-              "Continue, but no local cache will be used.");
-      dir_cache_ = "";
-      copy_to_tmp_dir_ = false;
-    }
-  } else {
-    copy_to_tmp_dir_ = false;
-  }
-}
-
-std::string SimpleCatalogManager::CopyCatalogToTempFile(
-                                                const std::string &cache_path) {
-  std::string tmp_path;
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
-  if (!fcatalog) {
-    PANIC(kLogStderr, "failed to create temp file when loading %s",
-                      cache_path.c_str());
-  }
-
-  const bool retval = CopyPath2File(cache_path, fcatalog);
-  if (!retval) {
-    PANIC(kLogStderr, "failed to read %s", cache_path.c_str());
-  }
-  (void) fclose(fcatalog);
-
-  return tmp_path;
-}
 }  // namespace catalog

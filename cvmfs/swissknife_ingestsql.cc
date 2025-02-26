@@ -418,7 +418,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   if (equiv == 1) {
     size_t binary_size;
     char *binary_acl = (char *)acl_to_xattr(acl, &binary_size);
-    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %d)", binary_size);
+    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %lu)", binary_size);
     free(binary_acl);
   }
 
@@ -490,8 +490,6 @@ static vector<string> get_file_list(string& path) {
 extern bool g_log_with_time;
 
 int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
-  LogCvmfs(kLogCvmfs, kLogStdout, "Running CVMFS release %s", PACKAGE_VERSION);
-
   g_log_with_time = true;
 
   // force no checking of manifest signature
@@ -730,7 +728,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     cancel_lease();
     return 1;
   }
-  if (!InitVerifyingSignatureManager(public_keys, "")) {
+  if (!InitSignatureManager(public_keys, "")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "signature manager init failed");
     cancel_lease();
     return 1;
@@ -1048,7 +1046,7 @@ int swissknife::IngestSQL::do_additions(
   int row_count = static_cast<int>(tree.size());
   int print_every = calculate_print_frequency(row_count);
   int curr_row = 0;
-  LogCvmfs(kLogCvmfs, kLogStdout, "Changeset: %d dirs, %d files, %d symlinks", tree.size(), all_files.size(), all_symlinks.size());
+  LogCvmfs(kLogCvmfs, kLogStdout, "Changeset: %ld dirs, %ld files, %ld symlinks", tree.size(), all_files.size(), all_symlinks.size());
 
   // STEP 2:
   // - process all the changes with DFS traversal
