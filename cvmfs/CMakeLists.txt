@@ -708,7 +708,7 @@ if (BUILD_SERVER)
     )
   else() # SSL disabled, so use vendored library for functionality which would otherwise be taken form OpenSSL
     list(APPEND CVMFS_SWISSKNIFE_LINK_LIBRARIES
-      -l:libcrypto.a
+      cvmfs_crypto
     )
   endif()
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
@@ -830,7 +830,7 @@ if (BUILD_SERVER)
     )
   else() # SSL disabled, so use vendored library for functionality which would otherwise be taken form OpenSSL
     list(APPEND LIBCVMFS_SERVER_LINK_LIBRARIES
-      -l:libcrypto.a
+      cvmfs_crypto
     )
   endif()
   add_library (cvmfs_server SHARED ${LIBCVMFS_SERVER_SOURCES})
