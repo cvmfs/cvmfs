@@ -27,17 +27,17 @@ namespace catalog {
 template <class CatalogMgrT>
 DirectoryEntryBase
 CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
-  string name,
+  const string& name,
   uid_t uid,
   gid_t gid)
 {
   // Note that another entity needs to ensure that the object of an empty
   // file is in the repository!  It is currently done by the sync_mediator.
-  shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
+  shash::Algorithms const algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
   void *empty_compressed;
   uint64_t sz_empty_compressed;
-  bool retval = zlib::CompressMem2Mem(
+  bool const retval = zlib::CompressMem2Mem(
     NULL, 0, &empty_compressed, &sz_empty_compressed);
   assert(retval);
   shash::HashMem(static_cast<unsigned char *>(empty_compressed),
@@ -55,19 +55,19 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
 }
 
 template <class CatalogMgrT>
-void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(string path) {
-  XattrList xattr;
+void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(const string& path) {
+  XattrList const xattr;
   DirectoryEntry parent;
   bool retval;
   retval = catalog_mgr_->LookupPath(PathString(path), kLookupDefault, &parent);
   assert(retval);
-  DirectoryEntryBase cvmfscatalog =
+  DirectoryEntryBase const cvmfscatalog =
       MakeEmptyDirectoryEntryBase(".cvmfscatalog", parent.uid(),
                                            parent.gid());
-  DirectoryEntryBase cvmfsautocatalog =
+  DirectoryEntryBase const cvmfsautocatalog =
       MakeEmptyDirectoryEntryBase(".cvmfsautocatalog", parent.uid(),
                                            parent.gid());
-  string relative_path = path.substr(1);
+  string const relative_path = path.substr(1);
   catalog_mgr_->AddFile(cvmfscatalog, xattr, relative_path);
   catalog_mgr_->AddFile(cvmfsautocatalog, xattr, relative_path);
 }
@@ -85,7 +85,7 @@ void CatalogBalancer<CatalogMgrT>::Balance(catalog_t *catalog) {
       Balance(catalogs[i]);
     return;
   }
-  string catalog_path = catalog->mountpoint().ToString();
+  string const catalog_path = catalog->mountpoint().ToString();
   virtual_node_t root_node(catalog_path, catalog_mgr_);
   root_node.ExtractChildren(catalog_mgr_);
   // we have just recursively loaded the entire virtual tree!
@@ -112,7 +112,7 @@ void CatalogBalancer<CatalogMgrT>::PartitionOptimally(
         heaviest_node->weight >= catalog_mgr_->min_weight_) {
       // the catalog now generated _cannot_ be overflowed because the tree is
       // being traversed in postorder, handling the lightest nodes first
-      unsigned max_weight = heaviest_node->weight;
+      unsigned const max_weight = heaviest_node->weight;
       AddCatalogMarker(heaviest_node->path);
       AddCatalog(heaviest_node);
       virtual_node->weight -= (max_weight - 1);
@@ -153,7 +153,7 @@ CatalogBalancer<CatalogMgrT>::MaxChild(
 template <class CatalogMgrT>
 void CatalogBalancer<CatalogMgrT>::AddCatalog(virtual_node_t *child_node) {
   assert(child_node != NULL);
-  string new_catalog_path = child_node->path.substr(1);
+  string const new_catalog_path = child_node->path.substr(1);
   catalog_mgr_->CreateNestedCatalog(new_catalog_path);
   child_node->weight = 1;
   child_node->is_new_nested_catalog = true;
@@ -167,7 +167,7 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::ExtractChildren(
   DirectoryEntryList direntlist;
   catalog_mgr->Listing(path, &direntlist);
   for (unsigned i = 0; i < direntlist.size(); ++i) {
-    string child_path = path + "/" + direntlist[i].name().ToString();
+    string const child_path = path + "/" + direntlist[i].name().ToString();
     children.push_back(virtual_node_t(
         child_path, direntlist[i], catalog_mgr));
     weight += children[i].weight;

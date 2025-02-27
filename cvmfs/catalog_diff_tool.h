@@ -5,8 +5,10 @@
 #ifndef CVMFS_CATALOG_DIFF_TOOL_H_
 #define CVMFS_CATALOG_DIFF_TOOL_H_
 
+#include <cstddef>
 #include <string>
 
+#include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "shortstring.h"
@@ -156,6 +158,6 @@ class CatalogDiffTool {
   const bool needs_setup_;
 };
 
-#include "catalog_diff_tool_impl.h"
+#include "catalog_diff_tool_impl.h" // NOLINT(misc-include-cleaner)
 
 #endif  // CVMFS_CATALOG_DIFF_TOOL_H_

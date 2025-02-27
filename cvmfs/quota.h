@@ -95,11 +95,11 @@ class QuotaManager : SingleCopy {
   std::map<shash::Md5, int> back_channels_;
   pthread_mutex_t *lock_back_channels_;
   void LockBackChannels() {
-    int retval = pthread_mutex_lock(lock_back_channels_);
+    int const retval = pthread_mutex_lock(lock_back_channels_);
     assert(retval == 0);
   }
   void UnlockBackChannels() {
-    int retval = pthread_mutex_unlock(lock_back_channels_);
+    int const retval = pthread_mutex_unlock(lock_back_channels_);
     assert(retval == 0);
   }
 
@@ -117,21 +117,21 @@ class QuotaManager : SingleCopy {
 class NoopQuotaManager : public QuotaManager {
  public:
   virtual ~NoopQuotaManager() { }
-  virtual bool HasCapability(Capabilities capability) { return false; }
+  virtual bool HasCapability(Capabilities  /*capability*/) { return false; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description) { }
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
                               const std::string &description) { }
-  virtual bool Pin(const shash::Any &hash, const uint64_t size,
-                   const std::string &description, const bool is_catalog)
+  virtual bool Pin(const shash::Any & /*hash*/, const uint64_t  /*size*/,
+                   const std::string & /*description*/, const bool  /*is_catalog*/)
   {
     return true;
   }
   virtual void Unpin(const shash::Any &hash) { }
   virtual void Touch(const shash::Any &hash) { }
   virtual void Remove(const shash::Any &file) { }
-  virtual bool Cleanup(const uint64_t leave_size) { return false; }
+  virtual bool Cleanup(const uint64_t  /*leave_size*/) { return false; }
 
   virtual void RegisterBackChannel(int back_channel[2],
                                    const std::string &channel_id) { }
@@ -148,12 +148,12 @@ class NoopQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListVolatile() {
     return std::vector<std::string>();
   }
-  virtual uint64_t GetMaxFileSize() { return uint64_t(-1); }
-  virtual uint64_t GetCapacity() { return uint64_t(-1); }
+  virtual uint64_t GetMaxFileSize() { return static_cast<uint64_t>(-1); }
+  virtual uint64_t GetCapacity() { return static_cast<uint64_t>(-1); }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
   virtual bool     SetLimit(uint64_t) {return false;}
-  virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
+  virtual uint64_t GetCleanupRate(uint64_t  /*period_s*/) { return 0; }
 
   virtual void Spawn() { }
   virtual pid_t GetPid() { return getpid(); }

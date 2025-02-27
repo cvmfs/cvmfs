@@ -77,7 +77,7 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
   SqlGetCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i    = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     bool current_retval = sql_counter.BindCounter(i->first) &&
                           sql_counter.FetchRow();
@@ -136,7 +136,7 @@ bool TreeCountersBase<FieldT>::WriteToDatabase(
   SqlUpdateCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i    = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     const bool current_retval =
       sql_counter.BindCounter(i->first)   &&
@@ -161,7 +161,7 @@ bool TreeCountersBase<FieldT>::InsertIntoDatabase(
   SqlCreateCounter sql_counter(database);
 
   typename FieldsMap::const_iterator i    = map.begin();
-  typename FieldsMap::const_iterator iend = map.end();
+  typename FieldsMap::const_iterator const iend = map.end();
   for (; i != iend; ++i) {
     const bool current_retval =
       sql_counter.BindCounter(i->first)   &&

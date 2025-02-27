@@ -128,8 +128,8 @@ class CatalogBalancer {
   typedef typename CatalogBalancer<CatalogMgrT>::VirtualNode virtual_node_t;
 
   void PartitionOptimally(VirtualNode *virtual_node);
-  void AddCatalogMarker(std::string path);
-  DirectoryEntryBase MakeEmptyDirectoryEntryBase(std::string name,
+  void AddCatalogMarker(const std::string& path);
+  DirectoryEntryBase MakeEmptyDirectoryEntryBase(const std::string& name,
                                                  uid_t uid,
                                                  gid_t gid);
   static VirtualNode *MaxChild(VirtualNode *virtual_node);

@@ -17,10 +17,18 @@
 
 #include <stdint.h>
 
+#include <cstddef>
+#include <cassert>
 #include <string>
 #include <vector>
 
 #include "catalog.h"
+#include "directory_entry.h"
+#include "crypto/hash.h"
+#include "file_chunk.h"
+#include "catalog_counters.h"
+#include "catalog_sql.h"
+#include "util/atomic.h"
 #include "util/posix.h"
 
 class XattrList;
@@ -193,7 +201,7 @@ class WritableCatalog : public Catalog {
                             grand_child_mountpoints);
   }
   void MoveToNestedRecursively(
-    const std::string dir_structure_root,
+    const std::string& dir_structure_root,
     WritableCatalog *new_nested_catalog,
     std::vector<std::string> *grand_child_mountpoints);
   void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,

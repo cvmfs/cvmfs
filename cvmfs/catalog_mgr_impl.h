@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "catalog.h"
 #include "shortstring.h"
 #include "statistics.h"
 #include "util/logging.h"

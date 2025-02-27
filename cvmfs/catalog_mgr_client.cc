@@ -5,18 +5,29 @@
 
 #include "catalog_mgr_client.h"
 
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cerrno>
+#include <cinttypes>
+#include <map>
 #include <string>
 #include <vector>
 
 #include "cache_posix.h"
+#include "catalog_counters.h"
+#include "catalog_mgr.h"
+#include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "manifest.h"
+#include "manifest_fetch.h"
 #include "mountpoint.h"
-#include "network/download.h"
 #include "quota.h"
+#include "shortstring.h"
 #include "statistics.h"
-#include "util/posix.h"
+#include "util/logging.h"
+#include "util/pointer.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -48,7 +59,7 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
   , fixed_alt_root_catalog_(false)
   , root_fd_(-1)
 {
-  LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
+  LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager"); // NOLINT(misc-include-cleaner)
   n_certificate_hits_ = mountpoint->statistics()->Register(
     "cache.n_certificate_hits", "Number of certificate hits");
   n_certificate_misses_ = mountpoint->statistics()->Register(
@@ -57,7 +68,7 @@ ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
 
 
 ClientCatalogManager::~ClientCatalogManager() {
-  LogCvmfs(kLogCache, kLogDebug, "unpinning / unloading all catalogs");
+  LogCvmfs(kLogCache, kLogDebug, "unpinning / unloading all catalogs"); // NOLINT(misc-include-cleaner)
 
   for (map<PathString, shash::Any>::iterator i = mounted_catalogs_.begin(),
        iend = mounted_catalogs_.end(); i != iend; ++i)
@@ -102,7 +113,7 @@ bool ClientCatalogManager::InitFixed(
   fixed_alt_root_catalog_ = alternative_path;
   fixed_root_catalog_ = root_hash;
 
-  bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
+  bool const attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
   if (!attached) {
@@ -156,7 +167,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
 
-  manifest::Breadcrumb breadcrumb =
+  manifest::Breadcrumb const breadcrumb =
                               fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
   if (breadcrumb.IsValid()) {
     local_newest_hash = breadcrumb.catalog_hash;
@@ -291,7 +302,7 @@ std::string ClientCatalogManager::GetCatalogDescription(
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(
                                                  CatalogContext *ctlg_context) {
-  string catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
+  string const catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
                                                ctlg_context->hash());
   string alt_root_catalog_path = "";
 
@@ -354,7 +365,7 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   CacheManager::Label label;
   label.path = name;
   label.flags = CacheManager::kLabelCatalog;
-  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
+  int const fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
                            alt_root_catalog_path);
   if (fd >= 0) {
     if (root_fd_ < 0) {
@@ -382,7 +393,7 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   CacheManager::Label label;
   label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
-  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
+  int const fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
 }
@@ -391,7 +402,7 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->mountpoint().c_str());
 
-  map<PathString, shash::Any>::iterator iter =
+  map<PathString, shash::Any>::iterator const iter =
     mounted_catalogs_.find(catalog->mountpoint());
   assert(iter != mounted_catalogs_.end());
   fetcher_->cache_mgr()->quota_mgr()->Unpin(iter->second);
@@ -410,7 +421,7 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
  * @return true if it is blacklisted, false otherwise
  */
 bool ClientCatalogManager::IsRevisionBlacklisted() {
-  uint64_t revision = GetRevision();
+  uint64_t const revision = GetRevision();
 
   LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %" PRIu64
            " is blacklisted", repo_name_.c_str(), revision);
@@ -451,13 +462,14 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   label.flags |= CacheManager::kLabelCertificate;
   label.path = catalog_mgr_->repo_name();
   uint64_t size;
-  bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
+  bool const retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
                                      &cert_buf, &size);
   cert_size = size;
-  if (retval)
+  if (retval) {
     perf::Inc(catalog_mgr_->n_certificate_hits_);
-  else
+  } else {
     perf::Inc(catalog_mgr_->n_certificate_misses_);
+  }
 }
 
 }  // namespace catalog

@@ -32,19 +32,27 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <cassert>
+#include <cstddef>
 #include <map>
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
 
+#include "catalog.h"
+#include "catalog_mgr.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
 #include "catalog_downloader.h"
+#include "crypto/hash.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "ingestion/pipeline.h"
+#include "shortstring.h"
 #include "upload_spooler_result.h"
 #include "util/future.h"
+#include "util/logging.h"
 #include "xattr.h"
 #include "upload.h"
 
@@ -117,7 +125,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                       const std::string &directory_path);
   void RemoveDirectory(const std::string &directory_path);
 
-  void Clone(const std::string from, const std::string to);
+  void Clone(const std::string& from, const std::string& to);
   void CloneTree(const std::string &from_dir, const std::string &to_dir);
 
   // Hardlink group handling
@@ -154,7 +162,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
       if (IsBalanceable()) {
           DoBalance();
       } else {
-          LogCvmfs(kLogCatalog, kLogVerboseMsg, "Not balancing the catalog "
+          LogCvmfs(kLogCatalog, kLogVerboseMsg, "Not balancing the catalog " // NOLINT(misc-include-cleaner)
                   "manager because it is not balanceable");
       }
   }
@@ -256,7 +264,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   static const std::string kCatalogFilename;
 
   // private lock of WritableCatalogManager
-  pthread_mutex_t *sync_lock_;
+  pthread_mutex_t *sync_lock_; // NOLINT(misc-include-cleaner)
   upload::Spooler *spooler_;
 
   pthread_mutex_t                         *catalog_processing_lock_;

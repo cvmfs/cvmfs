@@ -5,21 +5,19 @@
 #ifndef CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
 #define CVMFS_CATALOG_DIFF_TOOL_IMPL_H_
 
-#include <algorithm>
-#include <string>
+#include <assert.h>
 
-#include "catalog.h"
-#include "catalog_mgr.h"
-#include "crypto/hash.h"
-#include "network/download.h"
+#include <cstdint>
+
+#include "catalog_mgr.h" // NOLINT(misc-include-cleaner)
+#include "directory_entry.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/posix.h"
 
-const uint64_t kLastInode = uint64_t(-1);
+const uint64_t kLastInode = static_cast<uint64_t>(-1);
 
 inline void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
-  catalog::DirectoryEntry empty_entry;
+  catalog::DirectoryEntry const empty_entry;
   entry_list->push_back(empty_entry);
 }
 
@@ -32,10 +30,10 @@ inline void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
 
 inline bool IsSmaller(const catalog::DirectoryEntry& a,
                       const catalog::DirectoryEntry& b) {
-  bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
-  bool a_is_last = (a.inode() == kLastInode);
-  bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
-  bool b_is_last = (b.inode() == kLastInode);
+  bool const a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  bool const a_is_last = (a.inode() == kLastInode);
+  bool const b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  bool const b_is_last = (b.inode() == kLastInode);
 
   if (a_is_last || b_is_first) return false;
   if (a_is_first) return !b_is_first;
@@ -193,7 +191,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   old_path.Append("/", 1);
   PathString new_path(path);
   new_path.Append("/", 1);
-  unsigned length_after_truncate = old_path.GetLength();
+  unsigned const length_after_truncate = old_path.GetLength();
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
@@ -266,7 +264,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
 
     if (IsIgnoredPath(old_path)) continue;
 
-    catalog::DirectoryEntryBase::Differences diff =
+    catalog::DirectoryEntryBase::Differences const diff =
         old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
         old_entry.IsNestedCatalogMountpoint()) {

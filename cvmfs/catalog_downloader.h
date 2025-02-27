@@ -1,10 +1,14 @@
 #ifndef CVMFS_CATALOG_DOWNLOADER_H_
 #define CVMFS_CATALOG_DOWNLOADER_H_
 
+#include <string>
+
 #include "catalog_mgr_ro.h"
 #include "ingestion/task.h"
 #include "crypto/hash.h"
 #include "util/concurrency.h"
+#include "util/single_copy.h"
+#include "util/tube.h"
 
 extern int kCatalogDownloadMultiplier;
 
@@ -20,7 +24,7 @@ class CatalogItem : SingleCopy {
  public:
   explicit CatalogItem(const shash::Any &hash);
   static CatalogItem *CreateQuitBeacon() {
-    shash::Any empty;
+    shash::Any const empty;
     return new CatalogItem(empty);
   }
   bool IsQuitBeacon() {

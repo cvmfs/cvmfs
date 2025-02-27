@@ -6,20 +6,22 @@
 #define CVMFS_CATALOG_TRAVERSAL_H_
 
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <cerrno>
 #include <limits>
 #include <set>
 #include <stack>
 #include <string>
 #include <vector>
 
-#include "catalog.h"
 #include "compression/compression.h"
-#include "crypto/signature.h"
-#include "history_sqlite.h"
 #include "manifest.h"
 #include "object_fetcher.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
+#include "util/pointer.h"
 
 namespace catalog {
 class Catalog;
@@ -176,11 +178,12 @@ class CatalogTraversalBase
     , no_close_(params.no_close)
     , ignore_load_failure_(params.ignore_load_failure)
     , no_repeat_history_(params.no_repeat_history)
-    , error_sink_((params.quiet) ? kLogDebug : kLogStderr)
+    , error_sink_((params.quiet) ? kLogDebug : kLogStderr) // NOLINT(misc-include-cleaner)
   {
     assert(object_fetcher_ != NULL);
   }
 
+  // NOLINTBEGIN(google-default-arguments)
   /**
    * Starts the traversal process.
    * After calling this methods CatalogTraversal will go through all catalogs
@@ -247,7 +250,7 @@ class CatalogTraversalBase
         break;
 
       case ObjectFetcherT::kFailNotFound:
-        LogCvmfs(kLogCatalogTraversal, kLogDebug,
+        LogCvmfs(kLogCatalogTraversal, kLogDebug, // NOLINT(misc-include-cleaner)
                  "didn't find a history database to traverse");
         return true;
 
@@ -263,6 +266,7 @@ class CatalogTraversalBase
     assert(success);
     return TraverseList(root_hashes, type);
   }
+  // NOLINTEND(google-default-arguments)
 
   void SetCatalogInfoShim(CatalogTraversalInfoShim<CatalogTN> *shim) {
     catalog_info_shim_ = shim;
@@ -427,7 +431,7 @@ class CatalogTraversalBase
     assert(timestamp_threshold >= 0);
     const bool t =
       catalog_info_shim_->GetLastModified(job.catalog) <
-      unsigned(timestamp_threshold);
+      static_cast<unsigned>(timestamp_threshold);
 
     return t || h;
   }
@@ -440,7 +444,7 @@ class CatalogTraversalBase
   const bool              no_close_;
   const bool              ignore_load_failure_;
   const bool              no_repeat_history_;
-  LogFacilities           error_sink_;
+  LogFacilities           error_sink_; // NOLINT(misc-include-cleaner)
 };
 
 /**

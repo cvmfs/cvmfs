@@ -1,12 +1,18 @@
 #include "catalog_downloader.h"
 
+#include <string>
+
+#include "catalog_mgr.h"
+#include "crypto/hash.h"
+#include "shortstring.h"
+
 int kCatalogDownloadMultiplier = 32;
 
 CatalogItem::CatalogItem(const shash::Any &hash) : hash_(hash) {}
 
 void TaskCatalogDownload::Process(CatalogItem *input) {
-  std::string catalog_path;
-  shash::Any  catalog_hash;
+  std::string const catalog_path;
+  shash::Any  const catalog_hash;
   // will PANIC if download failed
   //catalog_mgr_->LoadCatalog(PathString("") /* not used */, *input->GetHash(), &catalog_path, &catalog_hash, NULL);
   catalog::CatalogContext context(*input->GetHash(), PathString(catalog_path));

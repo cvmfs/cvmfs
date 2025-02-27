@@ -6,14 +6,14 @@
 #define CVMFS_CATALOG_MGR_H_
 
 #ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS // NOLINT(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp)
 #endif
 
 #include <inttypes.h>
 #include <pthread.h>
 
 #include <cassert>
-#include <map>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -23,10 +23,10 @@
 #include "file_chunk.h"
 #include "manifest_fetch.h"
 #include "statistics.h"
-#include "util/algorithm.h"
-#include "util/atomic.h"
 #include "util/logging.h"
-#include "util/platform.h"
+#include "util/platform.h" // NOLINT(misc-include-cleaner)
+#include "util/pointer.h"
+#include "util/single_copy.h"
 
 class XattrList;
 namespace catalog {
@@ -97,14 +97,14 @@ struct CatalogContext {
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlgNoLocationNeeded),
-              manifest_ensemble_(NULL) { }
+              manifest_ensemble_(nullptr) { }
   CatalogContext(const shash::Any &hash, const PathString &mountpoint) :
               hash_(hash),
               mountpoint_(mountpoint),
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(kCtlgNoLocationNeeded),
-              manifest_ensemble_(NULL) { }
+              manifest_ensemble_(nullptr) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
                  const RootCatalogLocation location) :
@@ -113,7 +113,7 @@ struct CatalogContext {
               sqlite_path_(""),
               root_ctlg_revision_(-1ul),
               root_ctlg_location_(location),
-              manifest_ensemble_(NULL)  { }
+              manifest_ensemble_(nullptr)  { }
 
   bool IsRootCatalog() {
     return mountpoint_.IsEmpty();
@@ -413,19 +413,19 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevisionNoLock() const;
   uint64_t GetTimestampNoLock() const;
   inline void ReadLock() const {
-    int retval = pthread_rwlock_rdlock(rwlock_);
+    int const retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
   }
   inline void WriteLock() const {
-    uint64_t timestamp = platform_monotonic_time_ns();
-    int retval = pthread_rwlock_wrlock(rwlock_);
+    uint64_t const timestamp = platform_monotonic_time_ns(); // NOLINT(misc-include-cleaner)
+    int const retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
     perf::Inc(statistics_.n_write_lock);
-    uint64_t duration = platform_monotonic_time_ns() - timestamp;
-    perf::Xadd(statistics_.ns_write_lock, duration);
+    uint64_t const duration = platform_monotonic_time_ns() - timestamp;
+    perf::Xadd(statistics_.ns_write_lock, static_cast<int64_t>(duration));
   }
   inline void Unlock() const {
-    int retval = pthread_rwlock_unlock(rwlock_);
+    int const retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
   virtual void EnforceSqliteMemLimit();
@@ -466,9 +466,9 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t incarnation_;
   // TODO(molina) we could just add an atomic global counter instead
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
-  pthread_rwlock_t *rwlock_;
+  pthread_rwlock_t *rwlock_; // NOLINT(misc-include-cleaner)
   Statistics statistics_;
-  pthread_key_t pkey_sqlitemem_;
+  pthread_key_t pkey_sqlitemem_; // NOLINT(misc-include-cleaner)
   OwnerMap uid_map_;
   OwnerMap gid_map_;
 
@@ -497,7 +497,7 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   }
   virtual void IncGeneration(const uint64_t by) {
     inode_offset_ += by;
-    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
+    LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu", // NOLINT(misc-include-cleaner)
              inode_offset_);
   }
   virtual inode_t GetGeneration() { return inode_offset_; }

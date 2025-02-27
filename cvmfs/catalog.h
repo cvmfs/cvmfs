@@ -5,7 +5,7 @@
 #ifndef CVMFS_CATALOG_H_
 #define CVMFS_CATALOG_H_
 
-#include <pthread.h>
+#include <pthread.h> // NOLINT(misc-include-cleaner)
 #include <stdint.h>
 
 #include <cassert>
@@ -15,6 +15,7 @@
 
 #include "catalog_counters.h"
 #include "catalog_sql.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
@@ -22,6 +23,7 @@
 #include "shortstring.h"
 #include "sql.h"
 #include "uid_map.h"
+#include "util/single_copy.h"
 #include "xattr.h"
 
 namespace swissknife {
@@ -116,7 +118,7 @@ class Catalog : SingleCopy {
   static Catalog *AttachFreely(const std::string  &imaginary_mountpoint,
                                const std::string  &file,
                                const shash::Any   &catalog_hash,
-                                     Catalog      *parent    = NULL,
+                                     Catalog      *parent    = nullptr,
                                const bool          is_nested = false);
 
   bool OpenDatabase(const std::string &db_path);
@@ -161,7 +163,7 @@ class Catalog : SingleCopy {
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
-    return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
+    return ((database_ != nullptr) && database_->OwnsFile()) || managed_database_;
   }
 
   uint64_t GetTTL() const;
@@ -198,7 +200,7 @@ class Catalog : SingleCopy {
     return LookupPath(PathString(
             mountpoint_.ToString() + "/.cvmfsautocatalog"), &dirent);
   }
-  inline bool HasParent() const { return parent_ != NULL; }
+  inline bool HasParent() const { return parent_ != nullptr; }
   inline virtual bool IsWritable() const { return false; }
 
   typedef struct {
@@ -230,7 +232,7 @@ class Catalog : SingleCopy {
   typedef std::map<uint64_t, inode_t> HardlinkGroupMap;
   mutable HardlinkGroupMap hardlink_groups_;
 
-  pthread_mutex_t *lock_;
+  pthread_mutex_t *lock_; // NOLINT(misc-include-cleaner)
 
   bool InitStandalone(const std::string &database_file);
   bool ReadCatalogCounters();

@@ -2,12 +2,27 @@
  * This file is part of the CernVM file system.
  */
 
-
 #include "catalog_mgr_ro.h"
 
+#include <assert.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <string>
+
+#include "catalog.h"
+#include "catalog_mgr.h"
 #include "compression/compression.h"
+#include "crypto/hash.h"
 #include "network/download.h"
+#include "network/jobinfo.h"
+#include "network/network_errors.h"
+#include "network/sink_file.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
@@ -35,7 +50,7 @@ SimpleCatalogManager::SimpleCatalogManager(
     const bool success = MakeCacheDirectories(dir_cache_, 0755);
 
     if (!success) {
-      LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog,
+      LogCvmfs(kLogCatalog, kLogStdout | kLogSyslog, // NOLINT(misc-include-cleaner)
               "Failure during creation of local cache directory for server."
               "Continue, but no local cache will be used.");
       dir_cache_ = "";
@@ -62,7 +77,7 @@ std::string SimpleCatalogManager::CopyCatalogToTempFile(
   std::string tmp_path;
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
   if (!fcatalog) {
-    PANIC(kLogStderr, "failed to create temp file when loading %s",
+    PANIC(kLogStderr, "failed to create temp file when loading %s", // NOLINT(misc-include-cleaner)
                       cache_path.c_str());
   }
 
@@ -100,7 +115,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   FILE *fcatalog=NULL;
 
   if (UseLocalCache()) {
-    std::string cache_path = dir_cache_ + "/"
+    std::string const cache_path = dir_cache_ + "/"
                            + effective_hash.MakePathWithoutSuffix();
 
     ctlg_context->SetSqlitePath(cache_path);
@@ -108,7 +123,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
     // catalog is cached in "cache_dir/" + standard cvmfs file hierarchy
     if (FileExists(cache_path.c_str())) {
 #ifndef BUILD_INGESTSQL
-      LogCvmfs(kLogCvmfs, kLogSyslog, "LoadCatalog: serving catalog %s from cache", effective_hash.ToString().c_str() );
+      LogCvmfs(kLogCvmfs, kLogSyslog, "LoadCatalog: serving catalog %s from cache", effective_hash.ToString().c_str() ); // NOLINT(misc-include-cleaner)
 #endif
       if (!copy_to_tmp_dir_) {
         return kLoadNew;
@@ -130,18 +145,21 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   }
   ctlg_context->SetSqlitePath(tmp_path);
 
-  time_t t1=tick();
+  time_t const t1=tick();
   cvmfs::FileSink filesink(fcatalog);
   download::JobInfo download_catalog(&url, true, false,
                                      &effective_hash, &filesink);
 
   if(getenv("_CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES") ) {
-    LogCvmfs(kLogCatalog, kLogSyslog | kLogDebug, "Ignoring signature for catalog %s", effective_hash.ToString().c_str() );
+    LogCvmfs(kLogCatalog, kLogSyslog | kLogDebug, "Ignoring signature for catalog %s", effective_hash.ToString().c_str() ); // NOLINT(misc-include-cleaner)
     download_catalog.SetExpectedHash(NULL);
   }
 
   const download::Failures retval = download_manager_->Fetch(&download_catalog);
-  fclose(fcatalog);
+  int ret = fclose(fcatalog);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", tmp_path.c_str());
+  }
 
 
   if (retval != download::kFailOk) {
@@ -155,7 +173,7 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   if (UseLocalCache()) {
     const std::string cache_path = dir_cache_ + "/"
                                     + effective_hash.MakePathWithoutSuffix();
-    int ret = rename(tmp_path.c_str(), cache_path.c_str());
+    ret = rename(tmp_path.c_str(), cache_path.c_str());
     if (ret!=0) {
       PANIC(kLogStderr, "failed to rename %s to %s: errno= %d", tmp_path.c_str(), cache_path.c_str(), errno );
     }

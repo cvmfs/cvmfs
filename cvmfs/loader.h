@@ -5,7 +5,7 @@
 #ifndef CVMFS_LOADER_H_
 #define CVMFS_LOADER_H_
 
-#define _FILE_OFFSET_BITS 64
+#define _FILE_OFFSET_BITS 64 // NOLINT(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp)
 
 #include <stdint.h>
 #include <time.h>

@@ -4,14 +4,27 @@
 
 
 #include "catalog_sql.h"
+#include <sys/stat.h>
 
+#include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 #include "catalog.h"
+#include "directory_entry.h"
+#include "crypto/hash.h"
+#include "compression/compression.h"
+#include "file_chunk.h"
 #include "globals.h"
+#include "shortstring.h"
+#include "sqlite3.h"
 #include "util/logging.h"
+#include "util/platform_linux.h"
+#include "util/pointer.h"
 #include "util/posix.h"
+#include "util/string.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
@@ -95,7 +108,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   assert(read_write());
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)"); // NOLINT(misc-include-cleaner)
 
     SqlCatalog sql_upgrade(*this, "ALTER TABLE nested_catalogs "
                                   "ADD size INTEGER;");
@@ -290,8 +303,8 @@ bool CatalogDatabase::InsertInitialValues(
   bool retval = false;
 
   // Path hashes
-  shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
-  shash::Md5 root_parent_hash = (root_path == "")
+  shash::Md5 const root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
+  shash::Md5 const root_parent_hash = (root_path == "")
     ? shash::Md5()
     : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
@@ -443,12 +456,13 @@ bool CatalogDatabase::CompactDatabase() const {
 unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   unsigned int database_flags = 0;
 
-  if (entry.IsNestedCatalogRoot())
+  if (entry.IsNestedCatalogRoot()) {
     database_flags |= kFlagDirNestedRoot;
-  else if (entry.IsNestedCatalogMountpoint())
+  } else if (entry.IsNestedCatalogMountpoint()) {
     database_flags |= kFlagDirNestedMountpoint;
-  else if (entry.IsBindMountpoint())
+  } else if (entry.IsBindMountpoint()) {
     database_flags |= kFlagDirBindMountpoint;
+  }
 
   if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
@@ -499,7 +513,7 @@ zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(const unsigned flags)
   const
 {
   // 3 bits, so use 7 (111) to only pull out the flags we want
-  unsigned in_flags =
+  unsigned const in_flags =
     ((7 << kFlagPosCompression) & flags) >> kFlagPosCompression;
   return static_cast<zlib::Algorithms>(in_flags);
 }
@@ -607,13 +621,13 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 
   bool result =
     BindHashBlob(hash_idx, entry.checksum_) &&
-    BindInt64(hardlinks_idx, hardlinks) &&
-    BindInt64(size_idx, entry.size_) &&
-    BindInt(mode_idx, entry.mode_) &&
+    BindInt64(hardlinks_idx, static_cast<sqlite_int64>(hardlinks)) &&
+    BindInt64(size_idx, static_cast<sqlite_int64>(entry.size_)) &&
+    BindInt(mode_idx, static_cast<int>(entry.mode_)) &&
     BindInt64(uid_idx, entry.uid_) &&
     BindInt64(gid_idx, entry.gid_) &&
     BindInt64(mtime_idx, entry.mtime_) &&
-    BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
+    BindInt(flags_idx, static_cast<int>(CreateDatabaseFlags(entry))) &&
     BindText(name_idx, entry.name_.GetChars(),
                        static_cast<int>(entry.name_.GetLength())) &&
     BindText(symlink_idx, entry.symlink_.GetChars(),
@@ -846,7 +860,7 @@ SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
 
 
 bool SqlLookupInode::BindRowId(const uint64_t inode) {
-  return BindInt64(1, inode);
+  return BindInt64(1, static_cast<sqlite_int64>(inode));
 }
 
 
@@ -889,11 +903,11 @@ SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
   bool result =
     BindHashBlob(1, entry.checksum_) &&
-    BindInt64(2, entry.size_) &&
-    BindInt(3, entry.mode_) &&
+    BindInt64(2, static_cast<sqlite_int64>(entry.size_)) &&
+    BindInt(3, static_cast<int>(entry.mode_)) &&
     BindInt64(4, entry.mtime_) &&
-    BindText(5, entry.name_.GetChars(),    entry.name_.GetLength()) &&
-    BindText(6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
+    BindText(5, entry.name_.GetChars(),    static_cast<int>(entry.name_.GetLength())) &&
+    BindText(6, entry.symlink_.GetChars(), static_cast<int>(entry.symlink_.GetLength())) &&
     BindInt64(7, entry.uid_) &&
     BindInt64(8, entry.gid_);
   if (entry.HasMtimeNs()) {
@@ -961,7 +975,7 @@ SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
 
 
 bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
-  return BindText(1, path.GetChars(), path.GetLength());
+  return BindText(1, path.GetChars(), static_cast<int>(path.GetLength()));
 }
 
 
@@ -1214,7 +1228,7 @@ bool SqlChunkInsert::BindPathHash(const shash::Md5 &hash) {
 bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
   return
     BindInt64(3,    chunk.offset())       &&
-    BindInt64(4,    chunk.size())         &&
+    BindInt64(4,    static_cast<sqlite_int64>(chunk.size()))         &&
     BindHashBlob(5, chunk.content_hash());
 }
 
@@ -1280,7 +1294,7 @@ bool SqlChunksCount::BindPathHash(const shash::Md5 &hash) {
 
 
 int SqlChunksCount::GetChunkCount() const {
-  return RetrieveInt64(0);
+  return static_cast<int>(RetrieveInt64(0));
 }
 
 
@@ -1371,13 +1385,13 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 
 
 SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
-  int hash_mask = 7 << SqlDirent::kFlagPosHash;
-  string flags2hash =
+  int const hash_mask = 7 << SqlDirent::kFlagPosHash;
+  string const flags2hash =
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
-  int compression_mask = 7 << SqlDirent::kFlagPosCompression;
-  string flags2compression =
+  int const compression_mask = 7 << SqlDirent::kFlagPosCompression;
+  string const flags2compression =
     " ((flags&" + StringifyInt(compression_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosCompression) + ") " +
     "AS compression_algorithm ";
@@ -1453,9 +1467,9 @@ XattrList SqlLookupXattrs::GetXattrs() {
   if (packed_xattrs == NULL)
     return XattrList();
 
-  int size = RetrieveBytes(0);
+  int const size = RetrieveBytes(0);
   assert(size >= 0);
-  UniquePtr<XattrList> xattrs(XattrList::Deserialize(packed_xattrs, size));
+  UniquePtr<XattrList> const xattrs(XattrList::Deserialize(packed_xattrs, size));
   if (!xattrs.IsValid()) {
     LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");
     return XattrList();

@@ -9,14 +9,18 @@
 
 #include <inttypes.h>
 
+#include <cstdint>
 #include <map>
 #include <string>
 
 #include "backoff.h"
+#include "catalog.h"
 #include "crypto/hash.h"
 #include "gtest/gtest_prod.h"
+#include "manifest.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
+#include "util/pointer.h"
 
 class CacheManager;
 namespace cvmfs {

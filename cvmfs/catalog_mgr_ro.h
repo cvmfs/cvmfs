@@ -13,10 +13,11 @@
 
 #include <string>
 
+#include "catalog.h"
 #include "catalog_mgr.h"
-#include "util/logging.h"
-#include "util/posix.h"
+#include "crypto/hash.h"
 #include "network/download.h"
+#include "shortstring.h"
 
 namespace manifest {
 class Manifest;
