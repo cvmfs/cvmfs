@@ -417,8 +417,8 @@ double Database<DerivedT>::GetFreePageRatio() const {
                       free_page_count_query.FetchRow();
   assert(retval);
 
-  int64_t pages      = page_count_query.RetrieveInt64(0);
-  int64_t free_pages = free_page_count_query.RetrieveInt64(0);
+  int64_t const pages      = page_count_query.RetrieveInt64(0);
+  int64_t const free_pages = free_page_count_query.RetrieveInt64(0);
   assert(pages > 0);
 
   return (static_cast<double>(free_pages) / static_cast<double>(pages));

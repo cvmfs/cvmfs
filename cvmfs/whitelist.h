@@ -87,7 +87,7 @@ class Whitelist {
             download::DownloadManager *download_manager,
             signature::SignatureManager *signature_manager);
   ~Whitelist();
-  explicit Whitelist(const Whitelist &other);
+  Whitelist(const Whitelist &other);
   Whitelist &operator= (const Whitelist &other);
   Failures LoadUrl(const std::string &base_url);
   Failures LoadMem(const std::string &whitelist);

@@ -4,16 +4,21 @@
 
 #include "manifest_fetch.h"
 
-#include <string>
-#include <vector>
+#include <stdlib.h>
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
+#include <string>
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "manifest.h"
 #include "network/download.h"
+#include "network/jobinfo.h"
+#include "network/network_errors.h"
+#include "network/sink_mem.h"
+#include "util/logging.h"
 #include "util/smalloc.h"
 #include "whitelist.h"
 
@@ -27,7 +32,7 @@ namespace manifest {
  *
  * @note Ownership of manifest_data is transferred to the ensemble.
  */
-static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
+static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size, // NOLINT(misc-use-anonymous-namespace)
                          const std::string &base_url,
                          const std::string &repository_name,
                          const uint64_t minimum_timestamp,
@@ -58,7 +63,7 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
 
   // Basic manifest sanity check
   if (ensemble->manifest->repository_name() != repository_name) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, // NOLINT(misc-include-cleaner)
              "repository name does not match (found %s, expected %s)",
              ensemble->manifest->repository_name().c_str(),
              repository_name.c_str());
@@ -165,7 +170,7 @@ cleanup:
  * Downloads and verifies the manifest, the certificate, and the whitelist.
  * If base_url is empty, uses the probe_hosts feature from download manager.
  */
-static Failures DoFetch(const std::string &base_url,
+static Failures DoFetch(const std::string &base_url, // NOLINT(misc-use-anonymous-namespace)
                         const std::string &repository_name,
                         const uint64_t minimum_timestamp,
                         const shash::Any *base_catalog,
@@ -182,7 +187,7 @@ static Failures DoFetch(const std::string &base_url,
 
   retval_dl = download_manager->Fetch(&download_manifest);
   if (retval_dl != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, // NOLINT(misc-include-cleaner)
              "failed to download repository manifest (%d - %s)", retval_dl,
              download::Code2Ascii(retval_dl));
     return kFailLoad;
@@ -211,7 +216,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
       (result != kFailInvalidCertificate) &&
       (download_manager->num_hosts() > 1))
   {
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn, // NOLINT(misc-include-cleaner)
              "failed to fetch manifest (%d - %s), trying another stratum 1",
              result, Code2Ascii(result));
     download_manager->SwitchHost();

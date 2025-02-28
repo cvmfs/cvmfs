@@ -11,7 +11,6 @@
 #include <string>
 
 #include "crypto/hash.h"
-#include "history.h"
 
 namespace manifest {
 

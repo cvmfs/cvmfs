@@ -4,11 +4,17 @@
 
 #include "manifest.h"
 
+#include <unistd.h>
+
+#include <cstdint>
 #include <cstdio>
 #include <map>
+#include <string>
 #include <vector>
 
 #include "catalog.h"
+#include "crypto/hash.h"
+#include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
 
@@ -47,21 +53,24 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
 
 bool Breadcrumb::Export(const string &fqrn, const string &directory,
                         const int mode) const {
-  string breadcrumb_path = MakeCanonicalPath(directory) +
+  string const breadcrumb_path = MakeCanonicalPath(directory) +
                                 "/cvmfschecksum." + fqrn;
   string tmp_path;
   FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
   if (fbreadcrumb == NULL)
     return false;
   string str_breadcrumb = ToString();
-  int written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
+  size_t const written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
                        fbreadcrumb);
-  fclose(fbreadcrumb);
-  if (static_cast<unsigned>(written) != str_breadcrumb.length()) {
+  int retval = fclose(fbreadcrumb);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", tmp_path.c_str()); // NOLINT(misc-include-cleaner)
+  }
+  if (written != str_breadcrumb.length()) {
     unlink(tmp_path.c_str());
     return false;
   }
-  int retval = rename(tmp_path.c_str(), breadcrumb_path.c_str());
+  retval = rename(tmp_path.c_str(), breadcrumb_path.c_str());
   if (retval != 0) {
     unlink(tmp_path.c_str());
     return false;
@@ -108,17 +117,20 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   uint64_t revision;
 
   iter = content.find('C');
-  if ((iter = content.find('C')) == content.end())
+  if (iter == content.end())
     return NULL;
   catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
                               shash::kSuffixCatalog);
-  if ((iter = content.find('R')) == content.end())
+  iter = content.find('R');
+  if (iter == content.end())
     return NULL;
   root_path = shash::Md5(shash::HexPtr(iter->second));
-  if ((iter = content.find('D')) == content.end())
+  iter = content.find('D');
+  if (iter == content.end())
     return NULL;
   ttl = String2Uint64(iter->second);
-  if ((iter = content.find('S')) == content.end())
+  iter = content.find('S');
+  if (iter == content.end())
     return NULL;
   revision = String2Uint64(iter->second);
 
@@ -136,31 +148,46 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   shash::Any meta_info;
   shash::Any reflog_hash;
 
-  if ((iter = content.find('B')) != content.end())
+  iter = content.find('B');
+  if (iter != content.end())
     catalog_size = String2Uint64(iter->second);
-  if ((iter = content.find('L')) != content.end())
+  iter = content.find('L');
+  if (iter != content.end()) {
     micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
                                       shash::kSuffixMicroCatalog);
-  if ((iter = content.find('N')) != content.end())
+  }
+  iter = content.find('N');
+  if (iter != content.end())
     repository_name = iter->second;
-  if ((iter = content.find('X')) != content.end())
+  iter = content.find('X');
+  if (iter != content.end()) {
     certificate = MkFromHexPtr(shash::HexPtr(iter->second),
                                shash::kSuffixCertificate);
-  if ((iter = content.find('H')) != content.end())
+  }
+  iter = content.find('H');
+  if (iter != content.end()) {
     history = MkFromHexPtr(shash::HexPtr(iter->second),
                            shash::kSuffixHistory);
-  if ((iter = content.find('T')) != content.end())
+  }
+  iter = content.find('T');
+  if (iter != content.end())
     publish_timestamp = String2Uint64(iter->second);
-  if ((iter = content.find('P')) != content.end())
+  iter = content.find('P');
+  if (iter != content.end())
     publish_timestamp_ns = String2Uint64(iter->second);
-  if ((iter = content.find('G')) != content.end())
+  iter = content.find('G');
+  if (iter != content.end())
     garbage_collectable = (iter->second == "yes");
-  if ((iter = content.find('A')) != content.end())
+  iter = content.find('A');
+  if (iter != content.end())
     has_alt_catalog_path = (iter->second == "yes");
-  if ((iter = content.find('M')) != content.end())
+  iter = content.find('M');
+  if (iter != content.end()) {
     meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
                              shash::kSuffixMetainfo);
-  if ((iter = content.find('Y')) != content.end()) {
+  }
+  iter = content.find('Y');
+  if (iter != content.end()) {
     reflog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   }
 
@@ -192,10 +219,10 @@ Manifest::Manifest(const shash::Any &catalog_hash,
 string Manifest::ExportString() const {
   string manifest =
     "C" + catalog_hash_.ToString() + "\n" +
-    "B" + StringifyInt(catalog_size_) + "\n" +
+    "B" + StringifyUint(catalog_size_) + "\n" +
     "R" + root_path_.ToString() + "\n" +
     "D" + StringifyInt(ttl_) + "\n" +
-    "S" + StringifyInt(revision_) + "\n" +
+    "S" + StringifyUint(revision_) + "\n" +
     "G" + StringifyBool(garbage_collectable_) + "\n" +
     "A" + StringifyBool(has_alt_catalog_path_) + "\n";
 
@@ -208,14 +235,14 @@ string Manifest::ExportString() const {
   if (!history_.IsNull())
     manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
-    manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
+    manifest += "T" + StringifyUint(publish_timestamp_) + "\n";
   if (!meta_info_.IsNull())
     manifest += "M" + meta_info_.ToString() + "\n";
   if (!reflog_hash_.IsNull()) {
     manifest += "Y" + reflog_hash_.ToString() + "\n";
   }
   if (publish_timestamp_ns_ > 0)
-    manifest += "P" + StringifyInt(publish_timestamp_ns_) + "\n";
+    manifest += "P" + StringifyUint(publish_timestamp_ns_) + "\n";
   // Reserved: Z -> for identification of channel tips
 
   return manifest;
@@ -233,14 +260,21 @@ bool Manifest::Export(const std::string &path) const {
 
   string manifest = ExportString();
 
+  int ret;
   if (fwrite(manifest.data(), 1, manifest.length(), fmanifest) !=
       manifest.length())
   {
-    fclose(fmanifest);
+    ret = fclose(fmanifest);
+    if (ret != 0) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", path.c_str());
+    }
     unlink(path.c_str());
     return false;
   }
-  fclose(fmanifest);
+  ret = fclose(fmanifest);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", path.c_str());
+  }
 
   return true;
 }
@@ -275,7 +309,10 @@ Breadcrumb Manifest::ReadBreadcrumb(
   if (read_bytes > 0) {
     breadcrumb = Breadcrumb(std::string(tmp, read_bytes));
   }
-  fclose(fbreadcrumb);
+  int const ret = fclose(fbreadcrumb);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", breadcrumb_path.c_str());
+  }
 
   return breadcrumb;
 }
