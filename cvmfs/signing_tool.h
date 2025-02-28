@@ -43,7 +43,7 @@ class SigningTool {
              const bool garbage_collectable = false,
              const bool bootstrap_shortcuts = false,
              const bool return_early = false,
-             const std::vector<shash::Any> reflog_catalogs =
+             const std::vector<shash::Any>& reflog_catalogs =
               std::vector<shash::Any>(), const bool remove_reflog=false, bool omit_manifest_upload = false );
 
  protected:

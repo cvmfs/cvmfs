@@ -2,7 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-
 #include "publish/repository.h"
 
 #include <cassert>
@@ -13,7 +12,8 @@
 #include "catalog_mgr_ro.h"
 #include "crypto/hash.h"
 #include "file_chunk.h"
-#include "history_sqlite.h"
+#include "history.h"
+#include "history_sqlite.h" // NOLINT(misc-include-cleaner)
 #include "publish/except.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -33,7 +33,7 @@ static history::History::Tag GetTag(const std::string &tag_name,
     tag.root_hash =
       shash::MkFromHexPtr(shash::HexPtr(tag.name), shash::kSuffixCatalog);
   } else {
-    bool retval = history.GetByName(tag_name, &tag);
+    bool const retval = history.GetByName(tag_name, &tag);
     if (!retval)
       throw publish::EPublish("unknown repository tag name: " + tag_name);
   }
@@ -89,8 +89,8 @@ namespace publish {
 void Repository::Diff(const std::string &from, const std::string &to,
                       DiffListener *diff_listener)
 {
-  history::History::Tag from_tag = GetTag(from, *history_);
-  history::History::Tag to_tag = GetTag(to, *history_);
+  history::History::Tag const from_tag = GetTag(from, *history_);
+  history::History::Tag const to_tag = GetTag(to, *history_);
   diff_listener->OnInit(from_tag, to_tag);
 
   perf::Statistics stats_from;
@@ -113,8 +113,8 @@ void Repository::Diff(const std::string &from, const std::string &to,
     true /* manage_catalog_files */);
   mgr_to->Init();
 
-  catalog::Counters counters_from = mgr_from->GetRootCatalog()->GetCounters();
-  catalog::Counters counters_to = mgr_to->GetRootCatalog()->GetCounters();
+  catalog::Counters const counters_from = mgr_from->GetRootCatalog()->GetCounters();
+  catalog::Counters const counters_to = mgr_to->GetRootCatalog()->GetCounters();
   diff_listener->OnStats(catalog::Counters::Diff(counters_from, counters_to));
 
   // DiffTool takes ownership of the catalog managers

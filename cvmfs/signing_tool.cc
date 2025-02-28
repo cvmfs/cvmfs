@@ -4,15 +4,27 @@
 
 #include "signing_tool.h"
 
-#include <string>
+#include <unistd.h>
 
+#include <ctime>
+#include <cstddef>
+#include <cstdlib>
+#include <cerrno>
+#include <string>
+#include <vector>
+
+#include "crypto/hash.h"
 #include "manifest.h"
 #include "object_fetcher.h"
+#include "util/platform.h" // NOLINT(misc-include-cleaner)
 #include "reflog.h"
 #include "server_tool.h"
 #include "upload.h"
+#include "upload_spooler_definition.h"
 #include "util/exception.h"
+#include "util/logging.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 
 namespace {
 
@@ -29,15 +41,15 @@ SigningTool::Result SigningTool::Run(
     const std::string &spooler_definition, const std::string &temp_dir,
     std::string &final_root_hash,
     const std::string &certificate, const std::string &priv_key,
-    const std::string &repo_name, const std::string &pwd,
+    const std::string &repo_name, const std::string & /*pwd*/,
     const std::string &meta_info, const std::string &reflog_chksum_path,
     const std::string &proxy,
     const bool garbage_collectable, const bool bootstrap_shortcuts,
-    const bool return_early, const std::vector<shash::Any> reflog_catalogs, const bool remove_reflog, bool omit_manifest_upload) {
+    const bool return_early, const std::vector<shash::Any>& reflog_catalogs, const bool remove_reflog, bool omit_manifest_upload) {
   shash::Any reflog_hash;
   if ( !remove_reflog && reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Could not read reflog checksum"); // NOLINT(misc-include-cleaner)
       return kReflogChecksumMissing;
     }
   }
@@ -94,7 +106,7 @@ SigningTool::Result SigningTool::Run(
       return kReflogMissing;
     }
   } else {
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)");
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no reflog (ignoring)"); // NOLINT(misc-include-cleaner)
     if (spooler->Peek(".cvmfsreflog")) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "no reflog hash specified but reflog is present");
@@ -165,7 +177,7 @@ SigningTool::Result SigningTool::Run(
     // Callers of SigningTool may provide a list of additional catalogs that
     // need to be added to reflog (e. g. for later garbage collection)
     std::vector<shash::Any>::const_iterator i = reflog_catalogs.begin();
-    std::vector<shash::Any>::const_iterator iend = reflog_catalogs.end();
+    std::vector<shash::Any>::const_iterator const iend = reflog_catalogs.end();
     for (; i != iend; ++i) {
       if (!reflog->AddCatalog(*i)) {
         LogCvmfs(kLogCvmfs, kLogStderr,
@@ -205,7 +217,7 @@ SigningTool::Result SigningTool::Run(
   manifest->set_certificate(certificate_hash);
   manifest->set_repository_name(repo_name);
   manifest->set_publish_timestamp(time(NULL));
-  manifest->set_publish_timestamp_ns(platform_realtime_ns());
+  manifest->set_publish_timestamp_ns(platform_realtime_ns()); // NOLINT(misc-include-cleaner)
   manifest->set_garbage_collectability(garbage_collectable);
   manifest->set_has_alt_catalog_path(bootstrap_shortcuts);
   if (!metainfo_hash.IsNull()) {
@@ -267,12 +279,12 @@ SigningTool::Result SigningTool::Run(
 
 
   if(omit_manifest_upload) { 
-     LogCvmfs(kLogCvmfs, kLogSyslog, "Not uploading manifest");
+     LogCvmfs(kLogCvmfs, kLogSyslog, "Not uploading manifest"); // NOLINT(misc-include-cleaner)
      return kSuccess; 
   }
 
   // Upload manifest
-  time_t t1=tick();
+  time_t const t1=tick();
   spooler->UploadManifest(manifest_path);
   spooler->WaitForUpload();
   tock(t1, "WaitForUpload on manifest");

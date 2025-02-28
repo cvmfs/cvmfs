@@ -5,7 +5,7 @@
 #ifndef CVMFS_STATISTICS_H_
 #define CVMFS_STATISTICS_H_
 
-#include <pthread.h>
+#include <pthread.h> // NOLINT(misc-include-cleaner)
 #include <stdint.h>
 
 #include <map>
@@ -93,7 +93,7 @@ class Statistics {
     std::string desc;
   };
   std::map<std::string, CounterInfo *> counters_;
-  mutable pthread_mutex_t *lock_;
+  mutable pthread_mutex_t *lock_; // NOLINT(misc-include-cleaner)
   std::vector<Log2Histogram *> histograms_;
 };
 
@@ -124,7 +124,7 @@ class StatisticsTemplate {
                                      const std::string &desc)
   {
     Counter *result = statistics_->Lookup(name_major_ + "." + name_minor);
-    if (result == NULL) {
+    if (result == nullptr) {
       return RegisterTemplated(name_minor, desc);
     }
     return result;

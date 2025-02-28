@@ -186,7 +186,7 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
     std::string tmp_path;
     const bool decompress = false;
     const bool nocache = true;
-    Failures failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
+    Failures const failure = Fetch(kReflogFilename, decompress, nocache, &tmp_path);
     if (failure != kFailOk) {
       return failure;
     }
@@ -405,7 +405,10 @@ class LocalObjectFetcher :
     const bool success = (decompress)
       ? zlib::DecompressPath2File(source, f)
       : CopyPath2File(source, f);
-    fclose(f);
+    int const ret = fclose(f);
+    if (ret != 0) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to close file %s", file_path->c_str());
+    }
 
     // check the decompression success and remove the temporary file otherwise
     if (!success) {
@@ -486,8 +489,6 @@ class HttpObjectFetcher :
  public:
   using BaseTN::FetchManifest;  // un-hiding convenience overload
   Failures FetchManifest(manifest::Manifest** manifest) {
-    const std::string url = BuildUrl(BaseTN::kManifestFilename);
-
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
     manifest::Failures retval = manifest::Fetch(
@@ -586,9 +587,12 @@ class HttpObjectFetcher :
     download::JobInfo download_job(&url, decompress, probe_hosts, expected_hash,
                                    &filesink);
     download_job.SetForceNocache(nocache);
-    download::Failures retval = download_manager_->Fetch(&download_job);
+    download::Failures const retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
-    fclose(f);
+    int const ret = fclose(f);
+    if (ret != 0) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to close file %s", file_path->c_str());
+    }
 
     // check if download worked and remove temporary file if not
     if (!success) {

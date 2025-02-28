@@ -8,10 +8,12 @@
 #ifndef CVMFS_DIRECTORY_ENTRY_H_
 #define CVMFS_DIRECTORY_ENTRY_H_
 
-#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -19,7 +21,6 @@
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
-#include "util/platform.h"
 
 namespace publish {
 class SyncItem;
