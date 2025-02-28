@@ -6,8 +6,15 @@
 #include "pipeline.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cinttypes>
+#include <cstdint>
 #include <cstdlib>
 
+#include "compression/compression.h"
+#include "crypto/hash.h"
+#include "ingestion/ingestion_source.h"
+#include "ingestion/item.h"
 #include "ingestion/task_chunk.h"
 #include "ingestion/task_compress.h"
 #include "ingestion/task_hash.h"
@@ -16,12 +23,15 @@
 #include "ingestion/task_write.h"
 #include "upload_facility.h"
 #include "upload_spooler_definition.h"
+#include "upload_spooler_result.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
-#include "util/platform.h"
+#include "util/logging.h"
+#include "util/platform.h" // NOLINT (misc-include-cleaner)
 #include "util/string.h"
+#include "util/tube.h"
 
-const uint64_t IngestionPipeline::kMaxPipelineMem = 1024 * 1024 * 1024;
+const uint64_t IngestionPipeline::kMaxPipelineMem = static_cast<int64_t>(1024 * 1024 * 1024);
 
 IngestionPipeline::IngestionPipeline(
   upload::AbstractUploader *uploader,
@@ -37,7 +47,7 @@ IngestionPipeline::IngestionPipeline(
   , uploader_(uploader)
   , tube_ctr_inflight_pre_(kMaxFilesInFlight)
 {
-  unsigned nfork_base = 1;
+  unsigned const nfork_base = 1;
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
@@ -80,13 +90,13 @@ IngestionPipeline::IngestionPipeline(
   tubes_chunk_.Activate();
 
   uint64_t high = kMaxPipelineMem;
-  high = std::min(high, platform_memsize() / 5);
+  high = std::min(high, platform_memsize() / 5); // NOLINT(misc-include-cleaner)
   char *fixed_limit_mb = getenv("_CVMFS_SERVER_PIPELINE_MB");
   if (fixed_limit_mb != NULL) {
     high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
   }
-  uint64_t low = (high * 2) / 3;
-  LogCvmfs(kLogCvmfs, kLogDebug,
+  uint64_t const low = (high * 2) / 3;
+  LogCvmfs(kLogCvmfs, kLogDebug, // NOLINT(misc-include-cleaner)
            "pipeline memory thresholds %" PRIu64 "/%" PRIu64 " M",
            low / (1024 * 1024), high / (1024 * 1024));
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
@@ -193,7 +203,7 @@ ScrubbingPipeline::ScrubbingPipeline()
   : spawned_(false)
   , tube_counter_(kMaxFilesInFlight)
 {
-  unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
+  unsigned const nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
     Tube<BlockItem> *tube = new Tube<BlockItem>();

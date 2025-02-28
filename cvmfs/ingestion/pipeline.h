@@ -5,10 +5,13 @@
 #ifndef CVMFS_INGESTION_PIPELINE_H_
 #define CVMFS_INGESTION_PIPELINE_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
+#include "ingestion/ingestion_source.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/task.h"
@@ -131,8 +134,8 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   void OnFileProcessed(const ScrubbingResult &scrubbing_result);
 
  private:
-  static const uint64_t kMemLowWatermark = 384 * 1024 * 1024;
-  static const uint64_t kMemHighWatermark = 512 * 1024 * 1024;
+  static const uint64_t kMemLowWatermark = static_cast<int64_t>(384 * 1024 * 1024);
+  static const uint64_t kMemHighWatermark = static_cast<int64_t>(512 * 1024 * 1024);
   static const unsigned kMaxFilesInFlight = 8000;
   static const unsigned kNforkScrubbingCallback = 1;
   static const unsigned kNforkHash = 2;
@@ -201,8 +204,8 @@ class CompressHashPipeline : public Observable<CompressHashResult> {
   void OnFileProcessed(const CompressHashResult &compress_hash_result);
 
  private:
-  static const uint64_t kMemLowWatermark = 64 * 1024 * 1024;
-  static const uint64_t kMemHighWatermark = 128 * 1024 * 1024;
+  static const uint64_t kMemLowWatermark = static_cast<int64_t>(64 * 1024 * 1024);
+  static const uint64_t kMemHighWatermark = static_cast<int64_t>(128 * 1024 * 1024);
 
   bool spawned_;
   Tube<FileItem> tube_input_;

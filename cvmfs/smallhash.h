@@ -39,7 +39,7 @@ class SmallHashBase {
   static const double kThresholdGrow;  // only used for resizable version
   static const double kThresholdShrink;  // only used for resizable version
 
-  SmallHashBase() {
+  SmallHashBase() : empty_key_() {
     keys_ = NULL;
     values_ = NULL;
     hasher_ = NULL;
@@ -169,14 +169,14 @@ class SmallHashBase {
 
   void AllocMemory() {
     keys_ = static_cast<Key *>(smmap(capacity_ * sizeof(Key)));
-    values_ = static_cast<Value *>(smmap(capacity_ * sizeof(Value)));
+    values_ = static_cast<Value *>(smmap(capacity_ * sizeof(Value))); // NOLINT(bugprone-sizeof-expression)
     for (uint32_t i = 0; i < capacity_; ++i) {
       /*keys_[i] =*/ new (keys_ + i) Key();
     }
     for (uint32_t i = 0; i < capacity_; ++i) {
-      /*values_[i] =*/ new (values_ + i) Value();
+      /*values_[i] =*/ new (reinterpret_cast<void*>(values_ + i)) Value();
     }
-    bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_;
+    bytes_allocated_ = (sizeof(Key) + sizeof(Value)) * capacity_; // NOLINT(bugprone-sizeof-expression)
   }
 
   void DeallocMemory(Key *k, Value *v, uint32_t c) {
@@ -189,7 +189,7 @@ class SmallHashBase {
     if (k)
       smunmap(k);
     if (v)
-      smunmap(v);
+      smunmap(reinterpret_cast<void*>(v));
     k = NULL;
     v = NULL;
   }
@@ -342,7 +342,7 @@ class SmallHashDynamic :
     // Shuffle (no shuffling for the last element)
     for (unsigned i = 0; i < N-1; ++i) {
       const uint32_t swap_idx = i + g_prng.Next(N - i);
-      uint32_t tmp = shuffled[i];
+      uint32_t const tmp = shuffled[i];
       shuffled[i] = shuffled[swap_idx];
       shuffled[swap_idx]  = tmp;
     }

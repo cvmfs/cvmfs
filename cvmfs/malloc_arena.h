@@ -77,7 +77,7 @@ class MallocArena {
   static inline MallocArena *GetMallocArena(void *ptr, unsigned arena_size) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
     void *arena = reinterpret_cast<void *>(
-      uintptr_t(ptr) & ~(uintptr_t(arena_size) - uintptr_t(1)));
+      reinterpret_cast<uintptr_t>(ptr) & ~(static_cast<uintptr_t>(arena_size) - static_cast<uintptr_t>(1)));
     return *reinterpret_cast<MallocArena **>(arena);
   }
 
