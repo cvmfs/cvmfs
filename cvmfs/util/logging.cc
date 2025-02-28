@@ -16,20 +16,25 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <sys/syslog.h>
+#include <sys/types.h>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string>
 #include <vector>
 
 #include "util/export.h"
 #include "util/mutex.h"
-#include "util/platform.h"
+#include "util/platform.h" // NOLINT(misc-include-cleaner)
 #include "util/posix.h"
 #include "util/single_copy.h"
 #include "util/smalloc.h"
@@ -42,7 +47,7 @@ CVMFS_EXPORT bool g_log_with_time = false;
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-static void LogCustom(unsigned id, const std::string &message);
+static void LogCustom(unsigned id, const std::string &message); // NOLINT(misc-use-anonymous-namespace)
 
 LogFacilities DefaultLogging::info = kLogSyslog;
 LogFacilities DefaultLogging::error = kLogSyslogErr;
@@ -56,7 +61,7 @@ namespace {
 
 unsigned gMicroSyslogMax = 500 * 1024;  // default: rotate after 500kB
 
-pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock_stdout = PTHREAD_MUTEX_INITIALIZER; // NOLINT(misc-include-cleaner)
 pthread_mutex_t lock_stderr = PTHREAD_MUTEX_INITIALIZER;
 #ifdef DEBUGMSG
 pthread_mutex_t lock_debug = PTHREAD_MUTEX_INITIALIZER;
@@ -102,7 +107,7 @@ static void (*alt_log_func)(const LogSource source, const int mask,
 class LogBuffer : SingleCopy {
  public:
   LogBuffer() : next_id_(0) {
-    int retval = pthread_mutex_init(&lock_, NULL);
+    int const retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
   }
 
@@ -111,8 +116,8 @@ class LogBuffer : SingleCopy {
   }
 
   void Append(const LogBufferEntry &entry) {
-    MutexLockGuard lock_guard(lock_);
-    size_t idx = next_id_++ % kBufferSize;
+    MutexLockGuard const lock_guard(lock_);
+    size_t const idx = next_id_++ % kBufferSize;
     if (idx >= buffer_.size()) {
       buffer_.push_back(entry);
     } else {
@@ -123,16 +128,16 @@ class LogBuffer : SingleCopy {
   std::vector<LogBufferEntry> GetBuffer() {
     // Return a buffer sorted from newest to oldest buffer
     std::vector<LogBufferEntry> sorted_buffer;
-    MutexLockGuard lock_guard(lock_);
+    MutexLockGuard const lock_guard(lock_);
     for (unsigned i = 1; i <= buffer_.size(); ++i) {
-      unsigned idx = (next_id_ - i) % kBufferSize;
+      unsigned const idx = (next_id_ - i) % kBufferSize;
       sorted_buffer.push_back(buffer_[idx]);
     }
     return sorted_buffer;
   }
 
   void Clear() {
-    MutexLockGuard lock_guard(lock_);
+    MutexLockGuard const lock_guard(lock_);
     next_id_ = 0;
     buffer_.clear();
   }
@@ -158,9 +163,6 @@ void SetLogSyslogLevel(const int level) {
       break;
     case 2:
       syslog_level = LOG_INFO;
-      break;
-    case 3:
-      syslog_level = LOG_NOTICE;
       break;
     default:
       syslog_level = LOG_NOTICE;
@@ -247,7 +249,7 @@ void SetLogSyslogPrefix(const std::string &prefix) {
   if (prefix == "") {
     syslog_prefix = NULL;
   } else {
-    unsigned len = prefix.length() + 1;
+    unsigned const len = prefix.length() + 1;
     syslog_prefix = static_cast<char *>(smalloc(len));
     syslog_prefix[len - 1] = '\0';
     memcpy(syslog_prefix, &prefix[0], prefix.length());
@@ -290,18 +292,18 @@ void SetLogMicroSyslog(const std::string &filename) {
 
   usyslog_fd = open(filename.c_str(), O_RDWR | O_APPEND | O_CREAT, 0600);
   if (usyslog_fd < 0) {
-    fprintf(stderr, "could not open usyslog file %s (%d), aborting\n",
+    fprintf(stderr, "could not open usyslog file %s (%d), aborting\n", // NOLINT(cert-err33-c)
             filename.c_str(), errno);
     abort();
   }
   usyslog_fd1 = open((filename + ".1").c_str(), O_WRONLY | O_CREAT, 0600);
   if (usyslog_fd1 < 0) {
-    fprintf(stderr, "could not open usyslog.1 file %s.1 (%d), aborting\n",
+    fprintf(stderr, "could not open usyslog.1 file %s.1 (%d), aborting\n", // NOLINT(cert-err33-c)
             filename.c_str(), errno);
     abort();
   }
-  platform_stat64 info;
-  int retval = platform_fstat(usyslog_fd, &info);
+  platform_stat64 info; // NOLINT(misc-include-cleaner)
+  int const retval = platform_fstat(usyslog_fd, &info); // NOLINT(misc-include-cleaner)
   assert(retval == 0);
   usyslog_size = info.st_size;
   usyslog_dest = new string(filename);
@@ -316,7 +318,7 @@ std::string GetLogMicroSyslog() {
   return result;
 }
 
-static void LogMicroSyslog(const std::string &message) {
+static void LogMicroSyslog(const std::string &message) { // NOLINT(misc-use-anonymous-namespace)
   if (message.size() == 0) return;
 
   pthread_mutex_lock(&lock_usyslock);
@@ -325,8 +327,8 @@ static void LogMicroSyslog(const std::string &message) {
     return;
   }
 
-  int written = write(usyslog_fd, message.data(), message.size());
-  if ((written < 0) || (static_cast<unsigned>(written) != message.size())) {
+  ssize_t const written = write(usyslog_fd, message.data(), message.size());
+  if ((written < 0) || (static_cast<size_t>(written) != message.size())) {
     close(usyslog_fd);
     usyslog_fd = -1;
     abort();
@@ -341,22 +343,22 @@ static void LogMicroSyslog(const std::string &message) {
     assert(retval == 0);
 
     // Copy from usyslog to usyslog.1
-    retval = lseek(usyslog_fd, 0, SEEK_SET);
+    retval = static_cast<int>(lseek(usyslog_fd, 0, SEEK_SET));
     assert(retval == 0);
     unsigned char buf[4096];
-    int num_bytes;
+    ssize_t num_bytes;
     do {
       num_bytes = read(usyslog_fd, buf, 4096);
       assert(num_bytes >= 0);
       if (num_bytes == 0) break;
-      int written = write(usyslog_fd1, buf, num_bytes);
+      ssize_t const written = write(usyslog_fd1, buf, num_bytes);
       assert(written == num_bytes);
     } while (num_bytes == 4096);
-    retval = lseek(usyslog_fd1, 0, SEEK_SET);
+    retval = static_cast<int>(lseek(usyslog_fd1, 0, SEEK_SET));
     assert(retval == 0);
 
     // Reset usyslog
-    retval = lseek(usyslog_fd, 0, SEEK_SET);
+    retval = static_cast<int>(lseek(usyslog_fd, 0, SEEK_SET));
     assert(retval == 0);
     retval = ftruncate(usyslog_fd, 0);
     assert(retval == 0);
@@ -372,7 +374,7 @@ static void LogMicroSyslog(const std::string &message) {
 void SetLogDebugFile(const string &filename) {
   if (filename == "") {
     if ((file_debug != NULL) && (file_debug != stderr)) {
-      fclose(file_debug);
+      fclose(file_debug); // NOLINT(cert-err33-c)
       file_debug = NULL;
     }
     delete path_debug;
@@ -382,15 +384,15 @@ void SetLogDebugFile(const string &filename) {
 
   if ((file_debug != NULL) && (file_debug != stderr)) {
     if ((fclose(file_debug) < 0)) {
-      fprintf(stderr, "could not close current log file (%d), aborting\n",
+      fprintf(stderr, "could not close current log file (%d), aborting\n", // NOLINT(cert-err33-c)
               errno);
 
       abort();
     }
   }
-  int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
-  if ((fd < 0) || ((file_debug = fdopen(fd, "a")) == NULL)) {
-    fprintf(stderr, "could not open debug log file %s (%d), aborting\n",
+  int const fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
+  if ((fd < 0) || ((file_debug = fdopen(fd, "a")) == NULL)) { // NOLINT(bugprone-assignment-in-if-condition)
+    fprintf(stderr, "could not open debug log file %s (%d), aborting\n", // NOLINT(cert-err33-c)
             filename.c_str(), errno);
     syslog(syslog_facility | LOG_ERR,
            "could not open debug log file %s (%d), "
@@ -436,7 +438,7 @@ void vLogCvmfs(const LogSource source, const int mask,
 #endif
 
   // Format the message string
-  int retval = vasprintf(&msg, format, variadic_list);
+  int const retval = vasprintf(&msg, format, variadic_list);
   assert(retval != -1);  // else: out of memory
 
   if (alt_log_func) {
@@ -453,16 +455,16 @@ void vLogCvmfs(const LogSource source, const int mask,
 
     // Get timestamp
     time_t rawtime;
-    time(&rawtime);
+    time(&rawtime); // NOLINT(cert-err33-c)
     struct tm now;
     localtime_r(&rawtime, &now);
 
     if (file_debug == stderr) pthread_mutex_lock(&lock_stderr);
-    fprintf(file_debug, "(%s) %s    [%02d-%02d-%04d %02d:%02d:%02d %s]\n",
+    fprintf(file_debug, "(%s) %s    [%02d-%02d-%04d %02d:%02d:%02d %s]\n", // NOLINT(cert-err33-c)
             module_names[source], msg, (now.tm_mon) + 1, now.tm_mday,
             (now.tm_year) + 1900, now.tm_hour, now.tm_min, now.tm_sec,
             now.tm_zone);
-    fflush(file_debug);
+    fflush(file_debug); // NOLINT(cert-err33-c)
     if (file_debug == stderr) pthread_mutex_unlock(&lock_stderr);
 
     pthread_mutex_unlock(&lock_debug);
@@ -471,7 +473,7 @@ void vLogCvmfs(const LogSource source, const int mask,
 
   // Get timestamp
   time_t rawtime;
-  time(&rawtime);
+  time(&rawtime); // NOLINT(cert-err33-c)
   struct tm now;
   localtime_r(&rawtime, &now);
 
@@ -484,20 +486,20 @@ void vLogCvmfs(const LogSource source, const int mask,
       printf("%s", msg);
     }
     if (!(mask & kLogNoLinebreak)) printf("\n");
-    fflush(stdout);
+    fflush(stdout); // NOLINT(cert-err33-c)
     pthread_mutex_unlock(&lock_stdout);
   }
 
   if (mask & kLogStderr) {
     pthread_mutex_lock(&lock_stderr);
-    if (mask & kLogShowSource) fprintf(stderr, "(%s) ", module_names[source]);
+    if (mask & kLogShowSource) fprintf(stderr, "(%s) ", module_names[source]); // NOLINT(cert-err33-c)
     if (g_log_with_time) { 
-        fprintf(stderr, "[%04d-%02d-%02d %02d:%02d:%02d %s] %s", (now.tm_year) + 1900, (now.tm_mon) + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec , now.tm_zone,  msg);
+        fprintf(stderr, "[%04d-%02d-%02d %02d:%02d:%02d %s] %s", (now.tm_year) + 1900, (now.tm_mon) + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec , now.tm_zone,  msg); // NOLINT(cert-err33-c)
     } else {
-        fprintf(stderr, "%s", msg);
+        fprintf(stderr, "%s", msg); // NOLINT(cert-err33-c)
     }
-    if (!(mask & kLogNoLinebreak)) fprintf(stderr, "\n");
-    fflush(stderr);
+    if (!(mask & kLogNoLinebreak)) fprintf(stderr, "\n"); // NOLINT(cert-err33-c)
+    fflush(stderr); // NOLINT(cert-err33-c)
     pthread_mutex_unlock(&lock_stderr);
   }
 
@@ -506,7 +508,7 @@ void vLogCvmfs(const LogSource source, const int mask,
       string fmt_msg(msg);
       if (syslog_prefix) fmt_msg = "(" + string(syslog_prefix) + ") " + fmt_msg;
       time_t rawtime;
-      time(&rawtime);
+      time(&rawtime); // NOLINT(cert-err33-c)
       char fmt_time[26];
       ctime_r(&rawtime, fmt_time);
       fmt_msg = string(fmt_time, 24) + " " + fmt_msg;
@@ -599,21 +601,21 @@ void SetLogCustomFile(unsigned id, const std::string &filename) {
 }
 
 
-static void LogCustom(unsigned id, const std::string &message) {
+static void LogCustom(unsigned id, const std::string &message) { // NOLINT(misc-use-anonymous-namespace)
   assert(id < kMaxCustomlog);
   if (message.size() == 0) return;
 
   pthread_mutex_lock(&customlog_locks[id]);
   assert(customlog_fds[id] >= 0);
 
-  bool retval_b = SafeWrite(customlog_fds[id], message.data(), message.size());
+  bool const retval_b = SafeWrite(customlog_fds[id], message.data(), message.size());
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "could not write into log file %s (%d), aborting - lost: %s",
              customlog_dests[id]->c_str(), errno, message.c_str());
     abort();
   }
-  int retval_i = fsync(customlog_fds[id]);
+  int const retval_i = fsync(customlog_fds[id]);
   assert(retval_i == 0);
 
   pthread_mutex_unlock(&customlog_locks[id]);
@@ -628,14 +630,14 @@ void LogShutdown() {
 
 CVMFS_EXPORT
 time_t tick(void) {
-  return platform_monotonic_time_ns();
+  return static_cast<time_t>(platform_monotonic_time_ns()); // NOLINT(misc-include-cleaner)
 }
 
 CVMFS_EXPORT
 time_t tock(time_t tick, const char *str) {
-  time_t t2 = platform_monotonic_time_ns();
-  time_t delta = t2 - tick;
-  float delta_ms =  delta /1.e6;
+  time_t const t2 = static_cast<time_t>(platform_monotonic_time_ns());
+  time_t const delta = t2 - tick;
+  float const delta_ms =  static_cast<float>(delta) / static_cast<float>(1.e6);
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog, "* Interval %s:  %.3f ms", str, delta_ms );
   return t2;
 }

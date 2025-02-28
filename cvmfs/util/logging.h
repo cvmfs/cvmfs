@@ -5,7 +5,9 @@
 #ifndef CVMFS_UTIL_LOGGING_H_
 #define CVMFS_UTIL_LOGGING_H_
 
-#include <string>
+#include <time.h>
+
+#include <cstdarg>
 
 #include "util/export.h"
 // Shared declarations of debug and non-debug logging
