@@ -5,18 +5,24 @@
 #include "reactor.h"
 
 #include <stdint.h>
+#include <sys/types.h>
 #include <unistd.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
-#include <utility>
+#include <string>
 #include <vector>
 
 #include "commit_processor.h"
+#include "crypto/hash.h"
+#include "json.h"
+#include "json_document.h"
 #include "json_document_write.h"
 #include "payload_processor.h"
 #include "repository_tag.h"
 #include "session_token.h"
+#include "statistics.h"
 #include "upload_facility.h"
 #include "util/exception.h"
 #include "util/logging.h"
@@ -39,7 +45,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
 
   // First, read the command identifier
   int32_t req_id = kQuit;
-  int nb = SafeRead(fd, &req_id, 4);
+  ssize_t nb = SafeRead(fd, &req_id, 4);
 
   if (nb != 4) {
     return kError;
@@ -69,8 +75,8 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
 }
 
 bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
-  const int32_t msg_size = data.size();
-  const int32_t total_size = 8 + data.size();  // req + msg_size + data
+  const uint64_t msg_size = data.size();
+  const uint64_t total_size = 8 + data.size();  // req + msg_size + data
 
   std::vector<char> buffer(total_size);
 
@@ -86,7 +92,7 @@ bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
 
 bool Reactor::ReadReply(int fd, std::string* data) {
   int32_t msg_size(0);
-  int nb = SafeRead(fd, &msg_size, 4);
+  ssize_t nb = SafeRead(fd, &msg_size, 4);
 
   if (nb != 4) {
     return false;
@@ -105,8 +111,8 @@ bool Reactor::ReadReply(int fd, std::string* data) {
 }
 
 bool Reactor::WriteReply(int fd, const std::string& data) {
-  const int32_t msg_size = data.size();
-  const int32_t total_size = 4 + data.size();
+  const uint64_t msg_size = data.size();
+  const uint64_t total_size = 4 + data.size();
 
   std::vector<char> buffer(total_size);
 
@@ -121,13 +127,13 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
 
 bool Reactor::ExtractStatsFromReq(JsonDocument* req, perf::Statistics* stats,
                                   std::string* start_time) {
-  perf::StatisticsTemplate stats_tmpl("publish", stats);
-  upload::UploadCounters counters(stats_tmpl);
+  perf::StatisticsTemplate const stats_tmpl("publish", stats);
+  upload::UploadCounters const counters(stats_tmpl);
 
   const JSON* statistics =
       JsonDocument::SearchInObject(req->root(), "statistics", JSON_OBJECT);
   if (statistics == NULL) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogSyslogErr, // NOLINT(misc-include-cleaner)
              "Could not find 'statistics' field in request");
     return false;
   }
@@ -197,7 +203,7 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   if (reply == NULL) {
     PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  UniquePtr<JsonDocument> const req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleGenerateToken: Invalid JSON request.");
@@ -233,7 +239,7 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   input.Add("token", session_token);
   input.Add("id", public_token_id);
   input.Add("secret", token_secret);
-  std::string json = input.GenerateString();
+  std::string const json = input.GenerateString();
   *reply = json;
 
   return true;
@@ -253,7 +259,7 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
     input.Add("status", "ok");
     input.Add("id", token_id);
   }
-  std::string json = input.GenerateString();
+  std::string const json = input.GenerateString();
   *reply = json;
 
   return true;
@@ -264,7 +270,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
     PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
   }
 
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  UniquePtr<JsonDocument> const req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCheckToken: Invalid JSON request.");
@@ -284,7 +290,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 
   std::string path;
   JsonStringGenerator input;
-  TokenCheckResult ret =
+  TokenCheckResult const ret =
       CheckToken(token->string_value, secret->string_value, &path);
   switch (ret) {
     case kExpired:
@@ -308,7 +314,7 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
             "HandleCheckToken: Unknown value received. Exiting.");
   }
 
-  std::string json = input.GenerateString();
+  std::string const json = input.GenerateString();
   *reply = json;
 
   return true;
@@ -324,7 +330,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   // Extract the Path (used for verification), Digest and DigestSize from the
   // request JSON.
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  UniquePtr<JsonDocument> const req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleSubmitPayload: Invalid JSON request.");
@@ -346,10 +352,10 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
 
   perf::Statistics statistics;
 
-  UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
+  UniquePtr<PayloadProcessor> const proc(MakePayloadProcessor());
   proc->SetStatistics(&statistics);
   JsonStringGenerator reply_input;
-  PayloadProcessor::Result res =
+  PayloadProcessor::Result const res =
       proc->Process(fdin, digest_json->string_value, path_json->string_value,
                     header_size_json->int_value);
 
@@ -377,10 +383,10 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   }
 
   // HandleSubmitPayload sends partial statistics back to the gateway
-  std::string stats_json = statistics.PrintJSON();
+  std::string const stats_json = statistics.PrintJSON();
   reply_input.AddJsonObject("statistics", stats_json);
 
-  std::string json = reply_input.GenerateString();
+  std::string const json = reply_input.GenerateString();
   *reply = json;
 
   return true;
@@ -391,7 +397,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
   // Extract the Path from the request JSON.
-  UniquePtr<JsonDocument> req_json(JsonDocument::Create(req));
+  UniquePtr<JsonDocument> const req_json(JsonDocument::Create(req));
   if (!req_json.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Invalid JSON request.");
@@ -434,17 +440,17 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   remove_reflog = getenv( "_CVMFS_DEVEL_REMOVE_REFLOG" );
 
   LogCvmfs(
-        kLogReceiver, kLogSyslog,
+        kLogReceiver, kLogSyslog, // NOLINT(misc-include-cleaner)
             "HandleCommit: Remove reflog %d", remove_reflog );
 
   // Here we use the path to commit the changes!
-  UniquePtr<CommitProcessor> proc(MakeCommitProcessor());
+  UniquePtr<CommitProcessor> const proc(MakeCommitProcessor());
   proc->SetStatistics(&statistics, start_time);
-  shash::Any old_root_hash = shash::MkFromSuffixedHexPtr(
+  shash::Any const old_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(old_root_hash_json->string_value));
-  shash::Any new_root_hash = shash::MkFromSuffixedHexPtr(
+  shash::Any const new_root_hash = shash::MkFromSuffixedHexPtr(
       shash::HexPtr(new_root_hash_json->string_value));
-  RepositoryTag repo_tag(tag_name_json->string_value,
+  RepositoryTag const repo_tag(tag_name_json->string_value,
                          tag_description_json->string_value);
 
   bool omit_manifest_upload = omit_manifest_upload_json->int_value;
@@ -453,7 +459,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
 
   std::string final_root_hash;
 
-  CommitProcessor::Result res =
+  CommitProcessor::Result const res =
       proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
                     repo_tag, &final_revision, final_root_hash, remove_reflog, omit_manifest_upload);
 
@@ -482,7 +488,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       break;
   }
 
-  std::string json = reply_input.GenerateString();
+  std::string const json = reply_input.GenerateString();
   *reply = json;
 
   return true;

@@ -5,24 +5,30 @@
 #include "commit_processor.h"
 
 #include <time.h>
+#include <unistd.h>
 
+#include <string>
+#include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
 #include <vector>
 
-#include "catalog_diff_tool.h"
 #include "catalog_merge_tool.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "compression/compression.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "network/download.h"
 #include "params.h"
+#include "shortstring.h"
+#include "repository_tag.h"
 #include "signing_tool.h"
 #include "statistics.h"
-#include "statistics_database.h"
 #include "swissknife.h"
 #include "swissknife_history.h"
-#include "util/algorithm.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -36,10 +42,10 @@ namespace {
 
 PathString RemoveRepoName(const PathString& lease_path) {
   std::string abs_path = lease_path.ToString();
-  std::string::const_iterator it =
+  std::string::const_iterator const it =
       std::find(abs_path.begin(), abs_path.end(), '/');
   if (it != abs_path.end()) {
-    size_t idx = it - abs_path.begin() + 1;
+    size_t const idx = it - abs_path.begin() + 1;
     return lease_path.Suffix(idx);
   } else {
     return lease_path;
@@ -64,12 +70,12 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
 
-  UniquePtr<swissknife::CommandEditTag> edit_cmd(
+  UniquePtr<swissknife::CommandEditTag> const edit_cmd(
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
   if (ret) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret,
+    LogCvmfs(kLogReceiver, kLogSyslogErr, "Error %d creating tag: %s", ret, // NOLINT(misc-include-cleaner)
              repo_tag.name().c_str());
     return false;
   }
@@ -106,7 +112,7 @@ CommitProcessor::Result CommitProcessor::Process(
     const shash::Any& new_root_hash, const RepositoryTag& tag,
     uint64_t *final_revision, std::string &final_root_hash, bool remove_reflog, bool omit_manifest_upload) {
 
-  time_t t1 = tick();
+  time_t const t1 = tick();
  
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
@@ -114,7 +120,7 @@ CommitProcessor::Result CommitProcessor::Process(
     final_tag.SetGenericName();
   }
 
-  LogCvmfs(kLogReceiver, kLogSyslog,
+  LogCvmfs(kLogReceiver, kLogSyslog, // NOLINT(misc-include-cleaner)
            "CommitProcessor - lease_path: %s, old hash: %s, new hash: %s, "
            "tag_name: %s, tag_description: %s omit_manifest_upload: %d",
            lease_path.c_str(), old_root_hash.ToString(true).c_str(),
@@ -124,7 +130,7 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::vector<std::string> lease_path_tokens =
       SplitString(lease_path, '/');
 
-  const std::string repo_name = lease_path_tokens.front();
+  const std::string& repo_name = lease_path_tokens.front();
 
   Params params;
   if (!GetParamsFromFile(repo_name, &params)) {
@@ -141,7 +147,7 @@ CommitProcessor::Result CommitProcessor::Process(
   }
   LogCvmfs(kLogReceiver, kLogSyslog, "Using spooler configuration [%s]",  params.spooler_configuration.c_str());
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  UniquePtr<ServerTool> const server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true, params.proxy)) {
     LogCvmfs(
@@ -161,8 +167,8 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  shash::Any manifest_base_hash;
-  std::string cached_manifest_file =  "/var/spool/cvmfs/" + repo_name + "/cvmfs_receiver_last_manifest";
+  shash::Any const manifest_base_hash;
+  std::string const cached_manifest_file =  "/var/spool/cvmfs/" + repo_name + "/cvmfs_receiver_last_manifest";
   UniquePtr<manifest::Manifest> manifest{manifest::Manifest::LoadFile(cached_manifest_file)};
   if(!manifest.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslog, "No cached manifest - loading from remote" );
@@ -228,7 +234,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kMergeFailure;
   }
 
-  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
+  UniquePtr<RaiiTempDir> const raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
 
   if (final_tag.name() != "" && !CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
@@ -251,7 +257,7 @@ CommitProcessor::Result CommitProcessor::Process(
   reflog_catalogs.push_back(new_root_hash);
 
   SigningTool signing_tool(server_tool.weak_ref());
-  SigningTool::Result res = signing_tool.Run(
+  SigningTool::Result const res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, final_root_hash, certificate, private_key, repo_name, "", "",
       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum", params.proxy,
@@ -293,16 +299,19 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   // copy the new_manifest to /var/spool in anticipation of the next instantiation
-  bool ret = rename( new_manifest_path.c_str(), cached_manifest_file.c_str() );
+  bool const ret = rename( new_manifest_path.c_str(), cached_manifest_file.c_str() );
   if(!ret) {
     LogCvmfs(kLogReceiver, kLogSyslog, "Cached manifest for next run %s", cached_manifest_file.c_str());
   } else {
     LogCvmfs(kLogReceiver, kLogSyslog, "Failed to cache manifest for next run %d", errno );
   }
   LogCvmfs(kLogReceiver, kLogSyslog, "Revision %lu hash %s", *final_revision, final_root_hash.c_str() );
-  float dead_time = g_dead_time / 1.e6;
+  float const dead_time = static_cast<float>(g_dead_time) / static_cast<float>(1.e6);
   char buf[100];
-  sprintf(buf, " dead time %0.3f ms %s %s", dead_time, omit_manifest_upload ? "omit_manifest" : "", fast_path_diff ? "fast-path" : "");
+  int const retval = sprintf(buf, " dead time %0.3f ms %s %s", dead_time, omit_manifest_upload ? "omit_manifest" : "", fast_path_diff ? "fast-path" : "");
+  if (retval != 0) {
+    LogCvmfs(kLogReceiver, kLogDebug, "failed to print to string"); // NOLINT(misc-include-cleaner)
+  }
   tock(t1, ("end-to-end time for " + lease_path + buf).c_str() );
 
   return kSuccess;

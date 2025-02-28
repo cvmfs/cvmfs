@@ -5,6 +5,7 @@
 #ifndef CVMFS_RECEIVER_PARAMS_H_
 #define CVMFS_RECEIVER_PARAMS_H_
 
+#include <cstddef>
 #include <string>
 
 #include "compression/compression.h"

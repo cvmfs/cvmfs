@@ -4,9 +4,15 @@
 
 #include "params.h"
 
+#include <assert.h>
+
+#include <string>
 #include <vector>
 
+#include "compression/compression.h"
+#include "crypto/hash.h"
 #include "options.h"
+#include "util/logging.h"
 #include "util/string.h"
 
 namespace receiver {
@@ -30,7 +36,7 @@ bool GetParamsFromFile(const std::string& repo_name, Params* params) {
   SimpleOptionsParser parser = SimpleOptionsParser(
     new DefaultOptionsTemplateManager(repo_name));
   if (!parser.TryParsePath(repo_config_file)) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogSyslogErr, // NOLINT(misc-include-cleaner)
              "Could not parse repository configuration: %s.",
              repo_config_file.c_str());
     return false;

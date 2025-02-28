@@ -2,21 +2,21 @@
  * This file is part of the CernVM File System.
  */
 
+#include <stdio.h>
+#include <unistd.h> // NOLINT(misc-include-cleaner)
+
+#include <cstddef>
+#include <cstdlib>
 #include <string>
 
-
-
-#include "monitor.h"
 #include "swissknife.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/posix.h"
-#include "util/string.h"
 
 #include "reactor.h"
 
-static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
-static const char *kDefaultDebugLog = "/dev/null";
+static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/"; // NOLINT(misc-use-anonymous-namespace)
+static const char *kDefaultDebugLog = "/dev/null"; // NOLINT(misc-use-anonymous-namespace)
 
 swissknife::ParameterList MakeParameterList() {
   swissknife::ParameterList params;
@@ -38,7 +38,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
                           const swissknife::ParameterList& params,
                           swissknife::ArgumentList* arguments) {
   // parse the command line arguments for the Command
-  optind = 1;
+  optind = 1; // NOLINT(misc-include-cleaner)
   std::string option_string = "";
 
   for (unsigned j = 0; j < params.size(); ++j) {
@@ -46,22 +46,22 @@ bool ReadCmdLineArguments(int argc, char** argv,
     if (!params[j].switch_only()) option_string.push_back(':');
   }
 
-  int c;
-  while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
+  char c;
+  while ((c = static_cast<char>(getopt(argc, argv, option_string.c_str()))) != -1) { // NOLINT(misc-include-cleaner)
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
         valid_option = true;
         (*arguments)[c].Reset();
         if (!params[j].switch_only()) {
-          (*arguments)[c].Reset(new std::string(optarg));
+          (*arguments)[c].Reset(new std::string(optarg)); // NOLINT(misc-include-cleaner)
         }
         break;
       }
     }
 
     if (!valid_option) {
-      LogCvmfs(kLogReceiver, kLogSyslog,
+      LogCvmfs(kLogReceiver, kLogSyslog, // NOLINT(misc-include-cleaner)
                "CVMFS gateway services receiver component. Usage:");
       for (size_t i = 0; i < params.size(); ++i) {
         LogCvmfs(kLogReceiver, kLogSyslog, "  \"%c\" - %s", params[i].key(),
@@ -74,7 +74,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
   for (size_t j = 0; j < params.size(); ++j) {
     if (!params[j].optional()) {
       if (arguments->find(params[j].key()) == arguments->end()) {
-        LogCvmfs(kLogReceiver, kLogSyslogErr, "parameter -%c missing",
+        LogCvmfs(kLogReceiver, kLogSyslogErr, "parameter -%c missing", // NOLINT(misc-include-cleaner)
                  params[j].key());
         return false;
       }
@@ -99,8 +99,8 @@ int main(int argc, char** argv) {
   // For the debug mode, the gateway sets a debug log file that is collected
   // after the application quits.
 
-  SetLogSyslogFacility(1);
-  SetLogSyslogShowPID(true);
+  SetLogSyslogFacility(1); // NOLINT(misc-include-cleaner)
+  SetLogSyslogShowPID(true); // NOLINT(misc-include-cleaner)
 
   int fdin = 0;
   int fdout = 1;
@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
   }
 
   // The gateway hard-codes this to /var/log/cvmfs_receiver/debug.log
-  SetLogDebugFile(debug_log);
+  SetLogDebugFile(debug_log); // NOLINT(misc-include-cleaner)
 
   // Spawn monitoring process (watchdog)
   /*

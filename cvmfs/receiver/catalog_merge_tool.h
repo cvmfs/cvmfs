@@ -5,13 +5,18 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "catalog_diff_tool.h"
+#include "directory_entry.h"
 #include "file_chunk.h"
 #include "params.h"
+#include "shortstring.h"
 #include "statistics.h"
 #include "util/pointer.h"
+#include "xattr.h"
 
 namespace catalog {
 class WritableCatalogManager;
@@ -137,6 +142,6 @@ class CatalogMergeTool : public CatalogDiffTool<RoCatalogMgr> {
 
 }  // namespace receiver
 
-#include "catalog_merge_tool_impl.h"
+#include "catalog_merge_tool_impl.h" // NOLINT(misc-include-cleaner)
 
 #endif  // CVMFS_RECEIVER_CATALOG_MERGE_TOOL_H_

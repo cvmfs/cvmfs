@@ -123,11 +123,11 @@ class BigVector {
 
  private:
   static const size_t kNumInit = 16;
-  static const size_t kMmapThreshold = 128*1024;
+  static const size_t kMmapThreshold = static_cast<int64_t>(128*1024);
 
   Item *Alloc(const size_t num_elements) {
     Item *result;
-    size_t num_bytes = sizeof(Item) * num_elements;
+    size_t const num_bytes = sizeof(Item) * num_elements;
     if (num_bytes >= kMmapThreshold) {
       result = static_cast<Item *>(smmap(num_bytes));
       large_alloc_ = true;

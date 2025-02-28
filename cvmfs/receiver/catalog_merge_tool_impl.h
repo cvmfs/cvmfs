@@ -5,18 +5,17 @@
 #ifndef CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 #define CVMFS_RECEIVER_CATALOG_MERGE_TOOL_IMPL_H_
 
+#include <assert.h>
+
 #include <string>
 
-#include "catalog.h"
-#include "crypto/hash.h"
-#include "manifest.h"
-#include "options.h"
-#include "upload.h"
+#include "directory_entry.h"
+#include "receiver/params.h" // NOLINT(misc-include-cleaner)
+#include "shortstring.h"
+#include "upload.h" // NOLINT(misc-include-cleaner)
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/posix.h"
-#include "util/raii_temp_dir.h"
-#include "util/lease_path.h"
+#include "util/lease_path.h" // NOLINT(misc-include-cleaner)
 
 inline PathString MakeRelative(const PathString& path) {
   std::string rel_path;
@@ -31,7 +30,7 @@ inline PathString MakeRelative(const PathString& path) {
 
 inline void SplitHardlink(catalog::DirectoryEntry* entry) {
   if (entry->linkcount() > 1) {
-    LogCvmfs(kLogReceiver, kLogSyslogErr,
+    LogCvmfs(kLogReceiver, kLogSyslogErr, // NOLINT(misc-include-cleaner)
               "CatalogMergeTool - Hardlink found: %s. Hardlinks are not "
               "supported when publishing through repository gateway and "
               "will be split.", entry->name().c_str());

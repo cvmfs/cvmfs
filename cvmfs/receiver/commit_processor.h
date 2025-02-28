@@ -5,11 +5,12 @@
 #ifndef CVMFS_RECEIVER_COMMIT_PROCESSOR_H_
 #define CVMFS_RECEIVER_COMMIT_PROCESSOR_H_
 
+#include <cstdint>
 #include <string>
 
+#include "crypto/hash.h"
 #include "repository_tag.h"
-#include "server_tool.h"
-#include "util/pointer.h"
+#include "statistics.h"
 
 namespace receiver {
 

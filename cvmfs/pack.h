@@ -52,7 +52,7 @@ class ObjectPack : SingleCopy {
    */
   enum BucketContentType { kEmpty, kNamed, kCas };
 
-  static const uint64_t kDefaultLimit = 200 * 1024 * 1024;  // 200MB
+  static const uint64_t kDefaultLimit = static_cast<int64_t>(200 * 1024 * 1024);  // 200MB
 
   /**
    * Limit the maximum number of objects to avoid very large headers.  Assuming
@@ -65,15 +65,15 @@ class ObjectPack : SingleCopy {
   ~ObjectPack();
 
   static void AddToBucket(const void *buf, const uint64_t size,
-                          const BucketHandle handle);
+                          const BucketHandle handle); // NOLINT(misc-misplaced-const)
 
   BucketHandle NewBucket();
 
   bool CommitBucket(const BucketContentType type, const shash::Any &id,
-                    const BucketHandle handle, const std::string &name = "");
+                    const BucketHandle handle, const std::string &name = ""); // NOLINT(misc-misplaced-const)
 
-  void DiscardBucket(const BucketHandle handle);
-  void TransferBucket(const BucketHandle handle, ObjectPack *other);
+  void DiscardBucket(const BucketHandle handle); // NOLINT(misc-misplaced-const)
+  void TransferBucket(const BucketHandle handle, ObjectPack *other); // NOLINT(misc-misplaced-const)
 
   unsigned char *BucketContent(size_t idx) const;
   uint64_t BucketSize(size_t idx) const;
