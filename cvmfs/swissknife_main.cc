@@ -2,13 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
-#include <string>
-
-
+#include <getopt.h> // NOLINT(misc-include-cleaner)
 
 #include <cassert>
+#include <cstddef>
+#include <string>
+#include <vector>
 
-#include "statistics_database.h"
 #include "swissknife.h"
 
 #include "swissknife_check.h"
@@ -32,7 +32,6 @@
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
 #include "util/logging.h"
-#include "util/posix.h"
 #include "util/string.h"
 
 using namespace std;  // NOLINT
@@ -41,7 +40,7 @@ typedef vector<swissknife::Command *> Commands;
 Commands command_list;
 
 void Usage() {
-  LogCvmfs(kLogCvmfs, kLogStdout,
+  LogCvmfs(kLogCvmfs, kLogStdout, // NOLINT(misc-include-cleaner)
     "CernVM-FS repository storage management commands\n"
     "Version %s\n"
     "Usage (normally called from cvmfs_server):\n"
@@ -49,7 +48,7 @@ void Usage() {
     CVMFS_VERSION);
 
   for (unsigned i = 0; i < command_list.size(); ++i) {
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n"
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n" // NOLINT(misc-include-cleaner)
              "Command %s\n"
              "--------", command_list[i]->GetName().c_str());
     for (unsigned j = 0; j < command_list[i]->GetName().length(); ++j) {
@@ -64,8 +63,9 @@ void Usage() {
       for (unsigned j = 0; j < params.size(); ++j) {
         LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "  -%c    %s",
                  params[j].key(), params[j].description().c_str());
-        if (params[j].optional())
+        if (params[j].optional()) {
           LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, " (optional)");
+        }
         LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
       }
     }  // Parameter list
@@ -77,7 +77,7 @@ void Usage() {
 
 int main(int argc, char **argv) {
   // Set default logging facilities
-  DefaultLogging::Set(kLogStdout, kLogStderr);
+  DefaultLogging::Set(kLogStdout, kLogStderr); // NOLINT(misc-include-cleaner)
 
   command_list.push_back(new swissknife::CommandCreate());
   command_list.push_back(new swissknife::CommandUpload());
@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
 
   // parse the command line arguments for the Command
   swissknife::ArgumentList args;
-  optind = 1;
+  optind = 1; // NOLINT(misc-include-cleaner)
   string option_string = "";
   swissknife::ParameterList params = command->GetParams();
   for (unsigned j = 0; j < params.size(); ++j) {
@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
   // Now adding the generic -+ extra option command
   option_string.push_back(swissknife::Command::kGenericParam);
   option_string.push_back(':');
-  int c;
-  while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
+  char c;
+  while ((c = static_cast<char>(getopt(argc, argv, option_string.c_str()))) != -1) { // NOLINT(misc-include-cleaner)
     bool valid_option = false;
     for (unsigned j = 0; j < params.size(); ++j) {
       if (c == params[j].key()) {
@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
         valid_option = true;
         args[c].Reset();
         if (!params[j].switch_only()) {
-          args[c].Reset(new string(optarg));
+          args[c].Reset(new string(optarg)); // NOLINT(misc-include-cleaner)
         }
         break;
       }
@@ -193,9 +193,7 @@ int main(int argc, char **argv) {
   }
 
   // run the command
-  string start_time = GetGMTimestamp();
   const int retval = command->Main(args);
-  string finish_time = GetGMTimestamp();
 
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");

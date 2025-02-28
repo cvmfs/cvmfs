@@ -1,34 +1,66 @@
 #include "swissknife_ingestsql.h"
 
+#include <dirent.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/xattr.h>
 #include <unistd.h>
-#include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/types.h>
-#include <pwd.h>
-#include <grp.h>
 
+#include <algorithm>
+#include <cassert>
+#include <cerrno>
 #include <csignal>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
 #include <fstream>
+#include <iterator>
+#include <map>
+#include <set>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <stack>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "acl/libacl.h"
+#include "catalog_mgr.h"
 #include "catalog_mgr_rw.h"
+#include "compression/compression.h"
+#include "crypto/hash.h"
 #include "curl/curl.h"
+#include "curl/easy.h"
+#include "directory_entry.h"
+#include "duplex_sqlite3.h"
+#include "file_chunk.h"
 #include "gateway_util.h"
+#include "shortstring.h"
+#include "swissknife.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
+#include "sys/acl.h"
 #include "upload.h"
+#include "upload_spooler_definition.h"
 #include "util/lease_path.h"
 #include "util/logging.h"
 #include "catalog_downloader.h"
+#include "util/string.h"
+#include "util/pointer.h"
+#include "util/posix.h"
 
+// NOLINTBEGIN(misc-include-cleaner)
 #define CHECK_SQLITE_ERROR(ret, expected) do {                                                          \
-                                            if (ret!=expected) {                                        \
+                                            if ((ret)!=(expected)) {                                        \
                                               LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d", ret); \
                                               assert(0);                                                \
                                             }                                                           \
@@ -42,19 +74,21 @@
                                        } while (0)
 
 #define SHOW_PROGRESS(item, freq, curr, total) do {                                                                          \
-                                                 if (curr % freq == 0 || curr == total) {                                    \
+                                                 if ((curr) % (freq) == 0 || (curr) == (total)) {                                    \
                                                    LogCvmfs(kLogCvmfs, kLogStdout, "Processed %d/%d %s", curr, total, item); \
                                                  }                                                                           \
                                                } while (0)
+// NOLINTEND(misc-include-cleaner)
 
-extern long g_final_revision;
+extern int64_t g_final_revision;
 
+// NOLINTBEGIN(misc-use-anonymous-namespace)
 // bring these in from SyncParameters, as we're not using that class now
 static const unsigned kDefaultMaxWeight = 100000;
 static const unsigned kDefaultMinWeight = 1000;
-static const size_t kDefaultMinFileChunkSize = 4 * 1024 * 1024;
-static const size_t kDefaultAvgFileChunkSize = 8 * 1024 * 1024;
-static const size_t kDefaultMaxFileChunkSize = 16 * 1024 * 1024;
+static const size_t kDefaultMinFileChunkSize = static_cast<int64_t>(4 * 1024 * 1024);
+static const size_t kDefaultAvgFileChunkSize = static_cast<int64_t>(8 * 1024 * 1024);
+static const size_t kDefaultMaxFileChunkSize = static_cast<int64_t>(16 * 1024 * 1024);
 static const unsigned kDefaultNestedKcatalogLimit = 500;
 static const unsigned kDefaultRootKcatalogLimit = 200;
 static const unsigned kDefaultFileMbyteLimit = 1024;
@@ -64,7 +98,7 @@ static const unsigned kInternalChunkSize = 6  * 1024 * 1024;
 static const unsigned kDefaultLeaseBusyRetryInterval = 10;
 static const unsigned kLeaseRefreshInterval = 90; // seconds
 
-static string kConfigDir("/etc/cvmfs/gateway-client/");
+static string kConfigDir("/etc/cvmfs/gateway-client/"); 
 
 static bool g_lease_acquired = false;
 static string g_gateway_url;
@@ -98,7 +132,7 @@ static int check_hash(const char *hash) ;
 static void recursively_delete_directory(PathString& path, catalog::WritableCatalogManager &catalog_manager);
 static void create_empty_database( string& filename );
 static void relax_db_locking(sqlite3 *db);
-static void wait_for_update( std::string path, long revision) ;
+static void wait_for_update( const std::string& path, int64_t revision) ;
 static void invalidate_manifest( std::string proxy, const std::string &url ) ;
 static bool check_prefix(const std::string &path , const std::string &prefix); 
 
@@ -112,7 +146,7 @@ static string sanitise_name(const char *name_cstr,
   int reason = 0;
   const char *c = name_cstr;
   while(*c == '/') {c++;} // strip any leading slashes
-  string name = string(c);
+  string const name = string(c);
   bool ok = true;
 #if 0
   for (int i = strlen(name_cstr) - 1; i >= 0; i--) {
@@ -159,7 +193,7 @@ static string sanitise_name(const char *name_cstr,
 }
 
 static string get_parent(const string& path) {
-  size_t found = path.find_last_of('/');
+  size_t const found = path.find_last_of('/');
   if (found == string::npos) {
     return string("");
   }
@@ -167,7 +201,7 @@ static string get_parent(const string& path) {
 }
 
 static string get_basename(const string& path) {
-  size_t found = path.find_last_of('/');
+  size_t const found = path.find_last_of('/');
   if (found == string::npos) {
     return path;
   }
@@ -182,9 +216,9 @@ static string MakeCatalogPath(const std::string &relative_path) {
 static string acquire_lease(const string& key_id, const string& secret, const string& lease_path,
                             const string& repo_service_url, bool force_cancel_lease, uint64_t *current_revision, string &current_root_hash,
                             unsigned int refresh_interval) {
-  CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
+  CURLcode const ret = curl_global_init(CURL_GLOBAL_ALL);
   CUSTOM_ASSERT(ret == CURLE_OK, "failed to init curl");
-  bool acquired = false;
+  bool const acquired = false;
 
   string gateway_metadata_str;
   char *gateway_metadata = getenv("CVMFS_GATEWAY_METADATA");
@@ -196,10 +230,9 @@ static string acquire_lease(const string& key_id, const string& secret, const st
                            &buffer, gateway_metadata_str)) {
       string session_token;
 
-      LeaseReply rep = ParseAcquireReply(buffer, &session_token, current_revision, current_root_hash);
+      LeaseReply const rep = ParseAcquireReply(buffer, &session_token, current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
-          acquired = true;
           g_lease_acquired = true;
           g_last_lease_refresh = time(NULL);
           return session_token;
@@ -229,10 +262,13 @@ static string acquire_lease(const string& key_id, const string& secret, const st
 static uint64_t make_commit_on_gateway( const std::string &old_root_hash, const std::string &new_root_hash, int priority) {
   CurlBuffer buffer;
   char priorityStr[100];
-  sprintf(priorityStr, "%d", priority);
+  int const ret = sprintf(priorityStr, "%d", priority);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to write to string"); // NOLINT(misc-include-cleaner)
+  }
   buffer.data="";
 
-  std::string payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
+  std::string const payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, payload,  &buffer, true);
@@ -245,9 +281,9 @@ static void refresh_lease() {
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, "", &buffer,false)) {
-    int ret = ParseDropReply(buffer);
+    int const ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
-      LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
+      LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed"); // NOLINT(misc-include-cleaner)
       g_last_lease_refresh=time(NULL);
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Lease refresh failed: %d", ret);
@@ -267,9 +303,9 @@ static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, "", &buffer, false)) {
-    int ret = ParseDropReply(buffer);
+    int const ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
+      LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled"); // NOLINT(misc-include-cleaner)
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Lease cancellation failed: %d", ret);
     }
@@ -280,7 +316,10 @@ static void cancel_lease() {
 }
 
 static void on_signal(int sig) {
-  signal(sig, SIG_DFL);
+  sighandler_t const ret = signal(sig, SIG_DFL);
+  if (ret == SIG_ERR) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "error while creating singal. errno: %s", strerror(errno));
+  }
   if (g_lease_acquired) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Cancelling lease");
     cancel_lease();
@@ -316,12 +355,12 @@ static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
     for (vector<string>::iterator it = tables.begin(); it != tables.end();
          it++) {
       sqlite3_stmt *stmt;
-      string query = "SELECT name FROM " + *it;
+      string const query = "SELECT name FROM " + *it;
       ret = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL);
       CHECK_SQLITE_ERROR(ret, SQLITE_OK);
       while (sqlite3_step(stmt) == SQLITE_ROW) {
-        char *name = (char *)sqlite3_column_text(stmt, 0);
-        string names = sanitise_name(name);
+        const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+        string const names = sanitise_name(name);
         if (*it=="dirs") { 
           paths.push_back(names);
         } else {
@@ -347,7 +386,7 @@ static int get_db_schema_revision(sqlite3 *db, const std::string &db_name = "") 
   ret = sqlite3_step(stmt);
   // if table exists, we require that it must have a schema_revision row
   CHECK_SQLITE_ERROR(ret, SQLITE_ROW);
-  std::string schema_revision_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
+  std::string const schema_revision_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
   return std::stoi(schema_revision_str);
 }
@@ -361,7 +400,7 @@ static int get_row_count(sqlite3 *db, const std::string &table_name) {
 
   ret = sqlite3_step(stmt);
   CHECK_SQLITE_ERROR(ret, SQLITE_ROW);
-  std::string count_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
+  std::string const count_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
   return std::stoi(count_str);
 }
@@ -413,11 +452,11 @@ static XattrList marshal_xattrs(const char *acl_string) {
   CUSTOM_ASSERT(acl != NULL, "failed to parse ACL from string: %s", acl_string);
   CUSTOM_ASSERT(0 == acl_valid(acl), "parsed ACL failed acl_valid check");
   // check if the ACL string contains more than the synthetic ACLs
-  int equiv = acl_equiv_mode(acl, NULL);
+  int const equiv = acl_equiv_mode(acl, NULL);
   CUSTOM_ASSERT(-1 != equiv, "error on acl_equiv_mode check");
   if (equiv == 1) {
     size_t binary_size;
-    char *binary_acl = (char *)acl_to_xattr(acl, &binary_size);
+    char *binary_acl = static_cast<char *>(acl_to_xattr(acl, &binary_size));
     CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %lu)", binary_size);
     free(binary_acl);
   }
@@ -425,6 +464,8 @@ static XattrList marshal_xattrs(const char *acl_string) {
   acl_free(acl);
   return aclobj;
 }
+
+// NOLINTEND(misc-use-anonymous-namespace)
 
 std::unordered_map<string, string> load_config(const string& config_file) {
   std::unordered_map<string, string> config_map;
@@ -439,10 +480,10 @@ std::unordered_map<string, string> load_config(const string& config_file) {
   }
 
   for (auto it = lines.begin(); it != lines.end(); it++) {
-    string l = *it;
-    size_t p = l.find("=", 0);
+    string const l = *it;
+    size_t const p = l.find('=', 0);
     if (p != string::npos) {
-      string key = l.substr(0, p);
+      string const key = l.substr(0, p);
       string val = l.substr(p + 1);
       // trim any double quotes
       if (val.front() == '"') {
@@ -461,11 +502,11 @@ string retrieve_config(std::unordered_map<string, string> &config_map, const str
   return kv->second;
 }
 
-static vector<string> get_file_list(string& path) {
+static vector<string> get_file_list(string& path) { // NOLINT(misc-use-anonymous-namespace)
   vector<string> paths;
   const char *cpath = path.c_str();
   struct stat st;
-  int ret = stat(cpath, &st);
+  int const ret = stat(cpath, &st);
   CUSTOM_ASSERT(ret == 0, "failed to stat file %s", cpath);
 
   if (S_ISDIR(st.st_mode)) {
@@ -497,11 +538,20 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   // the catalog code uses assert() liberally.
   // install ABRT signal handler to catch an abort and cancel lease
-  signal(SIGABRT, &on_signal);
-  signal(SIGINT, &on_signal);
-  signal(SIGTERM, &on_signal);
+  sighandler_t sigret = signal(SIGABRT, &on_signal);
+  if (sigret == SIG_ERR) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "error while creating singal. errno: %s", strerror(errno));
+  }
+  sigret = signal(SIGINT, &on_signal);
+  if (sigret == SIG_ERR) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "error while creating singal. errno: %s", strerror(errno));
+  }
+  sigret = signal(SIGTERM, &on_signal);
+  if (sigret == SIG_ERR) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "error while creating singal. errno: %s", strerror(errno));
+  }
 
-  bool enable_corefiles = (args.find('c') != args.end());
+  bool const enable_corefiles = (args.find('c') != args.end());
   if( !enable_corefiles ) {
     struct rlimit rlim;
     rlim.rlim_cur = rlim.rlim_max = 0;
@@ -525,7 +575,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   if (args.find('P') != args.end()) {
     g_priority = atoi((*args.find('P')->second).c_str());
   } else {
-    g_priority = -time(NULL);
+    g_priority = static_cast<int>(-time(NULL));
   }
 
 
@@ -538,7 +588,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   if (args.find('t') != args.end()) {
     dir_temp = MakeCanonicalPath(*args.find('t')->second);
   } else if (getenv("TMPDIR")) {
-    dir_temp = MakeCanonicalPath(getenv("TMPDIR"));
+    dir_temp = MakeCanonicalPath(getenv("TMPDIR")); // NOLINT(clang-analyzer-cplusplus.StringChecker)
   } else {
     LogCvmfs(kLogCvmfs, kLogStderr, "-t or TMPDIR required");
     return 1;
@@ -551,19 +601,19 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   } 
 
   // mandatory arguments
-  string repo_name = *args.find('N')->second;
+  string const repo_name = *args.find('N')->second;
   string sqlite_db_path = *args.find('D')->second;
 
   vector<string> sqlite_db_vec = get_file_list(sqlite_db_path);
 
   // optional arguments
-  bool allow_deletions = (args.find('d') != args.end());
-  bool force_cancel_lease = (args.find('x') != args.end());
-  bool allow_additions = !allow_deletions || (args.find('a') != args.end());
+  bool const allow_deletions = (args.find('d') != args.end());
+  bool const force_cancel_lease = (args.find('x') != args.end());
+  bool const allow_additions = !allow_deletions || (args.find('a') != args.end());
   g_add_missing_catalogs = ( args.find('z') != args.end());
-  bool check_completed_graft_property = ( args.find('Z') != args.end());
+  bool const check_completed_graft_property = ( args.find('Z') != args.end());
   if (args.find('v') != args.end()) {
-    SetLogVerbosity(kLogVerbose);
+    SetLogVerbosity(kLogVerbose); // NOLINT(misc-include-cleaner)
   }
 
   if(check_completed_graft_property) {
@@ -579,7 +629,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     }
   }
 
-  string config_file = kConfigDir + repo_name + "/config";
+  string const config_file = kConfigDir + repo_name + "/config";
   string stratum0;
   string proxy;
 
@@ -620,7 +670,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     lease_path = *args.find('l')->second;
   } else {
     // lease path wasn't specified, so try to autodetect it
-    vector<string> paths = get_all_dirs_from_sqlite(
+    vector<string> const paths = get_all_dirs_from_sqlite(
         sqlite_db_vec, allow_additions, allow_deletions);
     if (paths.size() == 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Database is empty, nothing to do");
@@ -663,7 +713,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
 //  string spooler_definition_string = string("gw,,") + g_gateway_url;
   // create a spooler that will upload to S3
-  string spooler_definition_string = string("S3,") + dir_temp + "," + repo_name + "@" + s3_file;
+  string const spooler_definition_string = string("S3,") + dir_temp + "," + repo_name + "@" + s3_file;
 
   // load gateway lease
   if (!gateway::ReadKeys(key_file, &g_gateway_key_id, &g_gateway_secret)) {
@@ -683,17 +733,23 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
  
   char *_tmpfile = strdup( (dir_temp + "/gateway_session_token_XXXXXX").c_str() );
-  int temp_fd = mkstemp(_tmpfile);
+  int const temp_fd = mkstemp(_tmpfile);
   g_session_token_file = string(_tmpfile);
   free(_tmpfile);
 
   FILE *fout=fdopen(temp_fd, "wb"); 
   CUSTOM_ASSERT(fout!=NULL, "failed to open session token file %s for writing", g_session_token_file.c_str());
-  fputs(g_session_token.c_str(), fout);
-  fclose(fout);
+  int ret = fputs(g_session_token.c_str(), fout);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed ot write to stream");
+  }
+  ret = fclose(fout);
+  if (ret != 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file with descriptor %d", temp_fd);
+  }
 
   // now start the lease refresh thread
-  pthread_t lease_thread;
+  pthread_t lease_thread; // NOLINT(misc-include-cleaner)
   if ( 0 != pthread_create( &lease_thread, NULL, lease_refresh_thread, NULL ) ) {
      LogCvmfs(kLogCvmfs, kLogStderr, "Unable to start lease refresh thread");
      cancel_lease();
@@ -712,10 +768,10 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
         String2Uint64(*args.find('q')->second);
   }
 
-  upload::SpoolerDefinition spooler_definition_catalogs(
+  upload::SpoolerDefinition const spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
-  UniquePtr<upload::Spooler> spooler_catalogs(
+  UniquePtr<upload::Spooler> const spooler_catalogs(
       upload::Spooler::Construct(spooler_definition_catalogs, nullptr));
 
   if (!spooler_catalogs.IsValid()) {
@@ -767,13 +823,13 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
 
   // get hash of current root catalog, remove terminal "C", encode it
-  string old_root_hash = manifest->catalog_hash().ToString(true);
-  string hash = old_root_hash.substr(0, old_root_hash.length() - 1);
-  shash::Any base_hash =
+  string const old_root_hash = manifest->catalog_hash().ToString(true);
+  string const hash = old_root_hash.substr(0, old_root_hash.length() - 1);
+  shash::Any const base_hash =
       shash::MkFromHexPtr(shash::HexPtr(hash), shash::kSuffixCatalog);
   LogCvmfs(kLogCvmfs, kLogStdout, "old_root_hash: %s", old_root_hash.c_str());
 
-  bool is_balanced = false;
+  bool const is_balanced = false;
 
   catalog::WritableCatalogManager catalog_manager(
       base_hash, stratum0, dir_temp, spooler_catalogs.weak_ref(),
@@ -846,7 +902,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Committing with priority %d", g_priority);
 
-  bool ok = make_commit_on_gateway( old_root_hash, new_root_hash, g_priority );
+  bool const ok = make_commit_on_gateway( old_root_hash, new_root_hash, g_priority );
   if(!ok) {
    LogCvmfs(kLogCvmfs, kLogStderr, "something went wrong during commit on gateway");
    cancel_lease(); 
@@ -873,7 +929,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   return 0;
 }
 
-size_t writeFunction(void *ptr, size_t size, size_t nmemb, std::string* data) {
+size_t writeFunction(void * /*ptr*/, size_t size, size_t nmemb, std::string*  /*data*/) {
     return size * nmemb;
 }
 
@@ -888,7 +944,7 @@ void replaceAllSubstrings(std::string& str, const std::string& from, const std::
     }
 }
 
-static void invalidate_manifest( std::string proxy_list, const std::string &url ) {
+static void invalidate_manifest( std::string proxy_list, const std::string &url ) { // NOLINT(misc-use-anonymous-namespace)
    // split the proxy string -- remove any '"' and split on '|' or ';'
     size_t pos = 0;
    // replace any ';' with '|' to simplify subsequent split
@@ -914,22 +970,22 @@ static void invalidate_manifest( std::string proxy_list, const std::string &url 
    bool first=true;
    for( auto p = proxies.begin(); p != proxies.end(); p++) {
      bool ok=true;
-     string proxy=*p;
+     string const proxy=*p;
      CURL *curl=NULL;
-     CURLcode res=CURLE_OK;
+     int res=static_cast<int>(CURLE_OK);
      struct curl_slist *headers = NULL;
      curl = curl_easy_init();
      if(!curl) {
        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Unable to init curl!");
        return;
      }
-     res = curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+     res += static_cast<int>(curl_easy_setopt(curl, CURLOPT_URL, url.c_str()));
      if( proxy != "DIRECT" ) {
-       res = curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+       res += static_cast<int>(curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str()));
      }
-     res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1l);
-     res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3l);
-     res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);
+     res += static_cast<int>(curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1L));
+     res += static_cast<int>(curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L));
+     res += static_cast<int>(curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction));
 
      if( first ) {
        headers = curl_slist_append(headers, "Cache-Control: no-cache");
@@ -938,9 +994,9 @@ static void invalidate_manifest( std::string proxy_list, const std::string &url 
        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PURGE");
      }
      
-     res = curl_easy_perform(curl);
-     if(res!=CURLE_OK) {
-       LogCvmfs(kLogCvmfs, kLogStderr, "Manifest invalidation failed: curl error = [%d] [%s] url = %s proxy = %s", res, curl_easy_strerror(res), url.c_str(), proxy.c_str() );
+     res += static_cast<int>(curl_easy_perform(curl));
+     if(res!=static_cast<int>(CURLE_OK)) {
+       LogCvmfs(kLogCvmfs, kLogStderr, "Manifest invalidation failed: url = %s proxy = %s", url.c_str(), proxy.c_str() );
        ok=false;
      } 
      if( headers ) { curl_slist_free_all(headers); }
@@ -951,12 +1007,12 @@ static void invalidate_manifest( std::string proxy_list, const std::string &url 
    }
 }
 
-static void wait_for_update( std::string path, long revision) {
+static void wait_for_update( const std::string& path, int64_t revision) { // NOLINT(misc-use-anonymous-namespace)
   char val[101];
   memset(val, 0, 101 );
-  long current=-1;
+  int64_t current=-1;
   while (-1 !=  getxattr( path.c_str(), "user.revision", val, 100 ) ) {
-    long x = atol(val);
+    int64_t const x = atol(val);
     if (x>=revision) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Mount reached revision %ld", x);
       return;
@@ -1043,8 +1099,8 @@ int swissknife::IngestSQL::do_additions(
   for (auto&& p : all_symlinks) {
     add_dir_to_tree(p.first, tree, lease_path);
   }
-  int row_count = static_cast<int>(tree.size());
-  int print_every = calculate_print_frequency(row_count);
+  int const row_count = static_cast<int>(tree.size());
+  int const print_every = calculate_print_frequency(row_count);
   int curr_row = 0;
   LogCvmfs(kLogCvmfs, kLogStdout, "Changeset: %ld dirs, %ld files, %ld symlinks", tree.size(), all_files.size(), all_symlinks.size());
 
@@ -1063,7 +1119,7 @@ int swissknife::IngestSQL::do_additions(
   }
   std::set<string> visited;
   while (!dfs_stack.empty()) {
-    string curr_dir = dfs_stack.top();
+    string const curr_dir = dfs_stack.top();
     // add content for the dir in post-order traversal
     if (visited.count(curr_dir)) {
       curr_row++;
@@ -1143,7 +1199,7 @@ int swissknife::IngestSQL::do_additions(
         dir2.checksum_ = shash::MkFromHexPtr(
             shash::HexPtr("da39a3ee5e6b4b0d3255bfef95601890afd80709"),
             shash::kSuffixNone);  // hash of ""
-        XattrList xattr2;
+        XattrList const xattr2;
         catalog_manager.AddFile(dir2, xattr2, dir.name);
 
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Creating Nested Catalog [%s]", dir.name.c_str());
@@ -1164,7 +1220,7 @@ int swissknife::IngestSQL::add_symlinks(
   for (auto&& symlink : symlinks) {
     catalog::DirectoryEntry dir;
     catalog::DirectoryEntryBase dir2;
-    XattrList xattr;
+    XattrList const xattr;
     bool exists = false;
     exists = catalog_manager.LookupDirEntry(MakeCatalogPath(symlink.name),
                                         catalog::kLookupDefault, &dir);
@@ -1199,7 +1255,7 @@ int swissknife::IngestSQL::add_symlinks(
       }
     }
     if(!noop) {
-      string parent = get_parent(symlink.name);
+      string const parent = get_parent(symlink.name);
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Adding symlink [%s] -> [%s]", symlink.name.c_str(), symlink.target.c_str());
       catalog_manager.AddFile(dir2, xattr, parent);
     }
@@ -1207,7 +1263,7 @@ int swissknife::IngestSQL::add_symlinks(
   return 0;
 }
 
-static int check_hash( const char*hash) {
+static int check_hash( const char*hash) { // NOLINT(misc-use-anonymous-namespace)
   if (strlen(hash)!=40) { return 1;}
   for(int i=0; i<40; i++ ) {
    // < '0' || > 'f' || ( > '9' && < 'a' )
@@ -1230,23 +1286,23 @@ bool check_prefix(const std::string &path , const std::string &prefix) {
 
 void swissknife::IngestSQL::load_dirs(sqlite3 *db, const std::string &lease_path, const std::string &additional_prefix, std::map<std::string, Directory> &all_dirs) {
   sqlite3_stmt *stmt;
-  int schema_revision = get_db_schema_revision(db);
+  int const schema_revision = get_db_schema_revision(db);
   string select_stmt = "SELECT name, mode, mtime, owner, grp, acl, nested FROM dirs";
   if (schema_revision <= 3) {
     select_stmt = "SELECT name, mode, mtime, owner, grp, acl FROM dirs";
   }
-  int ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
+  int const ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
   CHECK_SQLITE_ERROR(ret, SQLITE_OK);
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    char *name_cstr = (char *)sqlite3_column_text(stmt, 0);
-    mode_t mode = sqlite3_column_int(stmt, 1);
-    time_t mtime = sqlite3_column_int64(stmt, 2);
-    uid_t owner = sqlite3_column_int(stmt, 3);
-    gid_t grp = sqlite3_column_int(stmt, 4);
-    char *acl = (char *)sqlite3_column_text(stmt, 5);
-    int nested = schema_revision <= 3 ? 1 : sqlite3_column_int(stmt, 6);
+    const char *name_cstr = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+    mode_t const mode = sqlite3_column_int(stmt, 1);
+    time_t const mtime = sqlite3_column_int64(stmt, 2);
+    uid_t const owner = sqlite3_column_int(stmt, 3);
+    gid_t const grp = sqlite3_column_int(stmt, 4);
+    const char *acl = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 5));
+    int const nested = schema_revision <= 3 ? 1 : sqlite3_column_int(stmt, 6);
 
-    string name = additional_prefix + sanitise_name(name_cstr);
+    string const name = additional_prefix + sanitise_name(name_cstr);
     CUSTOM_ASSERT(check_prefix(name, lease_path), "%s is not below lease path %s", name.c_str(), lease_path.c_str());
 
     Directory dir(name, mtime, mode, owner, grp, nested);
@@ -1258,27 +1314,27 @@ void swissknife::IngestSQL::load_dirs(sqlite3 *db, const std::string &lease_path
 
 void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_path, const std::string &additional_prefix, std::map<std::string, std::vector<File>> &all_files) {
   sqlite3_stmt *stmt;
-  int schema_revision = get_db_schema_revision(db);
+  int const schema_revision = get_db_schema_revision(db);
   string select_stmt = "SELECT name, mode, mtime, owner, grp, size, hashes, internal, compressed FROM files";
   if (schema_revision <= 2) {
     select_stmt = "SELECT name, mode, mtime, owner, grp, size, hashes, internal FROM files";
   }
-  int ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
+  int const ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
   CHECK_SQLITE_ERROR(ret, SQLITE_OK);
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    char *name = (char *)sqlite3_column_text(stmt, 0);
-    mode_t mode = sqlite3_column_int(stmt, 1);
-    time_t mtime = sqlite3_column_int64(stmt, 2);
-    uid_t owner = sqlite3_column_int(stmt, 3);
-    gid_t grp = sqlite3_column_int(stmt, 4);
-    size_t size = sqlite3_column_int64(stmt, 5);
-    char *hashes_cstr = (char *)sqlite3_column_text(stmt, 6);
-    int internal = sqlite3_column_int(stmt, 7);
-    int compressed = schema_revision <= 2 ? 0 : sqlite3_column_int(stmt, 8);
+    const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+    mode_t const mode = sqlite3_column_int(stmt, 1);
+    time_t const mtime = sqlite3_column_int64(stmt, 2);
+    uid_t const owner = sqlite3_column_int(stmt, 3);
+    gid_t const grp = sqlite3_column_int(stmt, 4);
+    size_t const size = sqlite3_column_int64(stmt, 5);
+    char *hashes_cstr = reinterpret_cast<char*>(const_cast<unsigned char *>(sqlite3_column_text(stmt, 6)));
+    int const internal = sqlite3_column_int(stmt, 7);
+    int const compressed = schema_revision <= 2 ? 0 : sqlite3_column_int(stmt, 8);
 
     string names = additional_prefix + sanitise_name(name);
     CUSTOM_ASSERT(check_prefix(names, lease_path), "%s is not below lease path %s", names.c_str(), lease_path.c_str());
-    string parent_dir = get_parent(names);
+    string const parent_dir = get_parent(names);
 
     if (!all_files.count(parent_dir)) {
       all_files[parent_dir] = vector<swissknife::IngestSQL::File>();
@@ -1295,28 +1351,28 @@ void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_pat
     off_t offset = 0;
 
     CUSTOM_ASSERT(size>=0, "file size cannot be negative [%s]", names.c_str());
-    size_t kChunkSize = internal ? kInternalChunkSize : kExternalChunkSize;
+    size_t const kChunkSize = internal ? kInternalChunkSize : kExternalChunkSize;
 
     while (tok) {
       offsets.push_back(offset);
-      // TODO: check the hash format
+      // TODO(mharvey): check the hash format
       CUSTOM_ASSERT(check_hash(tok)==0, "provided hash for [%s] is invalid: %s", names.c_str(), tok);
       hashes.push_back(
           shash::MkFromHexPtr(shash::HexPtr(tok), shash::kSuffixNone));
       tok = strtok_r(NULL, ",", &ref);
-      offset += kChunkSize;  // TODO: in the future we might want variable chunk
-                             // sizes specified in the DB
+      offset += static_cast<off_t>(kChunkSize);  // TODO(mharvey): in the future we might want variable chunk
+                                                 // sizes specified in the DB
     }
     size_t expected_num_chunks = size/kChunkSize;
-    if (expected_num_chunks * (size_t)kChunkSize < (size_t) size || size==0 ) { expected_num_chunks++; }
-    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %d does not match expected number of chunks %d", offsets.size(), expected_num_chunks);
+    if (expected_num_chunks * kChunkSize < size || size==0 ) { expected_num_chunks++; }
+    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %ld does not match expected number of chunks %ld", offsets.size(), expected_num_chunks);
     for (size_t i = 0; i < offsets.size() - 1; i++) {  
-      sizes.push_back(size_t(offsets[i + 1] - offsets[i]));
+      sizes.push_back(static_cast<size_t>(offsets[i + 1] - offsets[i]));
     }
 
-    sizes.push_back(size_t(size - offsets[offsets.size() - 1]));
+    sizes.push_back((size - offsets[offsets.size() - 1]));
     for (size_t i = 0; i < offsets.size(); i++) {
-      FileChunk chunk = FileChunk(hashes[i], offsets[i], sizes[i]);
+      FileChunk const chunk = FileChunk(hashes[i], offsets[i], sizes[i]);
       all_files[parent_dir].back().chunks.PushBack(chunk);
     }
   }
@@ -1325,21 +1381,21 @@ void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_pat
 
 void swissknife::IngestSQL::load_symlinks(sqlite3 *db, const std::string &lease_path, const std::string &additional_prefix, std::map<std::string, std::vector<Symlink>> &all_symlinks) {
   sqlite3_stmt *stmt;
-  string select_stmt = "SELECT name, target, mtime, owner, grp, skip_if_file_or_dir FROM links";
-  int ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
+  string const select_stmt = "SELECT name, target, mtime, owner, grp, skip_if_file_or_dir FROM links";
+  int const ret = sqlite3_prepare_v2(db, select_stmt.c_str(), -1, &stmt, NULL);
   CHECK_SQLITE_ERROR(ret, SQLITE_OK);
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    char *name_cstr = (char *)sqlite3_column_text(stmt, 0);
-    char *target_cstr = (char *)sqlite3_column_text(stmt, 1);
-    time_t mtime = sqlite3_column_int64(stmt, 2);
-    uid_t owner = sqlite3_column_int(stmt, 3);
-    gid_t grp = sqlite3_column_int(stmt, 4);
-    int skip_if_file_or_dir = sqlite3_column_int(stmt, 5);
+    const char *name_cstr = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+    const char *target_cstr = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+    time_t const mtime = sqlite3_column_int64(stmt, 2);
+    uid_t const owner = sqlite3_column_int(stmt, 3);
+    gid_t const grp = sqlite3_column_int(stmt, 4);
+    int const skip_if_file_or_dir = sqlite3_column_int(stmt, 5);
 
     string names = additional_prefix + sanitise_name(name_cstr);
     CUSTOM_ASSERT(check_prefix(names, lease_path), "%s is not below lease path %s", names.c_str(), lease_path.c_str());
     string target= target_cstr; //JCS like garbage in their symlinks //sanitise_symlink_target(target_cstr);
-    string parent_dir = get_parent(names);
+    string const parent_dir = get_parent(names);
     
     if (!all_symlinks.count(parent_dir)) {
       all_symlinks[parent_dir] = vector<swissknife::IngestSQL::Symlink>();
@@ -1354,7 +1410,7 @@ int swissknife::IngestSQL::add_files(
 {
   for (auto&& file : files) {
     catalog::DirectoryEntry dir;
-    XattrList xattr;
+    XattrList const xattr;
     bool exists = false;
     exists = catalog_manager.LookupDirEntry(MakeCatalogPath(file.name),
                                         catalog::kLookupDefault, &dir);
@@ -1393,7 +1449,7 @@ int swissknife::IngestSQL::add_files(
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Removing existing file [%s]", file.name.c_str());
       catalog_manager.RemoveFile(file.name);
     }
-    string parent = get_parent(file.name);
+    string const parent = get_parent(file.name);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Adding chunked file [%s]", file.name.c_str());
     catalog_manager.AddChunkedFile(dir, xattr, parent, file.chunks);
   }
@@ -1404,20 +1460,20 @@ int swissknife::IngestSQL::add_files(
 int swissknife::IngestSQL::do_deletions(
     sqlite3 *db, catalog::WritableCatalogManager &catalog_manager, const std::string &lease_path, const std::string &additional_prefix) {
   sqlite3_stmt *stmt;
-  int row_count = get_row_count(db, "deletions");
-  int print_every = calculate_print_frequency(row_count);
+  int const row_count = get_row_count(db, "deletions");
+  int const print_every = calculate_print_frequency(row_count);
   int curr_row = 0;
   int ret = sqlite3_prepare_v2(db, "SELECT name, directory, file, link FROM deletions ORDER BY length(name) DESC", -1, &stmt, NULL);
   CHECK_SQLITE_ERROR(ret, SQLITE_OK);
   while (sqlite3_step(stmt) == SQLITE_ROW) {
     curr_row++;
 
-    char *name = (char *)sqlite3_column_text(stmt, 0);
-    int64_t isdir  = sqlite3_column_int64(stmt, 1);
-    int64_t isfile = sqlite3_column_int64(stmt, 2);
-    int64_t islink = sqlite3_column_int64(stmt, 3);
+    const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+    int64_t const isdir  = sqlite3_column_int64(stmt, 1);
+    int64_t const isfile = sqlite3_column_int64(stmt, 2);
+    int64_t const islink = sqlite3_column_int64(stmt, 3);
 
-    string names = additional_prefix + sanitise_name(name);
+    string const names = additional_prefix + sanitise_name(name);
     CUSTOM_ASSERT(check_prefix( names, lease_path), "%s is not below lease path %s", names.c_str(), lease_path.c_str());
 
     catalog::DirectoryEntry dirent;
@@ -1436,7 +1492,7 @@ int swissknife::IngestSQL::do_deletions(
           catalog_manager.RemoveFile(names);
         }
       } else {
-        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Mismatch in deletion type, not deleting: [%s] (dir %d/%d , link %d/%d, file %d/%d)", names.c_str(), isdir,  S_ISDIR(dirent.mode_), islink, S_ISLNK(dirent.mode_), isfile, S_ISREG(dirent.mode_) );
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Mismatch in deletion type, not deleting: [%s] (dir %ld/%d , link %ld/%d, file %ld/%d)", names.c_str(), isdir,  S_ISDIR(dirent.mode_), islink, S_ISLNK(dirent.mode_), isfile, S_ISREG(dirent.mode_) );
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Not Removing non-existent [%s]",
@@ -1499,6 +1555,7 @@ const char*schema[] = {
   NULL
 };
 
+// NOLINTBEGIN(misc-use-anonymous-namespace)
 static void create_empty_database( string& filename ) {
   sqlite3 *db_out;
   LogCvmfs(kLogCvmfs, kLogStdout, "Creating empty database file %s", filename.c_str());
@@ -1516,11 +1573,11 @@ static void create_empty_database( string& filename ) {
 }
 
 static void recursively_delete_directory(PathString& path, catalog::WritableCatalogManager &catalog_manager) {
-   catalog::DirectoryEntryList listing;
+   catalog::DirectoryEntryList const listing;
 
   // Add all names
    catalog::StatEntryList listing_from_catalog;
-   bool retval = catalog_manager.ListingStat(PathString( "/" +  path.ToString()), &listing_from_catalog);
+   bool const retval = catalog_manager.ListingStat(PathString( "/" +  path.ToString()), &listing_from_catalog);
 
    CUSTOM_ASSERT(retval, "failed to call ListingStat for %s", path.c_str());
 
@@ -1563,7 +1620,7 @@ static void relax_db_locking(sqlite3 *db) {
 }
 
 
-extern "C" void* lease_refresh_thread(void *payload) {
+extern "C" void* lease_refresh_thread(void * /*payload*/) {
  while( !g_stop_refresh ) {
    sleep(2);
    refresh_lease();
@@ -1586,7 +1643,7 @@ static bool isDatabaseMarkedComplete(const char *dbfile) {
     return false; 
   }
   if(sqlite3_step(stmt) == SQLITE_ROW) {
-    int id = sqlite3_column_int(stmt,0);
+    int const id = sqlite3_column_int(stmt,0);
     if(id>0) { 
       retval=true; 
     }
@@ -1611,4 +1668,4 @@ static void setDatabaseMarkedComplete(const char *dbfile) {
   }
   sqlite3_close(db);
 }
-
+// NOLINTEND(misc-use-anonymous-namespace)

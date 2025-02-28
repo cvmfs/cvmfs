@@ -7,39 +7,26 @@
 #include "swissknife_sign.h"
 
 
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <termios.h>
-#include <unistd.h>
 
 #include <cstdio>
 #include <cstdlib>
-#include <set>
 #include <string>
-#include <vector>
 
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "crypto/signature.h"
-#include "manifest.h"
 #include "object_fetcher.h"
-#include "reflog.h"
 #include "signing_tool.h"
-#include "upload.h"
-#include "util/logging.h"
-#include "util/posix.h"
-#include "util/smalloc.h"
+#include "swissknife.h"
 
 using namespace std;  // NOLINT
 
 typedef HttpObjectFetcher<> ObjectFetcher;
 
 int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
-  string manifest_path = *args.find('m')->second;
-  string repo_url = *args.find('u')->second;
-  string spooler_definition = *args.find('r')->second;
-  string temp_dir = *args.find('t')->second;
+  string const manifest_path = *args.find('m')->second;
+  string const repo_url = *args.find('u')->second;
+  string const spooler_definition = *args.find('r')->second;
+  string const temp_dir = *args.find('t')->second;
 
   string certificate = "";
   if (args.find('c') != args.end()) certificate = *args.find('c')->second;
@@ -58,7 +45,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   const bool return_early = (args.count('e') > 0);
 
   string reflog_chksum_path;
-  shash::Any reflog_hash;
+  shash::Any const reflog_hash;
   if (args.find('R') != args.end()) {
     reflog_chksum_path = *args.find('R')->second;
   }

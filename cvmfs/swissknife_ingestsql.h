@@ -5,12 +5,17 @@
 #ifndef CVMFS_SWISSKNIFE_INGESTSQL_H_
 #define CVMFS_SWISSKNIFE_INGESTSQL_H_
 
+#include <cstddef>
+#include <ctime>
 #include <string>
 #include <utility>
 #include <map>
+#include <sys/types.h>
 #include <vector>
 
 #include "catalog_mgr_rw.h"
+#include "duplex_sqlite3.h"
+#include "file_chunk.h"
 #include "swissknife.h"
 
 namespace swissknife {

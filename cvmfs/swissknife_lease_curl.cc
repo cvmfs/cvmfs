@@ -4,10 +4,16 @@
 
 #include "swissknife_lease_curl.h"
 
-
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 #include "crypto/hash.h"
+#include "curl/curl.h"
+#include "curl/easy.h"
+#include "curl/system.h"
 #include "gateway_util.h"
+#include "json.h"
 #include "json_document.h"
 #include "json_document_write.h"
 #include "ssl.h"
@@ -16,10 +22,8 @@
 #include "util/posix.h"
 #include "util/string.h"
 
-#include <unistd.h>
-
 //static std::string GetHostname(void);
-long g_final_revision = -1;
+int64_t g_final_revision = -1;
 
 namespace {
 
@@ -96,7 +100,7 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
 
   ret = curl_easy_perform(h_curl);
   if (ret) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
+    LogCvmfs(kLogUploadGateway, kLogStderr, // NOLINT(misc-include-cleaner)
              "Make lease acquire request failed: %d. Reply: %s", ret,
              buffer->data.c_str());
   }
@@ -157,7 +161,7 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
        ok=false;
   }
   else { 
-    UniquePtr<JsonDocument> reply_json(doc);
+    UniquePtr<JsonDocument> const reply_json(doc);
     const JSON *reply_status =
       JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
     ok = (reply_status != NULL &&

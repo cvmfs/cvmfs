@@ -5,9 +5,10 @@
 #ifndef CVMFS_SWISSKNIFE_LEASE_JSON_H_
 #define CVMFS_SWISSKNIFE_LEASE_JSON_H_
 
-#include "swissknife_lease_curl.h"
-
+#include <cstdint>
 #include <string>
+
+#include "swissknife_lease_curl.h"
 
 enum LeaseReply {
   kLeaseReplySuccess,

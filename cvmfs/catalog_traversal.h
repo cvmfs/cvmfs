@@ -181,6 +181,7 @@ class CatalogTraversalBase
     assert(object_fetcher_ != NULL);
   }
 
+  // NOLINTBEGIN(google-default-arguments)
   /**
    * Starts the traversal process.
    * After calling this methods CatalogTraversal will go through all catalogs
@@ -263,6 +264,7 @@ class CatalogTraversalBase
     assert(success);
     return TraverseList(root_hashes, type);
   }
+  // NOLINTEND(google-default-arguments)
 
   void SetCatalogInfoShim(CatalogTraversalInfoShim<CatalogTN> *shim) {
     catalog_info_shim_ = shim;
@@ -427,7 +429,7 @@ class CatalogTraversalBase
     assert(timestamp_threshold >= 0);
     const bool t =
       catalog_info_shim_->GetLastModified(job.catalog) <
-      unsigned(timestamp_threshold);
+      static_cast<unsigned>(timestamp_threshold);
 
     return t || h;
   }

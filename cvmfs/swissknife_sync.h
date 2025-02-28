@@ -16,9 +16,9 @@
 struct SyncParameters {
   static const unsigned kDefaultMaxWeight = 100000;
   static const unsigned kDefaultMinWeight = 1000;
-  static const size_t kDefaultMinFileChunkSize = 4 * 1024 * 1024;
-  static const size_t kDefaultAvgFileChunkSize = 8 * 1024 * 1024;
-  static const size_t kDefaultMaxFileChunkSize = 16 * 1024 * 1024;
+  static const size_t kDefaultMinFileChunkSize = static_cast<int64_t>(4 * 1024 * 1024);
+  static const size_t kDefaultAvgFileChunkSize = static_cast<int64_t>(8 * 1024 * 1024);
+  static const size_t kDefaultMaxFileChunkSize = static_cast<int64_t>(16 * 1024 * 1024);
   static const unsigned kDefaultNestedKcatalogLimit = 500;
   static const unsigned kDefaultRootKcatalogLimit = 200;
   static const unsigned kDefaultFileMbyteLimit = 1024;

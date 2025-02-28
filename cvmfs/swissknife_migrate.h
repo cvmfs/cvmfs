@@ -57,7 +57,7 @@ class CommandMigrate : public Command {
 
    public:
     inline void Insert(const CatalogStatistics &statistics) {
-      LockGuard<CatalogStatisticsList> lock(this);
+      LockGuard<CatalogStatisticsList> const lock(this);
       this->push_back(statistics);
     }
   };
@@ -132,7 +132,7 @@ class CommandMigrate : public Command {
     void operator()(const expected_data &data);
 
    protected:
-    bool RunMigration(PendingCatalog *data) const { return false; }
+    bool RunMigration(PendingCatalog * /*data*/) const { return false; }
 
     bool UpdateNestedCatalogReferences(PendingCatalog *data) const;
     bool UpdateCatalogMetadata(PendingCatalog *data) const;

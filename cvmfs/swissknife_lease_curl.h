@@ -7,8 +7,6 @@
 
 #include <string>
 
-#include "curl/curl.h"
-
 struct CurlBuffer {
   std::string data;
 };

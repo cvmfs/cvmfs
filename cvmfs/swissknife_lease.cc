@@ -3,11 +3,17 @@
  */
 
 #include "swissknife_lease.h"
+#include <unistd.h>
 
-#include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
+#include "curl/curl.h"
 #include "gateway_util.h"
+#include "swissknife.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
 #include "util/logging.h"
@@ -73,7 +79,7 @@ int CommandLease::Main(const ArgumentList& args) {
   std::string key_id;
   std::string secret;
   if (!gateway::ReadKeys(params.key_file, &key_id, &secret)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Error reading key file %s.",
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error reading key file %s.", // NOLINT(misc-include-cleaner)
              params.key_file.c_str());
     return kLeaseKeyParseError;
   }
@@ -86,7 +92,7 @@ int CommandLease::Main(const ArgumentList& args) {
       std::string session_token;
       uint64_t current_revision=0;
       std::string current_root_hash="";
-      LeaseReply rep = ParseAcquireReply(buffer, &session_token, &current_revision, current_root_hash);
+      LeaseReply const rep = ParseAcquireReply(buffer, &session_token, &current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
           {
@@ -113,19 +119,23 @@ int CommandLease::Main(const ArgumentList& args) {
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
     std::string session_token;
-    std::string token_file_name =
+    std::string const token_file_name =
         "/var/spool/cvmfs/" + lease_fqdn + "/session_token";
     FILE* token_file = std::fopen(token_file_name.c_str(), "r");
     if (token_file) {
       GetLineFile(token_file, &session_token);
-      LogCvmfs(kLogCvmfs, kLogDebug, "Read session token from file: %s",
+      LogCvmfs(kLogCvmfs, kLogDebug, "Read session token from file: %s", // NOLINT(misc-include-cleaner)
                session_token.c_str());
 
       CurlBuffer buffer;
+      int retval;
       if (MakeEndRequest("DELETE", key_id, secret, session_token,
                          params.repo_service_url, "", &buffer)) {
         if (kLeaseReplySuccess == ParseDropReply(buffer)) {
-          std::fclose(token_file);
+          retval = std::fclose(token_file);
+          if (retval != 0) {
+            LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", token_file_name.c_str());
+          }
           if (unlink(token_file_name.c_str())) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "Warning - Could not delete session token file.");
@@ -140,7 +150,10 @@ int CommandLease::Main(const ArgumentList& args) {
         ret = kLeaseCurlReqError;
       }
 
-      std::fclose(token_file);
+      retval = std::fclose(token_file);
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "failed to close file %s", token_file_name.c_str());
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Error reading session token from file");
       ret = kLeaseFileOpenError;
