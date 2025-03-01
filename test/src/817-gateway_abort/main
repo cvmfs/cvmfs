@@ -1,0 +1,27 @@
+#!/bin/bash
+cvmfs_test_name="Lease cleanup when the publishing process aborts on the gateway"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    echo "*** Starting initial transaction"
+    cvmfs_server transaction test.repo.org || return 10
+    cvmfs_server publish test.repo.org     || return 11
+
+    echo "*** Let transaction crash on the gateway side"
+    cvmfs_server transaction test.repo.org || return 20
+    sudo mv /etc/cvmfs/keys/test.repo.org.key /etc/cvmfs/keys/test.repo.org.key.hidden
+    cvmfs_server publish test.repo.org && return 21
+
+    echo "*** Try to recover"
+    cvmfs_server abort -f test.repo.org || return 30
+    sudo mv /etc/cvmfs/keys/test.repo.org.key.hidden /etc/cvmfs/keys/test.repo.org.key
+    cvmfs_server transaction test.repo.org || return 31
+    cvmfs_server publish test.repo.org || return 32
+
+    return 0
+}
+

@@ -186,6 +186,12 @@ class OptionsManager {
   void SetValue(const std::string &key, const std::string &value);
 
   /**
+   * Artificially inject values in the option manager, marking
+     cvmfs_talk as the source.
+   */
+  void SetValueFromTalk(const std::string &key, const std::string &value);
+
+  /**
    * Purge a value from the parameter map.  Used in unit tests.
    */
   void UnsetValue(const std::string &key);
@@ -262,7 +268,7 @@ class SimpleOptionsParser : public OptionsManager {
  * Derived class from OptionsManager. This class provides the
  * complete parsing of the configuration files. In order to parse the
  * configuration files it retrieves the "KEY=VALUE" pairs and uses bash for
- * the rest, so that you can execute sightly complex scripts
+ * the rest, so that you can execute slightly complex scripts
  */
 class BashOptionsManager : public OptionsManager {
  public:

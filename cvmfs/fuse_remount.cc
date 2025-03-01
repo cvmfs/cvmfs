@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "fuse_remount.h"
 
 #include <errno.h>
@@ -82,7 +82,8 @@ FuseRemounter::Status FuseRemounter::Check() {
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadError retval = mountpoint_->catalog_mgr()->Remount(true);
+  const catalog::LoadReturn retval =
+                                    mountpoint_->catalog_mgr()->RemountDryrun();
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);
@@ -126,7 +127,7 @@ FuseRemounter::Status FuseRemounter::Check() {
 
 
 /**
- * Used from the TalkManager.  Continously calls 'check' until it returns with
+ * Used from the TalkManager.  Continuously calls 'check' until it returns with
  * "up to date" or a failure.
  */
 FuseRemounter::Status FuseRemounter::CheckSynchronously() {
@@ -165,8 +166,7 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
                              bool fuse_notify_invalidation)
     : mountpoint_(mountpoint),
       inode_generation_info_(inode_generation_info),
-      invalidator_(new FuseInvalidator(mountpoint->inode_tracker(),
-                                       mountpoint->dentry_tracker(),
+      invalidator_(new FuseInvalidator(mountpoint,
                                        fuse_channel_or_session,
                                        fuse_notify_invalidation)),
       invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec())),
@@ -322,9 +322,9 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
 
   // Ensure that all Fuse callbacks left the catalog query code
   fence_->Drain();
-  catalog::LoadError retval;
+  catalog::LoadReturn retval;
   if (root_hash.IsNull()) {
-    retval = mountpoint_->catalog_mgr()->Remount(false);
+    retval = mountpoint_->catalog_mgr()->Remount();
   } else {
     retval = mountpoint_->catalog_mgr()->ChangeRoot(root_hash);
   }
@@ -349,7 +349,7 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     SetAlarm(MountPoint::kShortTermTTL);
   } else {
     SetOfflineMode(false);
-    LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %d",
+    LogCvmfs(kLogCvmfs, kLogSyslog, "switched to catalog revision %" PRIu64,
              mountpoint_->catalog_mgr()->GetRevision());
     catalogs_valid_until_ = time(NULL) + mountpoint_->GetEffectiveTtlSec();
     SetAlarm(mountpoint_->GetEffectiveTtlSec());

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "cmd_enter.h"
 
 #include <dirent.h>
@@ -476,7 +476,7 @@ int CmdEnter::Main(const Options &options) {
   bool rvb;
 
   // We cannot have any capabilities or else we are not allowed to write
-  // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
+  // to /proc/self/setgroups and /proc/self/[u|g]id_map when creating a user
   // namespace
   Env::DropCapabilities();
 
@@ -646,7 +646,7 @@ int CmdEnter::Main(const Options &options) {
     preserved_fds.insert(0);
     preserved_fds.insert(1);
     preserved_fds.insert(2);
-    pid_t pid_child;
+    pid_t pid_child = 0;
     rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
                       false /* drop_credentials */, false /* clear_env */,
                       false /* double_fork */,
@@ -658,6 +658,7 @@ int CmdEnter::Main(const Options &options) {
     sigs.push_back(SIGUSR1);
     exit_code = WaitForChild(pid_child, sigs);
 
+    LogCvmfs(kLogCvmfs, kLogStdout, "Closing CernVM-FS shell...");
     if (options.Has("transaction") &&
         !FileExists(session_dir_ + "/shellaction.marker")) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");

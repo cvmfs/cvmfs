@@ -27,18 +27,26 @@ template<unsigned char StackSize, char Type>
 class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
+#ifdef DEBUGMSG
     atomic_inc64(&num_instances_);
+#endif
     Assign(std_string.data(), std_string.length());
   }
 
@@ -55,7 +63,9 @@ class ShortString {
     long_string_ = NULL;
     this->length_ = length;
     if (length > StackSize) {
+#ifdef DEBUGMSG
       atomic_inc64(&num_overflows_);
+#endif
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
@@ -75,7 +85,9 @@ class ShortString {
 
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
+#ifdef DEBUGMSG
       atomic_inc64(&num_overflows_);
+#endif
       long_string_ = new std::string();
       long_string_->reserve(new_length);
       long_string_->assign(stack_, length_);
@@ -84,6 +96,21 @@ class ShortString {
     }
     if (length > 0)
       memcpy(&stack_[this->length_], chars, length);
+    this->length_ = new_length;
+  }
+
+  /**
+   * Truncates the current string to be of size smaller or equal to current size
+   * 
+   * Note: Can lead to a heap allocated string that is shorter than
+   *       the reserved stack space.
+  */
+  void Truncate(unsigned new_length) {
+    assert(new_length <= this->GetLength());
+    if (long_string_) {
+      long_string_->erase(new_length);
+      return;
+    }
     this->length_ = new_length;
   }
 

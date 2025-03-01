@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 
 # This is a simple echo script
@@ -9,10 +9,17 @@ import struct
 import re
 import os
 
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+
 def ReadMsg():
 
     try:
-        msg = sys.stdin.read(8)
+        # python2 compatibility
+        if PY3:
+            msg = sys.stdin.buffer.read(8)
+        else:
+            msg = sys.stdin.read(8)
         if len(msg) != 8:
             return
         (version, size) = struct.unpack("II", msg)
@@ -59,16 +66,17 @@ def GetToken(message):
         f.write("Found token: %s\n" % token)
         return token.strip()
     f.close()
-    
-    
-    
 
 
 def WriteMsg(msg):
     json_str = json.dumps(msg)
     packed = struct.pack("II", 1, len(json_str))
-    sys.stdout.write(packed)
-    sys.stdout.write(json_str)
+    if PY3:
+        sys.stdout.buffer.write(packed)
+        sys.stdout.buffer.write(bytes(json_str,'utf-8'))
+    else:
+        sys.stdout.write(packed)
+        sys.stdout.write(json_str)
     sys.stdout.flush()
 
 # Read the initialization
@@ -94,8 +102,3 @@ while True:
     else:
         msg['cvmfs_authz_v1'] = {'msgid': 3, 'revision': 0, 'status': 2}
     WriteMsg(msg)
-
-
-
-
-

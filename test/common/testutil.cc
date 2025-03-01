@@ -76,6 +76,30 @@ pid_t GetParentPid(const pid_t pid) {
   return parent_pid;
 }
 
+std::string GetProcessname(const pid_t pid) {
+#ifdef __APPLE__
+  std::cerr << "Implementation missing to get process name by pid on MAC\n";
+  return "NO VALID PROCESSNAME";
+#else
+  static const std::string label = "Name:";
+
+  std::stringstream proc_status_path;
+  proc_status_path << "/proc/" << pid << "/status";
+
+  std::ifstream proc_status(proc_status_path.str().c_str());
+
+  std::string line;
+  while (std::getline(proc_status, line)) {
+    if (line.compare(0, label.size(), label) == 0) {
+      const std::string line_without_label = line.substr(label.size());
+
+      return Trim(line_without_label);
+    }
+  }
+  return "NO VALID PROCESSNAME";
+#endif
+}
+
 
 class ShowOpenFilesHelper {
  public:
@@ -106,10 +130,23 @@ string ShowOpenFiles() {
 }
 
 
+class CountOpenFilesHelper {
+ public:
+  CountOpenFilesHelper() : count(0) {}
+
+  void CountSymlink(const string & /* parent_path */, const string & /* name */)
+  {
+    count++;
+  }
+
+  unsigned count;
+};
+
 unsigned GetNoUsedFds() {
   // Syslog file descriptor could still be open
   closelog();
 
+#ifdef __APPLE__
   unsigned result = 0;
   int max_fd = getdtablesize();
   assert(max_fd >= 0);
@@ -119,6 +156,14 @@ unsigned GetNoUsedFds() {
       result++;
   }
   return result;
+#else
+  CountOpenFilesHelper count_files_helper;
+  FileSystemTraversal<CountOpenFilesHelper>
+    traversal(&count_files_helper, "", false);
+  traversal.fn_new_symlink = &CountOpenFilesHelper::CountSymlink;
+  traversal.Recurse("/proc/self/fd");
+  return count_files_helper.count;
+#endif
 }
 
 
@@ -461,21 +506,42 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                          0, is_root, parent_catalog, NULL);
 }
 
-catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
-                                                  const PathString &mountpoint,
-                                                  const shash::Any &hash,
-                                                  string  *catalog_path,
-                                                  shash::Any *catalog_hash)
-{
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
-  if (it != catalog_map_.end() && catalog_hash != NULL) {
+catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
+                                          CatalogContext *result) {
+  LogCvmfs(kLogCache, kLogDebug,
+                       "catalog::MockCatalogManager::GetNewRootCatalogContext");
+  const map<PathString, MockCatalog*>::iterator it =
+                                           catalog_map_.find(PathString("", 0));
+  if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
-    *catalog_hash = catalog->hash();
+    result->SetHash(catalog->hash());
+    // TODO(heretherebedragons) is this the correct choice?
+    result->SetRootCtlgRevision(GetRevision());
+    result->SetRootCtlgLocation(kCtlgLocationServer);
+    result->SetMountpoint(PathString("", 0));
+    result->SetSqlitePath("");
+    return kLoadUp2Date;
+  }
+  // This is an ugly workaround needed, otherwise Init() within
+  // t_catalog_mgr.cc fails as it calls the non-mocked MountCatalog() function
+  // which fails if no valid root catalog is found
+  return kLoadNew;
+}
+
+catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
+                            CatalogContext *ctlg_context) {
+  LogCvmfs(kLogCache, kLogDebug,
+                              "catalog::MockCatalogManager::LoadCatalogByHash");
+  const map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
+                                                    ctlg_context->mountpoint());
+  if (it != catalog_map_.end() && !ctlg_context->hash().IsNull()) {
+    return kLoadUp2Date;
   } else {
-    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
-                                           hash, 4096, 1, 0,
-                                           true, NULL, NULL);
-    catalog_map_[mountpoint] = catalog;
+    MockCatalog *catalog = new MockCatalog(
+                                          ctlg_context->mountpoint().ToString(),
+                                          ctlg_context->hash(), 4096, 1, 0,
+                                          true, NULL, NULL);
+    catalog_map_[ctlg_context->mountpoint()] = catalog;
   }
   return kLoadNew;
 }

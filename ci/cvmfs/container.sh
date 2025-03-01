@@ -39,8 +39,8 @@ if ! $CVMFS_BUSYBOX --help | head -5; then
   exit 1
 fi
 
-if ! lsb_release -sicr; then
-  echo "lsb_release required to build container image"
+if [ ! -f /etc/os-release ]; then
+  echo "/etc/os-release required to build container image"
   exit 1
 fi
 

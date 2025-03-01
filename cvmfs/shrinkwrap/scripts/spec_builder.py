@@ -102,7 +102,7 @@ class TraceParser:
                       if r[3] not in self.filters and int(r[1])>=0
                         and r[2] not in TraceParser.blacklist]:
         if row[2] == "@UNKNOWN":
-          print("ERROR: An error occured during tracing (event code 8)")
+          print("ERROR: An error occurred during tracing (event code 8)")
           quit(-1)
         pathsToInclude.append(TracePoint(row[2], row[3]))
     specsToInclude = self.policy(pathsToInclude)

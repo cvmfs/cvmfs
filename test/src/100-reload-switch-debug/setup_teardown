@@ -1,0 +1,8 @@
+#!/bin/bash
+cleanup() {
+  echo "cleanup $cvmfs_test_name"
+  if [ "x$CVMFS_TEST_100_TMPFILE" != "x" ]; then
+    sudo rm -f "$CVMFS_TEST_100_TMPFILE"
+  fi
+}
+

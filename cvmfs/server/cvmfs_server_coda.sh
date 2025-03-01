@@ -15,7 +15,7 @@ CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=14 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=28 # Maximum days before considering it urgent
 
-CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/app/geoip_download"
+CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/geoip/databases/GeoLite2-City/download"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
 CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
 
@@ -35,7 +35,7 @@ if [ -f /etc/cvmfs/server.local ]; then
   fi
 fi
 
-# setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
+# setup server hooks: no-ops (overridable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
 transaction_after_hook() { :; }
 abort_before_hook() { :; }
@@ -79,6 +79,10 @@ else # RedHat based
   APACHE_WSGI_MODPKG="mod_wsgi"
 fi
 
+SUPERVISOR_BIN="false"
+if [ -f /bin/supervisorctl ]; then
+  SUPERVISOR_BIN=/bin/supervisorctl
+fi
 SERVICE_BIN="false"
 if [ ! -f /bin/systemctl ]; then
   if cvmfs_sys_file_is_executable /sbin/service ; then

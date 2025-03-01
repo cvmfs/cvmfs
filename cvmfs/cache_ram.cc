@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "cache_ram.h"
 
 #include <errno.h>
@@ -47,8 +47,11 @@ RamCacheManager::RamCacheManager(
 {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
-  LogCvmfs(kLogCache, kLogDebug, "max %u B, %u entries",
+  LogCvmfs(kLogCache, kLogDebug, "max %lu B, %u entries",
            max_size, max_entries);
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
+           "DEPRECATION WARNING: The RAM cache manager is depcreated and "
+           "will be removed from future releases.");
 }
 
 
@@ -75,7 +78,7 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 }
 
 
-int RamCacheManager::Open(const BlessedObject &object) {
+int RamCacheManager::Open(const LabeledObject &object) {
   WriteLockGuard guard(rwlock_);
   return DoOpen(object.id);
 }
@@ -223,14 +226,12 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 }
 
 
-void RamCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
-  const int flags,
-  void *txn)
+void RamCacheManager::CtrlTxn(const Label &label, const int /* flags */,
+                              void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->description = object_info.description;
-  transaction->buffer.object_type = object_info.type;
+  transaction->description = label.GetDescription();
+  transaction->buffer.object_flags = label.flags;
   LogCvmfs(kLogCache, kLogDebug, "modified transaction %s",
            transaction->buffer.id.ToString().c_str());
 }
@@ -244,8 +245,8 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     if (transaction->expected_size == kSizeUnknown) {
       perf::Inc(counters_.n_realloc);
       size_t new_size = max(2*transaction->buffer.size,
-        (size_t) (size + transaction->pos));
-      LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %u B",
+        static_cast<size_t>(size + transaction->pos));
+      LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %lu B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
       void *new_ptr = realloc(transaction->buffer.address, new_size);
@@ -259,7 +260,7 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       transaction->buffer.size = new_size;
     } else {
       LogCvmfs(kLogCache, kLogDebug,
-               "attempted to write more than requested (%u>%u)",
+               "attempted to write more than requested (%lu>%zu)",
                size, transaction->buffer.size);
       return -EFBIG;
     }
@@ -293,7 +294,7 @@ int RamCacheManager::OpenFromTxn(void *txn) {
   int64_t retval = CommitToKvStore(transaction);
   if (retval < 0) {
     LogCvmfs(kLogCache, kLogDebug,
-             "error while commiting transaction on %s: %s",
+             "error while committing transaction on %s: %s",
              transaction->buffer.id.ToString().c_str(), strerror(-retval));
     return retval;
   }
@@ -328,13 +329,15 @@ int RamCacheManager::CommitTxn(void *txn) {
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
 
-  if (transaction->buffer.object_type == kTypeVolatile) {
+  if (transaction->buffer.object_flags & CacheManager::kLabelVolatile)
+  {
     store = &volatile_entries_;
   } else {
     store = &regular_entries_;
   }
-  if (transaction->buffer.object_type == kTypePinned ||
-      transaction->buffer.object_type == kTypeCatalog) {
+  if ((transaction->buffer.object_flags & CacheManager::kLabelPinned) ||
+      (transaction->buffer.object_flags & CacheManager::kLabelCatalog))
+  {
     transaction->buffer.refcount = 1;
   } else {
     transaction->buffer.refcount = 0;
@@ -358,7 +361,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   overrun -= regular_size -regular_entries_.GetUsed();
   if (overrun > 0) {
     LogCvmfs(kLogCache, kLogDebug,
-             "transaction for %s would overrun the cache limit by %d",
+             "transaction for %s would overrun the cache limit by %ld",
              transaction->buffer.id.ToString().c_str(), overrun);
     perf::Inc(counters_.n_full);
     return -ENOSPC;

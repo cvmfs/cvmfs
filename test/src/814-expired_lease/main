@@ -1,0 +1,35 @@
+#!/bin/bash
+cvmfs_test_name="Automatic cleanup when a lease has expired"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    echo "*** Starting initial transaction"
+    cvmfs_server transaction test.repo.org || return 10
+    cvmfs_server publish test.repo.org     || return 11
+
+    echo "*** Reducing lease lifetime"
+    cp /etc/cvmfs/gateway/user.json user.json.orig
+    jq '.max_lease_time = 1' /etc/cvmfs/gateway/user.json > user.json.new
+    sudo mv user.json.new /etc/cvmfs/gateway/user.json
+    restart_repository_gateway
+
+    echo "*** Transaction should fail but recover through abort -f"
+    cvmfs_server transaction test.repo.org || return 20
+    sleep 3
+    cvmfs_server publish test.repo.org     && return 21
+    cvmfs_server abort -f test.repo.org    || return 22
+
+    echo "*** Restore lease lifetime"
+    sudo mv user.json.orig /etc/cvmfs/gateway/user.json
+    restart_repository_gateway
+
+    cvmfs_server transaction test.repo.org/ || return 30
+    cvmfs_server publish test.repo.org || return 31
+
+    return 0
+}
+

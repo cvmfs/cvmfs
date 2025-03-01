@@ -1,7 +1,10 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import HTTPRangeServer
-import SocketServer
+try:
+  import socketserver as SocketServer
+except ImportError:
+  import SocketServer
 import sys
 import os
 from optparse import OptionParser
@@ -18,10 +21,10 @@ if not options.docroot or not options.http_port:
     parser.print_help()
     sys.exit(1)
 
-print "changing directory to" , options.docroot
+print("changing directory to" , options.docroot)
 os.chdir(options.docroot)
 
-print "start serving..."
+print("start serving...")
 handler = HTTPRangeServer.HTTPRangeRequestHandler
 httpd = SocketServer.TCPServer(("", options.http_port), handler)
 httpd.serve_forever()

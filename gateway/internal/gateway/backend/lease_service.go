@@ -3,20 +3,27 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	gw "github.com/cvmfs/gateway/internal/gateway"
 )
+
+var leaseMutex sync.Mutex
 
 // LeaseDTO is the lease information returned to the HTTP frontend
 type LeaseDTO struct {
 	KeyID     string `json:"key_id,omitempty"`
 	LeasePath string `json:"path,omitempty"`
 	Expires   string `json:"expires,omitempty"`
+	Hostname  string `json:"hostname,omitempty"`
 }
 
 // NewLease for the specified path, using keyID
-func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protocolVersion int) (string, error) {
+func (s *Services) NewLease(ctx context.Context, keyID, leasePath, hostname string, protocolVersion int) (string, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
+
 	t0 := time.Now()
 
 	outcome := "success"
@@ -80,6 +87,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 		KeyID:           keyID,
 		Expiration:      time.Now().Add(s.Config.MaxLeaseTime),
 		ProtocolVersion: protocolVersion,
+		Hostname:        hostname,
 	}
 
 	if err := CreateLease(ctx, tx, lease); err != nil {
@@ -110,6 +118,8 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath string, protoc
 
 // GetLeases returns all active and valid leases
 func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -129,7 +139,7 @@ func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
 	ret := make(map[string]LeaseDTO)
 	for _, l := range leases {
 		leasePath := l.Repository + l.Path
-		ret[leasePath] = LeaseDTO{KeyID: l.KeyID, LeasePath: leasePath, Expires: l.Expiration.String()}
+		ret[leasePath] = LeaseDTO{KeyID: l.KeyID, LeasePath: leasePath, Expires: l.Expiration.String(), Hostname: l.Hostname}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -141,6 +151,8 @@ func (s *Services) GetLeases(ctx context.Context) (map[string]LeaseDTO, error) {
 
 // GetLease returns the lease associated with a token
 func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -172,12 +184,15 @@ func (s *Services) GetLease(ctx context.Context, token string) (*LeaseDTO, error
 		KeyID:     lease.KeyID,
 		LeasePath: lease.CombinedLeasePath(),
 		Expires:   lease.Expiration.String(),
+		Hostname:  lease.Hostname,
 	}
 	return ret, nil
 }
 
 // CancelLeases cancels all the active leases below a repository path
 func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -209,6 +224,8 @@ func (s *Services) CancelLeases(ctx context.Context, repoPath string) error {
 
 // CancelLease associated with the token
 func (s *Services) CancelLease(ctx context.Context, token string) error {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"
@@ -237,10 +254,9 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 		return err
 	}
 
-	if _, err := s.StatsMgr.PopLease(lease.CombinedLeasePath()); err != nil {
-		outcome = err.Error()
-		return err
-	}
+	// We don't check the error - if the statistics are missing, the lease
+	// should still be cancelable
+	s.StatsMgr.PopLease(lease.CombinedLeasePath());
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("could not commit transaction: %w", err)
@@ -251,6 +267,8 @@ func (s *Services) CancelLease(ctx context.Context, token string) error {
 
 // CommitLease associated with the token (transaction commit)
 func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
 	t0 := time.Now()
 
 	outcome := "success"

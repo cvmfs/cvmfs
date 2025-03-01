@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "cmd_diff.h"
 
 #ifndef __STDC_FORMAT_MACROS
@@ -51,7 +51,8 @@ class DiffReporter : public publish::DiffListener {
              "C - content, L - symlink target; entry types: F - regular file, "
              "S - symbolic link, D - directory, N - nested catalog");
     } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "DELTA: %s/r%u (%s) --> %s/r%u (%s)",
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "DELTA: %s/r%" PRIu64 " (%s) --> %s/r%" PRIu64 " (%s)",
                from_tag.name.c_str(), from_tag.revision,
                StringifyTime(from_tag.timestamp, true).c_str(),
                to_tag.name.c_str(), to_tag.revision,
@@ -89,8 +90,13 @@ class DiffReporter : public publish::DiffListener {
   {
     std::string operation = machine_readable_ ? "A" : "add";
     if (machine_readable_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64, operation.c_str(),
-               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
+               operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+      if (!entry.IsDirectory()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, " +%" PRIu64, entry.size());
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s +%" PRIu64 " bytes",
                path.c_str(), operation.c_str(),
@@ -104,8 +110,13 @@ class DiffReporter : public publish::DiffListener {
   {
     std::string operation = machine_readable_ ? "R" : "remove";
     if (machine_readable_) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64, operation.c_str(),
-               PrintEntryType(entry).c_str(), path.c_str(), entry.size());
+      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
+               operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
+      if (!entry.IsDirectory()) {
+        LogCvmfs(kLogCvmfs, kLogStdout, " -%" PRIu64, entry.size());
+      } else {
+        LogCvmfs(kLogCvmfs, kLogStdout, "");
+      }
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %s -%" PRIu64 " bytes",
                path.c_str(), operation.c_str(),
@@ -122,6 +133,11 @@ class DiffReporter : public publish::DiffListener {
       entry_from.CompareTo(entry_to);
     if (ignore_timediff_) {
       diff = diff & ~catalog::DirectoryEntryBase::Difference::kMtime;
+      if (diff == 0)
+        return;
+    }
+    if (entry_from.IsDirectory() || entry_to.IsDirectory()) {
+      diff = diff & ~catalog::DirectoryEntryBase::Difference::kSize;
       if (diff == 0)
         return;
     }
@@ -179,6 +195,10 @@ class DiffReporter : public publish::DiffListener {
       result_list.push_back(machine_readable_ ? "H" : "hidden");
     if (diff & catalog::DirectoryEntryBase::Difference::kDirectIoFlag)
       result_list.push_back(machine_readable_ ? "D" : "direct-io");
+    if (diff & catalog::DirectoryEntryBase::Difference::kUid)
+      result_list.push_back(machine_readable_ ? "U" : "uid");
+    if (diff & catalog::DirectoryEntryBase::Difference::kGid)
+      result_list.push_back(machine_readable_ ? "R" : "gid");
 
     return machine_readable_ ? ("[" + JoinStrings(result_list, "") + "]")
                              : (" [" + JoinStrings(result_list, ", ") + "]");

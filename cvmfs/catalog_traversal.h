@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "catalog.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "manifest.h"
@@ -45,7 +45,7 @@ struct CatalogTraversalData {
                        const shash::Any   &catalog_hash,
                        const unsigned      tree_level,
                        const size_t        file_size,
-                       const unsigned int  history_depth)
+                       const uint64_t      history_depth)
   : catalog(catalog)
   , catalog_hash(catalog_hash)
   , tree_level(tree_level)
@@ -56,7 +56,7 @@ struct CatalogTraversalData {
   const shash::Any    catalog_hash;
   const unsigned int  tree_level;
   const size_t        file_size;
-  const unsigned int  history_depth;
+  const uint64_t      history_depth;
 };
 
 
@@ -142,13 +142,13 @@ class CatalogTraversalBase
       , num_threads(8)
       , serialize_callbacks(true) {}
 
-    static const unsigned int kFullHistory;
-    static const unsigned int kNoHistory;
+    static const uint64_t     kFullHistory;
+    static const uint64_t     kNoHistory;
     static const time_t       kNoTimestampThreshold;
 
     ObjectFetcherT *object_fetcher;
 
-    unsigned int    history;
+    uint64_t        history;
     time_t          timestamp;
     bool            no_repeat_history;
     bool            no_close;
@@ -275,7 +275,7 @@ class CatalogTraversalBase
     CatalogJob(const std::string  &path,
                const shash::Any   &hash,
                const unsigned      tree_level,
-               const unsigned      history_depth,
+               const uint64_t      history_depth,
                      CatalogTN    *parent = NULL) :
       path(path),
       hash(hash),
@@ -299,7 +299,7 @@ class CatalogTraversalBase
     const std::string   path;
     const shash::Any    hash;
     const unsigned      tree_level;
-    const unsigned      history_depth;
+    const uint64_t      history_depth;
           CatalogTN    *parent;
 
     // dynamic processing state (used internally)
@@ -307,7 +307,7 @@ class CatalogTraversalBase
     size_t        catalog_file_size;
     bool          ignore;
     CatalogTN    *catalog;
-    unsigned int  referenced_catalogs;
+    uint64_t      referenced_catalogs;
     bool          postponed;
   };
 
@@ -404,7 +404,7 @@ class CatalogTraversalBase
 
   /**
    * Checks if a root catalog is below one of the pruning thresholds.
-   * Pruning thesholds can be either the catalog's history depth or a timestamp
+   * Pruning thresholds can be either the catalog's history depth or a timestamp
    * threshold applied to the last modified timestamp of the catalog.
    *
    * @param ctx  traversal context for traversal-specific state
@@ -413,7 +413,7 @@ class CatalogTraversalBase
    */
   bool IsBelowPruningThresholds(
     const CatalogJob &job,
-    const unsigned history_depth,
+    const uint64_t history_depth,
     const time_t timestamp_threshold
   ) {
     assert(job.IsRootCatalog());
@@ -431,7 +431,7 @@ class CatalogTraversalBase
   ObjectFetcherT         *object_fetcher_;
   CatalogTraversalInfoShim<CatalogTN> catalog_info_default_shim_;
   CatalogTraversalInfoShim<CatalogTN> *catalog_info_shim_;
-  const unsigned int      default_history_depth_;
+  const uint64_t          default_history_depth_;
   const time_t            default_timestamp_threshold_;
   const bool              no_close_;
   const bool              ignore_load_failure_;
@@ -458,7 +458,7 @@ class CatalogTraversalBase
  *
  * Breadth First Traversal Strategy
  *   Catalogs are handed out to the user identical as they are traversed.
- *   Say: From top to buttom. When you would simply print each received catalog
+ *   Say: From top to bottom. When you would simply print each received catalog
  *        the result would be a nice representation of the catalog tree.
  *   This method is more efficient, because catalogs are opened, processed and
  *   thrown away directly afterwards.
@@ -520,14 +520,14 @@ class CatalogTraversal
    * @param callback_stack  used in depth first traversal for deferred yielding
    */
   struct TraversalContext {
-    TraversalContext(const unsigned       history_depth,
+    TraversalContext(const uint64_t       history_depth,
                      const time_t         timestamp_threshold,
                      const TraversalType  traversal_type) :
       history_depth(history_depth),
       timestamp_threshold(timestamp_threshold),
       traversal_type(traversal_type) {}
 
-    const unsigned       history_depth;
+    const uint64_t       history_depth;
     const time_t         timestamp_threshold;
     const TraversalType  traversal_type;
     CatalogJobStack      catalog_stack;
@@ -655,7 +655,7 @@ class CatalogTraversal
       }
     }
 
-    // invariant: after the traversal finshed, there should be no more catalogs
+    // invariant: after the traversal finished, there should be no more catalogs
     //            to traverse or to yield!
     assert(ctx->catalog_stack.empty());
     assert(ctx->callback_stack.empty());
@@ -889,13 +889,11 @@ class CatalogTraversal
 };
 
 template <class ObjectFetcherT>
-const unsigned int
-  CatalogTraversalBase<ObjectFetcherT>::Parameters::kFullHistory =
-    std::numeric_limits<unsigned int>::max();
+const uint64_t CatalogTraversalBase<ObjectFetcherT>::Parameters::kFullHistory =
+    std::numeric_limits<uint64_t>::max();
 
 template <class ObjectFetcherT>
-const unsigned int
-  CatalogTraversalBase<ObjectFetcherT>::Parameters::kNoHistory = 0;
+const uint64_t CatalogTraversalBase<ObjectFetcherT>::Parameters::kNoHistory = 0;
 
 template <class ObjectFetcherT>
 const time_t

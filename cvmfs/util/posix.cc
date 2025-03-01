@@ -9,7 +9,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 #include "posix.h"
 
 #include <arpa/inet.h>
@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
 // If valgrind headers are present on the build system, then we can detect
@@ -55,6 +56,7 @@
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
+#include "util/pipe.h"
 #include "util/platform.h"
 #include "util/string.h"
 
@@ -195,6 +197,9 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
       break;
     case kFsTypeBeeGFS:
       result.type = kFsTypeBeeGFS;
+      break;
+    case kFsTypeTmpfs:
+      result.type = kFsTypeTmpfs;
       break;
     default:
       result.type = kFsTypeUnknown;
@@ -517,10 +522,15 @@ void ReadPipe(int fd, void *buf, size_t nbyte) {
 /**
  * Reads from a pipe where writer's end is not yet necessarily connected
  */
-void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
+bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
   ssize_t num_bytes;
   unsigned i = 0;
   unsigned backoff_ms = 1;
+  uint64_t duration_ms = 0;
+  uint64_t timestamp = 0;
+  if (timeout_ms != 0)
+    timestamp = platform_monotonic_time_ns();
+
   const unsigned max_backoff_ms = 256;
   do {
     // When the writer is not connected, this takes ~200-300ns per call as per
@@ -535,8 +545,14 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
       SafeSleepMs(backoff_ms);
       if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
     }
+    if ((timeout_ms != 0) && (num_bytes == 0)) {
+      duration_ms = (platform_monotonic_time_ns() - timestamp) / (1000UL * 1000UL);
+      if (duration_ms  > timeout_ms)
+        return false;
+    }
   } while (num_bytes == 0);
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
+  return true;
 }
 
 
@@ -739,6 +755,14 @@ int RecvFdFromSocket(int msg_fd) {
   memcpy(&passing_fd, CMSG_DATA(cmsgp), sizeof(int));
   assert(passing_fd >= 0);
   return passing_fd;
+}
+
+
+std::string GetHostname() {
+  char name[HOST_NAME_MAX + 1];
+  int retval = gethostname(name, HOST_NAME_MAX);
+  assert(retval == 0);
+  return name;
 }
 
 
@@ -1051,7 +1075,7 @@ std::string GetCurrentWorkingDirectory() {
 
 
 /**
- * Helper class that provides callback funtions for the file system traversal.
+ * Helper class that provides callback functions for the file system traversal.
  */
 class RemoveTreeHelper {
  public:
@@ -1427,6 +1451,16 @@ std::string GetHomeDirectory() {
   return home_dir;
 }
 
+/**
+ * Returns the output of `uname -m`
+ */
+std::string GetArch() {
+  struct utsname info;
+  int retval = uname(&info);
+  assert(retval == 0);
+  return info.machine;
+}
+
 
 /**
  * Sets soft and hard limit for maximum number of open file descriptors.
@@ -1574,7 +1608,7 @@ void WaitForSignal(int signum) {
 /**
  * Returns -1 if the child crashed or the exit code otherwise.
  * @param pid Process identifier.
- * @param sig_ok List of signals that are still considered a sucessful termination.
+ * @param sig_ok List of signals that are still considered a successful termination.
  */
 int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);
@@ -1584,7 +1618,8 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     if (retval == -1) {
       if (errno == EINTR)
         continue;
-      PANIC(NULL);
+      PANIC(kLogSyslogErr | kLogDebug,
+            "waitpid failed with errno %d", errno);
     }
     assert(retval == pid);
     break;
@@ -1596,6 +1631,69 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     return 0;
   return -1;
 }
+
+/**
+ * Exec a command as a daemon.
+ */
+
+bool ExecAsDaemon(const std::vector<std::string>  &command_line,
+                       pid_t           *child_pid) {
+  assert(command_line.size() >= 1);
+
+  Pipe<kPipeDetachedChild> pipe_fork;
+  pid_t pid = fork();
+  assert(pid >= 0);
+  if (pid == 0) {
+    pid_t pid_grand_child;
+
+    const char *argv[command_line.size() + 1];
+    for (unsigned i = 0; i < command_line.size(); ++i)
+      argv[i] = command_line[i].c_str();
+    argv[command_line.size()] = NULL;
+    int retval = setsid();
+    assert(retval != -1);
+
+    pid_grand_child = fork();
+    assert(pid_grand_child >= 0);
+
+    if (pid_grand_child != 0){
+      pipe_fork.Write<pid_t>(pid_grand_child);
+      _exit(0);
+    } else {
+      int null_read = open("/dev/null", O_RDONLY);
+      int null_write = open("/dev/null", O_WRONLY);
+      assert((null_read >= 0) && (null_write >= 0));
+      retval = dup2(null_read, 0);
+      assert(retval == 0);
+      retval = dup2(null_write, 1);
+      assert(retval == 1);
+      retval = dup2(null_write, 2);
+      assert(retval == 2);
+      close(null_read);
+      close(null_write);
+
+      execvp(command_line[0].c_str(), const_cast<char **>(argv));
+
+      pipe_fork.CloseWriteFd();
+    }
+  }
+  int statloc;
+  waitpid(pid, &statloc, 0);
+  pid_t buf_child_pid = 0;
+  pipe_fork.Read(&buf_child_pid);
+  if (child_pid != NULL)
+    *child_pid = buf_child_pid;
+  pipe_fork.CloseReadFd();
+
+  LogCvmfs(kLogCvmfs, kLogDebug, "exec'd as daemon %s (PID: %d)",
+           command_line[0].c_str(),
+           static_cast<int>(*child_pid));
+  return true;
+
+}
+
+
+
 
 
 /**
@@ -1699,7 +1797,7 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
     kSendPid,
     kUnknown,
     kFailDupFd,
-    kFailGetMaxFd,
+    kFailCloseFds,
     kFailGetFdFlags,
     kFailSetFdFlags,
     kFailDropCredentials,
@@ -1716,8 +1814,8 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
         return "Unknown Status";
       case kFailDupFd:
         return "Duplicate File Descriptor";
-      case kFailGetMaxFd:
-        return "Read maximal File Descriptor";
+      case kFailCloseFds:
+        return "Close File Descriptors";
       case kFailGetFdFlags:
         return "Read File Descriptor Flags";
       case kFailSetFdFlags:
@@ -1729,6 +1827,82 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
     }
   }
 };
+
+/**
+ *  Loop through all possible FDs and close them.
+ */
+static bool CloseAllFildesUntilMaxFD(
+  const std::set<int> &preserve_fildes,
+  int max_fd
+) {
+  for (int fd = 0; fd < max_fd; fd++) {
+    if (preserve_fildes.count(fd) == 0) {
+      close(fd);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Loop through /proc/self/fd and close the listed FDs.
+ * Not used on macOS.
+ */
+#ifndef __APPLE__
+static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
+{
+  DIR *dirp = opendir("/proc/self/fd");
+  if (!dirp)
+    return false;
+
+  platform_dirent64 *dirent;
+
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    uint64_t name_uint64;
+
+    // Make sure the dir name is digits only (skips ".", ".." and similar).
+    if (!String2Uint64Parse(name, &name_uint64)) {
+      continue;
+    }
+
+    int fd = static_cast<int>(name_uint64);
+    if (preserve_fildes.count(fd)) {
+      continue;
+    }
+
+    close(fd);
+  }
+
+  closedir(dirp);
+
+  return true;
+}
+#endif
+
+/**
+ * Closes all file descriptors except the ones in preserve_fildes.
+ * To be used after fork but before exec.
+ */
+bool CloseAllFildes(const std::set<int> &preserve_fildes)
+{
+  int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  if (max_fd < 0) {
+    return false;
+  }
+
+#ifdef __APPLE__
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
+#else   // ifdef __APPLE__
+  if (max_fd > 100000) {
+    // CloseAllFildesUntilMaxFD is inefficient with very large max_fd.
+    // Looping through /proc/self/fd performs better.
+    return CloseAllFildesInProcSelfFd(preserve_fildes);
+  }
+
+  return CloseAllFildesUntilMaxFD(preserve_fildes, max_fd);
+#endif  // #ifdef __APPLE__
+}
 
 /**
  * Execve to the given command line, preserving the given file descriptors.
@@ -1753,14 +1927,16 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 {
   assert(command_line.size() >= 1);
 
-  Pipe pipe_fork;
+  Pipe<kPipeDetachedChild> pipe_fork;
   pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
     pid_t pid_grand_child;
-    int max_fd;
     int fd_flags;
     ForkFailures::Names failed = ForkFailures::kUnknown;
+
+    std::set<int> skip_fds = preserve_fildes;
+    skip_fds.insert(pipe_fork.GetWriteFd());
 
     if (clear_env) {
 #ifdef __APPLE__
@@ -1788,15 +1964,9 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     }
 
     // Child, close file descriptors
-    max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
-    if (max_fd < 0) {
-      failed = ForkFailures::kFailGetMaxFd;
+    if (!CloseAllFildes(skip_fds)) {
+      failed = ForkFailures::kFailCloseFds;
       goto fork_failure;
-    }
-    for (int fd = 0; fd < max_fd; fd++) {
-      if ((fd != pipe_fork.write_end) && (preserve_fildes.count(fd) == 0)) {
-        close(fd);
-      }
     }
 
     // Double fork to disconnect from parent
@@ -1806,13 +1976,13 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
       if (pid_grand_child != 0) _exit(0);
     }
 
-    fd_flags = fcntl(pipe_fork.write_end, F_GETFD);
+    fd_flags = fcntl(pipe_fork.GetWriteFd(), F_GETFD);
     if (fd_flags < 0) {
       failed = ForkFailures::kFailGetFdFlags;
       goto fork_failure;
     }
     fd_flags |= FD_CLOEXEC;
-    if (fcntl(pipe_fork.write_end, F_SETFD, fd_flags) < 0) {
+    if (fcntl(pipe_fork.GetWriteFd(), F_SETFD, fd_flags) < 0) {
       failed = ForkFailures::kFailSetFdFlags;
       goto fork_failure;
     }
@@ -1829,15 +1999,15 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     // grand father
     pid_grand_child = getpid();
     failed = ForkFailures::kSendPid;
-    pipe_fork.Write(&failed, sizeof(failed));
-    pipe_fork.Write(pid_grand_child);
+    pipe_fork.Write<ForkFailures::Names>(failed);
+    pipe_fork.Write<pid_t>(pid_grand_child);
 
     execvp(command_line[0].c_str(), const_cast<char **>(argv));
 
     failed = ForkFailures::kFailExec;
 
    fork_failure:
-    pipe_fork.Write(&failed, sizeof(failed));
+    pipe_fork.Write<ForkFailures::Names>(failed);
     _exit(1);
   }
   if (double_fork) {
@@ -1845,14 +2015,14 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     waitpid(pid, &statloc, 0);
   }
 
-  close(pipe_fork.write_end);
+  pipe_fork.CloseWriteFd();
 
   // Either the PID or a return value is sent
   ForkFailures::Names status_code;
-  bool retcode = pipe_fork.Read(&status_code, sizeof(status_code));
-  assert(retcode);
+  pipe_fork.Read<ForkFailures::Names>(&status_code);
+
   if (status_code != ForkFailures::kSendPid) {
-    close(pipe_fork.read_end);
+    pipe_fork.CloseReadFd();
     LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
@@ -1864,7 +2034,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
   pipe_fork.Read(&buf_child_pid);
   if (child_pid != NULL)
     *child_pid = buf_child_pid;
-  close(pipe_fork.read_end);
+  pipe_fork.CloseReadFd();
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
            static_cast<int>(buf_child_pid));

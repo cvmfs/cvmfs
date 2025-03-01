@@ -21,12 +21,16 @@ Feel free to fill issues and pull requests.
 This plugin is tested using `kind`.
 
 ```
-$ docker build -t cvmfs-kind-node https://github.com/cvmfs/containerd-remote-snapshotter.git
+$ docker build -t cvmfs-kind-node  https://github.com/cvmfs/cvmfs.git\#:snapshotter
 $ cat kind-mount-cvmfs.yaml
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
+  extraMounts:
+    - hostPath: /cvmfs/unpacked.cern.ch
+      containerPath: /cvmfs/unpacked.cern.ch
+- role: worker
   extraMounts:
     - hostPath: /cvmfs/unpacked.cern.ch
       containerPath: /cvmfs/unpacked.cern.ch

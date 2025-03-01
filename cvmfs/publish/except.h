@@ -37,17 +37,19 @@ class EPublish : public std::runtime_error {
   explicit EPublish(const std::string& what, EFailures f = kFailUnspecified)
     : std::runtime_error(what + "\n\nStacktrace:\n" + GetStacktrace())
     , failure_(f)
-    , msg_(what)
+    , msg_holder_(what)
   {}
 
   virtual ~EPublish() throw();
 
   EFailures failure() const { return failure_; }
-  std::string msg() const { return msg_; }
+  std::string msg() const { return msg_holder_.what(); }
 
  private:
   EFailures failure_;
-  std::string msg_;
+  // We cannot use an std::string because it would make the EPublish copy
+  // constructor exception unsafe.
+  std::runtime_error msg_holder_;
 
   /**
    * Maximum number of frames in the stack trace

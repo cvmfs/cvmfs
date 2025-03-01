@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+    cvmfs-test-gw1:
+        image: registry.cern.ch/cvmfs-dev:latest
+        container_name: cvmfs-gw1
+        hostname: cvmfs-gw1
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-dev-pub
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - ./keys/:/etc/cvmfs/keys
+            - var_spool_cvmfs1:/var/spool/cvmfs
+            - ../../../:/home/sftnight/cvmfs
+            - ./config/:/etc/cvmfs/gateway
+            - ./scripts:/scripts
+        ports:
+            - "4929"
+            - "80"
+
+    cvmfs-test-pub1:
+        image: registry.cern.ch/cvmfs-dev:latest
+        container_name: cvmfs-pub1
+        hostname: cvmfs-pub1
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-dev-pub
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - ./keys/:/etc/cvmfs/keys
+            - ./scripts:/scripts
+            - var_spool_cvmfs2:/var/spool/cvmfs
+            - ../../../:/home/sftnight/cvmfs
+
+    cvmfs-test-pub2:
+        image: registry.cern.ch/cvmfs-dev-pub:latest
+        container_name: cvmfs-pub2
+        hostname: cvmfs-pub2
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-dev-pub
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup
+            - ./keys/:/etc/cvmfs/keys
+            - ./scripts:/scripts
+            - var_spool_cvmfs3:/var/spool/cvmfs
+            - ../../../:/home/sftnight/cvmfs
+
+volumes:
+    var_spool_cvmfs1:
+    var_spool_cvmfs2:
+    var_spool_cvmfs3:
+

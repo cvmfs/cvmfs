@@ -13,7 +13,7 @@
 #include "catalog_rw.h"
 #include "catalog_sql.h"
 #include "catalog_virtual.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "swissknife_history.h"
 #include "util/concurrency.h"
@@ -67,7 +67,7 @@ ParameterList CommandMigrate::GetParams() const {
 
 
 static void Error(const std::string &message) {
-  LogCvmfs(kLogCatalog, kLogStderr, message.c_str());
+  LogCvmfs(kLogCatalog, kLogStderr, "%s", message.c_str());
 }
 
 
@@ -156,7 +156,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     const bool follow_redirects = false;
     const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
     if (!this->InitDownloadManager(follow_redirects, proxy) ||
-        !this->InitVerifyingSignatureManager(repo_keys)) {
+        !this->InitSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init repo connection");
       return 1;
     }
@@ -327,7 +327,7 @@ void CommandMigrate::UploadHistoryClosure(
 
 bool CommandMigrate::UpdateUndoTags(
   PendingCatalog *root_catalog,
-  unsigned revision,
+  uint64_t revision,
   time_t timestamp,
   shash::Any *history_hash)
 {
@@ -352,7 +352,6 @@ bool CommandMigrate::UpdateUndoTags(
 
     tag_trunk.root_hash = root_catalog->new_catalog_hash;
     tag_trunk.size = root_catalog->new_catalog_size;
-    tag_trunk.revision = root_catalog->new_catalog_size;
     tag_trunk.revision = revision;
     tag_trunk.timestamp = timestamp;
 
@@ -443,7 +442,7 @@ bool CommandMigrate::DoMigrationAndCommit(
                           new_catalog->GetLastModified(),
                           &history_hash))
       {
-        Error("Updateing tag database failed.\nAborting...");
+        Error("Updating tag database failed.\nAborting...");
         return false;
       }
       manifest.set_history(history_hash);
@@ -748,8 +747,8 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
     "INSERT OR REPLACE INTO nested_catalogs (path,   sha1,  size) "
     "                VALUES                 (:path, :sha1, :size);");
 
-  // go through all nested catalogs and update their references (we are curently
-  // in their parent catalog)
+  // go through all nested catalogs and update their references (we are
+  // currently in their parent catalog)
   // Note: we might need to wait for the nested catalog to be fully processed.
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
@@ -860,7 +859,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 6;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 7;
 
 
 template<class DerivedT>
@@ -1107,7 +1106,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "         IFNULL(hardlink_group_id, 0) << 32 | "
     "         COALESCE(hardlinks.linkcount, dir_linkcounts.linkcount, 1) "
     "           AS hardlinks, "
-    "         hash, size, mode, mtime, "
+    "         hash, size, mode, mtime, NULL, " // set empty mtimens
     "         flags, name, symlink, "
     "         :uid, "
     "         :gid, "
@@ -1410,7 +1409,7 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
       update_directory_entry.Reset();
 
       // Fixing of this mountpoint went well... inform the user that this minor
-      // issue occured
+      // issue occurred
       LogCvmfs(kLogCatalog, kLogStdout,
                "NOTE: fixed incompatible nested catalog transition point at: "
                "'%s' ", nested_root_path.c_str());
@@ -1561,7 +1560,8 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   const catalog::CatalogDatabase &writable = data->new_catalog->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully
+  // processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
@@ -1745,7 +1745,8 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
     GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully
+  // processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
@@ -2100,7 +2101,8 @@ bool CommandMigrate::StatsMigrationWorker::RepairStatisticsCounters(
     GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
-  // Note: we might need to wait until nested catalogs are sucessfully processed
+  // Note: we might need to wait until nested catalogs are successfully
+  // processed
   catalog::DeltaCounters stats_counters;
   PendingCatalogList::const_iterator i = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();

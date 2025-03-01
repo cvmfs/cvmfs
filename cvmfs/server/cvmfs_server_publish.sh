@@ -186,7 +186,6 @@ cvmfs_server_publish() {
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
     local sync_command="$(__swissknife_cmd dbg) sync \
         -u /cvmfs/$name                                \
         -s ${scratch_dir}                              \
@@ -198,7 +197,6 @@ cvmfs_server_publish() {
         -o $manifest                                   \
         -e $hash_algorithm                             \
         -Z $compression_alg                            \
-        -C $trusted_certs                              \
         -N $name                                       \
         -K $CVMFS_PUBLIC_KEY                           \
         $(get_follow_http_redirects_flag)              \
@@ -241,6 +239,9 @@ cvmfs_server_publish() {
     if [ "x$CVMFS_AUTOCATALOGS_MIN_WEIGHT" != "x" ]; then
       sync_command="$sync_command -M $CVMFS_AUTOCATALOGS_MIN_WEIGHT"
     fi
+    if [ "x$CVMFS_SERVER_USE_CATALOG_CACHE" = "xtrue" ]; then
+      sync_command="$sync_command -G"
+    fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
     fi
@@ -249,6 +250,9 @@ cvmfs_server_publish() {
     fi
     if [ "x${CVMFS_ENFORCE_LIMITS:-$CVMFS_DEFAULT_ENFORCE_LIMITS}" = "xtrue" ]; then
       sync_command="$sync_command -E"
+    fi
+    if [ "x$CVMFS_ENABLE_MTIME_NS" = "xtrue" ]; then
+      sync_command="$sync_command -j"
     fi
     if [ "x$CVMFS_NESTED_KCATALOG_LIMIT" != "x" ]; then
       sync_command="$sync_command -Q $CVMFS_NESTED_KCATALOG_LIMIT"
@@ -494,7 +498,7 @@ filter_auto_tags() {
     $(get_swissknife_proxy)                    \
     -x $(get_follow_http_redirects_flag)       | \
     grep -E \
-    '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}Z' | \
+    '^generic(_[[:digit:]]+)?-[[:digit:]]{4}-[[:digit:]]{2}-[[:digit:]]{2}T[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?Z' | \
     awk '{print $1 " " $5}')"
   [ "x$auto_tags" = "x" ] && return 0 || true
 

@@ -1,0 +1,26 @@
+#!/bin/bash
+cvmfs_test_name="Active leases survive gateway restart"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    echo "*** Starting initial transaction"
+    cvmfs_server transaction test.repo.org || return 10
+    cvmfs_server publish test.repo.org     || return 11
+
+    echo "*** Restart 1: abort"
+    cvmfs_server transaction test.repo.org || return 20
+    restart_repository_gateway
+    cvmfs_server abort -f test.repo.org    || return 21
+
+    echo "*** Restart 2: publish"
+    cvmfs_server transaction test.repo.org || return 30
+    # With a full fix of gateway restart functionality, publish after restart should work, too
+    # restart_repository_gateway
+    cvmfs_server publish test.repo.org     || return 31
+
+    return 0
+}

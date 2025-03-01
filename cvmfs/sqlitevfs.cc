@@ -3,7 +3,7 @@
  *
  * An optimized virtual file system layer for the client only.  It expects to
  * operate on immutable, valid SQlite files.  Hence it can do a few
- * optimiziations.  Most notably it doesn't need to know about the path of
+ * optimizations.  Most notably it doesn't need to know about the path of
  * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
@@ -11,7 +11,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 #include "sqlitevfs.h"
 
 #include <dlfcn.h>
@@ -359,7 +359,7 @@ static int VfsRdOnlyRandomness(
   int nBuf,
   char *zBuf)
 {
-  assert((size_t)nBuf >= (sizeof(time_t) + sizeof(int)));
+  assert(static_cast<size_t>(nBuf) >= (sizeof(time_t) + sizeof(int)));
   perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_rand);
   memset(zBuf, 0, nBuf);
   pid_t randomnessPid = getpid();
@@ -370,7 +370,7 @@ static int VfsRdOnlyRandomness(
     time(&t);
     memcpy(zBuf, &t, sizeof(t));
     memcpy(&zBuf[sizeof(t)], &randomnessPid, sizeof(randomnessPid));
-    assert(sizeof(t) + sizeof(randomnessPid) <= (size_t)nBuf);
+    assert(sizeof(t) + sizeof(randomnessPid) <= static_cast<size_t>(nBuf));
     nBuf = sizeof(t) + sizeof(randomnessPid);
   } else {
     do {
@@ -541,6 +541,13 @@ bool UnregisterVfsRdOnly() {
 void RegisterFdMapping(int from, int to) {
   fd_from_->push_back(from);
   fd_to_->push_back(to);
+}
+
+void ReplaceCacheManager(CacheManager *new_cache_mgr) {
+  sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName);
+  if (vfs == NULL)
+    return;
+  static_cast<VfsRdOnly *>(vfs->pAppData)->cache_mgr = new_cache_mgr;
 }
 
 }  // namespace sqlite

@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server gc" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -96,7 +96,7 @@ cvmfs_server_gc() {
     fi
   done
 
-  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidded
+  # TODO: Once the gateway administration endpoint is in place (CVM-1685), it should be forbidden
   #       to run GC directly on the gateway
   # Check if the command is called on a repository gateway, and if so,
   # abort if there are any active leases
@@ -145,7 +145,7 @@ cvmfs_server_gc() {
       echo "Preserved Legacy Revisions:    $preserve_revisions"
     fi
     if [ $preserve_timestamp -gt 0 ]; then
-      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%Y/%m/%d %H:%M:%S')"
     fi
     if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
       echo "Only the latest revision will be preserved."

@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
@@ -371,7 +371,7 @@ bool handle_file(
     pstats->Lookup(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED)->Xadd(src_st->st_size);
   }
 
-  // The target alway exists (either previously existed or just created).
+  // The target always exists (either previously existed or just created).
   // This is not done in parallel like copyFile
   if (result && dest->do_link(dest->context_, entry, dest_data)) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -504,6 +504,12 @@ bool Sync(
               src_entry, src_st->cvm_symlink, errno, strerror(errno));
             result = false;
           }
+          break;
+        case S_IFIFO:
+           // Ignore pipe, but continue
+            LogCvmfs(kLogCvmfs, kLogStderr,
+              "Skipping pipe: %s",
+              src_entry);
           break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr,
@@ -654,9 +660,9 @@ perf::Statistics *GetSyncStatTemplate() {
   result->Register(SHRINKWRAP_STAT_ENTRIES_DEST,
     "Number of file system entries processed in the destination");
   result->Register(SHRINKWRAP_STAT_DATA_FILES,
-    "Number of data files transfered from source to destination");
+    "Number of data files transferred from source to destination");
   result->Register(SHRINKWRAP_STAT_DATA_BYTES,
-    "Bytes transfered from source to destination");
+    "Bytes transferred from source to destination");
   result->Register(SHRINKWRAP_STAT_DATA_FILES_DEDUPED,
     "Number of files not copied due to deduplication");
   result->Register(SHRINKWRAP_STAT_DATA_BYTES_DEDUPED,
@@ -763,9 +769,8 @@ int GarbageCollect(struct fs_traversal *fs) {
   uint64_t start_time = platform_monotonic_time();
   int retval = fs->garbage_collector(fs->context_);
   uint64_t end_time = platform_monotonic_time();
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "Garbage collection took %d seconds.",
-  (end_time-start_time));
+  LogCvmfs(kLogCvmfs, kLogStdout, "Garbage collection took %lu seconds.",
+           (end_time-start_time));
   return retval;
 }
 

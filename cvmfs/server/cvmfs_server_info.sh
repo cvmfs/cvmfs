@@ -6,7 +6,7 @@
 # Implementation of the "cvmfs_server info" command
 # Migrated to the new cvmfs_publish command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 

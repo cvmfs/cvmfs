@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 
 namespace receiver {
@@ -18,6 +18,7 @@ struct Params {
   std::string stratum0;
   std::string proxy;
   std::string spooler_configuration;
+  bool use_local_cache;
   shash::Algorithms hash_alg;
   std::string hash_alg_str;
   zlib::Algorithms compression_alg;

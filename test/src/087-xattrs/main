@@ -1,10 +1,55 @@
+#!/bin/bash
 cvmfs_test_name="Test magic extended attributes"
 cvmfs_test_suites="quick"
+
+# Test for protected extended attribute access
+check_protected_xattr() {
+  echo "*** Test protected extended attributes"
+  echo "  Having no restrictions"
+  cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always" || return 3
+  local no_restrictions=$(get_xattr fqrn /cvmfs/grid.cern.ch/README)
+
+  [ "$no_restrictions" = "grid.cern.ch" ] || return 60
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+
+  echo "  Adding current user's gid to access"
+  local user_gid=$(id -g ${CVMFS_TEST_USER})
+  cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always
+CVMFS_XATTR_PRIVILEGED_GIDS=$user_gid
+CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
+  local ok_user=$(get_xattr fqrn /cvmfs/grid.cern.ch/README)
+
+  [ "$ok_user" = "grid.cern.ch" ] || return 61
+
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+
+  echo "  Only root access"
+  cvmfs_mount grid.cern.ch "CVMFS_MAGIC_XATTRS_VISIBILITY=always
+CVMFS_XATTR_PROTECTED_XATTRS=user.fqrn" || return 3
+
+  echo "    Test root"
+  local root_access
+  if running_on_osx; then
+    root_access=$(sudo xattr -p user.fqrn /cvmfs/grid.cern.ch/README)
+  else
+    root_access=$(sudo attr -qg fqrn /cvmfs/grid.cern.ch/README)
+  fi
+  echo "    Test non-root"
+  local non_root_denied=$(get_xattr fqrn /cvmfs/grid.cern.ch/README)
+
+  [ "$root_access" = "grid.cern.ch" ] || return 62
+  [ "$non_root_denied" = "grid.cern.ch" ] && return 63
+
+  cvmfs_umount grid.cern.ch || return 2
+  echo "  ...Success"
+}
 
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount grid.cern.ch "CVMFS_HIDE_MAGIC_XATTRS=no" || return 1
+  cvmfs_mount grid.cern.ch || return 1
 
   echo "Test listing magic extended attributes"
 
@@ -63,9 +108,72 @@ cvmfs_run_test() {
   [ "x$readme_chunk_size" = "x$readme_size" ] || return 12
 
   echo "*** Test log buffer (quite basic)"
-  local logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
+  local logbuffer
+  logbuffer=$(get_xattr logbuffer /cvmfs/grid.cern.ch/)
   get_xattr logbuffer /cvmfs/grid.cern.ch/
   [ "x$logbuffer" != "x" ] || return 20
+
+  echo "*** Check existence of proxy_list and proxy_list_external "
+  proxy_list=$(get_xattr proxy_list /cvmfs/grid.cern.ch/README)
+  proxy_list_external=$(get_xattr proxy_list_external /cvmfs/grid.cern.ch/README)
+  [ "x$proxy_list" != "x" ] || return 21
+  [ "x$proxy_list_external" != "x" ] || return 22
+
+  # check different access modes 
+  echo "*** Check different access modes: human vs machine"
+  runc_chunk_list_machine=$(get_xattr chunk_list~0 /cvmfs/grid.cern.ch/vc/containers/runc)
+  runc_chunk_list_human=$(get_xattr chunk_list@0 /cvmfs/grid.cern.ch/vc/containers/runc)
+
+  [ "x$runc_chunk_list" = "x$runc_chunk_list_machine" ] || return 30
+
+
+  if echo $runc_chunk_list_human | grep -v "# Access page at idx: 0. Total num pages: 1 "; then
+    return 31
+  fi
+
+  if echo $runc_chunk_list_human | grep -v "$runc_chunk_list_machine"; then
+    return 32
+  fi
+
+  echo "*** Check info elements"
+  info_human_correct="Access xattr with xattr~<page_num> (machine-readable mode) or  xattr@<page_num> (human-readable mode).
+Pages available: 1"
+  info_machine_correct="num_pages, 1"
+  info_human=$(get_xattr proxy_list@? /cvmfs/grid.cern.ch/README)
+  info_machine=$(get_xattr proxy_list~? /cvmfs/grid.cern.ch/README)
+
+  [ "x$info_human" != "$info_human_correct" ] || return 40
+  [ "x$info_machine" != "$info_machine_correct" ] || return 41
+
+  echo "*** Check invalid input for num pages"
+  negative_num=$(get_xattr proxy_list@-2 /cvmfs/grid.cern.ch/README 2>&1)
+  large_num=$(get_xattr proxy_list~1000 /cvmfs/grid.cern.ch/README 2>&1)  
+  letters_num=$(get_xattr proxy_list~xxx /cvmfs/grid.cern.ch/README 2>&1) 
+  nothing=$(get_xattr proxy_list@ /cvmfs/grid.cern.ch/README 2>&1) 
+
+  local error
+  if running_on_osx; then
+    error="No message available on STREAM"
+  else
+    error="attr_get: No data available"
+  fi
+
+  if echo $negative_num | grep -v "$error"; then
+    return 50
+  fi
+  if echo $large_num | grep -v "$error"; then
+    return 51
+  fi
+  if echo $letters_num | grep -v "$error"; then
+    return 52
+  fi
+  if echo $nothing | grep -v "$error"; then
+    return 53
+  fi
+
+  cvmfs_umount grid.cern.ch || return 2
+
+  check_protected_xattr || return $?
 
   return 0
 }

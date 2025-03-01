@@ -5,6 +5,8 @@
 #ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 #define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
 
+#include "garbage_collection/garbage_collector.h"
+
 #include <algorithm>
 #include <limits>
 #include <string>
@@ -14,13 +16,13 @@
 #include "util/string.h"
 
 template<class CatalogTraversalT, class HashFilterT>
-const unsigned int GarbageCollector<CatalogTraversalT,
-                                    HashFilterT>::Configuration::kFullHistory =
-  std::numeric_limits<unsigned int>::max();
+const uint64_t GarbageCollector<CatalogTraversalT,
+                                HashFilterT>::Configuration::kFullHistory =
+  std::numeric_limits<uint64_t>::max();
 
 template<class CatalogTraversalT, class HashFilterT>
-const unsigned int GarbageCollector<CatalogTraversalT,
-                                    HashFilterT>::Configuration::kNoHistory = 0;
+const uint64_t GarbageCollector<CatalogTraversalT,
+                                HashFilterT>::Configuration::kNoHistory = 0;
 
 template<class CatalogTraversalT, class HashFilterT>
 const time_t GarbageCollector<CatalogTraversalT,
@@ -36,6 +38,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
       GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
                                                                 configuration))
   , hash_filter_()
+  , hash_map_delete_requests_()
   , use_reflog_timestamps_(false)
   , oldest_trunk_catalog_(static_cast<uint64_t>(-1))
   , oldest_trunk_catalog_found_(false)
@@ -46,6 +49,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , last_reported_status_(0.0)
   , condemned_objects_(0)
   , condemned_bytes_(0)
+  , duplicate_delete_requests_(0)
 {
   assert(configuration_.uploader != NULL);
 }
@@ -89,9 +93,9 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
     if (!oldest_trunk_catalog_found_)
       oldest_trunk_catalog_ = std::min(oldest_trunk_catalog_, mtime);
     if (configuration_.verbose) {
-      const int    rev   = data.catalog->revision();
+      const uint64_t rev = data.catalog->revision();
       LogCvmfs(kLogGc, kLogStdout | kLogDebug,
-               "Preserving Revision %d (%s / added @ %s)",
+               "Preserving Revision %" PRIu64 " (%s / added @ %s)",
                rev,
                StringifyTime(data.catalog->GetLastModified(), true).c_str(),
                StringifyTime(catalog_info_shim_.GetLastModified(data.catalog),
@@ -129,9 +133,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
-      const int    rev   = data.catalog->revision();
+      const uint64_t rev = data.catalog->revision();
       const time_t mtime = static_cast<time_t>(data.catalog->GetLastModified());
-      LogCvmfs(kLogGc, kLogStdout | kLogDebug, "Sweeping Revision %d (%s)",
+      LogCvmfs(kLogGc, kLogStdout | kLogDebug,
+               "Sweeping Revision %" PRIu64 " (%s)",
                rev, StringifyTime(mtime, true).c_str());
     }
     PrintCatalogTreeEntry(data.tree_level, data.catalog);
@@ -154,7 +159,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
     static_cast<float>(unreferenced_trees_);
   if (threshold > last_reported_status_ + 0.1) {
     LogCvmfs(kLogGc, kLogStdout | kLogDebug,
-             "      - %02.0f%%    %u / %u unreferenced revisions removed [%s]",
+             "      - %02.0f%%    %" PRIu64 " / %" PRIu64
+             " unreferenced revisions removed [%s]",
              100.0 * threshold, condemned_trees_, unreferenced_trees_,
              RfcTimestamp().c_str());
     last_reported_status_ = threshold;
@@ -166,8 +172,16 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
   const shash::Any &hash)
 {
-  if (!hash_filter_.Contains(hash))
-    Sweep(hash);
+  if (!hash_filter_.Contains(hash)) {
+    if (!hash_map_delete_requests_.Contains(hash)) {
+      hash_map_delete_requests_.Fill(hash);
+      Sweep(hash);
+    } else {
+      ++duplicate_delete_requests_;
+      LogCvmfs(kLogGc, kLogDebug, "Hash %s already marked as to delete",
+               hash.ToString().c_str());
+    }
+  }
 }
 
 
@@ -300,10 +314,14 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepReflog() {
     perf::Counter *ctr_condemned_bytes =
       configuration_.statistics->Register(
         "gc.sz_condemned_bytes", "number of deleted bytes");
+    perf::Counter *ctr_duplicate_delete_requests =
+      configuration_.statistics->Register(
+      "gc.n_duplicate_delete_requests", "number of duplicated delete requests");
     ctr_preserved_catalogs->Set(preserved_catalog_count());
     ctr_condemned_catalogs->Set(condemned_catalog_count());
     ctr_condemned_objects->Set(condemned_objects_count());
     ctr_condemned_bytes->Set(condemned_bytes_count());
+    ctr_duplicate_delete_requests->Set(duplicate_delete_requests());
   }
 
   configuration_.uploader->WaitForUpload();

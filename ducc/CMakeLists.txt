@@ -29,7 +29,7 @@ configure_file (
 # and then we install the generated file
 install (
   FILES ${CMAKE_BINARY_DIR}/cvmfs_ducc.service
-  DESTINATION /usr/lib/systemd/system
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system
 )
 
 install(
@@ -37,7 +37,7 @@ install(
 )
 
 install (
-    FILES webhook/registry-webhook.py
+    FILES webhook/registry_webhook.py
     DESTINATION ${CVMFS_LIBEXEC_DIR}/ducc
     PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 )

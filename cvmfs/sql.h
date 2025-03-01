@@ -307,7 +307,7 @@ class Database : SingleCopy {
 
 /**
  * Base class for all SQL statement classes.  It wraps a single SQL statement
- * and all neccessary calls of the sqlite3 API to deal with this statement.
+ * and all necessary calls of the sqlite3 API to deal with this statement.
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE  *
@@ -438,6 +438,11 @@ class Sql {
   }
   double RetrieveDouble(const int idx_column) const {
     return sqlite3_column_double(statement_, idx_column);
+  }
+  int RetrieveNullableInt(const int idx_column, const int val_null) const {
+    if (sqlite3_column_type(statement_, idx_column) == SQLITE_NULL)
+      return val_null;
+    return sqlite3_column_int(statement_, idx_column);
   }
   int RetrieveInt(const int idx_column) const {
     return sqlite3_column_int(statement_, idx_column);

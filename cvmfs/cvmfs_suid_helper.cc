@@ -39,12 +39,14 @@ static void GetCredentials(uid_t *calling_uid, uid_t *effective_uid) {
 }
 
 static void ExecAsRoot(const char *binary,
-                       const char *arg1, const char *arg2, const char *arg3)
+                       const char *arg1, const char *arg2, const char *arg3,
+                       const char *arg4)
 {
   char *argv[] = { strdup(binary),
                    arg1 ? strdup(arg1) : NULL,
                    arg2 ? strdup(arg2) : NULL,
                    arg3 ? strdup(arg3) : NULL,
+                   arg4 ? strdup(arg4) : NULL,
                    NULL };
   char *environ[] = { NULL };
 
@@ -60,14 +62,15 @@ static void ExecAsRoot(const char *binary,
 }
 
 static void ForkAndExecAsRoot(const char *binary, const char *arg1,
-                              const char *arg2, const char *arg3)
+                              const char *arg2, const char *arg3,
+                              const char *arg4)
 {
   pid_t child = fork();
   if (child == -1) {
     fprintf(stderr, "failed to fork %s... (%d)\n", binary, errno);
     exit(1);
   } else if (child == 0) {
-    ExecAsRoot(binary, arg1, arg2, arg3);
+    ExecAsRoot(binary, arg1, arg2, arg3, arg4);
   } else {
     int wstatus;
     waitpid(child, &wstatus, 0);
@@ -93,7 +96,10 @@ static void Remount(const string &path, const RemountType how) {
       exit(1);
   }
 
-  ExecAsRoot("/bin/mount", "-o", remount_option.c_str(), path.c_str());
+  // Note: the device name "dev" doesn't matter. It won't change from the
+  // "overlayfs_<fqrn>" name used when originally mounting the path. It is
+  // a dummy argument to appease the mount command.
+  ExecAsRoot("/bin/mount", "-o", remount_option.c_str(), "dev", path.c_str());
 }
 
 static void Mount(const string &path) {
@@ -113,19 +119,21 @@ static void Mount(const string &path) {
       }
       systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
     }
-    ForkAndExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(), NULL);
-    ExecAsRoot("/bin/systemctl", "reset-failed", systemd_unit.c_str(), NULL);
+    ForkAndExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(),
+                      NULL, NULL);
+    ExecAsRoot("/bin/systemctl", "reset-failed", systemd_unit.c_str(),
+               NULL, NULL);
   } else {
-    ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL);
+    ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL, NULL);
   }
 }
 
 static void Umount(const string &path) {
-  ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL);
+  ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL, NULL);
 }
 
 static void LazyUmount(const string &path) {
-  ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL);
+  ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL, NULL);
 }
 
 static void KillCvmfs(const string &fqrn) {
@@ -142,7 +150,7 @@ static void KillCvmfs(const string &fqrn) {
   sanitizer::PositiveIntegerSanitizer pid_sanitizer;
   if (!pid_sanitizer.IsValid(pid))
     exit(1);
-  ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
+  ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL, NULL);
 }
 
 class ScopedWorkingDirectory {

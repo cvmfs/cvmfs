@@ -1,6 +1,6 @@
 // This file is part of the CernVM File System.
 //
-// Protocol defintion for RPCs between cvmfs client and cache manager plugin.
+// Protocol definition for RPCs between cvmfs client and cache manager plugin.
 // The protocol is used to access a store of content-addressable objects that
 // are maintained by a cache manager plugin.  Objects are reference counted,
 // mirroring currently open files.  Only objects with reference count zero may
@@ -25,7 +25,8 @@ option optimize_for = LITE_RUNTIME;
 // # Protocol changelog
 // Version 1: First version
 //   2019-05-27: add breadcrumb handling
-
+// Version 2:
+//   2023-11-14: add (optional) revision to breadcrumb
 
 //------------------------------------------------------------------------------
 // # Enum definitions
@@ -104,6 +105,7 @@ message MsgBreadcrumb {
   required string fqrn      = 1;
   required MsgHash hash     = 2;
   required uint64 timestamp = 3;
+  optional uint64 revision  = 4;
 }
 
 
@@ -154,7 +156,7 @@ message MsgIoctl {
   required uint64 session_id = 1;
   // When there are no more open connections, the cache plugin can shutdown
   // itself.  During client reloads, this is unwanted.  Before the reload, the
-  // client tells the plugin to artifically increase the connection counter.
+  // client tells the plugin to artificially increase the connection counter.
   // Once reloading has finished, the connection counter is decreased again.
   optional sint32 conncnt_change_by  = 2;
 }
@@ -238,7 +240,7 @@ message MsgShrinkReply {
   required uint64 used_bytes  = 3;
 }
 
-// Read a portion from a stored object.  Garuanteed to work for objects with a
+// Read a portion from a stored object.  Guaranteed to work for objects with a
 // reference counter larger than zero.
 message MsgReadReq {
   required uint64 session_id = 1;
@@ -297,7 +299,7 @@ message MsgListReq {
 }
 
 // The cache manager decides how many objects are in each part.  The cache
-// manager assignes a unique listing id so that clients can continue to query
+// manager assigns a unique listing id so that clients can continue to query
 // for more listings.
 message MsgListReply {
   required uint64 req_id             = 1;

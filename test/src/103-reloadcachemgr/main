@@ -1,0 +1,95 @@
+#!/bin/bash
+
+cvmfs_test_name="Check changing CVMFS_CACHE_REFCOUNT between reloads"
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+  ############### 1) Check that the normal cache manager 
+  ############### creates new fds for the same object 
+
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+  local CVMFS_TEST_REPO=atlas.cern.ch
+  local CVMFS_MOUNTPOINT=/cvmfs/atlas.cern.ch
+
+  local talk_socket="$(get_cvmfs_cachedir $CVMFS_TEST_REPO)/cvmfs_io.$CVMFS_TEST_REPO"
+  echo $talk_socket
+
+
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+  testfile=$(find /cvmfs/atlas.cern.ch -type f | head -n1)
+  # testfile has the following cvmfs hash:
+  testfile_hash=$(get_xattr hash $testfile)
+
+  gcc -Wall -pthread -o openwaitprint ${src_location}/openwaitprint.c || return 60
+
+    ./openwaitprint $testfile > testfile1 &
+  local pid_helper1=$!
+  ./openwaitprint $testfile > testfile2 &
+  local pid_helper2=$!
+  ./openwaitprint $testfile > testfile3 &
+  local pid_helper3=$!
+
+
+  sleep 1;
+
+  sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=yes\" >> /etc/cvmfs/default.local" || return 2
+  
+  sudo cvmfs_config reload || return 20
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
+
+
+    ./openwaitprint $testfile > testfile4 &
+  local pid_helper4=$!
+  ./openwaitprint $testfile > testfile5 &
+  local pid_helper5=$!
+  ./openwaitprint $testfile > testfile6 &
+  local pid_helper6=$!
+
+    kill -USR1 $pid_helper1
+  wait $pid_helper1 || return 65
+  kill -USR1 $pid_helper2
+  wait $pid_helper2 || return 66
+  kill -USR1 $pid_helper3
+  wait $pid_helper3 || return 67
+
+  diff testfile1 $testfile || return 73
+  diff testfile2 $testfile || return 74
+  diff testfile3 $testfile || return 75
+
+
+
+  sudo sh -c "echo \"CVMFS_CACHE_REFCOUNT=no\" >> /etc/cvmfs/default.local" || return 2
+
+  sudo cvmfs_config reload || return 30
+  local cache_instance=$(sudo cvmfs_talk -p $talk_socket cache instance)
+  echo $cache_instance
+
+    kill -USR1 $pid_helper4
+  wait $pid_helper4 || return 65
+  kill -USR1 $pid_helper5
+  wait $pid_helper5 || return 66
+  kill -USR1 $pid_helper6
+  wait $pid_helper6 || return 67
+
+  cat $testfile > testfile7
+
+  diff testfile4 $testfile || return 76
+  diff testfile5 $testfile || return 77
+  diff testfile6 $testfile || return 78
+  diff testfile7 $testfile || return 79
+
+  cvmfs_umount atlas.cern.ch || return 80
+
+  return 0
+}
+

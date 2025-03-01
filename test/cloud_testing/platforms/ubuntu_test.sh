@@ -51,11 +51,13 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/024-reload-during-asetup                 \
+                                 src/056-lowspeedlimit                        \
                                  src/084-premounted                           \
                                  src/094-attachmount                          \
                                  $CVMFS_EXCLUDE                               \
                                  --                                           \
                                  src/0*                                       \
+                                 src/1*                                       \
                               || retval=1
 
 
@@ -70,6 +72,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/684-https_s3                             \
                                    src/686-azureblob_s3                         \
                                    src/687-import_s3                            \
+                                   src/702-symlink_caching                      \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
                                    src/5*                                       \

@@ -13,9 +13,9 @@
 
 #include "cache.h"
 #include "crypto/hash.h"
-#include "download.h"
 #include "gtest/gtest_prod.h"
-#include "sink.h"
+#include "network/download.h"
+#include "network/sink.h"
 
 class BackoffThrottle;
 
@@ -33,15 +33,60 @@ namespace cvmfs {
 class TransactionSink : public Sink {
  public:
   TransactionSink(CacheManager *cache_mgr, void *open_txn)
-    : cache_mgr_(cache_mgr)
-    , open_txn_(open_txn)
-  { }
+    : Sink(false),
+      cache_mgr_(cache_mgr),
+      open_txn_(open_txn) { }
   virtual ~TransactionSink() { }
+
+  /**
+   * Appends data to the sink
+   *
+   * @returns on success: number of bytes written (can be less than requested)
+   *          on failure: -errno.
+   */
   virtual int64_t Write(const void *buf, uint64_t sz) {
     return cache_mgr_->Write(buf, sz, open_txn_);
   }
+
+  /**
+   * Truncate all written data and start over at position zero.
+   *
+   * @returns Success = 0
+   *          Failure = -errno
+   */
   virtual int Reset() {
     return cache_mgr_->Reset(open_txn_);
+  }
+
+  /**
+   * Purges all resources leaving the sink in an invalid state.
+   * More aggressive version of Reset().
+   * For some sinks it might do the same as Reset().
+   *
+   * @returns Success = 0
+   *          Failure = -errno
+   */
+  virtual int Purge() {
+    return Reset();
+  }
+  /**
+    * @returns true if the object is correctly initialized.
+    */
+  virtual bool IsValid() {
+    return cache_mgr_ != NULL && open_txn_ != NULL;
+  }
+
+  virtual int Flush() { return 0; }
+  virtual bool Reserve(size_t /*size*/) { return true; }
+  virtual bool RequiresReserve() { return false; }
+
+  /**
+   * Return a string representation describing the type of sink and its status
+  */
+  virtual std::string Describe() {
+    std::string result = "Transaction sink that is ";
+    result += IsValid() ? "valid"  : "invalid";
+    return result;
   }
 
  private:
@@ -70,18 +115,15 @@ class Fetcher : SingleCopy {
   Fetcher(CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
-          perf::StatisticsTemplate statistics,
-          bool external_data = false);
+          perf::StatisticsTemplate statistics);
   ~Fetcher();
-  // TODO(jblomer): reduce number of arguments
-  int Fetch(const shash::Any &id,
-            const uint64_t size,
-            const std::string &name,
-            const zlib::Algorithms compression_algorithm,
-            const CacheManager::ObjectType object_type,
-            const std::string &alt_url = "",
-            off_t range_offset = -1);
 
+  int Fetch(const CacheManager::LabeledObject &object,
+            const std::string &alt_url = "");
+
+  void ReplaceCacheManager(CacheManager *new_cache_mgr) {
+    cache_mgr_ = new_cache_mgr;
+  }
   CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }
 
@@ -131,16 +173,7 @@ class Fetcher : SingleCopy {
   void CleanupTls(ThreadLocalStorage *tls);
   void SignalWaitingThreads(const int fd, const shash::Any &id,
                             ThreadLocalStorage *tls);
-  int OpenSelect(const shash::Any &id,
-                 const std::string &name,
-                 const CacheManager::ObjectType object_type);
-
-  /**
-   * If set to true, this fetcher is in 'external data' mode:
-   * instead of constructing the to-be-downloaded URL from the entry hash,
-   * it will use the filename.
-   */
-  bool external_;
+  int OpenSelect(const CacheManager::LabeledObject &object);
 
   /**
    * Key to the thread's ThreadLocalStorage memory

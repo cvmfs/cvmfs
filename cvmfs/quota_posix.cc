@@ -15,7 +15,7 @@
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "quota_posix.h"
 
 #include <dirent.h>
@@ -39,7 +39,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -136,7 +136,7 @@ bool PosixQuotaManager::Cleanup(const uint64_t leave_size) {
   cmd.return_pipe = pipe_cleanup[1];
 
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_cleanup[0], &result, sizeof(result));
+  ManagedReadHalfPipe(pipe_cleanup[0], &result, sizeof(result));
   CloseReturnPipe(pipe_cleanup);
 
   return result;
@@ -150,6 +150,7 @@ void PosixQuotaManager::CloseDatabase() {
   if (stmt_list_) sqlite3_finalize(stmt_list_);
   if (stmt_lru_) sqlite3_finalize(stmt_lru_);
   if (stmt_rm_) sqlite3_finalize(stmt_rm_);
+  if (stmt_rm_batch_) sqlite3_finalize(stmt_rm_batch_);
   if (stmt_size_) sqlite3_finalize(stmt_size_);
   if (stmt_touch_) sqlite3_finalize(stmt_touch_);
   if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
@@ -164,6 +165,7 @@ void PosixQuotaManager::CloseDatabase() {
   stmt_list_volatile_ = NULL;
   stmt_list_ = NULL;
   stmt_rm_ = NULL;
+  stmt_rm_batch_ = NULL;
   stmt_size_ = NULL;
   stmt_touch_ = NULL;
   stmt_unpin_ = NULL;
@@ -270,6 +272,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   string workspace_dir;
   ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
 
+  pid_t new_cachemgr_pid;
+
   // Create lock file: only one fuse client at a time
   const int fd_lockfile = LockFile(workspace_dir + "/lock_cachemgr");
   if (fd_lockfile < 0) {
@@ -288,6 +292,30 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
+    const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
+    unsigned lockfile_magicnumber = 0;
+    const ssize_t result_mn = SafeRead(fd_lockfile_rw, &lockfile_magicnumber, sizeof(lockfile_magicnumber));
+    const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+    close(fd_lockfile_rw);
+
+    if ((lockfile_magicnumber != kLockFileMagicNumber) || (result < 0) || (result_mn < 0)
+         || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
+      if (result != 0) {
+        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                 "could not read cache manager pid from lockfile");
+        UnlockFile(fd_lockfile);
+        delete quota_mgr;
+        return NULL;
+      } else {
+        // support reload from old versions of the cache manager
+        // lock file is empty in this case, try a plain ReadHalfPipe to get pid
+        quota_mgr->SetCacheMgrPid(quota_mgr->GetPid());
+      }
+    } else {
+      quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
+    }
+
+
     LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
     quota_mgr->initialized_ = true;
     Nonblock2Block(quota_mgr->pipe_lru_[1]);
@@ -347,7 +375,9 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(pipe_handshake[0]));
   command_line.push_back(StringifyInt(limit));
   command_line.push_back(StringifyInt(cleanup_threshold));
-  command_line.push_back(StringifyInt(foreground));
+  // do not propagate foreground in order to reliably get pid from exec
+  // instead, daemonize right here
+  command_line.push_back(StringifyInt(true)); //foreground
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
@@ -359,7 +389,15 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   preserve_filedes.insert(pipe_boot[1]);
   preserve_filedes.insert(pipe_handshake[0]);
 
-  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
+  if (foreground) {
+    retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
+                         /*drop_credentials*/ false,
+                         /*clear_env*/ false,
+                         /*double_fork*/  true,
+                         &new_cachemgr_pid);
+  } else {
+    retval = ExecAsDaemon(command_line, &new_cachemgr_pid);
+  }
   if (!retval) {
     UnlockFile(fd_lockfile);
     ClosePipe(pipe_boot);
@@ -368,7 +406,17 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
     return NULL;
   }
+  LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid);
+  quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
+  const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
+  const unsigned magic_number = PosixQuotaManager::kLockFileMagicNumber;
+  const bool result_mn = SafeWrite(fd_lockfile_rw, &magic_number, sizeof(magic_number));
+  const bool result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+  if (!result || !result_mn) {
+    PANIC(kLogSyslogErr, "could not write cache manager pid to lockfile");
+  }
 
+  close(fd_lockfile_rw);
   // Wait for cache manager to be ready
   close(pipe_boot[1]);
   close(pipe_handshake[0]);
@@ -426,103 +474,130 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     return true;
 
   // TODO(jblomer) transaction
-  LogCvmfs(kLogQuota, kLogSyslog,
+  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
            "clean up cache until at most %lu KB is used", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
   bool result;
-  string hash_str;
   vector<string> trash;
 
+  // Note that volatile files start counting from the smallest int64 number:
+  // the absolute sequence number with the first bit set in two's complement.
+  // So -1 can be a marker that will never appear in the database.
+  int64_t max_acseq = -1;
   do {
     sqlite3_reset(stmt_lru_);
-    if (sqlite3_step(stmt_lru_) != SQLITE_ROW) {
-      LogCvmfs(kLogQuota, kLogDebug, "could not get lru-entry");
+    sqlite3_bind_int64(stmt_lru_, 1, (max_acseq == -1) ?
+                       std::numeric_limits<int64_t>::min() : (max_acseq + 1));
+
+    std::vector<EvictCandidate> candidates;
+    candidates.reserve(kEvictBatchSize);
+    string hash_str;
+    unsigned i = 0;
+    while (sqlite3_step(stmt_lru_) == SQLITE_ROW) {
+      hash_str = reinterpret_cast<const char *>(
+        sqlite3_column_text(stmt_lru_, 0));
+      LogCvmfs(kLogQuota, kLogDebug, "add %s to candidates for eviction",
+               hash_str.c_str());
+      candidates.push_back(EvictCandidate(
+        shash::MkFromHexPtr(shash::HexPtr(hash_str)),
+        sqlite3_column_int64(stmt_lru_, 1),
+        sqlite3_column_int64(stmt_lru_, 2)));
+      i++;
+    }
+    if (candidates.empty()) {
+      LogCvmfs(kLogQuota, kLogDebug, "no more entries to evict");
       break;
     }
 
-    hash_str = string(reinterpret_cast<const char *>(
-                      sqlite3_column_text(stmt_lru_, 0)));
-    LogCvmfs(kLogQuota, kLogDebug, "removing %s", hash_str.c_str());
-    shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
-
-    // That's a critical condition.  We must not delete a not yet inserted
-    // pinned file as it is already reserved (but will be inserted later).
-    // Instead, set the pin bit in the db to not run into an endless loop
-    if (pinned_chunks_.find(hash) == pinned_chunks_.end()) {
-      trash.push_back(cache_dir_ + "/" + hash.MakePathWithoutSuffix());
-      gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
-      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
-               hash_str.c_str(), gauge_);
-
-      sqlite3_bind_text(stmt_rm_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      result = (sqlite3_step(stmt_rm_) == SQLITE_DONE);
-      sqlite3_reset(stmt_rm_);
-
-      if (!result) {
-        LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-                 "failed to find %s in cache database (%d). "
-                 "Cache database is out of sync. "
-                 "Restart cvmfs with clean cache.", hash_str.c_str(), result);
-        return false;
+    const unsigned N = candidates.size();
+    for (i = 0; i < N; ++i) {
+      // That's a critical condition.  We must not delete a not yet inserted
+      // pinned file as it is already reserved (but will be inserted later).
+      // Instead, set the pin bit in the db to not run into an endless loop
+      if (pinned_chunks_.find(candidates[i].hash) != pinned_chunks_.end()) {
+        hash_str = candidates[i].hash.ToString();
+        LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction",
+                 hash_str.c_str());
+        sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                          SQLITE_STATIC);
+        result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+        sqlite3_reset(stmt_block_);
+        assert(result);
+        continue;
       }
-    } else {
-      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-      sqlite3_reset(stmt_block_);
-      assert(result);
+
+      trash.push_back(cache_dir_ + "/" +
+                      candidates[i].hash.MakePathWithoutSuffix());
+      gauge_ -= candidates[i].size;
+      max_acseq = candidates[i].acseq;
+      LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
+               candidates[i].hash.ToString().c_str(), gauge_);
+
+      if (gauge_ <= leave_size)
+        break;
     }
   } while (gauge_ > leave_size);
 
-  result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
-  sqlite3_reset(stmt_unblock_);
-  assert(result);
+  if (max_acseq != -1) {
+    sqlite3_bind_int64(stmt_rm_batch_, 1, max_acseq);
+    result = (sqlite3_step(stmt_rm_batch_) == SQLITE_DONE);
+    assert(result);
+    sqlite3_reset(stmt_rm_batch_);
 
-  // Double fork avoids zombie, forked removal process must not flush file
-  // buffers
-  if (!trash.empty()) {
-    if (async_delete_) {
-      pid_t pid;
-      int statloc;
-      if ((pid = fork()) == 0) {
-        // TODO(jblomer): eviciting files in the cache should perhaps become a
-        // thread.  This would also allow to block the chunks and prevent the
-        // race with re-insertion.  Then again, a thread can block umount.
-#ifndef DEBUGMSG
-        int max_fd = sysconf(_SC_OPEN_MAX);
-        for (int i = 0; i < max_fd; ++i)
-          close(i);
-#endif
-        if (fork() == 0) {
-          for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-            LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
-            unlink(trash[i].c_str());
-          }
-          _exit(0);
-        }
-        _exit(0);
-      } else {
-        if (pid > 0)
-          waitpid(pid, &statloc, 0);
-        else
-          return false;
-      }
-    } else {  // !async_delete_
-      for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-        LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
-        unlink(trash[i].c_str());
-      }
-    }
+    result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
+    sqlite3_reset(stmt_unblock_);
+    assert(result);
   }
+
+  if (!EmptyTrash(trash))
+    return false;
 
   if (gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "request to clean until %" PRIu64 ", "
              "but effective gauge is %" PRIu64, leave_size, gauge_);
     return false;
+  }
+  return true;
+}
+
+bool PosixQuotaManager::EmptyTrash(const std::vector<std::string> &trash) {
+  if (trash.empty())
+    return true;
+
+  if (async_delete_) {
+    // Double fork avoids zombie, forked removal process must not flush file
+    // buffers
+    pid_t pid;
+    int statloc;
+    if ((pid = fork()) == 0) {
+      // TODO(jblomer): eviciting files in the cache should perhaps become a
+      // thread. This would also allow to block the chunks and prevent the
+      // race with re-insertion. Then again, a thread can block umount.
+#ifndef DEBUGMSG
+      CloseAllFildes(std::set<int>());
+#endif
+      if (fork() == 0) {
+        for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+          LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+          unlink(trash[i].c_str());
+        }
+        _exit(0);
+      }
+      _exit(0);
+    } else {
+      if (pid > 0)
+        waitpid(pid, &statloc, 0);
+      else
+        return false;
+    }
+  } else {  // !async_delete_
+    for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+      LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+      unlink(trash[i].c_str());
+    }
   }
   return true;
 }
@@ -567,7 +642,7 @@ vector<string> PosixQuotaManager::DoList(const CommandType list_command) {
 
   int length;
   do {
-    ReadHalfPipe(pipe_list[0], &length, sizeof(length));
+    ManagedReadHalfPipe(pipe_list[0], &length, sizeof(length));
     if (length > 0) {
       ReadPipe(pipe_list[0], description_buffer, length);
       result.push_back(string(description_buffer, length));
@@ -604,7 +679,7 @@ void PosixQuotaManager::GetLimits(uint64_t *limit, uint64_t *cleanup_threshold)
   cmd.command_type = kLimits;
   cmd.return_pipe = pipe_limits[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
+  ManagedReadHalfPipe(pipe_limits[0], limit, sizeof(*limit));
   ReadPipe(pipe_limits[0], cleanup_threshold, sizeof(*cleanup_threshold));
   CloseReturnPipe(pipe_limits);
 }
@@ -622,6 +697,9 @@ uint64_t PosixQuotaManager::GetMaxFileSize() {
 pid_t PosixQuotaManager::GetPid() {
   if (!shared_ || !spawned_) {
     return getpid();
+  }
+  if (cachemgr_pid_) {
+    return cachemgr_pid_;
   }
 
   pid_t result;
@@ -648,7 +726,7 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
   uint32_t revision;
-  ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+  ManagedReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
   CloseReturnPipe(pipe_revision);
   return revision;
 }
@@ -665,11 +743,36 @@ void PosixQuotaManager::GetSharedStatus(uint64_t *gauge, uint64_t *pinned) {
   cmd.command_type = kStatus;
   cmd.return_pipe = pipe_status[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_status[0], gauge, sizeof(*gauge));
+  ManagedReadHalfPipe(pipe_status[0], gauge, sizeof(*gauge));
   ReadPipe(pipe_status[0], pinned, sizeof(*pinned));
   CloseReturnPipe(pipe_status);
 }
 
+bool PosixQuotaManager::SetSharedLimit(uint64_t limit) {
+  int pipe_set_limit[2];
+  bool result;
+  MakeReturnPipe(pipe_set_limit);
+
+  LruCommand cmd;
+  cmd.command_type = kSetLimit;
+  cmd.size = limit;
+  cmd.return_pipe = pipe_set_limit[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  ReadHalfPipe(pipe_set_limit[0], &result, sizeof(result));
+  CloseReturnPipe(pipe_set_limit);
+  return result;
+}
+
+
+bool PosixQuotaManager::SetLimit( uint64_t size) {
+  if (!spawned_) {
+     limit_ = size;
+     cleanup_threshold_ = size/2;
+     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", limit_, cleanup_threshold_ ); 
+     return true;
+  }
+  return SetSharedLimit(size);
+}
 
 uint64_t PosixQuotaManager::GetSize() {
   if (!spawned_) return gauge_;
@@ -698,7 +801,7 @@ uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
   cmd.size = period_s;
   cmd.return_pipe = pipe_cleanup_rate[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
+  ManagedReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
   CloseReturnPipe(pipe_cleanup_rate);
 
   return cleanup_rate;
@@ -859,9 +962,13 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   sqlite3_prepare_v2(database_, "DELETE FROM cache_catalog WHERE sha1=:sha1;",
                      -1, &stmt_rm_, NULL);
   sqlite3_prepare_v2(database_,
-                     "SELECT sha1, size FROM cache_catalog WHERE "
-                     "acseq=(SELECT min(acseq) "
-                     "FROM cache_catalog WHERE pinned<>2);",
+                     "DELETE FROM cache_catalog WHERE acseq<=:a AND pinned<>2;",
+                     -1, &stmt_rm_batch_, NULL);
+  sqlite3_prepare_v2(database_, (std::string(
+                     "SELECT sha1, size, acseq FROM cache_catalog "
+                     "WHERE pinned<>2 AND acseq>=:a "
+                     "ORDER BY acseq ASC "
+                     "LIMIT ") + StringifyInt(kEvictBatchSize) + ";").c_str(),
                      -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(database_,
                      ("SELECT path FROM cache_catalog WHERE type=" +
@@ -950,6 +1057,7 @@ vector<string> PosixQuotaManager::ListVolatile() {
  * Entry point for the shared cache manager process
  */
 int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
+	
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
@@ -981,9 +1089,9 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   if (!foreground)
     Daemonize();
 
-  UniquePtr<Watchdog> watchdog(Watchdog::Create("./stacktrace.cachemgr"));
+  UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
   assert(watchdog.IsValid());
-  watchdog->Spawn();
+  watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo =
@@ -1134,6 +1242,20 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       continue;
     }
 
+    if (command_type == kSetLimit) {
+      const int return_pipe =
+        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+      quota_mgr->limit_ = size; // use the size field to transmit the size
+      quota_mgr->cleanup_threshold_ = size/2;
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", quota_mgr->limit_, quota_mgr->cleanup_threshold_ );
+      bool ret = true;
+      WritePipe(return_pipe, &ret, sizeof(ret));
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
@@ -1144,7 +1266,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
       const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
-      LogCvmfs(kLogQuota, kLogDebug, "reserve %d bytes for %s",
+      LogCvmfs(kLogQuota, kLogDebug, "reserve %lu bytes for %s",
                size, hash_str.c_str());
 
       if (quota_mgr->pinned_chunks_.find(hash) ==
@@ -1506,7 +1628,7 @@ bool PosixQuotaManager::Pin(
   cmd.return_pipe = pipe_reserve[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
   bool result;
-  ReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
+  ManagedReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
   CloseReturnPipe(pipe_reserve);
 
   if (!result) return false;
@@ -1531,6 +1653,7 @@ PosixQuotaManager::PosixQuotaManager(
   , workspace_dir_()  // initialized in body
   , fd_lock_cachedb_(-1)
   , async_delete_(true)
+  , cachemgr_pid_(0)
   , database_(NULL)
   , stmt_touch_(NULL)
   , stmt_unpin_(NULL)
@@ -1540,6 +1663,7 @@ PosixQuotaManager::PosixQuotaManager(
   , stmt_lru_(NULL)
   , stmt_size_(NULL)
   , stmt_rm_(NULL)
+  , stmt_rm_batch_(NULL)
   , stmt_list_(NULL)
   , stmt_list_pinned_(NULL)
   , stmt_list_catalogs_(NULL)
@@ -1631,7 +1755,7 @@ void PosixQuotaManager::ProcessCommandBunch(
 
         // Cleanup, move to trash and unlink
         if (!exists && (gauge_ + size > limit_)) {
-          LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %lu",
+          LogCvmfs(kLogQuota, kLogDebug, "over limit, gauge %lu, file size %u",
                    gauge_, size);
           retval = DoCleanup(cleanup_threshold_);
           assert(retval != 0);
@@ -1791,7 +1915,7 @@ bool PosixQuotaManager::RebuildDatabase() {
   seq_ = seq;
   result = true;
   LogCvmfs(kLogQuota, kLogDebug,
-           "rebuilding finished, seqence %" PRIu64 ", gauge %" PRIu64,
+           "rebuilding finished, sequence %" PRIu64 ", gauge %" PRIu64,
            seq_, gauge_);
 
  build_return:
@@ -1822,7 +1946,7 @@ void PosixQuotaManager::RegisterBackChannel(
     WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
     char success;
-    ReadHalfPipe(back_channel[0], &success, sizeof(success));
+    ManagedReadHalfPipe(back_channel[0], &success, sizeof(success));
     // At this point, the named FIFO is unlinked, so don't use CloseReturnPipe
     if (success != 'S') {
       PANIC(kLogDebug | kLogSyslogErr,
@@ -1851,7 +1975,7 @@ void PosixQuotaManager::Remove(const shash::Any &hash) {
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
 
   bool success;
-  ReadHalfPipe(pipe_remove[0], &success, sizeof(success));
+  ManagedReadHalfPipe(pipe_remove[0], &success, sizeof(success));
   CloseReturnPipe(pipe_remove);
 
   unlink((cache_dir_ + "/" + hash.MakePathWithoutSuffix()).c_str());
@@ -1923,4 +2047,17 @@ void PosixQuotaManager::UnregisterBackChannel(
   } else {
     ClosePipe(back_channel);
   }
+}
+
+void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
+  const unsigned timeout_ms = cachemgr_pid_ ? 1000 : 0;
+  bool result = false;
+  do {
+    result = ReadHalfPipe(fd, buf, nbyte, timeout_ms);
+    // try only as long as the cachemgr is still alive
+  } while (!result && getpgid(cachemgr_pid_) >= 0);
+  if (!result) {
+    PANIC(kLogStderr, "Error: quota manager could not read from cachemanager pipe");
+  }
+
 }

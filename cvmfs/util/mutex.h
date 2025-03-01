@@ -15,7 +15,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 /**
  * Used to allow for static polymorphism in the RAII template to statically
- * decide which 'lock' functions to use, if we have more than one possiblity.
+ * decide which 'lock' functions to use, if we have more than one possibility.
  * (I.e. Read/Write locks)
  * Note: Static Polymorphism - Strategy Pattern
  *

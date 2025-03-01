@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "mountpoint.h"
 
 #include <errno.h>
@@ -34,12 +34,12 @@
 #include "cache_extern.h"
 #include "cache_posix.h"
 #include "cache_ram.h"
+#include "cache_stream.h"
 #include "cache_tiered.h"
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "file_chunk.h"
@@ -51,6 +51,7 @@
 #include "lru_md.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "nfs_maps.h"
 #ifdef CVMFS_NFS_SUPPORT
 #include "nfs_maps_leveldb.h"
@@ -62,6 +63,7 @@
 #include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
+#include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/concurrency.h"
 #include "util/logging.h"
@@ -165,6 +167,8 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   UniquePtr<FileSystem>
     file_system(new FileSystem(fs_info));
 
+  file_system->SetupGlobalEnvironmentParams();
+
   file_system->SetupLogging();
   LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
            file_system->options_mgr()->Dump().c_str());
@@ -226,6 +230,10 @@ void FileSystem::CreateStatistics() {
   n_fs_stat_ = statistics_->Register("cvmfs.n_fs_stat", "Number of stats");
   n_fs_stat_stale_ = statistics_->Register("cvmfs.n_fs_stat_stale",
     "Number of stats for stale (open, meanwhile changed) regular files");
+  n_fs_statfs_ = statistics_->Register("cvmfs.n_fs_statfs",
+                                       "Overall number of statsfs calls");
+  n_fs_statfs_cached_ = statistics_->Register("cvmfs.n_fs_statfs_cached",
+                "Number of statsfs calls that accessed the cached statfs info");
   n_fs_read_ = statistics_->Register("cvmfs.n_fs_read", "Number of files read");
   n_fs_readlink_ = statistics_->Register("cvmfs.n_fs_readlink",
                                          "Number of links read");
@@ -239,6 +247,26 @@ void FileSystem::CreateStatistics() {
                   "Number of currently opened directories");
   io_error_info_.SetCounter(statistics_->Register("cvmfs.n_io_error",
                                                   "Number of I/O errors"));
+  n_eio_total_ =  statistics_->Register("eio.total",
+     "EIO returned to calling process. Sum of individual eio counters");
+  n_eio_01_ =  statistics_->Register("eio.01",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+  n_eio_02_ =  statistics_->Register("eio.02",
+     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+  n_eio_03_ =  statistics_->Register("eio.03",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+  n_eio_04_ =  statistics_->Register("eio.04",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_05_ =  statistics_->Register("eio.05",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_06_ =  statistics_->Register("eio.06",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+  n_eio_07_ =  statistics_->Register("eio.07",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_eio_08_ =  statistics_->Register("eio.08",
+     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+  n_emfile_ =  statistics_->Register("eio.emfile",
+     "EMFILE returned to calling process. cvmfs.cc:cvmfs_read()");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -270,6 +298,13 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
 ) {
   string optarg;
   PosixCacheSettings settings;
+
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_REFCOUNT", instance),
+                             &optarg)
+      && options_mgr_->IsOff(optarg))
+  {
+    settings.do_refcount = false;
+  }
 
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
@@ -377,12 +412,24 @@ FileSystem::FileSystem(const FileSystem::FileSystemInfo &fs_info)
   , n_fs_lookup_negative_(NULL)
   , n_fs_stat_(NULL)
   , n_fs_stat_stale_(NULL)
+  , n_fs_statfs_(NULL)
+  , n_fs_statfs_cached_(NULL)
   , n_fs_read_(NULL)
   , n_fs_readlink_(NULL)
   , n_fs_forget_(NULL)
   , n_fs_inode_replace_(NULL)
   , no_open_files_(NULL)
   , no_open_dirs_(NULL)
+  , n_eio_total_(NULL)
+  , n_eio_01_(NULL)
+  , n_eio_02_(NULL)
+  , n_eio_03_(NULL)
+  , n_eio_04_(NULL)
+  , n_eio_05_(NULL)
+  , n_eio_06_(NULL)
+  , n_eio_07_(NULL)
+  , n_eio_08_(NULL)
+  , n_emfile_(NULL)
   , statistics_(NULL)
   , fd_workspace_lock_(-1)
   , found_previous_crash_(false)
@@ -557,6 +604,16 @@ string FileSystem::MkCacheParm(
 
 void FileSystem::ResetErrorCounters() {
   io_error_info_.Reset();
+  n_eio_total_->Set(0);
+  n_eio_01_->Set(0);
+  n_eio_02_->Set(0);
+  n_eio_03_->Set(0);
+  n_eio_04_->Set(0);
+  n_eio_05_->Set(0);
+  n_eio_06_->Set(0);
+  n_eio_07_->Set(0);
+  n_eio_08_->Set(0);
+  n_emfile_->Set(0);
 }
 
 
@@ -640,12 +697,12 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
-
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
     settings.cache_path,
     settings.is_alien,
     settings.avoid_rename ? PosixCacheManager::kRenameLink
-                          : PosixCacheManager::kRenameNormal));
+                          : PosixCacheManager::kRenameNormal,
+    settings.do_refcount));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in " +
                   settings.cache_path + ": " + strerror(errno);
@@ -805,21 +862,38 @@ bool FileSystem::SetupCwd() {
 }
 
 
-void FileSystem::SetupLogging() {
+/**
+ * Environment variables useful, e.g., for variant symlinks
+ */
+void FileSystem::SetupGlobalEnvironmentParams() {
+  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
+}
+
+
+void FileSystem::SetupLoggingStandalone(
+  const OptionsManager &options_mgr, const std::string &prefix)
+{
+  SetupGlobalEnvironmentParams();
+
   string optarg;
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
     SetLogSyslogLevel(String2Uint64(optarg));
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+  if (options_mgr.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
     SetLogSyslogFacility(String2Int64(optarg));
-  if (options_mgr_->GetValue("CVMFS_USYSLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_USYSLOG", &optarg))
     SetLogMicroSyslog(optarg);
-  if (options_mgr_->GetValue("CVMFS_DEBUGLOG", &optarg))
+  if (options_mgr.GetValue("CVMFS_DEBUGLOG", &optarg))
     SetLogDebugFile(optarg);
-  if (options_mgr_->GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
+  if (options_mgr.GetValue("CVMFS_SYSLOG_PREFIX", &optarg)) {
     SetLogSyslogPrefix(optarg);
   } else {
-    SetLogSyslogPrefix(name_);
+    SetLogSyslogPrefix(prefix);
   }
+}
+
+
+void FileSystem::SetupLogging() {
+  SetupLoggingStandalone(*options_mgr_, name_);
 }
 
 
@@ -1060,7 +1134,8 @@ void FileSystem::SetupUuid() {
  * cache in order to properly unravel the file system stack on shutdown.
  */
 void FileSystem::TearDown2ReadOnly() {
-  if ((cache_mgr_ != NULL) && (cache_mgr_->id() == kPosixCacheManager)) {
+  if ((cache_mgr_ != NULL) &&
+      (cache_mgr_->id() == kPosixCacheManager)) {
     PosixCacheManager *posix_cache_mgr =
       reinterpret_cast<PosixCacheManager *>(cache_mgr_);
     posix_cache_mgr->TearDown2ReadOnly();
@@ -1076,6 +1151,11 @@ void FileSystem::RemapCatalogFd(int from, int to) {
   sqlite::RegisterFdMapping(from, to);
 }
 
+void FileSystem::ReplaceCacheManager(CacheManager *new_cache_mgr) {
+  cache_mgr_ = new_cache_mgr;
+  sqlite::ReplaceCacheManager(new_cache_mgr);
+}
+
 
 bool FileSystem::TriageCacheMgr() {
   cache_mgr_instance_ = kDefaultCacheMgrInstance;
@@ -1089,7 +1169,24 @@ bool FileSystem::TriageCacheMgr() {
   }
 
   cache_mgr_ = SetupCacheMgr(cache_mgr_instance_);
-  return cache_mgr_ != NULL;
+  if (cache_mgr_ == NULL)
+    return false;
+
+  std::string optarg;
+  if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    unsigned nfiles = kDefaultNfiles;
+    if (options_mgr_->GetValue("CVMFS_NFILES", &optarg))
+      nfiles = String2Uint64(optarg);
+    size_t buffer_size = StreamingCacheManager::kDefaultBufferSize;
+    if (options_mgr_->GetValue("CVMFS_STREAMING_CACHE_BUFFER_SIZE", &optarg))
+      buffer_size = String2Uint64(optarg);
+    cache_mgr_ = new StreamingCacheManager(nfiles, cache_mgr_, NULL, NULL,
+                                           buffer_size, statistics_);
+  }
+
+  return true;
 }
 
 
@@ -1153,6 +1250,26 @@ bool MountPoint::ReloadBlacklists() {
   return result;
 }
 
+/**
+ * Disables kernel caching of symlinks.
+ * Symlink caching requires fuse >= 3.10 (FUSE_CAP_CACHE_SYMLINKS) and
+ * linux kernel >= 4.2. Some OS might backport it.
+ *
+ * NOTE: This function should only be called before or within cvmfs_init().
+ *
+ */
+void MountPoint::DisableCacheSymlinks() {
+  cache_symlinks_ = false;
+}
+
+/**
+ * Instead of invalidate dentries, they should be expired.
+ * Fixes issues with mount-on-top mounts and symlink caching.
+ */
+void MountPoint::EnableFuseExpireEntry() {
+  fuse_expire_entry_ = true;
+}
+
 
 /**
  * The option_mgr parameter can be NULL, in which case the global option manager
@@ -1179,6 +1296,13 @@ MountPoint *MountPoint::Create(
     return mountpoint.Release();
   if (!mountpoint->CreateDownloadManagers())
     return mountpoint.Release();
+  if (file_system->cache_mgr()->id() == kStreamingCacheManager) {
+    StreamingCacheManager *streaming_cachemgr =
+      dynamic_cast<StreamingCacheManager *>(file_system->cache_mgr());
+    streaming_cachemgr->SetRegularDownloadManager(mountpoint->download_mgr());
+    streaming_cachemgr->SetExternalDownloadManager(
+      mountpoint->external_download_mgr());
+  }
   if (!mountpoint->CreateResolvConfWatcher()) {
     return mountpoint.Release();
   }
@@ -1283,13 +1407,40 @@ bool MountPoint::CreateCatalogManager() {
 
 bool MountPoint::CreateDownloadManagers() {
   string optarg;
-  download_mgr_ = new download::DownloadManager();
-  download_mgr_->Init(kDefaultNumConnections,
-                      perf::StatisticsTemplate("download", statistics_));
+  download_mgr_ = new download::DownloadManager(kDefaultNumConnections,
+                             perf::StatisticsTemplate("download", statistics_));
   download_mgr_->SetCredentialsAttachment(authz_attachment_);
 
-  if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
+  // must be set before proxy and host chains are being initialized
+  // error output is handled in SetShardingPolicy
+  if (options_mgr_->GetValue("CVMFS_PROXY_SHARDING_POLICY", &optarg)) {
+    if (optarg.compare("EXTERNAL") == 0) {
+      download_mgr_->SetShardingPolicy(download::kShardingPolicyExternal);
+      download_mgr_->SetFqrn(fqrn());
+    }
+  }
+
+  if (options_mgr_->GetValue("CVMFS_FAILOVER_INDEFINITELY", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+      download_mgr_->SetFailoverIndefinitely();
+  }
+
+  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
+    download_mgr_->SetMetalinkChain(optarg);  
+    // host chain will be set later when the metalink server is contacted
+    download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    download_mgr_->EnableRedirects();
+  } else if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(optarg);
+  }
+
+  if (options_mgr_->GetValue("_CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    download_mgr_->EnableIgnoreSignatureFailures();
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+      "Development option: Activate ignore signature failures during download. "
+      "DO NOT USE IN PRODUCTION");
   }
 
   SetupDnsTuning(download_mgr_);
@@ -1344,6 +1495,51 @@ bool MountPoint::CreateDownloadManagers() {
     download_mgr_->ShardProxies();
   }
 
+  // configure http tracing header
+  if (options_mgr_->GetValue("CVMFS_HTTP_TRACING", &optarg) &&
+      options_mgr_->IsOn(optarg)) {
+    download_mgr_->EnableHTTPTracing();
+    if (options_mgr_->GetValue("CVMFS_HTTP_TRACING_HEADERS", &optarg)) {
+      if (optarg.size() > 1000) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+           "CVMFS_HTTP_TRACING_HEADERS too large ( max 1000 chars, given %ld )",
+           optarg.size());
+      } else {
+        std::vector<std::string> tokens = SplitString(optarg, '|');
+        sanitizer::AlphaNumSanitizer sanitizer;
+
+        for (unsigned int i = 0; i < tokens.size(); i++) {
+          std::string token = Trim(tokens[i]);
+
+          std::vector<std::string> key_val = SplitString(token, ':');
+
+          if (key_val.size() != 2) {
+            LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+              "Http tracing header: Skipping current token part of "
+              "CVMFS_HTTP_TRACING_HEADERS! Invalid "
+              "<key:value> pair. Token: %s", token.c_str());
+            continue;
+          }
+
+          std::string prefix = "X-CVMFS-";
+          std::string key = Trim(key_val[0]);
+
+          if (!sanitizer.IsValid(key)) {
+            LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+            "Http tracing header: Skipping current token part of "
+            "CVMFS_HTTP_TRACING_HEADERS! Invalid key. Only alphanumeric keys "
+            "are allowed (a-z, A-Z, 0-9). Token: %s", token.c_str());
+            continue;
+          }
+
+          std::string final_token = prefix + key + ": " + Trim(key_val[1]);
+
+          download_mgr_->AddHTTPTracingHeader(final_token);
+        }
+      }
+    }
+  }
+
   return SetupExternalDownloadMgr(do_geosort);
 }
 
@@ -1377,13 +1573,11 @@ void MountPoint::CreateFetchers() {
     backoff_throttle_,
     perf::StatisticsTemplate("fetch", statistics_));
 
-  const bool is_external_data = true;
   external_fetcher_ = new cvmfs::Fetcher(
     file_system_->cache_mgr(),
     external_download_mgr_,
     backoff_throttle_,
-    perf::StatisticsTemplate("fetch-external", statistics_),
-    is_external_data);
+    perf::StatisticsTemplate("fetch-external", statistics_));
 }
 
 
@@ -1408,15 +1602,12 @@ bool MountPoint::CreateSignatureManager() {
     boot_status_ = loader::kFailSignature;
     return false;
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
-           public_keys.c_str());
 
-  if (options_mgr_->GetValue("CVMFS_TRUSTED_CERTS", &optarg)) {
-    if (!signature_mgr_->LoadTrustedCaCrl(optarg)) {
-      boot_error_ = "failed to load trusted certificates";
-      boot_status_ = loader::kFailSignature;
-      return false;
-    }
+  if (public_keys.size() > 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
+                                   public_keys.c_str());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "no public key loaded");
   }
 
   return true;
@@ -1621,12 +1812,10 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     return false;
   }
 
-  int fd = fetcher_->Fetch(
-    history_hash,
-    CacheManager::kSizeUnknown,
-    "tag database for " + fqrn_,
-    zlib::kZlibDefault,
-    CacheManager::kTypeRegular);
+  CacheManager::Label label;
+  label.flags = CacheManager::kLabelHistory;
+  label.path = fqrn_;
+  int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;
@@ -1674,6 +1863,7 @@ MountPoint::MountPoint(
   , file_system_(file_system)
   , options_mgr_(options_mgr)
   , statistics_(NULL)
+  , telemetry_aggr_(NULL)
   , authz_fetcher_(NULL)
   , authz_session_mgr_(NULL)
   , authz_attachment_(NULL)
@@ -1694,11 +1884,14 @@ MountPoint::MountPoint(
   , inode_tracker_(NULL)
   , dentry_tracker_(NULL)
   , page_cache_tracker_(NULL)
+  , statfs_cache_(NULL)
   , resolv_conf_watcher_(NULL)
   , max_ttl_sec_(kDefaultMaxTtlSec)
   , kcache_timeout_sec_(static_cast<double>(kDefaultKCacheTtlSec))
   , fixed_catalog_(false)
   , enforce_acls_(false)
+  , cache_symlinks_(false)
+  , fuse_expire_entry_(false)
   , has_membership_req_(false)
   , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
   , talk_socket_uid_(0)
@@ -1726,14 +1919,10 @@ MountPoint::~MountPoint() {
   delete inode_annotation_;
   delete external_fetcher_;
   delete fetcher_;
-  if (external_download_mgr_ != NULL) {
-    external_download_mgr_->Fini();
-    delete external_download_mgr_;
-  }
-  if (download_mgr_ != NULL) {
-    download_mgr_->Fini();
-    delete download_mgr_;
-  }
+
+  delete external_download_mgr_;
+  delete download_mgr_;
+
   if (signature_mgr_ != NULL) {
     signature_mgr_->Fini();
     delete signature_mgr_;
@@ -1748,8 +1937,11 @@ MountPoint::~MountPoint() {
   delete authz_attachment_;
   delete authz_session_mgr_;
   delete authz_fetcher_;
+  delete telemetry_aggr_;
   delete statistics_;
   delete uuid_;
+
+  delete statfs_cache_;
 }
 
 
@@ -1768,7 +1960,6 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   max_ttl_sec_ = value_minutes * 60;
 }
 
-
 bool MountPoint::SetupBehavior() {
   string optarg;
 
@@ -1782,6 +1973,14 @@ bool MountPoint::SetupBehavior() {
   }
   LogCvmfs(kLogCvmfs, kLogDebug, "kernel caches expire after %d seconds",
            static_cast<int>(kcache_timeout_sec_));
+
+  uint64_t statfs_time_cache_valid = 0;
+  if (options_mgr_->GetValue("CVMFS_STATFS_CACHE_TIMEOUT", &optarg)) {
+    statfs_time_cache_valid = static_cast<uint64_t>(String2Uint64(optarg));
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "statfs cache expires after %d seconds",
+           static_cast<int>(statfs_time_cache_valid));
+  statfs_cache_ = new StatfsCache(statfs_time_cache_valid);
 
   MagicXattrManager::EVisibility xattr_visibility =
     MagicXattrManager::kVisibilityRootOnly;
@@ -1804,7 +2003,38 @@ bool MountPoint::SetupBehavior() {
                optarg.c_str());
     }
   }
-  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility);
+
+  std::set<gid_t> protected_xattr_gids;
+  if (options_mgr_->GetValue("CVMFS_XATTR_PRIVILEGED_GIDS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      std::string trimmed = Trim(tmp[i]);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Privileged gid for xattr added: %s", trimmed.c_str());
+      protected_xattr_gids.insert(static_cast<gid_t>(String2Uint64(trimmed)));
+    }
+  }
+  std::set<std::string> protected_xattrs;
+  if (options_mgr_->GetValue("CVMFS_XATTR_PROTECTED_XATTRS", &optarg)) {
+    std::vector<string> tmp = SplitString(optarg, ',');
+
+    for (size_t i = 0; i < tmp.size(); i++) {
+      std::string trimmed = Trim(tmp[i]);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Protected xattr added: %s", trimmed.c_str());
+      protected_xattrs.insert(trimmed);
+    }
+
+    // root has always access to xattr
+    if (protected_xattr_gids.count(0) < 1) {
+      protected_xattr_gids.insert(0);
+      LogCvmfs(kLogCvmfs, kLogDebug,
+              "Automatically added root to have access to protected xattrs.");
+    }
+  }
+  magic_xattr_mgr_ = new MagicXattrManager(this, xattr_visibility,
+                                    protected_xattrs, protected_xattr_gids);
 
 
   if (options_mgr_->GetValue("CVMFS_ENFORCE_ACLS", &optarg)
@@ -1812,6 +2042,14 @@ bool MountPoint::SetupBehavior() {
   {
     enforce_acls_ = true;
   }
+
+  if (options_mgr_->GetValue("CVMFS_CACHE_SYMLINKS", &optarg)
+      && options_mgr_->IsOn(optarg))
+  {
+    cache_symlinks_ = true;
+  }
+
+
 
   if (options_mgr_->GetValue("CVMFS_TALK_SOCKET", &optarg)) {
     talk_socket_path_ = optarg;
@@ -1822,6 +2060,31 @@ bool MountPoint::SetupBehavior() {
       boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
       boot_status_ = loader::kFailOptions;
       return false;
+    }
+  }
+
+  // this can be later be changed to switch through different
+  // telemetryAggregators
+  if (options_mgr_->GetValue("CVMFS_TELEMETRY_SEND", &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    int telemetry_send_rate_sec = kDefaultTelemetrySendRateSec;
+    if (options_mgr_->GetValue("CVMFS_TELEMETRY_RATE", &optarg)) {
+      telemetry_send_rate_sec = static_cast<int>(String2Uint64(optarg));
+
+      // minimum send rate: 5sec
+      if (telemetry_send_rate_sec < kMinimumTelemetrySendRateSec) {
+        telemetry_send_rate_sec = kMinimumTelemetrySendRateSec;
+      }
+
+      telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
+                                                        telemetry_send_rate_sec,
+                                                        options_mgr_,
+                                                        this,
+                                                        fqrn_,
+                                                        perf::kTelemetryInflux);
+      LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
+               "Enable telemetry to report every %d seconds",
+               telemetry_send_rate_sec);
     }
   }
 
@@ -1877,7 +2140,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   string optarg;
   external_download_mgr_ =
     download_mgr_->Clone(perf::StatisticsTemplate("download-external",
-      statistics_));
+      statistics_), "external");
 
   unsigned timeout;
   unsigned timeout_direct;
@@ -1890,7 +2153,13 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
+    external_download_mgr_->SetMetalinkChain(optarg);  
+    // host chain will be set later when the metalink server is contacted
+    external_download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    external_download_mgr_->EnableRedirects();
+  } else if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
     external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
       std::vector<std::string> host_chain;
@@ -1960,8 +2229,13 @@ void MountPoint::SetupHttpTuning() {
 
   if (options_mgr_->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
     download_mgr_->SetLowSpeedLimit(String2Uint64(optarg));
-  if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg))
+  if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg)) {
     download_mgr_->SetProxyGroupResetDelay(String2Uint64(optarg));
+    // Use the proxy reset delay as the default for the metalink reset delay
+    download_mgr_->SetMetalinkResetDelay(String2Uint64(optarg));
+  }
+  if (options_mgr_->GetValue("CVMFS_METALINK_RESET_AFTER", &optarg))
+    download_mgr_->SetMetalinkResetDelay(String2Uint64(optarg));
   if (options_mgr_->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
     download_mgr_->SetHostResetDelay(String2Uint64(optarg));
 
@@ -2023,6 +2297,13 @@ bool MountPoint::SetupOwnerMaps() {
   {
     g_claim_ownership = true;
   }
+  if (options_mgr_->GetValue("CVMFS_WORLD_READABLE", &optarg) &&
+      options_mgr_->IsOn(optarg))
+  {
+    g_world_readable = true;
+  }
+
+
 
   return true;
 }

@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Tests publication of uncompressed files through the gateway.
+# Catalogs should remain zlib compressed.
+#
+
+cvmfs_test_name="Uncompressed files through gateway"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+    set_up_repository_gateway || return 1
+
+    echo "CVMFS_COMPRESSION_ALGORITHM=none" | sudo tee -a \
+        /etc/cvmfs/repositories.d/test.repo.org/server.conf || return 10
+
+    echo "*** Starting transaction with an uncompressed file"
+    cvmfs_server transaction test.repo.org               || return 20
+    mkdir /cvmfs/test.repo.org/foo                       || return 21
+    echo "Hello, World!" > /cvmfs/test.repo.org/foo/bar  || return 23
+    touch /cvmfs/test.repo.org/foo/.cvmfscatalog         || return 24
+    cvmfs_server publish test.repo.org                   || return 25
+
+    cat /var/spool/cvmfs/test.repo.org/rdonly/foo/bar || return 30
+    local compression=$(get_xattr compression /var/spool/cvmfs/test.repo.org/rdonly/foo/bar)
+    echo "*** compression: $compression"
+    [ "x$compression" = "xnone" ] || return 31
+
+    return 0
+}

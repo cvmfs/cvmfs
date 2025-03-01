@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "catalog_mgr.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "util/logging.h"
@@ -59,7 +59,7 @@ void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(string path) {
   XattrList xattr;
   DirectoryEntry parent;
   bool retval;
-  retval = catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
+  retval = catalog_mgr_->LookupPath(PathString(path), kLookupDefault, &parent);
   assert(retval);
   DirectoryEntryBase cvmfscatalog =
       MakeEmptyDirectoryEntryBase(".cvmfscatalog", parent.uid(),

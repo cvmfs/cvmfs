@@ -23,7 +23,7 @@
  * Many of the options possible to set in the ArgumentList are not actually used
  * by the ingest command since they are not part of its interface, hence those
  * unused options cannot be set by the shell script. Of course if there is the
- * necessitty those paramenters can be added and managed.
+ * necessitty those parameters can be added and managed.
  * At the moment this approach worked fine and didn't add much complexity,
  * however if yet another command will need to use a similar approach it would
  * be good to consider creating different options handler for each command.
@@ -56,17 +56,26 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   if (args.find('O') != args.end()) {
     params.generate_legacy_bulk_chunks = true;
   }
+  if (args.find('j') != args.end()) {
+    params.enable_mtime_ns = true;
+  }
   shash::Algorithms hash_algorithm = shash::kSha1;
   if (args.find('e') != args.end()) {
     hash_algorithm = shash::ParseHashAlgorithm(*args.find('e')->second);
     if (hash_algorithm == shash::kAny) {
-      PrintError("unknown hash algorithm");
+      PrintError("Swissknife Ingest: unknown hash algorithm");
       return 1;
     }
   }
   if (args.find('Z') != args.end()) {
     params.compression_alg =
         zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+  if (args.find('U') != args.end()) {
+    params.uid = static_cast<uid_t>(String2Int64(*args.find('U')->second));
+  }
+  if (args.find('G') != args.end()) {
+    params.gid = static_cast<gid_t>(String2Int64(*args.find('G')->second));
   }
 
   bool create_catalog = args.find('C') != args.end();
@@ -122,8 +131,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  if (!InitVerifyingSignatureManager(params.public_keys,
-                                     params.trusted_certs)) {
+  if (!InitSignatureManager(params.public_keys)) {
     return 3;
   }
 
@@ -161,15 +169,15 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
-  LogCvmfs(kLogPublish, kLogStdout, "Processing changes...");
+  LogCvmfs(kLogPublish, kLogStdout, "Swissknife Ingest: Processing changes...");
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
-    &mediator, params.dir_rdonly, params.tar_file,
-    params.base_directory, params.to_delete, create_catalog);
+    &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
+    params.uid, params.gid, params.to_delete, create_catalog);
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
-             "Initialization of the synchronisation "
+             "Swissknife Ingest: Initialization of the synchronisation "
              "engine failed");
     return 4;
   }
@@ -178,13 +186,13 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!params.authz_file.empty()) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-             "Adding contents of authz file %s to"
+             "Swissknife Ingest: Adding contents of authz file %s to"
              " root catalog.",
              params.authz_file.c_str());
     int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Unable to open authz file (%s)"
+               "Swissknife Ingest: Unable to open authz file (%s)"
                "from the publication process: %s",
                params.authz_file.c_str(), strerror(errno));
       return 7;
@@ -195,8 +203,9 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     close(fd);
 
     if (!read_successful) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to read authz file (%s): %s",
-               params.authz_file.c_str(), strerror(errno));
+      LogCvmfs(kLogCvmfs, kLogStderr,
+                        "Swissknife Ingest: Failed to read authz file (%s): %s",
+                        params.authz_file.c_str(), strerror(errno));
       return 8;
     }
 
@@ -204,7 +213,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   }
 
   if (!mediator.Commit(manifest.weak_ref())) {
-    PrintError("something went wrong during sync");
+    PrintError("Swissknife Ingest: something went wrong during sync");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
       stats_db->UploadStatistics(params.spooler);
@@ -217,12 +226,14 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
   // finalize the spooler
-  LogCvmfs(kLogCvmfs, kLogStdout, "Wait for all uploads to finish");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                           "Swissknife Ingest: Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
+  LogCvmfs(kLogCvmfs, kLogStdout,
+                            "Swissknife Ingest: Exporting repository manifest");
 
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").
@@ -232,7 +243,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   if (!spooler_catalogs->FinalizeSession(true, old_root_hash, new_root_hash,
                                          params.repo_tag)) {
-    PrintError("Failed to commit the transaction.");
+    PrintError("Swissknife Ingest: Failed to commit the transaction.");
     stats_db->StorePublishStatistics(this->statistics(), start_time, false);
     if (upload_statsdb) {
       stats_db->UploadStatistics(params.spooler);
@@ -248,7 +259,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   delete params.spooler;
 
   if (!manifest->Export(params.manifest_path)) {
-    PrintError("Failed to create new repository");
+    PrintError("Swissknife Ingest: Failed to create new repository");
     return 6;
   }
 

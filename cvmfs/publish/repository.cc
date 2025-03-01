@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "publish/repository.h"
 
 #include <cassert>
@@ -13,12 +13,12 @@
 #include "catalog_mgr_rw.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "gateway_util.h"
 #include "history_sqlite.h"
 #include "ingestion/ingestion_source.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "publish/except.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
@@ -78,9 +78,8 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
     if (rvi != 0)
       throw EPublish("cannot set X509_CERT_BUNDLE environment variable");
   }
-  download_mgr_ = new download::DownloadManager();
-  download_mgr_->Init(16,
-                      perf::StatisticsTemplate("download", statistics_));
+  download_mgr_ = new download::DownloadManager(16,
+                             perf::StatisticsTemplate("download", statistics_));
   download_mgr_->UseSystemCertificatePath();
 
   if (settings.proxy() != "") {
@@ -93,7 +92,6 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
       DownloadRootObjects(settings.url(), settings.fqrn(), settings.tmp_dir());
     } catch (const EPublish& e) {
       signature_mgr_->Fini();
-      download_mgr_->Fini();
       delete signature_mgr_;
       delete download_mgr_;
       delete statistics_;
@@ -104,7 +102,6 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
 
 Repository::~Repository() {
   if (signature_mgr_ != NULL) signature_mgr_->Fini();
-  if (download_mgr_ != NULL) download_mgr_->Fini();
 
   delete history_;
   delete manifest_;
@@ -160,12 +157,9 @@ void Repository::DownloadRootObjects(
   std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
-  download::JobInfo download_reflog(
-       &reflog_url,
-       false /* compressed */,
-       false /* probe hosts */,
-       reflog_fd,
-       NULL);
+  cvmfs::FileSink filesink(reflog_fd);
+  download::JobInfo download_reflog(&reflog_url, false /* compressed */,
+                                    false /* probe hosts */, NULL, &filesink);
   download::Failures rv_dl = download_mgr_->Fetch(&download_reflog);
   fclose(reflog_fd);
   if (rv_dl == download::kFailOk) {
@@ -187,12 +181,10 @@ void Repository::DownloadRootObjects(
   if (!manifest_->history().IsNull()) {
     std::string tags_url = url + "/data/" + manifest_->history().MakePath();
     shash::Any tags_hash(manifest_->history());
-    download::JobInfo download_tags(
-         &tags_url,
-         true /* compressed */,
-         true /* probe hosts */,
-         tags_fd,
-         &tags_hash);
+    cvmfs::FileSink filesink(tags_fd);
+    download::JobInfo download_tags(&tags_url, true /* compressed */,
+                                    true /* probe hosts */, &tags_hash,
+                                    &filesink);
     rv_dl = download_mgr_->Fetch(&download_tags);
     fclose(tags_fd);
     if (rv_dl != download::kFailOk) throw EPublish("cannot load tag database");
@@ -210,18 +202,17 @@ void Repository::DownloadRootObjects(
   if (!manifest_->meta_info().IsNull()) {
     shash::Any info_hash(manifest_->meta_info());
     std::string info_url = url + "/data/" + info_hash.MakePath();
-    download::JobInfo download_info(
-      &info_url,
-      true /* compressed */,
-      true /* probe_hosts */,
-      &info_hash);
+    cvmfs::MemSink metainfo_memsink;
+    download::JobInfo download_info(&info_url, true /* compressed */,
+                                    true /* probe_hosts */, &info_hash,
+                                    &metainfo_memsink);
     download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [") +
                      download::Code2Ascii(rv_info) + "]");
     }
-    meta_info_ = std::string(download_info.destination_mem.data,
-                             download_info.destination_mem.pos);
+    meta_info_ = std::string(reinterpret_cast<char*>(metainfo_memsink.data()),
+                             metainfo_memsink.pos());
   } else {
     meta_info_ = "n/a";
   }
@@ -237,8 +228,8 @@ bool Repository::IsMasterReplica() {
   std::string url = settings_.url() + "/.cvmfs_master_replica";
   download::JobInfo head(&url, false /* probe_hosts */);
   download::Failures retval = download_mgr_->Fetch(&head);
-  if (retval == download::kFailOk) return true;
-  if (head.IsFileNotFound()) return false;
+  if (retval == download::kFailOk) { return true; }
+  if (head.IsFileNotFound()) { return false; }
 
   throw EPublish(std::string("error looking for .cvmfs_master_replica [") +
                  download::Code2Ascii(retval) + "]");
@@ -571,7 +562,7 @@ void Publisher::OnUploadWhitelist(const upload::SpoolerResult &result) {
 
 void Publisher::CreateDirectoryAsOwner(const std::string &path, int mode)
 {
-  bool rvb = MkdirDeep(path, kPrivateDirMode);
+  const bool rvb = MkdirDeep(path, mode);
   if (!rvb) throw EPublish("cannot create directory " + path);
   int rvi = chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
   if (rvi != 0) throw EPublish("cannot set ownership on directory " + path);
@@ -585,18 +576,18 @@ void Publisher::InitSpoolArea() {
   CreateDirectoryAsOwner(settings_.transaction().spool_area().cache_dir(),
                          kPrivateDirMode);
   CreateDirectoryAsOwner(settings_.transaction().spool_area().scratch_dir(),
-                         kPrivateDirMode);
+                         kDefaultDirMode);
   CreateDirectoryAsOwner(settings_.transaction().spool_area().ovl_work_dir(),
                          kPrivateDirMode);
 
   // On a managed node, the mount points are already mounted
   if (!DirectoryExists(settings_.transaction().spool_area().readonly_mnt())) {
     CreateDirectoryAsOwner(settings_.transaction().spool_area().readonly_mnt(),
-                           kPrivateDirMode);
+                           kDefaultDirMode);
   }
   if (!DirectoryExists(settings_.transaction().spool_area().union_mnt())) {
     CreateDirectoryAsOwner(
-      settings_.transaction().spool_area().union_mnt(), kPrivateDirMode);
+      settings_.transaction().spool_area().union_mnt(), kDefaultDirMode);
   }
 }
 
@@ -700,7 +691,8 @@ void Publisher::ConstructSyncManagers() {
       statistics_,
       settings_.transaction().use_catalog_autobalance(),
       settings_.transaction().autobalance_max_weight(),
-      settings_.transaction().autobalance_min_weight());
+      settings_.transaction().autobalance_min_weight(),
+      "");
     catalog_mgr_->Init();
   }
 
@@ -750,6 +742,8 @@ void Publisher::ConstructSyncManagers() {
           // TODO(jblomer): get from settings
           "tar_file",
           "base_directory",
+          -1u,
+          -1u,
           "to_delete",
           false /* create_catalog */);
         break;
@@ -818,7 +812,8 @@ void Publisher::Sync() {
   catalog_mgr_ = NULL;
 
   if (!settings_.transaction().dry_run()) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %d", manifest_->revision());
+    LogCvmfs(kLogCvmfs, kLogStdout, "New revision: %" PRIu64,
+             manifest_->revision());
     reflog_->AddCatalog(manifest_->catalog_hash());
   }
 }

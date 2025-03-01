@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server resign" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -79,7 +79,7 @@ cvmfs_server_resign() {
       # do it!
       if [ $sign_published -eq 1 ]; then
         # This is intended to be used when a repository key has been changed
-        # It re-uses everything from an old .cvmfspublished except the
+        # It reuses everything from an old .cvmfspublished except the
         #  certificate hash, signature, and timestamp.
 
         echo -n "Signing .cvmfspublished... "

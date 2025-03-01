@@ -52,7 +52,7 @@ namespace receiver {
 
 template <typename RwCatalogMgr, typename RoCatalogMgr>
 bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
-    const Params& params, std::string* new_manifest_path, uint64_t *final_rev) {
+    const Params& params, std::string* new_manifest_path, shash::Any* new_manifest_hash, uint64_t *final_rev) {
   UniquePtr<upload::Spooler> spooler;
   perf::StatisticsTemplate stats_tmpl("publish", statistics_);
   counters_ = new perf::FsCounters(stats_tmpl);
@@ -70,14 +70,15 @@ bool CatalogMergeTool<RwCatalogMgr, RoCatalogMgr>::Run(
         manifest_->catalog_hash(), repo_path_, temp_dir, spooler.weak_ref(),
         download_manager_, params.enforce_limits, params.nested_kcatalog_limit,
         params.root_kcatalog_limit, params.file_mbyte_limit, statistics_,
-        params.use_autocatalogs, params.max_weight, params.min_weight);
+        params.use_autocatalogs, params.max_weight, params.min_weight,
+        cache_dir_);
     output_catalog_mgr_->Init();
   }
 
   bool ret = CatalogDiffTool<RoCatalogMgr>::Run(PathString(""));
 
   ret &= CreateNewManifest(new_manifest_path);
-
+  *new_manifest_hash = manifest_->catalog_hash();
   *final_rev = manifest_->revision();
 
   output_catalog_mgr_.Destroy();

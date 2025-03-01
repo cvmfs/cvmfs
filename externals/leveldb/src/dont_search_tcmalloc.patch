@@ -1,7 +1,7 @@
---- build_detect_platform.orig	2013-08-15 13:32:42.000000000 +0200
-+++ build_detect_platform	2013-08-15 13:36:26.000000000 +0200
-@@ -185,12 +185,12 @@
-     fi
+--- build_detect_platform.orig	2022-11-21 11:50:01.933197574 +0100
++++ build_detect_platform	2022-11-21 11:50:52.179862263 +0100
+@@ -202,12 +202,12 @@
+ #    fi
  
      # Test whether tcmalloc is available
 -    $CXX $CXXFLAGS -x c++ - -o $CXXOUTPUT -ltcmalloc 2>/dev/null  <<EOF

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "namespace.h"
 
 #include <fcntl.h>
@@ -132,6 +132,7 @@ bool CreateMountNamespace() {
 }
 
 
+#ifdef CVMFS_HAS_UNSHARE
 namespace {
 
 static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
@@ -143,6 +144,7 @@ static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
 }
 
 }  // anonymous namespace
+#endif
 
 
 /**

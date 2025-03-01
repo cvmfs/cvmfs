@@ -1,0 +1,9 @@
+[Unit]
+Description=Reload any cvmfs instances.
+ConditionPathExists=/var/run/cvmfs
+
+[Service]
+Type=simple
+TimeoutSec=1 hour
+ExecStart=/usr/bin/cvmfs_config reload
+

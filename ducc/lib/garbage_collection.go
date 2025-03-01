@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,6 +14,31 @@ import (
 	da "github.com/cvmfs/ducc/docker-api"
 	l "github.com/cvmfs/ducc/log"
 )
+
+func ConstructDeleteCommands(pathsToDelete []string, pathsPerBatchCommand int, CVMFSRepo string) ([][]string, error) {
+
+	if pathsPerBatchCommand < 1 {
+		return nil, errors.New("Num of paths per batch command must be greater than zero")
+	}
+
+	// we send pathsPerBatchCommand folders to deletion at a time
+	commandPrefix := []string{"cvmfs_server", "ingest"}
+	commands := make([][]string, 0)
+	command := commandPrefix
+	for i, path := range pathsToDelete {
+		if i%pathsPerBatchCommand == 0 && i > 0 {
+			command = append(command, CVMFSRepo)
+			commands = append(commands, command)
+			command = commandPrefix
+		}
+		command = append(command, "--delete", path)
+	}
+	command = append(command, CVMFSRepo)
+	commands = append(commands, command)
+
+	return commands, nil
+
+}
 
 func FindAllUsedFlatImages(CVMFSRepo string) ([]string, error) {
 	root := filepath.Join("/", "cvmfs", CVMFSRepo)
@@ -128,7 +154,7 @@ func FindAllUsedLayers(CVMFSRepo string) ([]string, error) {
 			}
 			for _, layerStruct := range manifest.Layers {
 				if layerStruct.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-					continue;
+					continue
 				}
 				layer := strings.Split(layerStruct.Digest, ":")[1]
 				layerPath := filepath.Join("/", "cvmfs", CVMFSRepo, ".layers", layer[0:2], layer)

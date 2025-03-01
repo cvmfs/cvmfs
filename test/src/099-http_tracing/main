@@ -1,0 +1,89 @@
+#!/bin/bash
+cvmfs_test_name="HTTP Tracing with Custom Headers"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+source ./src/099-http_tracing/setup_teardown
+
+TEST099_REPO=lhcb.cern.ch
+TEST099_MOUNTPOINT=/cvmfs/lhcb.cern.ch
+
+CVMFS_TEST_099_TMPFILE=
+
+mount_and_read() {
+  echo "Mount repo, read and check HTTP tracing headers"
+
+  # used in file test_functions for cvmfs_moount()
+  CVMFS_TEST_DEBUGLOG="$CVMFS_TEST_099_TMPFILE"
+  CVMFS_TEST_QUOTED_PARAM_KEY_VAL='CVMFS_HTTP_TRACING_HEADERS="h1:test|CVMFS-X-h2:ff|X-CVMFS-h3:12_ad |  h4  : 12fs_? "'
+
+  echo "   Mount $TEST099_REPO"
+  cvmfs_mount $TEST099_REPO "CVMFS_HTTP_TRACING=on" || return 1
+
+  echo "   Client config $TEST099_REPO"
+  cat /etc/cvmfs/default.local
+
+  echo "   Access data to send HTTP requests"
+  local some_files
+  some_files=$(find $TEST099_MOUNTPOINT -type f | head -n3)
+  for a_file in $some_files; do
+    cat "$a_file" > /dev/null
+  done
+
+  echo "   Umount $TEST099_REPO"
+  cvmfs_umount $TEST099_REPO
+
+  echo "   Check output in file $CVMFS_TEST_099_TMPFILE"
+  local h1
+  local h2
+  local h3
+  local h4
+  local pid
+  local gid
+  local uid
+
+  h1=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h1: test")
+  h2=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h2: ff")
+  h3=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h3: 12_ad")
+  h4=$(sudo grep -c "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-h4: 12fs_?")
+  pid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-PID:" | sort | uniq | wc -l)
+  gid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-GID:" | sort | uniq | wc -l)
+  uid=$(sudo grep "$CVMFS_TEST_099_TMPFILE" -e "X-CVMFS-UID:" | sort | uniq | wc -l)
+
+  echo "      Occurence of h1 correct? $h1 > 0"
+  [ "$h1" -gt "0" ] || return 10
+  echo "      Occurence of h2 correct? $h2 == 0"
+  [ "$h2" -eq "0" ] || return 11
+  echo "      Occurence of h3 correct? $h3 == 0"
+  [ "$h3" -eq "0" ] || return 12
+  echo "      Occurence of h4 correct? $h4 > 0"
+  [ "$h4" -gt "0" ] || return 13
+
+  # if unique occurence would be 1 this means only the default values would be
+  # used and not the actual fuse pid/gid/uid
+  echo "      Unique occurence of pid correct? $pid > 1"
+  [ "$pid" -gt "1" ] || return 20
+
+  echo "      Unique occurence of gid correct? $gid > 1"
+  [ "$gid" -gt "1" ] || return 21
+
+  echo "      Unique occurence of uid correct? $uid > 1"
+  [ "$uid" -gt "1" ] || return 22
+
+  echo "   ... Success"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  trap cleanup HUP INT TERM EXIT || return $?
+
+  echo "create temporary directory"
+  CVMFS_TEST_099_TMPFILE=$(mktemp /tmp/cvmfs_test099.log.XXXXXXXX)
+  # needed because of wrong file ownership
+  sudo rm -f "$CVMFS_TEST_099_TMPFILE"
+  echo "tmpfile is $CVMFS_TEST_099_TMPFILE"
+
+  mount_and_read || return $?
+
+  return 0
+}

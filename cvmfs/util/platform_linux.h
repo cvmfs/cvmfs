@@ -9,6 +9,7 @@
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
 #include <sys/xattr.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -173,7 +174,7 @@ inline int platform_sigwait(const int signum) {
 }
 
 /**
- * Grants a PID capabilites for ptrace() usage
+ * Grants a PID capabilities for ptrace() usage
  *
  * @param PID  the PID of the process to be granted ptrace()-access
  *             (may be ignored)

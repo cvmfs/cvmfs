@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server import" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 # - cvmfs_server_ssl.sh
@@ -209,7 +209,7 @@ cvmfs_server_import() {
     masterkeycard_cert_available >/dev/null || die "Neither masterkey nor masterkeycard found for recreating whitelist"
   fi
 
-  # set up desaster cleanup
+  # set up disaster cleanup
   IMPORT_DESASTER_REPO_NAME="$name"
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 

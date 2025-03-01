@@ -10,7 +10,7 @@
 
 #include "catalog.h"
 #include "crypto/hash.h"
-#include "download.h"
+#include "network/download.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -52,12 +52,14 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
     // Old catalog from release manager machine (before lease)
     old_catalog_mgr_ =
         OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
-                           old_root_hash_, download_manager_, &stats_old_);
+                           old_root_hash_, download_manager_, &stats_old_,
+                           cache_dir_);
 
     // New catalog from release manager machine (before lease)
     new_catalog_mgr_ =
         OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
-                           new_root_hash_, download_manager_, &stats_new_);
+                           new_root_hash_, download_manager_, &stats_new_,
+                           cache_dir_);
 
     if (!old_catalog_mgr_.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -84,9 +86,10 @@ template <typename RoCatalogMgr>
 RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
     const std::string& repo_path, const std::string& temp_dir,
     const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats) {
+    perf::Statistics* stats, const std::string& cache_dir) {
   RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
-                                       download_manager, stats, true);
+                                       download_manager, stats, true,
+                                       cache_dir);
   mgr->Init();
 
   return mgr;
@@ -105,6 +108,15 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
   old_catalog_mgr_->Listing(path, &old_listing);
   sort(old_listing.begin(), old_listing.end(), IsSmaller);
   AppendLastEntry(&old_listing);
+
+  // create these paths here so it can be "reused" in the loop without
+  // re-initializing every time, this should save time in doing memcpy
+  // especially when the path gets longer
+  PathString old_path(path);
+  old_path.Append("/", 1);
+  PathString new_path(path);
+  new_path.Append("/", 1);
+  unsigned length_after_truncate = old_path.GetLength();
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
@@ -135,11 +147,9 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     while (old_entry.IsHidden()) old_entry = old_listing[++i_from];
     while (new_entry.IsHidden()) new_entry = new_listing[++i_to];
 
-    PathString old_path(path);
-    old_path.Append("/", 1);
+    old_path.Truncate(length_after_truncate);
     old_path.Append(old_entry.name().GetChars(), old_entry.name().GetLength());
-    PathString new_path(path);
-    new_path.Append("/", 1);
+    new_path.Truncate(length_after_truncate);
     new_path.Append(new_entry.name().GetChars(), new_entry.name().GetLength());
 
     XattrList xattrs;

@@ -52,7 +52,7 @@ SigningTool::Result SigningTool::Run(
   // prepare global manager modules
   const bool follow_redirects = false;
   if (!server_tool_->InitDownloadManager(follow_redirects, proxy) ||
-      !server_tool_->InitSigningSignatureManager(certificate, priv_key, pwd)) {
+      !server_tool_->InitSignatureManager("", certificate, priv_key)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return kInitError;
   }

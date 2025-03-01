@@ -1,0 +1,139 @@
+#!/bin/bash
+
+cvmfs_test_name="Check that open cache file descriptors from different processes are not duplicated in cvmfs"
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+
+  ############### 1) Check that the normal cache manager
+  ############### creates new fds for the same object
+  # make sure the setting is not overridden by the config repo
+
+
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=no  || return 10
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+  local testfile=$(find /cvmfs/atlas.cern.ch -type f | head -n1)
+  # testfile has the following cvmfs hash:
+  local testfile_hash=$(get_xattr hash $testfile)
+
+   gcc -Wall -pthread -o openwaitprint $src_location/openwaitprint.c || return 60
+  ./openwaitprint $testfile > test &
+  local pid_helper1=$!
+  ./openwaitprint $testfile > test &
+  local pid_helper2=$!
+  ./openwaitprint $testfile > test &
+  local pid_helper3=$!
+
+
+  ###########
+  # check the open file descriptors of the cvmfs2 process
+  local atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "PID of /cvmfs/atlas.cern.ch is $atlas_pid"
+  echo "Test file is $testfile"
+  echo "Test file in cache: $(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}"
+  sudo ls -l /proc/$atlas_pid/fd/
+  local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
+
+  echo "The normal cache manager has $num_open_fds open file descriptors for the same open test file";
+  if [ "$num_open_fds" -lt "2" ]; then
+    return 21
+  fi
+
+  kill -USR1 $pid_helper1
+  wait $pid_helper1 || return 62
+  kill -USR1 $pid_helper2
+  wait $pid_helper2 || return 63
+  kill -USR1 $pid_helper3
+  wait $pid_helper3 || return 64
+  sleep 1;
+
+  cvmfs_umount atlas.cern.ch || return 22
+
+  ############### 2) Check that the refcounted cache manager
+  ############### reuses fds for the same object
+
+  cvmfs_mount atlas.cern.ch CVMFS_CACHE_REFCOUNT=yes || return 30
+
+  ############
+  # open some test file in several simultaneously in different processes
+
+
+  ./openwaitprint $testfile > testfile1 &
+  local pid_helper1=$!
+  ./openwaitprint $testfile > testfile2 &
+  local pid_helper2=$!
+  ./openwaitprint $testfile > testfile3 &
+  local pid_helper3=$!
+
+
+  ###########
+  # check the open file descriptors of the cvmfs2 process
+  atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  local num_open_fds=$(sudo ls -l /proc/$atlas_pid/fd/ | grep "$(get_cvmfs_cachedir atlas.cern.ch)/${testfile_hash:0:2}/${testfile_hash:2}" | wc -l)
+
+  kill -USR1 $pid_helper1
+  wait $pid_helper1 || return 65
+  kill -USR1 $pid_helper2
+  wait $pid_helper2 || return 66
+  kill -USR1 $pid_helper3
+  wait $pid_helper3 || return 67
+
+  echo "The refcount cache manager has $num_open_fds open file descriptors for the same open test file"
+  if [ "$num_open_fds" -gt "1" ]; then
+    return 40
+  fi
+
+  cvmfs_umount atlas.cern.ch || return 23
+
+  echo "Verify CVMFS_NFILES checking"
+  cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=no || return 50
+  local atlas_pid=$(sudo cvmfs_talk -i atlas.cern.ch pid)
+  echo "PID of /cvmfs/atlas.cern.ch is $atlas_pid"
+  sudo cat /proc/$atlas_pid/limits
+
+  echo "Non-refcounted manager: should fail"
+  local job_pids=""
+  for i in $(seq 1 64); do
+    ./openwaitprint $testfile >/dev/null &
+    job_pids="$job_pids $!"
+  done
+  sleep 1
+  local got_emfile=0
+  for p in $job_pids; do
+    kill -USR1 $p
+    wait $p
+    if [ $? -ne 0 ]; then
+      got_emfile=1
+    fi
+  done
+  [ $got_emfile -eq 1 ] || return 51
+
+  cvmfs_umount atlas.cern.ch || return 55
+  cvmfs_mount atlas.cern.ch CVMFS_NFILES=550 CVMFS_CACHE_REFCOUNT=yes || return 56
+  echo "Refcounted manager: should succeed"
+  job_pids=""
+  for i in $(seq 1 64); do
+    ./openwaitprint $testfile >/dev/null &
+    job_pids="$job_pids $!"
+  done
+  sleep 1
+  got_emfile=0
+  for p in $job_pids; do
+    kill -USR1 $p
+    wait $p
+    if [ $? -ne 0 ]; then
+      got_emfile=1
+    fi
+  done
+  [ $got_emfile -eq 1 ] && return 57
+
+  return 0
+}
+

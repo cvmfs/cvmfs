@@ -197,7 +197,7 @@ class SqlInsertBranch : public SqlHistory {
  *
  * @param MixinT  the class that should gain BindTargetTags()'s functionality
  * @param offset  offset for SQLite placeholders, if used inside other complex
- *                SQL queries with preceeding placeholders
+ *                SQL queries with preceding placeholders
  */
 template <class MixinT, int offset = 0>
 class SqlRollback : public MixinT {

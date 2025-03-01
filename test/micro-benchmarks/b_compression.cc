@@ -9,7 +9,7 @@
 #include <cstring>
 
 #include "bm_util.h"
-#include "compression.h"
+#include "compression/compression.h"
 
 class BM_Compression : public benchmark::Fixture {
  protected:

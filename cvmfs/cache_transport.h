@@ -67,7 +67,7 @@ class CacheTransport {
    */
   static const uint32_t kMaxMsgSize = (2 << 24) - 1;  // 24MB (3 bytes)
   /**
-   * The first byte has the wire protocol version, optinally or-ed with the
+   * The first byte has the wire protocol version, optionally or-ed with the
    * "has attachment" flag.  The other three bytes encode the overall message
    * size in little-endian.
    */
@@ -141,10 +141,8 @@ class CacheTransport {
 
   void FillMsgHash(const shash::Any &hash, cvmfs::MsgHash *msg_hash);
   bool ParseMsgHash(const cvmfs::MsgHash &msg_hash, shash::Any *hash);
-  void FillObjectType(CacheManager::ObjectType object_type,
-                      cvmfs::EnumObjectType *wire_type);
-  bool ParseObjectType(cvmfs::EnumObjectType wire_type,
-                       CacheManager::ObjectType *object_type);
+  void FillObjectType(int object_flags, cvmfs::EnumObjectType *wire_type);
+  bool ParseObjectType(cvmfs::EnumObjectType wire_type, int *object_flags);
 
   int fd_connection() const { return fd_connection_; }
 

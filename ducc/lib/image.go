@@ -246,7 +246,7 @@ func (img *Image) GetManifest() (da.Manifest, error) {
 
 	// First try to fetch a simple manifest
 	manifest, err := img.fetchManifest()
-	if err != nil || manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
+	if err != nil || manifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" || manifest.MediaType == "application/vnd.oci.image.index.v1+json" {
 		// If the first fetch fails, try to fetch from a manifest list
 		manifest, err := img.fetchManifestList()
 		if err != nil {
@@ -467,7 +467,8 @@ func (i *Image) GetPublicSymlinkPath() string {
 
 func (img *Image) getByteManifestList() ([]byte, error) {
 	url := img.GetManifestUrl("")
-	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json"})
+	return makeGetRequest(url, map[string]string{"Accept":
+		"application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"})
 }
 
 func (img *Image) getByteManifest(reference string) ([]byte, error) {

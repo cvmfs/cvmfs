@@ -1,0 +1,49 @@
+#!/bin/bash
+create_world_readable_repo() {
+  echo ""
+  echo "*** CREATE a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local short_name="$1"
+  local long_name="$2"
+  local symlink_name="$3"  
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  touch /cvmfs/$CVMFS_TEST_REPO/test1.txt
+  mkdir /cvmfs/$CVMFS_TEST_REPO/testdir
+  touch /cvmfs/$CVMFS_TEST_REPO/testdir/test2.txt
+
+  chmod 0400 /cvmfs/$CVMFS_TEST_REPO/test1.txt
+  chmod 0400 /cvmfs/$CVMFS_TEST_REPO/testdir/test2.txt
+  chmod 0500 /cvmfs/$CVMFS_TEST_REPO/testdir
+
+  publish_repo $CVMFS_TEST_REPO || return 200
+  echo "*** FINISHED creating a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  echo ""
+}
+
+private_mount_world_readable() {
+  local mntpnt="$1"
+  local world_readable_status="$2"
+  TEST704_PRIVATE_MOUNT="$mntpnt"
+
+  do_local_mount_as_root "$mntpnt"          \
+                 "$CVMFS_TEST_REPO" \
+                 "$(get_repo_url $CVMFS_TEST_REPO)" \
+                 "" \
+                 "CVMFS_WORLD_READABLE=$world_readable_status" || return 1
+}
+
+
+private_unmount() {
+  sudo umount $TEST704_PRIVATE_MOUNT
+  TEST704_PRIVATE_MOUNT=
+}
+
+cleanup() {
+  echo "running cleanup()..."
+  if [ "x$TEST704_PRIVATE_MOUNT" != "x" ]; then
+    private_unmount
+  fi
+}

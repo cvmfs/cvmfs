@@ -68,19 +68,38 @@ static string MkFqrn(const string &repository) {
   return repository;
 }
 
+#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
+static bool IsFuseTInstalled() {
+  return true;
+  string fuseTComponentsPaths[] = { "/usr/local/bin/go-nfsv4", 
+                                          "/usr/local/lib/libfuse-t.dylib",
+                                           "/usr/local/lib/libfuse-t.a" };
+  const int pathsNumber = sizeof(fuseTComponentsPaths) / sizeof(fuseTComponentsPaths[0]);
+  platform_stat64 info;
+  for (int idx = 0; idx < pathsNumber; ++idx) {
+    bzero(&info, sizeof(platform_stat64));
+    int retval = platform_stat(fuseTComponentsPaths[idx].c_str(), &info);
+    if ((retval != 0) || !S_ISREG(info.st_mode)) {
+      return false;
+    }
+  }
+  return true;
+}
+#endif
 
 static bool CheckFuse() {
+#if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
+  bool is_fuse_t_installed = IsFuseTInstalled();
+  if (!is_fuse_t_installed) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "FUSE-T installation check failed. FUSE not loaded"); 
+  }
+  return is_fuse_t_installed;
+#else 
   string fuse_device;
   int retval;
 #ifdef __APPLE__
-  retval = system("/Library/Filesystems/macfuse.fs/Contents/Resources/"
-                  "load_macfuse");
-  if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading macFUSE");
-    return false;
-  }
   fuse_device = "/dev/macfuse0";
-#else
+#else 
   fuse_device = "/dev/fuse";
 #endif
   platform_stat64 info;
@@ -90,6 +109,7 @@ static bool CheckFuse() {
     return false;
   }
   return true;
+#endif
 }
 
 
@@ -137,6 +157,7 @@ static bool CheckProxy() {
 static bool CheckConcurrentMount(const string &fqrn,
                                  const string &workspace,
                                  string *mountpointp) {
+  LockFile(workspace + "/cvmfs_io." + fqrn + ".mountcheck.lock");
   // Try connecting to cvmfs_io socket
   int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
@@ -410,6 +431,17 @@ int main(int argc, char **argv) {
     new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
 
+  string optarg;
+  if (options_manager_.GetValue("CVMFS_SYSLOG_LEVEL", &optarg))
+    SetLogSyslogLevel(String2Uint64(optarg));
+  if (options_manager_.GetValue("CVMFS_SYSLOG_FACILITY", &optarg))
+    SetLogSyslogFacility(String2Int64(optarg));
+  if (options_manager_.GetValue("CVMFS_USYSLOG", &optarg))
+    SetLogMicroSyslog(optarg + ".mount");
+  if (options_manager_.GetValue("CVMFS_DEBUGLOG", &optarg))
+    SetLogDebugFile(optarg + ".mount");
+  SetLogSyslogPrefix(fqrn);
+
   int retval;
   int sysret;
   bool dedicated_cachedir = false;
@@ -444,6 +476,14 @@ int main(int argc, char **argv) {
     return 1;
   }
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
+
+  // Prepare workspace
+  retval = MkdirDeep(workspace, 0755, false);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create workspace %s",
+             workspace.c_str());
+    return 1;
+  }
 
   // This is not a sure thing.  When the CVMFS_CACHE_BASE parameter is changed
   // two repositories can get mounted concurrently (but that should not hurt).
@@ -482,13 +522,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Prepare workspace and cache directory
-  retval = MkdirDeep(workspace, 0755, false);
-  if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create workspace %s",
-             workspace.c_str());
-    return 1;
-  }
+  // Prepare cache directory
   if (dedicated_cachedir) {
     retval = MkdirDeep(cachedir, 0755, false);
     if (!retval) {
@@ -633,19 +667,23 @@ int main(int argc, char **argv) {
   fd_set readfds;
   bool stdout_open = true;
   bool stderr_open = true;
+  int status = 0;
+  int ended = false;
+
   do {
     FD_ZERO(&readfds);
     if (stdout_open) FD_SET(fd_stdout, &readfds);
     if (stderr_open) FD_SET(fd_stderr, &readfds);
-    do {
-      retval = select(nfds, &readfds, NULL, NULL, NULL);
-      if ((retval == -1) && (errno != EINTR)) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to pipe stdout/stderr");
-        return 32;
-      }
-      if (retval > 0)
-        break;
-    } while (true);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100;
+    retval = select(nfds, &readfds, NULL, NULL, &timeout);
+    if ((retval == -1) && (errno != EINTR)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to pipe stdout/stderr");
+      return 32;
+    }
+
     char buf;
     ssize_t num_bytes;
     if (FD_ISSET(fd_stdout, &readfds)) {
@@ -676,16 +714,21 @@ int main(int argc, char **argv) {
           return 32;
       }
     }
-  } while (stdout_open || stderr_open);
+
+    // TODO(vvolkl): This block has seen several rounds of iterations,
+    // that tried to adress races and incorrect return codes.
+    // Should be looked at once again to make sure the cause of the
+    // race is understood, and if the timeout is really needed.
+
+    ended = (waitpid(pid_cvmfs, &status, WNOHANG) == pid_cvmfs);
+  } while ((stdout_open || stderr_open) && !ended);
+  if (!ended) {
+    waitpid(pid_cvmfs, &status, 0);
+  }
+
   close(fd_stdout);
   close(fd_stderr);
 
-  int status;
-  retval = waitpid(pid_cvmfs, &status, 0);
-  if (retval == -1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed reading return code");
-    return 32;
-  }
   if (WIFEXITED(status) && (WEXITSTATUS(status) == 0))
     return 0;
 

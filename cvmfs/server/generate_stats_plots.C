@@ -328,29 +328,29 @@ void generate_stats_plots(std::string stats_db_path, std::string out_path) {
   assert(f && ! f->IsZombie());
   unsigned row_id = 0;
   g_rdfs["publish"]["revision"] = new ROOT::RDF::RNode(
-    ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish)
+    ROOT::RDF::FromSqlite(stats_db_path, stmt_publish)
               .Define("x", [&row_id] (Long64_t rev) {++row_id; return (rev > row_id) ? rev : row_id; }, {"revision"}));
   g_rdfs["publish"]["daily"] = new ROOT::RDF::RNode(
-    ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_daily)
+    ROOT::RDF::FromSqlite(stats_db_path, stmt_publish_daily)
               .Define("x", getDayCoord, {"day"}));
   g_rdfs["publish"]["weekly"] = new ROOT::RDF::RNode(
-    ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_publish_weekly)
+    ROOT::RDF::FromSqlite(stats_db_path, stmt_publish_weekly)
               .Define("x", getWeekCoord, {"date"}));
 
   row_id = 0;
   auto rdf_gc_rev =
     new ROOT::RDF::RNode(
-    ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc)
+    ROOT::RDF::FromSqlite(stats_db_path, stmt_gc)
               .Alias("x", "gc_id"));
   bool garbage_collectible;
   garbage_collectible = *rdf_gc_rev->Count();
   if (garbage_collectible) {
     g_rdfs["gc"]["revision"] = rdf_gc_rev;
     g_rdfs["gc"]["daily"] = new ROOT::RDF::RNode(
-      ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc_daily)
+      ROOT::RDF::FromSqlite(stats_db_path, stmt_gc_daily)
                 .Define("x", getDayCoord, {"day"}));
     g_rdfs["gc"]["weekly"] = new ROOT::RDF::RNode(
-      ROOT::RDF::MakeSqliteDataFrame(stats_db_path, stmt_gc_weekly)
+      ROOT::RDF::FromSqlite(stats_db_path, stmt_gc_weekly)
                 .Define("x", getWeekCoord, {"date"}));
   }
 

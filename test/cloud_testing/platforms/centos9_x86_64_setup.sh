@@ -42,6 +42,7 @@ install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo rubygems
 install_from_repo wget
+install_from_repo bc
 install_from_repo java-1.8.0-openjdk
 #install_from_repo redhat-lsb-core
 install_from_repo tree
@@ -60,8 +61,14 @@ sudo pip3 install flask                      || die "fail (installing flask)"
 install_from_repo python3
 install_from_repo netcat
 
+# Install test dependency for 598
+install_from_repo patch
+
 # Install the test S3 provider
 install_test_s3
+
+# building kernel
+install_from_repo perl
 
 # building preloader
 install_from_repo cmake
@@ -73,6 +80,10 @@ install_from_repo python3-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
+install_from_repo git
+
+sudo ln -s /usr/bin/python3 /usr/bin/python || true
+
 
 # Migration test needs lsb_release
 # echo "install lsb_release..."

@@ -18,7 +18,7 @@
                      Avoid some compiler warnings for input and output buffers
  */
 
-#include "cvmfs_config.h"
+
 #include "cmd_zpipe.h"
 
 #include <stdio.h>

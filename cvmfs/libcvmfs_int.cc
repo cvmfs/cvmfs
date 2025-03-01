@@ -9,7 +9,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 
 #include <sys/xattr.h>
-#include "cvmfs_config.h"
+
 #include "libcvmfs_int.h"
 
 #include <dirent.h>
@@ -49,18 +49,18 @@
 #include "catalog.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
-#include "download.h"
 #include "duplex_sqlite3.h"
 #include "fetch.h"
 #include "globals.h"
 #include "interrupt.h"
 #include "libcvmfs.h"
 #include "lru_md.h"
+#include "network/download.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "sqlitemem.h"
@@ -195,7 +195,7 @@ bool LibContext::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // TODO(jblomer): not twice md5 calculation
-  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupSole,
+  if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupDefault,
                                               dirent))
   {
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
@@ -591,12 +591,14 @@ int LibContext::Open(const char *c_path) {
   cvmfs::Fetcher *this_fetcher = dirent.IsExternalFile()
     ? mount_point_->external_fetcher()
     : mount_point_->fetcher();
-  fd = this_fetcher->Fetch(
-    dirent.checksum(),
-    dirent.size(),
-    string(path.GetChars(), path.GetLength()),
-    dirent.compression_algorithm(),
-    CacheManager::kTypeRegular);
+  CacheManager::Label label;
+  label.path = std::string(path.GetChars(), path.GetLength());
+  label.size = dirent.size();
+  label.zip_algorithm = dirent.compression_algorithm();
+  if (dirent.IsExternalFile())
+    label.flags |= CacheManager::kLabelExternal;
+  fd =
+    this_fetcher->Fetch(CacheManager::LabeledObject(dirent.checksum(), label));
   perf::Inc(file_system()->n_fs_open());
 
   if (fd >= 0) {
@@ -644,23 +646,21 @@ int64_t LibContext::Pread(
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
         if (chunk_fd->fd != -1) file_system()->cache_mgr()->Close(chunk_fd->fd);
+        cvmfs::Fetcher *this_fetcher = open_chunks.chunk_reflist.external_data
+          ? mount_point_->external_fetcher()
+          : mount_point_->fetcher();
+        CacheManager::Label label;
+        label.path = std::string(open_chunks.chunk_reflist.path.GetChars(),
+                                 open_chunks.chunk_reflist.path.GetLength());
+        label.size = chunk_list->AtPtr(chunk_idx)->size();
+        label.zip_algorithm = compression_alg;
+        label.flags |= CacheManager::kLabelChunked;
         if (open_chunks.chunk_reflist.external_data) {
-          chunk_fd->fd = mount_point_->external_fetcher()->Fetch(
-            chunk_list->AtPtr(chunk_idx)->content_hash(),
-            chunk_list->AtPtr(chunk_idx)->size(),
-            "no path info",
-            compression_alg,
-            CacheManager::kTypeRegular,
-            open_chunks.chunk_reflist.path.ToString(),
-            chunk_list->AtPtr(chunk_idx)->offset());
-        } else {
-          chunk_fd->fd = mount_point_->fetcher()->Fetch(
-            chunk_list->AtPtr(chunk_idx)->content_hash(),
-            chunk_list->AtPtr(chunk_idx)->size(),
-            "no path info",
-            compression_alg,
-            CacheManager::kTypeRegular);
+          label.flags |= CacheManager::kLabelExternal;
+          label.range_offset = chunk_list->AtPtr(chunk_idx)->offset();
         }
+        chunk_fd->fd = this_fetcher->Fetch(CacheManager::LabeledObject(
+          chunk_list->AtPtr(chunk_idx)->content_hash(), label));
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
           return -EIO;
@@ -683,7 +683,7 @@ int64_t LibContext::Pread(
         offset_in_chunk);
 
       if (bytes_fetched < 0) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d (%s)",
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %ld (%s)",
                  bytes_fetched,
                  open_chunks.chunk_reflist.path.ToString().c_str());
         return -bytes_fetched;
@@ -721,19 +721,24 @@ int LibContext::Close(int fd) {
 
 int LibContext::Remount() {
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  catalog::LoadError retval =
-    mount_point_->catalog_mgr()->Remount(true /* dry_run */);
+  catalog::LoadReturn retval = mount_point_->catalog_mgr()->RemountDryrun();
+
   switch (retval) {
     case catalog::kLoadUp2Date:
       LogCvmfs(kLogCvmfs, kLogDebug, "catalog up to date");
       return 0;
 
     case catalog::kLoadNew:
-      retval = mount_point_->catalog_mgr()->Remount(false /* dry_run */);
-      if (retval != catalog::kLoadNew)
+      retval = mount_point_->catalog_mgr()->Remount();
+
+      if (retval != catalog::kLoadUp2Date && retval != catalog::kLoadNew) {
+        LogCvmfs(kLogCvmfs, kLogDebug,
+                              "Remount requested to switch catalog but failed");
         return -1;
+      }
+
       mount_point_->ReEvaluateAuthz();
-      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %d",
+      LogCvmfs(kLogCvmfs, kLogDebug, "switched to catalog revision %" PRIu64,
                mount_point_->catalog_mgr()->GetRevision());
       return 0;
 

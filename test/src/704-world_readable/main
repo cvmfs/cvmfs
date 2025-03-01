@@ -1,0 +1,81 @@
+#!/bin/bash
+cvmfs_test_name="World readable repository access"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST704_PRIVATE_MOUNT=
+
+source ./src/704-world_readable/setup_teardown
+
+# check if access rights are changed to that
+# anyone can access them
+check_is_world_readable() {
+  local mntpnt="$1"
+
+  echo ""
+  echo "*** START Testing check_is_world_readable"
+
+  echo "  * Mounting repo..."
+  private_mount_world_readable $mntpnt ON || return $?
+
+  echo "  * Testing repo access... (should be possible)"
+  ls -ld $mntpnt/test1.txt | grep -qe ^-r--r--r--
+  [ $? = "0" ] || return 11
+
+  ls -ld $mntpnt/testdir | grep -qe ^dr-xr-xr-x
+  [ $? = "0" ] || return 12
+
+  ls -ld $mntpnt/testdir/test2.txt | grep -qe ^-r--r--r--
+  [ $? = "0" ] || return 13
+
+  echo "  * ...Success"
+  echo " * Unmount repo"
+  private_unmount
+  echo "*** FINISHED Testing check_is_world_readable"
+  echo ""
+}
+
+# check if access rights are unchanged:
+# only owner can access them
+check_is_not_world_readable() {
+  local mntpnt="$1"
+
+  echo ""
+  echo "*** START Testing check_is_not_world_readable"
+
+  echo "  * Mounting repo..."
+  private_mount_world_readable $mntpnt OFF || return $?
+
+  echo "  * Testing repo access... (should not be possible)"
+  ls -ld $mntpnt/test1.txt | grep -qe ^-r--------
+  [ $? = "0" ] || return 21
+
+  ls -ld $mntpnt/testdir | grep -qe ^dr-x------
+  [ $? = "0" ] || return 22
+
+  ls -ld $mntpnt/testdir/test2.txt | grep -qe ^-r--------
+  [ $? = "0" ] || return 23
+
+  echo "  * ...Success"
+  echo "  * Unmount repo"
+  private_unmount
+  echo "*** FINISHED Testing check_is_not_world_readable"
+  echo ""
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  create_world_readable_repo || return $?
+
+  check_is_world_readable ${mntpnt} || return $?
+  check_is_not_world_readable ${mntpnt} || return $?
+
+  return 0
+}

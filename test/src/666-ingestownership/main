@@ -1,0 +1,142 @@
+#!/bin/bash
+cvmfs_test_name="Tarball ingest: modify ownership"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+CVMFS_TEST666_ROOT_DIR=
+CVMFS_TEST666_TEST_UID=
+CVMFS_TEST666_TEST_GID=
+
+cleanup() {
+  if [ "x$CVMFS_TEST666_ROOT_DIR" != "x" ]; then
+    sudo rm -rf $CVMFS_TEST666_ROOT_DIR
+  fi
+
+  if [ "x$CVMFS_TEST666_TEST_UID" != "x" ]; then
+    sudo userdel cvmfstestuser
+  fi
+
+  if [ "x$CVMFS_TEST666_TEST_GID" != "x" ]; then
+    sudo groupdel cvmfstestgroup
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+
+  echo "*** create test user..."
+  sudo useradd -M cvmfstestuser
+  sudo groupadd cvmfstestgroup
+  sudo usermod -a -G cvmfstestgroup cvmfstestuser
+  CVMFS_TEST666_TEST_UID=$(id -u cvmfstestuser)
+  CVMFS_TEST666_TEST_GID=$(id -g cvmfstestuser)
+  echo "   cvmfstestuser ($CVMFS_TEST666_TEST_UID)"
+  echo "   cvmfstestgroup ($CVMFS_TEST666_TEST_GID)"
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** create tarball with everything owned by root and access 770 (only owner or group can access)"
+  echo "***    only tarball/secret/file2.txt will have ownership: cvmfstestuser:cvmfstestgroup"
+  mkdir tarball
+  mkdir tarball/secret
+  mkdir tarball/secret/subsecret
+  touch tarball/secret/file
+  echo "this is my secret file" > tarball/secret/file2.txt
+  sudo chown -R root:root tarball/secret || return 1
+  sudo chown -R cvmfstestuser:cvmfstestgroup tarball/secret/file2.txt || return 1
+  sudo chmod -R 770 tarball/secret || return 2
+  CVMFS_TEST666_ROOT_DIR="$PWD/tarball"
+  
+
+  sudo tar cf tarball.tar tarball || return 5
+
+  local dir=tar_dir
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+
+  echo "---------------------"
+  echo "    TESTING INGEST   "
+  echo "---------------------"
+
+  echo "*** 1) ingesting the tarball in the directory $dir"
+  cat tarball.tar | cvmfs_server ingest --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return 10
+
+  echo "   ** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 11
+
+  ls -lah $repo_dir/$dir/tarball/secret
+
+  echo "   ** check that files belong to $CVMFS_TEST_USER"
+  local tar_file1_user=$(ls -l $repo_dir/$dir/tarball/secret/file       | awk -F' ' {'print $3;'})
+  local tar_file1_group=$(ls -l $repo_dir/$dir/tarball/secret/file      | awk -F' ' {'print $3;'})
+  local tar_file2_user=$(ls -l $repo_dir/$dir/tarball/secret/file2.txt  | awk -F' ' {'print $3;'})
+  local tar_file2_group=$(ls -l $repo_dir/$dir/tarball/secret/file2.txt | awk -F' ' {'print $3;'})
+
+  [ "x$tar_file1_user" =  "x$CVMFS_TEST_USER" ]  || return 12
+  [ "x$tar_file1_group" =  "x$CVMFS_TEST_USER" ] || return 13
+  [ "x$tar_file2_user" =  "x$CVMFS_TEST_USER" ]  || return 14
+  [ "x$tar_file2_group" =  "x$CVMFS_TEST_USER" ] || return 15
+
+
+  echo "*** 2) ingesting the tarball again in the directory $dir: everything owned by root"
+  cat tarball.tar | cvmfs_server ingest -g 0 -u 0 --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return 20
+
+  echo "   ** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 21
+
+  ls -lah $repo_dir/$dir/tarball/secret
+
+  echo "   ** check that all files belong to root"
+  local tar2_file1_user=$(ls -l $repo_dir/$dir/tarball/secret/file       | awk -F' ' {'print $3;'})
+  local tar2_file1_group=$(ls -l $repo_dir/$dir/tarball/secret/file      | awk -F' ' {'print $3;'})
+  local tar2_file2_user=$(ls -l $repo_dir/$dir/tarball/secret/file2.txt  | awk -F' ' {'print $3;'})
+  local tar2_file2_group=$(ls -l $repo_dir/$dir/tarball/secret/file2.txt | awk -F' ' {'print $3;'})
+
+  [ "x$tar2_file1_user" =  "xroot" ]  || return 22
+  [ "x$tar2_file1_group" =  "xroot" ] || return 23
+  [ "x$tar2_file2_user" =  "xroot" ]  || return 24
+  [ "x$tar2_file2_group" =  "xroot" ] || return 25
+
+  # normal user cant access
+  cat "$repo_dir/$dir/tarball/secret/file" && return 26
+  # sudo can access
+  sudo cat "$repo_dir/$dir/tarball/secret/file" || return 27
+
+
+
+  echo "*** 3) ingesting the tarball again in the directory $dir: keep file rights"
+  cat tarball.tar | cvmfs_server ingest -k --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return 30
+
+  echo "   ** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 31
+
+  ls -lah $repo_dir/$dir/tarball/secret
+
+  echo "   ** check that all files belong to root"
+  local tar3_file1_user=$(ls -l $repo_dir/$dir/tarball/secret/file       | awk -F' ' {'print $3;'})
+  local tar3_file1_group=$(ls -l $repo_dir/$dir/tarball/secret/file      | awk -F' ' {'print $3;'})
+  local tar3_file2_user=$(ls -n $repo_dir/$dir/tarball/secret/file2.txt  | awk -F' ' {'print $3;'})
+  local tar3_file2_group=$(ls -n $repo_dir/$dir/tarball/secret/file2.txt | awk -F' ' {'print $3;'})
+
+  [ "x$tar3_file1_user" =  "xroot" ]  || return 32
+  [ "x$tar3_file1_group" =  "xroot" ] || return 33
+  [ "x$tar3_file2_user" =  "x$CVMFS_TEST666_TEST_UID" ]  || return 34
+  [ "x$tar3_file2_group" =  "x$CVMFS_TEST666_TEST_GID" ] || return 35
+
+  # normal user cant access
+  cat "$repo_dir/$dir/tarball/secret/file" && return 36
+  sudo -su cvmfstestuser sh -c 'cat $repo_dir/$dir/tarball/secret/file' && return 37
+  # sudo can access
+  sudo cat "$repo_dir/$dir/tarball/secret/file" || return 38
+
+  # normal user cant access
+  cat "$repo_dir/$dir/tarball/secret/file2.txt" && return 39
+  # cvmfstestuser can access
+  sudo -su cvmfstestuser sh -c 'cat $repo_dir/$dir/tarball/secret/file2.txt' && return 40
+
+  return 0
+}

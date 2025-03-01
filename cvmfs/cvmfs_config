@@ -32,9 +32,12 @@ case $sys_arch in
     fi
     if [ -x /sbin/pidof ]; then
       pidof="/sbin/pidof"
-    else
+    elif [ -x /bin/pidof ]; then
       # Ubuntu
       pidof="/bin/pidof"
+    elif [ -x /usr/bin/pidof ]; then
+      # Gentoo
+      pidof="/usr/bin/pidof"
     fi
     if [ -x /sbin/fuser ]; then
       fuser="/sbin/fuser"  # RHEL
@@ -133,7 +136,7 @@ cvmfs_config_usage() {
   echo "Common configuration tasks for CernVM-FS"
   echo "Usage: $0 <command>"
   echo "Commands are"
-  echo "  setup [nouser] [nocfgmod] [nostart]"
+  echo "  setup [nouser] [nocfgmod] [nostart] [noautofs]"
   if is_wsl2; then
     echo "  wsl2_start"
   fi
@@ -142,7 +145,7 @@ cvmfs_config_usage() {
   echo "  stat [-v | <repository>]"
   echo "  status"
   echo "  probe [<repository list>]"
-  echo "  fsck [<cvmfs_fsck options>]"
+  echo "  fsck [-q(uick check for zero byte files only) | <cvmfs_fsck options>]"
   echo "  fuser <repository>"
   echo "  reload [-c | <repository>]"
   echo "  umount"
@@ -229,6 +232,8 @@ cvmfs_setup() {
   done
 
   mkdir -p /cvmfs
+  # set permissions for home dir
+  mkdir -p /var/lib/cvmfs
 
   if [ $nouser -eq 0 ]; then
     if ! check_group "cvmfs"; then
@@ -244,11 +249,9 @@ cvmfs_setup() {
         exit 1
       fi
     fi
+    chown cvmfs:cvmfs /var/lib/cvmfs
   fi
 
-  # set permissions for home dir
-  mkdir -p /var/lib/cvmfs
-  chown cvmfs:cvmfs /var/lib/cvmfs
 
   # put workarounds for OS X in place (CernVM-FS poor-man's relocatability)
   if [ x"$sys_arch" = x"Darwin" ]; then
@@ -374,14 +377,6 @@ cvmfs_chksetup() {
     num_errors=$(($num_errors+1))
   fi
 
-  # Check that if CVMFS_USYSLOG is set, the path is writable.
-  if [ x"$CVMFS_USYSLOG" != x"" ]; then
-    if runascvmfsuser "test -w $(dirname $CVMFS_USYSLOG)"; then
-        echo "Error: $(dirname $CVMFS_USYSLOG) (CVMFS_USYSLOG) is not writable by cvmfs user"
-        num_errors=$(($num_errors+1))
-    fi
-  fi
-
   # Fusermount (not necessary under Mac OS X)
   if [ "$sys_arch" = "Linux" ]; then
     if [ ! -x $fusermount ]; then
@@ -475,9 +470,17 @@ cvmfs_chksetup() {
   fi
 
   # Check that /dev/fuse is read/writable from cvmfs user
-  if [ x"$sys_arch" = x"Darwin" ] && [ ! -d /Library/Filesystems/macfuse.fs ]; then
-    echo "Error: macFUSE is missing."
-    num_errors=$(($num_errors+1))
+  local macfuse_enabled=$(is_macfuse_enabled)
+  if [ x"$sys_arch" = x"Darwin" ] && [ ! $macfuse_enabled ]; then
+    if ! check_fuse_t_installation; then
+      echo "Error: FUSE-T is not installed."
+      num_errors=$(($num_errors+1))
+    fi
+  elif [ x"$sys_arch" = x"Darwin" ]; then
+    if [ ! -d /Library/Filesystems/macfuse.fs ]; then
+      echo "Error: macFUSE is missing."
+      num_errors=$(($num_errors+1))
+    fi
   fi
   check_dev_fuse
   exit_code=$?
@@ -531,7 +534,7 @@ cvmfs_chksetup() {
     fi
   done
 
-  # Check repository specfic settings
+  # Check repository specific settings
   local repo_list="$(list_repos)"
   local repo
   for repo in $repo_list
@@ -633,6 +636,17 @@ cvmfs_chksetup() {
         num_warnings=$(($num_warnings+1))
       fi
 
+      # Check that log file directories are writable
+      for parameter in CVMFS_USYSLOG CVMFS_DEBUGLOG CVMFS_TRACEFILE; do
+        eval value=\$$parameter
+        if [ ! -z $value ]; then
+          if ! runascvmfsuser "test -w $(dirname $value)"; then
+            echo "Error: log file directory $parameter=$value not writable for $fqrn"
+            num_errors=$(($num_errors+1))
+          fi
+        fi
+      done
+
       # Check syslog level / facility
       if [ ! -z $CVMFS_SYSLOG_LEVEL ]; then
         if [ $CVMFS_SYSLOG_LEVEL -lt 1 ] || [ $CVMFS_SYSLOG_LEVEL -gt 3 ]; then
@@ -642,7 +656,7 @@ cvmfs_chksetup() {
       fi
       if [ ! -z $CVMFS_SYSLOG_FACILITY ]; then
         if ! expr "$CVMFS_SYSLOG_FACILITY" : '[0,1,2,3,4,5,6,7]' > /dev/null; then
-          echo -n "Error: invalud value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
+          echo -n "Error: invalid value for CVMFS_SYSLOG_FACILITY ($CVMFS_SYSLOG_FACILITY) for $fqrn. "
           echo "Valid entries: 0..7"
           num_errors=$(($num_errors+1))
         fi
@@ -938,7 +952,7 @@ cvmfs_stat() {
   local active=0
   for mountpoint in $mounted_repos
   do
-    cd $mountpoint || exit 32
+    cd $mountpoint 2>/dev/null || continue
     local this_fqrn
     get_attr fqrn; this_fqrn=$attr_value
     if [ "$this_fqrn" = "$fqrn" ]; then
@@ -1054,6 +1068,11 @@ cvmfs_status() {
 _cvmfs_reload_pause() {
   # Helper function to put a particular repository in sleep mode
   local mountpoint="$1"
+  local debug_flag=""
+ 
+  if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
+    debug_flag="--debug"
+  fi
 
   cd "$mountpoint" 2>/dev/null || return
   get_attr fqrn ${mountpoint}; fqrn=$attr_value
@@ -1066,7 +1085,7 @@ _cvmfs_reload_pause() {
   echo "Pausing ${fqrn} on ${mountpoint}"
   cd "$mountpoint" &&
     rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$mountpoint" | base64_nowrap) && \
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go ${debug_flag} | \
     awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
   cd /
   echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1097,14 +1116,19 @@ cvmfs_reload() {
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   local clean_cache; clean_cache=0
   local cache_directories=
+  local debug_flag=""
   if [ "x$1" = "x-c" ]; then
     clean_cache=1
     shift
     cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
+    if [ "x${CVMFS_DEBUGLOG}" != "x" ]; then
+      debug_flag="--debug"
+    fi
+
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
-    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn
+    cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn ${debug_flag}
     return $?
   fi
 
@@ -1189,6 +1213,7 @@ cvmfs_reload() {
           rm -rf "$dir" && \
             mkdir -p "$dir" && \
             chown $CVMFS_USER "$dir"
+            sleep 15
           if [ $? -ne 0 ]; then
             echo "Failed!"
             RETVAL=1
@@ -1240,7 +1265,11 @@ cvmfs_probe() {
         cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         ls "$CVMFS_MOUNT_DIR/$fqrn" > /dev/null 2>&1  # workaround for FC28+
-        df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
+        if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q "$fqrn"
+        else 
+          df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
+        fi
         if [ $? -ne 0 ]; then
           echo "Failed!"
           RETVAL=1
@@ -1265,9 +1294,24 @@ cvmfs_config_fsck() {
       continue
     fi
 
-    echo "CernVM-FS fsck on $dir"
-    cvmfs_fsck $@ $dir
-    retval=$(($? + $retval))
+    if [ "x$1" = "x-q" ]; then
+      # hardcode hashes for the (legitimately) empty file:
+      # SHA1: full hash of empty file: e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78
+      ignore_empty_hashes=" ! -name ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78 "
+      # RMD160: full hash of empty file: fcdb20b894f31f1306d56294c049ca7293dde0fc
+      ignore_empty_hashes="$ignore_empty_hashes ! -name db20b894f31f1306d56294c049ca7293dde0fc-rmd160 "
+      # SHAKE128: full hash of empty file: 28d94b83b7229b331fc601362b8e272e02665122
+      ignore_empty_hashes="$ignore_empty_hashes ! -name d94b83b7229b331fc601362b8e272e02665122-shake128 "
+      for zeroed_file in $(find $dir -empty -wholename "$dir/[a-z0-9][a-z0-9]/*" ${ignore_empty_hashes}); do
+        echo "WARNING: unexpected zero-byte file $zeroed_file -  Moving it to quarantaine."
+        mv $zeroed_file $dir/quarantaine
+        retval=1
+      done
+    else
+      echo "CernVM-FS fsck on $dir"
+      cvmfs_fsck $@ $dir
+      retval=$(($? + $retval))
+    fi
   done
 
   return $retval
@@ -1292,7 +1336,11 @@ cvmfs_config_fuser() {
   fi
   [ -n "$deviceid" ] || die "Could not obtain device id for $fqrn"
 
-  lsof | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
+  local skip_afs_opt=
+  if mountpoint /afs >/dev/null 2>&1; then
+    skip_afs_opt="-e /afs"
+  fi
+  lsof $skip_afs_opt | awk '{if ($6 == "'"${deviceid/:/,}"'") print $2}' | sort -un | paste -sd ' '
 }
 
 cvmfs_umount() {
@@ -1311,12 +1359,20 @@ cvmfs_umount() {
   for m in $mount_list
   do
     [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
-    umount $umount_options $m 2>/dev/null
+    if [ "$sys_arch" = "Darwin" ] && ! is_macfuse_enabled; then
+      umount -f $umount_options $m 2>/dev/null
+    else
+      umount $umount_options $m 2>/dev/null
+    fi
     if [ $? -ne 0 ]; then
       RETVAL=1
       if [ "x$silent" = "x" ]; then
         echo "Failed!"
-        $fuser -m -a -v $m
+        if [ "$sys_arch" = "Linux" ]; then
+          $fuser -m -a -v $m
+        else
+          $fuser -u -c $m
+        fi
       fi
     else
       [ "x$silent" != "x" ] || echo "OK"
@@ -1541,8 +1597,12 @@ waitfor() {
 
 list_mounts() {
   # Matches lines that begin with cvmfs2 or /usr/bin/cvmfs2 (/bin/cvmfs2,
-  # /usr/local/bin/cvmfs2)
-  mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  # /usr/local/bin/cvmfs2) on Linux or lines that contain fuse-t on macOS
+  if [ x"$sys_arch" = x"Darwin" ] && ! is_macfuse_enabled; then
+    mount -t "nfs" | grep "fuse-t"
+  else
+    mount -t $fuse_fs_type | grep "^\(/[^[:space:]]*/\)\?cvmfs2[[:space:]]"
+  fi
 }
 
 
@@ -1732,6 +1792,40 @@ check_cvmfs_user() {
   esac
 }
 
+# Expected to be ran only on macOS
+check_fuse_t_installation() {
+  local product="fuse-t"
+  local nfsV4ServerLink="/usr/local/bin/go-nfsv4"
+  local dylibPath="/usr/local/lib/lib${product}.dylib"
+  local staticLibPath="/usr/local/lib/lib${product}.a"
+
+  # Check for existence of required files and links
+  local paths=("$nfsV4ServerLink" "$dylibPath" "$staticLibPath")
+  for path in "${paths[@]}"; do
+    if [ ! -e "$path" ]; then
+      echo "Error: Missing required file or directory: $path"
+      return 1
+    fi
+  done
+  return 0
+}
+
+is_macfuse_enabled() {
+  if [ x"$CVMFS_USE_MACFUSE_KEXT" = x ]; then
+    return 1
+  fi
+  local value=$(echo "$CVMFS_USE_MACFUSE_KEXT" | tr '[:upper:]' '[:lower:]')
+  case "$value" in
+    yes|on|1|true)
+      return 0 ;;
+    no|off|0|false)
+      return 1 ;;
+    *)
+      echo "Error: invalid value of CVMFS_USE_MACFUSE_KEXT: $CVMFS_USE_MACFUSE_KEXT"
+      echo "Valid values are: yes, on, 1, true, no, off, 0, false"
+      return 1 ;;
+  esac
+}
 
 check_dev_fuse() {
   local charDevice
@@ -1742,15 +1836,16 @@ check_dev_fuse() {
       charDevice=/dev/fuse ;;
 
     Darwin )
-      charDevice=/dev/macfuse0 ;;
-
+      if ! is_macfuse_enabled; then
+      # Since we rely on user-space FUSE-T now the check for /dev/<device_name> isn't necessary
+        exit 0
+      fi
+      charDevice=/dev/macfuse ;;
     * )
      echo "Architecture $sys_arch is not supported"
      exit 1 ;;
   esac
-
   return_code=0
-
   if [ ! -c $charDevice ]; then
     if [ x"$sys_arch" = x"Linux" ]; then
       echo "Error: character device $charDevice does not exist"
@@ -2069,7 +2164,7 @@ canonicalize_path() {
       echo $(readlink -f "$path_name")
       ;;
     Darwin )
-      echo $(/usr/local/bin/greadlink -f "$path_name")
+      echo $(greadlink -f "$path_name")
       ;;
   esac
 }

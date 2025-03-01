@@ -289,7 +289,7 @@ count_wr_fds() {
   local path=$1
   local cnt=0
   for line in $(get_fd_modes $path); do
-    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+    if echo "$line" | grep -qe '^rw'; then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
 }
@@ -553,7 +553,7 @@ check_upstream_validity() {
 # @return  0 if overlayfs is installed and viable
 #          1 if it is not viable, and stdout contains a reason
 # This should probably now be called check_overlayfs_viability except
-#   that for backward compatiblity we need to keep the variable that
+#   that for backward compatibility we need to keep the variable that
 #   overrides it, CVMFS_DONT_CHECK_OVERLAYFS_VERSION, and changing the
 #   function name would make the variable name not make sense.
 check_overlayfs_version() {
@@ -745,7 +745,7 @@ _os_set_etc_release_filename() {
   fi
 }
 
-# Pick a specific field from the os-release file and return it. 
+# Pick a specific field from the os-release file and return it.
 # 1. _os_set_etc_release_filename is called on every check, this is probably overkill,
 #    but the question would be where to call this once and for all. In theory one could
 #    call it right after the declaration above?
@@ -839,7 +839,7 @@ If you go for production, backup your masterkey from /etc/cvmfs/keys/!"
 
 get_fd_modes() {
   local path=$1
-  $LSOF_BIN -Fan +f -- $path 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+  cvmfs_publish lsof $path
 }
 
 # gets the number of open read-only file descriptors beneath a given path
@@ -850,7 +850,7 @@ count_rd_only_fds() {
   local path=$1
   local cnt=0
   for line in $(get_fd_modes $path); do
-    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+    if echo "$line" | grep -qe '^ro';  then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
 }
@@ -913,8 +913,12 @@ minpidof() {
 }
 
 
+# Return true if systemd is to be used, that is, if neither the service
+# command nor the supervisorctl command has been located.  Note that
+# the service command is only looked for if systemctl is missing, but
+# the supervisorctl command will take precedence over systemctl.
 is_systemd() {
-  [ x"$SERVICE_BIN" = x"false" ]
+  [ x"$SERVICE_BIN" = x"false" ] && [ x"$SUPERVISOR_BIN" = x"false" ]
 }
 
 
@@ -957,11 +961,16 @@ _to_syslog_for_geoip() {
 
 _update_geodb_install() {
   local retcode=0
-  local dburl="${CVMFS_UPDATEGEO_URLBASE}?edition_id=${CVMFS_UPDATEGEO_DB%.*}&suffix=tar.gz&license_key=$CVMFS_GEO_LICENSE_KEY"
+  local dburl="${CVMFS_UPDATEGEO_URLBASE}?suffix=tar.gz"
   local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
   local download_target=${dbfile}.tgz
   local untar_dir=${dbfile}.untar
 
+  if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
+      echo "CVMFS_GEO_ACCOUNT_ID not set" >&2
+      _to_syslog_for_geoip "CVMFS_GEO_ACCOUNT_ID not set"
+      return 1
+  fi
   if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
       echo "CVMFS_GEO_LICENSE_KEY not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_LICENSE_KEY not set"
@@ -971,8 +980,9 @@ _update_geodb_install() {
   _to_syslog_for_geoip "started update from $dburl"
 
   # downloading the GeoIP database file
-  curl -sS  --connect-timeout 10 \
+  curl -L -sS  --connect-timeout 10 \
             --max-time 60        \
+            -u "${CVMFS_GEO_ACCOUNT_ID}:${CVMFS_GEO_LICENSE_KEY}" \
             "$dburl" > $download_target || true
   if ! tar tzf $download_target >/dev/null 2>&1; then
     local msg
@@ -1294,6 +1304,13 @@ Supported Commands:
   merge-stats     [-o output db file]
                   <db_file_1> <db_file_2>
                   Merge tables from two database files.
+  enter           [-w stratum0 url] [-c path to cvmfs2 binary] 
+                  [-C path to extra client config] [-r run as root]
+                  [-k keep session after shell exits] [-t open a transaction] 
+                  [-l remove session but keep logs after shell exits] 
+                  [-x path to repository configuration]
+                  <fully qualified repository name> [-- <command> <params>]
+                  Open an ephemeral namespace to publish content
 "
 
 

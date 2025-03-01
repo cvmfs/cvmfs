@@ -1,4 +1,166 @@
+2.12.7:
+  * [server] Fix for cvmfs_server transaction -t, update repository state after waiting for lease (#3771)
+
+2.12.6:
+  * [client] Revert CVMFS_PATCH_LEVEL to 0 for check_cvmfs.sh (#3750)
+  * [rpm] fix package install on wsl2 and other non-systemd platforms (#3749)
+
+2.12.4:
+  * [client] Fix cvmfs_config fsck -q to work with rmd160, shake128 hashes (#3739)
+  * [server] Fix mkfs overwrite-manifest check when upstream is gateway (#3740)
+
+2.12.3:
+  * [client] Don't commit empty certificates to cache (#3728)
+
+2.12.2:
+  * [client] Add cvmfs_config fsck -q(uick) to check for zeroed files in cache (#3726)
+
+2.12.1:
+  * [rpm] bugfix for reload service after rpm upgrades (#3725)
+
+2.12.0:
+  * [client] FUSE-T support for macOS (#3587)
+  * [server] Add metalink support (#3683)
+  * Add support for high-precision timestamps (#3513)
+  * [client] Turn CVMFS_CACHE_REFCOUNT on by default (#3684)
+  * [client] Add memory buffer to streaming cache manager (#3632)
+  * [client] Add "cache limit set <MB>" function to cvmfs_talk (#3623) 
+  * [client] Fix replacement of stale inodes (#3507)
+  * [client] Print correct timezone in logbuffer (#3679)
+  * [client] log NOTFOUND in tracefile when lookup unsuccessful (#3704)
+  * [client] Add "cache limit set <MB>" function to cvmfs_talk (#3623)
+  * [client] add eio.emfile counter for  open() operations (#3625)
+  * [client] Better logging for host/proxies (#3617)
+  * [client] Close page cache tracker entry if cvmfs_open() fails (#3588)
+  * [client] Remove unnecessary remount fence in forget callback (#3591)
+  * [client] Move getxattr check of valid return value closer to its request (#3516)
+  * [client] Improve error logging in inode tracker (#3502)
+  * [client] Fix a few Log2Histogram bugs (#3511)
+  * [client] Reduce write lock contention in catalog mgr (#3476)
+  * [client] Support for the new CVMFS_FUSE3_IDLE_THREADS and CVMFS_FUSE3_MAX_THREADS parameters (#3505)
+  * [client] Log JobInfo object id and its respective CURL requests (#3492)
+  * [client] Avoid possible race in mount helper (#3475)
+  * [client] Add paging to xattr (#3355)
+  * [server] Ingest Tarball now with modifiyable ownership (#3362)
+  * [server] mkfs: do not overwrite existing manifest in s3 bucket (#3693) 
+  * [server] allow absolute paths for ingest --base_dir and --to_delete (#3695)
+  * [server] Fixes and improvements to concurrency in SessionContext (#3546)
+  * [server] Fix race when publishing to a gateway (#3546)
+  * [server] Consistently use 64bit ints for catalog revision (#3478)
+  * [server] Create scratch dir with consistent permissions (#3660)
+  * [gw] Cache catalogs for cvmfs_receiver (#3431)
+  * [rpm] Run post-install reload in a unit (#3707) 
+  * [rpm] Fix externals for RISC-V build (#3446)
+  * [ducc] Enable syncronous GC on webhook (#3646)
+  * [service container] use all env vars in config (#3677)
+
+2.11.5:
+  * [client] Fix ReadHalfPipe for reads larger than the timeout  (#3653)
+
+2.11.4:
+  * [client] Fix streaming cache mgr with secure repos (#3631) 
+  * [client] Fix handling of network errors in streaming cache mgr (#3630)
+  * [client] Add timeout to ReadHalfPipe (#3614)
+
+2.11.3:
+ * [server] Update method of downloading the MaxMind GeoIP (#3566)
+
+2.11.2:
+  * [client] Fix mount helper race condition causing spurious directories (#3430)
+  * [client] Suppress CVMFS_NFILES check for refcounted cache manager (#3426)
+  * [deb] Let cvmfs-fuse3 depend on cvmfs of same version (#3421)
+  * [rpm] Match subpackage release in addition to version (#3422)
+  * [client] Fix corrupted paths for concurrent external file requests (#3418)
+
+2.11.1:
+  * [client] Fix race condition on concurrent mounts (#3393)
+  * [config] Fix client reload if remote config repo is unavailable (#3390)
+  * [rpm] Patch out the git build dependency of pacparser (#3376)
+  * [rpm] Add Debian 12 bookworm to cvmfs-release
+  * [rpm] Limit initscripts dependency to rhel <=7 (#3408)
+
+2.11.0:
+  * [client] Allow change to/from debug mode during cvmfs_config reload (#2897, #3359)
+  * [client] Re-use the file descriptor for a file already open in the local cache (#3067)
+  * [client] Support latest signature of fuse_lowlevel_notify_expire_entry (#3352)
+  * [client] Placeholder for custom proxy health check and sharding policy (#3095)
+  * [client] Custom http tracing headers (#3094)
+  * [client] Use http client auth only if membership is set (#3333)
+  * [gw] Fix publication of uncompressed files through gateway (#3338)
+  * [client] Add curl debug info to debug log (#3329)
+  * [server] Verify meta-info object in cvmfs_server check (#3139)
+  * [client] Allow CPU affinity setting through CVMFS_CPU_AFFINITY (#3330)
+  * [server] Fix deadlock in uploading pipeline (#3195)
+  * [gw] Fix transaction abort after gateway restart (#3128)
+  * [gw] Fix occasional lease contention errors (#3259, #3077, #3272)
+  * [client] Check for writable log file directories in chkconfig (#3310)
+  * [server] Restrict error handling of readahead (#3305)
+  * [client] Fix tmpfs recognition to skip readahead (#3316)
+  * [client] Add development option _CVMFS_DEVEL_IGNORE_SIGNATURE_FAILURES (#3317)
+  * [client] Add streaming cache mode through CVMFS_STREAMING_CACHE=yes (#3263, #2948)
+  * [client] Use dedicated log files for mount helper (#3314)
+  * [client] Warn about potential incorrect use of cvmfs_talk (#3303)
+  * [gc] Extend grep filter to accept microsecond precision in tags (#3301)
+  * [client] Use logging settings in mount helper (#2962)
+  * [client] Fix race in signal handling when authz helper is started (#3211)
+  * [server] Fix race in parallel catalog traversal (#3171)
+  * If CVMFS_SUPPRESS_ASSERTS is defined, keep retrying memory allocation on failure (#3244)
+  * [server] Fix force abort after client crash (#3283)
+  * Add proxy_list and proxy_list_external magic xattrs (#3233)
+  * [client] Error out early if certificate is invalid (#3238)
+  * [client] Improve watchdog startup procedure (#3089)
+  * [gc] Avoid duplicate delete requests (#3117)
+  * Fix mount helper so that it works with libfuse3 auto_unmount (#3143)
+  * Enable core file generation if watchdog is disabled (#3142)
+  * Fix closing of file descriptors for very large nfiles limit (#3158)
+  * Add AssertOrLog to conditionally continue on certain fatal errors (#3157)
+  * [client] Add telemetry framework to send performance counters to influx (#3096)
+  * [macOS] Fix xattr on symlinks (#3170)
+  * [client] Add support for evicting chunked files through cvmfs_talk (#3122)
+  * [client] Add support for symlink kernel cache through CVMFS_CACHE_SYMLINKS (#2949)
+  * [rpm] Bump base for service container to EL9
+  * [s3] Add support for CVMFS_S3_X_AMZ_ACL server parameter (#2970)
+  * Add support for protected xattrs, new client parameters
+    CVMFS_XATTR_[PRIVILEGED_GIDS,PROTECTED_XATTRS] (#3103)
+  * [client] Improve logging of I/O errors (#2941)
+  * [gw] Store publisher hostname in lease (#3130)
+  * [client] Make CVMFS_ARCH env available for variant symlinks (#3127, CVM-910)
+  * Add user.external_url extended attribute (#3101)
+  * [rpm] Change libcvmfs static library to libcvmfs_client shared library (#3113)
+  * [gw] Add HTTPS support for connecting to gateway (#3060)
+  * [client] Add CVMFS_WORLD_READABLE client option (#3115)
+  * [rpm] Let client depend on cvmfs-libs (#3107)
+  * [rpm] Bump libcurl to version 7.86.0 (#3093)
+  * [client] Gracefully handle CURLE_SEND_ERROR in download manager (#2925)
+  * [client] Add CVMFS_STATFS_CACHE_TIMEOUT parameter to cache statfs results (#3015)
+  * Restrict ShortString overflow counters to debug mode (#3081)
+  * [S3] Gracefully handle HTTP 500 return codes during upload (#2912)
+
+2.10.2:
+  * [gw] fix for a concurrency issue in the leases db
+  * Fix locale setting in cvmfs_server (#3237)
+
+2.10.1:
+  * Check object existance only once in cvmfs_server check (#3138)
+  * Fix overflow of logbuffer xattr with very long log lines (#2979)
+  * Limit parallel cvmfs_server snapshot -a commands (#3064)
+  * Let cvmfs_server abort -f succeed even if session token is missing (#3159)
+  * Update individual cvmfs_server check status when successful (#3147)
+  * [geo] Allow for missing location info in geo record (#3186)
+  * [container] Fix importing of images with OCI manifest list (#3164)
+  * Improve file reset logic on download retries (#3085)
+  * Improve "mount transfer" syslog message (#2956)
+  * Fix false recreation of the reflog in cvmfs_server check (#3123)
+  * Fix SQlite NFS maps initialization (#3150)
+  * Restore ability of cvmfs_server abort -f to survive invalid lease (#3088)
+  * Ignore /afs in cvmfs_config fuser (#3090)
+  * Fix building leveldb external with non-GNU patch (#3110)
+  * [rpm] Fix python build requirements (#2986)
+
 2.10.0:
+  * [server] Ignore size of directories in snapshot diff output
+  * [server] Remove partial support for "channels" from manifest (#2838)
+  * [server] Fix counting of open file descriptors
   * [ducc] Support images with OCI manifest (#2851)
   * [server] Fix ingestion (with catalog) of empty tarfile (#3055)
   * [client] Gracefully handle open, changing files (CVM-2001)

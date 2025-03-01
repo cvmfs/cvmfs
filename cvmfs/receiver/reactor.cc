@@ -443,7 +443,7 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   switch (res) {
     case CommitProcessor::kSuccess:
       reply_input.Add("status", "ok");
-      reply_input.Add("final_revision", static_cast<int>(final_revision));
+      reply_input.Add("final_revision", static_cast<int64_t>(final_revision));
       break;
     case CommitProcessor::kError:
       reply_input.Add("status", "error");

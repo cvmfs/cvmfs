@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef TEST_UNITTESTS_TESTUTIL_H_
-#define TEST_UNITTESTS_TESTUTIL_H_
+#ifndef TEST_COMMON_TESTUTIL_H_
+#define TEST_COMMON_TESTUTIL_H_
 
 #include <gtest/gtest.h>
 
@@ -19,13 +19,14 @@
 #include "catalog_mgr.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
-#include "ingestion/ingestion_source.h"
 #include "history.h"
+#include "ingestion/ingestion_source.h"
 #include "object_fetcher.h"
 #include "upload_facility.h"
 #include "util/atomic.h"
 
 pid_t GetParentPid(const pid_t pid);
+std::string GetProcessname(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
 unsigned GetNoUsedFds();
@@ -568,10 +569,8 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
 
   virtual ~MockCatalogManager() { delete spooler_; }
 
-  virtual LoadError LoadCatalog(const PathString &mountpoint,
-                                const shash::Any &hash,
-                                std::string  *catalog_path,
-                                shash::Any   *catalog_hash);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
@@ -861,4 +860,4 @@ class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
 };
 
 
-#endif  // TEST_UNITTESTS_TESTUTIL_H_
+#endif  // TEST_COMMON_TESTUTIL_H_

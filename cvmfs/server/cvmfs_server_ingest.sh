@@ -5,12 +5,12 @@
 #
 # Implementation of the "cvmfs_server ingest-tarball" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
 
-# TODO Most of this code is replicated and shared between different scrips,
+# TODO Most of this code is replicated and shared between different scripts,
 # it would be a good idea to refactor common patterns into coherent functions.
 
 cvmfs_server_ingest() {
@@ -18,6 +18,11 @@ cvmfs_server_ingest() {
   local tar_file=""
   local to_delete="" # directories or file to delete before the extraction
   local name="" #repository name
+  local user=""
+  local group=""
+  local uid=""
+  local gid=""
+  local keep_ownership=false
   local create_catalog=false
 
   local force_native=0
@@ -25,6 +30,9 @@ cvmfs_server_ingest() {
 
   # if we use the gateway we cannot easily accept multiple deletion
   local multiple_delete=0
+
+  local name_from_absolute_arg=""
+  local name_from_absolute_arg2=""
 
   while [ "$2" != "" ]; do
     case $1 in
@@ -46,12 +54,53 @@ cvmfs_server_ingest() {
       -c | --catalog )
         create_catalog=true
         ;;
+      -u | --user )
+        user=$2
+      ;;
+      -g | --group )
+        group=$2
+      ;;
+      -k | --keep-ownership )
+        keep_ownership=true
+      ;;
     esac
     shift
   done
 
+  # deal with absolute/relative paths
+  case x"$base_dir" in
+      x/cvmfs/*) 
+        echo "Warning: interpreting the base_dir as absolute path. Remove leading slash to get a relative path to the mountpoint"
+        name_from_absolute_arg=$(echo $base_dir | cut -d'/' -f3)
+        base_dir=$(echo $base_dir | cut -d'/' -f 4-)
+  esac
+  for to_delete_path in $(echo $to_delete | sed "s/:/ /g"); do
+    case x"$to_delete_path" in
+        x/cvmfs/*) 
+          echo "Warning: interpreting the base_dir as absolute path. Remove leading slash to get a relative path to the mountpoint"
+          name_from_absolute_arg2=$(echo $to_delete_path | cut -d'/' -f3)
+          to_delete=$(echo $to_delete_path | cut -d'/' -f 4-)
+          if [ ! x$name_from_absolute_arg = "x" ] ; then
+            if [ ! x$name_from_absolute_arg = x$name_from_absolute_arg2 ] ; then
+              die "Cannot use different repositories in same transaction: $name_from_absolute_arg2, $name_from_absolute_arg"
+            fi
+          fi
+          name_from_absolute_arg=$name_from_absolute_arg2
+    esac
+  done
+
   name=$1
   name=$(echo $name | cut -d'/' -f1)
+
+  if [ x"$name" = "x" ] ; then
+    name=$name_from_absolute_arg
+  fi
+  echo "Info: transaction on repository $name"
+
+  if [ x"$name" = "x" ] ; then
+
+    die "Please provide a repository name, as positional argument or via an absolute path on /cvmfs given to -b"
+  fi
 
   if [ x"$tar_file" = "x" ] && [ x"$base_dir" = "x" ] && [ x"$to_delete" = "x" ] ; then
     die "Please provide some parameters, use -t \$TAR_FILE to provide the tar to extract -b \$BASE_DIR to provide where to extract the tar and -d \$TO_DELETE to provide what to delete from the repository"
@@ -67,6 +116,53 @@ cvmfs_server_ingest() {
 
   load_repo_config $name
 
+  #### check and set uid/gid
+  # error: cannot keep ownership while also requesting other user/group
+  if { [ x"$user" != "x" ] || [ x"$group" != "x" ]; } && [ $keep_ownership = true ]; then
+    die "You cannot provide both: either provide user (-u)/group (-g) or keep the ownership (-k) of the tarball"
+  fi
+
+
+  # error: group also needs user
+  if [ x"$user" = "x" ] && [ x"$group" != "x" ]; then
+    die "If providing a group name, you also must provide a user (use -u) to set new owner of the ingest tarball"
+  fi
+
+  # both set
+  if [ x"$user" != "x" ]; then
+    uid=$(id -u "$user")
+
+    if [ x"$uid" = xi* ]; then
+      die "User set but no valid user name given"
+    fi
+  fi
+
+  if [ x"$group" != "x" ]; then
+    gid=$(getent group "$group" | awk -F':' '{print $3;}')
+
+    if [ x"$gid" = "x" ]; then
+      die "Group set but no valid group name given"
+    fi
+  fi
+  # only user set: get gid from user
+  if [ x"$group" != "x" ]; then
+    gid=$(id -g "$user")
+  fi
+  # use default cvmfs repo owner
+  if [ x"$user" = "x" ] && [ x"$group" = "x" ] && [ $keep_ownership = false ]; then
+    uid=$(id -u "$CVMFS_USER")
+    gid=$(id -g "$CVMFS_USER")
+
+    if [ x"$uid" = xi* ]; then
+      die "Default CVMFS_USER $CVMFS_USER for the repo does not exist"
+    fi
+  fi
+  # keep tar ball ownership
+  if [ $keep_ownership = true ]; then
+    uid="-1"
+    gid="-1"
+  fi
+
   upstream=$CVMFS_UPSTREAM_STORAGE
   upstream_type=$(get_upstream_type $upstream)
 
@@ -79,7 +175,7 @@ cvmfs_server_ingest() {
     if [ ! x"$tar_file" = "x" ] && [ ! x"$to_delete" = "x" ]; then
       die "Could not delete and add a file in the same transaction while using gateway."
     fi
-    # by the chek above we are sure that there is only a tar_file to ingest or a directory to_delete
+    # by the check above we are sure that there is only a tar_file to ingest or a directory to_delete
     # hence we just concatenate them with the name for the transaction
     cvmfs_server_transaction "$name/$base_dir$to_delete" || die "Impossible to start a transaction"
   else
@@ -155,8 +251,6 @@ cvmfs_server_ingest() {
   local log_level=
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-  local trusted_certs="/etc/cvmfs/repositories.d/${name}/trusted_certs"
-
   local tag_command="$(__swissknife_cmd dbg) tag_edit \
     -r $upstream                                      \
     -w $stratum0                                      \
@@ -208,6 +302,8 @@ cvmfs_server_ingest() {
     -o $manifest                                \
     -K $CVMFS_PUBLIC_KEY                        \
     -N $name                                    \
+    -U $uid                                     \
+    -G $gid                                     \
     "
 
   if [ ! x"$tar_file" = "x" ]; then
@@ -224,6 +320,10 @@ cvmfs_server_ingest() {
 
   if [ "$create_catalog" = true ]; then
     ingest_command="$ingest_command -C true"
+  fi
+
+  if [ "x$CVMFS_ENABLE_MTIME_NS" = "xtrue" ]; then
+    ingest_command="$ingest_command -j"
   fi
 
   if [ "x$CVMFS_PRINT_STATISTICS" = "xtrue" ]; then

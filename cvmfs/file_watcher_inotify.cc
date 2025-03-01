@@ -129,7 +129,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
           }
         } else {
           LogCvmfs(kLogCvmfs, kLogDebug,
-                   "FileWatcherInotify - Unknown event ident: %ld",
+                   "FileWatcherInotify - Unknown event ident: %d",
                    inotify_event->wd);
         }
 

@@ -12,7 +12,7 @@
 
 namespace catalog {
 
-// TODO(jblomer): Dirtab and RelaxedPathFilter can use static inhertiance.  It
+// TODO(jblomer): Dirtab and RelaxedPathFilter can use static inheritance.  It
 // is clear at compile time which one should be used.  They are not on a
 // critical path though.
 

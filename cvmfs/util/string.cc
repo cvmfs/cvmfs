@@ -10,7 +10,7 @@
 #endif
 
 #include "string.h"
-#include "cvmfs_config.h"
+
 
 #include <errno.h>
 #include <fcntl.h>
@@ -120,6 +120,24 @@ string StringifyTime(const time_t seconds, const bool utc) {
   return string(buffer);
 }
 
+/**
+ * Converts seconds since UTC 0 into something like 12 Sep 14:59:37 CDT
+ */
+string StringifyLocalTime(const time_t seconds) {
+  struct tm timestamp;
+  localtime_r(&seconds, &timestamp);
+
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  char buffer[26];
+  (void)/* cast to void ignores return and placates clang-tidy */
+   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s", timestamp.tm_mday,
+           months[timestamp.tm_mon], timestamp.tm_year + 1900,
+           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec, timestamp.tm_zone);
+
+  return string(buffer);
+}
+
 
 /**
  * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
@@ -192,7 +210,7 @@ string StringifyTimeval(const timeval value) {
 }
 
 /**
- * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Parses a timestamp of the form YYYY-MM-DDTHH:MM:SSZ
  * Return 0 on error
  */
 time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
@@ -227,8 +245,10 @@ int64_t String2Int64(const string &value) {
 
 uint64_t String2Uint64(const string &value) {
   uint64_t result;
-  sscanf(value.c_str(), "%" PRIu64, &result);
-  return result;
+  if (sscanf(value.c_str(), "%" PRIu64, &result) == 1) {
+    return result;
+  }
+  return 0;
 }
 
 /**

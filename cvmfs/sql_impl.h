@@ -214,12 +214,15 @@ bool Database<DerivedT>::FileReadAhead() {
     }
     const ssize_t retval = platform_readahead(fd_readahead);
     close(fd_readahead);
-    if (retval != 0) {
+
+    // Read-ahead is known to fail on tmpfs with EINVAL
+    // EINVAL = "readahead() cannot be applied to that a file type"
+    // Don't consider it a fatal error.
+    if (retval != 0 && errno != EINVAL) {
       LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-               "failed to read-ahead %s (%d)", filename().c_str(), errno);
-      // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
-      // error.
-      // return false;
+        "failed to read-ahead %s: invalid file descrp. or not open for reading",
+        filename().c_str());
+      return false;
     }
   }
 

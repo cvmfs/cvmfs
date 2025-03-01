@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Warn on Huge Catalog Creation"
 cvmfs_test_autofs_on_startup=false
 

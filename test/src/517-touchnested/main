@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Touch a Nested Catalog"
 cvmfs_test_autofs_on_startup=false

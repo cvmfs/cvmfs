@@ -4,7 +4,7 @@
  * This tool signs a CernVM-FS manifest with an X.509 certificate.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_letter.h"
 
 #include <inttypes.h>
@@ -14,8 +14,8 @@
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "letter.h"
+#include "network/download.h"
 #include "util/string.h"
 #include "whitelist.h"
 
@@ -110,17 +110,15 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   string fqrn;
   string text;
   string key_path;
-  string cacrl_path;
   fqrn = *args.find('f')->second;
   key_path = *args.find('k')->second;
   if (args.find('t') != args.end()) text = *args.find('t')->second;
-  if (args.find('z') != args.end()) cacrl_path = *args.find('z')->second;
 
   whitelist::Failures retval_wl;
   letter::Failures retval_ltr;
 
   if (verify) {
-    if (!InitVerifyingSignatureManager(key_path, cacrl_path)) {
+    if (!InitSignatureManager(key_path)) {
       return 2;
     }
 
@@ -216,9 +214,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     return exit_code;
   }
 
-  if (!InitSigningSignatureManager(certificate_path,
-                                   key_path,
-                                   certificate_password)) {
+  if (!InitSignatureManager("", certificate_path, key_path)) {
     return 2;
   }
 

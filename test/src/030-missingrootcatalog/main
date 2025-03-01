@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="404 on Root Catalog Download"
 cvmfs_test_suites="quick"
@@ -47,7 +48,13 @@ cvmfs_run_test() {
   cd ..
 
   echo "run a simple HTTP server"
-  cmd="${CVMFS_PYTHON2} -m SimpleHTTPServer 8000"
+  export PYTHON_VERSION=`python -c 'import sys; version=sys.version_info[:1]; print("{0}".format(*version))'`
+   if [  $PYTHON_VERSION -gt 2  ]; then
+     cmd="python -m http.server 8000"
+   else
+     cmd="python -m SimpleHTTPServer 8000"
+   fi
+
   http_pid=$(run_background_service $logfile "$cmd")
   if [ $? -ne 0 ]; then return 9; fi
   echo "simple HTTP server serving empty directory started with PID $http_pid"
@@ -63,7 +70,13 @@ cvmfs_run_test() {
 
   sudo rm -f /etc/cvmfs/domain.d/cern.ch.local || retval=12
 
-  local expected_max=6000
+  if running_on_osx; then 
+    #expanding expected max timeout as we sleep for 3 seconds after a mount with FUSE-T
+    local expected_max=20000
+  else
+    local expected_max=6000  
+  fi
+
   if [ $milliseconds -gt $expected_max ]; then
     echo "mounting took too long with $milliseconds seconds (expected $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1

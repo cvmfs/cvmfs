@@ -1,3 +1,4 @@
+#!/bin/bash
 cvmfs_test_name="Start image from singularity"
 cvmfs_test_suites="quick"
 
@@ -8,7 +9,7 @@ cvmfs_run_test() {
   . ${script_location}/../container_common.sh
 
   cvmfs_mount unpacked.cern.ch,atlas.cern.ch || return 1
-  singularity exec --bind /cvmfs \
+  apptainer exec --bind /cvmfs \
     /cvmfs/unpacked.cern.ch/registry.hub.docker.com/library/centos\:centos7 \
     mount && ls -lah /cvmfs/atlas.cern.ch && ls -lah /cvmfs/cms.cern.ch || return 10
 

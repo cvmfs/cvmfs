@@ -26,7 +26,7 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
   ignore_filenames_.insert(".wh..wh.orph");
   ignore_filenames_.insert(".wh..wh..opq");
 
-  // set the whiteout prefix AUFS preceeds for every whiteout file
+  // set the whiteout prefix AUFS precedes for every whiteout file
   whiteout_prefix_ = ".wh.";
 }
 

@@ -107,6 +107,8 @@ enum LogSource {
   kLogAuthz,
   kLogReflog,
   kLogKvStore,
+  kLogTelemetry,
+  kLogCurl
 };
 
 const int kLogWarning = kLogStdout | kLogShowSource | kLogNormal;

@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "catalog_traversal.h"
-#include "ingestion/tube.h"
 #include "util/atomic.h"
 #include "util/exception.h"
+#include "util/tube.h"
 
 namespace swissknife {
 
@@ -60,7 +60,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     explicit CatalogJob(const std::string &path,
                         const shash::Any &hash,
                         const unsigned tree_level,
-                        const unsigned history_depth,
+                        const uint64_t history_depth,
                         CatalogTN *parent = NULL) :
       CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
                                                    history_depth, parent) {
@@ -205,8 +205,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       reinterpret_cast<CatalogTraversalParallel<ObjectFetcherT> *>(data);
     CatalogJob *current_job;
     while (true) {
-      if (!traversal->post_job_queue_.IsEmpty()) {
-        current_job = traversal->post_job_queue_.PopFront();
+      current_job = traversal->post_job_queue_.TryPopFront();
+      if (current_job != NULL) {
         traversal->ProcessJobPost(current_job);
       } else {
         current_job = traversal->pre_job_queue_.PopFront();
@@ -403,7 +403,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   unsigned int num_threads_;
   bool serialize_callbacks_;
 
-  unsigned int effective_history_depth_;
+  uint64_t effective_history_depth_;
   time_t effective_timestamp_threshold_;
   TraversalType effective_traversal_type_;
 

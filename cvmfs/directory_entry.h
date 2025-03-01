@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "bigvector.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "shortstring.h"
 #include "util/platform.h"
@@ -77,25 +77,28 @@ class DirectoryEntryBase {
 
   /**
    * Used in the swissknife for sanity checks and catalog migration.  If
-   * anything is added, also adjust PrintDifferences in swissknife::CommandDiff.
+   * anything is added, also adjust PrintDifferences in swissknife::CommandDiff
+   * and CommandCheck::CompareEntries
    */
   struct Difference {
-    static const unsigned int kIdentical                    = 0x000;
-    static const unsigned int kName                         = 0x001;
-    static const unsigned int kLinkcount                    = 0x002;
-    static const unsigned int kSize                         = 0x004;
-    static const unsigned int kMode                         = 0x008;
-    static const unsigned int kMtime                        = 0x010;
-    static const unsigned int kSymlink                      = 0x020;
-    static const unsigned int kChecksum                     = 0x040;
-    static const unsigned int kHardlinkGroup                = 0x080;
-    static const unsigned int kNestedCatalogTransitionFlags = 0x100;
-    static const unsigned int kChunkedFileFlag              = 0x200;
-    static const unsigned int kHasXattrsFlag                = 0x400;
-    static const unsigned int kExternalFileFlag             = 0x800;
-    static const unsigned int kBindMountpointFlag           = 0x1000;
-    static const unsigned int kHiddenFlag                   = 0x2000;
-    static const unsigned int kDirectIoFlag                 = 0x4000;
+    static const unsigned int kIdentical                    = 0x00000;
+    static const unsigned int kName                         = 0x00001;
+    static const unsigned int kLinkcount                    = 0x00002;
+    static const unsigned int kSize                         = 0x00004;
+    static const unsigned int kMode                         = 0x00008;
+    static const unsigned int kMtime                        = 0x00010;
+    static const unsigned int kSymlink                      = 0x00020;
+    static const unsigned int kChecksum                     = 0x00040;
+    static const unsigned int kHardlinkGroup                = 0x00080;
+    static const unsigned int kNestedCatalogTransitionFlags = 0x00100;
+    static const unsigned int kChunkedFileFlag              = 0x00200;
+    static const unsigned int kHasXattrsFlag                = 0x00400;
+    static const unsigned int kExternalFileFlag             = 0x00800;
+    static const unsigned int kBindMountpointFlag           = 0x01000;
+    static const unsigned int kHiddenFlag                   = 0x02000;
+    static const unsigned int kDirectIoFlag                 = 0x04000;
+    static const unsigned int kUid                          = 0x08000;
+    static const unsigned int kGid                          = 0x10000;
   };
   typedef unsigned int Differences;
 
@@ -109,6 +112,7 @@ class DirectoryEntryBase {
     , gid_(0)
     , size_(0)
     , mtime_(0)
+    , mtime_ns_(-1)
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
     , has_xattrs_(false)
     , is_external_file_(false)
@@ -129,12 +133,14 @@ class DirectoryEntryBase {
   inline bool IsExternalFile() const            { return is_external_file_; }
   inline bool IsDirectIo() const                { return is_direct_io_; }
   inline bool HasXattrs() const                 { return has_xattrs_;    }
+  inline bool HasMtimeNs() const                { return mtime_ns_ >= 0; }
 
   inline inode_t inode() const                  { return inode_; }
   inline uint32_t linkcount() const             { return linkcount_; }
   inline NameString name() const                { return name_; }
   inline LinkString symlink() const             { return symlink_; }
   inline time_t mtime() const                   { return mtime_; }
+  inline int32_t mtime_ns() const               { return mtime_ns_; }
   inline unsigned int mode() const              { return mode_; }
   inline uid_t uid() const                      { return uid_; }
   inline gid_t gid() const                      { return gid_; }
@@ -197,6 +203,17 @@ class DirectoryEntryBase {
     s.st_atime = mtime_;
     s.st_mtime = mtime_;
     s.st_ctime = mtime_;
+    if (HasMtimeNs()) {
+#ifdef __APPLE__
+      s.st_atimespec.tv_nsec = mtime_ns_;
+      s.st_mtimespec.tv_nsec = mtime_ns_;
+      s.st_ctimespec.tv_nsec = mtime_ns_;
+#else
+      s.st_atim.tv_nsec = mtime_ns_;
+      s.st_mtim.tv_nsec = mtime_ns_;
+      s.st_ctim.tv_nsec = mtime_ns_;
+#endif
+    }
     return s;
   }
 
@@ -219,6 +236,8 @@ class DirectoryEntryBase {
   gid_t gid_;
   uint64_t size_;
   time_t mtime_;
+  // nanosecond part of the mtime. Only valid if non-negative
+  int32_t mtime_ns_;
   LinkString symlink_;
   uint32_t linkcount_;
   // In order to save memory, we only indicate if a directory entry has custom

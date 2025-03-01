@@ -401,7 +401,7 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
             rollback_tag_->Reset();
   if (!success || Exists(old_target_tag.name)) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags "
-                                     "until '%s' - '%d'",
+                                     "until '%s' - '%" PRIu64 "'",
                                      old_target_tag.name.c_str(),
                                      old_target_tag.revision);
     return false;

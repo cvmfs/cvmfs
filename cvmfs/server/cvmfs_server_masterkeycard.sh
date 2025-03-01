@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server masterkeycard" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_sys.sh
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
@@ -15,7 +15,7 @@
 # If not, the reason is sent to stdout and false is returned,
 # otherwise there's nothing to stdout and true is returned
 masterkeycard_available() {
-  local pattern="Yubikey.*CCID"
+  local pattern="Yubi[kK]ey.*CCID"
   local reason=""
   if ! lsusb | grep -q "$pattern"; then
     reason="USB device matching \"$pattern\" not present"

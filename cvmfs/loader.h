@@ -103,7 +103,8 @@ enum StateId {
   kStateOpenChunksV4,       // >= 2.2.3
   kStateOpenFiles,          // >= 2.4
   kStateDentryTracker,      // >= 2.7 (renamed from kStateNentryTracker in 2.10)
-  kStatePageCacheTracker    // >= 2.10
+  kStatePageCacheTracker,   // >= 2.10
+  kStateFuse                // >= 2.11
 
   // Note: kStateOpenFilesXXX was renamed to kStateOpenChunksXXX as of 2.4
 };
@@ -242,7 +243,14 @@ struct CvmfsExports {
   struct fuse_lowlevel_ops cvmfs_operations;
 };
 
-Failures Reload(const int fd_progress, const bool stop_and_go);
+enum ReloadMode {
+  kReloadNoDebug = 0,
+  kReloadDebug,
+  kReloadLegacy
+};
+
+Failures Reload(const int fd_progress, const bool stop_and_go,
+                const ReloadMode reload_mode = kReloadLegacy);
 
 }  // namespace loader
 

@@ -4,6 +4,9 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+# use archive, see https://linux.web.cern.ch/els7/
+sudo sed -i 's#http://linuxsoft.cern.ch/epel/7/#http://linuxsoft.cern.ch/internal/archive/epel/7/#g' /etc/yum.repos.d/epel.repo || die "fail (patching epel mirror)"
+
 # # Place the overlay directories on ftype=1 16GB xfs partition
 # sudo dd if=/dev/zero of=/xfs-backend bs=$((1024*1024)) count=$((16*1024))
 # sudo mkfs.xfs -n ftype=1 /xfs-backend
@@ -81,6 +84,9 @@ curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
 sudo yum install -y nodejs
 sudo npm install -g azurite
 
+# building kernel
+install_from_repo perl
+
 # building preloader
 install_from_repo cmake
 install_from_repo zlib-devel
@@ -91,6 +97,7 @@ install_from_repo python-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
+install_from_repo git
 
 # install docker for testing DUCC
 sudo yum install -y yum-utils
@@ -107,6 +114,9 @@ set_nofile_limit 65536 || die "fail"
 echo "done"
 
 disable_systemd_rate_limit
+
+# Needed so that a mod_proxy can connect to the MinIO S3 service
+sudo /usr/sbin/setsebool -P httpd_can_network_connect 1
 
 # Ensure Apache is up and running after package update
 sudo systemctl restart httpd || die "failure in final Apache restart"

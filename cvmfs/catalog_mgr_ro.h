@@ -37,19 +37,13 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     const std::string          &dir_temp,
     download::DownloadManager  *download_manager,
     perf::Statistics           *statistics,
-    const bool                  manage_catalog_files = false)
-    : AbstractCatalogManager<Catalog>(statistics)
-    , base_hash_(base_hash)
-    , stratum0_(stratum0)
-    , dir_temp_(dir_temp)
-    , download_manager_(download_manager)
-    , manage_catalog_files_(manage_catalog_files) { }
+    const bool                  manage_catalog_files = false,
+    const std::string           &dir_cache = "",
+    const bool                  copy_to_tmp_dir = false);
 
  protected:
-  virtual LoadError LoadCatalog(const PathString  &mountpoint,
-                                const shash::Any  &hash,
-                                std::string       *catalog_path,
-                                shash::Any        *catalog_hash);
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog           *parent_catalog);
@@ -60,7 +54,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
 
   /**
    * Makes the given path relative to the catalog structure
-   * Pathes coming out here can be used for lookups in catalogs
+   * Paths coming out here can be used for lookups in catalogs
    * @param relativePath the path to be mangled
    * @return the mangled path
    */
@@ -68,7 +62,18 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
     return (relative_path == "") ? "" : "/" + relative_path;
   }
 
+  bool UseLocalCache() const { return !dir_cache_.empty(); }
+
+  std::string                dir_cache_;  // absolute path to local cache
+                                                // directory
+  bool                       copy_to_tmp_dir_;  // only relevant if using local
+                                                // cache directory:
+                                                // for writeable catalogs a copy
+                                                // must be created in dir_temp_
+
  private:
+  std::string CopyCatalogToTempFile(const std::string &cache_path);
+
   shash::Any                 base_hash_;
   std::string                stratum0_;
   std::string                dir_temp_;

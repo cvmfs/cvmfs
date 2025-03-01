@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System
  */
-#include "cvmfs_config.h"
+
 #include "swissknife_assistant.h"
 
 #include <unistd.h>
@@ -11,10 +11,10 @@
 
 #include "catalog.h"
 #include "catalog_rw.h"
-#include "download.h"
 #include "history.h"
 #include "history_sqlite.h"
 #include "manifest.h"
+#include "network/download.h"
 #include "util/logging.h"
 #include "util/posix.h"
 
@@ -104,7 +104,9 @@ bool Assistant::FetchObject(const shash::Any &id, const string &local_path) {
 
   download::Failures dl_retval;
   const std::string url = repository_url_ + "/data/" + id.MakePath();
-  download::JobInfo download_info(&url, true, false, &local_path, &id);
+
+  cvmfs::PathSink pathsink(local_path);
+  download::JobInfo download_info(&url, true, false, &id, &pathsink);
   dl_retval = download_mgr_->Fetch(&download_info);
 
   if (dl_retval != download::kFailOk) {

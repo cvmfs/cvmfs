@@ -26,7 +26,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "cache_posix.h"
 
 #include <dirent.h>
@@ -52,9 +52,9 @@
 #include "crypto/hash.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
-#include "download.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "quota.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -138,7 +138,7 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int PosixCacheManager::Close(int fd) {
-  int retval = close(fd);
+  int retval = do_refcount_ ? fd_mgr_->Close(fd) : close(fd);
   if (retval != 0)
     return -errno;
   return 0;
@@ -180,12 +180,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->object_info.type == kTypePinned) ||
-      (transaction->object_info.type == kTypeCatalog))
+  if ((transaction->label.flags & kLabelPinned) ||
+      (transaction->label.flags & kLabelCatalog))
   {
     bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->object_info.description,
-      (transaction->object_info.type == kTypeCatalog));
+      transaction->id, transaction->size, transaction->label.GetDescription(),
+      (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -206,19 +206,21 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->object_info.type == kTypePinned) ||
-        (transaction->object_info.type == kTypeCatalog))
+    if ((transaction->label.flags & kLabelPinned) ||
+        (transaction->label.flags & kLabelCatalog))
     {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
     // Success, inform quota manager
-    if (transaction->object_info.type == kTypeVolatile) {
+    if (transaction->label.flags & kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
-                                 transaction->object_info.description);
-    } else if (transaction->object_info.type == kTypeRegular) {
+                                 transaction->label.GetDescription());
+    } else if (!transaction->label.IsCatalog() &&
+               !transaction->label.IsPinned())
+    {
       quota_mgr_->Insert(transaction->id, transaction->size,
-                         transaction->object_info.description);
+                         transaction->label.GetDescription());
     }
   }
   transaction->~Transaction();
@@ -226,32 +228,27 @@ int PosixCacheManager::CommitTxn(void *txn) {
   return result;
 }
 
+bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
+  FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
 
-PosixCacheManager *PosixCacheManager::Create(
-  const string &cache_path,
-  const bool alien_cache,
-  const RenameWorkarounds rename_workaround)
-{
-  UniquePtr<PosixCacheManager> cache_manager(
-    new PosixCacheManager(cache_path, alien_cache));
-  assert(cache_manager.IsValid());
+  if (fs_info.type == kFsTypeTmpfs) {
+    is_tmpfs_ = true;
+  }
 
-  cache_manager->rename_workaround_ = rename_workaround;
-  if (cache_manager->alien_cache_) {
+  if (alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
-      return NULL;
+      return false;
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
-    FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
     switch (fs_info.type) {
       case kFsTypeNFS:
-        cache_manager->rename_workaround_ = kRenameLink;
+        rename_workaround_ = kRenameLink;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on NFS.");
         break;
       case kFsTypeBeeGFS:
-        cache_manager->rename_workaround_ = kRenameSamedir;
+        rename_workaround_ = kRenameSamedir;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on BeeGFS.");
         break;
@@ -260,13 +257,32 @@ PosixCacheManager *PosixCacheManager::Create(
     }
   } else {
     if (!MakeCacheDirectories(cache_path, 0700))
-      return NULL;
+      return false;
   }
 
   // TODO(jblomer): we might not need to look anymore for cvmfs 2.0 relicts
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
+    return false;
+  }
+  return true;
+}
+
+PosixCacheManager *PosixCacheManager::Create(
+  const string &cache_path,
+  const bool alien_cache,
+  const RenameWorkarounds rename_workaround,
+  const bool do_refcount)
+{
+  UniquePtr<PosixCacheManager> cache_manager(
+    new PosixCacheManager(cache_path, alien_cache, do_refcount));
+  assert(cache_manager.IsValid());
+
+  cache_manager->rename_workaround_ = rename_workaround;
+
+  bool result_ = cache_manager->InitCacheDirectory(cache_path);
+  if (!result_) {
     return NULL;
   }
 
@@ -275,48 +291,90 @@ PosixCacheManager *PosixCacheManager::Create(
 
 
 void PosixCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
+  const Label &label,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->object_info = object_info;
+  transaction->label = label;
 }
 
 
 string PosixCacheManager::Describe() {
-  return "Posix cache manager (cache directory: " + cache_path_ + ")\n";
+  string msg;
+  if (do_refcount_) {
+    msg = "Refcounting Posix cache manager"
+          "(cache directory: " + cache_path_ + ")\n";
+  } else {
+    msg = "Posix cache manager (cache directory: " + cache_path_ + ")\n";
+  }
+  return msg;
 }
 
 
 /**
- * Nothing to do, the kernel keeps the state of open file descriptors.  Return
- * a dummy memory location.
+ * If not refcounting, nothing to do, the kernel keeps the state 
+ * of open file descriptors.  Return a dummy memory location.
  */
 void *PosixCacheManager::DoSaveState() {
+  if (do_refcount_) {
+    SavedState *state = new SavedState();
+    state->fd_mgr = fd_mgr_->Clone();
+    return state;
+  }
   char *c = reinterpret_cast<char *>(smalloc(1));
-  *c = '\0';
+  *c = kMagicNoRefcount;
   return c;
 }
 
 
 int PosixCacheManager::DoRestoreState(void *data) {
   assert(data);
+  if (do_refcount_) {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    if (state->magic_number == kMagicRefcount) {
+      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                    "refcounted posix cache manager");
+
+      fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+    } else {
+      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
+                                    "non-refcounted posix cache manager");
+    }
+    return -1;
+  }
+
   char *c = reinterpret_cast<char *>(data);
-  assert(*c == '\0');
+  assert(*c == kMagicNoRefcount || *c == kMagicRefcount);
+  if (*c == kMagicRefcount) {
+    SavedState *state = reinterpret_cast<SavedState *>(data);
+    LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
+                                    "refcounted posix cache manager - this "
+                                    " is not possible, keep refcounting.");
+    fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
+    do_refcount_ = true;
+  }
   return -1;
 }
 
 
 bool PosixCacheManager::DoFreeState(void *data) {
-  free(data);
+  assert(data);
+  SavedState *state = reinterpret_cast<SavedState *>(data);
+  if (state->magic_number == kMagicRefcount) {
+    delete state;
+  } else {
+    // If not refcounted, the state is the dummy SavedState
+    // of the regular posix cache manager
+    free(data);
+  }
   return true;
 }
 
 
 
 int PosixCacheManager::Dup(int fd) {
-  int new_fd = dup(fd);
+  int new_fd = do_refcount_ ? fd_mgr_->Dup(fd) : dup(fd);
   if (new_fd < 0)
     return -errno;
   return new_fd;
@@ -353,10 +411,14 @@ int64_t PosixCacheManager::GetSize(int fd) {
 }
 
 
-int PosixCacheManager::Open(const BlessedObject &object) {
+int PosixCacheManager::Open(const LabeledObject &object) {
   const string path = GetPathInCache(object.id);
-  int result = open(path.c_str(), O_RDONLY);
-
+  int result;
+  if (do_refcount_) {
+    result = fd_mgr_->Open(object.id, path);
+  } else {
+    result = open(path.c_str(), O_RDONLY);
+  }
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
@@ -374,7 +436,13 @@ int PosixCacheManager::OpenFromTxn(void *txn) {
   int retval = Flush(transaction);
   if (retval < 0)
     return retval;
-  int fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
+  int fd_rdonly;
+
+  if (do_refcount_) {
+    fd_rdonly = fd_mgr_->Open(transaction->id, transaction->tmp_path.c_str());
+  } else {
+    fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
+  }
   if (fd_rdonly == -1)
     return -errno;
   return fd_rdonly;
@@ -409,10 +477,11 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 
   result = link(oldpath, newpath);
   if (result < 0) {
-    if (errno == EEXIST)
+    if (errno == EEXIST) {
       LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
-    else
+    } else {
       return -errno;
+    }
   }
   result = unlink(oldpath);
   if (result < 0)
@@ -424,11 +493,16 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 /**
  * Used by the sqlite vfs in order to preload file catalogs into the file system
  * buffers.
+ *
+ * No-op if the fd is to a file that is on a tmpfs, and so already in page cache
  */
 int PosixCacheManager::Readahead(int fd) {
   unsigned char *buf[4096];
   int nbytes;
   uint64_t pos = 0;
+  if (is_tmpfs()) {
+    return 0;
+  }
   do {
     nbytes = Pread(fd, buf, 4096, pos);
     pos += nbytes;

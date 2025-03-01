@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Chunked, grafted, uncompressed, external files"
 cvmfs_test_autofs_on_startup=false

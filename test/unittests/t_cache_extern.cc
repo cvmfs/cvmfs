@@ -256,6 +256,14 @@ class T_ExternalCacheManager : public ::testing::Test {
     delete mock_plugin_;
   }
 
+  CacheManager::LabeledObject LabelWithPath(const shash::Any &id,
+                                            const std::string &path)
+  {
+    CacheManager::Label label;
+    label.path = path;
+    return CacheManager::LabeledObject(id, label);
+  }
+
   static const unsigned nfiles;
   int fd_client;
   string socket_path_;
@@ -287,28 +295,29 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
   EXPECT_EQ(-EBADF, cache_mgr_->Close(0));
   shash::Any rnd_id(shash::kSha1);
   rnd_id.Randomize();
-  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::Bless(rnd_id)));
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(CacheManager::LabeledObject(rnd_id)));
   uint64_t session_id = mock_plugin_->last_id;
   EXPECT_EQ(0, strcmp(mock_plugin_->last_reponame, "test"));
   EXPECT_EQ(0, strcmp(mock_plugin_->last_client_instance, "instance"));
 
   int fds[nfiles];
   for (unsigned i = 0; i < nfiles; ++i) {
-    fds[i] = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+    fds[i] =
+      cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
     EXPECT_GE(fds[i], 0);
   }
   EXPECT_EQ(session_id, mock_plugin_->last_id);
   EXPECT_EQ(static_cast<int>(nfiles), mock_plugin_->known_object_refcnt);
-  EXPECT_EQ(-ENFILE,
-            cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
+  EXPECT_EQ(-ENFILE, cache_mgr_->Open(
+    CacheManager::LabeledObject(mock_plugin_->known_object)));
   for (unsigned i = 0; i < nfiles; ++i) {
     EXPECT_EQ(0, cache_mgr_->Close(fds[i]));
   }
   EXPECT_EQ(0, mock_plugin_->known_object_refcnt);
 
   mock_plugin_->next_status = cvmfs::STATUS_MALFORMED;
-  EXPECT_EQ(-EINVAL,
-            cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object)));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Open(
+    CacheManager::LabeledObject(mock_plugin_->known_object)));
   mock_plugin_->next_status = -1;
 }
 
@@ -328,7 +337,8 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   cache_mgr_->AcquireQuotaManager(quota_mgr_);
   EXPECT_GE(cache_mgr_->session_id(), 0);
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
@@ -339,13 +349,15 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(id, content.length(), txn));
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                         data, content.length()));
 }
 
 
 TEST_F(T_ExternalCacheManager, GetSize) {
   EXPECT_EQ(-EBADF, cache_mgr_->GetSize(0));
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(static_cast<int64_t>(mock_plugin_->known_object_content.length()),
             cache_mgr_->GetSize(fd));
@@ -361,7 +373,8 @@ TEST_F(T_ExternalCacheManager, GetSize) {
 TEST_F(T_ExternalCacheManager, Dup) {
   EXPECT_EQ(-EBADF, cache_mgr_->Dup(0));
   int fds[nfiles];
-  fds[0] = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  fds[0] =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fds[0], 0);
   for (unsigned i = 1; i < nfiles; ++i) {
     fds[i] = cache_mgr_->Dup(fds[0]);
@@ -381,7 +394,8 @@ TEST_F(T_ExternalCacheManager, Pread) {
   char buffer[64];
   EXPECT_EQ(-EBADF, cache_mgr_->Pread(0, buffer, buf_size, 0));
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, buffer, 1, 64));
   int64_t len = cache_mgr_->Pread(fd, buffer, 64, 0);
@@ -395,7 +409,8 @@ TEST_F(T_ExternalCacheManager, Pread) {
 
 TEST_F(T_ExternalCacheManager, Readahead) {
   EXPECT_EQ(-EBADF, cache_mgr_->Readahead(0));
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Readahead(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -408,31 +423,32 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
     reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        data, content.length()));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
 
   content = "";
   HashString(content, &id);
   data = NULL;
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, data, content.length(), "test"));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &buffer, &size));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+              data, content.length()));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
 
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
     scalloc(large_size, 1));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        large_buffer, large_size));
   unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
     smalloc(large_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &large_buffer_verify, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
+                                   &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
   EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
   free(large_buffer_verify);
@@ -440,10 +456,11 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
   large_size = 50 * 1024 * 1024 + 1;
   large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        large_buffer, large_size));
   large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &large_buffer_verify, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
+                                   &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
   EXPECT_EQ(0, memcmp(large_buffer, large_buffer_verify, large_size));
   free(large_buffer_verify);
@@ -475,7 +492,8 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
 
   uint64_t read_size = write_size;
   unsigned char *read_buffer = static_cast<unsigned char *>(smalloc(read_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(id, "test", &read_buffer, &read_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
+                                   &read_buffer, &read_size));
   EXPECT_EQ(read_size, write_size);
   EXPECT_EQ(0, memcmp(read_buffer, write_buffer, read_size));
   free(read_buffer);
@@ -509,7 +527,8 @@ void *MainBackchannel(void *data) {
 }  // anonymous namespace
 
 TEST_F(T_ExternalCacheManager, Detach) {
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   BackchannelData bd;
   quota_mgr_->RegisterBackChannel(bd.channel, "xyz");
@@ -543,7 +562,8 @@ TEST_F(T_ExternalCacheManager, Info) {
   EXPECT_EQ(mock_plugin_->known_object_content.length(), quota_mgr_->GetSize());
   EXPECT_EQ(0U, quota_mgr_->GetSizePinned());
 
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(mock_plugin_->known_object_content.length(),
             quota_mgr_->GetSizePinned());
@@ -553,7 +573,8 @@ TEST_F(T_ExternalCacheManager, Info) {
 
 TEST_F(T_ExternalCacheManager, Shrink) {
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_FALSE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -608,7 +629,11 @@ static void *MainMultiThread(void *data) {
 
   uint64_t size;
   unsigned char *buffer;
-  EXPECT_TRUE(td->cache_mgr->Open2Mem(td->id, "test", &buffer, &size));
+  CacheManager::Label label;
+  label.path = "test";
+  EXPECT_TRUE(
+    td->cache_mgr->Open2Mem(CacheManager::LabeledObject(td->id, label),
+                            &buffer, &size));
   EXPECT_EQ(td->large_size, size);
   EXPECT_EQ(0, memcmp(buffer, td->large_buffer, size));
   free(buffer);
@@ -635,8 +660,8 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
   memset(large_buffer, 1, large_size);
   shash::Any id(shash::kSha1);
   shash::HashMem(large_buffer, large_size, &id);
-  EXPECT_TRUE(
-    cache_mgr_->CommitFromMem(id, large_buffer, large_size, "test"));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
+                                        large_buffer, large_size));
 
   const unsigned num_threads = 10;
   pthread_t threads[num_threads];
@@ -672,7 +697,8 @@ TEST_F(T_ExternalCacheManager, SaveState) {
   cache_mgr_->FreeState(-1, data);
 
   // Now with a new cache manager
-  int fd = cache_mgr_->Open(CacheManager::Bless(mock_plugin_->known_object));
+  int fd =
+    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
   uint64_t old_session_id = mock_plugin_->last_id;
   EXPECT_GE(fd, 0);
   data = cache_mgr_->SaveState(-1);

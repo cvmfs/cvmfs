@@ -5,7 +5,7 @@
  * counterparts.
  */
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 
 #include <cstdio>
@@ -332,7 +332,7 @@ static void usage() {
                                "e.g. /cvmfs/atlas.cern.ch\n"
   " blacklist=FILE             Local blacklist for invalid certificates. "
                                "Has precedence over the whitelist.\n",
-  PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct);
+  CVMFS_VERSION, defaults.timeout, defaults.timeout_direct);
 }
 
 

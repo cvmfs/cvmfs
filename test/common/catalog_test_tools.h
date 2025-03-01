@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "catalog_mgr_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/signature.h"
 #include "directory_entry.h"
 #include "manifest.h"

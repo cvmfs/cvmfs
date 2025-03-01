@@ -83,7 +83,7 @@ class GatewayUploader : public AbstractUploader {
   virtual void DoRemoveAsync(const std::string& file_to_delete);
 
  protected:
-  virtual bool ReadSessionTokenFile(const std::string& token_file_name,
+  virtual void ReadSessionTokenFile(const std::string& token_file_name,
                                     std::string* token);
 
   virtual bool ReadKey(const std::string& key_file, std::string* key_id,

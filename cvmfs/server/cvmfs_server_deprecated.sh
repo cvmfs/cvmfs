@@ -5,7 +5,7 @@
 #
 # Implementation of deprecated cvmfs_server commands
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 # - cvmfs_server_ssl.sh

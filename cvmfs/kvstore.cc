@@ -247,7 +247,7 @@ int64_t MemoryKvStore::Read(
     return -ENOENT;
   }
   if (offset > mem.size) {
-    LogCvmfs(kLogKvStore, kLogDebug, "out of bounds read (%u>%u) on %s",
+    LogCvmfs(kLogKvStore, kLogDebug, "out of bounds read (%zu>%zu) on %s",
              offset, mem.size, id.ToString().c_str());
     return 0;
   }
@@ -295,7 +295,7 @@ int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
     // refcount (starting at 1 for pinning, for example)
     mem.refcount = buf.refcount;
   }
-  mem.object_type = buf.object_type;
+  mem.object_flags = buf.object_flags;
   mem.id = buf.id;
   mem.size = buf.size;
   if (entry_count_ == max_entries_) {
@@ -360,7 +360,7 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     return true;
   }
 
-  LogCvmfs(kLogKvStore, kLogDebug, "shrinking to %u B", size);
+  LogCvmfs(kLogKvStore, kLogDebug, "shrinking to %zu B", size);
   entries_.FilterBegin();
   while (entries_.FilterNext()) {
     if (used_bytes_ <= size) break;
@@ -380,6 +380,6 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
     LogCvmfs(kLogKvStore, kLogDebug, "delete %s", key.ToString().c_str());
   }
   entries_.FilterEnd();
-  LogCvmfs(kLogKvStore, kLogDebug, "shrunk to %u B", used_bytes_);
+  LogCvmfs(kLogKvStore, kLogDebug, "shrunk to %zu B", used_bytes_);
   return used_bytes_ <= size;
 }

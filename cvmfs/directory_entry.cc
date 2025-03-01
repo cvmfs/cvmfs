@@ -23,7 +23,7 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
   if (mode() != other.mode()) {
     result |= Difference::kMode;
   }
-  if (mtime() != other.mtime()) {
+  if ((mtime() != other.mtime()) || (mtime_ns() != other.mtime_ns())) {
     result |= Difference::kMtime;
   }
   if (symlink() != other.symlink()) {
@@ -34,6 +34,12 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
   }
   if (HasXattrs() != other.HasXattrs()) {
     result |= Difference::kHasXattrsFlag;
+  }
+  if (uid() != other.uid()) {
+    result |= Difference::kUid;
+  }
+  if (gid() != other.gid()) {
+    result |= Difference::kGid;
   }
 
   return result;

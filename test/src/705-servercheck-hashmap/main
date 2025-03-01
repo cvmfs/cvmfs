@@ -1,0 +1,63 @@
+#!/bin/bash
+cvmfs_test_name="Hashmap to avoid duplicated lookups in cvmfs_server check"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 10
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return 11
+
+  echo "generating an artificial but more or less representative repo"
+    ${TEST_ROOT}/common/mock_services/make_repo.py \
+    --max-dir-depth        3                                    \
+    --num-subdirs          2                                    \
+    --num-files-per-dir    5                                    \
+    --min-file-size        0                                    \
+    --max-file-size     5120                                    \
+    --duplicate-ratio    0.5                                    \
+    $repo_dir || return 12
+
+  mkdir /cvmfs/test.cern.ch/testdata
+  echo "abcdefg12345" > /cvmfs/test.cern.ch/testdata/a
+  cp /cvmfs/test.cern.ch/testdata/a /cvmfs/test.cern.ch/testdata/b
+
+
+  echo "creating CVMFS snapshot"
+  echo "--> redirecting publishing output to publish_output_1.log and publish_error_1.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output_1.log 2>publish_error_1.log || return 13
+
+  echo "check catalog and data integrity"
+  CVMFS_LOG_LEVEL=4 check_repository $CVMFS_TEST_REPO -i | tee  server_check.log || return 20
+
+  grep -A 1 "ad4841cf3811c1b9b8f88ec3d688f123eb229b" server_check.log | grep "/testdata/[ab] \[needs check\] 0" || return 21
+
+  cvmfs_swissknife check -c -d  -l 4 -r http://localhost/cvmfs/test.cern.ch  \
+                        -k /etc/cvmfs/keys/test.cern.ch.pub -N test.cern.ch \
+                         | tee server_check_no_hashmap.log || return 30
+
+  grep  "/testdata/b \[needs check\] 1" server_check_no_hashmap.log || return 31
+  grep  "/testdata/a \[needs check\] 1" server_check_no_hashmap.log || return 32
+
+  #TODO (vvolkl): add test for chunked files
+
+  echo "find out how many file system items are in the repo"
+  local num_1
+  num_1=$(find $repo_dir | wc -l)
+  echo "found $num_1 file system entries"
+
+  if [ $num_1 -lt 1 ]; then
+    echo "found $num_1 file system entries, should be more than one"
+    return 40;
+  fi
+
+  return 0
+}

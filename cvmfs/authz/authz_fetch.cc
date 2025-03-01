@@ -16,6 +16,7 @@
 #include <cstring>
 #include <vector>
 
+#include "monitor.h"
 #include "options.h"
 #include "sanitizer.h"
 #include "util/concurrency.h"
@@ -154,8 +155,26 @@ void AuthzExternalFetcher::ExecHelper() {
   envp.push_back(strdupa("CVMFS_AUTHZ_HELPER=yes"));
   envp.push_back(NULL);
 
+#ifdef __APPLE__
   int max_fd = sysconf(_SC_OPEN_MAX);
   assert(max_fd > 0);
+#else
+  std::vector<int> open_fds;
+  DIR *dirp = opendir("/proc/self/fd");
+  assert(dirp);
+  platform_dirent64 *dirent;
+  while ((dirent = platform_readdir(dirp))) {
+    const std::string name(dirent->d_name);
+    uint64_t name_uint64;
+    // Make sure the dir name is digits only (skips ".", ".." and similar).
+    if (!String2Uint64Parse(name, &name_uint64))
+      continue;
+    if (name_uint64 < 2)
+      continue;
+    open_fds.push_back(static_cast<int>(name_uint64));
+  }
+  closedir(dirp);
+#endif
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
            argv0);
 
@@ -166,13 +185,25 @@ void AuthzExternalFetcher::ExecHelper() {
     assert(retval == 0);
     retval = dup2(pipe_recv[1], 1);
     assert(retval == 1);
+#ifdef __APPLE__
     for (int fd = 2; fd < max_fd; fd++)
       close(fd);
+#else
+    for (unsigned i = 0; i < open_fds.size(); ++i)
+      close(open_fds[i]);
+#endif
+
+    for (size_t i = 0; i < sizeof(Watchdog::g_suppressed_signals)/sizeof(int);
+         i++) {
+      struct sigaction signal_handler;
+      signal_handler.sa_handler = SIG_DFL;
+      sigaction(Watchdog::g_suppressed_signals[i], &signal_handler, NULL);
+    }
 
     execve(argv0, argv, &envp[0]);
     syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
            argv0, errno);
-    abort();
+    _exit(1);
   }
   assert(pid > 0);
   close(pipe_send[0]);

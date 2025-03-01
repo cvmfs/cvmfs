@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "file_chunk.h"
 
 namespace upload {

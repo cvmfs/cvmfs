@@ -130,7 +130,7 @@ TEST(T_Reflog, Checksum) {
 }
 
 
-TYPED_TEST(T_Reflog, Initalize) {}
+TYPED_TEST(T_Reflog, Initialize) {}
 
 
 TYPED_TEST(T_Reflog, CreateReflog) {

@@ -114,14 +114,14 @@ tar --owner=root --group=root -cvf rootfs.tar .
 cp ${CVMFS_SOURCE_LOCATION}/packaging/container/Dockerfile .
 docker build \
   --build-arg VERSION=$CVMFS_TAG \
-  --build-arg PLATFORM="$(lsb_release -sicr)" \
+  --build-arg PLATFORM="$(. /etc/os-release; echo $PRETTY_NAME)" \
   --tag cvmfs/service:$CVMFS_TAG \
   .
 
 # TODO(jblomer): use buildah once build nodes are recent enough
 #buildah bud \
 #  --build-arg VERSION=$CVMFS_TAG \
-#  --build-arg PLATFORM="$(lsb_release -sicr)" \
+#  --build-arg PLATFORM="$(. /etc/os-release; echo $PRETTY_NAME)" \
 #  --tag cvmfs/service:$CVMFS_TAG
 
 ARCHIVE_NAME="cvmfs-service-${CVMFS_TAG}.$(uname -m)"

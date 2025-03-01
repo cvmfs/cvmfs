@@ -6,7 +6,7 @@
 
 #include <cstdio>
 
-#include "s3fanout.h"
+#include "network/s3fanout.h"
 #include "util/file_backed_buffer.h"
 
 using namespace std;  // NOLINT

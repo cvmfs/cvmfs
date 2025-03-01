@@ -27,8 +27,21 @@ __version__ = "0.2"
 __author__ = "John Smith <code@john-smith.me>"
 
 import os
-import BaseHTTPServer
-import SimpleHTTPServer
+import sys
+
+# for python 2/3 compatibility:
+# store the python version information in some global flags
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+
+
+if PY3:
+  import http.server as BaseHTTPServer
+  import http.server as SimpleHTTPServer
+else:
+  import BaseHTTPServer
+  import SimpleHTTPServer
+
 
 # Additions for handling Range: header
 import logging
@@ -49,7 +62,6 @@ def parse_range_header(range_header, total_length):
     (which could either be handled as a user
     request failure, or the same as if (None, None) was returned
     """
-    # range_header = self.headers.getheader("Range")
     if range_header is None or range_header == "":
         return (None, None)
     if not range_header.startswith("bytes="):
@@ -182,9 +194,13 @@ class HTTPRangeRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         fs = os.fstat(f.fileno())
         total_length = fs[6]
         try:
-            self.range_from, self.range_to = parse_range_header(
-                self.headers.getheader("Range"), total_length)
-        except InvalidRangeHeader, e:
+            if PY2:
+              self.range_from, self.range_to = parse_range_header(
+                  self.headers.getheader("Range"), total_length)
+            else:
+              self.range_from, self.range_to = parse_range_header(
+                  self.headers.get("Range"), total_length)
+        except InvalidRangeHeader as e:
             # Just serve them the whole file, although it's possibly
             # more correct to return a 4xx error?
             logging.warning("Range header parsing failed, "

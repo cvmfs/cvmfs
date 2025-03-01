@@ -1,0 +1,34 @@
+#!/bin/bash
+
+#
+# Test CVMFS_CPU_AFFINITY parameter to pin the cvmfs client to certain cores
+#
+
+cvmfs_test_name="CPU affinity"
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  if running_on_osx; then
+    echo "Skipping test on macOS"
+    return 0
+  fi
+
+  echo "*** mount cernvm-prod.cern.ch with cpu affinity 0,1"
+  cvmfs_mount cernvm-prod.cern.ch CVMFS_CPU_AFFINITY=0,1 || return 1
+
+  local pid=$(get_xattr pid /cvmfs/cernvm-prod.cern.ch/)
+  echo "*** PID is $pid"
+
+  echo -n "*** Task set: "
+  taskset -c -a -p $pid
+
+  taskset -c -a -p $pid | while read t; do
+    echo "*** Checking task $t"
+    [ "$(echo "$t" | awk '{print $NF}')" = "0,1" ] || return 1
+  done || return 20
+
+  return 0
+}
+

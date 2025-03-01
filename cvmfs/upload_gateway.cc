@@ -4,6 +4,7 @@
 
 #include "upload_gateway.h"
 
+#include <cassert>
 #include <limits>
 #include <vector>
 
@@ -84,9 +85,7 @@ bool GatewayUploader::Initialize() {
     return false;
   }
   std::string session_token;
-  if (!ReadSessionTokenFile(config_.session_token_file, &session_token)) {
-    return false;
-  }
+  ReadSessionTokenFile(config_.session_token_file, &session_token);
 
   std::string key_id;
   std::string secret;
@@ -230,24 +229,20 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
-bool GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
+void GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
                                            std::string* token) {
-  if (!token) {
-    return false;
-  }
+  assert(token);
+  *token = "INVALIDTOKEN";  // overwritten if reading from file works
 
   FILE* token_file = std::fopen(token_file_name.c_str(), "r");
   if (!token_file) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "HTTP Uploader - Could not open session token "
-             "file. Aborting.");
-    return false;
+             "HTTP Uploader - Could not open session token file.");
+    return;
   }
 
-  bool ret = GetLineFile(token_file, token);
+  GetLineFile(token_file, token);
   fclose(token_file);
-
-  return ret;
 }
 
 bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,

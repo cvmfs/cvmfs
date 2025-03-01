@@ -1,0 +1,29 @@
+--- CMakeLists.txt.orig	2023-07-12 22:09:36.558429929 +0200
++++ CMakeLists.txt	2023-07-12 22:09:48.278349271 +0200
+@@ -1911,6 +1911,6 @@
+ ENDIF(ENABLE_TEST)
+ 
+ add_subdirectory(libarchive)
+-add_subdirectory(cat)
+-add_subdirectory(tar)
+-add_subdirectory(cpio)
++#add_subdirectory(cat)
++#add_subdirectory(tar)
++#add_subdirectory(cpio)
+--- libarchive/CMakeLists.txt.orig	2023-07-12 22:12:07.117270670 +0200
++++ libarchive/CMakeLists.txt	2023-07-12 22:12:22.637137428 +0200
+@@ -240,7 +240,7 @@
+ 
+ IF(ENABLE_INSTALL)
+   # How to install the libraries
+-  INSTALL(TARGETS archive archive_static
++  INSTALL(TARGETS  archive_static
+           RUNTIME DESTINATION bin
+           LIBRARY DESTINATION lib
+           ARCHIVE DESTINATION lib)
+@@ -248,4 +248,4 @@
+   INSTALL(FILES ${include_HEADERS} DESTINATION include)
+ ENDIF()
+ 
+-add_subdirectory(test)
++#add_subdirectory(test)

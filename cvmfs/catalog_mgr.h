@@ -21,30 +21,32 @@
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
+#include "manifest_fetch.h"
 #include "statistics.h"
+#include "util/algorithm.h"
 #include "util/atomic.h"
 #include "util/logging.h"
+#include "util/platform.h"
 
 class XattrList;
-
 namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
 
-/**
- * Lookup a directory entry including its parent entry or not.
- */
-enum LookupOptions {
-  kLookupSole        = 0x01,
-  // kLookupFull        = 0x02  not used anymore
-  kLookupRawSymlink  = 0x10,
-};
 
+/**
+ * LookupOption for a directory entry (bitmask).
+ * kLookupDefault = Look solely at the given directory entry (parent is ignored)
+ * kLookupRawSymlink = Don't resolve environment variables in symlink targets
+ */
+typedef unsigned LookupOptions;
+const unsigned kLookupDefault = 0b1;
+const unsigned kLookupRawSymlink = 0b10;
 
 /**
  * Results upon loading a catalog file.
  */
-enum LoadError {
+enum LoadReturn {
   kLoadNew = 0,
   kLoadUp2Date,
   kLoadNoSpace,
@@ -53,7 +55,113 @@ enum LoadError {
   kLoadNumEntries
 };
 
-inline const char *Code2Ascii(const LoadError error) {
+/**
+ * Location of the most recent root catalog.
+ * Used as part of the process of loading a catalog.
+ * - GetNewRootCatalogContext() sets the location within the CatalogContext obj
+ * - LoadCatalogByHash(): when loading a root catalog it uses the location
+ *                        stored within the CatalogContext object to retrieve
+ *                        the root catalog from the right location
+ */
+enum RootCatalogLocation {
+  kCtlgNoLocationNeeded = 0,  // hash known, no location needed
+  kCtlgLocationMounted,      // already loaded in mounted_catalogs_
+  kCtlgLocationServer,
+  kCtlgLocationBreadcrumb
+};
+
+/**
+ * CatalogContext class contains all necessary information to load a catalog and
+ * also keeps track of the resulting output.
+ * It works as follows:
+ * 1) Load a new root catalog:
+ *  - Use empty constructor CatalogContext()
+ *  - Let the CatalogContext object be populated by GetNewRootCatalogContext()
+ *    - This will set: hash, mountpoint, root_ctlg_revision, root_ctlg_location
+ *  - Call LoadCatalogByHash()
+ *    - This will set: sqlite_path
+ * 2) Load a catalog based on a given hash
+ *  - Populate CatalogContext object; used constructor depends on catalog type
+ *    - Root catalog: CatalogContext(shash::Any hash, PathString mountpoint,
+              RootCatalogLocation location)
+      - Nested catalog: CatalogContext(shash::Any hash, PathString mountpoint)
+      - Note: in this case root_ctlg_revision is not used
+ *  - Call LoadCatalogByHash()
+      - This will set: sqlite_path
+ */
+struct CatalogContext {
+ public:
+  CatalogContext() :
+              hash_(shash::Any()),
+              mountpoint_(PathString("invalid", 7)),  // empty str is root ctlg
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(kCtlgNoLocationNeeded),
+              manifest_ensemble_(NULL) { }
+  CatalogContext(const shash::Any &hash, const PathString &mountpoint) :
+              hash_(hash),
+              mountpoint_(mountpoint),
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(kCtlgNoLocationNeeded),
+              manifest_ensemble_(NULL) { }
+
+  CatalogContext(const shash::Any &hash, const PathString &mountpoint,
+                 const RootCatalogLocation location) :
+              hash_(hash),
+              mountpoint_(mountpoint),
+              sqlite_path_(""),
+              root_ctlg_revision_(-1ul),
+              root_ctlg_location_(location),
+              manifest_ensemble_(NULL)  { }
+
+  bool IsRootCatalog() {
+    return mountpoint_.IsEmpty();
+  }
+
+  std::string *GetSqlitePathPtr() { return &sqlite_path_; }
+  shash::Any *GetHashPtr() { return &hash_; }
+
+  shash::Any hash() const { return hash_; }
+  PathString mountpoint() const { return mountpoint_; }
+  std::string sqlite_path() const { return sqlite_path_; }
+  uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
+  RootCatalogLocation root_ctlg_location() const
+                                                 { return root_ctlg_location_; }
+  manifest::ManifestEnsemble *manifest_ensemble() const
+                                       { return manifest_ensemble_.weak_ref(); }
+
+  void SetHash(shash::Any hash) { hash_ = hash; }
+  void SetMountpoint(const PathString &mountpoint) { mountpoint_ = mountpoint; }
+  void SetSqlitePath(const std::string &sqlite_path)
+                                                 { sqlite_path_ = sqlite_path; }
+  void SetRootCtlgRevision(uint64_t root_ctlg_revision)
+                                   { root_ctlg_revision_ = root_ctlg_revision; }
+  void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)
+                                   { root_ctlg_location_ = root_ctlg_location; }
+  /**
+   * Gives ownership to CatalogContext
+   */
+  void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
+                                     { manifest_ensemble_ = manifest_ensemble; }
+
+
+ private:
+  // mandatory for LoadCatalogByHash()
+  shash::Any hash_;
+  // mandatory for LoadCatalogByHash()
+  PathString mountpoint_;
+  // out parameter, path name of the sqlite catalog
+  std::string sqlite_path_;
+  // root catalog: revision is needed for GetNewRootCatalogContext()
+  uint64_t root_ctlg_revision_;
+  // root catalog: location is mandatory for LoadCatalogByHash()
+  RootCatalogLocation root_ctlg_location_;
+  // root catalog: if location = server mandatory for LoadCatalogByHash()
+  UniquePtr<manifest::ManifestEnsemble> manifest_ensemble_;
+};
+
+inline const char *Code2Ascii(const LoadReturn error) {
   const char *texts[kLoadNumEntries + 1];
   texts[0] = "loaded new catalog";
   texts[1] = "catalog was up to date";
@@ -72,6 +180,10 @@ struct Statistics {
   perf::Counter *n_listing;
   perf::Counter *n_nested_listing;
   perf::Counter *n_detach_siblings;
+  perf::Counter *n_write_lock;
+  perf::Counter *ns_write_lock;
+
+  perf::Counter *catalog_revision;
 
   explicit Statistics(perf::Statistics *statistics) {
     n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
@@ -89,6 +201,12 @@ struct Statistics {
         "Number of listings of nested catalogs");
     n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
+    n_write_lock = statistics->Register("catalog_mgr.n_write_lock",
+                                        "number of write lock calls");
+    ns_write_lock = statistics->Register("catalog_mgr.ns_write_lock",
+        "time spent in WriteLock() [ns]");
+    catalog_revision = statistics->Register("catalog_revision",
+                                    "Revision number of the root file catalog");
   }
 };
 
@@ -125,8 +243,9 @@ class AbstractCatalogManager : public SingleCopy {
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);
   virtual bool Init();
-  LoadError Remount(const bool dry_run);
-  LoadError ChangeRoot(const shash::Any &root_hash);
+  LoadReturn RemountDryrun();
+  LoadReturn Remount();
+  LoadReturn ChangeRoot(const shash::Any &root_hash);
   void DetachNested();
 
   bool LookupPath(const PathString &path, const LookupOptions options,
@@ -173,6 +292,7 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
+  uint64_t GetTimestamp() const;
   uint64_t GetTTL() const;
   bool HasExplicitTTL() const;
   bool GetVOMSAuthz(std::string *authz) const;
@@ -206,17 +326,40 @@ class AbstractCatalogManager : public SingleCopy {
 
  protected:
   /**
-   * Load the catalog and return a file name and the catalog hash. Derived
-   * class can decide if it wants to use the hash or the path.
-   * Both the input as well as the output hash can be 0.
+   * Load the catalog and return a file name and the catalog hash.
+   *
+   * GetNewRootCatalogContext() populates CatalogContext object with the
+   * information needed to retrieve the most recent root catalog independent of
+   * its location.
+   * The CatalogContext object must be populated with at least hash and
+   * mountpoint to call LoadCatalogByHash().
+   *
+   * See class description of CatalogContext for more information.
    */
-  virtual LoadError LoadCatalog(const PathString &mountpoint,
-                                const shash::Any &hash,
-                                std::string  *catalog_path,
-                                shash::Any   *catalog_hash) = 0;
+  virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result) = 0;
+  virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
+
+  /**
+   * Opportunistic optimization: the client catalog manager uses this method
+   * to preload into the cache a nested catalog that is likely to be required
+   * next. Likely, because there is a race with the root catalog reload which
+   * may result in the wrong catalog being staged. That's not a fault though,
+   * the correct catalog will still be loaded with the write lock held.
+   * Note that this method is never used for root catalogs.
+   */
+  virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
+                                        const PathString & /*mountpoint*/)
+  { }
+  /**
+   * Called within the ReadLock(), which will be released before downloading
+   * the catalog (and before leaving the method)
+   */
+  void StageNestedCatalogAndUnlock(const PathString &path,
+                                   const CatalogT *parent,
+                                   bool is_listable);
 
   /**
    * Create a new Catalog object.
@@ -251,13 +394,19 @@ class AbstractCatalogManager : public SingleCopy {
 
   CatalogT *FindCatalog(const PathString &path) const;
 
+  uint64_t GetRevisionNoLock() const;
+  uint64_t GetTimestampNoLock() const;
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
   }
   inline void WriteLock() const {
+    uint64_t timestamp = platform_monotonic_time_ns();
     int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
+    perf::Inc(statistics_.n_write_lock);
+    uint64_t duration = platform_monotonic_time_ns() - timestamp;
+    perf::Xadd(statistics_.ns_write_lock, duration);
   }
   inline void Unlock() const {
     int retval = pthread_rwlock_unlock(rwlock_);
@@ -275,6 +424,7 @@ class AbstractCatalogManager : public SingleCopy {
   int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
+  uint64_t timestamp_cache_;
   /**
    * Try to keep number of nested catalogs below the given limit. Zero means no
    * limit. Surpassing the watermark on mounting a catalog triggers

@@ -34,12 +34,16 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &rdonly_path,
                                    const std::string &tarball_path,
                                    const std::string &base_directory,
+                                   const uid_t uid,
+                                   const gid_t gid,
                                    const std::string &to_delete,
                                    const bool create_catalog_on_root)
     : SyncUnion(mediator, rdonly_path, "", ""),
       src(NULL),
       tarball_path_(tarball_path),
       base_directory_(base_directory),
+      uid_(uid),
+      gid_(gid),
       to_delete_(to_delete),
       create_catalog_on_root_(create_catalog_on_root),
       read_archive_signal_(new Signal) {}
@@ -68,7 +72,8 @@ bool SyncUnionTarball::Initialize() {
   }
 
   if (result != ARCHIVE_OK) {
-    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive.");
+    LogCvmfs(kLogUnionFs, kLogStderr, "Impossible to open the archive: %s",
+             archive_error_string(src));
     return false;
   }
 
@@ -119,7 +124,7 @@ void SyncUnionTarball::Traverse() {
     }
   }
 
-  // we are simplying deleting entity from  the repo
+  // we are simply deleting entity from  the repo
   if (NULL == src) return;
 
   struct archive_entry *entry = archive_entry_new();
@@ -180,7 +185,7 @@ void SyncUnionTarball::Traverse() {
       default: {
         // We should never enter in this branch, but just for safeness we prefer
         // to abort in case we hit a case we don't how to manage.
-        PANIC(kLogStderr, "Enter in unknow state. Aborting.\nError: %s\n",
+        PANIC(kLogStderr, "Enter in unknown state. Aborting.\nError: %s\n",
               result, archive_error_string(src));
       }
     }
@@ -204,7 +209,8 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   CreateDirectories(parent_path);
 
   SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-      parent_path, filename, src, entry, read_archive_signal_, this));
+                                       parent_path, filename, src, entry,
+                                       read_archive_signal_, this, uid_, gid_));
 
   if (NULL != archive_entry_hardlink(entry)) {
     const std::string hardlink_name(
@@ -313,7 +319,7 @@ bool SyncUnionTarball::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
   return false;
 }
 
-/* Tar files are not necessarly traversed in order from root to leave.
+/* Tar files are not necessarily traversed in order from root to leave.
  * So it may happens that we are expanding the file `/a/b/c.txt` without
  * having created yet the directory `/a/b/`.
  * In order to overcome this limitation the following function create dummy
@@ -331,7 +337,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
 
   if (dirname == ".") dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
-      new SyncItemDummyDir(dirname, filename, this, kItemDir));
+      new SyncItemDummyDir(dirname, filename, this, kItemDir, uid_, gid_));
 
   ProcessUnmaterializedDirectory(dummy);
   dirs_[target] = dummy;

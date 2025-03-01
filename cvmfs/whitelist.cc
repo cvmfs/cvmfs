@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "whitelist.h"
 
 #include <algorithm>
@@ -11,7 +11,7 @@
 #include <ctime>
 
 #include "crypto/signature.h"
-#include "download.h"
+#include "network/download.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 #include "util/string.h"
@@ -221,16 +221,17 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
   Reset();
 
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
-  download::JobInfo download_whitelist(&whitelist_url,
-                                       false, probe_hosts, NULL);
+  cvmfs::MemSink whitelist_memsink;
+  download::JobInfo download_whitelist(&whitelist_url, false, probe_hosts, NULL,
+                                       &whitelist_memsink);
   retval_dl = download_manager_->Fetch(&download_whitelist);
   if (retval_dl != download::kFailOk)
     return kFailLoad;
-  plain_size_ = download_whitelist.destination_mem.pos;
+  plain_size_ = whitelist_memsink.pos();
   if (plain_size_ == 0)
     return kFailEmpty;
-  plain_buf_ =
-    reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
+  whitelist_memsink.Release();
+  plain_buf_ = whitelist_memsink.data();
 
   retval_wl = ParseWhitelist(plain_buf_, plain_size_);
   if (retval_wl != kFailOk)
@@ -240,16 +241,17 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
     // Load the separate whitelist pkcs7 structure
     const string whitelist_pkcs7_url =
       base_url + string("cvmfswhitelist.pkcs7");
+    cvmfs::MemSink pkcs7_memsink;
     download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
-                                               probe_hosts, NULL);
+                                             probe_hosts, NULL, &pkcs7_memsink);
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
-    pkcs7_size_ = download_whitelist_pkcs7.destination_mem.pos;
+    pkcs7_size_ = pkcs7_memsink.pos();
     if (pkcs7_size_ == 0)
       return kFailEmptyPkcs7;
-    pkcs7_buf_ = reinterpret_cast<unsigned char *>
-      (download_whitelist_pkcs7.destination_mem.data);
+    pkcs7_memsink.Release();
+    pkcs7_buf_ = pkcs7_memsink.data();
   }
 
   return VerifyWhitelist();

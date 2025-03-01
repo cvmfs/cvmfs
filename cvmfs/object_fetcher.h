@@ -11,10 +11,10 @@
 
 #include "catalog.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "reflog.h"
 #include "util/posix.h"
 
@@ -582,12 +582,10 @@ class HttpObjectFetcher :
     // fetch and decompress the requested object
     const std::string url = BuildUrl(relative_path);
     const bool probe_hosts = false;
-    download::JobInfo download_job(&url,
-                                        decompress,
-                                        probe_hosts,
-                                        f,
-                                        expected_hash);
-    download_job.force_nocache = nocache;
+    cvmfs::FileSink filesink(f);
+    download::JobInfo download_job(&url, decompress, probe_hosts, expected_hash,
+                                   &filesink);
+    download_job.SetForceNocache(nocache);
     download::Failures retval = download_manager_->Fetch(&download_job);
     const bool success = (retval == download::kFailOk);
     fclose(f);
@@ -616,11 +614,11 @@ class HttpObjectFetcher :
 
         case download::kFailProxyHttp:
         case download::kFailHostHttp:
-          if (download_job.http_code == 404)
+          if (download_job.http_code() == 404)
             return BaseTN::kFailNotFound;
           LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
                    "HTTP protocol error %d: %s (%d)",
-                   download_job.http_code, url.c_str(), retval);
+                   download_job.http_code(), url.c_str(), retval);
           return BaseTN::kFailNetwork;
 
         case download::kFailBadData:
@@ -633,7 +631,7 @@ class HttpObjectFetcher :
           {
             LogCvmfs(kLogDownload, kLogDebug | kLogStderr,
                      "HTTP transfer error %d (HTTP code %d): %s",
-                     retval, download_job.http_code, url.c_str());
+                     retval, download_job.http_code(), url.c_str());
             return BaseTN::kFailNetwork;
           }
           return BaseTN::kFailUnknown;

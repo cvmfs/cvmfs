@@ -12,7 +12,7 @@
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 #include "loader.h"
 
 #include <dlfcn.h>
@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "crypto/crypto_util.h"
 #include "duplex_fuse.h"
 #include "fence.h"
 #include "fuse_main.h"
@@ -128,6 +127,8 @@ string *mount_point_ = NULL;
 string *config_files_ = NULL;
 string *socket_path_ = NULL;
 string *usyslog_path_ = NULL;
+int fuse3_max_threads_ = 0;
+int fuse3_idle_threads_ = 0;
 uid_t uid_ = 0;
 gid_t gid_ = 0;
 bool single_threaded_ = false;
@@ -177,7 +178,7 @@ static void Usage(const string &exename) {
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
-    PACKAGE_VERSION, exename.c_str());
+    CVMFS_VERSION, exename.c_str());
 }
 
 /**
@@ -380,7 +381,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       exit(0);
     case KEY_VERSION:
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS version %s\n",
-               PACKAGE_VERSION);
+               CVMFS_VERSION);
       exit(0);
     case KEY_FOREGROUND:
       foreground_ = true;
@@ -400,7 +401,6 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       PANIC(kLogStderr, "internal option parsing error");
   }
 }
-
 
 static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   struct fuse_args *mount_options = new fuse_args();
@@ -498,7 +498,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
   string error_messages;
 
-  static vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
+  vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
   if (library_paths.empty()) {
     library_paths.push_back(local_lib_path + library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
@@ -543,9 +543,16 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
-
-Failures Reload(const int fd_progress, const bool stop_and_go) {
+Failures Reload(const int fd_progress, const bool stop_and_go,
+                const ReloadMode reload_mode) {
   int retval;
+
+  // for legacy call we take the current state of debug_mode_
+  if (reload_mode == kReloadDebug) {
+    debug_mode_ = true;
+  } else if (reload_mode == kReloadNoDebug) {
+    debug_mode_ = false;
+  }
 
   retval = cvmfs_exports_->fnMaintenanceMode(fd_progress);
   if (!retval)
@@ -627,7 +634,23 @@ int FuseMain(int argc, char *argv[]) {
       bool stop_and_go = false;
       if ((argc > 3) && (string(argv[3]) == "stop_and_go"))
         stop_and_go = true;
-      retval = loader_talk::MainReload(argv[2], stop_and_go);
+
+      // always last param of the cvmfs2 __RELOAD__ command
+      // check if debug mode is requested
+      // NOTE:
+      // debug mode is decided based on CVMFS_DEBUGLOG being set or not
+      // this means: reloading is now always based on CVMFS_DEBUGLOG, and
+      // reload ignores the current state
+      //
+      // if you mount with debug but do not set CVMFS_DEBUGLOG and reload,
+      // you will reload with
+      if (std::string(argv[argc - 1]) == std::string("--debug")) {
+        debug_mode_ = true;
+      } else {
+        debug_mode_ = false;
+      }
+      retval = loader_talk::MainReload(argv[2], stop_and_go, debug_mode_);
+
       if ((retval != 0) && (stop_and_go)) {
         CreateFile(string(argv[2]) + ".paused.crashed", 0600);
       }
@@ -677,8 +700,6 @@ int FuseMain(int argc, char *argv[]) {
       return kFailLoadLibrary;
     return cvmfs_exports_->fnAltProcessFlavor(argc, argv);
   }
-
-  crypto::SetupLibcryptoMt();
 
   // Option parsing
   struct fuse_args *mount_options;
@@ -736,8 +757,29 @@ int FuseMain(int argc, char *argv[]) {
     fuse_opt_add_arg(mount_options, "-osuid");
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with suid support");
   }
+
+  if (options_manager->GetValue("CVMFS_CPU_AFFINITY", &parameter)) {
+#ifndef __APPLE__
+     cpu_set_t mask;
+     vector<string> cpus = SplitString(parameter, ',');
+     CPU_ZERO(&mask);
+     for (vector<string>::iterator i = cpus.begin(); i != cpus.end(); i++) {
+        CPU_SET(String2Uint64(Trim(*i)), &mask);
+     }
+     LogCvmfs(kLogCvmfs, kLogStdout,
+              "CernVM-FS: setting CPU Affinity to %s", parameter.c_str());
+     int err = sched_setaffinity(0, sizeof(mask), &mask);
+     if (err != 0) {
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
+                 "Setting CPU Affinity failed with error %d", errno);
+     }
+#else
+     LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
+              "CPU affinity setting not supported on macOS");
+#endif
+  }
   loader_exports_ = new LoaderExports();
-  loader_exports_->loader_version = PACKAGE_VERSION;
+  loader_exports_->loader_version = CVMFS_VERSION;
   loader_exports_->boot_time = time(NULL);
   loader_exports_->program_name = argv[0];
   loader_exports_->foreground = foreground_;
@@ -776,7 +818,7 @@ int FuseMain(int argc, char *argv[]) {
 
   if (!premounted_ && !DirectoryExists(*mount_point_)) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Moint point %s does not exist", mount_point_->c_str());
+             "Mount point %s does not exist", mount_point_->c_str());
     return kFailPermission;
   }
 
@@ -850,6 +892,10 @@ int FuseMain(int argc, char *argv[]) {
       return kFailPermission;
     }
   }
+  if (disable_watchdog_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
+    prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+  }
 
   // Only set usyslog now, otherwise file permissions are wrong
   usyslog_path_ = new string();
@@ -888,6 +934,30 @@ int FuseMain(int argc, char *argv[]) {
              "Failed to initialize loader socket");
     return kFailLoaderTalk;
   }
+
+  // TODO(jblomer): we probably want to apply a default setting related to the
+  // number of cores.
+  if (options_manager->GetValue("CVMFS_FUSE3_MAX_THREADS", &parameter)) {
+    fuse3_max_threads_ = String2Int64(parameter);
+  }
+  if (options_manager->GetValue("CVMFS_FUSE3_IDLE_THREADS", &parameter)) {
+    fuse3_idle_threads_ = String2Int64(parameter);
+  }
+#ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+  if (fuse3_max_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: Fuse3 max_threads=%d", fuse3_max_threads_);
+  }
+  if (fuse3_idle_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: Fuse3 min_idle_threads=%d", fuse3_idle_threads_);
+  }
+#else
+  if (fuse3_max_threads_ || fuse3_idle_threads_) {
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "CernVM-FS: ignoring fuse3 thread settings (libfuse too old)");
+  }
+#endif
 
   // Options are not needed anymore
   delete options_manager;
@@ -1041,8 +1111,24 @@ int FuseMain(int argc, char *argv[]) {
 #if CVMFS_USE_LIBFUSE == 2
     retval = fuse_session_loop_mt(session);
 #else
+#ifdef CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+    struct fuse_loop_config *fuse_loop_cfg = fuse_loop_cfg_create();
+
+    fuse_loop_cfg_set_clone_fd(fuse_loop_cfg, 1);
+
+    if (fuse3_max_threads_ > 0) {
+      fuse_loop_cfg_set_max_threads(fuse_loop_cfg, fuse3_max_threads_);
+    }
+    if (fuse3_idle_threads_ > 0) {
+      fuse_loop_cfg_set_idle_threads(fuse_loop_cfg, fuse3_idle_threads_);
+    }
+
+    retval = fuse_session_loop_mt(session, fuse_loop_cfg);
+    fuse_loop_cfg_destroy(fuse_loop_cfg);
+#else
     retval = fuse_session_loop_mt(session, 1 /* use fd per thread */);
-#endif
+#endif  // CVMFS_ENABLE_FUSE3_LOOP_CONFIG
+#endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
 
@@ -1071,8 +1157,6 @@ int FuseMain(int argc, char *argv[]) {
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
-
-  crypto::CleanupLibcryptoMt();
 
   delete fence_reload_;
   delete loader_exports_;

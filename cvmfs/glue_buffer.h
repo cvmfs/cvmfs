@@ -22,9 +22,11 @@
 #include "bigqueue.h"
 #include "bigvector.h"
 #include "crypto/hash.h"
+#include "directory_entry.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"
+#include "util/exception.h"
 #include "util/mutex.h"
 #include "util/platform.h"
 #include "util/posix.h"
@@ -536,7 +538,12 @@ class InodeReferences {
       return false;
     }
 
-    assert(refcounter >= by);
+    if (refcounter < by) {
+      PANIC(kLogSyslogErr | kLogDebug,
+            "inode tracker refcount mismatch, inode % " PRIu64
+            ", refcounts %u / %u", inode, refcounter, by);
+    }
+
     if (refcounter == by) {
       map_.Erase(inode);
       return true;
@@ -620,7 +627,11 @@ class InodeTracker {
         shash::Md5 md5path;
         InodeEx inode_ex(inode, InodeEx::kUnknownType);
         bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
-        assert(found);
+        if (!found) {
+          PANIC(kLogSyslogErr | kLogDebug,
+                "inode tracker ref map and path map out of sync: %" PRIu64,
+                inode);
+        }
         tracker_->inode_ex_map_.Erase(inode);
         tracker_->path_map_.Erase(md5path);
         atomic_inc64(&tracker_->statistics_.num_removes);
@@ -1035,6 +1046,47 @@ class PageCacheTracker {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Checks if the dirent's inode is registered in the page cache tracker and
+   * if
+   *  - it is currently open and has a different content than dirent
+   *  - it has been previously found stale (no matter if now open or not)
+   */
+  bool IsStale(const catalog::DirectoryEntry &dirent) {
+    Entry entry;
+    const MutexLockGuard guard(lock_);
+
+    const bool retval = map_.Lookup(dirent.inode(), &entry);
+    if (!retval)
+      return false;
+    if (entry.hash.IsNull()) {
+      // A previous call to IsStale() returned true (see below)
+      return true;
+    }
+    if (entry.nopen == 0)
+      return false;
+    if (entry.hash == dirent.checksum())
+      return false;
+
+    bool is_stale = true;
+    if (dirent.IsChunkedFile()) {
+      // Shortcut for chunked files: go by last modified timestamp
+      is_stale =
+        stat_store_.Get(entry.idx_stat).st_mtime != dirent.mtime();
+    }
+    if (is_stale) {
+      // We mark that inode as "stale" by setting its hash to NULL.
+      // When we check next time IsStale(), it is returned stale even
+      // if it is not open.
+      // The call to GetInfoIfOpen() will from now on return the null hash.
+      // That works, the caller will still assume that the version in the
+      // page cache tracker is different from any inode in the catalogs.
+      entry.hash = shash::Any();
+      map_.Insert(dirent.inode(), entry);
+    }
+    return is_stale;
   }
 
   EvictRaii GetEvictRaii() { return EvictRaii(this); }

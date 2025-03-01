@@ -7,7 +7,7 @@
  */
 
 #include "swissknife.h"
-#include "cvmfs_config.h"
+
 
 #include <unistd.h>
 

@@ -74,7 +74,7 @@ struct ManifestEnsemble {
     if (whitelist_buf) free(whitelist_buf);
     if (whitelist_pkcs7_buf) free(whitelist_pkcs7_buf);
   }
-  // Can be overwritte to fetch certificate from cache
+  // Can be overwritten to fetch certificate from cache
   virtual void FetchCertificate(const shash::Any &hash) {}
 
   Manifest *manifest;
@@ -95,7 +95,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble);
 
-Failures Verify(char *manifest_data, size_t manifest_size,
+Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 const std::string &base_url, const std::string &repository_name,
                 const uint64_t minimum_timestamp,
                 const shash::Any *base_catalog,

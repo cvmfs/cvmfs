@@ -65,17 +65,18 @@ install_from_repo fuse-overlayfs
 # TODO: uncomment once trickle is available for Centos 8
 #       and enable test 056-lowspeedlimit
 
-# Install test dependency for 647
-install_from_repo python2-pip
-sudo pip2 install flask                      || die "fail (installing python-flask)"
-install_from_repo python3-flask
-
 # Install test dependency for 604
 install_from_repo python3
 install_from_repo netcat
 
+
+
 # Install the test S3 provider
 install_test_s3
+
+
+# building kernel
+install_from_repo perl
 
 # building preloader
 install_from_repo cmake
@@ -87,6 +88,7 @@ install_from_repo python2-devel
 install_from_repo unzip
 install_from_repo bzip2
 install_from_repo acl
+install_from_repo git
 
 # install docker for testing DUCC
 sudo yum install -y yum-utils
@@ -96,6 +98,14 @@ sudo yum install -y --nobest docker-ce
 sudo firewall-cmd --zone=public --add-masquerade --permanent
 sudo firewall-cmd --reload
 sudo systemctl restart docker
+
+
+# Install test dependency for 647
+install_from_repo python3-flask   || die "fail (installing python3-flask)"
+# making sure that a `python` executable exists...
+# NOTE: this needs to run after installing python2
+# as its postinstall can remove this symlink
+sudo ln -s /usr/bin/python3 /usr/bin/python || true
 
 # Migration test needs lsb_release
 echo "install lsb_release..."

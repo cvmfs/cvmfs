@@ -10,7 +10,7 @@
 #include <sstream>
 
 #include "catalog_rw.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
 #include "options.h"
@@ -309,8 +309,7 @@ void CatalogTestTool::UpdateManifest() {
 }
 
 // Note: we always apply the dir spec to the revision corresponding to the
-// original,
-//       empty repository.
+// original, empty repository.
 bool CatalogTestTool::Apply(const std::string& id, const DirSpec& spec) {
   statistics_ = new perf::Statistics();
   catalog_mgr_ =
@@ -404,7 +403,7 @@ bool CatalogTestTool::LookupNestedCatalogHash(
 
   catalog::DirectoryEntry entry;
   // This lookup is used to ensure the needed catalogs are mounted
-  catalog_mgr->LookupPath(path, catalog::kLookupSole, &entry);
+  catalog_mgr->LookupPath(path, catalog::kLookupDefault, &entry);
 
   p.Assign(&path[0], path.length());
   shash::Any hash = catalog_mgr->GetNestedCatalogHash(p);
@@ -436,7 +435,7 @@ bool CatalogTestTool::FindEntry(
     return false;
   }
 
-  if (!catalog_mgr->LookupPath(path, catalog::kLookupSole, entry)) {
+  if (!catalog_mgr->LookupPath(path, catalog::kLookupDefault, entry)) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "catalog for directory '%s' cannot be found",
              path.c_str());
@@ -488,7 +487,7 @@ catalog::WritableCatalogManager* CatalogTestTool::CreateCatalogMgr(
   catalog::WritableCatalogManager* catalog_mgr =
       new catalog::WritableCatalogManager(root_hash, stratum0, temp_dir,
                                           spooler, dl_mgr, false, 0, 0, 0,
-                                          stats, false, 0, 0);
+                                          stats, false, 0, 0, "");
   catalog_mgr->Init();
 
   return catalog_mgr;

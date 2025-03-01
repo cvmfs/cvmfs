@@ -20,13 +20,13 @@ set -e
 
 case "$1" in
     configure)
-	codename=$(lsb_release -sc)
+	codename=$(env -i sh -c '. /etc/os-release; echo $VERSION_CODENAME')
 	repolist=/usr/share/cvmfs-release/cernvm.list.${codename}
 	mkdir -p /etc/apt/sources.list.d
 	if [ -f $repolist ]; then
 	  ln -f -s $repolist /etc/apt/sources.list.d/cernvm.list
 	else
-		version_major=$(lsb_release -sr | cut -d. -f1)
+		version_major=$(env -i sh -c '. /etc/os-release; echo $VERSION_ID' | cut -d. -f1)
 		fallback_release=
 		if [ $version_major -ge 22 ]; then
 			echo "Warning: this distribution is not supported. Using Ubuntu 22.04 packages as fallback."

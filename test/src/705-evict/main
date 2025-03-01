@@ -1,0 +1,112 @@
+#!/bin/bash
+cvmfs_test_name="Evict chunks"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST705_PRIVATE_MOUNT=
+
+source ./src/705-evict/setup_teardown
+
+
+evict_file() {
+  local mntpnt="$1"
+  local filename="$2"
+  local minimum_chunks="$3"
+
+  echo ""
+  echo "*** START Testing evict_file for file: /$filename"
+
+  echo "   Mounting repo..."
+  private_mount $mntpnt || return $?
+
+  echo "   Accessing files"
+  cat $mntpnt/large > /dev/null
+  cat $mntpnt/small > /dev/null
+
+  local lc_oldCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
+  # make sure filehas at least $minimum_chunks in cache
+  [ $lc_oldCache -ge $minimum_chunks ] || return 10  
+
+  echo "   Evicting file $filename"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO evict "/$filename"
+
+  local lc_newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
+  # make sure file is completely evicted from cache
+  [ $lc_newCache -eq 0 ] || return 11 
+
+
+  echo "   ...Success"
+  echo "   Unmount repo"
+  private_unmount
+  echo "*** FINISHED Testing evict_file for file: /$filename"
+  echo ""
+}
+
+evict_and_readd() {
+  local mntpnt="$1"
+  local filename="$2"
+  local minimum_chunks="$3"
+
+  echo ""
+  echo "*** START Testing evict_file for file: /$filename"
+
+  echo "   Mounting repo..."
+  private_mount $mntpnt || return $?
+
+  echo "   Accessing files"
+  cat $mntpnt/large > /dev/null
+  cat $mntpnt/small > /dev/null
+
+  local lc_oldCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
+  # make sure filehas at least $minimum_chunks in cache
+  [ $lc_oldCache -ge $minimum_chunks ] || return 20  
+
+  echo "   Evicting file $filename"
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO evict "/$filename"
+
+  # NOTE NOTE NOTE NOTE
+  # You need to drop the kernel caches
+  # Evict leaves a weird state for cache because
+  # - files deleted from cvmfs cache (quota manager)
+  # - kernel cache still has files
+  # - !!!! meta data still ok --> cvmfs does not evict from kernel cache
+  # --> files will be retrieved from kernel cache without being visible
+  #     in the cvmfs cache
+  # Workaround for test: drop kernel caches
+  echo "   Dropping kernel caches"
+  sudo sh -c "echo 3 > /proc/sys/vm/drop_caches" || return 3
+
+  echo "   Accessing files again"
+  cat $mntpnt/large > /dev/null
+  cat $mntpnt/small > /dev/null
+
+  local lc_newCache=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO cache list | grep -e $filename | wc -l)
+  # make sure file is completely evicted from cache
+  [ $lc_newCache -eq $lc_oldCache ] || return 21 
+
+  echo "   ...Success"
+  echo "   Unmount repo"
+  private_unmount
+  echo "*** FINISHED Testing evict_file for file: /$filename"
+  echo ""
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  create_evict_repo || return $?
+
+  evict_file ${mntpnt} "large" 2 || return $?
+  evict_file ${mntpnt} "small" 1 || return $?
+
+  evict_and_readd ${mntpnt} "large" 2 || return $?
+  evict_and_readd ${mntpnt} "small" 1 || return $?
+
+  return 0
+}

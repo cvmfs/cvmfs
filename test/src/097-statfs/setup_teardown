@@ -1,0 +1,16 @@
+#!/bin/bash
+test097_mount() {
+  local repo=$1
+  local params=$2
+
+  # We use a number of wipe cache operations in this test. On macOS, where we
+  # don't have active cache eviction, they all take 1 minute, resulting in a
+  # test case timeout. Therefore, reduce the kernel cache timeout.
+  cvmfs_mount $repo CVMFS_KCACHE_TIMEOUT=5 $params
+}
+
+test097_unmount() {
+  local repo=$1
+
+  cvmfs_umount $repo
+}

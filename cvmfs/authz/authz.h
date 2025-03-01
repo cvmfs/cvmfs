@@ -47,7 +47,7 @@ enum AuthzStatus {
 
 /**
  * The credentials together with the membership string it was verified for.
- * Entries expire.  Negative credential verification can be representated, too,
+ * Entries expire.  Negative credential verification can be represented, too,
  * with status != kAuthzOk.
  */
 struct AuthzData {

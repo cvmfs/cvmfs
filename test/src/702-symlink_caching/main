@@ -1,0 +1,204 @@
+#!/bin/bash
+cvmfs_test_name="Symlink caching and dentry eviction: Proper eviction policy for kernel cache"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+TEST702_PRIVATE_MOUNT=
+TEST702_PIDS=
+CVMFS_TEST_702_OSXMOUNTPOINT=
+
+source ./src/702-symlink_caching/setup_teardown
+
+
+# Returns 0 if readlink is cached in kernel cache
+# Otherwise 1
+# If empty string (=error) return 2
+check_readlink_is_cached() {
+  local mntpnt="$1"
+  local symlink_name="$2"
+
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  local old_counter=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  readlink ${mntpnt}/${symlink_name} > /dev/null
+  local new_counter=$(sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO internal affairs | grep readlink)
+
+  if [ "$old_counter" = "$new_counter" ] && [ "$old_counter" != "" ] ; then
+    echo "0"
+  elif [ "$old_counter" != "$new_counter" ] && [ "$old_counter" != "" ] && [ "$new_counter" != "" ] ; then
+    echo "1"
+  else
+    echo "2"
+  fi
+}
+
+# for fuse3 check
+replace_short_symlink_with_long() {
+  local short_name="$1"
+  local long_name="$2"
+  local symlink_name="$3"
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  ln -sf ${long_name} /cvmfs/${CVMFS_TEST_REPO}/${symlink_name}
+  publish_repo ${CVMFS_TEST_REPO} || return $?
+
+  #remount
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync
+}
+
+cleanup_mount_on_top() {
+  echo "Cleaning up: umount mount-on-top"
+  sudo umount $TEST702_PRIVATE_MOUNT/testdir_mountpoint
+  if [ "x$CVMFS_TEST_702_OSXMOUNTPOINT" != "x" ]; then
+    sudo hdiutil detach $CVMFS_TEST_702_OSXMOUNTPOINT
+  fi
+}
+
+# should work both for libfuse2 and libfuse3 as
+# - libfuse2 does not evict dentries
+# - libfuse3.15.1 expires dentries instead of evicting
+mount_on_top() {
+  local mntpnt="$1"
+  echo $mntpnt
+
+
+  if running_on_osx; then
+    CVMFS_TEST_702_OSXMOUNTPOINT=$(sudo hdid -nomount ram://256000)
+    sudo newfs_hfs $CVMFS_TEST_702_OSXMOUNTPOINT || return 30
+    sudo mount -t hfs $CVMFS_TEST_702_OSXMOUNTPOINT $mntpnt/testdir_mountpoint || return 31
+    sudo mkdir $mntpnt/testdir_mountpoint/self || return 32
+  else
+    sudo mount -t proc none $mntpnt/testdir_mountpoint || return 33
+  fi
+  trap cleanup_mount_on_top EXIT HUP INT TERM
+
+  ls $mntpnt/testdir_mountpoint/self > /dev/null || return 34
+  diff $mntpnt/testdir_mountpoint/self/maps /proc/self/maps || return 35
+
+  # better to use: sudo cvmfs_config reload $CVMFS_TEST_REPO || return 36
+  # however this is not possible with a socket
+  # as such workaround: use remount sync
+  # this requires change to repo to force catalog update
+  add_some_tmp_file_to_repo
+  sudo cvmfs_talk -p ${mntpnt}c/$CVMFS_TEST_REPO/cvmfs_io.$CVMFS_TEST_REPO remount sync || return 36
+
+  ls $mntpnt/testdir_mountpoint/self > /dev/null || return 37
+  diff $mntpnt/testdir_mountpoint/self/maps /proc/self/maps  || return 38
+
+  cleanup_mount_on_top
+}
+
+# for fuse 2
+# checks that
+# 1) symlinks are not cached in kernel
+check_libfuse2() {
+  local mntpnt="$1"
+  local config_file_path="$2"
+  local symlink_name="$3"
+
+  
+  echo ""
+  echo "*** START Testing libfuse2"
+  
+  echo "Mounting repo..."
+  private_mount $mntpnt "2"|| return $?
+  
+  echo ""
+  echo "  *** Testing caching..."
+  local res=$(check_readlink_is_cached $mntpnt $symlink_name)
+
+  [ $res = "1" ] || return 11
+
+  echo ""
+  echo "  *** Testing mount on top..."
+  mount_on_top $mntpnt || return $?
+
+  echo ""
+  echo "  *** Unmount repo"
+  private_unmount
+  echo "*** FINISHED Testing libfuse2"
+  echo ""
+
+
+}
+
+# for fuse3 (prerequirement: fuse >= 3.10)
+# checks that
+# 1) symlinks are cached in kernel
+# 2) symlinks switching from location with a short path --> long path should 
+#    not trunacte
+#
+# TODO(HereThereBeDragons)
+# this code does not do proper check it. it still assumes no correct
+# support of expire
+check_libfuse3() {
+  local mntpnt="$1"
+  local config_file_path="$2"
+  local short_name="$3"
+  local long_name="$4"
+  local symlink_name="$5"  
+
+  echo ""
+  echo "*** START Testing libfuse3"
+
+  echo "  *** Mounting repo..."
+  private_mount $mntpnt "3"
+
+  echo ""
+  echo "  *** Testing caching..."
+  # res_cached must be 0
+  local res_cached=$(check_readlink_is_cached $mntpnt $symlink_name)
+
+  echo ""
+  echo "  *** Test symlink short -> long replacement"
+  local old_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
+  replace_short_symlink_with_long $short_name $long_name $symlink_name
+  local new_symlink_pointer=$(readlink ${mntpnt}/${symlink_name})
+  # res_switch must be 0
+  if [ "$new_symlink_pointer" = "$long_name" ] && [ "$old_symlink_pointer" = "$short_name" ]; then
+    local res_switch="0"
+  else
+    local res_switch="1"
+  fi
+
+  [ $res_cached = "0" ] || return 20
+  [ $res_switch = "0" ] || return 21
+
+  echo ""
+  echo "  *** Testing mount on top..."
+  mount_on_top $mntpnt || return $?
+
+  echo ""
+  echo "  *** Unmount repo"
+  private_unmount
+
+
+  echo ""
+  echo "*** FINISHED Testing libfuse3"
+  echo ""
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local scratch_dir=$(pwd)
+  local mntpnt="${scratch_dir}/private_mnt"
+  local config_file_path="${scratch_dir}/${CVMFS_TEST_REPO}.config.txt"
+  local short_name="test1.txt"
+  local long_name="thisismyverylongsecondfile_solongthatnoonebelieveshowlongitis_butneverthelessitislongerthananythingyouhaveeverseen_especiallybecausewehavetogetthe200charactersfull_andwearestillafewaway_butnotanymore.txt"
+  local symlink_name="symlink.txt"  
+
+  echo "*** Set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+
+  create_symlink_repo ${short_name} ${long_name} ${symlink_name} || return $?
+
+  check_libfuse2 ${mntpnt} ${config_file_path} ${symlink_name} || return $?
+  check_libfuse3 ${mntpnt} ${config_file_path} ${short_name} ${long_name} ${symlink_name} || return $?
+
+  return 0
+}

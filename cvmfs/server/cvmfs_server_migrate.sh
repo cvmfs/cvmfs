@@ -5,7 +5,7 @@
 #
 # Implementation of the "cvmfs_server migrate" command
 
-# This file depends on fuctions implemented in the following files:
+# This file depends on functions implemented in the following files:
 # - cvmfs_server_util.sh
 # - cvmfs_server_common.sh
 
@@ -127,7 +127,6 @@ _migrate_2_1_7() {
     -t $temp_dir                                       \
     -o $new_manifest                                   \
     -k /etc/cvmfs/keys/$name.pub                       \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -s || die "fail! (migrating catalogs)"
   chown ${CVMFS_USER} $new_manifest
 

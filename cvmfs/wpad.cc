@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "wpad.h"
 
 #include <fcntl.h>
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "download.h"
+#include "network/download.h"
 #include "pacparser.h"
 #include "statistics.h"
 #include "util/logging.h"
@@ -173,15 +173,16 @@ string AutoProxy(DownloadManager *download_manager) {
     }
     LogCvmfs(kLogDownload, kLogDebug, "looking for proxy config at %s",
              pac_paths[i].c_str());
-    download::JobInfo download_pac(&pac_paths[i], false, false, NULL);
+    cvmfs::MemSink pac_memsink;
+    download::JobInfo download_pac(&pac_paths[i], false, false, NULL,
+                                   &pac_memsink);
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
-      retval = ParsePac(download_pac.destination_mem.data,
-                        download_pac.destination_mem.pos,
+      retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data()),
+                        pac_memsink.pos(),
                         download_manager,
                         &proxies);
-      free(download_pac.destination_mem.data);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "failed to parse pac file %s",  pac_paths[i].c_str());
@@ -278,12 +279,11 @@ int MainResolveProxyDescription(int argc, char **argv) {
   string proxy_configuration = argv[2];
   string host_list = argv[3];
 
-  DownloadManager download_manager;
-  download_manager.Init(1, perf::StatisticsTemplate("pac", &statistics));
+  DownloadManager download_manager(1,
+                                  perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);
-  download_manager.Fini();
 
   LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
   return resolved_proxies == "";

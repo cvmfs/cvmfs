@@ -10,7 +10,7 @@
 // NOLINTNEXTLINE
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "swissknife_pull.h"
 
 #include <inttypes.h>
@@ -24,13 +24,13 @@
 #include <vector>
 
 #include "catalog.h"
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "object_fetcher.h"
 #include "path_filters/relaxed_path_filter.h"
 #include "reflog.h"
@@ -139,9 +139,9 @@ static bool Peek(const shash::Any &remote_hash) {
 }
 
 static void ReportDownloadError(const download::JobInfo &download_job) {
-  const download::Failures error_code = download_job.error_code;
-  const int http_code = download_job.http_code;
-  const std::string url = *download_job.url;
+  const download::Failures error_code = download_job.error_code();
+  const int http_code = download_job.http_code();
+  const std::string url = *download_job.url();
 
   LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
            url.c_str(), error_code, download::Code2Ascii(error_code));
@@ -227,7 +227,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   assert(ftmp);
   int retval;
   if (compress) {
-    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unsused
+    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unused
     retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
   } else {
     retval = CopyMem2File(buffer, size, ftmp);
@@ -274,10 +274,10 @@ static void *MainWorker(void *data) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
-      assert(fchunk);
       string url_chunk = *stratum0_url + "/data/" + chunk_hash.MakePath();
-      download::JobInfo download_chunk(&url_chunk, false, false, fchunk,
-                                       &chunk_hash);
+      cvmfs::FileSink filesink(fchunk);
+      download::JobInfo download_chunk(&url_chunk, false, false,
+                                       &chunk_hash, &filesink);
 
       const download::Failures download_result =
                                        download_manager->Fetch(&download_chunk);
@@ -397,8 +397,9 @@ bool CommandPull::Pull(const shash::Any   &catalog_hash,
     return false;
   }
   const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
+  cvmfs::FileSink filesink(fcatalog_vanilla);
   download::JobInfo download_catalog(&url_catalog, false, false,
-                                     fcatalog_vanilla, &catalog_hash);
+                                     &catalog_hash, &filesink);
   dl_retval = download_manager()->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
@@ -525,9 +526,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (DirectoryExists(master_keys))
     master_keys = JoinStrings(FindFilesBySuffix(master_keys, ".pub"), ":");
   const string repository_name = *args.find('m')->second;
-  string trusted_certs;
-  if (args.find('y') != args.end())
-    trusted_certs = *args.find('y')->second;
   if (args.find('n') != args.end())
     num_parallel = String2Uint64(*args.find('n')->second);
   if (args.find('t') != args.end())
@@ -588,18 +586,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  if (!this->InitVerifyingSignatureManager(master_keys, trusted_certs)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initalize CVMFS signatures");
+  if (!this->InitSignatureManager(master_keys)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize CVMFS signatures");
     return 1;
   } else {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: using public key(s) %s",
              JoinStrings(SplitString(master_keys, ':'), ", ").c_str());
-    if (!trusted_certs.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStdout,
-               "CernVM-FS: using trusted certificates in %s",
-               JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
-    }
   }
 
   unsigned current_group;
@@ -639,13 +632,13 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   download::JobInfo download_sentinel(&url_sentinel, false);
   retval = download_manager()->Fetch(&download_sentinel);
   if (retval != download::kFailOk) {
-    if (download_sentinel.http_code == 404) {
+    if (download_sentinel.http_code() == 404) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "This is not a CernVM-FS server for replication");
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Failed to contact stratum 0 server (%d - %s)",
-               retval, download::Code2Ascii(download_sentinel.error_code));
+               retval, download::Code2Ascii(download_sentinel.error_code()));
     }
     goto fini;
   }
@@ -664,15 +657,17 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!meta_info_hash.IsNull()) {
     meta_info_hash = ensemble.manifest->meta_info();
     const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
-    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
+    cvmfs::MemSink metainfo_memsink;
+    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash,
+                                        &metainfo_memsink);
     dl_retval = download_manager()->Fetch(&download_metainfo);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
                dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
-    meta_info = string(download_metainfo.destination_mem.data,
-                       download_metainfo.destination_mem.pos);
+    meta_info = string(reinterpret_cast<char*>(metainfo_memsink.data()),
+                       metainfo_memsink.pos());
   }
 
   is_garbage_collectable = ensemble.manifest->garbage_collectable();
@@ -735,9 +730,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string history_url = *stratum0_url + "/data/"
                                              + history_hash.MakePath();
     const string history_path = *temp_dir + "/" + history_hash.ToString();
+
+    cvmfs::PathSink pathsink(history_path);
     download::JobInfo download_history(&history_url, false, false,
-                                       &history_path,
-                                       &history_hash);
+                                       &history_hash, &pathsink);
     dl_retval = download_manager()->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       ReportDownloadError(download_history);
@@ -762,7 +758,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       goto fini;
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Found %lu named snapshots",
              historic_tags.size());
     // TODO(jblomer): We should repliacte the previous history dbs, too,
     // in order to avoid races on fail-over between non-synchronized stratum 1s
@@ -900,7 +896,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
                   ".cvmfspublished", false);
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %u",
+    LogCvmfs(kLogCvmfs, kLogStdout, "Serving revision %" PRIu64,
              ensemble.manifest->revision());
   }
 

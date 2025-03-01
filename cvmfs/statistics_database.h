@@ -28,7 +28,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   bool StoreEntry(const std::string &insert_statement);
 
 /**
- * Prune the statistics DB (delete records older than certain threshhold)
+ * Prune the statistics DB (delete records older than certain threshold)
  * @param days number of days of records to keep, 0 means no pruning
  * @return true on success, false otherwise
  */
@@ -108,7 +108,7 @@ class StatisticsDatabase : public sqlite::Database<StatisticsDatabase> {
   * maximum age (in days) of records to keep when pruning
   * (zero means keep forever)
   *   key: CVMFS_STATS_DB_DAYS_TO_KEEP
-  *   deafult: 365
+  *   default: 365
   *
   * @param repo_name Fully qualified name of the repository
   * @param path pointer to save the db path in

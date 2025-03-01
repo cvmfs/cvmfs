@@ -42,12 +42,12 @@ struct MemoryBuffer {
     : address(NULL)
     , size(0)
     , refcount(0)
-    , object_type(CacheManager::kTypeRegular)
+    , object_flags(0)
     , id() {}
   void *address;
   size_t size;
   unsigned int refcount;
-  CacheManager::ObjectType object_type;
+  int object_flags;
   shash::Any id;
 };
 

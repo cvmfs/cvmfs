@@ -3,7 +3,7 @@
  */
 
 #include "swissknife_history.h"
-#include "cvmfs_config.h"
+
 
 #include <algorithm>
 #include <cassert>
@@ -12,8 +12,8 @@
 #include "catalog_rw.h"
 #include "crypto/hash.h"
 #include "crypto/signature.h"
-#include "download.h"
 #include "manifest_fetch.h"
+#include "network/download.h"
 #include "upload.h"
 
 using namespace std;         // NOLINT
@@ -30,7 +30,6 @@ static void InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Mandatory('w', "repository directory / url"));
   r->push_back(Parameter::Mandatory('t', "temporary scratch directory"));
   r->push_back(Parameter::Optional('p', "public key of the repository"));
-  r->push_back(Parameter::Optional('z', "trusted certificates"));
   r->push_back(Parameter::Optional('f', "fully qualified repository name"));
   r->push_back(Parameter::Optional('r', "spooler definition string"));
   r->push_back(Parameter::Optional('m', "(unsigned) manifest file to edit"));
@@ -60,9 +59,6 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   const string pubkey_path = (args.find('p') == args.end())
                                  ? ""
                                  : MakeCanonicalPath(*args.find('p')->second);
-  const string trusted_certs = (args.find('z') == args.end())
-                                   ? ""
-                                   : MakeCanonicalPath(*args.find('z')->second);
   const shash::Any base_hash =
       (args.find('b') == args.end())
           ? shash::Any()
@@ -128,8 +124,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   }
 
   // initialize the (swissknife global) signature manager (if possible)
-  if (!pubkey_path.empty() &&
-      !this->InitVerifyingSignatureManager(pubkey_path, trusted_certs)) {
+  if (!pubkey_path.empty() && !this->InitSignatureManager(pubkey_path)) {
     return NULL;
   }
 
@@ -228,8 +223,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   // disable the unlink guard in order to keep the newly exported manifest file
   env->manifest_path.Disable();
   LogCvmfs(kLogCvmfs, kLogVerboseMsg,
-           "exported manifest (%d) with new "
-           "history '%s'",
+           "exported manifest (%" PRIu64 ") with new history '%s'",
            env->manifest->revision(), new_history_hash.ToString().c_str());
 
   return true;
@@ -272,7 +266,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
   env->manifest->set_catalog_size(catalog_size);
   env->manifest->set_catalog_hash(new_catalog_hash);
 
-  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "uploaded new catalog (%d bytes) '%s'",
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "uploaded new catalog (%lu bytes) '%s'",
            catalog_size, new_catalog_hash.ToString().c_str());
 
   return true;
@@ -344,8 +338,8 @@ bool CommandTag::FetchObject(const std::string &repository_url,
   download::Failures dl_retval;
   const std::string url = repository_url + "/data/" + object_hash.MakePath();
 
-  download::JobInfo download_object(&url, true, false, &destination_path,
-                                    &object_hash);
+  cvmfs::PathSink pathsink(destination_path);
+  download::JobInfo download_object(&url, true, false, &object_hash, &pathsink);
   dl_retval = download_manager()->Fetch(&download_object);
 
   if (dl_retval != download::kFailOk) {
@@ -410,7 +404,8 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
 
 void CommandTag::PrintTagMachineReadable(
     const history::History::Tag &tag) const {
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s", tag.name.c_str(),
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %" PRIu64 " %" PRIu64 " %ld %s %s",
+           tag.name.c_str(),
            tag.root_hash.ToString().c_str(), tag.size, tag.revision,
            tag.timestamp,
            (tag.branch == "") ? "(default)" : tag.branch.c_str(),
@@ -514,7 +509,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     return 1;
   }
 
-  // open the catalog to be tagged (to check for existance and for meta info)
+  // open the catalog to be tagged (to check for existence and for meta info)
   const UnlinkGuard catalog_path(
       CreateTempPath(env->tmp_path + "/catalog", 0600));
   const bool catalog_read_write = false;
@@ -697,7 +692,7 @@ int CommandEditTag::RemoveTags(const ArgumentList &args, Environment *env) {
     }
   }
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
+  LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %lu tags",
            condemned_tags.size());
 
   // check if the tags to be deleted exist
@@ -820,7 +815,7 @@ void CommandListTags::PrintHumanReadableTagList(
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
 
   // print the number of tags listed
-  LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %d tags", tags.size());
+  LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %lu tags", tags.size());
 }
 
 void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
@@ -841,7 +836,7 @@ void CommandListTags::PrintHumanReadableBranchList(
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
                ((l + 1) == branches[i].level) ? "\u251c " : "\u2502 ");
     }
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s @%u",
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s @%" PRIu64,
              branches[i].branch.branch.c_str(),
              branches[i].branch.initial_revision);
   }
@@ -853,7 +848,7 @@ void CommandListTags::PrintMachineReadableBranchList(
 {
   unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%u",
+    LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%" PRIu64,
              branches[i].level,
              AddPadding("", branches[i].level, false, " ").c_str(),
              branches[i].branch.branch.c_str(),
@@ -970,7 +965,7 @@ void CommandInfoTag::PrintHumanReadableInfo(
     const history::History::Tag &tag) const {
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Name:         %s\n"
-           "Revision:     %d\n"
+           "Revision:     %" PRIu64 "\n"
            "Timestamp:    %s\n"
            "Branch:       %s\n"
            "Root Hash:    %s\n"
@@ -1069,7 +1064,8 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   const uint64_t current_revision = env->manifest->revision();
   assert(target_tag.revision <= current_revision);
   if (target_tag.revision == current_revision) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to current head (%u)",
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "not rolling back to current head (%" PRIu64 ")",
              current_revision);
     return 1;
   }

@@ -1,5 +1,9 @@
 #!/bin/sh
 
-make
+if [[ "x$(uname -s)" == "xDarwin" ]]; then
+  cd mybuild
+fi
 
-make install
+make -j ${CVMFS_BUILD_EXTERNAL_NJOBS}
+
+make install -j ${CVMFS_BUILD_EXTERNAL_NJOBS}

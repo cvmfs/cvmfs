@@ -45,7 +45,7 @@ class CmdDiff : public Command {
     p.push_back(Parameter::Optional("keychain", 'k', "directory",
       "Path to the directory containing the repository public key"));
     p.push_back(Parameter::Switch("machine-readable", 'm',
-      "Produce machine readble output"));
+      "Produce machine readable output"));
     p.push_back(Parameter::Optional("from", 's', "repository tag",
       "The source tag name [default='trunk-previous']"));
     p.push_back(Parameter::Optional("to", 'd', "repository tag",

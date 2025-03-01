@@ -16,7 +16,7 @@
 
 namespace publish {
 /**
- * Syncing a cvmfs repository by the help of an overlayed AUFS
+ * Syncing a cvmfs repository by the help of an overlaid AUFS
  * read-write volume.
  */
 class SyncUnionAufs : public SyncUnion {

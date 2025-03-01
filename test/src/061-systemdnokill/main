@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Mark cvmfs to survive systemd process termination on shutdown"
 cvmfs_test_suites="quick"

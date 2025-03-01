@@ -53,17 +53,17 @@ class DiffBuilder:
             curNode = self.root
             passthrough = '-' if mode=='!' else '_'
             curDepth = 0
-            mergable = True
+            mergeable = True
             for part in path_parts:
               curDepth+=1
               if not part in curNode.children\
                 and curDepth > self.depth\
-                and mergable:
-                print("Found mergable")
+                and mergeable:
+                print("Found mergeable")
                 curNode.mode = self.calc_new_mode(curNode.mode, '*')
                 break
               elif not part in curNode.children:
-                mergable = False
+                mergeable = False
                 curNode.children[part] = TreeNode(passthrough)
               curNode = curNode.children[part]
               curNode.mode = self.calc_new_mode(curNode.mode, passthrough)

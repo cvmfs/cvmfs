@@ -1,0 +1,19 @@
+
+####   git blame ignore file for cvmfs/cvmfs #######################
+
+# add here commit hashes (from devel branch) that you 
+# don't want to show up in git blame - that's usually formatting
+# or cleanups across many files without substantial code changes
+
+# github.com picks up this file automatically, locally you can use it with
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+
+# cleanup of top level directory, removes an include of cvmfs_config.h in many headers
+28992272cb4a6ca7c21038677a7fb8179fc2e479
+
+# adds bash shebang in all integration test scripts
+162764632962d140c3d123d0997c9c016e78075f
+
+# cleanup with some getter renames
+0d34ff1279fb021e9c2217ff223b0d7806c633de

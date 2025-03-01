@@ -78,11 +78,16 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
+  virtual bool     SetLimit(uint64_t limit);
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn();
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
+
+  void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
+  void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_;};
+
 
  private:
   /**
@@ -118,6 +123,7 @@ class PosixQuotaManager : public QuotaManager {
     // as of protocol revision 2
     kListVolatile,
     kCleanupRate,
+    kSetLimit,
   };
 
   /**
@@ -174,6 +180,22 @@ class PosixQuotaManager : public QuotaManager {
   };
 
   /**
+   * Used for batch queries in DoCleanup()
+   */
+  struct EvictCandidate {
+    uint64_t size;
+    uint64_t acseq;
+    shash::Any hash;
+    EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
+      : size(s), acseq(a), hash(h) {}
+  };
+
+  /**
+   * Magic number to make reading PIDs from lockfiles more robust and versionable
+   */
+  static const unsigned kLockFileMagicNumber = 142857;
+
+  /**
    * Maximum page cache per thread (Bytes).
    */
   static const unsigned kSqliteMemPerThread = 2*1024*1024;
@@ -185,8 +207,13 @@ class PosixQuotaManager : public QuotaManager {
   static const unsigned kCommandBufferSize = 32;
 
   /**
+   * Batch size for database operations during DoCleanup()
+   */
+  static const unsigned kEvictBatchSize = 1000;
+
+  /**
    * Make sure that the amount of data transferred through the RPC pipe is
-   * within the OS's guarantees for atomiticity.
+   * within the OS's guarantees for atomicity.
    */
   static const unsigned kMaxDescription = 512-sizeof(LruCommand);
 
@@ -208,6 +235,7 @@ class PosixQuotaManager : public QuotaManager {
   void CloseDatabase();
   bool Contains(const std::string &hash_str);
   bool DoCleanup(const uint64_t leave_size);
+  bool EmptyTrash(const std::vector<std::string> &trash);
 
   void MakeReturnPipe(int pipe[2]);
   int BindReturnPipe(int pipe_wronly);
@@ -227,6 +255,7 @@ class PosixQuotaManager : public QuotaManager {
                 const std::string &description, const CommandType command_type);
   std::vector<std::string> DoList(const CommandType list_command);
   void GetSharedStatus(uint64_t *gauge, uint64_t *pinned);
+  bool SetSharedLimit(uint64_t limit);
   void GetLimits(uint64_t *limit, uint64_t *cleanup_threshold);
 
   static void ParseDirectories(const std::string cache_workspace,
@@ -311,6 +340,13 @@ class PosixQuotaManager : public QuotaManager {
    */
   bool async_delete_;
 
+
+  /**
+   * Record pid of current cache manager in order to check if its process
+   * disappeared.
+   */
+  pid_t cachemgr_pid_;
+
   /**
    * Keeps track of the number of cleanups over time.  Use by
    * `cvmfs_talk cleanup rate`
@@ -326,6 +362,7 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_lru_;
   sqlite3_stmt *stmt_size_;
   sqlite3_stmt *stmt_rm_;
+  sqlite3_stmt *stmt_rm_batch_;
   sqlite3_stmt *stmt_list_;
   sqlite3_stmt *stmt_list_pinned_;  /**< Loaded catalogs are pinned. */
   sqlite3_stmt *stmt_list_catalogs_;

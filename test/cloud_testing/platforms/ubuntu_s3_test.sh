@@ -24,17 +24,21 @@ CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/628-pythonwrappedcvmfsserver"
 # Hardlinks do not work with overlayfs
 CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/672-publish_stats_hardlinks"
 
+  # Azurite doesn't install on 16.04 and 24.04, skip it
+  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
+
 if [ "x$ubuntu_release" = "xxenial" ]; then
   # Ubuntu 16.04 has no fuse-overlayfs
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
-  # Azurite doesn't install on 16.04
-  CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/686-azureblob_s3 src/687-import_s3"
 fi
 
 if [ "x$ubuntu_release" = "xbionic" ]; then
   # Ubuntu 18.04 has no fuse-overlayfs
   CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/682-enter src/811-commit-gateway"
 fi
+
+# test assumes local srv storage
+CVMFS_EXCLUDE="$CVMFS_EXCLUDE src/691-metalink"
 
 export CVMFS_TEST_UNIONFS=overlayfs
 
@@ -90,6 +94,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/670-listreflog                           \
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
+                               src/702-symlink_caching                      \
                                $CVMFS_EXCLUDE                               \
                                --                                           \
                                src/5*                                       \

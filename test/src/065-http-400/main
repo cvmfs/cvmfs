@@ -1,3 +1,4 @@
+#!/bin/bash
 
 cvmfs_test_name="Probing host failover on HTTP 400"
 cvmfs_test_suites="quick"
@@ -21,7 +22,7 @@ cvmfs_run_test() {
   src_location=$2
 
   local faulty_port="9091"
-  local faulty_server="${CVMFS_PYTHON2} ${src_location}/../../common/mock_services/http_400.py"
+  local faulty_server="${src_location}/../../common/mock_services/http_400.py"
 
   which curl > /dev/null 2>&1 || { echo "curl not found"; return 1; }
   trap "cleanup" EXIT HUP INT TERM

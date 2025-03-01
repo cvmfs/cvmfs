@@ -8,7 +8,7 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 
 #include <dirent.h>
 #include <errno.h>
@@ -23,7 +23,7 @@
 #include <cstring>
 #include <string>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "crypto/hash.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
@@ -76,7 +76,7 @@ static void Usage() {
            "  -p try to fix automatically\n"
            "  -f force rebuild of managed cache db on next mount\n"
            "  -j number of concurrent integrity check worker threads\n",
-           VERSION);
+           CVMFS_VERSION);
 }
 
 
@@ -333,7 +333,7 @@ int main(int argc, char **argv) {
   }
   free(workers);
   if (!g_verbose)
-    LogCvmfs(kLogCvmfs, kLogStdout, "");
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
   LogCvmfs(kLogCvmfs, kLogStdout, "Verified %d files",
            atomic_read32(&g_num_files));
 

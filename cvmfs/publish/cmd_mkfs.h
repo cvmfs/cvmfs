@@ -41,7 +41,7 @@ class CmdMkfs : public Command {
       "Disable automatic creation of timestamp tags, useful with --gc"));
 
     p.push_back(Parameter::Optional("autotag-span", 'G', "timespan",
-      "Speficy a `date` compatible time windows for keeping auto tags"));
+      "Specify a `date` compatible time windows for keeping auto tags"));
 
     p.push_back(Parameter::Optional("hash", 'a', "algorithm",
       "Select a secure hash algorithm: sha1 (default) or rmd160 or shake128"));

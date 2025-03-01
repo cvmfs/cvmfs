@@ -5,7 +5,7 @@ Release: 3
 BuildArch: noarch
 Requires: cvmfs >= 2.1
 Group: System/Filesystems
-License: Copyright (c) 2009, CERN.  Distributed unter the BSD License.
+License: Copyright (c) 2009, CERN.  Distributed under the BSD License.
 %description
 HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch

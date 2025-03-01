@@ -10,7 +10,8 @@
 #include <string>
 
 #include "catalog_sql.h"
-#include "compression.h"
+#include "compression/compression.h"
+#include "crypto/signature.h"
 #include "history_sqlite.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -33,7 +34,8 @@ class T_ObjectFetcher : public ::testing::Test {
     public_key_path(sandbox + "/" + fqrn + ".pub"),
     private_key_path(sandbox + "/" + fqrn + ".key"),
     certificate_path(sandbox + "/" + fqrn + ".crt"),
-    master_key_path(sandbox + "/" + fqrn + ".masterkey") { }
+    master_key_path(sandbox + "/" + fqrn + ".masterkey"),
+    download_manager_(1, perf::StatisticsTemplate("test", &statistics_)) {}
 
  protected:
   const std::string  sandbox;
@@ -242,25 +244,16 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void SignRsa(const shash::Any  hash,
+               signature::SignatureManager  *signature_manager,
                std::string      *signature) const {
-    std::string hash_string = hash.ToString();
-    FILE *f_rsa_pkey = fopen(master_key_path.c_str(), "r");
-    ASSERT_NE(static_cast<FILE*>(NULL), f_rsa_pkey);
-    RSA *rsa = PEM_read_RSAPrivateKey(f_rsa_pkey, NULL, NULL, NULL);
-    ASSERT_NE(static_cast<RSA*>(NULL), rsa);
-    fclose(f_rsa_pkey);
-
-    unsigned char *sig = (unsigned char*)malloc(RSA_size(rsa));
-    const int res =
-      RSA_private_encrypt(hash_string.length(),
-                          reinterpret_cast<const unsigned char *>(
-                            hash_string.data()),
-                          sig, rsa, RSA_PKCS1_PADDING);
-    ASSERT_NE(-1, res) << "RSA error code: " << ERR_get_error();
-    *signature = std::string(reinterpret_cast<char*>(sig), res);
-
-    free(sig);
-    RSA_free(rsa);
+    unsigned char *sig;
+    unsigned sig_size;
+    ASSERT_TRUE(signature_manager->SignRsa(
+                  reinterpret_cast<const unsigned char *>(
+                    hash.ToString().data()),
+                    hash.GetHexSize(),
+                  &sig, &sig_size));
+    *signature = std::string(reinterpret_cast<char*>(sig), sig_size);
   }
 
   void SignString(std::string                  *str,
@@ -273,7 +266,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     std::string sig;
     if (rsa) {
-      SignRsa(hash, &sig);
+      SignRsa(hash, signature_manager, &sig);
     } else {
       Sign(hash, signature_manager, &sig);
     }
@@ -300,6 +293,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     ASSERT_TRUE(signature_manager.LoadCertificatePath(certificate_path));
     ASSERT_TRUE(signature_manager.LoadPrivateKeyPath(private_key_path, ""));
+    ASSERT_TRUE(signature_manager.LoadPrivateMasterKeyPath(master_key_path));
 
     std::string manifest_string = manifest->ExportString();
     SignString(&manifest_string, &signature_manager);
@@ -320,6 +314,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
     ASSERT_TRUE(signature_manager.LoadCertificatePath(certificate_path));
     ASSERT_TRUE(signature_manager.LoadPrivateKeyPath(master_key_path, ""));
+    ASSERT_TRUE(signature_manager.LoadPrivateMasterKeyPath(master_key_path));
 
     whitelist += signature_manager.FingerprintCertificate(shash::kSha1)
               + "\n";
@@ -346,14 +341,11 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void InitializeExternalManagers() {
-    download_manager_.Init(1,
-      perf::StatisticsTemplate("test", &statistics_));
     signature_manager_.Init();
     ASSERT_TRUE(signature_manager_.LoadPublicRsaKeys(public_key_path));
   }
 
   void FinalizeExternalManagers() {
-    download_manager_.Fini();
     signature_manager_.Fini();
   }
 

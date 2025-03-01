@@ -67,8 +67,8 @@ EOF
 EOF
   echo "********** Environment for starting S3 integration tests **************"
   echo "export CVMFS_TEST_S3_CONFIG=$s3_config"
-  echo "export CVMFS_TEST_HTTP_BASE=http://localhost:13337/testbucket"
-  echo "export CVMFS_TEST_S3_STORAGE=$s3_storage/data/testbucket"
+  echo "export CVMFS_TEST_HTTP_BASE=http://localhost:13337/cvmfstest"
+  echo "export CVMFS_TEST_S3_STORAGE=$s3_storage/data/cvmfstest"
   echo "***********************************************************************"
   /usr/local/bin/minio server --address :13337 --config-dir $s3_storage/config $s3_storage/data
   exit 0
@@ -77,7 +77,7 @@ fi
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
-# read command line paramters
+# read command line parameters
 shift
 test_exclusions=0
 xml_output=""

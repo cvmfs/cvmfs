@@ -10,6 +10,9 @@
 #include "testutil.h"
 #include "xattr.h"
 
+#include "c_file_sandbox.h"
+#include "c_http_server.h"
+
 namespace {
 const char* hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d100000000",
                         "26ab0db90d72e28ad0ba1e22ee51051000000000",
@@ -75,7 +78,9 @@ class T_CatalogMergeTool : public ::testing::Test {};
 TEST_F(T_CatalogMergeTool, CRUD) {
   DirSpec spec1 = MakeBaseSpec();
 
-  CatalogTestTool tester("test");
+  const std::string repo_name = "test";
+
+  CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
 
   EXPECT_TRUE(tester.Apply("first", spec1));
@@ -117,12 +122,14 @@ TEST_F(T_CatalogMergeTool, CRUD) {
                              catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, history[1].second, history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest, &statistics);
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;
+  shash::Any output_manifest_hash;
   uint64_t final_rev;
-  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &final_rev));
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &output_manifest_hash, &final_rev));
   EXPECT_EQ(2U, final_rev);
 
   UniquePtr<manifest::Manifest> output_manifest(
@@ -170,7 +177,8 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   EXPECT_TRUE(base.AddDirectory("baz", "bar", 4096));
   EXPECT_TRUE(base.AddNestedCatalog("bar/baz"));
 
-  CatalogTestTool tester("test_symlink");
+  const std::string repo_name = "test_symlink";
+  CatalogTestTool tester(repo_name);
   EXPECT_TRUE(tester.Init());
 
   // we apply the structure above to the tester
@@ -193,7 +201,7 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   UniquePtr<ServerTool> server_tool(new ServerTool());
   EXPECT_TRUE(server_tool->InitDownloadManager(true, ""));
 
-  receiver::Params params = MakeMergeToolParams("test_symlink");
+  const receiver::Params params = MakeMergeToolParams(repo_name);
 
   CatalogTestTool::History history = tester.history();
 
@@ -201,14 +209,17 @@ TEST_F(T_CatalogMergeTool, Symlink) {
 
   receiver::CatalogMergeTool<catalog::WritableCatalogManager,
                              catalog::SimpleCatalogManager>
-      merge_tool(params.stratum0, history[1].second, history[2].second,
+      merge_tool(params.stratum0, history[1].second,
+                 history[2].second,
                  PathString(""), GetCurrentWorkingDirectory() + "/merge_tool",
-                 server_tool->download_manager(), &first_manifest, &statistics);
+                 server_tool->download_manager(), &first_manifest, &statistics,
+                 "");
   EXPECT_TRUE(merge_tool.Init());
 
   std::string output_manifest_path;
+  shash::Any output_manifest_hash;
   uint64_t final_rev;
-  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &final_rev));
+  EXPECT_TRUE(merge_tool.Run(params, &output_manifest_path, &output_manifest_hash, &final_rev));
   EXPECT_EQ(2U, final_rev);
 
   UniquePtr<manifest::Manifest> output_manifest(
@@ -219,6 +230,8 @@ TEST_F(T_CatalogMergeTool, Symlink) {
   DirSpec output_spec;
   EXPECT_TRUE(
       tester.DirSpecAtRootHash(output_manifest->catalog_hash(), &output_spec));
+  EXPECT_TRUE(
+      tester.DirSpecAtRootHash(output_manifest_hash, &output_spec));
 
   std::string spec2_str;
   update.ToString(&spec2_str);

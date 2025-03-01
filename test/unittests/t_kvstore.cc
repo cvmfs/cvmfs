@@ -36,7 +36,7 @@ class T_MemoryKvStore : public ::testing::Test {
     buf_.address = malloc(malloc_size);
     buf_.size = malloc_size;
     buf_.refcount = 0;
-    buf_.object_type = CacheManager::kTypeRegular;
+    buf_.object_flags = 0;
   }
 
   virtual void TearDown() {}

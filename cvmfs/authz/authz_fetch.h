@@ -124,7 +124,7 @@ class AuthzExternalFetcher : public AuthzFetcher, SingleCopy {
 
  private:
   /**
-   * After 5 seconds of unresponsiveness, helper prcesses may be killed.
+   * After 5 seconds of unresponsiveness, helper processes may be killed.
    */
   static const unsigned kChildTimeout = 5;
 

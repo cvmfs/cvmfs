@@ -1,7 +1,7 @@
 
 CVMFS_EC_BASE_URL="https://ecsft.cern.ch/dist/cvmfs"
 
-# tries to guess the pacakge download URLs for a provided package name and cvmfs
+# tries to guess the package download URLs for a provided package name and cvmfs
 # version. This relies on the Electric Commander installation of SFT.
 #
 # Note: CVMFS_EC_BASE_URL needs to point to the cvmfs download location
@@ -21,8 +21,10 @@ guess_package_url() {
   fi
 
   # Ubuntu
+  local short_id=$(lsb_release --id --short 2>/dev/null)
   if [ -f /etc/debian_version ]                               && \
-     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ]
+     { [ x${short_id} = x"Ubuntu" ] || \
+       [ x${short_id} = x"Debian" ] ; }
   then
     local release=1
     local architecture=$(uname -m)
@@ -31,28 +33,29 @@ guess_package_url() {
     local flavor="$(lsb_release -si | tr [:upper:] [:lower:])$(lsb_release -sr)"
     package_file_name="${package_name}_${short_cvmfs_version_string}~${release}+${flavor}_${architecture}.deb"
 
-  # SLC 5 and 6
-  elif [ x$(lsb_release --id --short 2>/dev/null) = x"ScientificCERNSLC" ]; then
-    local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9][0-9]* .*$/\1/')
-    local architecture=$(uname -m)
-    if [ x"$slc_major_version" = x"5" ] || [ x"$slc_major_version" = x"6" ]; then
-      if [ x"$slc_major_version" = x"5" ] && [ x"$architecture" = x"i686" ]; then
-        architecture="i386"
-      fi
-      package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
-    fi
-
-  # CentOS 7
-  elif [ x$(lsb_release --id --short 2>/dev/null) = x"CentOS" ]; then
+  # CentOS 7, 8
+  elif [ x${short_id} = x"CentOS" ] || \
+       [ x${short_id} = x"AlmaLinux" ]; then
+    local release=1
     local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9\.][0-9\.]* .*$/\1/')
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}.el${slc_major_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el${slc_major_version}.${architecture}.rpm"
 
   # Fedora
   elif [ -f /etc/fedora-release ]; then
+    local release=1
     local fedora_version=$(cat /etc/fedora-release | tr -Cd 0-9)
     local architecture=$(uname -m)
-    package_file_name="${package_name}-${cvmfs_version_string}.fc${fedora_version}.${architecture}.rpm"
+    package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.fc${fedora_version}.${architecture}.rpm"
+
+  # CentOS 9
+  elif [ -f /etc/os-release ]; then
+    local release=1
+    local platform="$(. /etc/os-release; echo $PLATFORM_ID)"
+    if [ x"$platform" = "xplatform:el9" ]; then
+      local architecture=$(uname -m)
+      package_file_name="${package_name}-${short_cvmfs_version_string}-${release}.el9.${architecture}.rpm"
+    fi
 
   # to be extended
   else
@@ -176,13 +179,13 @@ is_installed() {
 
 
 yum_install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
   sudo yum -y install --nogpgcheck $pkg_paths
 }
 
 
 dnf_install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
   sudo dnf -y install --nogpgcheck $pkg_paths
 }
 
@@ -222,7 +225,7 @@ yum_update_fallback() {
 
 
 install_packages() {
-  local pkg_paths="$1"
+  local pkg_paths="$@"
 
   if has_binary dnf; then
     dnf_install_packages "$pkg_paths"
@@ -272,4 +275,8 @@ fi
 
 if [ x"$CVMFS_CONFIG_PACKAGE" = x"" ] || [ ! -f $CVMFS_CONFIG_PACKAGE ]; then
   echo "CernVM-FS config package '$CVMFS_CONFIG_PACKAGE' not found!"
+fi
+
+if [ x"$CVMFS_LIBS_PACKAGE" = x"" ] || [ ! -f $CVMFS_LIBS_PACKAGE ]; then
+  echo "CernVM-FS libs package '$CVMFS_LIBS_PACKAGE' not found!"
 fi

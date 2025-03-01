@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "cache_extern.h"
 
 #include <errno.h>
@@ -296,13 +296,13 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
 
 
 void ExternalCacheManager::CtrlTxn(
-  const ObjectInfo &object_info,
+  const Label &label,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  transaction->object_info = object_info;
-  transaction->object_info_modified = true;
+  transaction->label = label;
+  transaction->label_modified = true;
 }
 
 
@@ -325,7 +325,7 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
     WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(id));
     if (fd < 0) {
-      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
                strerror(-fd));
       return fd;
     }
@@ -445,11 +445,11 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   msg_store.set_expected_size(transaction->expected_size);
   msg_store.set_last_part(do_commit);
 
-  if (transaction->object_info_modified) {
+  if (transaction->label_modified) {
     cvmfs::EnumObjectType object_type;
-    transport_.FillObjectType(transaction->object_info.type, &object_type);
+    transport_.FillObjectType(transaction->label.flags, &object_type);
     msg_store.set_object_type(object_type);
-    msg_store.set_description(transaction->object_info.description);
+    msg_store.set_description(transaction->label.GetDescription());
   }
 
   RpcJob rpc_job(&msg_store);
@@ -572,7 +572,7 @@ void *ExternalCacheManager::MainRead(void *data) {
 }
 
 
-int ExternalCacheManager::Open(const BlessedObject &object) {
+int ExternalCacheManager::Open(const LabeledObject &object) {
   return DoOpen(object.id);
 }
 
@@ -590,7 +590,7 @@ int ExternalCacheManager::OpenFromTxn(void *txn) {
     WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(transaction->id));
     if (fd < 0) {
-      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd",
+      LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
                strerror(-fd));
       return fd;
     }
@@ -657,7 +657,7 @@ int ExternalCacheManager::Reset(void *txn) {
   transaction->size = 0;
   transaction->open_fds = 0;
   transaction->committed = false;
-  transaction->object_info_modified = true;
+  transaction->label_modified = true;
 
   if (!transaction->flushed)
     return 0;
@@ -701,6 +701,11 @@ manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
     assert(rv);
     breadcrumb.catalog_hash.suffix = shash::kSuffixCatalog;
     breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
+    if (msg_reply->breadcrumb().has_revision()) {
+      breadcrumb.revision = msg_reply->breadcrumb().revision();
+    } else {
+      breadcrumb.revision = 0;
+    }
   }
   return breadcrumb;
 }
@@ -716,6 +721,7 @@ bool ExternalCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
   breadcrumb.set_fqrn(manifest.repository_name());
   breadcrumb.set_allocated_hash(&hash);
   breadcrumb.set_timestamp(manifest.publish_timestamp());
+  breadcrumb.set_revision(manifest.revision());
   cvmfs::MsgBreadcrumbStoreReq msg_breadcrumb_store;
   msg_breadcrumb_store.set_session_id(session_id_);
   msg_breadcrumb_store.set_req_id(NextRequestId());

@@ -4,7 +4,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "malloc_arena.h"
 
 #include <cassert>
@@ -101,7 +101,7 @@ void MallocArena::Free(void *ptr) {
 
 
 /**
- * Inserts an avilable block at the end of the free list.
+ * Inserts an available block at the end of the free list.
  */
 void MallocArena::EnqueueAvailBlock(AvailBlockCtl *block) {
   AvailBlockCtl *next = head_avail_;

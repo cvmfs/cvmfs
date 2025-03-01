@@ -82,7 +82,7 @@ class SmallHashBase {
   /**
    * Returns both the key and the value. That is useful if Key's equality
    * operator implements an equivalence relation on Key. In this case, LookupEx
-   * returns the key representing the equivalance class that has been used
+   * returns the key representing the equivalence class that has been used
    * during Insert().
    * Used to return a glue::InodeEx element when looking for an inode.
    */
@@ -186,8 +186,10 @@ class SmallHashBase {
     for (uint32_t i = 0; i < c; ++i) {
       v[i].~Value();
     }
-    smunmap(k);
-    smunmap(v);
+    if (k)
+      smunmap(k);
+    if (v)
+      smunmap(v);
     k = NULL;
     v = NULL;
   }

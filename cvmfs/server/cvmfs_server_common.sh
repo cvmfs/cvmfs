@@ -96,7 +96,7 @@ get_or_guess_multiple_repository_names() {
     else
       for name in $names; do
         if ! contains "$repo_names" $(basename $name); then
-          repo_names="$(basename $name) $repo_names"
+          repo_names="$repo_names $(basename $name)"
         fi
       done
     fi
@@ -165,6 +165,9 @@ get_repository_name() {
 # loads the configuration for a specific repository
 load_repo_config() {
   local name=$1
+  if [ ! -e /etc/cvmfs/repositories.d/${name}/server.conf ]; then
+    die "Error: The repository $name does not exist."
+  fi
   . /etc/cvmfs/repositories.d/${name}/server.conf
   if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
     . /etc/cvmfs/repositories.d/${name}/client.conf
@@ -233,7 +236,7 @@ get_tag_branch() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    -n "$tag" 2>/dev/null | cut -d" " -f7)
+    -n "$tag" 2>/dev/null | cut -d" " -f6)
   if [ "x$branch" = "x(default)" ]; then
     branch=
   fi
@@ -272,7 +275,7 @@ get_head_of() {
     -f $repository_name                       \
     $(get_swissknife_proxy)                   \
     $(get_follow_http_redirects_flag) -x      \
-    | cut -d" " -f1,2,7 | grep " $branch\$" | head -n 1
+    | cut -d" " -f1,2,6 | grep " $branch\$" | head -n 1
 }
 
 
@@ -592,7 +595,7 @@ get_expiry_from_string() {
 # figures out the time to expiry of the repository's whitelist
 #
 # @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
+# @return          number of seconds until expiry (negative if already expired)
 get_expiry() {
   local name=$1
   local stratum0=$2
@@ -1045,7 +1048,6 @@ CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=${proxy_url:-DIRECT}
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
@@ -1244,7 +1246,17 @@ is_stratum0_garbage_collectable() {
 }
 
 
-# checks if a manifest ist present
+# checks if a manifest is present
+#
+# @param url  the url of the repository to be checked
+# @return      0 if it is empty
+is_empty_repository_from_url() {
+  local url=$1
+  [ x"$(get_repo_info_from_url "$url" -e)" = x"yes" ]
+}
+
+
+# checks if a manifest is present
 #
 # @param name  the name of the repository to be checked
 # @return      0 if it is empty

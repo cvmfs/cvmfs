@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "ingestion/tube.h"
+#include "util/tube.h"
 
 using namespace std;  // NOLINT
 

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 
 #include <algorithm>
 #include <cstdlib>
@@ -16,6 +16,7 @@
 #include "publish/cmd_hash.h"
 #include "publish/cmd_help.h"
 #include "publish/cmd_info.h"
+#include "publish/cmd_lsof.h"
 #include "publish/cmd_mkfs.h"
 #include "publish/cmd_transaction.h"
 #include "publish/cmd_zpipe.h"
@@ -27,7 +28,7 @@ using namespace std;  // NOLINT
 
 
 static void PrintVersion() {
-  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS Server Tool %s", VERSION);
+  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS Server Tool %s", CVMFS_VERSION);
 }
 
 static void Usage(const std::string &progname,
@@ -40,9 +41,9 @@ static void Usage(const std::string &progname,
     "Usage:\n"
     "------\n"
     "  %s COMMAND [options] <parameters>\n\n"
-    "Supported Commmands\n"
+    "Supported Commands\n"
     "-------------------\n",
-    VERSION, progname.c_str());
+    CVMFS_VERSION, progname.c_str());
     const vector<publish::Command *> commands = clist.commands();
 
   string::size_type max_len = 0;
@@ -60,7 +61,7 @@ static void Usage(const std::string &progname,
     LogCvmfs(kLogCvmfs, kLogStdout, "   %s", commands[i]->GetBrief().c_str());
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "");
+  LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
 }
 
 
@@ -76,6 +77,7 @@ int main(int argc, char **argv) {
   commands.TakeCommand(new publish::CmdHelp(&commands));
   commands.TakeCommand(new publish::CmdZpipe());
   commands.TakeCommand(new publish::CmdHash());
+  commands.TakeCommand(new publish::CmdLsof());
 
   if (argc < 2) {
     Usage(argv[0], commands);

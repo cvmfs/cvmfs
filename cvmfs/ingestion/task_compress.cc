@@ -2,12 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "task_compress.h"
 
 #include <cstdlib>
 
-#include "compression.h"
+#include "compression/compression.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
 

@@ -26,7 +26,7 @@
  * The purpose of this class is to add a common interface for object that are
  * ingested by the pipeline. Hence the pipeline is able to ingest everything
  * that implements this interface.
- * The ownership of new IngestionSource objects is transfered from their creator
+ * The ownership of new IngestionSource objects is transferred from their creator
  * directly to the pipeline itself that will take care of deallocating
  * everything.
  * The pipeline is multithreaded so it is very likely that the code implement in
@@ -71,7 +71,7 @@ class FileIngestionSource : public IngestionSource {
     ssize_t read = SafeRead(fd_, buffer, nbyte);
     if (read < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read the file: %s (%d)\n %s",
-               fd_, path_.c_str(), errno, strerror(errno));
+               path_.c_str(), errno, strerror(errno));
     }
     return read;
   }

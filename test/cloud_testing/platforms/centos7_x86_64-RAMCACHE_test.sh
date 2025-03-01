@@ -32,8 +32,13 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/084-premounted                           \
                                  src/089-external_cache_plugin                \
                                  src/094-attachmount                          \
+                                 src/097-statfs                               \
+                                 src/102-reusefd                              \
+                                 src/103-reloadcachemgr                       \
+                                 src/105-streaming-cache                      \
                                  --                                           \
                                  src/0*                                       \
+                                 src/1*                                       \
                               || retval=1
 
 echo "running CernVM-FS client migration test cases..."

@@ -1,0 +1,85 @@
+#!/bin/bash
+cvmfs_test_name="Test concurrent api calls on lease database to ensure proper locking"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+get_lease () {
+    local key="secret1"
+    local value="{\"api_version\": \"3\", \"path\": \"test.repo.org/\"}"
+    local hmac_b=$(echo -n ${value} | openssl dgst -sha1 -hmac ${key} |  cut -d' ' -f2-)
+    local hmac_64=$(echo -n $hmac_b | base64)
+
+    local response=$(curl -s -X POST -H "Authorization: key1 ${hmac_64}" -d "$value" http://localhost:4929/api/v1/leases)
+    echo $response
+    return 0
+}
+
+cancel_lease () {
+    sleep $((RANDOM / 1000))e-3
+    local key="secret1"
+    local session_token=$1 # session token
+    local value=${session_token}
+    local hmac_b=$(echo -n ${value} | openssl dgst -sha1 -hmac ${key} |  cut -d' ' -f2-)
+    local hmac_64=$(echo -n ${hmac_b} | base64)
+    local response_cancel=$(curl -s -X DELETE -H "Authorization: key1 ${hmac_64}" -d ${session_token} http://localhost:4929/api/v1/leases/${session_token})
+    echo $response_cancel
+    return 0
+}
+
+stresstest_lease() {
+  for i in {1..100}; do
+    local response=$(get_lease)
+    local status=$(echo  ${response} | jq --raw-output .status)
+    echo $response
+    echo ${status}
+    if [ "x${status}" = "xpath_busy" ]; then
+      continue;
+    fi
+    if [ "x${status}" != "xok" ]; then
+      echo "${response}">/tmp/cvmfs-test-818.log
+      return 45;
+    fi
+    local session_token=$(echo -n ${response} | jq --raw-output .session_token)
+    local response_cancel=$(cancel_lease $session_token)
+    local status_cancel=$(echo  ${response_cancel} | jq --raw-output .status)
+    if [ "x${status}" != "xok" ]; then
+      echo "${response_cancel}">/tmp/cvmfs-test-818.log
+      return 46;
+    fi
+    echo $response_cancel
+  done;
+  return 0
+}
+
+
+cvmfs_run_test() {
+  set_up_repository_gateway || return 1
+
+  echo "*** Starting initial transaction"
+  cvmfs_server transaction test.repo.org || return 10
+  cvmfs_server publish test.repo.org     || return 11
+
+  echo "*** hammering lease db with api requests"
+  local pids=""
+  stresstest_lease || return 10 & pids="$! $pids"
+  stresstest_lease || return 11 & pids="$! $pids"
+  stresstest_lease || return 12 & pids="$! $pids"
+  stresstest_lease || return 13 & pids="$! $pids"
+  stresstest_lease || return 14 & pids="$! $pids"
+  stresstest_lease || return 15 & pids="$! $pids"
+
+  local return_code=0
+  for pid in $pids; do
+    wait "$pid" || return_code=101
+  done
+
+  if [ "x$return_code" = "x0" ]; then
+    echo ".. finished successfully."
+    return 0
+  else
+    echo "got error: "
+    cat /tmp/cvmfs-test-818.log || true
+    echo "..failed!"
+    return $return_code
+  fi
+}

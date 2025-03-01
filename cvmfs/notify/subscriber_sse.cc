@@ -4,7 +4,7 @@
 
 #include "subscriber_sse.h"
 
-#include "cvmfs_config.h"
+
 
 #include <vector>
 
@@ -45,7 +45,7 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
 
   std::string request = "{\"version\":1,\"repository\":\"" + topic + "\"}";
 
-  const char* user_agent_string = "cvmfs/" VERSION;
+  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
 
   CURL* h_curl = curl_easy_init();
   if (h_curl == NULL) {
