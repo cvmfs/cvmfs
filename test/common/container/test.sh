@@ -61,6 +61,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
                                  src/688-checkall                             \
+                                 src/692-https_azureblob_s3                   \
                                  src/699-servermount                          \
                                  src/700-overlayfs_validation                 \
                                  src/702-symlink_caching                      \

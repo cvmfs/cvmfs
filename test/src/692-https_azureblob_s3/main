@@ -1,4 +1,4 @@
-#
+#!/bin/bash
 # Test for running CVMFS against an Azure S3 implementation
 #
 # In this test we create our own Azurite blob service.
@@ -6,7 +6,7 @@
 # keys are hard-coded dev keys in azurite, so safe to have in code
 
 cvmfs_test_name="Azure blob on azurite over https"
-cvmfs_test_autofs_on_startup=false
+cvmfs_test_autofs_on_startup="false"
 cvmfs_test_suites="quick"
 
 cleanup() {
