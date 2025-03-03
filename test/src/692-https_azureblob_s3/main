@@ -11,7 +11,9 @@ cvmfs_test_suites="quick"
 
 cleanup() {
   echo "*** cleaning up"
+
   sudo cvmfs_server rmfs -f azurite.cvmfs.io
+  sudo sed -i -e '/^X509_CERT_BUNDLE=/d' /etc/cvmfs/server.local
   if [ -f azurite_pid ]; then
     sudo kill -9 $(cat azurite_pid)
   fi
@@ -26,6 +28,7 @@ CVMFS_S3_BUCKET=devstoreaccount1/test
 CVMFS_S3_DNS_BUCKETS=false
 CVMFS_S3_FLAVOR=azure
 CVMFS_S3_USE_HTTPS=true
+#CVMFS_USE_SSL_SYSTEM_CA=true
 EOF
   tee 127.0.0.1-key.pem > /dev/null << EOF
 -----BEGIN PRIVATE KEY-----
@@ -57,31 +60,29 @@ S+xcyudCwPkDcb5K+dzq+DlO9rS4S61nPvnnF/oVTWzRTjb40bt//g+ynViRkmBA
 RZVtxI4OxZGPfARfxcDqBes=
 -----END PRIVATE KEY-----
 EOF
+# could be created on the fly as in test 684. Otherwise:
+# TODO update before certificate expires in 2125
   tee 127.0.0.1.pem > /dev/null << EOF
 -----BEGIN CERTIFICATE-----
-MIIEJTCCAo2gAwIBAgIQQqBSdbT/YTmzmYOlhkdpczANBgkqhkiG9w0BAQsFADBz
-MR4wHAYDVQQKExVta2NlcnQgZGV2ZWxvcG1lbnQgQ0ExJDAiBgNVBAsMG2hwY2Fk
-bWluQGN2bWZzIChDbG91ZCBVc2VyKTErMCkGA1UEAwwibWtjZXJ0IGhwY2FkbWlu
-QGN2bWZzIChDbG91ZCBVc2VyKTAeFw0yMjA5MTQwODQwMDhaFw0yNDEyMTQwODQw
-MDhaME8xJzAlBgNVBAoTHm1rY2VydCBkZXZlbG9wbWVudCBjZXJ0aWZpY2F0ZTEk
-MCIGA1UECwwbaHBjYWRtaW5AY3ZtZnMgKENsb3VkIFVzZXIpMIIBIjANBgkqhkiG
-9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwT/i5kn+mSPK10yTFPNnl5p0CIXMNaHJwFf2
-ohggb9IimQdcffulQTT47HMSs1xWbd20q6nkJbeTr/Nfg8iHQuBBlSQayWSd07XA
-QQPKxAZ8OJaUIHLsQaH2IAg3TwJfhzdIvWqS7a0rLbQE2hdQOiDHqIffSG2Gb97d
-SSZSORFTv+qYr39lscf65+ZD+F8+wXRJT3JxA5fUraYGx9pPD1QbGv4E4Ohook0a
-8PL3yN9VMt/kTr+DP2+Z21PfS6JJU1hVmqLDIyKIe3v7o5TnyKHCpP5F1GhF+LwX
-7OuRd551wvl5qj/EI4Zfb9vTBknVd44s1skxZszIEWGOFt0LDwIDAQABo1kwVzAO
-BgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHwYDVR0jBBgwFoAU
-RmiVMyp8gq4b26Xbx5CwFu+GjlEwDwYDVR0RBAgwBocEfwAAATANBgkqhkiG9w0B
-AQsFAAOCAYEAsyGaqeMvn4gHZ2P2Bz8c4WL5IoP7XGh2rceeMCqBFhHAT4mQP2z9
-LFYXMp9on4Fi737XfEkw8XcFA2oUZ4XKlrWB1gU34pBP6PljblI/j9FLqQHlhukq
-ohlooWcaXK3ww5Eer0mFrq846ObyO2y3YbFtsUqDNjTf9+50Embf1rD6hppX4jBO
-L1lfuHjsiq6Tu6rJHfWlKMS9ggNMG2w4UvDbcl9roqa4Fc/cpX8ATmZMMDrDT3Mj
-eRUJ4g5Gcxk1gJj6wY7Jfv9zlGteh/hzq7bx1rDcdUrK29GyBx1cjohlSmRVXnJ3
-Jm5ZGp+gaWx+JBg/GK7z3nqSYst5lkpZfuPmX+IF3B8IQKP7x3n13TIXVKzfOfsI
-fPdoZFNwJaNjX2XinZvHkgw1V8T9GMXflda8V6O6Cj1cN5HL55mWuCokAfLJT0Gf
-kIS0UVjowvU5XonPw4XDt5bmnx5UEp4/buzGDDzUw+YwrHzphCLc4kYv/FaDK3IN
-o8wrWm2uwPUw
+MIIDfjCCAmagAwIBAgIURg6+Cs+oEQYnquelzhqC7pqp2MEwDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAgFw0yNTAzMDEyMTU3MTFaGA8yMTI1
+MDIwNTIxNTcxMVowRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUx
+ITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAME/4uZJ/pkjytdMkxTzZ5eadAiFzDWhycBX9qIY
+IG/SIpkHXH37pUE0+OxzErNcVm3dtKup5CW3k6/zX4PIh0LgQZUkGslkndO1wEED
+ysQGfDiWlCBy7EGh9iAIN08CX4c3SL1qku2tKy20BNoXUDogx6iH30hthm/e3Ukm
+UjkRU7/qmK9/ZbHH+ufmQ/hfPsF0SU9ycQOX1K2mBsfaTw9UGxr+BODoaKJNGvDy
+98jfVTLf5E6/gz9vmdtT30uiSVNYVZqiwyMiiHt7+6OU58ihwqT+RdRoRfi8F+zr
+kXeedcL5eao/xCOGX2/b0wZJ1XeOLNbJMWbMyBFhjhbdCw8CAwEAAaNkMGIwHQYD
+VR0OBBYEFMoVvMY9fMo1B885o4c+WdaI1VglMB8GA1UdIwQYMBaAFMoVvMY9fMo1
+B885o4c+WdaI1VglMA8GA1UdEwEB/wQFMAMBAf8wDwYDVR0RBAgwBocEfwAAATAN
+BgkqhkiG9w0BAQsFAAOCAQEAXCklOcfwE9UEL4DMyqwpT2zCYex216ZarW6w3nM7
+F8+PwE/D8it8dNJUQe87bn81USExJpjYc/ee+nrGymu1wrH25Qyt62w55+QEnslV
+Sp1ec57CE5JUfRzvc0yXOIVhSCsOi9rZ1QCxDRl90HukpQNqPZUlegkk2Wxd5oys
+t80mn9wwktjEoCO//wIgf3/6Muo1yKENeHwRxTZtkRvWbBKqRPIItpkATAZ77Q4n
+faKupx8UYxItDzrsW0Xcp0OB6Q9Kx/emYkfkdtAhIFpRLLFyqEchnsiojq4kCR0i
+9d6oanrSOPoGgG8PN7pX/gLeNvBcvoLE5bfbjyItfS/xUQ==
 -----END CERTIFICATE-----
 EOF
 }
@@ -103,14 +104,12 @@ start_azurite() {
 
   echo "*** create the container and we make it public"
   export AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=anycontent
+  # first try to delete container - only needed in case this test is rerun
+  az storage container delete --name 'test' --connection-string 'DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=https://127.0.0.1:10000/devstoreaccount1;' || true
   az storage container create --name 'test' --connection-string 'DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=https://127.0.0.1:10000/devstoreaccount1;' --public-access blob || exit 21
 }
 
 cvmfs_run_test() {
-  if ! running_on_s3; then
-    echo "not running, since s3 tests are blocked"
-    return 1
-  fi
 
   trap cleanup EXIT HUP INT TERM || return $?
 
@@ -118,17 +117,23 @@ cvmfs_run_test() {
   start_azurite || return 20
 
   echo "*** create repository"
-  sudo cvmfs_server mkfs \
+  echo "*** create repository"
+  export X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem)
+  echo "X509_CERT_BUNDLE=$X509_CERT_BUNDLE" | sudo tee -a /etc/cvmfs/server.local
+  sudo X509_CERT_BUNDLE=$X509_CERT_BUNDLE \
+       cvmfs_server mkfs \
     -o root \
     -s cvmfs_azurite.conf \
     -w https://127.0.0.1:10000/devstoreaccount1/test  \
     azurite.cvmfs.io || return 40
 
   echo "*** poke around the new repository"
-  sudo cvmfs_server transaction azurite.cvmfs.io || return 50
-  sudo touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
-  sudo cvmfs_server publish azurite.cvmfs.io || return 52
-  sudo ls /cvmfs/azurite.cvmfs.io/miaomiao || return 53
+  #TODO: Investigate why it is necessary to set the X509_CERT_BUNDLE env var.
+  # Setting it in the server config should work, but does not
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) cvmfs_server transaction azurite.cvmfs.io || return 50
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) cvmfs_server publish azurite.cvmfs.io || return 52
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) ls /cvmfs/azurite.cvmfs.io/miaomiao || return 53
 
   return 0
 }
