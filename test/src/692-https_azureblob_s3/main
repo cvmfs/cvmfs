@@ -1,0 +1,138 @@
+#!/bin/bash
+# Test for running CVMFS against an Azure S3 implementation
+#
+# In this test we create our own Azurite blob service.
+# require az-cli and azurite to be installed, see $platform_setup.sh
+# keys are hard-coded dev keys in azurite, so safe to have in code
+
+cvmfs_test_name="Azure blob on azurite over https"
+cvmfs_test_autofs_on_startup="false"
+
+cleanup() {
+  echo "*** cleaning up"
+
+  sudo cvmfs_server rmfs -f azurite.cvmfs.io
+  sudo sed -i -e '/^X509_CERT_BUNDLE=/d' /etc/cvmfs/server.local
+  if [ -f azurite_pid ]; then
+    sudo kill -9 $(cat azurite_pid)
+  fi
+}
+
+create_azurite_config() {
+  tee cvmfs_azurite.conf > /dev/null << EOF
+CVMFS_S3_HOST=127.0.0.1:10000
+CVMFS_S3_ACCESS_KEY=devstoreaccount1
+CVMFS_S3_SECRET_KEY=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+CVMFS_S3_BUCKET=devstoreaccount1/test
+CVMFS_S3_DNS_BUCKETS=false
+CVMFS_S3_FLAVOR=azure
+CVMFS_S3_USE_HTTPS=true
+#CVMFS_USE_SSL_SYSTEM_CA=true
+EOF
+  tee 127.0.0.1-key.pem > /dev/null << EOF
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDBP+LmSf6ZI8rX
+TJMU82eXmnQIhcw1ocnAV/aiGCBv0iKZB1x9+6VBNPjscxKzXFZt3bSrqeQlt5Ov
+81+DyIdC4EGVJBrJZJ3TtcBBA8rEBnw4lpQgcuxBofYgCDdPAl+HN0i9apLtrSst
+tATaF1A6IMeoh99IbYZv3t1JJlI5EVO/6pivf2Wxx/rn5kP4Xz7BdElPcnEDl9St
+pgbH2k8PVBsa/gTg6GiiTRrw8vfI31Uy3+ROv4M/b5nbU99LoklTWFWaosMjIoh7
+e/ujlOfIocKk/kXUaEX4vBfs65F3nnXC+XmqP8Qjhl9v29MGSdV3jizWyTFmzMgR
+YY4W3QsPAgMBAAECggEAXjALIP7TjkQ5qvHxhfaUePmYsEa2HzW5pXu6A4sK1DVx
+E3DZDbZG9x8ga+4yISVSIr46PqjRP+jXnJxb41krQ9cVX+F3BM17dyJQj9+PRjd6
++AG8NIyOxfZwhXA7tNCNStQRKfD1p84NC3uAGePfAFXVujhvBVgMfB39cJey34jN
++Lj1foK3Ok8xaW87io0ZHW0NUuVbe4IuZiAvN2x2mShv+P4Mxjbw+Oos9OqPEoUL
++d6nlzUUEgsbHuExSwdM4jv1c5l0Lv2fQLCK/1SqoneW5IGdu21YeWMbeZxDNOyv
+njG1bFjkF3NwmHByhjEMHE3GnA5KHXpKzzGwWhCKEQKBgQDEp4T1ujaC8Jf+anSz
+/M2wkuJznPGUR2UxE4IZSGuTWLdn3LigraDobXAzgZk49l4JbiNpZcZfpusGqFbY
+iQIxIW39zQL+0seNIjjl33yRkjRuTTjZJVWwZ3BaLnPIB+aqnTX/LNgx51ZvdPgF
+DjFrW8FqDp8mz4swCKiIU/zz2wKBgQD7kVQpxEg/J2a+Z4rx02UHhIQfuEjOPOnu
+mX6X48borYgHl7qhOIXojolIELwl2TAvW5CIZD9N0sYoE77IwhNcMab1mMTgN4cn
+7Eg7nJHzEFcaME23uTnz0AE/TRSbysu+0GoOMndbOH0BNlVQiWLZ2jGf1wQVTNR/
+cxqDzLXF3QKBgAN4APxkoHmGzOeL8SsLloU60gvABPLcn4hSE8VmZZ9fvTxzxD3x
+UhlHdOczrgQ3NEluS+mcBffB9ftUFNQU9pjvQgVsDFV6WlK++8nyOzxGG+6mJg6O
+fghyiqTMlPY+TW9M/prVq6qVrgyhP463RV/janH4eA4zMv1R6ccd1CRpAoGBAMlo
+w09lPMqDSzkqQQ33x61LJVUYAAJOtqQ29Cm7TadAN+aMTfmB/YQBilvOOjS7PF7O
+Glt4l05BcDDqDhdBeqqXfiqnkwhIrMcD35kKc7d835+yCKcNfx567GS328YXiSRO
+THrtYK4B/eMYkxmVxTTSAmUMitJa3s7jYtke7nFpAoGAT8GCaiB4ztvaCGlm+W6b
+Ll8Ic2JQzy9t/pA4KvrdY/DLo+s9Hdz34kNtF+3UWPAq08LQlYC10ZHtEx3FKlBA
+S+xcyudCwPkDcb5K+dzq+DlO9rS4S61nPvnnF/oVTWzRTjb40bt//g+ynViRkmBA
+RZVtxI4OxZGPfARfxcDqBes=
+-----END PRIVATE KEY-----
+EOF
+# could be created on the fly as in test 684. Otherwise:
+# TODO update before certificate expires in 2125
+  tee 127.0.0.1.pem > /dev/null << EOF
+-----BEGIN CERTIFICATE-----
+MIIDfjCCAmagAwIBAgIURg6+Cs+oEQYnquelzhqC7pqp2MEwDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAgFw0yNTAzMDEyMTU3MTFaGA8yMTI1
+MDIwNTIxNTcxMVowRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUx
+ITAfBgNVBAoMGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAME/4uZJ/pkjytdMkxTzZ5eadAiFzDWhycBX9qIY
+IG/SIpkHXH37pUE0+OxzErNcVm3dtKup5CW3k6/zX4PIh0LgQZUkGslkndO1wEED
+ysQGfDiWlCBy7EGh9iAIN08CX4c3SL1qku2tKy20BNoXUDogx6iH30hthm/e3Ukm
+UjkRU7/qmK9/ZbHH+ufmQ/hfPsF0SU9ycQOX1K2mBsfaTw9UGxr+BODoaKJNGvDy
+98jfVTLf5E6/gz9vmdtT30uiSVNYVZqiwyMiiHt7+6OU58ihwqT+RdRoRfi8F+zr
+kXeedcL5eao/xCOGX2/b0wZJ1XeOLNbJMWbMyBFhjhbdCw8CAwEAAaNkMGIwHQYD
+VR0OBBYEFMoVvMY9fMo1B885o4c+WdaI1VglMB8GA1UdIwQYMBaAFMoVvMY9fMo1
+B885o4c+WdaI1VglMA8GA1UdEwEB/wQFMAMBAf8wDwYDVR0RBAgwBocEfwAAATAN
+BgkqhkiG9w0BAQsFAAOCAQEAXCklOcfwE9UEL4DMyqwpT2zCYex216ZarW6w3nM7
+F8+PwE/D8it8dNJUQe87bn81USExJpjYc/ee+nrGymu1wrH25Qyt62w55+QEnslV
+Sp1ec57CE5JUfRzvc0yXOIVhSCsOi9rZ1QCxDRl90HukpQNqPZUlegkk2Wxd5oys
+t80mn9wwktjEoCO//wIgf3/6Muo1yKENeHwRxTZtkRvWbBKqRPIItpkATAZ77Q4n
+faKupx8UYxItDzrsW0Xcp0OB6Q9Kx/emYkfkdtAhIFpRLLFyqEchnsiojq4kCR0i
+9d6oanrSOPoGgG8PN7pX/gLeNvBcvoLE5bfbjyItfS/xUQ==
+-----END CERTIFICATE-----
+EOF
+}
+
+start_azurite() {
+  echo "*** create azurite configuration"
+  create_azurite_config || return 20
+
+  echo "*** start azurite"
+  azurite_command="sudo azurite --debug azurite.txt --cert 127.0.0.1.pem --key 127.0.0.1-key.pem --loose --skipApiVersionCheck --location ./"
+  local azurite_pid=$(run_background_service "$azurite_command")
+  echo $azurite_pid > azurite_pid
+  echo "*** Azurite PID is $azurite_pid"
+  if [ "x$azurite_pid" = "x" ]; then
+    return 10
+  fi
+
+  sleep 5
+
+  echo "*** create the container and we make it public"
+  export AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=anycontent
+  # first try to delete container - only needed in case this test is rerun
+  az storage container delete --name 'test' --connection-string 'DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=https://127.0.0.1:10000/devstoreaccount1;' || true
+  az storage container create --name 'test' --connection-string 'DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=https://127.0.0.1:10000/devstoreaccount1;' --public-access blob || exit 21
+}
+
+cvmfs_run_test() {
+
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** setup azurite"
+  start_azurite || return 20
+
+  echo "*** create repository"
+  echo "*** create repository"
+  export X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem)
+  echo "X509_CERT_BUNDLE=$X509_CERT_BUNDLE" | sudo tee -a /etc/cvmfs/server.local
+  sudo X509_CERT_BUNDLE=$X509_CERT_BUNDLE \
+       cvmfs_server mkfs \
+    -o root \
+    -s cvmfs_azurite.conf \
+    -w https://127.0.0.1:10000/devstoreaccount1/test  \
+    azurite.cvmfs.io || return 40
+
+  echo "*** poke around the new repository"
+  #TODO: Investigate why it is necessary to set the X509_CERT_BUNDLE env var.
+  # Setting it in the server config should work, but does not
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) cvmfs_server transaction azurite.cvmfs.io || return 50
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) touch /cvmfs/azurite.cvmfs.io/miaomiao || return 51
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) cvmfs_server publish azurite.cvmfs.io || return 52
+  sudo X509_CERT_BUNDLE=$(realpath 127.0.0.1.pem) ls /cvmfs/azurite.cvmfs.io/miaomiao || return 53
+
+  return 0
+}

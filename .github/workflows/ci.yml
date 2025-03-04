@@ -9,11 +9,11 @@ on:
 jobs:
   docker:
     name: "Docker"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build image
         run: |
@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload logs as artifact
         if: ${{ always () }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with: 
           name: CVMFS test logs
           path: |

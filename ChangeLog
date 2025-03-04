@@ -1,4 +1,7 @@
-2.12.5:
+2.12.7:
+  * [server] Fix for cvmfs_server transaction -t, update repository state after waiting for lease (#3771)
+
+2.12.6:
   * [client] Revert CVMFS_PATCH_LEVEL to 0 for check_cvmfs.sh (#3750)
   * [rpm] fix package install on wsl2 and other non-systemd platforms (#3749)
 
