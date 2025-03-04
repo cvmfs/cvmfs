@@ -86,9 +86,8 @@ struct Digest {
 
   bool IsNull() const {
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
-      if (digest[i] != 0) {
+      if (digest[i] != 0)
         return false;
-      }
     }
     return true;
   }
@@ -97,9 +96,8 @@ struct Digest {
     if (this->algorithm != other.algorithm)
       return false;
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
-      if (this->digest[i] != other.digest[i]) {
+      if (this->digest[i] != other.digest[i])
         return false;
-      }
     }
     return true;
   }
@@ -481,10 +479,10 @@ class PathMap {
     if (found) return value.inode;
     return 0;
   }
-  shash_v1::Md5 Insert(const PathString &path, const uint64_t /* inode */) { // NOLINT(misc-unused-parameters)
+  shash_v1::Md5 Insert(const PathString & /* path */, const uint64_t /* inode */) {
     assert(false);
   }
-  void Erase(const shash_v1::Md5 &md5path) { // NOLINT(misc-unused-parameters)
+  void Erase(const shash_v1::Md5 & /* md5path */) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -508,10 +506,10 @@ class InodeMap {
     const bool found = map_.Lookup(inode, md5path);
     return found;
   }
-  void Insert(const uint64_t /* inode */, const shash_v1::Md5 &md5path) { // NOLINT(misc-unused-parameters)
+  void Insert(const uint64_t /* inode */, const shash_v1::Md5 & /* md5path */) {
     assert(false);
   }
-  void Erase(const uint64_t /* inode */) { // NOLINT(misc-unused-parameters)
+  void Erase(const uint64_t /* inode */) {
     assert(false);
   }
   void Clear() { assert(false); }

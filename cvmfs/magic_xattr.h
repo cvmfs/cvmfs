@@ -219,7 +219,7 @@ class SymlinkMagicXattr : public BaseMagicXattr {
  */
 class MagicXattrManager : public SingleCopy {
  public:
-  enum EVisibility : uint8_t { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
+  enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
 
   MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
                     const std::set<std::string> &protected_xattrs,
