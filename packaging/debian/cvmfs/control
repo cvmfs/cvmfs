@@ -30,7 +30,7 @@ Description: CernVM-FS common libraries
 Package: cvmfs-server
 Architecture: amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: psmisc, curl, attr, openssl, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, sqlite3, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
+Depends: psmisc, curl, attr, openssl, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, sqlite3, tar, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
 Recommends: cvmfs-fuse3, apache2
 Conflicts: cvmfs-server (<< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)

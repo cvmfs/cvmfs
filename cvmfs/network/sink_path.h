@@ -12,7 +12,6 @@
 #include "sink.h"
 #include "sink_file.h"
 #include "util/pointer.h"
-#include "util/posix.h"
 
 namespace cvmfs {
 

@@ -69,7 +69,7 @@ class Tracer : SingleCopy {
    */
   static const int kEventStart = -1;
   /**
-   * Code of the lasr log line in the trace file.
+   * Code of the last log line in the trace file.
    */
   static const int kEventStop = -2;
   /**
