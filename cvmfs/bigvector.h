@@ -152,9 +152,9 @@ class BigVector {
 
     if (buf) {
       if (large) {
-        smunmap(reinterpret_cast<void*>(buf)); // NOSCHMLINT(bugprone-multi-level-implicit-pointer-conversion)
+        smunmap(reinterpret_cast<void*>(buf));
       } else {
-        free(reinterpret_cast<void*>(buf)); // NOSCHMLINT(bugprone-multi-level-implicit-pointer-conversion)
+        free(reinterpret_cast<void*>(buf));
       }
     }
   }
