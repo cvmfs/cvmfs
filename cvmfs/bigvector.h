@@ -60,7 +60,7 @@ class BigVector {
   void PushBack(const Item &item) {
     if (size_ == capacity_)
       DoubleCapacity();
-    new (buffer_ + size_) Item(item); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
+    new (reinterpret_cast<void*>(buffer_ + size_)) Item(item);
     size_++;
   }
 
@@ -91,7 +91,7 @@ class BigVector {
     assert(capacity_ > 0);
     buffer_ = Alloc(capacity_ * 2);
     for (size_t i = 0; i < size_; ++i)
-      new (buffer_ + i) Item(old_buffer[i]); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
+      new (reinterpret_cast<void*>(buffer_ + i)) Item(old_buffer[i]);
 
     FreeBuffer(old_buffer, size_, old_large_alloc);
   }
@@ -152,9 +152,9 @@ class BigVector {
 
     if (buf) {
       if (large) {
-        smunmap(buf); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
+        smunmap(reinterpret_cast<void*>(buf)); // NOSCHMLINT(bugprone-multi-level-implicit-pointer-conversion)
       } else {
-        free(buf); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
+        free(reinterpret_cast<void*>(buf)); // NOSCHMLINT(bugprone-multi-level-implicit-pointer-conversion)
       }
     }
   }
