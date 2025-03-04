@@ -1475,7 +1475,14 @@ cvmfs_bugreport() {
 
   echo "Gathering /var/run/cvmfs"
   mkdir -p var/run/cvmfs
-  cp -r /var/run/cvmfs var/run/cvmfs
+  # omit to copy sockets
+  find /var/run/cvmfs -maxdepth 1 -type f -exec cp "{}" var/run/cvmfs  \;
+  # keep correct directory hierarchy
+  if [ -d /var/run/cvmfs/cvmfs.pause ]; then
+    mkdir -p var/run/cvmfs/cvmfs.pause
+    cp /var/run/cvmfs/cvmfs.pause/* var/run/cvmfs/cvmfs.pause
+  fi
+
 
   echo "Gathering files in quarantaine"
   for repo in `ls "$CVMFS_CACHE_BASE"`
@@ -1499,7 +1506,7 @@ cvmfs_bugreport() {
   cvmfs_cmds=('cvmfs2 --version' 'cvmfs_config probe' 'cvmfs_config status' \
               'cvmfs_config showconfig' 'cvmfs_config chksetup' \
               'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
-              "find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah {} ;")
+              "find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah  \{\} \;")
 
   # always run this last as "df" might hang
   common_cmds=('uname -a' 'hostname -f' 'ifconfig -a' 'ls -lR /var/run/cvmfs' \
