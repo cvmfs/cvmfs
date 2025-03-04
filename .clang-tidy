@@ -16,6 +16,7 @@ Checks: -*
   ,-misc-static-assert
   ,-misc-no-recursion
   ,-misc-non-private-member-variables-in-classes
+  ,-misc-use-anonymous-namespace
   ,performance-*
   ,-performance-enum-size
   ,-performance-inefficient-string-concatenation
