@@ -24,7 +24,7 @@ extern std::string *usyslog_path_;
  * Possible failures when booting/mounting cvmfs.  Remember to add a constant
  * to libcvmfs.h and libcvmfs_legacy.cc when a constant to this enum is added.
  */
-enum Failures : uint8_t {
+enum Failures {
   kFailOk = 0,
   kFailUnknown,
   kFailOptions,
@@ -88,7 +88,7 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
-enum StateId : uint8_t {
+enum StateId {
   kStateUnknown = 0,
   kStateOpenDirs,           // >= 2.1.4
   kStateOpenChunks,         // >= 2.1.4, used as of 2.1.15
@@ -243,7 +243,7 @@ struct CvmfsExports {
   struct fuse_lowlevel_ops cvmfs_operations;
 };
 
-enum ReloadMode : uint8_t {
+enum ReloadMode {
   kReloadNoDebug = 0,
   kReloadDebug,
   kReloadLegacy

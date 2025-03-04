@@ -14,7 +14,7 @@ class Statistics;
 
 namespace sqlite {
 
-enum VfsOptions : uint8_t {
+enum VfsOptions {
   kVfsOptNone = 0,
   kVfsOptDefault,  // the VFS becomes the default for new database connections.
 };

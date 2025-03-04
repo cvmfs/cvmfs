@@ -48,12 +48,12 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
 
  public:
-  enum CacheModes : uint8_t {
+  enum CacheModes {
     kCacheReadWrite = 0,
     kCacheReadOnly,
   };
 
-  enum RenameWorkarounds : uint8_t {
+  enum RenameWorkarounds {
     kRenameNormal = 0,
     kRenameLink,
     kRenameSamedir

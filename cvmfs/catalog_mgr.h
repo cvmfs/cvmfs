@@ -46,7 +46,7 @@ const unsigned kLookupRawSymlink = 0b10;
 /**
  * Results upon loading a catalog file.
  */
-enum LoadReturn : uint8_t {
+enum LoadReturn {
   kLoadNew = 0,
   kLoadUp2Date,
   kLoadNoSpace,
@@ -63,7 +63,7 @@ enum LoadReturn : uint8_t {
  *                        stored within the CatalogContext object to retrieve
  *                        the root catalog from the right location
  */
-enum RootCatalogLocation : uint8_t {
+enum RootCatalogLocation {
   kCtlgNoLocationNeeded = 0,  // hash known, no location needed
   kCtlgLocationMounted,      // already loaded in mounted_catalogs_
   kCtlgLocationServer,

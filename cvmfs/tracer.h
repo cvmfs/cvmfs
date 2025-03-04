@@ -34,7 +34,7 @@
  */
 class Tracer : SingleCopy {
  public:
-  enum TraceEvents : uint8_t {
+  enum TraceEvents {
     kEventOpen = 1,
     kEventOpenDir,
     kEventReadlink,

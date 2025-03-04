@@ -37,7 +37,7 @@ class MountPoint;
  */
 class FuseRemounter : SingleCopy {
  public:
-  enum Status : uint8_t {
+  enum Status {
     kStatusUp2Date = 0,
     kStatusDraining,
     kStatusMaintenance,

@@ -20,7 +20,7 @@
 
 class MountPoint;
 
-enum MagicXattrFlavor : uint8_t {
+enum MagicXattrFlavor {
   kXattrBase = 0,
   kXattrWithHash,
   kXattrRegular,
@@ -29,7 +29,7 @@ enum MagicXattrFlavor : uint8_t {
   kXattrAuthz
 };
 
-enum MagicXattrMode : uint8_t {
+enum MagicXattrMode {
   kXattrMachineMode = 0,
   kXattrHumanMode
 };

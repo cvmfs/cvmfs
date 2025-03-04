@@ -44,7 +44,7 @@ class QuotaManager : SingleCopy {
    */
   static const uint32_t kProtocolRevision;
 
-  enum Capabilities : uint8_t {
+  enum Capabilities {
     kCapIntrospectSize = 0,
     kCapIntrospectCleanupRate,
     kCapList,

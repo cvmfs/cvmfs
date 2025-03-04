@@ -12,7 +12,7 @@
 
 namespace file_watcher {
 
-enum Event : uint8_t {
+enum Event {
   kModified,
   kRenamed,
   kAttributes,

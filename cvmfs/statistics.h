@@ -59,7 +59,7 @@ inline int64_t Xadd(class Counter *counter, const int64_t delta) {
  */
 class Statistics {
  public:
-  enum PrintOptions : uint8_t {
+  enum PrintOptions {
     kPrintSimple = 0,
     kPrintHeader
   };

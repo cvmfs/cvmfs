@@ -53,7 +53,7 @@ class InodeEx {
   static inline uint64_t ShiftMode(unsigned mode) { return (mode >> 12) & 017; }
 
  public:
-  enum EFileType : uint8_t {
+  enum EFileType {
     kUnknownType = 0,
     kRegular     = 010,
     kSymlink     = 012,

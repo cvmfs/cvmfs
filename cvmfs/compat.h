@@ -28,7 +28,7 @@ namespace compat {
 
 namespace shash_v1 {
 
-enum Algorithms : uint8_t {
+enum Algorithms {
   kMd5 = 0,
   kSha1,
   kRmd160,
@@ -152,7 +152,7 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash);
 
 namespace shash_v2 {
 
-enum Algorithms : uint8_t {
+enum Algorithms {
   kMd5 = 0,
   kSha1,
   kRmd160,

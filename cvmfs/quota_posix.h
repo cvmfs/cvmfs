@@ -93,7 +93,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Loaded catalogs are pinned in the LRU and have to be treated differently.
    */
-  enum FileTypes : uint8_t {
+  enum FileTypes {
     kFileRegular = 0,
     kFileCatalog,
   };
@@ -101,7 +101,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * List of RPCs that can be sent to the cache manager.
    */
-  enum CommandType : uint8_t {
+  enum CommandType {
     kTouch = 0,
     kInsert,
     kReserve,

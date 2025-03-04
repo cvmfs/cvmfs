@@ -102,7 +102,7 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
 
  public:
-  enum Type : uint8_t {
+  enum Type {
     kFsFuse = 0,
     kFsLibrary
   };

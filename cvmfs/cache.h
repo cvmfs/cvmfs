@@ -21,7 +21,7 @@
 
 class QuotaManager;
 
-enum CacheManagerIds : uint8_t {
+enum CacheManagerIds {
   kUnknownCacheManager = 0,
   kPosixCacheManager,
   kRamCacheManager,
@@ -30,7 +30,7 @@ enum CacheManagerIds : uint8_t {
   kStreamingCacheManager,
 };
 
-enum CacheModes : uint8_t {
+enum CacheModes {
   kCacheReadWrite = 0,
   kCacheReadOnly,
 };
