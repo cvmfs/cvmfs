@@ -24,6 +24,7 @@ namespace publish {
 
 
 void Publisher::TransactionRetry() {
+  bool waiting_on_lease = false;
   if (managed_node_.IsValid()) {
     int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
@@ -39,7 +40,7 @@ void Publisher::TransactionRetry() {
 
   while (true) {
     try {
-      TransactionImpl();
+      TransactionImpl(waiting_on_lease);
       break;
     } catch (const publish::EPublish& e) {
       if (e.failure() != EPublish::kFailTransactionState) {
@@ -53,6 +54,7 @@ void Publisher::TransactionRetry() {
         if (platform_monotonic_time() > deadline)
           throw;
 
+        waiting_on_lease = true;
         LogCvmfs(kLogCvmfs, kLogStdout, "repository busy, retrying");
         throttle.Throttle();
         continue;
@@ -67,7 +69,7 @@ void Publisher::TransactionRetry() {
 }
 
 
-void Publisher::TransactionImpl() {
+void Publisher::TransactionImpl(bool waiting_on_lease) {
   if (in_transaction_.IsSet()) {
     throw EPublish("another transaction is already open",
                    EPublish::kFailTransactionState);
@@ -77,7 +79,6 @@ void Publisher::TransactionImpl() {
 
   // On error, Transaction() will release the transaction lock and drop
   // the session
-  in_transaction_.Set();
   session_->Acquire();
 
   // We might have a valid lease for a non-existing path. Nevertheless, we run
@@ -101,11 +102,20 @@ void Publisher::TransactionImpl() {
     }
   }
 
-  ConstructSpoolers();
 
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
     settings_.transaction().spool_area().checkout_marker()));
   // TODO(jblomer): take root hash from r/o mountpoint?
+
+
+  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway && waiting_on_lease) {
+    DownloadRootObjects(settings_.url(), settings_.fqrn(), settings_.transaction().spool_area().tmp_dir());
+    int rvi = managed_node_->Check(true /* is_quiet */);
+    if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
+  }
+
+  in_transaction_.Set();
+  ConstructSpoolers();
   if (marker.IsValid())
     settings_.GetTransaction()->SetBaseHash(marker->hash());
   else

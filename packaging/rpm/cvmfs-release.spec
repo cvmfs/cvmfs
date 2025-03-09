@@ -1,5 +1,5 @@
 Name:           cvmfs-release
-Version:        4
+Version:        5
 Release:        1
 Summary:        Packages for the CernVM File System
 
@@ -18,25 +18,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildArch:     noarch
 
-%if 0%{?rhel}
-Requires:      redhat-release >= 5
-%endif
-
-%if 0%{?suse_version}
-%if 0%{?is_opensuse}
-Requires:      openSUSE-release
-%else
-Requires:      sles-release
-%endif
-%endif
-
-%if 0%{?amzn}
-Requires:      system-release
-%endif
-
-%if 0%{?fedora}
-Requires:      fedora-release-common
-%endif
+Recommends:    ( redhat-release >= 5 or openSUSE-release or sles-release or system-release or fedora-release-common )  
 
 
 %description
@@ -73,6 +55,9 @@ rm -rf $RPM_BUILD_ROOT
 /etc/pki/rpm-gpg/*
 
 %post
+if [[ ! -f /etc/os-release ]]; then
+  >&2 echo "Warning: could not find /etc/os-release. Assuming this is a RHEL-compatible distribution."
+else
 . /etc/os-release
 if  [[ "$ID_LIKE" == *"suse"* ]]; then
 mv /etc/yum.repos.d/cernvm.repo /etc/zypp/repos.d
@@ -89,9 +74,12 @@ fi
 if  [[ "$ID" == "fedora" ]]; then
 sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
 fi
+fi
 
 
 %changelog
+* Tue Feb 25 2025 Valentin Volkl <vavolkl@cern.ch> - 5-1
+- Drop explicit dependence on *-release packages
 * Sat Jan 04 2025 Valentin Volkl <vavolkl@cern.ch> - 4-1
 - Add second url as mirror
 - Add support for fedora, suse, amzn (equiv to centos7/9)

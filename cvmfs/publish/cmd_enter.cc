@@ -476,7 +476,7 @@ int CmdEnter::Main(const Options &options) {
   bool rvb;
 
   // We cannot have any capabilities or else we are not allowed to write
-  // to /proc/self/setgroups anc /proc/self/[u|g]id_map when creating a user
+  // to /proc/self/setgroups and /proc/self/[u|g]id_map when creating a user
   // namespace
   Env::DropCapabilities();
 

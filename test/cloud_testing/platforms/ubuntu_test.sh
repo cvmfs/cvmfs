@@ -72,6 +72,7 @@ if [ x"$(uname -m)" = x"x86_64" ]; then
                                    src/684-https_s3                             \
                                    src/686-azureblob_s3                         \
                                    src/687-import_s3                            \
+                                   src/692-https_azureblob_s3                   \
                                    src/702-symlink_caching                      \
                                    $CVMFS_EXCLUDE                               \
                                    --                                           \
