@@ -44,7 +44,7 @@ const (
 
 var (
 	address      = flag.String("address", defaultAddress, "address for the snapshotter's GRPC server")
-	configPath   = flag.String("config", "", "path to the configuration file")
+	configPath   = flag.String("config", "/etc/containerd-cvmfs-grpc/config.toml", "path to the configuration file")
 	logLevel     = flag.String("log-level", defaultLogLevel.String(), "set the logging level [trace, debug, info, warn, error, fatal, panic]")
 	rootDir      = flag.String("root", defaultRootDir, "path to the root directory for this snapshotter")
 	printVersion = flag.Bool("version", false, "print the version number")
@@ -56,7 +56,7 @@ func main() {
 	flag.Parse()
 
 	if *printVersion {
-		fmt.Println("CernvVM-FS Containerd Snapshotter:\t", Version)
+		fmt.Println("CernVM-FS Containerd Snapshotter:\t", Version)
 		os.Exit(0)
 	}
 

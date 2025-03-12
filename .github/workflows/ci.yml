@@ -8,8 +8,8 @@ on:
 
 jobs:
   docker:
-    name: "Docker"
-    runs-on: ubuntu-20.04
+    name: "Cloudtests (dockerized, alma9)"
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository

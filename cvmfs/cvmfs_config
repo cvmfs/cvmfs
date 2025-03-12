@@ -151,7 +151,7 @@ cvmfs_config_usage() {
   echo "  umount"
   echo "  wipecache"
   echo "  killall"
-  echo "  bugreport"
+  echo "  bugreport <timeout_in_sec_per_command (default = 90)>"
 }
 
 has_selinux() {
@@ -1454,6 +1454,13 @@ cvmfs_bugreport() {
   mkdir bugreport
   cd bugreport
 
+  local timeout_sec
+  if [ -z "$1" ]; then
+    timeout_sec=90  # default: 90sec per command until it is killed
+  else
+    timeout_sec=$1
+  fi
+
   dist_default="/etc/cvmfs/default.d/*.conf"
   for file in /etc/cvmfs/default.conf $dist_default /etc/cvmfs/default.local
   do
@@ -1465,6 +1472,17 @@ cvmfs_bugreport() {
   echo "Gathering /etc/cvmfs"
   mkdir etc
   cp -r /etc/cvmfs etc/
+
+  echo "Gathering /var/run/cvmfs"
+  mkdir -p var/run/cvmfs
+  # omit to copy sockets
+  find /var/run/cvmfs -maxdepth 1 -type f -exec cp "{}" var/run/cvmfs  \;
+  # keep correct directory hierarchy
+  if [ -d /var/run/cvmfs/cvmfs.pause ]; then
+    mkdir -p var/run/cvmfs/cvmfs.pause
+    cp /var/run/cvmfs/cvmfs.pause/* var/run/cvmfs/cvmfs.pause
+  fi
+
 
   echo "Gathering files in quarantaine"
   for repo in `ls "$CVMFS_CACHE_BASE"`
@@ -1485,35 +1503,38 @@ cvmfs_bugreport() {
 
   local commands
 
+  cvmfs_cmds=('cvmfs2 --version' 'cvmfs_config probe' 'cvmfs_config status' \
+              'cvmfs_config showconfig' 'cvmfs_config chksetup' \
+              'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
+              "find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah  \{\} \;")
+
+  # always run this last as "df" might hang
+  common_cmds=('uname -a' 'hostname -f' 'ifconfig -a' 'ls -lR /var/run/cvmfs' \
+               'cat /etc/fuse.conf' 'cat /etc/exports' 'cat /etc/hosts' 'id cvmfs' \
+               'mount' 'ps -ef' 'df -h')
+
   case $sys_arch in
     Linux )
-      commands=( 'uname -a' 'cat /etc/issue' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
-                 'ls -lR /var/run/cvmfs' 'grep cvmfs /var/log/messages' 'grep cvmfs /var/log/syslog' \
-                 'find /usr/lib /usr/lib64 /lib /lib64 -name libfuse*' \
-                 'journalctl -alm /usr/bin/cvmfs2' \
-                 'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_ram' \
-                 "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
-                 'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
-                 'cvmfs_config status' 'cvmfs_config showconfig' \
-                 'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
-                 'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
-                 'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
-                 'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' 'journalctl -almu autofs.service' \
-                 'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
-                 'cat /etc/hosts' 'free -m' 'systemctl show autofs.service' \
-                 'id cvmfs' 'ls -la /etc/auto.master.d/*' 'cat /etc/auto.master.d/*' )
+      commands=('find /usr/lib /usr/lib64 /lib /lib64 -name libfuse*' \
+                'cat /etc/issue' \
+                'grep cvmfs /var/log/messages' 'grep cvmfs /var/log/syslog' \
+                'journalctl -alm /usr/bin/cvmfs2' \
+                'journalctl -alm /usr/libexec/cvmfs/cache/cvmfs_cache_ram' \
+                'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
+                'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
+                'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' 'journalctl -almu autofs.service' \
+                'cat /etc/fstab' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
+                'free -m' 'systemctl show autofs.service' \
+                'ls -la /etc/auto.master.d/*' 'cat /etc/auto.master.d/*' \
+                "${cvmfs_cmds[@]}" "${common_cmds[@]}")
       ;;
 
     Darwin )
-      commands=( 'uname -a' 'sw_vers' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
-                 'ls -lR /var/run/cvmfs' 'grep cvmfs /var/log/system.log' 'grep cvmfs /var/log/kernel.log' \
-                 'cat /Library/Filesystems/macfuse.fs/Contents/version.plist' \
-                 "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
-                 'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_talk internal affairs' \
-                 'mount' 'df -h' 'ps -ef' 'cvmfs_config showconfig' 'cvmfs_config chksetup' \
-                 'cvmfs_config stat -v' 'cat /etc/fuse.conf' \
-                 'cat /etc/auto_master' 'sysctl vfs.autofs' 'cat /etc/exports' 'cat /etc/hosts' \
-                 'id cvmfs' 'syslog | grep cvmfs' )
+      commands=('sw_vers' 'syslog | grep cvmfs' \
+                'grep cvmfs /var/log/system.log' 'grep cvmfs /var/log/kernel.log' \
+                'cat /Library/Filesystems/macfuse.fs/Contents/version.plist' \
+                'cat /etc/auto_master' 'sysctl vfs.autofs' \
+                "${cvmfs_cmds[@]}" "${common_cmds[@]}" )
       ;;
 
     * )
@@ -1523,11 +1544,27 @@ cvmfs_bugreport() {
 
   for cmd in "${commands[@]}"
    do
-     out="`echo $cmd | tr -Cd [:alnum:]`.stdout"
-     err="`echo $cmd | tr -Cd [:alnum:]`.stderr"
+      out="`echo $cmd | tr -Cd [:alnum:]`.stdout"
+      err="`echo $cmd | tr -Cd [:alnum:]`.stderr"
       echo "Gathering $cmd"
       echo "$cmd" > $out
-      $cmd >> $out 2>$err
+
+      case $sys_arch in
+        Linux )
+          timeout -s 9 ${timeout_sec} sh -c "$cmd >> $out 2>$err & wait"
+          ret="$?"
+          if [ "$ret" -eq "124" ] || [ "$ret" -eq "137" ]; then
+            # write to stdout and into the files $out and $err
+            # add some new lines so that the error stands in a new line
+            echo -e "\nERROR! Command '$cmd' killed by timeout of length: ${timeout_sec} seconds\n" \
+              | tee -a "$out" "$err"
+          fi
+        ;;
+        Darwin )
+          # base installation on mac does not have any "timeout" cmd
+          $cmd >> $out 2>$err
+        ;;
+      esac
    done
 
    cd ..

@@ -1,4 +1,4 @@
-version: '3'
+# This file is part of the CernVM File System.
 
 services:
     cvmfs-dev:
@@ -6,6 +6,7 @@ services:
         container_name: cvmfs-dev
         hostname: cvmfs-dev
         privileged: true
+        cgroup: host # required to run sbin/init with cgroups v2
         build:
             context: .
             dockerfile: Dockerfile-dev
