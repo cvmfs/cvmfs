@@ -582,6 +582,7 @@ if (BUILD_SERVER)
        backoff.cc
        catalog.cc
        catalog_counters.cc
+       catalog_downloader.cc
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_sql.cc
@@ -654,6 +655,7 @@ if (BUILD_SERVER)
        swissknife_history.cc
        swissknife_info.cc
        swissknife_ingest.cc
+       swissknife_ingestsql.cc
        swissknife_lease.cc
        swissknife_lease_curl.cc
        swissknife_lease_json.cc
@@ -699,6 +701,7 @@ if (BUILD_SERVER)
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
+        ${LIBACL_LIBRARY}
         pthread
         dl
   )
@@ -733,6 +736,7 @@ if (BUILD_SERVER)
        catalog_mgr_ro.cc
        catalog_mgr_rw.cc
        catalog_virtual.cc
+       catalog_downloader.cc
        compression/compression.cc
        directory_entry.cc
        gateway_util.cc
@@ -1026,6 +1030,7 @@ if(BUILD_RECEIVER)
        receiver/receiver.cc
        receiver/session_token.cc
        backoff.cc
+       catalog_downloader.cc
        catalog.cc
        catalog_rw.cc
        catalog_counters.cc
