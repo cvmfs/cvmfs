@@ -76,6 +76,16 @@ class FuseInvalidator : SingleCopy {
     uint64_t parent_ino;
     NameString name;
   };
+  struct InvalDentriesCommand : public Command {
+    Handle *handle;
+  };
+  struct InvalDentriesAndInodesCommand : public Command {
+    Handle *handle;
+  };
+  struct InvalDentriesAndInodesNoEvictCommand : public Command {
+    Handle *handle;
+  };
+  
 
   FuseInvalidator(MountPoint *mountpoint,
                   void **fuse_channel_or_session,
@@ -139,7 +149,7 @@ class FuseInvalidator : SingleCopy {
    * 
    * This function should not be called for MacOS.
    */
-  void DoInvalidateDentry();
+  void DoInvalidateDentry(uint64_t parent_ino, const NameString &name);
       /**
    * Invalidates all inodes tracked by inode_tracker_.
    * Information which dentry should be invalidated is communicated via the

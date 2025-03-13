@@ -101,23 +101,28 @@ FuseInvalidator::~FuseInvalidator() {
 
 void FuseInvalidator::InvalidateInodesAndDentries(Handle *handle) {
   assert(handle != NULL);
-  char c = 'B';
-  WritePipe(pipe_ctrl_[1], &c, 1);
-  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+  InvalDentriesAndInodesCommand *command =
+    new (smalloc(sizeof(InvalDentriesAndInodesCommand)))
+         InvalDentriesAndInodesCommand();
+  command->handle = handle;
+  channel_.PushBack(command);
 }
 
 void FuseInvalidator::InvalidateInodesNoEvictAndDentries(Handle *handle) {
   assert(handle != NULL);
-  char c = 'X';
-  WritePipe(pipe_ctrl_[1], &c, 1);
-  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+  InvalDentriesAndInodesNoEvictCommand *command =
+    new (smalloc(sizeof(InvalDentriesAndInodesNoEvictCommand)))
+         InvalDentriesAndInodesNoEvictCommand();
+  command->handle = handle;
+  channel_.PushBack(command);
 }
 
 void FuseInvalidator::InvalidateDentries(Handle *handle) {
   assert(handle != NULL);
-  char c = 'D';
-  WritePipe(pipe_ctrl_[1], &c, 1);
-  WritePipe(pipe_ctrl_[1], &handle, sizeof(handle));
+  InvalDentriesCommand *command =
+    new (smalloc(sizeof(InvalDentriesCommand))) InvalDentriesCommand();
+  command->handle = handle;
+  channel_.PushBack(command);
 }
 
 
@@ -161,86 +166,115 @@ void *FuseInvalidator::MainInvalidator(void *data) {
 #ifdef __APPLE__
   bool reported_missing_inval_support = false;
 #endif
-  char c;
-  Handle *handle;
+
   while (true) {
     Command *command = invalidator->channel_.PopFront();
 
     if (dynamic_cast<QuitCommand *>(command)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "stopping dentry invalidator thread");
       command->~Command();
       free(command);
-      break;
+      return NULL;
     }
 
+    // invalidate single dentry
     InvalDentryCommand *inval_dentry_command =
       dynamic_cast<InvalDentryCommand *>(command);
     if (inval_dentry_command) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "InvalDentryCommand");
+      uint64_t parent_ino = inval_dentry_command->parent_ino;
+      const NameString name = inval_dentry_command->name;
 #ifdef __APPLE__
-      if (invalidator->fuse_channel_or_session_ == NULL) {
-        if (!reported_missing_inval_support) {
-          LogCvmfs(kLogCvmfs, kLogSyslogWarn,
-                   "missing fuse support for dentry invalidation "
-                   "(%" PRIu64 "/%s)",
-                   inval_dentry_command->parent_ino,
-                   inval_dentry_command->name.ToString().c_str());
-          reported_missing_inval_support = true;
-        }
+      if (!reported_missing_inval_support) {
+        LogCvmfs(kLogCvmfs, kLogSyslogWarn,
+                  "missing fuse support for dentry invalidation "
+                  "(%" PRIu64 "/%s)", parent_ino, name.ToString().c_str());
+        reported_missing_inval_support = true;
+      }
 #else
-        invalidator->DoInvalidateDentry();
+      invalidator->DoInvalidateDentry(parent_ino, name);
 #endif
-break;
-case 'I':  // invalidate all "I"nodes
-  ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
-#ifdef __APPLE__
-  ClearCacheByTimeout(handle);
-#else
-        invalidator->DoInvalidateInodes(handle);
-        invalidator->evict_list_.Clear(); 
-#endif
-  handle->SetDone();
-break;
-case 'D':  // invalidate all "D"entries
-  ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
-#ifdef __APPLE__
-  ClearCacheByTimeout(handle);
-#else
-        invalidator->DoInvalidateDentries();
-#endif
-  handle->SetDone();
-break;
-case 'B':  // invalidate all "B"oth: inodes and dentries
-  ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
-#ifdef __APPLE__
-  ClearCacheByTimeout(handle);
-#else
-        invalidator->DoInvalidateDentries();
-        invalidator->DoInvalidateInodes(handle);
-        invalidator->evict_list_.Clear();
-#endif
-        handle->SetDone();
-      break;
-      case 'X':  // invalidate all both: inodes (do not delete evict list)
-                 // and dentries
-        ReadPipe(invalidator->pipe_ctrl_[0], &handle, sizeof(handle));
-#ifdef __APPLE__
-        ClearCacheByTimeout(handle);
-#else
-        invalidator->DoInvalidateDentries();
-        invalidator->DoInvalidateInodes(handle);
-#endif
-  handle->SetDone();
-break;
-default:
-// TODO(heretherebedragons) PANIC?
-break;
-}
-}
+      inval_dentry_command->~InvalDentryCommand();
+      free(inval_dentry_command);
+      LogCvmfs(kLogCvmfs, kLogDebug, "END InvalDentryCommand");
+      continue;
+    }  // end invalidate single dentry
 
-quit_thread:
-LogCvmfs(kLogCvmfs, kLogDebug, "stopping dentry invalidator thread");
-return NULL;
-}
+    // invalidate all "I"nodes
+    InvalInodesCommand *inval_inodes_command =
+          dynamic_cast<InvalInodesCommand *>(command);
+    if (inval_inodes_command) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "InvalInodesCommand");
+      Handle *handle = inval_inodes_command->handle;
+#ifdef __APPLE__
+      ClearCacheByTimeout(handle);
+#else
+      invalidator->DoInvalidateInodes(handle);
+      invalidator->evict_list_.Clear(); 
+#endif
+      handle->SetDone();
+      inval_inodes_command->~InvalInodesCommand();
+      free(inval_inodes_command);
+      LogCvmfs(kLogCvmfs, kLogDebug, "END InvalInodesCommand");
+      continue;  // end invalidate all "I"nodes
+    }
 
+    // invalidate all "D"entries
+    InvalDentriesCommand *inval_dentries_command =
+      dynamic_cast<InvalDentriesCommand *>(command);
+    if (inval_dentries_command) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "InvalDentriesCommand");
+      Handle *handle = inval_dentries_command->handle;
+#ifdef __APPLE__
+      ClearCacheByTimeout(handle);
+#else
+      invalidator->DoInvalidateDentries();
+#endif
+      handle->SetDone();
+      inval_dentries_command->~InvalDentriesCommand();
+      free(inval_dentries_command);
+      LogCvmfs(kLogCvmfs, kLogDebug, "END InvalDentriesCommand");
+      continue;
+    }  //  end invalidate all "D"entries
+
+    // invalidate all "B"oth: inodes and dentries
+    InvalDentriesAndInodesCommand *inval_both_command =
+      dynamic_cast<InvalDentriesAndInodesCommand *>(command);
+    if (inval_both_command) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "InvalDentriesAndInodesCommand");
+      Handle *handle = inval_both_command->handle;
+#ifdef __APPLE__
+      ClearCacheByTimeout(handle);
+#else
+      invalidator->DoInvalidateDentries();
+      invalidator->DoInvalidateInodes(handle);
+      invalidator->evict_list_.Clear();
+#endif
+      handle->SetDone();
+      inval_both_command->~InvalDentriesAndInodesCommand();
+      free(inval_both_command);
+      LogCvmfs(kLogCvmfs, kLogDebug, "END InvalDentriesAndInodesCommand");
+      continue;
+    }
+
+    // invalidate all both: inodes (do not delete evict list)  and dentries
+    InvalDentriesAndInodesNoEvictCommand *inval_both_no_evict_command =
+      dynamic_cast<InvalDentriesAndInodesNoEvictCommand *>(command);
+    if (inval_both_no_evict_command) {
+      Handle *handle = inval_both_no_evict_command->handle;
+#ifdef __APPLE__
+      ClearCacheByTimeout(handle);
+#else
+      invalidator->DoInvalidateDentries();
+      invalidator->DoInvalidateInodes(handle);
+#endif
+      handle->SetDone();
+      inval_both_no_evict_command->~InvalDentriesAndInodesNoEvictCommand();
+      free(inval_both_no_evict_command);
+      continue;
+    }
+  }
+}
 
 void FuseInvalidator::ClearCacheByTimeout(Handle *handle) {
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -259,40 +293,24 @@ void FuseInvalidator::ClearCacheByTimeout(Handle *handle) {
   }
 }
 
-void FuseInvalidator::DoInvalidateDentry() {
-  uint64_t parent_ino;
-  unsigned len;
-  ReadPipe(pipe_ctrl_[0], &parent_ino, sizeof(parent_ino));
-  ReadPipe(pipe_ctrl_[0], &len, sizeof(len));
-  char *name = static_cast<char *>(smalloc(len + 1));
-  ReadPipe(pipe_ctrl_[0], name, len);
-  name[len] = '\0';
-
-      LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
-               parent_ino, name);
+void FuseInvalidator::DoInvalidateDentry(uint64_t parent_ino,
+                                         const NameString &name) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "evicting single dentry %" PRIu64 "/%s",
+            parent_ino, name.ToString().c_str());
 #if CVMFS_USE_LIBFUSE == 2
-      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_chan**>(
-        invalidator->fuse_channel_or_session_),
-        inval_dentry_command->parent_ino,
-        inval_dentry_command->name.GetChars(),
-        inval_dentry_command->name.GetLength());
+  fuse_lowlevel_notify_inval_entry(
+    *reinterpret_cast<struct fuse_chan**>(fuse_channel_or_session_),
+    parent_ino, name.GetChars(), name.GetLength());
 #else
-      fuse_lowlevel_notify_inval_entry(*reinterpret_cast<struct fuse_session**>(
-        invalidator->fuse_channel_or_session_),
-        inval_dentry_command->parent_ino,
-        inval_dentry_command->name.GetChars(),
-        inval_dentry_command->name.GetLength());
+  fuse_lowlevel_notify_inval_entry(
+    *reinterpret_cast<struct fuse_session**>(fuse_channel_or_session_),
+    parent_ino, name.GetChars(), name.GetLength());
 #endif
-      inval_dentry_command->~InvalDentryCommand();
-      free(inval_dentry_command);
-      continue;
-    }
+}
 
-  void FuseInvalidator::DoInvalidateInodes(Handle *handle) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "invalidating kernel caches, timeout %u",
-             handle->timeout_s_);
-    inval_inodes_command->~InvalInodesCommand();
-    free(inval_inodes_command);
+void FuseInvalidator::DoInvalidateInodes(Handle *handle) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "invalidating kernel caches, timeout %u",
+            handle->timeout_s_);
 
   uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
@@ -346,8 +364,10 @@ void FuseInvalidator::DoInvalidateDentry() {
 }
 
 void FuseInvalidator::DoInvalidateDentries() {
+  LogCvmfs(kLogCvmfs, kLogDebug, "eviciting dentries");
   // Do not do any prune. Can create deadlocks and give back broken symlinks
   // during catalog reload
+  // dentry_tracker_->Prune();
 
   // Copy and empty the dentry tracker in a single atomic operation
   glue::DentryTracker *dentries_copy = dentry_tracker_->Move();
