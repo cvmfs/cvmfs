@@ -1390,7 +1390,7 @@ int swissknife::IngestSQL::add_files(
     }
 
     if (exists) {
-      CUSTOM_ASSERT(!S_ISDIR(dir.mode_) && !S_ISLNK(dir.mode_), "Refusing to replace existing dir/symlink at %s with a file", file.name.c_str());
+      CUSTOM_ASSERT(!S_ISDIR(dir.mode()) && !S_ISLNK(dir.mode()), "Refusing to replace existing dir/symlink at %s with a file", file.name.c_str());
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Removing existing file [%s]", file.name.c_str());
       catalog_manager.RemoveFile(file.name);
     }
