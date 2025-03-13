@@ -1426,10 +1426,10 @@ int swissknife::IngestSQL::do_deletions(
     exists = catalog_manager.LookupDirEntry(MakeCatalogPath(names),
                                         catalog::kLookupDefault, &dirent);
     if(exists) {
-      if(    (isdir  && S_ISDIR(dirent.mode_) )
-          || (islink && S_ISLNK(dirent.mode_) )
-          || (isfile && S_ISREG(dirent.mode_) ) ) {
-        if (S_ISDIR(dirent.mode_)) {
+      if(    (isdir  && S_ISDIR(dirent.mode()) )
+          || (islink && S_ISLNK(dirent.mode()) )
+          || (isfile && S_ISREG(dirent.mode()) ) ) {
+        if (S_ISDIR(dirent.mode())) {
           PathString names_path(names);
           recursively_delete_directory(names_path, catalog_manager);
         } else {
@@ -1437,7 +1437,7 @@ int swissknife::IngestSQL::do_deletions(
           catalog_manager.RemoveFile(names);
         }
       } else {
-        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Mismatch in deletion type, not deleting: [%s] (dir %d/%d , link %d/%d, file %d/%d)", names.c_str(), isdir,  S_ISDIR(dirent.mode_), islink, S_ISLNK(dirent.mode_), isfile, S_ISREG(dirent.mode_) );
+        LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Mismatch in deletion type, not deleting: [%s] (dir %ld/%d , link %ld/%d, file %ld/%d)", names.c_str(), isdir,  S_ISDIR(dirent.mode()), islink, S_ISLNK(dirent.mode()), isfile, S_ISREG(dirent.mode()) );
       }
     } else {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Not Removing non-existent [%s]",
