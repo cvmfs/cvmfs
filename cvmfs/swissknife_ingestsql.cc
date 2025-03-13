@@ -1310,7 +1310,7 @@ void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_pat
     }
     size_t expected_num_chunks = size/kChunkSize;
     if (expected_num_chunks * (size_t)kChunkSize < (size_t) size || size==0 ) { expected_num_chunks++; }
-    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %d does not match expected number of chunks %d", offsets.size(), expected_num_chunks);
+    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %ld does not match expected number of chunks %d", offsets.size(), expected_num_chunks);
     for (size_t i = 0; i < offsets.size() - 1; i++) {  
       sizes.push_back(size_t(offsets[i + 1] - offsets[i]));
     }
