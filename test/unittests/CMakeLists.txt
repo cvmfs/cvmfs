@@ -477,7 +477,6 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/quota_posix.cc
   ${CVMFS_SOURCE_DIR}/receiver/commit_processor.cc
-  ${CVMFS_SOURCE_DIR}/receiver/lease_path_util.cc
   ${CVMFS_SOURCE_DIR}/receiver/params.cc
   ${CVMFS_SOURCE_DIR}/receiver/payload_processor.cc
   ${CVMFS_SOURCE_DIR}/receiver/reactor.cc

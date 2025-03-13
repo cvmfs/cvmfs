@@ -223,6 +223,8 @@ atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
 PathString GetParentPath(const PathString &path);
 NameString GetFileName(const PathString &path);
 
+bool IsSubPath(const PathString& parent, const PathString& path);
+
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

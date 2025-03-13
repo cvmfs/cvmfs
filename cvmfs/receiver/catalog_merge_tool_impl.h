@@ -9,7 +9,6 @@
 
 #include "catalog.h"
 #include "crypto/hash.h"
-#include "lease_path_util.h"
 #include "manifest.h"
 #include "options.h"
 #include "upload.h"
@@ -17,6 +16,7 @@
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
+#include "shortstring.h"
 
 inline PathString MakeRelative(const PathString &path) {
   std::string rel_path;

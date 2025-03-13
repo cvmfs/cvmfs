@@ -1020,7 +1020,6 @@ endif ()
 if(BUILD_RECEIVER)
   set (CVMFS_RECEIVER_SOURCES
        receiver/commit_processor.cc
-       receiver/lease_path_util.cc
        receiver/params.cc
        receiver/payload_processor.cc
        receiver/reactor.cc
