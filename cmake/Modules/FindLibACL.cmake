@@ -12,7 +12,7 @@ find_library(
 
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(
-    LIBACL
+    LibACL
     DEFAULT_MSG
     LIBACL_LIBRARY
     LIBACL_INCLUDE_DIRS
