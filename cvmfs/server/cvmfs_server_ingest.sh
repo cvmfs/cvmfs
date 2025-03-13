@@ -38,6 +38,9 @@ cvmfs_server_ingest() {
     case $1 in
       -b | --base_dir )
         base_dir=$2
+        # remove any duplicated slashes in pathname
+        # swissknife cannot handle it at the moment
+        base_dir=$(echo $base_dir | tr -s / )
         ;;
       -t | --tar_file )
         tar_file=$2
