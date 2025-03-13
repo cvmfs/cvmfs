@@ -28,7 +28,7 @@ produce_tarball() {
   rm -rf tarball_foo
 }
 
-check_repo_contents() {
+check_repository_contents() {
   local repo_dir=$1
 
   if [ ! -d $repo_dir/tarball_foo ]; then
