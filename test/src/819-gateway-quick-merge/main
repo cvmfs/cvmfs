@@ -24,7 +24,7 @@ cvmfs_run_test() {
   touch /cvmfs/test.repo.org/foo/bar/.cvmfscatalog     || return 33
   touch /cvmfs/test.repo.org/foo/bar/baz/.cvmfscatalog || return 34
   # During merge, the cvmfs_receiver must not recurse into the nested
-  # catalog at /foo/bar and futher
+  # catalog at /foo/bar and further
   cvmfs_server publish test.repo.org || return 35
   cvmfs_server check -i test.repo.org || return 36
   ls -lahR /cvmfs/test.repo.org/foo || return 37
