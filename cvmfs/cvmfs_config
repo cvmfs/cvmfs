@@ -1213,7 +1213,9 @@ cvmfs_reload() {
           rm -rf "$dir" && \
             mkdir -p "$dir" && \
             chown $CVMFS_USER "$dir"
-            sleep 15
+            if [ "$sys_arch" = "Darwin" ]; then
+              sleep 15
+            fi
           if [ $? -ne 0 ]; then
             echo "Failed!"
             RETVAL=1
