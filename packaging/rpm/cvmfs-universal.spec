@@ -552,7 +552,8 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-
+%post ducc
+setcap "cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep cap_sys_admin=ep cap_mknod=ep" /usr/bin/cvmfs_ducc
 
 %preun
 if [ $1 = 0 ] ; then
