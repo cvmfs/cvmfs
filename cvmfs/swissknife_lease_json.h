@@ -7,6 +7,7 @@
 
 #include "swissknife_lease_curl.h"
 
+#include <cstdint>
 #include <string>
 
 enum LeaseReply {
