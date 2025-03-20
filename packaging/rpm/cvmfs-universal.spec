@@ -526,6 +526,9 @@ restorecon -R /var/lib/cvmfs
 if  [ -d /run/systemd/system ]; then
   systemctl daemon-reload
   systemctl start cvmfs-reload.service
+  # if there's apparmor, reload to bring
+  # fusermount3 config into effect
+  systemctl reload apparmor || true
 else
   if [ -d /var/run/cvmfs ]; then
     /usr/bin/cvmfs_config reload
@@ -656,6 +659,7 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
+%config(noreplace) %{_sysconfdir}/apparmor.d/local/fusermount3
 
 %files libs
 %defattr(-,root,root)

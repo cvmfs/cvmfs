@@ -365,6 +365,13 @@ if (BUILD_CVMFS)
     DESTINATION /usr/lib/systemd/system
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
+  # Apparmor fusermount3 profile extension
+  install (
+    FILES pkg/apparmor.local.fusermount3
+    DESTINATION /etc/apparmor.d/local
+    RENAME fusermount3
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
 
 endif (BUILD_CVMFS)
 
