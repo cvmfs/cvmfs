@@ -260,6 +260,13 @@ cvmfs_run_test() {
   cvmfs_server ingest --base_dir /cvmfs/no.such.repository/absolute_path2  --tar_file $tarfile  && return 48
   cvmfs_server ingest -d /cvmfs/$CVMFS_TEST_REPO/absolute_path1/tarball_foo/a/b/2.txt -d /cvmfs/no.such.directory/absolute_path1/tarball_foo/a/b/3.txt && return 49
 
+
+  echo "** check deletion of files with : in filename"
+  cvmfs_server transaction $CVMFS_TEST_REPO || return 50
+  echo "testwith:" > /cvmfs/$CVMFS_TEST_REPO/unlucky:filename || return 51
+  cvmfs_server publish $CVMFS_TEST_REPO || return 52
+  cvmfs_server ingest -d /cvmfs/$CVMFS_TEST_REPO/unlucky:filename || return 53
+
   return 0
 }
 

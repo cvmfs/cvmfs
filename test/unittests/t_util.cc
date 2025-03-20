@@ -1435,6 +1435,26 @@ TEST_F(T_Util, SplitString) {
             SplitStringBounded(5000, str2, ':'));
 }
 
+TEST_F(T_Util, SplitStringMultiChar) {
+  string str1 = "the string that will be cut in pieces";
+  string str2 = "my///////string///by///colons";
+  vector<string> result;
+
+
+  result = SplitStringMultiChar(str1, " ");
+  EXPECT_EQ(8u, result.size());
+  EXPECT_EQ("the", result[0]);
+  EXPECT_EQ("string", result[1]);
+
+  result = SplitStringMultiChar(str1, ";");
+  EXPECT_EQ(1u, result.size());
+  EXPECT_EQ(str1, result[0]);
+
+  result = SplitStringMultiChar(str2, "///");
+  EXPECT_EQ(5u, result.size());
+  EXPECT_EQ("", result[1]);
+}
+
 TEST_F(T_Util, JoinStrings) {
   vector<string> result;
   result.push_back("my");

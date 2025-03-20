@@ -48,9 +48,9 @@ cvmfs_server_ingest() {
       -d | --delete )
         if [ "x$to_delete" = "x" ]
         then
-          to_delete=($2)
+          to_delete=($(echo $2 | tr -s /))
         else
-          to_delete+=($2)
+          to_delete+=($(echo $2 | tr -s /))
           multiple_delete=1
         fi
         ;;
@@ -318,7 +318,10 @@ cvmfs_server_ingest() {
   fi
 
   if [ ! x"$to_delete" = "x" ]; then
-    ingest_command="$ingest_command -D $to_delete"
+    # concatenate to_delete with three slashes
+    local to_delete2=${to_delete[@]:1}
+    local to_delete_delim=$(printf %s "${to_delete}" "${to_delete2[@]/#////}")
+    ingest_command="$ingest_command -D $to_delete_delim"
   fi
 
   if [ "$create_catalog" = true ]; then

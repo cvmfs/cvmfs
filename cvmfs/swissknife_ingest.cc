@@ -173,7 +173,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
     &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
-    params.uid, params.gid, params.to_delete, create_catalog);
+    params.uid, params.gid, params.to_delete, create_catalog, "///");
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
