@@ -724,10 +724,27 @@ int FuseMain(int argc, char *argv[]) {
 
   string parameter;
   OptionsManager *options_manager;
+  int origuid = -1;
+  int origgid = -1;
   if (simple_options_parsing_) {
     options_manager = new SimpleOptionsParser(
         new DefaultOptionsTemplateManager(*repository_name_));
   } else {
+    if ((uid_ != 0) || (gid_ != 0)) {
+      // temporarily switch to requested uid/gid while running bash parser
+      origuid = (int) getuid();
+      origgid = (int) getgid();
+      if (((int) uid_ != origuid) || ((int) gid_ != origgid)) {
+        if (!SwitchCredentials(uid_, gid_, true)) {
+          LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                   "Failed to switch credentials for options parser");
+          return kFailPermission;
+        }
+      } else {
+        origuid = -1;
+        origgid = -1;
+      }
+    }
     options_manager = new BashOptionsManager(
         new DefaultOptionsTemplateManager(*repository_name_));
   }
@@ -739,6 +756,14 @@ int FuseMain(int argc, char *argv[]) {
   } else {
     options_manager->ParseDefault(*repository_name_);
   }
+  if (origuid != -1) {
+    if (!SwitchCredentials(origuid, origgid, true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to switch credentials back after options parser");
+      return kFailPermission;
+    }
+  }
+
   if (options_manager->GetValue("CVMFS_PREMOUNT_FUSE", &parameter)
       && options_manager->IsOff(parameter)) {
     premount_fuse_ = false;
