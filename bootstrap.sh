@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 set -e
 
@@ -118,8 +118,8 @@ do_build() {
 
   local save_dir=$(pwd)
   cd $library_build_dir
-  sh configureHook.sh
-  sh makeHook.sh
+  ./configureHook.sh
+  ./makeHook.sh
   cd $save_dir
 }
 
