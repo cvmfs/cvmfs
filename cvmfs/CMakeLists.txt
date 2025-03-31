@@ -359,6 +359,7 @@ if (BUILD_CVMFS)
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif ()
+  if (NOT MACOSX)
   # Systemd service unit for reloads after package upgrades
   install (
     FILES pkg/cvmfs-reload.service
@@ -372,6 +373,7 @@ if (BUILD_CVMFS)
     RENAME fusermount3
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
+  endif()
 
 endif (BUILD_CVMFS)
 
