@@ -53,7 +53,9 @@ IF (FUSE3_FOUND)
         endif(HAS_FUSE_CACHE_READDIR)
 
         # Check if we can use fuse_loop_config in fuse_session_loop_mt (libfuse >= 3.12)
-        cmake_path(GET FUSE3_LIBRARY PARENT_PATH FUSE3_LIB_PATH)
+        get_filename_component(FUSE3_LIB_PATH ${FUSE3_LIBRARY} DIRECTORY)
+        # Replace get_filename_component with cmake_path when CentOS7 is finally deprecated
+        # cmake_path(GET FUSE3_LIBRARY PARENT_PATH FUSE3_LIB_PATH)
         try_compile(HAS_FUSE_LOOP_CONFIG "${CMAKE_BINARY_DIR}/temp"
                     "${PROJECT_SOURCE_DIR}/cmake/check_fuse3_loop_config.c"
                     LINK_LIBRARIES fuse3
