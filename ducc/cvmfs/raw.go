@@ -138,7 +138,9 @@ func RepositoryExists(CVMFSRepo string) bool {
 	}
 	stdoutString := string(stdout.Bytes())
 
-	if strings.Contains(stdoutString, CVMFSRepo) {
+	// remove sub directory in case it was passed
+	repo, _, _ := strings.Cut(CVMFSRepo, "/")
+	if strings.Contains(stdoutString, repo) {
 		return true
 	} else {
 		return false
