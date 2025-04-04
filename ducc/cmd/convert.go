@@ -36,7 +36,7 @@ func init() {
 }
 
 var convertCmd = &cobra.Command{
-	Use:   "convert wish-list.yaml",
+	Use:   "convert <wish-list.yaml>",
 	Short: "Convert the wishes",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

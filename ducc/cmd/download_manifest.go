@@ -22,7 +22,7 @@ func init() {
 }
 
 var downloadManifestCmd = &cobra.Command{
-	Use:     "download-manifest",
+	Use:     "download-manifest <image>",
 	Short:   "Download the manifest of the image, if sucessful it will print the manifest itself, otherwise will show what went wrong.",
 	Aliases: []string{"get-manifest"},
 	Args:    cobra.MinimumNArgs(1),

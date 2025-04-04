@@ -25,7 +25,7 @@ func init() {
 }
 
 var loopCmd = &cobra.Command{
-	Use:   "loop wish-list.yaml",
+	Use:   "loop <wish-list.yaml>",
 	Short: "An infinite loop that keep converting all the images",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
