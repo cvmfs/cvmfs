@@ -214,28 +214,43 @@ endif()
 #    if the debug one is specified also include debug/optimized keywords
 #    in *_LIBRARIES variable
 function(_protobuf_find_libraries name filename)
-   find_library(${name}_LIBRARY
-       NAMES ${filename}
-       PATHS ${PROTOBUF_SRC_ROOT_FOLDER}/vsprojects/${_PROTOBUF_ARCH_DIR}Release)
-   mark_as_advanced(${name}_LIBRARY)
+  find_package(PkgConfig)
+  if (PKG_CONFIG_FOUND)
+    pkg_check_modules(${name} IMPORTED_TARGET GLOBAL ${filename})
+    if (${${name}_FOUND})
+      MESSAGE(${PKG_CONFIG_EXECUTABLE})
+      MESSAGE(${${name}_LIBRARIES})
+      MESSAGE(${${name}_LINK_LIBRARIES})
+      set(${name}_LIBRARIES     ${${name}_LINK_LIBRARIES} PARENT_SCOPE)
+    endif (${${name}_FOUND})
+  endif (PKG_CONFIG_FOUND)
 
-   find_library(${name}_LIBRARY_DEBUG
-       NAMES ${filename}
-       PATHS ${PROTOBUF_SRC_ROOT_FOLDER}/vsprojects/${_PROTOBUF_ARCH_DIR}Debug)
-   mark_as_advanced(${name}_LIBRARY_DEBUG)
+  if (NOT ${${name}_FOUND})
+    # pkg-config didn't work
 
-   if(NOT ${name}_LIBRARY_DEBUG)
+    find_library(${name}_LIBRARY
+      NAMES ${filename}
+      PATHS ${PROTOBUF_SRC_ROOT_FOLDER}/vsprojects/${_PROTOBUF_ARCH_DIR}Release)
+    mark_as_advanced(${name}_LIBRARY)
+
+    find_library(${name}_LIBRARY_DEBUG
+      NAMES ${filename}
+      PATHS ${PROTOBUF_SRC_ROOT_FOLDER}/vsprojects/${_PROTOBUF_ARCH_DIR}Debug)
+    mark_as_advanced(${name}_LIBRARY_DEBUG)
+
+    if(NOT ${name}_LIBRARY_DEBUG)
       # There is no debug library
       set(${name}_LIBRARY_DEBUG ${${name}_LIBRARY} PARENT_SCOPE)
       set(${name}_LIBRARIES     ${${name}_LIBRARY} PARENT_SCOPE)
-   else()
+    else()
       # There IS a debug library
       set(${name}_LIBRARIES
-          optimized ${${name}_LIBRARY}
-          debug     ${${name}_LIBRARY_DEBUG}
-          PARENT_SCOPE
+        optimized ${${name}_LIBRARY}
+        debug     ${${name}_LIBRARY_DEBUG}
+        PARENT_SCOPE
       )
-   endif()
+    endif()
+  endif()
 endfunction()
 
 # Internal function: find threads library
@@ -303,11 +318,6 @@ find_program(PROTOBUF_PROTOC_EXECUTABLE
 )
 mark_as_advanced(PROTOBUF_PROTOC_EXECUTABLE)
 
-
-include(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(Protobuf DEFAULT_MSG
-    PROTOBUF_LIBRARY PROTOBUF_INCLUDE_DIR)
-
-if(PROTOBUF_FOUND)
+if(NOT PROTOBUF_INCLUDE_DIRS AND PROTOBUF_INCLUDE_DIR)
     set(PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIR})
 endif()

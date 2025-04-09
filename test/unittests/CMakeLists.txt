@@ -52,7 +52,7 @@ if (BUILD_LIBCVMFS_CACHE)
                          ${GTEST_LIBRARIES}
                          ${ZLIB_LIBRARIES}
                          ${RT_LIBRARY}
-                         ${PROTOBUF_LITE_LIBRARY}
+                         ${PROTOBUF_LITE_LIBRARIES}
                          pthread
   )
   if (INSTALL_UNITTESTS)
@@ -550,7 +550,7 @@ list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
       ${UUID_LIBRARIES}
       ${PACPARSER_LIBRARIES}
       ${VJSON_LIBRARIES}
-      ${PROTOBUF_LITE_LIBRARY}
+      ${PROTOBUF_LITE_LIBRARIES}
       ${LibArchive_LIBRARY}
       ${RT_LIBRARY}
       pthread
