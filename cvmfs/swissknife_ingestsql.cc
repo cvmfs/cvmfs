@@ -23,6 +23,7 @@
 #include "gateway_util.h"
 #include "swissknife_lease_curl.h"
 #include "swissknife_lease_json.h"
+#include "swissknife_sync.h"
 #include "upload.h"
 #include "util/logging.h"
 #include "catalog_downloader.h"
@@ -48,24 +49,13 @@
                                                  }                                                                           \
                                                } while (0)
 
-extern long g_final_revision;
 
-// bring these in from SyncParameters, as we're not using that class now
-static const unsigned kDefaultMaxWeight = 100000;
-static const unsigned kDefaultMinWeight = 1000;
-static const size_t kDefaultMinFileChunkSize = 4 * 1024 * 1024;
-static const size_t kDefaultAvgFileChunkSize = 8 * 1024 * 1024;
-static const size_t kDefaultMaxFileChunkSize = 16 * 1024 * 1024;
-static const unsigned kDefaultNestedKcatalogLimit = 500;
-static const unsigned kDefaultRootKcatalogLimit = 200;
-static const unsigned kDefaultFileMbyteLimit = 1024;
 
 static const unsigned kExternalChunkSize = 24 * 1024 * 1024;
 static const unsigned kInternalChunkSize = 6  * 1024 * 1024;
 static const unsigned kDefaultLeaseBusyRetryInterval = 10;
 static const unsigned kLeaseRefreshInterval = 90; // seconds
 
-static string kConfigDir("/etc/cvmfs/gateway-client/");
 
 static bool g_lease_acquired = false;
 static string g_gateway_url;
@@ -537,6 +527,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
+  string kConfigDir("/etc/cvmfs/gateway-client/");
   if (args.find('C') != args.end()) {
     kConfigDir = MakeCanonicalPath(*args.find('C')->second);
      kConfigDir += "/";
@@ -697,8 +688,8 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   upload::SpoolerDefinition spooler_definition(
       spooler_definition_string, shash::kSha1, zlib::kZlibDefault, false, true,
-      kDefaultMinFileChunkSize, kDefaultAvgFileChunkSize,
-      kDefaultMaxFileChunkSize, g_session_token_file, key_file);
+      SyncParameters::kDefaultMinFileChunkSize, SyncParameters::kDefaultAvgFileChunkSize,
+      SyncParameters::kDefaultMaxFileChunkSize, g_session_token_file, key_file);
 
   if (args.find('q') != args.end()) {
     spooler_definition.number_of_concurrent_uploads =
@@ -770,9 +761,9 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       base_hash, stratum0, dir_temp, spooler_catalogs.weak_ref(),
-      download_manager(), false, kDefaultNestedKcatalogLimit,
-      kDefaultRootKcatalogLimit, kDefaultFileMbyteLimit, statistics(),
-      is_balanced, kDefaultMaxWeight, kDefaultMinWeight, dir_temp /* dir_cache */);
+      download_manager(), false, SyncParameters::kDefaultNestedKcatalogLimit,
+      SyncParameters::kDefaultRootKcatalogLimit, SyncParameters::kDefaultFileMbyteLimit, statistics(),
+      is_balanced, SyncParameters::kDefaultMaxWeight, SyncParameters::kDefaultMinWeight, dir_temp /* dir_cache */);
 
   catalog_manager.Init();
 
