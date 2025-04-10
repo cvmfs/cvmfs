@@ -76,7 +76,6 @@ static string g_session_token_file;
 static string g_s3_file;
 static time_t g_last_lease_refresh=0;
 static bool   g_stop_refresh = false;
-static int    g_ttl = 0;
 static int    g_priority=0;
 static bool   g_add_missing_catalogs = false;
 static string get_lease_from_paths(vector<string> paths);
@@ -513,10 +512,8 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   }
 
   //TODO(@vvolkl): add 'B' option to wait_for_update
+  //TODO(@vvolkl): add 'T' option for ttl
 
-  if (args.find('T') != args.end()) {
-    g_ttl = atoi((*args.find('T')->second).c_str());
-  }
 
   if (args.find('P') != args.end()) {
     g_priority = atoi((*args.find('P')->second).c_str());
@@ -779,24 +776,6 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   catalog_manager.Init();
 
-  // NB: this currently doesn't work -- TTL not resetable when publishing via a gateway
-  if (g_ttl>0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %d", g_ttl);
-    catalog_manager.SetTTL(g_ttl);
-    manifest->set_ttl(g_ttl);
-  }
-
-  // check to see if the lease path is valid - ie it already exists in the repo
-#if 0 
-  catalog::DirectoryEntry dir;
-  if (lease_path != "/" &&
-      !catalog_manager.LookupPath(lease_path, catalog::kLookupDefault, &dir)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Lease path %s does not exist. Aborting",
-             lease_path.c_str());
-    cancel_lease();
-    return 1;
-  }
-#endif 
 
   // now graft the contents of the DB
   vector<sqlite3*> open_dbs;
@@ -918,7 +897,7 @@ void swissknife::IngestSQL::process_sqlite(
   }
 
   if (allow_additions) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Procesing additions...");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Processing additions...");
     // first ensure all directories are present and create missing ones
     do_additions(all_dirs, all_files, all_symlinks, lease_path, catalog_manager);
   }
@@ -1041,7 +1020,7 @@ int swissknife::IngestSQL::do_additions(
       }
       if (add_nested_catalog) {
         // now add a .cvmfscatalog file
-        // so that manual changes wont remove the nested catalog
+        // so that manual changes won't remove the nested catalog
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Placing .cvmfscatalog file in [%s]", dir.name.c_str());
         catalog::DirectoryEntryBase dir2;
         dir2.name_ = NameString(".cvmfscatalog");
