@@ -153,4 +153,71 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   ItemAllocator item_allocator_;
 };
 
+
+struct CompressHashResult {
+  CompressHashResult() { }
+  CompressHashResult(const std::string &p, const shash::Any &h)
+    : path(p), hash(h) { }
+  std::string path;
+  shash::Any hash;
+};
+
+
+class TaskCompressHashCallback
+  : public TubeConsumer<BlockItem>
+  , public Observable<CompressHashResult>
+{
+ public:
+  TaskCompressHashCallback(Tube<BlockItem> *tube_in,
+                           Tube<FileItem> *tube_counter)
+    : TubeConsumer<BlockItem>(tube_in)
+    , tube_counter_(tube_counter)
+  { }
+
+ protected:
+  virtual void Process(BlockItem *block_item);
+
+ private:
+  Tube<FileItem> *tube_counter_;
+};
+
+
+class CompressHashPipeline : public Observable<CompressHashResult> {
+ public:
+  CompressHashPipeline();
+  ~CompressHashPipeline();
+
+  void Spawn();
+  void Process(IngestionSource* source,
+               shash::Algorithms hash_algorithm,
+               shash::Suffix hash_suffix);
+  void WaitFor();
+
+  void OnFileProcessed(const CompressHashResult &compress_hash_result);
+
+ private:
+  static const uint64_t kMemLowWatermark = 64 * 1024 * 1024;
+  static const uint64_t kMemHighWatermark = 128 * 1024 * 1024;
+
+  bool spawned_;
+  Tube<FileItem> tube_input_;
+  Tube<FileItem> tube_counter_;
+
+  TubeConsumerGroup<FileItem> tasks_read_;
+
+  TubeGroup<BlockItem> tubes_chunk_;
+  TubeConsumerGroup<BlockItem> tasks_chunk_;
+
+  TubeGroup<BlockItem> tubes_compress_;
+  TubeConsumerGroup<BlockItem> tasks_compress_;
+
+  TubeGroup<BlockItem> tubes_hash_;
+  TubeConsumerGroup<BlockItem> tasks_hash_;
+
+  TubeGroup<BlockItem> tubes_compress_hash_callback_;
+  TubeConsumerGroup<BlockItem> tasks_compress_hash_callback_;
+
+  ItemAllocator item_allocator_;
+};
+
 #endif  // CVMFS_INGESTION_PIPELINE_H_

@@ -152,6 +152,7 @@ if (BUILD_SERVER)
        ${CVMFS_SOURCE_DIR}/backoff.cc
        ${CVMFS_SOURCE_DIR}/catalog.cc
        ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+       ${CVMFS_SOURCE_DIR}/catalog_downloader.cc
        ${CVMFS_SOURCE_DIR}/catalog_sql.cc
        ${CVMFS_SOURCE_DIR}/catalog_rw.cc
        ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
@@ -416,6 +417,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache_transport.cc
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_downloader.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc

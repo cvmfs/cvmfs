@@ -76,7 +76,6 @@ static string g_session_token_file;
 static string g_s3_file;
 static time_t g_last_lease_refresh=0;
 static bool   g_stop_refresh = false;
-static string g_wait_for_update;
 static int    g_ttl = 0;
 static int    g_priority=0;
 static bool   g_add_missing_catalogs = false;
@@ -86,7 +85,9 @@ static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
                                                 bool include_deletions);
 static string get_parent(const string& path);
 static string get_basename(const string& path);
-static XattrList marshal_xattrs(const char *acl);
+
+//TODO(@vvolkl): figure out how to export acl_to_xattr
+//static XattrList marshal_xattrs(const char *acl);
 static string sanitise_name(const char *name_cstr, bool allow_leading_slash);
 static void on_signal(int sig);
 static string acquire_lease(const string& key_id, const string& secret, const string& lease_path,
@@ -99,8 +100,6 @@ static int check_hash(const char *hash) ;
 static void recursively_delete_directory(PathString& path, catalog::WritableCatalogManager &catalog_manager);
 static void create_empty_database( string& filename );
 static void relax_db_locking(sqlite3 *db);
-static void wait_for_update( std::string path, long revision) ;
-static void invalidate_manifest( std::string proxy, const std::string &url ) ;
 static bool check_prefix(const std::string &path , const std::string &prefix); 
 
 static bool isDatabaseMarkedComplete(const char *dbfile);
@@ -197,7 +196,7 @@ static string acquire_lease(const string& key_id, const string& secret, const st
                            &buffer, gateway_metadata_str)) {
       string session_token;
 
-      LeaseReply rep = ParseAcquireReply(buffer, &session_token, current_revision, current_root_hash);
+      LeaseReply rep = ParseAcquireReplyWithRevision(buffer, &session_token, current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
           acquired = true;
@@ -401,31 +400,32 @@ static string get_lease_from_paths(vector<string> paths) {
   return prefix;
 }
 
+//TODO(@vvolkl): figure out how to export acl_to_xattr
 // Convert the human-readable ACL into the binary format used to store it in an
 // xattr.
-static XattrList marshal_xattrs(const char *acl_string) {
-  XattrList aclobj;
-
-  if (acl_string == NULL || strlen(acl_string) == 0) {
-    return aclobj;
-  }
-
-  acl_t acl = acl_from_text(acl_string);  // Convert ACL string to acl_t object
-  CUSTOM_ASSERT(acl != NULL, "failed to parse ACL from string: %s", acl_string);
-  CUSTOM_ASSERT(0 == acl_valid(acl), "parsed ACL failed acl_valid check");
-  // check if the ACL string contains more than the synthetic ACLs
-  int equiv = acl_equiv_mode(acl, NULL);
-  CUSTOM_ASSERT(-1 != equiv, "error on acl_equiv_mode check");
-  if (equiv == 1) {
-    size_t binary_size;
-    char *binary_acl = (char *)acl_to_xattr(acl, &binary_size);
-    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %lu)", binary_size);
-    free(binary_acl);
-  }
-
-  acl_free(acl);
-  return aclobj;
-}
+//static XattrList marshal_xattrs(const char *acl_string) {
+//  XattrList aclobj;
+//
+//  if (acl_string == NULL || strlen(acl_string) == 0) {
+//    return aclobj;
+//  }
+//
+//  acl_t acl = acl_from_text(acl_string);  // Convert ACL string to acl_t object
+//  CUSTOM_ASSERT(acl != NULL, "failed to parse ACL from string: %s", acl_string);
+//  CUSTOM_ASSERT(0 == acl_valid(acl), "parsed ACL failed acl_valid check");
+//  // check if the ACL string contains more than the synthetic ACLs
+//  int equiv = acl_equiv_mode(acl, NULL);
+//  CUSTOM_ASSERT(-1 != equiv, "error on acl_equiv_mode check");
+//  if (equiv == 1) {
+//    size_t binary_size;
+//    char *binary_acl = (char *)acl_to_xattr(acl, &binary_size);
+//    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %lu)", binary_size);
+//    free(binary_acl);
+//  }
+//
+//  acl_free(acl);
+//  return aclobj;
+//}
 
 std::unordered_map<string, string> load_config(const string& config_file) {
   std::unordered_map<string, string> config_map;
@@ -491,10 +491,7 @@ static vector<string> get_file_list(string& path) {
 extern bool g_log_with_time;
 
 int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
-  g_log_with_time = true;
 
-  // force no checking of manifest signature
-  setenv("_CVMFS_DEVEL_NO_MANIFEST_SIGNATURE_CHECK_","1", 1);
 
   // the catalog code uses assert() liberally.
   // install ABRT signal handler to catch an abort and cancel lease
@@ -515,9 +512,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     exit(0);
   }
 
-  if (args.find('B') != args.end()) {
-    g_wait_for_update = *args.find('B')->second;
-  }
+  //TODO(@vvolkl): add 'B' option to wait_for_update
 
   if (args.find('T') != args.end()) {
     g_ttl = atoi((*args.find('T')->second).c_str());
@@ -854,16 +849,11 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
    exit(1);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "new_root_hash: %s, new revision: %ld", new_root_hash.c_str(), g_final_revision);
 
   unlink( g_session_token_file.c_str() );
 
   g_stop_refresh=true;
 
-  if(g_wait_for_update!="") {
-    invalidate_manifest( proxy, stratum0 + "/.cvmfspublished" );
-    wait_for_update( g_wait_for_update, g_final_revision );
-  }
 
   if(check_completed_graft_property) {
     setDatabaseMarkedComplete(sqlite_db_vec[0].c_str()); 
@@ -889,87 +879,6 @@ void replaceAllSubstrings(std::string& str, const std::string& from, const std::
     }
 }
 
-static void invalidate_manifest( std::string proxy_list, const std::string &url ) {
-   // split the proxy string -- remove any '"' and split on '|' or ';'
-    size_t pos = 0;
-   // replace any ';' with '|' to simplify subsequent split
-    while ((pos = proxy_list.find(';', pos)) != std::string::npos) {
-        proxy_list.replace(pos, 1, 1, '|');
-        ++pos;
-    }
-   // remove any leading or trailing '"'
-   if (HasPrefix(proxy_list, "\"", true)) {
-     proxy_list = proxy_list.substr(1);
-   }
-   if (HasSuffix(proxy_list, "\"", true)) {
-     proxy_list = proxy_list.substr(0, proxy_list.size()-1);
-   }
-   // rewrite the port from 6086 to 6081 to ensure the invalidation works
-   replaceAllSubstrings( proxy_list, ":6086", ":6081" );
- 
-   std::vector<std::string> proxies = SplitString( proxy_list, '|' );
- 
-   // now iterate over all the proxies
-   // for the first, force a no-cache GET back to google
-   // for the remainder just PURGE 
-   bool first=true;
-   for( auto p = proxies.begin(); p != proxies.end(); p++) {
-     bool ok=true;
-     string proxy=*p;
-     CURL *curl=NULL;
-     CURLcode res=CURLE_OK;
-     struct curl_slist *headers = NULL;
-     curl = curl_easy_init();
-     if(!curl) {
-       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Unable to init curl!");
-       return;
-     }
-     res = curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-     if( proxy != "DIRECT" ) {
-       res = curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
-     }
-     res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1l);
-     res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3l);
-     res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);
-
-     if( first ) {
-       headers = curl_slist_append(headers, "Cache-Control: no-cache");
-       curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-     } else {
-       curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PURGE");
-     }
-     
-     res = curl_easy_perform(curl);
-     if(res!=CURLE_OK) {
-       LogCvmfs(kLogCvmfs, kLogStderr, "Manifest invalidation failed: curl error = [%d] [%s] url = %s proxy = %s", res, curl_easy_strerror(res), url.c_str(), proxy.c_str() );
-       ok=false;
-     } 
-     if( headers ) { curl_slist_free_all(headers); }
-     curl_easy_cleanup(curl);
-     if(ok) {
-       first = false;
-     }
-   }
-}
-
-static void wait_for_update( std::string path, long revision) {
-  char val[101];
-  memset(val, 0, 101 );
-  long current=-1;
-  while (-1 !=  getxattr( path.c_str(), "user.revision", val, 100 ) ) {
-    long x = atol(val);
-    if (x>=revision) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Mount reached revision %ld", x);
-      return;
-    } else if (x!=current) {
-      current=x;
-      LogCvmfs(kLogCvmfs, kLogStdout, "Mount at revision %ld, waiting..", x);
-    }
-    sleep(1);
-  }
-  LogCvmfs(kLogCvmfs, kLogStderr, "Unable to query user.revision xattr of [%s]: errno: %d", path.c_str(), errno );
-
-}
 
 void swissknife::IngestSQL::process_sqlite(
     const std::vector<sqlite3*> &dbs,
@@ -1244,14 +1153,15 @@ void swissknife::IngestSQL::load_dirs(sqlite3 *db, const std::string &lease_path
     time_t mtime = sqlite3_column_int64(stmt, 2);
     uid_t owner = sqlite3_column_int(stmt, 3);
     gid_t grp = sqlite3_column_int(stmt, 4);
-    char *acl = (char *)sqlite3_column_text(stmt, 5);
     int nested = schema_revision <= 3 ? 1 : sqlite3_column_int(stmt, 6);
 
     string name = additional_prefix + sanitise_name(name_cstr);
     CUSTOM_ASSERT(check_prefix(name, lease_path), "%s is not below lease path %s", name.c_str(), lease_path.c_str());
 
     Directory dir(name, mtime, mode, owner, grp, nested);
-    dir.xattr = marshal_xattrs(acl);
+    //TODO(@vvolkl): figure out how to export acl_to_xattr
+    //char *acl = (char *)sqlite3_column_text(stmt, 5);
+    //dir.xattr = marshal_xattrs(acl);
     all_dirs.insert(std::make_pair(name, dir));
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
@@ -1310,7 +1220,7 @@ void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_pat
     }
     size_t expected_num_chunks = size/kChunkSize;
     if (expected_num_chunks * (size_t)kChunkSize < (size_t) size || size==0 ) { expected_num_chunks++; }
-    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %ld does not match expected number of chunks %d", offsets.size(), expected_num_chunks);
+    CUSTOM_ASSERT(offsets.size() == expected_num_chunks, "offsets size %ld does not match expected number of chunks %ld", offsets.size(), expected_num_chunks);
     for (size_t i = 0; i < offsets.size() - 1; i++) {  
       sizes.push_back(size_t(offsets[i + 1] - offsets[i]));
     }

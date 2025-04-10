@@ -1577,4 +1577,166 @@ WritableCatalogManager::SnapshotCatalogsSerialized(const bool stop_for_tweaks) {
   return root_catalog_info;
 }
 
+void WritableCatalogManager::SetupSingleCatalogUploadCallback()
+{
+  spooler_->RegisterListener(&WritableCatalogManager::SingleCatalogUploadCallback, this);
+}
+
+void WritableCatalogManager::RemoveSingleCatalogUploadCallback()
+{
+  spooler_->WaitForUpload(); // wait for all outstanding jobs to finish before tearing it down
+  spooler_->UnregisterListeners();
+  pending_catalogs_ = {}; // whatever we couldn't process, leave it to the Commit
+}
+
+void WritableCatalogManager::AddCatalogToQueue(const std::string &path)
+{
+  SyncLock();
+  WritableCatalog *catalog = NULL;
+  bool retval = FindCatalog(MakeRelativePath(path), &catalog, NULL);
+  assert(retval);
+  assert(catalog);
+  catalog->SetDirty(); // ensure it's dirty so its parent will wait for it
+  SyncUnlock();
+  pending_catalogs_.push_back(catalog);
+}
+
+void WritableCatalogManager::ScheduleReadyCatalogs()
+{
+  // best effort to schedule as many catalogs for upload as possible
+  for (auto it = pending_catalogs_.begin(); it != pending_catalogs_.end(); ) {
+    if ((*it)->dirty_children() == 0) {
+      FinalizeCatalog(*it, false /* stop_for_tweaks */);
+      ScheduleCatalogProcessing(*it);
+      LogCvmfs(kLogCatalog, kLogVerboseMsg, "scheduled %s for processing", (*it)->mountpoint().c_str());
+      it = pending_catalogs_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+// Callback for uploading a single catalog, similar to CatalogUploadCallback. The main difference
+// is that this callback would not trigger processing of the parent
+void WritableCatalogManager::SingleCatalogUploadCallback(
+                          const upload::SpoolerResult &result) {
+  if (result.return_code != 0) {
+    PANIC(kLogStderr, "failed to upload '%s' (retval: %d)",
+          result.local_path.c_str(), result.return_code);
+  }
+
+  // retrieve the catalog object based on the callback information
+  // see WritableCatalogManager::ScheduleCatalogProcessing()
+  WritableCatalog *catalog = NULL;
+  {
+    MutexLockGuard guard(catalog_processing_lock_);
+    std::map<std::string, WritableCatalog*>::iterator c =
+      catalog_processing_map_.find(result.local_path);
+    assert(c != catalog_processing_map_.end());
+    catalog = c->second;
+  }
+
+  uint64_t catalog_size = GetFileSize(result.local_path);
+  assert(catalog_size > 0);
+
+  SyncLock();
+  if (catalog->HasParent()) {
+    // finalized nested catalogs will update their parent's pointer
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
+    WritableCatalog *parent = catalog->GetWritableParent();
+
+    parent->UpdateNestedCatalog(catalog->mountpoint().ToString(),
+                                result.content_hash,
+                                catalog_size,
+                                catalog->delta_counters_);
+    parent->DecrementDirtyChildren();
+    catalog->delta_counters_.SetZero();
+  }
+  // JUMP: detach the catalog after uploading to free sqlite related resources
+  DetachCatalog(catalog);
+  SyncUnlock();
+}
+// using the given list of dirs, fetch all relevant catalogs
+void WritableCatalogManager::LoadCatalogs(const std::string &base_path, const std::unordered_set<std::string> &dirs)
+{
+  // mount everything up to "base_path" first (this would be our lease_path typically)
+  Catalog *base_catalog;
+  MountSubtree(PathString(base_path), NULL /* entry_point */, true /* is_listable */, &base_catalog);
+
+  // start up the downloader
+  CatalogDownloadContext context;
+  context.dirs = &dirs;
+  catalog_download_pipeline_ = new CatalogDownloadPipeline(static_cast<SimpleCatalogManager*>(this));
+  catalog_download_pipeline_->RegisterListener(&WritableCatalogManager::CatalogDownloadCallback, this, context);
+  catalog_download_pipeline_->Spawn();
+
+  Catalog::NestedCatalogList nested_catalogs = base_catalog->ListNestedCatalogs();
+  for (auto it = nested_catalogs.begin(); it != nested_catalogs.end(); ++it) {
+    // schedule relevant child nested catalogs for download
+    std::string mountpoint = it->mountpoint.ToString();
+    if (dirs.find(mountpoint) != dirs.end()) {
+      Catalog *catalog = CreateCatalog(it->mountpoint, it->hash, NULL /* parent */);
+      {
+        MutexLockGuard guard(catalog_download_lock_);
+        catalog_download_map_.insert(std::make_pair(it->hash.ToString(), catalog));
+      }
+      catalog_download_pipeline_->Process(it->hash);
+    }
+  }
+
+  catalog_download_pipeline_->WaitFor();
+  delete catalog_download_pipeline_; // terminate all the threads
+}
+
+bool WritableCatalogManager::LookupDirEntry(const string &path,
+                                            const LookupOptions options,
+                                            DirectoryEntry *dirent) {
+  SyncLock();
+  bool exists = LookupPath(path, options, dirent);
+  SyncUnlock();
+  return exists;
+}
+
+void WritableCatalogManager::CatalogHashSerializedCallback(
+  const CompressHashResult &result)
+{
+  MutexLockGuard guard(catalog_hash_lock_);
+  catalog_hash_map_[result.path] = result.hash;
+}
+
+void WritableCatalogManager::CatalogDownloadCallback(
+  const CatalogDownloadResult &result,
+  CatalogDownloadContext context)
+{
+  Catalog *downloaded_catalog;
+  {
+    MutexLockGuard guard(catalog_download_lock_);
+    auto it = catalog_download_map_.find(result.hash);
+    assert(it != catalog_download_map_.end());
+    downloaded_catalog = it->second;
+  }
+
+  if (!downloaded_catalog->OpenDatabase(result.db_path)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "failed to initialize catalog");
+    delete downloaded_catalog;
+    return;
+  }
+
+  Catalog::NestedCatalogList nested_catalogs = downloaded_catalog->ListNestedCatalogs();
+  for (auto it = nested_catalogs.begin(); it != nested_catalogs.end(); ++it) {
+    // schedule relevant child nested catalogs for download
+    if (context.dirs->find(it->mountpoint.ToString()) != context.dirs->end()) {
+      Catalog *child_catalog = CreateCatalog(it->mountpoint, it->hash, NULL /* parent */);
+      {
+        MutexLockGuard guard(catalog_download_lock_);
+        catalog_download_map_.insert(std::make_pair(it->hash.ToString(), child_catalog));
+      }
+      catalog_download_pipeline_->Process(it->hash);
+    }
+  }
+  delete downloaded_catalog;
+}
+
+
+
 }  // namespace catalog

@@ -7,11 +7,15 @@
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
+#include "json_document_write.h"
 #include "ssl.h"
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
+
+#include <unistd.h>
+
 
 namespace {
 
@@ -45,10 +49,11 @@ size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
 
 }  // namespace
 
-bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
-                        const std::string &repo_path,
-                        const std::string &repo_service_url,
-                        CurlBuffer *buffer) {
+bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
+                        const std::string& repo_path,
+                        const std::string& repo_service_url,
+                        CurlBuffer* buffer,
+                        const std::string& metadata) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL *h_curl = PrepareCurl("POST");
@@ -56,10 +61,14 @@ bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
     return false;
   }
 
-  const std::string payload = "{\"path\" : \"" + repo_path
-                              + "\", \"api_version\" : \""
-                              + StringifyInt(gateway::APIVersion()) + "\""
-                              + ", \"hostname\" : \"" + GetHostname() + "\"}";
+  JsonStringGenerator payloadJson;
+  payloadJson.Add("path", repo_path);
+  payloadJson.Add("api_version", StringifyInt(gateway::APIVersion()));
+  payloadJson.Add("hostname", GetHostname());
+  if (!metadata.empty()) {
+    payloadJson.AddJsonObject("metadata", metadata);
+  }
+  const std::string payload = payloadJson.GenerateString();
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, payload, &hmac);
@@ -95,10 +104,10 @@ bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
   return !ret;
 }
 
-bool MakeEndRequest(const std::string &method, const std::string &key_id,
-                    const std::string &secret, const std::string &session_token,
-                    const std::string &repo_service_url,
-                    const std::string &request_payload, CurlBuffer *reply) {
+bool MakeEndRequest(const std::string& method, const std::string& key_id,
+                    const std::string& secret, const std::string& session_token,
+                    const std::string& repo_service_url,
+                    const std::string& request_payload, CurlBuffer* reply, bool expect_final_revision) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL *h_curl = PrepareCurl(method);
@@ -139,14 +148,22 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
              "Lease end request - curl_easy_perform failed: %d", ret);
   }
 
-  const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
-  const JSON *reply_status = JsonDocument::SearchInObject(
-      reply_json->root(), "status", JSON_STRING);
-  const bool ok = (reply_status != NULL
-                   && std::string(reply_status->string_value) == "ok");
-  if (!ok) {
-    LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Lease end request - error reply: %s", reply->data.c_str());
+  JsonDocument *doc = JsonDocument::Create(reply->data);
+  bool ok = true;
+  if (!doc ) {
+       ok=false;
+  }
+  else {
+    UniquePtr<JsonDocument> reply_json(doc);
+    const JSON *reply_status =
+      JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
+    ok = (reply_status != NULL &&
+                   std::string(reply_status->string_value) == "ok");
+    if (!ok) {
+      LogCvmfs(kLogUploadGateway, kLogStderr,
+             "Lease end request - error reply: %s",
+             reply->data.c_str());
+    }
   }
 
   curl_easy_cleanup(h_curl);
@@ -154,3 +171,4 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
 
   return ok && !ret;
 }
+
