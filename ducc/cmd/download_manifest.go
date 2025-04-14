@@ -37,12 +37,12 @@ var downloadManifestCmd = &cobra.Command{
 			img.User = username
 		}
 
-		manifest, err := img.GetManifest()
+		manifestList, err := img.FetchManifestList2()
 		if err != nil {
 			l.LogE(err).Fatal("Error in getting the manifest")
 			return err
 		}
-		text, err := json.MarshalIndent(manifest, "", "  ")
+		text, err := json.MarshalIndent(manifestList, "", "  ")
 		if err != nil {
 			l.LogE(err).Fatal("Error in encoding the manifest as JSON")
 			return err

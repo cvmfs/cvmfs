@@ -176,6 +176,63 @@ func (img *Image) PrintImage(machineFriendly, csv_header bool) {
 	}
 }
 
+func (img *Image) FetchManifestList2() (*da.ManifestList, error) {
+	bytes1, err := img.getByteManifestList()
+	if err != nil {
+		return nil, err
+	}
+
+	var manifestList da.ManifestList
+	err = json.Unmarshal(bytes1, &manifestList)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.ManifestList{}, manifestList) {
+		return nil, fmt.Errorf("got empty manifest list")
+	}
+
+	var validIndex []int
+	var manifestReference string
+	if len(manifestList.Manifests) == 1 {
+		manifestReference = manifestList.Manifests[0].Digest
+	} else {
+
+		for i, v := range manifestList.Manifests {
+			if v.Platform.Architecture == "amd64" {
+				manifestReference = v.Digest
+				validIndex = append(validIndex, i)
+				// skip "unknown" architecture
+			} else if v.Platform.Architecture != "unknown" {
+				validIndex = append(validIndex, i)
+
+			}
+		}
+	}
+
+	manifestsFiltered := make([]da.ManifestListItem, 0)
+	for _, j := range validIndex {
+		manifestsFiltered = append(manifestsFiltered, manifestList.Manifests[j])
+	}
+	manifestList.Manifests = manifestsFiltered
+
+	bytes2, err := img.getByteManifest(manifestReference)
+	if err != nil {
+		return nil, err
+	}
+
+	var manifest da.Manifest
+	err = json.Unmarshal(bytes2, &manifest)
+	if err != nil {
+		return nil, err
+	}
+	if reflect.DeepEqual(da.Manifest{}, manifest) {
+		return nil, fmt.Errorf("got empty manifest")
+	}
+
+	img.Manifest = &manifest
+	return &manifestList, nil
+}
+
 func (img *Image) fetchManifest() (*da.Manifest, error) {
 	bytes, err := img.getByteManifest("")
 	if err != nil {
