@@ -538,7 +538,7 @@ void *ExternalCacheManager::MainRead(void *data) {
       continue;
     } else {
       PANIC(kLogSyslogErr | kLogDebug, "unexpected message %s",
-            msg->GetTypeName().c_str());
+            msg->GetTypeName().data());
     }
 
     RpcInFlight rpc_inflight;

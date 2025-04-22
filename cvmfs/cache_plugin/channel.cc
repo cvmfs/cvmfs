@@ -550,7 +550,7 @@ bool CachePlugin::HandleRequest(int fd_con) {
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "unexpected message from client: %s",
-             msg_typed->GetTypeName().c_str());
+             msg_typed->GetTypeName().data());
     return false;
   }
 
