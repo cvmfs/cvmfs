@@ -1,6 +1,7 @@
 module github.com/cvmfs/ducc
 
 require (
+	github.com/aoliveti/curling v1.1.0
 	github.com/docker/docker v0.0.0-20190123164140-de86ba27fbea
 	github.com/google/uuid v1.2.0
 	github.com/olekukonko/tablewriter v0.0.1
@@ -23,7 +24,6 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.3.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aoliveti/curling"
 	"github.com/docker/docker/image"
 	"github.com/olekukonko/tablewriter"
 	log "github.com/sirupsen/logrus"
@@ -1074,6 +1075,15 @@ func makeGetRequest(url string, headers map[string]string) ([]byte, error) {
 	req.Header.Set("Authorization", token)
 	for k, v := range headers {
 		req.Header.Set(k, v)
+	}
+
+	// for debugging: log curl command corresponding to request
+	if log.IsLevelEnabled(log.TraceLevel) {
+		curlcmd, err := curling.NewFromRequest(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Trace(curlcmd)
 	}
 
 	resp, err := client.Do(req)

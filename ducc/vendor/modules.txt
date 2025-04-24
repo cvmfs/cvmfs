@@ -5,6 +5,9 @@
 github.com/Microsoft/go-winio
 # github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5
 ## explicit
+# github.com/aoliveti/curling v1.1.0
+## explicit; go 1.21
+github.com/aoliveti/curling
 # github.com/containerd/continuity v0.0.0-20181203112020-004b46473808
 ## explicit
 github.com/containerd/continuity/devices
@@ -74,8 +77,8 @@ github.com/docker/go-units
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
-# github.com/google/go-cmp v0.2.0
-## explicit
+# github.com/google/go-cmp v0.6.0
+## explicit; go 1.13
 # github.com/google/uuid v1.2.0
 ## explicit
 github.com/google/uuid
