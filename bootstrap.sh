@@ -16,7 +16,6 @@ MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
-GO_VERSION=1.18
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -249,12 +248,6 @@ build_lib() {
       patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
-    golang)
-      if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-        do_extract_go "go" "go${GO_VERSION}.src.tar.gz"
-        do_build "go"
-      fi
-      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -274,9 +267,6 @@ fi
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
     missing_libs="$missing_libs rapidcheck"
-fi
-if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-    missing_libs="$missing_libs golang"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
