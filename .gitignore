@@ -30,3 +30,8 @@ externals/build_*/
 externals/.decompressionDone
 externals_build
 externals_install
+
+# golang build products
+ducc/ducc
+ducc/cvmfs_ducc
+snapshotter/out
