@@ -112,7 +112,7 @@ func (fs *Filesystem) Check(ctx context.Context, mountpoint string, labels map[s
 			return err
 		}
 		err := fmt.Errorf("Error in stat-ing the layer: %s", statErr)
-		log.G(ctx).WithError(err).WithField("mountpoint", mountpoint).WithField("layer path", path).Error("cvmfs: unknow error in stating the file.")
+		log.G(ctx).WithError(err).WithField("mountpoint", mountpoint).WithField("layer path", path).Error("cvmfs: unknown error in stating the file.")
 		return err
 	}
 	return statErr
