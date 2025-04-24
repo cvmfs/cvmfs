@@ -117,7 +117,7 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 		return err
 	}
 	// from the relativePath we remove the first part of the path.
-	// The part we remove reprensent the same directory where is the target.
+	// The part we remove represents the same directory where is the target.
 	linkChunks := strings.Split(relativePath, string(os.PathSeparator))
 	link := filepath.Join(linkChunks[1:]...)
 
@@ -137,7 +137,7 @@ func CreateSymlinkIntoCVMFS(CVMFSRepo, newLinkName, toLinkPath string) (err erro
 				// the file exists and it is a symlink, we overwrite it
 				err = os.Remove(newLinkName)
 				if err != nil {
-					err = fmt.Errorf("Error in removing existsing symlink: %s", err)
+					err = fmt.Errorf("Error in removing existing symlink: %s", err)
 					llog(l.LogE(err)).Error("Error in removing previous symlink")
 					return err
 				}
@@ -362,7 +362,7 @@ func RemoveSingularityImageFromManifest(CVMFSRepo string, manifest da.Manifest) 
 	}
 	err := RemoveDirectory(CVMFSRepo, manifest.GetSingularityPath())
 	if err != nil {
-		llog(l.LogE(err)).Error("Error in removing singularity direcotry")
+		llog(l.LogE(err)).Error("Error in removing singularity directory")
 		return err
 	}
 	return nil
@@ -556,7 +556,7 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 			}
 
 			if len(sourceDirs) != len(destinationDirs) {
-				return fmt.Errorf("Different number of directories between the source and tha target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
+				return fmt.Errorf("Different number of directories between the source and the target directories during a template transaction. source: %s , # of dir: %d, target: %s, # of dirs: %d", source, len(sourceDirs), destination, len(destinationDirs))
 			}
 
 			f, _ := os.OpenFile(filepath.Join(destination, ".cvmfscatalog"), os.O_CREATE|os.O_RDONLY, constants.FilePermision)

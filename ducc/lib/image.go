@@ -277,7 +277,7 @@ func (img *Image) GetOCIImage() (config image.Image, err error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", configUrl, nil)
 	if err != nil {
-		l.LogE(err).Warning("Impossible to create a request for getting the changes no chnages set.")
+		l.LogE(err).Warning("Impossible to create a request for getting the changes, no changes set.")
 		return
 	}
 	req.Header.Set("Authorization", token)

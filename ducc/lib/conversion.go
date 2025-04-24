@@ -49,7 +49,7 @@ func ConvertWishFlat(wish WishFriendly) error {
 		nFlat.Elapsed(tFlat).AddField("action", "end_flat_conversion").Send()
 	}()
 
-	// it may happend at the very first round that this two calls return an error, let it be
+	// it may happen at the very first round that this two calls return an error, let it be
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".chains"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.chains` directory")
 	}
@@ -408,7 +408,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// this wil start to feed the above goroutine by writing into layersChanell
+	// this will start to feed the above goroutine by writing into layersChanell
 	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir)
 	if err != nil {
 		return err

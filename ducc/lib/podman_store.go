@@ -207,7 +207,7 @@ func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, 
 		l.LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-	// this is extremelly bad, we are making one transaction for each layer
+	// this is extremely bad, we are making one transaction for each layer
 	// all of them could be done in a single transaction
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
@@ -484,7 +484,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 
 // Ingest all the necessary files and dir in podmanStore dir.
 func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
-	// this code is extremelly slow
+	// this code is extremely slow
 	// if opens and publish several transaction and I believe it is possible to do pretty much anything in a single transaction
 	// it should be rewritten.
 	n := notification.NewNotification(NotificationService).AddField("image", img.GetSimpleName())

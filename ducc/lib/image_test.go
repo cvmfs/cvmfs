@@ -60,7 +60,7 @@ func TestFilterUsingGlobStarMatchEverything(t *testing.T) {
 		t.Errorf("Error in filtering: %s", err)
 	}
 	if len(result) != len(input) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != input[i] {
@@ -77,7 +77,7 @@ func TestFilterUsingGlobStar(t *testing.T) {
 	}
 	expected := []string{"aaaa", "aab.12-8"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != expected[i] {
@@ -94,7 +94,7 @@ func TestFilterUsingGlobAtBeginning(t *testing.T) {
 	}
 	expected := []string{"bar-foo", "ubuntu-foo"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != expected[i] {
@@ -111,7 +111,7 @@ func TestFilterUsingGlobTwice(t *testing.T) {
 	}
 	expected := []string{"foo", "ubuntu-foo", "foo-bar", "version-foo-2"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != expected[i] {
@@ -128,7 +128,7 @@ func TestFilterUsingGlobRealLifeImages01(t *testing.T) {
 	}
 	expected := []string{"rhel7-m201911", "rhel7-m202001", "rhel7-m202002"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != expected[i] {
@@ -145,7 +145,7 @@ func TestFilterUsingGlobRealLifeImages02(t *testing.T) {
 	}
 	expected := []string{"rhel7"}
 	if len(result) != len(expected) {
-		t.Errorf("The match is missing something, different lenghts %d != %d", len(result), len(input))
+		t.Errorf("The match is missing something, different lengths %d != %d", len(result), len(input))
 	}
 	for i := range result {
 		if result[i] != expected[i] {

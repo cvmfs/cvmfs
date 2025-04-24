@@ -28,7 +28,7 @@ type OnDiskReadAndHash struct {
 	path string
 }
 
-// this structure is useful, but each time we use this, we are hogging up the netowrk
+// this structure is useful, but each time we use this, we are hogging up the network
 // we force to download all the layer, and **then** we check if the layer is already in CVMFS
 // this can be optimize
 // the constructor, this function, should be smarter.
