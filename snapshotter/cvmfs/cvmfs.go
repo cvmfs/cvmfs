@@ -72,12 +72,12 @@ func (fs *Filesystem) Mount(ctx context.Context, mountpoint string, labels map[s
 		return err
 	}
 	log.G(ctx).WithField("layer digest", digest).Debug("cvmfs: Layer present in CVMFS")
-	// Check if the layer is already mounted 
+	// Check if the layer is already mounted
 	if _, found := fs.mountedPaths[path]; found {
-	      err := fmt.Errorf("layer %s is already mounted", digest)
-	      log.G(ctx).WithError(err).WithField("layer digest", digest).Debug("cvmfs: Layer was already mounted")
-              return err
-        }
+		err := fmt.Errorf("layer %s is already mounted", digest)
+		log.G(ctx).WithError(err).WithField("layer digest", digest).Debug("cvmfs: Layer was already mounted")
+		return err
+	}
 	err := syscall.Mount(path, mountpoint, "", syscall.MS_BIND, "")
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("layer digest", digest).WithField("mountpoint", mountpoint).Debug("cvmfs: Error in bind mounting the layer.")
