@@ -103,7 +103,7 @@ func (m Manifest) GetChainIDs() []digest.Digest {
 	for _, l := range m.Layers {
 		if l.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
 			result = append(result, "")
-			continue;
+			continue
 		}
 		if iChain == 0 {
 			d := digest.FromString(l.Digest)
@@ -113,7 +113,7 @@ func (m Manifest) GetChainIDs() []digest.Digest {
 		}
 		digest := digest.FromString(result[iChain-1].String() + " " + l.Digest)
 		result = append(result, digest)
-		iChain++;
+		iChain++
 	}
 	return result
 }

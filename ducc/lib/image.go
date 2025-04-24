@@ -77,7 +77,7 @@ func SetupRegistries() {
 
 		if ident == "" || ((user == "" || pass == "") && proxy == "") {
 			log.Fatalf("missing either $%s, ($%s or $%s) or %s for %s",
-			           iEnv, uEnv, uPass, proxyEnv, r)
+				iEnv, uEnv, uPass, proxyEnv, r)
 		}
 
 		inputRegistries = append(inputRegistries, RegistryConfig{
@@ -467,14 +467,12 @@ func (i *Image) GetPublicSymlinkPath() string {
 
 func (img *Image) getByteManifestList() ([]byte, error) {
 	url := img.GetManifestUrl("")
-	return makeGetRequest(url, map[string]string{"Accept":
-		"application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"})
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"})
 }
 
 func (img *Image) getByteManifest(reference string) ([]byte, error) {
 	url := img.GetManifestUrl(reference)
-	return makeGetRequest(url, map[string]string{"Accept":
-		"application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"})
+	return makeGetRequest(url, map[string]string{"Accept": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"})
 }
 
 func GetAuthToken(url string, credentials []Credentials) (token string, err error) {
@@ -505,7 +503,7 @@ func firstRequestForAuth_internal(url, user, pass string) (token string, err err
 	}
 	if resp.StatusCode != 401 {
 		log.WithFields(log.Fields{
-			"url": url,
+			"url":         url,
 			"status code": resp.StatusCode,
 		}).Info("Expected status code 401.")
 		return "", err
@@ -631,7 +629,7 @@ func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan
 	// at this point we iterate each layer and we download it.
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 
 		wg.Add(1)
@@ -831,7 +829,7 @@ func (ld *LayerDownloader) getToken() (token string, err error) {
 	firstLayer := manifest.Layers[0]
 	for _, l := range manifest.Layers {
 		if l.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		firstLayer = l
 		break
@@ -900,7 +898,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 
 	paths := []string{}
 	for _, chain := range chainIDs {
-		if (chain == "") {
+		if chain == "" {
 			continue
 		}
 		path := cvmfs.ChainPath(CVMFSRepo, chain.String())
@@ -958,7 +956,7 @@ func (img *Image) CreateSneakyChainStructure(CVMFSRepo string) (err error, lastC
 	ld := NewLayerDownloader(img)
 	previous := ""
 	for i, chain := range chainIDs {
-		if (chain == "") {
+		if chain == "" {
 			continue
 		}
 		digest := chain.String()

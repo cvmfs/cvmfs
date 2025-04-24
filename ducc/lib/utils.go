@@ -63,7 +63,7 @@ func (r *OnDiskReadAndHash) Close() error {
 	return r.ReadAndHash.Close()
 }
 
-//encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
+// encapsulates io.ReadCloser, with functionality to calculate hash and size of the content
 type ReadAndHash struct {
 	r    io.ReadCloser
 	tr   io.Reader
@@ -116,7 +116,7 @@ func (rh *ReadAndHash) Close() error {
 	return rh.r.Close()
 }
 
-//generates the file name for link dir in podman store
+// generates the file name for link dir in podman store
 func generateID(l int) (string, error) {
 	randomid := make([]byte, 16)
 	n, err := io.ReadFull(rand.Reader, randomid)
@@ -127,7 +127,7 @@ func generateID(l int) (string, error) {
 	return s[:l], nil
 }
 
-//generates the file name for config file (compliant with libpod) in podman store.
+// generates the file name for config file (compliant with libpod) in podman store.
 func generateConfigFileName(digest string) (fname string, err error) {
 	reader := strings.NewReader(digest)
 	for reader.Len() > 0 {

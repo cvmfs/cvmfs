@@ -405,7 +405,7 @@ func LayerMetadataPath(CVMFSRepo, layerDigest string) string {
 	return filepath.Join(LayerPath(CVMFSRepo, layerDigest), ".metadata")
 }
 
-//from /cvmfs/$REPO/foo/bar -> foo/bar
+// from /cvmfs/$REPO/foo/bar -> foo/bar
 func TrimCVMFSRepoPrefix(path string) string {
 	return strings.Join(strings.Split(path, string(os.PathSeparator))[3:], string(os.PathSeparator))
 }
@@ -482,7 +482,7 @@ func CreateCatalogIntoDir(CVMFSRepo, dir string) (err error) {
 	return nil
 }
 
-//writes data to file and publish in cvmfs repo path
+// writes data to file and publish in cvmfs repo path
 func WriteDataToCvmfs(CVMFSRepo, path string, data []byte) (err error) {
 	tmpFile, err := temp.UserDefinedTempFile()
 	if err != nil {
