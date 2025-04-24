@@ -40,6 +40,14 @@ __do_check() {
     url=$CVMFS_STRATUM0
   fi
 
+  if [ "x$tag" = "x" ] && is_garbage_collectable $name; then
+    # acquire gc lock
+    # waits for gc on the same repository to finish
+    # and prevents a gc from starting
+    acquire_gc_lock $name check || die "Failed to acquire gc lock for $name"
+    trap "release_gc_lock $name" EXIT HUP INT TERM
+  fi
+
   # do it!
   if [ $check_integrity -ne 0 ]; then
     if ! is_local_upstream $upstream; then
@@ -70,14 +78,6 @@ __do_check() {
   fi
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
-
-  if [ "x$tag" = "x" ] && is_garbage_collectable $name; then
-    # acquire gc lock
-    # waits for gc on the same repository to finish
-    # and prevents a gc from starting
-    acquire_gc_lock $name check || die "Failed to acquire gc lock for $name"
-    trap "release_gc_lock $name" EXIT HUP INT TERM
-  fi
 
   local user_shell="$(get_user_shell $name)"
   local check_cmd
