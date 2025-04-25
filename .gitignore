@@ -35,3 +35,4 @@ externals_install
 ducc/ducc
 ducc/cvmfs_ducc
 snapshotter/out
+gateway/gateway
