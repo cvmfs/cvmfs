@@ -1,6 +1,6 @@
 module github.com/cvmfs/cvmfs/snapshotter
 
-go 1.18
+go 1.21
 
 require (
 	github.com/BurntSushi/toml v1.1.0
