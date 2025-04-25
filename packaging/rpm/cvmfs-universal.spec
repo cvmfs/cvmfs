@@ -409,9 +409,10 @@ popd
 %pretrans unittests
 %check_transaction
 
+%if 0%{?build_gateway}
 %pretrans gateway
 %check_transaction
-
+%endif
 %endif
 
 %pre
