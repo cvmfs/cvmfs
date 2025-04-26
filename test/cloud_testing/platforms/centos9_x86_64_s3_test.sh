@@ -78,7 +78,10 @@ if [ $s3_retval -eq 0 ]; then
                                src/672-publish_stats_hardlinks              \
                                src/673-acl                                  \
                                src/682-enter                                \
+                               src/686-azureblob_s3                         \
+                               src/687-import_s3                            \
                                src/691-metalink                             \
+                               src/692-https_azureblob_s3                   \
                                src/702-symlink_caching                      \
                                src/811-commit-gateway                       \
                                --                                           \
