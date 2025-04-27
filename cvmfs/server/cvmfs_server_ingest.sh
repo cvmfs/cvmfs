@@ -50,7 +50,7 @@ cvmfs_server_ingest() {
         then
           to_delete="$(echo $2 | tr -s /)"
         else
-          to_delete+="$to_delete///$(echo $2 | tr -s /)"
+          to_delete="$to_delete///$(echo $2 | tr -s /)"
           multiple_delete=1
         fi
         ;;
