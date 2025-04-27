@@ -1,4 +1,4 @@
-package errdefs // import "github.com/docker/docker/errdefs"
+package errdefs
 
 import "context"
 
@@ -10,7 +10,13 @@ func (e errNotFound) Cause() error {
 	return e.error
 }
 
-// NotFound is a helper to create an error of the class with the same name from any error type
+func (e errNotFound) Unwrap() error {
+	return e.error
+}
+
+// NotFound creates an [ErrNotFound] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrNotFound],
 func NotFound(err error) error {
 	if err == nil || IsNotFound(err) {
 		return err
@@ -26,7 +32,13 @@ func (e errInvalidParameter) Cause() error {
 	return e.error
 }
 
-// InvalidParameter is a helper to create an error of the class with the same name from any error type
+func (e errInvalidParameter) Unwrap() error {
+	return e.error
+}
+
+// InvalidParameter creates an [ErrInvalidParameter] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrInvalidParameter],
 func InvalidParameter(err error) error {
 	if err == nil || IsInvalidParameter(err) {
 		return err
@@ -42,7 +54,13 @@ func (e errConflict) Cause() error {
 	return e.error
 }
 
-// Conflict is a helper to create an error of the class with the same name from any error type
+func (e errConflict) Unwrap() error {
+	return e.error
+}
+
+// Conflict creates an [ErrConflict] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrConflict],
 func Conflict(err error) error {
 	if err == nil || IsConflict(err) {
 		return err
@@ -58,7 +76,13 @@ func (e errUnauthorized) Cause() error {
 	return e.error
 }
 
-// Unauthorized is a helper to create an error of the class with the same name from any error type
+func (e errUnauthorized) Unwrap() error {
+	return e.error
+}
+
+// Unauthorized creates an [ErrUnauthorized] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrUnauthorized],
 func Unauthorized(err error) error {
 	if err == nil || IsUnauthorized(err) {
 		return err
@@ -74,7 +98,13 @@ func (e errUnavailable) Cause() error {
 	return e.error
 }
 
-// Unavailable is a helper to create an error of the class with the same name from any error type
+func (e errUnavailable) Unwrap() error {
+	return e.error
+}
+
+// Unavailable creates an [ErrUnavailable] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrUnavailable],
 func Unavailable(err error) error {
 	if err == nil || IsUnavailable(err) {
 		return err
@@ -90,7 +120,13 @@ func (e errForbidden) Cause() error {
 	return e.error
 }
 
-// Forbidden is a helper to create an error of the class with the same name from any error type
+func (e errForbidden) Unwrap() error {
+	return e.error
+}
+
+// Forbidden creates an [ErrForbidden] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrForbidden],
 func Forbidden(err error) error {
 	if err == nil || IsForbidden(err) {
 		return err
@@ -106,7 +142,13 @@ func (e errSystem) Cause() error {
 	return e.error
 }
 
-// System is a helper to create an error of the class with the same name from any error type
+func (e errSystem) Unwrap() error {
+	return e.error
+}
+
+// System creates an [ErrSystem] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrSystem],
 func System(err error) error {
 	if err == nil || IsSystem(err) {
 		return err
@@ -122,28 +164,18 @@ func (e errNotModified) Cause() error {
 	return e.error
 }
 
-// NotModified is a helper to create an error of the class with the same name from any error type
+func (e errNotModified) Unwrap() error {
+	return e.error
+}
+
+// NotModified creates an [ErrNotModified] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [NotModified],
 func NotModified(err error) error {
 	if err == nil || IsNotModified(err) {
 		return err
 	}
 	return errNotModified{err}
-}
-
-type errAlreadyExists struct{ error }
-
-func (errAlreadyExists) AlreadyExists() {}
-
-func (e errAlreadyExists) Cause() error {
-	return e.error
-}
-
-// AlreadyExists is a helper to create an error of the class with the same name from any error type
-func AlreadyExists(err error) error {
-	if err == nil || IsAlreadyExists(err) {
-		return err
-	}
-	return errAlreadyExists{err}
 }
 
 type errNotImplemented struct{ error }
@@ -154,7 +186,13 @@ func (e errNotImplemented) Cause() error {
 	return e.error
 }
 
-// NotImplemented is a helper to create an error of the class with the same name from any error type
+func (e errNotImplemented) Unwrap() error {
+	return e.error
+}
+
+// NotImplemented creates an [ErrNotImplemented] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrNotImplemented],
 func NotImplemented(err error) error {
 	if err == nil || IsNotImplemented(err) {
 		return err
@@ -170,7 +208,13 @@ func (e errUnknown) Cause() error {
 	return e.error
 }
 
-// Unknown is a helper to create an error of the class with the same name from any error type
+func (e errUnknown) Unwrap() error {
+	return e.error
+}
+
+// Unknown creates an [ErrUnknown] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrUnknown],
 func Unknown(err error) error {
 	if err == nil || IsUnknown(err) {
 		return err
@@ -186,7 +230,13 @@ func (e errCancelled) Cause() error {
 	return e.error
 }
 
-// Cancelled is a helper to create an error of the class with the same name from any error type
+func (e errCancelled) Unwrap() error {
+	return e.error
+}
+
+// Cancelled creates an [ErrCancelled] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrCancelled],
 func Cancelled(err error) error {
 	if err == nil || IsCancelled(err) {
 		return err
@@ -202,7 +252,13 @@ func (e errDeadline) Cause() error {
 	return e.error
 }
 
-// Deadline is a helper to create an error of the class with the same name from any error type
+func (e errDeadline) Unwrap() error {
+	return e.error
+}
+
+// Deadline creates an [ErrDeadline] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrDeadline],
 func Deadline(err error) error {
 	if err == nil || IsDeadline(err) {
 		return err
@@ -218,7 +274,13 @@ func (e errDataLoss) Cause() error {
 	return e.error
 }
 
-// DataLoss is a helper to create an error of the class with the same name from any error type
+func (e errDataLoss) Unwrap() error {
+	return e.error
+}
+
+// DataLoss creates an [ErrDataLoss] error from the given error.
+// It returns the error as-is if it is either nil (no error) or already implements
+// [ErrDataLoss],
 func DataLoss(err error) error {
 	if err == nil || IsDataLoss(err) {
 		return err

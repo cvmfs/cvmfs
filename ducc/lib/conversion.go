@@ -22,7 +22,7 @@ import (
 	singularity "github.com/cvmfs/ducc/singularity"
 	temp "github.com/cvmfs/ducc/temp"
 
-	"github.com/docker/docker/api/types"
+	dockerImage "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
 )
@@ -494,11 +494,11 @@ func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inp
 	}
 
 	changes, _ := inputImage.GetChanges()
-	image := types.ImageImportSource{
+	image := dockerImage.ImportSource{
 		Source:     bytes.NewBuffer(imageTar.Bytes()),
 		SourceName: "-",
 	}
-	importOptions := types.ImageImportOptions{
+	importOptions := dockerImage.ImportOptions{
 		Tag:     outputImage.Tag,
 		Message: "",
 		Changes: changes,
@@ -534,7 +534,7 @@ func PushImageToRegistry(outputImage Image) (err error) {
 	}
 	authBytes, _ := json.Marshal(authStruct)
 	authCredential := base64.StdEncoding.EncodeToString(authBytes)
-	pushOptions := types.ImagePushOptions{
+	pushOptions := dockerImage.PushOptions{
 		RegistryAuth: authCredential,
 	}
 	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.19"))

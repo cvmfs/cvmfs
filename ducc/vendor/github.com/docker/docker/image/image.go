@@ -1,6 +1,7 @@
 package image // import "github.com/docker/docker/image"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/docker/dockerversion"
 	"github.com/docker/docker/layer"
 	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ID is the content-addressable ID of an image.
@@ -26,47 +28,79 @@ func (id ID) Digest() digest.Digest {
 	return digest.Digest(id)
 }
 
-// IDFromDigest creates an ID from a digest
-func IDFromDigest(digest digest.Digest) ID {
-	return ID(digest)
-}
-
 // V1Image stores the V1 image configuration.
 type V1Image struct {
 	// ID is a unique 64 character identifier of the image
 	ID string `json:"id,omitempty"`
-	// Parent is the ID of the parent image
+
+	// Parent is the ID of the parent image.
+	//
+	// Depending on how the image was created, this field may be empty and
+	// is only set for images that were built/created locally. This field
+	// is empty if the image was pulled from an image registry.
 	Parent string `json:"parent,omitempty"`
-	// Comment is the commit message that was set when committing the image
+
+	// Comment is an optional message that can be set when committing or
+	// importing the image.
 	Comment string `json:"comment,omitempty"`
+
 	// Created is the timestamp at which the image was created
-	Created time.Time `json:"created"`
-	// Container is the id of the container used to commit
+	Created *time.Time `json:"created"`
+
+	// Container is the ID of the container that was used to create the image.
+	//
+	// Depending on how the image was created, this field may be empty.
 	Container string `json:"container,omitempty"`
-	// ContainerConfig is the configuration of the container that is committed into the image
+
+	// ContainerConfig is the configuration of the container that was committed
+	// into the image.
 	ContainerConfig container.Config `json:"container_config,omitempty"`
-	// DockerVersion specifies the version of Docker that was used to build the image
+
+	// DockerVersion is the version of Docker that was used to build the image.
+	//
+	// Depending on how the image was created, this field may be empty.
 	DockerVersion string `json:"docker_version,omitempty"`
-	// Author is the name of the author that was specified when committing the image
+
+	// Author is the name of the author that was specified when committing the
+	// image, or as specified through MAINTAINER (deprecated) in the Dockerfile.
 	Author string `json:"author,omitempty"`
-	// Config is the configuration of the container received from the client
+
+	// Config is the configuration of the container received from the client.
 	Config *container.Config `json:"config,omitempty"`
-	// Architecture is the hardware that the image is built and runs on
+
+	// Architecture is the hardware CPU architecture that the image runs on.
 	Architecture string `json:"architecture,omitempty"`
-	// OS is the operating system used to build and run the image
+
+	// Variant is the CPU architecture variant (presently ARM-only).
+	Variant string `json:"variant,omitempty"`
+
+	// OS is the Operating System the image is built to run on.
 	OS string `json:"os,omitempty"`
-	// Size is the total size of the image including all layers it is composed of
+
+	// Size is the total size of the image including all layers it is composed of.
 	Size int64 `json:",omitempty"`
 }
 
 // Image stores the image configuration
 type Image struct {
 	V1Image
-	Parent     ID        `json:"parent,omitempty"`
-	RootFS     *RootFS   `json:"rootfs,omitempty"`
-	History    []History `json:"history,omitempty"`
-	OSVersion  string    `json:"os.version,omitempty"`
-	OSFeatures []string  `json:"os.features,omitempty"`
+
+	// Parent is the ID of the parent image.
+	//
+	// Depending on how the image was created, this field may be empty and
+	// is only set for images that were built/created locally. This field
+	// is empty if the image was pulled from an image registry.
+	Parent ID `json:"parent,omitempty"` //nolint:govet
+
+	// RootFS contains information about the image's RootFS, including the
+	// layer IDs.
+	RootFS  *RootFS   `json:"rootfs,omitempty"`
+	History []History `json:"history,omitempty"`
+
+	// OsVersion is the version of the Operating System the image is built to
+	// run on (especially for Windows).
+	OSVersion  string   `json:"os.version,omitempty"`
+	OSFeatures []string `json:"os.features,omitempty"`
 
 	// rawJSON caches the immutable JSON associated with this image.
 	rawJSON []byte
@@ -74,6 +108,19 @@ type Image struct {
 	// computedID is the ID computed from the hash of the image config.
 	// Not to be confused with the legacy V1 ID in V1Image.
 	computedID ID
+
+	// Details holds additional details about image
+	Details *Details `json:"-"`
+}
+
+// Details provides additional image data
+type Details struct {
+	// ManifestDescriptor is the descriptor of the platform-specific manifest
+	// chosen by the [GetImage] call that returned this image.
+	// The exact descriptor depends on the [GetImageOpts.Platform] field
+	// passed to [GetImage] and the content availability.
+	// This is only set by the containerd image service.
+	ManifestDescriptor *ocispec.Descriptor
 }
 
 // RawJSON returns the immutable JSON associated with the image.
@@ -105,6 +152,13 @@ func (img *Image) BaseImgArch() string {
 	return arch
 }
 
+// BaseImgVariant returns the image's variant, whether populated or not.
+// This avoids creating an inconsistency where the stored image variant
+// is "greater than" (i.e. v8 vs v6) the actual image variant.
+func (img *Image) BaseImgVariant() string {
+	return img.Variant
+}
+
 // OperatingSystem returns the image's operating system. If not populated, defaults to the host runtime OS.
 func (img *Image) OperatingSystem() string {
 	os := img.OS
@@ -112,6 +166,17 @@ func (img *Image) OperatingSystem() string {
 		os = runtime.GOOS
 	}
 	return os
+}
+
+// Platform generates an OCI platform from the image
+func (img *Image) Platform() ocispec.Platform {
+	return ocispec.Platform{
+		Architecture: img.Architecture,
+		OS:           img.OS,
+		OSVersion:    img.OSVersion,
+		OSFeatures:   img.OSFeatures,
+		Variant:      img.Variant,
+	}
 }
 
 // MarshalJSON serializes the image to JSON. It sorts the top-level keys so
@@ -143,8 +208,15 @@ type ChildConfig struct {
 	Config          *container.Config
 }
 
+// NewImage creates a new image with the given ID
+func NewImage(id ID) *Image {
+	return &Image{
+		computedID: id,
+	}
+}
+
 // NewChildImage creates a new Image as a child of this image.
-func NewChildImage(img *Image, child ChildConfig, platform string) *Image {
+func NewChildImage(img *Image, child ChildConfig, os string) *Image {
 	isEmptyLayer := layer.IsEmpty(child.DiffID)
 	var rootFS *RootFS
 	if img.RootFS != nil {
@@ -167,7 +239,8 @@ func NewChildImage(img *Image, child ChildConfig, platform string) *Image {
 			DockerVersion:   dockerversion.Version,
 			Config:          child.Config,
 			Architecture:    img.BaseImgArch(),
-			OS:              platform,
+			Variant:         img.BaseImgVariant(),
+			OS:              os,
 			Container:       child.ContainerID,
 			ContainerConfig: *child.ContainerConfig,
 			Author:          child.Author,
@@ -180,28 +253,25 @@ func NewChildImage(img *Image, child ChildConfig, platform string) *Image {
 	}
 }
 
-// History stores build commands that were used to create an image
-type History struct {
-	// Created is the timestamp at which the image was created
-	Created time.Time `json:"created"`
-	// Author is the name of the author that was specified when committing the image
-	Author string `json:"author,omitempty"`
-	// CreatedBy keeps the Dockerfile command used while building the image
-	CreatedBy string `json:"created_by,omitempty"`
-	// Comment is the commit message that was set when committing the image
-	Comment string `json:"comment,omitempty"`
-	// EmptyLayer is set to true if this history item did not generate a
-	// layer. Otherwise, the history item is associated with the next
-	// layer in the RootFS section.
-	EmptyLayer bool `json:"empty_layer,omitempty"`
+// Clone clones an image and changes ID.
+func Clone(base *Image, id ID) *Image {
+	img := *base
+	img.RootFS = img.RootFS.Clone()
+	img.V1Image.ID = id.String()
+	img.computedID = id
+	return &img
 }
+
+// History stores build commands that were used to create an image
+type History = ocispec.History
 
 // NewHistory creates a new history struct from arguments, and sets the created
 // time to the current time in UTC
 func NewHistory(author, comment, createdBy string, isEmptyLayer bool) History {
+	now := time.Now().UTC()
 	return History{
 		Author:     author,
-		Created:    time.Now().UTC(),
+		Created:    &now,
 		CreatedBy:  createdBy,
 		Comment:    comment,
 		EmptyLayer: isEmptyLayer,
@@ -210,9 +280,9 @@ func NewHistory(author, comment, createdBy string, isEmptyLayer bool) History {
 
 // Exporter provides interface for loading and saving images
 type Exporter interface {
-	Load(io.ReadCloser, io.Writer, bool) error
+	Load(context.Context, io.ReadCloser, io.Writer, bool) error
 	// TODO: Load(net.Context, io.ReadCloser, <- chan StatusMessage) error
-	Save([]string, io.Writer) error
+	Save(context.Context, []string, io.Writer) error
 }
 
 // NewFromJSON creates an Image configuration from json.

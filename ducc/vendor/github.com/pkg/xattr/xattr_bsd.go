@@ -1,3 +1,4 @@
+//go:build freebsd || netbsd
 // +build freebsd netbsd
 
 package xattr

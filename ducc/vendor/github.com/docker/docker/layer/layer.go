@@ -10,14 +10,14 @@
 package layer // import "github.com/docker/docker/layer"
 
 import (
+	"context"
 	"errors"
 	"io"
 
+	"github.com/containerd/log"
 	"github.com/docker/distribution"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/containerfs"
+	"github.com/moby/go-archive"
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -38,23 +38,10 @@ var (
 	// used for creation.
 	ErrMountNameConflict = errors.New("mount already exists with name")
 
-	// ErrActiveMount is used when an operation on a
-	// mount is attempted but the layer is still
-	// mounted and the operation cannot be performed.
-	ErrActiveMount = errors.New("mount still active")
-
-	// ErrNotMounted is used when requesting an active
-	// mount but the layer is not mounted.
-	ErrNotMounted = errors.New("not mounted")
-
 	// ErrMaxDepthExceeded is used when a layer is attempted
 	// to be created which would result in a layer depth
 	// greater than the 125 max.
 	ErrMaxDepthExceeded = errors.New("max depth exceeded")
-
-	// ErrNotSupported is used when the action is not supported
-	// on the current host operating system.
-	ErrNotSupported = errors.New("not support on this host operating system")
 )
 
 // ChainID is the content-addressable ID of a layer.
@@ -102,11 +89,11 @@ type Layer interface {
 
 	// Size returns the size of the entire layer chain. The size
 	// is calculated from the total size of all files in the layers.
-	Size() (int64, error)
+	Size() int64
 
 	// DiffSize returns the size difference of the top layer
 	// from parent layer.
-	DiffSize() (int64, error)
+	DiffSize() int64
 
 	// Metadata returns the low level storage metadata associated
 	// with layer.
@@ -126,8 +113,8 @@ type RWLayer interface {
 	Parent() Layer
 
 	// Mount mounts the RWLayer and returns the filesystem path
-	// the to the writable layer.
-	Mount(mountLabel string) (containerfs.ContainerFS, error)
+	// to the writable layer.
+	Mount(mountLabel string) (string, error)
 
 	// Unmount unmounts the RWLayer. This should be called
 	// for every mount. If there are multiple mount calls
@@ -145,6 +132,9 @@ type RWLayer interface {
 
 	// Metadata returns the low level metadata for the mutable layer
 	Metadata() (map[string]string, error)
+
+	// ApplyDiff applies the diff to the RW layer
+	ApplyDiff(diff io.Reader) (int64, error)
 }
 
 // Metadata holds information about a
@@ -168,7 +158,7 @@ type Metadata struct {
 // writable mount. Changes made here will
 // not be included in the Tar stream of the
 // RWLayer.
-type MountInit func(root containerfs.ContainerFS) error
+type MountInit func(root string) error
 
 // CreateRWLayerOpts contains optional arguments to be passed to CreateRWLayer
 type CreateRWLayerOpts struct {
@@ -184,12 +174,10 @@ type Store interface {
 	Get(ChainID) (Layer, error)
 	Map() map[ChainID]Layer
 	Release(Layer) ([]Metadata, error)
-
 	CreateRWLayer(id string, parent ChainID, opts *CreateRWLayerOpts) (RWLayer, error)
 	GetRWLayer(id string) (RWLayer, error)
 	GetMountID(id string) (string, error)
 	ReleaseRWLayer(RWLayer) ([]Metadata, error)
-
 	Cleanup() error
 	DriverStatus() [][2]string
 	DriverName() string
@@ -211,11 +199,11 @@ func createChainIDFromParent(parent ChainID, dgsts ...DiffID) ChainID {
 		return parent
 	}
 	if parent == "" {
-		return createChainIDFromParent(ChainID(dgsts[0]), dgsts[1:]...)
+		return createChainIDFromParent(ChainID(dgsts[0]), dgsts[1:]...) // #nosec G602 -- slice index out of range, which is a false positive
 	}
 	// H = "H(n-1) SHA256(n)"
-	dgst := digest.FromBytes([]byte(string(parent) + " " + string(dgsts[0])))
-	return createChainIDFromParent(ChainID(dgst), dgsts[1:]...)
+	dgst := digest.FromBytes([]byte(string(parent) + " " + string(dgsts[0]))) // #nosec G602 -- slice index out of range, which is a false positive
+	return createChainIDFromParent(ChainID(dgst), dgsts[1:]...)               // #nosec G602 -- slice index out of range, which is a false positive
 }
 
 // ReleaseAndLog releases the provided layer from the given layer
@@ -223,7 +211,7 @@ func createChainIDFromParent(parent ChainID, dgsts ...DiffID) ChainID {
 func ReleaseAndLog(ls Store, l Layer) {
 	metadata, err := ls.Release(l)
 	if err != nil {
-		logrus.Errorf("Error releasing layer %s: %v", l.ChainID(), err)
+		log.G(context.TODO()).Errorf("Error releasing layer %s: %v", l.ChainID(), err)
 	}
 	LogReleaseMetadata(metadata)
 }
@@ -232,6 +220,6 @@ func ReleaseAndLog(ls Store, l Layer) {
 // ensure consistent logging for release metadata
 func LogReleaseMetadata(metadatas []Metadata) {
 	for _, metadata := range metadatas {
-		logrus.Infof("Layer %s cleaned up", metadata.ChainID)
+		log.G(context.TODO()).Infof("Layer %s cleaned up", metadata.ChainID)
 	}
 }

@@ -1,4 +1,4 @@
-package errdefs // import "github.com/docker/docker/errdefs"
+package errdefs
 
 // ErrNotFound signals that the requested object doesn't exist
 type ErrNotFound interface {
@@ -41,11 +41,6 @@ type ErrSystem interface {
 // ErrNotModified signals that an action can't be performed because it's already in the desired state
 type ErrNotModified interface {
 	NotModified()
-}
-
-// ErrAlreadyExists is a special case of ErrConflict which signals that the desired object already exists
-type ErrAlreadyExists interface {
-	AlreadyExists()
 }
 
 // ErrNotImplemented signals that the requested action/feature is not implemented on the system as configured.
