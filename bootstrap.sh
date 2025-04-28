@@ -16,6 +16,7 @@ MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
 RAPIDCHECK_VERSION=0.0
 LIBARCHIVE_VERSION=3.3.2
+GOLANG_VERSION=1.24.2
 
 if [ x"$EXTERNALS_LIB_LOCATION" = x"" ]; then
   echo "Bootstrap - Missing environment variable: EXTERNALS_LIB_LOCATION"
@@ -79,22 +80,30 @@ do_extract() {
   cp -r $library_dir/src/* $dest_dir
 }
 
-do_extract_go() {
-  local library_name="$1"
-  local library_archive="$2"
-
-  local library_dir="$externals_lib_dir/$library_name"
-  local dest_dir=$(get_destination_dir $library_name)
-  local cdir=$(pwd)
-
-  print_hint "Extracting $library_archive"
-
-  cd $externals_build_dir
-  tar --no-same-owner -xvf "$library_dir/$library_archive"
-  mv go $dest_dir
-  cd $cdir
-  cp -r $library_dir/src/* $dest_dir
+do_download_go() {
+  echo "Downloading Go Sources"
+  mkdir -p "$externals_build_dir/build_golang"
+  cd "$externals_build_dir/build_golang"
+  arch=$(arch)
+  goarch=""
+  if [ "$arch" = "x86_64" ]; then
+    goarch="amd64"
+  elif [ "$arch" = "aarch64" ]; then
+    goarch="arm64"
+  fi
+  if [ -z "${goarch}" ]; then
+    >&2 echo "Error: Failed to bootstrap go, couldn't parse architecture. Install go toolchain > 1.23 manually, see https://go.dev/doc/install"
+    exit 1
+  fi
+  echo "Downloading https://go.dev/dl/go${GOLANG_VERSION}.linux-${goarch}.tar.gz ..."
+  curl -LO https://go.dev/dl/go${GOLANG_VERSION}.linux-${goarch}.tar.gz
+  mkdir -p $externals_install_dir/go
+  tar -C $externals_install_dir/ -xzf go${GOLANG_VERSION}.linux-${goarch}.tar.gz
+  ls $externals_lib_dir/golang/src/* 
+  cp -r $externals_lib_dir/golang/src/* ./
+  cd -
 }
+
 
 do_copy() {
   local library_name="$1"
@@ -248,6 +257,10 @@ build_lib() {
       patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
+      golang)
+        do_download_go
+        do_build "golang"
+      ;;
     *)
       echo "Unknown library name. Exiting."
       exit 1
@@ -263,6 +276,20 @@ missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest max
 if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
     missing_libs="$missing_libs googlebench"
 fi
+
+if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+    required_go_minor_version="23"
+    if [ -n "$(command -v go)" ]; then
+      go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
+       if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then 
+         missing_libs="$missing_libs golang"
+       fi  
+    else
+      missing_libs="$missing_libs golang"
+    fi
+fi
+
+echo $missing_libs
 
 
 if [ x"$BUILD_QC_TESTS" != x"" ]; then
