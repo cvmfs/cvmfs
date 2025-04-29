@@ -81,9 +81,9 @@ do_extract() {
 }
 
 do_download_go() {
-  echo "Downloading Go Sources"
-  mkdir -p "$externals_build_dir/build_golang"
-  cd "$externals_build_dir/build_golang"
+  echo "Downloading Go Binaries ..."
+  mkdir -p "$externals_build_dir/build_golang_rev2"
+  cd "$externals_build_dir/build_golang_rev2"
   arch=$(arch)
   goarch=""
   if [ "$arch" = "x86_64" ]; then
@@ -97,10 +97,12 @@ do_download_go() {
   fi
   echo "Downloading https://go.dev/dl/go${GOLANG_VERSION}.linux-${goarch}.tar.gz ..."
   curl -LO https://go.dev/dl/go${GOLANG_VERSION}.linux-${goarch}.tar.gz
+  if [ $? -ne 0 ] ; then
+   >&2 echo "Error: Failed to download go binaries! Install go toolchain > 1.23 manually, see https://go.dev/doc/install"
+  fi
   mkdir -p $externals_install_dir/go
   tar -C $externals_install_dir/ -xzf go${GOLANG_VERSION}.linux-${goarch}.tar.gz
-  ls $externals_lib_dir/golang/src/* 
-  cp -r $externals_lib_dir/golang/src/* ./
+  cp -r $externals_lib_dir/golang_rev2/src/* ./
   cd -
 }
 
@@ -257,9 +259,9 @@ build_lib() {
       patch_external "libarchive" "libarchive_cmake.patch"
       do_build "libarchive"
       ;;
-      golang)
+      golang_rev2)
         do_download_go
-        do_build "golang"
+        do_build "golang_rev2"
       ;;
     *)
       echo "Unknown library name. Exiting."
@@ -282,10 +284,10 @@ if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTT
     if [ -n "$(command -v go)" ]; then
       go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
        if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then 
-         missing_libs="$missing_libs golang"
+         missing_libs="$missing_libs golang_rev2"
        fi  
     else
-      missing_libs="$missing_libs golang"
+      missing_libs="$missing_libs golang_rev2"
     fi
 fi
 
@@ -301,7 +303,7 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
   for l in $existing_libs; do
     if [ x"$l" != x ]; then
       echo "Bootstrap - found $l"
-      missing_libs=$(echo $missing_libs | sed -e "s/$l//")
+      missing_libs=$(echo $missing_libs | sed -e "s/$l\b//")
     fi
   done
 else
