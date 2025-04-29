@@ -4,7 +4,7 @@ Source: cvmfs
 Section: utils
 Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
-Build-Depends: libfuse3-dev, debhelper (>= 9), autotools-dev, cmake, cpio, libcap-dev, libssl-dev, libfuse-dev, pkg-config, libattr1-dev, patch, python3-dev, python3-setuptools, unzip, uuid-dev, valgrind, libz-dev
+Build-Depends: libfuse3-dev (>= 3.3.0), debhelper (>= 9), autotools-dev, cmake, cpio, libcap-dev, libssl-dev, libfuse-dev, pkg-config, libattr1-dev, patch, python3-dev, python3-setuptools, unzip, uuid-dev, valgrind, libz-dev
 Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
@@ -68,7 +68,7 @@ Description: CernVM File System Unit Tests
 Package: cvmfs-fuse3
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: fuse3, libfuse3-3, cvmfs (= ${binary:Version})
+Depends: libfuse3-3 (>= 3.3.0), cvmfs (= ${binary:Version})
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
