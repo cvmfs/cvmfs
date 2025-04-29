@@ -1492,7 +1492,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         if ( EIO == errno || EIO == -bytes_fetched ) {
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "EIO (07): Failed to read chunk %d from file %s",
-             chunks.path.ToString().c_str() );
+             chunk_idx, chunks.path.ToString().c_str() );
           perf::Inc(file_system_->n_eio_total());
           perf::Inc(file_system_->n_eio_07());
         }
