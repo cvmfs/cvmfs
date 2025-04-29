@@ -810,7 +810,7 @@ cvmfs_chksetup() {
               proxy_param=
               timeout=$CVMFS_TIMEOUT_DIRECT
             fi
-            $proxy_param curl -H "Pragma:" -f --connect-timeout $timeout $url > /dev/null 2>&1
+            $proxy_param curl -H "Pragma:" -f --max-time  $timeout $url > /dev/null 2>&1
             if [ $? -ne 0 ]; then
               echo "Warning: failed to access $url through proxy $proxy"
               num_warnings=$(($num_warnings+1))
@@ -823,7 +823,7 @@ cvmfs_chksetup() {
                   local server_name=$(echo $server | sed s,^http://,, | cut -d/ -f1 | sed 's/:[0-9]*$//')
                   url=$(echo $server | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g)
                   url="${url}/api/v1.0/geo/${uuid}/$server_name"
-                  $proxy_param curl -H "Pragma:" -f --connect-timeout $timeout $url > /dev/null 2>&1
+                  $proxy_param curl -H "Pragma:" -f --max-time $timeout $url > /dev/null 2>&1
                   if [ $? -ne 0 ]; then
                     echo "Warning: failed to use Geo-API with ${server_name}"
                     num_warnings=$(($num_warnings+1))
@@ -989,7 +989,7 @@ cvmfs_stat() {
     proxy_effective=
     timeout_effective=$timeout_direct
   fi
-  env http_proxy=$proxy_effective curl -H "Pragma:" -f --connect-timeout $timeout_effective ${host}/.cvmfspublished >/dev/null 2>&1
+  env http_proxy=$proxy_effective curl -H "Pragma:" -f --max-time $timeout_effective ${host}/.cvmfspublished >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     online=1
   else
