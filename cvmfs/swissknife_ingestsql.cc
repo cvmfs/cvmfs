@@ -660,7 +660,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   if (args.find('@') != args.end()) {
     proxy = *args.find('@')->second;
   } else {
-    if (!retrieve_config(config_map, "CVMFS_HTTP_PROXY", proxy, NULL)) { return 1; }
+    if (!retrieve_config(config_map, "CVMFS_HTTP_PROXY", proxy, "DIRECT")) { return 1; }
   }
 
   string lease_path = "";
