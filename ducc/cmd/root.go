@@ -56,6 +56,9 @@ func AliveMessage() {
 func setUpLogs(out io.Writer, level string) error {
 	logrus.SetOutput(out)
 	lvl, err := logrus.ParseLevel(level)
+	if lvl == logrus.TraceLevel {
+		logrus.SetReportCaller(true)
+	}
 	if err != nil {
 		return err
 	}

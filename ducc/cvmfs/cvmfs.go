@@ -697,10 +697,11 @@ func CreateSneakyChain(CVMFSRepo, newChainId, previousChainId string, layer tar.
 				l.LogE(err).Error("Error in chmod")
 				return err
 			}
-			if err := os.Chown(path, header.Uid, header.Gid); err != nil {
-				l.LogE(err).Error("Error in chown")
-				return err
-			}
+      // TODO(vavolkl): do we need to chown?
+			//if err := os.Chown(path, header.Uid, header.Gid); err != nil {
+			//	l.LogE(err).Error("Error in chown")
+			//	return err
+			//}
 			if err := os.Chtimes(path, header.AccessTime, header.ModTime); err != nil {
 				l.LogE(err).Error("Error in chtimes")
 				return err
