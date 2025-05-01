@@ -46,7 +46,7 @@ func (s *Services) NewLease(ctx context.Context, keyID, leasePath, hostname stri
 		return "", fmt.Errorf("could not retrieve repository information: %w", err)
 	}
 	if repoConfig == nil {
-		return "", fmt.Errorf("repository not found: %w", err)
+		return "", fmt.Errorf("repository not found: %s", repo)
 	}
 	if !repoConfig.Enabled {
 		return "", ErrRepoDisabled
