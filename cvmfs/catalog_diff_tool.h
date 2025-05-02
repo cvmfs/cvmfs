@@ -53,7 +53,9 @@ class CatalogDiffTool {
 
   bool Init();
 
-  bool Run(const PathString& path);
+  bool Run(const PathString& path, const PathString& lease_path);
+   
+  bool FastPathDiff(const PathString& lease_path_r);
 
  protected:
   /**

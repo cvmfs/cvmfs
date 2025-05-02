@@ -9,6 +9,7 @@
 #include <string>
 
 #include "catalog.h"
+#include "catalog_mgr.h"
 #include "crypto/hash.h"
 #include "network/download.h"
 #include "util/exception.h"
@@ -76,8 +77,68 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
 }
 
 template <typename RoCatalogMgr>
-bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
-  DiffRec(path);
+bool CatalogDiffTool<RoCatalogMgr>::FastPathDiff(const PathString& lease_path_r) {
+  bool success = false;
+
+  catalog::DirectoryEntry old_dirent_parent;
+  catalog::DirectoryEntry old_dirent;
+  catalog::DirectoryEntry new_dirent;
+
+  bool has_old_dirent_parent;
+  bool has_old_dirent;
+  bool has_new_dirent;
+
+  PathString lease_path= PathString("/" + lease_path_r.ToString());
+  PathString lease_path_parent = GetParentPath(lease_path);
+
+  has_old_dirent_parent = old_catalog_mgr_->LookupPath( lease_path_parent, catalog::kLookupDefault, &old_dirent_parent);
+  has_old_dirent        = old_catalog_mgr_->LookupPath( lease_path, catalog::kLookupDefault, &old_dirent);
+  has_new_dirent        = new_catalog_mgr_->LookupPath( lease_path, catalog::kLookupDefault, &new_dirent);
+
+  if( !has_old_dirent_parent || !has_new_dirent) { return false; }
+
+  if(   has_old_dirent && old_dirent.IsDirectory() && old_dirent.IsNestedCatalogMountpoint()
+      && new_dirent.IsDirectory() && new_dirent.IsNestedCatalogMountpoint() ) {
+     // switching from nested catalog to nested catalog
+      FileChunkList chunks;
+      XattrList xattrs;
+      if (new_dirent.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(lease_path, &xattrs);
+      }
+      LogCvmfs(kLogCvmfs, kLogSyslog, "Replacing existing nested catalog for directory %s", lease_path.c_str());
+
+      ReportModification(lease_path, old_dirent, new_dirent, xattrs, chunks);
+      success = true;
+  } else if (   !has_old_dirent && has_new_dirent
+              && new_dirent.IsDirectory() && new_dirent.IsNestedCatalogMountpoint() ) {
+      // new nested catalog in a parent nested catalog
+      FileChunkList chunks;
+      XattrList xattrs;
+      if (new_dirent.HasXattrs()) {
+        new_catalog_mgr_->LookupXattrs(lease_path, &xattrs);
+      }
+
+      LogCvmfs(kLogCvmfs, kLogSyslog, "Adding nested catalog for new directory %s", lease_path.c_str());
+      ReportAddition(lease_path, new_dirent, xattrs, chunks);
+      success = true;
+
+  }
+  return success;
+}
+
+
+template <typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path, const PathString& lease_path) {
+  bool fast_path_success = false;
+  if( lease_path != PathString("") ) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Trying fast-path diff");
+    fast_path_success = FastPathDiff(lease_path);
+  }
+
+  if (!fast_path_success){
+    LogCvmfs(kLogCvmfs, kLogDebug, "Doing slow-path diff");
+    DiffRec(path);
+  }
 
   return true;
 }
