@@ -217,11 +217,13 @@ bool Database<DerivedT>::FileReadAhead() {
 
     // Read-ahead is known to fail on tmpfs with EINVAL
     // EINVAL = "readahead() cannot be applied to that a file type"
-    // Don't consider it a fatal error.
-    if (retval != 0 && errno != EINVAL) {
+    // It can also fail with ENOSYS on kernel interfaces that do not implement
+    // readahead(), such as LX-Brand zones on illumos.
+    // Don't consider either a fatal error.
+    if (retval != 0 && errno != EINVAL && errno != ENOSYS) {
       LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-        "failed to read-ahead %s: invalid file descrp. or not open for reading",
-        filename().c_str());
+        "failed to read-ahead %s: invalid file descrp. or not open for reading (%d)",
+        filename().c_str(), errno);
       return false;
     }
   }
