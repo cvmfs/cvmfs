@@ -158,7 +158,7 @@ int ExternalCacheManager::Close(int fd) {
 int ExternalCacheManager::CommitTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "committing %s",
-           transaction->id.ToString().c_str());
+           std::string(transaction->id.ToString()).c_str());
   int retval = Flush(true, transaction);
   if (retval != 0)
     return retval;
@@ -434,7 +434,7 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   if (transaction->committed)
     return 0;
   LogCvmfs(kLogCache, kLogDebug, "flushing %u bytes for %s",
-           transaction->buf_pos, transaction->id.ToString().c_str());
+           transaction->buf_pos, std::string(transaction->id.ToString()).c_str());
   cvmfs::MsgHash object_id;
   transport_.FillMsgHash(transaction->id, &object_id);
   cvmfs::MsgStoreReq msg_store;
@@ -538,7 +538,7 @@ void *ExternalCacheManager::MainRead(void *data) {
       continue;
     } else {
       PANIC(kLogSyslogErr | kLogDebug, "unexpected message %s",
-            msg->GetTypeName().c_str());
+            std::string(msg->GetTypeName()).c_str());
     }
 
     RpcInFlight rpc_inflight;
@@ -580,7 +580,7 @@ int ExternalCacheManager::Open(const LabeledObject &object) {
 int ExternalCacheManager::OpenFromTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "open fd for transaction %s",
-           transaction->id.ToString().c_str());
+           std::string(transaction->id.ToString()).c_str());
   int retval = Flush(true, transaction);
   if (retval != 0)
     return retval;
