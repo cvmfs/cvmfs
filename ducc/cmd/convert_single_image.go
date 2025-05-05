@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"os"
-
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -19,8 +18,8 @@ var (
 func init() {
 	convertSingleImageCmd.Flags().BoolVarP(&skipFlat, "skip-flat", "s", false, "do not create a flat images (compatible with singularity)")
 	convertSingleImageCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
-	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
-	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
+	convertSingleImageCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", true, "do not create and push the docker thin image")
+	convertSingleImageCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", true, "do not create podman image store")
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
 	convertSingleImageCmd.Flags().StringVarP(&thinImageName, "thin-image-name", "", "", "name to use for the thin image to upload, if empty implies --skip-thin-image.")
 	convertSingleImageCmd.Flags().IntVarP(&attempts, "attempts", "r", 1, "number of time to try to unpack the image, default one")
@@ -31,7 +30,7 @@ var convertSingleImageCmd = &cobra.Command{
 	Use:   "convert-single-image [image to convert] [cvmfs repository]",
 	Short: "Convert a single image",
 	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		AliveMessage()
 
 		inputImage := args[0]
@@ -50,23 +49,24 @@ var convertSingleImageCmd = &cobra.Command{
 		}
 
 		if skipThinImage == false {
-			_, err := lib.GetPassword()
+			_, err = lib.GetPassword()
 			if err != nil {
-				l.LogE(err).Warning("Asked to create the docker thin image but did not provide the password for the registry, we cannot push the thin image to the registry, hence we won't create it. We will unpack the layers.")
+				l.LogE(err).Warning("Asked to create the docker thin image but did not provide the password for the registry, we cannot push the thin image to the registry, hence we won't create it.")
 				skipThinImage = true
+				return err
 			}
 		}
 
 		if !cvmfs.RepositoryExists(cvmfsRepo) {
-			l.Log().Error("The repository does not seems to exists.")
-			os.Exit(RepoNotExistsError)
+			l.Log().Error("The repository does not seem to exists.")
+			return fmt.Errorf("The repository does not seem to exists.")
 		}
 
 		input, err := lib.ParseImage(inputImage)
 		wish, err := lib.CreateWish(input, thinImageName, cvmfsRepo, username, username)
 		if err != nil {
 			l.LogE(err).Error("Error in creating the wish to convert")
-			os.Exit(1)
+			return err
 		}
 		fields := log.Fields{
 			"input image":    wish.InputName,
@@ -75,58 +75,76 @@ var convertSingleImageCmd = &cobra.Command{
 
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishFlat(wish)
+				err = lib.ConvertWishFlat(wish)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
-					log.Error("Error in converting singularity image")
+					log.Warning("Error in converting singularity image, trying again")
 				} else {
 					log.Info("Successfully created the singularity image")
 					break
 				}
 			}
+
+			if err != nil {
+				log.Error("Multiple Errors in converting singularity image")
+				return err
+			}
 		}
 
 		if !skipLayers {
 			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
-					log.Error("Error in converting wish (layers)")
+					log.Warning("Could not convert wish (layers), trying again")
 				} else {
 					log.Info("Successfully converted the layers")
 					break
 				}
 			}
+			if err != nil {
+				log.Error("Multiple Errors in converting layers")
+				return err
+			}
 		}
 
 		if !skipThinImage {
 			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishDocker(wish)
+				err = lib.ConvertWishDocker(wish)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
-					log.Error("Error in converting wish (docker)")
+					log.Warning("Could not convert  wish (docker), trying again")
 				} else {
 					log.Info("Successfully converted wish (docker)")
 					break
 				}
 			}
+			if err != nil {
+				log.Error("Multiple Errors in converting wish (docker)")
+				return err
+			}
 		}
 
 		if !skipPodman {
 			for i := 0; i < attempts; i++ {
-				err := lib.ConvertWishPodman(wish, convertAgain)
+				err = lib.ConvertWishPodman(wish, convertAgain)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
-					log.Error("Error in converting wish (podman)")
+					log.Warning("Could not convert wish (podman), trying again")
 				} else {
 					log.Info("Successfully converted with (podman)")
 					break
 				}
 			}
+			if err != nil {
+				log.Error("Multiple Errors in converting wish (podman)")
+				return err
+			}
 		}
+		return nil
 	},
 }

@@ -26,9 +26,9 @@ var checkImageSyntaxCmd = &cobra.Command{
 		img, err := lib.ParseImage(args[0])
 		if err != nil {
 			fmt.Println(err)
-      return err
+			return err
 		}
 		img.PrintImage(machineFriendly, true)
-    return nil 
+		return nil
 	},
 }

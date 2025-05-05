@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"io/ioutil"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	cvmfs "github.com/cvmfs/ducc/cvmfs"
-	exec "github.com/cvmfs/ducc/exec"
 	"github.com/cvmfs/ducc/lib"
 	l "github.com/cvmfs/ducc/log"
 )
@@ -39,32 +37,30 @@ var convertCmd = &cobra.Command{
 	Use:   "convert wish-list.yaml",
 	Short: "Convert the wishes",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		AliveMessage()
 
 		if (skipLayers == false) && (skipThinImage == false) {
 			_, err := lib.GetPassword()
 			if err != nil {
 				l.LogE(err).Error("No password provide to upload the docker images")
-				os.Exit(NoPasswordError)
+				return (err)
 			}
 		}
-
-		defer exec.ExecCommand("docker", "system", "prune", "--force", "--all")
 
 		data, err := ioutil.ReadFile(args[0])
 		if err != nil {
 			l.LogE(err).Error("Impossible to read the recipe file")
-			os.Exit(GetRecipeFileError)
+			return err
 		}
 		recipe, err := lib.ParseYamlRecipeV1(data)
 		if err != nil {
 			l.LogE(err).Error("Impossible to parse the recipe file")
-			os.Exit(ParseRecipeFileError)
+			return err
 		}
 		if !cvmfs.RepositoryExists(recipe.Repo) {
-			l.LogE(err).Error("The repository does not seems to exists.")
-			os.Exit(RepoNotExistsError)
+			l.LogE(err).Error("The repository does not seem to exists.")
+			return err
 		}
 		for wish := range recipe.Wishes {
 			fields := log.Fields{"input image": wish.InputName,
@@ -74,27 +70,32 @@ var convertCmd = &cobra.Command{
 			if !skipLayers {
 				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers)")
+					return err
 				}
 			}
 			if !skipThinImage {
 				err = lib.ConvertWishDocker(wish)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (docker), going on")
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (docker)")
+					return err
 				}
 			}
 			if !skipPodman {
 				err = lib.ConvertWishPodman(wish, convertAgain)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (podman), going on")
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (podman)")
+					return err
 				}
 			}
 			if !skipFlat {
 				err = lib.ConvertWishFlat(wish)
 				if err != nil {
-					l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity), going on")
+					l.LogE(err).WithFields(fields).Error("Error in converting wish (singularity)")
+					return err
 				}
 			}
 		}
+		return nil
 	},
 }
