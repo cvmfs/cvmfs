@@ -39,7 +39,7 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
     return 0;
   }
 
-  my_buffer->data = my_buffer->data + std::string((const char*)buffer, nmemb);
+  my_buffer->data = my_buffer->data + std::string(static_cast<char*>(buffer), nmemb);
 
   return nmemb;
 }
