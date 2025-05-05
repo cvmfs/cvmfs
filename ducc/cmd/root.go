@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"time"
+  "fmt"
 
 	"github.com/spf13/cobra"
 
@@ -24,13 +25,17 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.InfoLevel.String(), "Log level (trace, debug, info, warn, error, fatal, panic")
 }
 
-var rootCmd = &cobra.Command{
+
+
+func DuccRootCmd() *cobra.Command {
+  cmd := &cobra.Command{
 	Use:   "cvmfs_ducc",
-	Short: "Show the several commands available.",
+	Short: "Show the available commands.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		lib.SetupNotification()
 		lib.SetupRegistries()
 		setUpLogs(os.Stdout, v)
+    cmd.SilenceUsage = true
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -39,9 +44,16 @@ var rootCmd = &cobra.Command{
 		lib.StopNotification()
 	},
 }
+return cmd
+}
+
+var rootCmd = DuccRootCmd()
 
 func EntryPoint() {
-	rootCmd.Execute()
+    if err := rootCmd.Execute(); err != nil {
+    fmt.Fprintln(os.Stderr, err)
+    os.Exit(1)
+  }
 }
 
 func AliveMessage() {
