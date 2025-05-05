@@ -402,7 +402,6 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
   }
 }
 
-
 static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   struct fuse_args *mount_options = new fuse_args();
   CvmfsOptions cvmfs_options;
@@ -843,7 +842,7 @@ int FuseMain(int argc, char *argv[]) {
 
   // Number of file descriptors
   if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
-    int retval = SetLimitNoFile(atoi(parameter.c_str()));
+    int retval = SetLimitNoFile(String2Uint64(parameter));
     if (retval == -2) {
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
     } else if (retval == -1) {
