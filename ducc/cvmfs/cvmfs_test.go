@@ -20,6 +20,7 @@ func TestMain(m *testing.M) {
 	mockrepo, _ := os.MkdirTemp("", "DuccMockRepo")
 	os.MkdirAll(filepath.Join(mockrepo, "scratch", "current"), os.ModePerm)
 	os.Setenv("CVMFS_TEST_REPO", "/../../../../"+mockrepo)
+	os.Setenv("CVMFS_DUCC_NO_CHOWN", "nochown")
 	// Test
 	code := m.Run()
 	// Teardown
