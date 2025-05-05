@@ -820,11 +820,11 @@ int FuseMain(int argc, char *argv[]) {
 
   // Logging
   if (options_manager->GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
-    SetLogSyslogLevel(atoi(parameter.c_str()));
+    SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
   if (options_manager->GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
-    SetLogSyslogFacility(atoi(parameter.c_str()));
+    SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
   // Deferr setting usyslog until credentials are dropped
 
