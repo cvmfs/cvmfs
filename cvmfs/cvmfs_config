@@ -128,7 +128,7 @@ parse_killall_opts(){
 
 # Given a device id in the form <Major>:<minor>
 # we need only the <minor> part to identify the fuse device
-get_fuse_device()
+get_minor_device_id()
 {
   local device_id=$1
   echo $device_id | cut -d':' -f2
@@ -173,7 +173,7 @@ abort_all_devices()
   local devices="$@"
   for device in $devices
   do
-    abort_fuse_device $(get_fuse_device $device)
+    abort_fuse_device $(get_minor_device_id $device)
   done
 }
 
@@ -183,7 +183,7 @@ abort_stuck_devices()
   local devices="$@"
   for device in $devices
   do
-    fuse_dev=$(get_fuse_device $device)
+    fuse_dev=$(get_minor_device_id $device)
     local fuse_dev_path="/sys/fs/fuse/connections/$fuse_dev"
     # Abort waiting devices only
     if [ "$(cat $fuse_dev_path/waiting)" != "0" ] ;

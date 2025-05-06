@@ -426,6 +426,9 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->download_mgr()->SetDnsServer(host);
         talk_mgr->Answer(con_fd, "OK\n");
       }
+    } else if (line.substr(0,22) == "__testing_freeze_cvmfs") {
+      const std::string fs_dir=line.substr(23)+"/dir";
+      mkdir(fs_dir.c_str(),0700);
     } else if (line == "external metalink info") {
       const string external_metalink_info =
         talk_mgr->FormatMetalinkInfo(mount_point->external_download_mgr());
