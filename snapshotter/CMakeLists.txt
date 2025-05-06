@@ -13,3 +13,15 @@ add_custom_command(
   DEPENDS ${CVMFS_SNAPSHOTTER_GO_SOURCES}
   COMMENT "Build containerd cvmfs_snapshotter using the Go Compiler"
 )
+
+install (
+  PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_snapshotter
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/bin"
+)
+
+# Systemd service unit
+install (
+  FILES script/config/etc/systemd/system/cvmfs-snapshotter.service
+  DESTINATION /usr/lib/systemd/system
+  PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+)

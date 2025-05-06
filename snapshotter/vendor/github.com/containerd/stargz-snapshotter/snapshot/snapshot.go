@@ -25,12 +25,12 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/log"
 	"github.com/moby/sys/mountinfo"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -71,8 +71,9 @@ type FileSystem interface {
 
 // SnapshotterConfig is used to configure the remote snapshotter instance
 type SnapshotterConfig struct {
-	asyncRemove bool
-	noRestore   bool
+	asyncRemove                 bool
+	noRestore                   bool
+	allowInvalidMountsOnRestart bool
 }
 
 // Opt is an option to configure the remote snapshotter
@@ -92,15 +93,21 @@ func NoRestore(config *SnapshotterConfig) error {
 	return nil
 }
 
+func AllowInvalidMountsOnRestart(config *SnapshotterConfig) error {
+	config.allowInvalidMountsOnRestart = true
+	return nil
+}
+
 type snapshotter struct {
 	root        string
 	ms          *storage.MetaStore
 	asyncRemove bool
 
 	// fs is a filesystem that this snapshotter recognizes.
-	fs        FileSystem
-	userxattr bool // whether to enable "userxattr" mount option
-	noRestore bool
+	fs                          FileSystem
+	userxattr                   bool // whether to enable "userxattr" mount option
+	noRestore                   bool
+	allowInvalidMountsOnRestart bool
 }
 
 // NewSnapshotter returns a Snapshotter which can use unpacked remote layers
@@ -144,12 +151,13 @@ func NewSnapshotter(ctx context.Context, root string, targetFs FileSystem, opts 
 	}
 
 	o := &snapshotter{
-		root:        root,
-		ms:          ms,
-		asyncRemove: config.asyncRemove,
-		fs:          targetFs,
-		userxattr:   userxattr,
-		noRestore:   config.noRestore,
+		root:                        root,
+		ms:                          ms,
+		asyncRemove:                 config.asyncRemove,
+		fs:                          targetFs,
+		userxattr:                   userxattr,
+		noRestore:                   config.noRestore,
+		allowInvalidMountsOnRestart: config.allowInvalidMountsOnRestart,
 	}
 
 	if err := o.restoreRemoteSnapshot(ctx); err != nil {
@@ -308,8 +316,9 @@ func (o *snapshotter) commit(ctx context.Context, isRemote bool, name, key strin
 		return err
 	}
 
+	rollback := true
 	defer func() {
-		if err != nil {
+		if rollback {
 			if rerr := t.Rollback(); rerr != nil {
 				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
 			}
@@ -334,6 +343,7 @@ func (o *snapshotter) commit(ctx context.Context, isRemote bool, name, key strin
 		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 
+	rollback = false
 	return t.Commit()
 }
 
@@ -741,6 +751,14 @@ func (o *snapshotter) restoreRemoteSnapshot(ctx context.Context) error {
 	}
 	for _, info := range task {
 		if err := o.prepareRemoteSnapshot(ctx, info.Name, info.Labels); err != nil {
+			if o.allowInvalidMountsOnRestart {
+				logrus.WithError(err).Warnf("failed to restore remote snapshot %s; remove this snapshot manually", info.Name)
+				// This snapshot mount is invalid but allow this.
+				// NOTE: snapshotter.Mount() will fail to return the mountpoint of these invalid snapshots so
+				//       containerd cannot use them anymore. User needs to manually remove the snapshots from
+				//       containerd's metadata store using ctr (e.g. `ctr snapshot rm`).
+				continue
+			}
 			return fmt.Errorf("failed to prepare remote snapshot: %s: %w", info.Name, err)
 		}
 	}

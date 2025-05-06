@@ -16,7 +16,6 @@ func (cli *Client) NodeList(ctx context.Context, options types.NodeListOptions) 
 
 	if options.Filters.Len() > 0 {
 		filterJSON, err := filters.ToJSON(options.Filters)
-
 		if err != nil {
 			return nil, err
 		}
@@ -25,12 +24,12 @@ func (cli *Client) NodeList(ctx context.Context, options types.NodeListOptions) 
 	}
 
 	resp, err := cli.get(ctx, "/nodes", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []swarm.Node
-	err = json.NewDecoder(resp.body).Decode(&nodes)
-	ensureReaderClosed(resp)
+	err = json.NewDecoder(resp.Body).Decode(&nodes)
 	return nodes, err
 }

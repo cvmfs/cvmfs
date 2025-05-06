@@ -1,9 +1,16 @@
+//go:build !linux && !freebsd && !netbsd && !darwin && !solaris
 // +build !linux,!freebsd,!netbsd,!darwin,!solaris
 
 package xattr
 
 import (
 	"os"
+	"syscall"
+)
+
+const (
+	// We need to use the default for non supported operating systems
+	ENOATTR = syscall.Errno(0x59)
 )
 
 // XATTR_SUPPORTED will be true if the current platform is supported

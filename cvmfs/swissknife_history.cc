@@ -3,7 +3,7 @@
  */
 
 #include "swissknife_history.h"
-#include "cvmfs_config.h"
+
 
 #include <algorithm>
 #include <cassert>
@@ -124,8 +124,7 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   }
 
   // initialize the (swissknife global) signature manager (if possible)
-  if (!pubkey_path.empty() &&
-      !this->InitVerifyingSignatureManager(pubkey_path)) {
+  if (!pubkey_path.empty() && !this->InitSignatureManager(pubkey_path)) {
     return NULL;
   }
 

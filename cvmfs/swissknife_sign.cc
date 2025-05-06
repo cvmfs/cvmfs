@@ -5,7 +5,7 @@
  */
 
 #include "swissknife_sign.h"
-#include "cvmfs_config.h"
+
 
 #include <dirent.h>
 #include <sys/stat.h>

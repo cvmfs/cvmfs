@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System
  */
 
-#include "cvmfs_config.h"
+
 #include "crypto/encrypt.h"
 
 #include <fcntl.h>

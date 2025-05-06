@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -24,7 +24,7 @@
 
 using namespace std;  // NOLINT
 
-const char *kVersion = VERSION;
+const char *kVersion = CVMFS_VERSION;
 const int kDefaultPreloaderTimeout = 10;
 const int kDefaultPreloaderRetries = 2;
 

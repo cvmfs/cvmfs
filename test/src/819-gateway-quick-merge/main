@@ -1,0 +1,40 @@
+#!/bin/bash
+cvmfs_test_name="Quick merge of nested catalogs"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cleanup() {
+  sudo mv /etc/cvmfs/gateway/user.json.orig /etc/cvmfs/gateway/user.json
+}
+
+cvmfs_run_test() {
+  set_up_repository_gateway || return 1
+
+  sudo cp /etc/cvmfs/gateway/user.json /etc/cvmfs/gateway/user.json.orig || return 10
+  jq '.receiver_path = "/usr/bin/cvmfs_receiver_debug"' \
+    /etc/cvmfs/gateway/user.json > user.json.new || return 11
+  sudo mv user.json.new /etc/cvmfs/gateway/user.json || return 12
+  trap cleanup EXIT HUP INT TERM || return 13
+  restart_repository_gateway || return 14
+
+  echo "*** Add multi-level catalog tree"
+  cvmfs_server transaction test.repo.org               || return 30
+  mkdir -p /cvmfs/test.repo.org/foo/bar/baz            || return 31
+  touch /cvmfs/test.repo.org/foo/.cvmfscatalog         || return 32
+  touch /cvmfs/test.repo.org/foo/bar/.cvmfscatalog     || return 33
+  touch /cvmfs/test.repo.org/foo/bar/baz/.cvmfscatalog || return 34
+  # During merge, the cvmfs_receiver must not recurse into the nested
+  # catalog at /foo/bar and further
+  cvmfs_server publish test.repo.org || return 35
+  cvmfs_server check -i test.repo.org || return 36
+  ls -lahR /cvmfs/test.repo.org/foo || return 37
+
+  echo "*** Receiver debug log:"
+  grep_receiver_debuglog "(receiver)"
+  echo "***"
+
+  grep_receiver_debuglog "(receiver)" | grep "recursing into" || return 40
+  grep_receiver_debuglog "(receiver)" | grep "recursing into /foo" && return 41
+
+  return 0
+}

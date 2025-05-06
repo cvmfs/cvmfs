@@ -17,7 +17,7 @@ func TestLeaseHandlerNewLease(t *testing.T) {
 	msg, _ := json.Marshal(map[string]interface{}{
 		"path":        "test2.repo.org/some/path",
 		"api_version": "3",
-		"hostname": "client host name",
+		"hostname":    "client host name",
 	})
 
 	req := httptest.NewRequest("POST", "/api/v1/leases", bytes.NewReader(msg))

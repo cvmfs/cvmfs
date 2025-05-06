@@ -47,6 +47,7 @@ class TalkManager : SingleCopy {
   static void *MainResponder(void *data);
   void Answer(int con_fd, const std::string &msg);
   void AnswerStringList(int con_fd, const std::vector<std::string> &list);
+  std::string FormatMetalinkInfo(download::DownloadManager *download_mgr);
   std::string FormatHostInfo(download::DownloadManager *download_mgr);
   std::string FormatProxyInfo(download::DownloadManager *download_mgr);
   std::string FormatLatencies(const MountPoint &mount_point,

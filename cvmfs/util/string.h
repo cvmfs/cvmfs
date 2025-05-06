@@ -52,6 +52,8 @@ CVMFS_EXPORT std::vector<std::string> SplitStringBounded(
   unsigned max_chunks, const std::string &str, char delim);
 CVMFS_EXPORT std::vector<std::string> SplitString(const std::string &str,
                                                   char delim);
+CVMFS_EXPORT std::vector<std::string> SplitStringMultiChar(const std::string &str,
+                                                  const std::string &delim);
 
 CVMFS_EXPORT std::string JoinStrings(const std::vector<std::string> &strings,
                                      const std::string &joint);

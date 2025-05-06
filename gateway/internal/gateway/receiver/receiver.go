@@ -84,7 +84,8 @@ func NewCvmfsReceiver(ctx context.Context, execPath string, statsMgr *stats.Stat
 		return nil, fmt.Errorf("worker process executable not found: %w", err)
 	}
 
-	cmdLine := []string{"-i", "3", "-o", "4"}
+	debugLog := "/var/log/cvmfs_receiver/debug.log"
+	cmdLine := []string{"-i", "3", "-o", "4", "-d", debugLog}
 	cmdLine = append(cmdLine, args...)
 	cmd := exec.Command(execPath, cmdLine...)
 

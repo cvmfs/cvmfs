@@ -35,6 +35,12 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
   if (HasXattrs() != other.HasXattrs()) {
     result |= Difference::kHasXattrsFlag;
   }
+  if (uid() != other.uid()) {
+    result |= Difference::kUid;
+  }
+  if (gid() != other.gid()) {
+    result |= Difference::kGid;
+  }
 
   return result;
 }

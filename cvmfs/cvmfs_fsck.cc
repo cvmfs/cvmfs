@@ -8,7 +8,7 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#include "cvmfs_config.h"
+
 
 #include <dirent.h>
 #include <errno.h>
@@ -76,7 +76,7 @@ static void Usage() {
            "  -p try to fix automatically\n"
            "  -f force rebuild of managed cache db on next mount\n"
            "  -j number of concurrent integrity check worker threads\n",
-           VERSION);
+           CVMFS_VERSION);
 }
 
 

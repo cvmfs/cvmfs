@@ -54,14 +54,13 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/684-https_s3                             \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
+                                 src/691-metalink                             \
+                                 src/692-https_azureblob_s3                   \
                                  src/702-symlink_caching                      \
-                                 src/811-commit-gateway                       \
                                  --                                           \
                                  src/5*                                       \
                                  src/6*                                       \
                                  src/7*                                       \
-                                 src/8*                                       \
-                                 src/9*                                       \
                               || retval=1
 
 

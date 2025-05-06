@@ -41,7 +41,11 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   return true;
 }
 
-bool ServerTool::InitVerifyingSignatureManager(const std::string &pubkey_path) {
+bool ServerTool::InitSignatureManager(
+    const std::string &pubkey_path,
+    const std::string &certificate_path,
+    const std::string &private_key_path)
+{
   if (signature_manager_.IsValid()) {
     return true;
   }
@@ -50,27 +54,21 @@ bool ServerTool::InitVerifyingSignatureManager(const std::string &pubkey_path) {
   assert(signature_manager_.IsValid());
   signature_manager_->Init();
 
-  if (!signature_manager_->LoadPublicRsaKeys(pubkey_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repo key '%s'",
-             pubkey_path.c_str());
-    return false;
+  // We may not have a public key. In this case, the signature manager
+  // can only be used for signing, not for verification.
+  if (!pubkey_path.empty()) {
+    if (!signature_manager_->LoadPublicRsaKeys(pubkey_path)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repo key '%s'",
+               pubkey_path.c_str());
+      return false;
+    }
   }
 
-  return true;
-}
-
-bool ServerTool::InitSigningSignatureManager(
-    const std::string &certificate_path, const std::string &private_key_path,
-    const std::string &private_key_password) {
-  if (signature_manager_.IsValid()) {
+  // We may not have a certificate and key. In this case, the signature manager
+  // can only be used for verification, not for signing.
+  if (certificate_path.empty())
     return true;
-  }
 
-  signature_manager_ = new signature::SignatureManager();
-  assert(signature_manager_.IsValid());
-  signature_manager_->Init();
-
-  // Load certificate
   if (!signature_manager_->LoadCertificatePath(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load certificate '%s'",
              certificate_path.c_str());
@@ -78,8 +76,7 @@ bool ServerTool::InitSigningSignatureManager(
   }
 
   // Load private key
-  if (!signature_manager_->LoadPrivateKeyPath(private_key_path,
-                                              private_key_password)) {
+  if (!signature_manager_->LoadPrivateKeyPath(private_key_path, "")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load private key '%s' (%s)",
              private_key_path.c_str(),
              signature_manager_->GetCryptoError().c_str());

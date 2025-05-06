@@ -12,7 +12,6 @@
 #include "sink.h"
 #include "util/posix.h"
 #include "util/smalloc.h"
-#include "util/string.h"
 
 namespace cvmfs {
 

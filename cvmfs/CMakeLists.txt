@@ -251,6 +251,10 @@ if (BUILD_CVMFS)
   if (CVMFS_ENABLE_FUSE3_CACHE_READDIR)
     set (CVMFS_FUSE_CFLAGS "${CVMFS_FUSE_CFLAGS} -DCVMFS_ENABLE_FUSE3_CACHE_READDIR")
   endif ()
+  if (CVMFS_ENABLE_FUSE3_LOOP_CONFIG)
+    set (CVMFS_FUSE_CFLAGS "${CVMFS_FUSE_CFLAGS} -DCVMFS_ENABLE_FUSE3_LOOP_CONFIG")
+  endif ()
+
   set (CVMFS_FUSE_LDFLAGS "-ldl -lm")
   set (CVMFS_FUSE_LINK_LIBRARIES "")
   list(APPEND CVMFS_FUSE_LINK_LIBRARIES
@@ -359,6 +363,22 @@ if (BUILD_CVMFS)
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif ()
+  if (NOT MACOSX)
+  # Systemd service unit for reloads after package upgrades
+  install (
+    FILES pkg/cvmfs-reload.service
+    DESTINATION /usr/lib/systemd/system
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+  # Apparmor fusermount3 profile extension
+  install (
+    FILES pkg/apparmor.local.fusermount3
+    DESTINATION /etc/apparmor.d/local
+    RENAME fusermount3
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+  endif()
+
 endif (BUILD_CVMFS)
 
 

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "publish/repository.h"
 
 #include <cassert>
@@ -56,12 +56,13 @@ class DiffForwarder : public CatalogDiffTool<catalog::SimpleCatalogManager> {
   }
   virtual ~DiffForwarder() {}
 
-  virtual void ReportAddition(const PathString& path,
+  virtual bool ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& /* xattrs */,
                               const FileChunkList& /* chunks */)
   {
     listener_->OnAdd(path.ToString(), entry);
+    return true;
   }
 
   virtual void ReportRemoval(const PathString& path,

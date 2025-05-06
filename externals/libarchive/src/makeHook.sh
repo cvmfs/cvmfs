@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -eu
 
-if [[ "x$(uname -s)" == "xDarwin" ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then
   cd mybuild
 fi
 

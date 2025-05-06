@@ -2,7 +2,7 @@
  * This file is part of the CernVM file system.
  */
 
-#include "cvmfs_config.h"
+
 #include "sql.h"
 
 #include "util/logging.h"

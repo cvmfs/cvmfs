@@ -68,7 +68,7 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 	var reqMsg struct {
 		Path     string `json:"path"`
 		Version  string `json:"api_version"` // cvmfs_swissknife sends this field as a string
-		Hostname string `json:"hostname"` // May be empty for cvmfs < 2.11
+		Hostname string `json:"hostname"`    // May be empty for cvmfs < 2.11
 	}
 	if err := json.NewDecoder(h.Body).Decode(&reqMsg); err != nil {
 		httpWrapError(ctx, err, "invalid request body", w, http.StatusBadRequest)
@@ -81,9 +81,9 @@ func handleNewLease(services be.ActionController, w http.ResponseWriter, h *http
 		return
 	}
 
-	hostname := h.RemoteAddr;  // fallback for cvmfs client < 2.11
+	hostname := h.RemoteAddr // fallback for cvmfs client < 2.11
 	if reqMsg.Hostname != "" {
-		hostname = reqMsg.Hostname;
+		hostname = reqMsg.Hostname
 	}
 
 	msg := make(map[string]interface{})

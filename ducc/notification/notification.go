@@ -97,8 +97,8 @@ func (n *Notification) Elapsed(t time.Time) *Notification {
 	return n.AddField("time_elapsed_s", ts)
 }
 
-/// Identifier are useful to match notification related between each other
-/// for instance the beginning of an operation and its end
+// / Identifier are useful to match notification related between each other
+// / for instance the beginning of an operation and its end
 func (n *Notification) AddId() *Notification {
 	return n.AddIdentifier("id")
 }

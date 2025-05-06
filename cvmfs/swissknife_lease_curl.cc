@@ -4,7 +4,7 @@
 
 #include "swissknife_lease_curl.h"
 
-#include "cvmfs_config.h"
+
 
 #include "crypto/hash.h"
 #include "gateway_util.h"
@@ -18,7 +18,7 @@
 namespace {
 
 CURL* PrepareCurl(const std::string& method) {
-  const char* user_agent_string = "cvmfs/" VERSION;
+  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
 
   CURL* h_curl = curl_easy_init();
 

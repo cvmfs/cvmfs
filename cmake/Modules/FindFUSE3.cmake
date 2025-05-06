@@ -9,10 +9,15 @@ IF (FUSE3_INCLUDE_DIR)
         SET (FUSE3_FIND_QUIETLY TRUE)
 ENDIF (FUSE3_INCLUDE_DIR)
 
+# find fuse3 only if they are not manually defined
+# format:
+# FUSE3_INCLUDE_DIR=/usr/local/include   ## do NOT add /fuse3 in the path
+# FUSE3_LIBRARY=/usr/local/lib64/libfuse3.so
+IF (NOT DEFINED FUSE3_INCLUDE_DIR AND NOT DEFINED FUSE3_LIBRARY)
 # find includes
-FIND_PATH (FUSE3_INCLUDE_DIR fuse.h
-        /usr/local/include/fuse3
-        /usr/include/fuse3
+FIND_PATH (FUSE3_INCLUDE_DIR fuse3/fuse.h
+           /usr/local/include
+           /usr/include
 )
 
 # find lib
@@ -21,6 +26,7 @@ FIND_LIBRARY(FUSE3_LIBRARY
         NAMES ${FUSE3_NAMES}
         PATHS /lib64 /lib /usr/lib64 /usr/lib /usr/local/lib64 /usr/local/lib
 )
+ENDIF()
 
 # check if lib was found and include is present
 IF (FUSE3_INCLUDE_DIR AND FUSE3_LIBRARY)
@@ -47,8 +53,15 @@ IF (FUSE3_FOUND)
         endif(HAS_FUSE_CACHE_READDIR)
 
         # Check if we can use fuse_loop_config in fuse_session_loop_mt (libfuse >= 3.12)
-        try_compile(HAS_FUSE_LOOP_CONFIG ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/cmake/check_fuse3_loop_config.c
-                    LINK_LIBRARIES fuse3)
+        get_filename_component(FUSE3_LIB_PATH ${FUSE3_LIBRARY} DIRECTORY)
+        # Replace get_filename_component with cmake_path when CentOS7 is finally deprecated
+        # cmake_path(GET FUSE3_LIBRARY PARENT_PATH FUSE3_LIB_PATH)
+        try_compile(HAS_FUSE_LOOP_CONFIG "${CMAKE_BINARY_DIR}/temp"
+                    "${PROJECT_SOURCE_DIR}/cmake/check_fuse3_loop_config.c"
+                    LINK_LIBRARIES fuse3
+                    CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${FUSE3_INCLUDE_DIR}"
+                                "-DLINK_DIRECTORIES=${FUSE3_LIB_PATH}")
+
         if (HAS_FUSE_LOOP_CONFIG)
                 message("Enable Fuse3 loop_config support")
                 set(CVMFS_ENABLE_FUSE3_LOOP_CONFIG ON)

@@ -2,6 +2,10 @@ FROM gitlab-registry.cern.ch/cernvm/build-images/centos_x86_64:9
 
 USER root
 
+# This is a workaround for a sudo error that started after an 
+# upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
+RUN chmod 0400 /etc/shadow
+
 RUN dnf install -y sudo autofs fuse fuse3 httpd wget lsof \
     python python3-pip attr nc sqlite python3-mod_wsgi jq usbutils
 

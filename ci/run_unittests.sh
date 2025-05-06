@@ -140,7 +140,7 @@ if can_build_gateway; then
   echo "*** Running gateway unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway)"
   pushd ${SCRIPT_LOCATION}/../gateway > /dev/null
   CVMFS_TEST_GATEWAY_OUTPUT=$(mktemp /tmp/cvmfs-gateway-unittests-XXXXX)
-  ${SCRIPT_LOCATION}/../externals_install/bin/go test -v -mod=vendor ./... > $CVMFS_TEST_GATEWAY_OUTPUT 2>&1
+  go test -v -mod=vendor ./... > $CVMFS_TEST_GATEWAY_OUTPUT 2>&1
   RETVAL=$(( RETVAL | $? ))
   cat $CVMFS_TEST_GATEWAY_OUTPUT | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.gateway
   rm -f $CVMFS_TEST_GATEWAY_OUTPUT
@@ -153,7 +153,7 @@ if can_build_ducc; then
   echo "*** Running container tools unit tests (with XML output ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc)"
   pushd ${SCRIPT_LOCATION}/../ducc > /dev/null
   CVMFS_TEST_DUCC_OUTPUT=$(mktemp /tmp/cvmfs-ducc-unittests-XXXXX)
-  ${SCRIPT_LOCATION}/../externals_install/bin/go test -v -mod=vendor ./... > $CVMFS_TEST_DUCC_OUTPUT 2>&1
+  go test -v -mod=vendor ./... > $CVMFS_TEST_DUCC_OUTPUT 2>&1
   RETVAL=$(( RETVAL | $? ))
   cat $CVMFS_TEST_DUCC_OUTPUT | go-junit-report > ${CVMFS_UNITTESTS_RESULT_LOCATION}.ducc
   rm -f $CVMFS_TEST_DUCC_OUTPUT

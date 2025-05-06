@@ -5,7 +5,7 @@
  */
 
 
-#include "cvmfs_config.h"
+
 #include "shortstring.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD

@@ -28,118 +28,8 @@ produce_tarball() {
   rm -rf tarball_foo
 }
 
-cvmfs_run_test() {
-  logfile=$1
-  local scratch_dir=$(pwd)
-  local tarfile=$scratch_dir/tarball.tar
-  local dir=tar_dir
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
-
-  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
-
-  # ============================================================================
-
-  echo "*** generating a tarball $tarfile"
-  produce_tarball $tarfile
-
-  echo "*** ingesting the tarball in the directory $dir"
-  cat $tarfile | cvmfs_server ingest --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
-
-  echo "*** check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
-
-  if [ ! -d $repo_dir/$dir/tarball_foo ]; then
-    return 1
-  fi
-
-  for d in a a/b a/b/c; do
-    if [ ! -d $repo_dir/$dir/tarball_foo/$d ]; then
-      echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
-      return 1
-    else
-      echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
-
-      for f in 1 2 3; do
-        file=$repo_dir/$dir/tarball_foo/$d/$f.txt
-        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
-          echo "*** Error not found file: $file"
-          return 1
-        else
-          echo "*** Ingested file of size 2048 bytes: $file"
-        fi
-      done
-
-    fi
-  done
-
-  file=$repo_dir/$dir/tarball_foo/d/e/f/foo.txt
-  file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
-    echo "*** Error not found file of size 5120: $file"
-    return 1
-  else
-    echo "*** Ingested file of size $file_size bytes: $file"
-  fi
-
-  if [ $file_size -eq 5120 ]; then
-    echo "*** It compare well"
-  fi
-
-  ### Below we ingest the file with the --catalog option
-
-  echo "*** ingesting tarball when generating a catalog"
-  dir=tar_dir_with_catalog
-  cat $tarfile | cvmfs_server ingest --catalog --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
-
-  echo "*** check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
-
-  echo "check that the catalog was created and that can be accessed"
-  cat $repo_dir/$dir/.cvmfscatalog > /dev/null || return 105
-
-  if [ ! -d $repo_dir/$dir/tarball_foo ]; then
-    return 1
-  fi
-
-  for d in a a/b a/b/c; do
-    if [ ! -d $repo_dir/$dir/tarball_foo/$d ]; then
-      echo "*** Error not found directory: $repo_dir/$dir/tarball_foo/$d"
-      return 1
-    else
-      echo "*** Ingested directory: $repo_dir/$dir/tarball_foo/$d"
-
-      for f in 1 2 3; do
-        file=$repo_dir/$dir/tarball_foo/$d/$f.txt
-        if [ ! -f $file ] || [ $(wc -c <$file) -ne 2048 ]; then
-          echo "*** Error not found file: $file"
-          return 1
-        else
-          echo "*** Ingested file of size 2048 bytes: $file"
-        fi
-      done
-
-    fi
-  done
-
-  file=$repo_dir/$dir/tarball_foo/d/e/f/foo.txt
-  file_size=$(wc -c <$file)
-  if [ ! -f $file ] || [ $file_size -ne 5120 ]; then
-    echo "*** Error not found file of size 5120: $file"
-    return 1
-  else
-    echo "*** Ingested file of size $file_size bytes: $file"
-  fi
-
-  if [ $file_size -eq 5120 ]; then
-    echo "*** It compare well"
-  fi
-
-  echo "*** ingesting the tarball in the root of the repository"
-  cat $tarfile | cvmfs_server ingest --base_dir / --tar_file - $CVMFS_TEST_REPO || return $?
-
-  echo "*** check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
+check_repository_contents() {
+  local repo_dir=$1
 
   if [ ! -d $repo_dir/tarball_foo ]; then
     return 1
@@ -177,6 +67,57 @@ cvmfs_run_test() {
   if [ $file_size -eq 5120 ]; then
     echo "*** It compare well"
   fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local tarfile=$scratch_dir/tarball.tar
+  local dir=tar_dir
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $USER || return $?
+
+  # ============================================================================
+
+  echo "*** generating a tarball $tarfile"
+  produce_tarball $tarfile
+
+  echo "*** ingesting the tarball in the directory $dir"
+  cat $tarfile | cvmfs_server ingest --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository_contents $repo_dir/$dir || return $?
+
+  ### Below we ingest the file with the --catalog option
+
+  echo "*** ingesting tarball when generating a catalog"
+  dir=tar_dir_with_catalog
+  cat $tarfile | cvmfs_server ingest --catalog --base_dir $dir --tar_file - $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  echo "check that the catalog was created and that can be accessed"
+  cat $repo_dir/$dir/.cvmfscatalog > /dev/null || return 105
+  check_repository_contents $repo_dir/$dir || return $?
+
+  echo "*** ingesting the tarball in the root of the repository"
+  cat $tarfile | cvmfs_server ingest --base_dir / --tar_file - $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository_contents $repo_dir || return $?
+  
+  echo "*** ingesting the tarball in a subdir containing double slashes"
+  local subdir="dir1/subdir2//subdir3"
+  cat $tarfile | cvmfs_server ingest --base_dir $subdir --tar_file - $CVMFS_TEST_REPO || return $?
+
+  echo "*** check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository_contents $repo_dir/$subdir || return $?
+
 
   return 0
 }

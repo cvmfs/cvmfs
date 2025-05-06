@@ -15,12 +15,20 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.12.0
+## CVMFS_VERSION 2.13.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 12)
+set (CernVM-FS_VERSION_MINOR 13)
 set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
+if (CMAKE_VERSION VERSION_LESS "3.12.0") 
+  add_definitions(-DCVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_definitions(-DCVMFS_PATCH_LEVEL="0")
+else()
+  add_compile_definitions(CVMFS_VERSION="${CernVM-FS_VERSION_STRING}")
+  add_compile_definitions(CVMFS_PATCH_LEVEL="0")
+endif()
+
 
 #
 # set the path where cmake looks for additional modules
@@ -305,13 +313,7 @@ endif (NOT MACOSX)
 look_for_required_include_files (${REQUIRED_HEADERS})
 look_for_optional_include_files (${OPTIONAL_HEADERS})
 
-#
-# configure the config.h.in file
-#
-configure_file (
-  "${CMAKE_SOURCE_DIR}/config_cmake.h.in"
-  "${CMAKE_BINARY_DIR}/cvmfs_config.h"
-)
+
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CMAKE_BINARY_DIR})
 
 

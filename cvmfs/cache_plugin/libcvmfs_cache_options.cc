@@ -4,7 +4,7 @@
  * Implements the C wrapper of the OptionsManager
  */
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs_cache.h"
 
 #include <cassert>

@@ -21,7 +21,6 @@ func (k *VersionInfo) String() string {
 
 // GetKernelVersion gets the current kernel version.
 func GetKernelVersion() (*VersionInfo, error) {
-
 	KVI := &VersionInfo{"Unknown", 0, 0, 0}
 
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
@@ -36,7 +35,7 @@ func GetKernelVersion() (*VersionInfo, error) {
 	}
 	KVI.kvi = blex
 
-	// Important - docker.exe MUST be manifested for this API to return
+	// Important - dockerd.exe MUST be manifested for this API to return
 	// the correct information.
 	dwVersion, err := windows.GetVersion()
 	if err != nil {
@@ -44,7 +43,7 @@ func GetKernelVersion() (*VersionInfo, error) {
 	}
 
 	KVI.major = int(dwVersion & 0xFF)
-	KVI.minor = int((dwVersion & 0XFF00) >> 8)
+	KVI.minor = int((dwVersion & 0xFF00) >> 8)
 	KVI.build = int((dwVersion & 0xFFFF0000) >> 16)
 
 	return KVI, nil

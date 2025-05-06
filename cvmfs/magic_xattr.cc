@@ -761,7 +761,7 @@ void UsedDirPMagicXattr::FinalizeValue() {
 }
 
 void VersionMagicXattr::FinalizeValue() {
-  result_pages_.push_back(std::string(VERSION) + "."
+  result_pages_.push_back(std::string(CVMFS_VERSION) + "."
                                               + std::string(CVMFS_PATCH_LEVEL));
 }
 

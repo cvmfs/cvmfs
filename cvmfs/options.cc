@@ -6,7 +6,7 @@
  * /etc/cvmfs/...
  */
 
-#include "cvmfs_config.h"
+
 #include "options.h"
 
 #include <fcntl.h>

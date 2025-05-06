@@ -9,6 +9,8 @@ SERVER_TEST_LOGFILE=/tmp/cvmfs-server-test.log
 echo "running CernVM-FS client test cases..."
 ./run.sh $CLIENT_TEST_LOGFILE -s "quick"                                      \
                               -x src/104-concurrent_mounts                    \
+                                 src/105-streaming-cache                      \
+                                 src/059-fallbackproxy                        \
                                  --                                           \
                                  src/0*                                       \
                                  src/1*                                       \
@@ -59,6 +61,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/686-azureblob_s3                         \
                                  src/687-import_s3                            \
                                  src/688-checkall                             \
+                                 src/692-https_azureblob_s3                   \
                                  src/699-servermount                          \
                                  src/700-overlayfs_validation                 \
                                  src/702-symlink_caching                      \

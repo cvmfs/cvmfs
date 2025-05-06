@@ -16,10 +16,12 @@ Checks: -*
   ,-misc-no-recursion
   ,-misc-non-private-member-variables-in-classes
   ,performance-*
+  ,-performance-enum-size
   ,-performance-inefficient-string-concatenation
   ,portability-*
+  # performance-enum-size is only supported since c++11. When using c++11 or later, this option can be re-enabled
 WarningsAsErrors: '*'
-HeaderFilterRegex: '/cvmfs/.*\.h$'
+HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
 CheckOptions:
   - key:    google-readability-braces-around-statements.ShortStatementLines
     value:  '2'

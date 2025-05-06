@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+if $(systemctl is-active --quiet cvmfs-snapshotter); then
+  systemctl stop cvmfs-snapshotter
+fi
+
+exit 0

@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "cvmfs_config.h"
+
 
 #include <cassert>
 
@@ -45,7 +45,7 @@ void Usage() {
     "Version %s\n"
     "Usage (normally called from cvmfs_server):\n"
     "  cvmfs_swissknife <command> [options]\n",
-    VERSION);
+    CVMFS_VERSION);
 
   for (unsigned i = 0; i < command_list.size(); ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n"

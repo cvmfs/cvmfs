@@ -20,15 +20,15 @@
 %define selinux_cvmfs_server 1
 %endif
 
-%if 0%{?rhel} >= 7 || 0%{?fedora} >= 29
-  %if "%{?_arch}" != "aarch64"
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 38
     %define build_gateway 1
     %define build_ducc 1
-  %endif
+    %define build_snapshotter 1
 %endif
 %if 0%{?sle15}
   %define build_gateway 1
   %define build_ducc 1
+  %define build_snapshotter 1
 %endif
 
 
@@ -69,7 +69,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.12.0
+Version: 2.13.0
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
@@ -101,7 +101,7 @@ BuildRequires: valgrind-devel
 BuildRequires: cmake
 BuildRequires: fuse-devel
 %if 0%{?build_fuse3}
-BuildRequires: fuse3-devel
+BuildRequires: fuse3-devel >= 3.3.0
 %endif
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
@@ -195,8 +195,7 @@ Common utility libraries for CernVM-FS packages
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs = %{version}-%{release}
-Requires: fuse3
-Requires: fuse3-libs
+Requires: fuse3-libs >= 3.3.0
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %endif
@@ -245,6 +244,7 @@ Requires: lsof
 Requires: rsync
 Requires: usbutils
 Requires: sqlite
+Requires: tar
 %if 0%{?rhel} >= 6 || 0%{?fedora} || 0%{?suse_version} >= 1300
 Requires: jq
 %endif
@@ -278,7 +278,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 %package gateway
 Summary: CernVM-FS Repository Gateway
 Group: Application/System
-BuildRequires: %{cvmfs_go} >= 1.11.4
+BuildRequires: %{cvmfs_go} >= 1.21.10
 Requires: cvmfs-server = %{version}-%{release}, psmisc
 %description gateway
 The CernVM-FS repository gateway service enables multiple remote publishers
@@ -289,9 +289,18 @@ to write to the same repository.
 %package ducc
 Summary: ducc: Daemon Unpacking Containers in CVMFS
 Group: Application/System
-BuildRequires: %{cvmfs_go} >= 1.11.4
+BuildRequires: %{cvmfs_go} >= 1.21.10
 %description ducc
 Daemon to automatically unpack and expose containers images into CernVM-FS
+%endif
+
+%if 0%{?build_snapshotter}
+%package snapshotter
+Summary: cvmfs-snapshotter: Lazy loading of containerd layers from CVMFS
+Group: Application/System
+BuildRequires: %{cvmfs_go} >= 1.21.10
+%description snapshotter
+A containerd snapshotter inspired by StarGZ that gives instant container startup
 %endif
 
 %prep
@@ -328,6 +337,10 @@ BUILD_DUCC=no
 %if 0%{?build_ducc}
 BUILD_DUCC=yes
 %endif
+BUILD_SNAPSHOTTER=no
+%if 0%{?build_snapshotter}
+BUILD_SNAPSHOTTER=yes
+%endif
 
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -340,6 +353,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_UNITTESTS=yes \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
+  -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=yes \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
@@ -358,23 +372,48 @@ popd
 
 %if 0%{?el4}
 %else
+# apply this to all subpackages that need to stay in version sync
+%define check_transaction \
+  [ -d "/var/spool/cvmfs"  ]          || exit 0; \
+  [ -d "/etc/cvmfs/repositories.d/" ] || exit 0; \
+  for repo in /var/spool/cvmfs/*; do \
+    [ -d $repo ] && [ ! -f /etc/cvmfs/repositories.d/$(basename $repo)/replica.conf ] || continue; \
+    if [ -f ${repo}/in_transaction.lock ] || \
+       [ -d ${repo}/in_transaction      ] || \
+       [ -f ${repo}/in_transaction      ]; then \
+      echo "     Found open CernVM-FS repository transactions."           >&2; \
+      echo "     Please abort or publish them before updating CernVM-FS." >&2; \
+      exit 1; \
+    fi; \
+  done
+
+%pretrans
+%check_transaction
+
+%pretrans libs
+%check_transaction
+
+%if 0%{?build_fuse3}
+%pretrans fuse3
+%check_transaction
+%endif
+
+%pretrans devel
+%check_transaction
+
 %pretrans server
-[ -d "/var/spool/cvmfs"  ]          || exit 0
-[ -d "/etc/cvmfs/repositories.d/" ] || exit 0
+%check_transaction
 
-for repo in /var/spool/cvmfs/*; do
-  [ -d $repo ] && [ ! -f /etc/cvmfs/repositories.d/$(basename $repo)/replica.conf ] || continue
+%pretrans shrinkwrap
+%check_transaction
 
-  if [ -f ${repo}/in_transaction.lock ] || \
-     [ -d ${repo}/in_transaction      ] || \
-     [ -f ${repo}/in_transaction      ]; then
-    echo "     Found open CernVM-FS repository transactions."           >&2
-    echo "     Please abort or publish them before updating CernVM-FS." >&2
-    exit 1
-  fi
-done
+%pretrans unittests
+%check_transaction
 
-exit 0
+%if 0%{?build_gateway}
+%pretrans gateway
+%check_transaction
+%endif
 %endif
 
 %pre
@@ -484,11 +523,16 @@ done
 restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
-%if 0%{?systemd_autofs_patch}
-/usr/bin/systemctl daemon-reload
-%endif
-if [ -d /var/run/cvmfs ]; then
-  /usr/bin/cvmfs_config reload
+if  [ -d /run/systemd/system ]; then
+  systemctl daemon-reload
+  systemctl start cvmfs-reload.service
+  # if there's apparmor, reload to bring
+  # fusermount3 config into effect
+  systemctl reload apparmor || true
+else
+  if [ -d /var/run/cvmfs ]; then
+    /usr/bin/cvmfs_config reload
+  fi
 fi
 :
 
@@ -511,9 +555,10 @@ restorecon -R /var/log/cvmfs
 rm -f /var/lib/cvmfs-server/geo/*.dat
 /sbin/ldconfig
 
-%if 0%{?build_gateway}
-%post gateway
-systemctl daemon-reload
+
+%if 0%{?build_ducc}
+%post ducc
+setcap "cap_dac_override=ep cap_dac_read_search=ep cap_fowner=ep cap_chown=ep cap_sys_admin=ep cap_mknod=ep" /usr/bin/cvmfs_ducc
 %endif
 
 %preun
@@ -616,6 +661,8 @@ systemctl daemon-reload
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
+%{_unitdir}/cvmfs-reload.service
+%config(noreplace) %{_sysconfdir}/apparmor.d/local/fusermount3
 
 %files libs
 %defattr(-,root,root)
@@ -707,8 +754,21 @@ systemctl daemon-reload
 /usr/libexec/cvmfs/ducc/registry_webhook.py*
 %endif
 
+%if 0%{?build_snapshotter}
+%files snapshotter
+%{_bindir}/cvmfs_snapshotter
+%{_unitdir}/cvmfs-snapshotter.service
+%dir %{_sysconfdir}/cvmfs/config.d
+%endif
+
 %changelog
-* Wed Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
+# - When using fuse3, require at least version 3.3.0 (for premounting).
+* Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
+- Apply %pretrans transaction check to all subpackages that need to
+  have their version stay in sync
+* Mon Dec 2 2024 Valentin Volkl <vavolkl@cern.ch> - 2.12
+- Add cvmfs-snapshotter package
+* Tue Nov 7 2023 Valentin Volkl <vavolkl@cern.ch> - 2.11.2
 - Rename registry-webhook.py to registry_webhook.py to allow imports
 * Wed Nov 16 2022 Jakob Blomer <jblomer@cern.ch> - 2.11.0
 - Make cvmfs-libs a dependency of the cvmfs package

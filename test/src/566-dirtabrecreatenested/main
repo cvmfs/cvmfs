@@ -235,7 +235,8 @@ check_catalog_presence_4() {
 
 extract_dirtab_warning() {
   local publish_log=$1
-  cat $publish_log | grep "^WARNING: '" | sed "s/^WARNING: '\([^']\+\)'.*$/\1/"
+  cat $publish_log | grep "^Swissknife Sync: WARNING: '" | sed "s/^Swissknife Sync: WARNING: '\([^']\+\)'.*$/\1/"
+
 }
 
 cvmfs_run_test() {

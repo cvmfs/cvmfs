@@ -1,0 +1,33 @@
+name: CI_DUCC
+
+on:
+  push:
+      paths:
+        - 'ducc/**'
+      branches: ['devel', 'cvmfs*']
+  pull_request:
+      paths:
+        - 'ducc/**'
+      branches: ['devel', 'cvmfs*']
+
+jobs:
+  docker:
+    name: "DUCC CI"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Build
+        working-directory: ./ducc
+        run: go build -v ./...
+      - name: Check Formatting
+        working-directory: ./ducc
+        run: | 
+           [ -z "$(go fmt ./...)" ]
+      - name: Test with the Go CLI
+        working-directory: ./ducc
+        run: go test -v ./...

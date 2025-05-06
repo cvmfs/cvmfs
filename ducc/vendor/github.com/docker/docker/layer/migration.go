@@ -2,124 +2,27 @@ package layer // import "github.com/docker/docker/layer"
 
 import (
 	"compress/gzip"
+	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
+	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
 
-// CreateRWLayerByGraphID creates a RWLayer in the layer store using
-// the provided name with the given graphID. To get the RWLayer
-// after migration the layer may be retrieved by the given name.
-func (ls *layerStore) CreateRWLayerByGraphID(name, graphID string, parent ChainID) (err error) {
-	ls.mountL.Lock()
-	defer ls.mountL.Unlock()
-	m, ok := ls.mounts[name]
-	if ok {
-		if m.parent.chainID != parent {
-			return errors.New("name conflict, mismatched parent")
-		}
-		if m.mountID != graphID {
-			return errors.New("mount already exists")
-		}
-
-		return nil
-	}
-
-	if !ls.driver.Exists(graphID) {
-		return fmt.Errorf("graph ID does not exist: %q", graphID)
-	}
-
-	var p *roLayer
-	if string(parent) != "" {
-		p = ls.get(parent)
-		if p == nil {
-			return ErrLayerDoesNotExist
-		}
-
-		// Release parent chain if error
-		defer func() {
-			if err != nil {
-				ls.layerL.Lock()
-				ls.releaseLayer(p)
-				ls.layerL.Unlock()
-			}
-		}()
-	}
-
-	// TODO: Ensure graphID has correct parent
-
-	m = &mountedLayer{
-		name:       name,
-		parent:     p,
-		mountID:    graphID,
-		layerStore: ls,
-		references: map[RWLayer]*referencedRWLayer{},
-	}
-
-	// Check for existing init layer
-	initID := fmt.Sprintf("%s-init", graphID)
-	if ls.driver.Exists(initID) {
-		m.initID = initID
-	}
-
-	return ls.saveMount(m)
-}
-
-func (ls *layerStore) ChecksumForGraphID(id, parent, oldTarDataPath, newTarDataPath string) (diffID DiffID, size int64, err error) {
-	defer func() {
-		if err != nil {
-			logrus.Debugf("could not get checksum for %q with tar-split: %q", id, err)
-			diffID, size, err = ls.checksumForGraphIDNoTarsplit(id, parent, newTarDataPath)
-		}
-	}()
-
-	if oldTarDataPath == "" {
-		err = errors.New("no tar-split file")
-		return
-	}
-
-	tarDataFile, err := os.Open(oldTarDataPath)
-	if err != nil {
-		return
-	}
-	defer tarDataFile.Close()
-	uncompressed, err := gzip.NewReader(tarDataFile)
-	if err != nil {
-		return
-	}
-
-	dgst := digest.Canonical.Digester()
-	err = ls.assembleTarTo(id, uncompressed, &size, dgst.Hash())
-	if err != nil {
-		return
-	}
-
-	diffID = DiffID(dgst.Digest())
-	err = os.RemoveAll(newTarDataPath)
-	if err != nil {
-		return
-	}
-	err = os.Link(oldTarDataPath, newTarDataPath)
-
-	return
-}
-
-func (ls *layerStore) checksumForGraphIDNoTarsplit(id, parent, newTarDataPath string) (diffID DiffID, size int64, err error) {
+func (ls *layerStore) ChecksumForGraphID(id, parent, newTarDataPath string) (diffID DiffID, size int64, err error) {
 	rawarchive, err := ls.driver.Diff(id, parent)
 	if err != nil {
-		return
+		return "", 0, err
 	}
 	defer rawarchive.Close()
 
 	f, err := os.Create(newTarDataPath)
 	if err != nil {
-		return
+		return "", 0, err
 	}
 	defer f.Close()
 	mfz := gzip.NewWriter(f)
@@ -130,14 +33,13 @@ func (ls *layerStore) checksumForGraphIDNoTarsplit(id, parent, newTarDataPath st
 
 	archive, err := asm.NewInputTarStream(rawarchive, packerCounter, nil)
 	if err != nil {
-		return
+		return "", 0, err
 	}
 	dgst, err := digest.FromReader(archive)
 	if err != nil {
-		return
+		return "", 0, err
 	}
-	diffID = DiffID(dgst)
-	return
+	return DiffID(dgst), size, nil
 }
 
 func (ls *layerStore) RegisterByGraphID(graphID string, parent ChainID, diffID DiffID, tarDataFile string, size int64) (Layer, error) {
@@ -147,7 +49,9 @@ func (ls *layerStore) RegisterByGraphID(graphID string, parent ChainID, diffID D
 	var err error
 	var p *roLayer
 	if string(parent) != "" {
+		ls.layerL.Lock()
 		p = ls.get(parent)
+		ls.layerL.Unlock()
 		if p == nil {
 			return nil, ErrLayerDoesNotExist
 		}
@@ -177,7 +81,7 @@ func (ls *layerStore) RegisterByGraphID(graphID string, parent ChainID, diffID D
 	ls.layerL.Lock()
 	defer ls.layerL.Unlock()
 
-	if existingLayer := ls.getWithoutLock(layer.chainID); existingLayer != nil {
+	if existingLayer := ls.get(layer.chainID); existingLayer != nil {
 		// Set error for cleanup, but do not return
 		err = errors.New("layer already exists")
 		return existingLayer.getReference(), nil
@@ -190,9 +94,9 @@ func (ls *layerStore) RegisterByGraphID(graphID string, parent ChainID, diffID D
 
 	defer func() {
 		if err != nil {
-			logrus.Debugf("Cleaning up transaction after failed migration for %s: %v", graphID, err)
+			log.G(context.TODO()).Debugf("Cleaning up transaction after failed migration for %s: %v", graphID, err)
 			if err := tx.Cancel(); err != nil {
-				logrus.Errorf("Error canceling metadata transaction %q: %s", tx.String(), err)
+				log.G(context.TODO()).Errorf("Error canceling metadata transaction %q: %s", tx.String(), err)
 			}
 		}
 	}()

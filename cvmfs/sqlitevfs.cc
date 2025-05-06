@@ -11,7 +11,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 #include "sqlitevfs.h"
 
 #include <dlfcn.h>

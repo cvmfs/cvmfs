@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-#include "cvmfs_config.h"
+
 #include "libcvmfs.h"
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
@@ -391,6 +391,7 @@ bool handle_dir(
   struct cvmfs_attr *dest_st,
   const char *entry
 ) {
+  src_st->st_mode |= S_IWUSR;
   if (dest->do_mkdir(dest->context_, entry, src_st)) {
     if (errno == EEXIST) {
       errno = 0;

@@ -2,7 +2,9 @@ name: CI_MacOS
 
 on:
   push:
+    branches: ['devel', 'cvmfs*']
   pull_request:
+    branches: ['devel', 'cvmfs*']
   workflow_dispatch:
 jobs:
   macos_build_and_test:
@@ -94,6 +96,7 @@ jobs:
             src/055-ownership                                 \
             src/056-lowspeedlimit                             \
             src/057-parallelmakecache                         \
+            src/059-fallbackproxy                             \
             src/060-hidexattrs                                \
             src/061-systemdnokill                             \
             src/069-systemremount                             \
@@ -120,6 +123,7 @@ jobs:
             src/102-reusefd                                   \
             src/103-reloadcachemgr                            \
             src/104-concurrent_mounts                         \
+            src/105-streaming-cache                           \
             src/406-ducc-webhook-notifications                \
             --                                                \
             src/0*                                            \

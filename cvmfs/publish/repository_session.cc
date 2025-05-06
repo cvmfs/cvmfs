@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 #include "publish/repository.h"
 
 #include <fcntl.h>
@@ -39,7 +39,7 @@ enum LeaseReply {
 };
 
 static CURL* PrepareCurl(const std::string& method) {
-  const char* user_agent_string = "cvmfs/" VERSION;
+  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
 
   CURL* h_curl = curl_easy_init();
   assert(h_curl != NULL);

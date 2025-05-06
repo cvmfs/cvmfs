@@ -1,10 +1,11 @@
 package image // import "github.com/docker/docker/image"
 
 import (
+	"context"
 	"runtime"
 
+	"github.com/containerd/log"
 	"github.com/docker/docker/layer"
-	"github.com/sirupsen/logrus"
 )
 
 // TypeLayers is used for RootFS.Type for filesystems organized into layers.
@@ -38,14 +39,15 @@ func (r *RootFS) Append(id layer.DiffID) {
 func (r *RootFS) Clone() *RootFS {
 	newRoot := NewRootFS()
 	newRoot.Type = r.Type
-	newRoot.DiffIDs = append(r.DiffIDs)
+	newRoot.DiffIDs = make([]layer.DiffID, len(r.DiffIDs))
+	copy(newRoot.DiffIDs, r.DiffIDs)
 	return newRoot
 }
 
 // ChainID returns the ChainID for the top layer in RootFS.
 func (r *RootFS) ChainID() layer.ChainID {
 	if runtime.GOOS == "windows" && r.Type == typeLayersWithBase {
-		logrus.Warnf("Layer type is unsupported on this platform. DiffIDs: '%v'", r.DiffIDs)
+		log.G(context.TODO()).Warnf("Layer type is unsupported on this platform. DiffIDs: '%v'", r.DiffIDs)
 		return ""
 	}
 	return layer.CreateChainID(r.DiffIDs)

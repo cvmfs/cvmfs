@@ -1,31 +1,69 @@
+2.13.0:
+  * [client] Improved EIO logging (#3723)
+  * [client] chksetup: use max-time instead of connect-timeout to avoid blocking (#3822)
+  * Fix ingest command to allow deletions of paths containing colons (:) (#3792)
+  * [gateway, ducc, snapshotter] bump and cleanup golang dependencies
+  * [rpm] fix permissions for cvmfs_ducc (#3790)
+  * [client] Install apparmor profile for fusermount3/cvmfs (#3791)
+  * [shrinkwrap] ensure that directories are writeable to avoid copy errors (#3798)
+  * [macos] fix chksetup for macfuse (#3800)
+
+2.12.7:
+  * [rpm] Apply %pretrans transaction check in most subpackages (#3779)
+  * [server] Fix for cvmfs_server transaction -t, update repository state after waiting for lease (#3771)
+
+2.12.6:
+  * [client] Revert CVMFS_PATCH_LEVEL to 0 for check_cvmfs.sh (#3750)
+  * [rpm] fix package install on wsl2 and other non-systemd platforms (#3749)
+
+2.12.4:
+  * [client] Fix cvmfs_config fsck -q to work with rmd160, shake128 hashes (#3739)
+  * [server] Fix mkfs overwrite-manifest check when upstream is gateway (#3740)
+
+2.12.3:
+  * [client] Don't commit empty certificates to cache (#3728)
+
+2.12.2:
+  * [client] Add cvmfs_config fsck -q(uick) to check for zeroed files in cache (#3726)
+
+2.12.1:
+  * [rpm] bugfix for reload service after rpm upgrades (#3725)
+
 2.12.0:
   * [client] FUSE-T support for macOS (#3587)
-  * Fix externals for RISC-V build (#3446)
-  * [client] add eio.emfile counter for  open() operations (#3625)
-  * [ducc] Enable syncronous GC on webhook (#3646)
-  * [client] Print correct timezone in logbuffer (#3679)
-  * [client] Add "cache limit set <MB>" function to cvmfs_talk (#3623)
-  * [service container] use all env vars in config (#3677)
+  * [server] Add metalink support (#3683)
   * Add support for high-precision timestamps (#3513)
-  * [server] Create scratch dir with consistent permissions (#3660)
+  * [client] Turn CVMFS_CACHE_REFCOUNT on by default (#3684)
+  * [client] Add memory buffer to streaming cache manager (#3632)
+  * [client] Add "cache limit set <MB>" function to cvmfs_talk (#3623) 
+  * [client] Fix replacement of stale inodes (#3507)
+  * [client] Print correct timezone in logbuffer (#3679)
+  * [client] log NOTFOUND in tracefile when lookup unsuccessful (#3704)
+  * [client] Add "cache limit set <MB>" function to cvmfs_talk (#3623)
+  * [client] add eio.emfile counter for  open() operations (#3625)
   * [client] Better logging for host/proxies (#3617)
   * [client] Close page cache tracker entry if cvmfs_open() fails (#3588)
-  * [gw] Cache catalogs for cvmfs_receiver (#3431)
   * [client] Remove unnecessary remount fence in forget callback (#3591)
-  * [server] Remove external package ipaddress (drops python 2 support) (#3607)
-  * [server] Remove 'trusted certs' (#3539)
-  * [server] Fix race when publishing to a gateway (#3546)
   * [client] Move getxattr check of valid return value closer to its request (#3516)
   * [client] Improve error logging in inode tracker (#3502)
   * [client] Fix a few Log2Histogram bugs (#3511)
   * [client] Reduce write lock contention in catalog mgr (#3476)
   * [client] Support for the new CVMFS_FUSE3_IDLE_THREADS and CVMFS_FUSE3_MAX_THREADS parameters (#3505)
   * [client] Log JobInfo object id and its respective CURL requests (#3492)
-  * [server] Consistently use 64bit ints for catalog revision (#3478)
   * [client] Avoid possible race in mount helper (#3475)
   * [client] Add paging to xattr (#3355)
   * [server] Ingest Tarball now with modifiyable ownership (#3362)
-  * [client] Refactoring of file catalog reloads (#3156)
+  * [server] mkfs: do not overwrite existing manifest in s3 bucket (#3693) 
+  * [server] allow absolute paths for ingest --base_dir and --to_delete (#3695)
+  * [server] Fixes and improvements to concurrency in SessionContext (#3546)
+  * [server] Fix race when publishing to a gateway (#3546)
+  * [server] Consistently use 64bit ints for catalog revision (#3478)
+  * [server] Create scratch dir with consistent permissions (#3660)
+  * [gw] Cache catalogs for cvmfs_receiver (#3431)
+  * [rpm] Run post-install reload in a unit (#3707) 
+  * [rpm] Fix externals for RISC-V build (#3446)
+  * [ducc] Enable syncronous GC on webhook (#3646)
+  * [service container] use all env vars in config (#3677)
 
 2.11.5:
   * [client] Fix ReadHalfPipe for reads larger than the timeout  (#3653)

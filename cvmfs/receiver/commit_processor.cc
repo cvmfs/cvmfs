@@ -138,7 +138,10 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
-  if (!server_tool->InitVerifyingSignatureManager(public_key)) {
+  const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
+  const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
+  if (!server_tool->InitSignatureManager(public_key, certificate, private_key))
+  {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the signature manager");
@@ -146,11 +149,12 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   shash::Any manifest_base_hash;
-  UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
+  const UniquePtr<manifest::Manifest> manifest_tgt(
+    server_tool->FetchRemoteManifest(
       params.stratum0, repo_name, manifest_base_hash));
 
   // Current catalog from the gateway machine
-  if (!manifest.IsValid()) {
+  if (!manifest_tgt.IsValid()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Could not open repository manifest");
     return kError;
@@ -159,7 +163,7 @@ CommitProcessor::Result CommitProcessor::Process(
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, target root hash: %s",
            lease_path.c_str(),
-           manifest->catalog_hash().ToString(false).c_str());
+           manifest_tgt->catalog_hash().ToString(false).c_str());
 
 
   std::string cache_dir_;
@@ -184,7 +188,7 @@ CommitProcessor::Result CommitProcessor::Process(
                    catalog::SimpleCatalogManager>
       merge_tool(params.stratum0, old_root_hash, new_root_hash,
                  relative_lease_path, temp_dir_root,
-                 server_tool->download_manager(), manifest.weak_ref(),
+                 server_tool->download_manager(), manifest_tgt.weak_ref(),
                  statistics_, cache_dir_);
   if (!merge_tool.Init()) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -193,7 +197,8 @@ CommitProcessor::Result CommitProcessor::Process(
   }
 
   std::string new_manifest_path;
-  if (!merge_tool.Run(params, &new_manifest_path, final_revision)) {
+  shash::Any new_manifest_hash;
+  if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash, final_revision)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;
@@ -201,8 +206,6 @@ CommitProcessor::Result CommitProcessor::Process(
 
   UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
-  const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
-  const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
 
   if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
                     public_key, params.proxy)) {
@@ -210,10 +213,6 @@ CommitProcessor::Result CommitProcessor::Process(
              final_tag.name().c_str());
     return kError;
   }
-
-  // We need to re-initialize the ServerTool component for signing
-  server_tool.Destroy();
-  server_tool = new ServerTool();
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, signing manifest",
@@ -250,33 +249,10 @@ CommitProcessor::Result CommitProcessor::Process(
                lease_path.c_str());
   }
 
-  {
-    UniquePtr<ServerTool> server_tool(new ServerTool());
-
-    if (!server_tool->InitDownloadManager(true, params.proxy)) {
-      LogCvmfs(
-          kLogReceiver, kLogSyslogErr,
-          "CommitProcessor - error: Could not initialize the download manager");
-      return kError;
-    }
-
-    const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
-    if (!server_tool->InitVerifyingSignatureManager(public_key)) {
-      LogCvmfs(kLogReceiver, kLogSyslogErr,
-               "CommitProcessor - error: Could not initialize the signature "
-               "manager");
-      return kError;
-    }
-
-    shash::Any manifest_base_hash;
-    UniquePtr<manifest::Manifest> manifest(server_tool->FetchRemoteManifest(
-        params.stratum0, repo_name, manifest_base_hash));
-
-    LogCvmfs(kLogReceiver, kLogSyslog,
-             "CommitProcessor - lease_path: %s, new root hash: %s",
-             lease_path.c_str(),
-             manifest->catalog_hash().ToString(false).c_str());
-  }
+  LogCvmfs(kLogReceiver, kLogSyslog,
+           "CommitProcessor - lease_path: %s, new root hash: %s",
+           lease_path.c_str(),
+           new_manifest_hash.ToString(false).c_str());
 
   // Ensure CVMFS_ROOT_HASH is not set in
   // /var/spool/cvmfs/<REPO_NAME>/client.local

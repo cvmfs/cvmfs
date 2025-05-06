@@ -12,6 +12,12 @@ type Config struct {
 // ConfigSpec represents a config specification from a config in swarm
 type ConfigSpec struct {
 	Annotations
+
+	// Data is the data to store as a config.
+	//
+	// The maximum allowed size is 1000KB, as defined in [MaxConfigSize].
+	//
+	// [MaxConfigSize]: https://pkg.go.dev/github.com/moby/swarmkit/v2@v2.0.0-20250103191802-8c1959736554/manager/controlapi#MaxConfigSize
 	Data []byte `json:",omitempty"`
 
 	// Templating controls whether and how to evaluate the config payload as
@@ -27,9 +33,14 @@ type ConfigReferenceFileTarget struct {
 	Mode os.FileMode
 }
 
+// ConfigReferenceRuntimeTarget is a target for a config specifying that it
+// isn't mounted into the container but instead has some other purpose.
+type ConfigReferenceRuntimeTarget struct{}
+
 // ConfigReference is a reference to a config in swarm
 type ConfigReference struct {
-	File       *ConfigReferenceFileTarget
+	File       *ConfigReferenceFileTarget    `json:",omitempty"`
+	Runtime    *ConfigReferenceRuntimeTarget `json:",omitempty"`
 	ConfigID   string
 	ConfigName string
 }

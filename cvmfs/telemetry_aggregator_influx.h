@@ -32,6 +32,7 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
   TelemetryAggregatorInflux(Statistics* statistics,
                             int send_rate_sec,
                             OptionsManager *options_mgr,
+                            MountPoint* mount_point,
                             const std::string &fqrn);
   virtual ~TelemetryAggregatorInflux();
 

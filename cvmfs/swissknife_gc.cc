@@ -5,7 +5,7 @@
  * outdated and/or unneeded data objects.
  */
 
-#include "cvmfs_config.h"
+
 #include "swissknife_gc.h"
 
 #include <string>
@@ -93,7 +93,7 @@ int CommandGc::Main(const ArgumentList &args) {
   const std::string proxy = ((args.count('@') > 0) ?
                              *args.find('@')->second : "");
   if (!this->InitDownloadManager(follow_redirects, proxy) ||
-      !this->InitVerifyingSignatureManager(repo_keys)) {
+      !this->InitSignatureManager(repo_keys)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }

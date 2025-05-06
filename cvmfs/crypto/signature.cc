@@ -11,7 +11,7 @@
  * We work exclusively with PEM formatted files (= Base64-encoded DER files).
  */
 
-#include "cvmfs_config.h"
+
 #include "crypto/signature.h"
 
 #include <openssl/bn.h>

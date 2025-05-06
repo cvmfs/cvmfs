@@ -11,7 +11,7 @@
 #include <cerrno>
 #include <utility>
 
-#include "cvmfs_config.h"
+
 #include "s3fanout.h"
 #include "upload_facility.h"
 #include "util/concurrency.h"
@@ -1218,7 +1218,7 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
 
   statistics_ = new Statistics();
   user_agent_ = new string();
-  *user_agent_ = "User-Agent: cvmfs " + string(VERSION);
+  *user_agent_ = "User-Agent: cvmfs " + string(CVMFS_VERSION);
   complete_hostname_ = MkCompleteHostname();
 
   CURLcode cretval = curl_global_init(CURL_GLOBAL_ALL);

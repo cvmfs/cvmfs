@@ -1,4 +1,4 @@
-// +build linux freebsd darwin openbsd
+//go:build linux || freebsd || darwin || openbsd
 
 package layer // import "github.com/docker/docker/layer"
 

@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "cvmfs_config.h"
+
 
 #include <algorithm>
 #include <cstdlib>
@@ -28,7 +28,7 @@ using namespace std;  // NOLINT
 
 
 static void PrintVersion() {
-  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS Server Tool %s", VERSION);
+  LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS Server Tool %s", CVMFS_VERSION);
 }
 
 static void Usage(const std::string &progname,
@@ -43,7 +43,7 @@ static void Usage(const std::string &progname,
     "  %s COMMAND [options] <parameters>\n\n"
     "Supported Commands\n"
     "-------------------\n",
-    VERSION, progname.c_str());
+    CVMFS_VERSION, progname.c_str());
     const vector<publish::Command *> commands = clist.commands();
 
   string::size_type max_len = 0;

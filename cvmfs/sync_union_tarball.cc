@@ -37,7 +37,8 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const uid_t uid,
                                    const gid_t gid,
                                    const std::string &to_delete,
-                                   const bool create_catalog_on_root)
+                                   const bool create_catalog_on_root,
+                                   const std::string &path_delimiter)
     : SyncUnion(mediator, rdonly_path, "", ""),
       src(NULL),
       tarball_path_(tarball_path),
@@ -46,6 +47,7 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
       gid_(gid),
       to_delete_(to_delete),
       create_catalog_on_root_(create_catalog_on_root),
+      path_delimiter_(path_delimiter),
       read_archive_signal_(new Signal) {}
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
@@ -110,7 +112,7 @@ void SyncUnionTarball::Traverse() {
    * As first step we eliminate the requested directories.
    */
   if (to_delete_ != "") {
-    vector<std::string> to_eliminate_vec = SplitString(to_delete_, ':');
+    vector<std::string> to_eliminate_vec = SplitStringMultiChar(to_delete_, path_delimiter_);
 
     for (vector<string>::iterator s = to_eliminate_vec.begin();
          s != to_eliminate_vec.end(); ++s) {

@@ -6,7 +6,7 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+
 #include "swissknife_check.h"
 
 #include <inttypes.h>
@@ -128,6 +128,18 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.name().c_str(), b.name().c_str());
     retval = false;
   }
+  if (!is_transition_point) {
+      if (diffs & Difference::kUid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)",
+                 a.uid(), b.uid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+      if (diffs & Difference::kGid) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)",
+                 a.gid(), b.gid(), a.name().c_str(), b.name().c_str());
+        retval = false;
+      }
+    }
 
   return retval;
 }
@@ -716,7 +728,12 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
   catalog::Catalog *catalog =
                    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
+  if (catalog_file_size <= 0) {
+
+    LogCvmfs(kLogCvmfs, kLogStderr, "Error downloading catalog %s at %s %s",
+             catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str() );
+    assert(catalog_file_size > 0);
+  }
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
@@ -984,7 +1001,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
 
-    if (!this->InitVerifyingSignatureManager(pubkey_path)) {
+    if (!this->InitSignatureManager(pubkey_path)) {
       return 1;
     }
   }

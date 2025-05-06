@@ -10,7 +10,7 @@
 #endif
 
 #include "string.h"
-#include "cvmfs_config.h"
+
 
 #include <errno.h>
 #include <fcntl.h>
@@ -338,6 +338,22 @@ vector<string> SplitStringBounded(
   // push the remainings of the string and return
   result.push_back(str.substr(marker));
   return result;
+}
+
+vector<string> SplitStringMultiChar(const string &str, const string &delim) {
+    size_t pos_start = 0, pos_end = 0, delim_len = delim.length();
+    std::string substring;
+    std::vector<std::string> result;
+
+    while ((pos_end = str.find(delim, pos_start)) != string::npos) {
+        substring = str.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        result.push_back(substring);
+    }
+
+    result.push_back(str.substr(pos_start));
+    return result;
+
 }
 
 string JoinStrings(const vector<string> &strings, const string &joint) {

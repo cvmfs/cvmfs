@@ -10,7 +10,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "cvmfs_config.h"
+
 #include "shrinkwrap/fs_traversal.h"
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "util/concurrency.h"
@@ -96,7 +96,7 @@ void Usage() {
         " -j --threads     Number of concurrent copy threads [default:2*CPUs]\n"
         " -p --stat-period Frequency of stat prints, 0 disables [default:10]\n"
         " -g --gc          Perform garbage collection on destination\n",
-           VERSION);
+           CVMFS_VERSION);
 }
 
 }  // anonymous namespace

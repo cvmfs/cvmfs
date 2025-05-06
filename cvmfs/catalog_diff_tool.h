@@ -91,7 +91,15 @@ class CatalogDiffTool {
    */
   virtual bool IsReportablePath(const PathString& /* path */) { return true; }
 
-  virtual void ReportAddition(const PathString& path,
+  // Note that addition and modification can return false to indicate that
+  // the recursion stops. In the merge tool, this happens at nested catalog
+  // transition points:
+  //  - For a new directory that is a nested catalog, we don't need to recurse
+  //    further but just install that nested catalog in the parent
+  //  - When a nested catalog is replaced, we likewise do not need to recurse
+  //    further into the new nested catalog tree.
+
+  virtual bool ReportAddition(const PathString& path,
                               const catalog::DirectoryEntry& entry,
                               const XattrList& xattrs,
                               const FileChunkList& chunks) = 0;

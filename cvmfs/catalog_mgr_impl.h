@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System
  */
 
+// avoid clang-tidy false positives (at least starting with clang14)
+//NOLINTBEGIN
+
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
 
@@ -9,7 +12,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "cvmfs_config.h"
+
 
 #include <cassert>
 #include <string>
@@ -1233,3 +1236,4 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
 
 
 #endif  // CVMFS_CATALOG_MGR_IMPL_H_
+//NOLINTEND

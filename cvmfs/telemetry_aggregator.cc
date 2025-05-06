@@ -8,6 +8,8 @@
 #include <poll.h>
 #include <unistd.h>
 
+#include "glue_buffer.h"
+#include "shortstring.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -20,6 +22,7 @@ namespace perf {
 TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
                                                  int send_rate,
                                                  OptionsManager *options_mgr,
+                                                 MountPoint* mount_point,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
   UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
@@ -28,7 +31,7 @@ TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
   switch (type) {
     case kTelemetryInflux:
       telemetryInflux = new TelemetryAggregatorInflux(statistics, send_rate,
-                                  options_mgr, fqrn);
+                                                options_mgr, mount_point, fqrn);
       telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator>*>
                                                             (&telemetryInflux);
     break;
@@ -68,6 +71,48 @@ void TelemetryAggregator::Spawn() {
   LogCvmfs(kLogTelemetry, kLogDebug, "Spawning of telemetry thread.");
 }
 
+void TelemetryAggregator::ManuallyUpdateSelectedCounters() {
+  if (!mount_point_) {
+    return;
+  }
+
+  // Manually setting the inode tracker numbers
+  glue::InodeTracker::Statistics inode_stats =
+                            mount_point_->inode_tracker()->GetStatistics();
+  glue::DentryTracker::Statistics dentry_stats =
+                            mount_point_->dentry_tracker()->GetStatistics();
+  glue::PageCacheTracker::Statistics page_cache_stats =
+                            mount_point_->page_cache_tracker()->GetStatistics();
+  mount_point_->statistics()->Lookup("inode_tracker.n_insert")->
+                               Set(atomic_read64(&inode_stats.num_inserts));
+  mount_point_->statistics()->Lookup("inode_tracker.n_remove")->
+                               Set(atomic_read64(&inode_stats.num_removes));
+  mount_point_->statistics()->Lookup("inode_tracker.no_reference")->
+                               Set(atomic_read64(&inode_stats.num_references));
+  mount_point_->statistics()->Lookup("inode_tracker.n_hit_inode")->
+                               Set(atomic_read64(&inode_stats.num_hits_inode));
+  mount_point_->statistics()->Lookup("inode_tracker.n_hit_path")->
+                               Set(atomic_read64(&inode_stats.num_hits_path));
+  mount_point_->statistics()->Lookup("inode_tracker.n_miss_path")->
+                               Set(atomic_read64(&inode_stats.num_misses_path));
+  mount_point_->statistics()->Lookup("dentry_tracker.n_insert")->
+                               Set(dentry_stats.num_insert);
+  mount_point_->statistics()->Lookup("dentry_tracker.n_remove")->
+                               Set(dentry_stats.num_remove);
+  mount_point_->statistics()->Lookup("dentry_tracker.n_prune")->
+                               Set(dentry_stats.num_prune);
+  mount_point_->statistics()->Lookup("page_cache_tracker.n_insert")->
+                               Set(page_cache_stats.n_insert);
+  mount_point_->statistics()->Lookup("page_cache_tracker.n_remove")->
+                               Set(page_cache_stats.n_remove);
+  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_direct")->
+                               Set(page_cache_stats.n_open_direct);
+  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_flush")->
+                               Set(page_cache_stats.n_open_flush);
+  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_cached")->
+                               Set(page_cache_stats.n_open_cached);
+}
+
 void *TelemetryAggregator::MainTelemetry(void *data) {
   TelemetryAggregator *telemetry = reinterpret_cast<TelemetryAggregator*>(data);
   Statistics *statistics = telemetry->statistics_;
@@ -101,6 +146,7 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
 
     // aggregate + send stuff
     if (retval == 0) {
+      telemetry->ManuallyUpdateSelectedCounters();
       statistics->SnapshotCounters(&telemetry->counters_,
                                    &telemetry->timestamp_);
       telemetry->PushMetrics();

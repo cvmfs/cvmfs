@@ -7,7 +7,7 @@ import requests
 if len(sys.argv) == 1 or len(sys.argv) != 3:
     # Only the invocation
     # we print a simple help
-    print("Utility to print to STDIN all tha images stored in an harbor repository")
+    print("Utility to print to STDIN all the images stored in an harbor repository")
     print("Pass as first argument the url with protocol of the harbor host")
     print("As second argument pass the name of the project")
     print("The username and password are to be provide as env var. HARBOR_{USER, PASS}")

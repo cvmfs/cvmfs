@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include "cvmfs_config.h"
+
 #include "mountpoint.h"
 
 #include <errno.h>
@@ -250,23 +250,25 @@ void FileSystem::CreateStatistics() {
   n_eio_total_ =  statistics_->Register("eio.total",
      "EIO returned to calling process. Sum of individual eio counters");
   n_eio_01_ =  statistics_->Register("eio.01",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_lookup()");
+     "EIO returned by cvmfs.cc:cvmfs_lookup() - lookup failed");
   n_eio_02_ =  statistics_->Register("eio.02",
-     "EIO returned to calling process. cvmfs.cc:ReplyNegative()");
+     "EIO returned by cvmfs.cc:ReplyNegative() "
+     "- CVMFS-specific metadata not found");
   n_eio_03_ =  statistics_->Register("eio.03",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_opendir()");
+     "EIO returned by cvmfs.cc:cvmfs_opendir() - failed to open directory ");
   n_eio_04_ =  statistics_->Register("eio.04",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+     "EIO returned by cvmfs.cc:cvmfs_open() "
+     "- chunked file does not have any chunks");
   n_eio_05_ =  statistics_->Register("eio.05",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to fetch chunk");
   n_eio_06_ =  statistics_->Register("eio.06",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_open()");
+     "EIO returned by cvmfs.cc:cvmfs_open() - failed to open file");
   n_eio_07_ =  statistics_->Register("eio.07",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to read chunk");
   n_eio_08_ =  statistics_->Register("eio.08",
-     "EIO returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EIO returned by cvmfs.cc:cvmfs_read() - failed to read file");
   n_emfile_ =  statistics_->Register("eio.emfile",
-     "EMFILE returned to calling process. cvmfs.cc:cvmfs_read()");
+     "EMFILE returned by cvmfs.cc:cvmfs_read(): too many open files");
 
   string optarg;
   if (options_mgr_->GetValue("CVMFS_INSTRUMENT_FUSE", &optarg) &&
@@ -1425,7 +1427,13 @@ bool MountPoint::CreateDownloadManagers() {
       download_mgr_->SetFailoverIndefinitely();
   }
 
-  if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_METALINK_URL", &optarg)) {
+    download_mgr_->SetMetalinkChain(optarg);  
+    // host chain will be set later when the metalink server is contacted
+    download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    download_mgr_->EnableRedirects();
+  } else if (options_mgr_->GetValue("CVMFS_SERVER_URL", &optarg)) {
     download_mgr_->SetHostChain(optarg);
   }
 
@@ -2073,6 +2081,7 @@ bool MountPoint::SetupBehavior() {
       telemetry_aggr_ = perf::TelemetryAggregator::Create(statistics_,
                                                         telemetry_send_rate_sec,
                                                         options_mgr_,
+                                                        this,
                                                         fqrn_,
                                                         perf::kTelemetryInflux);
       LogCvmfs(kLogTelemetry, kLogSyslog | kLogDebug,
@@ -2146,7 +2155,13 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   }
   external_download_mgr_->SetTimeout(timeout, timeout_direct);
 
-  if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
+  if (options_mgr_->GetValue("CVMFS_EXTERNAL_METALINK", &optarg)) {
+    external_download_mgr_->SetMetalinkChain(optarg);  
+    // host chain will be set later when the metalink server is contacted
+    external_download_mgr_->SetHostChain("");
+    // metalink requires redirects
+    external_download_mgr_->EnableRedirects();
+  } else if (options_mgr_->GetValue("CVMFS_EXTERNAL_URL", &optarg)) {
     external_download_mgr_->SetHostChain(optarg);
     if (dogeosort) {
       std::vector<std::string> host_chain;
@@ -2216,8 +2231,13 @@ void MountPoint::SetupHttpTuning() {
 
   if (options_mgr_->GetValue("CVMFS_LOW_SPEED_LIMIT", &optarg))
     download_mgr_->SetLowSpeedLimit(String2Uint64(optarg));
-  if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg))
+  if (options_mgr_->GetValue("CVMFS_PROXY_RESET_AFTER", &optarg)) {
     download_mgr_->SetProxyGroupResetDelay(String2Uint64(optarg));
+    // Use the proxy reset delay as the default for the metalink reset delay
+    download_mgr_->SetMetalinkResetDelay(String2Uint64(optarg));
+  }
+  if (options_mgr_->GetValue("CVMFS_METALINK_RESET_AFTER", &optarg))
+    download_mgr_->SetMetalinkResetDelay(String2Uint64(optarg));
   if (options_mgr_->GetValue("CVMFS_HOST_RESET_AFTER", &optarg))
     download_mgr_->SetHostResetDelay(String2Uint64(optarg));
 

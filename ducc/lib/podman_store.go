@@ -93,7 +93,7 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 	storedlayersdata := []LayerInfo{}
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		storedlayerdata := []LayerInfo{}
 		layerDigest := strings.Split(layer.Digest, ":")[1]
@@ -119,7 +119,7 @@ func (img *Image) PublishLayerInfo(CVMFSRepo string, digestMap map[string]string
 	lastLayer := ""
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		sizeMap[layer.Digest] = layer.Size
 		if lastLayer != "" {
@@ -207,11 +207,11 @@ func (img *Image) LinkRootfsIntoPodmanStore(CVMFSRepo, subDirInsideRepo string, 
 		l.LogE(err).Warn("Error in getting the image manifest")
 		return err
 	}
-	// this is extremelly bad, we are making one transaction for each layer
+	// this is extremely bad, we are making one transaction for each layer
 	// all of them could be done in a single transaction
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		layerid := strings.Split(layer.Digest, ":")[1]
 		layerdir := digestMap[layer.Digest]
@@ -242,7 +242,7 @@ func (img *Image) CreateLinkDir(CVMFSRepo, subDirInsideRepo string, digestMap, l
 	// also here, we are making one transaction for each layer
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		layerdir := digestMap[layer.Digest]
 		linkPath := filepath.Join(rootPath, rootfsDir, layerdir, "link")
@@ -295,7 +295,7 @@ func (img *Image) CreateLowerFiles(CVMFSRepo string, digestMap, layerIdMap map[s
 	// again, for each layer, one more transaction
 	for _, layer := range manifest.Layers {
 		if layer.MediaType == "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip" {
-			continue;
+			continue
 		}
 		if lastDigest != "" {
 			layerdir := digestMap[layer.Digest]
@@ -484,7 +484,7 @@ func (img *Image) CheckImageChanged(CVMFSRepo string) error {
 
 // Ingest all the necessary files and dir in podmanStore dir.
 func (img *Image) CreatePodmanImageStore(CVMFSRepo, subDirInsideRepo string) (err error) {
-	// this code is extremelly slow
+	// this code is extremely slow
 	// if opens and publish several transaction and I believe it is possible to do pretty much anything in a single transaction
 	// it should be rewritten.
 	n := notification.NewNotification(NotificationService).AddField("image", img.GetSimpleName())

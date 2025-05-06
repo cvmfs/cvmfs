@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "cvmfs_config.h"
+
 #include "util/algorithm.h"
 #include "util/string.h"
 

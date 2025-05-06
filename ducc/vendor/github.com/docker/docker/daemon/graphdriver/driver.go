@@ -1,35 +1,24 @@
 package graphdriver // import "github.com/docker/docker/daemon/graphdriver"
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
+	"github.com/moby/go-archive"
+	"github.com/moby/sys/user"
+	"github.com/pkg/errors"
 	"github.com/vbatts/tar-split/tar/storage"
-
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/containerfs"
-	"github.com/docker/docker/pkg/idtools"
-	"github.com/docker/docker/pkg/plugingetter"
 )
 
-// FsMagic unsigned id of the filesystem in use.
-type FsMagic uint32
+// All registered drivers
+var drivers map[string]InitFunc
 
-const (
-	// FsMagicUnsupported is a predefined constant value other than a valid filesystem id.
-	FsMagicUnsupported = FsMagic(0x00000000)
-)
-
-var (
-	// All registered drivers
-	drivers map[string]InitFunc
-)
-
-//CreateOpts contains optional arguments for Create() and CreateReadWrite()
+// CreateOpts contains optional arguments for Create() and CreateReadWrite()
 // methods.
 type CreateOpts struct {
 	MountLabel string
@@ -37,7 +26,7 @@ type CreateOpts struct {
 }
 
 // InitFunc initializes the storage driver.
-type InitFunc func(root string, options []string, uidMaps, gidMaps []idtools.IDMap) (Driver, error)
+type InitFunc func(root string, options []string, idMap user.IdentityMapping) (Driver, error)
 
 // ProtoDriver defines the basic capabilities of a driver.
 // This interface exists solely to be a minimum set of methods
@@ -61,7 +50,7 @@ type ProtoDriver interface {
 	// Get returns the mountpoint for the layered filesystem referred
 	// to by this id. You can optionally specify a mountLabel or "".
 	// Returns the absolute path to the mounted layered filesystem.
-	Get(id, mountLabel string) (fs containerfs.ContainerFS, err error)
+	Get(id, mountLabel string) (fs string, err error)
 	// Put releases the system resources for the specified id,
 	// e.g, unmounting layered filesystem.
 	Put(id string) error
@@ -71,8 +60,8 @@ type ProtoDriver interface {
 	// Status returns a set of key-value pairs which give low
 	// level diagnostic status about this driver.
 	Status() [][2]string
-	// Returns a set of key-value pairs which give low level information
-	// about the image/container driver is managing.
+	// GetMetadata returns a set of key-value pairs which give driver-specific
+	// low-level information about the image/container that the driver is managing.
 	GetMetadata(id string) (map[string]string, error)
 	// Cleanup performs necessary tasks to release resources
 	// held by the driver, e.g., unmounting all layered filesystems
@@ -105,23 +94,6 @@ type Driver interface {
 	DiffDriver
 }
 
-// Capabilities defines a list of capabilities a driver may implement.
-// These capabilities are not required; however, they do determine how a
-// graphdriver can be used.
-type Capabilities struct {
-	// Flags that this driver is capable of reproducing exactly equivalent
-	// diffs for read-only layers. If set, clients can rely on the driver
-	// for consistent tar streams, and avoid extra processing to account
-	// for potential differences (eg: the layer store's use of tar-split).
-	ReproducesExactDiffs bool
-}
-
-// CapabilityDriver is the interface for layered file system drivers that
-// can report on their Capabilities.
-type CapabilityDriver interface {
-	Capabilities() Capabilities
-}
-
 // DiffGetterDriver is the interface for layered file system drivers that
 // provide a specialized function for getting file contents for tar-split.
 type DiffGetterDriver interface {
@@ -139,12 +111,6 @@ type FileGetCloser interface {
 	Close() error
 }
 
-// Checker makes checks on specified filesystems.
-type Checker interface {
-	// IsMounted returns true if the provided path is mounted for the specific checker
-	IsMounted(path string) bool
-}
-
 func init() {
 	drivers = make(map[string]InitFunc)
 }
@@ -152,33 +118,32 @@ func init() {
 // Register registers an InitFunc for the driver.
 func Register(name string, initFunc InitFunc) error {
 	if _, exists := drivers[name]; exists {
-		return fmt.Errorf("Name already registered %s", name)
+		return errors.Errorf("name already registered %s", name)
 	}
 	drivers[name] = initFunc
 
 	return nil
 }
 
-// GetDriver initializes and returns the registered driver
-func GetDriver(name string, pg plugingetter.PluginGetter, config Options) (Driver, error) {
-	if initFunc, exists := drivers[name]; exists {
-		return initFunc(filepath.Join(config.Root, name), config.DriverOptions, config.UIDMaps, config.GIDMaps)
-	}
-
-	pluginDriver, err := lookupPlugin(name, pg, config)
-	if err == nil {
-		return pluginDriver, nil
-	}
-	logrus.WithError(err).WithField("driver", name).WithField("home-dir", config.Root).Error("Failed to GetDriver graph")
-	return nil, ErrNotSupported
+// GetDriver initializes and returns the registered driver.
+//
+// Deprecated: this function was exported for (integration-)tests, but no longer used, and will be removed in the next release.
+func GetDriver(name string, config Options) (Driver, error) {
+	return getDriver(name, config)
 }
 
-// getBuiltinDriver initializes and returns the registered driver, but does not try to load from plugins
-func getBuiltinDriver(name, home string, options []string, uidMaps, gidMaps []idtools.IDMap) (Driver, error) {
+// getDriver initializes and returns the registered driver.
+func getDriver(name string, config Options) (Driver, error) {
 	if initFunc, exists := drivers[name]; exists {
-		return initFunc(filepath.Join(home, name), options, uidMaps, gidMaps)
+		return initFunc(filepath.Join(config.Root, name), config.DriverOptions, config.IDMap)
 	}
-	logrus.Errorf("Failed to built-in GetDriver graph %s %s", name, home)
+	log.G(context.TODO()).WithFields(log.Fields{"driver": name, "home-dir": config.Root}).Error("Failed to GetDriver graph")
+
+	// TODO(thaJeztah): remove in next release.
+	if os.Getenv("DOCKERD_DEPRECATED_GRAPHDRIVER_PLUGINS") != "" {
+		return nil, fmt.Errorf("DEPRECATED: Support for experimental graphdriver plugins has been removed. See https://docs.docker.com/go/deprecated/")
+	}
+
 	return nil, ErrNotSupported
 }
 
@@ -186,92 +151,99 @@ func getBuiltinDriver(name, home string, options []string, uidMaps, gidMaps []id
 type Options struct {
 	Root                string
 	DriverOptions       []string
-	UIDMaps             []idtools.IDMap
-	GIDMaps             []idtools.IDMap
+	IDMap               user.IdentityMapping
 	ExperimentalEnabled bool
 }
 
 // New creates the driver and initializes it at the specified root.
-func New(name string, pg plugingetter.PluginGetter, config Options) (Driver, error) {
-	if name != "" {
-		logrus.Debugf("[graphdriver] trying provided driver: %s", name) // so the logs show specified driver
-		logDeprecatedWarning(name)
-		return GetDriver(name, pg, config)
+//
+// It is recommended to pass a name for the driver to use, but If no name
+// is provided, it attempts to detect the prior storage driver based on
+// existing state, or otherwise selects a storage driver based on a priority
+// list and the underlying filesystem.
+//
+// It returns an error if the requested storage driver is not supported,
+// if scanning prior drivers is ambiguous (i.e., if state is found for
+// multiple drivers), or if no compatible driver is available for the
+// platform and underlying filesystem.
+func New(driverName string, config Options) (Driver, error) {
+	ctx := context.TODO()
+	if driverName != "" {
+		log.G(ctx).Infof("[graphdriver] trying configured driver: %s", driverName)
+		if err := checkRemoved(driverName); err != nil {
+			return nil, err
+		}
+		return getDriver(driverName, config)
 	}
 
 	// Guess for prior driver
+	//
+	// TODO(thaJeztah): move detecting prior drivers separate from New(), and make "name" a required argument.
 	driversMap := scanPriorDrivers(config.Root)
-	list := strings.Split(priority, ",")
-	logrus.Debugf("[graphdriver] priority list: %v", list)
-	for _, name := range list {
-		if name == "vfs" {
-			// don't use vfs even if there is state present.
-			continue
-		}
+	priorityList := strings.Split(priority, ",")
+	log.G(ctx).Debugf("[graphdriver] priority list: %v", priorityList)
+	for _, name := range priorityList {
 		if _, prior := driversMap[name]; prior {
 			// of the state found from prior drivers, check in order of our priority
 			// which we would prefer
-			driver, err := getBuiltinDriver(name, config.Root, config.DriverOptions, config.UIDMaps, config.GIDMaps)
+			driver, err := getDriver(name, config)
 			if err != nil {
 				// unlike below, we will return error here, because there is prior
 				// state, and now it is no longer supported/prereq/compatible, so
 				// something changed and needs attention. Otherwise the daemon's
 				// images would just "disappear".
-				logrus.Errorf("[graphdriver] prior storage driver %s failed: %s", name, err)
+				log.G(ctx).Errorf("[graphdriver] prior storage driver %s failed: %s", name, err)
 				return nil, err
 			}
 
 			// abort starting when there are other prior configured drivers
 			// to ensure the user explicitly selects the driver to load
-			if len(driversMap)-1 > 0 {
+			if len(driversMap) > 1 {
 				var driversSlice []string
-				for name := range driversMap {
-					driversSlice = append(driversSlice, name)
+				for d := range driversMap {
+					driversSlice = append(driversSlice, d)
 				}
 
-				return nil, fmt.Errorf("%s contains several valid graphdrivers: %s; Please cleanup or explicitly choose storage driver (-s <DRIVER>)", config.Root, strings.Join(driversSlice, ", "))
+				err = errors.Errorf("%s contains several valid graphdrivers: %s; cleanup or explicitly choose storage driver (-s <DRIVER>)", config.Root, strings.Join(driversSlice, ", "))
+				log.G(ctx).Errorf("[graphdriver] %v", err)
+				return nil, err
 			}
 
-			logrus.Infof("[graphdriver] using prior storage driver: %s", name)
-			logDeprecatedWarning(name)
+			log.G(ctx).Infof("[graphdriver] using prior storage driver: %s", name)
 			return driver, nil
 		}
 	}
 
-	// Check for priority drivers first
-	for _, name := range list {
-		driver, err := getBuiltinDriver(name, config.Root, config.DriverOptions, config.UIDMaps, config.GIDMaps)
+	// If no prior state was found, continue with automatic selection, and pick
+	// the first supported, non-deprecated, storage driver (in order of priorityList).
+	for _, name := range priorityList {
+		driver, err := getDriver(name, config)
 		if err != nil {
 			if IsDriverNotSupported(err) {
 				continue
 			}
 			return nil, err
 		}
-		logDeprecatedWarning(name)
 		return driver, nil
 	}
 
 	// Check all registered drivers if no priority driver is found
 	for name, initFunc := range drivers {
-		if isDeprecated(name) {
-			// Deprecated storage-drivers are skipped in automatic selection, but
-			// can be selected through configuration.
-			continue
-		}
-		driver, err := initFunc(filepath.Join(config.Root, name), config.DriverOptions, config.UIDMaps, config.GIDMaps)
+		driver, err := initFunc(filepath.Join(config.Root, name), config.DriverOptions, config.IDMap)
 		if err != nil {
 			if IsDriverNotSupported(err) {
 				continue
 			}
 			return nil, err
 		}
-		logDeprecatedWarning(name)
 		return driver, nil
 	}
-	return nil, fmt.Errorf("No supported storage backend found")
+
+	return nil, errors.Errorf("no supported storage driver found")
 }
 
-// scanPriorDrivers returns an un-ordered scan of directories of prior storage drivers
+// scanPriorDrivers returns an un-ordered scan of directories of prior storage
+// drivers. The 'vfs' storage driver is not taken into account, and ignored.
 func scanPriorDrivers(root string) map[string]bool {
 	driversMap := make(map[string]bool)
 
@@ -284,18 +256,6 @@ func scanPriorDrivers(root string) map[string]bool {
 		}
 	}
 	return driversMap
-}
-
-// IsInitialized checks if the driver's home-directory exists and is non-empty.
-func IsInitialized(driverHome string) bool {
-	_, err := os.Stat(driverHome)
-	if os.IsNotExist(err) {
-		return false
-	}
-	if err != nil {
-		logrus.Warnf("graphdriver.IsInitialized: stat failed: %v", err)
-	}
-	return !isEmptyDir(driverHome)
 }
 
 // isEmptyDir checks if a directory is empty. It is used to check if prior
@@ -315,19 +275,11 @@ func isEmptyDir(name string) bool {
 	return false
 }
 
-// isDeprecated checks if a storage-driver is marked "deprecated"
-func isDeprecated(name string) bool {
+// checkRemoved checks if a storage-driver has been deprecated (and removed)
+func checkRemoved(name string) error {
 	switch name {
-	// NOTE: when deprecating a driver, update daemon.fillDriverInfo() accordingly
 	case "aufs", "devicemapper", "overlay":
-		return true
+		return NotSupportedError(fmt.Sprintf("[graphdriver] ERROR: the %s storage-driver has been deprecated and removed; visit https://docs.docker.com/go/storage-driver/ for more information", name))
 	}
-	return false
-}
-
-// logDeprecatedWarning logs a warning if the given storage-driver is marked "deprecated"
-func logDeprecatedWarning(name string) {
-	if isDeprecated(name) {
-		logrus.Warnf("[graphdriver] WARNING: the %s storage-driver is deprecated, and will be removed in a future release", name)
-	}
+	return nil
 }

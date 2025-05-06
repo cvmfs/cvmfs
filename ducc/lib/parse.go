@@ -52,16 +52,16 @@ func ParseImage(image string) (img Image, err error) {
 		return Image{}, fmt.Errorf("Impossible to parse the string into an image, too many `:` in : %s", image)
 	}
 	// the colon `:` is used also as separator in the digest between sha256
-	// and the actuall digest, a len(pathSplitted) == 2 could either means
+	// and the actual digest, a len(pathSplitted) == 2 could either mean
 	// a repository and a tag or a repository and an hash, in the case of
 	// the hash however the split will be more complex.  Now we split for
 	// the at `@` which separate the digest from everything else. If this
-	// split produce only one result we have a repository and maybe a tag,
-	// if it produce two we have a repository, maybe a tag and definitely a
-	// digest, if it produce more than two we have an error.
+	// split produces only one result we have a repository and maybe a tag,
+	// if it produces two we have a repository, maybe a tag and definitely a
+	// digest, if it produces more than two we have an error.
 	atPathSplitted := strings.Split(url.Path, "@")
 	if len(atPathSplitted) > 2 {
-		return Image{}, fmt.Errorf("To many `@` in the image name: %s", image)
+		return Image{}, fmt.Errorf("Too many `@` in the image name: %s", image)
 	}
 	var repoTag, digest string
 	if len(atPathSplitted) == 2 {

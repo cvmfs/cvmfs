@@ -5,7 +5,7 @@
  */
 
 #include "swissknife_graft.h"
-#include "cvmfs_config.h"
+
 
 #include <fcntl.h>
 #include <unistd.h>
