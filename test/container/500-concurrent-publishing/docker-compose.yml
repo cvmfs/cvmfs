@@ -9,7 +9,7 @@ services:
         cgroup: host # required to run sbin/init with cgroups v2
         build:
             context: ../../..
-            dockerfile: test/container/500-concurrent-publishing/Dockerfile-dev-pub
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
@@ -29,7 +29,7 @@ services:
         cgroup: host # required to run sbin/init with cgroups v2
         build:
             context: ../../..
-            dockerfile: test/container/500-concurrent-publishing/Dockerfile-dev-pub
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
@@ -45,7 +45,7 @@ services:
         cgroup: host # required to run sbin/init with cgroups v2
         build:
             context: ../../..
-            dockerfile: test/container/500-concurrent-publishing/Dockerfile-dev-pub
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
