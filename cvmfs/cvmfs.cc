@@ -36,7 +36,7 @@
 
 #include "cvmfs.h"
 
-#include <dirent.h>
+#include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -44,13 +44,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/errno.h>
-#include <sys/file.h>
-#include <sys/mount.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <sys/time.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -61,8 +56,6 @@
 #include <ctime>
 #include <functional>
 #include <google/dense_hash_map>
-#include <map>
-#include <new>
 #include <string>
 #include <utility>
 #include <vector>
@@ -70,26 +63,25 @@
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
+#include "bigvector.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
+#include "catalog_mgr.h"
 #include "catalog_mgr_client.h"
 #include "clientctx.h"
 #include "compat.h"
 #include "compression/compression.h"
 #include "crypto/crypto_util.h"
 #include "crypto/hash.h"
-#include "crypto/signature.h"
 #include "directory_entry.h"
-#include "duplex_fuse.h"
 #include "fence.h"
 #include "fetch.h"
 #include "file_chunk.h"
+#include "fuse_evict.h"
 #include "fuse_inode_gen.h"
 #include "fuse_remount.h"
-#include "globals.h"
 #include "glue_buffer.h"
-#include "history_sqlite.h"
 #include "interrupt.h"
 #include "loader.h"
 #include "lru_md.h"
@@ -105,19 +97,19 @@
 #include "quota_posix.h"
 #include "sanitizer.h"
 #include "shortstring.h"
-#include "sqlitemem.h"
 #include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
-#include "util/atomic.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
-#include "util/platform.h"
+#include "util/mutex.h"
+#include "util/pointer.h"
 #include "util/smalloc.h"
+#include "util/string.h"
+#include "util/posix.h"
 #include "util/testing.h"
 #include "util/uuid.h"
 #include "wpad.h"
