@@ -14,15 +14,20 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/syslog.h>
+#include <stdio.h>
+#include <stdio.h>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string>
 #include <vector>
 
 #include "util/export.h"

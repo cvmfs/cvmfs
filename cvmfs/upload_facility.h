@@ -17,6 +17,7 @@
 #include "upload_spooler_definition.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"
+#include "util/pointer.h"
 #include "util/posix.h"
 #include "util/tube.h"
 

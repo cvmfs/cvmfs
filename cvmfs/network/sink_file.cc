@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <string>
+#include <unistd.h>
 
 namespace cvmfs {
 

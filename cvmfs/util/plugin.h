@@ -8,10 +8,11 @@
 #include <pthread.h>
 
 #include <cassert>
+#include <cstddef>
 #include <vector>
 
 #include "util/atomic.h"
-#include "util/concurrency.h"
+#include "util/mutex.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

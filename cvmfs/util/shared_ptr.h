@@ -5,6 +5,7 @@
 #ifndef CVMFS_UTIL_SHARED_PTR_H_
 #define CVMFS_UTIL_SHARED_PTR_H_
 
+#include <cstdint>
 #include <cstdlib>
 
 #include "util/atomic.h"

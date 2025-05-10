@@ -5,8 +5,13 @@
 
 #include "namespace.h"
 
+#include <bits/types/siginfo_t.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <cstdlib>
+#include <cassert>
 #ifndef __APPLE__
 #include <sched.h>
 #include <sys/mount.h>

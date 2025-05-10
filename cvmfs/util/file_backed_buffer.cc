@@ -5,8 +5,12 @@
 #include "file_backed_buffer.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <string>
+#include <unistd.h>
 
 #include "util/exception.h"
 #include "util/logging.h"

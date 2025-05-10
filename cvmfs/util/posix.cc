@@ -9,6 +9,16 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include <cctype>
+#include <stdlib.h>
+#include <cstdlib>
+#include <dirent.h>
+#include <sys/file.h>
+#include <string.h>
+#include <stdio.h>
+#include <sched.h>
+#include <sys/select.h>
+#include <sys/uio.h>
 
 #include "posix.h"
 
@@ -52,13 +62,17 @@
 #include <vector>
 
 #include "util/algorithm.h"
-#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/pipe.h"
-#include "util/platform.h"
 #include "util/string.h"
+#include "util/smalloc.h"
+#include "util/smalloc.h"
+#include "util/smalloc.h"
+#include "util/mutex.h"
+#include "util/mutex.h"
+#include "util/mutex.h"
 
 // using namespace std;  // NOLINT
 

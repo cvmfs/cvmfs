@@ -9,8 +9,13 @@
 #include "util/uuid.h"
 
 #include <cassert>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <uuid/uuid.h>
 
 #include "util/pointer.h"
 #include "util/posix.h"

@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <uuid/uuid.h>
 
+#include <cstdint>
 #include <string>
 
 #include "util/export.h"

@@ -4,6 +4,8 @@
 
 
 #include "exception.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <cassert>
 #include <cstdarg>

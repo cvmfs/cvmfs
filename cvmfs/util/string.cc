@@ -9,19 +9,23 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "string.h"
-
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <stdint.h>
-#include <unistd.h>
-
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <algorithm>
+#include <vector>
+#include <map>
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <time.h>
 #include <string>
+#include <unistd.h>
+
 
 using namespace std;  // NOLINT
 

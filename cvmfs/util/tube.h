@@ -9,11 +9,11 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <cstddef>
 #include <vector>
 
 #include "util/atomic.h"
-#include "util/concurrency.h"
-#include "util/pointer.h"
+#include "util/mutex.h"
 #include "util/single_copy.h"
 
 /**

@@ -6,22 +6,22 @@
 #define CVMFS_UTIL_POSIX_H_
 
 #include <pthread.h>
+#include <sched.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <unistd.h>
 
 #include <cassert>
 #include <cerrno>
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "util/export.h"
-#include "util/pointer.h"
-#include "util/single_copy.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

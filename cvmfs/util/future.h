@@ -8,6 +8,7 @@
 #include <pthread.h>
 
 #include <cassert>
+#include <cstddef>
 
 #include "util/mutex.h"
 #include "util/single_copy.h"
