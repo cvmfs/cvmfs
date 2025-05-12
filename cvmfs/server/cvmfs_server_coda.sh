@@ -181,7 +181,7 @@ APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
 ################################################################################
 
 # check if there is at least a selected sub-command
-if [ $# -lt 1 ]; then
+if [ $# -lt 1 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
   usage
 fi
 
