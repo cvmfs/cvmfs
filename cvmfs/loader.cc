@@ -439,6 +439,24 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
 }
 
 
+static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
+  for (int i = 0; i < mount_options->argc; i++) {
+    char *arg = mount_options->argv[i];
+    char *p = strstr(arg, opt);
+    if (p != NULL) {
+      if (p == arg)
+        return true;
+      char c = *(p-1);
+      if ((c == ',') || (c == ' '))
+        return true;
+      if ((c == 'o') && (p >= arg+2) && (*(p-2) == '-'))
+        return true;
+    }
+  }
+  return false;
+}
+
+
 static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   memset(loader_operations, 0, sizeof(*loader_operations));
 
@@ -881,6 +899,47 @@ int FuseMain(int argc, char *argv[]) {
     }
   }
 
+#if CVMFS_USE_LIBFUSE != 2
+  int premount_fd = -1;
+  if (!premounted_ && !suid_mode_ && getuid() == 0) {
+    // If not already premounted or using suid mode, premount the fuse
+    // mountpoint before dropping privileges to avoid the need for fusermount.
+    // Requires libfuse >= 3.3.0.
+    platform_stat64 info;
+    // Need to know if it is a directory or not
+    if (platform_stat(mount_point_->c_str(), &info) != 0) { LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to stat mountpoint %s (%d)",
+               mount_point_->c_str(), errno);
+      return kFailPermission;
+    }
+    premount_fd = open("/dev/fuse", O_RDWR);
+    if (premount_fd == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to open /dev/fuse (%d)", errno);
+      return kFailPermission;
+    }
+    char opts[128];
+    snprintf(opts, sizeof(opts),
+      "fd=%i,rootmode=%o,user_id=0,group_id=0%s%s",
+      premount_fd, info.st_mode & S_IFMT,
+      MatchFuseOption(mount_options, "default_permissions") ?
+                                     ",default_permissions" : "",
+      MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
+    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
+    if (!MatchFuseOption(mount_options, "rw")) {
+      flags |= MS_RDONLY;
+    }
+    if (mount("cvmfs2", mount_point_->c_str(), "fuse", flags, opts) == -1) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "Failed to mount -t fuse -o %s cvmfs2 %s (%d)",
+               opts, mount_point_->c_str(), errno);
+      return kFailPermission;
+    }
+  }
+#endif
+
+  int fd_mountinfo = -1; // needs to be declared before start using goto
+
   // Drop credentials
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
@@ -889,7 +948,8 @@ int FuseMain(int argc, char *argv[]) {
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "Failed to drop credentials");
-      return kFailPermission;
+      retval = kFailPermission;
+      goto cleanup;
     }
   }
   if (disable_watchdog_) {
@@ -919,7 +979,8 @@ int FuseMain(int argc, char *argv[]) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "CernVM-FS: ACL support requested but not available in this "
              "version of libfuse");
-    return kFailPermission;
+    retval = kFailPermission;
+    goto cleanup;
   }
 #endif
 
@@ -932,7 +993,8 @@ int FuseMain(int argc, char *argv[]) {
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "Failed to initialize loader socket");
-    return kFailLoaderTalk;
+    retval = kFailLoaderTalk;
+    goto cleanup;
   }
 
   // TODO(jblomer): we probably want to apply a default setting related to the
@@ -978,7 +1040,8 @@ int FuseMain(int argc, char *argv[]) {
            "CernVM-FS: loading Fuse module... ");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_) {
-    return kFailLoadLibrary;
+    retval = kFailLoadLibrary;
+    goto cleanup;
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
@@ -993,7 +1056,7 @@ int FuseMain(int argc, char *argv[]) {
              cvmfs_exports_->fnGetErrorMsg().c_str(),
              retval, Code2Ascii((Failures)retval));
     cvmfs_exports_->fnFini();
-    return retval;
+    goto cleanup;
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
@@ -1006,7 +1069,8 @@ int FuseMain(int argc, char *argv[]) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for mounting");
       cvmfs_exports_->fnFini();
-      return kFailPermission;
+      retval = kFailPermission;
+      goto cleanup;
     }
   }
 
@@ -1024,7 +1088,8 @@ int FuseMain(int argc, char *argv[]) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "failed to create Fuse channel");
     cvmfs_exports_->fnFini();
-    return kFailMount;
+    retval = kFailMount;
+    goto cleanup;
   }
 
   session = fuse_lowlevel_new(mount_options, &loader_operations,
@@ -1034,7 +1099,8 @@ int FuseMain(int argc, char *argv[]) {
              "failed to create Fuse session");
     fuse_unmount(mount_point_->c_str(), channel);
     cvmfs_exports_->fnFini();
-    return kFailMount;
+    retval = kFailMount;
+    goto cleanup;
   }
 #else
   // libfuse3
@@ -1044,14 +1110,22 @@ int FuseMain(int argc, char *argv[]) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "failed to create Fuse session");
     cvmfs_exports_->fnFini();
-    return kFailMount;
+    retval = kFailMount;
+    goto cleanup;
   }
-  retval = fuse_session_mount(session, mount_point_->c_str());
+  if (premount_fd >= 0) {
+    char premount_str[64];
+    snprintf(premount_str, sizeof(premount_str), "/dev/fd/%d", premount_fd);
+    retval = fuse_session_mount(session, premount_str);
+  } else {
+    retval = fuse_session_mount(session, mount_point_->c_str());
+  }
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "failed to mount file system");
     cvmfs_exports_->fnFini();
-    return kFailMount;
+    retval = kFailMount;
+    goto cleanup;
   }
 #endif
 
@@ -1062,12 +1136,13 @@ int FuseMain(int argc, char *argv[]) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to drop permissions after mounting");
       cvmfs_exports_->fnFini();
-      return kFailPermission;
+      retval = kFailPermission;
+      goto cleanup;
     }
   }
 
   // Determine device id
-  int fd_mountinfo = open("/proc/self/mountinfo", O_RDONLY);
+  fd_mountinfo = open("/proc/self/mountinfo", O_RDONLY);
   if (fd_mountinfo > 0) {
     std::string line;
     while (GetLineFd(fd_mountinfo, &line)) {
@@ -1155,9 +1230,6 @@ int FuseMain(int argc, char *argv[]) {
 
   CloseLibrary();
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-           mount_point_->c_str(), repository_name_->c_str());
-
   delete fence_reload_;
   delete loader_exports_;
   delete config_files_;
@@ -1167,13 +1239,50 @@ int FuseMain(int argc, char *argv[]) {
   fence_reload_ = NULL;
   loader_exports_ = NULL;
   config_files_ = NULL;
-  repository_name_ = NULL;
-  mount_point_ = NULL;
   socket_path_ = NULL;
 
-  if (retval != 0)
-    return kFailFuseLoop;
-  return kFailOk;
+    if (retval != 0)
+      retval = kFailFuseLoop;
+    else
+      retval = kFailOk;
+
+#if CVMFS_USE_LIBFUSE != 2
+  if (premount_fd >= 0) {
+    goto cleanup;
+  }
+#endif
+
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+           mount_point_->c_str(), repository_name_->c_str());
+
+  repository_name_ = NULL;
+  mount_point_ = NULL;
+
+  return retval;
+
+cleanup:
+#if CVMFS_USE_LIBFUSE != 2
+  if (premount_fd >= 0) {
+    if (!SwitchCredentials(0, getgid(), true)) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to re-gain root permissions for umounting");
+      retval = kFailPermission;
+    } else if (umount(mount_point_->c_str()) < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "failed to umount %s (%d)", mount_point_->c_str(), errno);
+      retval = kFailPermission;
+    } else {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+               mount_point_->c_str(), repository_name_->c_str());
+    }
+    close(premount_fd);
+  }
+#endif
+
+  repository_name_ = NULL;
+  mount_point_ = NULL;
+
+  return retval;
 }
 
 

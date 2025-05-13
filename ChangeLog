@@ -1,12 +1,16 @@
 2.13.0:
   * [client] Improved EIO logging (#3723)
-  * [client] chksetup: use max-time instead of connect-timeout to avoid blocking (#3822)
-  * Fix ingest command to allow deletions of paths containing colons (:) (#3792)
+  * [client] chksetup: Now uses max-time instead of connect-timeout to avoid blocking when contacting stratum 1s (#3822)
+  * [server] Fixed garbage collection lock to avoid spurious check failures (#3815)
+  * [server] Ingest command can now delete paths containing colons (:) (#3792)
   * [gateway, ducc, snapshotter] bump and cleanup golang dependencies
-  * [rpm] fix permissions for cvmfs_ducc (#3790)
+  * [rpm] Automatically set permissions for cvmfs_ducc (#3790)
   * [client] Install apparmor profile for fusermount3/cvmfs (#3791)
-  * [shrinkwrap] ensure that directories are writeable to avoid copy errors (#3798)
-  * [macos] fix chksetup for macfuse (#3800)
+  * [shrinkwrap] Avoid possible copy errors by ensuring that directories are writeable (#3798)
+  * [macos] Chksetup for macfuse no longer complains about missing FUSE-T (#3800)
+  * [client] Bugreport no longer blocks and collects as much data as possible when client stuck (#3768)
+  * [server] Do not corrupt repository when ingesting a tarball to a base dir that contains a double slash (#3786)
+  
 
 2.12.7:
   * [rpm] Apply %pretrans transaction check in most subpackages (#3779)

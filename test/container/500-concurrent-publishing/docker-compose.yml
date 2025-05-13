@@ -6,9 +6,10 @@ services:
         container_name: cvmfs-gw1
         hostname: cvmfs-gw1
         privileged: true
+        cgroup: host # required to run sbin/init with cgroups v2
         build:
-            context: .
-            dockerfile: Dockerfile-dev-pub
+            context: ../../..
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
@@ -25,9 +26,10 @@ services:
         container_name: cvmfs-pub1
         hostname: cvmfs-pub1
         privileged: true
+        cgroup: host # required to run sbin/init with cgroups v2
         build:
-            context: .
-            dockerfile: Dockerfile-dev-pub
+            context: ../../..
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys
@@ -40,9 +42,10 @@ services:
         container_name: cvmfs-pub2
         hostname: cvmfs-pub2
         privileged: true
+        cgroup: host # required to run sbin/init with cgroups v2
         build:
-            context: .
-            dockerfile: Dockerfile-dev-pub
+            context: ../../..
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - ./keys/:/etc/cvmfs/keys

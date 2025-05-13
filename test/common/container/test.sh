@@ -35,6 +35,7 @@ CVMFS_TEST_UNIONFS=overlayfs                                                  \
                                  src/593-nestedwhiteout                       \
                                  src/595-geoipdbupdate                        \
                                  src/600-securecvmfs                          \
+                                 src/602-libcvmfs                             \
                                  src/608-infofile                             \
                                  src/610-altpath                              \
                                  src/615-externaldata                         \

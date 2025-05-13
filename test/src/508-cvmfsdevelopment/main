@@ -32,7 +32,7 @@ download_and_untar_cvmfs_versions() {
   do
     echo $cvmfs_version
 
-    wget --quiet $cvmfs_version || return 201
+    curl -LO --silent $cvmfs_version || return 200
     tarname=$(basename $cvmfs_version)
     tar -xzf $tarname || return 202
   done
@@ -199,9 +199,6 @@ cvmfs_run_test() {
   local scratch_dir=$(pwd)
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
-
-  echo -n "checking for wget... "
-  which wget > /dev/null 2>&1 && echo "done" || { echo "not found"; return 1; }
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?

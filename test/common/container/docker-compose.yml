@@ -8,8 +8,8 @@ services:
         privileged: true
         cgroup: host # required to run sbin/init with cgroups v2
         build:
-            context: .
-            dockerfile: Dockerfile-dev
+            context: ../../..
+            dockerfile: test/common/container/Dockerfile-dev
         volumes:
             - /sys/fs/cgroup:/sys/fs/cgroup
             - var_spool_cvmfs:/var/spool/cvmfs
