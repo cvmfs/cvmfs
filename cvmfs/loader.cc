@@ -148,38 +148,35 @@ LoaderExports *loader_exports_;
 
 
 static void Usage(const string &exename) {
-  LogCvmfs(
-      kLogCvmfs, kLogStdout,
-      "The CernVM File System\n"
-      "Version %s\n"
-      "Copyright (c) 2009- CERN, all rights reserved\n\n"
-      "Please visit http://cernvm.cern.ch for details.\n\n"
-      "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount options] "
-      "<repository name> <mount point>\n\n"
-      "CernVM-FS general options:\n"
-      "  --help|-h            Print Help output (this)\n"
-      "  --version|-V         Print CernVM-FS version\n"
-      "  -s                   Run singlethreaded\n"
-      "  -f                   Run in foreground\n"
-      "  -d                   Enable debugging\n"
-      "  -k                   Parse options\n"
-      "CernVM-FS mount options:\n"
-      "  -o config=FILES      colon-separated path list of config files\n"
-      "  -o uid=UID           Drop credentials to another user\n"
-      "  -o gid=GID           Drop credentials to another group\n"
-      "  -o system_mount      Indicate that mount is system-wide\n"
-      "  -o grab_mountpoint   give ownership of the mountpoint to the user "
-      "before mounting (required for autofs)\n"
-      "  -o parse             Parse and print cvmfs parameters\n"
-      "  -o cvmfs_suid        Enable suid mode\n\n"
-      "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
-      "  -o foreground        Run in foreground\n"
-      "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
-      "Fuse mount options:\n"
-      "  -o allow_other       allow access to other users\n"
-      "  -o allow_root        allow access to root\n"
-      "  -o nonempty          allow mounts over non-empty directory\n",
-      CVMFS_VERSION, exename.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout,
+    "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount_options] "
+      "<repository_name> <mount_point>\n\n"
+    "Mounts a CernVM-FS with the given repository at the given mountpoint.\n"
+    "Usually invoked via autofs or 'mount -t cvmfs <repository_name> <mount_point>'\n\n"
+    "CernVM-FS general options:\n"
+    "  -h, --help           Print Help output (this)\n"
+    "  -V, --version        Print CernVM-FS version\n"
+    "  -s                   Run singlethreaded\n"
+    "  -f                   Run in foreground\n"
+    "  -d                   Enable debugging\n"
+    "  -k                   Parse options\n"
+    "CernVM-FS mount options:\n"
+    "  -o config=FILES      colon-separated path list of config files\n"
+    "  -o uid=UID           Drop credentials to another user\n"
+    "  -o gid=GID           Drop credentials to another group\n"
+    "  -o system_mount      Indicate that mount is system-wide\n"
+    "  -o grab_mountpoint   give ownership of the mountpoint to the user "
+                            "before mounting (required for autofs)\n"
+    "  -o parse             Parse and print cvmfs parameters\n"
+    "  -o cvmfs_suid        Enable suid mode\n"
+    "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
+    "  -o foreground        Run in foreground\n"
+    "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
+    "Fuse mount options:\n"
+    "  -o allow_other       allow access to other users\n"
+    "  -o allow_root        allow access to root\n"
+    "  -o nonempty          allow mounts over non-empty directory\n",
+     exename.c_str());
 }
 
 /**
