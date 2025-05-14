@@ -9,6 +9,7 @@ Build-Depends:
  autotools-dev,
  cmake,
  cpio,
+ help2man,
  libcap-dev,
  libssl-dev,
  libattr1-dev,

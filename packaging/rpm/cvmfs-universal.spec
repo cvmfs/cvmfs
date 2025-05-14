@@ -96,6 +96,7 @@ BuildRequires: gcc4-c++
 %else
 BuildRequires: gcc
 BuildRequires: gcc-c++
+BuildRequires: help2man
 BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
@@ -213,6 +214,7 @@ Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
+BuildRequires: help2man
 BuildRequires: unzip
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
@@ -657,6 +659,8 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
+%doc %{mandir}/man1/cvmfs2.1
+%doc %{mandir}/man1/cvmfs_config.1
 
 %files libs
 %defattr(-,root,root)
@@ -715,6 +719,8 @@ systemctl daemon-reload
 %doc COPYING AUTHORS README.md ChangeLog
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
+%doc %{mandir}/man1/cvmfs_server.1
+%doc %{mandir}/man1/cvmfs_swissknife.1
 
 %files shrinkwrap
 %defattr(-,root,root)
