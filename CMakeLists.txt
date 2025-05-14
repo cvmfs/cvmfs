@@ -557,9 +557,10 @@ install (
   PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
 )
 
-#
-# Generate the documentation using doxygen
-#
+# Man pages
+add_subdirectory(doc/manpages)
+
+# Doxygen
 if (BUILD_DOCUMENTATION)
   message (STATUS "Generating Doxygen configuration ...")
   set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
@@ -576,4 +577,5 @@ if (BUILD_DOCUMENTATION)
     COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
   )
   include (cmake/Modules/UseDoxygen)
+
 endif ()

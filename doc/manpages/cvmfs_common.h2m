@@ -1,0 +1,18 @@
+[GETTING HELP]
+
+For general questions regarding CernVM-FS, use the forum:
+
+https://cernvm-forum.cern.ch
+
+[REPORTING BUGS]
+
+The issue tracker is located on GitHub:
+
+https://github.com/cvmfs/cvmfs/issues
+
+Consider using cvmfs_config bugreport to create a tarball with debugging information, and attaching it to to your issue. 
+
+
+[COPYRIGHT]
+
+Copyright (c) 2009- CERN, all rights reserved

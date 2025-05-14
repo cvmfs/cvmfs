@@ -1,0 +1,6 @@
+[EXAMPLES]
+
+mount -t cvmfs cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
+
+# same, but run in foreground for debugging
+cvmfs2 -d -f cvmfs-config.cern.ch /cvmfs/cvmfs-config.cern.ch
