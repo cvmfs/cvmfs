@@ -659,8 +659,8 @@ systemctl daemon-reload
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
-%doc %{mandir}/man1/cvmfs2.1
-%doc %{mandir}/man1/cvmfs_config.1
+%doc %{_mandir}/man1/cvmfs2.1.gz
+%doc %{_mandir}/man1/cvmfs_config.1.gz
 
 %files libs
 %defattr(-,root,root)
@@ -717,10 +717,15 @@ systemctl daemon-reload
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
+<<<<<<< HEAD
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 %doc %{mandir}/man1/cvmfs_server.1
 %doc %{mandir}/man1/cvmfs_swissknife.1
+=======
+%doc %{_mandir}/man1/cvmfs_server.1.gz
+%doc %{_mandir}/man1/cvmfs_swissknife.1.gz
+>>>>>>> 27c657bf4 (fix packaging for swissknife)
 
 %files shrinkwrap
 %defattr(-,root,root)
