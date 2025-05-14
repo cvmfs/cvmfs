@@ -185,6 +185,12 @@ if [ $# -lt 1 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
   usage
 fi
 
+## implement --version
+if [ "$1" == "--version" ]; then
+  echo "CernVM-FS version $(__swissknife --version)"
+  exit 0
+fi
+
 # check if the given sub-command is known and, if so, call it
 subcommand=$1
 shift
