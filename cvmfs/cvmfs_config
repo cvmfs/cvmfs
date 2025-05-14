@@ -257,22 +257,35 @@ compare_versions() {
 cvmfs_config_usage() {
   echo "Common configuration tasks for CernVM-FS"
   echo "Usage: $0 <command>"
-  echo "Commands are"
+  echo "Commands:"
   echo "  setup [nouser] [nocfgmod] [nostart] [noautofs]"
+  echo ""
   if is_wsl2; then
     echo "  wsl2_start"
+    echo ""
   fi
   echo "  chksetup"
+  echo ""
   echo "  showconfig [-s(hort output, only non-empty parameters)] [<repository>]"
+  echo ""
   echo "  stat [-v | <repository>]"
+  echo ""
   echo "  status"
+  echo ""
   echo "  probe [<repository list>]"
+  echo ""
   echo "  fsck [-q(uick check for zero byte files only) | <cvmfs_fsck options>]"
+  echo ""
   echo "  fuser <repository>"
+  echo ""
   echo "  reload [-c | <repository>]"
+  echo ""
   echo "  umount"
+  echo ""
   echo "  wipecache"
+  echo ""
   echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
+  echo ""
   echo "  bugreport <timeout_in_sec_per_command (default = 90)>"
 }
 
@@ -2547,9 +2560,21 @@ case "$1" in
      RETVAL=$?
      ;;
 
-   *)
+   --version)
+     echo $(cvmfs2 --version)
+     RETVAL=0
+     ;;
+   --help)
      cvmfs_config_usage
      RETVAL=0
+     ;;
+   -h)
+     cvmfs_config_usage
+     RETVAL=0
+     ;;
+   *)
+     cvmfs_config_usage
+     RETVAL=1
      ;;
 esac
 
