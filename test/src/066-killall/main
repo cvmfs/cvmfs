@@ -45,8 +45,13 @@ fs_cleanup(){
 
 freeze()
 {
+  # Inside docker fsfreeze is not supported.
+  # If fsfreeze fails, early return succesfully
   logdebug "Freezing ${DEST}.."
 	sudo fsfreeze -f -- "$DEST"
+  if [ "$?" != "0" ]; then
+    return 0
+  fi
 }
 
 unfreeze() {
@@ -191,10 +196,10 @@ cvmfs_run_test() {
   fs_setup
   trap fs_cleanup EXIT
 
-  logdebug "Testing killall -ff(fuse first)"
-  test_extra_args "-ff" || return $?
-  echo "Testing killall -sff(stuck ff)"
-  test_extra_args "-sff" || return $?
+  logdebug "Testing killall -r(reset fuse)"
+  test_extra_args "-r" || return $?
+  echo "Testing killall -s(stuck fuse reset)"
+  test_extra_args "-s" || return $?
 
   return 0
 }
