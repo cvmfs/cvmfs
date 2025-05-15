@@ -99,11 +99,6 @@ var_list="$parm_list $switch_list"
 
 cvmfs_fs_bundle="/Library/Filesystems/cvmfs.fs/Contents/Resources" # Mac OS X
 
-PROCNAME=cvmfs2
-MOUNTPOINT=/cvmfs
-IS_KILLALL_STUCK=FALSE
-IS_KILLALL_FORCE=FALSE
-
 # Check if killall has extra arguments
 # -f(orce): abort all cvmfs associated fuse devices
 # -s(tuck): abort all cvmfs associated fuse devices in waiting state
@@ -114,11 +109,11 @@ parse_killall_opts(){
   done
   while [[ $# -gt 0  ]]; do
     case "$1" in
-      "-f")
-        IS_KILLALL_FORCE=true
+      "-r")
+        abort_all_devices $(get_cvmfs_devices)
         ;;
       "-s")
-        IS_KILLALL_STUCK=true
+        abort_stuck_devices $(get_devices_map)
         ;;
       "--help")
         cvmfs_config_usage
@@ -155,7 +150,7 @@ abort_fuse_device(){
 get_cvmfs_devices()
 {
   local cvmfs_devices=""
-  for pid in $(pidof "$PROCNAME")
+  for pid in $(pidof cvmfs2)
   do
     while read -r line; do
       # Get the interesting fields from every line of mountinfo;
@@ -163,7 +158,7 @@ get_cvmfs_devices()
       device_id=$(echo "$line" | cut -d' ' -f 3)
       current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
 
-      if [[ "$current_mountpoint" == "$MOUNTPOINT/"*  ]]; then
+      if [[ "$current_mountpoint" == "/cvmfs/"*  ]]; then
         if ! grep -q "$device_id" <<< "$cvmfs_devices"; then
           cvmfs_devices=$cvmfs_devices" $device_id"
         fi
@@ -176,7 +171,7 @@ get_cvmfs_devices()
 get_devices_map()
 {
   local devices_map=""
-  for pid in $(pidof "$PROCNAME")
+  for pid in $(pidof cvmfs2)
   do
     while read -r line; do
       # Get the interesting fields from every line of mountinfo;
@@ -184,7 +179,7 @@ get_devices_map()
       device_id=$(echo "$line" | cut -d' ' -f 3)
       current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
 
-      if [[ "$current_mountpoint" == "$MOUNTPOINT/"*  ]]; then
+      if [[ "$current_mountpoint" == "/cvmfs/"*  ]]; then
         if ! grep -q "$device_id" <<< "$devices_map"; then
           devices_map="$current_mountpoint>$device_id "$devices_map
         fi
@@ -275,7 +270,7 @@ cvmfs_config_usage() {
   echo "  reload [-c | <repository>]"
   echo "  umount"
   echo "  wipecache"
-  echo "  killall [-f(orce) ] [-s(tuck)]"
+  echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo "  bugreport <timeout_in_sec_per_command (default = 90)>"
 }
 
@@ -1513,15 +1508,6 @@ cvmfs_killall() {
   local pid=$$
 
   parse_killall_opts "$@"
-
-
-  if [ ${IS_KILLALL_FORCE} = true ] ; then
-    local cvmfs_devices=$(get_cvmfs_devices)
-    abort_all_devices $cvmfs_devices
-  elif [ ${IS_KILLALL_STUCK} = true ] ; then
-    local devices_map=$(get_devices_map)
-    abort_stuck_devices  $devices_map
-  fi
 
   echo -n "Terminating cvmfs_config processes... "
   # The exact match (pgrep -x) works only on Linux.  On macOS, one needs to

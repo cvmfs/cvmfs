@@ -191,10 +191,10 @@ cvmfs_run_test() {
   fs_setup
   trap fs_cleanup EXIT
 
-  logdebug "Testing killall -f(orce)"
-  test_extra_args "-f" || return $?
-  echo "Testing killall -s(tuck)"
-  test_extra_args "-s" || return $?
+  logdebug "Testing killall -ff(fuse first)"
+  test_extra_args "-ff" || return $?
+  echo "Testing killall -sff(stuck ff)"
+  test_extra_args "-sff" || return $?
 
   return 0
 }
