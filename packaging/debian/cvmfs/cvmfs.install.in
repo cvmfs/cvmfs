@@ -24,3 +24,5 @@ etc/cvmfs/default.conf
 etc/cvmfs/default.d/README
 etc/bash_completion.d/cvmfs
 usr/lib/systemd/system/cvmfs-reload.service
+usr/share/man/man1/cvmfs2.1
+usr/share/man/man1/cvmfs_config.1

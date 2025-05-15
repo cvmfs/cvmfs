@@ -30,3 +30,5 @@ var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README
 etc/logrotate.d/cvmfs-statsdb
 etc/logrotate.d/cvmfs
+usr/share/man/man1/cvmfs_server.1
+usr/share/man/man1/cvmfs_swissknife.1
