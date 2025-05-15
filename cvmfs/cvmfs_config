@@ -99,6 +99,8 @@ var_list="$parm_list $switch_list"
 
 cvmfs_fs_bundle="/Library/Filesystems/cvmfs.fs/Contents/Resources" # Mac OS X
 
+PROCNAME=cvmfs2
+MOUNTPOINT=/cvmfs
 IS_KILLALL_STUCK=FALSE
 IS_KILLALL_FORCE=FALSE
 
@@ -106,7 +108,11 @@ IS_KILLALL_FORCE=FALSE
 # -f(orce): abort all cvmfs associated fuse devices
 # -s(tuck): abort all cvmfs associated fuse devices in waiting state
 parse_killall_opts(){
-  while [[ "${1:-}" == -* ]]; do
+  for arg in "$@"; do
+    [[ "$arg" == "killall"  ]] && shift && break
+    shift
+  done
+  while [[ $# -gt 0  ]]; do
     case "$1" in
       "-f")
         IS_KILLALL_FORCE=true
@@ -119,9 +125,9 @@ parse_killall_opts(){
         ;;
       *)
         echo "Ignoring unknown option $1"
+        break
         ;;
     esac
-    [ $# -gt 0 ] || break
     shift
   done
 }
@@ -157,7 +163,7 @@ get_cvmfs_devices()
       device_id=$(echo "$line" | cut -d' ' -f 3)
       current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
 
-      if [[ "$current_mountpoint" == "$MOUNTPOINT"/*  ]]; then
+      if [[ "$current_mountpoint" == "$MOUNTPOINT/"*  ]]; then
         if ! grep -q "$device_id" <<< "$cvmfs_devices"; then
           cvmfs_devices=$cvmfs_devices" $device_id"
         fi
@@ -165,6 +171,27 @@ get_cvmfs_devices()
     done < /proc/$pid/mountinfo
   done
   echo $cvmfs_devices
+}
+
+get_devices_map()
+{
+  local devices_map=""
+  for pid in $(pidof "$PROCNAME")
+  do
+    while read -r line; do
+      # Get the interesting fields from every line of mountinfo;
+      # those are the mountpoint and the device id
+      device_id=$(echo "$line" | cut -d' ' -f 3)
+      current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
+
+      if [[ "$current_mountpoint" == "$MOUNTPOINT/"*  ]]; then
+        if ! grep -q "$device_id" <<< "$devices_map"; then
+          devices_map="$current_mountpoint>$device_id "$devices_map
+        fi
+      fi
+    done < /proc/$pid/mountinfo
+  done
+  echo $devices_map
 }
 
 abort_all_devices()
@@ -180,14 +207,18 @@ abort_all_devices()
 abort_stuck_devices()
 {
   echo "Aborting stuck cvmfs fuse devices.."
-  local devices="$@"
-  for device in $devices
+  local device_map="$@"
+  for map_entry in $device_map
   do
+    local mountpoint=$(echo $map_entry | cut -d'>' -f 1)
+    local device=$(echo $map_entry | cut -d'>' -f 2)
+
     fuse_dev=$(get_minor_device_id $device)
     local fuse_dev_path="/sys/fs/fuse/connections/$fuse_dev"
     # Abort waiting devices only
     if [ "$(cat $fuse_dev_path/waiting)" != "0" ] ;
     then
+      echo "Aborting $mountpoint"
       abort_fuse_device $fuse_dev
     fi
   done
@@ -1482,11 +1513,14 @@ cvmfs_killall() {
   local pid=$$
 
   parse_killall_opts "$@"
-  local cvmfs_devices=$(get_cvmfs_devices)
+
+
   if [ ${IS_KILLALL_FORCE} = true ] ; then
+    local cvmfs_devices=$(get_cvmfs_devices)
     abort_all_devices $cvmfs_devices
   elif [ ${IS_KILLALL_STUCK} = true ] ; then
-    abort_stuck_devices $cvmfs_devices
+    local devices_map=$(get_devices_map)
+    abort_stuck_devices  $devices_map
   fi
 
   echo -n "Terminating cvmfs_config processes... "
