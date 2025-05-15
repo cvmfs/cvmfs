@@ -34,7 +34,7 @@ func init() {
 }
 
 var garbageCollectionCmd = &cobra.Command{
-	Use:     "garbage-collection",
+	Use:     "garbage-collection <cvmfs repo>",
 	Short:   "Removes layers that are not necessary anymore",
 	Aliases: []string{"gc"},
 	Args:    cobra.ExactArgs(1),

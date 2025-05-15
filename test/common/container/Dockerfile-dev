@@ -1,4 +1,29 @@
-FROM gitlab-registry.cern.ch/cernvm/build-images/centos_x86_64:9
+# Stage 1: Builder
+FROM gitlab-registry.cern.ch/cernvm/build-images/centos_x86_64:9 AS builder
+
+USER root
+# This is a workaround for a sudo error that started after an 
+# upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
+RUN chmod 0400 /etc/shadow
+
+
+RUN dnf install -y rpm-build
+
+RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+ENV USER sftnight
+
+RUN mkdir -p /home/sftnight/buildpackage
+RUN mkdir -p /home/sftnight/buildpackage_config
+RUN mkdir -p /home/sftnight/cvmfs
+
+# Copy the repo
+COPY . /home/sftnight/cvmfs
+RUN cd /home/sftnight/cvmfs; ./ci/build_package.sh $PWD $PWD/../buildpackage/ cvmfs
+RUN cd /home/sftnight/cvmfs; ./ci/build_package.sh $PWD $PWD/../buildpackage_config/ cvmfs-config
+
+# Stage 2: Final
+FROM almalinux:9
 
 USER root
 
@@ -6,11 +31,18 @@ USER root
 # upgrade to the build image. Similar to https://github.com/apptainer/apptainer/issues/2756 but not quite clear
 RUN chmod 0400 /etc/shadow
 
-RUN dnf install -y sudo autofs fuse fuse3 httpd wget lsof \
+# Copy and install binaries from the builder stage
+COPY --from=builder /home/sftnight/buildpackage/RPMS/x86_64/ /tmp/.
+COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/.
+RUN dnf -y install /tmp/*.rpm
+
+# cloudtest dependencies
+RUN dnf install -y sudo gcc autofs fuse fuse3 httpd  lsof \
     python python3-pip attr nc sqlite python3-mod_wsgi jq usbutils
 
 RUN pip3 install flask
-
+# Create the sftnight user
+RUN useradd -m -s /bin/bash sftnight
 RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 ENV USER sftnight

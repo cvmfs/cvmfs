@@ -15,25 +15,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build image
+      - name: Build  CVMFS in Image
         run: |
           cd test/common/container
           docker compose up --build -d cvmfs-dev
 
-      - name: Build CVMFS
-        run: |
-          docker exec -u sftnight -t cvmfs-dev bash -c \
-            "cmake -S /home/sftnight/cvmfs -B /tmp/cvmfs-build -D EXTERNALS_PREFIX=/tmp/cvmfs-ext -D BUILD_SHRINKWRAP=ON"
-
-      - name: Install CVMFS
-        run: |
-          docker exec -u sftnight -t cvmfs-dev bash -c \
-            "cd /tmp/cvmfs-build && make && sudo make install"
-
       - name: Setup CVMFS
         run: |
-          docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config setup"
-          docker exec -u sftnight -t cvmfs-dev /bin/bash -c "sudo cvmfs_config chksetup" || exit 1
+          docker exec -u sftnight -t cvmfs-dev bash -c \
+            "sudo cvmfs_config setup"
 
       - name: Run Tests
         run: |
