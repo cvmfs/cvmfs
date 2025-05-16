@@ -7,14 +7,20 @@ CVMFS_TEST084_MOUNTPOINT=
 CVMFS_TEST084_FUSEPREMOUNT=
 
 cleanup() {
+  echo "*** cleanup "
   if [ x"$CVMFS_TEST084_FUSEPREMOUNT" != "x" ]; then
-    rm -f "CVMFS_TEST084_FUSEPREMOUNT"
+    sudo rm -f "$CVMFS_TEST084_FUSEPREMOUNT"
   fi
   if [ x"$CVMFS_TEST084_MOUNTPOINT" != "x" ]; then
-    cat /proc/self/mountinfo
     sudo umount $CVMFS_TEST084_MOUNTPOINT
-    echo "*** unmounted $CVMFS_TEST084_MOUNTPOINT"
+    rmdir $CVMFS_TEST084_MOUNTPOINT
+    echo "  *** unmounted $CVMFS_TEST084_MOUNTPOINT"
   fi
+  if [ x"$CVMFS_TEST084_CACHEDIR" != "x" ]; then
+    rm -rf $CVMFS_TEST084_CACHEDIR
+    echo "  *** removed $CVMFS_TEST084_CACHEDIR"
+  fi
+  rm $workdir/sft.config || true
 }
 
 cvmfs_run_test() {
@@ -23,14 +29,16 @@ cvmfs_run_test() {
 
   echo "*** creating fuse-premount"
   cc -o fuse_premount "$workdir/fuse_premount.c" || return 1
-  CVMFS_TEST084_FUSEPREMOUNT=/fuse_premount
-  sudo cp fuse_premount $CVMFS_TEST084_FUSEPREMOUNT || return 2
+  CVMFS_TEST084_FUSEPREMOUNT=$workdir/fuse_premount
+  #sudo cp fuse_premount $CVMFS_TEST084_FUSEPREMOUNT || return 2
   sudo chown root:root $CVMFS_TEST084_FUSEPREMOUNT || return 3
   sudo chmod 4755 $CVMFS_TEST084_FUSEPREMOUNT || return 4
+  echo -n "   "
   ls -lah $CVMFS_TEST084_FUSEPREMOUNT
   trap cleanup HUP EXIT TERM INT || return 5
 
   local cache="$PWD/cache"
+  CVMFS_TEST084_CACHEDIR=$cache
   mkdir $cache
   cat > sft.config << EOF
 CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/sft.cern.ch
@@ -45,10 +53,16 @@ EOF
   CVMFS_TEST084_MOUNTPOINT="$PWD/mountpoint"
   echo "*** mounting on $CVMFS_TEST084_MOUNTPOINT"
   mkdir $CVMFS_TEST084_MOUNTPOINT
-  $CVMFS_TEST084_FUSEPREMOUNT /usr/bin/cvmfs2 -o debug,libfuse=3,config=sft.config sft.cern.ch $CVMFS_TEST084_MOUNTPOINT || return 10
-  ls -lah "$CVMFS_TEST084_MOUNTPOINT" || return 12
-  cat "$CVMFS_TEST084_MOUNTPOINT/.cvmfsdirtab" || return 13
+  $CVMFS_TEST084_FUSEPREMOUNT /usr/bin/cvmfs2 -o debug,libfuse=3,config=sft.config sft.cern.ch $CVMFS_TEST084_MOUNTPOINT &> $workdir/cvm-test-084-mount.log || return 10
+  echo "*** listing repository mounted at $CVMFS_TEST084_MOUNTPOINT"
+  ls -lah "$CVMFS_TEST084_MOUNTPOINT" > $workdir/cvm-test-084-repo-listing.log  || return 12
+  echo "*** checking dirtab in  $CVMFS_TEST084_MOUNTPOINT"
+  cat "$CVMFS_TEST084_MOUNTPOINT/.cvmfsdirtab" > $workdir/cvm-test-084-repo-dirtab.log || return 13
 
+
+  echo "*** finished successfully!"
+  cleanup
+  rm $workdir/cvm-test-084*.log
   return 0
 }
 
