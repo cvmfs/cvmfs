@@ -37,21 +37,15 @@ Commands command_list;
 
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
-           "CernVM-FS repository storage management commands\n"
-           "Version %s\n"
-           "Usage (normally called from cvmfs_server):\n"
-           "  cvmfs_swissknife <command> [options]\n",
-           CVMFS_VERSION);
+          "CernVM-FS repository storage management commands\n"
+          "Usage (normally called from cvmfs_server):\n"
+          "  cvmfs_swissknife <command> [options]\n");
 
   for (unsigned i = 0; i < command_list.size(); ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "\n"
              "Command %s\n"
-             "--------",
-             command_list[i]->GetName().c_str());
-    for (unsigned j = 0; j < command_list[i]->GetName().length(); ++j) {
-      LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "-");
-    }
+             "--", command_list[i]->GetName().c_str());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
              command_list[i]->GetDescription().c_str());
