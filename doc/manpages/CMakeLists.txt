@@ -60,16 +60,14 @@ else()
         COMPONENT documentation
     )
     if (BUILD_SERVER) 
+
     # cvmfs_server
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_server.1"
-        COMMAND ${HELP2MAN} 
-            -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs_common.h2m
-            --no-info 
-            --section=1 
-            --output=${MAN_OUTPUT_DIR}/cvmfs_server.1
-            --name "cvmfs_server: tools for publishing and managing CernVM-FS repositories" 
-            "${CMAKE_BINARY_DIR}/cvmfs/cvmfs_server"
+        COMMAND ${CMAKE_CURRENT_LIST_DIR}/generate_manpage_cvmfs_server.sh
+                ${CMAKE_CURRENT_LIST_DIR} # location of include files
+                ${MAN_OUTPUT_DIR} # directory for generated manpage
+                ${CMAKE_BINARY_DIR}/cvmfs # location of swissknife binary
         DEPENDS cvmfs_server_script
         COMMENT "Generating man page for cvmfs_server"
         VERBATIM
@@ -85,13 +83,10 @@ else()
     # cvmfs_swissknife
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs_swissknife.1"
-        COMMAND ${HELP2MAN} 
-            -i ${CMAKE_CURRENT_LIST_DIR}/cvmfs_common.h2m
-            --no-info 
-            --section=1 
-            --output=${MAN_OUTPUT_DIR}/cvmfs_swissknife.1
-            --name "cvmfs_swissknife: Low-level tools for publishing and managing CernVM-FS repositories" 
-            "$<TARGET_FILE:cvmfs_swissknife>"
+        COMMAND ${CMAKE_CURRENT_LIST_DIR}/generate_manpage_cvmfs_swissknife.sh
+                ${CMAKE_CURRENT_LIST_DIR} # location of include files
+                ${MAN_OUTPUT_DIR} # directory for generated manpage
+                ${CMAKE_BINARY_DIR}/cvmfs # location of swissknife binary
         DEPENDS cvmfs_swissknife
         COMMENT "Generating man page for cvmfs_swissknife"
         VERBATIM
