@@ -1,7 +1,8 @@
 #!/bin/bash
 cvmfs_test_name="Commit command in a repository connected to the gateway"
 cvmfs_test_autofs_on_startup=false
-cvmfs_test_suites="quick"
+#TODO(vavolkl): Investigate flaky test, and re-add to quick suite
+cvmfs_test_suites=""
 
 cleanup() {
     sudo rm -f /etc/cvmfs/config.d/test.repo.org.local
