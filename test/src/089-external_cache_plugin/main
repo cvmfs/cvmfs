@@ -38,8 +38,7 @@ cvmfs_run_test() {
 
   cvmfs_mount lhcb.cern.ch $mount_opts || return 3
   ls /cvmfs/lhcb.cern.ch > /dev/null || return 4
-  filename=$(find /cvmfs/lhcb.cern.ch -type f | head -n1)
-  cat $filename > /dev/null || return 5
+  cat /cvmfs/lhcb.cern.ch/README > /dev/null || return 5
   sudo cvmfs_config umount || return 6
 
   wait_for_umount || return 7
@@ -58,8 +57,7 @@ cvmfs_run_test() {
 
   cvmfs_mount lhcb.cern.ch $mount_opts || return $?
   ls /cvmfs/lhcb.cern.ch > /dev/null || return 10
-  filename=$(find /cvmfs/lhcb.cern.ch -type f | head -n1)
-  cat $filename > /dev/null || return 11
+  cat /cvmfs/lhcb.cern.ch/README > /dev/null || return 11
   sudo cvmfs_config umount || return 12
 
   wait_for_umount || return 13

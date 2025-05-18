@@ -7,8 +7,8 @@ CVMFS_TEST081_REPO=
 
 cleanup() {
     echo "*** [Cleanup]"
-    sudo rm -f /tmp/cvmfs-$CVMFS_TEST081_REPO.trace.log 2> /dev/null
-    sudo rm -f /tmp/cvmfs-$CVMFS_TEST081_REPO.spec.txt  2> /dev/null
+    sudo rm -f $workdir/cvmfs-$CVMFS_TEST081_REPO.trace.log 2> /dev/null
+    sudo rm -f $workdir/cvmfs-$CVMFS_TEST081_REPO.spec.txt  2> /dev/null
 
     sudo rm -rf $CVMFS_TEST081_SHRINKWRAP_DEST 2> /dev/null
     sudo rm -rf /var/lib/cvmfs/shrinkwrap 2> /dev/null
@@ -17,52 +17,61 @@ cleanup() {
 cvmfs_run_test() {
     logfile=$1
     local test_location=$2
+    workdir=/tmp/cvmfs-test-081-shrinkwrap-workdir
     CVMFS_TEST081_SHRINKWRAP_DEST="$PWD/shrinkwrap-base"
 
     local repo="sft.cern.ch"
     CVMFS_TEST081_REPO=$repo
+    tracelog=$workdir/cvmfs-$repo.trace.log
     echo "*** Setup..."
     cleanup
     trap cleanup HUP EXIT TERM INT || return 4
+    # make sure cvmfs user can write logs to workdir
+    mkdir -p $workdir
+    sudo chmod a+rw $workdir
 
     echo "*** Mounting test repository..."
     cvmfs_mount $repo "GLITE_VERSION=util" \
-      "CVMFS_TRACEFILE=/tmp/cvmfs-@fqrn@.trace.log" \
+      "CVMFS_CHECK_PERMISSIONS=no" \
+      "CVMFS_TRACEFILE=$workdir/cvmfs-@fqrn@.trace.log" \
       "CVMFS_TRACEBUFFER=4096" \
       "CVMFS_TRACEBUFFER_THRESHOLD=2048"
 
     echo "Checking trace log creation..."
     sudo cvmfs_talk -i $repo tracebuffer flush > /dev/null
 
-    if [ ! -f /tmp/cvmfs-$repo.trace.log ]; then
+    if [ ! -f $tracelog ]; then
         echo "*** ERROR: Trace file was not created"
         return 2
     fi
 
-    sudo truncate -s0 /tmp/cvmfs-$repo.trace.log
+    sudo truncate -s0 $tracelog
 
     echo "*** Executing a few operations to check tracing..."
-    for f in $(find /cvmfs/$repo -type f | head -n 3); do
-      cat $f > /dev/null
-    done
+
+    ls /cvmfs/sft.cern.ch/lcg/contrib/binutils/2.28/x86_64-centos7/
+    cat /cvmfs/sft.cern.ch/lcg/contrib/binutils/2.28/x86_64-centos7/version.txt > /dev/null
+    cat /cvmfs/sft.cern.ch/lcg/contrib/binutils/2.28/x86_64-centos7/lib/libopcodes.a > /dev/null
+    cat /cvmfs/sft.cern.ch/lcg/contrib/binutils/2.28/x86_64-centos7/lib/libopcodes.la > /dev/null
+
     sudo cvmfs_talk -i $repo tracebuffer flush
-    sudo cat /tmp/cvmfs-$repo.trace.log
+    sudo cat $tracelog
 
     echo "*** Creating specification file..."
     sudo $CVMFS_SYS_PYTHON /usr/libexec/cvmfs/shrinkwrap/spec_builder.py \
       --policy=exact \
       --filters opendir lookup -- \
-      /tmp/cvmfs-$repo.trace.log \
-      /tmp/cvmfs-$repo.spec.txt
+      $workdir/cvmfs-$repo.trace.log \
+      $workdir/cvmfs-$repo.spec.txt
     [ $? -eq 0 ] || return 3
-    cat /tmp/cvmfs-$repo.spec.txt
+    cat $workdir/cvmfs-$repo.spec.txt
     echo
 
     echo "*** Creating shrinkwrapped repository..."
-    echo "CVMFS_HTTP_PROXY=DIRECT" > local.config
+    echo "CVMFS_HTTP_PROXY=DIRECT" > $workdir/local.config
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config:local.config" \
-      --spec-file /tmp/cvmfs-$repo.spec.txt \
+      --src-config "$test_location/$repo.config:$workdir/local.config" \
+      --spec-file $workdir/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 4
 
@@ -86,14 +95,14 @@ cvmfs_run_test() {
     [ $? -ne 0 ] || return 20
 
     echo "*** Update destination..."
-    echo | sudo tee -a /tmp/cvmfs-$repo.spec.txt
-    echo "^/lcg/lastUpdate" | sudo tee -a /tmp/cvmfs-$repo.spec.txt
+    echo | sudo tee -a $workdir/cvmfs-$repo.spec.txt
+    echo "^/lcg/lastUpdate" | sudo tee -a $workdir/cvmfs-$repo.spec.txt
     sudo cvmfs_shrinkwrap --repo $repo \
-      --src-config "$test_location/$repo.config:local.config" \
-      --spec-file /tmp/cvmfs-$repo.spec.txt \
+      --src-config "$test_location/$repo.config:$workdir/local.config" \
+      --spec-file $workdir/cvmfs-$repo.spec.txt \
       --dest-base $CVMFS_TEST081_SHRINKWRAP_DEST
     [ $? -eq 0 ] || return 30
     ls $CVMFS_TEST081_SHRINKWRAP_DEST/$repo/lcg/lastUpdate || return 31
-
+    rm $workdir
     return 0
 }

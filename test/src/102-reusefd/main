@@ -18,8 +18,7 @@ cvmfs_run_test() {
 
   ############
   # open some test file in several simultaneously in different processes
-
-  local testfile=$(find /cvmfs/atlas.cern.ch -type f | head -n1)
+  local testfile=$(find /cvmfs/atlas.cern.ch/repo/benchmarks/cern/current/run/ -type f | head -n1)
   # testfile has the following cvmfs hash:
   local testfile_hash=$(get_xattr hash $testfile)
 
