@@ -13,10 +13,12 @@ import (
 
 var (
 	username string
+  arch string
 )
 
 func init() {
 	downloadManifestCmd.Flags().StringVarP(&username, "username", "u", "", "username to use to log in into the registry.")
+	downloadManifestCmd.Flags().StringVarP(&arch, "arch", "a", "amd64", "architecture to download, in case of multi-arch iamges")
 	rootCmd.AddCommand(downloadManifestCmd)
 }
 
@@ -42,12 +44,15 @@ var downloadManifestCmd = &cobra.Command{
 			l.LogE(err).Fatal("Error in getting the manifest")
 			return err
 		}
-		text, err := json.MarshalIndent(manifestList, "", "  ")
-		if err != nil {
-			l.LogE(err).Fatal("Error in encoding the manifest as JSON")
-			return err
-		}
-		fmt.Println(string(text))
-		return nil
+		if arch == "all" {
+      text, err := json.MarshalIndent(manifestList, "", "  ")
+      if err != nil {
+        l.LogE(err).Fatal("Error in encoding the manifest as JSON")
+        return err
+      }
+      fmt.Println(string(text))
+      return nil
+    }
+    return nil
 	},
 }
