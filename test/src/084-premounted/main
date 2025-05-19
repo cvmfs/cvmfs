@@ -28,7 +28,7 @@ cvmfs_run_test() {
   local workdir="$2"
 
   echo "*** creating fuse-premount"
-  cc -o fuse_premount "$workdir/fuse_premount.c" || return 1
+  cc -o $workdir/fuse_premount "$workdir/fuse_premount.c" || return 1
   CVMFS_TEST084_FUSEPREMOUNT=$workdir/fuse_premount
   sudo chown root:root $CVMFS_TEST084_FUSEPREMOUNT || return 3
   sudo chmod 4755 $CVMFS_TEST084_FUSEPREMOUNT || return 4
