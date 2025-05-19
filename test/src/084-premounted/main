@@ -16,19 +16,19 @@ cleanup() {
     rmdir $CVMFS_TEST084_MOUNTPOINT
     echo "  *** unmounted $CVMFS_TEST084_MOUNTPOINT"
   fi
-  if [ x"$CVMFS_TEST084_CACHEDIR" != "x" ]; then
-    rm -rf $CVMFS_TEST084_CACHEDIR
-    echo "  *** removed $CVMFS_TEST084_CACHEDIR"
+  if [ x"$workdir" != "x" ]; then
+    rm -rf $workdir
   fi
-  rm $workdir/sft.config || true
 }
 
 cvmfs_run_test() {
   local logfile=$1
-  local workdir="$2"
+  local sourcedir="$2"
+  workdir="/tmp/cvmfs-test/workdir-084-premount"
+  mkdir -p $workdir
 
   echo "*** creating fuse-premount"
-  cc -o $workdir/fuse_premount "$workdir/fuse_premount.c" || return 1
+  cc -o $workdir/fuse_premount "$sourcedir/fuse_premount.c" || return 1
   CVMFS_TEST084_FUSEPREMOUNT=$workdir/fuse_premount
   sudo chown root:root $CVMFS_TEST084_FUSEPREMOUNT || return 3
   sudo chmod 4755 $CVMFS_TEST084_FUSEPREMOUNT || return 4
@@ -61,7 +61,6 @@ EOF
 
   echo "*** finished successfully!"
   cleanup
-  rm $workdir/cvm-test-084*.log
   return 0
 }
 
