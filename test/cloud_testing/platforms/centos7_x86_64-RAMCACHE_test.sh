@@ -9,6 +9,9 @@ script_location=$(cd "$(dirname "$0")"; pwd)
 
 retval=0
 
+# Test exclusions
+# 066-killall: unresponsive CentOS7 machine (probably buggy fsfreeze support)
+
 cd ${SOURCE_DIRECTORY}/test
 echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
@@ -25,6 +28,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                                  src/044-unpinonmount                         \
                                  src/057-parallelmakecache                    \
                                  src/064-fsck                                 \
+                                 src/066-killall                              \
                                  src/068-rocache                              \
                                  src/070-tieredcache                          \
                                  src/081-shrinkwrap                           \

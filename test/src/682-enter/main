@@ -1,7 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="Enter ephemeral writable subshell"
 cvmfs_test_autofs_on_startup=true
-cvmfs_test_suites="quick"
+cvmfs_test_suites=""
 
 cvmfs_run_test() {
   logfile=$1

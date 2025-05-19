@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -24,24 +25,33 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.InfoLevel.String(), "Log level (trace, debug, info, warn, error, fatal, panic")
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "cvmfs_ducc",
-	Short: "Show the several commands available.",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		lib.SetupNotification()
-		lib.SetupRegistries()
-		setUpLogs(os.Stdout, v)
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		lib.StopNotification()
-	},
+func DuccRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cvmfs_ducc",
+		Short: "Show the available commands.",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			lib.SetupNotification()
+			lib.SetupRegistries()
+			setUpLogs(os.Stdout, v)
+			cmd.SilenceUsage = true
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			lib.StopNotification()
+		},
+	}
+	return cmd
 }
 
+var rootCmd = DuccRootCmd()
+
 func EntryPoint() {
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
 func AliveMessage() {
@@ -56,6 +66,9 @@ func AliveMessage() {
 func setUpLogs(out io.Writer, level string) error {
 	logrus.SetOutput(out)
 	lvl, err := logrus.ParseLevel(level)
+	if lvl == logrus.TraceLevel {
+		logrus.SetReportCaller(true)
+	}
 	if err != nil {
 		return err
 	}

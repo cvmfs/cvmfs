@@ -286,13 +286,12 @@ string Watchdog::ReportStacktrace() {
 }
 
 
-void Watchdog::ReportSignalAndTerminate(
+void Watchdog::ReportSignalAndContinue(
   int sig, siginfo_t *siginfo, void * /* context */)
 {
   LogCvmfs(kLogMonitor, kLogSyslogErr,
            "watchdog: received unexpected signal %d from PID %d / UID %d",
            sig, siginfo->si_pid, siginfo->si_uid);
-  _exit(1);
 }
 
 
@@ -460,7 +459,7 @@ bool Watchdog::WaitForSupervisee() {
   // The watchdog is not supposed to receive signals. If it does, report it.
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
-  sa.sa_sigaction = ReportSignalAndTerminate;
+  sa.sa_sigaction = ReportSignalAndContinue;
   sa.sa_flags = SA_SIGINFO;
   sigfillset(&sa.sa_mask);
 

@@ -166,8 +166,16 @@ include (cvmfs_compiler)
 # define where to find the external dependencies
 #
 set (EXTERNALS_LIB_LOCATION       "${CMAKE_SOURCE_DIR}/externals")
+
+# For convenience in CI workflows, allow to set EXTERNALS_PREFIX via environment
 if (NOT EXTERNALS_PREFIX)
-  set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
+  if (NOT $ENV{CVMFS_EXTERNALS_PREFIX} STREQUAL "")
+    set(EXTERNALS_PREFIX $ENV{CVMFS_EXTERNALS_PREFIX})
+  else()
+    set(EXTERNALS_PREFIX ${CMAKE_SOURCE_DIR})
+  endif()
+
+
 endif()
 set (EXTERNALS_BUILD_LOCATION     "${EXTERNALS_PREFIX}/externals_build")
 set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")

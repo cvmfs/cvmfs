@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -23,13 +22,13 @@ var checkImageSyntaxCmd = &cobra.Command{
 	Short:   "Check that the provide image has a valid syntax, the same checks are applied before any command in the converter.",
 	Aliases: []string{"check-image", "image-check"},
 	Args:    cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		img, err := lib.ParseImage(args[0])
 		if err != nil {
 			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 		img.PrintImage(machineFriendly, true)
-		os.Exit(0)
+		return nil
 	},
 }

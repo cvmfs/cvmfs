@@ -101,7 +101,7 @@ BuildRequires: valgrind-devel
 BuildRequires: cmake
 BuildRequires: fuse-devel
 %if 0%{?build_fuse3}
-BuildRequires: fuse3-devel
+BuildRequires: fuse3-devel >= 3.3.0
 %endif
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
@@ -195,8 +195,7 @@ Common utility libraries for CernVM-FS packages
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs = %{version}-%{release}
-Requires: fuse3
-Requires: fuse3-libs
+Requires: fuse3-libs >= 3.3.0
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 %endif
@@ -763,6 +762,7 @@ systemctl daemon-reload
 %endif
 
 %changelog
+# - When using fuse3, require at least version 3.3.0 (for premounting).
 * Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
 - Apply %pretrans transaction check to all subpackages that need to
   have their version stay in sync

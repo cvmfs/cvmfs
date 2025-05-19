@@ -99,6 +99,126 @@ var_list="$parm_list $switch_list"
 
 cvmfs_fs_bundle="/Library/Filesystems/cvmfs.fs/Contents/Resources" # Mac OS X
 
+# Check if killall has extra arguments
+# -f(orce): abort all cvmfs associated fuse devices
+# -s(tuck): abort all cvmfs associated fuse devices in waiting state
+parse_killall_opts(){
+  for arg in "$@"; do
+    [[ "$arg" == "killall"  ]] && shift && break
+    shift
+  done
+  while [[ $# -gt 0  ]]; do
+    case "$1" in
+      "-r")
+        abort_all_devices $(get_cvmfs_devices)
+        ;;
+      "-s")
+        abort_stuck_devices $(get_devices_map)
+        ;;
+      "--help")
+        cvmfs_config_usage
+        ;;
+      *)
+        echo "Ignoring unknown option $1"
+        break
+        ;;
+    esac
+    shift
+  done
+}
+
+# Given a device id in the form <Major>:<minor>
+# we need only the <minor> part to identify the fuse device
+get_minor_device_id()
+{
+  local device_id=$1
+  echo $device_id | cut -d':' -f2
+}
+
+abort_fuse_device(){
+  local fuse_device=$1
+  local device_path="/sys/fs/fuse/connections/$fuse_device"
+  if [ -d "$device_path" ]; then
+    echo -n "Aborting fuse device $fuse_device.. "
+    echo 1 > $device_path/abort
+    echo "OK"
+  fi
+}
+
+# Collect every device associated to a cvmfs mount point,
+# based on /proc/<cvmfs2_pid>/mountinfo
+get_cvmfs_devices()
+{
+  local cvmfs_devices=""
+  for pid in $(pidof cvmfs2)
+  do
+    while read -r line; do
+      # Get the interesting fields from every line of mountinfo;
+      # those are the mountpoint and the device id
+      device_id=$(echo "$line" | cut -d' ' -f 3)
+      current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
+
+      if [[ "$current_mountpoint" == "/cvmfs/"*  ]]; then
+        if ! grep -q "$device_id" <<< "$cvmfs_devices"; then
+          cvmfs_devices=$cvmfs_devices" $device_id"
+        fi
+      fi
+    done < /proc/$pid/mountinfo
+  done
+  echo $cvmfs_devices
+}
+
+get_devices_map()
+{
+  local devices_map=""
+  for pid in $(pidof cvmfs2)
+  do
+    while read -r line; do
+      # Get the interesting fields from every line of mountinfo;
+      # those are the mountpoint and the device id
+      device_id=$(echo "$line" | cut -d' ' -f 3)
+      current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
+
+      if [[ "$current_mountpoint" == "/cvmfs/"*  ]]; then
+        if ! grep -q "$device_id" <<< "$devices_map"; then
+          devices_map="$current_mountpoint>$device_id "$devices_map
+        fi
+      fi
+    done < /proc/$pid/mountinfo
+  done
+  echo $devices_map
+}
+
+abort_all_devices()
+{
+  echo "Aborting all cvmfs fuse devices.."
+  local devices="$@"
+  for device in $devices
+  do
+    abort_fuse_device $(get_minor_device_id $device)
+  done
+}
+
+abort_stuck_devices()
+{
+  echo "Aborting stuck cvmfs fuse devices.."
+  local device_map="$@"
+  for map_entry in $device_map
+  do
+    local mountpoint=$(echo $map_entry | cut -d'>' -f 1)
+    local device=$(echo $map_entry | cut -d'>' -f 2)
+
+    fuse_dev=$(get_minor_device_id $device)
+    local fuse_dev_path="/sys/fs/fuse/connections/$fuse_dev"
+    # Abort waiting devices only
+    if [ "$(cat $fuse_dev_path/waiting)" != "0" ] ;
+    then
+      echo "Aborting $mountpoint"
+      abort_fuse_device $fuse_dev
+    fi
+  done
+}
+
 # makes sure that a version is always of the form x.y.z-b
 normalize_version() {
   local version_string="$1"
@@ -150,7 +270,7 @@ cvmfs_config_usage() {
   echo "  reload [-c | <repository>]"
   echo "  umount"
   echo "  wipecache"
-  echo "  killall"
+  echo "  killall [-r(reset fuse) ] [-s(reset stuck fuse)]"
   echo "  bugreport <timeout_in_sec_per_command (default = 90)>"
 }
 
@@ -1386,6 +1506,8 @@ cvmfs_umount() {
 
 cvmfs_killall() {
   local pid=$$
+
+  parse_killall_opts "$@"
 
   echo -n "Terminating cvmfs_config processes... "
   # The exact match (pgrep -x) works only on Linux.  On macOS, one needs to

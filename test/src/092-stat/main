@@ -14,7 +14,7 @@ cvmfs_run_test() {
   echo "*** Initial hitrate: $hitrate_init"
 
   local files=
-  for f in $(find /cvmfs/cernvm-prod.cern.ch -type f | head -n 20); do
+  for f in $(find /cvmfs/cernvm-prod.cern.ch/update-packs/cvm3/ -type f | head -n 20); do
     files="$f $files"
     md5sum $f || return 10
   done

@@ -25,7 +25,7 @@ mount_and_read() {
 
   echo "   Access data to send HTTP requests"
   local some_files
-  some_files=$(find $TEST099_MOUNTPOINT -type f | head -n3)
+  some_files=$(find /cvmfs/lhcb.cern.ch/lib/etc/ -type f | head -n3)
   for a_file in $some_files; do
     cat "$a_file" > /dev/null
   done

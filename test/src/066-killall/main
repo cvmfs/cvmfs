@@ -3,6 +3,166 @@
 cvmfs_test_name="Killing all cvmfs2 instances"
 cvmfs_test_suites="quick"
 
+SRC=""
+DEST=""
+MOUNTPOINT=/cvmfs
+
+# Create a temporary filesystem and its mount point
+# The intension is to later freeze this fs using fsfreeze
+# and drive cvmfs2 in D-state to simulate a real world scenario.
+# More info on [this blog post](https://chrisdown.name/2024/02/05/reliably-creating-d-state-processes-on-demand.html)
+fs_setup(){
+  SRC="$(mktemp --suffix=FROZENFS)"
+  DEST="$(mktemp -d --suffix=FROZENFS)"
+
+  logdebug "Creating a filesystem on ${DEST}.."
+
+  if [ ! -d "$DEST" ] || [ ! -f "$SRC" ]; then
+    exit 51
+  fi
+
+	fallocate -l 8M -- "$SRC"
+	mkfs.ext4 -q -- "$SRC"
+	sudo mount -o loop -- "$SRC" "$DEST"
+}
+
+fs_cleanup(){
+  logdebug "Cleaning up ${DEST}.."
+
+  # If /tmp/freezeme is a mountpoint
+  # unfreeze it and unmount it
+  if mountpoint -q "${DEST}"; then
+    local loopdev=$(findmnt -n -o SOURCE --target "$DEST")
+    sudo fsfreeze -u ${DEST} 2> /dev/null
+    sudo umount ${DEST}
+    sudo losetup -d "$loopdev"
+    sudo rm -rf ${DEST}
+  fi
+  if [ -f ${SRC} ]; then
+    rm -- ${SRC}
+  fi
+}
+
+freeze()
+{
+  # Inside docker fsfreeze is not supported.
+  # If fsfreeze fails, early return succesfully
+  logdebug "Freezing ${DEST}.."
+	sudo fsfreeze -f -- "$DEST"
+  if [ "$?" != "0" ]; then
+    return 0
+  fi
+}
+
+unfreeze() {
+  logdebug "Unfreezing ${DEST}.."
+  sudo fsfreeze -u -- "$DEST"
+}
+
+get_D_state_pid() {
+  local d_pid
+
+  for pid in $(ps -eT -o tid,comm | awk '$2=="cvmfs2" {print $1}' | xargs);
+  do
+    read -r _ _ state _ < /proc/$pid/stat
+    if [ "$state" = "D" ]; then
+      echo $pid
+      break
+    fi
+  done
+}
+
+get_fuse_devices_of_process(){
+  local pid
+  # Trim whitespaces in pid
+  pid="$(echo -e "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+  if [ -z "$pid" ]; then
+    return 50
+  fi
+  local cvmfs_devices=""
+  while read -r line; do
+    # Get the interesting fields from every line of mountinfo;
+    # those are the mountpoint and the device id
+    device_id=$(echo "$line" | cut -d' ' -f 3)
+    current_mountpoint=$(echo "$line" | cut -d' ' -f 5)
+
+    if [[ "$current_mountpoint" == "$MOUNTPOINT"/*  ]]; then
+      if ! grep -q "$device_id" <<< "$cvmfs_devices"; then
+        if [ -z "$cvmfs_devices" ]; then
+          cvmfs_devices="$(echo $device_id | cut -d ':' -f 2)"
+        else
+          cvmfs_devices=$cvmfs_devices" $(echo $device_id | cut -d ':' -f 2)"
+        fi
+      fi
+    fi
+  done < "/proc/$pid/mountinfo"
+
+  echo "$cvmfs_devices"
+}
+
+get_fuse_devices(){
+  local devices=""
+  for pid in $(pidof cvmfs2);
+  do
+    local associated_fuse_devices=$(get_fuse_devices_of_process ${pid})
+    for dev in $associated_fuse_devices;
+    do
+      if ! grep -q "$dev" <<< "$devices"; then
+        if [ -z "$devices" ]; then
+          devices="$dev"
+        else
+          devices="$devices $dev"
+        fi
+      fi
+    done
+  done
+  echo $devices
+}
+
+test_extra_args(){
+  logdebug "\tTesting cvmfs_config killall $1.."
+  arg="$1"
+  local repo="atlas.cern.ch"
+  freeze
+
+  logdebug "Mounting repositories and reloading.."
+  cvmfs_mount $repo || return 40
+  sudo cvmfs_config reload || return 41
+
+  logdebug "Freezing cvmfs.."
+  sudo cvmfs_talk -i $repo __testing_freeze_cvmfs &
+
+  # accessing a cvmfs repo with a cvmfs2 process
+  # in D-stat should hang.
+  ls ${MOUNTPOINT}/$repo
+  local d_pid=$!
+
+  local fuse_devices="$(get_fuse_devices)"
+
+  logdebug "\tbefore killall $arg FUSE devices: $fuse_devices"
+
+  logdebug "Killing cvmfs using cvmfs_config killall $arg"
+  sudo cvmfs_config killall "$arg" &
+
+  unfreeze
+
+  sleep 1
+
+  # At this point the ls process should have terminated
+  if [ -d /proc/$d_pid ]; then
+    return 42
+  fi
+}
+
+logdebug(){
+  if [[  "${DEBUG_LOGGING_MODE}" == "colored"  ]]; then
+    echo -e "\e[35m$1\e[0m"
+  else
+    echo -e "$1"
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -25,6 +185,21 @@ cvmfs_run_test() {
 
   echo "Killall once again because we don't know where the reloaded was interrupted"
   sudo cvmfs_config killall || return 30
+  wait $!
+
+  if [ "$(uname)" != "Linux" ]; then
+    # specific killall options are not meant
+    # to be tested on non Linux machines
+    return 0
+  fi
+
+  fs_setup
+  trap fs_cleanup EXIT
+
+  logdebug "Testing killall -r(reset fuse)"
+  test_extra_args "-r" || return $?
+  echo "Testing killall -s(stuck fuse reset)"
+  test_extra_args "-s" || return $?
 
   return 0
 }

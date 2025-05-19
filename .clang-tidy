@@ -12,6 +12,7 @@ Checks: -*
   ,google-*
   ,-google-readability-avoid-underscore-in-googletest-name
   ,misc-*
+  ,-misc-include-cleaner
   ,-misc-static-assert
   ,-misc-no-recursion
   ,-misc-non-private-member-variables-in-classes
