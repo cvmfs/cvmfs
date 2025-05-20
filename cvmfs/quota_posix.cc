@@ -35,6 +35,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -506,6 +507,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   // the absolute sequence number with the first bit set in two's complement.
   // So -1 can be a marker that will never appear in the database.
   int64_t max_acseq = -1;
+  std::vector<EvictCandidate> lru_ordered_open;
+
   do {
     sqlite3_reset(stmt_lru_);
     sqlite3_bind_int64(stmt_lru_, 1,
@@ -533,24 +536,43 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     }
 
     const unsigned N = candidates.size();
+
+    auto &&skip_eviction = [&hash_str, &stmt_block_ = this->stmt_block_](
+                               EvictCandidate &candidate) {
+      bool res = true;
+      hash_str = candidate.hash.ToString();
+      LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction", hash_str.c_str());
+      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                        SQLITE_STATIC);
+      res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+      sqlite3_reset(stmt_block_);
+      assert(res);
+    };
+
+
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
-      if (pinned_chunks_.find(candidates[i].hash) != pinned_chunks_.end()) {
-        hash_str = candidates[i].hash.ToString();
-        LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction",
-                 hash_str.c_str());
-        sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                          SQLITE_STATIC);
-        result = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-        sqlite3_reset(stmt_block_);
-        assert(result);
+      bool is_pinned = pinned_chunks_.find(candidates[i].hash)
+                       != pinned_chunks_.end();
+
+      // Avoid evicting open files hopping there are enough more recently used
+      // files to satisfy the cleanup request
+      bool is_open = std::find(open_files_.begin(), open_files_.end(),
+                               candidates[i].hash)
+                     != open_files_.end();
+      if (is_pinned or is_open) {
+        skip_eviction(candidates[i]);
         continue;
       }
 
-      trash.push_back(cache_dir_ + "/"
-                      + candidates[i].hash.MakePathWithoutSuffix());
+      if (is_open) {
+        lru_ordered_open.push_back(candidates[i]);
+      }
+
+      trash.push_back(cache_dir_ + "/" +
+                      candidates[i].hash.MakePathWithoutSuffix());
       gauge_ -= candidates[i].size;
       max_acseq = candidates[i].acseq;
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
@@ -570,6 +592,17 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     result = (sqlite3_step(stmt_unblock_) == SQLITE_DONE);
     sqlite3_reset(stmt_unblock_);
     assert(result);
+  }
+
+  while (!lru_ordered_open.empty() and gauge_ > leave_size) {
+    // cleanup files in use
+    auto &candidate = lru_ordered_open[0];
+    trash.push_back(cache_dir_ + "/" + candidate.hash.MakePathWithoutSuffix());
+    gauge_ -= candidate.size;
+    max_acseq = candidate.acseq;
+    LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
+             candidate.hash.ToString().c_str(), gauge_);
+    lru_ordered_open.erase(lru_ordered_open.begin());
   }
 
   if (!EmptyTrash(trash))
