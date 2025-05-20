@@ -379,6 +379,14 @@ if (BUILD_CVMFS)
   )
   endif()
 
+  # Apparmor fusermount3 profile extension
+  install (
+    FILES pkg/logrotate.d/cvmfs-statsdb
+    DESTINATION /etc/logrotate.d
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+  endif()
+
 endif (BUILD_CVMFS)
 
 

@@ -254,6 +254,8 @@ Requires(postun): /usr/sbin/semanage
 %endif
 Requires: cvmfs-libs = %{version}-%{release}
 
+Recommends: logrotate
+
 Conflicts: cvmfs-server < 2.1
 
 %description server
@@ -663,6 +665,7 @@ systemctl daemon-reload
 %doc COPYING AUTHORS README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
 %config(noreplace) %{_sysconfdir}/apparmor.d/local/fusermount3
+%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
 
 %files libs
 %defattr(-,root,root)
