@@ -13,8 +13,15 @@ usr/lib/libcvmfs_server_debug.so.@CVMFS_VERSION@
 usr/lib/libcvmfs_server_debug.so
 etc/cvmfs/cvmfs_server_hooks.sh.demo
 var/www/wsgi-scripts/cvmfs-server/cvmfs-api.wsgi
-usr/share/cvmfs-server/webapi/*
-usr/share/cvmfs-server/webapi/*/*
+usr/share/cvmfs-server/webapi/cvmfs_api.py
+usr/share/cvmfs-server/webapi/cvmfs_geo.py
+usr/share/cvmfs-server/webapi/maxminddb/compat.py
+usr/share/cvmfs-server/webapi/maxminddb/errors.py
+usr/share/cvmfs-server/webapi/maxminddb/decoder.py
+usr/share/cvmfs-server/webapi/maxminddb/reader.py
+usr/share/cvmfs-server/webapi/maxminddb/__init__.py
+usr/share/cvmfs-server/webapi/maxminddb/const.py
+usr/share/cvmfs-server/webapi/maxminddb/file.py
 usr/share/cvmfs-server/generate_stats_plots.C
 usr/share/cvmfs-server/stats_index.html.tpl
 usr/share/cvmfs-server/upload_stats_plots.sh
