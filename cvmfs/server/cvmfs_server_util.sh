@@ -1269,7 +1269,7 @@ Supported Commands:
                   <fully qualified name>
                   Synchronize a Stratum 1 replica with the Stratum 0 source
   snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
-                  [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
+                  [-n DEPRECATED (used to warn if no logrotate config, now has no effect) ]
                   [-i skip repositories that have not run initial snapshot]
                   [-g group (do only the repositories in snapshot group)]
                   Do snapshot on all active replica repositories

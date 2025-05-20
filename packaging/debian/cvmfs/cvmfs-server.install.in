@@ -28,3 +28,5 @@ usr/share/cvmfs-server/upload_stats_plots.sh
 usr/share/cvmfs-server/fix_stats_db.sh
 var/lib/cvmfs-server/geo/
 var/spool/cvmfs/README
+etc/logrotate.d/cvmfs-statsdb
+etc/logrotate.d/cvmfs-logs

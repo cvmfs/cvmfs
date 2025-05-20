@@ -1,2 +1,3 @@
 /etc/apparmor.d/local/fusermount3
 /etc/logrotate.d/cvmfs-statsdb
+/etc/logrotate.d/cvmfs-logs

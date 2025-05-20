@@ -220,20 +220,6 @@ __do_all_snapshots() {
   fi
   [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
 
-  if [ $logrotate_nowarn -eq 0 ] && [ ! -f /etc/logrotate.d/cvmfs ]; then
-    cat << EOF
-/etc/logrotate.d/cvmfs does not exist!
-To prevent this error message, create the file or use -n option.
-Suggested content:
-/var/log/cvmfs/*.log {
-    weekly
-    missingok
-    notifempty
-}
-EOF
-    exit 1
-  fi
-
   local maxparallel="${CVMFS_MAX_PARALLEL_SNAPSHOTS:-`nproc`}"
   local fulllog=/var/log/cvmfs/snapshots.log
 
