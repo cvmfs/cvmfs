@@ -377,7 +377,6 @@ if (BUILD_CVMFS)
     RENAME fusermount3
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
-  endif()
 
   # Apparmor fusermount3 profile extension
   install (
