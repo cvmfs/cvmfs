@@ -378,7 +378,6 @@ if (BUILD_CVMFS)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  # Apparmor fusermount3 profile extension
   install (
     FILES pkg/logrotate.d/cvmfs-statsdb
     DESTINATION /etc/logrotate.d
