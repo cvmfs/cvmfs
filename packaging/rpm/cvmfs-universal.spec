@@ -666,7 +666,7 @@ systemctl daemon-reload
 %{_unitdir}/cvmfs-reload.service
 %config(noreplace) %{_sysconfdir}/apparmor.d/local/fusermount3
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-logs
+%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 
 %files libs
 %defattr(-,root,root)

@@ -984,7 +984,7 @@ if (BUILD_SERVER)
   )
 
   install (
-    FILES pkg/logrotate.d/cvmfs-statsdb pkg/logrotate.d/cvmfs-logs
+    FILES pkg/logrotate.d/cvmfs-statsdb pkg/logrotate.d/cvmfs
     DESTINATION /etc/logrotate.d
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
