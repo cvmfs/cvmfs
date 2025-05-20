@@ -1,0 +1,2 @@
+/etc/logrotate.d/cvmfs-statsdb
+/etc/logrotate.d/cvmfs
