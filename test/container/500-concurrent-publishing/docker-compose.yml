@@ -4,6 +4,9 @@ services:
     cvmfs-test-gw1:
         image: registry.cern.ch/cvmfs-dev:latest
         container_name: cvmfs-gw1
+        depends_on:
+            cvmfs-test-s3-creator:
+                condition: service_completed_successfully
         hostname: cvmfs-gw1
         privileged: true
         cgroup: host # required to run sbin/init with cgroups v2
@@ -24,6 +27,9 @@ services:
     cvmfs-test-pub1:
         image: registry.cern.ch/cvmfs-dev:latest
         container_name: cvmfs-pub1
+        depends_on:
+            cvmfs-test-s3-creator:
+                condition: service_completed_successfully
         hostname: cvmfs-pub1
         privileged: true
         cgroup: host # required to run sbin/init with cgroups v2
@@ -40,6 +46,9 @@ services:
     cvmfs-test-pub2:
         image: registry.cern.ch/cvmfs-dev-pub:latest
         container_name: cvmfs-pub2
+        depends_on:
+            cvmfs-test-s3-creator:
+                condition: service_completed_successfully
         hostname: cvmfs-pub2
         privileged: true
         cgroup: host # required to run sbin/init with cgroups v2
@@ -53,8 +62,42 @@ services:
             - var_spool_cvmfs3:/var/spool/cvmfs
             - ../../../:/home/sftnight/cvmfs
 
+    cvmfs-test-s3:
+        image: minio/minio:latest
+        container_name: cvmfs-s3
+        ports:
+            - "9000:9000"   # S3 API
+            - "9001:9001"   # Web UI
+        environment:
+            MINIO_ROOT_USER: minioadmin
+            MINIO_ROOT_PASSWORD: minioadmin123
+        volumes:
+            - minio-data:/data
+        command: server --console-address ":9001" /data
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 1s
+            timeout: 5s
+            retries: 3
+    
+    cvmfs-test-s3-creator:
+        image: minio/mc:latest
+        container_name: cvmfs-s3-creator
+        depends_on:
+            cvmfs-test-s3:
+                condition: service_healthy
+        entrypoint: >
+            /bin/sh -c "
+            /usr/bin/mc alias set myminio http://cvmfs-s3:9000 minioadmin minioadmin123;
+            /usr/bin/mc rb --force myminio/stratum0bucket;
+            /usr/bin/mc mb myminio/stratum0bucket;
+            /usr/bin/mc anonymous set public myminio/stratum0bucket;
+            exit 0;
+            "
+
 volumes:
     var_spool_cvmfs1:
     var_spool_cvmfs2:
     var_spool_cvmfs3:
+    minio-data:
 
