@@ -285,6 +285,7 @@ set(CVMFS_UNITTEST_SOURCES
   ../common/testutil.cc
   ../common/catalog_test_tools.cc
 
+  t_acl.cc
   t_assert_or_log.cc
   t_atomic.cc
   t_authz_fetch.cc
@@ -402,6 +403,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_wpad.cc
   t_xattr.cc
 
+  ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_curl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz_fetch.cc

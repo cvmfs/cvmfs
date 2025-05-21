@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <stack>
 
-#include "acl/libacl.h"
+#include "acl.h"
 #include "catalog_mgr_rw.h"
 #include "curl/curl.h"
 #include "gateway_util.h"
@@ -75,8 +75,7 @@ static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
 static string get_parent(const string& path);
 static string get_basename(const string& path);
 
-//TODO(@vvolkl): figure out how to export acl_to_xattr
-//static XattrList marshal_xattrs(const char *acl);
+static XattrList marshal_xattrs(const char *acl);
 static string sanitise_name(const char *name_cstr, bool allow_leading_slash);
 static void on_signal(int sig);
 static string acquire_lease(const string& key_id, const string& secret, const string& lease_path,
@@ -389,32 +388,29 @@ static string get_lease_from_paths(vector<string> paths) {
   return prefix;
 }
 
-//TODO(@vvolkl): figure out how to export acl_to_xattr
-// Convert the human-readable ACL into the binary format used to store it in an
-// xattr.
-//static XattrList marshal_xattrs(const char *acl_string) {
-//  XattrList aclobj;
-//
-//  if (acl_string == NULL || strlen(acl_string) == 0) {
-//    return aclobj;
-//  }
-//
-//  acl_t acl = acl_from_text(acl_string);  // Convert ACL string to acl_t object
-//  CUSTOM_ASSERT(acl != NULL, "failed to parse ACL from string: %s", acl_string);
-//  CUSTOM_ASSERT(0 == acl_valid(acl), "parsed ACL failed acl_valid check");
-//  // check if the ACL string contains more than the synthetic ACLs
-//  int equiv = acl_equiv_mode(acl, NULL);
-//  CUSTOM_ASSERT(-1 != equiv, "error on acl_equiv_mode check");
-//  if (equiv == 1) {
-//    size_t binary_size;
-//    char *binary_acl = (char *)acl_to_xattr(acl, &binary_size);
-//    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %lu)", binary_size);
-//    free(binary_acl);
-//  }
-//
-//  acl_free(acl);
-//  return aclobj;
-//}
+static XattrList marshal_xattrs(const char *acl_string) {
+  XattrList aclobj;
+
+  if (acl_string == NULL || acl_string[0] == '\0') {
+    return aclobj;
+  }
+
+  bool equiv_mode;
+  size_t binary_size;
+  char *binary_acl;
+  int ret = acl_from_text_to_xattr_value(string(acl_string), binary_acl, binary_size, equiv_mode);
+  if (ret) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failure of acl_from_text_to_xattr_value(%s)", acl_string);
+    assert(0); // TODO incorporate error handling other than asserting
+    return aclobj;
+  }
+  if (!equiv_mode) {
+    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %d)", binary_size);
+    free(binary_acl);
+  }
+
+  return aclobj;
+}
 
 std::unordered_map<string, string> load_config(const string& config_file) {
   std::unordered_map<string, string> config_map;
@@ -1129,9 +1125,8 @@ void swissknife::IngestSQL::load_dirs(sqlite3 *db, const std::string &lease_path
     CUSTOM_ASSERT(check_prefix(name, lease_path), "%s is not below lease path %s", name.c_str(), lease_path.c_str());
 
     Directory dir(name, mtime, mode, owner, grp, nested);
-    //TODO(@vvolkl): figure out how to export acl_to_xattr
-    //char *acl = (char *)sqlite3_column_text(stmt, 5);
-    //dir.xattr = marshal_xattrs(acl);
+    char *acl = (char *)sqlite3_column_text(stmt, 5);
+    dir.xattr = marshal_xattrs(acl);
     all_dirs.insert(std::make_pair(name, dir));
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
