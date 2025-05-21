@@ -1,2 +1,0 @@
-# Added by cvmfs to allow mounts on /cvmfs
-mount fstype=@{fuse_types} options=(nosuid,nodev,ro) -> /cvmfs/**/, 

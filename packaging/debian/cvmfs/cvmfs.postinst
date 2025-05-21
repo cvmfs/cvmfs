@@ -28,9 +28,6 @@ case "$1" in
         if [ -d /run/systemd/system ]; then
           systemctl daemon-reload
           systemctl start cvmfs-reload
-          # if apparmor is installed, reload to bring updated
-          # fusermount3 profile into effect
-          systemctl reload apparmor || true
         else
           if [ -d /var/run/cvmfs ]; then
             cvmfs_config reload

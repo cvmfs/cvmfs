@@ -24,4 +24,3 @@ etc/cvmfs/default.conf
 etc/cvmfs/default.d/README
 etc/bash_completion.d/cvmfs
 usr/lib/systemd/system/cvmfs-reload.service
-etc/apparmor.d/local/fusermount3
