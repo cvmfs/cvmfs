@@ -9,8 +9,10 @@
 
 #include "curl/curl.h"
 
-struct CurlBuffer {
-  std::string data;
+class CurlBuffer {
+  public:
+    std::string data;
+    CurlBuffer(): data("") {}
 };
 
 bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,

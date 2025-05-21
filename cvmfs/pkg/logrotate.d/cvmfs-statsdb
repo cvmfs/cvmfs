@@ -1,0 +1,31 @@
+
+# rotate the stats.db.archive files for all repositories
+/var/spool/cvmfs/*/stats.db.archive {
+    monthly
+    rotate 36
+    missingok
+    ifempty
+    nocompress
+    nomail
+}
+
+# vacuum the current stats db to stats.db.archive 
+/var/spool/cvmfs/*/stats.db {
+    monthly
+    rotate 0
+    missingok
+    ifempty
+    copy
+    nocompress
+    nomail
+    firstaction
+        for db in /var/spool/cvmfs/*/stats.db; do
+        if [ -f "$db" ]; then
+        echo $db
+        rm ${db}.archive || true
+        sqlite3 $db "VACUUM INTO '${db}.archive';"
+        sqlite3 $db "delete from publish_statistics; delete from gc_statistics; vacuum;"
+        fi
+        done
+    endscript
+}
