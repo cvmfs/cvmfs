@@ -665,8 +665,6 @@ systemctl daemon-reload
 %doc COPYING AUTHORS README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
 %config(noreplace) %{_sysconfdir}/apparmor.d/local/fusermount3
-%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
-%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 
 %files libs
 %defattr(-,root,root)
@@ -725,6 +723,8 @@ systemctl daemon-reload
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
+%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
+%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 
 %files shrinkwrap
 %defattr(-,root,root)
