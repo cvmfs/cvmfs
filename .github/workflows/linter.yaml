@@ -39,6 +39,7 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get install -y /tmp/cvmfs-build-deps_2.1.0_all.deb
+          sudo apt-get install -y libacl1-dev #TODO: figure out why not installed with mk-build-deps
       - name: Hash Externals
         id: get-externals-hash
         run: |
