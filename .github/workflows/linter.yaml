@@ -25,6 +25,7 @@ jobs:
       - name: Generate build-dep metapackage
         if: steps.cachedeb-restore.outputs.cache-hit != 'true'
         run: |
+          sudo apt-get -y update
           sudo apt-get install -y devscripts equivs
           mk-build-deps ./packaging/debian/cvmfs/control
           mv cvmfs-build-deps_2.1.0_all.deb /tmp
