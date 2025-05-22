@@ -702,7 +702,6 @@ if (BUILD_SERVER)
         ${VJSON_LIBRARIES}
         ${CAP_LIBRARIES}
         ${LibArchive_LIBRARY}
-        ${LIBACL_LIBRARY}
         pthread
         dl
   )
