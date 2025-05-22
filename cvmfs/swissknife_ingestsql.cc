@@ -405,7 +405,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
     return aclobj;
   }
   if (!equiv_mode) {
-    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %d)", binary_size);
+    CUSTOM_ASSERT(aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)), "failed to set system.posix_acl_access (ACL size %ld)", binary_size);
     free(binary_acl);
   }
 
