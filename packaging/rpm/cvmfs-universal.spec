@@ -212,7 +212,6 @@ Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: %{cvmfs_python_devel}
 BuildRequires: libcap-devel
-BuildRequires: libacl-devel
 BuildRequires: unzip
 BuildRequires: %{cvmfs_python_setuptools}
 %if 0%{?suse_version}
@@ -233,7 +232,6 @@ Requires: sed
 Requires: psmisc
 Requires: curl
 Requires: gzip
-Requires: libacl
 Requires: attr
 Requires: openssl
 Requires: httpd
