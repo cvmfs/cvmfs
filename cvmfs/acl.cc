@@ -282,7 +282,7 @@ int acl_from_text_to_xattr_value(const string textual_acl, char *&o_binary_acl, 
     return EINVAL;
   }
 
-  // if nothing but usual u,g,o bits, don't produce a binary. Mimicing libacl.
+  // if nothing but usual u,g,o bits, don't produce a binary. Mimicking libacl.
   if (o_equiv_mode) {
     o_binary_acl = NULL;
     o_size = 0;
