@@ -35,7 +35,6 @@ endif()
 #
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-
 #
 # detect the operating system and the distribution we are compiling on
 #
