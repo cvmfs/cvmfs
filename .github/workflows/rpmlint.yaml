@@ -2,8 +2,8 @@ name: cvmfs_rpmlint
 
 on:
   push:
-      #paths:
-      #  - 'packaging/rpm/**'
+      paths:
+        - 'packaging/rpm/**'
       branches: ['devel', 'cvmfs*']
   pull_request:
       paths:
