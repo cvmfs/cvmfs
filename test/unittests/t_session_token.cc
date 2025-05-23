@@ -3,12 +3,11 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <receiver/session_token.h>
 
 using namespace receiver;  // NOLINT
 
-class T_SessionToken : public ::testing::Test {};
+class T_SessionToken : public ::testing::Test { };
 
 TEST_F(T_SessionToken, GenerateBasic) {
   std::string session_token;

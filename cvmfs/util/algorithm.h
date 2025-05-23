@@ -27,17 +27,17 @@ namespace CVMFS_NAMESPACE_GUARD {
 CVMFS_EXPORT double DiffTimeSeconds(struct timeval start, struct timeval end);
 
 // Bitfield manipulation for different integer types T
-template <typename T>
+template<typename T>
 inline void SetBit(unsigned int bit, T *field) {
   *field |= static_cast<T>(1) << bit;
 }
 
-template <typename T>
+template<typename T>
 inline void ClearBit(unsigned int bit, T *field) {
   *field &= ~(static_cast<T>(1) << bit);
 }
 
-template <typename T>
+template<typename T>
 inline bool TestBit(unsigned int bit, const T field) {
   return field & (static_cast<T>(1) << bit);
 }
@@ -46,7 +46,7 @@ inline bool TestBit(unsigned int bit, const T field) {
 /**
  * Knuth's random shuffle algorithm.
  */
-template <typename T>
+template<typename T>
 std::vector<T> Shuffle(const std::vector<T> &input, Prng *prng) {
   std::vector<T> shuffled(input);
   unsigned N = shuffled.size();
@@ -64,7 +64,7 @@ std::vector<T> Shuffle(const std::vector<T> &input, Prng *prng) {
  * vectors have to be of the same size.  Type T must be sortable (< operator).
  * Uses insertion sort (n^2), only efficient for small vectors.
  */
-template <typename T, typename U>
+template<typename T, typename U>
 void SortTeam(std::vector<T> *tractor, std::vector<U> *towed) {
   assert(tractor);
   assert(towed);
@@ -76,19 +76,19 @@ void SortTeam(std::vector<T> *tractor, std::vector<U> *towed) {
     T val_tractor = (*tractor)[i];
     U val_towed = (*towed)[i];
     int pos;
-    for (pos = i-1; (pos >= 0) && ((*tractor)[pos] > val_tractor); --pos) {
-      (*tractor)[pos+1] = (*tractor)[pos];
-      (*towed)[pos+1] = (*towed)[pos];
+    for (pos = i - 1; (pos >= 0) && ((*tractor)[pos] > val_tractor); --pos) {
+      (*tractor)[pos + 1] = (*tractor)[pos];
+      (*towed)[pos + 1] = (*towed)[pos];
     }
-    (*tractor)[pos+1] = val_tractor;
-    (*towed)[pos+1] = val_towed;
+    (*tractor)[pos + 1] = val_tractor;
+    (*towed)[pos + 1] = val_towed;
   }
 }
 
 
-template <typename hashed_type>
+template<typename hashed_type>
 struct hash_murmur {
-  size_t operator() (const hashed_type key) const {
+  size_t operator()(const hashed_type key) const {
 #ifdef __x86_64__
     return MurmurHash64A(&key, sizeof(key), 0x9ce603115bba659bLLU);
 #else
@@ -111,7 +111,7 @@ struct hash_murmur {
  */
 class CVMFS_EXPORT StopWatch : SingleCopy {
  public:
-  StopWatch() : running_(false) {}
+  StopWatch() : running_(false) { }
 
   void Start();
   void Stop();
@@ -139,7 +139,7 @@ class CVMFS_EXPORT StopWatch : SingleCopy {
  */
 
 class CVMFS_EXPORT Log2Histogram {
-friend class UTLog2Histogram;
+  friend class UTLog2Histogram;
 
  public:
   explicit Log2Histogram(unsigned int nbins);
@@ -201,9 +201,8 @@ class CVMFS_EXPORT HighPrecisionTimer : SingleCopy {
   static bool g_is_enabled;  // false by default
 
   explicit HighPrecisionTimer(Log2Histogram *recorder)
-    : timestamp_start_(g_is_enabled ? platform_monotonic_time_ns() : 0)
-    , recorder_(recorder)
-  { }
+      : timestamp_start_(g_is_enabled ? platform_monotonic_time_ns() : 0)
+      , recorder_(recorder) { }
 
   ~HighPrecisionTimer() {
     if (g_is_enabled)

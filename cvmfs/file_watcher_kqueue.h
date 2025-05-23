@@ -5,10 +5,10 @@
 #ifndef CVMFS_FILE_WATCHER_KQUEUE_H_
 #define CVMFS_FILE_WATCHER_KQUEUE_H_
 
-#include "file_watcher.h"
-
 #include <map>
 #include <string>
+
+#include "file_watcher.h"
 
 namespace file_watcher {
 
@@ -18,10 +18,10 @@ class FileWatcherKqueue : public FileWatcher {
   virtual ~FileWatcherKqueue();
 
  protected:
-  virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
+  virtual bool RunEventLoop(const FileWatcher::HandlerMap &handler,
                             int read_pipe, int write_pipe);
 
-  virtual int TryRegisterFilter(const std::string& file_path);
+  virtual int TryRegisterFilter(const std::string &file_path);
 
  private:
   void RemoveFilter(int fd);

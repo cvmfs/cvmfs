@@ -10,7 +10,6 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
-
 #include <string>
 #include <vector>
 
@@ -40,8 +39,7 @@ static int PrintPacError(const char *fmt, va_list argp) {
 
 
 static string PacProxy2Cvmfs(const string &pac_proxy,
-                             const bool report_errors)
-{
+                             const bool report_errors) {
   int log_flags = report_errors ? kLogDebug | kLogSyslogWarn : kLogDebug;
   if (pac_proxy == "")
     return "DIRECT";
@@ -64,9 +62,7 @@ static string PacProxy2Cvmfs(const string &pac_proxy,
       continue;
     }
 
-    if ((next_proxy != "DIRECT") &&
-        !HasPrefix(next_proxy, "PROXY", false))
-    {
+    if ((next_proxy != "DIRECT") && !HasPrefix(next_proxy, "PROXY", false)) {
       LogCvmfs(kLogDownload, log_flags, "invalid proxy definition: %s",
                next_proxy.c_str());
       continue;
@@ -86,9 +82,7 @@ static string PacProxy2Cvmfs(const string &pac_proxy,
 
 
 static bool ParsePac(const char *pac_data, const size_t size,
-                     DownloadManager *download_manager,
-                     string *proxies)
-{
+                     DownloadManager *download_manager, string *proxies) {
   *proxies = "";
 
   pacparser_set_error_printer(PrintPacError);
@@ -112,11 +106,13 @@ static bool ParsePac(const char *pac_data, const size_t size,
   for (unsigned i = 0; i < host_list.size(); ++i) {
     size_t hostname_begin = 7;  // Strip http:// or file://
     size_t hostname_end = host_list[i].find_first_of(":/", hostname_begin);
-    size_t hostname_len =
-      (hostname_end == string::npos) ?
-      string::npos : hostname_end-hostname_begin;
-    const string hostname = (hostname_begin > host_list[i].length()) ?
-      "localhost" : host_list[i].substr(hostname_begin, hostname_len);
+    size_t hostname_len = (hostname_end == string::npos)
+                              ? string::npos
+                              : hostname_end - hostname_begin;
+    const string hostname = (hostname_begin > host_list[i].length())
+                                ? "localhost"
+                                : host_list[i].substr(hostname_begin,
+                                                      hostname_len);
     const string url = host_list[i] + "/.cvmfspublished";
 
     // pac_proxy is freed by JavaScript GC
@@ -153,7 +149,8 @@ static bool ParsePac(const char *pac_data, const size_t size,
 string AutoProxy(DownloadManager *download_manager) {
   char *http_env = getenv("http_proxy");
   if (http_env) {
-    LogCvmfs(kLogDownload, kLogDebug | kLogSyslog, "CernVM-FS: "
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+             "CernVM-FS: "
              "using HTTP proxy server(s) %s from http_proxy environment",
              http_env);
     return string(http_env);
@@ -179,16 +176,17 @@ string AutoProxy(DownloadManager *download_manager) {
     int retval = download_manager->Fetch(&download_pac);
     if (retval == download::kFailOk) {
       string proxies;
-      retval = ParsePac(reinterpret_cast<char*>(pac_memsink.data()),
+      retval = ParsePac(reinterpret_cast<char *>(pac_memsink.data()),
                         pac_memsink.pos(),
                         download_manager,
                         &proxies);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-                 "failed to parse pac file %s",  pac_paths[i].c_str());
+                 "failed to parse pac file %s", pac_paths[i].c_str());
       } else {
         if (proxies != "") {
-          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog, "CernVM-FS: "
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                   "CernVM-FS: "
                    "using HTTP proxy server(s) %s from pac file %s",
                    proxies.c_str(), pac_paths[i].c_str());
           return proxies;
@@ -196,7 +194,7 @@ string AutoProxy(DownloadManager *download_manager) {
       }
 
       LogCvmfs(kLogDownload, kLogDebug, "no proxy settings found in %s",
-              pac_paths[i].c_str());
+               pac_paths[i].c_str());
     }
   }
 
@@ -204,11 +202,9 @@ string AutoProxy(DownloadManager *download_manager) {
 }
 
 
-string ResolveProxyDescription(
-  const string &cvmfs_proxies,
-  const std::string &path_fallback_cache,
-  DownloadManager *download_manager)
-{
+string ResolveProxyDescription(const string &cvmfs_proxies,
+                               const std::string &path_fallback_cache,
+                               DownloadManager *download_manager) {
   if ((cvmfs_proxies == "") || (cvmfs_proxies.find("auto") == string::npos))
     return cvmfs_proxies;
 
@@ -224,7 +220,7 @@ string ResolveProxyDescription(
   }
 
   if (empty_auto != -1)
-    lb_groups.erase(lb_groups.begin()+static_cast<unsigned>(empty_auto));
+    lb_groups.erase(lb_groups.begin() + static_cast<unsigned>(empty_auto));
   string discovered_proxies = JoinStrings(lb_groups, ";");
 
   if (!path_fallback_cache.empty()) {
@@ -242,8 +238,8 @@ string ResolveProxyDescription(
         }
       }
     } else {
-      bool retval =
-        SafeWriteToFile(discovered_proxies, path_fallback_cache, 0660);
+      bool retval = SafeWriteToFile(discovered_proxies, path_fallback_cache,
+                                    0660);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
                  "failed to write proxy settings into %s",
@@ -257,8 +253,7 @@ string ResolveProxyDescription(
 
 
 static void AltCvmfsLogger(const LogSource source, const int mask,
-                           const char *msg)
-{
+                           const char *msg) {
   FILE *log_output = NULL;
   if (mask & kLogStdout)
     log_output = stdout;
@@ -279,8 +274,8 @@ int MainResolveProxyDescription(int argc, char **argv) {
   string proxy_configuration = argv[2];
   string host_list = argv[3];
 
-  DownloadManager download_manager(1,
-                                  perf::StatisticsTemplate("pac", &statistics));
+  DownloadManager download_manager(
+      1, perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
                                                     &download_manager);

@@ -8,14 +8,13 @@
 
 #include "json.h"
 #include "json_document.h"
-
 #include "util/logging.h"
 #include "util/pointer.h"
 #include "util/string.h"
 
 namespace {
 
-const LogFacilities& kLogError = DefaultLogging::error;
+const LogFacilities &kLogError = DefaultLogging::error;
 
 }  // namespace
 
@@ -23,26 +22,26 @@ namespace notify {
 
 namespace msg {
 
-Activity::Activity() : version_(0), timestamp_(), repository_(), manifest_() {}
+Activity::Activity() : version_(0), timestamp_(), repository_(), manifest_() { }
 
-Activity::~Activity() {}
+Activity::~Activity() { }
 
-bool Activity::operator==(const Activity& other) const {
-  return (this->version_ == other.version_) &&
-         (this->timestamp_ == other.timestamp_) &&
-         (this->repository_ == other.repository_) &&
-         (this->manifest_ == other.manifest_);
+bool Activity::operator==(const Activity &other) const {
+  return (this->version_ == other.version_)
+         && (this->timestamp_ == other.timestamp_)
+         && (this->repository_ == other.repository_)
+         && (this->manifest_ == other.manifest_);
 }
 
-void Activity::ToJSONString(std::string* s) {
+void Activity::ToJSONString(std::string *s) {
   assert(s);
 
-  *s = "{ \"version\" : " + StringifyInt(version_) + ", \"timestamp\" : \"" +
-       timestamp_ + "\", \"type\" : \"activity\", \"repository\" : \"" +
-       repository_ + "\", \"manifest\" : \"" + Base64(manifest_) + "\"}";
+  *s = "{ \"version\" : " + StringifyInt(version_) + ", \"timestamp\" : \""
+       + timestamp_ + "\", \"type\" : \"activity\", \"repository\" : \""
+       + repository_ + "\", \"manifest\" : \"" + Base64(manifest_) + "\"}";
 }
 
-bool Activity::FromJSONString(const std::string& s) {
+bool Activity::FromJSONString(const std::string &s) {
   const UniquePtr<JsonDocument> m(JsonDocument::Create(s));
   if (!m.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogError, "Could not create JSON document.");

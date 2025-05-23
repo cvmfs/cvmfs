@@ -58,8 +58,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       close(con_fd);
     }
     if ((con_fd = accept(socket_fd_, (struct sockaddr *)&remote, &socket_size))
-         < 0)
-    {
+        < 0) {
       break;
     }
 
@@ -85,7 +84,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
       SetLogMicroSyslog(*usyslog_path_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module. Reload mode=%d",
-                                      reload_mode);
+               reload_mode);
       int retval = Reload(con_fd, command == 'S', reload_mode);
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
@@ -113,7 +112,8 @@ void Fini() {
   unlink(socket_path_->c_str());
   shutdown(socket_fd_, SHUT_RDWR);
   close(socket_fd_);
-  if (spawned_) pthread_join(thread_talk_, NULL);
+  if (spawned_)
+    pthread_join(thread_talk_, NULL);
 
   delete socket_path_;
   socket_path_ = NULL;
@@ -193,18 +193,21 @@ int MainReload(const std::string &socket_path, const bool stop_and_go,
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%c", buf);
   }
   if (retval != 1) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Reload CRASHED! "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Reload CRASHED! "
              "CernVM-FS mountpoints unusable.");
     return 101;
   }
 
   int result = 102;
   if (read(socket_fd, &result, sizeof(result)) < 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Socket read FAILED! "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Socket read FAILED! "
              "CernVM-FS mountpoints unusable.");
   } else {
     if (result != kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Reload FAILED! "
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Reload FAILED! "
                "CernVM-FS mountpoints unusable.");
     }
   }

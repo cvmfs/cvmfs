@@ -42,12 +42,12 @@ namespace catalog {
  * c) The number of entries of the catalog is lesser than min_weight_: the
  * catalog gets merged with its father (except the root catalog, obviously).
  */
-template <class CatalogMgrT>
+template<class CatalogMgrT>
 class CatalogBalancer {
  public:
   typedef typename CatalogMgrT::catalog_t catalog_t;
   explicit CatalogBalancer(CatalogMgrT *catalog_mgr)
-    : catalog_mgr_(catalog_mgr) { }
+      : catalog_mgr_(catalog_mgr) { }
 
   /**
    * This method balances a catalog. A catalog is considered overflowed if
@@ -79,18 +79,18 @@ class CatalogBalancer {
   void Balance(catalog_t *catalog);
 
  private:
- /**
-  * A VirtualNode is the abstract representation of an entry in a catalog.
-  * It is used by the CatalogBalancer to "virtually" represent the
-  * file-system tree of a concrete catalog and spot the nodes where
-  * a new catalog should be created.
-  *
-  * One of its main functions is to keep track of the current weight of a
-  * file or directory, i.e., the number of entries it contains. Concretely:
-  * - Normal files and symlinks: it is always one.
-  * - Normal directories: one plus the weight of each node it contains.
-  * - Directories which are catalog mount points: it is always one
-  */
+  /**
+   * A VirtualNode is the abstract representation of an entry in a catalog.
+   * It is used by the CatalogBalancer to "virtually" represent the
+   * file-system tree of a concrete catalog and spot the nodes where
+   * a new catalog should be created.
+   *
+   * One of its main functions is to keep track of the current weight of a
+   * file or directory, i.e., the number of entries it contains. Concretely:
+   * - Normal files and symlinks: it is always one.
+   * - Normal directories: one plus the weight of each node it contains.
+   * - Directories which are catalog mount points: it is always one
+   */
   struct VirtualNode {
     std::vector<VirtualNode> children;
     unsigned weight;
@@ -98,32 +98,39 @@ class CatalogBalancer {
     std::string path;
     bool is_new_nested_catalog;
 
-   /**
-    * Extracts not only the direct children of this VirtualNode, but
-    * recursively all the VirtualNodes of this catalog. When a VirtualNode that
-    * is the root of a nested catalog is created, it won't be expanded. In order
-    * to actually expand that node it will be necessary to manually call this
-    * method on it.
-    *
-    * @param catalog_mgr catalog manager that contains the file system tree
-    */
+    /**
+     * Extracts not only the direct children of this VirtualNode, but
+     * recursively all the VirtualNodes of this catalog. When a VirtualNode that
+     * is the root of a nested catalog is created, it won't be expanded. In
+     * order to actually expand that node it will be necessary to manually call
+     * this method on it.
+     *
+     * @param catalog_mgr catalog manager that contains the file system tree
+     */
     void ExtractChildren(CatalogMgrT *catalog_mgr);
     void FixWeight();
     VirtualNode(const std::string &path, CatalogMgrT *catalog_mgr)
-      : children(), weight(1), dirent(), path(path),
-        is_new_nested_catalog(false) {
+        : children()
+        , weight(1)
+        , dirent()
+        , path(path)
+        , is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupDefault, &dirent);
     }
     VirtualNode(const std::string &path, const DirectoryEntry &dirent,
                 CatalogMgrT *catalog_mgr)
-      : children(), weight(1), dirent(dirent), path(path),
-        is_new_nested_catalog(false) {
+        : children()
+        , weight(1)
+        , dirent(dirent)
+        , path(path)
+        , is_new_nested_catalog(false) {
       if (!IsCatalog() && IsDirectory())
         ExtractChildren(catalog_mgr);
     }
     bool IsDirectory() { return dirent.IsDirectory(); }
-    bool IsCatalog() { return is_new_nested_catalog ||
-        dirent.IsNestedCatalogMountpoint(); }
+    bool IsCatalog() {
+      return is_new_nested_catalog || dirent.IsNestedCatalogMountpoint();
+    }
   };
   typedef typename CatalogBalancer<CatalogMgrT>::VirtualNode virtual_node_t;
 
@@ -143,4 +150,3 @@ class CatalogBalancer {
 #include "catalog_balancer_impl.h"
 
 #endif  // CVMFS_CATALOG_BALANCER_H_
-

@@ -95,8 +95,8 @@ class SqliteMemoryManager {
     /**
      * Accumulates to 4kB.
      */
-    static const unsigned kBufferSize =
-      kLookasideSlotSize * kLookasideSlotsPerDb;
+    static const unsigned kBufferSize = kLookasideSlotSize
+                                        * kLookasideSlotsPerDb;
 
     /**
      * Has to be a multiple of the number of bits in the int type.  One arena

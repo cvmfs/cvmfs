@@ -45,46 +45,46 @@ template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
-  typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
-  typedef typename ObjectFetcherTN::ReflogTN          ReflogTN;
-  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
-  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
-  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
-  typedef std::vector<shash::Any>                     HashVector;
+  typedef typename ObjectFetcherTN::HistoryTN HistoryTN;
+  typedef typename ObjectFetcherTN::ReflogTN ReflogTN;
+  typedef typename CatalogTraversalT::CatalogTN CatalogTN;
+  typedef typename CatalogTraversalT::CallbackDataTN TraversalCallbackDataTN;
+  typedef typename CatalogTraversalT::Parameters TraversalParameters;
+  typedef std::vector<shash::Any> HashVector;
 
  public:
   struct Configuration {
-    static const uint64_t     kFullHistory;
-    static const uint64_t     kNoHistory;
-    static const time_t       kNoTimestamp;
-    static const shash::Any   kLatestHistoryDatabase;
+    static const uint64_t kFullHistory;
+    static const uint64_t kNoHistory;
+    static const time_t kNoTimestamp;
+    static const shash::Any kLatestHistoryDatabase;
 
     Configuration()
-      : uploader(NULL)
-      , object_fetcher(NULL)
-      , reflog(NULL)
-      , keep_history_depth(kFullHistory)
-      , keep_history_timestamp(kNoTimestamp)
-      , dry_run(false)
-      , verbose(false)
-      , deleted_objects_logfile(NULL)
-      , statistics(NULL)
-      , extended_stats(false)
-      , num_threads(8) {}
+        : uploader(NULL)
+        , object_fetcher(NULL)
+        , reflog(NULL)
+        , keep_history_depth(kFullHistory)
+        , keep_history_timestamp(kNoTimestamp)
+        , dry_run(false)
+        , verbose(false)
+        , deleted_objects_logfile(NULL)
+        , statistics(NULL)
+        , extended_stats(false)
+        , num_threads(8) { }
 
     bool has_deletion_log() const { return deleted_objects_logfile != NULL; }
 
-    upload::AbstractUploader  *uploader;
-    ObjectFetcherTN           *object_fetcher;
-    ReflogTN                  *reflog;
-    uint64_t                   keep_history_depth;
-    time_t                     keep_history_timestamp;
-    bool                       dry_run;
-    bool                       verbose;
-    FILE                      *deleted_objects_logfile;
-    perf::Statistics          *statistics;
-    bool                       extended_stats;
-    unsigned int               num_threads;
+    upload::AbstractUploader *uploader;
+    ObjectFetcherTN *object_fetcher;
+    ReflogTN *reflog;
+    uint64_t keep_history_depth;
+    time_t keep_history_timestamp;
+    bool dry_run;
+    bool verbose;
+    FILE *deleted_objects_logfile;
+    perf::Statistics *statistics;
+    bool extended_stats;
+    unsigned int num_threads;
   };
 
  public:
@@ -95,10 +95,11 @@ class GarbageCollector {
 
   uint64_t preserved_catalog_count() const { return preserved_catalogs_; }
   uint64_t condemned_catalog_count() const { return condemned_catalogs_; }
-  uint64_t condemned_objects_count() const { return condemned_objects_;  }
+  uint64_t condemned_objects_count() const { return condemned_objects_; }
   uint64_t duplicate_delete_requests() const {
-                                           return duplicate_delete_requests_;  }
-  uint64_t condemned_bytes_count() const { return condemned_bytes_;  }
+    return duplicate_delete_requests_;
+  }
+  uint64_t condemned_bytes_count() const { return condemned_bytes_; }
   uint64_t oldest_trunk_catalog() const { return oldest_trunk_catalog_; }
 
  protected:
@@ -115,21 +116,18 @@ class GarbageCollector {
   void Sweep(const shash::Any &hash);
   bool RemoveCatalogFromReflog(const shash::Any &catalog);
 
-  void PrintCatalogTreeEntry(const unsigned int  tree_level,
-                             const CatalogTN    *catalog) const;
+  void PrintCatalogTreeEntry(const unsigned int tree_level,
+                             const CatalogTN *catalog) const;
   void LogDeletion(const shash::Any &hash) const;
 
  private:
-  class ReflogBasedInfoShim :
-    public swissknife::CatalogTraversalInfoShim<CatalogTN>
-  {
+  class ReflogBasedInfoShim
+      : public swissknife::CatalogTraversalInfoShim<CatalogTN> {
    public:
     explicit ReflogBasedInfoShim(ReflogTN *reflog) : reflog_(reflog) {
       pthread_mutex_init(&reflog_mutex_, NULL);
     }
-    virtual ~ReflogBasedInfoShim() {
-      pthread_mutex_destroy(&reflog_mutex_);
-    }
+    virtual ~ReflogBasedInfoShim() { pthread_mutex_destroy(&reflog_mutex_); }
     virtual uint64_t GetLastModified(const CatalogTN *catalog) {
       uint64_t timestamp;
       MutexLockGuard m(&reflog_mutex_);
@@ -142,11 +140,11 @@ class GarbageCollector {
     pthread_mutex_t reflog_mutex_;
   };
 
-  const Configuration  configuration_;
-  ReflogBasedInfoShim  catalog_info_shim_;
-  CatalogTraversalT    traversal_;
-  HashFilterT          hash_filter_;
-  HashFilterT          hash_map_delete_requests_;
+  const Configuration configuration_;
+  ReflogBasedInfoShim catalog_info_shim_;
+  CatalogTraversalT traversal_;
+  HashFilterT hash_filter_;
+  HashFilterT hash_map_delete_requests_;
 
 
   bool use_reflog_timestamps_;
@@ -156,30 +154,30 @@ class GarbageCollector {
    * older than this snapshot.  The oldest_trunk_catalog_ is used as a marker
    * for when to remove auxiliary files (meta info, history, ...).
    */
-  uint64_t              oldest_trunk_catalog_;
-  bool                  oldest_trunk_catalog_found_;
-  uint64_t              preserved_catalogs_;
+  uint64_t oldest_trunk_catalog_;
+  bool oldest_trunk_catalog_found_;
+  uint64_t preserved_catalogs_;
   /**
    * Number of catalogs in the reflog that are to be deleted (in fact, some of
    * them might not exist anymore).
    */
-  uint64_t              unreferenced_trees_;
+  uint64_t unreferenced_trees_;
   /**
    * Number of root catalogs garbage collected, count grows as GC progresses
    */
-  uint64_t              condemned_trees_;
+  uint64_t condemned_trees_;
   /**
    * Number of catalogs garbage collected, count grows as GC progresses
    */
-  uint64_t              condemned_catalogs_;
+  uint64_t condemned_catalogs_;
   /**
    * Keeps track if the last status report issued, between 0 and 1
    */
-  float                 last_reported_status_;
+  float last_reported_status_;
 
-  uint64_t              condemned_objects_;
-  uint64_t              condemned_bytes_;
-  uint64_t              duplicate_delete_requests_;
+  uint64_t condemned_objects_;
+  uint64_t condemned_bytes_;
+  uint64_t duplicate_delete_requests_;
 };
 
 #include "garbage_collector_impl.h"

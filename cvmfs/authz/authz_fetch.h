@@ -22,7 +22,7 @@ class AuthzFetcher {
  public:
   struct QueryInfo {
     QueryInfo(pid_t p, uid_t u, gid_t g, const std::string &m)
-      : pid(p), uid(u), gid(g), membership(m) { }
+        : pid(p), uid(u), gid(g), membership(m) { }
     pid_t pid;
     uid_t uid;
     gid_t gid;
@@ -50,8 +50,7 @@ class AuthzStaticFetcher : public AuthzFetcher {
   virtual ~AuthzStaticFetcher() { }
   virtual AuthzStatus Fetch(const QueryInfo &query_info,
                             AuthzToken *authz_token,
-                            unsigned *ttl)
-  {
+                            unsigned *ttl) {
     *authz_token = AuthzToken();
     *ttl = ttl_;
     return status_;

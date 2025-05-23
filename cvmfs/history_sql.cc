@@ -10,9 +10,9 @@
 
 namespace history {
 
-const float    HistoryDatabase::kLatestSchema          = 1.0;
-const float    HistoryDatabase::kLatestSupportedSchema = 1.0;
-const unsigned HistoryDatabase::kLatestSchemaRevision  = 3;
+const float HistoryDatabase::kLatestSchema = 1.0;
+const float HistoryDatabase::kLatestSupportedSchema = 1.0;
+const unsigned HistoryDatabase::kLatestSchemaRevision = 3;
 
 /**
  * Database Schema ChangeLog:
@@ -39,27 +39,29 @@ bool HistoryDatabase::CreateEmptyDatabase() {
   if (!sql_foreign_keys.Execute())
     return false;
 
-  return CreateBranchesTable() &&
-         CreateTagsTable() &&
-         CreateRecycleBinTable();
+  return CreateBranchesTable() && CreateTagsTable() && CreateRecycleBinTable();
 }
 
 
 bool HistoryDatabase::CreateTagsTable() {
   assert(read_write());
-  return sqlite::Sql(sqlite_db(),
-    "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
-    "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
-    "  branch TEXT, CONSTRAINT pk_tags PRIMARY KEY (name), "
-    "  FOREIGN KEY (branch) REFERENCES branches (branch));").Execute();
+  return sqlite::Sql(
+             sqlite_db(),
+             "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
+             "  timestamp INTEGER, channel INTEGER, description TEXT, size "
+             "INTEGER, "
+             "  branch TEXT, CONSTRAINT pk_tags PRIMARY KEY (name), "
+             "  FOREIGN KEY (branch) REFERENCES branches (branch));")
+      .Execute();
 }
 
 
 bool HistoryDatabase::CreateRecycleBinTable() {
   assert(read_write());
   return sqlite::Sql(sqlite_db(),
-    "CREATE TABLE recycle_bin (hash TEXT, flags INTEGER, "
-    "  CONSTRAINT pk_hash PRIMARY KEY (hash))").Execute();
+                     "CREATE TABLE recycle_bin (hash TEXT, flags INTEGER, "
+                     "  CONSTRAINT pk_hash PRIMARY KEY (hash))")
+      .Execute();
 }
 
 
@@ -67,18 +69,20 @@ bool HistoryDatabase::CreateBranchesTable() {
   assert(read_write());
 
   sqlite::Sql sql_create(sqlite_db(),
-    "CREATE TABLE branches (branch TEXT, parent TEXT, initial_revision INTEGER,"
-    "  CONSTRAINT pk_branch PRIMARY KEY (branch), "
-    "  FOREIGN KEY (parent) REFERENCES branches (branch), "
-    "  CHECK ((branch <> '') OR (parent IS NULL)), "
-    "  CHECK ((branch = '') OR (parent IS NOT NULL)));");
+                         "CREATE TABLE branches (branch TEXT, parent TEXT, "
+                         "initial_revision INTEGER,"
+                         "  CONSTRAINT pk_branch PRIMARY KEY (branch), "
+                         "  FOREIGN KEY (parent) REFERENCES branches (branch), "
+                         "  CHECK ((branch <> '') OR (parent IS NULL)), "
+                         "  CHECK ((branch = '') OR (parent IS NOT NULL)));");
   bool retval = sql_create.Execute();
   if (!retval)
     return false;
 
-  sqlite::Sql sql_init(sqlite_db(),
-    "INSERT INTO branches (branch, parent, initial_revision) "
-    "VALUES ('', NULL, 0);");
+  sqlite::Sql sql_init(
+      sqlite_db(),
+      "INSERT INTO branches (branch, parent, initial_revision) "
+      "VALUES ('', NULL, 0);");
   retval = sql_init.Execute();
   return retval;
 }
@@ -96,8 +100,8 @@ bool HistoryDatabase::ContainsRecycleBin() const {
 
 
 bool HistoryDatabase::CheckSchemaCompatibility() {
-  return !((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
-           (schema_version() > kLatestSchema          + kSchemaEpsilon));
+  return !((schema_version() < kLatestSupportedSchema - kSchemaEpsilon)
+           || (schema_version() > kLatestSchema + kSchemaEpsilon));
 }
 
 
@@ -112,14 +116,15 @@ bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
     return true;
   }
 
-  LogCvmfs(kLogHistory, kLogDebug, "upgrading history schema revision "
-                                   "%.2f (Rev: %d) to %.2f (Rev: %d)",
-           schema_version(), schema_revision(),
-           kLatestSchema, kLatestSchemaRevision);
+  LogCvmfs(kLogHistory, kLogDebug,
+           "upgrading history schema revision "
+           "%.2f (Rev: %d) to %.2f (Rev: %d)",
+           schema_version(), schema_revision(), kLatestSchema,
+           kLatestSchemaRevision);
 
-  const bool success = UpgradeSchemaRevision_10_1() &&
-                       UpgradeSchemaRevision_10_2() &&
-                       UpgradeSchemaRevision_10_3();
+  const bool success = UpgradeSchemaRevision_10_1()
+                       && UpgradeSchemaRevision_10_2()
+                       && UpgradeSchemaRevision_10_3();
 
   return success && StoreSchemaRevision();
 }
@@ -166,8 +171,9 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
     return false;
   }
 
-  sqlite::Sql sql_upgrade(sqlite_db(),
-    "ALTER TABLE tags ADD branch TEXT REFERENCES branches (branch);");
+  sqlite::Sql sql_upgrade(
+      sqlite_db(),
+      "ALTER TABLE tags ADD branch TEXT REFERENCES branches (branch);");
   if (!sql_upgrade.Execute()) {
     LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade tags table");
     return false;
@@ -193,43 +199,44 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_3() {
 
 //------------------------------------------------------------------------------
 
-#define DB_FIELDS_V1R0  "name, hash, revision, timestamp, channel, " \
-                        "description, 0, ''"
-#define DB_FIELDS_V1R1  "name, hash, revision, timestamp, channel, " \
-                        "description, size, ''"
-#define DB_FIELDS_V1R3  "name, hash, revision, timestamp, channel, " \
-                        "description, size, branch"
-#define DB_PLACEHOLDERS ":name, :hash, :revision, :timestamp, :channel, " \
-                        ":description, :size, :branch"
-#define ROLLBACK_COND   "(revision > :target_rev  OR " \
-                        " name = :target_name) " \
-                        "AND branch = ''"
+#define DB_FIELDS_V1R0                         \
+  "name, hash, revision, timestamp, channel, " \
+  "description, 0, ''"
+#define DB_FIELDS_V1R1                         \
+  "name, hash, revision, timestamp, channel, " \
+  "description, size, ''"
+#define DB_FIELDS_V1R3                         \
+  "name, hash, revision, timestamp, channel, " \
+  "description, size, branch"
+#define DB_PLACEHOLDERS                             \
+  ":name, :hash, :revision, :timestamp, :channel, " \
+  ":description, :size, :branch"
+#define ROLLBACK_COND            \
+  "(revision > :target_rev  OR " \
+  " name = :target_name) "       \
+  "AND branch = ''"
 
-#define MAKE_STATEMENT(STMT_TMPL, REV)       \
-static const std::string REV =               \
-  ReplaceAll(                                \
-    ReplaceAll(                              \
-      ReplaceAll(STMT_TMPL,                  \
-        "@DB_FIELDS@", DB_FIELDS_ ## REV),   \
-      "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS), \
-    "@ROLLBACK_COND@", ROLLBACK_COND)
+#define MAKE_STATEMENT(STMT_TMPL, REV)                                  \
+  static const std::string REV = ReplaceAll(                            \
+      ReplaceAll(ReplaceAll(STMT_TMPL, "@DB_FIELDS@", DB_FIELDS_##REV), \
+                 "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS),                 \
+      "@ROLLBACK_COND@", ROLLBACK_COND)
 
 #define MAKE_STATEMENTS(STMT_TMPL) \
   MAKE_STATEMENT(STMT_TMPL, V1R0); \
   MAKE_STATEMENT(STMT_TMPL, V1R1); \
   MAKE_STATEMENT(STMT_TMPL, V1R3)
 
-#define DEFERRED_INIT(DB, REV) \
-  DeferredInit((DB)->sqlite_db(), (REV).c_str())
+#define DEFERRED_INIT(DB, REV) DeferredInit((DB)->sqlite_db(), (REV).c_str())
 
-#define DEFERRED_INITS(DB) \
-  if ((DB)->IsEqualSchema((DB)->schema_version(), 1.0f) && \
-      (DB)->schema_revision() == 0) {                      \
-    DEFERRED_INIT((DB), V1R0);                             \
-  } else if ((DB)->schema_revision() < 3) {                \
-    DEFERRED_INIT((DB), V1R1);                             \
-  } else {                                                 \
-    DEFERRED_INIT((DB), V1R3);                             \
+#define DEFERRED_INITS(DB)                              \
+  if ((DB)->IsEqualSchema((DB)->schema_version(), 1.0f) \
+      && (DB)->schema_revision() == 0) {                \
+    DEFERRED_INIT((DB), V1R0);                          \
+  } else if ((DB)->schema_revision() < 3) {             \
+    DEFERRED_INIT((DB), V1R1);                          \
+  } else {                                              \
+    DEFERRED_INIT((DB), V1R3);                          \
   }
 
 SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
@@ -239,18 +246,14 @@ SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
 
 
 bool SqlInsertTag::BindTag(const History::Tag &tag) {
-  return
-    BindText(1, tag.name) &&
-    BindTextTransient(2, tag.root_hash.ToString()) &&  // temporary (ToString)
-    BindInt64(3, tag.revision) &&
-    BindInt64(4, tag.timestamp) &&
-    // Channels are no longer supported: store 0 (i.e. kChannelTrunk)
-    // for backwards compatibility with existing databases
-    //
-    BindInt64(5, 0) &&
-    BindText(6, tag.description) &&
-    BindInt64(7, tag.size) &&
-    BindText(8, tag.branch);
+  return BindText(1, tag.name) && BindTextTransient(2, tag.root_hash.ToString())
+         &&  // temporary (ToString)
+         BindInt64(3, tag.revision) && BindInt64(4, tag.timestamp) &&
+         // Channels are no longer supported: store 0 (i.e. kChannelTrunk)
+         // for backwards compatibility with existing databases
+         //
+         BindInt64(5, 0) && BindText(6, tag.description)
+         && BindInt64(7, tag.size) && BindText(8, tag.branch);
 }
 
 
@@ -274,9 +277,7 @@ SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
   DEFERRED_INITS(database);
 }
 
-bool SqlFindTag::BindName(const std::string &name) {
-  return BindText(1, name);
-}
+bool SqlFindTag::BindName(const std::string &name) { return BindText(1, name); }
 
 
 //------------------------------------------------------------------------------
@@ -335,7 +336,7 @@ unsigned SqlCountTags::RetrieveCount() const {
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
   MAKE_STATEMENTS(
-    "SELECT @DB_FIELDS@ FROM tags ORDER BY timestamp DESC, revision DESC;");
+      "SELECT @DB_FIELDS@ FROM tags ORDER BY timestamp DESC, revision DESC;");
   DEFERRED_INITS(database);
 }
 
@@ -382,14 +383,14 @@ SqlListBranches::SqlListBranches(const HistoryDatabase *database) {
     DeferredInit(database->sqlite_db(), "SELECT '', NULL, 0;");
   else
     DeferredInit(database->sqlite_db(),
-      "SELECT branch, parent, initial_revision FROM branches;");
+                 "SELECT branch, parent, initial_revision FROM branches;");
 }
 
 
 History::Branch SqlListBranches::RetrieveBranch() const {
   std::string branch = RetrieveString(0);
-  std::string parent =
-    (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
+  std::string parent = (RetrieveType(1) == SQLITE_NULL) ? ""
+                                                        : RetrieveString(1);
   unsigned initial_revision = RetrieveInt64(2);
   return History::Branch(branch, parent, initial_revision);
 }
@@ -400,16 +401,14 @@ History::Branch SqlListBranches::RetrieveBranch() const {
 
 SqlInsertBranch::SqlInsertBranch(const HistoryDatabase *database) {
   DeferredInit(database->sqlite_db(),
-    "INSERT INTO branches (branch, parent, initial_revision) "
-    "VALUES (:branch, :parent, :initial_revision);");
+               "INSERT INTO branches (branch, parent, initial_revision) "
+               "VALUES (:branch, :parent, :initial_revision);");
 }
 
 
 bool SqlInsertBranch::BindBranch(const History::Branch &branch) {
-  return
-    BindText(1, branch.branch) &&
-    BindText(2, branch.parent) &&
-    BindInt64(3, branch.initial_revision);
+  return BindText(1, branch.branch) && BindText(2, branch.parent)
+         && BindInt64(3, branch.initial_revision);
 }
 
 
@@ -417,8 +416,8 @@ bool SqlInsertBranch::BindBranch(const History::Branch &branch) {
 
 
 bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
-  return (database->IsEqualSchema(database->schema_version(), 1.0)) &&
-         (database->schema_revision() >= 2);
+  return (database->IsEqualSchema(database->schema_version(), 1.0))
+         && (database->schema_revision() >= 2);
 }
 
 

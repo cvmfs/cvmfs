@@ -15,17 +15,17 @@
 
 namespace {
 
-bool BothAreSpaces(const char& c1, const char& c2) {
+bool BothAreSpaces(const char &c1, const char &c2) {
   return c1 == ' ' && (c1 == c2);
 }
 
-}
+}  // namespace
 
 namespace gateway {
 
 int APIVersion() { return 2; }
 
-GatewayKey ReadGatewayKey(const std::string& key_file_name) {
+GatewayKey ReadGatewayKey(const std::string &key_file_name) {
   std::string id;
   std::string secret;
   bool retval = ReadKeys(key_file_name, &id, &secret);
@@ -34,8 +34,8 @@ GatewayKey ReadGatewayKey(const std::string& key_file_name) {
   return GatewayKey(id, secret);
 }
 
-bool ReadKeys(const std::string& key_file_name, std::string* key_id,
-              std::string* secret) {
+bool ReadKeys(const std::string &key_file_name, std::string *key_id,
+              std::string *secret) {
   if (!(key_id && secret)) {
     return false;
   }
@@ -56,8 +56,8 @@ bool ReadKeys(const std::string& key_file_name, std::string* key_id,
   return ParseKey(body, key_id, secret);
 }
 
-bool ParseKey(const std::string& body, std::string* key_id,
-              std::string* secret) {
+bool ParseKey(const std::string &body, std::string *key_id,
+              std::string *secret) {
   std::string line = GetLineMem(body.data(), body.size());
   std::string l = Trim(ReplaceAll(line, "\t", " "));
   l.erase(std::unique(l.begin(), l.end(), BothAreSpaces), l.end());

@@ -42,15 +42,16 @@ CheckoutMarker *CheckoutMarker::CreateFrom(const std::string &path) {
   if (tokens.size() < 3 || tokens.size() > 4)
     throw publish::EPublish("checkout marker not parsable: " + line);
 
-  CheckoutMarker *marker = new CheckoutMarker(tokens[0], tokens[2],
-    shash::MkFromHexPtr(shash::HexPtr(tokens[1]), shash::kSuffixCatalog),
-    previous_branch);
+  CheckoutMarker *marker = new CheckoutMarker(
+      tokens[0], tokens[2],
+      shash::MkFromHexPtr(shash::HexPtr(tokens[1]), shash::kSuffixCatalog),
+      previous_branch);
   return marker;
 }
 
 void CheckoutMarker::SaveAs(const std::string &path) const {
-  std::string marker =
-    tag_ + " " + hash_.ToString(false /* with_suffix */) + " " + branch_;
+  std::string marker = tag_ + " " + hash_.ToString(false /* with_suffix */)
+                       + " " + branch_;
   if (!previous_branch_.empty())
     marker += " " + previous_branch_;
   marker += "\n";
@@ -103,14 +104,10 @@ void ServerFlagFile::Set() {
 }
 
 
-void ServerFlagFile::Clear() {
-  unlink(path_.c_str());
-}
+void ServerFlagFile::Clear() { unlink(path_.c_str()); }
 
 
-bool ServerFlagFile::IsSet() const {
-  return FileExists(path_);
-}
+bool ServerFlagFile::IsSet() const { return FileExists(path_); }
 
 
 //------------------------------------------------------------------------------
@@ -126,10 +123,8 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn) {
   preserved_fds.insert(2);
   pid_t child_pid;
   bool retval = ManagedExec(cmd_line, preserved_fds, std::map<int, int>(),
-                            false /* drop_credentials */,
-                            true /* clear_env */,
-                            false /* double_fork */,
-                            &child_pid);
+                            false /* drop_credentials */, true /* clear_env */,
+                            false /* double_fork */, &child_pid);
   if (!retval)
     throw EPublish("cannot spawn suid helper");
   int exit_code = WaitForChild(child_pid);
@@ -138,9 +133,8 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn) {
 }
 
 
-void SetInConfig(const std::string &path,
-                 const std::string &key, const std::string &value)
-{
+void SetInConfig(const std::string &path, const std::string &key,
+                 const std::string &value) {
   int fd = open(path.c_str(), O_RDWR | O_CREAT, kDefaultFileMode);
   if (fd < 0)
     throw EPublish("cannot modify configuration file " + path);

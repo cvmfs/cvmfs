@@ -5,10 +5,10 @@
 #ifndef CVMFS_FILE_WATCHER_INOTIFY_H_
 #define CVMFS_FILE_WATCHER_INOTIFY_H_
 
-#include "file_watcher.h"
-
 #include <map>
 #include <string>
+
+#include "file_watcher.h"
 
 namespace file_watcher {
 
@@ -18,10 +18,10 @@ class FileWatcherInotify : public FileWatcher {
   virtual ~FileWatcherInotify();
 
  protected:
-  virtual bool RunEventLoop(const FileWatcher::HandlerMap& handler,
+  virtual bool RunEventLoop(const FileWatcher::HandlerMap &handler,
                             int read_pipe, int write_pipe);
 
-  virtual int TryRegisterFilter(const std::string& file_path);
+  virtual int TryRegisterFilter(const std::string &file_path);
 
  private:
   int inotify_fd_;

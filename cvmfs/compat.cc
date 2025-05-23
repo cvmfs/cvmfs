@@ -65,8 +65,7 @@ bool InodeContainer::ConstructPath(const uint64_t inode, PathString *path) {
 
   bool retval = ConstructPath(needle->second.parent_inode, path);
   path->Append("/", 1);
-  path->Append(needle->second.name.GetChars(),
-               needle->second.name.GetLength());
+  path->Append(needle->second.name.GetChars(), needle->second.name.GetLength());
   assert(retval);
   return retval;
 }
@@ -86,8 +85,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
     uint32_t references = i->second.references;
     PathString path;
     old_tracker->inode2path_.ConstructPath(inode, &path);
-    new_tracker->VfsGetBy(
-      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
+    new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
+                          references, path);
   }
 }
 
@@ -100,7 +99,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v2 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) *((uint32_t *)key.digest + 1);  // NOLINT
+  return (uint32_t) * ((uint32_t *)key.digest + 1);  // NOLINT
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {
@@ -111,18 +110,19 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
   old_tracker->inode_map_.map_.hasher_ = hasher_inode;
   old_tracker->path_map_.map_.hasher_ = hasher_md5;
 
-  SmallHashDynamic<uint64_t, uint32_t> *old_inodes =
-    &old_tracker->inode_references_.map_;
+  SmallHashDynamic<uint64_t, uint32_t>
+      *old_inodes = &old_tracker->inode_references_.map_;
   for (unsigned i = 0; i < old_inodes->capacity_; ++i) {
     const uint64_t inode = old_inodes->keys_[i];
-    if (inode == 0) continue;
+    if (inode == 0)
+      continue;
 
     const uint32_t references = old_inodes->values_[i];
     PathString path;
     bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
-    new_tracker->VfsGetBy(
-      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
+    new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
+                          references, path);
   }
 }
 
@@ -135,7 +135,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v3 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) *((uint32_t *)key.digest + 1);  // NOLINT
+  return (uint32_t) * ((uint32_t *)key.digest + 1);  // NOLINT
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {
@@ -147,18 +147,19 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
   old_tracker->path_map_.map_.SetHasher(hasher_md5);
   old_tracker->path_map_.path_store_.map_.SetHasher(hasher_md5);
 
-  SmallHashDynamic<uint64_t, uint32_t> *old_inodes =
-    &old_tracker->inode_references_.map_;
+  SmallHashDynamic<uint64_t, uint32_t>
+      *old_inodes = &old_tracker->inode_references_.map_;
   for (unsigned i = 0; i < old_inodes->capacity(); ++i) {
     const uint64_t inode = old_inodes->keys()[i];
-    if (inode == 0) continue;
+    if (inode == 0)
+      continue;
 
     const uint32_t references = old_inodes->values()[i];
     PathString path;
     bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
-    new_tracker->VfsGetBy(
-      glue::InodeEx(inode, glue::InodeEx::kUnknownType), references, path);
+    new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
+                          references, path);
   }
 }
 
@@ -184,11 +185,12 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
   new_tables->handle2fd = old_tables->handle2fd;
   new_tables->inode2references = old_tables->inode2references;
 
-  SmallHashDynamic<uint64_t, FileChunkReflist> *old_inode2chunks =
-    &old_tables->inode2chunks;
+  SmallHashDynamic<uint64_t, FileChunkReflist>
+      *old_inode2chunks = &old_tables->inode2chunks;
   for (unsigned keyno = 0; keyno < old_inode2chunks->capacity(); ++keyno) {
     const uint64_t inode = old_inode2chunks->keys()[keyno];
-    if (inode == 0) continue;
+    if (inode == 0)
+      continue;
 
     FileChunkReflist *old_reflist = &old_inode2chunks->values()[keyno];
     BigVector<FileChunk> *old_list = old_reflist->list;
@@ -230,11 +232,12 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
   new_tables->handle2fd = old_tables->handle2fd;
   new_tables->inode2references = old_tables->inode2references;
 
-  SmallHashDynamic<uint64_t, FileChunkReflist> *old_inode2chunks =
-    &old_tables->inode2chunks;
+  SmallHashDynamic<uint64_t, FileChunkReflist>
+      *old_inode2chunks = &old_tables->inode2chunks;
   for (unsigned keyno = 0; keyno < old_inode2chunks->capacity(); ++keyno) {
     const uint64_t inode = old_inode2chunks->keys()[keyno];
-    if (inode == 0) continue;
+    if (inode == 0)
+      continue;
 
     FileChunkReflist *old_reflist = &old_inode2chunks->values()[keyno];
     BigVector<FileChunk> *old_list = old_reflist->list;

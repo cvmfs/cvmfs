@@ -41,7 +41,7 @@ enum PipeSignals {
   kPipeTerminateSignal = 1
 };
 
-template <PipeType pipeType>
+template<PipeType pipeType>
 class CVMFS_EXPORT Pipe : public SingleCopy {
   FRIEND_TEST(T_Util, ManagedExecRunShell);
   FRIEND_TEST(T_Util, ManagedExecExecuteBinaryDoubleFork);
@@ -70,9 +70,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   /**
    * Destructor closes all valid file descriptors of the pipe
    */
-  ~Pipe() {
-    Close();
-  }
+  ~Pipe() { Close(); }
 
   /**
    * Closes all open file descriptors of the pipe and marks them as invalid
@@ -96,7 +94,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * Closes file descriptor that writes to the pipe and marks it as invalid.
    */
   void CloseWriteFd() {
-    if (fd_write_  >= 0) {
+    if (fd_write_ >= 0) {
       close(fd_write_);
       fd_write_ = -1;
     }
@@ -183,16 +181,12 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
   /**
    * Returns the file descriptor that reads from the pipe
    */
-  int GetReadFd() const {
-    return fd_read_;
-  }
+  int GetReadFd() const { return fd_read_; }
 
   /**
    * Returns the file descriptor that writes to the pipe
    */
-  int GetWriteFd() const {
-    return fd_write_;
-  }
+  int GetWriteFd() const { return fd_write_; }
 
 
  private:
@@ -201,9 +195,9 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
 
   /**
    * Only used in the unit tests to test pipes using stdin/stdout as read/write.
-  */
-  Pipe(const int fd_read, const int fd_write) : fd_read_(fd_read),
-                                                fd_write_(fd_write) {}
+   */
+  Pipe(const int fd_read, const int fd_write)
+      : fd_read_(fd_read), fd_write_(fd_write) { }
 
   /**
    * Creating a pipe should always succeed.
@@ -226,9 +220,9 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     } while ((num_bytes < 0) && (errno == EINTR));
     if (!((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte))) {
       PANIC(kLogSyslogErr | kLogDebug,
-                                   "WritePipe failed: expected write size %lu, "
-                                   "actually written %lu, errno %d, fd %d",
-                                   nbyte, num_bytes, errno, fd);
+            "WritePipe failed: expected write size %lu, "
+            "actually written %lu, errno %d, fd %d",
+            nbyte, num_bytes, errno, fd);
     }
   }
 
@@ -243,9 +237,9 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
     } while ((num_bytes < 0) && (errno == EINTR));
     if (!((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte))) {
       PANIC(kLogSyslogErr | kLogDebug,
-                                     "ReadPipe failed: expected read size %lu, "
-                                     "actually read %lu, errno %d, fd %d",
-                                     nbyte, num_bytes, errno, fd);
+            "ReadPipe failed: expected read size %lu, "
+            "actually read %lu, errno %d, fd %d",
+            nbyte, num_bytes, errno, fd);
     }
   }
 };

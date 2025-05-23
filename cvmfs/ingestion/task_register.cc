@@ -12,8 +12,8 @@
 void TaskRegister::Process(FileItem *file_item) {
   assert(file_item != NULL);
   assert(!file_item->path().empty());
-  assert(!file_item->has_legacy_bulk_chunk() ||
-         !file_item->bulk_hash().IsNull());
+  assert(!file_item->has_legacy_bulk_chunk()
+         || !file_item->bulk_hash().IsNull());
   assert(file_item->nchunks_in_fly() == 0);
   assert((file_item->GetNumChunks() > 1) || !file_item->bulk_hash().IsNull());
   assert(file_item->GetNumChunks() != 1);
@@ -22,17 +22,17 @@ void TaskRegister::Process(FileItem *file_item) {
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg,
            "File '%s' processed (bulk hash: %s suffix: %c)",
-           file_item->path().c_str(),
-           file_item->bulk_hash().ToString().c_str(),
+           file_item->path().c_str(), file_item->bulk_hash().ToString().c_str(),
            file_item->hash_suffix());
 
   tube_ctr_inflight_pre_->PopFront();
 
-  NotifyListeners(upload::SpoolerResult(0,
-    file_item->path(),
-    file_item->bulk_hash(),
-    FileChunkList(*file_item->GetChunksPtr()),
-    file_item->compression_algorithm()));
+  NotifyListeners(
+      upload::SpoolerResult(0,
+                            file_item->path(),
+                            file_item->bulk_hash(),
+                            FileChunkList(*file_item->GetChunksPtr()),
+                            file_item->compression_algorithm()));
 
   delete file_item;
 

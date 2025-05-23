@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 #ifdef __APPLE__
-  #include <sys/sysctl.h>
+#include <sys/sysctl.h>
 #endif
 #include <syslog.h>
 #include <unistd.h>
@@ -64,7 +64,8 @@ pid_t GetParentPid(const pid_t pid) {
       const std::string s_ppid = line.substr(ppid_label.size());
       std::istringstream iss_ppid(s_ppid);
       SkipWhitespace(&iss_ppid);
-      int i_ppid = 0; iss_ppid >> i_ppid;
+      int i_ppid = 0;
+      iss_ppid >> i_ppid;
       if (i_ppid > 0) {
         parent_pid = static_cast<pid_t>(i_ppid);
       }
@@ -107,9 +108,8 @@ class ShowOpenFilesHelper {
     char buf[1024];
     string full_path = parent_path + "/" + name;
     int size = readlink(full_path.c_str(), buf, 1024);
-    file_list += (size < 0)
-                  ? ("failed to read fd " + name + "\n")
-                  : string(buf, size) + "\n";
+    file_list += (size < 0) ? ("failed to read fd " + name + "\n")
+                            : string(buf, size) + "\n";
   }
 
   string file_list;
@@ -121,8 +121,8 @@ string ShowOpenFiles() {
   return "listing open files not supported on OS X";
 #else
   ShowOpenFilesHelper open_files_helper;
-  FileSystemTraversal<ShowOpenFilesHelper>
-    traversal(&open_files_helper, "", false);
+  FileSystemTraversal<ShowOpenFilesHelper> traversal(&open_files_helper, "",
+                                                     false);
   traversal.fn_new_symlink = &ShowOpenFilesHelper::ShowSymlink;
   traversal.Recurse("/proc/self/fd");
   return open_files_helper.file_list;
@@ -132,10 +132,10 @@ string ShowOpenFiles() {
 
 class CountOpenFilesHelper {
  public:
-  CountOpenFilesHelper() : count(0) {}
+  CountOpenFilesHelper() : count(0) { }
 
-  void CountSymlink(const string & /* parent_path */, const string & /* name */)
-  {
+  void CountSymlink(const string & /* parent_path */,
+                    const string & /* name */) {
     count++;
   }
 
@@ -158,8 +158,8 @@ unsigned GetNoUsedFds() {
   return result;
 #else
   CountOpenFilesHelper count_files_helper;
-  FileSystemTraversal<CountOpenFilesHelper>
-    traversal(&count_files_helper, "", false);
+  FileSystemTraversal<CountOpenFilesHelper> traversal(&count_files_helper, "",
+                                                      false);
   traversal.fn_new_symlink = &CountOpenFilesHelper::CountSymlink;
   traversal.Recurse("/proc/self/fd");
   return count_files_helper.count;
@@ -191,7 +191,7 @@ std::string GetExecutablePath(const std::string &exe_name) {
   }
 
   const std::vector<std::string> paths = SplitString(searchpath, ':');
-        std::vector<std::string>::const_iterator i    = paths.begin();
+  std::vector<std::string>::const_iterator i = paths.begin();
   const std::vector<std::string>::const_iterator iend = paths.end();
   for (; i != iend; ++i) {
     const std::string candidate_path = *i + "/" + exe_name;
@@ -213,9 +213,8 @@ std::string GetExecutablePath(const std::string &exe_name) {
       break;
     }
 
-    if (statinfo.st_mode & S_IXUSR ||
-        statinfo.st_mode & S_IXGRP ||
-        statinfo.st_mode & S_IXOTH) {
+    if (statinfo.st_mode & S_IXUSR || statinfo.st_mode & S_IXGRP
+        || statinfo.st_mode & S_IXOTH) {
       result = real_path;
       break;
     }
@@ -227,12 +226,12 @@ std::string GetExecutablePath(const std::string &exe_name) {
 time_t t(const int day, const int month, const int year) {
   struct tm time_descriptor;
 
-  time_descriptor.tm_hour  = 0;
-  time_descriptor.tm_min   = 0;
-  time_descriptor.tm_sec   = 0;
-  time_descriptor.tm_mday  = day;
-  time_descriptor.tm_mon   = month - 1;
-  time_descriptor.tm_year  = year - 1900;
+  time_descriptor.tm_hour = 0;
+  time_descriptor.tm_min = 0;
+  time_descriptor.tm_sec = 0;
+  time_descriptor.tm_mday = day;
+  time_descriptor.tm_mon = month - 1;
+  time_descriptor.tm_year = year - 1900;
   time_descriptor.tm_isdst = 0;
 
   const time_t result = mktime(&time_descriptor);
@@ -275,8 +274,7 @@ DirectoryEntry DirectoryEntryTestFactory::Directory(
     const string &name,
     unsigned size,
     shash::Any hash,
-    bool is_nested_catalog_mountpoint)
-{
+    bool is_nested_catalog_mountpoint) {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
   dirent.name_ = NameString(name);
@@ -308,19 +306,19 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
 }
 
 catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
-    const Metadata& metadata) {
+    const Metadata &metadata) {
   DirectoryEntry dirent;
-  dirent.name_       = NameString(metadata.name);
-  dirent.mode_       = metadata.mode;
-  dirent.uid_        = metadata.uid;
-  dirent.gid_        = metadata.gid;
-  dirent.size_       = metadata.size;
-  dirent.mtime_      = metadata.mtime;
-  dirent.symlink_    = LinkString(metadata.symlink);
-  dirent.linkcount_  = metadata.linkcount;
+  dirent.name_ = NameString(metadata.name);
+  dirent.mode_ = metadata.mode;
+  dirent.uid_ = metadata.uid;
+  dirent.gid_ = metadata.gid;
+  dirent.size_ = metadata.size;
+  dirent.mtime_ = metadata.mtime;
+  dirent.symlink_ = LinkString(metadata.symlink);
+  dirent.linkcount_ = metadata.linkcount;
   dirent.has_xattrs_ = metadata.has_xattrs;
-  dirent.checksum_   = metadata.checksum;
-  dirent.is_hidden_  = metadata.is_hidden;
+  dirent.checksum_ = metadata.checksum;
+  dirent.is_hidden_ = metadata.is_hidden;
   return dirent;
 }
 
@@ -330,24 +328,19 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 //------------------------------------------------------------------------------
 
 
-
 atomic_int32 MockCatalog::instances;
 
-const std::string MockCatalog::rhs =
-  "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
-const shash::Any MockCatalog::root_hash =
-  shash::Any(shash::kSha1, shash::HexPtr(MockCatalog::rhs),
-             shash::kSuffixCatalog);
+const std::string MockCatalog::rhs = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
+const shash::Any MockCatalog::root_hash = shash::Any(
+    shash::kSha1, shash::HexPtr(MockCatalog::rhs), shash::kSuffixCatalog);
 
-void MockCatalog::ResetGlobalState() {
-  atomic_init32(&MockCatalog::instances);
-}
+void MockCatalog::ResetGlobalState() { atomic_init32(&MockCatalog::instances); }
 
-MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
-                                       const std::string  &file,
-                                       const shash::Any   &catalog_hash,
-                                             MockCatalog  *parent,
-                                       const bool          is_not_root) {
+MockCatalog *MockCatalog::AttachFreely(const std::string &root_path,
+                                       const std::string &file,
+                                       const shash::Any &catalog_hash,
+                                       MockCatalog *parent,
+                                       const bool is_not_root) {
   MockCatalog *catalog = MockCatalog::Get(catalog_hash);
 
   if (catalog == NULL) {
@@ -371,7 +364,7 @@ void MockCatalog::RemoveChild(MockCatalog *child) {
   }
 }
 
-MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
+MockCatalog *MockCatalog::FindSubtree(const PathString &path) {
   for (unsigned i = 0; i < active_children_.size(); ++i) {
     if (active_children_[i].mountpoint == path)
       return active_children_[i].child;
@@ -380,11 +373,9 @@ MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
 }
 
 
-bool MockCatalog::FindNested(
-  const PathString &mountpoint,
-  shash::Any *hash,
-  uint64_t *size) const
-{
+bool MockCatalog::FindNested(const PathString &mountpoint,
+                             shash::Any *hash,
+                             uint64_t *size) const {
   for (unsigned i = 0; i < children_.size(); ++i) {
     if (children_[i].mountpoint == mountpoint) {
       *hash = children_[i].hash;
@@ -397,7 +388,7 @@ bool MockCatalog::FindNested(
 
 
 bool MockCatalog::LookupPath(const PathString &path,
-                catalog::DirectoryEntry *dirent) const {
+                             catalog::DirectoryEntry *dirent) const {
   shash::Md5 md5_path(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
     if (files_[i].path_hash == md5_path) {
@@ -409,8 +400,8 @@ bool MockCatalog::LookupPath(const PathString &path,
 }
 
 bool MockCatalog::ListingPath(const PathString &path,
-                 catalog::DirectoryEntryList *listing,
-                 const bool /* expand_symlink */) const {
+                              catalog::DirectoryEntryList *listing,
+                              const bool /* expand_symlink */) const {
   unsigned initial_size = listing->size();
   shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
@@ -425,7 +416,7 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   nested.mountpoint = PathString(child->root_path());
   nested.hash = child->hash();
   nested.child = child;
-  nested.size  = child->catalog_size();
+  nested.size = child->catalog_size();
   children_.push_back(nested);
 
   // update the directory entries in both catalogs
@@ -449,40 +440,36 @@ void MockCatalog::AddChild(MockCatalog *child) {
   active_children_.push_back(nested);
 }
 
-void MockCatalog::AddFile(const shash::Any   &content_hash,
-                          const size_t        file_size,
-                          const string        &parent_path,
-                          const string        &name)
-{
+void MockCatalog::AddFile(const shash::Any &content_hash,
+                          const size_t file_size,
+                          const string &parent_path,
+                          const string &name) {
   MockCatalog::File f(content_hash, file_size, parent_path, name);
   files_.push_back(f);
 }
 
-void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
-                           const size_t       chunk_size) {
+void MockCatalog::AddChunk(const shash::Any &chunk_content_hash,
+                           const size_t chunk_size) {
   MockCatalog::Chunk c;
   c.hash = chunk_content_hash;
   c.size = chunk_size;
   chunks_.push_back(c);
 }
 
-template <class T>
+template<class T>
 struct HashExtractor {
-  const shash::Any& operator() (const T &object) const {
-    return object.hash;
-  }
+  const shash::Any &operator()(const T &object) const { return object.hash; }
 };
 
-const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
+const MockCatalog::HashVector &MockCatalog::GetReferencedObjects() const {
   if (referenced_objects_.empty()) {
     const size_t num_objs = files_.size() + chunks_.size();
     referenced_objects_.resize(num_objs);
     HashVector::iterator i = referenced_objects_.begin();
 
-    i = std::transform(files_.begin(), files_.end(),
-                       i, HashExtractor<File>());
-    i = std::transform(chunks_.begin(), chunks_.end(),
-                       i, HashExtractor<Chunk>());
+    i = std::transform(files_.begin(), files_.end(), i, HashExtractor<File>());
+    i = std::transform(chunks_.begin(), chunks_.end(), i,
+                       HashExtractor<Chunk>());
   }
 
   return referenced_objects_;
@@ -492,26 +479,25 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 //------------------------------------------------------------------------------
 
 
-MockCatalog* catalog::MockCatalogManager::CreateCatalog(
-                               const PathString  &mountpoint,
-                               const shash::Any  &catalog_hash,
-                               MockCatalog *parent_catalog)
-{
-  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+MockCatalog *catalog::MockCatalogManager::CreateCatalog(
+    const PathString &mountpoint,
+    const shash::Any &catalog_hash,
+    MockCatalog *parent_catalog) {
+  map<PathString, MockCatalog *>::iterator it = catalog_map_.find(mountpoint);
   if (it != catalog_map_.end()) {
     return it->second;
   }
   bool is_root = parent_catalog == NULL;
-  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1,
-                         0, is_root, parent_catalog, NULL);
+  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1, 0,
+                         is_root, parent_catalog, NULL);
 }
 
 catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
-                                          CatalogContext *result) {
+    CatalogContext *result) {
   LogCvmfs(kLogCache, kLogDebug,
-                       "catalog::MockCatalogManager::GetNewRootCatalogContext");
-  const map<PathString, MockCatalog*>::iterator it =
-                                           catalog_map_.find(PathString("", 0));
+           "catalog::MockCatalogManager::GetNewRootCatalogContext");
+  const map<PathString, MockCatalog *>::iterator it = catalog_map_.find(
+      PathString("", 0));
   if (it != catalog_map_.end()) {
     MockCatalog *catalog = it->second;
     result->SetHash(catalog->hash());
@@ -529,18 +515,17 @@ catalog::LoadReturn catalog::MockCatalogManager::GetNewRootCatalogContext(
 }
 
 catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
-                            CatalogContext *ctlg_context) {
+    CatalogContext *ctlg_context) {
   LogCvmfs(kLogCache, kLogDebug,
-                              "catalog::MockCatalogManager::LoadCatalogByHash");
-  const map<PathString, MockCatalog*>::iterator it = catalog_map_.find(
-                                                    ctlg_context->mountpoint());
+           "catalog::MockCatalogManager::LoadCatalogByHash");
+  const map<PathString, MockCatalog *>::iterator it = catalog_map_.find(
+      ctlg_context->mountpoint());
   if (it != catalog_map_.end() && !ctlg_context->hash().IsNull()) {
     return kLoadUp2Date;
   } else {
     MockCatalog *catalog = new MockCatalog(
-                                          ctlg_context->mountpoint().ToString(),
-                                          ctlg_context->hash(), 4096, 1, 0,
-                                          true, NULL, NULL);
+        ctlg_context->mountpoint().ToString(), ctlg_context->hash(), 4096, 1, 0,
+        true, NULL, NULL);
     catalog_map_[ctlg_context->mountpoint()] = catalog;
   }
   return kLoadNew;
@@ -550,21 +535,18 @@ catalog::LoadReturn catalog::MockCatalogManager::LoadCatalogByHash(
 //------------------------------------------------------------------------------
 
 
-MockObjectFetcher::Failures
-MockObjectFetcher::FetchManifest(manifest::Manifest** manifest) {
-  const uint64_t    catalog_size = 0;
-  const std::string root_path    = "";
+MockObjectFetcher::Failures MockObjectFetcher::FetchManifest(
+    manifest::Manifest **manifest) {
+  const uint64_t catalog_size = 0;
+  const std::string root_path = "";
   *manifest = new manifest::Manifest(
-      MockCatalog::root_hash,
-      catalog_size,
-      root_path);
+      MockCatalog::root_hash, catalog_size, root_path);
   (*manifest)->set_history(MockHistory::root_hash);
   return MockObjectFetcher::kFailOk;
 }
 
-MockObjectFetcher::Failures
-MockObjectFetcher::Fetch(const shash::Any   &object_hash,
-                               std::string  *file_path) {
+MockObjectFetcher::Failures MockObjectFetcher::Fetch(
+    const shash::Any &object_hash, std::string *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
   if (!ObjectExists(object_hash)) {
@@ -573,11 +555,11 @@ MockObjectFetcher::Fetch(const shash::Any   &object_hash,
   return MockObjectFetcher::kFailOk;
 }
 
-MockObjectFetcher::Failures
-MockObjectFetcher::Fetch(const std::string &relative_path,
-                         const bool         decompress,
-                         const bool         nocache,
-                         std::string *file_path) {
+MockObjectFetcher::Failures MockObjectFetcher::Fetch(
+    const std::string &relative_path,
+    const bool decompress,
+    const bool nocache,
+    std::string *file_path) {
   *file_path = relative_path;
   if (!PathExists(relative_path)) {
     return MockObjectFetcher::kFailNotFound;
@@ -586,8 +568,7 @@ MockObjectFetcher::Fetch(const std::string &relative_path,
 }
 
 bool MockObjectFetcher::ObjectExists(const shash::Any &object_hash) const {
-  return MockCatalog::Exists(object_hash) ||
-         MockHistory::Exists(object_hash);
+  return MockCatalog::Exists(object_hash) || MockHistory::Exists(object_hash);
 }
 
 bool MockObjectFetcher::PathExists(const std::string &path) const {
@@ -599,29 +580,23 @@ bool MockObjectFetcher::PathExists(const std::string &path) const {
 
 
 unsigned int MockHistory::instances = 0;
-const std::string MockHistory::rhs =
-  "b46091c745a1ffef707dd7eabec852fb8679cf28";
-const shash::Any  MockHistory::root_hash =
-  shash::Any(shash::kSha1, shash::HexPtr(MockHistory::rhs),
-             shash::kSuffixHistory);
+const std::string MockHistory::rhs = "b46091c745a1ffef707dd7eabec852fb8679cf28";
+const shash::Any MockHistory::root_hash = shash::Any(
+    shash::kSha1, shash::HexPtr(MockHistory::rhs), shash::kSuffixHistory);
 
-void MockHistory::ResetGlobalState() {
-  MockHistory::instances = 0;
-}
+void MockHistory::ResetGlobalState() { MockHistory::instances = 0; }
 
 
-MockHistory* MockHistory::Open(const std::string &path) {
-  const shash::Any history_hash(shash::MkFromHexPtr(shash::HexPtr(path),
-                                                    shash::kSuffixHistory));
+MockHistory *MockHistory::Open(const std::string &path) {
+  const shash::Any history_hash(
+      shash::MkFromHexPtr(shash::HexPtr(path), shash::kSuffixHistory));
   MockHistory *history = MockHistory::Get(history_hash);
   return (history != NULL) ? history->Clone() : NULL;
 }
 
 
-MockHistory::MockHistory(const bool          writable,
-                         const std::string  &fqrn)
-        : writable_(writable)
-        , owns_database_file_(false) {
+MockHistory::MockHistory(const bool writable, const std::string &fqrn)
+    : writable_(writable), owns_database_file_(false) {
   set_fqrn(fqrn);
   branches_[""] = History::Branch("", "", 0);
   ++MockHistory::instances;
@@ -629,23 +604,20 @@ MockHistory::MockHistory(const bool          writable,
 
 
 MockHistory::MockHistory(const MockHistory &other)
-  : tags_(other.tags_)
-  , recycle_bin_(other.recycle_bin_)
-  , writable_(other.writable_)
-  , previous_revision_(other.previous_revision_)
-  , owns_database_file_(false)
-{
+    : tags_(other.tags_)
+    , recycle_bin_(other.recycle_bin_)
+    , writable_(other.writable_)
+    , previous_revision_(other.previous_revision_)
+    , owns_database_file_(false) {
   set_fqrn(other.fqrn());
   ++MockHistory::instances;
 }
 
 
-MockHistory::~MockHistory() {
-  --MockHistory::instances;
-}
+MockHistory::~MockHistory() { --MockHistory::instances; }
 
 
-MockHistory* MockHistory::Clone(const bool writable) const {
+MockHistory *MockHistory::Clone(const bool writable) const {
   MockHistory *new_copy = new MockHistory(*this);
   new_copy->set_writable(writable);
   return new_copy;
@@ -655,8 +627,8 @@ MockHistory* MockHistory::Clone(const bool writable) const {
 void MockHistory::GetTags(std::vector<Tag> *tags) const {
   tags->clear();
   tags->resize(tags_.size());
-  std::transform(tags_.begin(), tags_.end(),
-                 tags->begin(), MockHistory::get_tag);
+  std::transform(tags_.begin(), tags_.end(), tags->begin(),
+                 MockHistory::get_tag);
 }
 
 
@@ -665,9 +637,8 @@ bool MockHistory::Insert(const Tag &tag) {
     return false;
   }
   bool found_branch = false;
-  for (BranchMap::const_iterator i = branches_.begin();
-       i != branches_.end(); ++i)
-  {
+  for (BranchMap::const_iterator i = branches_.begin(); i != branches_.end();
+       ++i) {
     if (i->first == tag.branch) {
       found_branch = true;
       break;
@@ -742,9 +713,8 @@ bool MockHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
 
 bool MockHistory::InsertBranch(const Branch &branch) {
   bool found_parent = false;
-  for (BranchMap::const_iterator i = branches_.begin();
-       i != branches_.end(); ++i)
-  {
+  for (BranchMap::const_iterator i = branches_.begin(); i != branches_.end();
+       ++i) {
     if (i->first == branch.branch)
       return false;
     if (i->first == branch.parent)
@@ -756,24 +726,20 @@ bool MockHistory::InsertBranch(const Branch &branch) {
   return true;
 }
 
-bool MockHistory::PruneBranches() {
-  return false;
-}
+bool MockHistory::PruneBranches() { return false; }
 
 bool MockHistory::ListBranches(vector<Branch> *branches) const {
-  for (BranchMap::const_iterator i = branches_.begin();
-       i != branches_.end(); ++i)
-  {
-    branches->push_back(Branch(
-      i->first, i->second.parent, i->second.initial_revision));
+  for (BranchMap::const_iterator i = branches_.begin(); i != branches_.end();
+       ++i) {
+    branches->push_back(
+        Branch(i->first, i->second.parent, i->second.initial_revision));
   }
   return true;
 }
 
 bool MockHistory::ExistsBranch(const std::string &branch_name) const {
-  for (BranchMap::const_iterator i = branches_.begin();
-       i != branches_.end(); ++i)
-  {
+  for (BranchMap::const_iterator i = branches_.begin(); i != branches_.end();
+       ++i) {
     if (i->first == branch_name)
       return true;
   }
@@ -803,8 +769,8 @@ bool MockHistory::Rollback(const Tag &updated_target_tag) {
   return Insert(updated_target_tag);
 }
 
-bool MockHistory:: ListTagsAffectedByRollback(const std::string  &tag_name,
-                                              std::vector<Tag>   *tags) const {
+bool MockHistory::ListTagsAffectedByRollback(const std::string &tag_name,
+                                             std::vector<Tag> *tags) const {
   History::Tag target_tag;
   if (!GetByName(tag_name, &target_tag)) {
     return false;
@@ -814,9 +780,8 @@ bool MockHistory:: ListTagsAffectedByRollback(const std::string  &tag_name,
 
   // TODO(rmeusel): C++11 use std::copy_if
   RollbackPredicate pred(target_tag, true /* inverse */);
-  std::vector<Tag>::iterator last = std::remove_copy_if(tags->begin(),
-                                                        tags->end(),
-                                                        tags->begin(), pred);
+  std::vector<Tag>::iterator last = std::remove_copy_if(
+      tags->begin(), tags->end(), tags->begin(), pred);
   tags->erase(last, tags->end());
   std::sort(tags->rbegin(), tags->rend());
 
@@ -838,8 +803,8 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
   // extract hashes from deduplicated vector
   hashes->clear();
   hashes->resize(tags.size());
-  std::transform(tags.rbegin(), tags.rend(),
-                 hashes->begin(), MockHistory::get_hash);
+  std::transform(tags.rbegin(), tags.rend(), hashes->begin(),
+                 MockHistory::get_hash);
   return true;
 }
 
@@ -847,15 +812,15 @@ bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 //------------------------------------------------------------------------------
 
 
-MockReflog* MockReflog::Open(const std::string &path) {
-  MockReflog* reflog = MockReflog::Get(path);
+MockReflog *MockReflog::Open(const std::string &path) {
+  MockReflog *reflog = MockReflog::Get(path);
   if (NULL == reflog) {
     return NULL;
   }
   return reflog->Clone();
 }
 
-MockReflog* MockReflog::Create(const std::string &path,
+MockReflog *MockReflog::Create(const std::string &path,
                                const std::string &repo_name) {
   MockReflog *reflog = new MockReflog(repo_name);
   MockReflog::RegisterPath(path, reflog);
@@ -863,22 +828,19 @@ MockReflog* MockReflog::Create(const std::string &path,
 }
 
 
-void MockReflog::HashDatabase(
-  const std::string &database_path,
-  shash::Any *hash_reflog)
-{
+void MockReflog::HashDatabase(const std::string &database_path,
+                              shash::Any *hash_reflog) {
   HashString("", hash_reflog);
 }
 
 
-MockReflog* MockReflog::Clone() const {
+MockReflog *MockReflog::Clone() const {
   MockReflog *new_reflog = new MockReflog(*this);
   return new_reflog;
 }
 
 MockReflog::MockReflog(const std::string fqrn)
-  : owns_database_file_(false)
-  , fqrn_(fqrn) {}
+    : owns_database_file_(false), fqrn_(fqrn) { }
 
 bool MockReflog::AddCertificate(const shash::Any &certificate) {
   references_[certificate] = time(NULL);
@@ -900,25 +862,21 @@ bool MockReflog::AddMetainfo(const shash::Any &metainfo) {
   return true;
 }
 
-bool MockReflog::List(
-  SqlReflog::ReferenceType type,
-  std::vector<shash::Any> *hashes) const
-{
+bool MockReflog::List(SqlReflog::ReferenceType type,
+                      std::vector<shash::Any> *hashes) const {
   return ListOlderThan(type, static_cast<uint64_t>(-1), hashes);
 }
 
-bool MockReflog::ListOlderThan(
-  SqlReflog::ReferenceType type,
-  uint64_t timestamp,
-  std::vector<shash::Any> *hashes) const
-{
+bool MockReflog::ListOlderThan(SqlReflog::ReferenceType type,
+                               uint64_t timestamp,
+                               std::vector<shash::Any> *hashes) const {
   hashes->clear();
   for (map<shash::Any, uint64_t>::const_iterator i = references_.begin(),
-       i_end = references_.end(); i != i_end; ++i)
-  {
-    if ((i->first.suffix == SqlReflog::ToSuffix(type)) &&
-        (i->second < timestamp))
-    {
+                                                 i_end = references_.end();
+       i != i_end;
+       ++i) {
+    if ((i->first.suffix == SqlReflog::ToSuffix(type))
+        && (i->second < timestamp)) {
       hashes->push_back(i->first);
     }
   }
@@ -927,12 +885,10 @@ bool MockReflog::ListOlderThan(
   return true;
 }
 
-bool MockReflog::GetCatalogTimestamp(
-  const shash::Any &catalog,
-  uint64_t *timestamp)
-{
-  std::map<shash::Any, uint64_t>::const_iterator iter =
-    references_.find(catalog);
+bool MockReflog::GetCatalogTimestamp(const shash::Any &catalog,
+                                     uint64_t *timestamp) {
+  std::map<shash::Any, uint64_t>::const_iterator iter = references_.find(
+      catalog);
   if (iter == references_.end())
     return false;
   *timestamp = iter->second;

@@ -15,10 +15,9 @@
 
 using namespace std;  // NOLINT
 
-const char *repo_options =
-  "repo_name=%s,url=%s,"
-  "pubkey=/etc/cvmfs/keys/%s.pub,"
-  "proxies=DIRECT";
+const char *repo_options = "repo_name=%s,url=%s,"
+                           "pubkey=/etc/cvmfs/keys/%s.pub,"
+                           "proxies=DIRECT";
 
 int main(int argc, char *argv[]) {
   if (argc < 4) {
@@ -32,10 +31,10 @@ int main(int argc, char *argv[]) {
     return -1;
   }
   cvmfs_context *ctx = NULL;
-  string base_url       = argv[1];
+  string base_url = argv[1];
   string base_repo_name = argv[2];
-  int    num_repos      = atoi(argv[3]);
-  vector<cvmfs_context*> ctx_vector;
+  int num_repos = atoi(argv[3]);
+  vector<cvmfs_context *> ctx_vector;
   char options[TEST_LINE_MAX];
 
   for (int counter = 1; counter <= num_repos; ++counter) {
@@ -44,12 +43,10 @@ int main(int argc, char *argv[]) {
     string repo_name = rn.str();
 
     ostringstream ru;
-    ru << base_url
-      << '/'
-      << repo_name;
+    ru << base_url << '/' << repo_name;
     string repo_url = ru.str();
     snprintf(options, TEST_LINE_MAX, repo_options, repo_name.c_str(),
-      repo_url.c_str(), repo_name.c_str());
+             repo_url.c_str(), repo_name.c_str());
     printf("Trying to mount with options:\n%s\n", options);
     ctx = cvmfs_attach_repo(options);
     ctx_vector.push_back(ctx);
@@ -64,7 +61,7 @@ int main(int argc, char *argv[]) {
     int fd = cvmfs_open(ctx, mainfile_path.c_str());
     if (fd < 0) {
       printf("Couldn't perform the lookup operation in %s\n",
-        mainfile_path.c_str());
+             mainfile_path.c_str());
       return fd;
     }
     char buffer[10];
@@ -94,7 +91,8 @@ int main(int argc, char *argv[]) {
     num_elem -= 2;
     if (num_elem != counter) {
       printf("Failed to list the correct number of files\n"
-        "Current: %d       Expected: %d\n", num_elem, num_repos);
+             "Current: %d       Expected: %d\n",
+             num_elem, num_repos);
       return -6;
     }
 

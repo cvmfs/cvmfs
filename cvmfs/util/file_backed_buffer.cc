@@ -14,25 +14,22 @@
 #include "util/smalloc.h"
 
 FileBackedBuffer *FileBackedBuffer::Create(uint64_t in_memory_threshold,
-                                           const std::string &tmp_dir)
-{
+                                           const std::string &tmp_dir) {
   return new FileBackedBuffer(in_memory_threshold, tmp_dir);
 }
 
 FileBackedBuffer::FileBackedBuffer(uint64_t in_memory_threshold,
-                                   const std::string &tmp_dir) :
-  in_memory_threshold_(in_memory_threshold),
-  tmp_dir_(tmp_dir),
-  state_(kWriteState),
-  mode_(kMemoryMode),
-  size_(0),
-  buf_(NULL),
-  pos_(0),
-  fp_(NULL),
-  file_path_(""),
-  mmapped_(NULL)
-{
-}
+                                   const std::string &tmp_dir)
+    : in_memory_threshold_(in_memory_threshold)
+    , tmp_dir_(tmp_dir)
+    , state_(kWriteState)
+    , mode_(kMemoryMode)
+    , size_(0)
+    , buf_(NULL)
+    , pos_(0)
+    , fp_(NULL)
+    , file_path_("")
+    , mmapped_(NULL) { }
 
 FileBackedBuffer::~FileBackedBuffer() {
   free(buf_);
@@ -60,7 +57,8 @@ void FileBackedBuffer::Append(const void *source, uint64_t len) {
   // Cannot write after Commit()
   assert(state_ == kWriteState);
 
-  if (len == 0) return;
+  if (len == 0)
+    return;
 
   // check the size and eventually save to file
   if (mode_ == kMemoryMode && pos_ + len > in_memory_threshold_) {
@@ -86,9 +84,10 @@ void FileBackedBuffer::Append(const void *source, uint64_t len) {
     assert(fp_ != NULL);
     uint64_t bytes_written = fwrite(source, 1, len, fp_);
     if (bytes_written != len) {
-      PANIC(kLogStderr, "could not append to temporary file %s: length %lu, "
-                        "actually written %lu, error %d",
-                        file_path_.c_str(), len, bytes_written, ferror(fp_));
+      PANIC(kLogStderr,
+            "could not append to temporary file %s: length %lu, "
+            "actually written %lu, error %d",
+            file_path_.c_str(), len, bytes_written, ferror(fp_));
     }
     pos_ += len;
     size_ += len;
@@ -121,8 +120,9 @@ void FileBackedBuffer::Commit() {
 int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
   assert(state_ == kReadState);
 
-  int64_t actual_len = (pos + len <= size_) ?
-    len : static_cast<int64_t>(size_) - static_cast<int64_t>(pos);
+  int64_t actual_len = (pos + len <= size_) ? len
+                                            : static_cast<int64_t>(size_)
+                                                  - static_cast<int64_t>(pos);
   assert(actual_len >= 0);
 
   if (mode_ == kMemoryMode) {
@@ -169,9 +169,10 @@ void FileBackedBuffer::SaveToFile() {
 
   uint64_t bytes_written = fwrite(buf_, 1, pos_, fp_);
   if (bytes_written != pos_) {
-    PANIC(kLogStderr, "could not write to temporary file %s: length %lu, "
-                      "actually written %lu, error %d",
-                      file_path_.c_str(), pos_, bytes_written, ferror(fp_));
+    PANIC(kLogStderr,
+          "could not write to temporary file %s: length %lu, "
+          "actually written %lu, error %d",
+          file_path_.c_str(), pos_, bytes_written, ferror(fp_));
   }
 
   free(buf_);

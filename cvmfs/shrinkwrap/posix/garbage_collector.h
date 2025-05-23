@@ -6,7 +6,7 @@
 
 #include "statistics.h"
 
-struct posix_gc_thread{
+struct posix_gc_thread {
   struct fs_traversal_context *ctx;
   perf::Statistics *stat;
   unsigned thread_total;

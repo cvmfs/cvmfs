@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include "cvmfs_suid_util.h"
+#include "gtest/gtest.h"
 
 using namespace std;  // NOLINT
 

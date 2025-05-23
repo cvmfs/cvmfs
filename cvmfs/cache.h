@@ -77,14 +77,14 @@ class CacheManager : SingleCopy {
    * Relevant for the quota management and for downloading (URL construction).
    * Used in Label::flags.
    */
-  static const int kLabelCatalog     = 0x01;
-  static const int kLabelPinned      = 0x02;
-  static const int kLabelVolatile    = 0x04;
-  static const int kLabelExternal    = 0x08;
-  static const int kLabelChunked     = 0x10;
+  static const int kLabelCatalog = 0x01;
+  static const int kLabelPinned = 0x02;
+  static const int kLabelVolatile = 0x04;
+  static const int kLabelExternal = 0x08;
+  static const int kLabelChunked = 0x10;
   static const int kLabelCertificate = 0x20;
-  static const int kLabelMetainfo    = 0x40;
-  static const int kLabelHistory     = 0x80;
+  static const int kLabelMetainfo = 0x40;
+  static const int kLabelHistory = 0x80;
 
   /**
    * Meta-data of an object that the cache may or may not maintain/use.
@@ -93,11 +93,11 @@ class CacheManager : SingleCopy {
    * object, if necessary.
    */
   struct Label {
-    Label() : flags(0)
-            , size(kSizeUnknown)
-            , zip_algorithm(zlib::kZlibDefault)
-            , range_offset(-1)
-    {}
+    Label()
+        : flags(0)
+        , size(kSizeUnknown)
+        , zip_algorithm(zlib::kZlibDefault)
+        , range_offset(-1) { }
 
     bool IsCatalog() const { return flags & kLabelCatalog; }
     bool IsPinned() const { return flags & kLabelPinned; }
@@ -138,9 +138,7 @@ class CacheManager : SingleCopy {
    */
   struct LabeledObject {
     explicit LabeledObject(const shash::Any &id) : id(id), label() { }
-    LabeledObject(const shash::Any &id, const Label &l)
-      : id(id)
-      , label(l) { }
+    LabeledObject(const shash::Any &id, const Label &l) : id(id), label(l) { }
 
     shash::Any id;
     Label label;
@@ -184,8 +182,8 @@ class CacheManager : SingleCopy {
 
   int ChecksumFd(int fd, shash::Any *id);
   int OpenPinned(const LabeledObject &object);
-  bool Open2Mem(const LabeledObject &object,
-                unsigned char **buffer, uint64_t *size);
+  bool Open2Mem(const LabeledObject &object, unsigned char **buffer,
+                uint64_t *size);
   bool CommitFromMem(const LabeledObject &object,
                      const unsigned char *buffer,
                      const uint64_t size);
@@ -217,7 +215,7 @@ class CacheManager : SingleCopy {
   virtual manifest::Breadcrumb LoadBreadcrumb(const std::string & /*fqrn*/) {
     return manifest::Breadcrumb();
   }
-  virtual bool StoreBreadcrumb(const manifest::Manifest &/*manifest*/) {
+  virtual bool StoreBreadcrumb(const manifest::Manifest & /*manifest*/) {
     return false;
   }
 
@@ -243,10 +241,9 @@ class CacheManager : SingleCopy {
    */
   struct State : SingleCopy {
     State()
-      : version(kStateVersion)
-      , manager_type(kUnknownCacheManager)
-      , concrete_state(NULL)
-    { }
+        : version(kStateVersion)
+        , manager_type(kUnknownCacheManager)
+        , concrete_state(NULL) { }
 
     unsigned version;
     CacheManagerIds manager_type;

@@ -51,9 +51,10 @@ struct ComparableHash {
   ComparableHash() { memset(&hash, 0, sizeof(hash)); }
   explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
   struct cvmcache_hash hash;
-  bool operator <(const ComparableHash &other) const {
+  bool operator<(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
-                             const_cast<cvmcache_hash *>(&(other.hash))) < 0;
+                             const_cast<cvmcache_hash *>(&(other.hash)))
+           < 0;
   }
 };
 
@@ -78,10 +79,8 @@ static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
 }
 
 
-static int null_obj_info(
-  struct cvmcache_hash *id,
-  struct cvmcache_object_info *info)
-{
+static int null_obj_info(struct cvmcache_hash *id,
+                         struct cvmcache_object_info *info) {
   ComparableHash h(*id);
   if (storage.find(h) == storage.end())
     return CVMCACHE_STATUS_NOENTRY;
@@ -96,27 +95,24 @@ static int null_obj_info(
 
 
 static int null_pread(struct cvmcache_hash *id,
-                    uint64_t offset,
-                    uint32_t *size,
-                    unsigned char *buffer)
-{
+                      uint64_t offset,
+                      uint32_t *size,
+                      unsigned char *buffer) {
   ComparableHash h(*id);
   string data = storage[h].data;
   if (offset > data.length())
     return CVMCACHE_STATUS_OUTOFBOUNDS;
-  unsigned nbytes =
-    std::min(*size, static_cast<uint32_t>(data.length() - offset));
+  unsigned nbytes = std::min(*size,
+                             static_cast<uint32_t>(data.length() - offset));
   memcpy(buffer, data.data() + offset, nbytes);
   *size = nbytes;
   return CVMCACHE_STATUS_OK;
 }
 
 
-static int null_start_txn(
-  struct cvmcache_hash *id,
-  uint64_t txn_id,
-  struct cvmcache_object_info *info)
-{
+static int null_start_txn(struct cvmcache_hash *id,
+                          uint64_t txn_id,
+                          struct cvmcache_object_info *info) {
   Object partial_object;
   partial_object.id = *id;
   partial_object.type = info->type;
@@ -131,11 +127,9 @@ static int null_start_txn(
 }
 
 
-static int null_write_txn(
-  uint64_t txn_id,
-  unsigned char *buffer,
-  uint32_t size)
-{
+static int null_write_txn(uint64_t txn_id,
+                          unsigned char *buffer,
+                          uint32_t size) {
   TxnInfo txn = transactions[txn_id];
   txn.partial_object.data += string(reinterpret_cast<char *>(buffer), size);
   transactions[txn_id] = txn;
@@ -160,8 +154,9 @@ static int null_info(struct cvmcache_info *info) {
   info->size_bytes = uint64_t(-1);
   info->used_bytes = info->pinned_bytes = 0;
   for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; ++i)
-  {
+                                                   i_end = storage.end();
+       i != i_end;
+       ++i) {
     info->used_bytes += i->second.data.length();
     if (i->second.refcnt > 0)
       info->pinned_bytes += i->second.data.length();
@@ -179,10 +174,10 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
 
   // Volatile objects
   for (map<ComparableHash, Object>::iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; )
-  {
-    if ((i->second.refcnt > 0) || (i->second.type != CVMCACHE_OBJECT_VOLATILE))
-    {
+                                             i_end = storage.end();
+       i != i_end;) {
+    if ((i->second.refcnt > 0)
+        || (i->second.type != CVMCACHE_OBJECT_VOLATILE)) {
       ++i;
       continue;
     }
@@ -197,8 +192,8 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
   }
   // All other objects
   for (map<ComparableHash, Object>::iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; )
-  {
+                                             i_end = storage.end();
+       i != i_end;) {
     if (i->second.refcnt > 0) {
       ++i;
       continue;
@@ -217,26 +212,22 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
   return CVMCACHE_STATUS_PARTIAL;
 }
 
-static int null_listing_begin(
-  uint64_t lst_id,
-  enum cvmcache_object_type type)
-{
+static int null_listing_begin(uint64_t lst_id, enum cvmcache_object_type type) {
   Listing lst;
   lst.type = type;
   lst.elems = new vector<Object>();
   for (map<ComparableHash, Object>::const_iterator i = storage.begin(),
-       i_end = storage.end(); i != i_end; ++i)
-  {
+                                                   i_end = storage.end();
+       i != i_end;
+       ++i) {
     lst.elems->push_back(i->second);
   }
   listings[lst_id] = lst;
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_listing_next(
-  int64_t listing_id,
-  struct cvmcache_object_info *item)
-{
+static int null_listing_next(int64_t listing_id,
+                             struct cvmcache_object_info *item) {
   Listing lst = listings[listing_id];
   do {
     if (lst.pos >= lst.elems->size())
@@ -249,8 +240,8 @@ static int null_listing_next(
       item->type = (*elems)[lst.pos].type;
       item->pinned = (*elems)[lst.pos].refcnt > 0;
       item->description = (*elems)[lst.pos].description.empty()
-                          ? NULL
-                          : strdup((*elems)[lst.pos].description.c_str());
+                              ? NULL
+                              : strdup((*elems)[lst.pos].description.c_str());
       break;
     }
     lst.pos++;
@@ -266,20 +257,16 @@ static int null_listing_end(int64_t listing_id) {
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_breadcrumb_store(
-  const char *fqrn,
-  const cvmcache_breadcrumb *breadcrumb)
-{
+static int null_breadcrumb_store(const char *fqrn,
+                                 const cvmcache_breadcrumb *breadcrumb) {
   breadcrumbs[fqrn] = *breadcrumb;
   return CVMCACHE_STATUS_OK;
 }
 
-static int null_breadcrumb_load(
-  const char *fqrn,
-  cvmcache_breadcrumb *breadcrumb)
-{
-  map<std::string, cvmcache_breadcrumb>::const_iterator itr =
-    breadcrumbs.find(fqrn);
+static int null_breadcrumb_load(const char *fqrn,
+                                cvmcache_breadcrumb *breadcrumb) {
+  map<std::string, cvmcache_breadcrumb>::const_iterator itr = breadcrumbs.find(
+      fqrn);
   if (itr == breadcrumbs.end())
     return CVMCACHE_STATUS_NOENTRY;
   *breadcrumb = itr->second;
@@ -378,7 +365,8 @@ int main(int argc, char **argv) {
   cvmcache_process_requests(ctx, 0);
 
   if (test_mode)
-    while (true) sleep(1);
+    while (true)
+      sleep(1);
 
   if (!cvmcache_is_supervised()) {
     printf("Press <R ENTER> to ask clients to release nested catalogs\n");

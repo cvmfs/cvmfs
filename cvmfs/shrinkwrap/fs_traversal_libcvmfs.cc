@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "fs_traversal_libcvmfs.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,7 +12,6 @@
 #include <vector>
 
 #include "fs_traversal_interface.h"
-#include "fs_traversal_libcvmfs.h"
 #include "libcvmfs.h"
 #include "util/logging.h"
 #include "util/smalloc.h"
@@ -19,16 +20,13 @@
 #define MAX_INTEGER_DIGITS 20
 
 
-void libcvmfs_sw_log(const char *msg) {
-  printf("(libcvmfs) %s\n", msg);
-}
+void libcvmfs_sw_log(const char *msg) { printf("(libcvmfs) %s\n", msg); }
 
 
 void libcvmfs_list_dir(struct fs_traversal_context *ctx,
-  const char *dir,
-  char ***buf,
-  size_t *len)
-{
+                       const char *dir,
+                       char ***buf,
+                       size_t *len) {
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   size_t buf_len = 0;
   struct cvmfs_nc_attr *nc_attr = cvmfs_nc_attr_init();
@@ -40,21 +38,18 @@ void libcvmfs_list_dir(struct fs_traversal_context *ctx,
 
 
 int libcvmfs_get_stat(struct fs_traversal_context *ctx,
-  const char *path,
-  struct cvmfs_attr *stat_result,
-  bool get_hash)
-{
+                      const char *path,
+                      struct cvmfs_attr *stat_result,
+                      bool get_hash) {
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   return cvmfs_stat_attr(context, path, stat_result);
 }
 
 
-char *libcvmfs_get_identifier(
-  struct fs_traversal_context *ctx,
-  const struct cvmfs_attr *stat)
-{
+char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
+                              const struct cvmfs_attr *stat) {
   int length = 2 + strlen(stat->cvm_parent) + strlen(stat->cvm_name);
-  char* res = reinterpret_cast<char *>(smalloc(length));
+  char *res = reinterpret_cast<char *>(smalloc(length));
   snprintf(res, length, "%s/%s", stat->cvm_parent, stat->cvm_name);
   return res;
 }
@@ -77,12 +72,11 @@ struct libcvmfs_file_handle {
 };
 
 
-void *libcvmfs_get_handle(
-  struct fs_traversal_context *ctx,
-  const char *identifier)
-{
-  struct libcvmfs_file_handle *file_ctx =
-    reinterpret_cast<libcvmfs_file_handle *>(calloc(1, sizeof(*file_ctx)));
+void *libcvmfs_get_handle(struct fs_traversal_context *ctx,
+                          const char *identifier) {
+  struct libcvmfs_file_handle
+      *file_ctx = reinterpret_cast<libcvmfs_file_handle *>(
+          calloc(1, sizeof(*file_ctx)));
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   file_ctx->ctx = context;
   file_ctx->path = strdup(identifier);
@@ -92,8 +86,8 @@ void *libcvmfs_get_handle(
 
 
 int libcvmfs_do_fopen(void *file_ctx, fs_open_type op_mode) {
-  struct libcvmfs_file_handle *handle =
-    reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
+  struct libcvmfs_file_handle
+      *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
   handle->fd = cvmfs_open(handle->ctx, handle->path);
   if (handle->fd == -1) {
     return -1;
@@ -103,25 +97,24 @@ int libcvmfs_do_fopen(void *file_ctx, fs_open_type op_mode) {
 
 
 int libcvmfs_do_fclose(void *file_ctx) {
-  struct libcvmfs_file_handle *handle =
-    reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
+  struct libcvmfs_file_handle
+      *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
   int res = cvmfs_close(handle->ctx, handle->fd);
-  if (res != 0) return -1;
+  if (res != 0)
+    return -1;
   handle->fd = -1;
   return 0;
 }
 
 
-int libcvmfs_do_fread(
-  void *file_ctx,
-  char *buff,
-  size_t len,
-  size_t *read_len
-) {
-  struct libcvmfs_file_handle *handle =
-    reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
+int libcvmfs_do_fread(void *file_ctx,
+                      char *buff,
+                      size_t len,
+                      size_t *read_len) {
+  struct libcvmfs_file_handle
+      *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
   ssize_t read = cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->off);
-  if (read == -1)  {
+  if (read == -1) {
     return -1;
   }
   *read_len = read;
@@ -136,8 +129,8 @@ int libcvmfs_do_fwrite(void *file_ctx, const char *buff, size_t len) {
 
 
 void libcvmfs_do_ffree(void *file_ctx) {
-  struct libcvmfs_file_handle *handle =
-    reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
+  struct libcvmfs_file_handle
+      *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
   if (handle->fd > 0) {
     libcvmfs_do_fclose(file_ctx);
   }
@@ -146,30 +139,27 @@ void libcvmfs_do_ffree(void *file_ctx) {
 }
 
 
-struct fs_traversal_context *libcvmfs_initialize(
-  const char *repo,
-  const char *base,
-  const char *data,
-  const char *config,
-  int num_threads)
-{
+struct fs_traversal_context *libcvmfs_initialize(const char *repo,
+                                                 const char *base,
+                                                 const char *data,
+                                                 const char *config,
+                                                 int num_threads) {
   if (!repo) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-      "Repository name must be specified");
+    LogCvmfs(kLogCvmfs, kLogStderr, "Repository name must be specified");
     return NULL;
   }
   int retval = 0;
 
   struct fs_traversal_context *result = new struct fs_traversal_context;
   result->version = 1;
-  char* major = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
+  char *major = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(major, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MAJOR);
-  char* minor = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
+  char *minor = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(minor, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MINOR);
-  char* rev = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
+  char *rev = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(rev, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_REVISION);
   size_t len = 3 + strlen(major) + strlen(minor) + strlen(rev);
-  char* lib_version = reinterpret_cast<char *>(smalloc(len));
+  char *lib_version = reinterpret_cast<char *>(smalloc(len));
   snprintf(lib_version, len, "%s.%s:%s", major, minor, rev);
 
   result->lib_version = strdup(lib_version);
@@ -191,8 +181,8 @@ struct fs_traversal_context *libcvmfs_initialize(
     result->config = strdup(config);
   } else {
     size_t len = 8 + strlen(result->repo);
-    char *def_config = reinterpret_cast<char *>(smalloc(len*sizeof(char)));
-    snprintf(def_config, len, "%s.config",  result->repo);
+    char *def_config = reinterpret_cast<char *>(smalloc(len * sizeof(char)));
+    snprintf(def_config, len, "%s.config", result->repo);
     result->config = strdup(def_config);
     free(def_config);
   }
@@ -200,8 +190,8 @@ struct fs_traversal_context *libcvmfs_initialize(
   for (unsigned i = 0; i < config_files.size(); ++i) {
     retval = cvmfs_options_parse(options_mgr, config_files[i].c_str());
     if (retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-        "CVMFS Options failed to parse from : %s", config_files[i].c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS Options failed to parse from : %s",
+               config_files[i].c_str());
       return NULL;
     }
   }
@@ -215,16 +205,16 @@ struct fs_traversal_context *libcvmfs_initialize(
   }
 
   // Override Cache base if not specified in configuration
-  if (data && (!cvmfs_options_get(options_mgr, "CVMFS_CACHE_BASE") &&
-               !cvmfs_options_get(options_mgr, "CVMFS_CACHE_DIR"))) {
+  if (data
+      && (!cvmfs_options_get(options_mgr, "CVMFS_CACHE_BASE")
+          && !cvmfs_options_get(options_mgr, "CVMFS_CACHE_DIR"))) {
     cvmfs_options_set(options_mgr, "CVMFS_CACHE_BASE", data);
     result->data = strdup(data);
   }
 
   retval = cvmfs_init_v2(options_mgr);
   if (retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "CVMFS Initialization failed : %s", repo);
+    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS Initialization failed : %s", repo);
     return NULL;
   }
 
@@ -233,8 +223,7 @@ struct fs_traversal_context *libcvmfs_initialize(
   cvmfs_context *ctx;
   retval = cvmfs_attach_repo_v2(repo, options_mgr, &ctx);
   if (retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-    "CVMFS Attach to %s failed", repo);
+    LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS Attach to %s failed", repo);
     return NULL;
   }
   cvmfs_enable_threaded(ctx);

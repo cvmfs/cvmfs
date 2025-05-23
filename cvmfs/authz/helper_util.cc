@@ -19,8 +19,9 @@
 typedef struct json_value JSON;
 
 #ifdef __APPLE__
-#define strdupa(s) strcpy(/* NOLINT(runtime/printf) */\
-  reinterpret_cast<char *>(alloca(strlen((s)) + 1)), (s))
+#define strdupa(s)                    \
+  strcpy(/* NOLINT(runtime/printf) */ \
+         reinterpret_cast<char *>(alloca(strlen((s)) + 1)), (s))
 #endif
 
 using namespace std;  // NOLINT
@@ -40,9 +41,10 @@ void CheckCallContext() {
 
 void ParseHandshakeInit(const string &msg) {
   block_allocator allocator(2048);
-  char *err_pos; char *err_desc; int err_line;
-  JSON *json = json_parse(strdupa(msg.c_str()),
-                          &err_pos, &err_desc, &err_line,
+  char *err_pos;
+  char *err_desc;
+  int err_line;
+  JSON *json = json_parse(strdupa(msg.c_str()), &err_pos, &err_desc, &err_line,
                           &allocator);
   assert((json != NULL) && (json->first_child != NULL));
   json = json->first_child;
@@ -67,9 +69,10 @@ void ParseHandshakeInit(const string &msg) {
 
 void ParseRequest(const string &msg) {
   block_allocator allocator(2048);
-  char *err_pos; char *err_desc; int err_line;
-  JSON *json = json_parse(strdupa(msg.c_str()),
-                          &err_pos, &err_desc, &err_line,
+  char *err_pos;
+  char *err_desc;
+  int err_line;
+  JSON *json = json_parse(strdupa(msg.c_str()), &err_pos, &err_desc, &err_line,
                           &allocator);
   assert((json != NULL) && (json->first_child != NULL));
   json = json->first_child;
@@ -78,7 +81,7 @@ void ParseRequest(const string &msg) {
   while (json) {
     string name(json->name);
     if (name == "msgid") {
-      if (json->int_value == 4) {  /* kAuthzMsgQuit */
+      if (json->int_value == 4) { /* kAuthzMsgQuit */
         LogAuthz(kLogAuthzDebug, "shut down");
         exit(0);
       }

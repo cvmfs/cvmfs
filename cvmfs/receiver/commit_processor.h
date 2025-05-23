@@ -25,13 +25,18 @@ namespace receiver {
  */
 class CommitProcessor {
  public:
-  enum Result { kSuccess, kError, kMergeFailure, kMissingReflog};
+  enum Result {
+    kSuccess,
+    kError,
+    kMergeFailure,
+    kMissingReflog
+  };
 
   CommitProcessor();
   virtual ~CommitProcessor();
 
-  Result Process(const std::string& lease_path, const shash::Any& old_root_hash,
-                 const shash::Any& new_root_hash, const RepositoryTag& tag,
+  Result Process(const std::string &lease_path, const shash::Any &old_root_hash,
+                 const shash::Any &new_root_hash, const RepositoryTag &tag,
                  uint64_t *final_revision);
 
   int GetNumErrors() const { return num_errors_; }

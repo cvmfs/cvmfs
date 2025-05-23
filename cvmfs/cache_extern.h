@@ -38,6 +38,7 @@ class ExternalCacheManager : public CacheManager {
    */
   class PluginHandle {
     friend class ExternalCacheManager;
+
    public:
     PluginHandle() : fd_connection_(-1) { }
     bool IsValid() const { return fd_connection_ >= 0; }
@@ -53,9 +54,8 @@ class ExternalCacheManager : public CacheManager {
     std::string error_msg_;
   };
 
-  static PluginHandle *CreatePlugin(
-    const std::string &locator,
-    const std::vector<std::string> &cmd_line);
+  static PluginHandle *CreatePlugin(const std::string &locator,
+                                    const std::vector<std::string> &cmd_line);
 
   static ExternalCacheManager *Create(int fd_connection,
                                       unsigned max_open_fds,
@@ -81,9 +81,7 @@ class ExternalCacheManager : public CacheManager {
   }
 #endif
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const Label &label,
-                       const int flags,
-                       void *txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int AbortTxn(void *txn);
@@ -123,18 +121,17 @@ class ExternalCacheManager : public CacheManager {
 
   struct Transaction {
     explicit Transaction(const shash::Any &id)
-      : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(Transaction))
-      , buf_pos(0)
-      , size(0)
-      , expected_size(kSizeUnknown)
-      , label()
-      , open_fds(0)
-      , flushed(false)
-      , committed(false)
-      , label_modified(false)
-      , transaction_id(0)
-      , id(id)
-    { }
+        : buffer(reinterpret_cast<unsigned char *>(this) + sizeof(Transaction))
+        , buf_pos(0)
+        , size(0)
+        , expected_size(kSizeUnknown)
+        , label()
+        , open_fds(0)
+        , flushed(false)
+        , committed(false)
+        , label_modified(false)
+        , transaction_id(0)
+        , id(id) { }
 
     /**
      * Allocated size is max_object_size_, allocated by the caller at the end
@@ -156,10 +153,10 @@ class ExternalCacheManager : public CacheManager {
   struct ReadOnlyHandle {
     ReadOnlyHandle() : id(kInvalidHandle) { }
     explicit ReadOnlyHandle(const shash::Any &h) : id(h) { }
-    bool operator ==(const ReadOnlyHandle &other) const {
+    bool operator==(const ReadOnlyHandle &other) const {
       return this->id == other.id;
     }
-    bool operator !=(const ReadOnlyHandle &other) const {
+    bool operator!=(const ReadOnlyHandle &other) const {
       return this->id != other.id;
     }
     shash::Any id;
@@ -168,27 +165,55 @@ class ExternalCacheManager : public CacheManager {
   class RpcJob {
    public:
     explicit RpcJob(cvmfs::MsgRefcountReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgObjectInfoReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgReadReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgStoreReq *msg)
-      : req_id_(msg->req_id()), part_nr_(msg->part_nr()), msg_req_(msg),
-        frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(msg->part_nr())
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgStoreAbortReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg),
-        frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgInfoReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgShrinkReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgListReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgBreadcrumbLoadReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
     explicit RpcJob(cvmfs::MsgBreadcrumbStoreReq *msg)
-      : req_id_(msg->req_id()), part_nr_(0), msg_req_(msg), frame_send_(msg) { }
+        : req_id_(msg->req_id())
+        , part_nr_(0)
+        , msg_req_(msg)
+        , frame_send_(msg) { }
 
     void set_attachment_send(void *data, unsigned size) {
       frame_send_.set_attachment(data, size);
@@ -202,52 +227,52 @@ class ExternalCacheManager : public CacheManager {
     // Type checking has been already performed
     cvmfs::MsgRefcountReply *msg_refcount_reply() {
       cvmfs::MsgRefcountReply *m = reinterpret_cast<cvmfs::MsgRefcountReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgObjectInfoReply *msg_object_info_reply() {
-      cvmfs::MsgObjectInfoReply *m =
-        reinterpret_cast<cvmfs::MsgObjectInfoReply *>(
-          frame_recv_.GetMsgTyped());
+      cvmfs::MsgObjectInfoReply
+          *m = reinterpret_cast<cvmfs::MsgObjectInfoReply *>(
+              frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgReadReply *msg_read_reply() {
       cvmfs::MsgReadReply *m = reinterpret_cast<cvmfs::MsgReadReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgStoreReply *msg_store_reply() {
       cvmfs::MsgStoreReply *m = reinterpret_cast<cvmfs::MsgStoreReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       assert(m->part_nr() == part_nr_);
       return m;
     }
     cvmfs::MsgInfoReply *msg_info_reply() {
       cvmfs::MsgInfoReply *m = reinterpret_cast<cvmfs::MsgInfoReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgShrinkReply *msg_shrink_reply() {
       cvmfs::MsgShrinkReply *m = reinterpret_cast<cvmfs::MsgShrinkReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgListReply *msg_list_reply() {
       cvmfs::MsgListReply *m = reinterpret_cast<cvmfs::MsgListReply *>(
-        frame_recv_.GetMsgTyped());
+          frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
     cvmfs::MsgBreadcrumbReply *msg_breadcrumb_reply() {
-      cvmfs::MsgBreadcrumbReply *m =
-        reinterpret_cast<cvmfs::MsgBreadcrumbReply *>(
-          frame_recv_.GetMsgTyped());
+      cvmfs::MsgBreadcrumbReply
+          *m = reinterpret_cast<cvmfs::MsgBreadcrumbReply *>(
+              frame_recv_.GetMsgTyped());
       assert(m->req_id() == req_id_);
       return m;
     }
@@ -312,16 +337,15 @@ class ExternalQuotaManager : public QuotaManager {
   virtual bool HasCapability(Capabilities capability);
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
-                      const std::string &description)
-  { }
+                      const std::string &description) { }
 
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
-                              const std::string &description)
-  { }
+                              const std::string &description) { }
 
   virtual bool Pin(const shash::Any &hash, const uint64_t size,
-                   const std::string &description, const bool is_catalog)
-  { return is_catalog; }
+                   const std::string &description, const bool is_catalog) {
+    return is_catalog;
+  }
 
   virtual void Unpin(const shash::Any &hash) { }
   virtual void Touch(const shash::Any &hash) { }
@@ -341,7 +365,7 @@ class ExternalQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
-  virtual bool     SetLimit(uint64_t limit) { return false;} // NOLINT
+  virtual bool SetLimit(uint64_t limit) { return false; }  // NOLINT
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn() { }
@@ -358,7 +382,7 @@ class ExternalQuotaManager : public QuotaManager {
   };
 
   explicit ExternalQuotaManager(ExternalCacheManager *cache_mgr)
-    : cache_mgr_(cache_mgr) { }
+      : cache_mgr_(cache_mgr) { }
   int GetInfo(QuotaInfo *quota_info);
   bool DoListing(cvmfs::EnumObjectType type,
                  std::vector<cvmfs::MsgListRecord> *result);

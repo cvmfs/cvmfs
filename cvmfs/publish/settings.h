@@ -25,24 +25,23 @@ namespace publish {
  * overwritten.  Otherwise, default values can be changed to upstream repository
  * settings.
  */
-template <class T>
+template<class T>
 class Setting {
  public:
   Setting() : value_(), is_default_(true) { }
   explicit Setting(const T &v) : value_(v), is_default_(true) { }
 
-  Setting& operator=(const T &v) {
+  Setting &operator=(const T &v) {
     value_ = v;
     is_default_ = false;
     return *this;
   }
 
-  const T& operator()() const {
-    return value_;
-  }
+  const T &operator()() const { return value_; }
 
   bool SetIfDefault(const T &v) {
-    if (!is_default_) return false;
+    if (!is_default_)
+      return false;
     value_ = v;
     is_default_ = false;
     return true;
@@ -50,7 +49,7 @@ class Setting {
 
   bool is_default() const { return is_default_; }
 
-  T* GetPtr() { return &value_; }
+  T *GetPtr() { return &value_; }
 
  private:
   T value_;
@@ -75,11 +74,10 @@ enum EUnionMountRepairMode {
 class SettingsSpoolArea {
  public:
   explicit SettingsSpoolArea(const std::string &fqrn)
-    : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
-    , tmp_dir_(workspace_() + "/tmp")
-    , union_mnt_(std::string("/cvmfs/") + fqrn)
-    , repair_mode_(kUnionMountRepairSafe)
-  { }
+      : workspace_(std::string("/var/spool/cvmfs/") + fqrn)
+      , tmp_dir_(workspace_() + "/tmp")
+      , union_mnt_(std::string("/cvmfs/") + fqrn)
+      , repair_mode_(kUnionMountRepairSafe) { }
 
   void UseSystemTempDir();
   void SetSpoolArea(const std::string &path);
@@ -94,7 +92,7 @@ class SettingsSpoolArea {
   std::string tmp_dir() const { return tmp_dir_(); }
   std::string readonly_mnt() const { return workspace_() + "/rdonly"; }
   std::string readonly_talk_socket() const {
-     return workspace_() + "/cvmfs_io";
+    return workspace_() + "/cvmfs_io";
   }
   std::string union_mnt() const { return union_mnt_(); }
   std::string scratch_base() const { return workspace_() + "/scratch"; }
@@ -133,31 +131,30 @@ class SettingsSpoolArea {
 class SettingsTransaction {
  public:
   explicit SettingsTransaction(const std::string &fqrn)
-    : layout_revision_(0)
-    , in_enter_session_(false)
-    , hash_algorithm_(shash::kShake128)
-    , compression_algorithm_(zlib::kZlibDefault)
-    , ttl_second_(240)
-    , is_garbage_collectable_(true)
-    , is_volatile_(false)
-    , enforce_limits_(false)
-    // SyncParameters::kDefaultNestedKcatalogLimit
-    , limit_nested_catalog_kentries_(500)
-    // SyncParameters::kDefaultRootKcatalogLimit
-    , limit_root_catalog_kentries_(500)
-    // SyncParameters::kDefaultFileMbyteLimit
-    , limit_file_size_mb_(1024)
-    , use_catalog_autobalance_(false)
-    // SyncParameters::kDefaultMaxWeight
-    , autobalance_max_weight_(100000)
-    // SyncParameters::kDefaultMinWeight
-    , autobalance_min_weight_(1000)
-    , print_changeset_(false)
-    , dry_run_(false)
-    , union_fs_(kUnionFsUnknown)
-    , timeout_s_(0)
-    , spool_area_(fqrn)
-  {}
+      : layout_revision_(0)
+      , in_enter_session_(false)
+      , hash_algorithm_(shash::kShake128)
+      , compression_algorithm_(zlib::kZlibDefault)
+      , ttl_second_(240)
+      , is_garbage_collectable_(true)
+      , is_volatile_(false)
+      , enforce_limits_(false)
+      // SyncParameters::kDefaultNestedKcatalogLimit
+      , limit_nested_catalog_kentries_(500)
+      // SyncParameters::kDefaultRootKcatalogLimit
+      , limit_root_catalog_kentries_(500)
+      // SyncParameters::kDefaultFileMbyteLimit
+      , limit_file_size_mb_(1024)
+      , use_catalog_autobalance_(false)
+      // SyncParameters::kDefaultMaxWeight
+      , autobalance_max_weight_(100000)
+      // SyncParameters::kDefaultMinWeight
+      , autobalance_min_weight_(1000)
+      , print_changeset_(false)
+      , dry_run_(false)
+      , union_fs_(kUnionFsUnknown)
+      , timeout_s_(0)
+      , spool_area_(fqrn) { }
 
   void SetLayoutRevision(const unsigned revision);
   void SetInEnterSession(const bool value);
@@ -274,18 +271,16 @@ class SettingsTransaction {
 };  // class SettingsTransaction
 
 
-class SettingsGc {
-};  // class SettingsGc
+class SettingsGc { };  // class SettingsGc
 
 
 class SettingsStorage {
  public:
   explicit SettingsStorage(const std::string &fqrn)
-    : fqrn_(fqrn)
-    , type_(upload::SpoolerDefinition::Local)
-    , tmp_dir_(std::string("/srv/cvmfs/") + fqrn + "/data/txn")
-    , endpoint_(std::string("/srv/cvmfs/") + fqrn)
-  { }
+      : fqrn_(fqrn)
+      , type_(upload::SpoolerDefinition::Local)
+      , tmp_dir_(std::string("/srv/cvmfs/") + fqrn + "/data/txn")
+      , endpoint_(std::string("/srv/cvmfs/") + fqrn) { }
 
   std::string GetLocator() const;
   void SetLocator(const std::string &locator);
@@ -308,14 +303,13 @@ class SettingsStorage {
 class SettingsKeychain {
  public:
   explicit SettingsKeychain(const std::string &fqrn)
-    : fqrn_(fqrn)
-    , keychain_dir_("/etc/cvmfs/keys")
-    , master_private_key_path_(keychain_dir_() + "/" + fqrn + ".masterkey")
-    , master_public_key_path_(keychain_dir_() + "/" + fqrn + ".pub")
-    , private_key_path_(keychain_dir_() + "/" + fqrn + ".key")
-    , certificate_path_(keychain_dir_() + "/" + fqrn + ".crt")
-    , gw_key_path_(keychain_dir_() + "/" + fqrn + ".gw")
-  {}
+      : fqrn_(fqrn)
+      , keychain_dir_("/etc/cvmfs/keys")
+      , master_private_key_path_(keychain_dir_() + "/" + fqrn + ".masterkey")
+      , master_public_key_path_(keychain_dir_() + "/" + fqrn + ".pub")
+      , private_key_path_(keychain_dir_() + "/" + fqrn + ".key")
+      , certificate_path_(keychain_dir_() + "/" + fqrn + ".crt")
+      , gw_key_path_(keychain_dir_() + "/" + fqrn + ".gw") { }
 
   void SetKeychainDir(const std::string &keychain_dir);
 
@@ -356,12 +350,11 @@ class SettingsReplica;
 class SettingsRepository {
  public:
   explicit SettingsRepository(const std::string &fqrn)
-    : fqrn_(fqrn)
-    , url_(std::string("http://localhost/cvmfs/") + fqrn_())
-    , proxy_("")
-    , tmp_dir_("/tmp")
-    , keychain_(fqrn)
-  {}
+      : fqrn_(fqrn)
+      , url_(std::string("http://localhost/cvmfs/") + fqrn_())
+      , proxy_("")
+      , tmp_dir_("/tmp")
+      , keychain_(fqrn) { }
   explicit SettingsRepository(const SettingsPublisher &settings_publisher);
   explicit SettingsRepository(const SettingsReplica &settings_replica);
 
@@ -400,19 +393,18 @@ class SettingsPublisher {
   static const unsigned kDefaultWhitelistValidity;  // 30 days
 
   explicit SettingsPublisher(const std::string &fqrn)
-    : fqrn_(fqrn)
-    , url_(std::string("http://localhost/cvmfs/") + fqrn)
-    , proxy_("")
-    , owner_uid_(0)
-    , owner_gid_(0)
-    , whitelist_validity_days_(kDefaultWhitelistValidity)
-    , is_silent_(false)
-    , is_managed_(false)
-    , ignore_invalid_lease_(false)
-    , storage_(fqrn_())
-    , transaction_(fqrn_())
-    , keychain_(fqrn_())
-  { }
+      : fqrn_(fqrn)
+      , url_(std::string("http://localhost/cvmfs/") + fqrn)
+      , proxy_("")
+      , owner_uid_(0)
+      , owner_gid_(0)
+      , whitelist_validity_days_(kDefaultWhitelistValidity)
+      , is_silent_(false)
+      , is_managed_(false)
+      , ignore_invalid_lease_(false)
+      , storage_(fqrn_())
+      , transaction_(fqrn_())
+      , keychain_(fqrn_()) { }
   explicit SettingsPublisher(const SettingsRepository &settings_repository);
 
   void SetUrl(const std::string &url);
@@ -469,10 +461,9 @@ class SettingsPublisher {
 class SettingsReplica {
  public:
   explicit SettingsReplica(const std::string &fqrn)
-    : fqrn_(fqrn)
-    , alias_(fqrn)
-    , url_(std::string("http://localhost/cvmfs/") + alias_())
-  {}
+      : fqrn_(fqrn)
+      , alias_(fqrn)
+      , url_(std::string("http://localhost/cvmfs/") + alias_()) { }
 
   std::string fqrn() const { return fqrn_(); }
   std::string url() const { return url_(); }
@@ -491,14 +482,12 @@ class SettingsReplica {
 class SettingsBuilder : SingleCopy {
  public:
   SettingsBuilder()
-    : config_path_("/etc/cvmfs/repositories.d")
-    , options_mgr_(NULL)
-  {}
+      : config_path_("/etc/cvmfs/repositories.d"), options_mgr_(NULL) { }
   ~SettingsBuilder();
   /**
    * Used in unit tests.
    */
-  explicit SettingsBuilder(const std::string &c) : config_path_(c) {}
+  explicit SettingsBuilder(const std::string &c) : config_path_(c) { }
 
   /**
    * If ident is a url, creates a generic settings object inferring the fqrn
@@ -520,27 +509,28 @@ class SettingsBuilder : SingleCopy {
    * environment is applied.
    */
 
-  SettingsPublisher* CreateSettingsPublisher(
-      const std::string &ident, bool needs_managed = false);
+  SettingsPublisher *CreateSettingsPublisher(const std::string &ident,
+                                             bool needs_managed = false);
 
   OptionsManager *options_mgr() const { return options_mgr_; }
   bool IsManagedRepository() const { return options_mgr_ != NULL; }
 
   /**
-  * Get the values from the server configuration and set them to the publisher settings.
-  */
+   * Get the values from the server configuration and set them to the publisher
+   * settings.
+   */
   void ApplyOptionsFromServerPath(const OptionsManager &options_mgr_,
-                                  SettingsPublisher* settings_publisher);
+                                  SettingsPublisher *settings_publisher);
 
   void SetConfigPath(const std::string &config_path) {
     config_path_ = config_path;
   }
 
  private:
- /**
-  * For non locally managed repositories, a configuration file should be
-  * provided in order to publish from the ephemeral shell through the gateway
-  */
+  /**
+   * For non locally managed repositories, a configuration file should be
+   * provided in order to publish from the ephemeral shell through the gateway
+   */
   std::string config_path_;
 
   /**
@@ -568,7 +558,7 @@ class SettingsBuilder : SingleCopy {
   /**
    * Create settings from an ephermal writable shell
    */
-  SettingsPublisher* CreateSettingsPublisherFromSession();
+  SettingsPublisher *CreateSettingsPublisherFromSession();
 };  // class SettingsBuilder
 
 }  // namespace publish

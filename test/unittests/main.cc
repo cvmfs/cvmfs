@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   Watchdog *watchdog = Watchdog::Create(NULL);
   assert(watchdog != NULL);
   //  watchdog->Spawn("/tmp/stacktrace.cvmfs_unittests");
-  CvmfsEnvironment* env = new CvmfsEnvironment(argc, argv);
+  CvmfsEnvironment *env = new CvmfsEnvironment(argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   ::testing::AddGlobalTestEnvironment(env);

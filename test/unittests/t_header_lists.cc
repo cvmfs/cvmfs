@@ -3,16 +3,13 @@
  */
 
 #include "gtest/gtest.h"
-
 #include "network/download.h"
 
 namespace download {
 
 class T_HeaderLists : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-    header_lists = new download::HeaderLists();
-  }
+  virtual void SetUp() { header_lists = new download::HeaderLists(); }
 
   download::HeaderLists *header_lists;
 };
@@ -34,7 +31,7 @@ TEST_F(T_HeaderLists, Intrinsics) {
   EXPECT_EQ(header_lists->blocks_.size(), 1U);
 
   header_lists->PutList(
-    &(header_lists->blocks_[0][header_lists->kBlockSize-1]));
+      &(header_lists->blocks_[0][header_lists->kBlockSize - 1]));
   header_lists->GetList("Some: Header");
   EXPECT_EQ(header_lists->blocks_.size(), 1U);
 

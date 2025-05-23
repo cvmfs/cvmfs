@@ -4,11 +4,10 @@
 
 #include "manifest_fetch.h"
 
-#include <string>
-#include <vector>
-
 #include <cassert>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "crypto/hash.h"
 #include "crypto/signature.h"
@@ -47,14 +46,16 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
   shash::Any certificate_hash;
   cvmfs::MemSink certificate_memsink;
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
-                                       &certificate_hash, &certificate_memsink);
+                                         &certificate_hash,
+                                         &certificate_memsink);
 
   // Load Manifest
   ensemble->raw_manifest_buf = manifest_data;
   ensemble->raw_manifest_size = manifest_size;
-  ensemble->manifest = manifest::Manifest::LoadMem(
-    ensemble->raw_manifest_buf, ensemble->raw_manifest_size);
-  if (!ensemble->manifest) return kFailIncomplete;
+  ensemble->manifest = manifest::Manifest::LoadMem(ensemble->raw_manifest_buf,
+                                                   ensemble->raw_manifest_size);
+  if (!ensemble->manifest)
+    return kFailIncomplete;
 
   // Basic manifest sanity check
   if (ensemble->manifest->repository_name() != repository_name) {
@@ -102,9 +103,7 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
 
   // Verify manifest
   retval_b = signature_manager->VerifyLetter(
-        ensemble->raw_manifest_buf,
-        ensemble->raw_manifest_size,
-        false);
+      ensemble->raw_manifest_buf, ensemble->raw_manifest_size, false);
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
@@ -140,10 +139,14 @@ static Failures DoVerify(unsigned char *manifest_data, size_t manifest_size,
 cleanup:
   delete ensemble->manifest;
   ensemble->manifest = NULL;
-  if (ensemble->raw_manifest_buf) free(ensemble->raw_manifest_buf);
-  if (ensemble->cert_buf) free(ensemble->cert_buf);
-  if (ensemble->whitelist_buf) free(ensemble->whitelist_buf);
-  if (ensemble->whitelist_pkcs7_buf) free(ensemble->whitelist_pkcs7_buf);
+  if (ensemble->raw_manifest_buf)
+    free(ensemble->raw_manifest_buf);
+  if (ensemble->cert_buf)
+    free(ensemble->cert_buf);
+  if (ensemble->whitelist_buf)
+    free(ensemble->whitelist_buf);
+  if (ensemble->whitelist_pkcs7_buf)
+    free(ensemble->whitelist_pkcs7_buf);
   ensemble->raw_manifest_buf = NULL;
   ensemble->cert_buf = NULL;
   ensemble->whitelist_buf = NULL;
@@ -197,14 +200,12 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
                signature::SignatureManager *signature_manager,
                download::DownloadManager *download_manager,
                ManifestEnsemble *ensemble) {
-  Failures result =
-      DoFetch(base_url, repository_name, minimum_timestamp, base_catalog,
-              signature_manager, download_manager, ensemble);
-  if ((result != kFailOk) &&
-      (result != kFailLoad) &&
-      (result != kFailInvalidCertificate) &&
-      (download_manager->num_hosts() > 1))
-  {
+  Failures result = DoFetch(base_url, repository_name, minimum_timestamp,
+                            base_catalog, signature_manager, download_manager,
+                            ensemble);
+  if ((result != kFailOk) && (result != kFailLoad)
+      && (result != kFailInvalidCertificate)
+      && (download_manager->num_hosts() > 1)) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
              "failed to fetch manifest (%d - %s), trying another stratum 1",
              result, Code2Ascii(result));
@@ -227,8 +228,8 @@ Failures Verify(unsigned char *manifest_data, size_t manifest_size,
                 signature::SignatureManager *signature_manager,
                 download::DownloadManager *download_manager,
                 ManifestEnsemble *ensemble) {
-  unsigned char *manifest_copy =
-                      reinterpret_cast<unsigned char *>(smalloc(manifest_size));
+  unsigned char *manifest_copy = reinterpret_cast<unsigned char *>(
+      smalloc(manifest_size));
   memcpy(manifest_copy, manifest_data, manifest_size);
   return DoVerify(manifest_copy, manifest_size, base_url, repository_name,
                   minimum_timestamp, base_catalog, signature_manager,

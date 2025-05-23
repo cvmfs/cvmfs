@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -65,14 +64,14 @@ class T_CatalogManager : public ::testing::Test {
     root_catalog->AddFile(empty_content, file_size, "", "dir");
     // adding "/file1"
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[0]),
+                      reinterpret_cast<const unsigned char *>(hashes[0]),
                       suffix);
     root_catalog->AddFile(hash, file_size, "", "file1");
     // adding "/dir/dir"
     root_catalog->AddFile(empty_content, file_size, "/dir", "dir");
     // adding "/dir/dir/file2"
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[1]),
+                      reinterpret_cast<const unsigned char *>(hashes[1]),
                       suffix);
     root_catalog->AddFile(hash, file_size, "/dir/dir", "file2");
     // adding "/dir/dir/dir"
@@ -82,20 +81,19 @@ class T_CatalogManager : public ::testing::Test {
     PathString catalog_path(catalog_path_str.c_str(),
                             catalog_path_str.length());
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[5]),
+                      reinterpret_cast<const unsigned char *>(hashes[5]),
                       suffix);
-    MockCatalog *new_catalog = new MockCatalog("/dir/dir/dir", hash,
-                                               4096, 1, 0, false,
-                                               root_catalog, NULL);
-    ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
+    MockCatalog *new_catalog = new MockCatalog("/dir/dir/dir", hash, 4096, 1, 0,
+                                               false, root_catalog, NULL);
+    ASSERT_NE(static_cast<MockCatalog *>(NULL), new_catalog);
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[2]),
+                      reinterpret_cast<const unsigned char *>(hashes[2]),
                       suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file3");
     // adding "/dir/dir/dir/file4" to the new nested catalog
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[3]),
+                      reinterpret_cast<const unsigned char *>(hashes[3]),
                       suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file4");
     // adding "/dir/dir/dir/dir"
@@ -107,24 +105,22 @@ class T_CatalogManager : public ::testing::Test {
 
     // mounting a new catalog in "/dir/dir/dir/dir/dir"
     MockCatalog *new_catalog_2 = new MockCatalog("/dir/dir/dir/dir/dir",
-                                                 shash::Any(),
-                                                 4096, 1, 0, false,
-                                                 new_catalog, NULL);
+                                                 shash::Any(), 4096, 1, 0,
+                                                 false, new_catalog, NULL);
     // adding "/dir/dir/dir/dir/dir/file5"
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[4]),
+                      reinterpret_cast<const unsigned char *>(hashes[4]),
                       suffix);
     new_catalog_2->AddFile(hash, file_size, "/dir/dir/dir/dir/dir", "file5");
     // we haven't mounted the third catalog yet!
     ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
 
     root_catalog->AddFile(empty_content, file_size, "", "nested");
-    MockCatalog *new_catalog_3 = new MockCatalog("/nested", shash::Any(),
-                                                 4096, 1, 0, false,
-                                                 root_catalog, NULL);
-    ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog_3);
+    MockCatalog *new_catalog_3 = new MockCatalog(
+        "/nested", shash::Any(), 4096, 1, 0, false, root_catalog, NULL);
+    ASSERT_NE(static_cast<MockCatalog *>(NULL), new_catalog_3);
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[6]),
+                      reinterpret_cast<const unsigned char *>(hashes[6]),
                       suffix);
     new_catalog_3->AddFile(hash, file_size, "/nested", "file6");
 
@@ -140,15 +136,13 @@ class T_CatalogManager : public ::testing::Test {
 };
 
 const char *T_CatalogManager::hashes[] = {
-     "b026324c6904b2a9cb4b88d6d61c81d1000000",
-     "26ab0db90d72e28ad0ba1e22ee510510000000",
-     "6d7fce9fee471194aa8b5b6e47267f03000000",
-     "48a24b70a0b376535542b996af517398000000",
-     "1dcca23355272056f04fe8bf20edfce0000000",
-     "11111111111111111111111111111111111111",
-     "11111111111111111111111111111111111000"
-};
-
+    "b026324c6904b2a9cb4b88d6d61c81d1000000",
+    "26ab0db90d72e28ad0ba1e22ee510510000000",
+    "6d7fce9fee471194aa8b5b6e47267f03000000",
+    "48a24b70a0b376535542b996af517398000000",
+    "1dcca23355272056f04fe8bf20edfce0000000",
+    "11111111111111111111111111111111111111",
+    "11111111111111111111111111111111111000"};
 
 
 TEST_F(T_CatalogManager, InitialConfiguration) {
@@ -177,8 +171,8 @@ TEST_F(T_CatalogManager, InodeConfiguration) {
   catalog_mgr_.SetInodeAnnotation(&annotation);
   EXPECT_TRUE(catalog_mgr_.Init());
   // now the root catalog is loaded and has 6 entries
-  EXPECT_EQ(initial_offset + 1 +
-            AbstractCatalogManager<MockCatalogManager>::kInodeOffset,
+  EXPECT_EQ(initial_offset + 1
+                + AbstractCatalogManager<MockCatalogManager>::kInodeOffset,
             catalog_mgr_.GetRootInode());
 }
 
@@ -193,14 +187,15 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupDefault,
-                                      &dirent));
+  EXPECT_TRUE(
+      catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupDefault, &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
 
   // it is not a symplink, so it should crash
-  EXPECT_DEATH(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
-                                      &dirent), ".*");
+  EXPECT_DEATH(
+      catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupRawSymlink, &dirent),
+      ".*");
 
   // load the next catalog
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
@@ -209,13 +204,13 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 
   // load the next catalog
-  EXPECT_FALSE(catalog_mgr_.LookupPath("/nested_not_available",
-                                       kLookupDefault, &dirent));
+  EXPECT_FALSE(catalog_mgr_.LookupPath("/nested_not_available", kLookupDefault,
+                                       &dirent));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
   EXPECT_TRUE(catalog_mgr_.LookupPath("/nested", kLookupDefault, &dirent));
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/nested/file6", kLookupDefault,
-                                      &dirent));
+  EXPECT_TRUE(
+      catalog_mgr_.LookupPath("/nested/file6", kLookupDefault, &dirent));
   EXPECT_EQ(4, catalog_mgr_.GetNumCatalogs());
 }
 
@@ -252,13 +247,13 @@ TEST_F(T_CatalogManager, Listing) {
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 
   EXPECT_EQ(shash::Any(),
-    catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
+            catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
   EXPECT_EQ(shash::Any(),
-    catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
-  shash::Any hash_nested = shash::Any(shash::kSha1,
-    reinterpret_cast<const unsigned char*>(hashes[5]), 'C');
+            catalog_mgr_.GetNestedCatalogHash(PathString("/file1")));
+  shash::Any hash_nested = shash::Any(
+      shash::kSha1, reinterpret_cast<const unsigned char *>(hashes[5]), 'C');
   EXPECT_EQ(hash_nested,
-    catalog_mgr_.GetNestedCatalogHash(PathString("/dir/dir/dir")));
+            catalog_mgr_.GetNestedCatalogHash(PathString("/dir/dir/dir")));
 
   del.clear();
   EXPECT_TRUE(catalog_mgr_.Listing("/nested", &del));

@@ -7,12 +7,12 @@
 #ifndef CVMFS_COMPAT_H_
 #define CVMFS_COMPAT_H_
 
-#include <google/sparse_hash_map>
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
 
 #include <cassert>
+#include <google/sparse_hash_map>
 #include <string>
 
 #include "bigvector.h"
@@ -47,7 +47,7 @@ struct Digest {
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
-    return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
+    return 2 * kDigestSizes[algorithm] + kSuffixLengths[algorithm];
   }
 
   Digest() {
@@ -55,9 +55,8 @@ struct Digest {
     memset(digest, 0, digest_size_);
   }
 
-  Digest(const Algorithms a,
-         const unsigned char *digest_buffer, const unsigned buffer_size)
-  {
+  Digest(const Algorithms a, const unsigned char *digest_buffer,
+         const unsigned buffer_size) {
     algorithm = a;
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
@@ -73,10 +72,10 @@ struct Digest {
       char dgt2 = (unsigned)digest[i] % 16;
       dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
       dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      result[i*2] = dgt1;
-      result[i*2+1] = dgt2;
+      result[i * 2] = dgt1;
+      result[i * 2 + 1] = dgt2;
     }
-    unsigned pos = i*2;
+    unsigned pos = i * 2;
     for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
       result[pos] = *s;
       pos++;
@@ -91,7 +90,7 @@ struct Digest {
     return true;
   }
 
-  bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return false;
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
@@ -100,11 +99,11 @@ struct Digest {
     return true;
   }
 
-  bool operator !=(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator!=(const Digest<digest_size_, algorithm_> &other) const {
     return !(*this == other);
   }
 
-  bool operator <(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator<(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm < other.algorithm);
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
@@ -116,7 +115,7 @@ struct Digest {
     return false;
   }
 
-  bool operator >(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator>(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm > other.algorithm);
     for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
@@ -160,36 +159,32 @@ extern const char *kAlgorithmIds[];
 const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 0};
 const unsigned kMaxAlgorithmIdentifierSize = 7;
 typedef char Suffix;
-const char kSuffixNone         = 0;
-const char kSuffixCatalog      = 'C';
-const char kSuffixHistory      = 'H';
+const char kSuffixNone = 0;
+const char kSuffixCatalog = 'C';
+const char kSuffixHistory = 'H';
 const char kSuffixMicroCatalog = 'L';  // currently unused
-const char kSuffixPartial      = 'P';
-const char kSuffixTemporary    = 'T';
-const char kSuffixCertificate  = 'X';
+const char kSuffixPartial = 'P';
+const char kSuffixTemporary = 'T';
+const char kSuffixCertificate = 'X';
 
 template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
   unsigned char digest[digest_size_];
-  Algorithms    algorithm;
-  Suffix        suffix;
+  Algorithms algorithm;
+  Suffix suffix;
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
-    return 2*kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
+    return 2 * kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
   }
 
-  Digest() :
-    algorithm(algorithm_), suffix(kSuffixNone)
-  {
+  Digest() : algorithm(algorithm_), suffix(kSuffixNone) {
     memset(digest, 0, digest_size_);
   }
 
-  Digest(const Algorithms a,
-         const unsigned char *digest_buffer, const unsigned buffer_size,
-         const Suffix s = kSuffixNone) :
-    algorithm(a), suffix(s)
-  {
+  Digest(const Algorithms a, const unsigned char *digest_buffer,
+         const unsigned buffer_size, const Suffix s = kSuffixNone)
+      : algorithm(a), suffix(s) {
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
   }
@@ -224,33 +219,32 @@ struct Dirent {
 
 class InodeContainer {
  public:
-  typedef google::sparse_hash_map<uint64_t, Dirent,
-          hash_murmur<uint64_t> >
-          InodeMap;
+  typedef google::sparse_hash_map<uint64_t, Dirent, hash_murmur<uint64_t> >
+      InodeMap;
 
-  InodeContainer() {
-    assert(false);
-  }
+  InodeContainer() { assert(false); }
   bool Add(const uint64_t inode, const uint64_t parent_inode,
-           const NameString &name)
-  {
-    assert(false); return false;
+           const NameString &name) {
+    assert(false);
+    return false;
   }
   bool Get(const uint64_t inode, const uint64_t parent_inode,
-           const NameString &name)
-  {
-    assert(false); return false;
+           const NameString &name) {
+    assert(false);
+    return false;
   }
   uint32_t Put(const uint64_t inode, const uint32_t by) {
-    assert(false); return false;
+    assert(false);
+    return false;
   }
   bool ConstructPath(const uint64_t inode, PathString *path);
-  bool Contains(const uint64_t inode) {
-    return map_.find(inode) != map_.end();
-  }
+  bool Contains(const uint64_t inode) { return map_.find(inode) != map_.end(); }
   inline size_t Size() { return map_.size(); }
-// private:
-  std::string DebugPrint() { assert(false); return ""; }
+  // private:
+  std::string DebugPrint() {
+    assert(false);
+    return "";
+  }
   InodeMap map_;
 };
 
@@ -261,10 +255,11 @@ class InodeContainer {
 class InodeTracker {
  public:
   struct Statistics {
-    Statistics() {
+    Statistics() { assert(false); }
+    std::string Print() {
       assert(false);
+      return "";
     }
-    std::string Print() { assert(false); return ""; }
     atomic_int64 num_inserts;
     atomic_int64 num_dangling_try;
     atomic_int64 num_double_add;
@@ -277,23 +272,23 @@ class InodeTracker {
 
   InodeTracker() { assert(false); }
   explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker &operator=(const InodeTracker &other) { assert(false); }
   ~InodeTracker();
 
   bool VfsGet(const uint64_t inode, const uint64_t parent_inode,
-              const NameString &name)
-  {
-    assert(false); return false;
+              const NameString &name) {
+    assert(false);
+    return false;
   }
   bool VfsAdd(const uint64_t inode, const uint64_t parent_inode,
-              const NameString &name)
-  {
-    assert(false); return false;
+              const NameString &name) {
+    assert(false);
+    return false;
   }
   void VfsPut(const uint64_t inode, const uint32_t by) { assert(false); }
   bool Find(const uint64_t inode, PathString *path) { assert(false); }
 
-// private:
+  // private:
   static const unsigned kVersion = 1;
 
   void InitLock() { assert(false); }
@@ -324,7 +319,7 @@ namespace inode_tracker_v2 {
 template<class Key, class Value, class Derived>
 class SmallHashBase {
  public:
-  static const double kLoadFactor;  // mainly useless for the dynamic version
+  static const double kLoadFactor;     // mainly useless for the dynamic version
   static const double kThresholdGrow;  // only used for resizable version
   static const double kThresholdShrink;  // only used for resizable version
 
@@ -334,8 +329,7 @@ class SmallHashBase {
     delete[] values_;
   }
   void Init(uint32_t expected_size, Key empty,
-            uint32_t (*hasher)(const Key &key))
-  {
+            uint32_t (*hasher)(const Key &key)) {
     assert(false);
   }
   bool Lookup(const Key &key, Value *value) const {
@@ -352,31 +346,25 @@ class SmallHashBase {
     const bool found = DoLookup(key, &bucket, &collisions);
     return found;
   }
-  void Insert(const Key &key, const Value &value) {
-    assert(false);
-  }
+  void Insert(const Key &key, const Value &value) { assert(false); }
   void Erase(const Key &key) { assert(false); }
   void Clear() { assert(false); }
   uint64_t bytes_allocated() const { return bytes_allocated_; }
-  static double GetEntrySize() {
-    assert(false);
-  }
+  static double GetEntrySize() { assert(false); }
   void GetCollisionStats(uint64_t *num_collisions,
-                         uint32_t *max_collisions) const
-  {
+                         uint32_t *max_collisions) const {
     assert(false);
   }
 
-// private:
+  // private:
   uint32_t ScaleHash(const Key &key) const {
     double bucket = (double(hasher_(key)) * double(capacity_) /  // NOLINT
-                     double((uint32_t)(-1)));  // NOLINT
+                     double((uint32_t)(-1)));                    // NOLINT
     return (uint32_t)bucket % capacity_;
   }
   void InitMemory() { assert(false); }
   bool DoInsert(const Key &key, const Value &value,
-                const bool count_collisions)
-  {
+                const bool count_collisions) {
     assert(false);
   }
   bool DoLookup(const Key &key, uint32_t *bucket, uint32_t *collisions) const {
@@ -385,14 +373,12 @@ class SmallHashBase {
     while (!(keys_[*bucket] == empty_key_)) {
       if (keys_[*bucket] == key)
         return true;
-      *bucket = (*bucket+1) % capacity_;
+      *bucket = (*bucket + 1) % capacity_;
       (*collisions)++;
     }
     return false;
   }
-  void DoClear(const bool reset_capacity) {
-    assert(false);
-  }
+  void DoClear(const bool reset_capacity) { assert(false); }
   // Methods for resizable version
   void SetThresholds() { }
   void Grow() { }
@@ -408,51 +394,43 @@ class SmallHashBase {
   uint32_t (*hasher_)(const Key &key);
   uint64_t bytes_allocated_;
   uint64_t num_collisions_;
-  uint32_t max_collisions_;  /**< maximum collisions for a single insert */
+  uint32_t max_collisions_; /**< maximum collisions for a single insert */
   Key empty_key_;
 };
 
 template<class Key, class Value>
-class SmallHashDynamic :
-public SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >
-{
-  friend class SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >;
+class SmallHashDynamic
+    : public SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> > {
+  friend class SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> >;
+
  public:
-  typedef SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> > Base;
+  typedef SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> > Base;
   static const double kThresholdGrow;
   static const double kThresholdShrink;
 
-  SmallHashDynamic() : Base() {
+  SmallHashDynamic() : Base() { assert(false); }
+  explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other)
+      : Base() {
     assert(false);
   }
-  explicit SmallHashDynamic(const SmallHashDynamic<Key, Value> &other) : Base()
-  {
-    assert(false);
-  }
-  SmallHashDynamic<Key, Value> &operator= (
-    const SmallHashDynamic<Key, Value> &other)
-  {
+  SmallHashDynamic<Key, Value> &operator=(
+      const SmallHashDynamic<Key, Value> &other) {
     assert(false);
   }
 
   uint32_t capacity() const { return Base::capacity_; }
   uint32_t size() const { return Base::size_; }
   uint32_t num_migrates() const { assert(false); }
+
  protected:
-  void SetThresholds() {
-    assert(false);
-  }
+  void SetThresholds() { assert(false); }
   void Grow() { assert(false); }
   void Shrink() { assert(false); }
   void ResetCapacity() { assert(false); }
 
  private:
-  void Migrate(const uint32_t new_capacity) {
-    assert(false);
-  }
-  void CopyFrom(const SmallHashDynamic<Key, Value> &other) {
-    assert(false);
-  }
+  void Migrate(const uint32_t new_capacity) { assert(false); }
+  void CopyFrom(const SmallHashDynamic<Key, Value> &other) { assert(false); }
   uint32_t num_migrates_;
   uint32_t threshold_grow_;
   uint32_t threshold_shrink_;
@@ -461,9 +439,7 @@ public SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >
 
 class PathMap {
  public:
-  PathMap() {
-    assert(false);
-  }
+  PathMap() { assert(false); }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
     PathInfo value;
     bool found = map_.Lookup(md5path, &value);
@@ -474,21 +450,23 @@ class PathMap {
     PathInfo value;
     bool found = map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()),
                              &value);
-    if (found) return value.inode;
+    if (found)
+      return value.inode;
     return 0;
   }
   shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
     assert(false);
   }
-  void Erase(const shash_v1::Md5 &md5path) {
-    assert(false);
-  }
+  void Erase(const shash_v1::Md5 &md5path) { assert(false); }
   void Clear() { assert(false); }
 
-// private:
+  // private:
   struct PathInfo {
     PathInfo() { inode = 0; }
-    PathInfo(const uint64_t i, const PathString &p) { inode = i; path = p; }
+    PathInfo(const uint64_t i, const PathString &p) {
+      inode = i;
+      path = p;
+    }
     uint64_t inode;
     PathString path;
   };
@@ -497,9 +475,7 @@ class PathMap {
 
 class InodeMap {
  public:
-  InodeMap() {
-    assert(false);
-  }
+  InodeMap() { assert(false); }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
     bool found = map_.Lookup(inode, md5path);
     return found;
@@ -507,28 +483,20 @@ class InodeMap {
   void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
     assert(false);
   }
-  void Erase(const uint64_t inode) {
-    assert(false);
-  }
+  void Erase(const uint64_t inode) { assert(false); }
   void Clear() { assert(false); }
-// private:
+  // private:
   SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
 };
 
 
 class InodeReferences {
  public:
-  InodeReferences() {
-    assert(false);
-  }
-  bool Get(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
-  bool Put(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
+  InodeReferences() { assert(false); }
+  bool Get(const uint64_t inode, const uint32_t by) { assert(false); }
+  bool Put(const uint64_t inode, const uint32_t by) { assert(false); }
   void Clear() { assert(false); }
-// private:
+  // private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
 
@@ -548,21 +516,17 @@ class InodeTracker {
 
   InodeTracker() { assert(false); }
   explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker &operator=(const InodeTracker &other) { assert(false); }
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
-  {
+  void VfsGetBy(const uint64_t inode, const uint32_t by,
+                const PathString &path) {
     assert(false);
   }
-  void VfsGet(const uint64_t inode, const PathString &path) {
-    assert(false);
-  }
-  void VfsPut(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
+  void VfsGet(const uint64_t inode, const PathString &path) { assert(false); }
+  void VfsPut(const uint64_t inode, const uint32_t by) { assert(false); }
   bool FindPath(const uint64_t inode, PathString *path) {
     // Lock();
     shash_v1::Md5 md5path;
@@ -577,9 +541,7 @@ class InodeTracker {
     return found;
   }
 
-  uint64_t FindInode(const PathString &path) {
-    assert(false);
-  }
+  uint64_t FindInode(const PathString &path) { assert(false); }
 
  public:
   static const unsigned kVersion = 2;
@@ -616,11 +578,10 @@ class StringRef {
     return sizeof(uint16_t) + length;
   }
   char *data() const { return reinterpret_cast<char *>(length_ + 1); }
-  static StringRef Place(const uint16_t length, const char *str,
-                         void *addr)
-  {
+  static StringRef Place(const uint16_t length, const char *str, void *addr) {
     assert(false);
   }
+
  private:
   uint16_t *length_;
 };
@@ -637,9 +598,7 @@ class StringHeap : public SingleCopy {
     }
   }
 
-  StringRef AddString(const uint16_t length, const char *str) {
-    assert(false);
-  }
+  StringRef AddString(const uint16_t length, const char *str) { assert(false); }
   void RemoveString(const StringRef str_ref) { assert(false); }
   double GetUsage() const { assert(false); }
   uint64_t used() const { assert(false); }
@@ -658,11 +617,9 @@ class StringHeap : public SingleCopy {
 class PathStore {
  public:
   PathStore() { assert(false); }
-  ~PathStore() {
-    delete string_heap_;
-  }
+  ~PathStore() { delete string_heap_; }
   explicit PathStore(const PathStore &other) { assert(false); }
-  PathStore &operator= (const PathStore &other) { assert(false); }
+  PathStore &operator=(const PathStore &other) { assert(false); }
 
   void Insert(const shash_v1::Md5 &md5path, const PathString &path) {
     assert(false);
@@ -688,11 +645,9 @@ class PathStore {
   void Erase(const shash_v1::Md5 &md5path) { assert(false); }
   void Clear() { assert(false); }
 
-// private:
+  // private:
   struct PathInfo {
-    PathInfo() {
-      refcnt = 1;
-    }
+    PathInfo() { refcnt = 1; }
     shash_v1::Md5 parent;
     uint32_t refcnt;
     StringRef name;
@@ -705,9 +660,7 @@ class PathStore {
 
 class PathMap {
  public:
-  PathMap() {
-    assert(false);
-  }
+  PathMap() { assert(false); }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
     bool found = path_store_.Lookup(md5path, path);
     return found;
@@ -716,10 +669,9 @@ class PathMap {
   shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
     assert(false);
   }
-  void Erase(const shash_v1::Md5 &md5path) {
-    assert(false);
-  }
+  void Erase(const shash_v1::Md5 &md5path) { assert(false); }
   void Clear() { assert(false); }
+
  public:
   SmallHashDynamic<shash_v1::Md5, uint64_t> map_;
   PathStore path_store_;
@@ -727,9 +679,7 @@ class PathMap {
 
 class InodeMap {
  public:
-  InodeMap() {
-    assert(false);
-  }
+  InodeMap() { assert(false); }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
     bool found = map_.Lookup(inode, md5path);
     return found;
@@ -737,28 +687,20 @@ class InodeMap {
   void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
     assert(false);
   }
-  void Erase(const uint64_t inode) {
-    assert(false);
-  }
+  void Erase(const uint64_t inode) { assert(false); }
   void Clear() { assert(false); }
-// private:
+  // private:
   SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
 };
 
 
 class InodeReferences {
  public:
-  InodeReferences() {
-    assert(false);
-  }
-  bool Get(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
-  bool Put(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
+  InodeReferences() { assert(false); }
+  bool Get(const uint64_t inode, const uint32_t by) { assert(false); }
+  bool Put(const uint64_t inode, const uint32_t by) { assert(false); }
   void Clear() { assert(false); }
-// private:
+  // private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
 
@@ -778,21 +720,17 @@ class InodeTracker {
 
   InodeTracker() { assert(false); }
   explicit InodeTracker(const InodeTracker &other) { assert(false); }
-  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  InodeTracker &operator=(const InodeTracker &other) { assert(false); }
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
   }
-  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
-  {
+  void VfsGetBy(const uint64_t inode, const uint32_t by,
+                const PathString &path) {
     assert(false);
   }
-  void VfsGet(const uint64_t inode, const PathString &path) {
-    assert(false);
-  }
-  void VfsPut(const uint64_t inode, const uint32_t by) {
-    assert(false);
-  }
+  void VfsGet(const uint64_t inode, const PathString &path) { assert(false); }
+  void VfsPut(const uint64_t inode, const uint32_t by) { assert(false); }
   bool FindPath(const uint64_t inode, PathString *path) {
     // Lock();
     shash_v1::Md5 md5path;
@@ -807,11 +745,9 @@ class InodeTracker {
     return found;
   }
 
-  uint64_t FindInode(const PathString &path) {
-    assert(false);
-  }
+  uint64_t FindInode(const PathString &path) { assert(false); }
 
-// private:
+  // private:
   static const unsigned kVersion = 3;
 
   void InitLock() { assert(false); }
@@ -843,11 +779,11 @@ class FileChunk {
   FileChunk(const shash_v1::Any &hash, const off_t offset, const size_t size) {
     assert(false);
   }
-  inline const shash_v1::Any& content_hash() const { return content_hash_; }
+  inline const shash_v1::Any &content_hash() const { return content_hash_; }
   inline off_t offset() const { return offset_; }
   inline size_t size() const { return size_; }
 
-// protected:
+  // protected:
   shash_v1::Any content_hash_;  //!< content hash of the compressed file chunk
   off_t offset_;                //!< byte offset in the uncompressed input file
   size_t size_;                 //!< uncompressed size of the data chunk
@@ -866,7 +802,7 @@ struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
   ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
+  ChunkTables &operator=(const ChunkTables &other) { assert(false); }
   void CopyFrom(const ChunkTables &other) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }
@@ -902,11 +838,11 @@ class FileChunk {
   FileChunk(const shash_v2::Any &hash, const off_t offset, const size_t size) {
     assert(false);
   }
-  inline const shash_v2::Any& content_hash() const { return content_hash_; }
+  inline const shash_v2::Any &content_hash() const { return content_hash_; }
   inline off_t offset() const { return offset_; }
   inline size_t size() const { return size_; }
 
-// protected:
+  // protected:
   shash_v2::Any content_hash_;  //!< content hash of the compressed file chunk
   off_t offset_;                //!< byte offset in the uncompressed input file
   size_t size_;                 //!< uncompressed size of the data chunk
@@ -925,7 +861,7 @@ struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
   ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
+  ChunkTables &operator=(const ChunkTables &other) { assert(false); }
   void CopyFrom(const ChunkTables &other) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }
@@ -959,7 +895,7 @@ struct ChunkTables {
   ChunkTables() { assert(false); }
   ~ChunkTables();
   ChunkTables(const ChunkTables &other) { assert(false); }
-  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
+  ChunkTables &operator=(const ChunkTables &other) { assert(false); }
   void CopyFrom(const ChunkTables &other) { assert(false); }
   void InitLocks() { assert(false); }
   void InitHashmaps() { assert(false); }

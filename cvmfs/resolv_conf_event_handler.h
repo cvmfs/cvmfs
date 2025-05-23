@@ -28,23 +28,23 @@ class ResolvConfEventHandler : public file_watcher::EventHandler {
    */
   typedef std::vector<std::pair<int, std::string> > AddressList;
 
-  ResolvConfEventHandler(download::DownloadManager* download_manager,
-                         download::DownloadManager* external_download_manager);
+  ResolvConfEventHandler(download::DownloadManager *download_manager,
+                         download::DownloadManager *external_download_manager);
   virtual ~ResolvConfEventHandler();
 
-  virtual bool Handle(const std::string& file_path,
+  virtual bool Handle(const std::string &file_path,
                       file_watcher::Event event,
-                      bool* clear_handler);
+                      bool *clear_handler);
 
-  static void GetDnsAddresses(const std::string& resolv_file,
-                              AddressList* addresses);
+  static void GetDnsAddresses(const std::string &resolv_file,
+                              AddressList *addresses);
 
-  static void SetDnsAddress(download::DownloadManager* download_manager,
-                            const AddressList& addresses);
+  static void SetDnsAddress(download::DownloadManager *download_manager,
+                            const AddressList &addresses);
 
  private:
-  download::DownloadManager* download_manager_;
-  download::DownloadManager* external_download_manager_;
+  download::DownloadManager *download_manager_;
+  download::DownloadManager *external_download_manager_;
 };
 
 #endif  // CVMFS_RESOLV_CONF_EVENT_HANDLER_H_

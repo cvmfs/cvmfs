@@ -19,14 +19,14 @@ class CmdZpipe : public Command {
   }
   virtual std::string GetDescription() const {
     return "Compresses or decompresses a file using the DEFLATE algorithm.\n"
-      "Input comes on stdin, output goes to stdout.";
+           "Input comes on stdin, output goes to stdout.";
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
-    p.push_back(Parameter::Switch("decompress", 'd',
-      "Decompress input data (default is compression)"));
-    p.push_back(Parameter::Optional("input", 'i', "file",
-      "Path to input file"));
+    p.push_back(Parameter::Switch(
+        "decompress", 'd', "Decompress input data (default is compression)"));
+    p.push_back(
+        Parameter::Optional("input", 'i', "file", "Path to input file"));
     return p;
   }
   virtual bool IsHidden() const { return true; }

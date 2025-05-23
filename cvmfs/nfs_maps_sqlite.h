@@ -19,7 +19,7 @@
 namespace perf {
 class Counter;
 class Statistics;
-}
+}  // namespace perf
 
 class NfsMapsSqlite : public NfsMaps {
  public:
@@ -27,11 +27,10 @@ class NfsMapsSqlite : public NfsMaps {
   virtual uint64_t GetInode(const PathString &path);
   virtual bool GetPath(const uint64_t inode, PathString *path);
 
-  static NfsMapsSqlite *Create(
-    const std::string &db_dir,
-    const uint64_t root_inode,
-    const bool rebuild,
-    perf::Statistics *statistics_);
+  static NfsMapsSqlite *Create(const std::string &db_dir,
+                               const uint64_t root_inode,
+                               const bool rebuild,
+                               perf::Statistics *statistics_);
 
  private:
   static const char *kSqlCreateTable;
@@ -41,9 +40,7 @@ class NfsMapsSqlite : public NfsMaps {
   static const char *kSqlGetPath;
 
   struct BusyHandlerInfo {
-    BusyHandlerInfo() : accumulated_ms(0) {
-      prng.InitLocaltime();
-    }
+    BusyHandlerInfo() : accumulated_ms(0) { prng.InitLocaltime(); }
 
     static const unsigned kMaxWaitMs = 60000;
     static const unsigned kMaxBackoffMs = 100;

@@ -33,16 +33,16 @@ struct DirSpecItem {
   XattrList xattrs_;
   std::string parent_;
 
-  DirSpecItem(const catalog::DirectoryEntry& entry, const XattrList& xattrs,
-              const std::string& parent)
-      : entry_(entry), xattrs_(xattrs), parent_(parent) {}
+  DirSpecItem(const catalog::DirectoryEntry &entry, const XattrList &xattrs,
+              const std::string &parent)
+      : entry_(entry), xattrs_(xattrs), parent_(parent) { }
 
 
-  const catalog::DirectoryEntryBase& entry_base() const {
-    return static_cast<const catalog::DirectoryEntryBase&>(entry_);
+  const catalog::DirectoryEntryBase &entry_base() const {
+    return static_cast<const catalog::DirectoryEntryBase &>(entry_);
   }
-  const XattrList& xattrs() const { return xattrs_; }
-  const std::string& parent() const { return parent_; }
+  const XattrList &xattrs() const { return xattrs_; }
+  const std::string &parent() const { return parent_; }
 };
 
 /**
@@ -63,53 +63,53 @@ class DirSpec {
 
   DirSpec();
 
-  bool AddFile(const std::string& name,
-               const std::string& parent,
-               const std::string& digest,
+  bool AddFile(const std::string &name,
+               const std::string &parent,
+               const std::string &digest,
                const size_t size,
-               const XattrList& xattrs = XattrList(),
+               const XattrList &xattrs = XattrList(),
                shash::Suffix suffix = shash::kSha1);
-  bool LinkFile(const std::string& name,
-                const std::string& parent,
-                const std::string& symlink,
+  bool LinkFile(const std::string &name,
+                const std::string &parent,
+                const std::string &symlink,
                 const size_t size,
-                const XattrList& xattrs = XattrList(),
+                const XattrList &xattrs = XattrList(),
                 shash::Suffix suffix = shash::kSha1);
-  bool AddDirectory(const std::string& name,
-                    const std::string& parent,
+  bool AddDirectory(const std::string &name,
+                    const std::string &parent,
                     const size_t size);
-  bool AddNestedCatalog(const std::string& name);
+  bool AddNestedCatalog(const std::string &name);
 
-  bool AddDirectoryEntry(const catalog::DirectoryEntry& entry,
-                         const XattrList& xattrs,
-                         const std::string& parent);
+  bool AddDirectoryEntry(const catalog::DirectoryEntry &entry,
+                         const XattrList &xattrs,
+                         const std::string &parent);
 
-  void ToString(std::string* out);
+  void ToString(std::string *out);
 
-  const ItemList& items() const { return items_; }
+  const ItemList &items() const { return items_; }
 
-  const NestedCatalogList& nested_catalogs() const { return nested_catalogs_; }
+  const NestedCatalogList &nested_catalogs() const { return nested_catalogs_; }
 
   size_t NumItems() const { return items_.size(); }
 
-  const DirSpecItem* Item(const std::string& full_path) const;
+  const DirSpecItem *Item(const std::string &full_path) const;
 
-  void SetItem(const DirSpecItem& item, const std::string& full_path) {
+  void SetItem(const DirSpecItem &item, const std::string &full_path) {
     ItemList::iterator it = items_.find(full_path);
     if (it != items_.end()) {
       it->second = item;
     }
   }
 
-  void RemoveItemRec(const std::string& full_path);
+  void RemoveItemRec(const std::string &full_path);
 
   std::vector<std::string> GetDirs() const;
 
  private:
-  bool AddDir(const std::string& name, const std::string& parent);
-  bool AddNC(const std::string& name);
-  bool RmDir(const std::string& name, const std::string& parent);
-  bool HasDir(const std::string& name) const;
+  bool AddDir(const std::string &name, const std::string &parent);
+  bool AddNC(const std::string &name);
+  bool RmDir(const std::string &name, const std::string &parent);
+  bool HasDir(const std::string &name) const;
 
   ItemList items_;
   NestedCatalogList nested_catalogs_;
@@ -134,22 +134,22 @@ class CatalogTestTool : public ServerTool {
  public:
   typedef std::vector<std::pair<std::string, shash::Any> > History;
 
-  explicit CatalogTestTool(const std::string& name);
+  explicit CatalogTestTool(const std::string &name);
   ~CatalogTestTool();
 
   bool Init();
-  bool Apply(const std::string& id, const DirSpec& spec);
-  bool ApplyAtRootHash(const shash::Any& root_hash, const DirSpec& spec);
-  bool FindEntry(const shash::Any& root_hash,
-                 const std::string& path,
+  bool Apply(const std::string &id, const DirSpec &spec);
+  bool ApplyAtRootHash(const shash::Any &root_hash, const DirSpec &spec);
+  bool FindEntry(const shash::Any &root_hash,
+                 const std::string &path,
                  catalog::DirectoryEntry *entry);
-  bool LookupNestedCatalogHash(const shash::Any& root_hash,
-                               const std::string& path,
+  bool LookupNestedCatalogHash(const shash::Any &root_hash,
+                               const std::string &path,
                                char **nc_hash);
 
-  bool DirSpecAtRootHash(const shash::Any& root_hash, DirSpec* spec);
+  bool DirSpecAtRootHash(const shash::Any &root_hash, DirSpec *spec);
 
-  manifest::Manifest* manifest() { return manifest_.weak_ref(); }
+  manifest::Manifest *manifest() { return manifest_.weak_ref(); }
 
   History history() { return history_; }
 
@@ -169,10 +169,10 @@ class CatalogTestTool : public ServerTool {
   void UpdateManifest();
 
  private:
-  static upload::Spooler* CreateSpooler(const std::string& config);
+  static upload::Spooler *CreateSpooler(const std::string &config);
 
-  static manifest::Manifest* CreateRepository(const std::string& dir,
-                                              upload::Spooler* spooler);
+  static manifest::Manifest *CreateRepository(const std::string &dir,
+                                              upload::Spooler *spooler);
 
   void CreateHistory(string repo_path_,
                      manifest::Manifest *manifest,
@@ -181,10 +181,10 @@ class CatalogTestTool : public ServerTool {
   void CreateWhitelist(string repo_path_);
   void CreateKeys(string repo_path_, string *public_key, shash::Any *hash_cert);
 
-  static catalog::WritableCatalogManager* CreateCatalogMgr(
-      const shash::Any& root_hash, const std::string stratum0,
-      const std::string& temp_dir, upload::Spooler* spooler,
-      download::DownloadManager* dl_mgr, perf::Statistics* stats);
+  static catalog::WritableCatalogManager *CreateCatalogMgr(
+      const shash::Any &root_hash, const std::string stratum0,
+      const std::string &temp_dir, upload::Spooler *spooler,
+      download::DownloadManager *dl_mgr, perf::Statistics *stats);
 
   const std::string name_;
 
@@ -199,8 +199,7 @@ class CatalogTestTool : public ServerTool {
   History history_;
 };
 
-void CreateMiniRepository(
-  SimpleOptionsParser *options_mgr_,
-  string *repo_path_);
+void CreateMiniRepository(SimpleOptionsParser *options_mgr_,
+                          string *repo_path_);
 
 #endif  //  TEST_COMMON_CATALOG_TEST_TOOLS_H_

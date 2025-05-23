@@ -10,19 +10,18 @@
 
 #include "glue_buffer.h"
 #include "shortstring.h"
+#include "telemetry_aggregator_influx.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/pointer.h"
 #include "util/posix.h"
-
-#include "telemetry_aggregator_influx.h"
 namespace perf {
 
-TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
+TelemetryAggregator *TelemetryAggregator::Create(Statistics *statistics,
                                                  int send_rate,
                                                  OptionsManager *options_mgr,
-                                                 MountPoint* mount_point,
+                                                 MountPoint *mount_point,
                                                  const std::string &fqrn,
                                                  const TelemetrySelector type) {
   UniquePtr<TelemetryAggregatorInflux> telemetryInflux;
@@ -30,22 +29,22 @@ TelemetryAggregator* TelemetryAggregator::Create(Statistics* statistics,
 
   switch (type) {
     case kTelemetryInflux:
-      telemetryInflux = new TelemetryAggregatorInflux(statistics, send_rate,
-                                                options_mgr, mount_point, fqrn);
-      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator>*>
-                                                            (&telemetryInflux);
-    break;
+      telemetryInflux = new TelemetryAggregatorInflux(
+          statistics, send_rate, options_mgr, mount_point, fqrn);
+      telemetry = reinterpret_cast<UniquePtr<TelemetryAggregator> *>(
+          &telemetryInflux);
+      break;
     default:
       LogCvmfs(kLogTelemetry, kLogDebug,
-                      "No implementation available for given telemetry class.");
+               "No implementation available for given telemetry class.");
       return NULL;
-    break;
+      break;
   }
 
   if (telemetry->weak_ref()->is_zombie_) {
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,
-      "Requested telemetry will NOT be used. "
-      "It was not constructed correctly.");
+             "Requested telemetry will NOT be used. "
+             "It was not constructed correctly.");
     return NULL;
   }
 
@@ -77,52 +76,66 @@ void TelemetryAggregator::ManuallyUpdateSelectedCounters() {
   }
 
   // Manually setting the inode tracker numbers
-  glue::InodeTracker::Statistics inode_stats =
-                            mount_point_->inode_tracker()->GetStatistics();
-  glue::DentryTracker::Statistics dentry_stats =
-                            mount_point_->dentry_tracker()->GetStatistics();
-  glue::PageCacheTracker::Statistics page_cache_stats =
-                            mount_point_->page_cache_tracker()->GetStatistics();
-  mount_point_->statistics()->Lookup("inode_tracker.n_insert")->
-                               Set(atomic_read64(&inode_stats.num_inserts));
-  mount_point_->statistics()->Lookup("inode_tracker.n_remove")->
-                               Set(atomic_read64(&inode_stats.num_removes));
-  mount_point_->statistics()->Lookup("inode_tracker.no_reference")->
-                               Set(atomic_read64(&inode_stats.num_references));
-  mount_point_->statistics()->Lookup("inode_tracker.n_hit_inode")->
-                               Set(atomic_read64(&inode_stats.num_hits_inode));
-  mount_point_->statistics()->Lookup("inode_tracker.n_hit_path")->
-                               Set(atomic_read64(&inode_stats.num_hits_path));
-  mount_point_->statistics()->Lookup("inode_tracker.n_miss_path")->
-                               Set(atomic_read64(&inode_stats.num_misses_path));
-  mount_point_->statistics()->Lookup("dentry_tracker.n_insert")->
-                               Set(dentry_stats.num_insert);
-  mount_point_->statistics()->Lookup("dentry_tracker.n_remove")->
-                               Set(dentry_stats.num_remove);
-  mount_point_->statistics()->Lookup("dentry_tracker.n_prune")->
-                               Set(dentry_stats.num_prune);
-  mount_point_->statistics()->Lookup("page_cache_tracker.n_insert")->
-                               Set(page_cache_stats.n_insert);
-  mount_point_->statistics()->Lookup("page_cache_tracker.n_remove")->
-                               Set(page_cache_stats.n_remove);
-  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_direct")->
-                               Set(page_cache_stats.n_open_direct);
-  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_flush")->
-                               Set(page_cache_stats.n_open_flush);
-  mount_point_->statistics()->Lookup("page_cache_tracker.n_open_cached")->
-                               Set(page_cache_stats.n_open_cached);
+  glue::InodeTracker::Statistics inode_stats = mount_point_->inode_tracker()
+                                                   ->GetStatistics();
+  glue::DentryTracker::Statistics dentry_stats = mount_point_->dentry_tracker()
+                                                     ->GetStatistics();
+  glue::PageCacheTracker::Statistics
+      page_cache_stats = mount_point_->page_cache_tracker()->GetStatistics();
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.n_insert")
+      ->Set(atomic_read64(&inode_stats.num_inserts));
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.n_remove")
+      ->Set(atomic_read64(&inode_stats.num_removes));
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.no_reference")
+      ->Set(atomic_read64(&inode_stats.num_references));
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.n_hit_inode")
+      ->Set(atomic_read64(&inode_stats.num_hits_inode));
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.n_hit_path")
+      ->Set(atomic_read64(&inode_stats.num_hits_path));
+  mount_point_->statistics()
+      ->Lookup("inode_tracker.n_miss_path")
+      ->Set(atomic_read64(&inode_stats.num_misses_path));
+  mount_point_->statistics()
+      ->Lookup("dentry_tracker.n_insert")
+      ->Set(dentry_stats.num_insert);
+  mount_point_->statistics()
+      ->Lookup("dentry_tracker.n_remove")
+      ->Set(dentry_stats.num_remove);
+  mount_point_->statistics()
+      ->Lookup("dentry_tracker.n_prune")
+      ->Set(dentry_stats.num_prune);
+  mount_point_->statistics()
+      ->Lookup("page_cache_tracker.n_insert")
+      ->Set(page_cache_stats.n_insert);
+  mount_point_->statistics()
+      ->Lookup("page_cache_tracker.n_remove")
+      ->Set(page_cache_stats.n_remove);
+  mount_point_->statistics()
+      ->Lookup("page_cache_tracker.n_open_direct")
+      ->Set(page_cache_stats.n_open_direct);
+  mount_point_->statistics()
+      ->Lookup("page_cache_tracker.n_open_flush")
+      ->Set(page_cache_stats.n_open_flush);
+  mount_point_->statistics()
+      ->Lookup("page_cache_tracker.n_open_cached")
+      ->Set(page_cache_stats.n_open_cached);
 }
 
 void *TelemetryAggregator::MainTelemetry(void *data) {
-  TelemetryAggregator *telemetry = reinterpret_cast<TelemetryAggregator*>(data);
+  TelemetryAggregator *telemetry = reinterpret_cast<TelemetryAggregator *>(
+      data);
   Statistics *statistics = telemetry->statistics_;
 
   struct pollfd watch_term;
   watch_term.fd = telemetry->pipe_terminate_[0];
   watch_term.events = POLLIN | POLLPRI;
   int timeout_ms = telemetry->send_rate_sec_ * 1000;
-  uint64_t deadline_sec = platform_monotonic_time()
-                          + telemetry->send_rate_sec_;
+  uint64_t deadline_sec = platform_monotonic_time() + telemetry->send_rate_sec_;
   while (true) {
     // sleep and check if end - blocking wait for "send_rate_sec_" seconds
     watch_term.revents = 0;
@@ -131,13 +144,16 @@ void *TelemetryAggregator::MainTelemetry(void *data) {
       if (errno == EINTR) {  // external interrupt occurred - no error for us
         if (timeout_ms >= 0) {
           uint64_t now = platform_monotonic_time();
-          timeout_ms = (now > deadline_sec) ? 0 :
-                                  static_cast<int>((deadline_sec - now) * 1000);
+          timeout_ms = (now > deadline_sec)
+                           ? 0
+                           : static_cast<int>((deadline_sec - now) * 1000);
         }
         continue;
       }
-      PANIC(kLogSyslogErr | kLogDebug, "Error in telemetry thread. "
-                                       "Poll returned %d", retval);
+      PANIC(kLogSyslogErr | kLogDebug,
+            "Error in telemetry thread. "
+            "Poll returned %d",
+            retval);
     }
 
     // reset timeout and deadline of poll

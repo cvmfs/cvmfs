@@ -8,9 +8,8 @@
 #include <gtest/gtest_prod.h>
 #include <stdint.h>
 
-#include <cstdlib>
-
 #include <algorithm>
+#include <cstdlib>
 
 class BlockItem;
 
@@ -20,7 +19,7 @@ class BlockItem;
  */
 class ChunkDetector {
  public:
-  ChunkDetector() : last_cut_(0), offset_(0) {}
+  ChunkDetector() : last_cut_(0), offset_(0) { }
   virtual ~ChunkDetector() { }
   uint64_t FindNextCutMark(BlockItem *block);
 
@@ -103,7 +102,7 @@ class Xor32Detector : public ChunkDetector {
   virtual uint64_t DoFindNextCutMark(BlockItem *buffer);
 
   virtual uint64_t DoCut(const uint64_t offset) {
-    xor32_     = 0;
+    xor32_ = 0;
     xor32_ptr_ = offset;
     return ChunkDetector::DoCut(offset);
   }
@@ -113,9 +112,7 @@ class Xor32Detector : public ChunkDetector {
     return ChunkDetector::NoCut(offset);
   }
 
-  inline void xor32(const unsigned char byte) {
-    xor32_ = (xor32_ << 1) ^ byte;
-  }
+  inline void xor32(const unsigned char byte) { xor32_ = (xor32_ << 1) ^ byte; }
 
   inline bool CheckThreshold() {
     return abs(static_cast<int32_t>(xor32_) - kMagicNumber) < threshold_;

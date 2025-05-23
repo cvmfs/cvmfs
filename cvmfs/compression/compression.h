@@ -18,7 +18,7 @@
 namespace shash {
 struct Any;
 class ContextPtr;
-}
+}  // namespace shash
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
 bool CopyPath2File(const std::string &src, FILE *fdest);
@@ -26,8 +26,8 @@ bool CopyMem2Path(const unsigned char *buffer, const unsigned buffer_size,
                   const std::string &path);
 bool CopyMem2File(const unsigned char *buffer, const unsigned buffer_size,
                   FILE *fdest);
-bool CopyPath2Mem(const std::string &path,
-                  unsigned char **buffer, unsigned *buffer_size);
+bool CopyPath2Mem(const std::string &path, unsigned char **buffer,
+                  unsigned *buffer_size);
 
 namespace zlib {
 
@@ -58,7 +58,7 @@ enum Algorithms {
  * Compressor::RegisterPlugins function.
  *
  */
-class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
+class Compressor : public PolymorphicConstruction<Compressor, Algorithms> {
  public:
   explicit Compressor(const Algorithms & /* alg */) { }
   virtual ~Compressor() { }
@@ -79,9 +79,9 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual bool Deflate(const bool flush,
-                       unsigned char **inbuf, size_t *inbufsize,
-                       unsigned char **outbuf, size_t *outbufsize) = 0;
+  virtual bool Deflate(const bool flush, unsigned char **inbuf,
+                       size_t *inbufsize, unsigned char **outbuf,
+                       size_t *outbufsize) = 0;
 
   /**
    * Return an upper bound on the number of bytes required in order to compress
@@ -89,23 +89,22 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    * Returns: Upper bound on the number of bytes required to compress.
    */
   virtual size_t DeflateBound(const size_t bytes) = 0;
-  virtual Compressor* Clone() = 0;
+  virtual Compressor *Clone() = 0;
 
   static void RegisterPlugins();
 };
 
 
-class ZlibCompressor: public Compressor {
+class ZlibCompressor : public Compressor {
  public:
   explicit ZlibCompressor(const Algorithms &alg);
   ZlibCompressor(const ZlibCompressor &other);
   ~ZlibCompressor();
 
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
+  bool Deflate(const bool flush, unsigned char **inbuf, size_t *inbufsize,
                unsigned char **outbuf, size_t *outbufsize);
   size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
+  Compressor *Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
 
  private:
@@ -113,14 +112,13 @@ class ZlibCompressor: public Compressor {
 };
 
 
-class EchoCompressor: public Compressor {
+class EchoCompressor : public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);
-  bool Deflate(const bool flush,
-               unsigned char **inbuf, size_t *inbufsize,
+  bool Deflate(const bool flush, unsigned char **inbuf, size_t *inbufsize,
                unsigned char **outbuf, size_t *outbufsize);
   size_t DeflateBound(const size_t bytes);
-  Compressor* Clone();
+  Compressor *Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
 };
 
@@ -134,9 +132,9 @@ void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
 void DecompressFini(z_stream *strm);
 
-StreamStates CompressZStream2Null(
-  const void *buf, const int64_t size, const bool eof,
-  z_stream *strm, shash::ContextPtr *hash_context);
+StreamStates CompressZStream2Null(const void *buf, const int64_t size,
+                                  const bool eof, z_stream *strm,
+                                  shash::ContextPtr *hash_context);
 StreamStates DecompressZStream2File(const void *buf, const int64_t size,
                                     z_stream *strm, FILE *f);
 StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
@@ -150,7 +148,7 @@ bool DecompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressPath2Null(const std::string &src, shash::Any *compressed_hash);
 bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
 bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t* size = NULL);
+                     uint64_t *size = NULL);
 bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,
@@ -158,14 +156,14 @@ bool CompressPath2File(const std::string &src, FILE *fdest,
 bool DecompressFile2File(FILE *fsrc, FILE *fdest);
 bool DecompressPath2File(const std::string &src, FILE *fdest);
 
-bool CompressMem2File(const unsigned char *buf, const size_t size,
-                      FILE *fdest, shash::Any *compressed_hash);
+bool CompressMem2File(const unsigned char *buf, const size_t size, FILE *fdest,
+                      shash::Any *compressed_hash);
 
 // User of these functions has to free out_buf, if successful
-bool CompressMem2Mem(const void *buf, const int64_t size,
-                     void **out_buf, uint64_t *out_size);
-bool DecompressMem2Mem(const void *buf, const int64_t size,
-                       void **out_buf, uint64_t *out_size);
+bool CompressMem2Mem(const void *buf, const int64_t size, void **out_buf,
+                     uint64_t *out_size);
+bool DecompressMem2Mem(const void *buf, const int64_t size, void **out_buf,
+                       uint64_t *out_size);
 
 }  // namespace zlib
 

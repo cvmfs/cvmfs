@@ -24,12 +24,16 @@ namespace cvmfs {
  */
 class FileSink : public Sink {
  public:
-  explicit FileSink(FILE *destination_file) : Sink(false),
-                                              file_(destination_file) { }
-  FileSink(FILE *destination_file, bool is_owner) : Sink(is_owner),
-                                                    file_(destination_file) { }
+  explicit FileSink(FILE *destination_file)
+      : Sink(false), file_(destination_file) { }
+  FileSink(FILE *destination_file, bool is_owner)
+      : Sink(is_owner), file_(destination_file) { }
 
-  virtual ~FileSink() { if (is_owner_ && file_) { (void) fclose(file_); } }
+  virtual ~FileSink() {
+    if (is_owner_ && file_) {
+      (void)fclose(file_);
+    }
+  }
 
   /**
    * Appends data to the sink
@@ -50,20 +54,16 @@ class FileSink : public Sink {
   virtual int Purge();
 
   /**
-    * @returns true if the object is correctly initialized.
-    */
-  virtual bool IsValid() {
-    return file_ != NULL;
-  }
+   * @returns true if the object is correctly initialized.
+   */
+  virtual bool IsValid() { return file_ != NULL; }
 
   /**
    * Commit data to the sink
    * @returns success = 0
    *          failure = -errno
    */
-  virtual int Flush() {
-    return fflush(file_) == 0 ? 0 : -errno;
-  }
+  virtual int Flush() { return fflush(file_) == 0 ? 0 : -errno; }
 
   /**
    * Reserves new space in sinks that require reservation (see RequiresReserve)
@@ -81,9 +81,7 @@ class FileSink : public Sink {
    * @returns success = true
    *          failure = false
    */
-  virtual bool Reserve(size_t /*size*/) {
-    return true;
-  }
+  virtual bool Reserve(size_t /*size*/) { return true; }
 
   /**
    * Returns if the specific sink type needs reservation of (data) space
@@ -91,9 +89,7 @@ class FileSink : public Sink {
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
-  virtual bool RequiresReserve() {
-    return false;
-  }
+  virtual bool RequiresReserve() { return false; }
 
   /**
    * Return a string representation describing the type of sink and its status
@@ -106,8 +102,7 @@ class FileSink : public Sink {
    */
   void Adopt(FILE *file, bool is_owner = true);
 
-  FILE* file() { return file_; }
-
+  FILE *file() { return file_; }
 
 
  private:

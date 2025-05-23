@@ -19,41 +19,41 @@ namespace download {
 class DownloadManager;
 }
 
-template <typename RoCatalogMgr>
+template<typename RoCatalogMgr>
 class CatalogDiffTool {
  public:
-  CatalogDiffTool(RoCatalogMgr* old_catalog_mgr, RoCatalogMgr* new_catalog_mgr)
-      : repo_path_(""),
-        temp_dir_prefix_(""),
-        download_manager_(NULL),
-        cache_dir_(""),
-        old_catalog_mgr_(old_catalog_mgr),
-        new_catalog_mgr_(new_catalog_mgr),
-        needs_setup_(false) {}
+  CatalogDiffTool(RoCatalogMgr *old_catalog_mgr, RoCatalogMgr *new_catalog_mgr)
+      : repo_path_("")
+      , temp_dir_prefix_("")
+      , download_manager_(NULL)
+      , cache_dir_("")
+      , old_catalog_mgr_(old_catalog_mgr)
+      , new_catalog_mgr_(new_catalog_mgr)
+      , needs_setup_(false) { }
 
-  CatalogDiffTool(const std::string& repo_path,
-                  const shash::Any& old_root_hash,
-                  const shash::Any& new_root_hash,
-                  const std::string& temp_dir_prefix,
-                  download::DownloadManager* download_manager,
-                  const std::string& cache_dir = "")
-      : repo_path_(repo_path),
-        old_root_hash_(old_root_hash),
-        new_root_hash_(new_root_hash),
-        temp_dir_prefix_(temp_dir_prefix),
-        download_manager_(download_manager),
-        cache_dir_(cache_dir),
-        old_raii_temp_dir_(),
-        new_raii_temp_dir_(),
-        old_catalog_mgr_(),
-        new_catalog_mgr_(),
-        needs_setup_(true) {}
+  CatalogDiffTool(const std::string &repo_path,
+                  const shash::Any &old_root_hash,
+                  const shash::Any &new_root_hash,
+                  const std::string &temp_dir_prefix,
+                  download::DownloadManager *download_manager,
+                  const std::string &cache_dir = "")
+      : repo_path_(repo_path)
+      , old_root_hash_(old_root_hash)
+      , new_root_hash_(new_root_hash)
+      , temp_dir_prefix_(temp_dir_prefix)
+      , download_manager_(download_manager)
+      , cache_dir_(cache_dir)
+      , old_raii_temp_dir_()
+      , new_raii_temp_dir_()
+      , old_catalog_mgr_()
+      , new_catalog_mgr_()
+      , needs_setup_(true) { }
 
-  virtual ~CatalogDiffTool() {}
+  virtual ~CatalogDiffTool() { }
 
   bool Init();
 
-  bool Run(const PathString& path);
+  bool Run(const PathString &path);
 
  protected:
   /**
@@ -64,7 +64,7 @@ class CatalogDiffTool {
    * into paths that will not be of interest (e.g. paths that are
    * neither above nor within the lease path, when using a gateway).
    */
-  virtual bool IsIgnoredPath(const PathString& /* path */) { return false; }
+  virtual bool IsIgnoredPath(const PathString & /* path */) { return false; }
 
   /**
    * Check if a difference found on a path should be reported via
@@ -89,7 +89,7 @@ class CatalogDiffTool {
    * /foo/bar/thing   <-  not ignored      reportable
    * /foo/baz         <-      ignored (and therefore not reportable)
    */
-  virtual bool IsReportablePath(const PathString& /* path */) { return true; }
+  virtual bool IsReportablePath(const PathString & /* path */) { return true; }
 
   // Note that addition and modification can return false to indicate that
   // the recursion stops. In the merge tool, this happens at nested catalog
@@ -99,47 +99,43 @@ class CatalogDiffTool {
   //  - When a nested catalog is replaced, we likewise do not need to recurse
   //    further into the new nested catalog tree.
 
-  virtual bool ReportAddition(const PathString& path,
-                              const catalog::DirectoryEntry& entry,
-                              const XattrList& xattrs,
-                              const FileChunkList& chunks) = 0;
-  virtual void ReportRemoval(const PathString& path,
-                             const catalog::DirectoryEntry& entry) = 0;
-  virtual bool ReportModification(const PathString& path,
-                                  const catalog::DirectoryEntry& old_entry,
-                                  const catalog::DirectoryEntry& new_entry,
-                                  const XattrList& xattrs,
-                                  const FileChunkList& chunks) = 0;
+  virtual bool ReportAddition(const PathString &path,
+                              const catalog::DirectoryEntry &entry,
+                              const XattrList &xattrs,
+                              const FileChunkList &chunks) = 0;
+  virtual void ReportRemoval(const PathString &path,
+                             const catalog::DirectoryEntry &entry) = 0;
+  virtual bool ReportModification(const PathString &path,
+                                  const catalog::DirectoryEntry &old_entry,
+                                  const catalog::DirectoryEntry &new_entry,
+                                  const XattrList &xattrs,
+                                  const FileChunkList &chunks) = 0;
 
-  const catalog::Catalog* GetOldCatalog() const {
+  const catalog::Catalog *GetOldCatalog() const {
     return old_catalog_mgr_->GetRootCatalog();
   }
-  const catalog::Catalog* GetNewCatalog() const {
+  const catalog::Catalog *GetNewCatalog() const {
     return new_catalog_mgr_->GetRootCatalog();
   }
-  RoCatalogMgr* GetOldCatalogMgr() {
-    return old_catalog_mgr_.weak_ref();
-  }
-  RoCatalogMgr* GetNewCatalogMgr() {
-    return new_catalog_mgr_.weak_ref();
-  }
+  RoCatalogMgr *GetOldCatalogMgr() { return old_catalog_mgr_.weak_ref(); }
+  RoCatalogMgr *GetNewCatalogMgr() { return new_catalog_mgr_.weak_ref(); }
 
  private:
-  RoCatalogMgr* OpenCatalogManager(const std::string& repo_path,
-                                   const std::string& temp_dir,
-                                   const shash::Any& root_hash,
-                                   download::DownloadManager* download_manager,
-                                   perf::Statistics* stats,
-                                   const std::string& cache_dir);
+  RoCatalogMgr *OpenCatalogManager(const std::string &repo_path,
+                                   const std::string &temp_dir,
+                                   const shash::Any &root_hash,
+                                   download::DownloadManager *download_manager,
+                                   perf::Statistics *stats,
+                                   const std::string &cache_dir);
 
-  void DiffRec(const PathString& path);
+  void DiffRec(const PathString &path);
 
   std::string repo_path_;
   shash::Any old_root_hash_;
   shash::Any new_root_hash_;
   std::string temp_dir_prefix_;
 
-  download::DownloadManager* download_manager_;
+  download::DownloadManager *download_manager_;
   const std::string cache_dir_;  // path if local caching of catalogs
 
   perf::Statistics stats_old_;

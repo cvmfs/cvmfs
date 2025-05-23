@@ -27,14 +27,11 @@
 template<class HandleT>
 class FdTable : SingleCopy {
  public:
-  FdTable(
-    unsigned max_open_fds,
-    const HandleT &invalid_handle)
-    : invalid_handle_(invalid_handle)
-    , fd_pivot_(0)
-    , fd_index_(max_open_fds)
-    , open_fds_(max_open_fds, FdWrapper(invalid_handle_, 0))
-  {
+  FdTable(unsigned max_open_fds, const HandleT &invalid_handle)
+      : invalid_handle_(invalid_handle)
+      , fd_pivot_(0)
+      , fd_index_(max_open_fds)
+      , open_fds_(max_open_fds, FdWrapper(invalid_handle_, 0)) {
     assert(max_open_fds > 0);
     for (unsigned i = 0; i < max_open_fds; ++i) {
       fd_index_[i] = i;
@@ -60,8 +57,8 @@ class FdTable : SingleCopy {
    * Used to save the state.
    */
   FdTable<HandleT> *Clone() {
-    FdTable<HandleT> *result =
-      new FdTable<HandleT>(open_fds_.size(), invalid_handle_);
+    FdTable<HandleT> *result = new FdTable<HandleT>(open_fds_.size(),
+                                                    invalid_handle_);
     result->fd_pivot_ = fd_pivot_;
     for (unsigned i = 0; i < fd_index_.size(); ++i) {
       result->fd_index_[i] = fd_index_[i];

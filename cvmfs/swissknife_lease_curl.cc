@@ -4,8 +4,6 @@
 
 #include "swissknife_lease_curl.h"
 
-
-
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
@@ -17,10 +15,10 @@
 
 namespace {
 
-CURL* PrepareCurl(const std::string& method) {
-  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
+CURL *PrepareCurl(const std::string &method) {
+  const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
-  CURL* h_curl = curl_easy_init();
+  CURL *h_curl = curl_easy_init();
 
   if (h_curl) {
     curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
@@ -32,35 +30,36 @@ CURL* PrepareCurl(const std::string& method) {
   return h_curl;
 }
 
-size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
-  CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
+size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+  CurlBuffer *my_buffer = static_cast<CurlBuffer *>(userp);
 
   if (size * nmemb < 1) {
     return 0;
   }
 
-  my_buffer->data = my_buffer->data + std::string(static_cast<char*>(buffer), nmemb);
+  my_buffer->data = my_buffer->data
+                    + std::string(static_cast<char *>(buffer), nmemb);
 
   return nmemb;
 }
 
 }  // namespace
 
-bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
-                        const std::string& repo_path,
-                        const std::string& repo_service_url,
-                        CurlBuffer* buffer) {
+bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
+                        const std::string &repo_path,
+                        const std::string &repo_service_url,
+                        CurlBuffer *buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
 
-  CURL* h_curl = PrepareCurl("POST");
+  CURL *h_curl = PrepareCurl("POST");
   if (!h_curl) {
     return false;
   }
 
-  const std::string payload = "{\"path\" : \"" + repo_path +
-                              "\", \"api_version\" : \"" +
-                              StringifyInt(gateway::APIVersion()) + "\"" +
-                              ", \"hostname\" : \"" + GetHostname() + "\"}";
+  const std::string payload = "{\"path\" : \"" + repo_path
+                              + "\", \"api_version\" : \""
+                              + StringifyInt(gateway::APIVersion()) + "\""
+                              + ", \"hostname\" : \"" + GetHostname() + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(secret, payload, &hmac);
@@ -69,9 +68,9 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
   cs.UseSystemCertificatePath();
   cs.ApplySslCertificatePath(h_curl);
 
-  const std::string header_str = std::string("Authorization: ") + key_id + " " +
-                                 Base64(hmac.ToString(false));
-  struct curl_slist* auth_header = NULL;
+  const std::string header_str = std::string("Authorization: ") + key_id + " "
+                                 + Base64(hmac.ToString(false));
+  struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
@@ -96,13 +95,13 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
   return !ret;
 }
 
-bool MakeEndRequest(const std::string& method, const std::string& key_id,
-                    const std::string& secret, const std::string& session_token,
-                    const std::string& repo_service_url,
-                    const std::string& request_payload, CurlBuffer* reply) {
+bool MakeEndRequest(const std::string &method, const std::string &key_id,
+                    const std::string &secret, const std::string &session_token,
+                    const std::string &repo_service_url,
+                    const std::string &request_payload, CurlBuffer *reply) {
   CURLcode ret = static_cast<CURLcode>(0);
 
-  CURL* h_curl = PrepareCurl(method);
+  CURL *h_curl = PrepareCurl(method);
   if (!h_curl) {
     return false;
   }
@@ -114,9 +113,9 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
   cs.UseSystemCertificatePath();
   cs.ApplySslCertificatePath(h_curl);
 
-  const std::string header_str = std::string("Authorization: ") + key_id + " " +
-                                 Base64(hmac.ToString(false));
-  struct curl_slist* auth_header = NULL;
+  const std::string header_str = std::string("Authorization: ") + key_id + " "
+                                 + Base64(hmac.ToString(false));
+  struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
@@ -141,14 +140,13 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
   }
 
   UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
-  const JSON *reply_status =
-    JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
-  const bool ok = (reply_status != NULL &&
-                   std::string(reply_status->string_value) == "ok");
+  const JSON *reply_status = JsonDocument::SearchInObject(
+      reply_json->root(), "status", JSON_STRING);
+  const bool ok = (reply_status != NULL
+                   && std::string(reply_status->string_value) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Lease end request - error reply: %s",
-             reply->data.c_str());
+             "Lease end request - error reply: %s", reply->data.c_str());
   }
 
   curl_easy_cleanup(h_curl);

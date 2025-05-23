@@ -19,8 +19,8 @@
 
 namespace {
 
-const LogFacilities& kLogInfo = DefaultLogging::info;
-const LogFacilities& kLogError = DefaultLogging::error;
+const LogFacilities &kLogInfo = DefaultLogging::info;
+const LogFacilities &kLogError = DefaultLogging::error;
 
 const int kMaxPoolHandles = 1;
 const unsigned kDownloadTimeout = 60;  // 1 minute
@@ -30,16 +30,16 @@ const unsigned kDownloadRetries = 1;   // 2 attempts in total
 
 namespace notify {
 
-int DoPublish(const std::string& server_url, const std::string& repository_url,
+int DoPublish(const std::string &server_url, const std::string &repository_url,
               bool verbose) {
   const std::string repo_url = MakeCanonicalPath(repository_url);
 
   if (verbose) {
     LogCvmfs(kLogCvmfs, kLogInfo, "Parameters: ");
     LogCvmfs(kLogCvmfs, kLogInfo, "  CVMFS repository URL: %s",
-            repo_url.c_str());
+             repo_url.c_str());
     LogCvmfs(kLogCvmfs, kLogInfo, "  Notification server URL: %s",
-            server_url.c_str());
+             server_url.c_str());
   }
 
   // Download repository manifest
@@ -48,8 +48,8 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   if (IsHttpUrl(repo_url)) {
     perf::Statistics stats;
     UniquePtr<download::DownloadManager> download_manager(
-        new download::DownloadManager(kMaxPoolHandles,
-                                 perf::StatisticsTemplate("download", &stats)));
+        new download::DownloadManager(
+            kMaxPoolHandles, perf::StatisticsTemplate("download", &stats)));
     assert(download_manager.IsValid());
 
     download_manager->SetTimeout(kDownloadTimeout, kDownloadTimeout);
@@ -65,8 +65,8 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
       return 6;
     }
     manifest_contents = std::string(
-                               reinterpret_cast<char*>(manifest_memsink.data()),
-                               manifest_memsink.pos());
+        reinterpret_cast<char *>(manifest_memsink.data()),
+        manifest_memsink.pos());
   } else {
     int fd = open(manifest_url.c_str(), O_RDONLY);
     if (fd == -1) {
@@ -82,7 +82,7 @@ int DoPublish(const std::string& server_url, const std::string& repository_url,
   }
 
   UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
-      reinterpret_cast<const unsigned char*>(manifest_contents.data()),
+      reinterpret_cast<const unsigned char *>(manifest_contents.data()),
       manifest_contents.size()));
 
   if (verbose) {

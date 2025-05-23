@@ -5,11 +5,10 @@
 #ifndef CVMFS_NOTIFY_SUBSCRIBER_SSE_H_
 #define CVMFS_NOTIFY_SUBSCRIBER_SSE_H_
 
-#include "subscriber.h"
-
 #include <string>
 
 #include "duplex_curl.h"
+#include "subscriber.h"
 #include "util/atomic.h"
 
 namespace notify {
@@ -29,10 +28,10 @@ namespace notify {
  */
 class SubscriberSSE : public Subscriber {
  public:
-  explicit SubscriberSSE(const std::string& server_url);
+  explicit SubscriberSSE(const std::string &server_url);
   virtual ~SubscriberSSE();
 
-  virtual bool Subscribe(const std::string& topic);
+  virtual bool Subscribe(const std::string &topic);
   virtual void Unsubscribe();
 
  private:
@@ -45,13 +44,13 @@ class SubscriberSSE : public Subscriber {
    * ("data: "), before being appended to the internal buffer used by
    * the Curl receive callback.
    */
-  void AppendToBuffer(const std::string& s);
+  void AppendToBuffer(const std::string &s);
 
   void ClearBuffer();
 
-  static size_t CurlRecvCB(void* buffer, size_t size, size_t nmemb,
-                           void* userp);
-  static int CurlProgressCB(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+  static size_t CurlRecvCB(void *buffer, size_t size, size_t nmemb,
+                           void *userp);
+  static int CurlProgressCB(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
                             curl_off_t ultotal, curl_off_t ulnow);
 
   std::string server_url_;

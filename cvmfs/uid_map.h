@@ -42,18 +42,16 @@
  * When reading from a file, simple consistency checks are performed to ensure
  * proper functionality.
  */
-template <typename T>
+template<typename T>
 class IntegerMap {
  public:
-  typedef T                                       key_type;
-  typedef T                                       value_type;
+  typedef T key_type;
+  typedef T value_type;
   typedef typename std::map<key_type, value_type> map_type;
 
  public:
   IntegerMap()
-    : valid_(true)
-    , has_default_value_(false)
-    , default_value_(T(0)) {}
+      : valid_(true), has_default_value_(false), default_value_(T(0)) { }
 
   /**
    * Define a mapping from k to v
@@ -69,7 +67,7 @@ class IntegerMap {
    */
   void SetDefault(const T v) {
     has_default_value_ = true;
-    default_value_     = v;
+    default_value_ = v;
   }
 
   /**
@@ -108,22 +106,21 @@ class IntegerMap {
       return i->second;
     }
 
-    return (HasDefault())
-      ? default_value_
-      : k;
+    return (HasDefault()) ? default_value_ : k;
   }
 
-  bool HasEffect() const {
-    return (map_.size() != 0) || has_default_value_;
+  bool HasEffect() const { return (map_.size() != 0) || has_default_value_; }
+
+  bool IsEmpty() const { return map_.size() == 0; }
+  bool IsValid() const { return valid_; }
+  bool HasDefault() const { return has_default_value_; }
+  size_t RuleCount() const { return map_.size(); }
+
+  T GetDefault() const {
+    assert(has_default_value_);
+    return default_value_;
   }
-
-  bool   IsEmpty()    const { return map_.size() == 0;   }
-  bool   IsValid()    const { return valid_;             }
-  bool   HasDefault() const { return has_default_value_; }
-  size_t RuleCount()  const { return map_.size();        }
-
-  T GetDefault() const { assert(has_default_value_); return default_value_; }
-  const map_type& GetRuleMap() const { return map_; }
+  const map_type &GetRuleMap() const { return map_; }
 
  protected:
   bool ReadFromFile(const std::string &path) {
@@ -147,9 +144,8 @@ class IntegerMap {
 
       std::vector<std::string> components = SplitString(line, ' ');
       FilterEmptyStrings(&components);
-      if (components.size() != 2                ||
-          !int_sanitizer.IsValid(components[1]) ||
-          (components[0] != "*" && !int_sanitizer.IsValid(components[0]))) {
+      if (components.size() != 2 || !int_sanitizer.IsValid(components[1])
+          || (components[0] != "*" && !int_sanitizer.IsValid(components[0]))) {
         fclose(fmap);
         LogCvmfs(kLogUtility, kLogDebug, "failed to read line %d in %s",
                  line_number, path.c_str());
@@ -172,17 +168,17 @@ class IntegerMap {
 
   void FilterEmptyStrings(std::vector<std::string> *vec) const {
     std::vector<std::string>::iterator i = vec->begin();
-    for (; i != vec->end(); ) {
+    for (; i != vec->end();) {
       i = (i->empty()) ? vec->erase(i) : i + 1;
     }
   }
 
  private:
-  bool      valid_;
-  map_type  map_;
+  bool valid_;
+  map_type map_;
 
-  bool      has_default_value_;
-  T         default_value_;
+  bool has_default_value_;
+  T default_value_;
 };
 
 typedef IntegerMap<uid_t> UidMap;

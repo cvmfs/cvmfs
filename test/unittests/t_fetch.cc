@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <pthread.h>
 
 #include "backoff.h"
@@ -45,8 +44,8 @@ class T_Fetcher : public ::testing::Test {
               0700);
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              src_path_ + "/" + hash_regular_.MakePath()));
-    EXPECT_TRUE(CopyMem2Path(&x, 1,
-                             src_path_ + "/" + hash_uncompressed_.MakePath()));
+    EXPECT_TRUE(
+        CopyMem2Path(&x, 1, src_path_ + "/" + hash_uncompressed_.MakePath()));
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              tmp_path_ + "/reg"));
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
@@ -69,16 +68,15 @@ class T_Fetcher : public ::testing::Test {
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
 
-    download_mgr_ = new download::DownloadManager(8,
-                                perf::StatisticsTemplate("test", &statistics_));
+    download_mgr_ = new download::DownloadManager(
+        8, perf::StatisticsTemplate("test", &statistics_));
     download_mgr_->SetHostChain("file://" + tmp_path_);
 
-    fetcher_ = new Fetcher(
-      cache_mgr_, download_mgr_, &backoff_throttle_,
-      perf::StatisticsTemplate("fetch", &statistics_));
+    fetcher_ = new Fetcher(cache_mgr_, download_mgr_, &backoff_throttle_,
+                           perf::StatisticsTemplate("fetch", &statistics_));
     external_fetcher_ = new Fetcher(
-      cache_mgr_, download_mgr_, &backoff_throttle_,
-      perf::StatisticsTemplate("fetch-external", &statistics_));
+        cache_mgr_, download_mgr_, &backoff_throttle_,
+        perf::StatisticsTemplate("fetch-external", &statistics_));
   }
 
   virtual void TearDown() {
@@ -113,11 +111,10 @@ class T_Fetcher : public ::testing::Test {
 class BuggyCacheManager : public CacheManager {
  public:
   BuggyCacheManager()
-    : open_2nd_try(false)
-    , allow_open(false)
-    , stall_in_ctrltxn(false)
-    , allow_open_from_txn(false)
-  {
+      : open_2nd_try(false)
+      , allow_open(false)
+      , stall_in_ctrltxn(false)
+      , allow_open_from_txn(false) {
     atomic_init32(&waiting_in_ctrltxn);
     atomic_init32(&continue_ctrltxn);
   }
@@ -148,21 +145,17 @@ class BuggyCacheManager : public CacheManager {
     return 0;
   }
   virtual void CtrlTxn(const Label & /* label */, const int /* flags */,
-                       void * /* txn */)
-  {
+                       void * /* txn */) {
     if (stall_in_ctrltxn) {
       atomic_inc32(&waiting_in_ctrltxn);
-      while (atomic_read32(&continue_ctrltxn) == 0) { }
+      while (atomic_read32(&continue_ctrltxn) == 0) {
+      }
       atomic_dec32(&waiting_in_ctrltxn);
     }
   }
-  virtual int64_t Write(const void *buf, uint64_t sz, void *txn) {
-    return sz;
-  }
+  virtual int64_t Write(const void *buf, uint64_t sz, void *txn) { return sz; }
   virtual int Reset(void *txn) { return 0; }
-  virtual int AbortTxn(void *txn) {
-    return close(*static_cast<int *>(txn));
-  }
+  virtual int AbortTxn(void *txn) { return close(*static_cast<int *>(txn)); }
   virtual int OpenFromTxn(void *txn) {
     if (allow_open_from_txn) {
       return dup(*static_cast<int *>(txn));
@@ -170,9 +163,7 @@ class BuggyCacheManager : public CacheManager {
       return -EBADF;
     }
   }
-  virtual int CommitTxn(void *txn) {
-    return close(*static_cast<int *>(txn));
-  }
+  virtual int CommitTxn(void *txn) { return close(*static_cast<int *>(txn)); }
   virtual void Spawn() { }
 
   bool open_2nd_try;
@@ -220,12 +211,13 @@ TEST_F(T_Fetcher, ExternalFetch) {
   lbl.path = "/reg-fail";
 
   EXPECT_EQ(-EIO,
-    external_fetcher_->Fetch(CacheManager::LabeledObject(hash_regular_, lbl)));
+            external_fetcher_->Fetch(
+                CacheManager::LabeledObject(hash_regular_, lbl)));
 
   // Download and store in cache
   lbl.path = "/reg";
-  int fd =
-    external_fetcher_->Fetch(CacheManager::LabeledObject(hash_regular_, lbl));
+  int fd = external_fetcher_->Fetch(
+      CacheManager::LabeledObject(hash_regular_, lbl));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_regular_));
@@ -235,8 +227,7 @@ TEST_F(T_Fetcher, ExternalFetch) {
   // Download fails
   shash::Any rnd_hash(shash::kSha1);
   rnd_hash.Randomize();
-  EXPECT_EQ(-EIO,
-    fetcher_->Fetch(CacheManager::LabeledObject(rnd_hash, lbl)));
+  EXPECT_EQ(-EIO, fetcher_->Fetch(CacheManager::LabeledObject(rnd_hash, lbl)));
 }
 
 
@@ -294,8 +285,8 @@ TEST_F(T_Fetcher, FetchUncompressed) {
   CacheManager::Label lbl;
   lbl.size = 1;
   lbl.path = "x";
-  int fd =
-    fetcher_->Fetch(CacheManager::LabeledObject(hash_uncompressed_, lbl));
+  int fd = fetcher_->Fetch(
+      CacheManager::LabeledObject(hash_uncompressed_, lbl));
   EXPECT_EQ(-EIO, fd);
 
   lbl.zip_algorithm = zlib::kNoCompression;
@@ -325,7 +316,7 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
   perf::Statistics statistics;
   BuggyCacheManager bcm;
   Fetcher f(&bcm, download_mgr_, &backoff_throttle_,
-    perf::StatisticsTemplate("fetch", &statistics));
+            perf::StatisticsTemplate("fetch", &statistics));
   CacheManager::Label lbl;
   lbl.path = "cat";
   lbl.flags = CacheManager::kLabelCatalog;
@@ -334,7 +325,7 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
   // Wrong size (commit fails)
   lbl.size = 2;
   EXPECT_EQ(-EIO,
-    fetcher_->Fetch(CacheManager::LabeledObject(hash_cert_, lbl)));
+            fetcher_->Fetch(CacheManager::LabeledObject(hash_cert_, lbl)));
   EXPECT_TRUE(FileExists(tmp_path_ + "/quarantaine/" + hash_cert_.ToString()));
   lbl.flags = 0;
   lbl.size = 1;
@@ -348,7 +339,7 @@ TEST_F(T_Fetcher, FetchTransactionFailures) {
   lbl.size = CacheManager::kSizeUnknown;
   lbl.flags = 0;
   EXPECT_EQ(-ENOENT,
-    fetcher_->Fetch(CacheManager::LabeledObject(hash_regular_, lbl)));
+            fetcher_->Fetch(CacheManager::LabeledObject(hash_regular_, lbl)));
 }
 
 
@@ -375,8 +366,8 @@ void *TestFetchCollapse2(void *data) {
   BuggyCacheManager *bcm = reinterpret_cast<BuggyCacheManager *>(f->cache_mgr_);
   while (!bcm->continue_ctrltxn) {
     pthread_mutex_lock(f->lock_queues_download_);
-    Fetcher::ThreadQueues::iterator iDownloadQueue =
-      f->queues_download_.begin();
+    Fetcher::ThreadQueues::iterator iDownloadQueue = f->queues_download_
+                                                         .begin();
     for (; iDownloadQueue != f->queues_download_.end(); ++iDownloadQueue) {
       if (iDownloadQueue->second->size() > 0) {
         // printf("open up %s", iDownloadQueue->first.ToString().c_str());
@@ -396,7 +387,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
   BuggyCacheManager bcm;
   bcm.open_2nd_try = true;
   Fetcher f(&bcm, download_mgr_, &backoff_throttle_,
-    perf::StatisticsTemplate("fetch", &statistics));
+            perf::StatisticsTemplate("fetch", &statistics));
   CacheManager::Label lbl;
   lbl.path = "cat";
   lbl.flags = CacheManager::kLabelCatalog;
@@ -418,12 +409,12 @@ TEST_F(T_Fetcher, FetchCollapse) {
   info.f = &f;
   info.hash = hash_catalog_;
   EXPECT_EQ(0,
-    pthread_create(&thread_collapse, NULL, TestFetchCollapse, &info));
-  EXPECT_EQ(0,
-    pthread_create(&thread_collapse2, NULL, TestFetchCollapse2, &f));
+            pthread_create(&thread_collapse, NULL, TestFetchCollapse, &info));
+  EXPECT_EQ(0, pthread_create(&thread_collapse2, NULL, TestFetchCollapse2, &f));
 
   // Piggy-back onto existing download
-  while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) { }
+  while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) {
+  }
   fd = f.Fetch(CacheManager::LabeledObject(hash_catalog_, lbl));
   EXPECT_EQ(-EROFS, fd);
   pthread_join(thread_collapse, NULL);
@@ -434,7 +425,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
 TEST_F(T_Fetcher, SignalWaitingThreads) {
   unsigned char x = 'x';
   EXPECT_TRUE(cache_mgr_->CommitFromMem(
-    CacheManager::LabeledObject(hash_regular_), &x, 1));
+      CacheManager::LabeledObject(hash_regular_), &x, 1));
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(hash_regular_));
   EXPECT_GE(fd, 0);
   int tls_pipe[2];

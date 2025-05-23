@@ -54,14 +54,12 @@ class Tracer : SingleCopy {
   void Flush();
   void inline __attribute__((used)) Trace(const int event,
                                           const PathString &path,
-                                          const std::string &msg)
-  {
-    if (active_) DoTrace(event, path, msg);
+                                          const std::string &msg) {
+    if (active_)
+      DoTrace(event, path, msg);
   }
 
-  bool inline __attribute__((used)) IsActive() {
-    return active_;
-  }
+  bool inline __attribute__((used)) IsActive() { return active_; }
 
  private:
   /**
@@ -89,7 +87,7 @@ class Tracer : SingleCopy {
      * arbitrary code, negative codes are reserved for internal use.
      */
     int code;
-    PathString path;  /**< The path that is subject to the trace */
+    PathString path; /**< The path that is subject to the trace */
     std::string msg;
   };
 
@@ -107,9 +105,9 @@ class Tracer : SingleCopy {
   int flush_threshold_;
   BufferEntry *ring_buffer_;
   /**
-   * Has the same size as the ring buffer.  If a message is actually copied to the
-   * ring buffer memory, the respective flag is set to 1.  Flags are reset to 0 by
-   * the flush thread.
+   * Has the same size as the ring buffer.  If a message is actually copied to
+   * the ring buffer memory, the respective flag is set to 1.  Flags are reset
+   * to 0 by the flush thread.
    */
   atomic_int32 *commit_buffer_;
   pthread_t thread_flush_;
@@ -118,13 +116,13 @@ class Tracer : SingleCopy {
   pthread_cond_t sig_continue_trace_;
   pthread_mutex_t sig_continue_trace_mutex_;
   /**
-   * Starts with 0 and gets incremented by each call to trace.  Contains the first
-   * non-used sequence number.
+   * Starts with 0 and gets incremented by each call to trace.  Contains the
+   * first non-used sequence number.
    */
   atomic_int32 seq_no_;
   /**
-   * Starts with 0 and gets incremented by the flush thread.  Points to the first
-   * non-flushed message. flushed <= seq_no holds.
+   * Starts with 0 and gets incremented by the flush thread.  Points to the
+   * first non-flushed message. flushed <= seq_no holds.
    */
   atomic_int32 flushed_;
   atomic_int32 terminate_flush_thread_;

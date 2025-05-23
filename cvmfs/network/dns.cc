@@ -50,18 +50,16 @@ namespace dns {
  * IPv4/6 address.  Sets pos_begin and pos_end to 0 if url doesn't match the
  * format.
  */
-static void PinpointHostSubstr(
-  const std::string &url,
-  unsigned *pos_begin,
-  unsigned *pos_end)
-{
+static void PinpointHostSubstr(const std::string &url,
+                               unsigned *pos_begin,
+                               unsigned *pos_end) {
   *pos_begin = *pos_end = 0;
   const unsigned len = url.size();
   unsigned i = 0;
 
   // Search '//' in the url string and jump behind
   for (; i < len; ++i) {
-    if ((url[i] == '/') && (i < len-2) && (url[i+1] == '/')) {
+    if ((url[i] == '/') && (i < len - 2) && (url[i + 1] == '/')) {
       i += 2;
       *pos_begin = i;
       break;
@@ -126,10 +124,8 @@ std::string ExtractPort(const std::string &url) {
   unsigned pos_begin;
   unsigned pos_end;
   PinpointHostSubstr(url, &pos_begin, &pos_end);
-  if (pos_begin == 0 ||
-      pos_end + 2 >= url.size() ||
-      url.at(pos_end + 1) != ':')
-      return "";
+  if (pos_begin == 0 || pos_end + 2 >= url.size() || url.at(pos_end + 1) != ':')
+    return "";
 
   // Do not include path
   std::size_t pos_port = url.find("/", pos_end);
@@ -171,10 +167,9 @@ string RewriteUrl(const string &url, const string &ip) {
  */
 string StripIp(const string &decorated_ip) {
   if (!decorated_ip.empty()) {
-    if ((decorated_ip[0] == '[') &&
-        (decorated_ip[decorated_ip.length()-1] == ']'))
-    {
-      return decorated_ip.substr(1, decorated_ip.length()-2);
+    if ((decorated_ip[0] == '[')
+        && (decorated_ip[decorated_ip.length() - 1] == ']')) {
+      return decorated_ip.substr(1, decorated_ip.length() - 2);
     }
   }
   return decorated_ip;
@@ -186,11 +181,9 @@ string StripIp(const string &decorated_ip) {
  */
 std::string AddDefaultScheme(const std::string &proxy) {
   const bool ignore_case = true;
-  if (HasPrefix(proxy, "http://", ignore_case) ||
-      HasPrefix(proxy, "https://", ignore_case) ||
-      (proxy == "DIRECT") ||
-      proxy.empty())
-  {
+  if (HasPrefix(proxy, "http://", ignore_case)
+      || HasPrefix(proxy, "https://", ignore_case) || (proxy == "DIRECT")
+      || proxy.empty()) {
     return proxy;
   }
   return "http://" + proxy;
@@ -203,9 +196,8 @@ std::string AddDefaultScheme(const std::string &proxy) {
 atomic_int64 Host::global_id_ = 0;
 
 const set<string> &Host::ViewBestAddresses(IpPreference preference) const {
-  if (((preference == kIpPreferSystem) || (preference == kIpPreferV4)) &&
-      HasIpv4())
-  {
+  if (((preference == kIpPreferSystem) || (preference == kIpPreferV4))
+      && HasIpv4()) {
     return ipv4_addresses_;
   }
   if ((preference == kIpPreferV6) && !HasIpv6())
@@ -241,19 +233,15 @@ Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
  * can be copied around but only the resolver can create valid, new objects.
  */
 Host::Host()
-  : deadline_(0)
-  , id_(atomic_xadd64(&global_id_, 1))
-  , status_(kFailNotYetResolved)
-{
-}
+    : deadline_(0)
+    , id_(atomic_xadd64(&global_id_, 1))
+    , status_(kFailNotYetResolved) { }
 
 
-Host::Host(const Host &other) {
-  CopyFrom(other);
-}
+Host::Host(const Host &other) { CopyFrom(other); }
 
 
-Host &Host::operator= (const Host &other) {
+Host &Host::operator=(const Host &other) {
   if (&other == this)
     return *this;
   CopyFrom(other);
@@ -267,10 +255,9 @@ Host &Host::operator= (const Host &other) {
  * a host name.
  */
 bool Host::IsEquivalent(const Host &other) const {
-  return (status_ == kFailOk) && (other.status_ == kFailOk) &&
-      (name_ == other.name_) &&
-      (ipv4_addresses_ == other.ipv4_addresses_) &&
-      (ipv6_addresses_ == other.ipv6_addresses_);
+  return (status_ == kFailOk) && (other.status_ == kFailOk)
+         && (name_ == other.name_) && (ipv4_addresses_ == other.ipv4_addresses_)
+         && (ipv6_addresses_ == other.ipv6_addresses_);
 }
 
 
@@ -336,17 +323,15 @@ bool Resolver::IsIpv6Address(const string &address) {
 }
 
 
-Resolver::Resolver(
-  const bool ipv4_only,
-  const unsigned retries,
-  const unsigned timeout_ms)
-  : ipv4_only_(ipv4_only)
-  , retries_(retries)
-  , timeout_ms_(timeout_ms)
-  , throttle_(0)
-  , min_ttl_(kDefaultMinTtl)
-  , max_ttl_(kDefaultMaxTtl)
-{
+Resolver::Resolver(const bool ipv4_only,
+                   const unsigned retries,
+                   const unsigned timeout_ms)
+    : ipv4_only_(ipv4_only)
+    , retries_(retries)
+    , timeout_ms_(timeout_ms)
+    , throttle_(0)
+    , min_ttl_(kDefaultMinTtl)
+    , max_ttl_(kDefaultMaxTtl) {
   prng_.InitLocaltime();
 }
 
@@ -397,10 +382,8 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       ipv4_host.deadline_ = time(NULL) + max_ttl_;
       hosts->push_back(ipv4_host);
       skip[i] = true;
-    } else if ((names[i].length() >= 3) &&
-               (names[i][0] == '[') &&
-               (names[i][names[i].length()-1] == ']'))
-    {
+    } else if ((names[i].length() >= 3) && (names[i][0] == '[')
+               && (names[i][names[i].length() - 1] == ']')) {
       LogCvmfs(kLogDns, kLogDebug, "IPv6 address %s", names[i].c_str());
       Host ipv6_host;
       ipv6_host.name_ = names[i];
@@ -415,8 +398,8 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     }
   }
 
-  DoResolve(
-    names, skip, &ipv4_addresses, &ipv6_addresses, &failures, &ttls, &fqdns);
+  DoResolve(names, skip, &ipv4_addresses, &ipv6_addresses, &failures, &ttls,
+            &fqdns);
 
   // Construct host objects
   for (unsigned i = 0; i < num; ++i) {
@@ -452,11 +435,12 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
         continue;
       }
       if (names[i] == host.name_) {
-        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-                                names[i].c_str(), ipv4_addresses[i][j].c_str());
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s", names[i].c_str(),
+                 ipv4_addresses[i][j].c_str());
       } else {
         LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s -> %s",
-            names[i].c_str(), host.name_.c_str(), ipv4_addresses[i][j].c_str());
+                 names[i].c_str(), host.name_.c_str(),
+                 ipv4_addresses[i][j].c_str());
       }
       host.ipv4_addresses_.insert(ipv4_addresses[i][j]);
     }
@@ -470,11 +454,12 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       }
       // For URLs we need brackets around IPv6 addresses
       if (names[i] == host.name_) {
-        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-                                names[i].c_str(), ipv6_addresses[i][j].c_str());
+        LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s", names[i].c_str(),
+                 ipv6_addresses[i][j].c_str());
       } else {
         LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s -> %s",
-            names[i].c_str(), host.name_.c_str(), ipv6_addresses[i][j].c_str());
+                 names[i].c_str(), host.name_.c_str(),
+                 ipv6_addresses[i][j].c_str());
       }
       host.ipv6_addresses_.insert("[" + ipv6_addresses[i][j] + "]");
     }
@@ -523,18 +508,14 @@ enum ResourceRecord {
  * merged into a single response (for IPv4/IPv6).
  */
 struct QueryInfo {
-  QueryInfo(
-    vector<string> *a,
-    const string &n,
-    const ResourceRecord r)
-    : addresses(a)
-    , complete(false)
-    , fqdn(n)
-    , name(n)
-    , record(r)
-    , status(kFailOther)
-    , ttl(0)
-  { }
+  QueryInfo(vector<string> *a, const string &n, const ResourceRecord r)
+      : addresses(a)
+      , complete(false)
+      , fqdn(n)
+      , name(n)
+      , record(r)
+      , status(kFailOther)
+      , ttl(0) { }
 
   vector<string> *addresses;
   bool complete;
@@ -549,12 +530,10 @@ struct QueryInfo {
 
 
 static Failures CaresExtractIpv4(const unsigned char *abuf, int alen,
-                                 vector<string> *addresses,
-                                 unsigned *ttl,
+                                 vector<string> *addresses, unsigned *ttl,
                                  string *fqdn);
 static Failures CaresExtractIpv6(const unsigned char *abuf, int alen,
-                                 vector<string> *addresses,
-                                 unsigned *ttl,
+                                 vector<string> *addresses, unsigned *ttl,
                                  string *fqdn);
 
 /**
@@ -562,12 +541,7 @@ static Failures CaresExtractIpv6(const unsigned char *abuf, int alen,
  * IP addresses (if successful) in the QueryInfo object.
  */
 static void CallbackCares(
-  void *arg,
-  int status,
-  int timeouts_ms,
-  unsigned char *abuf,
-  int alen)
-{
+    void *arg, int status, int timeouts_ms, unsigned char *abuf, int alen) {
   QueryInfo *info = reinterpret_cast<QueryInfo *>(arg);
 
   info->complete = true;
@@ -576,12 +550,12 @@ static void CallbackCares(
       Failures retval;
       switch (info->record) {
         case kRrA:
-          retval = CaresExtractIpv4(
-            abuf, alen, info->addresses, &info->ttl, &info->fqdn);
+          retval = CaresExtractIpv4(abuf, alen, info->addresses, &info->ttl,
+                                    &info->fqdn);
           break;
         case kRrAaaa:
-          retval = CaresExtractIpv6(
-            abuf, alen, info->addresses, &info->ttl, &info->fqdn);
+          retval = CaresExtractIpv6(abuf, alen, info->addresses, &info->ttl,
+                                    &info->fqdn);
           break;
         default:
           // Never here.
@@ -614,13 +588,11 @@ static void CallbackCares(
  * Extracts IPv4 addresses from an A record return in c-ares.  TTLs are
  * merged to a single one, representing the minimum.
  */
-static Failures CaresExtractIpv4(
-  const unsigned char *abuf,
-  int alen,
-  vector<string> *addresses,
-  unsigned *ttl,
-  string *fqdn)
-{
+static Failures CaresExtractIpv4(const unsigned char *abuf,
+                                 int alen,
+                                 vector<string> *addresses,
+                                 unsigned *ttl,
+                                 string *fqdn) {
   struct hostent *host_entry = NULL;
   struct ares_addrttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
@@ -646,8 +618,8 @@ static Failures CaresExtractIpv4(
         *ttl = std::min(unsigned(records[i].ttl), *ttl);
 
         char addrstr[INET_ADDRSTRLEN];
-        const void *retval_p =
-          inet_ntop(AF_INET, &(records[i].ipaddr), addrstr, INET_ADDRSTRLEN);
+        const void *retval_p = inet_ntop(AF_INET, &(records[i].ipaddr), addrstr,
+                                         INET_ADDRSTRLEN);
         if (!retval_p)
           continue;
         addresses->push_back(addrstr);
@@ -665,18 +637,16 @@ static Failures CaresExtractIpv4(
 }
 
 
-static Failures CaresExtractIpv6(
-  const unsigned char *abuf,
-  int alen,
-  vector<string> *addresses,
-  unsigned *ttl,
-  string *fqdn)
-{
+static Failures CaresExtractIpv6(const unsigned char *abuf,
+                                 int alen,
+                                 vector<string> *addresses,
+                                 unsigned *ttl,
+                                 string *fqdn) {
   struct hostent *host_entry = NULL;
   struct ares_addr6ttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  int retval =
-    ares_parse_aaaa_reply(abuf, alen, &host_entry, records, &naddrttls);
+  int retval = ares_parse_aaaa_reply(abuf, alen, &host_entry, records,
+                                     &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
@@ -698,8 +668,8 @@ static Failures CaresExtractIpv6(
         *ttl = std::min(unsigned(records[i].ttl), *ttl);
 
         char addrstr[INET6_ADDRSTRLEN];
-        const void *retval_p =
-          inet_ntop(AF_INET6, &(records[i].ip6addr), addrstr, INET6_ADDRSTRLEN);
+        const void *retval_p = inet_ntop(AF_INET6, &(records[i].ip6addr),
+                                         addrstr, INET6_ADDRSTRLEN);
         if (!retval_p)
           continue;
         addresses->push_back(addrstr);
@@ -717,15 +687,12 @@ static Failures CaresExtractIpv6(
 }
 
 
-CaresResolver::CaresResolver(
-  const bool ipv4_only,
-  const unsigned retries,
-  const unsigned timeout_ms)
-  : Resolver(ipv4_only, retries, timeout_ms)
-  , channel_(NULL)
-  , lookup_options_(strdup("b"))
-{
-}
+CaresResolver::CaresResolver(const bool ipv4_only,
+                             const unsigned retries,
+                             const unsigned timeout_ms)
+    : Resolver(ipv4_only, retries, timeout_ms)
+    , channel_(NULL)
+    , lookup_options_(strdup("b")) { }
 
 
 CaresResolver::~CaresResolver() {
@@ -740,11 +707,9 @@ CaresResolver::~CaresResolver() {
 /**
  * Returns a CaresResolver readily initialized, or NULL if an error occurs.
  */
-CaresResolver *CaresResolver::Create(
-  const bool ipv4_only,
-  const unsigned retries,
-  const unsigned timeout_ms)
-{
+CaresResolver *CaresResolver::Create(const bool ipv4_only,
+                                     const unsigned retries,
+                                     const unsigned timeout_ms) {
   int retval;
   if (getenv("HOSTALIASES") == NULL) {
     retval = setenv("HOSTALIASES", "/etc/hosts", 1);
@@ -753,7 +718,7 @@ CaresResolver *CaresResolver::Create(
 
   CaresResolver *resolver = new CaresResolver(ipv4_only, retries, timeout_ms);
   resolver->channel_ = reinterpret_cast<ares_channel *>(
-    smalloc(sizeof(ares_channel)));
+      smalloc(sizeof(ares_channel)));
   memset(resolver->channel_, 0, sizeof(ares_channel));
 
   struct ares_addr_node *addresses;
@@ -789,8 +754,8 @@ CaresResolver *CaresResolver::Create(
     switch (iter->family) {
       case AF_INET: {
         char addrstr[INET_ADDRSTRLEN];
-        const void *retval_p =
-          inet_ntop(AF_INET, &(iter->addr), addrstr, INET_ADDRSTRLEN);
+        const void *retval_p = inet_ntop(AF_INET, &(iter->addr), addrstr,
+                                         INET_ADDRSTRLEN);
         if (!retval_p) {
           LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
                    "invalid system name resolver");
@@ -801,8 +766,8 @@ CaresResolver *CaresResolver::Create(
       }
       case AF_INET6: {
         char addrstr[INET6_ADDRSTRLEN];
-        const void *retval_p =
-          inet_ntop(AF_INET6, &(iter->addr), addrstr, INET6_ADDRSTRLEN);
+        const void *retval_p = inet_ntop(AF_INET6, &(iter->addr), addrstr,
+                                         INET6_ADDRSTRLEN);
         if (!retval_p) {
           LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
                    "invalid system name resolver");
@@ -822,10 +787,10 @@ CaresResolver *CaresResolver::Create(
 
   return resolver;
 
- create_fail:
+create_fail:
   LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
-           "failed to initialize c-ares resolver (%d - %s)",
-           retval, ares_strerror(retval));
+           "failed to initialize c-ares resolver (%d - %s)", retval,
+           ares_strerror(retval));
   free(resolver->channel_);
   resolver->channel_ = NULL;
   delete resolver;
@@ -837,15 +802,13 @@ CaresResolver *CaresResolver::Create(
  * Pushes all the DNS queries into the c-ares channel and waits for the results
  * on the file descriptors.
  */
-void CaresResolver::DoResolve(
-  const vector<string> &names,
-  const vector<bool> &skip,
-  vector<vector<string> > *ipv4_addresses,
-  vector<vector<string> > *ipv6_addresses,
-  vector<Failures> *failures,
-  vector<unsigned> *ttls,
-  vector<string> *fqdns)
-{
+void CaresResolver::DoResolve(const vector<string> &names,
+                              const vector<bool> &skip,
+                              vector<vector<string> > *ipv4_addresses,
+                              vector<vector<string> > *ipv6_addresses,
+                              vector<Failures> *failures,
+                              vector<unsigned> *ttls,
+                              vector<string> *fqdns) {
   unsigned num = names.size();
   if (num == 0)
     return;
@@ -863,8 +826,8 @@ void CaresResolver::DoResolve(
                   CallbackCares, infos_ipv6[i]);
     }
     infos_ipv4[i] = new QueryInfo(&(*ipv4_addresses)[i], names[i], kRrA);
-    ares_search(*channel_, names[i].c_str(), ns_c_in, ns_t_a,
-                CallbackCares, infos_ipv4[i]);
+    ares_search(*channel_, names[i].c_str(), ns_c_in, ns_t_a, CallbackCares,
+                infos_ipv4[i]);
   }
 
   bool all_complete;
@@ -872,9 +835,8 @@ void CaresResolver::DoResolve(
     all_complete = true;
     WaitOnCares();
     for (unsigned i = 0; i < num; ++i) {
-      if ((infos_ipv4[i] && !infos_ipv4[i]->complete) ||
-          (infos_ipv6[i] && !infos_ipv6[i]->complete))
-      {
+      if ((infos_ipv4[i] && !infos_ipv4[i]->complete)
+          || (infos_ipv6[i] && !infos_ipv6[i]->complete)) {
         all_complete = false;
         break;
       }
@@ -959,7 +921,7 @@ bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
   ares_channelhead.ndomains = static_cast<int>(domains.size());
   if (ares_channelhead.ndomains > 0) {
     ares_channelhead.domains = reinterpret_cast<char **>(
-      smalloc(ares_channelhead.ndomains * sizeof(char *)));
+        smalloc(ares_channelhead.ndomains * sizeof(char *)));
     for (int i = 0; i < ares_channelhead.ndomains; ++i) {
       ares_channelhead.domains[i] = strdup(domains[i].c_str());
     }
@@ -999,11 +961,11 @@ void CaresResolver::WaitOnCares() {
     pfd[i].revents = 0;
     if (ARES_GETSOCK_READABLE(bitmask, i)) {
       pfd[i].fd = socks[i];
-      pfd[i].events |= POLLRDNORM|POLLIN;
+      pfd[i].events |= POLLRDNORM | POLLIN;
     }
     if (ARES_GETSOCK_WRITABLE(bitmask, i)) {
       pfd[i].fd = socks[i];
-      pfd[i].events |= POLLWRNORM|POLLOUT;
+      pfd[i].events |= POLLWRNORM | POLLOUT;
     }
     if (pfd[i].events != 0)
       num++;
@@ -1030,11 +992,11 @@ void CaresResolver::WaitOnCares() {
   } else {
     // Go through the descriptors and ask for executing the callbacks.
     for (unsigned i = 0; i < num; ++i) {
-      ares_process_fd(*channel_,
-                      pfd[i].revents & (POLLRDNORM|POLLIN) ?
-                        pfd[i].fd : ARES_SOCKET_BAD,
-                      pfd[i].revents & (POLLWRNORM|POLLOUT) ?
-                        pfd[i].fd : ARES_SOCKET_BAD);
+      ares_process_fd(
+          *channel_,
+          pfd[i].revents & (POLLRDNORM | POLLIN) ? pfd[i].fd : ARES_SOCKET_BAD,
+          pfd[i].revents & (POLLWRNORM | POLLOUT) ? pfd[i].fd
+                                                  : ARES_SOCKET_BAD);
     }
   }
 }
@@ -1048,10 +1010,7 @@ void CaresResolver::WaitOnCares() {
  * If no path is given, the HOST_ALIASES environment variable is evaluated
  * followed by /etc/hosts.
  */
-HostfileResolver *HostfileResolver::Create(
-  const string &path,
-  bool ipv4_only)
-{
+HostfileResolver *HostfileResolver::Create(const string &path, bool ipv4_only) {
   HostfileResolver *resolver = new HostfileResolver(ipv4_only);
 
   string hosts_file = path;
@@ -1091,15 +1050,13 @@ static bool SortNameLength(const string &a, const string &b) {
 /**
  * Creates a fresh reverse lookup map
  */
-void HostfileResolver::DoResolve(
-  const vector<string> &names,
-  const vector<bool> &skip,
-  vector< vector<std::string> > *ipv4_addresses,
-  vector< vector<std::string> > *ipv6_addresses,
-  vector<Failures> *failures,
-  vector<unsigned> *ttls,
-  vector<string> *fqdns)
-{
+void HostfileResolver::DoResolve(const vector<string> &names,
+                                 const vector<bool> &skip,
+                                 vector<vector<std::string> > *ipv4_addresses,
+                                 vector<vector<std::string> > *ipv6_addresses,
+                                 vector<Failures> *failures,
+                                 vector<unsigned> *ttls,
+                                 vector<string> *fqdns) {
   unsigned num = names.size();
   if (num == 0)
     return;
@@ -1110,8 +1067,8 @@ void HostfileResolver::DoResolve(
       continue;
 
     vector<string> effective_names;
-    if (!names[i].empty() && (names[i][names[i].length()-1] == '.')) {
-      effective_names.push_back(names[i].substr(0, names[i].length()-1));
+    if (!names[i].empty() && (names[i][names[i].length() - 1] == '.')) {
+      effective_names.push_back(names[i].substr(0, names[i].length() - 1));
     } else {
       effective_names.push_back(names[i]);
       for (unsigned j = 0; j < domains().size(); ++j) {
@@ -1125,8 +1082,8 @@ void HostfileResolver::DoResolve(
     (*failures)[i] = kFailUnknownHost;
     (*fqdns)[i] = names[i];
     for (unsigned j = 0; j < effective_names.size(); ++j) {
-      map<string, HostEntry>::iterator iter =
-        host_map_.find(effective_names[j]);
+      map<string, HostEntry>::iterator iter = host_map_.find(
+          effective_names[j]);
       if (iter != host_map_.end()) {
         (*ipv4_addresses)[i].insert((*ipv4_addresses)[i].end(),
                                     iter->second.ipv4_addresses.begin(),
@@ -1145,9 +1102,7 @@ void HostfileResolver::DoResolve(
 
 
 HostfileResolver::HostfileResolver(const bool ipv4_only)
-  : Resolver(ipv4_only, 0, 0)
-  , fhosts_(NULL)
-{ }
+    : Resolver(ipv4_only, 0, 0), fhosts_(NULL) { }
 
 
 HostfileResolver::~HostfileResolver() {
@@ -1173,7 +1128,8 @@ void HostfileResolver::ParseHostFile() {
 
     // strip comments
     size_t hash_pos = line.find_first_of('#');
-    if (hash_pos != string::npos) line = line.substr(0, hash_pos);
+    if (hash_pos != string::npos)
+      line = line.substr(0, hash_pos);
 
     // First token is an IP address
     int ip_start_pos = -1, ip_end_pos = -1, scan_result;
@@ -1185,9 +1141,10 @@ void HostfileResolver::ParseHostFile() {
     if (ip_start_pos == ip_end_pos)
       continue;
     if (ip_end_pos - ip_start_pos > kIpMaxLength) {
-      LogCvmfs(kLogDns, kLogSyslogWarn,
-        "Skipping line in hosts file due to invalid IP address format: %s",
-        line.c_str());
+      LogCvmfs(
+          kLogDns, kLogSyslogWarn,
+          "Skipping line in hosts file due to invalid IP address format: %s",
+          line.c_str());
       continue;
     }
 
@@ -1211,9 +1168,10 @@ void HostfileResolver::ParseHostFile() {
         break;
 
       if (hostname_end_pos - hostname_start_pos > kHostnameMaxLength) {
-        LogCvmfs(kLogDns, kLogSyslogWarn,
-          "Skipping invalid (too long) hostname in hosts file on line: %s",
-          line.c_str());
+        LogCvmfs(
+            kLogDns, kLogSyslogWarn,
+            "Skipping invalid (too long) hostname in hosts file on line: %s",
+            line.c_str());
         str_offset += hostname_end_pos;
         continue;
       }
@@ -1225,22 +1183,22 @@ void HostfileResolver::ParseHostFile() {
       assert(bytes_read != -1);
       str_offset += bytes_read;
 
-      if (hostname[strlen(hostname)-1] == '.')
-        hostname[strlen(hostname)-1] = 0;  // strip the last character
+      if (hostname[strlen(hostname) - 1] == '.')
+        hostname[strlen(hostname) - 1] = 0;  // strip the last character
 
       map<string, HostEntry>::iterator iter = host_map_.find(hostname);
       if (iter == host_map_.end()) {
         HostEntry entry;
         if (IsIpv4Address(address))
           entry.ipv4_addresses.push_back(address);
-        else
-          if (!ipv4_only()) entry.ipv6_addresses.push_back(address);
+        else if (!ipv4_only())
+          entry.ipv6_addresses.push_back(address);
         host_map_[hostname] = entry;
       } else {
         if (IsIpv4Address(address))
           iter->second.ipv4_addresses.push_back(address);
-        else
-          if (!ipv4_only()) iter->second.ipv6_addresses.push_back(address);
+        else if (!ipv4_only())
+          iter->second.ipv6_addresses.push_back(address);
       }
     }  // Current line
   }  // Hosts file
@@ -1266,13 +1224,11 @@ void HostfileResolver::SetSystemSearchDomains() {
  * Creates hostfile and c-ares resolvers and uses c-ares resolvers search
  * domains for the hostfile resolver.
  */
-NormalResolver *NormalResolver::Create(
-  const bool ipv4_only,
-  const unsigned retries,
-  const unsigned timeout_ms)
-{
-  CaresResolver *cares_resolver =
-    CaresResolver::Create(ipv4_only, retries, timeout_ms);
+NormalResolver *NormalResolver::Create(const bool ipv4_only,
+                                       const unsigned retries,
+                                       const unsigned timeout_ms) {
+  CaresResolver *cares_resolver = CaresResolver::Create(ipv4_only, retries,
+                                                        timeout_ms);
   if (!cares_resolver)
     return NULL;
   HostfileResolver *hostfile_resolver = HostfileResolver::Create("", ipv4_only);
@@ -1327,8 +1283,8 @@ void NormalResolver::SetSystemResolvers() {
 
 void NormalResolver::SetSystemSearchDomains() {
   cares_resolver_->SetSystemSearchDomains();
-  bool retval =
-    hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
+  bool retval = hostfile_resolver_->SetSearchDomains(
+      cares_resolver_->domains());
   assert(retval);
 }
 
@@ -1337,15 +1293,13 @@ void NormalResolver::SetSystemSearchDomains() {
  * First pass done by the hostfile resolver, all successfully resolved names
  * are skipped by the c-ares resolver.
  */
-void NormalResolver::DoResolve(
-  const vector<string> &names,
-  const vector<bool> &skip,
-  vector< vector<string> > *ipv4_addresses,
-  vector< vector<string> > *ipv6_addresses,
-  vector<Failures> *failures,
-  vector<unsigned> *ttls,
-  vector<string> *fqdns)
-{
+void NormalResolver::DoResolve(const vector<string> &names,
+                               const vector<bool> &skip,
+                               vector<vector<string> > *ipv4_addresses,
+                               vector<vector<string> > *ipv6_addresses,
+                               vector<Failures> *failures,
+                               vector<unsigned> *ttls,
+                               vector<string> *fqdns) {
   unsigned num = names.size();
   hostfile_resolver_->DoResolve(names, skip, ipv4_addresses, ipv6_addresses,
                                 failures, ttls, fqdns);
@@ -1360,11 +1314,7 @@ void NormalResolver::DoResolve(
 
 
 NormalResolver::NormalResolver()
-  : Resolver(false, 0, 0)
-  , cares_resolver_(NULL)
-  , hostfile_resolver_(NULL)
-{
-}
+    : Resolver(false, 0, 0), cares_resolver_(NULL), hostfile_resolver_(NULL) { }
 
 
 NormalResolver::~NormalResolver() {

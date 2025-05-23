@@ -40,17 +40,15 @@ static void GetCredentials(uid_t *calling_uid, uid_t *effective_uid) {
   *effective_uid = geteuid();
 }
 
-static void ExecAsRoot(const char *binary,
-                       const char *arg1, const char *arg2, const char *arg3,
-                       const char *arg4)
-{
-  char *argv[] = { strdup(binary),
-                   arg1 ? strdup(arg1) : NULL,
-                   arg2 ? strdup(arg2) : NULL,
-                   arg3 ? strdup(arg3) : NULL,
-                   arg4 ? strdup(arg4) : NULL,
-                   NULL };
-  char *environ[] = { NULL };
+static void ExecAsRoot(const char *binary, const char *arg1, const char *arg2,
+                       const char *arg3, const char *arg4) {
+  char *argv[] = {strdup(binary),
+                  arg1 ? strdup(arg1) : NULL,
+                  arg2 ? strdup(arg2) : NULL,
+                  arg3 ? strdup(arg3) : NULL,
+                  arg4 ? strdup(arg4) : NULL,
+                  NULL};
+  char *environ[] = {NULL};
 
   int retval = setuid(0);
   if (retval != 0) {
@@ -65,8 +63,7 @@ static void ExecAsRoot(const char *binary,
 
 static void ForkAndExecAsRoot(const char *binary, const char *arg1,
                               const char *arg2, const char *arg3,
-                              const char *arg4)
-{
+                              const char *arg4) {
   pid_t child = fork();
   if (child == -1) {
     fprintf(stderr, "failed to fork %s... (%d)\n", binary, errno);
@@ -111,9 +108,8 @@ static void Mount(const string &path) {
     string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
     // On newer versions of systemd, the mount unit is based on the fully
     // resolved path (discovered on Ubuntu 18.04, test 539)
-    if (!cvmfs_suid::PathExists(
-          string("/run/systemd/generator/") + systemd_unit))
-    {
+    if (!cvmfs_suid::PathExists(string("/run/systemd/generator/")
+                                + systemd_unit)) {
       string resolved_path = cvmfs_suid::ResolvePath(path);
       if (resolved_path.empty()) {
         fprintf(stderr, "cannot resolve %s\n", path.c_str());
@@ -121,10 +117,10 @@ static void Mount(const string &path) {
       }
       systemd_unit = cvmfs_suid::EscapeSystemdUnit(resolved_path);
     }
-    ForkAndExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(),
-                      NULL, NULL);
-    ExecAsRoot("/bin/systemctl", "reset-failed", systemd_unit.c_str(),
-               NULL, NULL);
+    ForkAndExecAsRoot("/bin/systemctl", "restart", systemd_unit.c_str(), NULL,
+                      NULL);
+    ExecAsRoot("/bin/systemctl", "reset-failed", systemd_unit.c_str(), NULL,
+               NULL);
   } else {
     ExecAsRoot("/bin/mount", path.c_str(), NULL, NULL, NULL);
   }
@@ -158,9 +154,7 @@ static void KillCvmfs(const string &fqrn) {
 class ScopedWorkingDirectory {
  public:
   explicit ScopedWorkingDirectory(const string &path)
-    : previous_path_(GetCurrentWorkingDirectory())
-    , directory_handle_(NULL)
-  {
+      : previous_path_(GetCurrentWorkingDirectory()), directory_handle_(NULL) {
     ChangeDirectory(path);
     directory_handle_ = opendir(".");
   }
@@ -175,14 +169,15 @@ class ScopedWorkingDirectory {
   operator bool() const { return directory_handle_ != NULL; }
 
   struct DirectoryEntry {
-    bool   is_directory;
+    bool is_directory;
     string name;
   };
 
   bool NextDirectoryEntry(DirectoryEntry *entry) {
     platform_dirent64 *dirent;
-    while ((dirent = platform_readdir(directory_handle_)) != NULL &&
-           IsDotEntry(dirent)) {}
+    while ((dirent = platform_readdir(directory_handle_)) != NULL
+           && IsDotEntry(dirent)) {
+    }
     if (dirent == NULL) {
       return false;
     }
@@ -193,14 +188,14 @@ class ScopedWorkingDirectory {
     }
 
     entry->is_directory = S_ISDIR(info.st_mode);
-    entry->name         = dirent->d_name;
+    entry->name = dirent->d_name;
     return true;
   }
 
  protected:
   string GetCurrentWorkingDirectory() {
     char path[PATH_MAX];
-    const char* cwd = getcwd(path, PATH_MAX);
+    const char *cwd = getcwd(path, PATH_MAX);
     assert(cwd == path);
     return string(cwd);
   }
@@ -211,13 +206,13 @@ class ScopedWorkingDirectory {
   }
 
   bool IsDotEntry(const platform_dirent64 *dirent) {
-    return (strcmp(dirent->d_name, ".")  == 0) ||
-           (strcmp(dirent->d_name, "..") == 0);
+    return (strcmp(dirent->d_name, ".") == 0)
+           || (strcmp(dirent->d_name, "..") == 0);
   }
 
  private:
-  const string  previous_path_;
-        DIR    *directory_handle_;
+  const string previous_path_;
+  DIR *directory_handle_;
 };
 
 static bool ClearDirectory(const string &path) {
@@ -229,9 +224,9 @@ static bool ClearDirectory(const string &path) {
   bool success = true;
   ScopedWorkingDirectory::DirectoryEntry dirent;
   while (success && swd.NextDirectoryEntry(&dirent)) {
-    success = (dirent.is_directory)
-      ? ClearDirectory(dirent.name) && (rmdir(dirent.name.c_str()) == 0)
-      : (unlink(dirent.name.c_str()) == 0);
+    success = (dirent.is_directory) ? ClearDirectory(dirent.name)
+                                          && (rmdir(dirent.name.c_str()) == 0)
+                                    : (unlink(dirent.name.c_str()) == 0);
   }
 
   return success;
@@ -286,11 +281,11 @@ static int DoAsynchronousScratchCleanup(const string &fqrn) {
 
 static void Usage(const string &exe, FILE *output) {
   fprintf(output,
-    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|"
-      "clear_scratch|clear_scratch_async|kill_cvmfs <fqrn>\n"
-    "Example: %s rw_umount atlas.cern.ch\n"
-    "This binary is typically called by cvmfs_server.\n",
-    exe.c_str(), exe.c_str());
+          "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|"
+          "clear_scratch|clear_scratch_async|kill_cvmfs <fqrn>\n"
+          "Example: %s rw_umount atlas.cern.ch\n"
+          "This binary is typically called by cvmfs_server.\n",
+          exe.c_str(), exe.c_str());
 }
 
 
@@ -325,8 +320,8 @@ int main(int argc, char *argv[]) {
 
   // Verify if caller uid matches
   if ((calling_uid != 0) && (calling_uid != repository_uid)) {
-    fprintf(stderr, "called as %d, repository owned by %d\n",
-            calling_uid, repository_uid);
+    fprintf(stderr, "called as %d, repository owned by %d\n", calling_uid,
+            repository_uid);
     return 1;
   }
 

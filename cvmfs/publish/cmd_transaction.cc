@@ -28,8 +28,8 @@ int CmdTransaction::Main(const Options &options) {
   std::string fqrn;
   std::string lease_path;
   if (!options.plain_args().empty()) {
-    std::vector<std::string> tokens =
-      SplitStringBounded(2, options.plain_args()[0].value_str, '/');
+    std::vector<std::string> tokens = SplitStringBounded(
+        2, options.plain_args()[0].value_str, '/');
     fqrn = tokens[0];
     if (tokens.size() == 2)
       lease_path = MakeCanonicalPath(tokens[1]);
@@ -48,10 +48,9 @@ int CmdTransaction::Main(const Options &options) {
     throw;
   }
   if (settings->transaction().in_enter_session()) {
-    throw EPublish(
-      "opening a transaction is unsupported within the ephemeral "
-      "writable shell",
-      EPublish::kFailInvocation);
+    throw EPublish("opening a transaction is unsupported within the ephemeral "
+                   "writable shell",
+                   EPublish::kFailInvocation);
   }
   if (options.Has("retry-timeout")) {
     settings->GetTransaction()->SetTimeout(options.GetInt("retry-timeout"));
@@ -59,8 +58,8 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("template-from")) {
     if (!options.Has("template-to"))
       throw EPublish("invalid parameter combination for templates");
-    settings->GetTransaction()->SetTemplate(
-      options.GetString("template-from"), options.GetString("template-to"));
+    settings->GetTransaction()->SetTemplate(options.GetString("template-from"),
+                                            options.GetString("template-to"));
   }
   if (options.Has("template")) {
     if (options.Has("template-from") || options.Has("template-to"))
@@ -73,8 +72,7 @@ int CmdTransaction::Main(const Options &options) {
   }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
-                         false /* temporarily */))
-  {
+                         false /* temporarily */)) {
     throw EPublish("No write permission to repository",
                    EPublish::kFailPermission);
   }
@@ -94,19 +92,19 @@ int CmdTransaction::Main(const Options &options) {
     }
   } catch (const EPublish &e) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
-    if (e.failure() == EPublish::kFailLayoutRevision ||
-        e.failure() == EPublish::kFailWhitelistExpired)
-    {
+    if (e.failure() == EPublish::kFailLayoutRevision
+        || e.failure() == EPublish::kFailWhitelistExpired) {
       return EINVAL;
     }
     return EIO;
   }
 
-  double whitelist_valid_s =
-    difftime(publisher->whitelist()->expires(), time(NULL));
+  double whitelist_valid_s = difftime(publisher->whitelist()->expires(),
+                                      time(NULL));
   if (whitelist_valid_s < (12 * 60 * 60)) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Warning: Repository whitelist stays valid for less than 12 hours!");
+    LogCvmfs(
+        kLogCvmfs, kLogStdout,
+        "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
   int rvi = CallServerHook("transaction_before_hook", fqrn);
@@ -121,24 +119,24 @@ int CmdTransaction::Main(const Options &options) {
   } catch (const EPublish &e) {
     const char *msg_prefix = "CernVM-FS transaction error: ";
     if (e.failure() == EPublish::kFailTransactionState) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
-               msg_prefix, e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s", msg_prefix,
+               e.msg().c_str());
       return EEXIST;
     } else if (e.failure() == EPublish::kFailLeaseBusy) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
-               msg_prefix, e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s", msg_prefix,
+               e.msg().c_str());
       return EBUSY;
     } else if (e.failure() == EPublish::kFailLeaseNoEntry) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
-               msg_prefix, e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s", msg_prefix,
+               e.msg().c_str());
       return ENOENT;
     } else if (e.failure() == EPublish::kFailLeaseNoDir) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
-               msg_prefix, e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s", msg_prefix,
+               e.msg().c_str());
       return ENOTDIR;
     } else if (e.failure() == EPublish::kFailInput) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s",
-               msg_prefix, e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s%s", msg_prefix,
+               e.msg().c_str());
       return EINVAL;
     }
     throw;

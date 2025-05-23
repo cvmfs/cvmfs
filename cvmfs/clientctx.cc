@@ -23,7 +23,7 @@ void ClientCtx::CleanupInstance() {
 
 ClientCtx::ClientCtx() {
   lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
-    smalloc(sizeof(pthread_mutex_t)));
+      smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
 }
@@ -45,8 +45,8 @@ ClientCtx::~ClientCtx() {
 ClientCtx *ClientCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new ClientCtx();
-    int retval =
-      pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
+    int retval = pthread_key_create(&instance_->thread_local_storage_,
+                                    TlsDestructor);
     assert(retval == 0);
   }
 
@@ -56,7 +56,7 @@ ClientCtx *ClientCtx::GetInstance() {
 
 void ClientCtx::Get(uid_t *uid, gid_t *gid, pid_t *pid, InterruptCue **ic) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if ((tls == NULL) || !tls->is_set) {
     *uid = -1;
     *gid = -1;
@@ -73,7 +73,7 @@ void ClientCtx::Get(uid_t *uid, gid_t *gid, pid_t *pid, InterruptCue **ic) {
 
 bool ClientCtx::IsSet() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if (tls == NULL)
     return false;
 
@@ -83,7 +83,7 @@ bool ClientCtx::IsSet() {
 
 void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
 
   if (tls == NULL) {
     tls = new ThreadLocalStorage(uid, gid, pid, ic);
@@ -107,10 +107,10 @@ void ClientCtx::TlsDestructor(void *data) {
 
   assert(instance_);
   MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
-  for (vector<ThreadLocalStorage *>::iterator i =
-       instance_->tls_blocks_.begin(), iEnd = instance_->tls_blocks_.end();
-       i != iEnd; ++i)
-  {
+  for (vector<ThreadLocalStorage *>::iterator
+           i = instance_->tls_blocks_.begin(),
+           iEnd = instance_->tls_blocks_.end();
+       i != iEnd; ++i) {
     if ((*i) == tls) {
       instance_->tls_blocks_.erase(i);
       break;
@@ -121,7 +121,7 @@ void ClientCtx::TlsDestructor(void *data) {
 
 void ClientCtx::Unset() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if (tls != NULL) {
     tls->is_set = false;
     tls->uid = -1;

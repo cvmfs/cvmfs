@@ -19,10 +19,10 @@
 
 
 SpecTree *SpecTree::Create(const std::string &path) {
-    SpecTree *res = new SpecTree();
-    res->Open(path);
-    return res;
-  }
+  SpecTree *res = new SpecTree();
+  res->Open(path);
+  return res;
+}
 
 struct NodeCacheEntry {
   SpecTreeNode *node;
@@ -36,8 +36,7 @@ void SpecTree::Open(const std::string &path) {
 
   FILE *spec_file = fopen(path.c_str(), "r");
   if (spec_file == NULL) {
-    PANIC(kLogStderr,
-          "Cannot open specfile for reading at '%s' (errno: %d)",
+    PANIC(kLogStderr, "Cannot open specfile for reading at '%s' (errno: %d)",
           path.c_str(), errno);
   }
   Parse(spec_file);
@@ -54,16 +53,17 @@ bool SpecTree::IsMatching(std::string path) {
   if (cur_node->mode == '!') {
     return false;
   }
-  if (path.length() > 0 && path.at(path.length()-1) == '/') {
-    path.erase(path.length()-1);
+  if (path.length() > 0 && path.at(path.length() - 1) == '/') {
+    path.erase(path.length() - 1);
   }
   std::vector<std::string> path_parts = SplitString(path, '/');
-  for (std::vector<std::string>::const_iterator part_it = path_parts.begin()+1;
-      part_it != path_parts.end();
-      part_it++) {
+  for (std::vector<std::string>::const_iterator part_it =
+           path_parts.begin() + 1;
+       part_it != path_parts.end();
+       part_it++) {
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
-      if (is_wildcard || (is_flat_cp && (part_it+1) == path_parts.end())) {
+      if (is_wildcard || (is_flat_cp && (part_it + 1) == path_parts.end())) {
         return true;
       }
       return false;
@@ -79,8 +79,8 @@ bool SpecTree::IsMatching(std::string path) {
       is_flat_cp = true;
     }
   }
-  return is_wildcard || is_flat_cp
-    || cur_node->mode == '_' || cur_node->mode == 0;
+  return is_wildcard || is_flat_cp || cur_node->mode == '_'
+         || cur_node->mode == 0;
 }
 
 void SpecTree::Parse(FILE *spec_file) {
@@ -122,11 +122,11 @@ void SpecTree::Parse(FILE *spec_file) {
     }
     if (line.empty())
       PANIC(kLogStderr, "Invalid specification: %s", raw_line.c_str());
-    if (line.at(line.length()-1) == '*') {
+    if (line.at(line.length() - 1) == '*') {
       if (inclusion_mode == 0) {
         inclusion_mode = '*';
       }
-      line.erase(line.length()-1);
+      line.erase(line.length() - 1);
     } else if (inclusion_mode == '^') {
       inclusion_mode = 0;
     }
@@ -146,7 +146,8 @@ void SpecTree::Parse(FILE *spec_file) {
       }
     }
     char passthrough_mode = '_';
-    if (inclusion_mode == '!') passthrough_mode = '-';
+    if (inclusion_mode == '!')
+      passthrough_mode = '-';
     // Split remaining path into its parts
     std::vector<std::string> path_parts = SplitString(line, '/');
     cur_node = node_cache.top()->node;
@@ -154,8 +155,8 @@ void SpecTree::Parse(FILE *spec_file) {
     char past_1_mode = node_cache.top()->node->mode;
     char past_2_mode = node_cache.top()->node->mode;
     for (std::vector<std::string>::const_iterator part_it = path_parts.begin();
-      part_it != path_parts.end();
-      part_it++) {
+         part_it != path_parts.end();
+         part_it++) {
       if (*part_it == "") {  // If path is fully parsed/empty part => continue
         continue;
       }
@@ -192,9 +193,7 @@ void SpecTree::Parse(FILE *spec_file) {
   }
 }
 
-int SpecTree::ListDir(const char *dir,
-  char ***buf,
-  size_t *len) {
+int SpecTree::ListDir(const char *dir, char ***buf, size_t *len) {
   std::string path = dir;
   SpecTreeNode *cur_node = root_;
   bool is_wildcard = (cur_node->mode == '*');
@@ -202,13 +201,14 @@ int SpecTree::ListDir(const char *dir,
   if (cur_node->mode == '!') {
     return -1;
   }
-  if (path.length() > 0 && path.at(path.length()-1) == '/') {
-    path.erase(path.length()-1);
+  if (path.length() > 0 && path.at(path.length() - 1) == '/') {
+    path.erase(path.length() - 1);
   }
   std::vector<std::string> path_parts = SplitString(path, '/');
-  for (std::vector<std::string>::const_iterator part_it = path_parts.begin()+1;
-      part_it != path_parts.end();
-      part_it++) {
+  for (std::vector<std::string>::const_iterator part_it =
+           path_parts.begin() + 1;
+       part_it != path_parts.end();
+       part_it++) {
     cur_node = cur_node->GetNode(*part_it);
     if (cur_node == NULL) {
       if (is_wildcard) {
@@ -244,17 +244,16 @@ void SpecTreeNode::AddNode(const std::string &name, SpecTreeNode *node) {
   nodes_[name] = node;
 }
 
-int SpecTreeNode::GetListing(std::string base_path,
-  char ***buf, size_t *len) {
+int SpecTreeNode::GetListing(std::string base_path, char ***buf, size_t *len) {
   *len = 0;
   size_t buflen = 5;
   *buf = reinterpret_cast<char **>(smalloc(sizeof(char *) * buflen));
   // NULL terminate the list;
   AppendStringToList(NULL, buf, len, &buflen);
-  for (std::map<std::string, SpecTreeNode*>::const_iterator
-    it = nodes_.begin();
-    it != nodes_.end();
-    it++) {
+  for (std::map<std::string, SpecTreeNode *>::const_iterator it =
+           nodes_.begin();
+       it != nodes_.end();
+       it++) {
     // Do not follow excluded paths and paths only existing for exclusion
     if (it->second->mode != '!' && it->second->mode != '-') {
       AppendStringToList(it->first.c_str(), buf, len, &buflen);

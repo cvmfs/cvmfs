@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "c_http_server.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -13,8 +15,6 @@
 
 #include "duplex_curl.h"
 #include "util/posix.h"
-
-#include "c_http_server.h"
 
 HTTPRequestParser::HTTPRequestParser() {
   state_ = kBegin;
@@ -143,7 +143,7 @@ const HTTPRequest &HTTPRequestParser::GetParsedRequest() const {
 
 void HTTPRequestParser::PushHeaderField() {
   request_.headers.push_back(
-    std::pair<std::string, std::string>(headerKeyBuffer_, buffer_));
+      std::pair<std::string, std::string>(headerKeyBuffer_, buffer_));
   headerKeyBuffer_.clear();
   buffer_.clear();
 }
@@ -179,26 +179,29 @@ MockHTTPServer::~MockHTTPServer() {
 }
 
 bool MockHTTPServer::Start() {
-  if (atomic_read32(&running_)) return false;
+  if (atomic_read32(&running_))
+    return false;
   atomic_write32(&running_, 1);
   pthread_create(&server_thread_, NULL, Main, this);
   // wait for server thread to open the socket
-  while (!atomic_read32(&server_thread_ready_)) {}
+  while (!atomic_read32(&server_thread_ready_)) {
+  }
   return true;
 }
 
 
 bool MockHTTPServer::Stop() {
-  if (!atomic_read32(&running_)) return false;
+  if (!atomic_read32(&running_))
+    return false;
   atomic_write32(&running_, 0);
   pthread_join(server_thread_, NULL);
   return true;
 }
 
 bool MockHTTPServer::SetResponseCallback(
-  HTTPResponse (*callback_func)(const HTTPRequest &, void*),
-  void *data) {
-  if (atomic_read32(&running_)) return false;
+    HTTPResponse (*callback_func)(const HTTPRequest &, void *), void *data) {
+  if (atomic_read32(&running_))
+    return false;
   callback_func_ = callback_func;
   callback_data_ = data;
   return true;
@@ -229,20 +232,19 @@ void *MockHTTPServer::Main(void *data) {
     // Wait for traffic
     FD_ZERO(&rfds);
     FD_SET(listen_sockfd, &rfds);
-    retval = select(listen_sockfd+1, &rfds, NULL, NULL, &select_timeout);
+    retval = select(listen_sockfd + 1, &rfds, NULL, NULL, &select_timeout);
     assert(retval >= 0);
     if (retval == 0)  // Timeout
       continue;
 
-    accept_sockfd = accept(listen_sockfd,
-                            (struct sockaddr *) &cli_addr,
-                            &clilen);
+    accept_sockfd = accept(
+        listen_sockfd, (struct sockaddr *)&cli_addr, &clilen);
     bzero(buffer, kReadBufferSize);
     int bytes_read = 0;
     HTTPRequestParser parser;
     bool finished = false;
-    while (!finished &&
-           (bytes_read = read(accept_sockfd, buffer, kReadBufferSize))) {
+    while (!finished
+           && (bytes_read = read(accept_sockfd, buffer, kReadBufferSize))) {
       for (int i = 0; i < bytes_read; ++i) {
         if (parser.Parse(buffer[i])) {
           finished = true;
@@ -258,7 +260,7 @@ void *MockHTTPServer::Main(void *data) {
     std::string reply = response.ToString();
     int bytes_written = write(accept_sockfd, reply.c_str(), reply.length());
     assert(bytes_written >= 0);
-    assert((uint64_t) bytes_written == reply.length());
+    assert((uint64_t)bytes_written == reply.length());
     close(accept_sockfd);
   }
   close(listen_sockfd);
@@ -278,9 +280,7 @@ MockFileServer::MockFileServer(int port, std::string root_dir) {
   assert(server_->Start());
 }
 
-MockFileServer::~MockFileServer() {
-  delete server_;
-}
+MockFileServer::~MockFileServer() { delete server_; }
 
 HTTPResponse MockFileServer::FileServerHandler(const HTTPRequest &req,
                                                void *data) {
@@ -328,22 +328,20 @@ MockProxyServer::MockProxyServer(int port) {
   assert(server_->Start());
 }
 
-MockProxyServer::~MockProxyServer() {
-  delete server_;
-}
+MockProxyServer::~MockProxyServer() { delete server_; }
 
 size_t MockProxyServer::ProxyServerWriteCallback(char *ptr, size_t size,
-                                                 size_t nmemb, void* userdata) {
+                                                 size_t nmemb, void *userdata) {
   std::string *response = static_cast<std::string *>(userdata);
-  (*response) += std::string(ptr, size*nmemb);
-  return size*nmemb;
+  (*response) += std::string(ptr, size * nmemb);
+  return size * nmemb;
 }
 
 HTTPResponse MockProxyServer::ProxyServerHandler(const HTTPRequest &req,
                                                  void *data) {
   MockProxyServer *proxy_server = static_cast<MockProxyServer *>(data);
   HTTPResponse response;
-  CURL* handle = curl_easy_init();
+  CURL *handle = curl_easy_init();
   curl_easy_setopt(handle, CURLOPT_HEADER, 1);
   curl_easy_setopt(handle, CURLOPT_URL, req.path.c_str());
   curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.method.c_str());
@@ -388,19 +386,16 @@ MockRedirectServer::MockRedirectServer(int port,
   assert(server_->Start());
 }
 
-MockRedirectServer::~MockRedirectServer() {
-  delete server_;
-}
+MockRedirectServer::~MockRedirectServer() { delete server_; }
 
 HTTPResponse MockRedirectServer::RedirectServerHandler(const HTTPRequest &req,
-                                            void *data) {
-  MockRedirectServer *redirect_server =
-    static_cast<MockRedirectServer *>(data);
+                                                       void *data) {
+  MockRedirectServer *redirect_server = static_cast<MockRedirectServer *>(data);
   HTTPResponse response;
   response.code = 301;
   response.reason = "Moved Permanently";
   response.AddHeader("Location",
-                      redirect_server->redirect_destination_ + req.path);
+                     redirect_server->redirect_destination_ + req.path);
   ++redirect_server->num_processed_requests_;
   return response;
 }
@@ -415,9 +410,7 @@ MockGateway::MockGateway(int port) {
   assert(server_->Start());
 }
 
-MockGateway::~MockGateway() {
-  delete server_;
-}
+MockGateway::~MockGateway() { delete server_; }
 
 HTTPResponse MockGateway::GatewayHandler(const HTTPRequest &req, void *data) {
   MockGateway *gateway = static_cast<MockGateway *>(data);

@@ -55,9 +55,7 @@ static enum cvmcache_object_type ObjectType2CType(cvmfs::EnumObjectType type) {
 class ForwardCachePlugin : public CachePlugin {
  public:
   explicit ForwardCachePlugin(struct cvmcache_callbacks *callbacks)
-    : CachePlugin(callbacks->capabilities)
-    , callbacks_(*callbacks)
-  {
+      : CachePlugin(callbacks->capabilities), callbacks_(*callbacks) {
     assert(callbacks->cvmcache_chrefcnt != NULL);
     assert(callbacks->cvmcache_obj_info != NULL);
     assert(callbacks->cvmcache_pread != NULL);
@@ -86,19 +84,15 @@ class ForwardCachePlugin : public CachePlugin {
   virtual ~ForwardCachePlugin() { }
 
  protected:
-  virtual cvmfs::EnumStatus ChangeRefcount(
-    const shash::Any &id,
-    int32_t change_by)
-  {
+  virtual cvmfs::EnumStatus ChangeRefcount(const shash::Any &id,
+                                           int32_t change_by) {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus GetObjectInfo(
-    const shash::Any &id,
-    ObjectInfo *info)
-  {
+  virtual cvmfs::EnumStatus GetObjectInfo(const shash::Any &id,
+                                          ObjectInfo *info) {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     cvmcache_object_info c_info;
     memset(&c_info, 0, sizeof(c_info));
@@ -114,22 +108,18 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus Pread(
-    const shash::Any &id,
-    uint64_t offset,
-    uint32_t *size,
-    unsigned char *buffer)
-  {
+  virtual cvmfs::EnumStatus Pread(const shash::Any &id,
+                                  uint64_t offset,
+                                  uint32_t *size,
+                                  unsigned char *buffer) {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
     int result = callbacks_.cvmcache_pread(&c_hash, offset, size, buffer);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus StartTxn(
-    const shash::Any &id,
-    const uint64_t txn_id,
-    const ObjectInfo &info)
-  {
+  virtual cvmfs::EnumStatus StartTxn(const shash::Any &id,
+                                     const uint64_t txn_id,
+                                     const ObjectInfo &info) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
       return cvmfs::STATUS_NOSUPPORT;
 
@@ -148,11 +138,9 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus WriteTxn(
-    const uint64_t txn_id,
-    unsigned char *buffer,
-    uint32_t size)
-  {
+  virtual cvmfs::EnumStatus WriteTxn(const uint64_t txn_id,
+                                     unsigned char *buffer,
+                                     uint32_t size) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
       return cvmfs::STATUS_NOSUPPORT;
 
@@ -203,22 +191,17 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus ListingBegin(
-    uint64_t lst_id,
-    cvmfs::EnumObjectType type)
-  {
+  virtual cvmfs::EnumStatus ListingBegin(uint64_t lst_id,
+                                         cvmfs::EnumObjectType type) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result =
-      callbacks_.cvmcache_listing_begin(lst_id, ObjectType2CType(type));
+    int result = callbacks_.cvmcache_listing_begin(lst_id,
+                                                   ObjectType2CType(type));
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus ListingNext(
-    int64_t lst_id,
-    ObjectInfo *item)
-  {
+  virtual cvmfs::EnumStatus ListingNext(int64_t lst_id, ObjectInfo *item) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
@@ -246,15 +229,14 @@ class ForwardCachePlugin : public CachePlugin {
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
-  virtual cvmfs::EnumStatus LoadBreadcrumb(
-    const std::string &fqrn, manifest::Breadcrumb *breadcrumb)
-  {
+  virtual cvmfs::EnumStatus LoadBreadcrumb(const std::string &fqrn,
+                                           manifest::Breadcrumb *breadcrumb) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_BREADCRUMB))
       return cvmfs::STATUS_NOSUPPORT;
 
     cvmcache_breadcrumb c_breadcrumb;
-    int result =
-      callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(), &c_breadcrumb);
+    int result = callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(),
+                                                     &c_breadcrumb);
     if (result == CVMCACHE_STATUS_OK) {
       breadcrumb->catalog_hash = Chash2Cpphash(&c_breadcrumb.catalog_hash);
       breadcrumb->timestamp = c_breadcrumb.timestamp;
@@ -264,8 +246,7 @@ class ForwardCachePlugin : public CachePlugin {
   }
 
   virtual cvmfs::EnumStatus StoreBreadcrumb(
-    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb)
-  {
+      const std::string &fqrn, const manifest::Breadcrumb &breadcrumb) {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_BREADCRUMB))
       return cvmfs::STATUS_NOSUPPORT;
 
@@ -273,8 +254,8 @@ class ForwardCachePlugin : public CachePlugin {
     c_breadcrumb.catalog_hash = Cpphash2Chash(breadcrumb.catalog_hash);
     c_breadcrumb.timestamp = breadcrumb.timestamp;
     c_breadcrumb.revision = breadcrumb.revision;
-    int result =
-      callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(), &c_breadcrumb);
+    int result = callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(),
+                                                      &c_breadcrumb);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -327,8 +308,8 @@ int cvmcache_listen(struct cvmcache_context *ctx, char *locator) {
   return ctx->plugin->Listen(locator);
 }
 
-void cvmcache_process_requests(struct cvmcache_context *ctx, unsigned nworkers)
-{
+void cvmcache_process_requests(struct cvmcache_context *ctx,
+                               unsigned nworkers) {
   ctx->plugin->ProcessRequests(nworkers);
 }
 
@@ -353,9 +334,8 @@ void cvmcache_get_session(cvmcache_session *session) {
   assert(session != NULL);
   SessionCtx *session_ctx = SessionCtx::GetInstance();
   assert(session_ctx);
-  session_ctx->Get(&(session->id),
-                   &(session->repository_name),
-                   &(session->client_instance));
+  session_ctx->Get(
+      &(session->id), &(session->repository_name), &(session->client_instance));
 }
 
 void cvmcache_spawn_watchdog(const char *crash_dump_file) {

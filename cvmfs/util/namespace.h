@@ -14,10 +14,10 @@
 
 #include "util/export.h"
 
-const int kNsFeatureMount         = 0x01;
-const int kNsFeaturePid           = 0x02;
+const int kNsFeatureMount = 0x01;
+const int kNsFeaturePid = 0x02;
 const int kNsFeatureUserAvailable = 0x04;
-const int kNsFeatureUserEnabled   = 0x08;
+const int kNsFeatureUserEnabled = 0x08;
 
 enum NamespaceFailures {
   kFailNsOk = 0,

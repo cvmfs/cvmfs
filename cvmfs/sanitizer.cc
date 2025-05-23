@@ -42,8 +42,7 @@ InputSanitizer::InputSanitizer(const string &whitelist) : max_length_(-1) {
 
 
 InputSanitizer::InputSanitizer(const string &whitelist, int max_length)
-  : max_length_(max_length)
-{
+    : max_length_(max_length) {
   InitValidRanges(whitelist);
 }
 
@@ -53,8 +52,8 @@ void InputSanitizer::InitValidRanges(const std::string &whitelist) {
   const unsigned length = whitelist.length();
   unsigned pickup_pos = 0;
   for (unsigned i = 0; i < length; ++i) {
-    if ((i+1 >= length) || (whitelist[i+1] == ' ') || (i == length-1)) {
-      const string range = whitelist.substr(pickup_pos, i-pickup_pos+1);
+    if ((i + 1 >= length) || (whitelist[i + 1] == ' ') || (i == length - 1)) {
+      const string range = whitelist.substr(pickup_pos, i - pickup_pos + 1);
       switch (range.length()) {
         case 1:
           valid_ranges_.push_back(CharRange(range[0]));
@@ -66,16 +65,15 @@ void InputSanitizer::InitValidRanges(const std::string &whitelist) {
           assert(false);
       }
       ++i;
-      pickup_pos = i+1;
+      pickup_pos = i + 1;
     }
   }
 }
 
 
-bool InputSanitizer::Sanitize(
-                          std::string::const_iterator   begin,
-                          std::string::const_iterator   end,
-                          std::string                  *filtered_output) const {
+bool InputSanitizer::Sanitize(std::string::const_iterator begin,
+                              std::string::const_iterator end,
+                              std::string *filtered_output) const {
   int pos = 0;
   bool is_sane = true;
   for (; begin != end; ++begin) {
@@ -117,10 +115,9 @@ bool InputSanitizer::IsValid(const std::string &input) const {
 }
 
 
-bool IntegerSanitizer::Sanitize(
-                          std::string::const_iterator   begin,
-                          std::string::const_iterator   end,
-                          std::string                  *filtered_output) const {
+bool IntegerSanitizer::Sanitize(std::string::const_iterator begin,
+                                std::string::const_iterator end,
+                                std::string *filtered_output) const {
   if (std::distance(begin, end) == 0) {
     return false;
   }
@@ -135,10 +132,9 @@ bool IntegerSanitizer::Sanitize(
 }
 
 
-bool PositiveIntegerSanitizer::Sanitize(
-                          std::string::const_iterator   begin,
-                          std::string::const_iterator   end,
-                          std::string                  *filtered_output) const {
+bool PositiveIntegerSanitizer::Sanitize(std::string::const_iterator begin,
+                                        std::string::const_iterator end,
+                                        std::string *filtered_output) const {
   if (std::distance(begin, end) == 0) {
     return false;
   }

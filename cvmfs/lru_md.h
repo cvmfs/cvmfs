@@ -28,7 +28,7 @@ namespace lru {
 // Hash functions
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
@@ -38,31 +38,27 @@ static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
 // uint32_t hasher_inode(const fuse_ino_t &inode);
 
 
-class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
-{
+class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry> {
  public:
-  explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
-    LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode,
-      perf::StatisticsTemplate("inode_cache", statistics))
-  {
-  }
+  explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics)
+      : LruCache<fuse_ino_t, catalog::DirectoryEntry>(
+            cache_size, fuse_ino_t(-1), hasher_inode,
+            perf::StatisticsTemplate("inode_cache", statistics)) { }
 
   bool Insert(const fuse_ino_t &inode, const catalog::DirectoryEntry &dirent) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %lu -> '%s'",
-             inode, dirent.name().c_str());
-    const bool result =
-      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(inode, dirent);
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> dirent: %lu -> '%s'", inode,
+             dirent.name().c_str());
+    const bool result = LruCache<fuse_ino_t, catalog::DirectoryEntry>::Insert(
+        inode, dirent);
     return result;
   }
 
   bool Lookup(const fuse_ino_t &inode, catalog::DirectoryEntry *dirent,
-              bool update_lru = true)
-  {
-    const bool result =
-      LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(inode, dirent);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %lu (%s)",
-             inode, result ? "hit" : "miss");
+              bool update_lru = true) {
+    const bool result = LruCache<fuse_ino_t, catalog::DirectoryEntry>::Lookup(
+        inode, dirent);
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> dirent: %lu (%s)", inode,
+             result ? "hit" : "miss");
     return result;
   }
 
@@ -75,27 +71,23 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 
 class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
-  explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
-    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
-      perf::StatisticsTemplate("path_cache", statistics))
-  {
-  }
+  explicit PathCache(unsigned int cache_size, perf::Statistics *statistics)
+      : LruCache<fuse_ino_t, PathString>(
+            cache_size, fuse_ino_t(-1), hasher_inode,
+            perf::StatisticsTemplate("path_cache", statistics)) { }
 
   bool Insert(const fuse_ino_t &inode, const PathString &path) {
-    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %lu -> '%s'",
-             inode, path.c_str());
-    const bool result =
-      LruCache<fuse_ino_t, PathString>::Insert(inode, path);
+    LogCvmfs(kLogLru, kLogDebug, "insert inode --> path %lu -> '%s'", inode,
+             path.c_str());
+    const bool result = LruCache<fuse_ino_t, PathString>::Insert(inode, path);
     return result;
   }
 
   bool Lookup(const fuse_ino_t &inode, PathString *path,
-              bool update_lru = true)
-  {
-    const bool found =
-      LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
-    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %lu (%s)",
-             inode, found ? "hit" : "miss");
+              bool update_lru = true) {
+    const bool found = LruCache<fuse_ino_t, PathString>::Lookup(inode, path);
+    LogCvmfs(kLogLru, kLogDebug, "lookup inode --> path: %lu (%s)", inode,
+             found ? "hit" : "miss");
     return found;
   }
 
@@ -106,23 +98,20 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
 };  // PathCache
 
 
-class Md5PathCache :
-  public LruCache<shash::Md5, catalog::DirectoryEntry>
-{
+class Md5PathCache : public LruCache<shash::Md5, catalog::DirectoryEntry> {
  public:
-  explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics) :
-    LruCache<shash::Md5, catalog::DirectoryEntry>(
-      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5,
-      perf::StatisticsTemplate("md5_path_cache", statistics))
-  {
+  explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics)
+      : LruCache<shash::Md5, catalog::DirectoryEntry>(
+            cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5,
+            perf::StatisticsTemplate("md5_path_cache", statistics)) {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
 
   bool Insert(const shash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
-    const bool result =
-      LruCache<shash::Md5, catalog::DirectoryEntry>::Insert(hash, dirent);
+    const bool result = LruCache<shash::Md5, catalog::DirectoryEntry>::Insert(
+        hash, dirent);
     return result;
   }
 
@@ -134,18 +123,16 @@ class Md5PathCache :
   }
 
   bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent,
-              bool update_lru = true)
-  {
-    const bool result =
-      LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
+              bool update_lru = true) {
+    const bool result = LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(
+        hash, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s (%s)",
              hash.ToString().c_str(), result ? "hit" : "miss");
     return result;
   }
 
   bool Forget(const shash::Md5 &hash) {
-    LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
-             hash.ToString().c_str());
+    LogCvmfs(kLogLru, kLogDebug, "forget md5: %s", hash.ToString().c_str());
     return LruCache<shash::Md5, catalog::DirectoryEntry>::Forget(hash);
   }
 

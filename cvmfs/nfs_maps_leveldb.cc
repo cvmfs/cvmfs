@@ -36,14 +36,12 @@ using namespace std;  // NOLINT
 
 
 NfsMapsLeveldb::ForkAwareEnv::ForkAwareEnv(NfsMapsLeveldb *maps)
-  : leveldb::EnvWrapper(leveldb::Env::Default())
-  , maps_(maps)
-{
+    : leveldb::EnvWrapper(leveldb::Env::Default()), maps_(maps) {
   atomic_init32(&num_bg_threads_);
 }
 
 
-void NfsMapsLeveldb::ForkAwareEnv::StartThread(void (*f)(void*), void* a) {
+void NfsMapsLeveldb::ForkAwareEnv::StartThread(void (*f)(void *), void *a) {
   if (maps_->spawned_) {
     leveldb::Env::Default()->StartThread(f, a);
     return;
@@ -54,14 +52,13 @@ void NfsMapsLeveldb::ForkAwareEnv::StartThread(void (*f)(void*), void* a) {
 }
 
 
-void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void*), void* arg)
-{
+void NfsMapsLeveldb::ForkAwareEnv::Schedule(void (*function)(void *),
+                                            void *arg) {
   if (maps_->spawned_) {
     leveldb::Env::Default()->Schedule(function, arg);
     return;
   }
-  LogCvmfs(kLogNfsMaps, kLogDebug,
-           "single threaded leveldb::Schedule called");
+  LogCvmfs(kLogNfsMaps, kLogDebug, "single threaded leveldb::Schedule called");
   FuncArg *funcarg = new FuncArg();
   funcarg->function = function;
   funcarg->arg = arg;
@@ -85,7 +82,7 @@ void NfsMapsLeveldb::ForkAwareEnv::WaitForBGThreads() {
  * Leveldb's usleep might collide with the ALARM timer
  */
 void NfsMapsLeveldb::ForkAwareEnv::SleepForMicroseconds(int micros) {
-  SafeSleepMs(micros/1000);
+  SafeSleepMs(micros / 1000);
 }
 
 
@@ -101,16 +98,14 @@ void *NfsMapsLeveldb::ForkAwareEnv::MainFakeThread(void *data) {
 //------------------------------------------------------------------------------
 
 
-NfsMapsLeveldb *NfsMapsLeveldb::Create(
-    const string &leveldb_dir,
-    const uint64_t root_inode,
-    const bool rebuild,
-    perf::Statistics *statistics)
-{
+NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
+                                       const uint64_t root_inode,
+                                       const bool rebuild,
+                                       perf::Statistics *statistics) {
   assert(root_inode > 0);
   UniquePtr<NfsMapsLeveldb> maps(new NfsMapsLeveldb());
-  maps->n_db_added_ = statistics->Register(
-    "nfs.leveldb.n_added", "total number of issued inode");
+  maps->n_db_added_ = statistics->Register("nfs.leveldb.n_added",
+                                           "total number of issued inode");
 
   maps->root_inode_ = root_inode;
   maps->fork_aware_env_ = new ForkAwareEnv(maps.weak_ref());
@@ -123,8 +118,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(
   if (rebuild) {
     LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "rebuilding NFS maps, might result in stale entries");
-    bool retval = RemoveTree(leveldb_dir + "/inode2path") &&
-                  RemoveTree(leveldb_dir + "/path2inode");
+    bool retval = RemoveTree(leveldb_dir + "/inode2path")
+                  && RemoveTree(leveldb_dir + "/path2inode");
     if (!retval) {
       LogCvmfs(kLogNfsMaps, kLogDebug, "failed to remove previous databases");
       return NULL;
@@ -132,7 +127,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(
   }
 
   // Open databases
-  maps->cache_inode2path_ = leveldb::NewLRUCache(32 * 1024*1024);
+  maps->cache_inode2path_ = leveldb::NewLRUCache(32 * 1024 * 1024);
   leveldb_options.block_cache = maps->cache_inode2path_;
   maps->filter_inode2path_ = leveldb::NewBloomFilterPolicy(10);
   leveldb_options.filter_policy = maps->filter_inode2path_;
@@ -149,7 +144,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(
   leveldb_options.compression = leveldb::kNoCompression;
   // Random order, small block size to not trash caches
   leveldb_options.block_size = 512;
-  maps->cache_path2inode_ = leveldb::NewLRUCache(8 * 1024*1024);
+  maps->cache_path2inode_ = leveldb::NewLRUCache(8 * 1024 * 1024);
   leveldb_options.block_cache = maps->cache_path2inode_;
   maps->filter_path2inode_ = leveldb::NewBloomFilterPolicy(10);
   leveldb_options.filter_policy = maps->filter_path2inode_;
@@ -177,8 +172,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(
   return maps.Release();
 }
 
-void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class, unsigned remainder)
-{
+void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,
+                                     unsigned remainder) {
   MutexLockGuard lock_guard(lock_);
   if (residue_class < 2) {
     inode_residue_class_ = 1;
@@ -186,8 +181,8 @@ void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class, unsigned remainder)
   } else {
     inode_residue_class_ = residue_class;
     inode_remainder_ = remainder % residue_class;
-    seq_ = ((seq_ / inode_residue_class_) + 1)
-           * inode_residue_class_ + inode_remainder_;
+    seq_ = ((seq_ / inode_residue_class_) + 1) * inode_residue_class_
+           + inode_remainder_;
   }
 }
 
@@ -265,8 +260,8 @@ bool NfsMapsLeveldb::GetPath(const uint64_t inode, PathString *path) {
   }
 
   path->Assign(result.data(), result.length());
-  LogCvmfs(kLogNfsMaps, kLogDebug, "inode %" PRIu64 " maps to path %s",
-           inode, path->c_str());
+  LogCvmfs(kLogNfsMaps, kLogDebug, "inode %" PRIu64 " maps to path %s", inode,
+           path->c_str());
   return true;
 }
 
@@ -285,21 +280,20 @@ string NfsMapsLeveldb::GetStatistics() {
 
 
 NfsMapsLeveldb::NfsMapsLeveldb()
-  : db_inode2path_(NULL)
-  , db_path2inode_(NULL)
-  , cache_inode2path_(NULL)
-  , cache_path2inode_(NULL)
-  , filter_inode2path_(NULL)
-  , filter_path2inode_(NULL)
-  , fork_aware_env_(NULL)
-  , root_inode_(0)
-  , seq_(0)
-  , lock_(NULL)
-  , spawned_(false)
-  , inode_residue_class_(1)
-  , inode_remainder_(0)
-  , n_db_added_(NULL)
-{
+    : db_inode2path_(NULL)
+    , db_path2inode_(NULL)
+    , cache_inode2path_(NULL)
+    , cache_path2inode_(NULL)
+    , filter_inode2path_(NULL)
+    , filter_path2inode_(NULL)
+    , fork_aware_env_(NULL)
+    , root_inode_(0)
+    , seq_(0)
+    , lock_(NULL)
+    , spawned_(false)
+    , inode_residue_class_(1)
+    , inode_remainder_(0)
+    , n_db_added_(NULL) {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -323,10 +317,8 @@ NfsMapsLeveldb::~NfsMapsLeveldb() {
 }
 
 
-void NfsMapsLeveldb::PutInode2Path(
-  const uint64_t inode,
-  const PathString &path)
-{
+void NfsMapsLeveldb::PutInode2Path(const uint64_t inode,
+                                   const PathString &path) {
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
   leveldb::Slice value(path.GetChars(), path.GetLength());
@@ -342,10 +334,8 @@ void NfsMapsLeveldb::PutInode2Path(
 }
 
 
-void NfsMapsLeveldb::PutPath2Inode(
-  const shash::Md5 &path,
-  const uint64_t inode)
-{
+void NfsMapsLeveldb::PutPath2Inode(const shash::Md5 &path,
+                                   const uint64_t inode) {
   leveldb::Status status;
   leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
                      path.GetDigestSize());

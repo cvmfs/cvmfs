@@ -50,7 +50,7 @@ class ShortString {
     Assign(std_string.data(), std_string.length());
   }
 
-  ShortString & operator= (const ShortString & other) {
+  ShortString &operator=(const ShortString &other) {
     if (this != &other)
       Assign(other);
     return *this;
@@ -101,10 +101,10 @@ class ShortString {
 
   /**
    * Truncates the current string to be of size smaller or equal to current size
-   * 
+   *
    * Note: Can lead to a heap allocated string that is shorter than
    *       the reserved stack space.
-  */
+   */
   void Truncate(unsigned new_length) {
     assert(new_length <= this->GetLength());
     if (long_string_) {
@@ -134,9 +134,7 @@ class ShortString {
     return length_;
   }
 
-  bool IsEmpty() const {
-    return GetLength() == 0;
-  }
+  bool IsEmpty() const { return GetLength() == 0; }
 
   std::string ToString() const {
     return std::string(this->GetChars(), this->GetLength());
@@ -151,7 +149,7 @@ class ShortString {
     return stack_;
   }
 
-  bool operator ==(const ShortString &other) const {
+  bool operator==(const ShortString &other) const {
     const unsigned this_length = this->GetLength();
     const unsigned other_length = other.GetLength();
     if (this_length != other_length)
@@ -162,11 +160,9 @@ class ShortString {
     return memcmp(this->GetChars(), other.GetChars(), this_length) == 0;
   }
 
-  bool operator !=(const ShortString &other) const {
-    return !(*this == other);
-  }
+  bool operator!=(const ShortString &other) const { return !(*this == other); }
 
-  bool operator <(const ShortString &other) const {
+  bool operator<(const ShortString &other) const {
     const unsigned this_length = this->GetLength();
     const unsigned other_length = other.GetLength();
 
@@ -200,7 +196,7 @@ class ShortString {
     if (start_at >= length)
       return ShortString("", 0);
 
-    return ShortString(this->GetChars() + start_at, length-start_at);
+    return ShortString(this->GetChars() + start_at, length - start_at);
   }
 
   static uint64_t num_instances() { return atomic_read64(&num_instances_); }
@@ -208,7 +204,7 @@ class ShortString {
 
  private:
   std::string *long_string_;
-  char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
+  char stack_[StackSize + 1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
   static atomic_int64 num_overflows_;
   static atomic_int64 num_instances_;

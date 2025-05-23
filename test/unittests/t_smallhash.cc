@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <inttypes.h>
 #include <pthread.h>
 
@@ -19,7 +18,7 @@ static uint32_t hasher_int(const int &key) {
 
 static uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 class T_Smallhash : public ::testing::Test {
@@ -48,8 +47,8 @@ class T_Smallhash : public ::testing::Test {
   static void *tf_insert(void *data) {
     int ID = reinterpret_cast<uint64_t>(data);
 
-    unsigned chunk = kNumElements/kNumThreads;
-    for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
+    unsigned chunk = kNumElements / kNumThreads;
+    for (unsigned i = chunk * ID; i < chunk * ID + chunk; ++i) {
       active_multihash->Insert(i, i);
     }
     return NULL;
@@ -58,8 +57,8 @@ class T_Smallhash : public ::testing::Test {
   static void *tf_erase(void *data) {
     int ID = reinterpret_cast<uint64_t>(data);
 
-    unsigned chunk = kNumElements/kNumThreads;
-    for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
+    unsigned chunk = kNumElements / kNumThreads;
+    for (unsigned i = chunk * ID; i < chunk * ID + chunk; ++i) {
       active_multihash->Erase(i);
     }
     return NULL;
@@ -147,7 +146,7 @@ TEST_F(T_Smallhash, EraseUnknown) {
   for (unsigned i = 0; i < N; ++i) {
     smallhash_.Insert(i, i);
   }
-  EXPECT_FALSE(smallhash_.Erase(N+1));
+  EXPECT_FALSE(smallhash_.Erase(N + 1));
 
   EXPECT_EQ(N, smallhash_.size());
 
@@ -232,8 +231,8 @@ TEST_F(T_Smallhash, MultihashMultithread) {
 }
 
 TEST_F(T_Smallhash, CanDestructUninitialized) {
-  SmallHashDynamic<int, int>*  smallhash_uninit =
-      new SmallHashDynamic<int, int>();
+  SmallHashDynamic<int, int>
+      *smallhash_uninit = new SmallHashDynamic<int, int>();
   // No Init()
   delete smallhash_uninit;
 }

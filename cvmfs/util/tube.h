@@ -35,11 +35,12 @@
  * Internally, uses conditional variables to block when threads try to pop from
  * the empty tube or insert into the full tube.
  */
-template <class ItemT>
+template<class ItemT>
 class Tube : SingleCopy {
  public:
   class Link : SingleCopy {
     friend class Tube<ItemT>;
+
    public:
     explicit Link(ItemT *item) : item_(item), next_(NULL), prev_(NULL) { }
     ItemT *item() { return item_; }
@@ -51,9 +52,7 @@ class Tube : SingleCopy {
   };
 
   Tube() : limit_(uint64_t(-1)), size_(0) { Init(); }
-  explicit Tube(uint64_t limit) : limit_(limit), size_(0) {
-    Init();
-  }
+  explicit Tube(uint64_t limit) : limit_(limit), size_(0) { Init(); }
   ~Tube() {
     Link *cursor = head_;
     do {
@@ -242,12 +241,10 @@ class Tube : SingleCopy {
  * such a way that items with the same tag (a positive integer) are all sent
  * to the same tube.
  */
-template <class ItemT>
+template<class ItemT>
 class TubeGroup : SingleCopy {
  public:
-  TubeGroup() : is_active_(false) {
-    atomic_init32(&round_robin_);
-  }
+  TubeGroup() : is_active_(false) { atomic_init32(&round_robin_); }
 
   ~TubeGroup() {
     for (unsigned i = 0; i < tubes_.size(); ++i)
@@ -270,8 +267,8 @@ class TubeGroup : SingleCopy {
    */
   typename Tube<ItemT>::Link *Dispatch(ItemT *item) {
     assert(is_active_);
-    unsigned tube_idx = (tubes_.size() == 1)
-                        ? 0 : (item->tag() % tubes_.size());
+    unsigned tube_idx = (tubes_.size() == 1) ? 0
+                                             : (item->tag() % tubes_.size());
     return tubes_[tube_idx]->EnqueueBack(item);
   }
 
@@ -281,7 +278,8 @@ class TubeGroup : SingleCopy {
   typename Tube<ItemT>::Link *DispatchAny(ItemT *item) {
     assert(is_active_);
     unsigned tube_idx = (tubes_.size() == 1)
-                        ? 0 : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
+                            ? 0
+                            : (atomic_xadd32(&round_robin_, 1) % tubes_.size());
     return tubes_[tube_idx]->EnqueueBack(item);
   }
 

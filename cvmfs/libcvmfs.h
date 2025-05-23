@@ -15,7 +15,7 @@
 #ifndef CVMFS_LIBCVMFS_H_
 #define CVMFS_LIBCVMFS_H_
 
-#define LIBCVMFS_VERSION 2
+#define LIBCVMFS_VERSION       2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
 #define LIBCVMFS_VERSION_MINOR 13
 // Revision Changelog
@@ -51,7 +51,7 @@
 #include <unistd.h>
 
 // Legacy error codes
-#define LIBCVMFS_FAIL_OK         0
+#define LIBCVMFS_FAIL_OK        0
 #define LIBCVMFS_FAIL_NOFILES   -1
 #define LIBCVMFS_FAIL_MKCACHE   -2
 #define LIBCVMFS_FAIL_OPENCACHE -3
@@ -86,18 +86,18 @@ typedef enum {
   LIBCVMFS_ERR_LOAD_LIBRARY,           // unused in the library
   LIBCVMFS_ERR_INCOMPATIBLE_VERSIONS,  // unused
   LIBCVMFS_ERR_CACHE_DIR,
-  LIBCVMFS_ERR_PEERS,                  // unused
+  LIBCVMFS_ERR_PEERS,  // unused
   LIBCVMFS_ERR_NFS_MAPS,
   LIBCVMFS_ERR_QUOTA,
-  LIBCVMFS_ERR_MONITOR,                // unused in the library
-  LIBCVMFS_ERR_TALK,                   // unused in the library
+  LIBCVMFS_ERR_MONITOR,  // unused in the library
+  LIBCVMFS_ERR_TALK,     // unused in the library
   LIBCVMFS_ERR_SIGNATURE,
   LIBCVMFS_ERR_CATALOG,
-  LIBCVMFS_ERR_MAINTENANCE_MODE,       // unused in the library
-  LIBCVMFS_ERR_SAVE_STATE,             // unused in the library
-  LIBCVMFS_ERR_RESTORE_STATE,          // unused in the library
-  LIBCVMFS_ERR_OTHER_MOUNT,            // unused in the library
-  LIBCVMFS_ERR_DOUBLE_MOUNT,           // unused in the library
+  LIBCVMFS_ERR_MAINTENANCE_MODE,  // unused in the library
+  LIBCVMFS_ERR_SAVE_STATE,        // unused in the library
+  LIBCVMFS_ERR_RESTORE_STATE,     // unused in the library
+  LIBCVMFS_ERR_OTHER_MOUNT,       // unused in the library
+  LIBCVMFS_ERR_DOUBLE_MOUNT,      // unused in the library
   LIBCVMFS_ERR_HISTORY,
   LIBCVMFS_ERR_WPAD,
   LIBCVMFS_ERR_LOCK_WORKSPACE,
@@ -138,7 +138,7 @@ struct cvmfs_nc_attr {
  * returns the pointer to the user.
  * \return pointer to newly created cvmfs_nc_attr struct
  */
-struct cvmfs_nc_attr* cvmfs_nc_attr_init();
+struct cvmfs_nc_attr *cvmfs_nc_attr_init();
 
 /**
  * Frees the cvmfs_nc_attr struct passed, including
@@ -153,26 +153,26 @@ struct cvmfs_attr {
   uint64_t size;
 
   /* Contents of stat, mapped from DirectoryEntry */
-  dev_t     st_dev;
-  ino_t     st_ino;
-  mode_t    st_mode;
-  nlink_t   st_nlink;
-  uid_t     st_uid;
-  gid_t     st_gid;
-  dev_t     st_rdev;
-  off_t     st_size;
-  time_t    mtime;
+  dev_t st_dev;
+  ino_t st_ino;
+  mode_t st_mode;
+  nlink_t st_nlink;
+  uid_t st_uid;
+  gid_t st_gid;
+  dev_t st_rdev;
+  off_t st_size;
+  time_t mtime;
 
   /* CVMFS related content */
   int cvm_nchunks;
   int cvm_is_hash_artificial;
   /* This information is allocated and should be freed */
   // For chunked files without bulk hash: hash of chunk hashes
-  char * cvm_checksum;
-  char * cvm_symlink;
-  char * cvm_parent;
-  char * cvm_name;
-  void * cvm_xattrs;
+  char *cvm_checksum;
+  char *cvm_symlink;
+  char *cvm_parent;
+  char *cvm_name;
+  void *cvm_xattrs;
 };
 
 
@@ -181,7 +181,7 @@ struct cvmfs_attr {
  */
 struct cvmfs_stat_t {
   // name of the object, owned by the struct (needs to be freed)
-  char * name;
+  char *name;
   struct stat info;
 };
 
@@ -190,7 +190,7 @@ struct cvmfs_stat_t {
  * as a stat, but also has pointers to the hash, symlink, and name.
  * \Return pointer to a cvmfs_attr struct
  */
-struct cvmfs_attr* cvmfs_attr_init();
+struct cvmfs_attr *cvmfs_attr_init();
 
 /**
  * Destroy the cvmfs_attr struct and frees the checksum, symlink,
@@ -204,7 +204,7 @@ void cvmfs_attr_free(struct cvmfs_attr *attr);
  * should) be called before any other routine.  Setting this to NULL restores
  * the default logging behavior.
  */
-void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
+void cvmfs_set_log_fn(void (*log_fn)(const char *msg));
 
 /**
  * Get runtime statistics formatted as a string.  The raw counters
@@ -256,8 +256,8 @@ void cvmfs_options_fini(cvmfs_option_map *opts);
  * Fills a cvmfs_options_map.  Use the same key/value pairs as the configuration
  * parameters used by the fuse module in /etc/cvmfs/...
  */
-void cvmfs_options_set(cvmfs_option_map *opts,
-                       const char *key, const char *value);
+void cvmfs_options_set(cvmfs_option_map *opts, const char *key,
+                       const char *value);
 /**
  * Sets options from a file with linewise KEY=VALUE pairs.  Returns 0 on success
  * and -1 otherwise.
@@ -319,7 +319,7 @@ void cvmfs_fini();
  * @param[in] options, option1,option2,...
  * \return 0 on success
  */
-cvmfs_context* cvmfs_attach_repo(char const *options);
+cvmfs_context *cvmfs_attach_repo(char const *options);
 
 /**
  * Creates a new repository context.  On successful return, *ctx is not NULL and
@@ -367,8 +367,8 @@ int cvmfs_open(cvmfs_context *ctx, const char *path);
  * Read from a file descriptor returned by cvmfs_open().  File descriptors that
  * have bit 30 set indicate chunked files.
  */
-ssize_t cvmfs_pread(cvmfs_context *ctx,
-                    int fd, void *buf, size_t size, off_t off);
+ssize_t cvmfs_pread(cvmfs_context *ctx, int fd, void *buf, size_t size,
+                    off_t off);
 
 /**
  * Close a file previously opened with cvmfs_open().
@@ -385,14 +385,15 @@ int cvmfs_close(cvmfs_context *ctx, int fd);
  * value of the symlink, -1 is returned and errno is set to ERANGE.
  *
  * @param[in] path, path of symlink (e.g. /dir/file, not /cvmfs/repo/dir/file)
- * @param[out] buf, buffer in which to write the null-terminated value of the symlink
+ * @param[out] buf, buffer in which to write the null-terminated value of the
+ * symlink
  * @param[in] size, size of buffer
  * \return 0 on success, -1 on failure (sets errno)
  */
 int cvmfs_readlink(cvmfs_context *ctx,
-  const char *path,
-  char *buf,
-  size_t size);
+                   const char *path,
+                   char *buf,
+                   size_t size);
 
 /**
  * Get information about a file.  If the file is a symlink, return info about
@@ -422,10 +423,9 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * @param[out] attr, cvmfs_attr struct in which to write the result
  * \return 0 on success, -1 on failure
  */
-int cvmfs_stat_attr(
-  cvmfs_context *ctx,
-  const char *path,
-  struct cvmfs_attr *attr);
+int cvmfs_stat_attr(cvmfs_context *ctx,
+                    const char *path,
+                    struct cvmfs_attr *attr);
 
 /**
  * Get list of directory contents.  The directory contents includes "." and
@@ -441,11 +441,10 @@ int cvmfs_stat_attr(
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_listdir(
-  cvmfs_context *ctx,
-  const char *path,
-  char ***buf,
-  size_t *buflen);
+int cvmfs_listdir(cvmfs_context *ctx,
+                  const char *path,
+                  char ***buf,
+                  size_t *buflen);
 
 /**
  * Get list of directory contents.  The list does not include "." or "..".
@@ -460,12 +459,11 @@ int cvmfs_listdir(
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_listdir_contents(
-  cvmfs_context *ctx,
-  const char *path,
-  char ***buf,
-  size_t *listlen,
-  size_t *buflen);
+int cvmfs_listdir_contents(cvmfs_context *ctx,
+                           const char *path,
+                           char ***buf,
+                           size_t *listlen,
+                           size_t *buflen);
 
 /**
  * Get list of directory contents' stat info.
@@ -483,12 +481,11 @@ int cvmfs_listdir_contents(
  * Set @param listlen to 0 before to fill @param buf from index 0.
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_listdir_stat(
-  cvmfs_context *ctx,
-  const char *path,
-  struct cvmfs_stat_t **buf,
-  size_t *listlen,
-  size_t *buflen);
+int cvmfs_listdir_stat(cvmfs_context *ctx,
+                       const char *path,
+                       struct cvmfs_stat_t **buf,
+                       size_t *listlen,
+                       size_t *buflen);
 
 /**
  * Get the CVMFS information about a nested catalog. The information returned
@@ -500,39 +497,37 @@ int cvmfs_listdir_stat(
  * @param[out] ncst, cvmfs_nc_attr buffer in which to write the result
  * \return 0 on success, -1 on failure
  */
-int cvmfs_stat_nc(
-  cvmfs_context *ctx,
-  const char *path,
-  struct cvmfs_nc_attr *ncst);
+int cvmfs_stat_nc(cvmfs_context *ctx,
+                  const char *path,
+                  struct cvmfs_nc_attr *ncst);
 
 /**
-* Get list of nested catalog at path. The list contents includes the empty string
-* for the base and each nested catalog needed to reach this location. It also
-* contains the list of nested catalogs reachable directly from the nested catalog
-* serving this location. If this is a transition point, the nested catalog at this
-* location is used.
-*
-* On return, the array will contain a NULL-terminated list of strings.  The
-* caller must free the strings and the array containing them.  The array (*buf)
-* may be NULL when this function is called.
-*
-* @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
-* @param[out] buf, pointer to dynamically allocated NULL-terminated array of
-*             strings
-* @param[in] buflen, pointer to variable containing size of array
-* \return 0 on success, -1 on failure (sets errno)
-*/
-int cvmfs_list_nc(
-  cvmfs_context *ctx,
-  const char *path,
-  char ***buf,
-  size_t *buflen);
+ * Get list of nested catalog at path. The list contents includes the empty
+ * string for the base and each nested catalog needed to reach this location. It
+ * also contains the list of nested catalogs reachable directly from the nested
+ * catalog serving this location. If this is a transition point, the nested
+ * catalog at this location is used.
+ *
+ * On return, the array will contain a NULL-terminated list of strings.  The
+ * caller must free the strings and the array containing them.  The array (*buf)
+ * may be NULL when this function is called.
+ *
+ * @param[in] path, path of nested catalog (e.g. /dir, not /cvmfs/repo/dir)
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
+ *             strings
+ * @param[in] buflen, pointer to variable containing size of array
+ * \return 0 on success, -1 on failure (sets errno)
+ */
+int cvmfs_list_nc(cvmfs_context *ctx,
+                  const char *path,
+                  char ***buf,
+                  size_t *buflen);
 
 
 /**
-* Free the items contained in list and then the list.
-* @param[in] buf, pointer to the list that was allocated.
-*/
+ * Free the items contained in list and then the list.
+ * @param[in] buf, pointer to the list that was allocated.
+ */
 void cvmfs_list_free(char **buf);
 
 /**

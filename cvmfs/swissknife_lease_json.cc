@@ -6,9 +6,8 @@
 
 #include "json.h"
 #include "json_document.h"
-#include "util/pointer.h"
-
 #include "util/logging.h"
+#include "util/pointer.h"
 
 LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
                              std::string *session_token) {
@@ -21,8 +20,8 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const JSON *result =
-      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
+                                                    JSON_STRING);
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
@@ -44,8 +43,8 @@ LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
         return kLeaseReplyBusy;
       }
     } else if (status == "error") {
-      const JSON *reason =
-          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
+                                                        JSON_STRING);
       if (reason != NULL) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
       }
@@ -68,8 +67,8 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     return kLeaseReplyFailure;
   }
 
-  const JSON *result =
-      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
+                                                    JSON_STRING);
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
@@ -78,8 +77,8 @@ LeaseReply ParseDropReply(const CurlBuffer &buffer) {
     } else if (status == "invalid_token") {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: invalid session token");
     } else if (status == "error") {
-      const JSON *reason =
-          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
+                                                        JSON_STRING);
       if (reason != NULL) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
       }

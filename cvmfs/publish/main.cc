@@ -3,7 +3,6 @@
  */
 
 
-
 #include <algorithm>
 #include <cstdlib>
 #include <string>
@@ -32,28 +31,30 @@ static void PrintVersion() {
 }
 
 static void Usage(const std::string &progname,
-                  const publish::CommandList &clist)
-{
+                  const publish::CommandList &clist) {
   LogCvmfs(kLogCvmfs, kLogStdout,
-    "CernVM-FS Server Tool %s\n"
-    "NOTE: This utility is for CernVM-FS internal use only for the time being!"
-    "\n\n"
-    "Usage:\n"
-    "------\n"
-    "  %s COMMAND [options] <parameters>\n\n"
-    "Supported Commands\n"
-    "-------------------\n",
-    CVMFS_VERSION, progname.c_str());
-    const vector<publish::Command *> commands = clist.commands();
+           "CernVM-FS Server Tool %s\n"
+           "NOTE: This utility is for CernVM-FS internal use only for the time "
+           "being!"
+           "\n\n"
+           "Usage:\n"
+           "------\n"
+           "  %s COMMAND [options] <parameters>\n\n"
+           "Supported Commands\n"
+           "-------------------\n",
+           CVMFS_VERSION, progname.c_str());
+  const vector<publish::Command *> commands = clist.commands();
 
   string::size_type max_len = 0;
   for (unsigned i = 0; i < commands.size(); ++i) {
-    if (commands[i]->IsHidden()) continue;
+    if (commands[i]->IsHidden())
+      continue;
     max_len = std::max(commands[i]->GetName().length(), max_len);
   }
 
   for (unsigned i = 0; i < commands.size(); ++i) {
-    if (commands[i]->IsHidden()) continue;
+    if (commands[i]->IsHidden())
+      continue;
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "  %s",
              commands[i]->GetName().c_str());
     for (unsigned p = commands[i]->GetName().length(); p < max_len; ++p)
@@ -102,15 +103,14 @@ int main(int argc, char **argv) {
   try {
     publish::Command::Options options = command->ParseOptions(argc, argv);
     return command->Main(options);
-  } catch (const publish::EPublish& e) {
+  } catch (const publish::EPublish &e) {
     if (e.failure() == publish::EPublish::kFailInvocation) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Invocation error: %s", e.msg().c_str());
     } else if (e.failure() == publish::EPublish::kFailMissingDependency) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Missing dependency: %s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "Missing dependency: %s",
+               e.msg().c_str());
     } else if (e.failure() == publish::EPublish::kFailPermission) {
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "Permission error: %s", e.msg().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "Permission error: %s", e.msg().c_str());
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "(unexpected termination) %s", e.what());
     }

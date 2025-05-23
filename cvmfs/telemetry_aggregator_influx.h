@@ -29,10 +29,10 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
   FRIEND_TEST(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags);
 
  public:
-  TelemetryAggregatorInflux(Statistics* statistics,
+  TelemetryAggregatorInflux(Statistics *statistics,
                             int send_rate_sec,
                             OptionsManager *options_mgr,
-                            MountPoint* mount_point,
+                            MountPoint *mount_point,
                             const std::string &fqrn);
   virtual ~TelemetryAggregatorInflux();
 

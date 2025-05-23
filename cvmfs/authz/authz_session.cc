@@ -27,15 +27,14 @@ using namespace std;  // NOLINT
 
 
 AuthzSessionManager::AuthzSessionManager()
-  : deadline_sweep_pids_(0)
-  , deadline_sweep_creds_(0)
-  , authz_fetcher_(NULL)
-  , no_pid_(NULL)
-  , no_session_(NULL)
-  , n_fetch_(NULL)
-  , n_grant_(NULL)
-  , n_deny_(NULL)
-{
+    : deadline_sweep_pids_(0)
+    , deadline_sweep_creds_(0)
+    , authz_fetcher_(NULL)
+    , no_pid_(NULL)
+    , no_session_(NULL)
+    , n_fetch_(NULL)
+    , n_grant_(NULL)
+    , n_deny_(NULL) {
   int retval = pthread_mutex_init(&lock_pid2session_, NULL);
   assert(retval == 0);
   retval = pthread_mutex_init(&lock_session2cred_, NULL);
@@ -69,22 +68,20 @@ void AuthzSessionManager::ClearSessionCache() {
 }
 
 
-AuthzSessionManager *AuthzSessionManager::Create(
-  AuthzFetcher *authz_fetcher,
-  perf::Statistics *statistics)
-{
+AuthzSessionManager *AuthzSessionManager::Create(AuthzFetcher *authz_fetcher,
+                                                 perf::Statistics *statistics) {
   AuthzSessionManager *authz_mgr = new AuthzSessionManager();
   authz_mgr->authz_fetcher_ = authz_fetcher;
 
   authz_mgr->no_pid_ = statistics->Register("authz.no_pid", "cached pids");
-  authz_mgr->no_session_ = statistics->Register(
-    "authz.no_session", "cached sessions");
+  authz_mgr->no_session_ = statistics->Register("authz.no_session",
+                                                "cached sessions");
   authz_mgr->n_fetch_ = statistics->Register(
-    "authz.n_fetch", "overall number of authz helper invocations");
+      "authz.n_fetch", "overall number of authz helper invocations");
   authz_mgr->n_grant_ = statistics->Register(
-    "authz.n_grant", "overall number of granted membership queries");
+      "authz.n_grant", "overall number of granted membership queries");
   authz_mgr->n_deny_ = statistics->Register(
-    "authz.n_deny", "overall number of denied membership queries");
+      "authz.n_deny", "overall number of denied membership queries");
 
   return authz_mgr;
 }
@@ -104,7 +101,7 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
     return false;
   }
 
-  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+  int mib[] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
   struct kinfo_proc kp;
   size_t len = sizeof(kp);
   retval = sysctl(mib, 4, &kp, &len, NULL, 0);
@@ -115,8 +112,8 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
   }
   pid_key->uid = kp.kp_eproc.e_pcred.p_ruid;
   pid_key->gid = kp.kp_eproc.e_pcred.p_rgid;
-  int64_t usec =
-    static_cast<int64_t>(kp.kp_proc.p_un.__p_starttime.tv_sec) * 1000000;
+  int64_t usec = static_cast<int64_t>(kp.kp_proc.p_un.__p_starttime.tv_sec)
+                 * 1000000;
   usec += static_cast<int64_t>(kp.kp_proc.p_un.__p_starttime.tv_usec);
   pid_key->pid_bday = usec;
   pid_key->pid = pid;
@@ -132,8 +129,8 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
   FILE *fp_stat = fopen(pid_path, "r");
   if (fp_stat == NULL) {
     LogCvmfs(kLogAuthz, kLogDebug,
-             "Failed to open status file /proc/%d/stat: (errno=%d) %s",
-             pid, errno, strerror(errno));
+             "Failed to open status file /proc/%d/stat: (errno=%d) %s", pid,
+             errno, strerror(errno));
     LogCvmfs(kLogAuthz, kLogSyslogWarn | kLogDebug,
              "Authorization for session %d disappeared", pid);
     return false;
@@ -153,7 +150,8 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
   pid_key->gid = info.st_gid;
 
   // TODO(bbockelm): EINTR handling
-  retval = fscanf(fp_stat, "%*d %*s %*c %*d %*d %d %*d %*d %*u %*u %*u %*u "
+  retval = fscanf(fp_stat,
+                  "%*d %*s %*c %*d %*d %d %*d %*d %*u %*u %*u %*u "
                   "%*u %*u %*u %*d %*d %*d %*d %*d %*d %" SCNu64,
                   &(pid_key->sid), &(pid_key->pid_bday));
   fclose(fp_stat);
@@ -161,9 +159,10 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
     if (errno == 0) {
       errno = EINVAL;
     }
-    LogCvmfs(kLogAuthz, kLogDebug, "Failed to parse status file for "
-             "pid %d: (errno=%d) %s, fscanf result %d", pid, errno,
-             strerror(errno), retval);
+    LogCvmfs(kLogAuthz, kLogDebug,
+             "Failed to parse status file for "
+             "pid %d: (errno=%d) %s, fscanf result %d",
+             pid, errno, strerror(errno), retval);
     return false;
   }
 
@@ -175,10 +174,8 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
 /**
  * Caller is responsible for freeing the returned token.
  */
-AuthzToken *AuthzSessionManager::GetTokenCopy(
-  const pid_t pid,
-  const std::string &membership)
-{
+AuthzToken *AuthzSessionManager::GetTokenCopy(const pid_t pid,
+                                              const std::string &membership) {
   SessionKey session_key;
   PidKey pid_key;
   bool retval = LookupSessionKey(pid, &pid_key, &session_key);
@@ -186,18 +183,16 @@ AuthzToken *AuthzSessionManager::GetTokenCopy(
     return NULL;
 
   AuthzData authz_data;
-  const bool granted =
-    LookupAuthzData(pid_key, session_key, membership, &authz_data);
+  const bool granted = LookupAuthzData(pid_key, session_key, membership,
+                                       &authz_data);
   if (!granted)
     return NULL;
   return authz_data.token.DeepCopy();
 }
 
 
-bool AuthzSessionManager::IsMemberOf(
-  const pid_t pid,
-  const std::string &membership)
-{
+bool AuthzSessionManager::IsMemberOf(const pid_t pid,
+                                     const std::string &membership) {
   SessionKey session_key;
   PidKey pid_key;
   bool retval = LookupSessionKey(pid, &pid_key, &session_key);
@@ -213,12 +208,10 @@ bool AuthzSessionManager::IsMemberOf(
  * Calls out to the AuthzFetcher if the data is not cached.  Verifies the
  * membership.
  */
-bool AuthzSessionManager::LookupAuthzData(
-  const PidKey &pid_key,
-  const SessionKey &session_key,
-  const std::string &membership,
-  AuthzData *authz_data)
-{
+bool AuthzSessionManager::LookupAuthzData(const PidKey &pid_key,
+                                          const SessionKey &session_key,
+                                          const std::string &membership,
+                                          AuthzData *authz_data) {
   assert(authz_data != NULL);
 
   bool found;
@@ -244,19 +237,22 @@ bool AuthzSessionManager::LookupAuthzData(
   perf::Inc(n_fetch_);
   unsigned ttl;
   authz_data->status = authz_fetcher_->Fetch(
-    AuthzFetcher::QueryInfo(pid_key.pid, pid_key.uid, pid_key.gid, membership),
-    &(authz_data->token), &ttl);
+      AuthzFetcher::QueryInfo(pid_key.pid, pid_key.uid, pid_key.gid,
+                              membership),
+      &(authz_data->token), &ttl);
   authz_data->deadline = platform_monotonic_time() + ttl;
   if (authz_data->status == kAuthzOk)
     authz_data->membership = membership;
   LogCvmfs(kLogAuthz, kLogDebug,
            "fetched authz data for sid %d (pid %d), membership %s, status %d, "
-           "ttl %u", session_key.sid, pid_key.pid,
-           authz_data->membership.c_str(), authz_data->status, ttl);
+           "ttl %u",
+           session_key.sid, pid_key.pid, authz_data->membership.c_str(),
+           authz_data->status, ttl);
 
   {
     MutexLockGuard m(&lock_session2cred_);
-    if (!session2cred_.Contains(session_key)) perf::Inc(no_session_);
+    if (!session2cred_.Contains(session_key))
+      perf::Inc(no_session_);
     session2cred_.Insert(session_key, *authz_data);
   }
   const bool granted = authz_data->status == kAuthzOk;
@@ -273,11 +269,9 @@ bool AuthzSessionManager::LookupAuthzData(
  * ID and its birthday together with UID and GID make the Session Key.  The
  * translation result is cached in pid2session_.
  */
-bool AuthzSessionManager::LookupSessionKey(
-  pid_t pid,
-  PidKey *pid_key,
-  SessionKey *session_key)
-{
+bool AuthzSessionManager::LookupSessionKey(pid_t pid,
+                                           PidKey *pid_key,
+                                           SessionKey *session_key) {
   assert(pid_key != NULL);
   assert(session_key != NULL);
   if (!GetPidInfo(pid, pid_key))
@@ -292,8 +286,8 @@ bool AuthzSessionManager::LookupSessionKey(
   if (found) {
     LogCvmfs(kLogAuthz, kLogDebug,
              "Session key %d/%" PRIu64 " in cache; sid=%d, bday=%" PRIu64,
-             pid_key->pid, pid_key->pid_bday,
-             session_key->sid, session_key->sid_bday);
+             pid_key->pid, pid_key->pid_bday, session_key->sid,
+             session_key->sid_bday);
     return true;
   }
 
@@ -314,13 +308,14 @@ bool AuthzSessionManager::LookupSessionKey(
   {
     MutexLockGuard m(&lock_pid2session_);
     pid_key->deadline = platform_monotonic_time() + kPidLifetime;
-    if (!pid2session_.Contains(*pid_key)) perf::Inc(no_pid_);
+    if (!pid2session_.Contains(*pid_key))
+      perf::Inc(no_pid_);
     pid2session_.Insert(*pid_key, *session_key);
   }
 
   LogCvmfs(kLogAuthz, kLogDebug, "Lookup key %d/%" PRIu64 "; sid=%d, bday=%lu",
-           pid_key->pid, pid_key->pid_bday,
-           session_key->sid, session_key->sid_bday);
+           pid_key->pid, pid_key->pid_bday, session_key->sid,
+           session_key->sid_bday);
   return true;
 }
 

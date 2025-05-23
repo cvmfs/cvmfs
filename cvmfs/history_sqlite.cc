@@ -11,19 +11,19 @@ namespace history {
 const std::string SqliteHistory::kPreviousRevisionKey = "previous_revision";
 
 
-SqliteHistory* SqliteHistory::Open(const std::string &file_name) {
+SqliteHistory *SqliteHistory::Open(const std::string &file_name) {
   const bool read_write = false;
   return Open(file_name, read_write);
 }
 
 
-SqliteHistory* SqliteHistory::OpenWritable(const std::string &file_name) {
+SqliteHistory *SqliteHistory::OpenWritable(const std::string &file_name) {
   const bool read_write = true;
   return Open(file_name, read_write);
 }
 
 
-SqliteHistory* SqliteHistory::Open(const std::string &file_name,
+SqliteHistory *SqliteHistory::Open(const std::string &file_name,
                                    const bool read_write) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || !history->OpenDatabase(file_name, read_write)) {
@@ -40,7 +40,7 @@ SqliteHistory* SqliteHistory::Open(const std::string &file_name,
 }
 
 
-SqliteHistory* SqliteHistory::Create(const std::string &file_name,
+SqliteHistory *SqliteHistory::Create(const std::string &file_name,
                                      const std::string &fqrn) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || !history->CreateDatabase(file_name, fqrn)) {
@@ -48,29 +48,29 @@ SqliteHistory* SqliteHistory::Create(const std::string &file_name,
     return NULL;
   }
 
-  LogCvmfs(kLogHistory, kLogDebug, "created empty history database '%s' for"
-                                   "repository '%s'",
+  LogCvmfs(kLogHistory, kLogDebug,
+           "created empty history database '%s' for"
+           "repository '%s'",
            file_name.c_str(), fqrn.c_str());
   return history;
 }
 
 
-bool SqliteHistory::OpenDatabase(
-  const std::string &file_name,
-  const bool read_write
-) {
+bool SqliteHistory::OpenDatabase(const std::string &file_name,
+                                 const bool read_write) {
   assert(!database_.IsValid());
   const HistoryDatabase::OpenMode mode = (read_write)
-                                           ? HistoryDatabase::kOpenReadWrite
-                                           : HistoryDatabase::kOpenReadOnly;
+                                             ? HistoryDatabase::kOpenReadWrite
+                                             : HistoryDatabase::kOpenReadOnly;
   database_ = HistoryDatabase::Open(file_name, mode);
   if (!database_.IsValid()) {
     return false;
   }
 
   if (!database_->HasProperty(HistoryDatabase::kFqrnKey)) {
-    LogCvmfs(kLogHistory, kLogDebug, "opened history database does not provide "
-                                     "an FQRN under '%s'",
+    LogCvmfs(kLogHistory, kLogDebug,
+             "opened history database does not provide "
+             "an FQRN under '%s'",
              HistoryDatabase::kFqrnKey.c_str());
     return false;
   }
@@ -102,30 +102,30 @@ bool SqliteHistory::CreateDatabase(const std::string &file_name,
 void SqliteHistory::PrepareQueries() {
   assert(database_.IsValid());
 
-  find_tag_           = new SqlFindTag          (database_.weak_ref());
-  find_tag_by_date_   = new SqlFindTagByDate    (database_.weak_ref());
-  count_tags_         = new SqlCountTags        (database_.weak_ref());
-  list_tags_          = new SqlListTags         (database_.weak_ref());
-  get_hashes_         = new SqlGetHashes        (database_.weak_ref());
-  list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
-  list_branches_      = new SqlListBranches     (database_.weak_ref());
+  find_tag_ = new SqlFindTag(database_.weak_ref());
+  find_tag_by_date_ = new SqlFindTagByDate(database_.weak_ref());
+  count_tags_ = new SqlCountTags(database_.weak_ref());
+  list_tags_ = new SqlListTags(database_.weak_ref());
+  get_hashes_ = new SqlGetHashes(database_.weak_ref());
+  list_rollback_tags_ = new SqlListRollbackTags(database_.weak_ref());
+  list_branches_ = new SqlListBranches(database_.weak_ref());
 
   if (database_->ContainsRecycleBin()) {
     recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
   }
 
   if (IsWritable()) {
-    insert_tag_         = new SqlInsertTag          (database_.weak_ref());
-    remove_tag_         = new SqlRemoveTag          (database_.weak_ref());
-    rollback_tag_       = new SqlRollbackTag        (database_.weak_ref());
-    recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
-    insert_branch_      = new SqlInsertBranch       (database_.weak_ref());
-    find_branch_head_   = new SqlFindBranchHead     (database_.weak_ref());
+    insert_tag_ = new SqlInsertTag(database_.weak_ref());
+    remove_tag_ = new SqlRemoveTag(database_.weak_ref());
+    rollback_tag_ = new SqlRollbackTag(database_.weak_ref());
+    recycle_empty_ = new SqlRecycleBinFlush(database_.weak_ref());
+    insert_branch_ = new SqlInsertBranch(database_.weak_ref());
+    find_branch_head_ = new SqlFindBranchHead(database_.weak_ref());
   }
 }
 
 
-bool SqliteHistory::BeginTransaction()  const {
+bool SqliteHistory::BeginTransaction() const {
   return database_->BeginTransaction();
 }
 
@@ -144,8 +144,8 @@ bool SqliteHistory::SetPreviousRevision(const shash::Any &history_hash) {
 
 shash::Any SqliteHistory::previous_revision() const {
   assert(database_.IsValid());
-  const std::string hash_str =
-    database_->GetProperty<std::string>(kPreviousRevisionKey);
+  const std::string hash_str = database_->GetProperty<std::string>(
+      kPreviousRevisionKey);
   return shash::MkFromHexPtr(shash::HexPtr(hash_str), shash::kSuffixHistory);
 }
 
@@ -171,9 +171,8 @@ bool SqliteHistory::Insert(const History::Tag &tag) {
   assert(database_.IsValid());
   assert(insert_tag_.IsValid());
 
-  return insert_tag_->BindTag(tag) &&
-         insert_tag_->Execute()    &&
-         insert_tag_->Reset();
+  return insert_tag_->BindTag(tag) && insert_tag_->Execute()
+         && insert_tag_->Reset();
 }
 
 
@@ -186,9 +185,8 @@ bool SqliteHistory::Remove(const std::string &name) {
     return true;
   }
 
-  return remove_tag_->BindName(name)      &&
-         remove_tag_->Execute()           &&
-         remove_tag_->Reset();
+  return remove_tag_->BindName(name) && remove_tag_->Execute()
+         && remove_tag_->Reset();
 }
 
 
@@ -218,9 +216,8 @@ bool SqliteHistory::GetByDate(const time_t timestamp, Tag *tag) const {
   assert(find_tag_by_date_.IsValid());
   assert(NULL != tag);
 
-  if (!find_tag_by_date_->BindTimestamp(timestamp) ||
-      !find_tag_by_date_->FetchRow())
-  {
+  if (!find_tag_by_date_->BindTimestamp(timestamp)
+      || !find_tag_by_date_->FetchRow()) {
     find_tag_by_date_->Reset();
     return false;
   }
@@ -236,7 +233,7 @@ bool SqliteHistory::List(std::vector<Tag> *tags) const {
 }
 
 
-template <class SqlListingT>
+template<class SqlListingT>
 bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
   assert(database_.IsValid());
   assert(NULL != list);
@@ -254,9 +251,8 @@ bool SqliteHistory::GetBranchHead(const string &branch_name, Tag *tag) const {
   assert(find_branch_head_.IsValid());
   assert(tag != NULL);
 
-  if (!find_branch_head_->BindBranchName(branch_name) ||
-      !find_branch_head_->FetchRow())
-  {
+  if (!find_branch_head_->BindBranchName(branch_name)
+      || !find_branch_head_->FetchRow()) {
     find_branch_head_->Reset();
     return false;
   }
@@ -282,9 +278,8 @@ bool SqliteHistory::InsertBranch(const Branch &branch) {
   assert(database_.IsValid());
   assert(insert_branch_.IsValid());
 
-  return insert_branch_->BindBranch(branch) &&
-         insert_branch_->Execute()    &&
-         insert_branch_->Reset();
+  return insert_branch_->BindBranch(branch) && insert_branch_->Execute()
+         && insert_branch_->Reset();
 }
 
 
@@ -292,23 +287,25 @@ bool SqliteHistory::PruneBranches() {
   // Parent pointers might point to abandoned branches.  Redirect them to the
   // parent of the abandoned branch.  This has to be repeated until the fix
   // point is reached.  It always works because we never delete the root branch
-  sqlite::Sql sql_fix_parent_pointers(database_->sqlite_db(),
-    "INSERT OR REPLACE INTO branches (branch, parent, initial_revision) "
-    "SELECT branches.branch, abandoned_parent, branches.initial_revision "
-    "  FROM branches "
-    "  INNER JOIN (SELECT DISTINCT branches.branch AS abandoned_branch, "
-    "              branches.parent AS abandoned_parent FROM branches "
-    "              LEFT OUTER JOIN tags ON (branches.branch=tags.branch)"
-    "              WHERE tags.branch IS NULL) "
-    "  ON (branches.parent=abandoned_branch);");
+  sqlite::Sql sql_fix_parent_pointers(
+      database_->sqlite_db(),
+      "INSERT OR REPLACE INTO branches (branch, parent, initial_revision) "
+      "SELECT branches.branch, abandoned_parent, branches.initial_revision "
+      "  FROM branches "
+      "  INNER JOIN (SELECT DISTINCT branches.branch AS abandoned_branch, "
+      "              branches.parent AS abandoned_parent FROM branches "
+      "              LEFT OUTER JOIN tags ON (branches.branch=tags.branch)"
+      "              WHERE tags.branch IS NULL) "
+      "  ON (branches.parent=abandoned_branch);");
   // Detect if fix point is reached
-  sqlite::Sql sql_remaining_rows(database_->sqlite_db(),
-    "SELECT count(*) FROM branches "
-    "INNER JOIN "
-    "  (SELECT DISTINCT branches.branch AS abandoned_branch FROM branches "
-    "   LEFT OUTER JOIN tags ON (branches.branch=tags.branch) "
-    "   WHERE tags.branch IS NULL) "
-    "ON (branches.parent=abandoned_branch);");
+  sqlite::Sql sql_remaining_rows(
+      database_->sqlite_db(),
+      "SELECT count(*) FROM branches "
+      "INNER JOIN "
+      "  (SELECT DISTINCT branches.branch AS abandoned_branch FROM branches "
+      "   LEFT OUTER JOIN tags ON (branches.branch=tags.branch) "
+      "   WHERE tags.branch IS NULL) "
+      "ON (branches.parent=abandoned_branch);");
 
   bool retval;
   do {
@@ -329,9 +326,10 @@ bool SqliteHistory::PruneBranches() {
     assert(retval);
   } while (true);
 
-  sqlite::Sql sql_remove_branches(database_->sqlite_db(),
-    "DELETE FROM branches "
-    "WHERE branch NOT IN (SELECT DISTINCT branch FROM tags);");
+  sqlite::Sql sql_remove_branches(
+      database_->sqlite_db(),
+      "DELETE FROM branches "
+      "WHERE branch NOT IN (SELECT DISTINCT branch FROM tags);");
   retval = sql_remove_branches.Execute();
   return retval;
 }
@@ -367,8 +365,7 @@ bool SqliteHistory::EmptyRecycleBin() {
   assert(database_.IsValid());
   assert(IsWritable());
   assert(recycle_empty_.IsValid());
-  return recycle_empty_->Execute() &&
-         recycle_empty_->Reset();
+  return recycle_empty_->Execute() && recycle_empty_->Reset();
 }
 
 
@@ -387,7 +384,7 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   success = GetByName(updated_target_tag.name, &old_target_tag);
   if (!success) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve old target tag '%s'",
-                                     updated_target_tag.name.c_str());
+             updated_target_tag.name.c_str());
     return false;
   }
 
@@ -396,14 +393,13 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
 
   // rollback the history to the target tag
   // (essentially removing all intermediate tags + the old target tag)
-  success = rollback_tag_->BindTargetTag(old_target_tag) &&
-            rollback_tag_->Execute()                     &&
-            rollback_tag_->Reset();
+  success = rollback_tag_->BindTargetTag(old_target_tag)
+            && rollback_tag_->Execute() && rollback_tag_->Reset();
   if (!success || Exists(old_target_tag.name)) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags "
-                                     "until '%s' - '%" PRIu64 "'",
-                                     old_target_tag.name.c_str(),
-                                     old_target_tag.revision);
+    LogCvmfs(kLogHistory, kLogDebug,
+             "failed to remove intermediate tags "
+             "until '%s' - '%" PRIu64 "'",
+             old_target_tag.name.c_str(), old_target_tag.revision);
     return false;
   }
 
@@ -412,7 +408,7 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   success = Insert(updated_target_tag);
   if (!success) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to insert updated target tag '%s'",
-                                     updated_target_tag.name.c_str());
+             updated_target_tag.name.c_str());
     return false;
   }
 
@@ -426,13 +422,12 @@ bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
 
 
 bool SqliteHistory::ListTagsAffectedByRollback(
-                                            const std::string  &target_tag_name,
-                                            std::vector<Tag>   *tags) const {
+    const std::string &target_tag_name, std::vector<Tag> *tags) const {
   // retrieve the old version of the target tag from the history
   Tag target_tag;
   if (!GetByName(target_tag_name, &target_tag)) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve target tag '%s'",
-                                     target_tag_name.c_str());
+             target_tag_name.c_str());
     return false;
   }
 

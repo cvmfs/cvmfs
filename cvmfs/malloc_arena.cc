@@ -22,8 +22,7 @@ using namespace std;  // NOLINT
  * larger than block_size.  Returns NULL if no such block exists.
  */
 MallocArena::AvailBlockCtl *MallocArena::FindAvailBlock(
-  const int32_t block_size)
-{
+    const int32_t block_size) {
   bool wrapped = false;
   // Generally: p = LINK(q)
   AvailBlockCtl *q = rover_;
@@ -58,7 +57,7 @@ void MallocArena::Free(void *ptr) {
   no_reserved_--;
 
   ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
-    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
+      reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
   char prior_tag = *(reinterpret_cast<char *>(block_ctl) - 1);
   assert((prior_tag == kTagAvail) || (prior_tag == kTagReserved));
 
@@ -69,11 +68,13 @@ void MallocArena::Free(void *ptr) {
   if (prior_tag == kTagAvail) {
     // Merge with block before and remove the block from the list
     int32_t prior_size = reinterpret_cast<AvailBlockTag *>(
-      reinterpret_cast<char *>(block_ctl) - sizeof(AvailBlockTag))->size;
+                             reinterpret_cast<char *>(block_ctl)
+                             - sizeof(AvailBlockTag))
+                             ->size;
     assert(prior_size > 0);
     new_size += prior_size;
     new_avail = reinterpret_cast<AvailBlockCtl *>(
-      reinterpret_cast<char *>(block_ctl) - prior_size);
+        reinterpret_cast<char *>(block_ctl) - prior_size);
     // new_avail points now to the prior block
     UnlinkAvailBlock(new_avail);
     if (rover_ == new_avail)
@@ -81,11 +82,11 @@ void MallocArena::Free(void *ptr) {
   }
 
   int32_t succ_size = *reinterpret_cast<int32_t *>(
-    reinterpret_cast<char *>(new_avail) + new_size);
+      reinterpret_cast<char *>(new_avail) + new_size);
   if (succ_size >= 0) {
     // Merge with succeeding block and remove the block from the list
     AvailBlockCtl *succ_avail = reinterpret_cast<AvailBlockCtl *>(
-      reinterpret_cast<char *>(new_avail) + new_size);
+        reinterpret_cast<char *>(new_avail) + new_size);
     UnlinkAvailBlock(succ_avail);
     new_size += succ_size;
     if (rover_ == succ_avail)
@@ -121,7 +122,7 @@ uint32_t MallocArena::GetSize(void *ptr) const {
   assert(Contains(ptr));
 
   ReservedBlockCtl *block_ctl = reinterpret_cast<ReservedBlockCtl *>(
-    reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
+      reinterpret_cast<char *>(ptr) - sizeof(ReservedBlockCtl));
   int32_t size = block_ctl->size();
   assert(size > 1);
   return size - sizeof(ReservedBlockCtl) - 1;
@@ -159,20 +160,20 @@ void *MallocArena::Malloc(const uint32_t size) {
  * is a single negative int, which mimics another reserved block.
  */
 MallocArena::MallocArena(unsigned arena_size)
-  : arena_(reinterpret_cast<char *>(sxmmap_align(arena_size)))
-  , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(uint64_t)))
-  , rover_(head_avail_)
-  , no_reserved_(0)
-  , arena_size_(arena_size)
-{
+    : arena_(reinterpret_cast<char *>(sxmmap_align(arena_size)))
+    , head_avail_(reinterpret_cast<AvailBlockCtl *>(arena_ + sizeof(uint64_t)))
+    , rover_(head_avail_)
+    , no_reserved_(0)
+    , arena_size_(arena_size) {
   assert(arena_size_ > 0);
   assert((arena_size_ % (2 * 1024 * 1024)) == 0);  // Multiple of 2MB
-  assert(arena_size_ <= (512 * 1024 * 1024));  // <= 512MB
+  assert(arena_size_ <= (512 * 1024 * 1024));      // <= 512MB
 
   const unsigned char padding = 7;
   // Size of the initial free block: everything minus arena boundaries
-  int32_t usable_size = arena_size_ -
-    (sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1 + sizeof(int32_t));
+  int32_t usable_size = arena_size_
+                        - (sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding
+                           + 1 + sizeof(int32_t));
   assert((usable_size % 8) == 0);
 
   // First 8 bytes of arena: this pointer (occupies only 4 bytes on 32bit
@@ -180,17 +181,17 @@ MallocArena::MallocArena(unsigned arena_size)
   *reinterpret_cast<MallocArena **>(arena_) = this;
 
   // The initial large free block
-  AvailBlockCtl *free_block =
-    new (arena_ + sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1)
-    AvailBlockCtl();
+  AvailBlockCtl *free_block = new (arena_ + sizeof(uint64_t)
+                                   + sizeof(AvailBlockCtl) + padding + 1)
+      AvailBlockCtl();
   free_block->size = usable_size;
-  free_block->link_next = free_block->link_prev =
-    head_avail_->ConvertToLink(arena_);
+  free_block->link_next = free_block->link_prev = head_avail_->ConvertToLink(
+      arena_);
   new (AvailBlockTag::GetTagLocation(free_block)) AvailBlockTag(usable_size);
 
   head_avail_->size = 0;
-  head_avail_->link_next = head_avail_->link_prev =
-    free_block->ConvertToLink(arena_);
+  head_avail_->link_next = head_avail_->link_prev = free_block->ConvertToLink(
+      arena_);
 
   // Prevent succeeding blocks from merging
   *(reinterpret_cast<char *>(free_block) - 1) = kTagReserved;
@@ -203,27 +204,23 @@ MallocArena::MallocArena(unsigned arena_size)
  * Initializes the arena with repeated copies of the given pattern.  Used for
  * testing.
  */
-MallocArena *MallocArena::CreateInitialized(
-  unsigned arena_size,
-  unsigned char pattern)
-{
+MallocArena *MallocArena::CreateInitialized(unsigned arena_size,
+                                            unsigned char pattern) {
   MallocArena *result = new MallocArena(arena_size);
   // At this point, there is one big free block linked to by head_avail_
   AvailBlockCtl *free_block = result->head_avail_->GetNextPtr(result->arena_);
   assert(free_block != result->head_avail_);
   assert(free_block->size > 0);
   // Strip control information at both ends of the block
-  int usable_size = free_block->size -
-                    (sizeof(AvailBlockCtl) + sizeof(AvailBlockTag));
+  int usable_size = free_block->size
+                    - (sizeof(AvailBlockCtl) + sizeof(AvailBlockTag));
   assert(usable_size > 0);
   memset(free_block + 1, pattern, usable_size);
   return result;
 }
 
 
-MallocArena::~MallocArena() {
-  sxunmap(arena_, arena_size_);
-}
+MallocArena::~MallocArena() { sxunmap(arena_, arena_size_); }
 
 
 /**
@@ -231,10 +228,7 @@ MallocArena::~MallocArena() {
  * block_size at the end of the free block.  Returns a pointer usable by the
  * application.
  */
-void *MallocArena::ReserveBlock(
-  AvailBlockCtl *block,
-  int32_t block_size)
-{
+void *MallocArena::ReserveBlock(AvailBlockCtl *block, int32_t block_size) {
   assert(block->size >= block_size);
 
   int32_t remaining_size = block->size - block_size;

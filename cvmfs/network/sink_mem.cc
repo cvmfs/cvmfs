@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "sink_mem.h"
+
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -9,12 +11,10 @@
 #include "util/smalloc.h"
 #include "util/string.h"
 
-#include "sink_mem.h"
-
 namespace cvmfs {
 
-MemSink::MemSink(size_t size) : Sink(true), size_(size),
-                                pos_(0), max_size_(kMaxMemSize) {
+MemSink::MemSink(size_t size)
+    : Sink(true), size_(size), pos_(0), max_size_(kMaxMemSize) {
   data_ = static_cast<unsigned char *>(smalloc(size));
 }
 
@@ -23,8 +23,8 @@ MemSink::MemSink(size_t size) : Sink(true), size_(size),
  * If the sink is too small and
  * - the sink is the owner of data_: sink size is doubled
  * - the sink is NOT the owner of data_: fails with -ENOSPC
- * 
- * @returns on success: number of bytes written 
+ *
+ * @returns on success: number of bytes written
  *          on failure: -errno.
  */
 int64_t MemSink::Write(const void *buf, uint64_t sz) {
@@ -45,7 +45,7 @@ int64_t MemSink::Write(const void *buf, uint64_t sz) {
 
 /**
  * Truncate all written data and start over at position zero.
- * 
+ *
  * @returns Success = 0
  *          Failure = -errno
  */
@@ -62,26 +62,26 @@ int MemSink::Reset() {
 }
 
 /**
-  * @returns true if the object is correctly initialized.
-  */
+ * @returns true if the object is correctly initialized.
+ */
 bool MemSink::IsValid() {
-  return (size_ == 0 && pos_ == 0 && data_ == NULL) ||
-          (size_ > 0 && pos_ >= 0 && data_ != NULL);
+  return (size_ == 0 && pos_ == 0 && data_ == NULL)
+         || (size_ > 0 && pos_ >= 0 && data_ != NULL);
 }
 
 /**
  * Reserves new space in sinks that require reservation (see RequiresReserve)
- * 
+ *
  * Successful if the requested size is smaller than already space reserved, or
  * if the sink is the owner of the data and can allocate enough new space.
- * 
+ *
  * @note If successful, always resets the current position to 0.
- * 
- * Fails if 
+ *
+ * Fails if
  *     1) sink is not the owner of the data and more than the current size is
  *        requested
  *     2) more space is requested than allowed (max_size_)
- * 
+ *
  * @returns success = true
  *          failure = false
  */

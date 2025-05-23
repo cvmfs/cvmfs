@@ -38,7 +38,7 @@ class SqliteHistory : public History {
    * @param file_name  the path to the history SQLite file to be opened
    * @return           pointer to History object or NULL on error
    */
-  static SqliteHistory* Open(const std::string &file_name);
+  static SqliteHistory *Open(const std::string &file_name);
 
   /**
    * Same as SqliteHistory::Open(), but opens the history database file in
@@ -48,7 +48,7 @@ class SqliteHistory : public History {
    * @param file_name  the path to the history SQLite file to be opened
    * @return           pointer to History object or NULL on error
    */
-  static SqliteHistory* OpenWritable(const std::string &file_name);
+  static SqliteHistory *OpenWritable(const std::string &file_name);
 
   /**
    * Creates an empty History database. Since a History object is always
@@ -60,7 +60,7 @@ class SqliteHistory : public History {
    * @param fqrn       the FQRN of the repository containing this History
    * @return           pointer to empty History object or NULL on error
    */
-  static SqliteHistory* Create(const std::string &file_name,
+  static SqliteHistory *Create(const std::string &file_name,
                                const std::string &fqrn);
 
   bool IsWritable() const;
@@ -71,7 +71,7 @@ class SqliteHistory : public History {
    * This can greatly improve performance when used before inserting or
    * removing multiple tags.
    */
-  bool BeginTransaction()  const;
+  bool BeginTransaction() const;
 
   /**
    * Closes a transaction (see BeginTransaction())
@@ -127,8 +127,8 @@ class SqliteHistory : public History {
    * @param tags             pointer to the result tag list to be filled
    * @return                 true on success
    */
-  bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
-                                  std::vector<Tag>   *tags) const;
+  bool ListTagsAffectedByRollback(const std::string &target_tag_name,
+                                  std::vector<Tag> *tags) const;
 
   /**
    * Provides a list of all referenced catalog hashes in this History.
@@ -148,33 +148,33 @@ class SqliteHistory : public History {
   std::string filename() const { return database_->filename(); }
 
  protected:
-  static SqliteHistory* Open(const std::string &file_name,
+  static SqliteHistory *Open(const std::string &file_name,
                              const bool read_write);
   bool OpenDatabase(const std::string &file_name, const bool read_write);
   bool CreateDatabase(const std::string &file_name, const std::string &fqrn);
   void PrepareQueries();
 
  private:
-  template <class SqlListingT>
+  template<class SqlListingT>
   bool RunListing(std::vector<Tag> *list, SqlListingT *sql) const;
 
  private:
-  UniquePtr<HistoryDatabase>        database_;
+  UniquePtr<HistoryDatabase> database_;
 
-  UniquePtr<SqlInsertTag>           insert_tag_;
-  UniquePtr<SqlRemoveTag>           remove_tag_;
-  UniquePtr<SqlFindTag>             find_tag_;
-  UniquePtr<SqlFindTagByDate>       find_tag_by_date_;
-  UniquePtr<SqlCountTags>           count_tags_;
-  UniquePtr<SqlListTags>            list_tags_;
-  UniquePtr<SqlGetHashes>           get_hashes_;
-  UniquePtr<SqlRollbackTag>         rollback_tag_;
-  UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
-  UniquePtr<SqlListBranches>        list_branches_;
-  UniquePtr<SqlInsertBranch>        insert_branch_;
-  UniquePtr<SqlFindBranchHead>      find_branch_head_;
-  UniquePtr<SqlRecycleBinList>      recycle_list_;
-  UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
+  UniquePtr<SqlInsertTag> insert_tag_;
+  UniquePtr<SqlRemoveTag> remove_tag_;
+  UniquePtr<SqlFindTag> find_tag_;
+  UniquePtr<SqlFindTagByDate> find_tag_by_date_;
+  UniquePtr<SqlCountTags> count_tags_;
+  UniquePtr<SqlListTags> list_tags_;
+  UniquePtr<SqlGetHashes> get_hashes_;
+  UniquePtr<SqlRollbackTag> rollback_tag_;
+  UniquePtr<SqlListRollbackTags> list_rollback_tags_;
+  UniquePtr<SqlListBranches> list_branches_;
+  UniquePtr<SqlInsertBranch> insert_branch_;
+  UniquePtr<SqlFindBranchHead> find_branch_head_;
+  UniquePtr<SqlRecycleBinList> recycle_list_;
+  UniquePtr<SqlRecycleBinFlush> recycle_empty_;
 };
 
 }  // namespace history

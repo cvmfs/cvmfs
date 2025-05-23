@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <errno.h>
+#include <gtest/gtest.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -12,19 +11,17 @@
 
 class T_BlockingCounter : public ::testing::Test {
  protected:
-  T_BlockingCounter() : max_value_(100),
-                        int_counter_(max_value_)
-  {
+  T_BlockingCounter() : max_value_(100), int_counter_(max_value_) {
     EXPECT_TRUE(int_counter_.HasMaximalValue());
     EXPECT_EQ(0, int_counter_.Get());
     EXPECT_EQ(max_value_, int_counter_.maximal_value());
   }
 
-  virtual void SetUp() {}
+  virtual void SetUp() { }
 
   static void *concurrent_incrementer(void *counter) {
-    SynchronizingCounter<int64_t> &cntr =
-      *static_cast<SynchronizingCounter<int64_t>*>(counter);
+    SynchronizingCounter<int64_t>
+        &cntr = *static_cast<SynchronizingCounter<int64_t> *>(counter);
 
     T_BlockingCounter::concurrent_state_ = 1;
     ++cntr;
@@ -34,8 +31,8 @@ class T_BlockingCounter : public ::testing::Test {
   }
 
   static void *concurrent_zero_waiter(void *counter) {
-    SynchronizingCounter<int64_t> &cntr =
-      *static_cast<SynchronizingCounter<int64_t>*>(counter);
+    SynchronizingCounter<int64_t>
+        &cntr = *static_cast<SynchronizingCounter<int64_t> *>(counter);
 
     cntr.WaitForZero();
     ++cntr;
@@ -45,13 +42,13 @@ class T_BlockingCounter : public ::testing::Test {
   }
 
   struct thread_state {
-    thread_state() : counter(NULL), state(0) {}
+    thread_state() : counter(NULL), state(0) { }
     SynchronizingCounter<int64_t> *counter;
-    int                 state;
+    int state;
   };
 
   static void *concurrent_orchestrate_thread(void *arg) {
-    thread_state &state = *static_cast<thread_state*>(arg);
+    thread_state &state = *static_cast<thread_state *>(arg);
     state.state = 1;
 
     state.counter->Increment();
@@ -102,7 +99,7 @@ TEST_F(T_BlockingCounter, Decrement) {
 
   const int postcrement = int_counter_--;
   EXPECT_EQ(val - 1, int_counter_.Get());
-  EXPECT_EQ(val,     postcrement);
+  EXPECT_EQ(val, postcrement);
 
   const int precrement = --int_counter_;
   EXPECT_EQ(val - 2, int_counter_.Get());
@@ -121,15 +118,15 @@ TEST_F(T_BlockingCounter, IncrementAndWait) {
 
   pthread_t thread;
   const int res = pthread_create(&thread,
-                                  NULL,
+                                 NULL,
                                  &T_BlockingCounter::concurrent_incrementer,
-                                  static_cast<void*>(&int_counter_));
+                                 static_cast<void *>(&int_counter_));
   ASSERT_EQ(0, res);
 
   --int_counter_;
   pthread_join(thread, NULL);
 
-  EXPECT_EQ(2,          T_BlockingCounter::concurrent_state_);
+  EXPECT_EQ(2, T_BlockingCounter::concurrent_state_);
   EXPECT_EQ(max_value_, int_counter_.Get());
 }
 
@@ -141,14 +138,14 @@ TEST_F(T_BlockingCounter, BecomeZero) {
   int_counter_ = 1;
   pthread_t thread;
   const int res = pthread_create(&thread,
-                                  NULL,
+                                 NULL,
                                  &T_BlockingCounter::concurrent_zero_waiter,
-                                  static_cast<void*>(&int_counter_));
+                                 static_cast<void *>(&int_counter_));
   ASSERT_EQ(0, res);
 
   --int_counter_;
   pthread_join(thread, NULL);
-  EXPECT_EQ(1,  T_BlockingCounter::concurrent_state_);
+  EXPECT_EQ(1, T_BlockingCounter::concurrent_state_);
   EXPECT_EQ(1, int_counter_.Get());
 }
 
@@ -159,14 +156,14 @@ TEST_F(T_BlockingCounter, OrchestrateMultipleWaitingThreads) {
 
   const int thread_count = 10;
   ASSERT_LE(5, thread_count);
-  pthread_t     threads[thread_count];
-  thread_state  states[thread_count];
+  pthread_t threads[thread_count];
+  thread_state states[thread_count];
 
   for (int i = 0; i < thread_count; ++i) {
     states[i].counter = &int_counter_;
     const int ret = pthread_create(
-      &threads[i], NULL, &T_BlockingCounter::concurrent_orchestrate_thread,
-      static_cast<void*>(&states[i]));
+        &threads[i], NULL, &T_BlockingCounter::concurrent_orchestrate_thread,
+        static_cast<void *>(&states[i]));
     ASSERT_EQ(0, ret);
   }
 

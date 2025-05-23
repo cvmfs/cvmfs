@@ -29,8 +29,8 @@ enum ShardingPolicySelector {
  */
 class ShardingPolicy : SingleCopy {
  public:
-  ShardingPolicy() {}
-  virtual ~ShardingPolicy() {}
+  ShardingPolicy() { }
+  virtual ~ShardingPolicy() { }
 
   virtual void AddProxy(const std::string &proxy) = 0;
   virtual std::string GetNextProxy(const std::string *url,

@@ -48,9 +48,9 @@ class CVMFS_EXPORT FileBackedBuffer : SingleCopy {
   ~FileBackedBuffer();
   void Append(const void *source, uint64_t len);
   void Commit();
-  int64_t Data(void** ptr, int64_t len, uint64_t pos);
-  int64_t Read(void* ptr, int64_t len);
-  int64_t ReadP(void* ptr, int64_t len, uint64_t pos);
+  int64_t Data(void **ptr, int64_t len, uint64_t pos);
+  int64_t Read(void *ptr, int64_t len);
+  int64_t ReadP(void *ptr, int64_t len, uint64_t pos);
   void Rewind();
 
   uint64_t GetSize() const;

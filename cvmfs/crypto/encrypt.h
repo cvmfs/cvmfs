@@ -50,7 +50,7 @@ class CVMFS_EXPORT Key : SingleCopy {
   std::string ToBase64() const;
 
  private:
-  Key() : data_(NULL), size_(0)  { }
+  Key() : data_(NULL), size_(0) { }
   unsigned char *data_;
   unsigned size_;
 };
@@ -118,9 +118,9 @@ class CVMFS_EXPORT CipherAes256Cbc : public Cipher {
   FRIEND_TEST(T_Encrypt, Aes_256_Cbc_Iv);
 
  public:
-  static const unsigned kKeySize = 256/8;
-  static const unsigned kIvSize = 128/8;
-  static const unsigned kBlockSize = 128/8;
+  static const unsigned kKeySize = 256 / 8;
+  static const unsigned kIvSize = 128 / 8;
+  static const unsigned kBlockSize = 128 / 8;
 
   virtual ~CipherAes256Cbc() { }
 
@@ -148,9 +148,9 @@ class CVMFS_EXPORT CipherNone : public Cipher {
 
   virtual std::string name() const { return "FOR TESTING ONLY"; }
   virtual Algorithms algorithm() const { return kNone; }
-  virtual unsigned key_size() const { return 256/8; }
-  virtual unsigned iv_size() const { return 128/8; }
-  virtual unsigned block_size() const { return 128/8; }
+  virtual unsigned key_size() const { return 256 / 8; }
+  virtual unsigned iv_size() const { return 128 / 8; }
+  virtual unsigned block_size() const { return 128 / 8; }
 
  protected:
   virtual std::string DoEncrypt(const std::string &plaintext, const Key &key);

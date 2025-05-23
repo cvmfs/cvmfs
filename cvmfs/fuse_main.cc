@@ -7,6 +7,8 @@
  *
  */
 
+#include "fuse_main.h"
+
 #include <dlfcn.h>
 #include <unistd.h>
 
@@ -16,13 +18,12 @@
 #include <string>
 #include <vector>
 
-#include "fuse_main.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/smalloc.h"
 #include "util/string.h"
 
-using namespace stub; // NOLINT
+using namespace stub;  // NOLINT
 
 
 int main(int argc, char **argv) {
@@ -78,8 +79,8 @@ int main(int argc, char **argv) {
   if (enforce_libfuse > 0) {
     if ((enforce_libfuse < 2) || (enforce_libfuse > 3)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "Error: invalid libfuse version '%u', valid values are 2 or 3.",
-             enforce_libfuse);
+               "Error: invalid libfuse version '%u', valid values are 2 or 3.",
+               enforce_libfuse);
       return 1;
     }
   }
@@ -95,7 +96,7 @@ int main(int argc, char **argv) {
   std::vector<std::string> library_paths;
   if ((enforce_libfuse == 0) || (enforce_libfuse == 3)) {
     library_paths.push_back(local_lib_path + libname_fuse3);
-    library_paths.push_back("/usr/lib/"   + libname_fuse3);
+    library_paths.push_back("/usr/lib/" + libname_fuse3);
     library_paths.push_back("/usr/lib64/" + libname_fuse3);
 #ifdef __APPLE__
     library_paths.push_back("/usr/local/lib/" + libname_fuse3);
@@ -103,7 +104,7 @@ int main(int argc, char **argv) {
   }
   if ((enforce_libfuse == 0) || (enforce_libfuse == 2)) {
     library_paths.push_back(local_lib_path + libname_fuse2);
-    library_paths.push_back("/usr/lib/"   + libname_fuse2);
+    library_paths.push_back("/usr/lib/" + libname_fuse2);
     library_paths.push_back("/usr/lib64/" + libname_fuse2);
 #ifdef __APPLE__
     library_paths.push_back("/usr/local/lib/" + libname_fuse2);
@@ -111,7 +112,7 @@ int main(int argc, char **argv) {
   }
 
   void *library_handle;
-  std::vector<std::string>::const_iterator i    = library_paths.begin();
+  std::vector<std::string>::const_iterator i = library_paths.begin();
   std::vector<std::string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {
     library_handle = dlopen(i->c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -134,13 +135,12 @@ int main(int argc, char **argv) {
   }
 
   CvmfsStubExports **exports_ptr = reinterpret_cast<CvmfsStubExports **>(
-    dlsym(library_handle, "g_cvmfs_stub_exports"));
+      dlsym(library_handle, "g_cvmfs_stub_exports"));
   if (exports_ptr == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-           "Error: symbol g_cvmfs_stub_exports not found");
+             "Error: symbol g_cvmfs_stub_exports not found");
     return 1;
   }
 
   return (*exports_ptr)->fn_main(argc, argv);
 }
-

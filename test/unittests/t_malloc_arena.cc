@@ -21,11 +21,9 @@ class T_MallocArena : public ::testing::Test {
   static const unsigned kSmallArena = 8 * 1024 * 1024;
   static const unsigned kBigArena = 512 * 1024 * 1024;  // 512MB RAM Cache arena
 
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 
   uint32_t MemChecksum(void *p, uint32_t size) {
     struct {
@@ -38,14 +36,13 @@ class T_MallocArena : public ::testing::Test {
     return MurmurHash2(&values, sizeof(values), 0x07387a4f);
   }
 
-  uint32_t SimulateMalloc(
-    unsigned arena_size, unsigned N, unsigned S_max, unsigned T_max)
-  {
+  uint32_t SimulateMalloc(unsigned arena_size, unsigned N, unsigned S_max,
+                          unsigned T_max) {
     MallocArena M(arena_size);
     Prng prng;
     prng.InitLocaltime();
     // prng.InitSeed(42);
-    map< unsigned, vector<void *> * > schedule_free;
+    map<unsigned, vector<void *> *> schedule_free;
     unsigned t = 0;
     uint32_t total_alloc = 0;
 
@@ -61,7 +58,7 @@ class T_MallocArena : public ::testing::Test {
           uint32_t checksum = MemChecksum(p, p_size);
           EXPECT_EQ(checksum, *reinterpret_cast<uint32_t *>(p));
           EXPECT_EQ(checksum, *reinterpret_cast<uint32_t *>(
-                                p + p_size - sizeof(uint32_t)));
+                                  p + p_size - sizeof(uint32_t)));
           // free(p);
           M.Free(p);
           total_alloc -= p_size;

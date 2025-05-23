@@ -10,19 +10,19 @@
 #include "curl/curl.h"
 
 class CurlBuffer {
-  public:
-    std::string data;
-    CurlBuffer(): data("") {}
+ public:
+  std::string data;
+  CurlBuffer() : data("") { }
 };
 
-bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
-                        const std::string& repo_path,
-                        const std::string& repo_service_url,
-                        CurlBuffer* buffer);
+bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
+                        const std::string &repo_path,
+                        const std::string &repo_service_url,
+                        CurlBuffer *buffer);
 
-bool MakeEndRequest(const std::string& method, const std::string& key_id,
-                    const std::string& secret, const std::string& session_token,
-                    const std::string& repo_service_url,
-                    const std::string& request_payload, CurlBuffer* reply);
+bool MakeEndRequest(const std::string &method, const std::string &key_id,
+                    const std::string &secret, const std::string &session_token,
+                    const std::string &repo_service_url,
+                    const std::string &request_payload, CurlBuffer *reply);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_CURL_H_

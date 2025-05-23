@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "file_watcher_kqueue.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/event.h>
@@ -14,29 +16,29 @@
 #include <vector>
 
 #include "backoff.h"
-#include "file_watcher_kqueue.h"
 #include "util/logging.h"
 #include "util/posix.h"
 
 namespace file_watcher {
 
-FileWatcherKqueue::FileWatcherKqueue() {}
+FileWatcherKqueue::FileWatcherKqueue() { }
 
-FileWatcherKqueue::~FileWatcherKqueue() {}
+FileWatcherKqueue::~FileWatcherKqueue() { }
 
-bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
+bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap &handlers,
                                      int read_pipe, int write_pipe) {
   kq_ = kqueue();
   assert(kq_ != -1);
 
   // Control pipe sending the stop event.
   struct kevent watch_event;
-  EV_SET(&watch_event, read_pipe, EVFILT_READ, EV_ADD | EV_ENABLE | EV_CLEAR,
-         0, 0, 0);
+  EV_SET(&watch_event, read_pipe, EVFILT_READ, EV_ADD | EV_ENABLE | EV_CLEAR, 0,
+         0, 0);
   assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
 
   for (FileWatcher::HandlerMap::const_iterator it = handlers.begin();
-       it != handlers.end(); ++it) {
+       it != handlers.end();
+       ++it) {
     RegisterFilter(it->first, it->second);
   }
 
@@ -58,7 +60,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
       continue;
     }
     for (int i = 0; i < nev && !stop; ++i) {
-      struct kevent& current_ev = triggered_events[i];
+      struct kevent &current_ev = triggered_events[i];
       if (current_ev.ident == static_cast<uint64_t>(read_pipe)) {
         char buffer[1];
         ReadPipe(read_pipe, &buffer, 1);
@@ -67,8 +69,8 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
         continue;
       }
 
-      std::map<int, WatchRecord>::const_iterator it =
-          watch_records_.find(current_ev.ident);
+      std::map<int, WatchRecord>::const_iterator it = watch_records_.find(
+          current_ev.ident);
       if (it != watch_records_.end()) {
         int current_fd = current_ev.ident;
         WatchRecord current_record = it->second;
@@ -102,8 +104,7 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
         if (event == file_watcher::kDeleted) {
           RemoveFilter(current_fd);
           if (!clear_handler) {
-            RegisterFilter(current_record.file_path_,
-                           current_record.handler_);
+            RegisterFilter(current_record.file_path_, current_record.handler_);
           }
         }
       } else {
@@ -116,7 +117,8 @@ bool FileWatcherKqueue::RunEventLoop(const FileWatcher::HandlerMap& handlers,
 
   // Close all remaining open file descriptors
   for (std::map<int, WatchRecord>::const_iterator it = watch_records_.begin();
-       it != watch_records_.end(); ++it) {
+       it != watch_records_.end();
+       ++it) {
     close(it->first);
   }
   watch_records_.clear();
@@ -134,19 +136,19 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
   close(fd);
 }
 
-int FileWatcherKqueue::TryRegisterFilter(const std::string& file_path) {
-    int fd = open(file_path.c_str(), O_RDONLY);
-    if (fd > 0) {
-      struct kevent watch_event;
-      EV_SET(&watch_event, fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR,
-             NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK |
-             NOTE_RENAME | NOTE_REVOKE,
-             0, 0);
+int FileWatcherKqueue::TryRegisterFilter(const std::string &file_path) {
+  int fd = open(file_path.c_str(), O_RDONLY);
+  if (fd > 0) {
+    struct kevent watch_event;
+    EV_SET(&watch_event, fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR,
+           NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK
+               | NOTE_RENAME | NOTE_REVOKE,
+           0, 0);
 
-      assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
-    }
+    assert(kevent(kq_, &watch_event, 1, NULL, 0, NULL) != -1);
+  }
 
-    return fd;
+  return fd;
 }
 
 }  // namespace file_watcher

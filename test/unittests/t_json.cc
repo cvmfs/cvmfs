@@ -28,15 +28,14 @@ TEST(T_Json, Complex) {
       " \"vector\": [true, false, null, 0.0, 7, \"foo\", {1, 2}, {}, []],\n"
       " \"compound\": {\"a\": 2, \"b\": [1, 2, 3], \"c\": {}}}"));
   EXPECT_TRUE(json.IsValid());
-  EXPECT_EQ(
-      "{\"string\":\"a string with spaces\","
-      "\"number\":42,"
-      "\"float\":0.100,"
-      "\"switch\":true,"
-      "\"void\":null,"
-      "\"vector\":[true,false,null,0.000,7,\"foo\",{1,2},{},[]],"
-      "\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}}}",
-      json->PrintCanonical());
+  EXPECT_EQ("{\"string\":\"a string with spaces\","
+            "\"number\":42,"
+            "\"float\":0.100,"
+            "\"switch\":true,"
+            "\"void\":null,"
+            "\"vector\":[true,false,null,0.000,7,\"foo\",{1,2},{},[]],"
+            "\"compound\":{\"a\":2,\"b\":[1,2,3],\"c\":{}}}",
+            json->PrintCanonical());
 }
 
 TEST(T_Json, StringEscape) {
@@ -59,8 +58,8 @@ TEST(T_Json, SearchInObject) {
   EXPECT_EQ(NULL, result);
   result = json->SearchInObject(NULL, "string", JSON_STRING);
   EXPECT_EQ(NULL, result);
-  result =
-      json->SearchInObject(json->root()->first_child, "string", JSON_STRING);
+  result = json->SearchInObject(
+      json->root()->first_child, "string", JSON_STRING);
   EXPECT_EQ(NULL, result);
 }
 
@@ -74,10 +73,9 @@ TEST(T_Json, GenerateValidJsonString) {
 
   std::string output = input.GenerateString();
 
-  ASSERT_EQ(
-      "{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\","
-      "\"f4\":\"v\\n4\",\"integer\":12}",
-      output);
+  ASSERT_EQ("{\"f1\":\"v1\",\"f2\":\"v2\",\"f3\":\"v3\","
+            "\"f4\":\"v\\n4\",\"integer\":12}",
+            output);
 
   UniquePtr<JsonDocument> json(JsonDocument::Create(output));
   ASSERT_TRUE(json.IsValid());

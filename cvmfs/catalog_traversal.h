@@ -24,7 +24,7 @@
 namespace catalog {
 class Catalog;
 class WritableCatalog;
-}
+}  // namespace catalog
 
 namespace swissknife {
 
@@ -39,24 +39,24 @@ namespace swissknife {
  * @param history_depth       the distance from the current HEAD revision
  *                            (current HEAD has history_depth 0)
  */
-template <class CatalogT>
+template<class CatalogT>
 struct CatalogTraversalData {
-  CatalogTraversalData(const CatalogT     *catalog,
-                       const shash::Any   &catalog_hash,
-                       const unsigned      tree_level,
-                       const size_t        file_size,
-                       const uint64_t      history_depth)
-  : catalog(catalog)
-  , catalog_hash(catalog_hash)
-  , tree_level(tree_level)
-  , file_size(file_size)
-  , history_depth(history_depth) {}
+  CatalogTraversalData(const CatalogT *catalog,
+                       const shash::Any &catalog_hash,
+                       const unsigned tree_level,
+                       const size_t file_size,
+                       const uint64_t history_depth)
+      : catalog(catalog)
+      , catalog_hash(catalog_hash)
+      , tree_level(tree_level)
+      , file_size(file_size)
+      , history_depth(history_depth) { }
 
-  const CatalogT     *catalog;
-  const shash::Any    catalog_hash;
-  const unsigned int  tree_level;
-  const size_t        file_size;
-  const uint64_t      history_depth;
+  const CatalogT *catalog;
+  const shash::Any catalog_hash;
+  const unsigned int tree_level;
+  const size_t file_size;
+  const uint64_t history_depth;
 };
 
 
@@ -67,7 +67,7 @@ struct CatalogTraversalData {
  * collection, the timestamp of the catalog hash in the reflog counts, which
  * is the same or newer than the one stored in the catalog.
  */
-template <class CatalogT>
+template<class CatalogT>
 class CatalogTraversalInfoShim {
  public:
   virtual ~CatalogTraversalInfoShim() { }
@@ -84,30 +84,32 @@ class CatalogTraversalInfoShim {
  * common functionality. Actual traversal classes inherit from this class.
  *
  */
-template <class ObjectFetcherT>
+template<class ObjectFetcherT>
 class CatalogTraversalBase
-  : public Observable<CatalogTraversalData<typename ObjectFetcherT::CatalogTN> >
-{
+    : public Observable<
+          CatalogTraversalData<typename ObjectFetcherT::CatalogTN> > {
  public:
-  typedef ObjectFetcherT                      ObjectFetcherTN;
-  typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
-  typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
-  typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
+  typedef ObjectFetcherT ObjectFetcherTN;
+  typedef typename ObjectFetcherT::CatalogTN CatalogTN;
+  typedef typename ObjectFetcherT::HistoryTN HistoryTN;
+  typedef CatalogTraversalData<CatalogTN> CallbackDataTN;
 
   /**
    * @param repo_url             the path to the repository to be traversed:
    *                             -> either absolute path to the local catalogs
    *                             -> or an URL to a remote repository
-   * @param repo_name            fully qualified repository name (used for remote
-   *                             repository signature check) (optional)
+   * @param repo_name            fully qualified repository name (used for
+   * remote repository signature check) (optional)
    * @param repo_keys            a comma separated list of public key file
-   *                             locations to verify the repository manifest file
+   *                             locations to verify the repository manifest
+   * file
    * @param history              depth of the desired catalog history traversal
    *                             (default: 0 - only HEAD catalogs are traversed)
    * @param timestamp            timestamp of history traversal threshold
-   *                             (default: 0 - no threshold, traverse everything)
-   * @param no_repeat_history    keep track of visited catalogs and don't re-visit
-   *                             them in previous revisions
+   *                             (default: 0 - no threshold, traverse
+   * everything)
+   * @param no_repeat_history    keep track of visited catalogs and don't
+   * re-visit them in previous revisions
    * @param no_close             do not close catalogs after they were attached
    *                             (catalogs retain their parent/child pointers)
    * @param ignore_load_failure  suppressed an error message if a catalog file
@@ -132,31 +134,31 @@ class CatalogTraversalBase
    */
   struct Parameters {
     Parameters()
-      : object_fetcher(NULL)
-      , history(kNoHistory)
-      , timestamp(kNoTimestampThreshold)
-      , no_repeat_history(false)
-      , no_close(false)
-      , ignore_load_failure(false)
-      , quiet(false)
-      , num_threads(8)
-      , serialize_callbacks(true) {}
+        : object_fetcher(NULL)
+        , history(kNoHistory)
+        , timestamp(kNoTimestampThreshold)
+        , no_repeat_history(false)
+        , no_close(false)
+        , ignore_load_failure(false)
+        , quiet(false)
+        , num_threads(8)
+        , serialize_callbacks(true) { }
 
-    static const uint64_t     kFullHistory;
-    static const uint64_t     kNoHistory;
-    static const time_t       kNoTimestampThreshold;
+    static const uint64_t kFullHistory;
+    static const uint64_t kNoHistory;
+    static const time_t kNoTimestampThreshold;
 
     ObjectFetcherT *object_fetcher;
 
-    uint64_t        history;
-    time_t          timestamp;
-    bool            no_repeat_history;
-    bool            no_close;
-    bool            ignore_load_failure;
-    bool            quiet;
+    uint64_t history;
+    time_t timestamp;
+    bool no_repeat_history;
+    bool no_close;
+    bool ignore_load_failure;
+    bool quiet;
     // These parameters only apply for CatalogTraversalParallel
-    unsigned int    num_threads;
-    bool            serialize_callbacks;
+    unsigned int num_threads;
+    bool serialize_callbacks;
   };
 
   enum TraversalType {
@@ -165,15 +167,14 @@ class CatalogTraversalBase
   };
 
   explicit CatalogTraversalBase(const Parameters &params)
-    : object_fetcher_(params.object_fetcher)
-    , catalog_info_shim_(&catalog_info_default_shim_)
-    , default_history_depth_(params.history)
-    , default_timestamp_threshold_(params.timestamp)
-    , no_close_(params.no_close)
-    , ignore_load_failure_(params.ignore_load_failure)
-    , no_repeat_history_(params.no_repeat_history)
-    , error_sink_((params.quiet) ? kLogDebug : kLogStderr)
-  {
+      : object_fetcher_(params.object_fetcher)
+      , catalog_info_shim_(&catalog_info_default_shim_)
+      , default_history_depth_(params.history)
+      , default_timestamp_threshold_(params.timestamp)
+      , no_close_(params.no_close)
+      , ignore_load_failure_(params.ignore_load_failure)
+      , no_repeat_history_(params.no_repeat_history)
+      , error_sink_((params.quiet) ? kLogDebug : kLogStderr) {
     assert(object_fetcher_ != NULL);
   }
 
@@ -209,7 +210,7 @@ class CatalogTraversalBase
    * @return              true on success
    */
   virtual bool TraverseList(const std::vector<shash::Any> &catalog_list,
-    const TraversalType type = kBreadthFirst) = 0;
+                            const TraversalType type = kBreadthFirst) = 0;
 
   /**
    * Starts the traversal process at the catalog pointed to by the given hash
@@ -220,8 +221,8 @@ class CatalogTraversalBase
    * @param type               breadths or depth first traversal
    * @return                   true when catalogs were successfully traversed
    */
-  virtual bool TraverseRevision(const shash::Any     &root_catalog_hash,
-                        const TraversalType type = kBreadthFirst) = 0;
+  virtual bool TraverseRevision(const shash::Any &root_catalog_hash,
+                                const TraversalType type = kBreadthFirst) = 0;
 
   /**
    * Figures out all named tags in a repository and uses all of them as entry
@@ -231,13 +232,12 @@ class CatalogTraversalBase
    * @return      true when catalog traversal successfully finished
    */
   virtual bool TraverseNamedSnapshots(
-    const TraversalType type = kBreadthFirst)
-  {
+      const TraversalType type = kBreadthFirst) {
     typedef std::vector<shash::Any> HashList;
 
     UniquePtr<HistoryTN> tag_db;
-    const typename ObjectFetcherT::Failures retval =
-                                         object_fetcher_->FetchHistory(&tag_db);
+    const typename ObjectFetcherT::Failures
+        retval = object_fetcher_->FetchHistory(&tag_db);
     switch (retval) {
       case ObjectFetcherT::kFailOk:
         break;
@@ -249,8 +249,8 @@ class CatalogTraversalBase
 
       default:
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
-                 "failed to download history database (%d - %s)",
-                 retval, Code2Ascii(retval));
+                 "failed to download history database (%d - %s)", retval,
+                 Code2Ascii(retval));
         return false;
     }
 
@@ -267,75 +267,77 @@ class CatalogTraversalBase
  protected:
   typedef std::set<shash::Any> HashSet;
 
-   /**
+  /**
    * This struct keeps information about a catalog that still needs to be
    * traversed by a currently running catalog traversal process.
    */
   struct CatalogJob {
-    CatalogJob(const std::string  &path,
-               const shash::Any   &hash,
-               const unsigned      tree_level,
-               const uint64_t      history_depth,
-                     CatalogTN    *parent = NULL) :
-      path(path),
-      hash(hash),
-      tree_level(tree_level),
-      history_depth(history_depth),
-      parent(parent),
-      catalog_file_size(0),
-      ignore(false),
-      catalog(NULL),
-      referenced_catalogs(0),
-      postponed(false) {}
+    CatalogJob(const std::string &path,
+               const shash::Any &hash,
+               const unsigned tree_level,
+               const uint64_t history_depth,
+               CatalogTN *parent = NULL)
+        : path(path)
+        , hash(hash)
+        , tree_level(tree_level)
+        , history_depth(history_depth)
+        , parent(parent)
+        , catalog_file_size(0)
+        , ignore(false)
+        , catalog(NULL)
+        , referenced_catalogs(0)
+        , postponed(false) { }
 
     bool IsRootCatalog() const { return tree_level == 0; }
 
     CallbackDataTN GetCallbackData() const {
-      return CallbackDataTN(catalog, hash, tree_level,
-                            catalog_file_size, history_depth);
+      return CallbackDataTN(catalog, hash, tree_level, catalog_file_size,
+                            history_depth);
     }
 
     // initial state description
-    const std::string   path;
-    const shash::Any    hash;
-    const unsigned      tree_level;
-    const uint64_t      history_depth;
-          CatalogTN    *parent;
+    const std::string path;
+    const shash::Any hash;
+    const unsigned tree_level;
+    const uint64_t history_depth;
+    CatalogTN *parent;
 
     // dynamic processing state (used internally)
-    std::string   catalog_file_path;
-    size_t        catalog_file_size;
-    bool          ignore;
-    CatalogTN    *catalog;
-    uint64_t      referenced_catalogs;
-    bool          postponed;
+    std::string catalog_file_path;
+    size_t catalog_file_size;
+    bool ignore;
+    CatalogTN *catalog;
+    uint64_t referenced_catalogs;
+    bool postponed;
   };
 
   bool PrepareCatalog(CatalogJob *job) {
-    const typename ObjectFetcherT::Failures retval =
-      object_fetcher_->FetchCatalog(job->hash,
-                                    job->path,
-                                    &job->catalog,
-                                    !job->IsRootCatalog(),
-                                    job->parent);
+    const typename ObjectFetcherT::Failures
+        retval = object_fetcher_->FetchCatalog(job->hash,
+                                               job->path,
+                                               &job->catalog,
+                                               !job->IsRootCatalog(),
+                                               job->parent);
     switch (retval) {
       case ObjectFetcherT::kFailOk:
         break;
 
       case ObjectFetcherT::kFailNotFound:
         if (ignore_load_failure_) {
-          LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog "
-                                                    "%s (swept before?)",
+          LogCvmfs(kLogCatalogTraversal, kLogDebug,
+                   "ignoring missing catalog "
+                   "%s (swept before?)",
                    job->hash.ToString().c_str());
           job->ignore = true;
           return true;
         }
 
       default:
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s "
-                                                    "(%d - %s)",
-                 job->hash.ToStringWithSuffix().c_str(),
-                 retval, Code2Ascii(retval));
+        LogCvmfs(kLogCatalogTraversal, error_sink_,
+                 "failed to load catalog %s "
+                 "(%d - %s)",
+                 job->hash.ToStringWithSuffix().c_str(), retval,
+                 Code2Ascii(retval));
         return false;
     }
 
@@ -389,12 +391,13 @@ class CatalogTraversalBase
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
     UniquePtr<manifest::Manifest> manifest;
-    const typename ObjectFetcherT::Failures retval =
-                                      object_fetcher_->FetchManifest(&manifest);
+    const typename ObjectFetcherT::Failures
+        retval = object_fetcher_->FetchManifest(&manifest);
     if (retval != ObjectFetcherT::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load manifest "
-                                                 "(%d - %s)",
-                                                 retval, Code2Ascii(retval));
+      LogCvmfs(kLogCatalogTraversal, kLogStderr,
+               "failed to load manifest "
+               "(%d - %s)",
+               retval, Code2Ascii(retval));
       return shash::Any();
     }
 
@@ -411,32 +414,29 @@ class CatalogTraversalBase
    * @param job  the job defining the current catalog
    * @return     true if either history or timestamp threshold are satisfied
    */
-  bool IsBelowPruningThresholds(
-    const CatalogJob &job,
-    const uint64_t history_depth,
-    const time_t timestamp_threshold
-  ) {
+  bool IsBelowPruningThresholds(const CatalogJob &job,
+                                const uint64_t history_depth,
+                                const time_t timestamp_threshold) {
     assert(job.IsRootCatalog());
     assert(job.catalog != NULL);
 
     const bool h = job.history_depth >= history_depth;
     assert(timestamp_threshold >= 0);
-    const bool t =
-      catalog_info_shim_->GetLastModified(job.catalog) <
-      unsigned(timestamp_threshold);
+    const bool t = catalog_info_shim_->GetLastModified(job.catalog)
+                   < unsigned(timestamp_threshold);
 
     return t || h;
   }
 
-  ObjectFetcherT         *object_fetcher_;
+  ObjectFetcherT *object_fetcher_;
   CatalogTraversalInfoShim<CatalogTN> catalog_info_default_shim_;
   CatalogTraversalInfoShim<CatalogTN> *catalog_info_shim_;
-  const uint64_t          default_history_depth_;
-  const time_t            default_timestamp_threshold_;
-  const bool              no_close_;
-  const bool              ignore_load_failure_;
-  const bool              no_repeat_history_;
-  LogFacilities           error_sink_;
+  const uint64_t default_history_depth_;
+  const time_t default_timestamp_threshold_;
+  const bool no_close_;
+  const bool ignore_load_failure_;
+  const bool no_repeat_history_;
+  LogFacilities error_sink_;
 };
 
 /**
@@ -492,18 +492,16 @@ class CatalogTraversalBase
  *          CatalogTraversal object with no_close = true.
  */
 template<class ObjectFetcherT>
-class CatalogTraversal
-  : public CatalogTraversalBase<ObjectFetcherT>
-{
+class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
  public:
   typedef CatalogTraversalBase<ObjectFetcherT> Base;
-  typedef ObjectFetcherT                      ObjectFetcherTN;
-  typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
-  typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
-  typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
-  typedef typename Base::Parameters           Parameters;
-  typedef typename Base::TraversalType        TraversalType;
-  typedef typename Base::CatalogJob           CatalogJob;
+  typedef ObjectFetcherT ObjectFetcherTN;
+  typedef typename ObjectFetcherT::CatalogTN CatalogTN;
+  typedef typename ObjectFetcherT::HistoryTN HistoryTN;
+  typedef CatalogTraversalData<CatalogTN> CallbackDataTN;
+  typedef typename Base::Parameters Parameters;
+  typedef typename Base::TraversalType TraversalType;
+  typedef typename Base::CatalogJob CatalogJob;
 
  protected:
   typedef std::set<shash::Any> HashSet;
@@ -520,18 +518,18 @@ class CatalogTraversal
    * @param callback_stack  used in depth first traversal for deferred yielding
    */
   struct TraversalContext {
-    TraversalContext(const uint64_t       history_depth,
-                     const time_t         timestamp_threshold,
-                     const TraversalType  traversal_type) :
-      history_depth(history_depth),
-      timestamp_threshold(timestamp_threshold),
-      traversal_type(traversal_type) {}
+    TraversalContext(const uint64_t history_depth,
+                     const time_t timestamp_threshold,
+                     const TraversalType traversal_type)
+        : history_depth(history_depth)
+        , timestamp_threshold(timestamp_threshold)
+        , traversal_type(traversal_type) { }
 
-    const uint64_t       history_depth;
-    const time_t         timestamp_threshold;
-    const TraversalType  traversal_type;
-    CatalogJobStack      catalog_stack;
-    CatalogJobStack      callback_stack;
+    const uint64_t history_depth;
+    const time_t timestamp_threshold;
+    const TraversalType traversal_type;
+    CatalogJobStack catalog_stack;
+    CatalogJobStack callback_stack;
   };
 
  public:
@@ -540,8 +538,7 @@ class CatalogTraversal
    * parameters described in struct ConstructionParams.
    */
   explicit CatalogTraversal(const Parameters &params)
-    : CatalogTraversalBase<ObjectFetcherT>(params)
-  { }
+      : CatalogTraversalBase<ObjectFetcherT>(params) { }
 
   bool Traverse(const TraversalType type = Base::kBreadthFirst) {
     const shash::Any root_catalog_hash = this->GetRepositoryRootCatalogHash();
@@ -551,13 +548,12 @@ class CatalogTraversal
     return Traverse(root_catalog_hash, type);
   }
 
-  bool Traverse(const shash::Any     &root_catalog_hash,
-                const TraversalType   type = Base::kBreadthFirst) {
+  bool Traverse(const shash::Any &root_catalog_hash,
+                const TraversalType type = Base::kBreadthFirst) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    TraversalContext ctx(this->default_history_depth_,
-                         this->default_timestamp_threshold_,
-                         type);
+    TraversalContext ctx(
+        this->default_history_depth_, this->default_timestamp_threshold_, type);
     Push(root_catalog_hash, &ctx);
     return DoTraverse(&ctx);
   }
@@ -573,14 +569,11 @@ class CatalogTraversal
     return success;
   }
 
-  bool TraverseRevision(
-    const shash::Any     &root_catalog_hash,
-    const TraversalType type = Base::kBreadthFirst)
-  {
+  bool TraverseRevision(const shash::Any &root_catalog_hash,
+                        const TraversalType type = Base::kBreadthFirst) {
     // add the given root catalog as the first element on the job stack
-    TraversalContext ctx(Parameters::kNoHistory,
-                         Parameters::kNoTimestampThreshold,
-                         type);
+    TraversalContext ctx(
+        Parameters::kNoHistory, Parameters::kNoTimestampThreshold, type);
     Push(root_catalog_hash, &ctx);
     return DoTraverse(&ctx);
   }
@@ -631,7 +624,7 @@ class CatalogTraversal
 
       if (ShouldBeSkipped(job)) {
         job.ignore = true;
-      // download and open the catalog for processing
+        // download and open the catalog for processing
       } else if (!this->PrepareCatalog(&job)) {
         return false;
       }
@@ -665,8 +658,8 @@ class CatalogTraversal
   void PushReferencedCatalogs(CatalogJob *job, TraversalContext *ctx) {
     assert(!job->ignore);
     assert(job->catalog != NULL);
-    assert(ctx->traversal_type == Base::kBreadthFirst ||
-           ctx->traversal_type == Base::kDepthFirst);
+    assert(ctx->traversal_type == Base::kBreadthFirst
+           || ctx->traversal_type == Base::kDepthFirst);
 
     // this differs, depending on the traversal strategy.
     //
@@ -679,20 +672,19 @@ class CatalogTraversal
     //   Catalogs are traversed from oldest revision (depends on the configured
     //   maximal history depth) to the HEAD revision and from bottom (leafs) to
     //   top (root catalogs)
-    job->referenced_catalogs =
-      (ctx->traversal_type == Base::kBreadthFirst)
-      ? PushPreviousRevision(*job, ctx) + PushNestedCatalogs(*job, ctx)
-      : PushNestedCatalogs(*job, ctx) + PushPreviousRevision(*job, ctx);
+    job->referenced_catalogs = (ctx->traversal_type == Base::kBreadthFirst)
+                                   ? PushPreviousRevision(*job, ctx)
+                                         + PushNestedCatalogs(*job, ctx)
+                                   : PushNestedCatalogs(*job, ctx)
+                                         + PushPreviousRevision(*job, ctx);
   }
 
   /**
    * Pushes the previous revision of a (root) catalog.
    * @return  the number of catalogs pushed on the processing stack
    */
-  unsigned int PushPreviousRevision(
-    const CatalogJob &job,
-    TraversalContext *ctx
-  ) {
+  unsigned int PushPreviousRevision(const CatalogJob &job,
+                                    TraversalContext *ctx) {
     // only root catalogs are used for entering a previous revision (graph)
     if (!job.catalog->IsRoot()) {
       return 0;
@@ -720,16 +712,14 @@ class CatalogTraversal
    * Pushes all the referenced nested catalogs.
    * @return  the number of catalogs pushed on the processing stack
    */
-  unsigned int PushNestedCatalogs(
-    const CatalogJob &job,
-    TraversalContext *ctx
-  ) {
+  unsigned int PushNestedCatalogs(const CatalogJob &job,
+                                  TraversalContext *ctx) {
     typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
     const NestedCatalogList nested = job.catalog->ListOwnNestedCatalogs();
-    typename NestedCatalogList::const_iterator i    = nested.begin();
+    typename NestedCatalogList::const_iterator i = nested.begin();
     typename NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
-      CatalogTN* parent = (this->no_close_) ? job.catalog : NULL;
+      CatalogTN *parent = (this->no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->mountpoint.ToString(),
                                i->hash,
                                job.tree_level + 1,
@@ -748,8 +738,8 @@ class CatalogTraversal
   bool YieldToListeners(CatalogJob *job, TraversalContext *ctx) {
     assert(!job->ignore);
     assert(job->catalog != NULL);
-    assert(ctx->traversal_type == Base::kBreadthFirst ||
-           ctx->traversal_type == Base::kDepthFirst);
+    assert(ctx->traversal_type == Base::kBreadthFirst
+           || ctx->traversal_type == Base::kDepthFirst);
 
     // in breadth first search mode, every catalog is simply handed out once
     // it is visited. No extra magic required...
@@ -885,19 +875,19 @@ class CatalogTraversal
   }
 
  protected:
-  HashSet                 visited_catalogs_;
+  HashSet visited_catalogs_;
 };
 
-template <class ObjectFetcherT>
-const uint64_t CatalogTraversalBase<ObjectFetcherT>::Parameters::kFullHistory =
-    std::numeric_limits<uint64_t>::max();
+template<class ObjectFetcherT>
+const uint64_t CatalogTraversalBase<ObjectFetcherT>::Parameters::
+    kFullHistory = std::numeric_limits<uint64_t>::max();
 
-template <class ObjectFetcherT>
+template<class ObjectFetcherT>
 const uint64_t CatalogTraversalBase<ObjectFetcherT>::Parameters::kNoHistory = 0;
 
-template <class ObjectFetcherT>
+template<class ObjectFetcherT>
 const time_t
-  CatalogTraversalBase<ObjectFetcherT>::Parameters::kNoTimestampThreshold = 0;
+    CatalogTraversalBase<ObjectFetcherT>::Parameters::kNoTimestampThreshold = 0;
 
 }  // namespace swissknife
 

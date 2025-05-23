@@ -16,13 +16,11 @@ namespace publish {
 
 class CheckoutMarker {
  public:
-  CheckoutMarker(
-    const std::string &t,
-    const std::string &b,
-    const shash::Any &h,
-    const std::string &p)
-    : tag_(t), branch_(b), hash_(h), previous_branch_(p)
-  {}
+  CheckoutMarker(const std::string &t,
+                 const std::string &b,
+                 const shash::Any &h,
+                 const std::string &p)
+      : tag_(t), branch_(b), hash_(h), previous_branch_(p) { }
 
   static CheckoutMarker *CreateFrom(const std::string &path);
   void SaveAs(const std::string &path) const;
@@ -50,7 +48,7 @@ class CheckoutMarker {
  */
 class ServerLockFile {
  public:
-  explicit ServerLockFile(const std::string &path) : path_(path), fd_(-1) {}
+  explicit ServerLockFile(const std::string &path) : path_(path), fd_(-1) { }
 
   void Lock();
   bool TryLock();
@@ -96,9 +94,7 @@ class ServerLockFileGuard : SingleCopy {
   explicit ServerLockFileGuard(ServerLockFile &lock) : lock_(lock) {
     lock_.Lock();
   }
-  ~ServerLockFileGuard() {
-    lock_.Unlock();
-  }
+  ~ServerLockFileGuard() { lock_.Unlock(); }
 
  private:
   ServerLockFile &lock_;
@@ -111,7 +107,7 @@ class ServerLockFileGuard : SingleCopy {
  */
 class ServerFlagFile {
  public:
-  explicit ServerFlagFile(const std::string &path) : path_(path) {}
+  explicit ServerFlagFile(const std::string &path) : path_(path) { }
 
   void Set();
   void Clear();
@@ -133,8 +129,8 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn);
  * Replaces or creates $key=$value in the config file $path. Creates $path
  * if necessary. If value is empty, the key is removed.
  */
-void SetInConfig(const std::string &path,
-                 const std::string &key, const std::string &value);
+void SetInConfig(const std::string &path, const std::string &key,
+                 const std::string &value);
 
 std::string SendTalkCommand(const std::string &socket, const std::string &cmd);
 

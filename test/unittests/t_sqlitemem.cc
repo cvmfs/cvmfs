@@ -44,11 +44,12 @@ TEST_F(T_Sqlitemem, LookasideBufferArena) {
   EXPECT_TRUE(la_arena.Contains(buffer));
   EXPECT_FALSE(la_arena.Contains(reinterpret_cast<char *>(buffer) - 1));
   EXPECT_FALSE(la_arena.Contains(
-    reinterpret_cast<char *>(buffer) +
-    SqliteMemoryManager::LookasideBufferArena::kArenaSize));
-  EXPECT_TRUE(la_arena.Contains(
-    reinterpret_cast<char *>(buffer) +
-    SqliteMemoryManager::LookasideBufferArena::kArenaSize) - 1);
+      reinterpret_cast<char *>(buffer)
+      + SqliteMemoryManager::LookasideBufferArena::kArenaSize));
+  EXPECT_TRUE(
+      la_arena.Contains(reinterpret_cast<char *>(buffer)
+                        + SqliteMemoryManager::LookasideBufferArena::kArenaSize)
+      - 1);
   EXPECT_FALSE(la_arena.IsEmpty());
   la_arena.PutBuffer(buffer);
   EXPECT_TRUE(la_arena.IsEmpty());
@@ -71,12 +72,12 @@ TEST_F(T_Sqlitemem, LookasideBufferArena) {
   for (unsigned i = 0; i < N; ++i)
     bufferids.push_back(i);
   bufferids = Shuffle(bufferids, &prng);
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     la_arena.PutBuffer(buffer_multi[bufferids[i]]);
   }
 
   // Allocate again until full
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     buffer_multi[bufferids[i]] = la_arena.GetBuffer();
     EXPECT_TRUE(buffer_multi[bufferids[i]] != NULL);
     EXPECT_TRUE(la_arena.Contains(buffer_multi[bufferids[i]]));
@@ -140,7 +141,7 @@ TEST_F(T_Sqlitemem, Realloc) {
   // Switch default memory arena against initialized one
   delete mem_mgr_->malloc_arenas_[0];
   mem_mgr_->malloc_arenas_[0] = MallocArena::CreateInitialized(
-    SqliteMemoryManager::kArenaSize, pattern_one);
+      SqliteMemoryManager::kArenaSize, pattern_one);
 
   // Allocate 2 times 1kB from the end of the arena and set both areas to zero
   void *p1 = mem_mgr_->GetMemory(1024);

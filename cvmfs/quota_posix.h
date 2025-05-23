@@ -41,14 +41,14 @@ class PosixQuotaManager : public QuotaManager {
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_workspace,
-    const uint64_t limit, const uint64_t cleanup_threshold,
-    const bool rebuild_database);
-  static PosixQuotaManager *CreateShared(
-    const std::string &exe_path,
-    const std::string &cache_workspace,
-    const uint64_t limit,
-    const uint64_t cleanup_threshold,
-    bool foreground);
+                                   const uint64_t limit,
+                                   const uint64_t cleanup_threshold,
+                                   const bool rebuild_database);
+  static PosixQuotaManager *CreateShared(const std::string &exe_path,
+                                         const std::string &cache_workspace,
+                                         const uint64_t limit,
+                                         const uint64_t cleanup_threshold,
+                                         bool foreground);
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();
@@ -78,7 +78,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
-  virtual bool     SetLimit(uint64_t limit);
+  virtual bool SetLimit(uint64_t limit);
   virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn();
@@ -86,7 +86,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint32_t GetProtocolRevision();
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
-  void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_;};
+  void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_; };
 
 
  private:
@@ -133,8 +133,8 @@ class PosixQuotaManager : public QuotaManager {
    */
   struct LruCommand {
     CommandType command_type;
-    uint64_t size;    /**< Careful! Last 3 bits store hash algorithm */
-    int return_pipe;  /**< For cleanup, listing, and reservations */
+    uint64_t size;   /**< Careful! Last 3 bits store hash algorithm */
+    int return_pipe; /**< For cleanup, listing, and reservations */
     unsigned char digest[shash::kMaxDigestSize];
     /**
      * Maximum 512-sizeof(LruCommand) in order to guarantee atomic pipe
@@ -143,23 +143,22 @@ class PosixQuotaManager : public QuotaManager {
     uint16_t desc_length;
 
     LruCommand()
-      : command_type(static_cast<CommandType>(0))
-      , size(0)
-      , return_pipe(-1)
-      , desc_length(0)
-    {
+        : command_type(static_cast<CommandType>(0))
+        , size(0)
+        , return_pipe(-1)
+        , desc_length(0) {
       memset(digest, 0, shash::kMaxDigestSize);
     }
 
     void SetSize(const uint64_t new_size) {
       uint64_t mask = 7;
-      mask = ~(mask << (64-3));
+      mask = ~(mask << (64 - 3));
       size = (new_size & mask) | size;
     }
 
     uint64_t GetSize() const {
       uint64_t mask = 7;
-      mask = ~(mask << (64-3));
+      mask = ~(mask << (64 - 3));
       return size & mask;
     }
 
@@ -167,13 +166,13 @@ class PosixQuotaManager : public QuotaManager {
       memcpy(digest, hash.digest, hash.GetDigestSize());
       // Exclude MD5
       uint64_t algo_flags = hash.algorithm - 1;
-      algo_flags = algo_flags << (64-3);
+      algo_flags = algo_flags << (64 - 3);
       size |= algo_flags;
     }
 
     shash::Any RetrieveHash() const {
-      uint64_t algo_flags = size >> (64-3);
-      shash::Any result(static_cast<shash::Algorithms>(algo_flags+1));
+      uint64_t algo_flags = size >> (64 - 3);
+      shash::Any result(static_cast<shash::Algorithms>(algo_flags + 1));
       memcpy(result.digest, digest, result.GetDigestSize());
       return result;
     }
@@ -187,18 +186,19 @@ class PosixQuotaManager : public QuotaManager {
     uint64_t acseq;
     shash::Any hash;
     EvictCandidate(const shash::Any &h, uint64_t s, uint64_t a)
-      : size(s), acseq(a), hash(h) {}
+        : size(s), acseq(a), hash(h) { }
   };
 
   /**
-   * Magic number to make reading PIDs from lockfiles more robust and versionable
+   * Magic number to make reading PIDs from lockfiles more robust and
+   * versionable
    */
   static const unsigned kLockFileMagicNumber = 142857;
 
   /**
    * Maximum page cache per thread (Bytes).
    */
-  static const unsigned kSqliteMemPerThread = 2*1024*1024;
+  static const unsigned kSqliteMemPerThread = 2 * 1024 * 1024;
 
   /**
    * Collect a number of insert and touch operations before processing them
@@ -215,7 +215,7 @@ class PosixQuotaManager : public QuotaManager {
    * Make sure that the amount of data transferred through the RPC pipe is
    * within the OS's guarantees for atomicity.
    */
-  static const unsigned kMaxDescription = 512-sizeof(LruCommand);
+  static const unsigned kMaxDescription = 512 - sizeof(LruCommand);
 
   /**
    * Alarm when more than 75% of the cache fraction allowed for pinned files
@@ -270,10 +270,10 @@ class PosixQuotaManager : public QuotaManager {
    */
   bool shared_;
 
- /**
-  * True once the program switches into multi-threaded mode or the quota manager
-  * process has been forked resp.
-  */
+  /**
+   * True once the program switches into multi-threaded mode or the quota
+   * manager process has been forked resp.
+   */
   bool spawned_;
 
   /**
@@ -364,7 +364,7 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_rm_;
   sqlite3_stmt *stmt_rm_batch_;
   sqlite3_stmt *stmt_list_;
-  sqlite3_stmt *stmt_list_pinned_;  /**< Loaded catalogs are pinned. */
+  sqlite3_stmt *stmt_list_pinned_; /**< Loaded catalogs are pinned. */
   sqlite3_stmt *stmt_list_catalogs_;
   sqlite3_stmt *stmt_list_volatile_;
 

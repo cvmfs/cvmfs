@@ -11,8 +11,9 @@
 // TODO(jblomer): find a better solution than pulling in the .cc file
 #include "authz/voms_authz.cc"  // NOLINT
 
-#define TEST_DN "/DC=ch/DC=cern/OU=Organic Units/OU=Users" \
-                "/CN=bbockelm/CN=659869/CN=Brian Paul Bockelman"
+#define TEST_DN                              \
+  "/DC=ch/DC=cern/OU=Organic Units/OU=Users" \
+  "/CN=bbockelm/CN=659869/CN=Brian Paul Bockelman"
 
 TEST(T_VOMS, VomsAuthz) {
   // Initialize the VOMS data structures
@@ -25,7 +26,7 @@ TEST(T_VOMS, VomsAuthz) {
   voms_entries[1] = NULL;
   voms_info.data = voms_entries;
   struct data voms_data[3];
-  memset(voms_data, '\0', 3*sizeof(struct data));
+  memset(voms_data, '\0', 3 * sizeof(struct data));
   struct data *voms_datap[4];
   voms_datap[0] = voms_data;
   voms_datap[1] = voms_data + 1;
@@ -34,7 +35,8 @@ TEST(T_VOMS, VomsAuthz) {
   voms_entry.std = voms_datap;
 
   // Fill in attributes actually used in the authz matching.
-  std::vector<char> user_dn; user_dn.reserve(100);
+  std::vector<char> user_dn;
+  user_dn.reserve(100);
   strncpy(&user_dn[0], TEST_DN, 99);
   voms_entry.user = &user_dn[0];
   char voname[] = "cms";
@@ -80,15 +82,15 @@ TEST(T_VOMS, VomsAuthz) {
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "cms:/cms\natlas"), true);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\ncms:/cms"), true);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\n\ncms:/cms"), true);
-  EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, "atlas:/atlas\n\ndteam:/dteam\n"), false);
+  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\n\ndteam:/dteam\n"),
+            false);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN), false);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n"), false);
-  EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), false);
-  EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=pilot"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=prod"),
+            false);
+  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=pilot"),
+            true);
   voms_entry.user = &user_dn[0];
-  EXPECT_EQ(CheckMultipleAuthz(
-    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), true);
+  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=prod"),
+            true);
 }

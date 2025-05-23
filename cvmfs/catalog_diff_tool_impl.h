@@ -17,32 +17,35 @@
 
 const uint64_t kLastInode = uint64_t(-1);
 
-inline void AppendFirstEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendFirstEntry(catalog::DirectoryEntryList *entry_list) {
   catalog::DirectoryEntry empty_entry;
   entry_list->push_back(empty_entry);
 }
 
-inline void AppendLastEntry(catalog::DirectoryEntryList* entry_list) {
+inline void AppendLastEntry(catalog::DirectoryEntryList *entry_list) {
   assert(!entry_list->empty());
   catalog::DirectoryEntry last_entry;
   last_entry.set_inode(kLastInode);
   entry_list->push_back(last_entry);
 }
 
-inline bool IsSmaller(const catalog::DirectoryEntry& a,
-                      const catalog::DirectoryEntry& b) {
+inline bool IsSmaller(const catalog::DirectoryEntry &a,
+                      const catalog::DirectoryEntry &b) {
   bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
   bool a_is_last = (a.inode() == kLastInode);
   bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
   bool b_is_last = (b.inode() == kLastInode);
 
-  if (a_is_last || b_is_first) return false;
-  if (a_is_first) return !b_is_first;
-  if (b_is_last) return !a_is_last;
+  if (a_is_last || b_is_first)
+    return false;
+  if (a_is_first)
+    return !b_is_first;
+  if (b_is_last)
+    return !a_is_last;
   return a.name() < b.name();
 }
 
-template <typename RoCatalogMgr>
+template<typename RoCatalogMgr>
 bool CatalogDiffTool<RoCatalogMgr>::Init() {
   if (needs_setup_) {
     // Create a temp directory
@@ -50,16 +53,14 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
     new_raii_temp_dir_ = RaiiTempDir::Create(temp_dir_prefix_);
 
     // Old catalog from release manager machine (before lease)
-    old_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
-                           old_root_hash_, download_manager_, &stats_old_,
-                           cache_dir_);
+    old_catalog_mgr_ = OpenCatalogManager(repo_path_, old_raii_temp_dir_->dir(),
+                                          old_root_hash_, download_manager_,
+                                          &stats_old_, cache_dir_);
 
     // New catalog from release manager machine (before lease)
-    new_catalog_mgr_ =
-        OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
-                           new_root_hash_, download_manager_, &stats_new_,
-                           cache_dir_);
+    new_catalog_mgr_ = OpenCatalogManager(repo_path_, new_raii_temp_dir_->dir(),
+                                          new_root_hash_, download_manager_,
+                                          &stats_new_, cache_dir_);
 
     if (!old_catalog_mgr_.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Could not open old catalog");
@@ -75,28 +76,27 @@ bool CatalogDiffTool<RoCatalogMgr>::Init() {
   return true;
 }
 
-template <typename RoCatalogMgr>
-bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString& path) {
+template<typename RoCatalogMgr>
+bool CatalogDiffTool<RoCatalogMgr>::Run(const PathString &path) {
   DiffRec(path);
 
   return true;
 }
 
-template <typename RoCatalogMgr>
-RoCatalogMgr* CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
-    const std::string& repo_path, const std::string& temp_dir,
-    const shash::Any& root_hash, download::DownloadManager* download_manager,
-    perf::Statistics* stats, const std::string& cache_dir) {
-  RoCatalogMgr* mgr = new RoCatalogMgr(root_hash, repo_path, temp_dir,
-                                       download_manager, stats, true,
-                                       cache_dir);
+template<typename RoCatalogMgr>
+RoCatalogMgr *CatalogDiffTool<RoCatalogMgr>::OpenCatalogManager(
+    const std::string &repo_path, const std::string &temp_dir,
+    const shash::Any &root_hash, download::DownloadManager *download_manager,
+    perf::Statistics *stats, const std::string &cache_dir) {
+  RoCatalogMgr *mgr = new RoCatalogMgr(
+      root_hash, repo_path, temp_dir, download_manager, stats, true, cache_dir);
   mgr->Init();
 
   return mgr;
 }
 
-template <typename RoCatalogMgr>
-void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
+template<typename RoCatalogMgr>
+void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
   // Terminate recursion upon reaching an ignored path
   if (IsIgnoredPath(path)) {
     assert(!IsReportablePath(path));
@@ -147,8 +147,10 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     }
 
     // Skip .cvmfs hidden directory
-    while (old_entry.IsHidden()) old_entry = old_listing[++i_from];
-    while (new_entry.IsHidden()) new_entry = new_listing[++i_to];
+    while (old_entry.IsHidden())
+      old_entry = old_listing[++i_from];
+    while (new_entry.IsHidden())
+      new_entry = new_listing[++i_to];
 
     old_path.Truncate(length_after_truncate);
     old_path.Append(old_entry.name().GetChars(), old_entry.name().GetLength());
@@ -190,30 +192,32 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString& path) {
     i_from++;
     i_to++;
 
-    catalog::DirectoryEntryBase::Differences diff =
-        old_entry.CompareTo(new_entry);
-    if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical) &&
-        old_entry.IsNestedCatalogMountpoint()) {
+    catalog::DirectoryEntryBase::Differences diff = old_entry.CompareTo(
+        new_entry);
+    if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical)
+        && old_entry.IsNestedCatalogMountpoint()) {
       // Early recursion stop if nested catalogs are identical
       shash::Any id_nested_from, id_nested_to;
       id_nested_from = old_catalog_mgr_->GetNestedCatalogHash(old_path);
       id_nested_to = new_catalog_mgr_->GetNestedCatalogHash(new_path);
       assert(!id_nested_from.IsNull() && !id_nested_to.IsNull());
-      if (id_nested_from == id_nested_to) continue;
+      if (id_nested_from == id_nested_to)
+        continue;
     }
 
-    if (IsReportablePath(old_path) &&
-        ((diff != catalog::DirectoryEntryBase::Difference::kIdentical) ||
-         old_entry.IsNestedCatalogMountpoint())) {
+    if (IsReportablePath(old_path)
+        && ((diff != catalog::DirectoryEntryBase::Difference::kIdentical)
+            || old_entry.IsNestedCatalogMountpoint())) {
       // Modified directory entry, or nested catalog with modified hash
       FileChunkList chunks;
       if (new_entry.IsChunkedFile()) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
-      bool recurse =
-        ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
-      if (!recurse) continue;
+      bool recurse = ReportModification(old_path, old_entry, new_entry, xattrs,
+                                        chunks);
+      if (!recurse)
+        continue;
     }
 
     if (old_entry.IsDirectory() || new_entry.IsDirectory()) {

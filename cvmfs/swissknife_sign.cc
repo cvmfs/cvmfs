@@ -6,7 +6,6 @@
 
 #include "swissknife_sign.h"
 
-
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -42,17 +41,23 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   string temp_dir = *args.find('t')->second;
 
   string certificate = "";
-  if (args.find('c') != args.end()) certificate = *args.find('c')->second;
+  if (args.find('c') != args.end())
+    certificate = *args.find('c')->second;
   string priv_key = "";
-  if (args.find('k') != args.end()) priv_key = *args.find('k')->second;
+  if (args.find('k') != args.end())
+    priv_key = *args.find('k')->second;
   string repo_name = "";
-  if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
+  if (args.find('n') != args.end())
+    repo_name = *args.find('n')->second;
   string pwd = "";
-  if (args.find('s') != args.end()) pwd = *args.find('s')->second;
+  if (args.find('s') != args.end())
+    pwd = *args.find('s')->second;
   string meta_info = "";
-  if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
+  if (args.find('M') != args.end())
+    meta_info = *args.find('M')->second;
   string proxy = "";
-  if (args.find('@') != args.end()) proxy = *args.find('@')->second;
+  if (args.find('@') != args.end())
+    proxy = *args.find('@')->second;
   const bool garbage_collectable = (args.count('g') > 0);
   const bool bootstrap_shortcuts = (args.count('A') > 0);
   const bool return_early = (args.count('e') > 0);

@@ -33,7 +33,7 @@ class JsonDocument : SingleCopy {
   static const unsigned kDefaultBlockSize = 2048;  // 2kB
 
   struct PrintOptions {
-    PrintOptions() : with_whitespace(false), num_indent(0) {}
+    PrintOptions() : with_whitespace(false), num_indent(0) { }
     bool with_whitespace;
     unsigned num_indent;
   };
@@ -49,7 +49,7 @@ class JsonDocument : SingleCopy {
   char *raw_text_;
 };
 
-template <typename T>
+template<typename T>
 bool GetFromJSON(const JSON *object, const std::string &name, T *value);
 
 #endif  // CVMFS_JSON_DOCUMENT_H_

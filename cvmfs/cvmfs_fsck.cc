@@ -9,7 +9,6 @@
 #define _FILE_OFFSET_BITS 64
 
 
-
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -54,8 +53,8 @@ atomic_int32 g_num_tmp_catalog;
  */
 pthread_mutex_t g_lock_traverse = PTHREAD_MUTEX_INITIALIZER;
 DIR *g_DIRP_current = NULL;
-int g_num_dirs = -1;  /**< Number of cache directories already examined. */
-string *g_current_dir;  /**< Current cache sub directory */
+int g_num_dirs = -1;   /**< Number of cache directories already examined. */
+string *g_current_dir; /**< Current cache sub directory */
 
 int g_num_threads = 1;
 bool g_fix_errors = false;
@@ -87,7 +86,8 @@ static bool GetNextFile(string *relative_path, string *hash_name) {
 get_next_file_again:
   while (g_DIRP_current && ((d = platform_readdir(g_DIRP_current)) != NULL)) {
     const string name = d->d_name;
-    if ((name == ".") || (name == "..")) continue;
+    if ((name == ".") || (name == ".."))
+      continue;
 
     platform_stat64 info;
     *relative_path = *g_current_dir + "/" + name;
@@ -120,8 +120,7 @@ get_next_file_again:
       *g_current_dir = string(hex, 2);
 
       if (g_verbose)
-        LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s",
-                 g_current_dir->c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout, "Entering %s", g_current_dir->c_str());
       if ((g_DIRP_current = opendir(hex)) == NULL) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "Invalid cache directory, %s/%s does not exist",
@@ -149,7 +148,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
     if (!g_verbose && ((n % 1000) == 0))
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, ".");
 
-    if (relative_path[relative_path.length()-1] == 'T') {
+    if (relative_path[relative_path.length() - 1] == 'T') {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "Warning: temporary file catalog %s found", path.c_str());
       atomic_inc32(&g_num_tmp_catalog);
@@ -166,7 +165,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
       continue;
     }
 
-    int fd_src = open(relative_path.c_str() , O_RDONLY);
+    int fd_src = open(relative_path.c_str(), O_RDONLY);
     if (fd_src < 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: cannot open %s", path.c_str());
       atomic_inc32(&g_num_err_operational);
@@ -298,12 +297,14 @@ int main(int argc, char **argv) {
   platform_dirent64 *d;
   while ((d = platform_readdir(dirp_txn)) != NULL) {
     const string name = d->d_name;
-    if ((name == ".") || (name == "..")) continue;
+    if ((name == ".") || (name == ".."))
+      continue;
 
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Warning: temporary directory %s/txn is not empty\n"
              "If this repository is currently _not_ mounted, "
-             "you can remove its contents", g_cache_dir->c_str());
+             "you can remove its contents",
+             g_cache_dir->c_str());
     break;
   }
   closedir(dirp_txn);
@@ -315,21 +316,21 @@ int main(int argc, char **argv) {
   atomic_init32(&g_num_err_operational);
   atomic_init32(&g_num_tmp_catalog);
   pthread_t *workers = reinterpret_cast<pthread_t *>(
-    smalloc(g_num_threads * sizeof(pthread_t)));
+      smalloc(g_num_threads * sizeof(pthread_t)));
   if (!g_verbose)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Verifying: ");
   for (int i = 0; i < g_num_threads; ++i) {
     if (g_verbose)
-      LogCvmfs(kLogCvmfs, kLogStdout, "Starting worker %d", i+1);
+      LogCvmfs(kLogCvmfs, kLogStdout, "Starting worker %d", i + 1);
     if (pthread_create(&workers[i], NULL, MainCheck, NULL) != 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Fatal: could not create worker thread");
       return kErrorOperational;
     }
   }
-  for (int i = g_num_threads-1; i >= 0; --i) {
+  for (int i = g_num_threads - 1; i >= 0; --i) {
     pthread_join(workers[i], NULL);
     if (g_verbose)
-      LogCvmfs(kLogCvmfs, kLogStdout, "Stopping worker %d", i+1);
+      LogCvmfs(kLogCvmfs, kLogStdout, "Stopping worker %d", i + 1);
   }
   free(workers);
   if (!g_verbose)
@@ -355,7 +356,8 @@ int main(int argc, char **argv) {
   }
 
   if (atomic_read32(&g_modified_cache)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "\n"
+    LogCvmfs(kLogCvmfs, kLogStdout,
+             "\n"
              "WARNING: There might by corrupted files in the kernel buffers.\n"
              "Remount CernVM-FS or run 'echo 3 > /proc/sys/vm/drop_caches'"
              "\n\n");

@@ -23,23 +23,23 @@ using namespace std;  // NOLINT
 namespace {
 
 struct sslctx_info {
-  sslctx_info() : chain(NULL), pkey(NULL) {}
+  sslctx_info() : chain(NULL), pkey(NULL) { }
 
-  STACK_OF(X509) *chain;
+  STACK_OF(X509) * chain;
   EVP_PKEY *pkey;
 };
 
 struct bearer_info {
   /**
-  * List of extra headers to put on the HTTP request.  This is required
-  * in order to add the "Authorization: Bearer XXXXX" header.
-  */
+   * List of extra headers to put on the HTTP request.  This is required
+   * in order to add the "Authorization: Bearer XXXXX" header.
+   */
   struct curl_slist *list;
 
   /**
-  * Actual text of the bearer token
-  */
-  char* token;
+   * Actual text of the bearer token
+   */
+  char *token;
 };
 }  // anonymous namespace
 
@@ -48,19 +48,14 @@ bool AuthzAttachment::ssl_strings_loaded_ = false;
 
 
 AuthzAttachment::AuthzAttachment(AuthzSessionManager *sm)
-  : authz_session_manager_(sm)
-{
+    : authz_session_manager_(sm) {
   // Required for logging OpenSSL errors
   SSL_load_error_strings();
   ssl_strings_loaded_ = true;
 }
 
 
-CURLcode AuthzAttachment::CallbackSslCtx(
-  CURL *curl,
-  void *sslctx,
-  void *parm)
-{
+CURLcode AuthzAttachment::CallbackSslCtx(CURL *curl, void *sslctx, void *parm) {
   sslctx_info *p = reinterpret_cast<sslctx_info *>(parm);
   SSL_CTX *ctx = reinterpret_cast<SSL_CTX *>(sslctx);
 
@@ -110,34 +105,33 @@ CURLcode AuthzAttachment::CallbackSslCtx(
 }
 
 
-bool AuthzAttachment::ConfigureSciTokenCurl(
-  CURL *curl_handle,
-  const AuthzToken &token,
-  void **info_data)
-{
+bool AuthzAttachment::ConfigureSciTokenCurl(CURL *curl_handle,
+                                            const AuthzToken &token,
+                                            void **info_data) {
   if (*info_data == NULL) {
-    AuthzToken* saved_token = new AuthzToken();
+    AuthzToken *saved_token = new AuthzToken();
     saved_token->type = kTokenBearer;
     saved_token->data = new bearer_info;
-    bearer_info* bearer = static_cast<bearer_info*>(saved_token->data);
+    bearer_info *bearer = static_cast<bearer_info *>(saved_token->data);
     bearer->list = NULL;
-    bearer->token = static_cast<char*>(smalloc((sizeof(char) * token.size)+ 1));
+    bearer->token = static_cast<char *>(
+        smalloc((sizeof(char) * token.size) + 1));
     memcpy(bearer->token, token.data, token.size);
-    static_cast<char*>(bearer->token)[token.size] = 0;
+    static_cast<char *>(bearer->token)[token.size] = 0;
     *info_data = saved_token;
   }
 
-  AuthzToken* tmp_token = static_cast<AuthzToken*>(*info_data);
-  bearer_info* bearer = static_cast<bearer_info*>(tmp_token->data);
+  AuthzToken *tmp_token = static_cast<AuthzToken *>(*info_data);
+  bearer_info *bearer = static_cast<bearer_info *>(tmp_token->data);
 
   LogCvmfs(kLogAuthz, kLogDebug, "Setting OAUTH bearer token to: %s",
-           static_cast<char*>(bearer->token));
+           static_cast<char *>(bearer->token));
 
   // Create the Bearer token
   // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP"
   // protocols. Not HTTPS
   std::string auth_preamble = "Authorization: Bearer ";
-  std::string auth_header = auth_preamble + static_cast<char*>(bearer->token);
+  std::string auth_header = auth_preamble + static_cast<char *>(bearer->token);
   bearer->list = curl_slist_append(bearer->list, auth_header.c_str());
   int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
 
@@ -150,12 +144,9 @@ bool AuthzAttachment::ConfigureSciTokenCurl(
 }
 
 
-
-bool AuthzAttachment::ConfigureCurlHandle(
-  CURL *curl_handle,
-  pid_t pid,
-  void **info_data)
-{
+bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
+                                          pid_t pid,
+                                          void **info_data) {
   assert(info_data);
 
   // File catalog has no membership requirement, no tokens to attach
@@ -169,7 +160,7 @@ bool AuthzAttachment::ConfigureCurlHandle(
   curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
 
   UniquePtr<AuthzToken> token(
-    authz_session_manager_->GetTokenCopy(pid, membership_));
+      authz_session_manager_->GetTokenCopy(pid, membership_));
   if (!token.IsValid()) {
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);
     return false;
@@ -196,14 +187,13 @@ bool AuthzAttachment::ConfigureCurlHandle(
   // The calling layer is reusing data;
   if (*info_data) {
     curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
-                     static_cast<AuthzToken*>(*info_data)->data);
+                     static_cast<AuthzToken *>(*info_data)->data);
     return true;
   }
 
 
-  int retval = curl_easy_setopt(curl_handle,
-                                CURLOPT_SSL_CTX_FUNCTION,
-                                CallbackSslCtx);
+  int retval = curl_easy_setopt(
+      curl_handle, CURLOPT_SSL_CTX_FUNCTION, CallbackSslCtx);
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogDebug, "cannot configure curl ssl callback");
     return false;
@@ -232,7 +222,9 @@ bool AuthzAttachment::ConfigureCurlHandle(
 
   while (sk_X509_INFO_num(sk)) {
     X509_INFO *xi = sk_X509_INFO_shift(sk);
-    if (xi == NULL) {continue;}
+    if (xi == NULL) {
+      continue;
+    }
     if (xi->x509 != NULL) {
 #ifdef OPENSSL_API_INTERFACE_V11
       retval = X509_up_ref(xi->x509);
@@ -283,11 +275,11 @@ bool AuthzAttachment::ConfigureCurlHandle(
              sk_X509_num(certstack));
   }
 
-  AuthzToken* to_return = new AuthzToken();
+  AuthzToken *to_return = new AuthzToken();
   to_return->type = kTokenX509;
-  to_return->data = static_cast<void*>(parm.Release());
+  to_return->data = static_cast<void *>(parm.Release());
   curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA,
-                   static_cast<sslctx_info*>(to_return->data));
+                   static_cast<sslctx_info *>(to_return->data));
   *info_data = to_return;
   return true;
 }
@@ -308,13 +300,13 @@ void AuthzAttachment::LogOpenSSLErrors(const char *top_message) {
 void AuthzAttachment::ReleaseCurlHandle(CURL *curl_handle, void *info_data) {
   assert(info_data);
 
-  AuthzToken* token = static_cast<AuthzToken*>(info_data);
+  AuthzToken *token = static_cast<AuthzToken *>(info_data);
   if (token->type == kTokenBearer) {
     // Compiler complains if we delete a void*
-    bearer_info* bearer = static_cast<bearer_info*>(token->data);
-    delete static_cast<char*>(bearer->token);
+    bearer_info *bearer = static_cast<bearer_info *>(token->data);
+    delete static_cast<char *>(bearer->token);
     curl_slist_free_all(bearer->list);
-    delete static_cast<bearer_info*>(token->data);
+    delete static_cast<bearer_info *>(token->data);
     token->data = NULL;
     delete token;
 

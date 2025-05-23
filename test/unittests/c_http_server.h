@@ -15,12 +15,10 @@
 #include "util/atomic.h"
 #include "util/string.h"
 
-typedef std::vector< std::pair<std::string, std::string> > HTTPHeaderList;
+typedef std::vector<std::pair<std::string, std::string> > HTTPHeaderList;
 
 struct HTTPRequest {
-  HTTPRequest() {
-    content_length = 0;
-  }
+  HTTPRequest() { content_length = 0; }
 
   std::string ToString() const {
     std::string result;
@@ -52,7 +50,8 @@ struct HTTPResponse {
   }
 
   std::string ToString() const {
-    if (raw) return body;
+    if (raw)
+      return body;
     std::string result;
     result += protocol + " " + StringifyInt(code) + " " + reason + "\r\n";
     HTTPHeaderList::const_iterator it = headers.begin();
@@ -143,9 +142,9 @@ class MockHTTPServer {
   // custom persistent data, which can be used by the function to remember
   // the state. The function needs to return an HTTPResponse object, which
   // is then used by the server to respond to given HTTP request.
-  bool SetResponseCallback(
-    HTTPResponse (*callback_func)(const HTTPRequest &, void*),
-    void *data = NULL);
+  bool SetResponseCallback(HTTPResponse (*callback_func)(const HTTPRequest &,
+                                                         void *),
+                           void *data = NULL);
 
  protected:
   // Main function of the server.
@@ -157,7 +156,7 @@ class MockHTTPServer {
   int server_port_;
 
   void *callback_data_;
-  HTTPResponse (*callback_func_)(const HTTPRequest &, void*);
+  HTTPResponse (*callback_func_)(const HTTPRequest &, void *);
 
   pthread_t server_thread_;
 };
@@ -185,7 +184,7 @@ class MockProxyServer {
 
  protected:
   static size_t ProxyServerWriteCallback(char *ptr, size_t size, size_t nmemb,
-                                         void* userdata);
+                                         void *userdata);
   static HTTPResponse ProxyServerHandler(const HTTPRequest &req, void *data);
 
   int port_;
@@ -200,8 +199,7 @@ class MockRedirectServer {
   int num_processed_requests() { return num_processed_requests_; }
 
  protected:
-  static HTTPResponse RedirectServerHandler(const HTTPRequest &req,
-                                            void *data);
+  static HTTPResponse RedirectServerHandler(const HTTPRequest &req, void *data);
 
   int port_;
   std::string redirect_destination_;

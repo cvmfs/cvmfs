@@ -5,14 +5,13 @@
 #ifndef CVMFS_NFS_MAPS_LEVELDB_H_
 #define CVMFS_NFS_MAPS_LEVELDB_H_
 
-#include "nfs_maps.h"
-
 #include <pthread.h>
 
 #include <string>
 
 #include "crypto/hash.h"
 #include "leveldb/env.h"
+#include "nfs_maps.h"
 #include "util/atomic.h"
 
 
@@ -20,11 +19,11 @@ namespace leveldb {
 class DB;
 class Cache;
 class FilterPolicy;
-}
+}  // namespace leveldb
 namespace perf {
 class Counter;
 class Statistics;
-}
+}  // namespace perf
 
 
 class NfsMapsLeveldb : public NfsMaps {
@@ -36,16 +35,15 @@ class NfsMapsLeveldb : public NfsMaps {
   virtual void Spawn() { spawned_ = true; }
   virtual std::string GetStatistics();
 
-  static NfsMapsLeveldb *Create(
-    const std::string &leveldb_dir,
-    const uint64_t root_inode,
-    const bool rebuild,
-    perf::Statistics *statistics);
+  static NfsMapsLeveldb *Create(const std::string &leveldb_dir,
+                                const uint64_t root_inode,
+                                const bool rebuild,
+                                perf::Statistics *statistics);
 
  private:
   class ForkAwareEnv;
   struct FuncArg {
-    void (*function)(void*);
+    void (*function)(void *);
     void *arg;
     class ForkAwareEnv *env;
   };
@@ -58,8 +56,8 @@ class NfsMapsLeveldb : public NfsMaps {
   class ForkAwareEnv : public leveldb::EnvWrapper {
    public:
     explicit ForkAwareEnv(NfsMapsLeveldb *maps);
-    void StartThread(void (*f)(void*), void* a);
-    void Schedule(void (*function)(void*), void* arg);
+    void StartThread(void (*f)(void *), void *a);
+    void Schedule(void (*function)(void *), void *arg);
     void WaitForBGThreads();
     void SleepForMicroseconds(int micros);
 

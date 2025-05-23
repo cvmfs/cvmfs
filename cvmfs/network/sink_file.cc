@@ -2,11 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
+#include "sink_file.h"
+
 #include <cerrno>
 #include <cstdio>
 #include <string>
-
-#include "sink_file.h"
 
 namespace cvmfs {
 
@@ -36,9 +36,10 @@ int64_t FileSink::Write(const void *buf, uint64_t sz) {
  *          Failure = -1
  */
 int FileSink::Reset() {
-  return ((fflush(file_) == 0) &&
-          (ftruncate(fileno(file_), 0) == 0) &&
-          (freopen(NULL, "w", file_) == file_)) ? 0 : -errno;
+  return ((fflush(file_) == 0) && (ftruncate(fileno(file_), 0) == 0)
+          && (freopen(NULL, "w", file_) == file_))
+             ? 0
+             : -errno;
 }
 
 /**
@@ -74,7 +75,7 @@ std::string FileSink::Describe() {
 }
 void FileSink::Adopt(FILE *file, bool is_owner) {
   if (is_owner_ && file_) {
-    (void) fclose(file_);
+    (void)fclose(file_);
   }
 
   is_owner_ = is_owner;

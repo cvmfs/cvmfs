@@ -10,7 +10,7 @@
 
 namespace notify {
 
-Publisher::~Publisher() {}
+Publisher::~Publisher() { }
 
 bool Publisher::Init() { return true; }
 

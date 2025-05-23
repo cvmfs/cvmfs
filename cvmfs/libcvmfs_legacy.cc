@@ -6,12 +6,11 @@
  */
 
 
-#include "libcvmfs.h"
-
 #include <cstdio>
 #include <cstring>
 #include <string>
 
+#include "libcvmfs.h"
 #include "libcvmfs_int.h"
 #include "loader.h"
 #include "options.h"
@@ -62,7 +61,8 @@ static int set_option(char const *name, char const *value, string *var) {
 }
 
 
-#define CVMFS_OPT(var) if (strcmp(name, #var) == 0) \
+#define CVMFS_OPT(var)         \
+  if (strcmp(name, #var) == 0) \
   return ::set_option(name, value, &var)
 
 
@@ -90,35 +90,35 @@ struct cvmfs_repo_options {
       mountpoint = "/cvmfs/";
       mountpoint += repo_name;
     }
-    while (mountpoint.length() > 0 && mountpoint[mountpoint.length()-1] == '/')
-    {
-      mountpoint.resize(mountpoint.length()-1);
+    while (mountpoint.length() > 0
+           && mountpoint[mountpoint.length() - 1] == '/') {
+      mountpoint.resize(mountpoint.length() - 1);
     }
 
     return LIBCVMFS_FAIL_OK;
   }
 
-  cvmfs_repo_options() :
-    timeout(2),
-    timeout_direct(2),
-    pubkey("/etc/cvmfs/keys/cern.ch.pub"),
-    blacklist(""),
-    allow_unsigned(false) {}
+  cvmfs_repo_options()
+      : timeout(2)
+      , timeout_direct(2)
+      , pubkey("/etc/cvmfs/keys/cern.ch.pub")
+      , blacklist("")
+      , allow_unsigned(false) { }
 
-  unsigned       timeout;
-  unsigned       timeout_direct;
-  std::string    url;
-  std::string    external_url;
-  std::string    proxies;
-  std::string    fallback_proxies;
-  std::string    tracefile;  // unused
-  std::string    pubkey;
-  std::string    deep_mount;
-  std::string    blacklist;
-  std::string    repo_name;
-  std::string    root_hash;
-  std::string    mountpoint;
-  bool           allow_unsigned;
+  unsigned timeout;
+  unsigned timeout_direct;
+  std::string url;
+  std::string external_url;
+  std::string proxies;
+  std::string fallback_proxies;
+  std::string tracefile;  // unused
+  std::string pubkey;
+  std::string deep_mount;
+  std::string blacklist;
+  std::string repo_name;
+  std::string root_hash;
+  std::string mountpoint;
+  bool allow_unsigned;
 };
 
 
@@ -152,9 +152,8 @@ struct cvmfs_global_options {
     if (nofiles >= 0)
       max_open_files = nofiles;
 
-    if ((syslog_level >= 0) && (log_syslog_level != 0) &&
-        (syslog_level != log_syslog_level))
-    {
+    if ((syslog_level >= 0) && (log_syslog_level != 0)
+        && (syslog_level != log_syslog_level)) {
       return LIBCVMFS_FAIL_BADOPT;
     }
     if (syslog_level >= 0)
@@ -167,9 +166,8 @@ struct cvmfs_global_options {
     if (logfile != "")
       log_file = logfile;
 
-    if ((cachedir != "") && (cache_directory != "") &&
-        (cache_directory != cachedir))
-    {
+    if ((cachedir != "") && (cache_directory != "")
+        && (cache_directory != cachedir)) {
       return LIBCVMFS_FAIL_BADOPT;
     }
     if (cachedir != "")
@@ -179,32 +177,31 @@ struct cvmfs_global_options {
   }
 
   cvmfs_global_options()
-    : change_to_cache_directory(false)
-    , alien_cache(false)
-    , syslog_level(-1)
-    , log_syslog_level(-1)
-    , nofiles(-1)
-    , max_open_files(0)
-    , quota_limit(0)
-    , quota_threshold(0)
-    , rebuild_cachedb(0)
-  { }
+      : change_to_cache_directory(false)
+      , alien_cache(false)
+      , syslog_level(-1)
+      , log_syslog_level(-1)
+      , nofiles(-1)
+      , max_open_files(0)
+      , quota_limit(0)
+      , quota_threshold(0)
+      , rebuild_cachedb(0) { }
 
-  std::string    cache_directory;
-  std::string    cachedir;  // Alias of cache_directory
-  std::string    alien_cachedir;
-  std::string    lock_directory;
-  bool           change_to_cache_directory;
-  bool           alien_cache;
+  std::string cache_directory;
+  std::string cachedir;  // Alias of cache_directory
+  std::string alien_cachedir;
+  std::string lock_directory;
+  bool change_to_cache_directory;
+  bool alien_cache;
 
-  int            syslog_level;
-  int            log_syslog_level;
-  std::string    log_prefix;
-  std::string    logfile;
-  std::string    log_file;
+  int syslog_level;
+  int log_syslog_level;
+  std::string log_prefix;
+  std::string logfile;
+  std::string log_file;
 
-  int            nofiles;
-  int            max_open_files;  // Alias of nofiles
+  int nofiles;
+  int max_open_files;  // Alias of nofiles
 
   // Currently ignored
   unsigned quota_limit;
@@ -216,24 +213,24 @@ struct cvmfs_global_options {
 /**
  * Structure to parse the file system options.
  */
-template <class DerivedT>
+template<class DerivedT>
 struct cvmfs_options : public DerivedT {
   int set_option(char const *name, char const *value) {
     return DerivedT::set_option(name, value);
   }
 
-  int parse_options(char const *options)
-  {
+  int parse_options(char const *options) {
     while (*options) {
       char const *next = options;
       string name;
       string value;
 
       // get the option name
-      for (next=options; *next && *next != ',' && *next != '='; next++) {
+      for (next = options; *next && *next != ',' && *next != '='; next++) {
         if (*next == '\\') {
           next++;
-          if (*next == '\0') break;
+          if (*next == '\0')
+            break;
         }
         name += *next;
       }
@@ -246,7 +243,8 @@ struct cvmfs_options : public DerivedT {
       for (; *next && *next != ','; next++) {
         if (*next == '\\') {
           next++;
-          if (*next == '\0') break;
+          if (*next == '\0')
+            break;
         }
         value += *next;
       }
@@ -258,7 +256,8 @@ struct cvmfs_options : public DerivedT {
         }
       }
 
-      if (*next == ',') next++;
+      if (*next == ',')
+        next++;
       options = next;
     }
 
@@ -266,7 +265,7 @@ struct cvmfs_options : public DerivedT {
   }
 };
 
-typedef cvmfs_options<cvmfs_repo_options>   repo_options;
+typedef cvmfs_options<cvmfs_repo_options> repo_options;
 typedef cvmfs_options<cvmfs_global_options> global_options;
 
 /**
@@ -274,65 +273,70 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
  */
 static void usage() {
   struct cvmfs_repo_options defaults;
-  fprintf(stderr,
-  "CernVM-FS version %s\n"
-  "Copyright (c) 2009- CERN\n"
-  "All rights reserved\n\n"
-  "Please visit http://cernvm.cern.ch/project/info for license details "
-  "and author list.\n\n"
+  fprintf(
+      stderr,
+      "CernVM-FS version %s\n"
+      "Copyright (c) 2009- CERN\n"
+      "All rights reserved\n\n"
+      "Please visit http://cernvm.cern.ch/project/info for license details "
+      "and author list.\n\n"
 
-  "libcvmfs options are expected in the form: option1,option2,option3,...\n"
-  "Within an option, the characters , and \\ must be preceded by \\.\n\n"
+      "libcvmfs options are expected in the form: option1,option2,option3,...\n"
+      "Within an option, the characters , and \\ must be preceded by \\.\n\n"
 
-  "There are two types of options (global and repository specifics)\n"
-  "  cvmfs_init()        expects global options\n"
-  "  cvmfs_attach_repo() expects repository specific options\n"
+      "There are two types of options (global and repository specifics)\n"
+      "  cvmfs_init()        expects global options\n"
+      "  cvmfs_attach_repo() expects repository specific options\n"
 
-  "global options are:\n"
-  " cache_directory/cachedir=DIR Where to store disk cache\n"
-  " change_to_cache_directory  Performs a cd to the cache directory "
-                               "(performance tweak)\n"
-  " alien_cache                Treat cache directory as alien cache\n"
-  " alien_cachedir=DIR         Explicitly set an alien cache directory\n"
-  " lock_directory=DIR         Directory for per instance lock files.\n"
-  "                            Needs to be on a file system with POSIX locks.\n"
-  "                            Should be different from alien cache directory."
-  "                            \nDefaults to cache_directory.\n"
-  " (log_)syslog_level=LEVEL   Sets the level used for syslog to "
-                               "DEBUG (1), INFO (2), or NOTICE (3).\n"
-  "                            Default is NOTICE.\n"
-  " log_prefix                 String to use as a log prefix in syslog\n"
-  " log_file/logfile           Logs all messages to FILE instead of "
-                               "stderr and daemonizes.\n"
-  "                            Makes only sense for the debug version\n"
-  " nofiles/max_open_files     Set the maximum number of open files "
-                               "for CernVM-FS process (soft limit)\n\n"
+      "global options are:\n"
+      " cache_directory/cachedir=DIR Where to store disk cache\n"
+      " change_to_cache_directory  Performs a cd to the cache directory "
+      "(performance tweak)\n"
+      " alien_cache                Treat cache directory as alien cache\n"
+      " alien_cachedir=DIR         Explicitly set an alien cache directory\n"
+      " lock_directory=DIR         Directory for per instance lock files.\n"
+      "                            Needs to be on a file system with POSIX "
+      "locks.\n"
+      "                            Should be different from alien cache "
+      "directory."
+      "                            \nDefaults to cache_directory.\n"
+      " (log_)syslog_level=LEVEL   Sets the level used for syslog to "
+      "DEBUG (1), INFO (2), or NOTICE (3).\n"
+      "                            Default is NOTICE.\n"
+      " log_prefix                 String to use as a log prefix in syslog\n"
+      " log_file/logfile           Logs all messages to FILE instead of "
+      "stderr and daemonizes.\n"
+      "                            Makes only sense for the debug version\n"
+      " nofiles/max_open_files     Set the maximum number of open files "
+      "for CernVM-FS process (soft limit)\n\n"
 
-  "repository specific options are:"
-  " repo_name=REPO_NAME        Unique name of the mounted repository, "
-                               "e.g. atlas.cern.ch\n"
-  " url=REPOSITORY_URL         The URL of the CernVM-FS server(s): "
-                               "'url1;url2;...'\n"
-  " timeout=SECONDS            Timeout for network operations (default is %d)\n"
-  " timeout_direct=SECONDS     Timeout for network operations without proxy "
-                               "(default is %d)\n"
-  " proxies=HTTP_PROXIES       Set the HTTP proxy list, such as "
-                               "'proxy1|proxy2;DIRECT'\n"
-  " fallback_proxies=PROXIES   Set the fallback proxy list, such as "
-                               "'proxy1;proxy2'\n"
-  " tracefile=FILE             Trace FUSE opaerations into FILE\n"
-  " pubkey=PEMFILE             Public RSA key that is used to verify the "
-                               "whitelist signature.\n"
-  " allow_unsigned             Accept unsigned catalogs "
-                               "(allows man-in-the-middle attacks)\n"
-  " deep_mount=PREFIX          Path prefix if a repository is mounted on a "
-                               "nested catalog,\n"
-  "                            i.e. deep_mount=/software/15.0.1\n"
-  " mountpoint=PATH            Path to root of repository, "
-                               "e.g. /cvmfs/atlas.cern.ch\n"
-  " blacklist=FILE             Local blacklist for invalid certificates. "
-                               "Has precedence over the whitelist.\n",
-  CVMFS_VERSION, defaults.timeout, defaults.timeout_direct);
+      "repository specific options are:"
+      " repo_name=REPO_NAME        Unique name of the mounted repository, "
+      "e.g. atlas.cern.ch\n"
+      " url=REPOSITORY_URL         The URL of the CernVM-FS server(s): "
+      "'url1;url2;...'\n"
+      " timeout=SECONDS            Timeout for network operations (default is "
+      "%d)\n"
+      " timeout_direct=SECONDS     Timeout for network operations without "
+      "proxy "
+      "(default is %d)\n"
+      " proxies=HTTP_PROXIES       Set the HTTP proxy list, such as "
+      "'proxy1|proxy2;DIRECT'\n"
+      " fallback_proxies=PROXIES   Set the fallback proxy list, such as "
+      "'proxy1;proxy2'\n"
+      " tracefile=FILE             Trace FUSE opaerations into FILE\n"
+      " pubkey=PEMFILE             Public RSA key that is used to verify the "
+      "whitelist signature.\n"
+      " allow_unsigned             Accept unsigned catalogs "
+      "(allows man-in-the-middle attacks)\n"
+      " deep_mount=PREFIX          Path prefix if a repository is mounted on a "
+      "nested catalog,\n"
+      "                            i.e. deep_mount=/software/15.0.1\n"
+      " mountpoint=PATH            Path to root of repository, "
+      "e.g. /cvmfs/atlas.cern.ch\n"
+      " blacklist=FILE             Local blacklist for invalid certificates. "
+      "Has precedence over the whitelist.\n",
+      CVMFS_VERSION, defaults.timeout, defaults.timeout_direct);
 }
 
 
@@ -446,10 +450,8 @@ int cvmfs_init(char const *options) {
 }
 
 
-SimpleOptionsParser *cvmfs_options_clone_legacy(
-  SimpleOptionsParser *opts,
-  const char *legacy_options)
-{
+SimpleOptionsParser *cvmfs_options_clone_legacy(SimpleOptionsParser *opts,
+                                                const char *legacy_options) {
   // Parse options
   repo_options repo_opts;
   int parse_result = repo_opts.parse_options(legacy_options);
@@ -459,11 +461,11 @@ SimpleOptionsParser *cvmfs_options_clone_legacy(
 
   SimpleOptionsParser *options_mgr = cvmfs_options_clone(opts);
   options_mgr->SwitchTemplateManager(
-    new DefaultOptionsTemplateManager(repo_opts.repo_name));
+      new DefaultOptionsTemplateManager(repo_opts.repo_name));
   options_mgr->SetValue("CVMFS_FQRN", repo_opts.repo_name);
   options_mgr->SetValue("CVMFS_TIMEOUT", StringifyInt(repo_opts.timeout));
   options_mgr->SetValue("CVMFS_TIMEOUT_DIRECT",
-                       StringifyInt(repo_opts.timeout_direct));
+                        StringifyInt(repo_opts.timeout_direct));
   options_mgr->SetValue("CVMFS_SERVER_URL", repo_opts.url);
   if (!repo_opts.external_url.empty()) {
     options_mgr->SetValue("CVMFS_EXTERNAL_URL", repo_opts.external_url);
@@ -487,11 +489,10 @@ SimpleOptionsParser *cvmfs_options_clone_legacy(
 }
 
 
-LibContext* cvmfs_attach_repo(char const *options)
-{
+LibContext *cvmfs_attach_repo(char const *options) {
   SimpleOptionsParser *options_mgr_base = cvmfs_options_init();
-  SimpleOptionsParser *options_mgr =
-    cvmfs_options_clone_legacy(options_mgr_base, options);
+  SimpleOptionsParser *options_mgr = cvmfs_options_clone_legacy(
+      options_mgr_base, options);
   cvmfs_options_fini(options_mgr_base);
   if (options_mgr == NULL) {
     fprintf(stderr, "Invalid CVMFS options: %s.\n", options);

@@ -74,16 +74,15 @@ FuseRemounter::Status FuseRemounter::Check() {
 
   LogCvmfs(kLogCvmfs, kLogDebug,
            "catalog TTL expired, checking revision against blacklists");
-  if (mountpoint_->ReloadBlacklists() &&
-      mountpoint_->catalog_mgr()->IsRevisionBlacklisted())
-  {
+  if (mountpoint_->ReloadBlacklists()
+      && mountpoint_->catalog_mgr()->IsRevisionBlacklisted()) {
     PANIC(kLogDebug | kLogSyslogErr,
           "repository revision blacklisted, aborting");
   }
 
   LogCvmfs(kLogCvmfs, kLogDebug, "remounting root catalog");
-  const catalog::LoadReturn retval =
-                                    mountpoint_->catalog_mgr()->RemountDryrun();
+  const catalog::LoadReturn retval = mountpoint_->catalog_mgr()
+                                         ->RemountDryrun();
   switch (retval) {
     case catalog::kLoadNew:
       SetOfflineMode(false);
@@ -108,14 +107,14 @@ FuseRemounter::Status FuseRemounter::Check() {
       SetOfflineMode(true);
       catalogs_valid_until_ = time(NULL) + MountPoint::kShortTermTTL;
       SetAlarm(MountPoint::kShortTermTTL);
-      return (retval == catalog::kLoadFail) ?
-             kStatusFailGeneral : kStatusFailNoSpace;
+      return (retval == catalog::kLoadFail) ? kStatusFailGeneral
+                                            : kStatusFailNoSpace;
     case catalog::kLoadUp2Date: {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "catalog up to date (could be offline mode)");
       SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
-      unsigned ttl = offline_mode_ ?
-        MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
+      unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
+                                   : mountpoint_->GetEffectiveTtlSec();
       catalogs_valid_until_ = time(NULL) + ttl;
       SetAlarm(ttl);
       return kStatusUp2Date;
@@ -164,15 +163,14 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
                              cvmfs::InodeGenerationInfo *inode_generation_info,
                              void **fuse_channel_or_session,
                              bool fuse_notify_invalidation)
-    : mountpoint_(mountpoint),
-      inode_generation_info_(inode_generation_info),
-      invalidator_(new FuseInvalidator(mountpoint,
-                                       fuse_channel_or_session,
-                                       fuse_notify_invalidation)),
-      invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec())),
-      fence_(new Fence()),
-      offline_mode_(false),
-      catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
+    : mountpoint_(mountpoint)
+    , inode_generation_info_(inode_generation_info)
+    , invalidator_(new FuseInvalidator(
+          mountpoint, fuse_channel_or_session, fuse_notify_invalidation))
+    , invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec()))
+    , fence_(new Fence())
+    , offline_mode_(false)
+    , catalogs_valid_until_(MountPoint::kIndefiniteDeadline) {
   memset(&thread_remount_trigger_, 0, sizeof(thread_remount_trigger_));
   pipe_remount_trigger_[0] = pipe_remount_trigger_[1] = -1;
   atomic_init32(&drainout_mode_);
@@ -274,13 +272,13 @@ void FuseRemounter::Spawn() {
   invalidator_->Spawn();
   if (!mountpoint_->fixed_catalog()) {
     MakePipe(pipe_remount_trigger_);
-    int retval = pthread_create(
-      &thread_remount_trigger_, NULL, MainRemountTrigger, this);
+    int retval = pthread_create(&thread_remount_trigger_, NULL,
+                                MainRemountTrigger, this);
     assert(retval == 0);
 
     SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
-    unsigned ttl = offline_mode_ ?
-      MountPoint::kShortTermTTL : mountpoint_->GetEffectiveTtlSec();
+    unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
+                                 : mountpoint_->GetEffectiveTtlSec();
     catalogs_valid_until_ = time(NULL) + ttl;
     SetAlarm(ttl);
   }
@@ -329,8 +327,8 @@ void FuseRemounter::TryFinish(const shash::Any &root_hash) {
     retval = mountpoint_->catalog_mgr()->ChangeRoot(root_hash);
   }
   if (mountpoint_->inode_annotation()) {
-    inode_generation_info_->inode_generation =
-      mountpoint_->inode_annotation()->GetGeneration();
+    inode_generation_info_->inode_generation = mountpoint_->inode_annotation()
+                                                   ->GetGeneration();
   }
   mountpoint_->ReEvaluateAuthz();
   fence_->Open();

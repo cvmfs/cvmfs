@@ -142,7 +142,7 @@ namespace upload {
 class Spooler : public Observable<SpoolerResult> {
  public:
   static Spooler *Construct(const SpoolerDefinition &spooler_definition,
-                              perf::StatisticsTemplate *statistics = NULL);
+                            perf::StatisticsTemplate *statistics = NULL);
   virtual ~Spooler();
 
   /**

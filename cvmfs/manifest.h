@@ -22,19 +22,18 @@ namespace manifest {
 struct Breadcrumb {
   static const uint64_t kInvalidRevision = -1ul;
 
-  Breadcrumb() : catalog_hash(), timestamp(0), revision(kInvalidRevision) {}
-  Breadcrumb(const shash::Any &h, uint64_t t, uint64_t r) :
-                                                          catalog_hash(h),
-                                                          timestamp(t),
-                                                          revision(r) {}
+  Breadcrumb() : catalog_hash(), timestamp(0), revision(kInvalidRevision) { }
+  Breadcrumb(const shash::Any &h, uint64_t t, uint64_t r)
+      : catalog_hash(h), timestamp(t), revision(r) { }
   explicit Breadcrumb(const std::string &from_string);
 
-  bool Export(const std::string &fqrn,
-              const std::string &directory, const int mode) const;
+  bool Export(const std::string &fqrn, const std::string &directory,
+              const int mode) const;
   std::string ToString() const;
-  bool IsValid() const { return !catalog_hash.IsNull()
-                                && (timestamp > 0)
-                                && (revision != kInvalidRevision); }
+  bool IsValid() const {
+    return !catalog_hash.IsNull() && (timestamp > 0)
+           && (revision != kInvalidRevision);
+  }
 
   shash::Any catalog_hash;
   uint64_t timestamp;
@@ -67,20 +66,20 @@ class Manifest {
            const bool has_alt_catalog_path,
            const shash::Any &meta_info,
            const shash::Any &reflog_hash)
-  : catalog_hash_(catalog_hash)
-  , catalog_size_(catalog_size)
-  , root_path_(root_path)
-  , ttl_(ttl)
-  , revision_(revision)
-  , micro_catalog_hash_(micro_catalog_hash)
-  , repository_name_(repository_name)
-  , certificate_(certificate)
-  , history_(history)
-  , publish_timestamp_(publish_timestamp)
-  , garbage_collectable_(garbage_collectable)
-  , has_alt_catalog_path_(has_alt_catalog_path)
-  , meta_info_(meta_info)
-  , reflog_hash_(reflog_hash) {}
+      : catalog_hash_(catalog_hash)
+      , catalog_size_(catalog_size)
+      , root_path_(root_path)
+      , ttl_(ttl)
+      , revision_(revision)
+      , micro_catalog_hash_(micro_catalog_hash)
+      , repository_name_(repository_name)
+      , certificate_(certificate)
+      , history_(history)
+      , publish_timestamp_(publish_timestamp)
+      , garbage_collectable_(garbage_collectable)
+      , has_alt_catalog_path_(has_alt_catalog_path)
+      , meta_info_(meta_info)
+      , reflog_hash_(reflog_hash) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -95,9 +94,7 @@ class Manifest {
   void set_certificate(const shash::Any &certificate) {
     certificate_ = certificate;
   }
-  void set_history(const shash::Any &history_db) {
-    history_ = history_db;
-  }
+  void set_history(const shash::Any &history_db) { history_ = history_db; }
   void set_repository_name(const std::string &repository_name) {
     repository_name_ = repository_name;
   }
@@ -116,15 +113,11 @@ class Manifest {
   void set_has_alt_catalog_path(const bool &has_alt_path) {
     has_alt_catalog_path_ = has_alt_path;
   }
-  void set_meta_info(const shash::Any &meta_info) {
-    meta_info_ = meta_info;
-  }
+  void set_meta_info(const shash::Any &meta_info) { meta_info_ = meta_info; }
   void set_root_path(const std::string &root_path) {
     root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   }
-  void set_reflog_hash(const shash::Any& checksum) {
-    reflog_hash_ = checksum;
-  }
+  void set_reflog_hash(const shash::Any &checksum) { reflog_hash_ = checksum; }
 
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
@@ -140,13 +133,13 @@ class Manifest {
   shash::Any reflog_hash() const { return reflog_hash_; }
 
   std::string MakeCatalogPath() const {
-    return has_alt_catalog_path_ ? catalog_hash_.MakeAlternativePath() :
-      ("data/" + catalog_hash_.MakePath());
+    return has_alt_catalog_path_ ? catalog_hash_.MakeAlternativePath()
+                                 : ("data/" + catalog_hash_.MakePath());
   }
 
   std::string MakeCertificatePath() const {
-    return has_alt_catalog_path_ ?
-      certificate_.MakeAlternativePath() : ("data/" + certificate_.MakePath());
+    return has_alt_catalog_path_ ? certificate_.MakeAlternativePath()
+                                 : ("data/" + certificate_.MakePath());
   }
 
  private:
@@ -164,9 +157,9 @@ class Manifest {
   bool garbage_collectable_;
 
   /**
-   * The root catalog and the certificate might be available as .cvmfscatalog and
-   * .cvmfscertificate.  That is helpful if the data subdirectory is protected
-   * on the web server.
+   * The root catalog and the certificate might be available as .cvmfscatalog
+   * and .cvmfscertificate.  That is helpful if the data subdirectory is
+   * protected on the web server.
    */
   bool has_alt_catalog_path_;
 

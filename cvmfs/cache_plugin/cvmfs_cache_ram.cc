@@ -59,13 +59,13 @@ struct ObjectHeader {
   void SetDescription(char *description) {
     if (description == NULL)
       return;
-    memcpy(reinterpret_cast<char *>(this) + sizeof(ObjectHeader),
-           description, strlen(description) + 1);
+    memcpy(reinterpret_cast<char *>(this) + sizeof(ObjectHeader), description,
+           strlen(description) + 1);
   }
 
   unsigned char *GetData() {
-    return reinterpret_cast<unsigned char *>(this) +
-           sizeof(ObjectHeader) + size_desc;
+    return reinterpret_cast<unsigned char *>(this) + sizeof(ObjectHeader)
+           + size_desc;
   }
 
   /**
@@ -112,21 +112,25 @@ struct Listing {
 struct ComparableHash {
   ComparableHash() { memset(&hash, 0, sizeof(hash)); }
   explicit ComparableHash(const struct cvmcache_hash &h) : hash(h) { }
-  bool operator ==(const ComparableHash &other) const {
+  bool operator==(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
-                             const_cast<cvmcache_hash *>(&(other.hash))) == 0;
+                             const_cast<cvmcache_hash *>(&(other.hash)))
+           == 0;
   }
-  bool operator !=(const ComparableHash &other) const {
+  bool operator!=(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
-                             const_cast<cvmcache_hash *>(&(other.hash))) != 0;
+                             const_cast<cvmcache_hash *>(&(other.hash)))
+           != 0;
   }
-  bool operator <(const ComparableHash &other) const {
+  bool operator<(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
-                             const_cast<cvmcache_hash *>(&(other.hash))) < 0;
+                             const_cast<cvmcache_hash *>(&(other.hash)))
+           < 0;
   }
-  bool operator >(const ComparableHash &other) const {
+  bool operator>(const ComparableHash &other) const {
     return cvmcache_hash_cmp(const_cast<cvmcache_hash *>(&(this->hash)),
-                             const_cast<cvmcache_hash *>(&(other.hash))) > 0;
+                             const_cast<cvmcache_hash *>(&(other.hash)))
+           > 0;
   }
 
   struct cvmcache_hash hash;
@@ -140,7 +144,7 @@ static inline uint32_t hasher_uint64(const uint64_t &key) {
 }
 
 static inline uint32_t hasher_any(const ComparableHash &key) {
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(&key.hash));
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(&key.hash));
 }
 
 }  // anonymous namespace
@@ -182,9 +186,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     instance_ = NULL;
   }
 
-  void DropBreadcrumbs() {
-    breadcrumbs_.clear();
-  }
+  void DropBreadcrumbs() { breadcrumbs_.clear(); }
 
   static int ram_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
     ComparableHash h(*id);
@@ -213,10 +215,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
 
-  static int ram_obj_info(
-    struct cvmcache_hash *id,
-    struct cvmcache_object_info *info)
-  {
+  static int ram_obj_info(struct cvmcache_hash *id,
+                          struct cvmcache_object_info *info) {
     ComparableHash h(*id);
     ObjectHeader *object;
     if (!Me()->objects_all_->Lookup(h, &object, false))
@@ -226,36 +226,33 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     info->type = object->type;
     info->pinned = object->refcnt > 0;
     info->description = (object->GetDescription() == NULL)
-                        ? NULL
-                        : strdup(object->GetDescription());
+                            ? NULL
+                            : strdup(object->GetDescription());
     return CVMCACHE_STATUS_OK;
   }
 
 
   static int ram_pread(struct cvmcache_hash *id,
-                      uint64_t offset,
-                      uint32_t *size,
-                      unsigned char *buffer)
-  {
+                       uint64_t offset,
+                       uint32_t *size,
+                       unsigned char *buffer) {
     ComparableHash h(*id);
     ObjectHeader *object;
     bool retval = Me()->objects_all_->Lookup(h, &object, false);
     assert(retval);
     if (offset > object->size_data)
       return CVMCACHE_STATUS_OUTOFBOUNDS;
-    unsigned nbytes =
-      std::min(*size, static_cast<uint32_t>(object->size_data - offset));
+    unsigned nbytes = std::min(
+        *size, static_cast<uint32_t>(object->size_data - offset));
     memcpy(buffer, object->GetData() + offset, nbytes);
     *size = nbytes;
     return CVMCACHE_STATUS_OK;
   }
 
 
-  static int ram_start_txn(
-    struct cvmcache_hash *id,
-    uint64_t txn_id,
-    struct cvmcache_object_info *info)
-  {
+  static int ram_start_txn(struct cvmcache_hash *id,
+                           uint64_t txn_id,
+                           struct cvmcache_object_info *info) {
     ObjectHeader object_header;
     object_header.txn_id = txn_id;
     if (info->size != CVMCACHE_SIZE_UNKNOWN)
@@ -268,12 +265,12 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     object_header.type = info->type;
     object_header.id = *id;
 
-    uint32_t total_size = sizeof(object_header) +
-                          object_header.size_desc + object_header.size_data;
+    uint32_t total_size = sizeof(object_header) + object_header.size_desc
+                          + object_header.size_data;
     Me()->TryFreeSpace(total_size);
     ObjectHeader *allocd_object = reinterpret_cast<ObjectHeader *>(
-      Me()->storage_->Allocate(total_size,
-                               &object_header, sizeof(object_header)));
+        Me()->storage_->Allocate(total_size, &object_header,
+                                 sizeof(object_header)));
     if (allocd_object == NULL)
       return CVMCACHE_STATUS_NOSPACE;
 
@@ -283,11 +280,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
 
-  static int ram_write_txn(
-    uint64_t txn_id,
-    unsigned char *buffer,
-    uint32_t size)
-  {
+  static int ram_write_txn(uint64_t txn_id,
+                           unsigned char *buffer,
+                           uint32_t size) {
     ObjectHeader *txn_object;
     int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
@@ -299,23 +294,23 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       uint32_t current_size = Me()->storage_->GetSize(txn_object);
       uint32_t header_size = current_size - txn_object->size_data;
       uint32_t new_size = std::max(
-        header_size + size - txn_object->neg_nbytes_written,
-        uint32_t(current_size * kObjectExpandFactor));
+          header_size + size - txn_object->neg_nbytes_written,
+          uint32_t(current_size * kObjectExpandFactor));
       bool did_compact = Me()->TryFreeSpace(new_size);
       if (did_compact) {
         retval = Me()->transactions_.Lookup(txn_id, &txn_object);
         assert(retval);
       }
       txn_object = reinterpret_cast<ObjectHeader *>(
-        Me()->storage_->Expand(txn_object, new_size));
+          Me()->storage_->Expand(txn_object, new_size));
       if (txn_object == NULL)
         return CVMCACHE_STATUS_NOSPACE;
       txn_object->size_data = new_size - header_size;
       Me()->transactions_.Insert(txn_id, txn_object);
     }
 
-    memcpy(txn_object->GetData() - txn_object->neg_nbytes_written,
-           buffer, size);
+    memcpy(txn_object->GetData() - txn_object->neg_nbytes_written, buffer,
+           size);
     txn_object->neg_nbytes_written -= size;
     return CVMCACHE_STATUS_OK;
   }
@@ -338,8 +333,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       // increase ref count of existing copy
       Me()->storage_->MarkFree(txn_object);
       if (existing_object->refcnt == 0)
-        Me()->cache_info_.pinned_bytes +=
-          Me()->storage_->GetSize(existing_object);
+        Me()->cache_info_.pinned_bytes += Me()->storage_->GetSize(
+            existing_object);
       existing_object->refcnt++;
     } else {
       txn_object->txn_id = uint64_t(-1);
@@ -387,10 +382,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
 
-  static int ram_listing_begin(
-    uint64_t lst_id,
-    enum cvmcache_object_type type)
-  {
+  static int ram_listing_begin(uint64_t lst_id,
+                               enum cvmcache_object_type type) {
     Listing *lst = new Listing();
     Me()->objects_all_->FilterBegin();
     while (Me()->objects_all_->FilterNext()) {
@@ -406,8 +399,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       item.type = type;
       item.pinned = object->refcnt != 0;
       item.description = (object->size_desc > 0)
-                         ? strdup(object->GetDescription())
-                         : NULL;
+                             ? strdup(object->GetDescription())
+                             : NULL;
       lst->elems.push_back(item);
     }
     Me()->objects_all_->FilterEnd();
@@ -417,10 +410,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
 
-  static int ram_listing_next(
-    int64_t listing_id,
-    struct cvmcache_object_info *item)
-  {
+  static int ram_listing_next(int64_t listing_id,
+                              struct cvmcache_object_info *item) {
     Listing *lst;
     bool retval = Me()->listings_.Lookup(listing_id, &lst);
     assert(retval);
@@ -444,21 +435,17 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
 
-  static int ram_breadcrumb_store(
-    const char *fqrn,
-    const cvmcache_breadcrumb *breadcrumb)
-  {
+  static int ram_breadcrumb_store(const char *fqrn,
+                                  const cvmcache_breadcrumb *breadcrumb) {
     Me()->breadcrumbs_[fqrn] = *breadcrumb;
     return CVMCACHE_STATUS_OK;
   }
 
 
-  static int ram_breadcrumb_load(
-    const char *fqrn,
-    cvmcache_breadcrumb *breadcrumb)
-  {
-    map<std::string, cvmcache_breadcrumb>::const_iterator itr =
-      Me()->breadcrumbs_.find(fqrn);
+  static int ram_breadcrumb_load(const char *fqrn,
+                                 cvmcache_breadcrumb *breadcrumb) {
+    map<std::string, cvmcache_breadcrumb>::const_iterator
+        itr = Me()->breadcrumbs_.find(fqrn);
     if (itr == Me()->breadcrumbs_.end())
       return CVMCACHE_STATUS_NOENTRY;
     *breadcrumb = itr->second;
@@ -466,25 +453,23 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
  private:
-  static const uint64_t kMinSize;  // 100 * 1024 * 1024;
-  static const double kShrinkFactor;  //  = 0.75;
-  static const double kObjectExpandFactor;  // = 1.5;
-  static const double kSlotFraction;  // = 0.04;
+  static const uint64_t kMinSize;            // 100 * 1024 * 1024;
+  static const double kShrinkFactor;         //  = 0.75;
+  static const double kObjectExpandFactor;   // = 1.5;
+  static const double kSlotFraction;         // = 0.04;
   static const double kDangerZoneThreshold;  // = 0.7
 
   static PluginRamCache *instance_;
-  static PluginRamCache *Me() {
-    return instance_;
-  }
+  static PluginRamCache *Me() { return instance_; }
   explicit PluginRamCache(uint64_t mem_size) {
     in_danger_zone_ = false;
 
     uint64_t heap_size = RoundUp8(
-      std::max(kMinSize, uint64_t(mem_size * (1.0 - kSlotFraction))));
+        std::max(kMinSize, uint64_t(mem_size * (1.0 - kSlotFraction))));
     memset(&cache_info_, 0, sizeof(cache_info_));
     cache_info_.size_bytes = heap_size;
     storage_ = new MallocHeap(
-      heap_size, this->MakeCallback(&PluginRamCache::OnBlockMove, this));
+        heap_size, this->MakeCallback(&PluginRamCache::OnBlockMove, this));
 
     struct cvmcache_hash hash_empty;
     memset(&hash_empty, 0, sizeof(hash_empty));
@@ -492,27 +477,27 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     transactions_.Init(64, uint64_t(-1), hasher_uint64);
     listings_.Init(8, uint64_t(-1), hasher_uint64);
 
-    double slot_size =
-      lru::LruCache<ComparableHash, ObjectHeader *>::GetEntrySize();
-    uint64_t num_slots = uint64_t((heap_size * kSlotFraction) /
-                         (2.0 * slot_size));
+    double slot_size = lru::LruCache<ComparableHash,
+                                     ObjectHeader *>::GetEntrySize();
+    uint64_t num_slots = uint64_t((heap_size * kSlotFraction)
+                                  / (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
-    LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "Allocating %" PRIu64
-             "MB of memory for up to %" PRIu64 " objects",
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Allocating %" PRIu64 "MB of memory for up to %" PRIu64 " objects",
              heap_size / (1024 * 1024), num_slots & mask_64);
 
     // Number of cache entries must be a multiple of 64
     objects_all_ = new lru::LruCache<ComparableHash, ObjectHeader *>(
-      num_slots & mask_64,
-      ComparableHash(hash_empty),
-      hasher_any,
-      perf::StatisticsTemplate("objects_all", &statistics_));
+        num_slots & mask_64,
+        ComparableHash(hash_empty),
+        hasher_any,
+        perf::StatisticsTemplate("objects_all", &statistics_));
     objects_volatile_ = new lru::LruCache<ComparableHash, ObjectHeader *>(
-      num_slots & mask_64,
-      ComparableHash(hash_empty),
-      hasher_any,
-      perf::StatisticsTemplate("objects_volatile", &statistics_));
+        num_slots & mask_64,
+        ComparableHash(hash_empty),
+        hasher_any,
+        perf::StatisticsTemplate("objects_volatile", &statistics_));
   }
 
   /**
@@ -532,8 +517,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     }
 
     uint64_t shrink_to = std::min(
-      storage_->capacity() - (bytes_required + 8),
-      uint64_t(storage_->capacity() * kShrinkFactor));
+        storage_->capacity() - (bytes_required + 8),
+        uint64_t(storage_->capacity() * kShrinkFactor));
     DoShrink(shrink_to);
     return true;
   }
@@ -579,9 +564,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     objects_volatile_->FilterEnd();
 
     objects_all_->FilterBegin();
-    while ((storage_->compacted_bytes() > shrink_to) &&
-           objects_all_->FilterNext())
-    {
+    while ((storage_->compacted_bytes() > shrink_to)
+           && objects_all_->FilterNext()) {
       objects_all_->FilterGet(&h, &object);
       if (object->refcnt != 0)
         continue;
@@ -606,9 +590,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   }
 
   bool IsInDangerZone() {
-    return (static_cast<double>(cache_info_.pinned_bytes) /
-            static_cast<double>(cache_info_.size_bytes)) >
-           kDangerZoneThreshold;
+    return (static_cast<double>(cache_info_.pinned_bytes)
+            / static_cast<double>(cache_info_.size_bytes))
+           > kDangerZoneThreshold;
   }
 
 
@@ -661,8 +645,8 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCache, kLogStderr, "cannot parse options file %s", argv[1]);
     return 1;
   }
-  char *debug_log =
-    cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_DEBUGLOG");
+  char *debug_log = cvmcache_options_get(options,
+                                         "CVMFS_CACHE_PLUGIN_DEBUGLOG");
   if (debug_log != NULL) {
     SetLogDebugFile(debug_log);
     cvmcache_options_free(debug_log);
@@ -749,13 +733,15 @@ int main(int argc, char **argv) {
     }
   }
 
-  LogCvmfs(kLogCache, kLogStdout, "Listening for cvmfs clients on %s\n"
+  LogCvmfs(kLogCache, kLogStdout,
+           "Listening for cvmfs clients on %s\n"
            "NOTE: this process needs to run as user cvmfs\n",
            locator);
 
   cvmcache_process_requests(ctx, 0);
   if (test_mode)
-    while (true) sleep(1);
+    while (true)
+      sleep(1);
   if (!cvmcache_is_supervised()) {
     LogCvmfs(kLogCache, kLogStdout, "Press <Ctrl+D> to quit");
     LogCvmfs(kLogCache, kLogStdout,

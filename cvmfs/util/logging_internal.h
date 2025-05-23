@@ -51,22 +51,22 @@ struct CVMFS_EXPORT DefaultLogging {
    */
   static void Set(LogFacilities info, LogFacilities error);
 
-  static LogFacilities info;  // default kLogStdout
+  static LogFacilities info;   // default kLogStdout
   static LogFacilities error;  // default kLogStderr
 };
 
 enum LogFlags {
   kLogNoLinebreak = 0x200,
-  kLogShowSource  = 0x400,
-  kLogSensitive   = 0x800,  ///< Don't add the line to the memory log buffer
+  kLogShowSource = 0x400,
+  kLogSensitive = 0x800,  ///< Don't add the line to the memory log buffer
 };
 
 enum LogLevels {
-  kLogLevel0   = 0x01000,
-  kLogNormal   = 0x02000,
-  kLogInform   = 0x04000,
-  kLogVerbose  = 0x08000,
-  kLogNone     = 0x10000,
+  kLogLevel0 = 0x01000,
+  kLogNormal = 0x02000,
+  kLogInform = 0x04000,
+  kLogVerbose = 0x08000,
+  kLogNone = 0x10000,
 };
 
 /**
@@ -117,7 +117,7 @@ const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
 
 struct CVMFS_EXPORT LogBufferEntry {
   LogBufferEntry(LogSource s, int m, const std::string &msg)
-    : timestamp(time(NULL)), source(s), mask(m), message(msg) { }
+      : timestamp(time(NULL)), source(s), mask(m), message(msg) { }
 
   time_t timestamp;
   LogSource source;
@@ -143,7 +143,7 @@ CVMFS_EXPORT void SetLogDebugFile(const std::string &filename);
 CVMFS_EXPORT std::string GetLogDebugFile();
 #else
 #define SetLogDebugFile(filename) ((void)0)
-#define GetLogDebugFile() (std::string(""))
+#define GetLogDebugFile()         (std::string(""))
 #endif
 
 CVMFS_EXPORT

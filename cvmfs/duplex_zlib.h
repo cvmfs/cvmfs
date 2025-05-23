@@ -6,9 +6,9 @@
 #define CVMFS_DUPLEX_ZLIB_H_
 
 #ifdef _BUILT_IN_ZLIB
-  #include "zlib.h"
+#include "zlib.h"
 #else
-  #include <zlib.h>
+#include <zlib.h>
 #endif
 
 #endif  // CVMFS_DUPLEX_ZLIB_H_

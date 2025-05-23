@@ -15,8 +15,7 @@ namespace publish {
 
 class T_Transaction : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
 };

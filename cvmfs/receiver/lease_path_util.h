@@ -9,7 +9,7 @@
 
 namespace receiver {
 
-bool IsSubPath(const PathString& parent, const PathString& path);
+bool IsSubPath(const PathString &parent, const PathString &path);
 
 }
 

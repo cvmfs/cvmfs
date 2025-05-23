@@ -31,7 +31,7 @@ class CommandListReflog : public Command {
  protected:
   UniquePtr<SmallHashDynamic<shash::Any, bool> > objects_;
 
-  template <class ObjectFetcherT>
+  template<class ObjectFetcherT>
   bool Run(ObjectFetcherT *object_fetcher, std::string repo_name,
            std::string output_path, shash::Any reflog_hash);
   void CatalogCallback(const CatalogTraversalData<catalog::Catalog> &data);
@@ -40,7 +40,7 @@ class CommandListReflog : public Command {
 
   static uint32_t hasher(const shash::Any &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+    return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
   }
 };
 

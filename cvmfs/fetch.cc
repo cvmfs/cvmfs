@@ -23,17 +23,18 @@ using namespace std;  // NOLINT
 namespace cvmfs {
 
 void TLSDestructor(void *data) {
-  Fetcher::ThreadLocalStorage *tls =
-    static_cast<Fetcher::ThreadLocalStorage *>(data);
-  std::vector<Fetcher::ThreadLocalStorage *> *tls_blocks =
-    &tls->fetcher->tls_blocks_;
+  Fetcher::ThreadLocalStorage *tls = static_cast<Fetcher::ThreadLocalStorage *>(
+      data);
+  std::vector<Fetcher::ThreadLocalStorage *> *tls_blocks = &tls->fetcher
+                                                                ->tls_blocks_;
 
   {
     MutexLockGuard m(tls->fetcher->lock_tls_blocks_);
     for (vector<Fetcher::ThreadLocalStorage *>::iterator
              i = tls_blocks->begin(),
              iEnd = tls_blocks->end();
-         i != iEnd; ++i) {
+         i != iEnd;
+         ++i) {
       if ((*i) == tls) {
         tls_blocks->erase(i);
         break;
@@ -59,7 +60,7 @@ void Fetcher::CleanupTls(ThreadLocalStorage *tls) {
  */
 Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if (tls != NULL)
     return tls;
 
@@ -78,10 +79,8 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
 }
 
 
-int Fetcher::Fetch(
-  const CacheManager::LabeledObject &object,
-  const std::string &alt_url)
-{
+int Fetcher::Fetch(const CacheManager::LabeledObject &object,
+                   const std::string &alt_url) {
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
 
@@ -151,8 +150,8 @@ int Fetcher::Fetch(
   }
   cache_mgr_->CtrlTxn(object.label, 0, txn);
 
-  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s",
-           object.label.path.c_str(), url.c_str());
+  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", object.label.path.c_str(),
+           url.c_str());
   TransactionSink sink(cache_mgr_, txn);
   tls->download_job.SetUrl(&url);
   tls->download_job.SetSink(&sink);
@@ -165,8 +164,8 @@ int Fetcher::Fetch(
              tls->download_job.GetPidPtr(),
              tls->download_job.GetInterruptCuePtr());
   }
-  tls->download_job.SetCompressed(
-                              object.label.zip_algorithm == zlib::kZlibDefault);
+  tls->download_job.SetCompressed(object.label.zip_algorithm
+                                  == zlib::kZlibDefault);
   tls->download_job.SetRangeOffset(object.label.range_offset);
   tls->download_job.SetRangeSize(static_cast<int64_t>(object.label.size));
   download_mgr_->Fetch(&tls->download_job);
@@ -194,8 +193,7 @@ int Fetcher::Fetch(
   // Download failed
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
            "failed to fetch %s (hash: %s, error %d [%s])",
-           object.label.path.c_str(),
-           object.id.ToString().c_str(),
+           object.label.path.c_str(), object.id.ToString().c_str(),
            tls->download_job.error_code(),
            download::Code2Ascii(tls->download_job.error_code()));
   cache_mgr_->AbortTxn(txn);
@@ -205,32 +203,32 @@ int Fetcher::Fetch(
 }
 
 
-Fetcher::Fetcher(
-  CacheManager *cache_mgr,
-  download::DownloadManager *download_mgr,
-  BackoffThrottle *backoff_throttle,
-  perf::StatisticsTemplate statistics)
-  : lock_queues_download_(NULL)
-  , lock_tls_blocks_(NULL)
-  , cache_mgr_(cache_mgr)
-  , download_mgr_(download_mgr)
-  , backoff_throttle_(backoff_throttle)
-{
+Fetcher::Fetcher(CacheManager *cache_mgr,
+                 download::DownloadManager *download_mgr,
+                 BackoffThrottle *backoff_throttle,
+                 perf::StatisticsTemplate statistics)
+    : lock_queues_download_(NULL)
+    , lock_tls_blocks_(NULL)
+    , cache_mgr_(cache_mgr)
+    , download_mgr_(download_mgr)
+    , backoff_throttle_(backoff_throttle) {
   int retval;
   retval = pthread_key_create(&thread_local_storage_, TLSDestructor);
   assert(retval == 0);
   lock_queues_download_ = reinterpret_cast<pthread_mutex_t *>(
-    smalloc(sizeof(pthread_mutex_t)));
+      smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_queues_download_, NULL);
   assert(retval == 0);
   lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
-    smalloc(sizeof(pthread_mutex_t)));
+      smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
-  n_downloads = statistics.RegisterTemplated("n_downloads",
-    "overall number of downloaded files (incl. catalogs, chunks)");
-  n_invocations = statistics.RegisterTemplated("n_invocations",
-    "overall number of object requests (incl. catalogs, chunks)");
+  n_downloads = statistics.RegisterTemplated(
+      "n_downloads",
+      "overall number of downloaded files (incl. catalogs, chunks)");
+  n_invocations = statistics.RegisterTemplated(
+      "n_invocations",
+      "overall number of object requests (incl. catalogs, chunks)");
 }
 
 
@@ -269,11 +267,9 @@ int Fetcher::OpenSelect(const CacheManager::LabeledObject &object) {
 }
 
 
-void Fetcher::SignalWaitingThreads(
-  const int fd,
-  const shash::Any &id,
-  ThreadLocalStorage *tls)
-{
+void Fetcher::SignalWaitingThreads(const int fd,
+                                   const shash::Any &id,
+                                   ThreadLocalStorage *tls) {
   MutexLockGuard m(lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
     int fd_dup = (fd >= 0) ? cache_mgr_->Dup(fd) : fd;

@@ -7,11 +7,9 @@
 #include "util/platform.h"
 #include "util/string.h"
 
-RepositoryTag::RepositoryTag(const std::string& name,
-                             const std::string& description)
-    : name_(name),
-      description_(description) {
-}
+RepositoryTag::RepositoryTag(const std::string &name,
+                             const std::string &description)
+    : name_(name), description_(description) { }
 
 /**
  * Check if tag name is of the form "generic-*"
@@ -31,8 +29,8 @@ void RepositoryTag::SetGenericName() {
   struct tm timestamp;
   gmtime_r(&seconds, &timestamp);
   char seconds_buffer[32];
-  strftime(seconds_buffer, sizeof(seconds_buffer),
-           "generic-%Y-%m-%dT%H:%M:%S", &timestamp);
+  strftime(seconds_buffer, sizeof(seconds_buffer), "generic-%Y-%m-%dT%H:%M:%S",
+           &timestamp);
 
   // Append milliseconds
   unsigned offset_milliseconds = ((nanoseconds / 1000000) % 1000);

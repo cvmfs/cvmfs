@@ -68,8 +68,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     }
   }
   if (args.find('Z') != args.end()) {
-    params.compression_alg =
-        zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+    params.compression_alg = zlib::ParseCompressionAlgorithm(
+        *args.find('Z')->second);
   }
   if (args.find('U') != args.end()) {
     params.uid = static_cast<uid_t>(String2Int64(*args.find('U')->second));
@@ -97,8 +97,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   const bool upload_statsdb = (args.count('I') > 0);
 
   perf::StatisticsTemplate publish_statistics("publish", this->statistics());
-  StatisticsDatabase *stats_db =
-    StatisticsDatabase::OpenStandardDB(params.repo_name);
+  StatisticsDatabase *stats_db = StatisticsDatabase::OpenStandardDB(
+      params.repo_name);
 
   upload::SpoolerDefinition spooler_definition(
       params.spooler_definition, hash_algorithm, params.compression_alg,
@@ -106,8 +106,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
       params.min_file_chunk_size, params.avg_file_chunk_size,
       params.max_file_chunk_size, params.session_token_file, params.key_file);
   if (params.max_concurrent_write_jobs > 0) {
-    spooler_definition.number_of_concurrent_uploads =
-        params.max_concurrent_write_jobs;
+    spooler_definition
+        .number_of_concurrent_uploads = params.max_concurrent_write_jobs;
   }
 
   // Sanitize base_directory, removing any leading or trailing slashes
@@ -119,11 +119,12 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);
-  if (NULL == params.spooler) return 3;
-  UniquePtr<upload::Spooler> spooler_catalogs(
-      upload::Spooler::Construct(spooler_definition_catalogs,
-                                 &publish_statistics));
-  if (!spooler_catalogs.IsValid()) return 3;
+  if (NULL == params.spooler)
+    return 3;
+  UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
+      spooler_definition_catalogs, &publish_statistics));
+  if (!spooler_catalogs.IsValid())
+    return 3;
 
   const bool follow_redirects = (args.count('L') > 0);
   const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
@@ -135,8 +136,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway =
-      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+  bool with_gateway = spooler_definition.driver_type
+                      == upload::SpoolerDefinition::Gateway;
 
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
@@ -147,8 +148,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     manifest = new manifest::Manifest(shash::Any(), 0, "");
   } else {
     if (with_gateway) {
-      manifest =
-          FetchRemoteManifest(params.stratum0, params.repo_name, shash::Any());
+      manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
+                                     shash::Any());
     } else {
       manifest = FetchRemoteManifest(params.stratum0, params.repo_name,
                                      params.base_hash);
@@ -162,18 +163,18 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
   catalog::WritableCatalogManager catalog_manager(
       params.base_hash, params.stratum0, params.dir_temp,
-      spooler_catalogs.weak_ref(),
-      download_manager(), params.enforce_limits, params.nested_kcatalog_limit,
-      params.root_kcatalog_limit, params.file_mbyte_limit, statistics(),
-      params.is_balanced, params.max_weight, params.min_weight);
+      spooler_catalogs.weak_ref(), download_manager(), params.enforce_limits,
+      params.nested_kcatalog_limit, params.root_kcatalog_limit,
+      params.file_mbyte_limit, statistics(), params.is_balanced,
+      params.max_weight, params.min_weight);
   catalog_manager.Init();
 
   publish::SyncMediator mediator(&catalog_manager, &params, publish_statistics);
   LogCvmfs(kLogPublish, kLogStdout, "Swissknife Ingest: Processing changes...");
 
   publish::SyncUnion *sync = new publish::SyncUnionTarball(
-    &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
-    params.uid, params.gid, params.to_delete, create_catalog, "///");
+      &mediator, params.dir_rdonly, params.tar_file, params.base_directory,
+      params.uid, params.gid, params.to_delete, create_catalog, "///");
 
   if (!sync->Initialize()) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -204,8 +205,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
 
     if (!read_successful) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-                        "Swissknife Ingest: Failed to read authz file (%s): %s",
-                        params.authz_file.c_str(), strerror(errno));
+               "Swissknife Ingest: Failed to read authz file (%s): %s",
+               params.authz_file.c_str(), strerror(errno));
       return 8;
     }
 
@@ -221,19 +222,19 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
-  perf::Counter *revision_counter = statistics()->Register("publish.revision",
-                                                  "Published revision number");
+  perf::Counter *revision_counter = statistics()->Register(
+      "publish.revision", "Published revision number");
   revision_counter->Set(catalog_manager.GetRootCatalog()->revision());
 
   // finalize the spooler
   LogCvmfs(kLogCvmfs, kLogStdout,
-                           "Swissknife Ingest: Wait for all uploads to finish");
+           "Swissknife Ingest: Wait for all uploads to finish");
   params.spooler->WaitForUpload();
   spooler_catalogs->WaitForUpload();
   params.spooler->FinalizeSession(false);
 
   LogCvmfs(kLogCvmfs, kLogStdout,
-                            "Swissknife Ingest: Exporting repository manifest");
+           "Swissknife Ingest: Exporting repository manifest");
 
   // We call FinalizeSession(true) this time, to also trigger the commit
   // operation on the gateway machine (if the upstream is of type "gw").

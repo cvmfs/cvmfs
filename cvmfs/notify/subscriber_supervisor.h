@@ -18,14 +18,14 @@ class Subscriber;
  */
 class SubscriberSupervisor : public Supervisor {
  public:
-  SubscriberSupervisor(notify::Subscriber* s, std::string t, int max_retries,
+  SubscriberSupervisor(notify::Subscriber *s, std::string t, int max_retries,
                        uint64_t interval);
   virtual ~SubscriberSupervisor();
 
   virtual bool Task();
 
  private:
-  notify::Subscriber* subscriber_;
+  notify::Subscriber *subscriber_;
   std::string topic_;
 };
 

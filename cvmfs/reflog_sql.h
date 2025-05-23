@@ -23,17 +23,18 @@ class ReflogDatabase : public sqlite::Database<ReflogDatabase> {
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
-  bool CompactDatabase() const { return true; }  // no implementation specific
-                                                 // database compaction.
+  bool CompactDatabase() const {
+    return true;
+  }  // no implementation specific
+     // database compaction.
 
   bool InsertInitialValues(const std::string &repo_name);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<ReflogDatabase>;
-  ReflogDatabase(const std::string  &filename,
-                 const OpenMode      open_mode) :
-    sqlite::Database<ReflogDatabase>(filename, open_mode) {}
+  ReflogDatabase(const std::string &filename, const OpenMode open_mode)
+      : sqlite::Database<ReflogDatabase>(filename, open_mode) { }
 };
 
 
@@ -56,8 +57,8 @@ class SqlReflog : public sqlite::Sql {
 class SqlInsertReference : public SqlReflog {
  public:
   explicit SqlInsertReference(const ReflogDatabase *database);
-  bool BindReference(const shash::Any    &reference_hash,
-                     const ReferenceType  type);
+  bool BindReference(const shash::Any &reference_hash,
+                     const ReferenceType type);
 };
 
 
@@ -80,16 +81,16 @@ class SqlListReferences : public SqlReflog {
 class SqlRemoveReference : public SqlReflog {
  public:
   explicit SqlRemoveReference(const ReflogDatabase *database);
-  bool BindReference(const shash::Any    &reference_hash,
-                     const ReferenceType  type);
+  bool BindReference(const shash::Any &reference_hash,
+                     const ReferenceType type);
 };
 
 
 class SqlContainsReference : public SqlReflog {
  public:
   explicit SqlContainsReference(const ReflogDatabase *database);
-  bool BindReference(const shash::Any    &reference_hash,
-                     const ReferenceType  type);
+  bool BindReference(const shash::Any &reference_hash,
+                     const ReferenceType type);
   bool RetrieveAnswer();
 };
 
@@ -97,8 +98,8 @@ class SqlContainsReference : public SqlReflog {
 class SqlGetTimestamp : public SqlReflog {
  public:
   explicit SqlGetTimestamp(const ReflogDatabase *database);
-  bool BindReference(const shash::Any    &reference_hash,
-                     const ReferenceType  type);
+  bool BindReference(const shash::Any &reference_hash,
+                     const ReferenceType type);
   uint64_t RetrieveTimestamp();
 };
 

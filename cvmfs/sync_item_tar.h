@@ -5,13 +5,12 @@
 #ifndef CVMFS_SYNC_ITEM_TAR_H_
 #define CVMFS_SYNC_ITEM_TAR_H_
 
-#include "sync_item.h"
-
 #include <string>
 
 #include "directory_entry.h"
 #include "duplex_libarchive.h"
 #include "ingestion/ingestion_source.h"
+#include "sync_item.h"
 #include "sync_union_tarball.h"
 #include "util/concurrency.h"
 #include "util/platform.h"
@@ -23,7 +22,7 @@ class SyncItemTar : public SyncItem {
 
  public:
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
-    bool enable_mtime_ns) const;
+      bool enable_mtime_ns) const;
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
   virtual SyncItemType GetScratchFiletype() const;

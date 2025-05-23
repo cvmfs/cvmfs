@@ -20,9 +20,7 @@
 
 
 struct InstanceInfo {
-  bool IsDefined() {
-    return !socket_path.empty() || !instance_name.empty();
-  }
+  bool IsDefined() { return !socket_path.empty() || !instance_name.empty(); }
 
   // Called at most once by DeterminePath
   static std::string GetDefaultDomain() {
@@ -57,9 +55,8 @@ struct InstanceInfo {
         }
 
         std::string optarg;
-        if (options_mgr.GetValue("CVMFS_SHARED_CACHE", &optarg) &&
-            options_mgr.IsOn(optarg))
-        {
+        if (options_mgr.GetValue("CVMFS_SHARED_CACHE", &optarg)
+            && options_mgr.IsOn(optarg)) {
           workspace += "/shared";
         } else {
           workspace += "/" + fqrn;
@@ -111,7 +108,8 @@ static bool ReadResponse(int fd) {
 
 bool SendCommand(const std::string &command, InstanceInfo instance_info) {
   bool retval = instance_info.CompleteInfo();
-  if (!retval) return false;
+  if (!retval)
+    return false;
 
   int fd = ConnectSocket(instance_info.socket_path);
   if (fd < 0) {
@@ -141,76 +139,77 @@ bool SendCommand(const std::string &command, InstanceInfo instance_info) {
 
 
 static void Usage(const std::string &exe) {
-  LogCvmfs(kLogCvmfs, kLogStdout,
-    "Usage: %s [-i instance | -p socket] <command>                     \n"
-    "   By default, iterate through all instances defined in         \n"
-    "   CVMFS_REPOSITORIES                                             \n"
-    "\n"
-    "Example:                                                          \n"
-    "  %s -i atlas.cern.ch pid                                         \n"
-    "\n"
-    "Commands:                                                         \n"
-    "  tracebuffer flush      flushes the trace buffer to disk         \n"
-    "  cache instance         describes the active cache manager       \n"
-    "  cache size             gets current size of file cache          \n"
-    "  cache limit get        gets current size limit of the file cache\n"
-    "  cache limit set <MB>   sets the max size limit of the file cache\n"
-    "  cache list             gets files in cache                      \n"
-    "  cache list pinned      gets pinned file catalogs in cache       \n"
-    "  cache list catalogs    gets all file catalogs in cache          \n"
-    "  cleanup <MB>           cleans file cache until size <= <MB>     \n"
-    "  cleanup rate <period>  n.o. cleanups in the last <period> min   \n"
-    "  evict <path>           removes <path> from the cache            \n"
-    "  pin <path>             pins <path> in the cache                 \n"
-    "  mountpoint             returns the mount point                  \n"
-    "  device id              returns major:minor virtual device id    \n"
-    "                         on Linux and 0:0 on macOS                \n"
-    "  remount [sync]         look for new catalogs                    \n"
-    "  revision               gets the repository revision             \n"
-    "  max ttl info           gets the maximum ttl                     \n"
-    "  max ttl set <minutes>  sets the maximum ttl                     \n"
-    "  nameserver get         get the DNS server                       \n"
-    "  nameserver set <host>  sets a DNS server                        \n"
-    "  host info              get host chain and their rtt,            \n"
-    "                         if already probed                        \n"
-    "  host probe             orders the host chain according to rtt   \n"
-    "  host probe geo         let Stratum 1s order the host chain and  \n"
-    "                         fallback proxies using the Geo-API       \n"
-    "  host switch            switches to the next host in the chain   \n"
-    "  host set <host list>   sets a new host chain                    \n"
-    "  proxy info             gets load-balance proxy groups           \n"
-    "  proxy rebalance        randomly selects a new proxy server      \n"
-    "                         from the current load-balance group      \n"
-    "  proxy group switch     switches to the next load-balance        \n"
-    "                         proxy group in the chain                 \n"
-    "  proxy set <proxy list> sets a new chain of load-balance proxy   \n"
-    "                         groups (not including fallback proxies)  \n"
-    "  proxy fallback <list>  sets a new list of fallback proxies      \n"
-    "  external host info     gets info about external host chain      \n"
-    "  external host switch   switches to the next external host       \n"
-    "  external host set                                               \n"
-    "       <host list>       sets external host chain                 \n"
-    "  external proxy info    gets info about external proxy groups    \n"
-    "  external proxy set                                              \n"
-    "       <proxy list>      sets chain of external proxy groups      \n"
-    "  timeout info           gets the network timeouts                \n"
-    "  timeout set                                                     \n"
-    "       <proxy> <direct>  sets the network timeouts in seconds     \n"
-    "  pid                    gets the pid                             \n"
-    "  pid cachemgr           gets the pid of the shared cache manager \n"
-    "  pid watchdog           gets the pid of the crash handler process\n"
-    "  parameters             dumps the effective parameters           \n"
-    "  reset error counters   resets the counter for I/O errors        \n"
-    "  hotpatch history       shows timestamps and version info of     \n"
-    "                         loaded (hotpatched) Fuse modules         \n"
-    "  version                gets cvmfs version                       \n"
-    "  version patchlevel     gets cvmfs patchlevel                    \n"
-    "  open catalogs          shows information about currently        \n"
-    "                         loaded catalogs (_not_ all cached ones)  \n"
-    "  latency                show the latencies of different fuse     \n"
-    "                         calls (requires CVMFS_INSTRUMENT_FUSE)   \n"
-    "\n",
-    exe.c_str(), exe.c_str());
+  LogCvmfs(
+      kLogCvmfs, kLogStdout,
+      "Usage: %s [-i instance | -p socket] <command>                     \n"
+      "   By default, iterate through all instances defined in         \n"
+      "   CVMFS_REPOSITORIES                                             \n"
+      "\n"
+      "Example:                                                          \n"
+      "  %s -i atlas.cern.ch pid                                         \n"
+      "\n"
+      "Commands:                                                         \n"
+      "  tracebuffer flush      flushes the trace buffer to disk         \n"
+      "  cache instance         describes the active cache manager       \n"
+      "  cache size             gets current size of file cache          \n"
+      "  cache limit get        gets current size limit of the file cache\n"
+      "  cache limit set <MB>   sets the max size limit of the file cache\n"
+      "  cache list             gets files in cache                      \n"
+      "  cache list pinned      gets pinned file catalogs in cache       \n"
+      "  cache list catalogs    gets all file catalogs in cache          \n"
+      "  cleanup <MB>           cleans file cache until size <= <MB>     \n"
+      "  cleanup rate <period>  n.o. cleanups in the last <period> min   \n"
+      "  evict <path>           removes <path> from the cache            \n"
+      "  pin <path>             pins <path> in the cache                 \n"
+      "  mountpoint             returns the mount point                  \n"
+      "  device id              returns major:minor virtual device id    \n"
+      "                         on Linux and 0:0 on macOS                \n"
+      "  remount [sync]         look for new catalogs                    \n"
+      "  revision               gets the repository revision             \n"
+      "  max ttl info           gets the maximum ttl                     \n"
+      "  max ttl set <minutes>  sets the maximum ttl                     \n"
+      "  nameserver get         get the DNS server                       \n"
+      "  nameserver set <host>  sets a DNS server                        \n"
+      "  host info              get host chain and their rtt,            \n"
+      "                         if already probed                        \n"
+      "  host probe             orders the host chain according to rtt   \n"
+      "  host probe geo         let Stratum 1s order the host chain and  \n"
+      "                         fallback proxies using the Geo-API       \n"
+      "  host switch            switches to the next host in the chain   \n"
+      "  host set <host list>   sets a new host chain                    \n"
+      "  proxy info             gets load-balance proxy groups           \n"
+      "  proxy rebalance        randomly selects a new proxy server      \n"
+      "                         from the current load-balance group      \n"
+      "  proxy group switch     switches to the next load-balance        \n"
+      "                         proxy group in the chain                 \n"
+      "  proxy set <proxy list> sets a new chain of load-balance proxy   \n"
+      "                         groups (not including fallback proxies)  \n"
+      "  proxy fallback <list>  sets a new list of fallback proxies      \n"
+      "  external host info     gets info about external host chain      \n"
+      "  external host switch   switches to the next external host       \n"
+      "  external host set                                               \n"
+      "       <host list>       sets external host chain                 \n"
+      "  external proxy info    gets info about external proxy groups    \n"
+      "  external proxy set                                              \n"
+      "       <proxy list>      sets chain of external proxy groups      \n"
+      "  timeout info           gets the network timeouts                \n"
+      "  timeout set                                                     \n"
+      "       <proxy> <direct>  sets the network timeouts in seconds     \n"
+      "  pid                    gets the pid                             \n"
+      "  pid cachemgr           gets the pid of the shared cache manager \n"
+      "  pid watchdog           gets the pid of the crash handler process\n"
+      "  parameters             dumps the effective parameters           \n"
+      "  reset error counters   resets the counter for I/O errors        \n"
+      "  hotpatch history       shows timestamps and version info of     \n"
+      "                         loaded (hotpatched) Fuse modules         \n"
+      "  version                gets cvmfs version                       \n"
+      "  version patchlevel     gets cvmfs patchlevel                    \n"
+      "  open catalogs          shows information about currently        \n"
+      "                         loaded catalogs (_not_ all cached ones)  \n"
+      "  latency                show the latencies of different fuse     \n"
+      "                         calls (requires CVMFS_INSTRUMENT_FUSE)   \n"
+      "\n",
+      exe.c_str(), exe.c_str());
 }
 
 
@@ -265,7 +264,8 @@ int main(int argc, char *argv[]) {
       instance_info.instance_name = repos[i];
       LogCvmfs(kLogCvmfs, kLogStdout, "%s:", repos[i].c_str());
       bool retval = SendCommand(command, instance_info);
-      if (!retval) retcode = 1;
+      if (!retval)
+        retcode = 1;
     }
     if (is_empty_repo_list) {
       LogCvmfs(kLogCvmfs, kLogStdout,
@@ -276,7 +276,8 @@ int main(int argc, char *argv[]) {
     }
   } else {
     bool retval = SendCommand(command, instance_info);
-    if (!retval) retcode = 1;
+    if (!retval)
+      retcode = 1;
   }
   return retcode;
 }

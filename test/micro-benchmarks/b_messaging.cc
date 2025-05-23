@@ -2,7 +2,6 @@
  * This file is part of the CernVM File System.
  */
 #include <benchmark/benchmark.h>
-
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -19,11 +18,9 @@ using namespace std;  // NOLINT
 
 class BM_Messaging : public benchmark::Fixture {
  protected:
-  virtual void SetUp(const benchmark::State &st) {
-  }
+  virtual void SetUp(const benchmark::State &st) { }
 
-  virtual void TearDown(const benchmark::State &st) {
-  }
+  virtual void TearDown(const benchmark::State &st) { }
 };
 
 BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
@@ -39,9 +36,8 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
     case 0:
       struct sockaddr_un remote;
       socklen_t socket_size = sizeof(remote);
-      int fd_connection = accept(fd_socket,
-                                 (struct sockaddr *)&remote,
-                                 &socket_size);
+      int fd_connection = accept(
+          fd_socket, (struct sockaddr *)&remote, &socket_size);
       assert(fd_connection >= 0);
       CacheTransport transport(fd_connection);
       char buffer[st.range(0)];
@@ -89,8 +85,8 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
     assert(retval);
     google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
     assert(msg_typed->GetTypeName() == "cvmfs.MsgHandshakeAck");
-    cvmfs::MsgHandshakeAck *msg_ack =
-      reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
+    cvmfs::MsgHandshakeAck
+        *msg_ack = reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
     assert(msg_ack->session_id() == 42);
   }
   st.SetItemsProcessed(st.iterations());
@@ -105,5 +101,8 @@ BENCHMARK_DEFINE_F(BM_Messaging, CacheHandshake)(benchmark::State &st) {
   int statloc;
   waitpid(pid, &statloc, 0);
 }
-BENCHMARK_REGISTER_F(BM_Messaging, CacheHandshake)->Repetitions(3)->
-  Arg(1024)->Arg(128*1024)->UseRealTime();
+BENCHMARK_REGISTER_F(BM_Messaging, CacheHandshake)
+    ->Repetitions(3)
+    ->Arg(1024)
+    ->Arg(128 * 1024)
+    ->UseRealTime();

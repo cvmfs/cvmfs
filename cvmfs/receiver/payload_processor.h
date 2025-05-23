@@ -6,6 +6,7 @@
 #define CVMFS_RECEIVER_PAYLOAD_PROCESSOR_H_
 
 #include <stdint.h>
+
 #include <map>
 #include <string>
 #include <vector>
@@ -18,9 +19,9 @@ namespace receiver {
 
 struct FileInfo {
   FileInfo();
-  explicit FileInfo(const ObjectPackBuild::Event& event);
-  FileInfo(const FileInfo& other);
-  FileInfo& operator=(const FileInfo& other);
+  explicit FileInfo(const ObjectPackBuild::Event &event);
+  FileInfo(const FileInfo &other);
+  FileInfo &operator=(const FileInfo &other);
 
   upload::UploadStreamHandle *handle;
   size_t total_size;
@@ -40,15 +41,20 @@ struct FileInfo {
  */
 class PayloadProcessor {
  public:
-  enum Result { kSuccess, kPathViolation, kUploaderError, kOtherError };
+  enum Result {
+    kSuccess,
+    kPathViolation,
+    kUploaderError,
+    kOtherError
+  };
 
   PayloadProcessor();
   virtual ~PayloadProcessor();
 
-  Result Process(int fdin, const std::string& header_digest,
-                 const std::string& path, uint64_t header_size);
+  Result Process(int fdin, const std::string &header_digest,
+                 const std::string &path, uint64_t header_size);
 
-  virtual void ConsumerEventCallback(const ObjectPackBuild::Event& event);
+  virtual void ConsumerEventCallback(const ObjectPackBuild::Event &event);
 
   virtual void OnUploadJobComplete(const upload::UploaderResults &results,
                                    void *buffer);

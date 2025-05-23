@@ -6,7 +6,7 @@
  * fuse module cvmfs.cc.
  */
 
-#define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
+#define ENOATTR ENODATA /**< instead of including attr/xattr.h */
 
 // clang-format off
 #include <sys/xattr.h>
@@ -17,7 +17,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <google/dense_hash_map>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -26,6 +25,8 @@
 #include <sys/mount.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+
+#include <google/dense_hash_map>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -34,14 +35,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-
-#include <algorithm>
 #include <functional>
 #include <map>
 #include <string>
@@ -79,12 +79,12 @@ using namespace std;  // NOLINT
 
 // TODO(jblomer): remove.  Only needed to satisfy monitor.cc
 namespace cvmfs {
-  pid_t pid_ = 0;
+pid_t pid_ = 0;
 }
 
 
-LibGlobals* LibGlobals::instance_ = NULL;
-LibGlobals* LibGlobals::GetInstance() {
+LibGlobals *LibGlobals::instance_ = NULL;
+LibGlobals *LibGlobals::GetInstance() {
   assert(LibGlobals::instance_ != NULL);
   return LibGlobals::instance_;
 }
@@ -138,10 +138,7 @@ void LibGlobals::CleanupInstance() {
 }
 
 
-LibGlobals::LibGlobals()
-  : options_mgr_(NULL)
-  , file_system_(NULL)
-{ }
+LibGlobals::LibGlobals() : options_mgr_(NULL), file_system_(NULL) { }
 
 
 LibGlobals::~LibGlobals() {
@@ -155,24 +152,19 @@ LibGlobals::~LibGlobals() {
 //------------------------------------------------------------------------------
 
 
-LibContext *LibContext::Create(
-  const string &fqrn,
-  OptionsManager *options_mgr)
-{
+LibContext *LibContext::Create(const string &fqrn,
+                               OptionsManager *options_mgr) {
   assert(options_mgr != NULL);
   LibContext *ctx = new LibContext();
   assert(ctx != NULL);
 
   ctx->mount_point_ = MountPoint::Create(
-    fqrn, LibGlobals::GetInstance()->file_system(), options_mgr);
+      fqrn, LibGlobals::GetInstance()->file_system(), options_mgr);
   return ctx;
 }
 
 
-LibContext::LibContext()
-  : options_mgr_(NULL)
-  , mount_point_(NULL)
-{ }
+LibContext::LibContext() : options_mgr_(NULL), mount_point_(NULL) { }
 
 
 LibContext::~LibContext() {
@@ -184,9 +176,8 @@ void LibContext::EnableMultiThreaded() {
   mount_point_->download_mgr()->Spawn();
 }
 
-bool LibContext::GetDirentForPath(const PathString         &path,
-                                  catalog::DirectoryEntry  *dirent)
-{
+bool LibContext::GetDirentForPath(const PathString &path,
+                                  catalog::DirectoryEntry *dirent) {
   if (path.GetLength() == 1 && path.GetChars()[0] == '/') {
     // root path is expected to be "", not "/"
     PathString p;
@@ -198,8 +189,7 @@ bool LibContext::GetDirentForPath(const PathString         &path,
 
   // TODO(jblomer): not twice md5 calculation
   if (mount_point_->catalog_mgr()->LookupPath(path, catalog::kLookupDefault,
-                                              dirent))
-  {
+                                              dirent)) {
     mount_point_->md5path_cache()->Insert(md5path, *dirent);
     return true;
   }
@@ -213,18 +203,16 @@ bool LibContext::GetDirentForPath(const PathString         &path,
 }
 
 
-void LibContext::AppendStringToList(char const   *str,
-                                    char       ***buf,
-                                    size_t       *listlen,
-                                    size_t       *buflen)
-{
+void LibContext::AppendStringToList(char const *str,
+                                    char ***buf,
+                                    size_t *listlen,
+                                    size_t *buflen) {
   if (*listlen + 1 >= *buflen) {
-       size_t newbuflen = (*listlen)*2 + 5;
-       *buf = reinterpret_cast<char **>(
-         realloc(*buf, sizeof(char *) * newbuflen));
-       assert(*buf);
-       *buflen = newbuflen;
-       assert(*listlen < *buflen);
+    size_t newbuflen = (*listlen) * 2 + 5;
+    *buf = reinterpret_cast<char **>(realloc(*buf, sizeof(char *) * newbuflen));
+    assert(*buf);
+    *buflen = newbuflen;
+    assert(*listlen < *buflen);
   }
   if (str) {
     (*buf)[(*listlen)] = strdup(str);
@@ -236,18 +224,17 @@ void LibContext::AppendStringToList(char const   *str,
 }
 
 
-void LibContext::AppendStatToList(const cvmfs_stat_t   st,
-                                  cvmfs_stat_t       **buf,
-                                  size_t              *listlen,
-                                  size_t              *buflen)
-{
+void LibContext::AppendStatToList(const cvmfs_stat_t st,
+                                  cvmfs_stat_t **buf,
+                                  size_t *listlen,
+                                  size_t *buflen) {
   if (*listlen + 1 >= *buflen) {
-       size_t newbuflen = (*listlen)*2 + 5;
-       *buf = reinterpret_cast<cvmfs_stat_t *>(
-         realloc(*buf, sizeof(cvmfs_stat_t) * newbuflen));
-       assert(*buf);
-       *buflen = newbuflen;
-       assert(*listlen < *buflen);
+    size_t newbuflen = (*listlen) * 2 + 5;
+    *buf = reinterpret_cast<cvmfs_stat_t *>(
+        realloc(*buf, sizeof(cvmfs_stat_t) * newbuflen));
+    assert(*buf);
+    *buflen = newbuflen;
+    assert(*listlen < *buflen);
   }
   (*buf)[(*listlen)].info = st.info;
   (*buf)[(*listlen)++].name = st.name;
@@ -273,22 +260,20 @@ int LibContext::GetAttr(const char *c_path, struct stat *info) {
   return 0;
 }
 
-void LibContext::CvmfsAttrFromDirent(
-  const catalog::DirectoryEntry dirent,
-  struct cvmfs_attr *attr
-) {
-  attr->st_ino   = dirent.inode();
-  attr->st_mode  = dirent.mode();
+void LibContext::CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
+                                     struct cvmfs_attr *attr) {
+  attr->st_ino = dirent.inode();
+  attr->st_mode = dirent.mode();
   attr->st_nlink = dirent.linkcount();
-  attr->st_uid   = dirent.uid();
-  attr->st_gid   = dirent.gid();
-  attr->st_rdev  = dirent.rdev();
-  attr->st_size  = dirent.size();
-  attr->mtime    = dirent.mtime();
+  attr->st_uid = dirent.uid();
+  attr->st_gid = dirent.gid();
+  attr->st_rdev = dirent.rdev();
+  attr->st_size = dirent.size();
+  attr->mtime = dirent.mtime();
   attr->cvm_checksum = strdup(dirent.checksum().ToString().c_str());
-  attr->cvm_symlink  = strdup(dirent.symlink().c_str());
-  attr->cvm_name     = strdup(dirent.name().c_str());
-  attr->cvm_xattrs   = NULL;
+  attr->cvm_symlink = strdup(dirent.symlink().c_str());
+  attr->cvm_name = strdup(dirent.name().c_str());
+  attr->cvm_xattrs = NULL;
 }
 
 
@@ -315,15 +300,15 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
     info->cvm_nchunks = 1;
     if (dirent.IsChunkedFile()) {
       FileChunkList *chunks = new FileChunkList();
-      mount_point_->catalog_mgr()->ListFileChunks(
-        p, dirent.hash_algorithm(), chunks);
+      mount_point_->catalog_mgr()->ListFileChunks(p, dirent.hash_algorithm(),
+                                                  chunks);
       assert(!chunks->IsEmpty());
       info->cvm_nchunks = chunks->size();
       if (dirent.checksum().IsNull()) {
         info->cvm_is_hash_artificial = 1;
         free(info->cvm_checksum);
         FileChunkReflist chunks_reflist(
-          chunks, p, dirent.compression_algorithm(), dirent.IsExternalFile());
+            chunks, p, dirent.compression_algorithm(), dirent.IsExternalFile());
         std::string hash_str = chunks_reflist.HashChunkList().ToString();
         info->cvm_checksum = strdup(hash_str.c_str());
       }
@@ -360,21 +345,20 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
     return -EINVAL;
   }
 
-  unsigned len = (dirent.symlink().GetLength() >= size) ?
-    size : dirent.symlink().GetLength() + 1;
-  strncpy(buf, dirent.symlink().c_str(), len-1);
-  buf[len-1] = '\0';
+  unsigned len = (dirent.symlink().GetLength() >= size)
+                     ? size
+                     : dirent.symlink().GetLength() + 1;
+  strncpy(buf, dirent.symlink().c_str(), len - 1);
+  buf[len - 1] = '\0';
 
   return 0;
 }
 
-int LibContext::ListDirectory(
-  const char *c_path,
-  char ***buf,
-  size_t *listlen,
-  size_t *buflen,
-  bool self_reference
-) {
+int LibContext::ListDirectory(const char *c_path,
+                              char ***buf,
+                              size_t *listlen,
+                              size_t *buflen,
+                              bool self_reference) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
@@ -418,18 +402,17 @@ int LibContext::ListDirectory(
     return -EIO;
   }
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
-    AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(),
-                          buf, listlen, buflen);
+    AppendStringToList(listing_from_catalog.AtPtr(i)->name.c_str(), buf,
+                       listlen, buflen);
   }
 
   return 0;
 }
 
-int LibContext::ListDirectoryStat(
-  const char *c_path,
-  cvmfs_stat_t **buf,
-  size_t *listlen,
-  size_t *buflen) {
+int LibContext::ListDirectoryStat(const char *c_path,
+                                  cvmfs_stat_t **buf,
+                                  size_t *listlen,
+                                  size_t *buflen) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
 
@@ -467,13 +450,10 @@ int LibContext::ListDirectoryStat(
   return 0;
 }
 
-int LibContext::GetNestedCatalogAttr(
-  const char *c_path,
-  struct cvmfs_nc_attr *nc_attr
-) {
+int LibContext::GetNestedCatalogAttr(const char *c_path,
+                                     struct cvmfs_nc_attr *nc_attr) {
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
-  LogCvmfs(kLogCvmfs, kLogDebug,
-    "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -483,17 +463,18 @@ int LibContext::GetNestedCatalogAttr(
   uint64_t size;
 
   // Find the nested catalog from the root catalog
-  const bool found =
-    mount_point_->catalog_mgr()->LookupNested(p, &mountpoint, &hash, &size);
+  const bool found = mount_point_->catalog_mgr()->LookupNested(p, &mountpoint,
+                                                               &hash, &size);
   if (!found) {
     return -ENOENT;
   }
 
   std::string subcat_path;
   shash::Any tmp_hash;
-  std::map<std::string, uint64_t> counters =
-    mount_point_->catalog_mgr()->
-      LookupCounters(p, &subcat_path, &tmp_hash).GetValues();
+  std::map<std::string, uint64_t> counters = mount_point_->catalog_mgr()
+                                                 ->LookupCounters(
+                                                     p, &subcat_path, &tmp_hash)
+                                                 .GetValues();
 
   // Set values of the passed structure
   nc_attr->mountpoint = strdup(mountpoint.ToString().c_str());
@@ -516,14 +497,11 @@ int LibContext::GetNestedCatalogAttr(
 }
 
 
-int LibContext::ListNestedCatalogs(
-  const char *c_path,
-  char ***buf,
-  size_t *buflen
-) {
+int LibContext::ListNestedCatalogs(const char *c_path,
+                                   char ***buf,
+                                   size_t *buflen) {
   ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
-  LogCvmfs(kLogCvmfs, kLogDebug,
-    "cvmfs_list_nc on path: %s", c_path);
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_list_nc on path: %s", c_path);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -537,7 +515,7 @@ int LibContext::ListNestedCatalogs(
   bool retval = mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-      "cvmfs_list_nc failed to find skein of path: %s", c_path);
+             "cvmfs_list_nc failed to find skein of path: %s", c_path);
     return 1;
   }
 
@@ -574,43 +552,42 @@ int LibContext::Open(const char *c_path) {
 
     FileChunkList *chunks = new FileChunkList();
     if (!mount_point_->catalog_mgr()->ListFileChunks(
-          path, dirent.hash_algorithm(), chunks) ||
-        chunks->IsEmpty())
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
-               "'chunked', but no chunks found.", path.c_str());
+            path, dirent.hash_algorithm(), chunks)
+        || chunks->IsEmpty()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "file %s is marked as "
+               "'chunked', but no chunks found.",
+               path.c_str());
       file_system()->io_error_info()->AddIoError();
       delete chunks;
       return -EIO;
     }
 
-    fd = mount_point_->simple_chunk_tables()->Add(
-      FileChunkReflist(chunks, path, dirent.compression_algorithm(),
-                       dirent.IsExternalFile()));
+    fd = mount_point_->simple_chunk_tables()->Add(FileChunkReflist(
+        chunks, path, dirent.compression_algorithm(), dirent.IsExternalFile()));
     return fd | kFdChunked;
   }
 
   cvmfs::Fetcher *this_fetcher = dirent.IsExternalFile()
-    ? mount_point_->external_fetcher()
-    : mount_point_->fetcher();
+                                     ? mount_point_->external_fetcher()
+                                     : mount_point_->fetcher();
   CacheManager::Label label;
   label.path = std::string(path.GetChars(), path.GetLength());
   label.size = dirent.size();
   label.zip_algorithm = dirent.compression_algorithm();
   if (dirent.IsExternalFile())
     label.flags |= CacheManager::kLabelExternal;
-  fd =
-    this_fetcher->Fetch(CacheManager::LabeledObject(dirent.checksum(), label));
+  fd = this_fetcher->Fetch(
+      CacheManager::LabeledObject(dirent.checksum(), label));
   perf::Inc(file_system()->n_fs_open());
 
   if (fd >= 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
-             path.c_str(), fd);
+    LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)", path.c_str(), fd);
     return fd;
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-             "failed to open path: %s, CAS key %s, error code %d",
-             c_path, dirent.checksum().ToString().c_str(), errno);
+             "failed to open path: %s, CAS key %s, error code %d", c_path,
+             dirent.checksum().ToString().c_str(), errno);
     if (errno == EMFILE) {
       return -EMFILE;
     }
@@ -621,21 +598,16 @@ int LibContext::Open(const char *c_path) {
 }
 
 
-int64_t LibContext::Pread(
-  int fd,
-  void *buf,
-  uint64_t size,
-  uint64_t off)
-{
+int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
   if (fd & kFdChunked) {
     ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
                         &default_interrupt_cue_);
     const int chunk_handle = fd & ~kFdChunked;
-    SimpleChunkTables::OpenChunks open_chunks =
-      mount_point_->simple_chunk_tables()->Get(chunk_handle);
+    SimpleChunkTables::OpenChunks
+        open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
-    zlib::Algorithms compression_alg =
-      open_chunks.chunk_reflist.compression_alg;
+    zlib::Algorithms compression_alg = open_chunks.chunk_reflist
+                                           .compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -647,10 +619,11 @@ int64_t LibContext::Pread(
       // Open file descriptor to chunk
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
-        if (chunk_fd->fd != -1) file_system()->cache_mgr()->Close(chunk_fd->fd);
+        if (chunk_fd->fd != -1)
+          file_system()->cache_mgr()->Close(chunk_fd->fd);
         cvmfs::Fetcher *this_fetcher = open_chunks.chunk_reflist.external_data
-          ? mount_point_->external_fetcher()
-          : mount_point_->fetcher();
+                                           ? mount_point_->external_fetcher()
+                                           : mount_point_->fetcher();
         CacheManager::Label label;
         label.path = std::string(open_chunks.chunk_reflist.path.GetChars(),
                                  open_chunks.chunk_reflist.path.GetLength());
@@ -662,7 +635,7 @@ int64_t LibContext::Pread(
           label.range_offset = chunk_list->AtPtr(chunk_idx)->offset();
         }
         chunk_fd->fd = this_fetcher->Fetch(CacheManager::LabeledObject(
-          chunk_list->AtPtr(chunk_idx)->content_hash(), label));
+            chunk_list->AtPtr(chunk_idx)->content_hash(), label));
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
           return -EIO;
@@ -670,19 +643,19 @@ int64_t LibContext::Pread(
         chunk_fd->chunk_idx = chunk_idx;
       }
 
-      LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d",
-               chunk_fd->fd);
+      LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d", chunk_fd->fd);
       // Read data from chunk
       const size_t bytes_to_read = size - overall_bytes_fetched;
-      const size_t remaining_bytes_in_chunk =
-        chunk_list->AtPtr(chunk_idx)->size() - offset_in_chunk;
-      size_t bytes_to_read_in_chunk =
-        std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const size_t remaining_bytes_in_chunk = chunk_list->AtPtr(chunk_idx)
+                                                  ->size()
+                                              - offset_in_chunk;
+      size_t bytes_to_read_in_chunk = std::min(bytes_to_read,
+                                               remaining_bytes_in_chunk);
       const int64_t bytes_fetched = file_system()->cache_mgr()->Pread(
-        chunk_fd->fd,
-        reinterpret_cast<char *>(buf) + overall_bytes_fetched,
-        bytes_to_read_in_chunk,
-        offset_in_chunk);
+          chunk_fd->fd,
+          reinterpret_cast<char *>(buf) + overall_bytes_fetched,
+          bytes_to_read_in_chunk,
+          offset_in_chunk);
 
       if (bytes_fetched < 0) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %ld (%s)",
@@ -695,8 +668,8 @@ int64_t LibContext::Pread(
       // Proceed to the next chunk to keep on reading data
       ++chunk_idx;
       offset_in_chunk = 0;
-    } while ((overall_bytes_fetched < size) &&
-             (chunk_idx < chunk_list->size()));
+    } while ((overall_bytes_fetched < size)
+             && (chunk_idx < chunk_list->size()));
     return overall_bytes_fetched;
   } else {
     return file_system()->cache_mgr()->Pread(fd, buf, size, off);
@@ -708,8 +681,8 @@ int LibContext::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
   if (fd & kFdChunked) {
     const int chunk_handle = fd & ~kFdChunked;
-    SimpleChunkTables::OpenChunks open_chunks =
-      mount_point_->simple_chunk_tables()->Get(chunk_handle);
+    SimpleChunkTables::OpenChunks
+        open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     if (open_chunks.chunk_reflist.list == NULL)
       return -EBADF;
     if (open_chunks.chunk_fd->fd != -1)
@@ -735,7 +708,7 @@ int LibContext::Remount() {
 
       if (retval != catalog::kLoadUp2Date && retval != catalog::kLoadNew) {
         LogCvmfs(kLogCvmfs, kLogDebug,
-                              "Remount requested to switch catalog but failed");
+                 "Remount requested to switch catalog but failed");
         return -1;
       }
 

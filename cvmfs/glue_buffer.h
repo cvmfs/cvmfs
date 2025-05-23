@@ -55,22 +55,20 @@ class InodeEx {
  public:
   enum EFileType {
     kUnknownType = 0,
-    kRegular     = 010,
-    kSymlink     = 012,
-    kDirectory   = 004,
-    kFifo        = 001,
-    kSocket      = 014,
-    kCharDev     = 002,
-    kBulkDev     = 006,
+    kRegular = 010,
+    kSymlink = 012,
+    kDirectory = 004,
+    kFifo = 001,
+    kSocket = 014,
+    kCharDev = 002,
+    kBulkDev = 006,
   };
 
   InodeEx() : inode_ex_(0) { }
   InodeEx(uint64_t inode, EFileType type)
-    : inode_ex_(inode | (static_cast<uint64_t>(type) << 60))
-  { }
+      : inode_ex_(inode | (static_cast<uint64_t>(type) << 60)) { }
   InodeEx(uint64_t inode, unsigned mode)
-    : inode_ex_(inode | (ShiftMode(mode) << 60))
-  { }
+      : inode_ex_(inode | (ShiftMode(mode) << 60)) { }
 
   inline uint64_t GetInode() const { return inode_ex_ & ~(uint64_t(15) << 60); }
   inline EFileType GetFileType() const {
@@ -85,8 +83,8 @@ class InodeEx {
   }
 
   inline bool IsCompatibleFileType(unsigned mode) const {
-    return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode)) ||
-           (GetFileType() == kUnknownType);
+    return (static_cast<uint64_t>(GetFileType()) == ShiftMode(mode))
+           || (GetFileType() == kUnknownType);
   }
 
  private:
@@ -95,7 +93,7 @@ class InodeEx {
 
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const uint64_t &inode) {
@@ -115,9 +113,7 @@ static inline uint32_t hasher_inode_ex(const InodeEx &inode_ex) {
  */
 class StringRef {
  public:
-  StringRef() {
-    length_ = NULL;
-  }
+  StringRef() { length_ = NULL; }
 
   uint16_t length() const { return *length_; }
   uint16_t size() const { return sizeof(uint16_t) + *length_; }
@@ -125,9 +121,7 @@ class StringRef {
     return sizeof(uint16_t) + length;
   }
   char *data() const { return reinterpret_cast<char *>(length_ + 1); }
-  static StringRef Place(const uint16_t length, const char *str,
-                         void *addr)
-  {
+  static StringRef Place(const uint16_t length, const char *str, void *addr) {
     StringRef result;
     result.length_ = reinterpret_cast<uint16_t *>(addr);
     *result.length_ = length;
@@ -135,6 +129,7 @@ class StringRef {
       memcpy(result.length_ + 1, str, length);
     return result;
   }
+
  private:
   uint16_t *length_;
 };
@@ -151,12 +146,10 @@ class StringRef {
 class StringHeap : public SingleCopy {
  public:
   StringHeap() {
-    Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
+    Init(128 * 1024);  // 128kB (should be >= 64kB+2B which is largest string)
   }
 
-  explicit StringHeap(const uint64_t minimum_size) {
-    Init(minimum_size);
-  }
+  explicit StringHeap(const uint64_t minimum_size) { Init(minimum_size); }
 
   void Init(const uint64_t minimum_size) {
     size_ = 0;
@@ -181,23 +174,22 @@ class StringHeap : public SingleCopy {
     // May require opening of new bin
     if (remaining_bin_size < str_size) {
       size_ += remaining_bin_size;
-      AddBin(2*bin_size_);
+      AddBin(2 * bin_size_);
     }
-    StringRef result =
-      StringRef::Place(length, str,
-                       static_cast<char *>(bins_.At(bins_.size()-1))+bin_used_);
+    StringRef result = StringRef::Place(
+        length, str,
+        static_cast<char *>(bins_.At(bins_.size() - 1)) + bin_used_);
     size_ += str_size;
     used_ += str_size;
     bin_used_ += str_size;
     return result;
   }
 
-  void RemoveString(const StringRef str_ref) {
-    used_ -= str_ref.size();
-  }
+  void RemoveString(const StringRef str_ref) { used_ -= str_ref.size(); }
 
   double GetUsage() const {
-    if (size_ == 0) return 1.0;
+    if (size_ == 0)
+      return 1.0;
     return static_cast<double>(used_) / static_cast<double>(size_);
   }
 
@@ -249,12 +241,10 @@ class PathStore {
     string_heap_ = new StringHeap();
   }
 
-  ~PathStore() {
-    delete string_heap_;
-  }
+  ~PathStore() { delete string_heap_; }
 
   explicit PathStore(const PathStore &other);
-  PathStore &operator= (const PathStore &other);
+  PathStore &operator=(const PathStore &other);
 
   void Insert(const shash::Md5 &md5path, const PathString &path) {
     PathInfo info;
@@ -314,9 +304,8 @@ class PathStore {
         shash::Md5 empty_path = map_.empty_key();
         for (unsigned i = 0; i < map_.capacity(); ++i) {
           if (map_.keys()[i] != empty_path) {
-            (map_.values() + i)->name =
-              new_string_heap->AddString(map_.values()[i].name.length(),
-                                         map_.values()[i].name.data());
+            (map_.values() + i)->name = new_string_heap->AddString(
+                map_.values()[i].name.length(), map_.values()[i].name.data());
           }
         }
         delete string_heap_;
@@ -334,9 +323,7 @@ class PathStore {
     string_heap_ = new StringHeap();
   }
 
-  Cursor BeginEnumerate() {
-    return Cursor();
-  }
+  Cursor BeginEnumerate() { return Cursor(); }
 
   bool Next(Cursor *cursor, shash::Md5 *parent, StringRef *name) {
     shash::Md5 empty_key = map_.empty_key();
@@ -355,9 +342,7 @@ class PathStore {
 
  private:
   struct PathInfo {
-    PathInfo() {
-      refcnt = 1;
-    }
+    PathInfo() { refcnt = 1; }
     shash::Md5 parent;
     uint32_t refcnt;
     StringRef name;
@@ -411,9 +396,7 @@ class StatStore {
 
 class PathMap {
  public:
-  PathMap() {
-    map_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
-  }
+  PathMap() { map_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5); }
 
   bool LookupPath(const shash::Md5 &md5path, PathString *path) {
     bool found = path_store_.Lookup(md5path, path);
@@ -424,14 +407,16 @@ class PathMap {
     uint64_t inode;
     bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
                              &inode);
-    if (found) return inode;
+    if (found)
+      return inode;
     return 0;
   }
 
   uint64_t LookupInodeByMd5Path(const shash::Md5 &md5path) {
     uint64_t inode;
     bool found = map_.Lookup(md5path, &inode);
-    if (found) return inode;
+    if (found)
+      return inode;
     return 0;
   }
 
@@ -479,9 +464,7 @@ class PathMap {
  */
 class InodeExMap {
  public:
-  InodeExMap() {
-    map_.Init(16, InodeEx(), hasher_inode_ex);
-  }
+  InodeExMap() { map_.Init(16, InodeEx(), hasher_inode_ex); }
 
   bool LookupMd5Path(InodeEx *inode_ex, shash::Md5 *md5path) {
     bool found = map_.LookupEx(inode_ex, md5path);
@@ -516,9 +499,7 @@ class InodeReferences {
     uint32_t idx;
   };
 
-  InodeReferences() {
-    map_.Init(16, 0, hasher_inode);
-  }
+  InodeReferences() { map_.Init(16, 0, hasher_inode); }
 
   bool Get(const uint64_t inode, const uint32_t by) {
     uint32_t refcounter = 0;
@@ -541,7 +522,8 @@ class InodeReferences {
     if (refcounter < by) {
       PANIC(kLogSyslogErr | kLogDebug,
             "inode tracker refcount mismatch, inode % " PRIu64
-            ", refcounts %u / %u", inode, refcounter, by);
+            ", refcounts %u / %u",
+            inode, refcounter, by);
     }
 
     if (refcounter == by) {
@@ -558,13 +540,9 @@ class InodeReferences {
     map_.Insert(new_inode, 0);
   }
 
-  void Clear() {
-    map_.Clear();
-  }
+  void Clear() { map_.Clear(); }
 
-  Cursor BeginEnumerate() {
-    return Cursor();
-  }
+  Cursor BeginEnumerate() { return Cursor(); }
 
   bool Next(Cursor *cursor, uint64_t *inode) {
     uint64_t empty_key = map_.empty_key();
@@ -597,12 +575,9 @@ class InodeTracker {
    * Used to actively evict all known paths from kernel caches
    */
   struct Cursor {
-    explicit Cursor(
-      const PathStore::Cursor &p,
-      const InodeReferences::Cursor &i)
-      : csr_paths(p)
-      , csr_inos(i)
-    { }
+    explicit Cursor(const PathStore::Cursor &p,
+                    const InodeReferences::Cursor &i)
+        : csr_paths(p), csr_inos(i) { }
     PathStore::Cursor csr_paths;
     InodeReferences::Cursor csr_inos;
   };
@@ -615,9 +590,7 @@ class InodeTracker {
    */
   class VfsPutRaii {
    public:
-    explicit VfsPutRaii(InodeTracker *t) : tracker_(t) {
-      tracker_->Lock();
-    }
+    explicit VfsPutRaii(InodeTracker *t) : tracker_(t) { tracker_->Lock(); }
     ~VfsPutRaii() { tracker_->Unlock(); }
 
     bool VfsPut(const uint64_t inode, const uint32_t by) {
@@ -656,13 +629,13 @@ class InodeTracker {
       atomic_init64(&num_misses_path);
     }
     std::string Print() {
-      return
-      "inserts: " + StringifyInt(atomic_read64(&num_inserts)) +
-      "  removes: " + StringifyInt(atomic_read64(&num_removes)) +
-      "  references: " + StringifyInt(atomic_read64(&num_references)) +
-      "  hits(inode): " + StringifyInt(atomic_read64(&num_hits_inode)) +
-      "  hits(path): " + StringifyInt(atomic_read64(&num_hits_path)) +
-      "  misses(path): " + StringifyInt(atomic_read64(&num_misses_path));
+      return "inserts: " + StringifyInt(atomic_read64(&num_inserts))
+             + "  removes: " + StringifyInt(atomic_read64(&num_removes))
+             + "  references: " + StringifyInt(atomic_read64(&num_references))
+             + "  hits(inode): " + StringifyInt(atomic_read64(&num_hits_inode))
+             + "  hits(path): " + StringifyInt(atomic_read64(&num_hits_path))
+             + "  misses(path): "
+             + StringifyInt(atomic_read64(&num_misses_path));
     }
     atomic_int64 num_inserts;
     atomic_int64 num_removes;
@@ -675,12 +648,11 @@ class InodeTracker {
 
   InodeTracker();
   explicit InodeTracker(const InodeTracker &other);
-  InodeTracker &operator= (const InodeTracker &other);
+  InodeTracker &operator=(const InodeTracker &other);
   ~InodeTracker();
 
   void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
-                const PathString &path)
-  {
+                const PathString &path) {
     uint64_t inode = inode_ex.GetInode();
     Lock();
     bool is_new_inode = inode_references_.Get(inode, by);
@@ -689,7 +661,8 @@ class InodeTracker {
     Unlock();
 
     atomic_xadd64(&statistics_.num_references, by);
-    if (is_new_inode) atomic_inc64(&statistics_.num_inserts);
+    if (is_new_inode)
+      atomic_inc64(&statistics_.num_inserts);
   }
 
   void VfsGet(const InodeEx inode_ex, const PathString &path) {
@@ -770,8 +743,8 @@ class InodeTracker {
   bool NextEntry(Cursor *cursor, uint64_t *inode_parent, NameString *name) {
     shash::Md5 parent_md5;
     StringRef name_ref;
-    bool result = path_map_.path_store()->Next(
-      &(cursor->csr_paths), &parent_md5, &name_ref);
+    bool result = path_map_.path_store()->Next(&(cursor->csr_paths),
+                                               &parent_md5, &name_ref);
     if (!result)
       return false;
     if (parent_md5.IsNull())
@@ -786,9 +759,7 @@ class InodeTracker {
     return inode_references_.Next(&(cursor->csr_inos), inode);
   }
 
-  void EndEnumerate(Cursor *cursor) {
-    Unlock();
-  }
+  void EndEnumerate(Cursor *cursor) { Unlock(); }
 
  private:
   static const unsigned kVersion = 4;
@@ -822,12 +793,9 @@ class DentryTracker {
 
  private:
   struct Entry {
-    Entry() : expiry(0), inode_parent(0) {}
+    Entry() : expiry(0), inode_parent(0) { }
     Entry(uint64_t e, uint64_t p, const char *n)
-      : expiry(e)
-      , inode_parent(p)
-      , name(n, strlen(n))
-    {}
+        : expiry(e), inode_parent(p), name(n, strlen(n)) { }
     uint64_t expiry;
     uint64_t inode_parent;
     NameString name;
@@ -835,7 +803,7 @@ class DentryTracker {
 
  public:
   struct Cursor {
-    explicit Cursor(Entry *h) : head(h), pos(0) {}
+    explicit Cursor(Entry *h) : head(h), pos(0) { }
     Entry *head;
     size_t pos;
   };
@@ -843,7 +811,7 @@ class DentryTracker {
   // Cannot be moved to the statistics manager because it has to survive
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
-    Statistics() : num_insert(0), num_remove(0), num_prune(0) {}
+    Statistics() : num_insert(0), num_remove(0), num_prune(0) { }
     int64_t num_insert;
     int64_t num_remove;
     int64_t num_prune;
@@ -854,7 +822,7 @@ class DentryTracker {
 
   DentryTracker();
   DentryTracker(const DentryTracker &other);
-  DentryTracker &operator= (const DentryTracker &other);
+  DentryTracker &operator=(const DentryTracker &other);
   ~DentryTracker();
 
   /**
@@ -863,8 +831,10 @@ class DentryTracker {
   DentryTracker *Move();
 
   void Add(const uint64_t inode_parent, const char *name, uint64_t timeout_s) {
-    if (!is_active_) return;
-    if (timeout_s == 0) return;
+    if (!is_active_)
+      return;
+    if (timeout_s == 0)
+      return;
 
     uint64_t now = platform_monotonic_time();
     Lock();
@@ -932,9 +902,9 @@ class DentryTracker {
 class PageCacheTracker {
  private:
   struct Entry {
-    Entry() : nopen(0), idx_stat(-1) {}
+    Entry() : nopen(0), idx_stat(-1) { }
     Entry(int32_t n, int32_t i, const shash::Any &h)
-      : nopen(n), idx_stat(i), hash(h) {}
+        : nopen(n), idx_stat(i), hash(h) { }
     /**
      * Reference counter for currently open files with a given inode. If the
      * sign bit is set, the entry is in the transition phase from one hash to
@@ -980,9 +950,9 @@ class PageCacheTracker {
 
     // Defaults to the old (pre v2.10) behavior: always flush the cache, never
     // use direct I/O.
-    OpenDirectives() : keep_cache(false), direct_io(false) {}
+    OpenDirectives() : keep_cache(false), direct_io(false) { }
 
-    OpenDirectives(bool k, bool d) : keep_cache(k), direct_io(d) {}
+    OpenDirectives(bool k, bool d) : keep_cache(k), direct_io(d) { }
   };
 
   /**
@@ -1005,12 +975,11 @@ class PageCacheTracker {
   // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics()
-      : n_insert(0)
-      , n_remove(0)
-      , n_open_direct(0)
-      , n_open_flush(0)
-      , n_open_cached(0)
-    {}
+        : n_insert(0)
+        , n_remove(0)
+        , n_open_direct(0)
+        , n_open_flush(0)
+        , n_open_cached(0) { }
     uint64_t n_insert;
     uint64_t n_remove;
     uint64_t n_open_direct;
@@ -1021,7 +990,7 @@ class PageCacheTracker {
 
   PageCacheTracker();
   explicit PageCacheTracker(const PageCacheTracker &other);
-  PageCacheTracker &operator= (const PageCacheTracker &other);
+  PageCacheTracker &operator=(const PageCacheTracker &other);
   ~PageCacheTracker();
 
   OpenDirectives Open(uint64_t inode, const shash::Any &hash,
@@ -1033,8 +1002,7 @@ class PageCacheTracker {
   OpenDirectives OpenDirect();
   void Close(uint64_t inode);
 
-  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info)
-  {
+  bool GetInfoIfOpen(uint64_t inode, shash::Any *hash, struct stat *info) {
     MutexLockGuard guard(lock_);
     Entry entry;
     bool retval = map_.Lookup(inode, &entry);
@@ -1073,8 +1041,7 @@ class PageCacheTracker {
     bool is_stale = true;
     if (dirent.IsChunkedFile()) {
       // Shortcut for chunked files: go by last modified timestamp
-      is_stale =
-        stat_store_.Get(entry.idx_stat).st_mtime != dirent.mtime();
+      is_stale = stat_store_.Get(entry.idx_stat).st_mtime != dirent.mtime();
     }
     if (is_stale) {
       // We mark that inode as "stale" by setting its hash to NULL.

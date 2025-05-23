@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <errno.h>
 #include <dirent.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -147,8 +147,8 @@ int main(int argc, char **argv) {
 
     std::set<std::string>::const_iterator iter = active_repositories.begin();
     for (; iter != active_repositories.end(); ++iter) {
-      printf("@%s / %s (%s): %s\n",
-             name.c_str(), mnt_ns.c_str(), proc.c_str(), iter->c_str());
+      printf("@%s / %s (%s): %s\n", name.c_str(), mnt_ns.c_str(), proc.c_str(),
+             iter->c_str());
     }
   }
   closedir(dirp);

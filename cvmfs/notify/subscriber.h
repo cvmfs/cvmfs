@@ -20,8 +20,8 @@ class Subscriber {
     kError,
   };
 
-  Subscriber() {}
-  virtual ~Subscriber() {}
+  Subscriber() { }
+  virtual ~Subscriber() { }
 
   /**
    * Subscribe to a specific message topic
@@ -30,14 +30,14 @@ class Subscriber {
    * names. The subscription delivers activity messages containing the current
    * repository manifest. Returns false if an error occurred.
    */
-  virtual bool Subscribe(const std::string& topic) = 0;
+  virtual bool Subscribe(const std::string &topic) = 0;
 
   /**
    * Unsubscribe
    *
    * Cancel an active subscription
    */
-  virtual void Unsubscribe() {}
+  virtual void Unsubscribe() { }
 
  protected:
   /**
@@ -46,8 +46,8 @@ class Subscriber {
    * Consume the message and return the status value that can be used
    * to exit the subscription loop.
    */
-  virtual Status Consume(const std::string& topic,
-                         const std::string& msg_text) = 0;
+  virtual Status Consume(const std::string &topic,
+                         const std::string &msg_text) = 0;
 };
 
 }  // namespace notify

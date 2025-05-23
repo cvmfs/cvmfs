@@ -11,7 +11,6 @@
 
 #include "string.h"
 
-
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -64,7 +63,7 @@ namespace {
  * Used for cas  insensitive HasSuffix
  */
 struct IgnoreCaseComperator {
-  IgnoreCaseComperator() {}
+  IgnoreCaseComperator() { }
   bool operator()(const std::string::value_type a,
                   const std::string::value_type b) const {
     return std::tolower(a) == std::tolower(b);
@@ -131,9 +130,10 @@ string StringifyLocalTime(const time_t seconds) {
                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char buffer[26];
   (void)/* cast to void ignores return and placates clang-tidy */
-   snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s", timestamp.tm_mday,
-           months[timestamp.tm_mon], timestamp.tm_year + 1900,
-           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec, timestamp.tm_zone);
+      snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d %s",
+               timestamp.tm_mday, months[timestamp.tm_mon],
+               timestamp.tm_year + 1900, timestamp.tm_hour, timestamp.tm_min,
+               timestamp.tm_sec, timestamp.tm_zone);
 
   return string(buffer);
 }
@@ -171,12 +171,8 @@ std::string IsoTimestamp() {
 
   char buffer[17];
   snprintf(buffer, sizeof(buffer), "%04d%02d%02dT%02d%02d%02dZ",
-           timestamp.tm_year + 1900,
-           timestamp.tm_mon + 1,
-           timestamp.tm_mday,
-           timestamp.tm_hour,
-           timestamp.tm_min,
-           timestamp.tm_sec);
+           timestamp.tm_year + 1900, timestamp.tm_mon + 1, timestamp.tm_mday,
+           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);
   return string(buffer);
 }
 
@@ -190,12 +186,8 @@ std::string WhitelistTimestamp(time_t when) {
 
   char buffer[15];
   snprintf(buffer, sizeof(buffer), "%04d%02d%02d%02d%02d%02d",
-           timestamp.tm_year + 1900,
-           timestamp.tm_mon + 1,
-           timestamp.tm_mday,
-           timestamp.tm_hour,
-           timestamp.tm_min,
-           timestamp.tm_sec);
+           timestamp.tm_year + 1900, timestamp.tm_mon + 1, timestamp.tm_mday,
+           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);
   return string(buffer);
 }
 
@@ -217,9 +209,10 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
   time_t utc_time = 0;
   unsigned length = iso8601.length();
 
-  if (length != 20) return utc_time;
-  if ((iso8601[4] != '-') || (iso8601[7] != '-') || (iso8601[10] != 'T') ||
-      (iso8601[13] != ':') || (iso8601[16] != ':') || (iso8601[19] != 'Z')) {
+  if (length != 20)
+    return utc_time;
+  if ((iso8601[4] != '-') || (iso8601[7] != '-') || (iso8601[10] != 'T')
+      || (iso8601[13] != ':') || (iso8601[16] != ':') || (iso8601[19] != 'Z')) {
     return utc_time;
   }
 
@@ -232,7 +225,8 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
   tm_wl.tm_min = static_cast<int>(String2Int64(iso8601.substr(14, 2)));
   tm_wl.tm_sec = static_cast<int>(String2Int64(iso8601.substr(17, 2)));
   utc_time = timegm(&tm_wl);
-  if (utc_time < 0) return 0;
+  if (utc_time < 0)
+    return 0;
 
   return utc_time;
 }
@@ -264,8 +258,8 @@ bool String2Uint64Parse(const std::string &value, uint64_t *result) {
   char *endptr = NULL;
   errno = 0;
   long long myval = strtoll(value.c_str(), &endptr, 10);  // NOLINT
-  if ((value.size() == 0) || (endptr != (value.c_str() + value.size())) ||
-      (myval < 0)) {
+  if ((value.size() == 0) || (endptr != (value.c_str() + value.size()))
+      || (myval < 0)) {
     errno = EINVAL;
     return false;
   }
@@ -284,13 +278,16 @@ void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
 
 bool HasPrefix(const string &str, const string &prefix,
                const bool ignore_case) {
-  if (prefix.length() > str.length()) return false;
+  if (prefix.length() > str.length())
+    return false;
 
   for (unsigned i = 0, l = prefix.length(); i < l; ++i) {
     if (ignore_case) {
-      if (toupper(str[i]) != toupper(prefix[i])) return false;
+      if (toupper(str[i]) != toupper(prefix[i]))
+        return false;
     } else {
-      if (str[i] != prefix[i]) return false;
+      if (str[i] != prefix[i])
+        return false;
     }
   }
   return true;
@@ -298,7 +295,8 @@ bool HasPrefix(const string &str, const string &prefix,
 
 bool HasSuffix(const std::string &str, const std::string &suffix,
                const bool ignore_case) {
-  if (suffix.size() > str.size()) return false;
+  if (suffix.size() > str.size())
+    return false;
   const IgnoreCaseComperator icmp;
   return (ignore_case)
              ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
@@ -309,9 +307,8 @@ vector<string> SplitString(const string &str, char delim) {
   return SplitStringBounded(0, str, delim);
 }
 
-vector<string> SplitStringBounded(
-  unsigned max_chunks, const string &str, char delim)
-{
+vector<string> SplitStringBounded(unsigned max_chunks, const string &str,
+                                  char delim) {
   vector<string> result;
 
   // edge case... one chunk is always the whole string
@@ -331,7 +328,8 @@ vector<string> SplitStringBounded(
       marker = i + 1;
 
       // we got what we want... good bye
-      if (++chunks == max_chunks) break;
+      if (++chunks == max_chunks)
+        break;
     }
   }
 
@@ -341,19 +339,18 @@ vector<string> SplitStringBounded(
 }
 
 vector<string> SplitStringMultiChar(const string &str, const string &delim) {
-    size_t pos_start = 0, pos_end = 0, delim_len = delim.length();
-    std::string substring;
-    std::vector<std::string> result;
+  size_t pos_start = 0, pos_end = 0, delim_len = delim.length();
+  std::string substring;
+  std::vector<std::string> result;
 
-    while ((pos_end = str.find(delim, pos_start)) != string::npos) {
-        substring = str.substr (pos_start, pos_end - pos_start);
-        pos_start = pos_end + delim_len;
-        result.push_back(substring);
-    }
+  while ((pos_end = str.find(delim, pos_start)) != string::npos) {
+    substring = str.substr(pos_start, pos_end - pos_start);
+    pos_start = pos_end + delim_len;
+    result.push_back(substring);
+  }
 
-    result.push_back(str.substr(pos_start));
-    return result;
-
+  result.push_back(str.substr(pos_start));
+  return result;
 }
 
 string JoinStrings(const vector<string> &strings, const string &joint) {
@@ -362,7 +359,8 @@ string JoinStrings(const vector<string> &strings, const string &joint) {
 
   if (size > 0) {
     result = strings[0];
-    for (unsigned i = 1; i < size; ++i) result += joint + strings[i];
+    for (unsigned i = 1; i < size; ++i)
+      result += joint + strings[i];
   }
 
   return result;
@@ -374,7 +372,8 @@ void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
   unsigned pos = 0;
   while (pos < buffer_size) {
     if (static_cast<char>(buffer[pos]) == '\n') {
-      if (line == "--") return;
+      if (line == "--")
+        return;
 
       if (line != "") {
         const string tail = (line.length() == 1) ? "" : line.substr(1);
@@ -399,13 +398,15 @@ void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
 
 bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
   int fd = open(filename.c_str(), O_RDONLY);
-  if (fd < 0) return false;
+  if (fd < 0)
+    return false;
 
   unsigned char buffer[4096];
   ssize_t num_bytes = read(fd, buffer, sizeof(buffer));
   close(fd);
 
-  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer))) return false;
+  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
+    return false;
 
   ParseKeyvalMem(buffer, unsigned(num_bytes), content);
   return true;
@@ -413,7 +414,8 @@ bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
 
 string GetLineMem(const char *text, const int text_size) {
   int pos = 0;
-  while ((pos < text_size) && (text[pos] != '\n')) pos++;
+  while ((pos < text_size) && (text[pos] != '\n'))
+    pos++;
   return string(text, pos);
 }
 
@@ -429,7 +431,8 @@ bool GetLineFile(FILE *f, std::string *line) {
       break;
     }
     char c = static_cast<char>(retval);
-    if (c == '\n') break;
+    if (c == '\n')
+      break;
     line->push_back(c);
   }
   return (retval != EOF) || !line->empty();
@@ -450,7 +453,8 @@ bool GetLineFd(const int fd, std::string *line) {
     if (retval == -1) {
       break;
     }
-    if (c == '\n') break;
+    if (c == '\n')
+      break;
     line->push_back(c);
   }
   return (retval == 1) || !line->empty();
@@ -460,44 +464,38 @@ bool GetLineFd(const int fd, std::string *line) {
  * Removes leading and trailing whitespaces.
  */
 string Trim(const string &raw, bool trim_newline) {
-  if (raw.empty()) return "";
+  if (raw.empty())
+    return "";
 
   unsigned start_pos = 0;
-  for (; (start_pos < raw.length()) &&
-         (raw[start_pos] == ' ' || raw[start_pos] == '\t' ||
-         (trim_newline && (raw[start_pos] == '\n' || raw[start_pos] == '\r')));
-       ++start_pos)
-  {
+  for (; (start_pos < raw.length())
+         && (raw[start_pos] == ' ' || raw[start_pos] == '\t'
+             || (trim_newline
+                 && (raw[start_pos] == '\n' || raw[start_pos] == '\r')));
+       ++start_pos) {
   }
   unsigned end_pos = raw.length() - 1;  // at least one character in raw
   for (;
-       (end_pos >= start_pos) &&
-         (raw[end_pos] == ' ' || raw[end_pos] == '\t' ||
-         (trim_newline && (raw[end_pos] == '\n' || raw[end_pos] == '\r')));
-       --end_pos)
-  {
+       (end_pos >= start_pos)
+       && (raw[end_pos] == ' ' || raw[end_pos] == '\t'
+           || (trim_newline && (raw[end_pos] == '\n' || raw[end_pos] == '\r')));
+       --end_pos) {
   }
 
   return raw.substr(start_pos, end_pos - start_pos + 1);
 }
 
-std::string TrimString(
-  const std::string& path,
-  const std::string& toTrim,
-  const int trimMode)
-{
+std::string TrimString(const std::string &path,
+                       const std::string &toTrim,
+                       const int trimMode) {
   std::string trimmed = path;
   if (trimmed != toTrim) {
-    while ((trimMode & kTrimLeading) &&
-           HasPrefix(trimmed, toTrim, true) &&
-           (trimmed.size() > toTrim.size()))
-    {
+    while ((trimMode & kTrimLeading) && HasPrefix(trimmed, toTrim, true)
+           && (trimmed.size() > toTrim.size())) {
       trimmed = trimmed.substr(toTrim.size());
     }
-    while ((trimMode & kTrimTrailing) &&
-           HasSuffix(trimmed, toTrim, true) &&
-           (trimmed.size() > toTrim.size()))
-    {
+    while ((trimMode & kTrimTrailing) && HasSuffix(trimmed, toTrim, true)
+           && (trimmed.size() > toTrim.size())) {
       trimmed = trimmed.substr(0, trimmed.size() - toTrim.size());
     }
   }
@@ -520,7 +518,8 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
-  if (needle == "") return result;
+  if (needle == "")
+    return result;
 
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
@@ -539,8 +538,8 @@ string Base64(const string &data) {
   string result;
   result.reserve((data.length() + 3) * 4 / 3);
   unsigned pos = 0;
-  const unsigned char *data_ptr =
-      reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned char *data_ptr = reinterpret_cast<const unsigned char *>(
+      data.data());
   const unsigned length = data.length();
   while (pos + 2 < length) {
     char encoded_block[4];
@@ -578,12 +577,13 @@ string Base64Url(const string &data) {
   return base64;
 }
 
-static bool Debase64Block(const unsigned char input[4], unsigned char output[3])
-{
+static bool Debase64Block(const unsigned char input[4],
+                          unsigned char output[3]) {
   int32_t dec[4];
   for (int i = 0; i < 4; ++i) {
     dec[i] = db64_table[input[i]];
-    if (dec[i] < 0) return false;
+    if (dec[i] < 0)
+      return false;
   }
 
   output[0] = (dec[0] << 2) | (dec[1] >> 4);
@@ -599,23 +599,27 @@ bool Debase64(const string &data, string *decoded) {
   decoded->clear();
   decoded->reserve((data.length() + 4) * 3 / 4);
   unsigned pos = 0;
-  const unsigned char *data_ptr =
-      reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned char *data_ptr = reinterpret_cast<const unsigned char *>(
+      data.data());
   const unsigned length = data.length();
-  if (length == 0) return true;
-  if ((length % 4) != 0) return false;
+  if (length == 0)
+    return true;
+  if ((length % 4) != 0)
+    return false;
 
   while (pos < length) {
     unsigned char decoded_block[3];
     bool retval = Debase64Block(data_ptr + pos, decoded_block);
-    if (!retval) return false;
+    if (!retval)
+      return false;
     decoded->append(reinterpret_cast<char *>(decoded_block), 3);
     pos += 4;
   }
 
   for (int i = 0; i < 2; ++i) {
     pos--;
-    if (data[pos] == '=') decoded->erase(decoded->length() - 1);
+    if (data[pos] == '=')
+      decoded->erase(decoded->length() - 1);
   }
   return true;
 }
@@ -624,7 +628,8 @@ bool Debase64(const string &data, string *decoded) {
  * Assumes that source is terminated by a newline
  */
 string Tail(const string &source, unsigned num_lines) {
-  if (source.empty() || (num_lines == 0)) return "";
+  if (source.empty() || (num_lines == 0))
+    return "";
 
   int l = static_cast<int>(source.length());
   int i = l - 1;
@@ -641,16 +646,16 @@ string Tail(const string &source, unsigned num_lines) {
 }
 
 /**
-  * Get UTC Time.
-  *
-  * @param format format if timestamp (YYYY-MM-DD HH:MM:SS by default)
-  * @return a timestamp string on success, empty string on failure
-  */
+ * Get UTC Time.
+ *
+ * @param format format if timestamp (YYYY-MM-DD HH:MM:SS by default)
+ * @return a timestamp string on success, empty string on failure
+ */
 std::string GetGMTimestamp(const std::string &format) {
   struct tm time_ptr;
   char date_and_time[100];
   time_t t = time(NULL);
-  gmtime_r(&t, &time_ptr);      // take UTC
+  gmtime_r(&t, &time_ptr);  // take UTC
   // return empty string if formatting fails
   if (!strftime(date_and_time, 100, format.c_str(), &time_ptr)) {
     return "";

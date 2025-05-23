@@ -33,16 +33,15 @@ class ItemAllocator;
  */
 class FileItem : SingleCopy {
  public:
-  explicit FileItem(
-    IngestionSource* source,
-    uint64_t min_chunk_size = 4 * 1024 * 1024,
-    uint64_t avg_chunk_size = 8 * 1024 * 1024,
-    uint64_t max_chunk_size = 16 * 1024 * 1024,
-    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
-    shash::Algorithms hash_algorithm = shash::kSha1,
-    shash::Suffix hash_suffix = shash::kSuffixNone,
-    bool may_have_chunks = true,
-    bool has_legacy_bulk_chunk = false);
+  explicit FileItem(IngestionSource *source,
+                    uint64_t min_chunk_size = 4 * 1024 * 1024,
+                    uint64_t avg_chunk_size = 8 * 1024 * 1024,
+                    uint64_t max_chunk_size = 16 * 1024 * 1024,
+                    zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
+                    shash::Algorithms hash_algorithm = shash::kSha1,
+                    shash::Suffix hash_suffix = shash::kSuffixNone,
+                    bool may_have_chunks = true,
+                    bool has_legacy_bulk_chunk = false);
   ~FileItem();
 
   static FileItem *CreateQuitBeacon() {
@@ -145,7 +144,10 @@ class ChunkItem : SingleCopy {
   shash::ContextPtr hash_ctx() { return hash_ctx_; }
   shash::Any *hash_ptr() { return &hash_value_; }
 
-  void set_size(uint64_t val) { assert(size_ == 0); size_ = val; }
+  void set_size(uint64_t val) {
+    assert(size_ == 0);
+    size_ = val;
+  }
   void set_upload_handle(upload::UploadStreamHandle *val) {
     assert((upload_handle_ == NULL) && (val != NULL));
     upload_handle_ = val;
@@ -189,12 +191,8 @@ class BlockItem : SingleCopy {
   BlockItem(int64_t tag, ItemAllocator *allocator);
   ~BlockItem();
 
-  static BlockItem *CreateQuitBeacon() {
-    return new BlockItem(NULL);
-  }
-  bool IsQuitBeacon() {
-    return type_ == kBlockHollow;
-  }
+  static BlockItem *CreateQuitBeacon() { return new BlockItem(NULL); }
+  bool IsQuitBeacon() { return type_ == kBlockHollow; }
 
   void MakeStop();
   void MakeData(uint32_t capacity);
@@ -213,7 +211,10 @@ class BlockItem : SingleCopy {
   unsigned char *data() { return data_; }
   uint32_t capacity() { return capacity_; }
   uint32_t size() { return size_; }
-  void set_size(uint32_t val) { assert(val <= capacity_); size_ = val; }
+  void set_size(uint32_t val) {
+    assert(val <= capacity_);
+    size_ = val;
+  }
 
   BlockType type() { return type_; }
   int64_t tag() { return tag_; }

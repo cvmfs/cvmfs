@@ -2,27 +2,26 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <cstdlib>
 
+#include "gtest/gtest.h"
 #include "options.h"
 #include "util/file_guard.h"
 #include "util/posix.h"
 
 using namespace std;  // NOLINT
 
-template <class OptionsT>
+template<class OptionsT>
 class T_Options : public ::testing::Test {
  protected:
   virtual void SetUp() {
     FILE *temp_file = CreateTempFile("./cvmfs_ut_options", 0600, "w",
-        &config_file_);
+                                     &config_file_);
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
 
     FILE *temp_file_2 = CreateTempFile("./cvmfs_ut_options2", 0600, "w",
-        &config_file_2_);
+                                       &config_file_2_);
     ASSERT_TRUE(temp_file_2 != NULL);
     unlink_guard_2_.Set(config_file_2_);
 
@@ -58,30 +57,29 @@ class T_Options : public ::testing::Test {
   // Inspired from here:
   //   http://stackoverflow.com/questions/5512910/
   //          explicit-specialization-of-template-class-member-function
-  template <typename T> struct type {};
+  template<typename T>
+  struct type { };
 
-  unsigned ExpectedValues(const type<BashOptionsManager>  type_specifier) {
+  unsigned ExpectedValues(const type<BashOptionsManager> type_specifier) {
     return 14u;
   }
 
-  unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
+  unsigned ExpectedValues(const type<SimpleOptionsParser> type_specifier) {
     return 14u;
   }
 
-  unsigned ExpectedValues() {
-    return ExpectedValues(type<OptionsT>());
-  }
+  unsigned ExpectedValues() { return ExpectedValues(type<OptionsT>()); }
 
  protected:
-  OptionsT     options_manager_;
-  UnlinkGuard  unlink_guard_;
-  UnlinkGuard  unlink_guard_2_;
-  string       config_file_;
-  string       config_file_2_;
+  OptionsT options_manager_;
+  UnlinkGuard unlink_guard_;
+  UnlinkGuard unlink_guard_2_;
+  string config_file_;
+  string config_file_2_;
 };  // class T_Options
 
 typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser>
-  OptionsManagers;
+    OptionsManagers;
 TYPED_TEST_CASE(T_Options, OptionsManagers);
 
 
@@ -90,8 +88,8 @@ TYPED_TEST(T_Options, ParsePath) {
   OptionsManager &options_manager = TestFixture::options_manager_;
   const string &config_file = TestFixture::config_file_;
   const unsigned expected_number_elements = TestFixture::ExpectedValues();
-  OptionsTemplateManager *opt_temp_mgr =
-    new DefaultOptionsTemplateManager("atlas.cern.ch");
+  OptionsTemplateManager *opt_temp_mgr = new DefaultOptionsTemplateManager(
+      "atlas.cern.ch");
   opt_temp_mgr->SetTemplate("foo", "fourtytwo");
   options_manager.ParsePath(config_file, false);
   options_manager.SwitchTemplateManager(opt_temp_mgr);
@@ -172,11 +170,11 @@ TYPED_TEST(T_Options, GetEnvironmentSubset) {
   const string &config_file = TestFixture::config_file_;
   options_manager.ParsePath(config_file, false);
 
-  EXPECT_EQ(0U,
-    options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
+  EXPECT_EQ(
+      0U, options_manager.GetEnvironmentSubset("NO_SUCH_PREFIX", false).size());
   EXPECT_EQ(5U, options_manager.GetEnvironmentSubset("CVMFS", false).size());
-  vector<string> env =
-    options_manager.GetEnvironmentSubset("CVMFS_CACHE", false);
+  vector<string> env = options_manager.GetEnvironmentSubset("CVMFS_CACHE",
+                                                            false);
   ASSERT_EQ(1U, env.size());
   EXPECT_EQ(env[0], "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache");
 
@@ -248,16 +246,16 @@ TEST(T_OptionsTemplateManager, InsertRetrieveUpdate) {
 }
 
 void check_parser(OptionsTemplateManager opt_templ_mgr,
-  std::string in,
-  std::string out,
-  bool has_var) {
+                  std::string in,
+                  std::string out,
+                  bool has_var) {
   EXPECT_EQ(has_var, opt_templ_mgr.ParseString(&in));
   EXPECT_EQ(out, in);
 }
 
 TEST(T_OptionsTemplateManager, FqrnPredefined) {
-  OptionsTemplateManager opt_templ_mgr
-    = DefaultOptionsTemplateManager("atlas.cern.ch");
+  OptionsTemplateManager opt_templ_mgr = DefaultOptionsTemplateManager(
+      "atlas.cern.ch");
   opt_templ_mgr.SetTemplate("foo", "bar");
   EXPECT_TRUE(opt_templ_mgr.HasTemplate("foo"));
   EXPECT_EQ("bar", opt_templ_mgr.GetTemplate("foo"));
@@ -273,22 +271,13 @@ TEST(T_OptionsTemplateManager, FqrnPredefined) {
   EXPECT_EQ("atlas.cern.ch", opt_templ_mgr.GetTemplate("fqrn"));
 
   check_parser(opt_templ_mgr,
-    "/this/is/@a@/test/@fqrn@foo/@foo@/@fourtytwo@a@bc",
-    "/this/is/@a@/test/atlas.cern.chfoo/foobar/@fourtytwo@a@bc",
-    true);
+               "/this/is/@a@/test/@fqrn@foo/@foo@/@fourtytwo@a@bc",
+               "/this/is/@a@/test/atlas.cern.chfoo/foobar/@fourtytwo@a@bc",
+               true);
 
-  check_parser(opt_templ_mgr,
-    "abc/def",
-    "abc/def",
-    false);
+  check_parser(opt_templ_mgr, "abc/def", "abc/def", false);
 
-  check_parser(opt_templ_mgr,
-    "@",
-    "@",
-    false);
+  check_parser(opt_templ_mgr, "@", "@", false);
 
-  check_parser(opt_templ_mgr,
-  "@fqrn@",
-  "atlas.cern.ch",
-  true);
+  check_parser(opt_templ_mgr, "@fqrn@", "atlas.cern.ch", true);
 }

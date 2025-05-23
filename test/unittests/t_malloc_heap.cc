@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <inttypes.h>
 #include <stdint.h>
 
@@ -25,11 +24,9 @@ class T_MallocHeap : public ::testing::Test {
   static const unsigned kSmallArena = 8 * 1024 * 1024;
   static const unsigned kBigArena = 512 * 1024 * 1024;  // 512MB RAM Cache arena
 
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 
   static uint32_t MemChecksum(void *p, uint32_t size) {
     return MurmurHash2(p, size, 0x07387a4f);
@@ -40,7 +37,7 @@ class T_MallocHeap : public ::testing::Test {
     nbytes -= sizeof(uint32_t);
     for (uint32_t i = 0; i <= nbytes; i += sizeof(uint32_t)) {
       uint32_t *target = reinterpret_cast<uint32_t *>(
-        reinterpret_cast<unsigned char *>(ptr) + i);
+          reinterpret_cast<unsigned char *>(ptr) + i);
       *target = prng->Next(0xFFFFFFFF);
     }
   }
@@ -92,7 +89,7 @@ TEST_F(T_MallocHeap, Basic) {
   }
   uint64_t stored_bytes = M.stored_bytes();
   uint64_t used_bytes = M.used_bytes();
-  EXPECT_GE(stored_bytes, (N * (N-1) / 2) + (N * sizeof(unsigned)));
+  EXPECT_GE(stored_bytes, (N * (N - 1) / 2) + (N * sizeof(unsigned)));
   EXPECT_GT(used_bytes, stored_bytes);
   M.Compact();
   EXPECT_EQ(stored_bytes, M.stored_bytes());
@@ -101,7 +98,7 @@ TEST_F(T_MallocHeap, Basic) {
   EXPECT_LE(M.compacted_bytes(), used_bytes);
 
   for (unsigned i = 1; i <= N; ++i)
-    M.MarkFree(pointers[i-1]);
+    M.MarkFree(pointers[i - 1]);
   EXPECT_EQ(0U, M.compacted_bytes());
   M.Compact();
   EXPECT_EQ(0U, M.used_bytes());
@@ -129,8 +126,7 @@ TEST_F(T_MallocHeap, FillToFull) {
 
 TEST_F(T_MallocHeap, Stress) {
   IntMap int_map;
-  MallocHeap M(kBigArena,
-               int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
+  MallocHeap M(kBigArena, int_map.MakeCallback(&IntMap::OnBlockMove, &int_map));
   Prng prng;
   prng.InitLocaltime();
   // 512M can host ~100000 4k + 8 bytes blocks
@@ -168,10 +164,8 @@ TEST_F(T_MallocHeap, Stress) {
   EXPECT_LE(int_map.num_moves, int_map.mem_digest.size());
 
   // Verify survivor blocks
-  map<unsigned, IntMap::Info>::const_iterator iter =
-    int_map.mem_digest.begin();
-  map<unsigned, IntMap::Info>::const_iterator i_end =
-    int_map.mem_digest.end();
+  map<unsigned, IntMap::Info>::const_iterator iter = int_map.mem_digest.begin();
+  map<unsigned, IntMap::Info>::const_iterator i_end = int_map.mem_digest.end();
   for (; iter != i_end; ++iter) {
     EXPECT_EQ(MemChecksum(iter->second.ptr, M.GetSize(iter->second.ptr)),
               iter->second.checksum);

@@ -9,7 +9,7 @@
 // TODO(Radu): Could add some unit tests for all the functions in
 //             platform_{linux,osx}.h
 
-class T_Platform : public ::testing::Test {};
+class T_Platform : public ::testing::Test { };
 
 TEST_F(T_Platform, Spinlock) {
   platform_spinlock lock;

@@ -5,13 +5,12 @@
  */
 
 
-#include "libcvmfs.h"
-
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
+#include "libcvmfs.h"
 #include "options.h"
 
 using namespace std;  // NOLINT
@@ -19,19 +18,15 @@ using namespace std;  // NOLINT
 
 SimpleOptionsParser *cvmfs_options_clone(SimpleOptionsParser *opts) {
   SimpleOptionsParser *result = new SimpleOptionsParser(
-    *reinterpret_cast<SimpleOptionsParser *>(opts));
+      *reinterpret_cast<SimpleOptionsParser *>(opts));
   return result;
 }
 
 
-void cvmfs_options_fini(SimpleOptionsParser *opts) {
-  delete opts;
-}
+void cvmfs_options_fini(SimpleOptionsParser *opts) { delete opts; }
 
 
-void cvmfs_options_free(char *value) {
-  free(value);
-}
+void cvmfs_options_free(char *value) { free(value); }
 
 
 char *cvmfs_options_get(SimpleOptionsParser *opts, const char *key) {
@@ -52,9 +47,7 @@ char *cvmfs_options_dump(SimpleOptionsParser *opts) {
 }
 
 
-SimpleOptionsParser *cvmfs_options_init() {
-  return cvmfs_options_init_v2(0);
-}
+SimpleOptionsParser *cvmfs_options_init() { return cvmfs_options_init_v2(0); }
 
 
 SimpleOptionsParser *cvmfs_options_init_v2(int taint_environ) {
@@ -68,11 +61,8 @@ SimpleOptionsParser *cvmfs_options_init_v2(int taint_environ) {
 }
 
 
-void cvmfs_options_set(
-  SimpleOptionsParser *opts,
-  const char *key, const
-  char *value)
-{
+void cvmfs_options_set(SimpleOptionsParser *opts, const char *key,
+                       const char *value) {
   opts->SetValue(key, value);
 }
 

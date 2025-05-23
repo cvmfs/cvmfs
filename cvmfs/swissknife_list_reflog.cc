@@ -33,16 +33,16 @@ ParameterList CommandListReflog::GetParams() const {
 int CommandListReflog::Main(const ArgumentList &args) {
   const string &repo_url = *args.find('r')->second;
   const string &repo_name = *args.find('n')->second;
-  const std::string &reflog_chksum_path = (args.count('R') > 0) ?
-    *args.find('R')->second : "";
-  string repo_keys = (args.count('k') > 0) ?
-    *args.find('k')->second : "";
+  const std::string &reflog_chksum_path = (args.count('R') > 0)
+                                              ? *args.find('R')->second
+                                              : "";
+  string repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
     repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
-  const string temp_directory = (args.count('t') > 0) ?
-    *args.find('t')->second : "/tmp";
-  const string output_path = (args.count('o') > 0) ?
-    *args.find('o')->second : "";
+  const string temp_directory = (args.count('t') > 0) ? *args.find('t')->second
+                                                      : "/tmp";
+  const string output_path = (args.count('o') > 0) ? *args.find('o')->second
+                                                   : "";
 
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
@@ -54,8 +54,8 @@ int CommandListReflog::Main(const ArgumentList &args) {
 
   const bool follow_redirects = false;
   const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
-  if (!this->InitDownloadManager(follow_redirects, proxy) ||
-      !this->InitSignatureManager(repo_keys)) {
+  if (!this->InitDownloadManager(follow_redirects, proxy)
+      || !this->InitSignatureManager(repo_keys)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return 1;
   }
@@ -63,10 +63,10 @@ int CommandListReflog::Main(const ArgumentList &args) {
   bool success;
   if (IsHttpUrl(repo_url)) {
     HttpObjectFetcher<> object_fetcher(repo_name,
-                               repo_url,
-                               temp_directory,
-                               download_manager(),
-                               signature_manager());
+                                       repo_url,
+                                       temp_directory,
+                                       download_manager(),
+                                       signature_manager());
     if (reflog_hash.IsNull()) {
       manifest::Manifest *manifest = NULL;
       ObjectFetcherFailures::Failures failure;
@@ -76,7 +76,7 @@ int CommandListReflog::Main(const ArgumentList &args) {
           break;
         default:
           LogCvmfs(kLogCvmfs, kLogStderr, "Failed to fetch manifest: %s",
-                    Code2Ascii(failure));
+                   Code2Ascii(failure));
           return 1;
       }
       delete manifest;
@@ -90,10 +90,9 @@ int CommandListReflog::Main(const ArgumentList &args) {
   return (success) ? 0 : 1;
 }
 
-template <class ObjectFetcherT>
+template<class ObjectFetcherT>
 bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
-                            string output_path, shash::Any reflog_hash)
-{
+                            string output_path, shash::Any reflog_hash) {
   typename ObjectFetcherT::ReflogTN *reflog;
   reflog = FetchReflog(object_fetcher, repo_name, reflog_hash);
 
@@ -110,15 +109,14 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
   typename CatalogTraversal<ObjectFetcherT>::Parameters traversal_params;
   traversal_params.object_fetcher = object_fetcher;
   CatalogTraversal<ObjectFetcherT> traversal(traversal_params);
-  traversal.RegisterListener(
-    &swissknife::CommandListReflog::CatalogCallback,
-    this);
+  traversal.RegisterListener(&swissknife::CommandListReflog::CatalogCallback,
+                             this);
   bool success = true;
   vector<shash::Any>::iterator i = catalogs.begin();
   const vector<shash::Any>::const_iterator iend = catalogs.end();
   for (; i != iend && success; i++) {
-    success &= traversal.TraverseRevision(*i,
-                CatalogTraversal<ObjectFetcherT>::kBreadthFirst);
+    success &= traversal.TraverseRevision(
+        *i, CatalogTraversal<ObjectFetcherT>::kBreadthFirst);
   }
 
   if (!success) {
@@ -167,12 +165,11 @@ bool CommandListReflog::Run(ObjectFetcherT *object_fetcher, string repo_name,
 }
 
 void CommandListReflog::CatalogCallback(
-  const CatalogTraversalData<catalog::Catalog> &data)
-{
+    const CatalogTraversalData<catalog::Catalog> &data) {
   LogCvmfs(kLogCvmfs, kLogStderr, "Processing catalog \"%s\"",
            data.catalog->mountpoint().c_str());
-  const catalog::Catalog::HashVector &referenced_hashes =
-    data.catalog->GetReferencedObjects();
+  const catalog::Catalog::HashVector
+      &referenced_hashes = data.catalog->GetReferencedObjects();
   InsertObjects(referenced_hashes);
   if (data.catalog->hash() != objects_->empty_key())
     objects_->Insert(data.catalog->hash(), true);
@@ -187,8 +184,7 @@ void CommandListReflog::InsertObjects(const vector<shash::Any> &list) {
   }
 }
 
-void CommandListReflog::DumpObjects(FILE *stream)
-{
+void CommandListReflog::DumpObjects(FILE *stream) {
   shash::Any empty_key = objects_->empty_key();
   shash::Any *hashes = objects_->keys();
   for (uint32_t i = 0; i < objects_->capacity(); ++i) {

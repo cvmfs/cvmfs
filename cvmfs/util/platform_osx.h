@@ -10,8 +10,8 @@
 #include <alloca.h>
 #include <dirent.h>
 #include <fcntl.h>
-#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
-    __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) \
+    && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 #include <os/lock.h>  // NOLINT
 #else
 #include <libkern/OSAtomic.h>
@@ -35,7 +35,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
 #include <string>
 #include <vector>
 
@@ -87,8 +86,8 @@ inline int platform_umount_lazy(const char *mountpoint) {
 /**
  * Spinlocks on OS X are not in pthread but in OS X specific APIs.
  */
-#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && \
-    __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if defined(__MAC_OS_X_VERSION_MIN_REQUIRED) \
+    && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 typedef os_unfair_lock platform_spinlock;
 
 inline int platform_spinlock_init(platform_spinlock *lock, int /*pshared*/) {
@@ -198,21 +197,19 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 
 inline bool platform_setxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
-  int retval =
-      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0, 0);
+  int retval = setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(),
+                        0, 0);
   return retval == 0;
 }
 
 inline bool platform_lsetxattr(const std::string &path, const std::string &name,
                                const std::string &value) {
-  int retval =
-      setxattr(
-        path.c_str(),
-        name.c_str(),
-        value.c_str(),
-        value.size(),
-        0,
-        XATTR_NOFOLLOW);
+  int retval = setxattr(path.c_str(),
+                        name.c_str(),
+                        value.c_str(),
+                        value.size(),
+                        0,
+                        XATTR_NOFOLLOW);
   return retval == 0;
 }
 

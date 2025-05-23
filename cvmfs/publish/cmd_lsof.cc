@@ -15,8 +15,8 @@ int publish::CmdLsof::Main(const Options &options) {
   std::string path = options.plain_args()[0].value_str;
   std::vector<LsofEntry> entries = Lsof(path);
   for (unsigned i = 0; i < entries.size(); ++i) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s",
-             entries[i].read_only ? "ro" : "rw", entries[i].path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s", entries[i].read_only ? "ro" : "rw",
+             entries[i].path.c_str());
   }
   return 0;
 }

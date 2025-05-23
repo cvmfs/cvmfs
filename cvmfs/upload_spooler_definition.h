@@ -22,8 +22,14 @@ namespace upload {
 struct SpoolerDefinition {
   static const unsigned kDefaultMaxConcurrentUploads = 512;
   static const unsigned kDefaultNumUploadTasks = 1;
-  static const char* kDriverNames[];  ///< corresponds to DriverType
-  enum DriverType { S3, Local, Gateway, Mock, Unknown };
+  static const char *kDriverNames[];  ///< corresponds to DriverType
+  enum DriverType {
+    S3,
+    Local,
+    Gateway,
+    Mock,
+    Unknown
+  };
 
   /**
    * Reads a given definition_string as described above and interprets
@@ -35,7 +41,7 @@ struct SpoolerDefinition {
    *                            preted by the constructor
    */
   SpoolerDefinition(
-      const std::string& definition_string,
+      const std::string &definition_string,
       const shash::Algorithms hash_algorithm,
       const zlib::Algorithms compression_algorithm = zlib::kZlibDefault,
       const bool generate_legacy_bulk_chunks = false,
@@ -43,8 +49,8 @@ struct SpoolerDefinition {
       const size_t min_file_chunk_size = 0,
       const size_t avg_file_chunk_size = 0,
       const size_t max_file_chunk_size = 0,
-      const std::string& session_token_file = "",
-      const std::string& key_file = "");
+      const std::string &session_token_file = "",
+      const std::string &key_file = "");
 
   bool IsValid() const { return valid_; }
 
@@ -59,9 +65,9 @@ struct SpoolerDefinition {
   std::string temporary_path;  //!< scratch space for the IngestionPipeline
 
   /**
-  * A driver specific spooler configuration string (interpreted by the concrete
-  * spooler)
-  */
+   * A driver specific spooler configuration string (interpreted by the concrete
+   * spooler)
+   */
   std::string spooler_configuration;
 
   shash::Algorithms hash_algorithm;

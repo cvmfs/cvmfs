@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <inttypes.h>
 #include <pthread.h>
 #include <signal.h>
@@ -73,9 +72,11 @@ class T_AuthzFetch : public ::testing::Test {
   static void *MainOneAuth(void *data) {
     HelperFds helper_fds = *reinterpret_cast<HelperFds *>(data);
     RecvAndFind(helper_fds.fd_stdin, "\"uid\":2");
-    string auth_msg = string("{\"cvmfs_authz_v1\":") +
-       "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 60," +
-        "\"x509_proxy\": \"" + Base64(string(8192, 'X')) + "\"}}";
+    string auth_msg = string("{\"cvmfs_authz_v1\":")
+                      + "{\"msgid\": 3, \"revision\": 0, \"status\": 0, "
+                        "\"ttl\": 60,"
+                      + "\"x509_proxy\": \"" + Base64(string(8192, 'X'))
+                      + "\"}}";
     uint32_t version = AuthzExternalFetcher::kProtocolVersion;
     uint32_t length = auth_msg.length();
     SafeWrite(helper_fds.fd_stdout, &version, sizeof(version));
@@ -92,8 +93,8 @@ class T_AuthzFetch : public ::testing::Test {
 
 
 TEST_F(T_AuthzFetch, ExecHelper) {
-  AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_);
+  AuthzExternalFetcher *authz_fetcher = new AuthzExternalFetcher(
+      "X", "/bin/sh", "", &options_mgr_);
   authz_fetcher->ExecHelper();
   EXPECT_TRUE(authz_fetcher->Send("\n/bin/echo hello\n"));
   string dummy;
@@ -111,8 +112,8 @@ TEST_F(T_AuthzFetch, ExecHelper) {
   EXPECT_TRUE(authz_fetcher->fail_state_);
   delete authz_fetcher;
 
-  authz_fetcher =
-    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_);
+  authz_fetcher = new AuthzExternalFetcher("X", "/no/such/file", "",
+                                           &options_mgr_);
   // Execve will fail but that's noted on first communication
   authz_fetcher->ExecHelper();
   // Might fail or not, depending on how fast fork is
@@ -124,8 +125,8 @@ TEST_F(T_AuthzFetch, ExecHelper) {
 
 
 TEST_F(T_AuthzFetch, ExecHelperSlow) {
-  AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/bin/sh", "", &options_mgr_);
+  AuthzExternalFetcher *authz_fetcher = new AuthzExternalFetcher(
+      "X", "/bin/sh", "", &options_mgr_);
   authz_fetcher->ExecHelper();
   // Make /bin/sh hang on open stdin/stdout
   int fd_send = authz_fetcher->fd_send_;
@@ -142,60 +143,65 @@ TEST_F(T_AuthzFetch, ParseMsg) {
   AuthzExternalMsg binary_msg;
   EXPECT_FALSE(fetcher_->ParseMsg("", kAuthzMsgReady, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg("{{{", kAuthzMsgReady, &binary_msg));
-  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v2\": {}}",
-                                  kAuthzMsgReady, &binary_msg));
-  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v1\": {}}",
-                                  kAuthzMsgReady, &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v2\": {}}", kAuthzMsgReady,
+                                  &binary_msg));
+  EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v1\": {}}", kAuthzMsgReady,
+                                  &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg("{\"cvmfs_authz_v1\": {\"msgid\": 0}}",
                                   kAuthzMsgReady, &binary_msg));
   EXPECT_TRUE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0}}",
-    kAuthzMsgReady, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0}}", kAuthzMsgReady,
+      &binary_msg));
   EXPECT_TRUE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
-    kAuthzMsgReady, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
+      kAuthzMsgReady, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
-    kAuthzMsgHandshake, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": 0, null}}",
+      kAuthzMsgHandshake, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": 1000, \"revision\": 0}}",
-    kAuthzMsgReady, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1000, \"revision\": 0}}",
+      kAuthzMsgReady, &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": -1, \"revision\": 0}}",
-    kAuthzMsgReady, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": -1, \"revision\": 0}}", kAuthzMsgReady,
+      &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": -1}}",
-    kAuthzMsgReady, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": 1, \"revision\": -1}}", kAuthzMsgReady,
+      &binary_msg));
   EXPECT_FALSE(fetcher_->ParseMsg(
-    "{\"cvmfs_authz_v1\": {\"msgid\": \"1\", \"revision\": 0}}",
-    kAuthzMsgReady, &binary_msg));
-  EXPECT_TRUE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
-    "{\"msgid\": 3, \"revision\": 0, \"status\": 0}}",
-    kAuthzMsgPermit, &binary_msg));
-  EXPECT_TRUE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
-    "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 120}}",
-    kAuthzMsgPermit, &binary_msg));
+      "{\"cvmfs_authz_v1\": {\"msgid\": \"1\", \"revision\": 0}}",
+      kAuthzMsgReady, &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+      string("{\"cvmfs_authz_v1\":")
+          + "{\"msgid\": 3, \"revision\": 0, \"status\": 0}}",
+      kAuthzMsgPermit, &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+      string("{\"cvmfs_authz_v1\":")
+          + "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 120}}",
+      kAuthzMsgPermit, &binary_msg));
   EXPECT_EQ(kAuthzOk, binary_msg.permit.status);
   EXPECT_EQ(120U, binary_msg.permit.ttl);
   EXPECT_EQ(kTokenUnknown, binary_msg.permit.token.type);
-  EXPECT_TRUE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
-    "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 240, " +
-      "\"x509_proxy\": \"" + Base64("XYZ") + "\"}}",
-    kAuthzMsgPermit, &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+      string("{\"cvmfs_authz_v1\":")
+          + "{\"msgid\": 3, \"revision\": 0, \"status\": 0, \"ttl\": 240, "
+          + "\"x509_proxy\": \"" + Base64("XYZ") + "\"}}",
+      kAuthzMsgPermit, &binary_msg));
   EXPECT_EQ(kAuthzOk, binary_msg.permit.status);
   EXPECT_EQ(240U, binary_msg.permit.ttl);
   EXPECT_EQ(kTokenX509, binary_msg.permit.token.type);
   ASSERT_EQ(3U, binary_msg.permit.token.size);
-  EXPECT_EQ("XYZ", string(reinterpret_cast<char *>(
-                          binary_msg.permit.token.data), 3));
+  EXPECT_EQ("XYZ",
+            string(reinterpret_cast<char *>(binary_msg.permit.token.data), 3));
   free(binary_msg.permit.token.data);
-  EXPECT_TRUE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
-    "{\"msgid\": 3, \"revision\": 0, \"status\": 3, \"ttl\": 120}}",
-    kAuthzMsgPermit, &binary_msg));
+  EXPECT_TRUE(fetcher_->ParseMsg(
+      string("{\"cvmfs_authz_v1\":")
+          + "{\"msgid\": 3, \"revision\": 0, \"status\": 3, \"ttl\": 120}}",
+      kAuthzMsgPermit, &binary_msg));
   EXPECT_EQ(kAuthzNotMember, binary_msg.permit.status);
-  EXPECT_FALSE(fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":") +
-    "{\"msgid\": 3, \"revision\": 0, \"ttl\": 120}}",
-    kAuthzMsgPermit, &binary_msg));
+  EXPECT_FALSE(
+      fetcher_->ParseMsg(string("{\"cvmfs_authz_v1\":")
+                             + "{\"msgid\": 3, \"revision\": 0, \"ttl\": 120}}",
+                         kAuthzMsgPermit, &binary_msg));
 }
 
 
@@ -204,13 +210,14 @@ TEST_F(T_AuthzFetch, Handshake) {
   helper_fds.fd_stdin = pipe_send_[0];
   helper_fds.fd_stdout = pipe_recv_[1];
   pthread_t thread_handshake;
-  ASSERT_EQ(0,
-    pthread_create(&thread_handshake, NULL, MainSendHandshake, &helper_fds));
+  ASSERT_EQ(
+      0,
+      pthread_create(&thread_handshake, NULL, MainSendHandshake, &helper_fds));
   EXPECT_TRUE(fetcher_->Handshake());
   pthread_join(thread_handshake, NULL);
 
-  AuthzExternalFetcher *authz_fetcher =
-    new AuthzExternalFetcher("X", "/no/such/file", "", &options_mgr_);
+  AuthzExternalFetcher *authz_fetcher = new AuthzExternalFetcher(
+      "X", "/no/such/file", "", &options_mgr_);
   EXPECT_FALSE(authz_fetcher->Handshake());
   delete authz_fetcher;
 }

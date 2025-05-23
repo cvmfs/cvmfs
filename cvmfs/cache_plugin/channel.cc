@@ -37,7 +37,7 @@ void SessionCtx::CleanupInstance() {
 
 SessionCtx::SessionCtx() {
   lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
-    smalloc(sizeof(pthread_mutex_t)));
+      smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
 }
@@ -59,8 +59,8 @@ SessionCtx::~SessionCtx() {
 SessionCtx *SessionCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new SessionCtx();
-    int retval =
-      pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
+    int retval = pthread_key_create(&instance_->thread_local_storage_,
+                                    TlsDestructor);
     assert(retval == 0);
   }
 
@@ -70,7 +70,7 @@ SessionCtx *SessionCtx::GetInstance() {
 
 void SessionCtx::Get(uint64_t *id, char **reponame, char **client_instance) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if ((tls == NULL) || !tls->is_set) {
     *id = 0;
     *reponame = NULL;
@@ -85,7 +85,7 @@ void SessionCtx::Get(uint64_t *id, char **reponame, char **client_instance) {
 
 bool SessionCtx::IsSet() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if (tls == NULL)
     return false;
 
@@ -95,7 +95,7 @@ bool SessionCtx::IsSet() {
 
 void SessionCtx::Set(uint64_t id, char *reponame, char *client_instance) {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
 
   if (tls == NULL) {
     tls = new ThreadLocalStorage(id, reponame, client_instance);
@@ -118,10 +118,10 @@ void SessionCtx::TlsDestructor(void *data) {
 
   assert(instance_);
   MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
-  for (vector<ThreadLocalStorage *>::iterator i =
-       instance_->tls_blocks_.begin(), iEnd = instance_->tls_blocks_.end();
-       i != iEnd; ++i)
-  {
+  for (vector<ThreadLocalStorage *>::iterator
+           i = instance_->tls_blocks_.begin(),
+           iEnd = instance_->tls_blocks_.end();
+       i != iEnd; ++i) {
     if ((*i) == tls) {
       instance_->tls_blocks_.erase(i);
       break;
@@ -132,7 +132,7 @@ void SessionCtx::TlsDestructor(void *data) {
 
 void SessionCtx::Unset() {
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
-    pthread_getspecific(thread_local_storage_));
+      pthread_getspecific(thread_local_storage_));
   if (tls != NULL) {
     tls->is_set = false;
     tls->id = 0;
@@ -146,9 +146,7 @@ void SessionCtx::Unset() {
 
 
 CachePlugin::SessionInfo::SessionInfo(uint64_t id, const std::string &name)
-  : id(id)
-  , name(name)
-{
+    : id(id), name(name) {
   vector<string> tokens = SplitString(name, ':');
   reponame = strdup(tokens[0].c_str());
   if (tokens.size() > 1)
@@ -167,15 +165,14 @@ void CachePlugin::AskToDetach() {
 
 
 CachePlugin::CachePlugin(uint64_t capabilities)
-  : is_local_(false)
-  , capabilities_(capabilities)
-  , fd_socket_(-1)
-  , fd_socket_lock_(-1)
-  , running_(0)
-  , num_workers_(0)
-  , max_object_size_(kDefaultMaxObjectSize)
-  , num_inlimbo_clients_(0)
-{
+    : is_local_(false)
+    , capabilities_(capabilities)
+    , fd_socket_(-1)
+    , fd_socket_lock_(-1)
+    , running_(0)
+    , num_workers_(0)
+    , max_object_size_(kDefaultMaxObjectSize)
+    , num_inlimbo_clients_(0) {
   atomic_init64(&next_session_id_);
   atomic_init64(&next_txn_id_);
   atomic_init64(&next_lst_id_);
@@ -197,10 +194,8 @@ CachePlugin::~CachePlugin() {
 }
 
 
-void CachePlugin::HandleBreadcrumbStore(
-  cvmfs::MsgBreadcrumbStoreReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
+                                        CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgBreadcrumbReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -220,26 +215,23 @@ void CachePlugin::HandleBreadcrumbStore(
     } else {
       breadcrumb.revision = 0;
     }
-    cvmfs::EnumStatus status =
-      StoreBreadcrumb(msg_req->breadcrumb().fqrn(), breadcrumb);
+    cvmfs::EnumStatus status = StoreBreadcrumb(msg_req->breadcrumb().fqrn(),
+                                               breadcrumb);
     msg_reply.set_status(status);
   }
   transport->SendFrame(&frame_send);
 }
 
 
-void CachePlugin::HandleBreadcrumbLoad(
-  cvmfs::MsgBreadcrumbLoadReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleBreadcrumbLoad(cvmfs::MsgBreadcrumbLoadReq *msg_req,
+                                       CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgBreadcrumbReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   manifest::Breadcrumb breadcrumb;
-  cvmfs::EnumStatus status =
-    LoadBreadcrumb(msg_req->fqrn(), &breadcrumb);
+  cvmfs::EnumStatus status = LoadBreadcrumb(msg_req->fqrn(), &breadcrumb);
   msg_reply.set_status(status);
   if (status == cvmfs::STATUS_OK) {
     assert(breadcrumb.IsValid());
@@ -256,16 +248,14 @@ void CachePlugin::HandleBreadcrumbLoad(
 }
 
 
-void CachePlugin::HandleHandshake(
-  cvmfs::MsgHandshake *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleHandshake(cvmfs::MsgHandshake *msg_req,
+                                  CacheTransport *transport) {
   uint64_t session_id = NextSessionId();
   if (msg_req->has_name()) {
     sessions_[session_id] = SessionInfo(session_id, msg_req->name());
   } else {
-    sessions_[session_id] = SessionInfo(session_id,
-      "anonymous client (" + StringifyInt(session_id) + ")");
+    sessions_[session_id] = SessionInfo(
+        session_id, "anonymous client (" + StringifyInt(session_id) + ")");
   }
   cvmfs::MsgHandshakeAck msg_ack;
   CacheTransport::Frame frame_send(&msg_ack);
@@ -282,10 +272,8 @@ void CachePlugin::HandleHandshake(
 }
 
 
-void CachePlugin::HandleInfo(
-  cvmfs::MsgInfoReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleInfo(cvmfs::MsgInfoReq *msg_req,
+                             CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -324,10 +312,8 @@ void CachePlugin::HandleIoctl(cvmfs::MsgIoctl *msg_req) {
 }
 
 
-void CachePlugin::HandleList(
-  cvmfs::MsgListReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleList(cvmfs::MsgListReq *msg_req,
+                             CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgListReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -380,10 +366,8 @@ void CachePlugin::HandleList(
 }
 
 
-void CachePlugin::HandleObjectInfo(
-  cvmfs::MsgObjectInfoReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleObjectInfo(cvmfs::MsgObjectInfoReq *msg_req,
+                                   CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgObjectInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -411,10 +395,8 @@ void CachePlugin::HandleObjectInfo(
 }
 
 
-void CachePlugin::HandleRead(
-  cvmfs::MsgReadReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleRead(cvmfs::MsgReadReq *msg_req,
+                             CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgReadReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -450,10 +432,8 @@ void CachePlugin::HandleRead(
 }
 
 
-void CachePlugin::HandleRefcount(
-  cvmfs::MsgRefcountReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleRefcount(cvmfs::MsgRefcountReq *msg_req,
+                                 CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgRefcountReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -492,13 +472,13 @@ bool CachePlugin::HandleRequest(int fd_con) {
   google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
 
   if (msg_typed->GetTypeName() == "cvmfs.MsgHandshake") {
-    cvmfs::MsgHandshake *msg_req =
-      reinterpret_cast<cvmfs::MsgHandshake *>(msg_typed);
+    cvmfs::MsgHandshake *msg_req = reinterpret_cast<cvmfs::MsgHandshake *>(
+        msg_typed);
     HandleHandshake(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
     cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
-    map<uint64_t, SessionInfo>::const_iterator iter =
-      sessions_.find(msg_req->session_id());
+    map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(
+        msg_req->session_id());
     if (iter != sessions_.end()) {
       free(iter->second.reponame);
       free(iter->second.client_instance);
@@ -508,44 +488,44 @@ bool CachePlugin::HandleRequest(int fd_con) {
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgIoctl") {
     HandleIoctl(reinterpret_cast<cvmfs::MsgIoctl *>(msg_typed));
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgRefcountReq") {
-    cvmfs::MsgRefcountReq *msg_req =
-      reinterpret_cast<cvmfs::MsgRefcountReq *>(msg_typed);
+    cvmfs::MsgRefcountReq *msg_req = reinterpret_cast<cvmfs::MsgRefcountReq *>(
+        msg_typed);
     HandleRefcount(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgObjectInfoReq") {
-    cvmfs::MsgObjectInfoReq *msg_req =
-      reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed);
+    cvmfs::MsgObjectInfoReq
+        *msg_req = reinterpret_cast<cvmfs::MsgObjectInfoReq *>(msg_typed);
     HandleObjectInfo(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgReadReq") {
-    cvmfs::MsgReadReq *msg_req =
-      reinterpret_cast<cvmfs::MsgReadReq *>(msg_typed);
+    cvmfs::MsgReadReq *msg_req = reinterpret_cast<cvmfs::MsgReadReq *>(
+        msg_typed);
     HandleRead(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreReq") {
-    cvmfs::MsgStoreReq *msg_req =
-      reinterpret_cast<cvmfs::MsgStoreReq *>(msg_typed);
+    cvmfs::MsgStoreReq *msg_req = reinterpret_cast<cvmfs::MsgStoreReq *>(
+        msg_typed);
     HandleStore(msg_req, &frame_recv, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgStoreAbortReq") {
-    cvmfs::MsgStoreAbortReq *msg_req =
-      reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed);
+    cvmfs::MsgStoreAbortReq
+        *msg_req = reinterpret_cast<cvmfs::MsgStoreAbortReq *>(msg_typed);
     HandleStoreAbort(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgInfoReq") {
-    cvmfs::MsgInfoReq *msg_req =
-      reinterpret_cast<cvmfs::MsgInfoReq *>(msg_typed);
+    cvmfs::MsgInfoReq *msg_req = reinterpret_cast<cvmfs::MsgInfoReq *>(
+        msg_typed);
     HandleInfo(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgShrinkReq") {
-    cvmfs::MsgShrinkReq *msg_req =
-      reinterpret_cast<cvmfs::MsgShrinkReq *>(msg_typed);
+    cvmfs::MsgShrinkReq *msg_req = reinterpret_cast<cvmfs::MsgShrinkReq *>(
+        msg_typed);
     HandleShrink(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgListReq") {
-    cvmfs::MsgListReq *msg_req =
-      reinterpret_cast<cvmfs::MsgListReq *>(msg_typed);
+    cvmfs::MsgListReq *msg_req = reinterpret_cast<cvmfs::MsgListReq *>(
+        msg_typed);
     HandleList(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgBreadcrumbStoreReq") {
-    cvmfs::MsgBreadcrumbStoreReq *msg_req =
-      reinterpret_cast<cvmfs::MsgBreadcrumbStoreReq *>(msg_typed);
+    cvmfs::MsgBreadcrumbStoreReq
+        *msg_req = reinterpret_cast<cvmfs::MsgBreadcrumbStoreReq *>(msg_typed);
     HandleBreadcrumbStore(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgBreadcrumbLoadReq") {
-    cvmfs::MsgBreadcrumbLoadReq *msg_req =
-      reinterpret_cast<cvmfs::MsgBreadcrumbLoadReq *>(msg_typed);
+    cvmfs::MsgBreadcrumbLoadReq
+        *msg_req = reinterpret_cast<cvmfs::MsgBreadcrumbLoadReq *>(msg_typed);
     HandleBreadcrumbLoad(msg_req, &transport);
   } else {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
@@ -558,10 +538,8 @@ bool CachePlugin::HandleRequest(int fd_con) {
 }
 
 
-void CachePlugin::HandleShrink(
-  cvmfs::MsgShrinkReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleShrink(cvmfs::MsgShrinkReq *msg_req,
+                               CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgShrinkReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -578,10 +556,8 @@ void CachePlugin::HandleShrink(
 }
 
 
-void CachePlugin::HandleStoreAbort(
-  cvmfs::MsgStoreAbortReq *msg_req,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
+                                   CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -607,11 +583,9 @@ void CachePlugin::HandleStoreAbort(
 }
 
 
-void CachePlugin::HandleStore(
-  cvmfs::MsgStoreReq *msg_req,
-  CacheTransport::Frame *frame,
-  CacheTransport *transport)
-{
+void CachePlugin::HandleStore(cvmfs::MsgStoreReq *msg_req,
+                              CacheTransport::Frame *frame,
+                              CacheTransport *transport) {
   SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
@@ -619,10 +593,8 @@ void CachePlugin::HandleStore(
   msg_reply.set_part_nr(msg_req->part_nr());
   shash::Any object_id;
   bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
-  if ( !retval ||
-       (frame->att_size() > max_object_size_) ||
-       ((frame->att_size() < max_object_size_) && !msg_req->last_part()) )
-  {
+  if (!retval || (frame->att_size() > max_object_size_)
+      || ((frame->att_size() < max_object_size_) && !msg_req->last_part())) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed hash or bad object size received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
@@ -644,9 +616,15 @@ void CachePlugin::HandleStore(
     txn_id = NextTxnId();
     ObjectInfo info;
     info.id = object_id;
-    if (msg_req->has_expected_size()) {info.size = msg_req->expected_size();}
-    if (msg_req->has_object_type()) {info.object_type = msg_req->object_type();}
-    if (msg_req->has_description()) {info.description = msg_req->description();}
+    if (msg_req->has_expected_size()) {
+      info.size = msg_req->expected_size();
+    }
+    if (msg_req->has_object_type()) {
+      info.object_type = msg_req->object_type();
+    }
+    if (msg_req->has_description()) {
+      info.description = msg_req->description();
+    }
     status = StartTxn(object_id, txn_id, info);
     if (status != cvmfs::STATUS_OK) {
       LogSessionError(msg_req->session_id(), status,
@@ -693,9 +671,7 @@ void CachePlugin::HandleStore(
 }
 
 
-bool CachePlugin::IsRunning() {
-  return atomic_read32(&running_) != 0;
-}
+bool CachePlugin::IsRunning() { return atomic_read32(&running_) != 0; }
 
 
 bool CachePlugin::Listen(const string &locator) {
@@ -723,8 +699,8 @@ bool CachePlugin::Listen(const string &locator) {
   } else if (tokens[0] == "tcp") {
     vector<string> tcp_address = SplitString(tokens[1], ':');
     if (tcp_address.size() != 2) {
-      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
-               "invalid locator: %s", locator.c_str());
+      LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug, "invalid locator: %s",
+               locator.c_str());
       NotifySupervisor(CacheTransport::kFailureNotification);
       return false;
     }
@@ -761,23 +737,20 @@ void CachePlugin::LogSessionInfo(uint64_t session_id, const string &msg) {
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
-  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-           "session '%s': %s", session_str.c_str(), msg.c_str());
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "session '%s': %s",
+           session_str.c_str(), msg.c_str());
 }
 
 
-void CachePlugin::LogSessionError(
-  uint64_t session_id,
-  cvmfs::EnumStatus status,
-  const std::string &msg)
-{
+void CachePlugin::LogSessionError(uint64_t session_id,
+                                  cvmfs::EnumStatus status,
+                                  const std::string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
   map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(session_id);
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
-  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-           "session '%s': %s (%d - %s)",
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr, "session '%s': %s (%d - %s)",
            session_str.c_str(), msg.c_str(), status,
            CacheTransportCode2Ascii(status));
 }
@@ -832,8 +805,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
     if (watch_fds[1].revents) {
       struct sockaddr_un remote;
       socklen_t socket_size = sizeof(remote);
-      int fd_con =
-        accept(watch_fds[1].fd, (struct sockaddr *)&remote, &socket_size);
+      int fd_con = accept(watch_fds[1].fd, (struct sockaddr *)&remote,
+                          &socket_size);
       if (fd_con < 0) {
         LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
                  "failed to establish connection (%d)", errno);
@@ -847,17 +820,16 @@ void *CachePlugin::MainProcessRequests(void *data) {
     }
 
     // New request
-    for (unsigned i = 2; i < watch_fds.size(); ) {
+    for (unsigned i = 2; i < watch_fds.size();) {
       if (watch_fds[i].revents) {
         bool proceed = cache_plugin->HandleRequest(watch_fds[i].fd);
         if (!proceed) {
           close(watch_fds[i].fd);
           cache_plugin->connections_.erase(watch_fds[i].fd);
           watch_fds.erase(watch_fds.begin() + i);
-          if ( (getenv(CacheTransport::kEnvReadyNotifyFd) != NULL) &&
-               (cache_plugin->connections_.empty()) &&
-               (cache_plugin->num_inlimbo_clients_ == 0) )
-          {
+          if ((getenv(CacheTransport::kEnvReadyNotifyFd) != NULL)
+              && (cache_plugin->connections_.empty())
+              && (cache_plugin->num_inlimbo_clients_ == 0)) {
             LogCvmfs(kLogCache, kLogSyslog,
                      "stopping cache plugin, no more active clients");
             terminated = true;
@@ -908,8 +880,8 @@ void CachePlugin::SendDetachRequests() {
   set<int>::const_iterator iter_end = connections_.end();
   for (; iter != iter_end; ++iter) {
     CacheTransport transport(*iter,
-      CacheTransport::kFlagSendIgnoreFailure |
-      CacheTransport::kFlagSendNonBlocking);
+                             CacheTransport::kFlagSendIgnoreFailure
+                                 | CacheTransport::kFlagSendNonBlocking);
     cvmfs::MsgDetach msg_detach;
     CacheTransport::Frame frame_send(&msg_detach);
     transport.SendFrame(&frame_send);

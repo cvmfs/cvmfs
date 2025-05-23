@@ -82,17 +82,16 @@ struct Counters {
     n_hit = statistics.RegisterTemplated("n_hit", "Number of hits");
     n_miss = statistics.RegisterTemplated("n_miss", "Number of misses");
     n_insert = statistics.RegisterTemplated("n_insert", "Number of inserts");
-    n_insert_negative = statistics.RegisterTemplated("n_insert_negative",
-        "Number of negative inserts");
-    n_update = statistics.RegisterTemplated("n_update",
-        "Number of updates");
+    n_insert_negative = statistics.RegisterTemplated(
+        "n_insert_negative", "Number of negative inserts");
+    n_update = statistics.RegisterTemplated("n_update", "Number of updates");
     n_update_value = statistics.RegisterTemplated("n_update_value",
-        "Number of value changes");
+                                                  "Number of value changes");
     n_replace = statistics.RegisterTemplated("n_replace", "Number of replaces");
     n_forget = statistics.RegisterTemplated("n_forget", "Number of forgets");
     n_drop = statistics.RegisterTemplated("n_drop", "Number of drops");
     sz_allocated = statistics.RegisterTemplated("sz_allocated",
-        "Number of allocated bytes ");
+                                                "Number of allocated bytes ");
   }
 };
 
@@ -106,10 +105,14 @@ template<class Key, class Value>
 class LruCache : SingleCopy {
  private:
   // Forward declarations of private internal data structures
-  template<class T> class ListEntry;
-  template<class T> class ListEntryHead;
-  template<class T> class ListEntryContent;
-  template<class M> class MemoryAllocator;
+  template<class T>
+  class ListEntry;
+  template<class T>
+  class ListEntryHead;
+  template<class T>
+  class ListEntryContent;
+  template<class M>
+  class MemoryAllocator;
 
   // Helpers to get the template magic right
   typedef ListEntryContent<Key> ConcreteListEntryContent;
@@ -134,18 +137,20 @@ class LruCache : SingleCopy {
    *
    * @param T the type of object to be allocated by this MemoryAllocator
    */
-  template<class T> class MemoryAllocator : SingleCopy {
+  template<class T>
+  class MemoryAllocator : SingleCopy {
    public:
     /**
      * Creates a MemoryAllocator to handle a memory pool for objects of type T
-     * @param num_slots the number of slots to be allocated for the given datatype T
+     * @param num_slots the number of slots to be allocated for the given
+     * datatype T
      */
     explicit MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
       unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
       assert((num_slots % bits_per_block_) == 0);
-      assert(num_slots >= 2*bits_per_block_);
+      assert(num_slots >= 2 * bits_per_block_);
 
       // How much actual memory do we need?
       const unsigned int num_bytes_memory = sizeof(T) * num_slots;
@@ -165,7 +170,7 @@ class LruCache : SingleCopy {
      * Number of bytes for a single entry
      */
     static double GetEntrySize() {
-      return static_cast<double>(sizeof(T)) + 1.0/8.0;
+      return static_cast<double>(sizeof(T)) + 1.0 / 8.0;
     }
 
     /**
@@ -182,10 +187,10 @@ class LruCache : SingleCopy {
      */
     inline bool IsFull() const { return num_free_slots_ == 0; }
 
-    T* Construct(const T object) {
-      T* mem = Allocate();
+    T *Construct(const T object) {
+      T *mem = Allocate();
       if (mem != NULL) {
-        new (static_cast<void*>(mem)) T(object);
+        new (static_cast<void *>(mem)) T(object);
       }
       return mem;
     }
@@ -199,7 +204,7 @@ class LruCache : SingleCopy {
      * Allocate a slot and returns a pointer to the memory.
      * @return a pointer to a chunk of the memory pool
      */
-    T* Allocate() {
+    T *Allocate() {
       if (this->IsFull())
         return NULL;
 
@@ -226,7 +231,7 @@ class LruCache : SingleCopy {
      * Free a given slot in the memory pool
      * @param slot a pointer to the slot be freed
      */
-    void Deallocate(T* slot) {
+    void Deallocate(T *slot) {
       // Check if given slot is in bounds
       assert((slot >= memory_) && (slot <= memory_ + num_slots_));
 
@@ -252,8 +257,9 @@ class LruCache : SingleCopy {
      */
     inline bool GetBit(const unsigned position) {
       assert(position < num_slots_);
-      return ((bitmap_[position / bits_per_block_] &
-               (uint64_t(1) << (position % bits_per_block_))) != 0);
+      return ((bitmap_[position / bits_per_block_]
+               & (uint64_t(1) << (position % bits_per_block_)))
+              != 0);
     }
 
     /**
@@ -262,8 +268,8 @@ class LruCache : SingleCopy {
      */
     inline void SetBit(const unsigned position) {
       assert(position < num_slots_);
-      bitmap_[position / bits_per_block_] |=
-        uint64_t(1) << (position % bits_per_block_);
+      bitmap_[position / bits_per_block_] |= uint64_t(1)
+                                             << (position % bits_per_block_);
     }
 
     /**
@@ -272,17 +278,17 @@ class LruCache : SingleCopy {
      */
     inline void UnsetBit(const unsigned position) {
       assert(position < num_slots_);
-      bitmap_[position / bits_per_block_] &=
-        ~(uint64_t(1) << (position % bits_per_block_));
+      bitmap_[position / bits_per_block_] &= ~(uint64_t(1)
+                                               << (position % bits_per_block_));
     }
 
-    unsigned int num_slots_;  /**< Overall number of slots in memory pool. */
-    unsigned int num_free_slots_;  /**< Current number of free slots left. */
-    unsigned int next_free_slot_;  /**< Position of next free slot in pool. */
+    unsigned int num_slots_; /**< Overall number of slots in memory pool. */
+    unsigned int num_free_slots_; /**< Current number of free slots left. */
+    unsigned int next_free_slot_; /**< Position of next free slot in pool. */
     uint64_t bytes_allocated_;
-    uint64_t *bitmap_;  /**< A bitmap to mark slots as allocated. */
+    uint64_t *bitmap_; /**< A bitmap to mark slots as allocated. */
     unsigned bits_per_block_;
-    T *memory_;  /**< The memory pool, array of Ms. */
+    T *memory_; /**< The memory pool, array of Ms. */
   };
 
 
@@ -290,8 +296,10 @@ class LruCache : SingleCopy {
    * Internal LRU list entry, to maintain the doubly linked list.
    * The list keeps track of the least recently used keys in the cache.
    */
-  template<class T> class ListEntry {
-  friend class LruCache;
+  template<class T>
+  class ListEntry {
+    friend class LruCache;
+
    public:
     /**
      * Create a new list entry as lonely, both next and prev pointing to this.
@@ -306,7 +314,7 @@ class LruCache : SingleCopy {
       prev = (other.prev == &other) ? this : other.prev;
     }
 
-    virtual ~ListEntry() {}
+    virtual ~ListEntry() { }
 
     /**
      * Checks if the ListEntry is the list head
@@ -320,8 +328,8 @@ class LruCache : SingleCopy {
      */
     bool IsLonely() const { return (this->next == this && this->prev == this); }
 
-    ListEntry<T> *next;  /**< Pointer to next element in the list. */
-    ListEntry<T> *prev;  /**< Pointer to previous element in the list. */
+    ListEntry<T> *next; /**< Pointer to next element in the list. */
+    ListEntry<T> *prev; /**< Pointer to previous element in the list. */
 
    protected:
     /**
@@ -370,17 +378,16 @@ class LruCache : SingleCopy {
 
    private:
     // No assignment operator (enforced by linker error)
-    ListEntry<T>& operator=(const ListEntry<T> &other);
+    ListEntry<T> &operator=(const ListEntry<T> &other);
   };  // template<class T> class ListEntry
 
   /**
    * Specialized ListEntry to contain a data entry of type T
    */
-  template<class T> class ListEntryContent : public ListEntry<T> {
+  template<class T>
+  class ListEntryContent : public ListEntry<T> {
    public:
-    explicit ListEntryContent(T content) {
-      content_ = content;
-    }
+    explicit ListEntryContent(T content) { content_ = content; }
 
     inline bool IsListHead() const { return false; }
     inline T content() const { return content_; }
@@ -401,7 +408,7 @@ class LruCache : SingleCopy {
     }
 
    private:
-    T content_;  /**< The data content of this ListEntry */
+    T content_; /**< The data content of this ListEntry */
   };
 
   /**
@@ -409,14 +416,13 @@ class LruCache : SingleCopy {
    * Every list has exactly one list head which is also the entry point
    * in the list. It is used to manipulate the list.
    */
-  template<class T> class ListEntryHead : public ListEntry<T> {
+  template<class T>
+  class ListEntryHead : public ListEntry<T> {
    public:
-    explicit ListEntryHead(ConcreteMemoryAllocator *allocator) :
-      allocator_(allocator) {}
+    explicit ListEntryHead(ConcreteMemoryAllocator *allocator)
+        : allocator_(allocator) { }
 
-    virtual ~ListEntryHead() {
-      this->clear();
-    }
+    virtual ~ListEntryHead() { this->clear(); }
 
     /**
      * Remove all entries from the list.
@@ -429,7 +435,8 @@ class LruCache : SingleCopy {
       while (!entry->IsListHead()) {
         delete_me = entry;
         entry = entry->next;
-        allocator_->Destruct(static_cast<ConcreteListEntryContent*>(delete_me));
+        allocator_->Destruct(
+            static_cast<ConcreteListEntryContent *>(delete_me));
       }
 
       // Reset the list to lonely
@@ -445,9 +452,9 @@ class LruCache : SingleCopy {
      * @param the data object to insert
      * @return the ListEntryContent structure wrapped around the data object
      */
-    inline ListEntryContent<T>* PushBack(T content) {
-      ListEntryContent<T> *new_entry =
-        allocator_->Construct(ListEntryContent<T>(content));
+    inline ListEntryContent<T> *PushBack(T content) {
+      ListEntryContent<T> *new_entry = allocator_->Construct(
+          ListEntryContent<T>(content));
       this->InsertAsPredecessor(new_entry);
       return new_entry;
     }
@@ -492,8 +499,8 @@ class LruCache : SingleCopy {
       ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
       popped->RemoveFromList();
       T result = popped->content();
-      allocator_->Destruct(static_cast<ConcreteListEntryContent*>(
-        popped_entry));
+      allocator_->Destruct(
+          static_cast<ConcreteListEntryContent *>(popped_entry));
       return result;
     }
 
@@ -506,25 +513,24 @@ class LruCache : SingleCopy {
    * Create a new LRU cache object
    * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned   cache_size,
-           const Key       &empty_key,
+  LruCache(const unsigned cache_size,
+           const Key &empty_key,
            uint32_t (*hasher)(const Key &key),
-           perf::StatisticsTemplate statistics) :
-    counters_(statistics),
-    pause_(false),
-    cache_gauge_(0),
-    cache_size_(cache_size),
-    allocator_(cache_size),
-    lru_list_(&allocator_)
-  {
+           perf::StatisticsTemplate statistics)
+      : counters_(statistics)
+      , pause_(false)
+      , cache_gauge_(0)
+      , cache_size_(cache_size)
+      , allocator_(cache_size)
+      , lru_list_(&allocator_) {
     assert(cache_size > 0);
 
     counters_.sz_size->Set(cache_size_);
     filter_entry_ = NULL;
     // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
-    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
-                  cache_.bytes_allocated());
+    perf::Xadd(counters_.sz_allocated,
+               allocator_.bytes_allocated() + cache_.bytes_allocated());
 
 #ifdef LRU_CACHE_THREAD_SAFE
     int retval = pthread_mutex_init(&lock_, NULL);
@@ -533,8 +539,8 @@ class LruCache : SingleCopy {
   }
 
   static double GetEntrySize() {
-    return SmallHashFixed<Key, CacheEntry>::GetEntrySize() +
-           ConcreteMemoryAllocator::GetEntrySize();
+    return SmallHashFixed<Key, CacheEntry>::GetEntrySize()
+           + ConcreteMemoryAllocator::GetEntrySize();
   }
 
   virtual ~LruCache() {
@@ -702,8 +708,8 @@ class LruCache : SingleCopy {
     cache_.Clear();
     perf::Inc(counters_.n_drop);
     counters_.sz_allocated->Set(0);
-    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
-                  cache_.bytes_allocated());
+    perf::Xadd(counters_.sz_allocated,
+               allocator_.bytes_allocated() + cache_.bytes_allocated());
 
     this->Unlock();
   }
@@ -767,9 +773,9 @@ class LruCache : SingleCopy {
     return !filter_entry_->IsListHead();
   }
 
- /**
-  * Delete the current cache list entry
-  */
+  /**
+   * Delete the current cache list entry
+   */
   virtual void FilterDelete() {
     assert(filter_entry_);
     assert(!filter_entry_->IsListHead());
@@ -783,9 +789,9 @@ class LruCache : SingleCopy {
     filter_entry_ = new_current;
   }
 
- /**
-  * Finish filtering the entries and unlock the cache
-  */
+  /**
+   * Finish filtering the entries and unlock the cache
+   */
   virtual void FilterEnd() {
     assert(filter_entry_);
     filter_entry_ = NULL;
@@ -811,7 +817,8 @@ class LruCache : SingleCopy {
    * Touch an entry.
    * The entry will be moved to the back of the LRU list to mark it
    * as 'recently used'... this saves the entry from being deleted
-   * @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
+   * @param entry the CacheEntry to be touched (CacheEntry is the internal
+   * wrapper data structure)
    */
   inline void Touch(const CacheEntry &entry) {
     lru_list_.MoveToBack(entry.list_entry);
@@ -848,11 +855,11 @@ class LruCache : SingleCopy {
 #endif
   }
 
-  bool pause_;  /**< Temporarily stops the cache in order to avoid poisoning */
+  bool pause_; /**< Temporarily stops the cache in order to avoid poisoning */
 
   // Internal data fields
-  unsigned int            cache_gauge_;
-  const unsigned int      cache_size_;
+  unsigned int cache_gauge_;
+  const unsigned int cache_size_;
   ConcreteMemoryAllocator allocator_;
 
   /**
@@ -862,12 +869,12 @@ class LruCache : SingleCopy {
    * If the cache gets too long, the first element (the oldest) gets
    * deleted to obtain some space.
    */
-  ListEntryHead<Key>              lru_list_;
+  ListEntryHead<Key> lru_list_;
   SmallHashFixed<Key, CacheEntry> cache_;
 
   ListEntry<Key> *filter_entry_;
 #ifdef LRU_CACHE_THREAD_SAFE
-  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
+  pthread_mutex_t lock_; /**< Mutex to make cache thread safe. */
 #endif
 };  // class LruCache
 

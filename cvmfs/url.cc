@@ -9,9 +9,9 @@
 #include "util/string.h"
 
 const int Url::kDefaultPort = 80;
-const char* Url::kDefaultProtocol = "http";
+const char *Url::kDefaultProtocol = "http";
 
-Url* Url::Parse(const std::string& url, const std::string& default_protocol,
+Url *Url::Parse(const std::string &url, const std::string &default_protocol,
                 int default_port) {
   if (url.empty()) {
     return NULL;
@@ -45,8 +45,8 @@ Url* Url::Parse(const std::string& url, const std::string& default_protocol,
 
     // Check that part between ":" and "/" or the end of the string is an
     // unsigned number
-    size_t port_end =
-        slash_pos == std::string::npos ? std::string::npos : slash_pos - cursor;
+    size_t port_end = slash_pos == std::string::npos ? std::string::npos
+                                                     : slash_pos - cursor;
     if (!String2Uint64Parse(url.substr(cursor, port_end), &port)) {
       return NULL;
     }
@@ -73,7 +73,7 @@ Url* Url::Parse(const std::string& url, const std::string& default_protocol,
   return new Url(protocol, host, path, port);
 }
 
-bool Url::ValidateHost(const std::string& host) {
+bool Url::ValidateHost(const std::string &host) {
   if (host.empty()) {
     return false;
   }
@@ -87,19 +87,15 @@ bool Url::ValidateHost(const std::string& host) {
   return true;
 }
 
-Url::Url() : protocol_(), host_(), path_(), port_(), address_() {}
+Url::Url() : protocol_(), host_(), path_(), port_(), address_() { }
 
-Url::Url(const std::string& protocol, const std::string& host,
-         const std::string& path, int port)
-    : protocol_(protocol),
-      host_(host),
-      path_(path),
-      port_(port),
-      address_() {
+Url::Url(const std::string &protocol, const std::string &host,
+         const std::string &path, int port)
+    : protocol_(protocol), host_(host), path_(path), port_(port), address_() {
   if (port_ != kDefaultPort) {
     address_ = protocol + "://" + host + ":" + StringifyInt(port_) + path;
   } else {
     address_ = protocol + "://" + host + path;
   }
 }
-Url::~Url() {}
+Url::~Url() { }

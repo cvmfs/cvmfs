@@ -2,10 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
+#include "path_filters/relaxed_path_filter.h"
+
 #include <cstdio>
 #include <string>
-
-#include "path_filters/relaxed_path_filter.h"
 
 using namespace catalog;  // NOLINT
 

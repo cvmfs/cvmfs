@@ -11,7 +11,7 @@
 class TaskHash : public TubeConsumer<BlockItem> {
  public:
   TaskHash(Tube<BlockItem> *tube_in, TubeGroup<BlockItem> *tubes_out)
-    : TubeConsumer<BlockItem>(tube_in), tubes_out_(tubes_out) { }
+      : TubeConsumer<BlockItem>(tube_in), tubes_out_(tubes_out) { }
 
  protected:
   virtual void Process(BlockItem *input_block);

@@ -23,9 +23,9 @@
 
 namespace file_watcher {
 
-EventHandler::EventHandler() {}
+EventHandler::EventHandler() { }
 
-EventHandler::~EventHandler() {}
+EventHandler::~EventHandler() { }
 
 const unsigned FileWatcher::kInitialDelay = 1000;
 const unsigned FileWatcher::kMaxDelay = 10000;
@@ -35,11 +35,9 @@ FileWatcher::FileWatcher()
     : handler_map_()
     , control_pipe_to_back_()
     , control_pipe_to_front_()
-    , started_(false) {}
+    , started_(false) { }
 
-FileWatcher::~FileWatcher() {
-    Stop();
-}
+FileWatcher::~FileWatcher() { Stop(); }
 
 FileWatcher *FileWatcher::Create() {
 #ifdef __APPLE__
@@ -53,8 +51,8 @@ FileWatcher *FileWatcher::Create() {
 #endif
 }
 
-void FileWatcher::RegisterHandler(const std::string& file_path,
-                                  EventHandler* handler) {
+void FileWatcher::RegisterHandler(const std::string &file_path,
+                                  EventHandler *handler) {
   handler_map_[file_path] = handler;
 }
 
@@ -66,8 +64,8 @@ bool FileWatcher::Spawn() {
   MakePipe(control_pipe_to_back_);
   MakePipe(control_pipe_to_front_);
 
-  assert(pthread_create(&thread_, NULL,
-                        &FileWatcher::BackgroundThread, this) == 0);
+  assert(pthread_create(&thread_, NULL, &FileWatcher::BackgroundThread, this)
+         == 0);
 
   // Before returning, wait for a start signal in the control pipe
   // from the background thread.
@@ -97,8 +95,8 @@ void FileWatcher::Stop() {
   started_ = false;
 }
 
-void* FileWatcher::BackgroundThread(void* d) {
-  FileWatcher* watcher = reinterpret_cast<FileWatcher*>(d);
+void *FileWatcher::BackgroundThread(void *d) {
+  FileWatcher *watcher = reinterpret_cast<FileWatcher *>(d);
 
   if (!watcher->RunEventLoop(watcher->handler_map_,
                              watcher->control_pipe_to_back_[0],
@@ -109,17 +107,16 @@ void* FileWatcher::BackgroundThread(void* d) {
   pthread_exit(NULL);
 }
 
-void FileWatcher::RegisterFilter(const std::string& file_path,
-                                 EventHandler* handler) {
+void FileWatcher::RegisterFilter(const std::string &file_path,
+                                 EventHandler *handler) {
   bool done = false;
   BackoffThrottle throttle(kInitialDelay, kMaxDelay, kResetDelay);
   while (!done) {
     int wd = TryRegisterFilter(file_path);
     if (wd < 0) {
-      LogCvmfs(
-          kLogCvmfs, kLogDebug,
-          "FileWatcher - Could not add watch for file %s. Retrying.",
-          file_path.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "FileWatcher - Could not add watch for file %s. Retrying.",
+               file_path.c_str());
       throttle.Throttle();
       continue;
     }

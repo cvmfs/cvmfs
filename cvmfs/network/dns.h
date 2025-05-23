@@ -30,9 +30,9 @@ enum Failures {
   kFailInvalidResolvers,
   kFailTimeout,
   kFailInvalidHost,
-  kFailUnknownHost,   ///< Resolver returned a negative reply
+  kFailUnknownHost,  ///< Resolver returned a negative reply
   kFailMalformed,
-  kFailNoAddress,     ///< Resolver returned a positive reply but without IPs
+  kFailNoAddress,  ///< Resolver returned a positive reply but without IPs
   kFailNotYetResolved,
   kFailOther,
 
@@ -99,7 +99,7 @@ class Host {
   static Host ExtendDeadline(const Host &original, unsigned seconds_from_now);
   Host();
   Host(const Host &other);
-  Host &operator= (const Host &other);
+  Host &operator=(const Host &other);
   bool IsEquivalent(const Host &other) const;
   bool IsExpired() const;
   bool IsValid() const;
@@ -121,11 +121,11 @@ class Host {
  private:
   void CopyFrom(const Host &other);
 
-   /**
-    * Counter that is increased with every creation of a host object.  Allows to
-    * distinguish two Host objects with the same host name.  E.g. when the proxy
-    * list in Download.cc reads "http://A:3128|http://A:3128".
-    */
+  /**
+   * Counter that is increased with every creation of a host object.  Allows to
+   * distinguish two Host objects with the same host name.  E.g. when the proxy
+   * list in Download.cc reads "http://A:3128|http://A:3128".
+   */
   static atomic_int64 global_id_;
 
   /**
@@ -283,6 +283,7 @@ class Resolver : SingleCopy {
  */
 class CaresResolver : public Resolver {
   friend class NormalResolver;
+
  public:
   /**
    * More IP addresses for a single name will be ignored.  Due to c-ares
@@ -332,6 +333,7 @@ class CaresResolver : public Resolver {
  */
 class HostfileResolver : public Resolver {
   friend class NormalResolver;
+
  public:
   static HostfileResolver *Create(const std::string &path, bool ipv4_only);
   virtual ~HostfileResolver();

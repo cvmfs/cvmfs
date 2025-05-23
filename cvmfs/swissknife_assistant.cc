@@ -22,10 +22,8 @@ using namespace std;  // NOLINT
 
 namespace swissknife {
 
-catalog::Catalog *Assistant::GetCatalog(
-  const shash::Any &catalog_hash,
-  OpenMode open_mode)
-{
+catalog::Catalog *Assistant::GetCatalog(const shash::Any &catalog_hash,
+                                        OpenMode open_mode) {
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
   string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
   assert(!local_path.empty());
@@ -38,14 +36,12 @@ catalog::Catalog *Assistant::GetCatalog(
   catalog::Catalog *catalog;
   switch (open_mode) {
     case kOpenReadWrite:
-      catalog = catalog::WritableCatalog::AttachFreely(catalog_root_path,
-                                                      local_path,
-                                                      catalog_hash);
+      catalog = catalog::WritableCatalog::AttachFreely(
+          catalog_root_path, local_path, catalog_hash);
       break;
     case kOpenReadOnly:
-      catalog = catalog::Catalog::AttachFreely(catalog_root_path,
-                                               local_path,
-                                               catalog_hash);
+      catalog = catalog::Catalog::AttachFreely(
+          catalog_root_path, local_path, catalog_hash);
       break;
     default:
       abort();
@@ -111,8 +107,8 @@ bool Assistant::FetchObject(const shash::Any &id, const string &local_path) {
 
   if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object '%s' (%d - %s)",
-             id.ToStringWithSuffix().c_str(),
-             dl_retval, download::Code2Ascii(dl_retval));
+             id.ToStringWithSuffix().c_str(), dl_retval,
+             download::Code2Ascii(dl_retval));
     return false;
   }
   return true;

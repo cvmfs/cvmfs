@@ -58,8 +58,8 @@ class FuseRemounter : SingleCopy {
   void TryFinish(const shash::Any &root_hash = shash::Any());
   void EnterMaintenanceMode();
   bool IsCaching() {
-    return (atomic_read32(&maintenance_mode_) == 0) &&
-           (atomic_read32(&drainout_mode_) == 0);
+    return (atomic_read32(&maintenance_mode_) == 0)
+           && (atomic_read32(&drainout_mode_) == 0);
   }
   bool IsInDrainoutMode() { return atomic_read32(&drainout_mode_) == 2; }
   bool IsInMaintenanceMode() { return atomic_read32(&maintenance_mode_) == 1; }
@@ -77,14 +77,12 @@ class FuseRemounter : SingleCopy {
   bool HasRemountTrigger() { return pipe_remount_trigger_[0] >= 0; }
   void SetAlarm(int timeout);
 
-  bool EnterCriticalSection() {
-    return atomic_cas32(&critical_section_, 0, 1);
-  }
+  bool EnterCriticalSection() { return atomic_cas32(&critical_section_, 0, 1); }
   void LeaveCriticalSection() { atomic_dec32(&critical_section_); /* 1 -> 0 */ }
 
   void SetOfflineMode(bool value);
 
-  MountPoint *mountpoint_;  ///< Not owned
+  MountPoint *mountpoint_;                             ///< Not owned
   cvmfs::InodeGenerationInfo *inode_generation_info_;  ///< Not owned
   FuseInvalidator *invalidator_;
   /**

@@ -75,7 +75,7 @@ class QuotaManager : SingleCopy {
   virtual uint64_t GetCapacity() = 0;
   virtual uint64_t GetSize() = 0;
   virtual uint64_t GetSizePinned() = 0;
-  virtual bool     SetLimit(uint64_t limit) = 0;
+  virtual bool SetLimit(uint64_t limit) = 0;
   virtual uint64_t GetCleanupRate(uint64_t period_s) = 0;
 
   virtual void Spawn() = 0;
@@ -124,8 +124,7 @@ class NoopQuotaManager : public QuotaManager {
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
                               const std::string &description) { }
   virtual bool Pin(const shash::Any &hash, const uint64_t size,
-                   const std::string &description, const bool is_catalog)
-  {
+                   const std::string &description, const bool is_catalog) {
     return true;
   }
   virtual void Unpin(const shash::Any &hash) { }
@@ -152,7 +151,7 @@ class NoopQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity() { return uint64_t(-1); }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
-  virtual bool     SetLimit(uint64_t) {return false;}
+  virtual bool SetLimit(uint64_t) { return false; }
   virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }

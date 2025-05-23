@@ -2,10 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <alloca.h>
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -38,9 +37,8 @@ class MockCachePlugin : public CachePlugin {
   static const unsigned kMockListingNitems;
 
   MockCachePlugin(const string &socket_path, bool read_only)
-    : CachePlugin(read_only ? (cvmfs::CAP_ALL_V1 & ~cvmfs::CAP_WRITE)
-                            : cvmfs::CAP_ALL_V2)
-  {
+      : CachePlugin(read_only ? (cvmfs::CAP_ALL_V1 & ~cvmfs::CAP_WRITE)
+                              : cvmfs::CAP_ALL_V2) {
     bool retval = Listen("unix=" + socket_path);
     assert(retval);
     ProcessRequests(0);
@@ -78,10 +76,8 @@ class MockCachePlugin : public CachePlugin {
   std::map<std::string, manifest::Breadcrumb> breadcrumbs;
 
  protected:
-  virtual cvmfs::EnumStatus ChangeRefcount(
-    const shash::Any &id,
-    int32_t change_by)
-  {
+  virtual cvmfs::EnumStatus ChangeRefcount(const shash::Any &id,
+                                           int32_t change_by) {
     GetSession(&last_id, &last_reponame, &last_client_instance);
     if (next_status >= 0)
       return static_cast<cvmfs::EnumStatus>(next_status);
@@ -98,10 +94,8 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_NOENTRY;
   }
 
-  virtual cvmfs::EnumStatus GetObjectInfo(
-    const shash::Any &id,
-    ObjectInfo *info)
-  {
+  virtual cvmfs::EnumStatus GetObjectInfo(const shash::Any &id,
+                                          ObjectInfo *info) {
     if (next_status >= 0)
       return static_cast<cvmfs::EnumStatus>(next_status);
     if (id == known_object) {
@@ -115,12 +109,10 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_NOENTRY;
   }
 
-  virtual cvmfs::EnumStatus Pread(
-    const shash::Any &id,
-    uint64_t offset,
-    uint32_t *size,
-    unsigned char *buffer)
-  {
+  virtual cvmfs::EnumStatus Pread(const shash::Any &id,
+                                  uint64_t offset,
+                                  uint32_t *size,
+                                  unsigned char *buffer) {
     GetSession(&last_id, &last_reponame, &last_client_instance);
     if (next_status >= 0)
       return static_cast<cvmfs::EnumStatus>(next_status);
@@ -142,21 +134,17 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus StartTxn(
-    const shash::Any &id,
-    const uint64_t txn_id,
-    const ObjectInfo &info)
-  {
+  virtual cvmfs::EnumStatus StartTxn(const shash::Any &id,
+                                     const uint64_t txn_id,
+                                     const ObjectInfo &info) {
     new_object = id;
     new_object_content.clear();
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus WriteTxn(
-    const uint64_t txn_id,
-    unsigned char *buffer,
-    uint32_t size)
-  {
+  virtual cvmfs::EnumStatus WriteTxn(const uint64_t txn_id,
+                                     unsigned char *buffer,
+                                     uint32_t size) {
     string data(reinterpret_cast<char *>(buffer), size);
     new_object_content += data;
     return cvmfs::STATUS_OK;
@@ -171,8 +159,7 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus GetInfo(Info *info)
-  {
+  virtual cvmfs::EnumStatus GetInfo(Info *info) {
     info->size_bytes = kMockCacheSize;
     info->used_bytes = known_object_content.length();
     info->pinned_bytes = (known_object_refcnt == 0) ? 0 : info->used_bytes;
@@ -181,22 +168,20 @@ class MockCachePlugin : public CachePlugin {
   }
 
   virtual cvmfs::EnumStatus Shrink(uint64_t shrink_to, uint64_t *used_bytes) {
-    return
-      (known_object_refcnt == 0) ? cvmfs::STATUS_OK : cvmfs::STATUS_PARTIAL;
+    return (known_object_refcnt == 0) ? cvmfs::STATUS_OK
+                                      : cvmfs::STATUS_PARTIAL;
   }
 
-  virtual cvmfs::EnumStatus ListingBegin(
-    uint64_t lst_id,
-    cvmfs::EnumObjectType type)
-  {
+  virtual cvmfs::EnumStatus ListingBegin(uint64_t lst_id,
+                                         cvmfs::EnumObjectType type) {
     listing_nitems = 0;
     listing_type = type;
     return cvmfs::STATUS_OK;
   }
 
   virtual cvmfs::EnumStatus ListingNext(int64_t lst_id, ObjectInfo *item) {
-    if ((listing_type != cvmfs::OBJECT_REGULAR) ||
-        (listing_nitems >= kMockListingNitems))
+    if ((listing_type != cvmfs::OBJECT_REGULAR)
+        || (listing_nitems >= kMockListingNitems))
       return cvmfs::STATUS_OUTOFBOUNDS;
     item->id = known_object;
     item->size = known_object_content.length();
@@ -211,11 +196,10 @@ class MockCachePlugin : public CachePlugin {
     return cvmfs::STATUS_OK;
   }
 
-  virtual cvmfs::EnumStatus LoadBreadcrumb(
-    const std::string &fqrn, manifest::Breadcrumb *breadcrumb)
-  {
-    map<std::string, manifest::Breadcrumb>::const_iterator itr =
-      breadcrumbs.find(fqrn);
+  virtual cvmfs::EnumStatus LoadBreadcrumb(const std::string &fqrn,
+                                           manifest::Breadcrumb *breadcrumb) {
+    map<std::string, manifest::Breadcrumb>::const_iterator
+        itr = breadcrumbs.find(fqrn);
     if (itr == breadcrumbs.end())
       return cvmfs::STATUS_NOENTRY;
     *breadcrumb = itr->second;
@@ -223,8 +207,7 @@ class MockCachePlugin : public CachePlugin {
   }
 
   virtual cvmfs::EnumStatus StoreBreadcrumb(
-    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb)
-  {
+      const std::string &fqrn, const manifest::Breadcrumb &breadcrumb) {
     breadcrumbs[fqrn] = breadcrumb;
     return cvmfs::STATUS_OK;
   }
@@ -242,8 +225,8 @@ class T_ExternalCacheManager : public ::testing::Test {
 
     fd_client = ConnectSocket(socket_path_);
     ASSERT_GE(fd_client, 0);
-    cache_mgr_ =
-      ExternalCacheManager::Create(fd_client, nfiles, "test:instance");
+    cache_mgr_ = ExternalCacheManager::Create(fd_client, nfiles,
+                                              "test:instance");
     ASSERT_TRUE(cache_mgr_ != NULL);
     quota_mgr_ = ExternalQuotaManager::Create(cache_mgr_);
     ASSERT_TRUE(cache_mgr_ != NULL);
@@ -257,8 +240,7 @@ class T_ExternalCacheManager : public ::testing::Test {
   }
 
   CacheManager::LabeledObject LabelWithPath(const shash::Any &id,
-                                            const std::string &path)
-  {
+                                            const std::string &path) {
     CacheManager::Label label;
     label.path = path;
     return CacheManager::LabeledObject(id, label);
@@ -273,7 +255,6 @@ class T_ExternalCacheManager : public ::testing::Test {
 };
 
 const unsigned T_ExternalCacheManager::nfiles = 128;
-
 
 
 TEST_F(T_ExternalCacheManager, Connection) {
@@ -302,22 +283,22 @@ TEST_F(T_ExternalCacheManager, OpenClose) {
 
   int fds[nfiles];
   for (unsigned i = 0; i < nfiles; ++i) {
-    fds[i] =
-      cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+    fds[i] = cache_mgr_->Open(
+        CacheManager::LabeledObject(mock_plugin_->known_object));
     EXPECT_GE(fds[i], 0);
   }
   EXPECT_EQ(session_id, mock_plugin_->last_id);
   EXPECT_EQ(static_cast<int>(nfiles), mock_plugin_->known_object_refcnt);
-  EXPECT_EQ(-ENFILE, cache_mgr_->Open(
-    CacheManager::LabeledObject(mock_plugin_->known_object)));
+  EXPECT_EQ(-ENFILE, cache_mgr_->Open(CacheManager::LabeledObject(
+                         mock_plugin_->known_object)));
   for (unsigned i = 0; i < nfiles; ++i) {
     EXPECT_EQ(0, cache_mgr_->Close(fds[i]));
   }
   EXPECT_EQ(0, mock_plugin_->known_object_refcnt);
 
   mock_plugin_->next_status = cvmfs::STATUS_MALFORMED;
-  EXPECT_EQ(-EINVAL, cache_mgr_->Open(
-    CacheManager::LabeledObject(mock_plugin_->known_object)));
+  EXPECT_EQ(-EINVAL, cache_mgr_->Open(CacheManager::LabeledObject(
+                         mock_plugin_->known_object)));
   mock_plugin_->next_status = -1;
 }
 
@@ -337,8 +318,8 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   cache_mgr_->AcquireQuotaManager(quota_mgr_);
   EXPECT_GE(cache_mgr_->session_id(), 0);
 
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
@@ -348,16 +329,16 @@ TEST_F(T_ExternalCacheManager, ReadOnly) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(id, content.length(), txn));
   unsigned char *data = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                         data, content.length()));
+      reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_FALSE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), data,
+                                         content.length()));
 }
 
 
 TEST_F(T_ExternalCacheManager, GetSize) {
   EXPECT_EQ(-EBADF, cache_mgr_->GetSize(0));
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(static_cast<int64_t>(mock_plugin_->known_object_content.length()),
             cache_mgr_->GetSize(fd));
@@ -373,8 +354,8 @@ TEST_F(T_ExternalCacheManager, GetSize) {
 TEST_F(T_ExternalCacheManager, Dup) {
   EXPECT_EQ(-EBADF, cache_mgr_->Dup(0));
   int fds[nfiles];
-  fds[0] =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  fds[0] = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fds[0], 0);
   for (unsigned i = 1; i < nfiles; ++i) {
     fds[i] = cache_mgr_->Dup(fds[0]);
@@ -394,23 +375,23 @@ TEST_F(T_ExternalCacheManager, Pread) {
   char buffer[64];
   EXPECT_EQ(-EBADF, cache_mgr_->Pread(0, buffer, buf_size, 0));
 
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, buffer, 1, 64));
   int64_t len = cache_mgr_->Pread(fd, buffer, 64, 0);
   EXPECT_EQ(static_cast<int>(mock_plugin_->known_object_content.length()), len);
   EXPECT_EQ(mock_plugin_->known_object_content, string(buffer, len));
-  EXPECT_EQ(1, cache_mgr_->Pread(fd, buffer, 1, len-1));
-  EXPECT_EQ(mock_plugin_->known_object_content[len-1], buffer[0]);
+  EXPECT_EQ(1, cache_mgr_->Pread(fd, buffer, 1, len - 1));
+  EXPECT_EQ(mock_plugin_->known_object_content[len - 1], buffer[0]);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 
 TEST_F(T_ExternalCacheManager, Readahead) {
   EXPECT_EQ(-EBADF, cache_mgr_->Readahead(0));
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Readahead(fd));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -422,9 +403,9 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   string content = "foo";
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        data, content.length()));
+      reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), data,
+                                        content.length()));
   unsigned char *buffer;
   uint64_t size;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
@@ -434,19 +415,19 @@ TEST_F(T_ExternalCacheManager, Transaction) {
   content = "";
   HashString(content, &id);
   data = NULL;
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-              data, content.length()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), data,
+                                        content.length()));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
 
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
-    scalloc(large_size, 1));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        large_buffer, large_size));
+      scalloc(large_size, 1));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), large_buffer,
+                                        large_size));
   unsigned char *large_buffer_verify = reinterpret_cast<unsigned char *>(
-    smalloc(large_size));
+      smalloc(large_size));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
   EXPECT_EQ(large_size, size);
@@ -456,8 +437,8 @@ TEST_F(T_ExternalCacheManager, Transaction) {
 
   large_size = 50 * 1024 * 1024 + 1;
   large_buffer = reinterpret_cast<unsigned char *>(scalloc(large_size, 1));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        large_buffer, large_size));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), large_buffer,
+                                        large_size));
   large_buffer_verify = reinterpret_cast<unsigned char *>(smalloc(large_size));
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
                                    &large_buffer_verify, &size));
@@ -474,7 +455,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   shash::Any id(shash::kSha1);
   uint64_t write_size = cache_mgr_->max_object_size_ * 4;
   unsigned char *write_buffer = static_cast<unsigned char *>(
-    smalloc(write_size));
+      smalloc(write_size));
   memset(write_buffer, static_cast<unsigned char>(kMemMarker), write_size);
   HashMem(write_buffer, write_size, &id);
 
@@ -484,7 +465,7 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
   EXPECT_EQ(2, cache_mgr_->Write(write_buffer, 2, txn));
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(static_cast<int>(write_size / 2),
-            cache_mgr_->Write(write_buffer, write_size/2, txn));
+            cache_mgr_->Write(write_buffer, write_size / 2, txn));
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
   EXPECT_EQ(static_cast<int>(write_size),
             cache_mgr_->Write(write_buffer, write_size, txn));
@@ -492,8 +473,8 @@ TEST_F(T_ExternalCacheManager, TransactionAbort) {
 
   uint64_t read_size = write_size;
   unsigned char *read_buffer = static_cast<unsigned char *>(smalloc(read_size));
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"),
-                                   &read_buffer, &read_size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &read_buffer,
+                                   &read_size));
   EXPECT_EQ(read_size, write_size);
   EXPECT_EQ(0, memcmp(read_buffer, write_buffer, read_size));
   free(read_buffer);
@@ -527,8 +508,8 @@ void *MainBackchannel(void *data) {
 }  // anonymous namespace
 
 TEST_F(T_ExternalCacheManager, Detach) {
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   BackchannelData bd;
   quota_mgr_->RegisterBackChannel(bd.channel, "xyz");
@@ -562,8 +543,8 @@ TEST_F(T_ExternalCacheManager, Info) {
   EXPECT_EQ(mock_plugin_->known_object_content.length(), quota_mgr_->GetSize());
   EXPECT_EQ(0U, quota_mgr_->GetSizePinned());
 
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(mock_plugin_->known_object_content.length(),
             quota_mgr_->GetSizePinned());
@@ -573,8 +554,8 @@ TEST_F(T_ExternalCacheManager, Info) {
 
 TEST_F(T_ExternalCacheManager, Shrink) {
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   EXPECT_GE(fd, 0);
   EXPECT_FALSE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -631,9 +612,8 @@ static void *MainMultiThread(void *data) {
   unsigned char *buffer;
   CacheManager::Label label;
   label.path = "test";
-  EXPECT_TRUE(
-    td->cache_mgr->Open2Mem(CacheManager::LabeledObject(td->id, label),
-                            &buffer, &size));
+  EXPECT_TRUE(td->cache_mgr->Open2Mem(
+      CacheManager::LabeledObject(td->id, label), &buffer, &size));
   EXPECT_EQ(td->large_size, size);
   EXPECT_EQ(0, memcmp(buffer, td->large_buffer, size));
   free(buffer);
@@ -656,12 +636,12 @@ TEST_F(T_ExternalCacheManager, MultiThreaded) {
 
   unsigned large_size = 50 * 1024 * 1024;
   unsigned char *large_buffer = reinterpret_cast<unsigned char *>(
-    smalloc(large_size));
+      smalloc(large_size));
   memset(large_buffer, 1, large_size);
   shash::Any id(shash::kSha1);
   shash::HashMem(large_buffer, large_size, &id);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        large_buffer, large_size));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), large_buffer,
+                                        large_size));
 
   const unsigned num_threads = 10;
   pthread_t threads[num_threads];
@@ -697,8 +677,8 @@ TEST_F(T_ExternalCacheManager, SaveState) {
   cache_mgr_->FreeState(-1, data);
 
   // Now with a new cache manager
-  int fd =
-    cache_mgr_->Open(CacheManager::LabeledObject(mock_plugin_->known_object));
+  int fd = cache_mgr_->Open(
+      CacheManager::LabeledObject(mock_plugin_->known_object));
   uint64_t old_session_id = mock_plugin_->last_id;
   EXPECT_GE(fd, 0);
   data = cache_mgr_->SaveState(-1);

@@ -3,6 +3,7 @@
  */
 
 #include "jobinfo.h"
+
 #include "util/string.h"
 
 namespace download {
@@ -10,7 +11,7 @@ namespace download {
 atomic_int64 JobInfo::next_uuid = 0;
 
 JobInfo::JobInfo(const std::string *u, const bool c, const bool ph,
-         const shash::Any *h, cvmfs::Sink *s) {
+                 const shash::Any *h, cvmfs::Sink *s) {
   Init();
 
   url_ = u;

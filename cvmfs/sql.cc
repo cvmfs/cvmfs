@@ -13,11 +13,10 @@ using namespace std;  // NOLINT
 namespace sqlite {
 
 Sql::Sql(sqlite3 *sqlite_db, const std::string &statement)
-  : database_(NULL)
-  , statement_(NULL)
-  , query_string_(NULL)
-  , last_error_code_(0)
-{
+    : database_(NULL)
+    , statement_(NULL)
+    , query_string_(NULL)
+    , last_error_code_(0) {
   const bool success = Init(sqlite_db, statement);
   assert(success);
 }
@@ -79,7 +78,8 @@ std::string Sql::DebugResultTable() {
       for (unsigned int col = 0; col < cols; ++col) {
         const char *name = sqlite3_column_name(statement_, col);
         line += name;
-        if (col + 1 < cols) line += " | ";
+        if (col + 1 < cols)
+          line += " | ";
       }
       result += line + "\n";
       line.clear();
@@ -105,7 +105,8 @@ std::string Sql::DebugResultTable() {
           line += "[NULL]";
           break;
       }
-      if (col + 1 < cols) line += " | ";
+      if (col + 1 < cols)
+        line += " | ";
     }
 
     result += line + "\n";
@@ -157,7 +158,7 @@ bool Sql::Init(const char *statement) {
 
 void Sql::DeferredInit(const sqlite3 *database, const char *statement) {
   assert(NULL == database_);
-  database_     = const_cast<sqlite3 *>(database);
+  database_ = const_cast<sqlite3 *>(database);
   query_string_ = statement;
 }
 

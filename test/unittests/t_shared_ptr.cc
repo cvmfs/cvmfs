@@ -9,14 +9,14 @@
 
 class ClassSharedMember {
  public:
-  ClassSharedMember(int* counter, int value)
+  ClassSharedMember(int *counter, int value)
       : counter_(counter), value_(new int(value)) {
     (*counter_)++;
   }
   ~ClassSharedMember() { (*counter_)--; }
 
   // Need to defined special copy-constructor in order to increment counter_...
-  ClassSharedMember(const ClassSharedMember& other)
+  ClassSharedMember(const ClassSharedMember &other)
       : counter_(other.counter_), value_(other.value_) {
     (*counter_)++;
   }
@@ -24,18 +24,18 @@ class ClassSharedMember {
   int value_use_count() const { return value_.UseCount(); }
 
  private:
-  int* counter_;
+  int *counter_;
   SharedPtr<int> value_;
 };
 
 // Test class that allows tracking the number of instances
 class TestData {
  public:
-  explicit TestData(int* val) : val_(val) { (*val_)++; }
+  explicit TestData(int *val) : val_(val) { (*val_)++; }
   ~TestData() { (*val_)--; }
 
  private:
-  int* val_;
+  int *val_;
 };
 
 class T_SharedPtr : public ::testing::Test {

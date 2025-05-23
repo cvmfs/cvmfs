@@ -15,16 +15,16 @@
 
 class GatewayUploaderMocked : public upload::GatewayUploader {
  public:
-  explicit GatewayUploaderMocked(const upload::SpoolerDefinition& definition)
-      : upload::GatewayUploader(definition) {}
+  explicit GatewayUploaderMocked(const upload::SpoolerDefinition &definition)
+      : upload::GatewayUploader(definition) { }
 
  protected:
-  virtual void ReadSessionTokenFile(const std::string& /*token_file_name*/,
-                                    std::string* token) {
+  virtual void ReadSessionTokenFile(const std::string & /*token_file_name*/,
+                                    std::string *token) {
     *token = "ThisIsAFakeToken";
   }
-  virtual bool ReadKey(const std::string& /*key_file_name*/,
-                       std::string* key_id, std::string* secret) {
+  virtual bool ReadKey(const std::string & /*key_file_name*/,
+                       std::string *key_id, std::string *secret) {
     if (!(key_id && secret)) {
       return false;
     }
@@ -37,7 +37,7 @@ class GatewayUploaderMocked : public upload::GatewayUploader {
 
 class T_GatewayUploaderConfig : public ::testing::Test {
  protected:
-  T_GatewayUploaderConfig() : config() {}
+  T_GatewayUploaderConfig() : config() { }
 
   upload::GatewayUploader::Config config;
   std::string token_file_name;
@@ -45,7 +45,7 @@ class T_GatewayUploaderConfig : public ::testing::Test {
 
 class T_GatewayUploader : public ::testing::Test {
  protected:
-  T_GatewayUploader() {}
+  T_GatewayUploader() { }
 };
 
 TEST_F(T_GatewayUploaderConfig, ParseSpoolerDefinitionBadArgs) {
@@ -87,8 +87,8 @@ TEST_F(T_GatewayUploader, Construct) {
       "/var/spool/cvmfs/test.cern.ch/session_token_some_path", "some_key_file");
   GatewayUploaderMocked uploader(definition);
   EXPECT_TRUE(uploader.Initialize());
-  EXPECT_TRUE(uploader.FinalizeSession(false, "", "",
-                                       RepositoryTag("new_tag", "")));
+  EXPECT_TRUE(
+      uploader.FinalizeSession(false, "", "", RepositoryTag("new_tag", "")));
   uploader.TearDown();
 }
 

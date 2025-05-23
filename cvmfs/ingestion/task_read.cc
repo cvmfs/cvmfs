@@ -41,7 +41,7 @@ void TaskRead::Process(FileItem *item) {
 
   if (item->may_have_chunks()) {
     item->set_may_have_chunks(
-      item->chunk_detector()->MightFindChunks(item->size()));
+        item->chunk_detector()->MightFindChunks(item->size()));
   }
 
   unsigned char *buffer[kBlockSize];
@@ -67,9 +67,8 @@ void TaskRead::Process(FileItem *item) {
 
     cnt++;
     if ((cnt % 32) == 0) {
-      if ((high_watermark_ > 0) &&
-          (BlockItem::managed_bytes() > high_watermark_))
-      {
+      if ((high_watermark_ > 0)
+          && (BlockItem::managed_bytes() > high_watermark_)) {
         throttle.Throttle();
       }
     }

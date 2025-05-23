@@ -11,11 +11,11 @@
 
 namespace upload {
 
-const char* SpoolerDefinition::kDriverNames[] =
-  {"S3", "local", "gw", "mock", "unknown"};
+const char *SpoolerDefinition::kDriverNames[] = {"S3", "local", "gw", "mock",
+                                                 "unknown"};
 
 SpoolerDefinition::SpoolerDefinition(
-    const std::string& definition_string,
+    const std::string &definition_string,
     const shash::Algorithms hash_algorithm,
     const zlib::Algorithms compression_algorithm,
     const bool generate_legacy_bulk_chunks,
@@ -23,24 +23,25 @@ SpoolerDefinition::SpoolerDefinition(
     const size_t min_file_chunk_size,
     const size_t avg_file_chunk_size,
     const size_t max_file_chunk_size,
-    const std::string& session_token_file,
-    const std::string& key_file)
-    : driver_type(Unknown),
-      hash_algorithm(hash_algorithm),
-      compression_alg(compression_algorithm),
-      generate_legacy_bulk_chunks(generate_legacy_bulk_chunks),
-      use_file_chunking(use_file_chunking),
-      min_file_chunk_size(min_file_chunk_size),
-      avg_file_chunk_size(avg_file_chunk_size),
-      max_file_chunk_size(max_file_chunk_size),
-      number_of_concurrent_uploads(kDefaultMaxConcurrentUploads),
-      num_upload_tasks(kDefaultNumUploadTasks),
-      session_token_file(session_token_file),
-      key_file(key_file),
-      valid_(false) {
+    const std::string &session_token_file,
+    const std::string &key_file)
+    : driver_type(Unknown)
+    , hash_algorithm(hash_algorithm)
+    , compression_alg(compression_algorithm)
+    , generate_legacy_bulk_chunks(generate_legacy_bulk_chunks)
+    , use_file_chunking(use_file_chunking)
+    , min_file_chunk_size(min_file_chunk_size)
+    , avg_file_chunk_size(avg_file_chunk_size)
+    , max_file_chunk_size(max_file_chunk_size)
+    , number_of_concurrent_uploads(kDefaultMaxConcurrentUploads)
+    , num_upload_tasks(kDefaultNumUploadTasks)
+    , session_token_file(session_token_file)
+    , key_file(key_file)
+    , valid_(false) {
   // check if given file chunking values are sane
-  if (use_file_chunking && (min_file_chunk_size >= avg_file_chunk_size ||
-                            avg_file_chunk_size >= max_file_chunk_size)) {
+  if (use_file_chunking
+      && (min_file_chunk_size >= avg_file_chunk_size
+          || avg_file_chunk_size >= max_file_chunk_size)) {
     LogCvmfs(kLogSpooler, kLogStderr, "file chunk size values are not sane");
     return;
   }

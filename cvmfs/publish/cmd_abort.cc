@@ -21,15 +21,15 @@
 #include "whitelist.h"
 
 namespace {
-  std::string StripTrailingPath(const std::string& repo_and_path) {
-    if (!repo_and_path.empty()) {
-      std::vector<std::string> tokens = SplitString(repo_and_path, '/');
-      return tokens[0];
-    }
-
-    return "";
+std::string StripTrailingPath(const std::string &repo_and_path) {
+  if (!repo_and_path.empty()) {
+    std::vector<std::string> tokens = SplitString(repo_and_path, '/');
+    return tokens[0];
   }
+
+  return "";
 }
+}  // namespace
 
 namespace publish {
 
@@ -47,13 +47,12 @@ int CmdAbort::Main(const Options &options) {
     // be ignored, e.g. cvmfs_server abort repo.cern.ch/some/path is equivalent
     // to cvmfs_server abort repo.cern.ch
     std::string repository_ident = StripTrailingPath(
-      options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
-    settings = builder.CreateSettingsPublisher(
-      repository_ident, true /* needs_managed */);
+        options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
+    settings = builder.CreateSettingsPublisher(repository_ident,
+                                               true /* needs_managed */);
   } catch (const EPublish &e) {
-    if ((e.failure() == EPublish::kFailRepositoryNotFound) ||
-        (e.failure() == EPublish::kFailRepositoryType))
-    {
+    if ((e.failure() == EPublish::kFailRepositoryNotFound)
+        || (e.failure() == EPublish::kFailRepositoryType)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "CernVM-FS error: %s",
                e.msg().c_str());
       return 1;
@@ -62,16 +61,14 @@ int CmdAbort::Main(const Options &options) {
   }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
-                         false /* temporarily */))
-  {
+                         false /* temporarily */)) {
     throw EPublish("No write permission to repository",
                    EPublish::kFailPermission);
   }
 
   if (HasPrefix(GetCurrentWorkingDirectory() + "/",
                 settings->transaction().spool_area().union_mnt() + "/",
-                false /* ignore_case */))
-  {
+                false /* ignore_case */)) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "Current working directory is in %s.  Please release, "
              "e.g. by 'cd $HOME'.",
@@ -82,7 +79,8 @@ int CmdAbort::Main(const Options &options) {
   if (!options.Has("force")) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "You are about to DISCARD ALL CHANGES OF THE CURRENT TRANSACTION "
-             "for %s!  Are you sure (y/N)? ", settings->fqrn().c_str());
+             "for %s!  Are you sure (y/N)? ",
+             settings->fqrn().c_str());
     char answer[] = {0, 0, 0};
     char *rv_charp = fgets(answer, 3, stdin);
     if (rv_charp && (answer[0] != 'Y') && (answer[0] != 'y'))
@@ -94,8 +92,8 @@ int CmdAbort::Main(const Options &options) {
     settings->SetIgnoreInvalidLease(true);
   }
 
-  std::vector<LsofEntry> lsof_entries =
-    Lsof(settings->transaction().spool_area().union_mnt());
+  std::vector<LsofEntry> lsof_entries = Lsof(
+      settings->transaction().spool_area().union_mnt());
   if (!lsof_entries.empty()) {
     if (options.Has("force")) {
       LogCvmfs(kLogCvmfs, kLogStdout,
@@ -121,10 +119,8 @@ int CmdAbort::Main(const Options &options) {
       std::string owner_name;
       GetUserNameOf(lsof_entries[i].owner, &owner_name);
       LogCvmfs(kLogCvmfs, kLogStdout, "%s %d %s %s",
-               lsof_entries[i].executable.c_str(),
-               lsof_entries[i].pid,
-               owner_name.c_str(),
-               lsof_entries[i].path.c_str());
+               lsof_entries[i].executable.c_str(), lsof_entries[i].pid,
+               owner_name.c_str(), lsof_entries[i].path.c_str());
     }
 
     if (!options.Has("force")) {
@@ -163,8 +159,7 @@ int CmdAbort::Main(const Options &options) {
 
   rvi = CallServerHook("abort_after_hook", settings->fqrn());
   if (rvi != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "post abort hook failed");
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "post abort hook failed");
     return rvi;
   }
 

@@ -25,18 +25,16 @@ class CommandListCatalogs : public Command {
   virtual std::string GetName() const { return "lsrepo"; }
   virtual std::string GetDescription() const {
     return "CernVM File System Repository Traversal\n"
-      "This command lists the nested catalog tree that builds up a "
-      "cvmfs repository structure.";
+           "This command lists the nested catalog tree that builds up a "
+           "cvmfs repository structure.";
   }
   virtual ParameterList GetParams() const;
 
   int Main(const ArgumentList &args);
 
  protected:
-  template <class ObjectFetcherT>
-  bool Run(const shash::Any &manual_root_hash,
-           ObjectFetcherT *object_fetcher)
-  {
+  template<class ObjectFetcherT>
+  bool Run(const shash::Any &manual_root_hash, ObjectFetcherT *object_fetcher) {
     typename CatalogTraversal<ObjectFetcherT>::Parameters params;
     params.object_fetcher = object_fetcher;
     CatalogTraversal<ObjectFetcherT> traversal(params);

@@ -59,9 +59,9 @@ class SyncDiffReporter : public DiffListener {
 
   explicit SyncDiffReporter(PrintAction print_action = kPrintChanges,
                             unsigned int processing_dot_interval = 100)
-      : print_action_(print_action),
-        processing_dot_interval_(processing_dot_interval),
-        changed_items_(0) {}
+      : print_action_(print_action)
+      , processing_dot_interval_(processing_dot_interval)
+      , changed_items_(0) { }
 
   virtual void OnInit(const history::History::Tag &from_tag,
                       const history::History::Tag &to_tag);
@@ -196,11 +196,11 @@ class SyncMediator : public virtual AbstractSyncMediator {
 
   void TouchDirectoryRecursively(SharedPtr<SyncItem> entry);
   void TouchingFileCallback(const std::string &parent_dir,
-                          const std::string &file_name);
+                            const std::string &file_name);
   void TouchingSymlinkCallback(const std::string &parent_dir,
-                             const std::string &link_name);
+                               const std::string &link_name);
   void TouchDirectoryCallback(const std::string &parent_dir,
-                               const std::string &dir_name);
+                              const std::string &dir_name);
   void RemoveDirectoryRecursively(SharedPtr<SyncItem> entry);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);

@@ -26,15 +26,14 @@ class StreamingSink : public cvmfs::Sink {
  public:
   StreamingSink(void *buf, uint64_t size, uint64_t offset,
                 unsigned char *object)
-    : Sink(false /* is_owner */)
-    , pos_(0)
-    , window_buf_(buf)
-    , window_size_(size)
-    , window_offset_(offset)
-    , object_(object)
-  { }
+      : Sink(false /* is_owner */)
+      , pos_(0)
+      , window_buf_(buf)
+      , window_size_(size)
+      , window_offset_(offset)
+      , object_(object) { }
 
-  virtual ~StreamingSink() {}
+  virtual ~StreamingSink() { }
 
   virtual int64_t Write(const void *buf, uint64_t sz) {
     if (object_) {
@@ -56,8 +55,8 @@ class StreamingSink : public cvmfs::Sink {
     uint64_t copy_offset = std::max(old_pos, window_offset_);
     uint64_t inbuf_offset = copy_offset - old_pos;
     uint64_t outbuf_offset = copy_offset - window_offset_;
-    uint64_t copy_size =
-      std::min(sz - inbuf_offset, window_size_ - outbuf_offset);
+    uint64_t copy_size = std::min(sz - inbuf_offset,
+                                  window_size_ - outbuf_offset);
 
     memcpy(reinterpret_cast<unsigned char *>(window_buf_) + outbuf_offset,
            reinterpret_cast<const unsigned char *>(buf) + inbuf_offset,
@@ -79,8 +78,8 @@ class StreamingSink : public cvmfs::Sink {
   virtual bool Reserve(size_t /* size */) { return true; }
   virtual bool RequiresReserve() { return false; }
   virtual std::string Describe() {
-    std::string result =  "Streaming sink that is ";
-    result += IsValid() ? "valid"  : "invalid";
+    std::string result = "Streaming sink that is ";
+    result += IsValid() ? "valid" : "invalid";
     return result;
   }
 
@@ -95,8 +94,8 @@ class StreamingSink : public cvmfs::Sink {
 };  // class StreamingSink
 
 static inline uint32_t hasher_any(const shash::Any &key) {
-  return *const_cast<uint32_t *>(
-             reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *const_cast<uint32_t *>(reinterpret_cast<const uint32_t *>(key.digest)
+                                 + 1);
 }
 
 }  // anonymous namespace
@@ -107,43 +106,41 @@ const size_t StreamingCacheManager::kDefaultBufferSize = 64 * 1024 * 1024;
 
 StreamingCacheManager::Counters::Counters(perf::Statistics *statistics) {
   sz_transferred_bytes = statistics->Register(
-    "streaming_cache_mgr.sz_transferred_bytes",
-    "Number of bytes downloaded by the streaming cache manager");
+      "streaming_cache_mgr.sz_transferred_bytes",
+      "Number of bytes downloaded by the streaming cache manager");
   sz_transfer_ms = statistics->Register(
-    "streaming_cache_mgr.sz_transfer_ms",
-    "Time spent downloading data by the streaming cache manager");
-  n_downloads = statistics->Register(
-    "streaming_cache_mgr.n_downloads", "Number of objects requested remotely");
+      "streaming_cache_mgr.sz_transfer_ms",
+      "Time spent downloading data by the streaming cache manager");
+  n_downloads = statistics->Register("streaming_cache_mgr.n_downloads",
+                                     "Number of objects requested remotely");
   n_buffer_hits = statistics->Register(
-    "streaming_cache_mgr.n_buffer_hits",
-    "Number of requests served from the buffer");
+      "streaming_cache_mgr.n_buffer_hits",
+      "Number of requests served from the buffer");
   n_buffer_evicts = statistics->Register(
-    "streaming_cache_mgr.n_buffer_evicts",
-    "Number of objects evicted from the buffer");
+      "streaming_cache_mgr.n_buffer_evicts",
+      "Number of objects evicted from the buffer");
   n_buffer_objects = statistics->Register(
-    "streaming_cache_mgr.n_buffer_objects", "Number of objects in the buffer");
+      "streaming_cache_mgr.n_buffer_objects",
+      "Number of objects in the buffer");
   n_buffer_obstacles = statistics->Register(
-    "streaming_cache_mgr.n_buffer_obstacles",
-    "Number of objects that could not be stored in the buffer "
-    "(e.g., too large)");
+      "streaming_cache_mgr.n_buffer_obstacles",
+      "Number of objects that could not be stored in the buffer "
+      "(e.g., too large)");
 }
 
 
 download::DownloadManager *StreamingCacheManager::SelectDownloadManager(
-  const FdInfo &info)
-{
+    const FdInfo &info) {
   if (info.label.IsExternal())
     return external_download_mgr_;
   return regular_download_mgr_;
 }
 
 
-int64_t StreamingCacheManager::Stream(
-  const FdInfo &info,
-  void *buf,
-  uint64_t size,
-  uint64_t offset)
-{
+int64_t StreamingCacheManager::Stream(const FdInfo &info,
+                                      void *buf,
+                                      uint64_t size,
+                                      uint64_t offset) {
   // Note: objects stored in the ring buffer are prepended by their hash
 
   {
@@ -158,9 +155,9 @@ int64_t StreamingCacheManager::Stream(
 
   unsigned char *object = NULL;
   size_t nbytes_in_buffer = 0;
-  if ((info.label.size != CacheManager::kSizeUnknown) &&
-      (info.label.size + sizeof(shash::Any) <= buffer_->GetMaxObjectSize()))
-  {
+  if ((info.label.size != CacheManager::kSizeUnknown)
+      && (info.label.size + sizeof(shash::Any)
+          <= buffer_->GetMaxObjectSize())) {
     nbytes_in_buffer = sizeof(shash::Any) + info.label.size;
     object = reinterpret_cast<unsigned char *>(smalloc(nbytes_in_buffer));
   } else {
@@ -218,8 +215,8 @@ int64_t StreamingCacheManager::Stream(
       perf::Inc(counters_->n_buffer_evicts);
       perf::Dec(counters_->n_buffer_objects);
     }
-    RingBuffer::ObjectHandle_t handle =
-      buffer_->PushFront(object, nbytes_in_buffer);
+    RingBuffer::ObjectHandle_t handle = buffer_->PushFront(object,
+                                                           nbytes_in_buffer);
     buffered_objects_.Insert(info.object_id, handle);
     perf::Inc(counters_->n_buffer_objects);
   }
@@ -230,20 +227,19 @@ int64_t StreamingCacheManager::Stream(
 
 
 StreamingCacheManager::StreamingCacheManager(
-  unsigned max_open_fds,
-  CacheManager *cache_mgr,
-  download::DownloadManager *regular_download_mgr,
-  download::DownloadManager *external_download_mgr,
-  size_t buffer_size,
-  perf::Statistics *statistics)
-  : cache_mgr_(cache_mgr)
-  , regular_download_mgr_(regular_download_mgr)
-  , external_download_mgr_(external_download_mgr)
-  , fd_table_(max_open_fds, FdInfo())
-  , counters_(new Counters(statistics))
-{
-  lock_fd_table_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    unsigned max_open_fds,
+    CacheManager *cache_mgr,
+    download::DownloadManager *regular_download_mgr,
+    download::DownloadManager *external_download_mgr,
+    size_t buffer_size,
+    perf::Statistics *statistics)
+    : cache_mgr_(cache_mgr)
+    , regular_download_mgr_(regular_download_mgr)
+    , external_download_mgr_(external_download_mgr)
+    , fd_table_(max_open_fds, FdInfo())
+    , counters_(new Counters(statistics)) {
+  lock_fd_table_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_fd_table_, NULL);
   assert(retval == 0);
 
@@ -252,8 +248,8 @@ StreamingCacheManager::StreamingCacheManager(
 
   buffer_ = new RingBuffer(buffer_size);
   buffered_objects_.Init(16, shash::Any(), hasher_any);
-  lock_buffer_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_buffer_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_buffer_, NULL);
   assert(retval == 0);
 }
@@ -287,9 +283,8 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
   if (fd_in_cache_mgr != -ENOENT)
     return fd_in_cache_mgr;
 
-  if (object.label.IsCatalog() || object.label.IsPinned() ||
-      object.label.IsCertificate())
-  {
+  if (object.label.IsCatalog() || object.label.IsPinned()
+      || object.label.IsCertificate()) {
     return -ENOENT;
   }
 
@@ -353,9 +348,8 @@ int StreamingCacheManager::Close(int fd) {
   return 0;
 }
 
-int64_t StreamingCacheManager::Pread(
-  int fd, void *buf, uint64_t size, uint64_t offset)
-{
+int64_t StreamingCacheManager::Pread(int fd, void *buf, uint64_t size,
+                                     uint64_t offset) {
   FdInfo info;
   {
     MutexLockGuard lock_guard(lock_fd_table_);
@@ -417,8 +411,8 @@ int StreamingCacheManager::DoRestoreState(void *data) {
 
   SavedState *state = reinterpret_cast<SavedState *>(data);
 
-  int new_backing_root_fd =
-    cache_mgr_->RestoreState(-1, state->state_backing_cachemgr);
+  int new_backing_root_fd = cache_mgr_->RestoreState(
+      -1, state->state_backing_cachemgr);
   fd_table_.AssignFrom(*state->fd_table);
 
   int new_root_fd = -1;

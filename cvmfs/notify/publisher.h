@@ -26,7 +26,7 @@ class Publisher {
    *
    * The message body and the message topic are given as strings
    */
-  virtual bool Publish(const std::string& msg, const std::string& topic) = 0;
+  virtual bool Publish(const std::string &msg, const std::string &topic) = 0;
 
   /**
    * Perform (optional) finalization tasks after publishing the message

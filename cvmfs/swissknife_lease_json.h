@@ -5,9 +5,9 @@
 #ifndef CVMFS_SWISSKNIFE_LEASE_JSON_H_
 #define CVMFS_SWISSKNIFE_LEASE_JSON_H_
 
-#include "swissknife_lease_curl.h"
-
 #include <string>
+
+#include "swissknife_lease_curl.h"
 
 enum LeaseReply {
   kLeaseReplySuccess,
@@ -15,8 +15,8 @@ enum LeaseReply {
   kLeaseReplyFailure
 };
 
-LeaseReply ParseAcquireReply(const CurlBuffer& buffer,
-                             std::string* session_token);
-LeaseReply ParseDropReply(const CurlBuffer& buffer);
+LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
+                             std::string *session_token);
+LeaseReply ParseDropReply(const CurlBuffer &buffer);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_JSON_H_

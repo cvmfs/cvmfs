@@ -42,33 +42,30 @@ class EventHandler {
    * in the case a file was delete - useful for continuously watching a file
    * which may be deleted and recreated
    */
-  virtual bool Handle(const std::string& file_path,
+  virtual bool Handle(const std::string &file_path,
                       Event event,
-                      bool* clear_handler) = 0;
+                      bool *clear_handler) = 0;
 };
 
 struct WatchRecord {
-  WatchRecord() : file_path_(), handler_(NULL) {}
+  WatchRecord() : file_path_(), handler_(NULL) { }
 
-  WatchRecord(const std::string& path,
-              file_watcher::EventHandler* h)
-      : file_path_(path),
-        handler_(h) {}
+  WatchRecord(const std::string &path, file_watcher::EventHandler *h)
+      : file_path_(path), handler_(h) { }
 
   std::string file_path_;
-  file_watcher::EventHandler* handler_;
+  file_watcher::EventHandler *handler_;
 };
 
 class FileWatcher {
  public:
-  typedef std::map<std::string, EventHandler*> HandlerMap;
+  typedef std::map<std::string, EventHandler *> HandlerMap;
 
   FileWatcher();
   virtual ~FileWatcher();
   static FileWatcher *Create();
 
-  void RegisterHandler(const std::string& file_path,
-                       EventHandler* handler);
+  void RegisterHandler(const std::string &file_path, EventHandler *handler);
 
   bool Spawn();
 
@@ -80,18 +77,17 @@ class FileWatcher {
   static const unsigned kMaxDelay;
   static const unsigned kResetDelay;
 
-  void RegisterFilter(const std::string& file_path,
-                      EventHandler* handler);
+  void RegisterFilter(const std::string &file_path, EventHandler *handler);
 
-  virtual bool RunEventLoop(const HandlerMap& handler_map,
-                            int read_pipe, int write_pipe) = 0;
+  virtual bool RunEventLoop(const HandlerMap &handler_map, int read_pipe,
+                            int write_pipe) = 0;
 
-  virtual int TryRegisterFilter(const std::string& file_path) = 0;
+  virtual int TryRegisterFilter(const std::string &file_path) = 0;
 
   std::map<int, WatchRecord> watch_records_;
 
  private:
-  static void* BackgroundThread(void* d);
+  static void *BackgroundThread(void *d);
 
   HandlerMap handler_map_;
 

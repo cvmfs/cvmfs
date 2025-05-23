@@ -4,7 +4,6 @@
 
 #include "upload.h"
 
-
 #include <vector>
 
 #include "util/concurrency.h"
@@ -13,7 +12,7 @@
 namespace upload {
 
 Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
-                                  perf::StatisticsTemplate *statistics) {
+                            perf::StatisticsTemplate *statistics) {
   Spooler *result = new Spooler(spooler_definition);
   if (!result->Initialize(statistics)) {
     delete result;
@@ -23,7 +22,7 @@ Spooler *Spooler::Construct(const SpoolerDefinition &spooler_definition,
 }
 
 Spooler::Spooler(const SpoolerDefinition &spooler_definition)
-    : spooler_definition_(spooler_definition) {}
+    : spooler_definition_(spooler_definition) { }
 
 Spooler::~Spooler() {
   FinalizeSession(false);
@@ -49,8 +48,8 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   }
 
   // configure the file processor context
-  ingestion_pipeline_ =
-      new IngestionPipeline(uploader_.weak_ref(), spooler_definition_);
+  ingestion_pipeline_ = new IngestionPipeline(uploader_.weak_ref(),
+                                              spooler_definition_);
   ingestion_pipeline_->RegisterListener(&Spooler::ProcessingCallback, this);
   ingestion_pipeline_->Spawn();
 
@@ -58,9 +57,7 @@ bool Spooler::Initialize(perf::StatisticsTemplate *statistics) {
   return true;
 }
 
-bool Spooler::Create() {
-  return uploader_->Create();
-}
+bool Spooler::Create() { return uploader_->Create(); }
 
 void Spooler::Process(IngestionSource *source, const bool allow_chunking) {
   ingestion_pipeline_->Process(source, allow_chunking);
@@ -125,9 +122,7 @@ bool Spooler::Peek(const std::string &path) const {
   return uploader_->Peek(path);
 }
 
-bool Spooler::Mkdir(const std::string &path) {
-  return uploader_->Mkdir(path);
-}
+bool Spooler::Mkdir(const std::string &path) { return uploader_->Mkdir(path); }
 
 bool Spooler::PlaceBootstrappingShortcut(const shash::Any &object) const {
   assert(!object.IsNull());
@@ -150,8 +145,7 @@ void Spooler::WaitForUpload() const {
 bool Spooler::FinalizeSession(bool commit, const std::string &old_root_hash,
                               const std::string &new_root_hash,
                               const RepositoryTag &tag) const {
-  return uploader_->FinalizeSession(commit, old_root_hash,
-                                    new_root_hash, tag);
+  return uploader_->FinalizeSession(commit, old_root_hash, new_root_hash, tag);
 }
 
 unsigned int Spooler::GetNumberOfErrors() const {

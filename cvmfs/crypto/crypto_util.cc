@@ -4,10 +4,9 @@
 
 #include "crypto/crypto_util.h"
 
-#include <pthread.h>
-
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <pthread.h>
 
 #include <cassert>
 
@@ -23,9 +22,8 @@ namespace {
 
 pthread_mutex_t *gLibcryptoLocks = NULL;
 
-static void CallbackLibcryptoLock(int mode, int type,
-                                  const char * /* file */, int /* line */)
-{
+static void CallbackLibcryptoLock(int mode, int type, const char * /* file */,
+                                  int /* line */) {
   int retval;
 
   if (mode & CRYPTO_LOCK) {
@@ -44,9 +42,7 @@ static unsigned long CallbackLibcryptoThreadId() {  // NOLINT(runtime/int)
 #endif
 
 
-void crypto::InitRng() {
-  RAND_poll();
-}
+void crypto::InitRng() { RAND_poll(); }
 
 
 void crypto::SetupLibcryptoMt() {
@@ -54,8 +50,8 @@ void crypto::SetupLibcryptoMt() {
   if (gLibcryptoLocks != NULL)
     return;
 
-  gLibcryptoLocks = static_cast<pthread_mutex_t *>(OPENSSL_malloc(
-    CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
+  gLibcryptoLocks = static_cast<pthread_mutex_t *>(
+      OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t)));
   for (int i = 0; i < CRYPTO_num_locks(); ++i) {
     int retval = pthread_mutex_init(&(gLibcryptoLocks[i]), NULL);
     assert(retval == 0);

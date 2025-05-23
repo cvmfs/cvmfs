@@ -14,7 +14,7 @@
 #include "xattr.h"
 
 namespace {
-const char* test_file_hash = "b026324c6904b2a9cb4b88d6d61c81d1000000";
+const char *test_file_hash = "b026324c6904b2a9cb4b88d6d61c81d1000000";
 
 enum class ItemType : int {
   File,
@@ -44,7 +44,8 @@ DirSpec MakeBaseSpec() {
     const auto parent = dirs[parent_index];
 
     // Are we generating a file or a directory?
-    const auto entry_type = *rc::gen::arbitrary<size_t>() % 2; // 0 == file, 1 == dir,
+    const auto entry_type = *rc::gen::arbitrary<size_t>()
+                            % 2;  // 0 == file, 1 == dir,
     if (entry_type == static_cast<int>(ItemType::File)) {
       const auto file_name = "file" + std::to_string(i);
       const auto file_size = *rc::gen::arbitrary<size_t>();
@@ -59,38 +60,35 @@ DirSpec MakeBaseSpec() {
 }
 
 // TODO(radu): Randomly modify the input spec
-DirSpec ModifySpec(const DirSpec& in) {
+DirSpec ModifySpec(const DirSpec &in) {
   DirSpec out(in);
 
   // Choose number of changes to perform
   const auto num_changes = *rc::gen::arbitrary<size_t>();
 
   for (auto i = 0u; i < num_changes; ++i) {
-    const auto change_type = *rc::gen::arbitrary<size_t>() % 4; // 0 == AddFile , 1 == AddDir etc.
+    const auto change_type = *rc::gen::arbitrary<size_t>()
+                             % 4;  // 0 == AddFile , 1 == AddDir etc.
     switch (static_cast<ChangeType>(change_type)) {
-      case ChangeType::AddFile:
-      {
+      case ChangeType::AddFile: {
         const auto dirs = out.GetDirs();
         const auto parent_index = *rc::gen::arbitrary<size_t>() % dirs.size();
         const auto parent = dirs[parent_index];
         const auto file_name = "new_file" + std::to_string(i);
         const auto file_size = *rc::gen::arbitrary<size_t>();
         RC_ASSERT(out.AddFile(file_name, parent, test_file_hash, file_size));
-      }
-      break;
-      case ChangeType::AddDir:
-      {
+      } break;
+      case ChangeType::AddDir: {
         const auto dirs = out.GetDirs();
         const auto parent_index = *rc::gen::arbitrary<size_t>() % dirs.size();
         const auto parent = dirs[parent_index];
         const auto dir_name = "new_dir" + std::to_string(i);
         RC_ASSERT(out.AddDirectory(dir_name, parent, 1));
-      }
-      break;
-      case ChangeType::RemoveItem:
-      {
+      } break;
+      case ChangeType::RemoveItem: {
         if (out.NumItems() > 0) {
-          const auto item_index = *rc::gen::arbitrary<size_t>() % out.NumItems();
+          const auto item_index = *rc::gen::arbitrary<size_t>()
+                                  % out.NumItems();
           size_t idx = 0;
           auto it = out.items().begin();
           while (idx < item_index) {
@@ -99,8 +97,7 @@ DirSpec ModifySpec(const DirSpec& in) {
           }
           out.RemoveItemRec(it->first);
         }
-      }
-      break;
+      } break;
       case ChangeType::ModifyFile:
         // TODO(radu): Implement file content modifications
         break;
@@ -113,7 +110,7 @@ DirSpec ModifySpec(const DirSpec& in) {
   return out;
 }
 
-receiver::Params MakeMergeToolParams(const std::string& name) {
+receiver::Params MakeMergeToolParams(const std::string &name) {
   receiver::Params params;
 
   const std::string sandbox_root = GetCurrentWorkingDirectory();
@@ -142,7 +139,7 @@ receiver::Params MakeMergeToolParams(const std::string& name) {
 
 }  // namespace
 
-class T_CatalogMergeTool : public ::testing::Test {};
+class T_CatalogMergeTool : public ::testing::Test { };
 
 /**
  * This is a basic "what goes in, must also come out" test, implemented with
@@ -152,11 +149,14 @@ class T_CatalogMergeTool : public ::testing::Test {};
  *    the MakeBaseSpec function (state_1)
  * 2. The DirSpec object created at the previous step is randomly modified
  *    in the ModifySpec function (state_2)
- * 3. The two DirSpec objects are applied to the CatalogTestTool as sequential "states" of
- *    of the test repository. The CatalogTestTool object will create catalogs corresponding
-      to these states.
- * 4. A CatalogMergeTool is created to merge the changes of state_2 - state_1 onto state_1
- *    The resulting catalog, corresponding to state_3 should be equivalent to state_2.
+ * 3. The two DirSpec objects are applied to the CatalogTestTool as sequential
+ "states" of
+ *    of the test repository. The CatalogTestTool object will create catalogs
+ corresponding to these states.
+ * 4. A CatalogMergeTool is created to merge the changes of state_2 - state_1
+ onto state_1
+ *    The resulting catalog, corresponding to state_3 should be equivalent to
+ state_2.
  *
  * Note: This testing strategy can be later expanded to to a three-way merge.
  */

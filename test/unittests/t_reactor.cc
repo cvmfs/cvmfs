@@ -18,46 +18,45 @@ using namespace receiver;  // NOLINT
 
 class MockedPayloadProcessor : public PayloadProcessor {
  public:
-  MockedPayloadProcessor() : PayloadProcessor() {}
+  MockedPayloadProcessor() : PayloadProcessor() { }
 
  protected:
   virtual Result Initialize() { return kSuccess; }
 
   virtual Result Finalize() { return kSuccess; }
 
-  virtual void Upload(const std::string& source,
-                      const std::string& dest) {}
+  virtual void Upload(const std::string &source, const std::string &dest) { }
 
-  virtual bool WriteFile(int /*fd*/, const void* const /*buf*/,
+  virtual bool WriteFile(int /*fd*/, const void * const /*buf*/,
                          size_t /*buf_size*/) {
     // NO OP
     return true;
   }
 
-  virtual void ConsumerEventCallback(
-    const ObjectPackBuild::Event& /*event*/) {}
+  virtual void ConsumerEventCallback(const ObjectPackBuild::Event & /*event*/) {
+  }
 };
 
 class MockedReactor : public Reactor {
  public:
-  MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) {}
+  MockedReactor(int fdin, int fdout) : Reactor(fdin, fdout) { }
 
  protected:
-  PayloadProcessor* MakePayloadProcessor() {
+  PayloadProcessor *MakePayloadProcessor() {
     return new MockedPayloadProcessor();
   }
 };
 
 class T_Reactor : public ::testing::Test {
  protected:
-  T_Reactor() : ready_(1, 1), thread_() {}
+  T_Reactor() : ready_(1, 1), thread_() { }
 
   virtual void SetUp() {
     ASSERT_NE(-1, pipe(to_reactor_));
     ASSERT_NE(-1, pipe(from_reactor_));
 
     ASSERT_EQ(0, pthread_create(&thread_, NULL, T_Reactor::ReactorFunction,
-                                static_cast<void*>(this)));
+                                static_cast<void *>(this)));
 
     ASSERT_EQ(true, ready_.Dequeue());
   }
@@ -68,8 +67,8 @@ class T_Reactor : public ::testing::Test {
     close(from_reactor_[0]);
   }
 
-  static void* ReactorFunction(void* data) {
-    T_Reactor* ctx = static_cast<T_Reactor*>(data);
+  static void *ReactorFunction(void *data) {
+    T_Reactor *ctx = static_cast<T_Reactor *>(data);
 
     ctx->ready_.Enqueue(true);
 
@@ -102,8 +101,8 @@ TEST_F(T_Reactor, kEcho_kQuit) {
 }
 
 TEST_F(T_Reactor, kGenerateToken_kQuit) {
-  const std::string req_data =
-      "{\"key_id\":\"some_key\",\"path\":\"some_path\",\"max_lease_time\":10}";
+  const std::string req_data = "{\"key_id\":\"some_key\",\"path\":\"some_"
+                               "path\",\"max_lease_time\":10}";
 
   ASSERT_TRUE(
       Reactor::WriteRequest(to_reactor_[1], Reactor::kGenerateToken, req_data));
@@ -125,8 +124,8 @@ TEST_F(T_Reactor, FullCycle) {
   const std::string key_id = "some_key";
   const std::string path = "some_path";
 
-  const std::string req_data = "{\"key_id\":\"" + key_id + "\",\"path\":\"" +
-                               path + "\",\"max_lease_time\":10}";
+  const std::string req_data = "{\"key_id\":\"" + key_id + "\",\"path\":\""
+                               + path + "\",\"max_lease_time\":10}";
 
   // Generate token
   ASSERT_TRUE(
@@ -141,18 +140,18 @@ TEST_F(T_Reactor, FullCycle) {
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply
-    const JSON* token_json =
-        JsonDocument::SearchInObject(json_reply->root(), "token", JSON_STRING);
+    const JSON *token_json = JsonDocument::SearchInObject(json_reply->root(),
+                                                          "token", JSON_STRING);
     ASSERT_TRUE(token_json);
     token = token_json->string_value;
 
-    const JSON* public_id_json =
-        JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
+    const JSON *public_id_json = JsonDocument::SearchInObject(
+        json_reply->root(), "id", JSON_STRING);
     ASSERT_TRUE(public_id_json);
     public_id = public_id_json->string_value;
 
-    const JSON* secret_json =
-        JsonDocument::SearchInObject(json_reply->root(), "secret", JSON_STRING);
+    const JSON *secret_json = JsonDocument::SearchInObject(
+        json_reply->root(), "secret", JSON_STRING);
     ASSERT_TRUE(secret_json);
     secret = secret_json->string_value;
   }
@@ -168,8 +167,8 @@ TEST_F(T_Reactor, FullCycle) {
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply
-    const JSON* id_json =
-        JsonDocument::SearchInObject(json_reply->root(), "id", JSON_STRING);
+    const JSON *id_json = JsonDocument::SearchInObject(json_reply->root(), "id",
+                                                       JSON_STRING);
     ASSERT_TRUE(id_json);
     ASSERT_EQ(public_id, id_json->string_value);
   }
@@ -190,8 +189,8 @@ TEST_F(T_Reactor, FullCycle) {
     ASSERT_TRUE(json_reply.IsValid());
 
     // Extract the token, public_id and secret from the reply
-    const JSON* path_json =
-        JsonDocument::SearchInObject(json_reply->root(), "path", JSON_STRING);
+    const JSON *path_json = JsonDocument::SearchInObject(json_reply->root(),
+                                                         "path", JSON_STRING);
     ASSERT_TRUE(path_json);
     ASSERT_EQ(path, path_json->string_value);
   }
@@ -213,10 +212,10 @@ TEST_F(T_Reactor, FullCycle) {
     shash::Any digest(shash::kSha1);
     serializer.GetDigest(&digest);
 
-    const std::string request = "{\"path\":\"some_path\",\"digest\":\"" +
-                                digest.ToString(false) +
-                                "\",\"header_size\":" +
-                                StringifyInt(serializer.GetHeaderSize()) + "}";
+    const std::string request = "{\"path\":\"some_path\",\"digest\":\""
+                                + digest.ToString(false) + "\",\"header_size\":"
+                                + StringifyInt(serializer.GetHeaderSize())
+                                + "}";
 
     std::vector<unsigned char> payload(0);
     std::vector<unsigned char> buf(4096);

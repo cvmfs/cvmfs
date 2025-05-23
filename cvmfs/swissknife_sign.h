@@ -17,7 +17,7 @@ namespace swissknife {
 
 class CommandSign : public Command {
  public:
-  ~CommandSign() {}
+  ~CommandSign() { }
   virtual std::string GetName() const { return "sign"; }
   virtual std::string GetDescription() const {
     return "Adds a signature to the repository manifest.";

@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <alloca.h>
+#include <gtest/gtest.h>
 #include <unistd.h>
 
 #include "authz/authz.h"
@@ -17,11 +16,9 @@
 
 class TestAuthzFetcher : public AuthzFetcher {
  public:
-  virtual AuthzStatus Fetch(
-    const QueryInfo &query_info,
-    AuthzToken *authz_token,
-    unsigned *ttl)
-  {
+  virtual AuthzStatus Fetch(const QueryInfo &query_info,
+                            AuthzToken *authz_token,
+                            unsigned *ttl) {
     *ttl = next_ttl;
     *authz_token = next_token;
     return next_status;
@@ -36,13 +33,11 @@ class TestAuthzFetcher : public AuthzFetcher {
 class T_AuthzSession : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    authz_session_mgr_ =
-      AuthzSessionManager::Create(&authz_fetcher_, &statistics_);
+    authz_session_mgr_ = AuthzSessionManager::Create(&authz_fetcher_,
+                                                     &statistics_);
   }
 
-  virtual void TearDown() {
-    delete authz_session_mgr_;
-  }
+  virtual void TearDown() { delete authz_session_mgr_; }
 
   AuthzSessionManager *authz_session_mgr_;
   TestAuthzFetcher authz_fetcher_;
@@ -80,10 +75,10 @@ TEST_F(T_AuthzSession, LookupSessionKey) {
   AuthzSessionManager::SessionKey session_key;
   AuthzSessionManager::PidKey pid_key;
   EXPECT_FALSE(
-    authz_session_mgr_->LookupSessionKey(-1, &pid_key, &session_key));
+      authz_session_mgr_->LookupSessionKey(-1, &pid_key, &session_key));
 
-  EXPECT_TRUE(authz_session_mgr_->LookupSessionKey(
-    getpid(), &pid_key, &session_key));
+  EXPECT_TRUE(
+      authz_session_mgr_->LookupSessionKey(getpid(), &pid_key, &session_key));
   EXPECT_EQ(getpid(), pid_key.pid);
   EXPECT_EQ(getsid(0), pid_key.sid);
   EXPECT_EQ(getuid(), pid_key.uid);
@@ -108,7 +103,7 @@ TEST_F(T_AuthzSession, LookupAuthzData) {
   authz_fetcher_.next_status = kAuthzOk;
   authz_fetcher_.next_ttl = 1000;
   EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "A", &authz_data));
+      pid_key, session_key, "A", &authz_data));
   EXPECT_EQ("A", authz_data.membership);
   EXPECT_EQ(kAuthzOk, authz_data.status);
   EXPECT_LE(platform_monotonic_time() + authz_fetcher_.next_ttl,
@@ -117,23 +112,23 @@ TEST_F(T_AuthzSession, LookupAuthzData) {
   authz_fetcher_.next_status = kAuthzNotFound;
   // Cached
   EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "A", &authz_data));
+      pid_key, session_key, "A", &authz_data));
   // Membership changed
   EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "B", &authz_data));
+      pid_key, session_key, "B", &authz_data));
   session_key.sid = 1;
   pid_key.pid = 1;
   EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "A", &authz_data));
+      pid_key, session_key, "A", &authz_data));
 
   authz_fetcher_.next_status = kAuthzOk;
   // Negative cache
   EXPECT_FALSE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "A", &authz_data));
-  authz_session_mgr_->SweepCreds(platform_monotonic_time() +
-                                 authz_fetcher_.next_ttl);
+      pid_key, session_key, "A", &authz_data));
+  authz_session_mgr_->SweepCreds(platform_monotonic_time()
+                                 + authz_fetcher_.next_ttl);
   EXPECT_TRUE(authz_session_mgr_->LookupAuthzData(
-    pid_key, session_key, "A", &authz_data));
+      pid_key, session_key, "A", &authz_data));
 }
 
 
@@ -161,7 +156,6 @@ TEST_F(T_AuthzSession, ClearSessionCache) {
   EXPECT_FALSE(authz_session_mgr_->IsMemberOf(1, "A"));
   EXPECT_EQ(1, statistics_.Lookup("authz.no_session")->Get());
 }
-
 
 
 TEST_F(T_AuthzSession, GetTokenCopy) {

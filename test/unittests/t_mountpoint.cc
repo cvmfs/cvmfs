@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <sys/param.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -214,10 +213,12 @@ TEST_F(T_MountPoint, TieredCacheMgr) {
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
-    EXPECT_EQ(kRamCacheManager, reinterpret_cast<TieredCacheManager *>(
-      fs->cache_mgr())->upper_->id());
-    EXPECT_EQ(kPosixCacheManager, reinterpret_cast<TieredCacheManager *>(
-      fs->cache_mgr())->lower_->id());
+    EXPECT_EQ(
+        kRamCacheManager,
+        reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->upper_->id());
+    EXPECT_EQ(
+        kPosixCacheManager,
+        reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->lower_->id());
     EXPECT_FALSE(fs->cache_mgr()->LoadBreadcrumb(fs_info_.name).IsValid());
   }
 
@@ -269,9 +270,9 @@ TEST_F(T_MountPoint, TieredComplex) {
     EXPECT_EQ("tiered", fs->cache_mgr_instance());
     EXPECT_EQ(kTieredCacheManager, fs->cache_mgr()->id());
     TieredCacheManager *upper = reinterpret_cast<TieredCacheManager *>(
-      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->upper_);
+        reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->upper_);
     TieredCacheManager *lower = reinterpret_cast<TieredCacheManager *>(
-      reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->lower_);
+        reinterpret_cast<TieredCacheManager *>(fs->cache_mgr())->lower_);
     EXPECT_EQ(kRamCacheManager, upper->upper_->id());
     EXPECT_EQ(kRamCacheManager, upper->lower_->id());
     EXPECT_EQ(kPosixCacheManager, lower->upper_->id());
@@ -317,9 +318,9 @@ TEST_F(T_MountPoint, CacheSettings) {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(tmp_path_ + "/unit-test", fs->workspace());
-    EXPECT_EQ(tmp_path_ + "/alien",
-              reinterpret_cast<PosixCacheManager *>(
-                fs->cache_mgr())->cache_path());
+    EXPECT_EQ(
+        tmp_path_ + "/alien",
+        reinterpret_cast<PosixCacheManager *>(fs->cache_mgr())->cache_path());
   }
 
   fs_info_.type = FileSystem::kFsFuse;
@@ -327,9 +328,9 @@ TEST_F(T_MountPoint, CacheSettings) {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_EQ(".", fs->workspace());
-    EXPECT_EQ(tmp_path_ + "/alien",
-              reinterpret_cast<PosixCacheManager *>(
-                fs->cache_mgr())->cache_path());
+    EXPECT_EQ(
+        tmp_path_ + "/alien",
+        reinterpret_cast<PosixCacheManager *>(fs->cache_mgr())->cache_path());
   }
 
   RemoveTree(tmp_path_ + "/unit-test");
@@ -341,8 +342,9 @@ TEST_F(T_MountPoint, CacheSettings) {
     EXPECT_EQ(loader::kFailOk, fs->boot_status());
     EXPECT_TRUE(fs->IsNfsSource());
     EXPECT_TRUE(fs->IsHaNfsSource());
-    EXPECT_EQ(".", reinterpret_cast<PosixCacheManager *>(
-      fs->cache_mgr())->cache_path());
+    EXPECT_EQ(
+        ".",
+        reinterpret_cast<PosixCacheManager *>(fs->cache_mgr())->cache_path());
     EXPECT_EQ(".", fs->workspace());
     EXPECT_EQ(tmp_path_ + "/nfs", fs->nfs_maps_dir_);
   }
@@ -429,9 +431,9 @@ TEST_F(T_MountPoint, LockWorkspace) {
   int retval = waitpid(pid, &stat_loc, 0);
   EXPECT_NE(retval, -1);
   EXPECT_TRUE(WIFEXITED(stat_loc));
-  EXPECT_TRUE(((fs01->boot_status() == 0) && (WEXITSTATUS(stat_loc) == 1)) ||
-              ((fs01->boot_status() == loader::kFailLockWorkspace) &&
-                  (WEXITSTATUS(stat_loc) == 0)));
+  EXPECT_TRUE(((fs01->boot_status() == 0) && (WEXITSTATUS(stat_loc) == 1))
+              || ((fs01->boot_status() == loader::kFailLockWorkspace)
+                  && (WEXITSTATUS(stat_loc) == 0)));
   ClosePipe(pipe_sync);
 }
 
@@ -543,9 +545,8 @@ TEST_F(T_MountPoint, Blacklist) {
   RemoveTree("cvmfs_ut_cache");
 
   string bad_revision = "<keys.cern.ch 1000";
-  EXPECT_TRUE(SafeWriteToFile(bad_revision,
-                              repo_path_ + "/config.test/etc/cvmfs/blacklist",
-                              0600));
+  EXPECT_TRUE(SafeWriteToFile(
+      bad_revision, repo_path_ + "/config.test/etc/cvmfs/blacklist", 0600));
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());
@@ -553,11 +554,10 @@ TEST_F(T_MountPoint, Blacklist) {
     EXPECT_EQ(loader::kFailRevisionBlacklisted, mp->boot_status());
   }
 
-  string bad_fingerprint =
-    "00:7C:FA:EE:1A:2B:98:74:5D:14:A6:25:4E:C4:40:BC:BD:44:47:A3\n";
-  EXPECT_TRUE(SafeWriteToFile(bad_fingerprint,
-                              repo_path_ + "/config.test/etc/cvmfs/blacklist",
-                              0600));
+  string bad_fingerprint = "00:7C:FA:EE:1A:2B:98:74:5D:14:A6:25:4E:C4:40:BC:BD:"
+                           "44:47:A3\n";
+  EXPECT_TRUE(SafeWriteToFile(
+      bad_fingerprint, repo_path_ + "/config.test/etc/cvmfs/blacklist", 0600));
   {
     UniquePtr<FileSystem> fs(FileSystem::Create(fs_info_));
     ASSERT_EQ(loader::kFailOk, fs->boot_status());

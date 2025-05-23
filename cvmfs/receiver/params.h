@@ -12,7 +12,7 @@
 
 namespace receiver {
 
-std::string GetSpoolerTempDir(const std::string& spooler_config);
+std::string GetSpoolerTempDir(const std::string &spooler_config);
 
 struct Params {
   std::string stratum0;
@@ -38,7 +38,7 @@ struct Params {
   bool upload_stats_db;
 };
 
-bool GetParamsFromFile(const std::string& repo_name, Params* params);
+bool GetParamsFromFile(const std::string &repo_name, Params *params);
 
 }  // namespace receiver
 

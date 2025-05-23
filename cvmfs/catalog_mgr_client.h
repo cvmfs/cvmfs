@@ -5,14 +5,13 @@
 #ifndef CVMFS_CATALOG_MGR_CLIENT_H_
 #define CVMFS_CATALOG_MGR_CLIENT_H_
 
-#include "catalog_mgr.h"
-
 #include <inttypes.h>
 
 #include <map>
 #include <string>
 
 #include "backoff.h"
+#include "catalog_mgr.h"
 #include "crypto/hash.h"
 #include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
@@ -26,7 +25,7 @@ class MountPoint;
 namespace perf {
 class Counter;
 class Statistics;
-}
+}  // namespace perf
 namespace signature {
 class SignatureManager;
 }
@@ -81,16 +80,16 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   virtual void StageNestedCatalogByHash(const shash::Any &hash,
                                         const PathString &mountpoint);
   void UnloadCatalog(const catalog::Catalog *catalog);
-  catalog::Catalog* CreateCatalog(const PathString &mountpoint,
-                                  const shash::Any  &catalog_hash,
+  catalog::Catalog *CreateCatalog(const PathString &mountpoint,
+                                  const shash::Any &catalog_hash,
                                   catalog::Catalog *parent_catalog);
   void ActivateCatalog(catalog::Catalog *catalog);
 
  private:
   LoadReturn FetchCatalogByHash(const shash::Any &hash,
-                           const std::string &name,
-                           const std::string &alt_catalog_path,
-                           std::string *catalog_path);
+                                const std::string &name,
+                                const std::string &alt_catalog_path,
+                                std::string *catalog_path);
 
   /**
    * Required for unpinning
@@ -104,11 +103,11 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   cvmfs::Fetcher *fetcher_;
   signature::SignatureManager *signature_mgr_;
   std::string workspace_;
-  bool offline_mode_;  /**< cached copy used because there is no network */
+  bool offline_mode_; /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
-  shash::Any fixed_root_catalog_;      /**< fixed root hash */
-  bool fixed_alt_root_catalog_;  /**< fixed root hash but alternative url */
+  shash::Any fixed_root_catalog_; /**< fixed root hash */
+  bool fixed_alt_root_catalog_;   /**< fixed root hash but alternative url */
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;
   perf::Counter *n_certificate_misses_;
@@ -126,12 +125,9 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
  */
 class CachedManifestEnsemble : public manifest::ManifestEnsemble {
  public:
-  CachedManifestEnsemble(
-    CacheManager *cache_mgr,
-    ClientCatalogManager *catalog_mgr)
-    : cache_mgr_(cache_mgr)
-    , catalog_mgr_(catalog_mgr)
-  { }
+  CachedManifestEnsemble(CacheManager *cache_mgr,
+                         ClientCatalogManager *catalog_mgr)
+      : cache_mgr_(cache_mgr), catalog_mgr_(catalog_mgr) { }
   void FetchCertificate(const shash::Any &hash);
 
  private:

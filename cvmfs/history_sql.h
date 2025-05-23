@@ -33,14 +33,15 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
-  bool CompactDatabase() const { return true; }  // no implementation specific
-                                                 // database compaction.
+  bool CompactDatabase() const {
+    return true;
+  }  // no implementation specific
+     // database compaction.
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<HistoryDatabase>;
-  HistoryDatabase(const std::string  &filename,
-                  const OpenMode      open_mode) :
-    sqlite::Database<HistoryDatabase>(filename, open_mode) {}
+  HistoryDatabase(const std::string &filename, const OpenMode open_mode)
+      : sqlite::Database<HistoryDatabase>(filename, open_mode) { }
 
  private:
   bool CreateTagsTable();
@@ -56,7 +57,7 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 //------------------------------------------------------------------------------
 
 
-class SqlHistory : public sqlite::Sql {};
+class SqlHistory : public sqlite::Sql { };
 
 
 /**
@@ -92,7 +93,7 @@ class SqlHistory : public sqlite::Sql {};
  *
  * @param MixinT  the class that should gain RetrieveTag()'s functionality
  */
-template <class MixinT>
+template<class MixinT>
 class SqlRetrieveTag : public MixinT {
  public:
   /**
@@ -103,15 +104,14 @@ class SqlRetrieveTag : public MixinT {
    */
   History::Tag RetrieveTag() const {
     History::Tag result;
-    result.name        = MixinT::RetrieveString(0);
-    result.root_hash   = shash::MkFromHexPtr(
-                           shash::HexPtr(MixinT::RetrieveString(1)),
-                           shash::kSuffixCatalog);
-    result.revision    = MixinT::RetrieveInt64(2);
-    result.timestamp   = MixinT::RetrieveInt64(3);
+    result.name = MixinT::RetrieveString(0);
+    result.root_hash = shash::MkFromHexPtr(
+        shash::HexPtr(MixinT::RetrieveString(1)), shash::kSuffixCatalog);
+    result.revision = MixinT::RetrieveInt64(2);
+    result.timestamp = MixinT::RetrieveInt64(3);
     result.description = MixinT::RetrieveString(5);
-    result.size        = MixinT::RetrieveInt64(6);
-    result.branch      = MixinT::RetrieveString(7);
+    result.size = MixinT::RetrieveInt64(6);
+    result.branch = MixinT::RetrieveString(7);
     return result;
   }
 };
@@ -199,12 +199,12 @@ class SqlInsertBranch : public SqlHistory {
  * @param offset  offset for SQLite placeholders, if used inside other complex
  *                SQL queries with preceding placeholders
  */
-template <class MixinT, int offset = 0>
+template<class MixinT, int offset = 0>
 class SqlRollback : public MixinT {
  public:
   bool BindTargetTag(const History::Tag &target_tag) {
-    return MixinT::BindInt64(offset + 1, target_tag.revision) &&
-           MixinT::BindText(offset + 2, target_tag.name);
+    return MixinT::BindInt64(offset + 1, target_tag.revision)
+           && MixinT::BindText(offset + 2, target_tag.name);
   }
 };
 

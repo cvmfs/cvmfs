@@ -14,9 +14,7 @@ class T_BigQueue : public ::testing::Test {
     EXPECT_GE(queue_->capacity(), queue_->size());
   }
 
-  virtual void TearDown() {
-    delete queue_;
-  }
+  virtual void TearDown() { delete queue_; }
 
   static const unsigned kNumSmall = 1000;
   static const unsigned kNumBig = 10000000;
@@ -67,26 +65,26 @@ TEST_F(T_BigQueue, BigCycle) {
 
 TEST_F(T_BigQueue, JigSaw) {
   unsigned N = kNumSmall;
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     queue_->PushBack(i);
   }
-  EXPECT_EQ(queue_->size(), N/2);
+  EXPECT_EQ(queue_->size(), N / 2);
 
   unsigned *value = NULL;
-  for (unsigned i = 0; i < N/4; ++i) {
+  for (unsigned i = 0; i < N / 4; ++i) {
     ASSERT_TRUE(queue_->Peek(&value));
     EXPECT_EQ(*value, i);
     queue_->PopFront();
   }
 
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     queue_->PushBack(i);
   }
-  EXPECT_EQ(queue_->size(), N - N/4);
+  EXPECT_EQ(queue_->size(), N - N / 4);
 
-  for (unsigned i = 0; i < N/4; ++i) {
+  for (unsigned i = 0; i < N / 4; ++i) {
     ASSERT_TRUE(queue_->Peek(&value));
-    EXPECT_EQ(*value, i + N/4);
+    EXPECT_EQ(*value, i + N / 4);
     queue_->PopFront();
   }
 }
@@ -101,19 +99,19 @@ TEST_F(T_BigQueue, Copy) {
   EXPECT_GE(queue_->capacity(), queue_->size());
 
   unsigned *value = NULL;
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     ASSERT_TRUE(queue_->Peek(&value));
     EXPECT_EQ(*value, i);
     queue_->PopFront();
   }
-  EXPECT_EQ(N/2, queue_->size());
+  EXPECT_EQ(N / 2, queue_->size());
 
   BigQueue<unsigned> new_queue(*queue_);
   EXPECT_EQ(queue_->size(), new_queue.size());
   EXPECT_EQ(queue_->size(), new_queue.capacity());
-  for (unsigned i = 0; i < N/2; ++i) {
+  for (unsigned i = 0; i < N / 2; ++i) {
     ASSERT_TRUE(new_queue.Peek(&value));
-    EXPECT_EQ(i + N/2, *value);
+    EXPECT_EQ(i + N / 2, *value);
     new_queue.PopFront();
   }
   EXPECT_FALSE(new_queue.Peek(&value));

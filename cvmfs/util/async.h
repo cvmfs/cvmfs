@@ -17,17 +17,17 @@ namespace CVMFS_NAMESPACE_GUARD {
  *  --> 1. for static members or global C-like functions
  *  --> 2. for member functions of arbitrary objects
  */
-template <typename ParamT>
+template<typename ParamT>
 class CallbackBase {
  public:
-  virtual ~CallbackBase() {}
+  virtual ~CallbackBase() { }
   virtual void operator()(const ParamT &value) const = 0;
 };
 
-template <>
+template<>
 class CallbackBase<void> {
  public:
-  virtual ~CallbackBase() {}
+  virtual ~CallbackBase() { }
   virtual void operator()() const = 0;
 };
 
@@ -41,24 +41,24 @@ class CallbackBase<void> {
  *
  * @param ParamT    the type of the parameter to be passed to the callback
  */
-template <typename ParamT>
+template<typename ParamT>
 class Callback : public CallbackBase<ParamT> {
  public:
   typedef void (*CallbackFunction)(const ParamT &value);
 
-  explicit Callback(CallbackFunction function) : function_(function) {}
+  explicit Callback(CallbackFunction function) : function_(function) { }
   void operator()(const ParamT &value) const { function_(value); }
 
  private:
   CallbackFunction function_;
 };
 
-template <>
+template<>
 class Callback<void> : public CallbackBase<void> {
  public:
   typedef void (*CallbackFunction)();
 
-  explicit Callback(CallbackFunction function) : function_(function) {}
+  explicit Callback(CallbackFunction function) : function_(function) { }
   void operator()() const { function_(); }
 
  private:
@@ -80,34 +80,33 @@ class Callback<void> : public CallbackBase<void> {
  * @param DelegateT   the <class name> of the object the member <member name>
  *                    should be invoked in
  */
-template <typename ParamT, class DelegateT>
+template<typename ParamT, class DelegateT>
 class BoundCallback : public CallbackBase<ParamT> {
  public:
   typedef void (DelegateT::*CallbackMethod)(const ParamT &value);
 
-  BoundCallback(CallbackMethod method, DelegateT *delegate) :
-    delegate_(delegate),
-    method_(method) {}
+  BoundCallback(CallbackMethod method, DelegateT *delegate)
+      : delegate_(delegate), method_(method) { }
 
   void operator()(const ParamT &value) const { (delegate_->*method_)(value); }
 
  private:
-  DelegateT*     delegate_;
+  DelegateT *delegate_;
   CallbackMethod method_;
 };
 
-template <class DelegateT>
+template<class DelegateT>
 class BoundCallback<void, DelegateT> : public CallbackBase<void> {
  public:
   typedef void (DelegateT::*CallbackMethod)();
 
-  BoundCallback(CallbackMethod method, DelegateT *delegate) :
-    delegate_(delegate), method_(method) {}
+  BoundCallback(CallbackMethod method, DelegateT *delegate)
+      : delegate_(delegate), method_(method) { }
 
   void operator()() const { (delegate_->*method_)(); }
 
  private:
-  DelegateT*     delegate_;
+  DelegateT *delegate_;
   CallbackMethod method_;
 };
 
@@ -125,46 +124,40 @@ class BoundCallback<void, DelegateT> : public CallbackBase<void> {
  *                      should be invoked in
  * @param ClosureDataT  the type of the user data chunk to be passed on invoke
  */
-template <typename ParamT, class DelegateT, typename ClosureDataT>
+template<typename ParamT, class DelegateT, typename ClosureDataT>
 class BoundClosure : public CallbackBase<ParamT> {
  public:
-  typedef void (DelegateT::*CallbackMethod)(const ParamT        &value,
-                                            const ClosureDataT   closure_data);
+  typedef void (DelegateT::*CallbackMethod)(const ParamT &value,
+                                            const ClosureDataT closure_data);
 
  public:
-  BoundClosure(CallbackMethod  method,
-               DelegateT      *delegate,
-               ClosureDataT    data) :
-    delegate_(delegate),
-    method_(method),
-    closure_data_(data) {}
+  BoundClosure(CallbackMethod method, DelegateT *delegate, ClosureDataT data)
+      : delegate_(delegate), method_(method), closure_data_(data) { }
 
   void operator()(const ParamT &value) const {
     (delegate_->*method_)(value, closure_data_);
   }
 
  private:
-  DelegateT*          delegate_;
-  CallbackMethod      method_;
-  const ClosureDataT  closure_data_;
+  DelegateT *delegate_;
+  CallbackMethod method_;
+  const ClosureDataT closure_data_;
 };
 
-template <class DelegateT, typename ClosureDataT>
+template<class DelegateT, typename ClosureDataT>
 class BoundClosure<void, DelegateT, ClosureDataT> : public CallbackBase<void> {
  public:
   typedef void (DelegateT::*CallbackMethod)(const ClosureDataT closure_data);
 
  public:
-  BoundClosure(CallbackMethod  method,
-               DelegateT      *delegate,
-               ClosureDataT    data) :
-    delegate_(delegate), method_(method), closure_data_(data) {}
+  BoundClosure(CallbackMethod method, DelegateT *delegate, ClosureDataT data)
+      : delegate_(delegate), method_(method), closure_data_(data) { }
 
   void operator()() const { (delegate_->*method_)(closure_data_); }
 
  private:
-  DelegateT*         delegate_;
-  CallbackMethod     method_;
+  DelegateT *delegate_;
+  CallbackMethod method_;
   const ClosureDataT closure_data_;
 };
 
@@ -186,7 +179,7 @@ class BoundClosure<void, DelegateT, ClosureDataT> : public CallbackBase<void> {
  *
  * @param ParamT  the parameter type of the callbacks to be called
  */
-template <class ParamT>
+template<class ParamT>
 class Callbackable {
  public:
   typedef CallbackBase<ParamT> CallbackTN;
@@ -200,16 +193,14 @@ class Callbackable {
    * @param delegate      The delegate object on which <method> will be called
    * @param closure_data  The closure data to be passed along to <method>
    */
-  template <class DelegateT, typename ClosureDataT>
-  static CallbackTN* MakeClosure(
-    typename BoundClosure<ParamT, DelegateT, ClosureDataT>::
-             CallbackMethod method,
-    DelegateT *delegate,
-    const ClosureDataT &closure_data)
-  {
-    return new BoundClosure<ParamT, DelegateT, ClosureDataT>(method,
-                                                             delegate,
-                                                             closure_data);
+  template<class DelegateT, typename ClosureDataT>
+  static CallbackTN *MakeClosure(
+      typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod
+          method,
+      DelegateT *delegate,
+      const ClosureDataT &closure_data) {
+    return new BoundClosure<ParamT, DelegateT, ClosureDataT>(
+        method, delegate, closure_data);
   }
 
   /**
@@ -218,10 +209,10 @@ class Callbackable {
    * @param method    Function pointer to the method to be called
    * @param delegate  The delegate object on which <method> will be called
    */
-  template <class DelegateT>
-  static CallbackTN* MakeCallback(
-        typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
-        DelegateT *delegate) {
+  template<class DelegateT>
+  static CallbackTN *MakeCallback(
+      typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
+      DelegateT *delegate) {
     return new BoundCallback<ParamT, DelegateT>(method, delegate);
   }
 
@@ -231,8 +222,8 @@ class Callbackable {
    *
    * @param function  Function pointer to the function to be invoked
    */
-  static CallbackTN* MakeCallback(
-        typename Callback<ParamT>::CallbackFunction function) {
+  static CallbackTN *MakeCallback(
+      typename Callback<ParamT>::CallbackFunction function) {
     return new Callback<ParamT>(function);
   }
 };
@@ -244,12 +235,10 @@ class Callbackable {
  * The method called by the ThreadProxy template is meant to look like this:
  *   void foo();
  */
-template <class DelegateT>
-void ThreadProxy(DelegateT        *delegate,
-                 void (DelegateT::*method)()) {
+template<class DelegateT>
+void ThreadProxy(DelegateT *delegate, void (DelegateT::*method)()) {
   (*delegate.*method)();
 }
-
 
 
 #ifdef CVMFS_NAMESPACE_GUARD

@@ -31,35 +31,34 @@ struct UploadCounters {
 
   explicit UploadCounters(perf::StatisticsTemplate statistics) {
     n_chunks_added = statistics.RegisterOrLookupTemplated(
-      "n_chunks_added", "Number of new chunks added");
+        "n_chunks_added", "Number of new chunks added");
     n_chunks_duplicated = statistics.RegisterOrLookupTemplated(
-      "n_chunks_duplicated", "Number of duplicated chunks added");
+        "n_chunks_duplicated", "Number of duplicated chunks added");
     n_catalogs_added = statistics.RegisterOrLookupTemplated(
-      "n_catalogs_added", "Number of new catalogs added");
+        "n_catalogs_added", "Number of new catalogs added");
     sz_uploaded_bytes = statistics.RegisterOrLookupTemplated(
-      "sz_uploaded_bytes", "Number of uploaded bytes");
+        "sz_uploaded_bytes", "Number of uploaded bytes");
     sz_uploaded_catalog_bytes = statistics.RegisterOrLookupTemplated(
-      "sz_uploaded_catalog_bytes", "Number of uploaded bytes for catalogs");
+        "sz_uploaded_catalog_bytes", "Number of uploaded bytes for catalogs");
   }
 };  // UploadCounters
 
 struct UploaderResults {
-  enum Type { kFileUpload, kBufferUpload, kChunkCommit, kRemove, kLookup };
+  enum Type {
+    kFileUpload,
+    kBufferUpload,
+    kChunkCommit,
+    kRemove,
+    kLookup
+  };
 
   UploaderResults(const int return_code, const std::string &local_path)
-    : type(kFileUpload),
-      return_code(return_code),
-      local_path(local_path) {}
+      : type(kFileUpload), return_code(return_code), local_path(local_path) { }
 
   explicit UploaderResults(Type t, const int return_code)
-    : type(t),
-      return_code(return_code),
-      local_path("") {}
+      : type(t), return_code(return_code), local_path("") { }
 
-  UploaderResults()
-    : type(kRemove)
-    , return_code(0)
-  { }
+  UploaderResults() : type(kRemove), return_code(0) { }
 
   const Type type;
   const int return_code;
@@ -81,9 +80,9 @@ struct UploadStreamHandle;
  *       specific job.
  */
 class AbstractUploader
-  : public PolymorphicConstruction<AbstractUploader, SpoolerDefinition>
-  , public Callbackable<UploaderResults>
-  , public SingleCopy {
+    : public PolymorphicConstruction<AbstractUploader, SpoolerDefinition>,
+      public Callbackable<UploaderResults>,
+      public SingleCopy {
   friend class TaskUpload;
 
  public:
@@ -98,11 +97,19 @@ class AbstractUploader
   };
 
   struct JobStatus {
-    enum State { kOk, kTerminate, kNoJobs };
+    enum State {
+      kOk,
+      kTerminate,
+      kNoJobs
+    };
   };
 
   struct UploadJob {
-    enum Type { Upload, Commit, Terminate };
+    enum Type {
+      Upload,
+      Commit,
+      Terminate
+    };
 
     UploadJob(UploadStreamHandle *handle, UploadBuffer buffer,
               const CallbackTN *callback = NULL);
@@ -113,7 +120,7 @@ class AbstractUploader
         , stream_handle(NULL)
         , tag_(0)
         , buffer()
-        , callback(NULL) {}
+        , callback(NULL) { }
 
     static UploadJob *CreateQuitBeacon() { return new UploadJob(); }
     bool IsQuitBeacon() { return type == Terminate; }
@@ -191,21 +198,17 @@ class AbstractUploader
    * @param remote_path  desired path for the file in the backend storage
    * @param callback     (optional) gets notified when the upload was finished
    */
-  void UploadFile(
-    const std::string &local_path,
-    const std::string &remote_path,
-    const CallbackTN *callback = NULL)
-  {
+  void UploadFile(const std::string &local_path,
+                  const std::string &remote_path,
+                  const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     FileIngestionSource source(local_path);
     DoUpload(remote_path, &source, callback);
   }
 
-  void UploadIngestionSource(
-    const std::string &remote_path,
-    IngestionSource *source,
-    const CallbackTN *callback = NULL)
-  {
+  void UploadIngestionSource(const std::string &remote_path,
+                             IngestionSource *source,
+                             const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     DoUpload(remote_path, source, callback);
   }
@@ -235,11 +238,9 @@ class AbstractUploader
    * @param callback  (optional) callback object to be invoked once the given
    *                  upload is finished (see AbstractUploader::Respond())
    */
-  void ScheduleUpload(
-    UploadStreamHandle *handle,
-    UploadBuffer buffer,
-    const CallbackTN *callback = NULL)
-  {
+  void ScheduleUpload(UploadStreamHandle *handle,
+                      UploadBuffer buffer,
+                      const CallbackTN *callback = NULL) {
     ++jobs_in_flight_;
     tubes_upload_.Dispatch(new UploadJob(handle, buffer, callback));
   }
@@ -252,10 +253,8 @@ class AbstractUploader
    * @param handle        Pointer to a previously acquired UploadStreamHandle
    * @param content_hash  the content hash of the full uploaded data Chunk
    */
-  void ScheduleCommit(
-    UploadStreamHandle *handle,
-    const shash::Any &content_hash)
-  {
+  void ScheduleCommit(UploadStreamHandle *handle,
+                      const shash::Any &content_hash) {
     ++jobs_in_flight_;
     tubes_upload_.Dispatch(new UploadJob(handle, content_hash));
   }
@@ -384,8 +383,7 @@ class AbstractUploader
    *       by any means!
    */
   void Respond(const CallbackTN *callback,
-               const UploaderResults &result) const
-  {
+               const UploaderResults &result) const {
     if (callback != NULL) {
       (*callback)(result);
       delete callback;
@@ -420,9 +418,7 @@ class AbstractUploader
    * Used by concrete implementations when they use callbacks where it's not
    * already foreseen, e.g. S3Uploader::Peek().
    */
-  void IncJobsInFlight() {
-    ++jobs_in_flight_;
-  }
+  void IncJobsInFlight() { ++jobs_in_flight_; }
 
  private:
   const SpoolerDefinition spooler_definition_;
@@ -444,12 +440,9 @@ class AbstractUploader
  */
 class TaskUpload : public TubeConsumer<AbstractUploader::UploadJob> {
  public:
-  explicit TaskUpload(
-    AbstractUploader *uploader,
-    Tube<AbstractUploader::UploadJob> *tube)
-    : TubeConsumer<AbstractUploader::UploadJob>(tube)
-    , uploader_(uploader)
-  { }
+  explicit TaskUpload(AbstractUploader *uploader,
+                      Tube<AbstractUploader::UploadJob> *tube)
+      : TubeConsumer<AbstractUploader::UploadJob>(tube), uploader_(uploader) { }
 
  protected:
   virtual void Process(AbstractUploader::UploadJob *upload_job);
@@ -472,8 +465,8 @@ struct UploadStreamHandle {
 
   explicit UploadStreamHandle(const CallbackTN *commit_callback)
       : commit_callback(commit_callback)
-      , tag(atomic_xadd64(&g_upload_stream_tag, 1)) {}
-  virtual ~UploadStreamHandle() {}
+      , tag(atomic_xadd64(&g_upload_stream_tag, 1)) { }
+  virtual ~UploadStreamHandle() { }
 
   const CallbackTN *commit_callback;
 

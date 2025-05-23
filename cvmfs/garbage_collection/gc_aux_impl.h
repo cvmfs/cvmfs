@@ -12,20 +12,17 @@
 #include "util/logging.h"
 #include "util/string.h"
 
-template <class CatalogTraversalT, class HashFilterT>
+template<class CatalogTraversalT, class HashFilterT>
 GarbageCollectorAux<CatalogTraversalT, HashFilterT>::GarbageCollectorAux(
-  const ConfigurationTN &config)
-  : config_(config)
-{
+    const ConfigurationTN &config)
+    : config_(config) {
   assert(config_.uploader != NULL);
 }
 
 
-template <class CatalogTraversalT, class HashFilterT>
+template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
-  uint64_t timestamp,
-  const HashFilterT &preserved_objects)
-{
+    uint64_t timestamp, const HashFilterT &preserved_objects) {
   if (config_.verbose) {
     LogCvmfs(kLogGc, kLogStdout | kLogDebug,
              "Sweeping auxiliary objects older than %s",
@@ -37,8 +34,8 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
   aux_types.push_back(SqlReflog::kRefMetainfo);
   for (unsigned i = 0; i < aux_types.size(); ++i) {
     std::vector<shash::Any> hashes;
-    bool retval =
-      config_.reflog->ListOlderThan(aux_types[i], timestamp, &hashes);
+    bool retval = config_.reflog->ListOlderThan(aux_types[i], timestamp,
+                                                &hashes);
     if (!retval) {
       LogCvmfs(kLogGc, kLogStderr, "failed to enumerate %s objects",
                PrintAuxType(aux_types[i]).c_str());
@@ -68,10 +65,9 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::CollectOlderThan(
 }
 
 
-template <class CatalogTraversalT, class HashFilterT>
+template<class CatalogTraversalT, class HashFilterT>
 std::string GarbageCollectorAux<CatalogTraversalT, HashFilterT>::PrintAuxType(
-  SqlReflog::ReferenceType type)
-{
+    SqlReflog::ReferenceType type) {
   switch (type) {
     case SqlReflog::kRefCatalog:
       return "file catalog";
@@ -87,13 +83,12 @@ std::string GarbageCollectorAux<CatalogTraversalT, HashFilterT>::PrintAuxType(
 }
 
 
-template <class CatalogTraversalT, class HashFilterT>
+template<class CatalogTraversalT, class HashFilterT>
 bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::Sweep(
-  const shash::Any &hash)
-{
+    const shash::Any &hash) {
   if (config_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout | kLogDebug,
-             "  sweep: %s", hash.ToStringWithSuffix().c_str());
+    LogCvmfs(kLogGc, kLogStdout | kLogDebug, "  sweep: %s",
+             hash.ToStringWithSuffix().c_str());
   }
 
   if (!config_.dry_run) {
@@ -107,8 +102,8 @@ bool GarbageCollectorAux<CatalogTraversalT, HashFilterT>::Sweep(
   }
 
   if (config_.has_deletion_log()) {
-    const int written = fprintf(config_.deleted_objects_logfile,
-                                "%s\n", hash.ToStringWithSuffix().c_str());
+    const int written = fprintf(config_.deleted_objects_logfile, "%s\n",
+                                hash.ToStringWithSuffix().c_str());
     if (written < 0) {
       LogCvmfs(kLogGc, kLogStderr, "failed to write to deleted objects log");
       return false;

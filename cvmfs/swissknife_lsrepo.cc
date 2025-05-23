@@ -13,15 +13,17 @@
 
 namespace swissknife {
 
-CommandListCatalogs::CommandListCatalogs() :
-  print_tree_(false), print_hash_(false), print_size_(false),
-  print_entries_(false) {}
+CommandListCatalogs::CommandListCatalogs()
+    : print_tree_(false)
+    , print_hash_(false)
+    , print_size_(false)
+    , print_entries_(false) { }
 
 
 ParameterList CommandListCatalogs::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory(
-              'r', "repository URL (absolute local path or remote URL)"));
+      'r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
   r.push_back(Parameter::Optional('l', "temporary directory"));
@@ -36,43 +38,38 @@ ParameterList CommandListCatalogs::GetParams() const {
 
 
 int CommandListCatalogs::Main(const ArgumentList &args) {
-  print_tree_    = (args.count('t') > 0);
-  print_hash_    = (args.count('d') > 0);
-  print_size_    = (args.count('s') > 0);
+  print_tree_ = (args.count('t') > 0);
+  print_hash_ = (args.count('d') > 0);
+  print_size_ = (args.count('s') > 0);
   print_entries_ = (args.count('e') > 0);
 
   shash::Any manual_root_hash;
-  const std::string &repo_url  = *args.find('r')->second;
-  const std::string &repo_name =
-    (args.count('n') > 0) ? *args.find('n')->second : "";
-  std::string repo_keys =
-    (args.count('k') > 0) ? *args.find('k')->second : "";
+  const std::string &repo_url = *args.find('r')->second;
+  const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second
+                                                       : "";
+  std::string repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
     repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
-  const std::string &tmp_dir   =
-    (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
+  const std::string &tmp_dir = (args.count('l') > 0) ? *args.find('l')->second
+                                                     : "/tmp";
   if (args.count('h') > 0) {
-    manual_root_hash = shash::MkFromHexPtr(shash::HexPtr(
-      *args.find('h')->second), shash::kSuffixCatalog);
+    manual_root_hash = shash::MkFromHexPtr(
+        shash::HexPtr(*args.find('h')->second), shash::kSuffixCatalog);
   }
 
   bool success = false;
   if (IsHttpUrl(repo_url)) {
     const bool follow_redirects = false;
-    const std::string proxy = ((args.count('@') > 0) ?
-                               *args.find('@')->second : "");
-    if (!this->InitDownloadManager(follow_redirects, proxy) ||
-        !this->InitSignatureManager(repo_keys)) {
+    const std::string proxy = ((args.count('@') > 0) ? *args.find('@')->second
+                                                     : "");
+    if (!this->InitDownloadManager(follow_redirects, proxy)
+        || !this->InitSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
     }
 
-    HttpObjectFetcher<catalog::Catalog,
-                      history::SqliteHistory> fetcher(repo_name,
-                                                      repo_url,
-                                                      tmp_dir,
-                                                      download_manager(),
-                                                      signature_manager());
+    HttpObjectFetcher<catalog::Catalog, history::SqliteHistory> fetcher(
+        repo_name, repo_url, tmp_dir, download_manager(), signature_manager());
     success = Run(manual_root_hash, &fetcher);
   } else {
     LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
@@ -84,7 +81,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
 
 
 void CommandListCatalogs::CatalogCallback(
-                           const CatalogTraversalData<catalog::Catalog> &data) {
+    const CatalogTraversalData<catalog::Catalog> &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string clg_size;
@@ -116,9 +113,9 @@ void CommandListCatalogs::CatalogCallback(
   if (path.empty())
     path = "/";
 
-  LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s%s%s",
-    tree_indent.c_str(), hash_string.c_str(), clg_size.c_str(),
-    clg_entries.c_str(), path.c_str());
+  LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s%s%s", tree_indent.c_str(),
+           hash_string.c_str(), clg_size.c_str(), clg_entries.c_str(),
+           path.c_str());
 }
 
 }  // namespace swissknife

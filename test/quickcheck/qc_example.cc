@@ -9,9 +9,9 @@
 #include <algorithm>
 #include <vector>
 
-class T_QcExample : public ::testing::Test {};
+class T_QcExample : public ::testing::Test { };
 
-RC_GTEST_PROP(QC, ReverseVectorTwice, (const std::vector<int>& l0)) {
+RC_GTEST_PROP(QC, ReverseVectorTwice, (const std::vector<int> &l0)) {
   auto l1 = l0;
   std::reverse(begin(l1), end(l1));
   std::reverse(begin(l1), end(l1));
@@ -19,9 +19,9 @@ RC_GTEST_PROP(QC, ReverseVectorTwice, (const std::vector<int>& l0)) {
 }
 
 RC_GTEST_FIXTURE_PROP(T_QcExample, MapIsOrderedByKey, ()) {
-  const auto non_empty_seq = *rc::gen::nonEmpty<std::vector<int>>();
+  const auto non_empty_seq = *rc::gen::nonEmpty<std::vector<int> >();
   auto m0 = std::map<int, int>{};
-  for (const auto& val : non_empty_seq) {
+  for (const auto &val : non_empty_seq) {
     m0.insert(std::make_pair(val, val));
   }
   auto sorted_seq = non_empty_seq;

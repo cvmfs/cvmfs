@@ -30,8 +30,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 const unsigned kPageSize = 4096;
 const size_t kMaxPathLength = 256;
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
-const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
-                            S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR | S_IRGRP | S_IXGRP
+                            | S_IROTH | S_IXOTH;
 const int kPrivateFileMode = S_IWUSR | S_IRUSR;
 const int kPrivateDirMode = S_IXUSR | S_IWUSR | S_IRUSR;
 
@@ -51,7 +51,7 @@ enum EFileSystemTypes {
 };
 
 struct CVMFS_EXPORT FileSystemInfo {
-  FileSystemInfo() : type(kFsTypeUnknown), is_rdonly(false) {}
+  FileSystemInfo() : type(kFsTypeUnknown), is_rdonly(false) { }
   EFileSystemTypes type;
   bool is_rdonly;
 };
@@ -63,7 +63,7 @@ struct CVMFS_EXPORT LsofEntry {
   std::string executable;
   std::string path;
 
-  LsofEntry() : pid(0), owner(0), read_only(false) {}
+  LsofEntry() : pid(0), owner(0), read_only(false) { }
 };
 
 CVMFS_EXPORT std::string MakeCanonicalPath(const std::string &path);
@@ -91,7 +91,8 @@ CVMFS_EXPORT int ConnectTcpEndpoint(const std::string &ipv4_address,
 CVMFS_EXPORT void MakePipe(int pipe_fd[2]);
 CVMFS_EXPORT void WritePipe(int fd, const void *buf, size_t nbyte);
 CVMFS_EXPORT void ReadPipe(int fd, void *buf, size_t nbyte);
-CVMFS_EXPORT bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms = 0);
+CVMFS_EXPORT bool ReadHalfPipe(int fd, void *buf, size_t nbyte,
+                               unsigned timeout_ms = 0);
 CVMFS_EXPORT void ClosePipe(int pipe_fd[2]);
 CVMFS_EXPORT bool DiffTree(const std::string &path_a,
                            const std::string &path_b);

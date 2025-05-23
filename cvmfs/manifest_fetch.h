@@ -69,13 +69,17 @@ struct ManifestEnsemble {
   }
   virtual ~ManifestEnsemble() {
     delete manifest;
-    if (raw_manifest_buf) free(raw_manifest_buf);
-    if (cert_buf) free(cert_buf);
-    if (whitelist_buf) free(whitelist_buf);
-    if (whitelist_pkcs7_buf) free(whitelist_pkcs7_buf);
+    if (raw_manifest_buf)
+      free(raw_manifest_buf);
+    if (cert_buf)
+      free(cert_buf);
+    if (whitelist_buf)
+      free(whitelist_buf);
+    if (whitelist_pkcs7_buf)
+      free(whitelist_pkcs7_buf);
   }
   // Can be overwritten to fetch certificate from cache
-  virtual void FetchCertificate(const shash::Any &hash) {}
+  virtual void FetchCertificate(const shash::Any &hash) { }
 
   Manifest *manifest;
   unsigned char *raw_manifest_buf;

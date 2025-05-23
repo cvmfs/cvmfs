@@ -20,24 +20,23 @@ publish::Publisher *GetTestPublisher() {
   settings.SetOwner(GetUserName());
   settings.GetStorage()->MakeLocal(srv_dir);
   settings.GetTransaction()->GetSpoolArea()->SetSpoolArea(spool_dir);
-  settings.GetTransaction()->GetSpoolArea()->SetUnionMount(
-    spool_dir + "/union");
+  settings.GetTransaction()->GetSpoolArea()->SetUnionMount(spool_dir
+                                                           + "/union");
   settings.GetKeychain()->SetKeychainDir(keys_dir);
   settings.SetUrl("file://" + srv_dir);
   settings.GetTransaction()->SetLayoutRevision(
-    publish::Publisher::kRequiredLayoutRevision);
+      publish::Publisher::kRequiredLayoutRevision);
 
   return publish::Publisher::Create(settings);
 }
 
 
 publish::Repository *GetRepositoryFromPublisher(
-  const publish::Publisher &publisher)
-{
+    const publish::Publisher &publisher) {
   publish::SettingsRepository settings(publisher.settings().fqrn());
   settings.SetUrl(publisher.settings().url());
   settings.SetTmpDir(GetCurrentWorkingDirectory());
   settings.GetKeychain()->SetKeychainDir(
-    publisher.settings().keychain().keychain_dir());
+      publisher.settings().keychain().keychain_dir());
   return new publish::Repository(settings);
 }

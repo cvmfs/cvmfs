@@ -65,26 +65,26 @@ class T_MagicXattr : public ::testing::Test {
 TEST_F(T_MagicXattr, TestFqrn) {
   std::set<std::string> protected_xattrs;
   std::set<gid_t> protected_xattr_gids;
-  MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
-                        protected_xattrs, protected_xattr_gids);
+  MagicXattrManager *mgr = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityAlways, protected_xattrs,
+      protected_xattr_gids);
 
-  catalog::DirectoryEntry dirent =
-    catalog::DirectoryEntryTestFactory::ExternalFile();
+  catalog::DirectoryEntry
+      dirent = catalog::DirectoryEntryTestFactory::ExternalFile();
   PathString path("/asdf");
   MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
   ASSERT_FALSE(attr.IsNull());
   ASSERT_TRUE(attr->PrepareValueFenced());
-  EXPECT_STREQ("keys.cern.ch", attr->
-                                 GetValue(0, kXattrMachineMode).second.c_str());
+  EXPECT_STREQ("keys.cern.ch",
+               attr->GetValue(0, kXattrMachineMode).second.c_str());
 }
 
 TEST_F(T_MagicXattr, TestLogBuffer) {
   std::set<std::string> protected_xattrs;
   std::set<gid_t> protected_xattr_gids;
-  MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
-                          protected_xattrs, protected_xattr_gids);
+  MagicXattrManager *mgr = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityAlways, protected_xattrs,
+      protected_xattr_gids);
 
 
   catalog::DirectoryEntry dirent;
@@ -96,7 +96,7 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
     EXPECT_TRUE(HasSuffix(attr->GetValue(0, kXattrMachineMode).second, "test\n",
-                                                         false /* ign_case */));
+                          false /* ign_case */));
   }
 
   LogCvmfs(kLogCvmfs, 0, "%s", std::string(6000, 'x').c_str());
@@ -105,29 +105,30 @@ TEST_F(T_MagicXattr, TestLogBuffer) {
     ASSERT_FALSE(attr.IsNull());
     ASSERT_TRUE(attr->PrepareValueFenced());
     EXPECT_TRUE(HasSuffix(attr->GetValue(0, kXattrMachineMode).second,
-                                             "<snip>\n", false /* ign_case */));
+                          "<snip>\n", false /* ign_case */));
   }
 }
 
 TEST_F(T_MagicXattr, HideAttributes) {
   std::set<std::string> protected_xattrs;
   std::set<gid_t> protected_xattr_gids;
-  catalog::DirectoryEntry dirent_name =
-    catalog::DirectoryEntryTestFactory::RegularFile("name", 42, shash::Any());
-  catalog::DirectoryEntry dirent_root =
-    catalog::DirectoryEntryTestFactory::Directory();
+  catalog::DirectoryEntry
+      dirent_name = catalog::DirectoryEntryTestFactory::RegularFile(
+          "name", 42, shash::Any());
+  catalog::DirectoryEntry
+      dirent_root = catalog::DirectoryEntryTestFactory::Directory();
 
-  MagicXattrManager *mgr_never =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityNever,
-    protected_xattrs, protected_xattr_gids);
+  MagicXattrManager *mgr_never = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityNever, protected_xattrs,
+      protected_xattr_gids);
   std::string list = mgr_never->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_never->GetListString(&dirent_root);
   EXPECT_EQ(0U, list.length());
 
-  MagicXattrManager *mgr_rootonly =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityRootOnly,
-                          protected_xattrs, protected_xattr_gids);
+  MagicXattrManager *mgr_rootonly = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityRootOnly, protected_xattrs,
+      protected_xattr_gids);
   list = mgr_rootonly->GetListString(&dirent_name);
   EXPECT_EQ(0U, list.length());
   list = mgr_rootonly->GetListString(&dirent_root);
@@ -141,13 +142,13 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   std::set<gid_t> protected_xattr_gids;
   protected_xattr_gids.insert(1);
 
-  MagicXattrManager *mgr =
-    new MagicXattrManager(mount_point_, MagicXattrManager::kVisibilityAlways,
-                        protected_xattrs, protected_xattr_gids);
+  MagicXattrManager *mgr = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityAlways, protected_xattrs,
+      protected_xattr_gids);
   mgr->Freeze();
 
-  catalog::DirectoryEntry dirent =
-    catalog::DirectoryEntryTestFactory::ExternalFile();
+  catalog::DirectoryEntry
+      dirent = catalog::DirectoryEntryTestFactory::ExternalFile();
   PathString path("/asdf");
   MagicXattrRAIIWrapper attr(mgr->GetLocked("user.fqrn", path, &dirent));
 
@@ -155,7 +156,7 @@ TEST_F(T_MagicXattr, ProtectedXattr) {
   ASSERT_FALSE(attr->PrepareValueFencedProtected(2));
   ASSERT_TRUE(attr->PrepareValueFencedProtected(1));
   EXPECT_STREQ("keys.cern.ch",
-                           attr->GetValue(0, kXattrMachineMode).second.c_str());
+               attr->GetValue(0, kXattrMachineMode).second.c_str());
 }
 
 TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
@@ -177,14 +178,13 @@ TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
 
   EXPECT_EQ(attr.GetValue(0, kXattrMachineMode).second.find("ddddddd"),
             std::string::npos);
-  EXPECT_GE((int) attr.GetValue(0, kXattrMachineMode).second.find("aaaaaa"), 0);
-  EXPECT_GE((int) attr.GetValue(0, kXattrMachineMode).second.find("bbbbbb"), 0);
+  EXPECT_GE((int)attr.GetValue(0, kXattrMachineMode).second.find("aaaaaa"), 0);
+  EXPECT_GE((int)attr.GetValue(0, kXattrMachineMode).second.find("bbbbbb"), 0);
 
   EXPECT_EQ(attr.GetValue(1, kXattrMachineMode).second.find("ccccc"),
             std::string::npos);
-  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).second.find("dddddd"), 0);
-  EXPECT_GE((int) attr.GetValue(1, kXattrMachineMode).second.find("fffffff"),
-            0);
+  EXPECT_GE((int)attr.GetValue(1, kXattrMachineMode).second.find("dddddd"), 0);
+  EXPECT_GE((int)attr.GetValue(1, kXattrMachineMode).second.find("fffffff"), 0);
 
   EXPECT_FALSE(attr.GetValue(3, kXattrMachineMode).first);
   EXPECT_EQ(
@@ -195,8 +195,9 @@ TEST_F(T_MagicXattr, MultiPageMachineModeXattr) {
 TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
   PubkeysMagicXattr attr;
 
-  EXPECT_EQ((int) attr.GetValue(0, kXattrHumanMode).second.find(
-                                         "Page requested does not exists."), 0);
+  EXPECT_EQ((int)attr.GetValue(0, kXattrHumanMode)
+                .second.find("Page requested does not exists."),
+            0);
 
   attr.pubkeys_.push_back(std::string(10000, 'a'));
   attr.pubkeys_.push_back(std::string(10000, 'b'));
@@ -205,14 +206,16 @@ TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
   attr.pubkeys_.push_back(std::string(10000, 'e'));
   attr.pubkeys_.push_back(std::string(10000, 'f'));
 
-  EXPECT_EQ((int) attr.GetValue(1, kXattrHumanMode).second.find(
-                                                  "# Access page at idx: "), 0);
+  EXPECT_EQ((int)attr.GetValue(1, kXattrHumanMode)
+                .second.find("# Access page at idx: "),
+            0);
   EXPECT_EQ(attr.GetValue(1, kXattrHumanMode).second.find("ccccc"),
-                                                             std::string::npos);
-  EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).second.find("ddddddd"), 0);
-  EXPECT_GE((int) attr.GetValue(1, kXattrHumanMode).second.find("fffffff"), 0);
+            std::string::npos);
+  EXPECT_GE((int)attr.GetValue(1, kXattrHumanMode).second.find("ddddddd"), 0);
+  EXPECT_GE((int)attr.GetValue(1, kXattrHumanMode).second.find("fffffff"), 0);
 
 
-  EXPECT_EQ((int) attr.GetValue(3, kXattrHumanMode).second.find(
-                                         "Page requested does not exists."), 0);
+  EXPECT_EQ((int)attr.GetValue(3, kXattrHumanMode)
+                .second.find("Page requested does not exists."),
+            0);
 }

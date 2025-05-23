@@ -19,7 +19,7 @@ using namespace std;  // NOLINT
 class ConsumerCallbacks {
  public:
   ConsumerCallbacks()
-      : total_size(0), total_objects(0), this_size(0), verify_errors(0) {}
+      : total_size(0), total_objects(0), this_size(0), verify_errors(0) { }
 
   void OnEvent(const ObjectPackBuild::Event &event) {
     total_size += event.buf_size;
@@ -43,7 +43,7 @@ class ConsumerCallbacks {
 
 class PreserveContentCallbacks {
  public:
-  PreserveContentCallbacks() : num_calls_(0), hash_string_recovered_() {}
+  PreserveContentCallbacks() : num_calls_(0), hash_string_recovered_() { }
 
   void OnEvent(const ObjectPackBuild::Event &event) {
     num_calls_++;
@@ -95,9 +95,10 @@ class T_Pack : public ::testing::Test {
     const unsigned kBufSize = 1 * 1024 * 1024;    // 1MB
     Prng prng;
     prng.InitLocaltime();
-    unsigned char *obj_buf =
-        reinterpret_cast<unsigned char *>(smalloc(kMaxObject));
-    for (unsigned i = 0; i < kMaxObject; ++i) obj_buf[i] = prng.Next(256);
+    unsigned char *obj_buf = reinterpret_cast<unsigned char *>(
+        smalloc(kMaxObject));
+    for (unsigned i = 0; i < kMaxObject; ++i)
+      obj_buf[i] = prng.Next(256);
 
     bool has_space = true;
     do {
@@ -120,8 +121,8 @@ class T_Pack : public ::testing::Test {
     ConsumerCallbacks callbacks;
     // TODO(jblomer) Verify objects
     consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
-    unsigned char *transfer_buf =
-        reinterpret_cast<unsigned char *>(smalloc(kBufSize));
+    unsigned char *transfer_buf = reinterpret_cast<unsigned char *>(
+        smalloc(kBufSize));
     unsigned nspace;
     unsigned nwritten;
     do {
@@ -250,10 +251,11 @@ TEST_F(T_Pack, ObjectPackTransfer) {
 
 TEST_F(T_Pack, Produce) {
   ObjectPackProducer producer(&pack_of_three_);
-  const string expected_result =
-      "V2\nS4097\nN3\n--\nC " + hash_null_.ToString(true) + " 4096\nC " +
-      hash_partial_.ToString(true) + " 0\nC " + hash_null_.ToString(true) +
-      " 1\n" + string(4096, '\0') + string(1, '1');
+  const string expected_result = "V2\nS4097\nN3\n--\nC "
+                                 + hash_null_.ToString(true) + " 4096\nC "
+                                 + hash_partial_.ToString(true) + " 0\nC "
+                                 + hash_null_.ToString(true) + " 1\n"
+                                 + string(4096, '\0') + string(1, '1');
 
   unsigned char out_buf[8192];
   unsigned nbytes = producer.ProduceNext(8192, out_buf);
@@ -300,10 +302,10 @@ TEST_F(T_Pack, ProducerEmpty) {
 TEST_F(T_Pack, ProducerFile) {
   const std::string file_name = "the_file_name";
   ObjectPackProducer producer(hash_null_, ffoo_, file_name);
-  const string expected_result = "V2\nS" + StringifyInt(foo_content_.size()) +
-                                 "\nN1\n--\nN " + hash_null_.ToString(true) +
-                                 " " + StringifyInt(foo_content_.size()) + " " +
-                                 Base64Url(file_name) + "\n" + foo_content_;
+  const string expected_result = "V2\nS" + StringifyInt(foo_content_.size())
+                                 + "\nN1\n--\nN " + hash_null_.ToString(true)
+                                 + " " + StringifyInt(foo_content_.size()) + " "
+                                 + Base64Url(file_name) + "\n" + foo_content_;
 
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
@@ -338,7 +340,8 @@ TEST_F(T_Pack, Consumer) {
   callbacks.Reset();
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
   consumer_two.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
-  for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
+  for (unsigned i = 0; i < nbytes; ++i)
+    consumer_two.ConsumeNext(1, buf + i);
   EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
   EXPECT_EQ(3U, callbacks.total_objects);
   EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
@@ -359,7 +362,8 @@ TEST_F(T_Pack, ConsumerEmpty) {
   EXPECT_EQ(0U, callbacks.total_size);
 
   ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
-  for (unsigned i = 0; i < nbytes; ++i) consumer_two.ConsumeNext(1, buf + i);
+  for (unsigned i = 0; i < nbytes; ++i)
+    consumer_two.ConsumeNext(1, buf + i);
   EXPECT_EQ(ObjectPackBuild::kStateDone, consumer_two.ConsumeNext(0, NULL));
 }
 
@@ -383,7 +387,8 @@ TEST_F(T_Pack, ConsumerOfProducerFromFile) {
 TEST_F(T_Pack, RealWorld) { RealWorld(); }
 
 TEST_F(T_Pack, RealWorldSlow) {
-  for (unsigned i = 0; i < 64; ++i) RealWorld();
+  for (unsigned i = 0; i < 64; ++i)
+    RealWorld();
 }
 
 TEST_F(T_Pack, PreserveContentHash) {

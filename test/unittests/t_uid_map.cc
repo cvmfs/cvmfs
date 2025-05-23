@@ -7,13 +7,13 @@
 #include "uid_map.h"
 #include "util/posix.h"
 
-template <typename MapT>
+template<typename MapT>
 class T_UidMap : public ::testing::Test {
  protected:
   static const std::string sandbox;
 
  protected:
-  typedef typename MapT::key_type   key_type;
+  typedef typename MapT::key_type key_type;
   typedef typename MapT::value_type value_type;
 
  protected:
@@ -29,24 +29,24 @@ class T_UidMap : public ::testing::Test {
 
   void WriteFile(const std::string &path, const std::string &content) {
     FILE *f = fopen(path.c_str(), "w+");
-    ASSERT_NE(static_cast<FILE*>(NULL), f)
-      << "failed to open. errno: " << errno;
+    ASSERT_NE(static_cast<FILE *>(NULL), f)
+        << "failed to open. errno: " << errno;
     const size_t bytes_written = fwrite(content.data(), 1, content.length(), f);
     ASSERT_EQ(bytes_written, content.length())
-      << "failed to write. errno: " << errno;
+        << "failed to write. errno: " << errno;
 
     const int retval = fclose(f);
     ASSERT_EQ(0, retval) << "failed to close. errno: " << errno;
   }
 
   std::string GetValidFile() {
-    const std::string valid_file =
-      "# comment\n"  // comment
-      "42 3\n"       // ordinary rule
-      "1  2\n"       // ordinary rule with multiple spaces
-      "\n"           // empty line
-      "# comment\n"  // comment
-      "*   1337\n";  // default value
+    const std::string
+        valid_file = "# comment\n"  // comment
+                     "42 3\n"       // ordinary rule
+                     "1  2\n"       // ordinary rule with multiple spaces
+                     "\n"           // empty line
+                     "# comment\n"  // comment
+                     "*   1337\n";  // default value
 
     const std::string path = CreateTempPath(sandbox + "/valid", 0600);
     WriteFile(path, valid_file);
@@ -54,13 +54,13 @@ class T_UidMap : public ::testing::Test {
   }
 
   std::string GetInvalidFile1() {
-    const std::string invalid_file =
-      "# comment\n"  // comment
-      "42 3\n"       // ordinary rule
-      "1 *\n"        // invalid rule (non-numeric map result)    <---
-      "\n"           // empty line
-      "# comment\n"  // comment
-      "*   1337\n";  // default value
+    const std::string
+        invalid_file = "# comment\n"  // comment
+                       "42 3\n"       // ordinary rule
+                       "1 *\n"  // invalid rule (non-numeric map result)    <---
+                       "\n"     // empty line
+                       "# comment\n"  // comment
+                       "*   1337\n";  // default value
 
     const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
     WriteFile(path, invalid_file);
@@ -68,10 +68,10 @@ class T_UidMap : public ::testing::Test {
   }
 
   std::string GetInvalidFile2() {
-    const std::string invalid_file =
-      "# comment\n"  // comment
-      "12 4\n"       // ordinary rule
-      "1\n";         // invalid rule (no map result) <---
+    const std::string
+        invalid_file = "# comment\n"  // comment
+                       "12 4\n"       // ordinary rule
+                       "1\n";         // invalid rule (no map result) <---
 
     const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
     WriteFile(path, invalid_file);
@@ -79,27 +79,29 @@ class T_UidMap : public ::testing::Test {
   }
 
   std::string GetInvalidFile3() {
-    const std::string invalid_file =
-      "# empty file\n"  // comment
-      "foo 14";         // invalid rule (non-numeric ID value) <---
+    const std::string
+        invalid_file = "# empty file\n"  // comment
+                       "foo 14";  // invalid rule (non-numeric ID value) <---
 
     const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
     WriteFile(path, invalid_file);
     return path;
   }
 
-  template <typename T>
-  key_type k(const T k) const { return key_type(k); }
-  template <typename T>
-  value_type v(const T v) const { return value_type(v); }
+  template<typename T>
+  key_type k(const T k) const {
+    return key_type(k);
+  }
+  template<typename T>
+  value_type v(const T v) const {
+    return value_type(v);
+  }
 };
 
-template <typename MapT>
+template<typename MapT>
 const std::string T_UidMap<MapT>::sandbox = "./cvmfs_ut_uid_map";
 
-typedef ::testing::Types<
-  UidMap,
-  GidMap > UidMapTypes;
+typedef ::testing::Types<UidMap, GidMap> UidMapTypes;
 TYPED_TEST_CASE(T_UidMap, UidMapTypes);
 
 TYPED_TEST(T_UidMap, Initialize) {
@@ -175,8 +177,8 @@ TYPED_TEST(T_UidMap, MapWithDefault) {
   map.Set(TestFixture::k(1), TestFixture::v(2));
   map.SetDefault(TestFixture::v(42));
 
-  EXPECT_EQ(TestFixture::v(1),  map.Map(TestFixture::k(0)));
-  EXPECT_EQ(TestFixture::v(2),  map.Map(TestFixture::k(1)));
+  EXPECT_EQ(TestFixture::v(1), map.Map(TestFixture::k(0)));
+  EXPECT_EQ(TestFixture::v(2), map.Map(TestFixture::k(1)));
   EXPECT_EQ(TestFixture::v(42), map.Map(TestFixture::k(3)));
 }
 
@@ -196,8 +198,8 @@ TYPED_TEST(T_UidMap, ReadFromFile) {
   EXPECT_FALSE(map.Contains(TestFixture::k(2)));
   EXPECT_FALSE(map.Contains(TestFixture::k(1337)));
 
-  EXPECT_EQ(TestFixture::v(3),  map.Map(TestFixture::k(42)));
-  EXPECT_EQ(TestFixture::v(2),  map.Map(TestFixture::k(1)));
+  EXPECT_EQ(TestFixture::v(3), map.Map(TestFixture::k(42)));
+  EXPECT_EQ(TestFixture::v(2), map.Map(TestFixture::k(1)));
   EXPECT_EQ(TestFixture::v(1337), map.Map(TestFixture::k(3)));
   EXPECT_EQ(TestFixture::v(1337), map.Map(TestFixture::k(4)));
   EXPECT_EQ(TestFixture::v(1337), map.Map(TestFixture::k(0)));

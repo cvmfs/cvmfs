@@ -9,14 +9,11 @@
 
 class RepositoryTag {
  public:
-  RepositoryTag() : name_(""), description_("") {}
-  RepositoryTag(const std::string& name,
-                const std::string& description);
+  RepositoryTag() : name_(""), description_("") { }
+  RepositoryTag(const std::string &name, const std::string &description);
 
-  void SetName(const std::string& name) {
-    name_ = name;
-  }
-  void SetDescription(const std::string& description) {
+  void SetName(const std::string &name) { name_ = name; }
+  void SetDescription(const std::string &description) {
     description_ = description;
   }
 

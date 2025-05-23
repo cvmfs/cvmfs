@@ -9,11 +9,10 @@
 #ifndef CVMFS_SYNC_UNION_OVERLAYFS_H_
 #define CVMFS_SYNC_UNION_OVERLAYFS_H_
 
-#include "sync_union.h"
-
 #include <set>
 #include <string>
 
+#include "sync_union.h"
 #include "util/shared_ptr.h"
 
 namespace publish {

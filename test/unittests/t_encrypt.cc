@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <unistd.h>
 
 #include <algorithm>
@@ -60,10 +59,9 @@ TEST(T_Encrypt, KeyStrings) {
   UniquePtr<Key> k_invalid_small(Key::CreateFromString(""));
   EXPECT_FALSE(k_invalid_small.IsValid());
   UniquePtr<Key> k_invalid_big(
-    Key::CreateFromString(string(Key::kMaxSize + 1, 'X')));
+      Key::CreateFromString(string(Key::kMaxSize + 1, 'X')));
   EXPECT_FALSE(k_invalid_big.IsValid());
-  UniquePtr<Key> k_max_size(
-    Key::CreateFromString(string(Key::kMaxSize, 'X')));
+  UniquePtr<Key> k_max_size(Key::CreateFromString(string(Key::kMaxSize, 'X')));
   EXPECT_TRUE(k_max_size.IsValid());
 
   string secret = "This is a secret";
@@ -175,11 +173,11 @@ TEST(T_Encrypt, Aes_256_Cbc) {
 
   retval = Cipher::Decrypt(ciphertext.substr(0, 1), *k, &plaintext);
   EXPECT_EQ("", plaintext);
-  retval = Cipher::Decrypt(ciphertext.substr(0, 1 + cipher.block_size()),
-                           *k, &plaintext);
+  retval = Cipher::Decrypt(ciphertext.substr(0, 1 + cipher.block_size()), *k,
+                           &plaintext);
   EXPECT_EQ("", plaintext);
-  retval = Cipher::Decrypt(ciphertext.substr(0, ciphertext.length()-1),
-                           *k, &plaintext);
+  retval = Cipher::Decrypt(ciphertext.substr(0, ciphertext.length() - 1), *k,
+                           &plaintext);
   EXPECT_EQ("", plaintext);
 }
 

@@ -32,8 +32,8 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
 
   if (vec_split_timestamp.size() > 1) {
     // check if revision number is included
-    std::vector<std::string> vec_split_revision =
-                                       SplitString(vec_split_timestamp[1], 'R');
+    std::vector<std::string> vec_split_revision = SplitString(
+        vec_split_timestamp[1], 'R');
 
     // Get local last modified time
     timestamp = String2Uint64(vec_split_revision[0]);
@@ -47,8 +47,8 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
 
 bool Breadcrumb::Export(const string &fqrn, const string &directory,
                         const int mode) const {
-  string breadcrumb_path = MakeCanonicalPath(directory) +
-                                "/cvmfschecksum." + fqrn;
+  string breadcrumb_path = MakeCanonicalPath(directory) + "/cvmfschecksum."
+                           + fqrn;
   string tmp_path;
   FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
   if (fbreadcrumb == NULL)
@@ -70,9 +70,9 @@ bool Breadcrumb::Export(const string &fqrn, const string &directory,
 }
 
 std::string Breadcrumb::ToString() const {
-  return catalog_hash.ToString()
-                           + "T" + StringifyInt(static_cast<int64_t>(timestamp))
-                           + "R" + StringifyUint(revision);
+  return catalog_hash.ToString() + "T"
+         + StringifyInt(static_cast<int64_t>(timestamp)) + "R"
+         + StringifyUint(revision);
 }
 
 
@@ -80,8 +80,7 @@ std::string Breadcrumb::ToString() const {
 
 
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
-                            const unsigned length)
-{
+                            const unsigned length) {
   map<char, string> content;
   ParseKeyvalMem(buffer, length, &content);
 
@@ -146,8 +145,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     certificate = MkFromHexPtr(shash::HexPtr(iter->second),
                                shash::kSuffixCertificate);
   if ((iter = content.find('H')) != content.end())
-    history = MkFromHexPtr(shash::HexPtr(iter->second),
-                           shash::kSuffixHistory);
+    history = MkFromHexPtr(shash::HexPtr(iter->second), shash::kSuffixHistory);
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
   if ((iter = content.find('G')) != content.end())
@@ -162,8 +160,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   }
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
-                      micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, garbage_collectable,
+                      micro_catalog_hash, repository_name, certificate, history,
+                      publish_timestamp, garbage_collectable,
                       has_alt_catalog_path, meta_info, reflog_hash);
 }
 
@@ -171,29 +169,26 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 Manifest::Manifest(const shash::Any &catalog_hash,
                    const uint64_t catalog_size,
                    const string &root_path)
-  : catalog_hash_(catalog_hash)
-  , catalog_size_(catalog_size)
-  , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
-  , ttl_(catalog::Catalog::kDefaultTTL)
-  , revision_(0)
-  , publish_timestamp_(0)
-  , garbage_collectable_(false)
-  , has_alt_catalog_path_(false)
-{ }
+    : catalog_hash_(catalog_hash)
+    , catalog_size_(catalog_size)
+    , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
+    , ttl_(catalog::Catalog::kDefaultTTL)
+    , revision_(0)
+    , publish_timestamp_(0)
+    , garbage_collectable_(false)
+    , has_alt_catalog_path_(false) { }
 
 
 /**
  * Creates the manifest string
  */
 string Manifest::ExportString() const {
-  string manifest =
-    "C" + catalog_hash_.ToString() + "\n" +
-    "B" + StringifyInt(catalog_size_) + "\n" +
-    "R" + root_path_.ToString() + "\n" +
-    "D" + StringifyInt(ttl_) + "\n" +
-    "S" + StringifyInt(revision_) + "\n" +
-    "G" + StringifyBool(garbage_collectable_) + "\n" +
-    "A" + StringifyBool(has_alt_catalog_path_) + "\n";
+  string manifest = "C" + catalog_hash_.ToString() + "\n" + "B"
+                    + StringifyInt(catalog_size_) + "\n" + "R"
+                    + root_path_.ToString() + "\n" + "D" + StringifyInt(ttl_)
+                    + "\n" + "S" + StringifyInt(revision_) + "\n" + "G"
+                    + StringifyBool(garbage_collectable_) + "\n" + "A"
+                    + StringifyBool(has_alt_catalog_path_) + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
@@ -216,7 +211,6 @@ string Manifest::ExportString() const {
 }
 
 
-
 /**
  * Writes the .cvmfspublished file (unsigned).
  */
@@ -227,9 +221,8 @@ bool Manifest::Export(const std::string &path) const {
 
   string manifest = ExportString();
 
-  if (fwrite(manifest.data(), 1, manifest.length(), fmanifest) !=
-      manifest.length())
-  {
+  if (fwrite(manifest.data(), 1, manifest.length(), fmanifest)
+      != manifest.length()) {
     fclose(fmanifest);
     unlink(path.c_str());
     return false;
@@ -244,8 +237,8 @@ bool Manifest::Export(const std::string &path) const {
  * Writes the cvmfschecksum.$repository file.  Atomic store.
  */
 bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
-  return Breadcrumb(catalog_hash_, publish_timestamp_, revision_).
-                      Export(repository_name_, directory, mode);
+  return Breadcrumb(catalog_hash_, publish_timestamp_, revision_)
+      .Export(repository_name_, directory, mode);
 }
 
 
@@ -253,10 +246,8 @@ bool Manifest::ExportBreadcrumb(const string &directory, const int mode) const {
  * Read the hash and the last-modified time stamp from the
  * cvmfschecksum.$repository file in the given directory.
  */
-Breadcrumb Manifest::ReadBreadcrumb(
-  const std::string &repo_name,
-  const std::string &directory)
-{
+Breadcrumb Manifest::ReadBreadcrumb(const std::string &repo_name,
+                                    const std::string &directory) {
   Breadcrumb breadcrumb;
   const string breadcrumb_path = directory + "/cvmfschecksum." + repo_name;
   FILE *fbreadcrumb = fopen(breadcrumb_path.c_str(), "r");

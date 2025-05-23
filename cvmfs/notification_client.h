@@ -32,22 +32,22 @@ class SignatureManager;
  */
 class NotificationClient : public SingleCopy {
  public:
-  NotificationClient(const std::string& config, const std::string& repo_name,
-                     FuseRemounter* remounter,
-                     download::DownloadManager* dl_mgr,
-                     signature::SignatureManager* sig_mgr);
+  NotificationClient(const std::string &config, const std::string &repo_name,
+                     FuseRemounter *remounter,
+                     download::DownloadManager *dl_mgr,
+                     signature::SignatureManager *sig_mgr);
   virtual ~NotificationClient();
 
   void Spawn();
 
  private:
-  static void* Run(void* instance);
+  static void *Run(void *instance);
 
   std::string config_;
   std::string repo_name_;
-  FuseRemounter* remounter_;
-  download::DownloadManager* dl_mgr_;
-  signature::SignatureManager* sig_mgr_;
+  FuseRemounter *remounter_;
+  download::DownloadManager *dl_mgr_;
+  signature::SignatureManager *sig_mgr_;
   UniquePtr<notify::Subscriber> subscriber_;
   pthread_t thread_;
   bool spawned_;

@@ -3,7 +3,6 @@
  */
 
 #include "gtest/gtest.h"
-
 #include "util/tube.h"
 
 using namespace std;  // NOLINT
@@ -15,15 +14,13 @@ class DummyItem {
   int64_t tag() { return tag_; }
   int64_t tag_;
 };
-}
+}  // namespace
 
 class T_Tube : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 
   Tube<DummyItem> tube_;
 };
@@ -88,8 +85,12 @@ TEST_F(T_Tube, Group) {
   grp2.Dispatch(&c);
   EXPECT_EQ(3U, t2->size());
   EXPECT_EQ(1U, t3->size());
-  x = t2->PopFront();  EXPECT_EQ(&a1, x);
-  x = t2->PopFront();  EXPECT_EQ(&a2, x);
-  x = t2->PopFront();  EXPECT_EQ(&c, x);
-  x = t3->PopFront();  EXPECT_EQ(&b, x);
+  x = t2->PopFront();
+  EXPECT_EQ(&a1, x);
+  x = t2->PopFront();
+  EXPECT_EQ(&a2, x);
+  x = t2->PopFront();
+  EXPECT_EQ(&c, x);
+  x = t3->PopFront();
+  EXPECT_EQ(&b, x);
 }

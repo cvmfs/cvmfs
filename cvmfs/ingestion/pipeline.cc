@@ -24,26 +24,26 @@
 const uint64_t IngestionPipeline::kMaxPipelineMem = 1024 * 1024 * 1024;
 
 IngestionPipeline::IngestionPipeline(
-  upload::AbstractUploader *uploader,
-  const upload::SpoolerDefinition &spooler_definition)
-  : compression_algorithm_(spooler_definition.compression_alg)
-  , hash_algorithm_(spooler_definition.hash_algorithm)
-  , generate_legacy_bulk_chunks_(spooler_definition.generate_legacy_bulk_chunks)
-  , chunking_enabled_(spooler_definition.use_file_chunking)
-  , minimal_chunk_size_(spooler_definition.min_file_chunk_size)
-  , average_chunk_size_(spooler_definition.avg_file_chunk_size)
-  , maximal_chunk_size_(spooler_definition.max_file_chunk_size)
-  , spawned_(false)
-  , uploader_(uploader)
-  , tube_ctr_inflight_pre_(kMaxFilesInFlight)
-{
+    upload::AbstractUploader *uploader,
+    const upload::SpoolerDefinition &spooler_definition)
+    : compression_algorithm_(spooler_definition.compression_alg)
+    , hash_algorithm_(spooler_definition.hash_algorithm)
+    , generate_legacy_bulk_chunks_(
+          spooler_definition.generate_legacy_bulk_chunks)
+    , chunking_enabled_(spooler_definition.use_file_chunking)
+    , minimal_chunk_size_(spooler_definition.min_file_chunk_size)
+    , average_chunk_size_(spooler_definition.avg_file_chunk_size)
+    , maximal_chunk_size_(spooler_definition.max_file_chunk_size)
+    , spawned_(false)
+    , uploader_(uploader)
+    , tube_ctr_inflight_pre_(kMaxFilesInFlight) {
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
     tubes_register_.TakeTube(tube);
-    TaskRegister *task = new TaskRegister(tube,
-      &tube_ctr_inflight_pre_, &tube_ctr_inflight_post_);
+    TaskRegister *task = new TaskRegister(tube, &tube_ctr_inflight_pre_,
+                                          &tube_ctr_inflight_post_);
     task->RegisterListener(&IngestionPipeline::OnFileProcessed, this);
     tasks_register_.TakeConsumer(task);
   }
@@ -67,7 +67,7 @@ IngestionPipeline::IngestionPipeline(
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_compress_.TakeTube(t);
     tasks_compress_.TakeConsumer(
-      new TaskCompress(t, &tubes_hash_, &item_allocator_));
+        new TaskCompress(t, &tubes_hash_, &item_allocator_));
   }
   tubes_compress_.Activate();
 
@@ -75,7 +75,7 @@ IngestionPipeline::IngestionPipeline(
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
     tasks_chunk_.TakeConsumer(
-      new TaskChunk(t, &tubes_compress_, &item_allocator_));
+        new TaskChunk(t, &tubes_compress_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
@@ -90,8 +90,8 @@ IngestionPipeline::IngestionPipeline(
            "pipeline memory thresholds %" PRIu64 "/%" PRIu64 " M",
            low / (1024 * 1024), high / (1024 * 1024));
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read =
-      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
+    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_,
+                                       &item_allocator_);
     task_read->SetWatermarks(low, high);
     tasks_read_.TakeConsumer(task_read);
   }
@@ -111,27 +111,23 @@ IngestionPipeline::~IngestionPipeline() {
 
 
 void IngestionPipeline::OnFileProcessed(
-  const upload::SpoolerResult &spooler_result)
-{
+    const upload::SpoolerResult &spooler_result) {
   NotifyListeners(spooler_result);
 }
 
 
-void IngestionPipeline::Process(
-  IngestionSource* source,
-  bool allow_chunking,
-  shash::Suffix hash_suffix)
-{
-  FileItem *file_item = new FileItem(
-    source,
-    minimal_chunk_size_,
-    average_chunk_size_,
-    maximal_chunk_size_,
-    compression_algorithm_,
-    hash_algorithm_,
-    hash_suffix,
-    allow_chunking && chunking_enabled_,
-    generate_legacy_bulk_chunks_);
+void IngestionPipeline::Process(IngestionSource *source,
+                                bool allow_chunking,
+                                shash::Suffix hash_suffix) {
+  FileItem *file_item = new FileItem(source,
+                                     minimal_chunk_size_,
+                                     average_chunk_size_,
+                                     maximal_chunk_size_,
+                                     compression_algorithm_,
+                                     hash_algorithm_,
+                                     hash_suffix,
+                                     allow_chunking && chunking_enabled_,
+                                     generate_legacy_bulk_chunks_);
   tube_ctr_inflight_post_.EnqueueBack(file_item);
   tube_ctr_inflight_pre_.EnqueueBack(file_item);
   tube_input_.EnqueueBack(file_item);
@@ -149,9 +145,7 @@ void IngestionPipeline::Spawn() {
 }
 
 
-void IngestionPipeline::WaitFor() {
-  tube_ctr_inflight_post_.Wait();
-}
+void IngestionPipeline::WaitFor() { tube_ctr_inflight_post_.Wait(); }
 
 
 //------------------------------------------------------------------------------
@@ -172,8 +166,8 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 
     case BlockItem::kBlockStop:
       assert(!chunk_item->hash_ptr()->IsNull());
-      NotifyListeners(ScrubbingResult(file_item->path(),
-                                      *chunk_item->hash_ptr()));
+      NotifyListeners(
+          ScrubbingResult(file_item->path(), *chunk_item->hash_ptr()));
       delete block_item;
       delete chunk_item;
       delete file_item;
@@ -190,16 +184,14 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 
 
 ScrubbingPipeline::ScrubbingPipeline()
-  : spawned_(false)
-  , tube_counter_(kMaxFilesInFlight)
-{
+    : spawned_(false), tube_counter_(kMaxFilesInFlight) {
   unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
     Tube<BlockItem> *tube = new Tube<BlockItem>();
     tubes_scrubbing_callback_.TakeTube(tube);
-    TaskScrubbingCallback *task =
-      new TaskScrubbingCallback(tube, &tube_counter_);
+    TaskScrubbingCallback *task = new TaskScrubbingCallback(tube,
+                                                            &tube_counter_);
     task->RegisterListener(&ScrubbingPipeline::OnFileProcessed, this);
     tasks_scrubbing_callback_.TakeConsumer(task);
   }
@@ -215,14 +207,13 @@ ScrubbingPipeline::ScrubbingPipeline()
   for (unsigned i = 0; i < nfork_base * kNforkChunk; ++i) {
     Tube<BlockItem> *t = new Tube<BlockItem>();
     tubes_chunk_.TakeTube(t);
-    tasks_chunk_.TakeConsumer(
-      new TaskChunk(t, &tubes_hash_, &item_allocator_));
+    tasks_chunk_.TakeConsumer(new TaskChunk(t, &tubes_hash_, &item_allocator_));
   }
   tubes_chunk_.Activate();
 
   for (unsigned i = 0; i < nfork_base * kNforkRead; ++i) {
-    TaskRead *task_read =
-      new TaskRead(&tube_input_, &tubes_chunk_, &item_allocator_);
+    TaskRead *task_read = new TaskRead(&tube_input_, &tubes_chunk_,
+                                       &item_allocator_);
     task_read->SetWatermarks(kMemLowWatermark, kMemHighWatermark);
     tasks_read_.TakeConsumer(task_read);
   }
@@ -240,25 +231,18 @@ ScrubbingPipeline::~ScrubbingPipeline() {
 
 
 void ScrubbingPipeline::OnFileProcessed(
-  const ScrubbingResult &scrubbing_result)
-{
+    const ScrubbingResult &scrubbing_result) {
   NotifyListeners(scrubbing_result);
 }
 
 
-void ScrubbingPipeline::Process(
-  IngestionSource *source,
-  shash::Algorithms hash_algorithm,
-  shash::Suffix hash_suffix)
-{
-  FileItem *file_item = new FileItem(
-    source,
-    0, 0, 0,
-    zlib::kNoCompression,
-    hash_algorithm,
-    hash_suffix,
-    false,  /* may_have_chunks */
-    true  /* hash_legacy_bulk_chunk */);
+void ScrubbingPipeline::Process(IngestionSource *source,
+                                shash::Algorithms hash_algorithm,
+                                shash::Suffix hash_suffix) {
+  FileItem *file_item = new FileItem(source, 0, 0, 0, zlib::kNoCompression,
+                                     hash_algorithm, hash_suffix,
+                                     false, /* may_have_chunks */
+                                     true /* hash_legacy_bulk_chunk */);
   tube_counter_.EnqueueBack(file_item);
   tube_input_.EnqueueBack(file_item);
 }
@@ -273,6 +257,4 @@ void ScrubbingPipeline::Spawn() {
 }
 
 
-void ScrubbingPipeline::WaitFor() {
-  tube_counter_.Wait();
-}
+void ScrubbingPipeline::WaitFor() { tube_counter_.Wait(); }

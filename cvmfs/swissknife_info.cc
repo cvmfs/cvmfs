@@ -9,7 +9,6 @@
 
 #include "swissknife_info.h"
 
-
 #include <string>
 
 #include "crypto/hash.h"
@@ -27,8 +26,8 @@ namespace swissknife {
  * Checks if the given path looks like a remote path
  */
 static bool IsRemote(const string &repository) {
-  return HasPrefix(repository, "http://", false) ||
-         HasPrefix(repository, "https://", false);
+  return HasPrefix(repository, "http://", false)
+         || HasPrefix(repository, "https://", false);
 }
 
 /**
@@ -77,16 +76,16 @@ ParameterList CommandInfo::GetParams() const {
 
 int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
-    unsigned log_level =
-      kLogLevel0 << String2Uint64(*args.find('l')->second);
+    unsigned log_level = kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
-  const string mount_point =
-      (args.find('u') != args.end()) ? *args.find('u')->second : "";
+  const string mount_point = (args.find('u') != args.end())
+                                 ? *args.find('u')->second
+                                 : "";
   const string repository = MakeCanonicalPath(*args.find('r')->second);
 
   // sanity check
@@ -97,8 +96,9 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   if (IsRemote(repository)) {
     const bool follow_redirects = args.count('L') > 0;
-    const string proxy =
-      (args.find('@') != args.end()) ? *args.find('@')->second : "";
+    const string proxy = (args.find('@') != args.end())
+                             ? *args.find('@')->second
+                             : "";
     if (!this->InitDownloadManager(follow_redirects, proxy)) {
       return 1;
     }
@@ -115,7 +115,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Empty Repository:                " : "",
              StringifyBool(is_empty).c_str());
-    if (is_empty) return 0;
+    if (is_empty)
+      return 0;
   }
 
   // Load manifest file
@@ -166,8 +167,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     assert(!mount_point.empty());
     const std::string root_hash_xattr = "user.root_hash";
     std::string root_hash;
-    const bool success =
-        platform_getxattr(mount_point, root_hash_xattr, &root_hash);
+    const bool success = platform_getxattr(mount_point, root_hash_xattr,
+                                           &root_hash);
     if (!success) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "failed to retrieve extended attribute "
@@ -185,8 +186,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     assert(!mount_point.empty());
     const std::string external_data_xattr = "user.external_data";
     std::string external_data;
-    const bool success =
-        platform_getxattr(mount_point, external_data_xattr, &external_data);
+    const bool success = platform_getxattr(mount_point, external_data_xattr,
+                                           &external_data);
     if (!success) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "failed to retrieve extended attribute "
@@ -261,7 +262,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(reinterpret_cast<char*>(metainfo_memsink.data()),
+    string info(reinterpret_cast<char *>(metainfo_memsink.data()),
                 metainfo_memsink.pos());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }

@@ -23,7 +23,7 @@
  */
 class CvmfsEnvironment : public ::testing::Environment {
  private:
-  static const char* kSandboxEnvVariable;
+  static const char *kSandboxEnvVariable;
 
  public:
   CvmfsEnvironment(const int argc, char **argv);
@@ -49,8 +49,8 @@ class CvmfsEnvironment : public ::testing::Environment {
   void RemoveSandbox();
 
  private:
-  const bool   is_death_test_execution_;
-  std::string  sandbox_;
+  const bool is_death_test_execution_;
+  std::string sandbox_;
 };
 
-#endif  /* TEST_UNITTESTS_ENV_H_ */
+#endif /* TEST_UNITTESTS_ENV_H_ */

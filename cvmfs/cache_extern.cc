@@ -100,8 +100,8 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
       bool retval = transport_.RecvFrame(rpc_job->frame_recv());
       assert(retval);
       if (rpc_job->frame_recv()->IsMsgOutOfBand()) {
-        google::protobuf::MessageLite *msg_typed =
-          rpc_job->frame_recv()->GetMsgTyped();
+        google::protobuf::MessageLite *msg_typed = rpc_job->frame_recv()
+                                                       ->GetMsgTyped();
         assert(msg_typed->GetTypeName() == "cvmfs.MsgDetach");
         quota_mgr_->BroadcastBackchannels("R");  //  release pinned catalogs
         rpc_job->frame_recv()->Reset(save_att_size);
@@ -173,9 +173,8 @@ int ExternalCacheManager::CommitTxn(void *txn) {
 }
 
 
-int ExternalCacheManager::ConnectLocator(
-  const std::string &locator, bool print_error)
-{
+int ExternalCacheManager::ConnectLocator(const std::string &locator,
+                                         bool print_error) {
   vector<string> tokens = SplitString(locator, '=');
   int result = -1;
   if (tokens[0] == "unix") {
@@ -200,19 +199,17 @@ int ExternalCacheManager::ConnectLocator(
     }
     return -EIO;
   }
-  LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-           "connected to cache plugin at %s", locator.c_str());
+  LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "connected to cache plugin at %s",
+           locator.c_str());
   return result;
 }
 
 
-ExternalCacheManager *ExternalCacheManager::Create(
-  int fd_connection,
-  unsigned max_open_fds,
-  const string &ident)
-{
+ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
+                                                   unsigned max_open_fds,
+                                                   const string &ident) {
   UniquePtr<ExternalCacheManager> cache_mgr(
-    new ExternalCacheManager(fd_connection, max_open_fds));
+      new ExternalCacheManager(fd_connection, max_open_fds));
   assert(cache_mgr.IsValid());
 
   cvmfs::MsgHandshake msg_handshake;
@@ -228,8 +225,8 @@ ExternalCacheManager *ExternalCacheManager::Create(
   google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
   if (msg_typed->GetTypeName() != "cvmfs.MsgHandshakeAck")
     return NULL;
-  cvmfs::MsgHandshakeAck *msg_ack =
-    reinterpret_cast<cvmfs::MsgHandshakeAck *>(msg_typed);
+  cvmfs::MsgHandshakeAck *msg_ack = reinterpret_cast<cvmfs::MsgHandshakeAck *>(
+      msg_typed);
   cache_mgr->session_id_ = msg_ack->session_id();
   cache_mgr->capabilities_ = msg_ack->capabilities();
   cache_mgr->max_object_size_ = msg_ack->max_object_size();
@@ -259,9 +256,7 @@ ExternalCacheManager *ExternalCacheManager::Create(
  * retry connecting.
  */
 ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
-  const std::string &locator,
-  const std::vector<std::string> &cmd_line)
-{
+    const std::string &locator, const std::vector<std::string> &cmd_line) {
   UniquePtr<PluginHandle> plugin_handle(new PluginHandle());
   unsigned num_attempts = 0;
   bool try_again = false;
@@ -275,8 +270,8 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
     if (plugin_handle->IsValid()) {
       break;
     } else if (plugin_handle->fd_connection_ == -EINVAL) {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-               "Invalid locator: %s", locator.c_str());
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "Invalid locator: %s",
+               locator.c_str());
       plugin_handle->error_msg_ = "Invalid locator: " + locator;
       break;
     } else {
@@ -295,25 +290,21 @@ ExternalCacheManager::PluginHandle *ExternalCacheManager::CreatePlugin(
 }
 
 
-void ExternalCacheManager::CtrlTxn(
-  const Label &label,
-  const int flags,
-  void *txn)
-{
+void ExternalCacheManager::CtrlTxn(const Label &label,
+                                   const int flags,
+                                   void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->label = label;
   transaction->label_modified = true;
 }
 
 
-string ExternalCacheManager::Describe() {
-  return "External cache manager\n";
-}
+string ExternalCacheManager::Describe() { return "External cache manager\n"; }
 
 
 bool ExternalCacheManager::DoFreeState(void *data) {
-  FdTable<ReadOnlyHandle> *fd_table =
-    reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
+  FdTable<ReadOnlyHandle>
+      *fd_table = reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
   delete fd_table;
   return true;
 }
@@ -350,8 +341,8 @@ int ExternalCacheManager::DoRestoreState(void *data) {
   }
   ReadOnlyHandle handle_root = fd_table_.GetHandle(0);
 
-  FdTable<ReadOnlyHandle> *other =
-    reinterpret_cast<FdTable<ReadOnlyHandle> *>(data);
+  FdTable<ReadOnlyHandle> *other = reinterpret_cast<FdTable<ReadOnlyHandle> *>(
+      data);
   fd_table_.AssignFrom(*other);
   cvmfs::MsgIoctl msg_ioctl;
   msg_ioctl.set_session_id(session_id_);
@@ -388,18 +379,16 @@ int ExternalCacheManager::Dup(int fd) {
 }
 
 
-ExternalCacheManager::ExternalCacheManager(
-  int fd_connection,
-  unsigned max_open_fds)
-  : pid_plugin_(0)
-  , fd_table_(max_open_fds, ReadOnlyHandle())
-  , transport_(fd_connection)
-  , session_id_(-1)
-  , max_object_size_(0)
-  , spawned_(false)
-  , terminated_(false)
-  , capabilities_(cvmfs::CAP_NONE)
-{
+ExternalCacheManager::ExternalCacheManager(int fd_connection,
+                                           unsigned max_open_fds)
+    : pid_plugin_(0)
+    , fd_table_(max_open_fds, ReadOnlyHandle())
+    , transport_(fd_connection)
+    , session_id_(-1)
+    , max_object_size_(0)
+    , spawned_(false)
+    , terminated_(false)
+    , capabilities_(cvmfs::CAP_NONE) {
   int retval = pthread_rwlock_init(&rwlock_fd_table_, NULL);
   assert(retval == 0);
   retval = pthread_mutex_init(&lock_send_fd_, NULL);
@@ -434,7 +423,8 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
   if (transaction->committed)
     return 0;
   LogCvmfs(kLogCache, kLogDebug, "flushing %u bytes for %s",
-           transaction->buf_pos, std::string(transaction->id.ToString()).c_str());
+           transaction->buf_pos,
+           std::string(transaction->id.ToString()).c_str());
   cvmfs::MsgHash object_id;
   transport_.FillMsgHash(transaction->id, &object_id);
   cvmfs::MsgStoreReq msg_store;
@@ -500,8 +490,8 @@ int64_t ExternalCacheManager::GetSize(int fd) {
 
 
 void *ExternalCacheManager::MainRead(void *data) {
-  ExternalCacheManager *cache_mgr =
-    reinterpret_cast<ExternalCacheManager *>(data);
+  ExternalCacheManager *cache_mgr = reinterpret_cast<ExternalCacheManager *>(
+      data);
   LogCvmfs(kLogCache, kLogDebug, "starting external cache reader thread");
 
   unsigned char buffer[cache_mgr->max_object_size_];
@@ -548,8 +538,8 @@ void *ExternalCacheManager::MainRead(void *data) {
         RpcJob *rpc_job = cache_mgr->inflight_rpcs_[i].rpc_job;
         if ((rpc_job->req_id() == req_id) && (rpc_job->part_nr() == part_nr)) {
           rpc_inflight = cache_mgr->inflight_rpcs_[i];
-          cache_mgr->inflight_rpcs_.erase(
-            cache_mgr->inflight_rpcs_.begin() + i);
+          cache_mgr->inflight_rpcs_.erase(cache_mgr->inflight_rpcs_.begin()
+                                          + i);
           break;
         }
       }
@@ -600,12 +590,10 @@ int ExternalCacheManager::OpenFromTxn(void *txn) {
 }
 
 
-int64_t ExternalCacheManager::Pread(
-  int fd,
-  void *buf,
-  uint64_t size,
-  uint64_t offset)
-{
+int64_t ExternalCacheManager::Pread(int fd,
+                                    void *buf,
+                                    uint64_t size,
+                                    uint64_t offset) {
   shash::Any id = GetHandle(fd);
   if (id == kInvalidHandle)
     return -EBADF;
@@ -614,8 +602,8 @@ int64_t ExternalCacheManager::Pread(
   transport_.FillMsgHash(id, &object_id);
   uint64_t nbytes = 0;
   while (nbytes < size) {
-    uint64_t batch_size =
-      std::min(size - nbytes, static_cast<uint64_t>(max_object_size_));
+    uint64_t batch_size = std::min(size - nbytes,
+                                   static_cast<uint64_t>(max_object_size_));
     cvmfs::MsgReadReq msg_read;
     msg_read.set_session_id(session_id_);
     msg_read.set_req_id(NextRequestId());
@@ -679,8 +667,7 @@ int ExternalCacheManager::Reset(void *txn) {
 
 
 manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
-  const std::string &fqrn)
-{
+    const std::string &fqrn) {
   if (!(capabilities_ & cvmfs::CAP_BREADCRUMB))
     return manifest::Breadcrumb();
 
@@ -807,11 +794,9 @@ bool ExternalCacheManager::SpawnPlugin(const vector<string> &cmd_line) {
 }
 
 
-int ExternalCacheManager::StartTxn(
-  const shash::Any &id,
-  uint64_t size,
-  void *txn)
-{
+int ExternalCacheManager::StartTxn(const shash::Any &id,
+                                   uint64_t size,
+                                   void *txn) {
   if (!(capabilities_ & cvmfs::CAP_WRITE))
     return -EROFS;
 
@@ -819,8 +804,8 @@ int ExternalCacheManager::StartTxn(
   transaction->expected_size = size;
   transaction->transaction_id = NextRequestId();
 #ifdef __APPLE__
-  transaction->buffer =
-    reinterpret_cast<unsigned char *>(smalloc(max_object_size_));
+  transaction->buffer = reinterpret_cast<unsigned char *>(
+      smalloc(max_object_size_));
 #endif
   return 0;
 }
@@ -829,8 +814,8 @@ int ExternalCacheManager::StartTxn(
 int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   assert(!transaction->committed);
-  LogCvmfs(kLogCache, kLogDebug, "writing %" PRIu64 " bytes for %s",
-           size, transaction->id.ToString().c_str());
+  LogCvmfs(kLogCache, kLogDebug, "writing %" PRIu64 " bytes for %s", size,
+           transaction->id.ToString().c_str());
 
   if (transaction->expected_size != kSizeUnknown) {
     if (transaction->size + size > transaction->expected_size) {
@@ -871,10 +856,8 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 //------------------------------------------------------------------------------
 
 
-bool ExternalQuotaManager::DoListing(
-  cvmfs::EnumObjectType type,
-  vector<cvmfs::MsgListRecord> *result)
-{
+bool ExternalQuotaManager::DoListing(cvmfs::EnumObjectType type,
+                                     vector<cvmfs::MsgListRecord> *result) {
   if (!(cache_mgr_->capabilities_ & cvmfs::CAP_LIST))
     return false;
 
@@ -920,10 +903,9 @@ bool ExternalQuotaManager::Cleanup(const uint64_t leave_size) {
 
 
 ExternalQuotaManager *ExternalQuotaManager::Create(
-  ExternalCacheManager *cache_mgr)
-{
+    ExternalCacheManager *cache_mgr) {
   UniquePtr<ExternalQuotaManager> quota_mgr(
-    new ExternalQuotaManager(cache_mgr));
+      new ExternalQuotaManager(cache_mgr));
   assert(quota_mgr.IsValid());
 
   return quota_mgr.Release();
@@ -1064,10 +1046,8 @@ vector<string> ExternalQuotaManager::ListVolatile() {
 }
 
 
-void ExternalQuotaManager::RegisterBackChannel(
-  int back_channel[2],
-  const string &channel_id)
-{
+void ExternalQuotaManager::RegisterBackChannel(int back_channel[2],
+                                               const string &channel_id) {
   shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
   MakePipe(back_channel);
   LockBackChannels();
@@ -1077,10 +1057,8 @@ void ExternalQuotaManager::RegisterBackChannel(
 }
 
 
-void ExternalQuotaManager::UnregisterBackChannel(
-  int back_channel[2],
-  const string &channel_id)
-{
+void ExternalQuotaManager::UnregisterBackChannel(int back_channel[2],
+                                                 const string &channel_id) {
   shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
   LockBackChannels();
   back_channels_.erase(hash_id);

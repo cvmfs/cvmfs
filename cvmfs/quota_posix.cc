@@ -66,9 +66,9 @@ int PosixQuotaManager::BindReturnPipe(int pipe_wronly) {
     return pipe_wronly;
 
   // Connect writer's end
-  int result =
-    open((workspace_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
-         O_WRONLY | O_NONBLOCK);
+  int result = open(
+      (workspace_dir_ + "/pipe" + StringifyInt(pipe_wronly)).c_str(),
+      O_WRONLY | O_NONBLOCK);
   if (result >= 0) {
     Nonblock2Block(result);
   } else {
@@ -80,11 +80,11 @@ int PosixQuotaManager::BindReturnPipe(int pipe_wronly) {
 
 
 void PosixQuotaManager::CheckHighPinWatermark() {
-  const uint64_t watermark = kHighPinWatermark*cleanup_threshold_/100;
+  const uint64_t watermark = kHighPinWatermark * cleanup_threshold_ / 100;
   if ((cleanup_threshold_ > 0) && (pinned_ > watermark)) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "high watermark of pinned files (%" PRIu64 "M > %" PRIu64 "M)",
-             pinned_/(1024*1024), watermark/(1024*1024));
+             pinned_ / (1024 * 1024), watermark / (1024 * 1024));
     BroadcastBackchannels("R");  // clients: please release pinned catalogs
   }
 }
@@ -144,20 +144,34 @@ bool PosixQuotaManager::Cleanup(const uint64_t leave_size) {
 
 
 void PosixQuotaManager::CloseDatabase() {
-  if (stmt_list_catalogs_) sqlite3_finalize(stmt_list_catalogs_);
-  if (stmt_list_pinned_) sqlite3_finalize(stmt_list_pinned_);
-  if (stmt_list_volatile_) sqlite3_finalize(stmt_list_volatile_);
-  if (stmt_list_) sqlite3_finalize(stmt_list_);
-  if (stmt_lru_) sqlite3_finalize(stmt_lru_);
-  if (stmt_rm_) sqlite3_finalize(stmt_rm_);
-  if (stmt_rm_batch_) sqlite3_finalize(stmt_rm_batch_);
-  if (stmt_size_) sqlite3_finalize(stmt_size_);
-  if (stmt_touch_) sqlite3_finalize(stmt_touch_);
-  if (stmt_unpin_) sqlite3_finalize(stmt_unpin_);
-  if (stmt_block_) sqlite3_finalize(stmt_block_);
-  if (stmt_unblock_) sqlite3_finalize(stmt_unblock_);
-  if (stmt_new_) sqlite3_finalize(stmt_new_);
-  if (database_) sqlite3_close(database_);
+  if (stmt_list_catalogs_)
+    sqlite3_finalize(stmt_list_catalogs_);
+  if (stmt_list_pinned_)
+    sqlite3_finalize(stmt_list_pinned_);
+  if (stmt_list_volatile_)
+    sqlite3_finalize(stmt_list_volatile_);
+  if (stmt_list_)
+    sqlite3_finalize(stmt_list_);
+  if (stmt_lru_)
+    sqlite3_finalize(stmt_lru_);
+  if (stmt_rm_)
+    sqlite3_finalize(stmt_rm_);
+  if (stmt_rm_batch_)
+    sqlite3_finalize(stmt_rm_batch_);
+  if (stmt_size_)
+    sqlite3_finalize(stmt_size_);
+  if (stmt_touch_)
+    sqlite3_finalize(stmt_touch_);
+  if (stmt_unpin_)
+    sqlite3_finalize(stmt_unpin_);
+  if (stmt_block_)
+    sqlite3_finalize(stmt_block_);
+  if (stmt_unblock_)
+    sqlite3_finalize(stmt_unblock_);
+  if (stmt_new_)
+    sqlite3_finalize(stmt_new_);
+  if (database_)
+    sqlite3_close(database_);
   UnlockFile(fd_lock_cachedb_);
 
   stmt_list_catalogs_ = NULL;
@@ -196,8 +210,8 @@ bool PosixQuotaManager::Contains(const string &hash_str) {
   if (sqlite3_step(stmt_size_) == SQLITE_ROW)
     result = true;
   sqlite3_reset(stmt_size_);
-  LogCvmfs(kLogQuota, kLogDebug, "contains %s returns %d",
-           hash_str.c_str(), result);
+  LogCvmfs(kLogQuota, kLogDebug, "contains %s returns %d", hash_str.c_str(),
+           result);
 
   return result;
 }
@@ -211,8 +225,8 @@ void PosixQuotaManager::CheckFreeSpace() {
   int retval = statvfs((cache_dir_ + "/cachedb").c_str(), &vfs_info);
   if (retval != 0) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
-             "failed to query %s for free space (%d)",
-             cache_dir_.c_str(), errno);
+             "failed to query %s for free space (%d)", cache_dir_.c_str(),
+             errno);
     return;
   }
   int64_t free_space_byte = vfs_info.f_bavail * vfs_info.f_bsize;
@@ -229,20 +243,20 @@ void PosixQuotaManager::CheckFreeSpace() {
 }
 
 
-PosixQuotaManager *PosixQuotaManager::Create(
-  const string &cache_workspace,
-  const uint64_t limit,
-  const uint64_t cleanup_threshold,
-  const bool rebuild_database)
-{
+PosixQuotaManager *PosixQuotaManager::Create(const string &cache_workspace,
+                                             const uint64_t limit,
+                                             const uint64_t cleanup_threshold,
+                                             const bool rebuild_database) {
   if (cleanup_threshold >= limit) {
-    LogCvmfs(kLogQuota, kLogDebug, "invalid parameters: limit %" PRIu64 ", "
-             "cleanup_threshold %" PRIu64, limit, cleanup_threshold);
+    LogCvmfs(kLogQuota, kLogDebug,
+             "invalid parameters: limit %" PRIu64 ", "
+             "cleanup_threshold %" PRIu64,
+             limit, cleanup_threshold);
     return NULL;
   }
 
-  PosixQuotaManager *quota_manager =
-    new PosixQuotaManager(limit, cleanup_threshold, cache_workspace);
+  PosixQuotaManager *quota_manager = new PosixQuotaManager(
+      limit, cleanup_threshold, cache_workspace);
 
   // Initialize cache catalog
   if (!quota_manager->InitDatabase(rebuild_database)) {
@@ -262,12 +276,11 @@ PosixQuotaManager *PosixQuotaManager::Create(
  * Connects to a running shared local quota manager.  Creates one if necessary.
  */
 PosixQuotaManager *PosixQuotaManager::CreateShared(
-  const std::string &exe_path,
-  const std::string &cache_workspace,
-  const uint64_t limit,
-  const uint64_t cleanup_threshold,
-  bool foreground)
-{
+    const std::string &exe_path,
+    const std::string &cache_workspace,
+    const uint64_t limit,
+    const uint64_t cleanup_threshold,
+    bool foreground) {
   string cache_dir;
   string workspace_dir;
   ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
@@ -282,8 +295,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     return NULL;
   }
 
-  PosixQuotaManager *quota_mgr =
-    new PosixQuotaManager(limit, cleanup_threshold, cache_workspace);
+  PosixQuotaManager *quota_mgr = new PosixQuotaManager(limit, cleanup_threshold,
+                                                       cache_workspace);
   quota_mgr->shared_ = true;
   quota_mgr->spawned_ = true;
 
@@ -292,14 +305,18 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
-    const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR, 0600);
+    const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(),
+                                    O_RDWR, 0600);
     unsigned lockfile_magicnumber = 0;
-    const ssize_t result_mn = SafeRead(fd_lockfile_rw, &lockfile_magicnumber, sizeof(lockfile_magicnumber));
-    const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+    const ssize_t result_mn = SafeRead(fd_lockfile_rw, &lockfile_magicnumber,
+                                       sizeof(lockfile_magicnumber));
+    const ssize_t result = SafeRead(fd_lockfile_rw, &new_cachemgr_pid,
+                                    sizeof(new_cachemgr_pid));
     close(fd_lockfile_rw);
 
-    if ((lockfile_magicnumber != kLockFileMagicNumber) || (result < 0) || (result_mn < 0)
-         || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
+    if ((lockfile_magicnumber != kLockFileMagicNumber) || (result < 0)
+        || (result_mn < 0)
+        || (static_cast<size_t>(result) < sizeof(new_cachemgr_pid))) {
       if (result != 0) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                  "could not read cache manager pid from lockfile");
@@ -377,7 +394,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   command_line.push_back(StringifyInt(cleanup_threshold));
   // do not propagate foreground in order to reliably get pid from exec
   // instead, daemonize right here
-  command_line.push_back(StringifyInt(true)); //foreground
+  command_line.push_back(StringifyInt(true));  // foreground
   command_line.push_back(StringifyInt(GetLogSyslogLevel()));
   command_line.push_back(StringifyInt(GetLogSyslogFacility()));
   command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
@@ -393,8 +410,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     retval = ManagedExec(command_line, preserve_filedes, map<int, int>(),
                          /*drop_credentials*/ false,
                          /*clear_env*/ false,
-                         /*double_fork*/  true,
-                         &new_cachemgr_pid);
+                         /*double_fork*/ true, &new_cachemgr_pid);
   } else {
     retval = ExecAsDaemon(command_line, &new_cachemgr_pid);
   }
@@ -408,10 +424,13 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   }
   LogCvmfs(kLogQuota, kLogDebug, "new cache manager pid: %d", new_cachemgr_pid);
   quota_mgr->SetCacheMgrPid(new_cachemgr_pid);
-  const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(), O_RDWR | O_TRUNC, 0600);
+  const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(),
+                                  O_RDWR | O_TRUNC, 0600);
   const unsigned magic_number = PosixQuotaManager::kLockFileMagicNumber;
-  const bool result_mn = SafeWrite(fd_lockfile_rw, &magic_number, sizeof(magic_number));
-  const bool result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid, sizeof(new_cachemgr_pid));
+  const bool result_mn = SafeWrite(fd_lockfile_rw, &magic_number,
+                                   sizeof(magic_number));
+  const bool result = SafeWrite(fd_lockfile_rw, &new_cachemgr_pid,
+                                sizeof(new_cachemgr_pid));
   if (!result || !result_mn) {
     PANIC(kLogSyslogErr, "could not write cache manager pid to lockfile");
   }
@@ -462,7 +481,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
 
   quota_mgr->initialized_ = true;
   quota_mgr->GetLimits(&quota_mgr->limit_, &quota_mgr->cleanup_threshold_);
-  LogCvmfs(kLogQuota, kLogDebug, "received limit %" PRIu64 ", "
+  LogCvmfs(kLogQuota, kLogDebug,
+           "received limit %" PRIu64 ", "
            "threshold %" PRIu64,
            quota_mgr->limit_, quota_mgr->cleanup_threshold_);
   return quota_mgr;
@@ -475,7 +495,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
   // TODO(jblomer) transaction
   LogCvmfs(kLogQuota, kLogSyslog | kLogDebug,
-           "clean up cache until at most %lu KB is used", leave_size/1024);
+           "clean up cache until at most %lu KB is used", leave_size / 1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %" PRIu64, gauge_);
   cleanup_recorder_.Tick();
 
@@ -488,8 +508,9 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   int64_t max_acseq = -1;
   do {
     sqlite3_reset(stmt_lru_);
-    sqlite3_bind_int64(stmt_lru_, 1, (max_acseq == -1) ?
-                       std::numeric_limits<int64_t>::min() : (max_acseq + 1));
+    sqlite3_bind_int64(stmt_lru_, 1,
+                       (max_acseq == -1) ? std::numeric_limits<int64_t>::min()
+                                         : (max_acseq + 1));
 
     std::vector<EvictCandidate> candidates;
     candidates.reserve(kEvictBatchSize);
@@ -497,13 +518,13 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     unsigned i = 0;
     while (sqlite3_step(stmt_lru_) == SQLITE_ROW) {
       hash_str = reinterpret_cast<const char *>(
-        sqlite3_column_text(stmt_lru_, 0));
+          sqlite3_column_text(stmt_lru_, 0));
       LogCvmfs(kLogQuota, kLogDebug, "add %s to candidates for eviction",
                hash_str.c_str());
-      candidates.push_back(EvictCandidate(
-        shash::MkFromHexPtr(shash::HexPtr(hash_str)),
-        sqlite3_column_int64(stmt_lru_, 1),
-        sqlite3_column_int64(stmt_lru_, 2)));
+      candidates.push_back(
+          EvictCandidate(shash::MkFromHexPtr(shash::HexPtr(hash_str)),
+                         sqlite3_column_int64(stmt_lru_, 1),
+                         sqlite3_column_int64(stmt_lru_, 2)));
       i++;
     }
     if (candidates.empty()) {
@@ -528,8 +549,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
         continue;
       }
 
-      trash.push_back(cache_dir_ + "/" +
-                      candidates[i].hash.MakePathWithoutSuffix());
+      trash.push_back(cache_dir_ + "/"
+                      + candidates[i].hash.MakePathWithoutSuffix());
       gauge_ -= candidates[i].size;
       max_acseq = candidates[i].acseq;
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
@@ -557,7 +578,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   if (gauge_ > leave_size) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
              "request to clean until %" PRIu64 ", "
-             "but effective gauge is %" PRIu64, leave_size, gauge_);
+             "but effective gauge is %" PRIu64,
+             leave_size, gauge_);
     return false;
   }
   return true;
@@ -603,27 +625,26 @@ bool PosixQuotaManager::EmptyTrash(const std::vector<std::string> &trash) {
 }
 
 
-void PosixQuotaManager::DoInsert(
-  const shash::Any &hash,
-  const uint64_t size,
-  const string &description,
-  const CommandType command_type)
-{
+void PosixQuotaManager::DoInsert(const shash::Any &hash,
+                                 const uint64_t size,
+                                 const string &description,
+                                 const CommandType command_type) {
   const string hash_str = hash.ToString();
   LogCvmfs(kLogQuota, kLogDebug, "insert into lru %s, path %s, method %d",
            hash_str.c_str(), description.c_str(), command_type);
-  const unsigned desc_length = (description.length() > kMaxDescription) ?
-    kMaxDescription : description.length();
+  const unsigned desc_length = (description.length() > kMaxDescription)
+                                   ? kMaxDescription
+                                   : description.length();
 
-  LruCommand *cmd =
-    reinterpret_cast<LruCommand *>(alloca(sizeof(LruCommand) + desc_length));
+  LruCommand *cmd = reinterpret_cast<LruCommand *>(
+      alloca(sizeof(LruCommand) + desc_length));
   new (cmd) LruCommand;
   cmd->command_type = command_type;
   cmd->SetSize(size);
   cmd->StoreHash(hash);
   cmd->desc_length = desc_length;
-  memcpy(reinterpret_cast<char *>(cmd)+sizeof(LruCommand),
-         &description[0], desc_length);
+  memcpy(reinterpret_cast<char *>(cmd) + sizeof(LruCommand), &description[0],
+         desc_length);
   WritePipe(pipe_lru_[1], cmd, sizeof(LruCommand) + desc_length);
 }
 
@@ -670,8 +691,8 @@ uint64_t PosixQuotaManager::GetCapacity() {
 }
 
 
-void PosixQuotaManager::GetLimits(uint64_t *limit, uint64_t *cleanup_threshold)
-{
+void PosixQuotaManager::GetLimits(uint64_t *limit,
+                                  uint64_t *cleanup_threshold) {
   int pipe_limits[2];
   MakeReturnPipe(pipe_limits);
 
@@ -764,18 +785,21 @@ bool PosixQuotaManager::SetSharedLimit(uint64_t limit) {
 }
 
 
-bool PosixQuotaManager::SetLimit( uint64_t size) {
+bool PosixQuotaManager::SetLimit(uint64_t size) {
   if (!spawned_) {
-     limit_ = size;
-     cleanup_threshold_ = size/2;
-     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", limit_, cleanup_threshold_ ); 
-     return true;
+    limit_ = size;
+    cleanup_threshold_ = size / 2;
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+             "Quota limit set to %lu / threshold %lu", limit_,
+             cleanup_threshold_);
+    return true;
   }
   return SetSharedLimit(size);
 }
 
 uint64_t PosixQuotaManager::GetSize() {
-  if (!spawned_) return gauge_;
+  if (!spawned_)
+    return gauge_;
   uint64_t gauge, size_pinned;
   GetSharedStatus(&gauge, &size_pinned);
   return gauge;
@@ -783,7 +807,8 @@ uint64_t PosixQuotaManager::GetSize() {
 
 
 uint64_t PosixQuotaManager::GetSizePinned() {
-  if (!spawned_) return pinned_;
+  if (!spawned_)
+    return pinned_;
   uint64_t gauge, size_pinned;
   GetSharedStatus(&gauge, &size_pinned);
   return size_pinned;
@@ -791,7 +816,8 @@ uint64_t PosixQuotaManager::GetSizePinned() {
 
 
 uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
-  if (!spawned_ || (protocol_revision_ < 2)) return 0;
+  if (!spawned_ || (protocol_revision_ < 2))
+    return 0;
   uint64_t cleanup_rate;
 
   int pipe_cleanup_rate[2];
@@ -801,7 +827,8 @@ uint64_t PosixQuotaManager::GetCleanupRate(uint64_t period_s) {
   cmd.size = period_s;
   cmd.return_pipe = pipe_cleanup_rate[1];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  ManagedReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate, sizeof(cleanup_rate));
+  ManagedReadHalfPipe(pipe_cleanup_rate[0], &cleanup_rate,
+                      sizeof(cleanup_rate));
   CloseReturnPipe(pipe_cleanup_rate);
 
   return cleanup_rate;
@@ -827,7 +854,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
     unlink((db_file + "-journal").c_str());
   }
 
- init_recover:
+init_recover:
   int err = sqlite3_open(db_file.c_str(), &database_);
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
@@ -835,17 +862,17 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   }
   // TODO(reneme): make this a `QuotaDatabase : public sqlite::Database`
   sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
-    "PRAGMA auto_vacuum=1; "
-    "CREATE TABLE IF NOT EXISTS cache_catalog (sha1 TEXT, size INTEGER, "
-    "  acseq INTEGER, path TEXT, type INTEGER, pinned INTEGER, "
-    "CONSTRAINT pk_cache_catalog PRIMARY KEY (sha1)); "
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_catalog_acseq "
-    "  ON cache_catalog (acseq); "
-    "CREATE TEMP TABLE fscache (sha1 TEXT, size INTEGER, actime INTEGER, "
-    "CONSTRAINT pk_fscache PRIMARY KEY (sha1)); "
-    "CREATE INDEX idx_fscache_actime ON fscache (actime); "
-    "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
-    "  CONSTRAINT pk_properties PRIMARY KEY(key));";
+        "PRAGMA auto_vacuum=1; "
+        "CREATE TABLE IF NOT EXISTS cache_catalog (sha1 TEXT, size INTEGER, "
+        "  acseq INTEGER, path TEXT, type INTEGER, pinned INTEGER, "
+        "CONSTRAINT pk_cache_catalog PRIMARY KEY (sha1)); "
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_catalog_acseq "
+        "  ON cache_catalog (acseq); "
+        "CREATE TEMP TABLE fscache (sha1 TEXT, size INTEGER, actime INTEGER, "
+        "CONSTRAINT pk_fscache PRIMARY KEY (sha1)); "
+        "CREATE INDEX idx_fscache_actime ON fscache (actime); "
+        "CREATE TABLE IF NOT EXISTS properties (key TEXT, value TEXT, "
+        "  CONSTRAINT pk_properties PRIMARY KEY(key));";
   err = sqlite3_exec(database_, sql.c_str(), NULL, NULL, NULL);
   if (err != SQLITE_OK) {
     if (!retry) {
@@ -888,7 +915,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
 
   // Set schema version
   sql = "INSERT OR REPLACE INTO properties (key, value) "
-  "VALUES ('schema', '1.0')";
+        "VALUES ('schema', '1.0')";
   err = sqlite3_exec(database_, sql.c_str(), NULL, NULL, NULL);
   if (err != SQLITE_OK) {
     LogCvmfs(kLogQuota, kLogDebug, "could not init cache database (failed: %s)",
@@ -933,7 +960,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   sql = "SELECT coalesce(max(acseq & (~(1<<63))), 0) FROM cache_catalog;";
   sqlite3_prepare_v2(database_, sql.c_str(), -1, &stmt, NULL);
   if (sqlite3_step(stmt) == SQLITE_ROW) {
-    seq_ = sqlite3_column_int64(stmt, 0)+1;
+    seq_ = sqlite3_column_int64(stmt, 0) + 1;
   } else {
     LogCvmfs(kLogQuota, kLogDebug, "could not determine highest seq-no");
     sqlite3_finalize(stmt);
@@ -944,13 +971,20 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   // Prepare touch, new, remove statements
   sqlite3_prepare_v2(database_,
                      "UPDATE cache_catalog SET acseq=:seq | (acseq&(1<<63)) "
-                     "WHERE sha1=:sha1;", -1, &stmt_touch_, NULL);
-  sqlite3_prepare_v2(database_, "UPDATE cache_catalog SET pinned=0 "
-                     "WHERE sha1=:sha1;", -1, &stmt_unpin_, NULL);
-  sqlite3_prepare_v2(database_, "UPDATE cache_catalog SET pinned=2 "
-                     "WHERE sha1=:sha1;", -1, &stmt_block_, NULL);
-  sqlite3_prepare_v2(database_, "UPDATE cache_catalog SET pinned=1 "
-                     "WHERE pinned=2;", -1, &stmt_unblock_, NULL);
+                     "WHERE sha1=:sha1;",
+                     -1, &stmt_touch_, NULL);
+  sqlite3_prepare_v2(database_,
+                     "UPDATE cache_catalog SET pinned=0 "
+                     "WHERE sha1=:sha1;",
+                     -1, &stmt_unpin_, NULL);
+  sqlite3_prepare_v2(database_,
+                     "UPDATE cache_catalog SET pinned=2 "
+                     "WHERE sha1=:sha1;",
+                     -1, &stmt_block_, NULL);
+  sqlite3_prepare_v2(database_,
+                     "UPDATE cache_catalog SET pinned=1 "
+                     "WHERE pinned=2;",
+                     -1, &stmt_unblock_, NULL);
   sqlite3_prepare_v2(database_,
                      "INSERT OR REPLACE INTO cache_catalog "
                      "(sha1, size, acseq, path, type, pinned) "
@@ -964,29 +998,33 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   sqlite3_prepare_v2(database_,
                      "DELETE FROM cache_catalog WHERE acseq<=:a AND pinned<>2;",
                      -1, &stmt_rm_batch_, NULL);
-  sqlite3_prepare_v2(database_, (std::string(
-                     "SELECT sha1, size, acseq FROM cache_catalog "
-                     "WHERE pinned<>2 AND acseq>=:a "
-                     "ORDER BY acseq ASC "
-                     "LIMIT ") + StringifyInt(kEvictBatchSize) + ";").c_str(),
+  sqlite3_prepare_v2(database_,
+                     (std::string("SELECT sha1, size, acseq FROM cache_catalog "
+                                  "WHERE pinned<>2 AND acseq>=:a "
+                                  "ORDER BY acseq ASC "
+                                  "LIMIT ")
+                      + StringifyInt(kEvictBatchSize) + ";")
+                         .c_str(),
                      -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(database_,
-                     ("SELECT path FROM cache_catalog WHERE type=" +
-                      StringifyInt(kFileRegular) +
-                      ";").c_str(), -1, &stmt_list_, NULL);
+                     ("SELECT path FROM cache_catalog WHERE type="
+                      + StringifyInt(kFileRegular) + ";")
+                         .c_str(),
+                     -1, &stmt_list_, NULL);
   sqlite3_prepare_v2(database_,
-                     "SELECT path FROM cache_catalog WHERE pinned<>0;",
-                     -1, &stmt_list_pinned_, NULL);
+                     "SELECT path FROM cache_catalog WHERE pinned<>0;", -1,
+                     &stmt_list_pinned_, NULL);
   sqlite3_prepare_v2(database_,
-                     "SELECT path FROM cache_catalog WHERE acseq < 0;",
-                     -1, &stmt_list_volatile_, NULL);
+                     "SELECT path FROM cache_catalog WHERE acseq < 0;", -1,
+                     &stmt_list_volatile_, NULL);
   sqlite3_prepare_v2(database_,
-                     ("SELECT path FROM cache_catalog WHERE type=" +
-                      StringifyInt(kFileCatalog) +
-                      ";").c_str(), -1, &stmt_list_catalogs_, NULL);
+                     ("SELECT path FROM cache_catalog WHERE type="
+                      + StringifyInt(kFileCatalog) + ";")
+                         .c_str(),
+                     -1, &stmt_list_catalogs_, NULL);
   return true;
 
- init_database_fail:
+init_database_fail:
   sqlite3_close(database_);
   database_ = NULL;
   UnlockFile(fd_lock_cachedb_);
@@ -998,11 +1036,9 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
  * Inserts a new file into cache catalog.  This file gets a new,
  * highest sequence number. Does cache cleanup if necessary.
  */
-void PosixQuotaManager::Insert(
-  const shash::Any &any_hash,
-  const uint64_t size,
-  const string &description)
-{
+void PosixQuotaManager::Insert(const shash::Any &any_hash,
+                               const uint64_t size,
+                               const string &description) {
   DoInsert(any_hash, size, description, kInsert);
 }
 
@@ -1012,11 +1048,9 @@ void PosixQuotaManager::Insert(
  * and gets a new highest sequence number with the first bit set.  Cache cleanup
  * treats these files with priority.
  */
-void PosixQuotaManager::InsertVolatile(
-  const shash::Any &any_hash,
-  const uint64_t size,
-  const string &description)
-{
+void PosixQuotaManager::InsertVolatile(const shash::Any &any_hash,
+                                       const uint64_t size,
+                                       const string &description) {
   DoInsert(any_hash, size, description, kInsertVolatile);
 }
 
@@ -1024,17 +1058,13 @@ void PosixQuotaManager::InsertVolatile(
 /**
  * Lists all path names from the cache db.
  */
-vector<string> PosixQuotaManager::List() {
-  return DoList(kList);
-}
+vector<string> PosixQuotaManager::List() { return DoList(kList); }
 
 
 /**
  * Lists all pinned files from the cache db.
  */
-vector<string> PosixQuotaManager::ListPinned() {
-  return DoList(kListPinned);
-}
+vector<string> PosixQuotaManager::ListPinned() { return DoList(kListPinned); }
 
 
 /**
@@ -1057,7 +1087,6 @@ vector<string> PosixQuotaManager::ListVolatile() {
  * Entry point for the shared cache manager process
  */
 int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
-	
   LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
@@ -1094,10 +1123,11 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
-  const int fd_lockfile_fifo =
-    LockFile(shared_manager.workspace_dir_ + "/lock_cachemgr.fifo");
+  const int fd_lockfile_fifo = LockFile(shared_manager.workspace_dir_
+                                        + "/lock_cachemgr.fifo");
   if (fd_lockfile_fifo < 0) {
-    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr, "could not open lock file "
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "could not open lock file "
              "%s (%d)",
              (shared_manager.workspace_dir_ + "/lock_cachemgr.fifo").c_str(),
              errno);
@@ -1116,8 +1146,8 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
 
   // Redirect SQlite temp directory to cache (global variable)
   const string tmp_dir = shared_manager.workspace_dir_;
-  sqlite3_temp_directory =
-    static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
+  sqlite3_temp_directory = static_cast<char *>(
+      sqlite3_malloc(tmp_dir.length() + 1));
   snprintf(sqlite3_temp_directory, tmp_dir.length() + 1, "%s", tmp_dir.c_str());
 
   // Cleanup leftover named pipes
@@ -1132,8 +1162,8 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   // Save protocol revision to file.  If the file is not found, it indicates
   // to the client that the cache manager is from times before the protocol
   // was versioned.
-  const string protocol_revision_path =
-    shared_manager.workspace_dir_ + "/cachemgr.protocol";
+  const string protocol_revision_path = shared_manager.workspace_dir_
+                                        + "/cachemgr.protocol";
   retval = open(protocol_revision_path.c_str(), O_WRONLY | O_CREAT, 0600);
   if (retval < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
@@ -1198,29 +1228,29 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
   sqlite3_soft_heap_limit(quota_mgr->kSqliteMemPerThread);
 
   LruCommand command_buffer[kCommandBufferSize];
-  char description_buffer[kCommandBufferSize*kMaxDescription];
+  char description_buffer[kCommandBufferSize * kMaxDescription];
   unsigned num_commands = 0;
 
   while (read(quota_mgr->pipe_lru_[0], &command_buffer[num_commands],
-              sizeof(command_buffer[0])) == sizeof(command_buffer[0]))
-  {
+              sizeof(command_buffer[0]))
+         == sizeof(command_buffer[0])) {
     const CommandType command_type = command_buffer[num_commands].command_type;
     LogCvmfs(kLogQuota, kLogDebug, "received command %d", command_type);
     const uint64_t size = command_buffer[num_commands].GetSize();
 
     // Inserts and pins come with a description (usually a path)
-    if ((command_type == kInsert) || (command_type == kInsertVolatile) ||
-        (command_type == kPin) || (command_type == kPinRegular))
-    {
+    if ((command_type == kInsert) || (command_type == kInsertVolatile)
+        || (command_type == kPin) || (command_type == kPinRegular)) {
       const int desc_length = command_buffer[num_commands].desc_length;
       ReadPipe(quota_mgr->pipe_lru_[0],
-               &description_buffer[kMaxDescription*num_commands], desc_length);
+               &description_buffer[kMaxDescription * num_commands],
+               desc_length);
     }
 
     // The protocol revision is returned immediately
     if (command_type == kGetProtocolRevision) {
-      int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
       WritePipe(return_pipe, &quota_mgr->kProtocolRevision,
@@ -1231,8 +1261,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // The cleanup rate is returned immediately
     if (command_type == kCleanupRate) {
-      int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
       uint64_t period_s = size;  // use the size field to transmit the period
@@ -1243,13 +1273,15 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     }
 
     if (command_type == kSetLimit) {
-      const int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
-      quota_mgr->limit_ = size; // use the size field to transmit the size
-      quota_mgr->cleanup_threshold_ = size/2;
-      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog, "Quota limit set to %lu / threshold %lu", quota_mgr->limit_, quota_mgr->cleanup_threshold_ );
+      quota_mgr->limit_ = size;  // use the size field to transmit the size
+      quota_mgr->cleanup_threshold_ = size / 2;
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+               "Quota limit set to %lu / threshold %lu", quota_mgr->limit_,
+               quota_mgr->cleanup_threshold_);
       bool ret = true;
       WritePipe(return_pipe, &ret, sizeof(ret));
       quota_mgr->UnbindReturnPipe(return_pipe);
@@ -1259,19 +1291,18 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     // Reservations are handled immediately and "out of band"
     if (command_type == kReserve) {
       bool success = true;
-      int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
 
       const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
-      LogCvmfs(kLogQuota, kLogDebug, "reserve %lu bytes for %s",
-               size, hash_str.c_str());
+      LogCvmfs(kLogQuota, kLogDebug, "reserve %lu bytes for %s", size,
+               hash_str.c_str());
 
-      if (quota_mgr->pinned_chunks_.find(hash) ==
-          quota_mgr->pinned_chunks_.end())
-      {
+      if (quota_mgr->pinned_chunks_.find(hash)
+          == quota_mgr->pinned_chunks_.end()) {
         if ((quota_mgr->pinned_ + size) > quota_mgr->cleanup_threshold_) {
           LogCvmfs(kLogQuota, kLogDebug,
                    "failed to insert %s (pinned), no space", hash_str.c_str());
@@ -1290,8 +1321,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
     // Back channels are also handled out of band
     if (command_type == kRegisterBackChannel) {
-      int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0)
         continue;
 
@@ -1302,8 +1333,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
              shash::kDigestSizes[shash::kMd5]);
 
       quota_mgr->LockBackChannels();
-      map<shash::Md5, int>::const_iterator iter =
-        quota_mgr->back_channels_.find(hash);
+      map<shash::Md5, int>::const_iterator iter = quota_mgr->back_channels_
+                                                      .find(hash);
       if (iter != quota_mgr->back_channels_.end()) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                  "closing left-over back channel %s", hash.ToString().c_str());
@@ -1326,11 +1357,11 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
              shash::kDigestSizes[shash::kMd5]);
 
       quota_mgr->LockBackChannels();
-      map<shash::Md5, int>::iterator iter =
-        quota_mgr->back_channels_.find(hash);
+      map<shash::Md5, int>::iterator iter = quota_mgr->back_channels_.find(
+          hash);
       if (iter != quota_mgr->back_channels_.end()) {
-        LogCvmfs(kLogQuota, kLogDebug,
-                 "closing back channel %s", hash.ToString().c_str());
+        LogCvmfs(kLogQuota, kLogDebug, "closing back channel %s",
+                 hash.ToString().c_str());
         close(iter->second);
         quota_mgr->back_channels_.erase(iter);
       } else {
@@ -1347,17 +1378,16 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       const shash::Any hash = command_buffer[num_commands].RetrieveHash();
       const string hash_str(hash.ToString());
 
-      map<shash::Any, uint64_t>::iterator iter =
-        quota_mgr->pinned_chunks_.find(hash);
+      map<shash::Any, uint64_t>::iterator iter = quota_mgr->pinned_chunks_.find(
+          hash);
       if (iter != quota_mgr->pinned_chunks_.end()) {
         quota_mgr->pinned_ -= iter->second;
         quota_mgr->pinned_chunks_.erase(iter);
         // It can happen that files get pinned that were removed from the cache
         // (see cache.cc).  We fix this at this point, where we remove such
         // entries from the cache database.
-        if (!FileExists(quota_mgr->cache_dir_ + "/" +
-                        hash.MakePathWithoutSuffix()))
-        {
+        if (!FileExists(quota_mgr->cache_dir_ + "/"
+                        + hash.MakePathWithoutSuffix())) {
           LogCvmfs(kLogQuota, kLogDebug,
                    "remove orphaned pinned hash %s from cache database",
                    hash_str.c_str());
@@ -1385,24 +1415,29 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     }
 
     // Immediate commands trigger flushing of the buffer
-    bool immediate_command = (command_type == kCleanup) ||
-      (command_type == kList) || (command_type == kListPinned) ||
-      (command_type == kListCatalogs) || (command_type == kListVolatile) ||
-      (command_type == kRemove) || (command_type == kStatus) ||
-      (command_type == kLimits) || (command_type == kPid);
-    if (!immediate_command) num_commands++;
+    bool immediate_command = (command_type == kCleanup)
+                             || (command_type == kList)
+                             || (command_type == kListPinned)
+                             || (command_type == kListCatalogs)
+                             || (command_type == kListVolatile)
+                             || (command_type == kRemove)
+                             || (command_type == kStatus)
+                             || (command_type == kLimits)
+                             || (command_type == kPid);
+    if (!immediate_command)
+      num_commands++;
 
-    if ((num_commands == kCommandBufferSize) || immediate_command)
-    {
+    if ((num_commands == kCommandBufferSize) || immediate_command) {
       quota_mgr->ProcessCommandBunch(num_commands, command_buffer,
                                      description_buffer);
-      if (!immediate_command) num_commands = 0;
+      if (!immediate_command)
+        num_commands = 0;
     }
 
     if (immediate_command) {
       // Process cleanup, listings
-      int return_pipe =
-        quota_mgr->BindReturnPipe(command_buffer[num_commands].return_pipe);
+      int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
       if (return_pipe < 0) {
         num_commands = 0;
         continue;
@@ -1447,27 +1482,31 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
           sqlite3_reset(quota_mgr->stmt_size_);
 
           WritePipe(return_pipe, &success, sizeof(success));
-          break; }
+          break;
+        }
         case kCleanup:
           retval = quota_mgr->DoCleanup(size);
           WritePipe(return_pipe, &retval, sizeof(retval));
           break;
         case kList:
-          if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_;
+          if (!this_stmt_list)
+            this_stmt_list = quota_mgr->stmt_list_;
         case kListPinned:
-          if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_pinned_;
+          if (!this_stmt_list)
+            this_stmt_list = quota_mgr->stmt_list_pinned_;
         case kListCatalogs:
-          if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_catalogs_;
+          if (!this_stmt_list)
+            this_stmt_list = quota_mgr->stmt_list_catalogs_;
         case kListVolatile:
-          if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_volatile_;
+          if (!this_stmt_list)
+            this_stmt_list = quota_mgr->stmt_list_volatile_;
 
           // Pipe back the list, one by one
           int length;
           while (sqlite3_step(this_stmt_list) == SQLITE_ROW) {
             string path = "(NULL)";
             if (sqlite3_column_type(this_stmt_list, 0) != SQLITE_NULL) {
-              path = string(
-                reinterpret_cast<const char *>(
+              path = string(reinterpret_cast<const char *>(
                   sqlite3_column_text(this_stmt_list, 0)));
             }
             length = path.length();
@@ -1509,10 +1548,11 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
 
   // Unpin
   command_buffer[0].command_type = kTouch;
-  for (map<shash::Any, uint64_t>::const_iterator i =
-       quota_mgr->pinned_chunks_.begin(),
-       iEnd = quota_mgr->pinned_chunks_.end(); i != iEnd; ++i)
-  {
+  for (map<shash::Any, uint64_t>::const_iterator
+           i = quota_mgr->pinned_chunks_.begin(),
+           iEnd = quota_mgr->pinned_chunks_.end();
+       i != iEnd;
+       ++i) {
     command_buffer[0].StoreHash(i->first);
     quota_mgr->ProcessCommandBunch(1, command_buffer, description_buffer);
   }
@@ -1545,11 +1585,9 @@ void PosixQuotaManager::MakeReturnPipe(int pipe[2]) {
 }
 
 
-void PosixQuotaManager::ParseDirectories(
-  const std::string cache_workspace,
-  std::string *cache_dir,
-  std::string *workspace_dir)
-{
+void PosixQuotaManager::ParseDirectories(const std::string cache_workspace,
+                                         std::string *cache_dir,
+                                         std::string *workspace_dir) {
   vector<string> dir_tokens(SplitString(cache_workspace, ':'));
   switch (dir_tokens.size()) {
     case 1:
@@ -1570,17 +1608,15 @@ void PosixQuotaManager::ParseDirectories(
  *
  * \return True on success, false otherwise
  */
-bool PosixQuotaManager::Pin(
-  const shash::Any &hash,
-  const uint64_t size,
-  const string &description,
-  const bool is_catalog)
-{
+bool PosixQuotaManager::Pin(const shash::Any &hash,
+                            const uint64_t size,
+                            const string &description,
+                            const bool is_catalog) {
   assert((size > 0) || !is_catalog);
 
   const string hash_str = hash.ToString();
-  LogCvmfs(kLogQuota, kLogDebug, "pin into lru %s, path %s",
-           hash_str.c_str(), description.c_str());
+  LogCvmfs(kLogQuota, kLogDebug, "pin into lru %s, path %s", hash_str.c_str(),
+           description.c_str());
 
   // Has to run when not yet spawned (cvmfs initialization)
   if (!spawned_) {
@@ -1614,7 +1650,8 @@ bool PosixQuotaManager::Pin(
     int retval = sqlite3_step(stmt_new_);
     assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));
     sqlite3_reset(stmt_new_);
-    if (!exists) gauge_ += size;
+    if (!exists)
+      gauge_ += size;
     return true;
   }
 
@@ -1631,59 +1668,59 @@ bool PosixQuotaManager::Pin(
   ManagedReadHalfPipe(pipe_reserve[0], &result, sizeof(result));
   CloseReturnPipe(pipe_reserve);
 
-  if (!result) return false;
+  if (!result)
+    return false;
   DoInsert(hash, size, description, is_catalog ? kPin : kPinRegular);
 
   return true;
 }
 
 
-PosixQuotaManager::PosixQuotaManager(
-  const uint64_t limit,
-  const uint64_t cleanup_threshold,
-  const string &cache_workspace)
-  : shared_(false)
-  , spawned_(false)
-  , limit_(limit)
-  , cleanup_threshold_(cleanup_threshold)
-  , gauge_(0)
-  , pinned_(0)
-  , seq_(0)
-  , cache_dir_()  // initialized in body
-  , workspace_dir_()  // initialized in body
-  , fd_lock_cachedb_(-1)
-  , async_delete_(true)
-  , cachemgr_pid_(0)
-  , database_(NULL)
-  , stmt_touch_(NULL)
-  , stmt_unpin_(NULL)
-  , stmt_block_(NULL)
-  , stmt_unblock_(NULL)
-  , stmt_new_(NULL)
-  , stmt_lru_(NULL)
-  , stmt_size_(NULL)
-  , stmt_rm_(NULL)
-  , stmt_rm_batch_(NULL)
-  , stmt_list_(NULL)
-  , stmt_list_pinned_(NULL)
-  , stmt_list_catalogs_(NULL)
-  , stmt_list_volatile_(NULL)
-  , initialized_(false)
-{
+PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
+                                     const uint64_t cleanup_threshold,
+                                     const string &cache_workspace)
+    : shared_(false)
+    , spawned_(false)
+    , limit_(limit)
+    , cleanup_threshold_(cleanup_threshold)
+    , gauge_(0)
+    , pinned_(0)
+    , seq_(0)
+    , cache_dir_()      // initialized in body
+    , workspace_dir_()  // initialized in body
+    , fd_lock_cachedb_(-1)
+    , async_delete_(true)
+    , cachemgr_pid_(0)
+    , database_(NULL)
+    , stmt_touch_(NULL)
+    , stmt_unpin_(NULL)
+    , stmt_block_(NULL)
+    , stmt_unblock_(NULL)
+    , stmt_new_(NULL)
+    , stmt_lru_(NULL)
+    , stmt_size_(NULL)
+    , stmt_rm_(NULL)
+    , stmt_rm_batch_(NULL)
+    , stmt_list_(NULL)
+    , stmt_list_pinned_(NULL)
+    , stmt_list_catalogs_(NULL)
+    , stmt_list_volatile_(NULL)
+    , initialized_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
   // last 1.5 h with minute resolution
-  cleanup_recorder_.AddRecorder(60, 90*60);
+  cleanup_recorder_.AddRecorder(60, 90 * 60);
   // last 18 hours with 20 min resolution
-  cleanup_recorder_.AddRecorder(20*60, 60*60*18);
+  cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
-  cleanup_recorder_.AddRecorder(60*60, 60*60*24*4);
+  cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
 }
 
 
 PosixQuotaManager::~PosixQuotaManager() {
-  if (!initialized_) return;
+  if (!initialized_)
+    return;
 
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
@@ -1704,11 +1741,9 @@ PosixQuotaManager::~PosixQuotaManager() {
 }
 
 
-void PosixQuotaManager::ProcessCommandBunch(
-  const unsigned num,
-  const LruCommand *commands,
-  const char *descriptions)
-{
+void PosixQuotaManager::ProcessCommandBunch(const unsigned num,
+                                            const LruCommand *commands,
+                                            const char *descriptions) {
   int retval = sqlite3_exec(database_, "BEGIN", NULL, NULL, NULL);
   assert(retval == SQLITE_OK);
 
@@ -1716,8 +1751,8 @@ void PosixQuotaManager::ProcessCommandBunch(
     const shash::Any hash = commands[i].RetrieveHash();
     const string hash_str = hash.ToString();
     const unsigned size = commands[i].GetSize();
-    LogCvmfs(kLogQuota, kLogDebug, "processing %s (%d)",
-             hash_str.c_str(), commands[i].command_type);
+    LogCvmfs(kLogQuota, kLogDebug, "processing %s (%d)", hash_str.c_str(),
+             commands[i].command_type);
 
     bool exists;
     switch (commands[i].command_type) {
@@ -1727,7 +1762,7 @@ void PosixQuotaManager::ProcessCommandBunch(
                           SQLITE_STATIC);
         retval = sqlite3_step(stmt_touch_);
         LogCvmfs(kLogQuota, kLogDebug, "touching %s (%ld): %d",
-                 hash_str.c_str(), seq_-1, retval);
+                 hash_str.c_str(), seq_ - 1, retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
           PANIC(kLogSyslogErr, "failed to update %s in cachedb, error %d",
                 hash_str.c_str(), retval);
@@ -1738,8 +1773,8 @@ void PosixQuotaManager::ProcessCommandBunch(
         sqlite3_bind_text(stmt_unpin_, 1, &hash_str[0], hash_str.length(),
                           SQLITE_STATIC);
         retval = sqlite3_step(stmt_unpin_);
-        LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d",
-                 hash_str.c_str(), retval);
+        LogCvmfs(kLogQuota, kLogDebug, "unpinning %s: %d", hash_str.c_str(),
+                 retval);
         if ((retval != SQLITE_DONE) && (retval != SQLITE_OK)) {
           PANIC(kLogSyslogErr, "failed to unpin %s in cachedb, error %d",
                 hash_str.c_str(), retval);
@@ -1770,13 +1805,16 @@ void PosixQuotaManager::ProcessCommandBunch(
         } else {
           sqlite3_bind_int64(stmt_new_, 3, seq_++);
         }
-        sqlite3_bind_text(stmt_new_, 4, &descriptions[i*kMaxDescription],
+        sqlite3_bind_text(stmt_new_, 4, &descriptions[i * kMaxDescription],
                           commands[i].desc_length, SQLITE_STATIC);
-        sqlite3_bind_int64(stmt_new_, 5, (commands[i].command_type == kPin) ?
-                           kFileCatalog : kFileRegular);
+        sqlite3_bind_int64(
+            stmt_new_, 5,
+            (commands[i].command_type == kPin) ? kFileCatalog : kFileRegular);
         sqlite3_bind_int64(stmt_new_, 6,
-          ((commands[i].command_type == kPin) ||
-           (commands[i].command_type == kPinRegular)) ? 1 : 0);
+                           ((commands[i].command_type == kPin)
+                            || (commands[i].command_type == kPinRegular))
+                               ? 1
+                               : 0);
         retval = sqlite3_step(stmt_new_);
         LogCvmfs(kLogQuota, kLogDebug, "insert or replace %s, method %d: %d",
                  hash_str.c_str(), commands[i].command_type, retval);
@@ -1786,7 +1824,8 @@ void PosixQuotaManager::ProcessCommandBunch(
         }
         sqlite3_reset(stmt_new_);
 
-        if (!exists) gauge_ += size;
+        if (!exists)
+          gauge_ += size;
         break;
       default:
         // other types should have been taken care of by event loop
@@ -1828,8 +1867,10 @@ bool PosixQuotaManager::RebuildDatabase() {
 
   // Insert files from cache sub-directories 00 - ff
   // TODO(jblomer): fs_traversal
-  sqlite3_prepare_v2(database_, "INSERT INTO fscache (sha1, size, actime) "
-                     "VALUES (:sha1, :s, :t);", -1, &stmt_insert, NULL);
+  sqlite3_prepare_v2(database_,
+                     "INSERT INTO fscache (sha1, size, actime) "
+                     "VALUES (:sha1, :s, :t);",
+                     -1, &stmt_insert, NULL);
 
   for (int i = 0; i <= 0xff; i++) {
     snprintf(hex, sizeof(hex), "%02x", i);
@@ -1877,15 +1918,16 @@ bool PosixQuotaManager::RebuildDatabase() {
 
   // Transfer from temp table in cache catalog
   sqlite3_prepare_v2(database_,
-                     "SELECT sha1, size FROM fscache ORDER BY actime;",
-                     -1, &stmt_select, NULL);
-  sqlite3_prepare_v2(database_,
-    "INSERT INTO cache_catalog (sha1, size, acseq, path, type, pinned) "
-    "VALUES (:sha1, :s, :seq, 'unknown (automatic rebuild)', :t, 0);",
-    -1, &stmt_insert, NULL);
+                     "SELECT sha1, size FROM fscache ORDER BY actime;", -1,
+                     &stmt_select, NULL);
+  sqlite3_prepare_v2(
+      database_,
+      "INSERT INTO cache_catalog (sha1, size, acseq, path, type, pinned) "
+      "VALUES (:sha1, :s, :seq, 'unknown (automatic rebuild)', :t, 0);",
+      -1, &stmt_insert, NULL);
   while (sqlite3_step(stmt_select) == SQLITE_ROW) {
     const string hash = string(
-      reinterpret_cast<const char *>(sqlite3_column_text(stmt_select, 0)));
+        reinterpret_cast<const char *>(sqlite3_column_text(stmt_select, 0)));
     sqlite3_bind_text(stmt_insert, 1, &hash[0], hash.length(), SQLITE_STATIC);
     sqlite3_bind_int64(stmt_insert, 2, sqlite3_column_int64(stmt_select, 1));
     sqlite3_bind_int64(stmt_insert, 3, seq++);
@@ -1896,8 +1938,8 @@ bool PosixQuotaManager::RebuildDatabase() {
     if (retval != SQLITE_DONE) {
       // If the file system hosting the cache is full, we'll likely notice here
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
-               "could not insert into cache catalog (%d - %s)",
-               retval, sqlite3_errstr(retval));
+               "could not insert into cache catalog (%d - %s)", retval,
+               sqlite3_errstr(retval));
       goto build_return;
     }
     sqlite3_reset(stmt_insert);
@@ -1915,13 +1957,16 @@ bool PosixQuotaManager::RebuildDatabase() {
   seq_ = seq;
   result = true;
   LogCvmfs(kLogQuota, kLogDebug,
-           "rebuilding finished, sequence %" PRIu64 ", gauge %" PRIu64,
-           seq_, gauge_);
+           "rebuilding finished, sequence %" PRIu64 ", gauge %" PRIu64, seq_,
+           gauge_);
 
- build_return:
-  if (stmt_insert) sqlite3_finalize(stmt_insert);
-  if (stmt_select) sqlite3_finalize(stmt_select);
-  if (dirp) closedir(dirp);
+build_return:
+  if (stmt_insert)
+    sqlite3_finalize(stmt_insert);
+  if (stmt_select)
+    sqlite3_finalize(stmt_select);
+  if (dirp)
+    closedir(dirp);
   return result;
 }
 
@@ -1930,10 +1975,8 @@ bool PosixQuotaManager::RebuildDatabase() {
  * Register a channel that allows the cache manager to trigger action to its
  * clients.  Currently used for releasing pinned catalogs.
  */
-void PosixQuotaManager::RegisterBackChannel(
-  int back_channel[2],
-  const string &channel_id)
-{
+void PosixQuotaManager::RegisterBackChannel(int back_channel[2],
+                                            const string &channel_id) {
   if (protocol_revision_ >= 1) {
     shash::Md5 hash = shash::Md5(shash::AsciiPtr(channel_id));
     MakeReturnPipe(back_channel);
@@ -1987,8 +2030,8 @@ void PosixQuotaManager::Spawn() {
     return;
 
   if (pthread_create(&thread_lru_, NULL, MainCommandServer,
-      static_cast<void *>(this)) != 0)
-  {
+                     static_cast<void *>(this))
+      != 0) {
     PANIC(kLogDebug, "could not create lru thread");
   }
 
@@ -2029,10 +2072,8 @@ void PosixQuotaManager::Unpin(const shash::Any &hash) {
 }
 
 
-void PosixQuotaManager::UnregisterBackChannel(
-  int back_channel[2],
-  const string &channel_id)
-{
+void PosixQuotaManager::UnregisterBackChannel(int back_channel[2],
+                                              const string &channel_id) {
   if (protocol_revision_ >= 1) {
     shash::Md5 hash = shash::Md5(shash::AsciiPtr(channel_id));
 
@@ -2057,7 +2098,7 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
     // try only as long as the cachemgr is still alive
   } while (!result && getpgid(cachemgr_pid_) >= 0);
   if (!result) {
-    PANIC(kLogStderr, "Error: quota manager could not read from cachemanager pipe");
+    PANIC(kLogStderr,
+          "Error: quota manager could not read from cachemanager pipe");
   }
-
 }

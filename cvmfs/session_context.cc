@@ -8,7 +8,6 @@
 #include <limits>
 
 #include "curl/curl.h"
-
 #include "gateway_util.h"
 #include "json_document.h"
 #include "json_document_write.h"
@@ -22,12 +21,12 @@ namespace {
 // purposes. Note that we use uint32_t so that the Tube code works
 // correctly with this limit on 32bit systems.
 const uint32_t kMaxNumJobs = std::numeric_limits<uint32_t>::max();
-}
+}  // namespace
 
 namespace upload {
 
-size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
-  CurlSendPayload* payload = static_cast<CurlSendPayload*>(userp);
+size_t SendCB(void *ptr, size_t size, size_t nmemb, void *userp) {
+  CurlSendPayload *payload = static_cast<CurlSendPayload *>(userp);
 
   size_t max_chunk_size = size * nmemb;
   if (max_chunk_size < 1) {
@@ -38,9 +37,9 @@ size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
   while (current_chunk_size < max_chunk_size) {
     if (payload->index < payload->json_message->size()) {
       // Can add a chunk from the JSON message
-      const size_t read_size =
-          std::min(max_chunk_size - current_chunk_size,
-                   payload->json_message->size() - payload->index);
+      const size_t read_size = std::min(
+          max_chunk_size - current_chunk_size,
+          payload->json_message->size() - payload->index);
       current_chunk_size += read_size;
       std::memcpy(ptr, payload->json_message->data() + payload->index,
                   read_size);
@@ -49,7 +48,8 @@ size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
       // Can add a chunk from the payload
       const size_t max_read_size = max_chunk_size - current_chunk_size;
       const unsigned nbytes = payload->pack_serializer->ProduceNext(
-          max_read_size, static_cast<unsigned char*>(ptr) + current_chunk_size);
+          max_read_size,
+          static_cast<unsigned char *>(ptr) + current_chunk_size);
       current_chunk_size += nbytes;
 
       if (!nbytes) {
@@ -61,48 +61,48 @@ size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp) {
   return current_chunk_size;
 }
 
-size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
-  std::string* my_buffer = static_cast<std::string*>(userp);
+size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+  std::string *my_buffer = static_cast<std::string *>(userp);
 
   if (size * nmemb < 1) {
     return 0;
   }
 
-  *my_buffer = static_cast<char*>(buffer);
+  *my_buffer = static_cast<char *>(buffer);
 
   return my_buffer->size();
 }
 
 SessionContextBase::SessionContextBase()
-    : upload_results_(kMaxNumJobs),
-      api_url_(),
-      session_token_(),
-      key_id_(),
-      secret_(),
-      max_pack_size_(ObjectPack::kDefaultLimit),
-      active_handles_(),
-      current_pack_(NULL),
-      current_pack_mtx_(),
-      bytes_committed_(0),
-      bytes_dispatched_(0),
-      initialized_(false) {}
+    : upload_results_(kMaxNumJobs)
+    , api_url_()
+    , session_token_()
+    , key_id_()
+    , secret_()
+    , max_pack_size_(ObjectPack::kDefaultLimit)
+    , active_handles_()
+    , current_pack_(NULL)
+    , current_pack_mtx_()
+    , bytes_committed_(0)
+    , bytes_dispatched_(0)
+    , initialized_(false) { }
 
-SessionContextBase::~SessionContextBase() {}
+SessionContextBase::~SessionContextBase() { }
 
-bool SessionContextBase::Initialize(const std::string& api_url,
-                                    const std::string& session_token,
-                                    const std::string& key_id,
-                                    const std::string& secret,
+bool SessionContextBase::Initialize(const std::string &api_url,
+                                    const std::string &session_token,
+                                    const std::string &key_id,
+                                    const std::string &secret,
                                     uint64_t max_pack_size,
                                     uint64_t max_queue_size) {
   bool ret = true;
 
   // Initialize session context lock
   pthread_mutexattr_t attr;
-  if (pthread_mutexattr_init(&attr) ||
-      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) ||
-      pthread_mutex_init(&current_pack_mtx_, &attr) ||
-      pthread_mutexattr_destroy(&attr)) {
+  if (pthread_mutexattr_init(&attr)
+      || pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE)
+      || pthread_mutex_init(&current_pack_mtx_, &attr)
+      || pthread_mutexattr_destroy(&attr)) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Could not initialize SessionContext lock.");
     return false;
@@ -135,9 +135,9 @@ bool SessionContextBase::Initialize(const std::string& api_url,
   return ret;
 }
 
-bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
-                                  const std::string& new_root_hash,
-                                  const RepositoryTag& tag) {
+bool SessionContextBase::Finalize(bool commit, const std::string &old_root_hash,
+                                  const std::string &new_root_hash,
+                                  const RepositoryTag &tag) {
   assert(active_handles_.empty());
   if (!initialized_) {
     assert(!commit);
@@ -155,7 +155,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string& old_root_hash,
 
   bool results = true;
   while (!upload_results_.IsEmpty()) {
-    Future<bool>* future = upload_results_.PopBack();
+    Future<bool> *future = upload_results_.PopBack();
     results = future->Get() && results;
     delete future;
   }
@@ -195,9 +195,9 @@ ObjectPack::BucketHandle SessionContextBase::NewBucket() {
 }
 
 bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
-                                      const shash::Any& id,
+                                      const shash::Any &id,
                                       const ObjectPack::BucketHandle handle,
-                                      const std::string& name,
+                                      const std::string &name,
                                       const bool force_dispatch) {
   MutexLockGuard lock(current_pack_mtx_);
 
@@ -228,7 +228,7 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
     } else {
       new_size = max_pack_size_;
     }
-    ObjectPack* new_pack = new ObjectPack(new_size);
+    ObjectPack *new_pack = new ObjectPack(new_size);
     for (size_t i = 0u; i < active_handles_.size(); ++i) {
       current_pack_->TransferBucket(active_handles_[i], new_pack);
     }
@@ -256,18 +256,14 @@ void SessionContextBase::Dispatch() {
 }
 
 SessionContext::SessionContext()
-    : SessionContextBase(),
-      upload_jobs_(),
-      worker_()
-{
-}
+    : SessionContextBase(), upload_jobs_(), worker_() { }
 
 bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
   upload_jobs_ = new Tube<UploadJob>(max_queue_size);
 
-  int retval =
-      pthread_create(&worker_, NULL, UploadLoop, reinterpret_cast<void*>(this));
+  int retval = pthread_create(&worker_, NULL, UploadLoop,
+                              reinterpret_cast<void *>(this));
 
   return !retval;
 }
@@ -287,9 +283,9 @@ bool SessionContext::FinalizeDerived() {
   return true;
 }
 
-bool SessionContext::Commit(const std::string& old_root_hash,
-                            const std::string& new_root_hash,
-                            const RepositoryTag& tag) {
+bool SessionContext::Commit(const std::string &old_root_hash,
+                            const std::string &new_root_hash,
+                            const RepositoryTag &tag) {
   JsonStringGenerator request_input;
   request_input.Add("old_root_hash", old_root_hash);
   request_input.Add("new_root_hash", new_root_hash);
@@ -305,7 +301,7 @@ bool SessionContext::Commit(const std::string& old_root_hash,
                         request, &buffer);
 }
 
-Future<bool> *SessionContext::DispatchObjectPack(ObjectPack* pack) {
+Future<bool> *SessionContext::DispatchObjectPack(ObjectPack *pack) {
   UploadJob *job = new UploadJob;
   Future<bool> *result = new Future<bool>();
   job->pack = pack;
@@ -314,17 +310,19 @@ Future<bool> *SessionContext::DispatchObjectPack(ObjectPack* pack) {
   return result;
 }
 
-bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
+bool SessionContext::DoUpload(const SessionContext::UploadJob *job) {
   // Set up the object pack serializer
   ObjectPackProducer serializer(job->pack);
 
   shash::Any payload_digest(shash::kSha1);
   serializer.GetDigest(&payload_digest);
-  const std::string json_msg =
-      "{\"session_token\" : \"" + session_token_ +
-      "\", \"payload_digest\" : \"" + payload_digest.ToString(false) +
-      "\", \"header_size\" : \"" + StringifyInt(serializer.GetHeaderSize()) +
-      "\", \"api_version\" : \"" + StringifyInt(gateway::APIVersion()) + "\"}";
+  const std::string json_msg = "{\"session_token\" : \"" + session_token_
+                               + "\", \"payload_digest\" : \""
+                               + payload_digest.ToString(false)
+                               + "\", \"header_size\" : \""
+                               + StringifyInt(serializer.GetHeaderSize())
+                               + "\", \"api_version\" : \""
+                               + StringifyInt(gateway::APIVersion()) + "\"}";
 
   // Compute HMAC
   shash::Any hmac(shash::kSha1);
@@ -335,20 +333,20 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   payload.pack_serializer = &serializer;
   payload.index = 0;
 
-  const size_t payload_size =
-      json_msg.size() + serializer.GetHeaderSize() + job->pack->size();
+  const size_t payload_size = json_msg.size() + serializer.GetHeaderSize()
+                              + job->pack->size();
 
   // Prepare the Curl POST request
-  CURL* h_curl = curl_easy_init();
+  CURL *h_curl = curl_easy_init();
 
   if (!h_curl) {
     return false;
   }
 
   // Set HTTP headers (Authorization and Message-Size)
-  std::string header_str = std::string("Authorization: ") + key_id_ + " " +
-                           Base64(hmac.ToString(false));
-  struct curl_slist* auth_header = NULL;
+  std::string header_str = std::string("Authorization: ") + key_id_ + " "
+                           + Base64(hmac.ToString(false));
+  struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   header_str = std::string("Message-Size: ") + StringifyInt(json_msg.size());
   auth_header = curl_slist_append(auth_header, header_str.c_str());
@@ -372,19 +370,17 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext::DoUpload - curl_easy_perform failed: %d",
-             ret);
+             "SessionContext::DoUpload - curl_easy_perform failed: %d", ret);
   }
 
   UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
-  const JSON *reply_status =
-    JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
-  const bool ok = (reply_status != NULL &&
-                   std::string(reply_status->string_value) == "ok");
+  const JSON *reply_status = JsonDocument::SearchInObject(
+      reply_json->root(), "status", JSON_STRING);
+  const bool ok = (reply_status != NULL
+                   && std::string(reply_status->string_value) == "ok");
   if (!ok) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
-             "SessionContext::DoUpload - error reply: %s",
-             reply.c_str());
+             "SessionContext::DoUpload - error reply: %s", reply.c_str());
   }
 
   curl_easy_cleanup(h_curl);
@@ -393,8 +389,8 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob* job) {
   return ok && !ret;
 }
 
-void* SessionContext::UploadLoop(void* data) {
-  SessionContext* ctx = reinterpret_cast<SessionContext*>(data);
+void *SessionContext::UploadLoop(void *data) {
+  SessionContext *ctx = reinterpret_cast<SessionContext *>(data);
   UploadJob *job;
 
   while (true) {
@@ -402,8 +398,7 @@ void* SessionContext::UploadLoop(void* data) {
     if (job == &terminator_)
       return NULL;
     if (!ctx->DoUpload(job)) {
-      PANIC(kLogStderr,
-            "SessionContext: could not submit payload. Aborting.");
+      PANIC(kLogStderr, "SessionContext: could not submit payload. Aborting.");
     }
     job->result->Set(true);
     delete job->pack;

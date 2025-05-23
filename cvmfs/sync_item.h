@@ -61,68 +61,66 @@ class SyncItem {
   SyncItem();
   virtual ~SyncItem();
 
-  inline bool IsDirectory()       const { return IsType(kItemDir);             }
-  inline bool WasDirectory()      const { return WasType(kItemDir);            }
-  inline bool IsRegularFile()     const { return IsType(kItemFile);            }
-  inline bool WasRegularFile()    const { return WasType(kItemFile);           }
-  inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
-  inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
-  inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsDirectory() const { return IsType(kItemDir); }
+  inline bool WasDirectory() const { return WasType(kItemDir); }
+  inline bool IsRegularFile() const { return IsType(kItemFile); }
+  inline bool WasRegularFile() const { return WasType(kItemFile); }
+  inline bool IsSymlink() const { return IsType(kItemSymlink); }
+  inline bool WasSymlink() const { return WasType(kItemSymlink); }
+  inline bool IsNew() const { return WasType(kItemNew); }
   inline bool IsTouched() const {
-    return (GetRdOnlyFiletype() == GetUnionFiletype()) &&
-           (GetRdOnlyFiletype() == GetScratchFiletype()) &&
-           (GetUnionFiletype() == GetScratchFiletype());
+    return (GetRdOnlyFiletype() == GetUnionFiletype())
+           && (GetRdOnlyFiletype() == GetScratchFiletype())
+           && (GetUnionFiletype() == GetScratchFiletype());
   }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
-  inline bool IsBlockDevice()     const { return IsType(kItemBlockDevice);     }
-  inline bool IsFifo()            const { return IsType(kItemFifo);            }
-  inline bool IsSocket()          const { return IsType(kItemSocket);          }
-  inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
-  inline bool IsExternalData()    const { return external_data_;               }
-  inline bool IsDirectIo()        const { return direct_io_;                   }
+  inline bool IsBlockDevice() const { return IsType(kItemBlockDevice); }
+  inline bool IsFifo() const { return IsType(kItemFifo); }
+  inline bool IsSocket() const { return IsType(kItemSocket); }
+  inline bool IsGraftMarker() const { return IsType(kItemMarker); }
+  inline bool IsExternalData() const { return external_data_; }
+  inline bool IsDirectIo() const { return direct_io_; }
 
-  inline bool IsWhiteout()        const { return whiteout_;                    }
-  inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
-  inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
+  inline bool IsWhiteout() const { return whiteout_; }
+  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_; }
 
-  inline bool IsSpecialFile()     const {
+  inline bool IsSpecialFile() const {
     return IsCharacterDevice() || IsBlockDevice() || IsFifo() || IsSocket();
   }
-  inline bool WasSpecialFile()    const {
-    return WasType(kItemCharacterDevice) ||
-           WasType(kItemBlockDevice) ||
-           WasType(kItemFifo) ||
-           WasType(kItemSocket);
+  inline bool WasSpecialFile() const {
+    return WasType(kItemCharacterDevice) || WasType(kItemBlockDevice)
+           || WasType(kItemFifo) || WasType(kItemSocket);
   }
-  inline bool IsBundleSpec() const {
-    return filename_ == ".cvmfsbundles";
-  }
-  inline bool WasBundleSpec() const {
-    return filename_ == ".cvmfsbundles";
-  }
+  inline bool IsBundleSpec() const { return filename_ == ".cvmfsbundles"; }
+  inline bool WasBundleSpec() const { return filename_ == ".cvmfsbundles"; }
 
-  inline unsigned int GetRdevMajor()     const {
+  inline unsigned int GetRdevMajor() const {
     assert(IsSpecialFile());
-    StatUnion(true); return major(union_stat_.stat.st_rdev);
+    StatUnion(true);
+    return major(union_stat_.stat.st_rdev);
   }
 
-  inline unsigned int GetRdevMinor()     const {
+  inline unsigned int GetRdevMinor() const {
     assert(IsSpecialFile());
-    StatUnion(true); return minor(union_stat_.stat.st_rdev);
+    StatUnion(true);
+    return minor(union_stat_.stat.st_rdev);
   }
 
-  bool HasCatalogMarker()         const { return has_catalog_marker_;          }
-  bool HasGraftMarker()           const { return graft_marker_present_;        }
-  bool HasCompressionAlgorithm()  const { return has_compression_algorithm_;   }
-  bool IsValidGraft()             const { return valid_graft_;                 }
-  bool IsChunkedGraft()           const { return graft_chunklist_;             }
+  bool HasCatalogMarker() const { return has_catalog_marker_; }
+  bool HasGraftMarker() const { return graft_marker_present_; }
+  bool HasCompressionAlgorithm() const { return has_compression_algorithm_; }
+  bool IsValidGraft() const { return valid_graft_; }
+  bool IsChunkedGraft() const { return graft_chunklist_; }
 
-  inline const FileChunkList* GetGraftChunks() const {return graft_chunklist_;}
+  inline const FileChunkList *GetGraftChunks() const {
+    return graft_chunklist_;
+  }
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
-  void SetExternalData(bool val) {external_data_ = val;}
-  void SetDirectIo(bool val) {direct_io_ = val;}
+  void SetExternalData(bool val) { external_data_ = val; }
+  void SetDirectIo(bool val) { direct_io_ = val; }
 
   inline zlib::Algorithms GetCompressionAlgorithm() const {
     return compression_algorithm_;
@@ -144,12 +142,13 @@ class SyncItem {
    * @return  a DirectoryEntry structure to be written into a catalog
    */
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
-    bool enable_mtime_ns) const = 0;
+      bool enable_mtime_ns) const = 0;
 
   inline std::string GetRelativePath() const {
-    return (relative_parent_path_.empty()) ?
-      filename_                            :
-      relative_parent_path_ + (filename_.empty() ? "" : ("/" + filename_));
+    return (relative_parent_path_.empty())
+               ? filename_
+               : relative_parent_path_
+                     + (filename_.empty() ? "" : ("/" + filename_));
   }
 
   std::string GetRdOnlyPath() const;
@@ -187,8 +186,8 @@ class SyncItem {
   void SetCatalogMarker() { has_catalog_marker_ = true; }
 
   bool operator==(const SyncItem &other) const {
-    return ((relative_parent_path_ == other.relative_parent_path_) &&
-            (filename_ == other.filename_));
+    return ((relative_parent_path_ == other.relative_parent_path_)
+            && (filename_ == other.filename_));
   }
 
  protected:
@@ -202,10 +201,10 @@ class SyncItem {
    * @param filename the name of the file ;-)
    * @param entryType well...
    */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
+  SyncItem(const std::string &relative_parent_path,
+           const std::string &filename,
+           const SyncUnion *union_engine,
+           const SyncItemType entry_type);
 
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
@@ -250,24 +249,31 @@ class SyncItem {
 
     inline SyncItemType GetSyncItemType() const {
       assert(obtained);
-      if (S_ISREG(stat.st_mode)) return kItemFile;
-      if (S_ISLNK(stat.st_mode)) return kItemSymlink;
-      if (S_ISDIR(stat.st_mode)) return kItemDir;
-      if (S_ISFIFO(stat.st_mode)) return kItemFifo;
-      if (S_ISSOCK(stat.st_mode)) return kItemSocket;
-      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
-      if (S_ISBLK(stat.st_mode)) return kItemBlockDevice;
+      if (S_ISREG(stat.st_mode))
+        return kItemFile;
+      if (S_ISLNK(stat.st_mode))
+        return kItemSymlink;
+      if (S_ISDIR(stat.st_mode))
+        return kItemDir;
+      if (S_ISFIFO(stat.st_mode))
+        return kItemFifo;
+      if (S_ISSOCK(stat.st_mode))
+        return kItemSocket;
+      if (S_ISCHR(stat.st_mode))
+        return kItemCharacterDevice;
+      if (S_ISBLK(stat.st_mode))
+        return kItemBlockDevice;
       return kItemUnknown;
     }
 
-    bool obtained;   /**< false at the beginning, true after first stat call */
-    int error_code;  /**< errno value of the stat call */
+    bool obtained;  /**< false at the beginning, true after first stat call */
+    int error_code; /**< errno value of the stat call */
     platform_stat64 stat;
   };
 
-  static void StatGeneric(const std::string  &path,
-                          EntryStat          *info,
-                          const bool          refresh);
+  static void StatGeneric(const std::string &path,
+                          EntryStat *info,
+                          const bool refresh);
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
   void CheckMarkerFiles();
 
@@ -289,17 +295,17 @@ class SyncItem {
   std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
-  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
+  const SyncUnion *union_engine_; /**< this SyncUnion created this object */
 
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
 
-  bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
-  bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
-  bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
-  bool has_catalog_marker_;           /**< directory containing .cvmfscatalog */
-  bool valid_graft_;                  /**< checksum and size in graft marker */
-  bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
+  bool whiteout_;             /**< SyncUnion marked this as whiteout  */
+  bool opaque_;               /**< SyncUnion marked this as opaque dir*/
+  bool masked_hardlink_;      /**< SyncUnion masked out the linkcount */
+  bool has_catalog_marker_;   /**< directory containing .cvmfscatalog */
+  bool valid_graft_;          /**< checksum and size in graft marker */
+  bool graft_marker_present_; /**< .cvmfsgraft-$filename exists */
 
   bool external_data_;
   bool direct_io_;
@@ -330,7 +336,7 @@ typedef std::map<std::string, SharedPtr<SyncItem> > SyncItemList;
 class SyncItemNative : public SyncItem {
   friend class SyncUnion;
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
-    bool enable_mtime_ns) const;
+      bool enable_mtime_ns) const;
   virtual IngestionSource *CreateIngestionSource() const;
   virtual void MakePlaceholderDirectory() const { assert(false); }
   virtual SyncItemType GetScratchFiletype() const;

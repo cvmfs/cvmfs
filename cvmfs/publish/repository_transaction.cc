@@ -3,8 +3,6 @@
  */
 
 
-#include "publish/repository.h"
-
 #include <string>
 
 #include "backoff.h"
@@ -13,6 +11,7 @@
 #include "directory_entry.h"
 #include "manifest.h"
 #include "publish/except.h"
+#include "publish/repository.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "util/exception.h"
@@ -27,14 +26,15 @@ void Publisher::TransactionRetry() {
   bool waiting_on_lease = false;
   if (managed_node_.IsValid()) {
     int rvi = managed_node_->Check(false /* is_quiet */);
-    if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
+    if (rvi != 0)
+      throw EPublish("cannot establish writable mountpoint");
   }
 
   BackoffThrottle throttle(500, 5000, 10000);
   // Negative timeouts (i.e.: no retry) will result in a deadline that has
   // already passed and thus has the correct effect
-  uint64_t deadline = platform_monotonic_time() +
-                      settings_.transaction().GetTimeoutS();
+  uint64_t deadline = platform_monotonic_time()
+                      + settings_.transaction().GetTimeoutS();
   if (settings_.transaction().GetTimeoutS() == 0)
     deadline = uint64_t(-1);
 
@@ -42,15 +42,14 @@ void Publisher::TransactionRetry() {
     try {
       TransactionImpl(waiting_on_lease);
       break;
-    } catch (const publish::EPublish& e) {
+    } catch (const publish::EPublish &e) {
       if (e.failure() != EPublish::kFailTransactionState) {
         session_->Drop();
         in_transaction_.Clear();
       }
 
-      if ((e.failure() == EPublish::kFailTransactionState) ||
-          (e.failure() == EPublish::kFailLeaseBusy))
-      {
+      if ((e.failure() == EPublish::kFailTransactionState)
+          || (e.failure() == EPublish::kFailLeaseBusy)) {
         if (platform_monotonic_time() > deadline)
           throw;
 
@@ -85,8 +84,8 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   // run into problems when merging catalogs later, so for the time being we
   // disallow transactions on non-existing paths.
   if (!settings_.transaction().lease_path().empty()) {
-    std::string path = GetParentPath(
-      "/" + settings_.transaction().lease_path());
+    std::string path = GetParentPath("/"
+                                     + settings_.transaction().lease_path());
     catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
     catalog::DirectoryEntry dirent;
     bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
@@ -97,21 +96,24 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
     }
     if (!dirent.IsDirectory()) {
       throw EPublish(
-        "cannot open transaction on " + path + ", which is not a directory",
-        EPublish::kFailLeaseNoDir);
+          "cannot open transaction on " + path + ", which is not a directory",
+          EPublish::kFailLeaseNoDir);
     }
   }
 
 
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
-    settings_.transaction().spool_area().checkout_marker()));
+      settings_.transaction().spool_area().checkout_marker()));
   // TODO(jblomer): take root hash from r/o mountpoint?
 
 
-  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway && waiting_on_lease) {
-    DownloadRootObjects(settings_.url(), settings_.fqrn(), settings_.transaction().spool_area().tmp_dir());
+  if (settings_.storage().type() == upload::SpoolerDefinition::Gateway
+      && waiting_on_lease) {
+    DownloadRootObjects(settings_.url(), settings_.fqrn(),
+                        settings_.transaction().spool_area().tmp_dir());
     int rvi = managed_node_->Check(true /* is_quiet */);
-    if (rvi != 0) throw EPublish("cannot establish writable mountpoint");
+    if (rvi != 0)
+      throw EPublish("cannot establish writable mountpoint");
   }
 
   in_transaction_.Set();
@@ -140,15 +142,16 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
     }
 
     Sync();
-    SendTalkCommand(settings_.transaction().spool_area().readonly_talk_socket(),
-      "chroot " + settings_.transaction().base_hash().ToString() + "\n");
+    SendTalkCommand(
+        settings_.transaction().spool_area().readonly_talk_socket(),
+        "chroot " + settings_.transaction().base_hash().ToString() + "\n");
     LogCvmfs(kLogCvmfs, llvl_ | kLogStdout, "[done]");
     // TODO(jblomer): fix-me
     // PushReflog();
   }
 
-  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog,
-           "(%s) opened transaction", settings_.fqrn().c_str());
+  LogCvmfs(kLogCvmfs, llvl_ | kLogDebug | kLogSyslog, "(%s) opened transaction",
+           settings_.fqrn().c_str());
 }
 
 }  // namespace publish

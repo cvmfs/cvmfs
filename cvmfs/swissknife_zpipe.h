@@ -17,7 +17,7 @@ class CommandZpipe : public Command {
   virtual std::string GetName() const { return "zpipe"; }
   virtual std::string GetDescription() const {
     return "Compresses or decompresses a file using the DEFLATE algorithm.\n"
-      "Input comes on stdin, output goes to stdout.";
+           "Input comes on stdin, output goes to stdout.";
   }
   virtual ParameterList GetParams() const {
     ParameterList r;

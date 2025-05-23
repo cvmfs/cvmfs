@@ -17,19 +17,19 @@
 #include "testutil.h"
 #include "util/prng.h"
 
-using swissknife::CatalogTraversalParallel;
 using swissknife::CatalogTraversal;
+using swissknife::CatalogTraversalParallel;
 using upload::SpoolerDefinition;
 
 typedef CatalogTraversal<MockObjectFetcher> MockedCatalogTraversal;
 typedef CatalogTraversalParallel<MockObjectFetcher>
-        MockedCatalogTraversalParallel;
+    MockedCatalogTraversalParallel;
 typedef MockedCatalogTraversal::Parameters TraversalParams;
 
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
  public:
   explicit GC_MockUploader(const SpoolerDefinition &spooler_definition)
-      : AbstractMockUploader<GC_MockUploader>(spooler_definition) {}
+      : AbstractMockUploader<GC_MockUploader>(spooler_definition) { }
 
   virtual std::string name() const { return "GCMock"; }
 
@@ -42,8 +42,7 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
 
   void StreamedUpload(upload::UploadStreamHandle *abstract_handle,
                       upload::AbstractUploader::UploadBuffer buffer,
-                      const CallbackTN *callback = NULL)
-  {
+                      const CallbackTN *callback = NULL) {
     assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
@@ -53,8 +52,8 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   }
 
   virtual void DoRemoveAsync(const std::string &file_to_delete) {
-    shash::Any hash_to_delete(shash::MkFromSuffixedHexPtr(shash::HexPtr(
-      file_to_delete.substr(5, 2) + file_to_delete.substr(8))));
+    shash::Any hash_to_delete(shash::MkFromSuffixedHexPtr(
+        shash::HexPtr(file_to_delete.substr(5, 2) + file_to_delete.substr(8))));
     deleted_hashes.insert(hash_to_delete);
     Respond(NULL, upload::UploaderResults());
   }
@@ -73,9 +72,9 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
 };
 
 typedef std::map<std::pair<unsigned int, std::string>, MockCatalog *>
-        RevisionMap;
+    RevisionMap;
 
-template <class CatalogTraversalT>
+template<class CatalogTraversalT>
 class T_GarbageCollector : public ::testing::Test {
  public:
   static const std::string fqrn;
@@ -156,8 +155,8 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(1, "00")] =
-        CreateAndRegisterCatalog("", 1, t(27, 11, 1987), NULL, NULL);
+    c[mp(1, "00")] = CreateAndRegisterCatalog("", 1, t(27, 11, 1987), NULL,
+                                              NULL);
     c[mp(1, "10")] = CreateAndRegisterCatalog("/00/10", 1, t(27, 11, 1987) + 50,
                                               c[mp(1, "00")], NULL);
     c[mp(1, "11")] = CreateAndRegisterCatalog(
@@ -199,8 +198,8 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(2, "00")] =
-        CreateAndRegisterCatalog("", 2, t(3, 3, 2000), NULL, c[mp(1, "00")]);
+    c[mp(2, "00")] = CreateAndRegisterCatalog("", 2, t(3, 3, 2000), NULL,
+                                              c[mp(1, "00")]);
     c[mp(2, "10")] = CreateAndRegisterCatalog("/00/10", 2, t(3, 3, 2000) + 20,
                                               c[mp(2, "00")], c[mp(1, "10")]);
     c[mp(2, "11")] = ReuseCatalog(c[mp(1, "11")], c[mp(2, "00")]);
@@ -235,8 +234,8 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(3, "00")] =
-        CreateAndRegisterCatalog("", 3, t(24, 12, 2004), NULL, c[mp(2, "00")]);
+    c[mp(3, "00")] = CreateAndRegisterCatalog("", 3, t(24, 12, 2004), NULL,
+                                              c[mp(2, "00")]);
     c[mp(3, "10")] = CreateAndRegisterCatalog("/00/10", 3, t(24, 12, 2004) + 1,
                                               c[mp(3, "00")], c[mp(2, "10")]);
     c[mp(3, "11")] = CreateAndRegisterCatalog("/00/11", 3, t(24, 12, 2004) + 30,
@@ -290,8 +289,8 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(4, "00")] =
-        CreateAndRegisterCatalog("", 4, t(25, 12, 2004), NULL, c[mp(3, "00")]);
+    c[mp(4, "00")] = CreateAndRegisterCatalog("", 4, t(25, 12, 2004), NULL,
+                                              c[mp(3, "00")]);
     c[mp(4, "10")] = CreateAndRegisterCatalog("/00/10", 4, t(25, 12, 2004) + 12,
                                               c[mp(4, "00")], c[mp(3, "10")]);
     c[mp(4, "11")] = CreateAndRegisterCatalog("/00/11", 4, t(25, 12, 2004) + 24,
@@ -395,23 +394,22 @@ class T_GarbageCollector : public ::testing::Test {
     //
 
     const bool writable_history = false;  // MockHistory doesn't care!
-    MockHistory *history =
-        new MockHistory(writable_history, T_GarbageCollector::fqrn);
+    MockHistory *history = new MockHistory(writable_history,
+                                           T_GarbageCollector::fqrn);
     MockHistory::RegisterObject(MockHistory::root_hash, history);
 
     history->BeginTransaction();
-    ASSERT_TRUE(history->InsertBranch(history::History::Branch(
-                                      "other-branch", "", 4)));
-    ASSERT_TRUE(history->Insert(history::History::Tag(
-        "Revision2", c[mp(2, "00")]->hash(), 1337, 2, t(27, 11, 1987),
-        "this is rev 2", "")));
+    ASSERT_TRUE(
+        history->InsertBranch(history::History::Branch("other-branch", "", 4)));
+    ASSERT_TRUE(history->Insert(
+        history::History::Tag("Revision2", c[mp(2, "00")]->hash(), 1337, 2,
+                              t(27, 11, 1987), "this is rev 2", "")));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision4", c[mp(4, "00")]->hash(), 42, 4, t(11, 9, 2001),
         "this is revision 4", "other-branch")));
     ASSERT_TRUE(history->Insert(history::History::Tag(
         "Revision5", c[mp(5, "00")]->hash(), 7, 5, t(10, 7, 2014),
-        "this is revision 5 - the newest!",
-        "")));
+        "this is revision 5 - the newest!", "")));
     history->CommitTransaction();
   }
 
@@ -429,9 +427,9 @@ class T_GarbageCollector : public ::testing::Test {
 
     // produce the new catalog with references to it's predecessor and parent
     const bool is_root = (parent == NULL);
-    MockCatalog *catalog =
-        new MockCatalog(root_path, effective_clg_hash, dice_.Next(10000),
-                        revision, last_modified, is_root, parent, previous);
+    MockCatalog *catalog = new MockCatalog(
+        root_path, effective_clg_hash, dice_.Next(10000), revision,
+        last_modified, is_root, parent, previous);
 
     // populate Reflog with root catalogs
     if (is_root) {
@@ -474,16 +472,16 @@ class T_GarbageCollector : public ::testing::Test {
   MockReflog *reflog_;
 };
 
-template <class CatalogTraversalT>
+template<class CatalogTraversalT>
 const std::string T_GarbageCollector<CatalogTraversalT>::fqrn = "test.cern.ch";
 
 typedef ::testing::Types<MockedCatalogTraversal, MockedCatalogTraversalParallel>
-        CatalogTraversalTypes;
+    CatalogTraversalTypes;
 TYPED_TEST_CASE(T_GarbageCollector, CatalogTraversalTypes);
 
 TYPED_TEST(T_GarbageCollector, InitializeGarbageCollector) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   typename TestFixture::MyGarbageCollector gc(config);
   EXPECT_EQ(0u, gc.preserved_catalog_count());
   EXPECT_EQ(0u, gc.condemned_catalog_count());
@@ -491,8 +489,8 @@ TYPED_TEST(T_GarbageCollector, InitializeGarbageCollector) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepEverything) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = TraversalParams::kFullHistory;
 
   typename TestFixture::MyGarbageCollector gc(config);
@@ -506,8 +504,8 @@ TYPED_TEST(T_GarbageCollector, KeepEverything) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepLastRevision) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;  // no history preservation
 
   typename TestFixture::MyGarbageCollector gc(config);
@@ -582,8 +580,8 @@ TYPED_TEST(T_GarbageCollector, KeepLastRevision) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepLastThreeRevisions) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 2;  // preserve two historic revisions
 
   typename TestFixture::MyGarbageCollector gc(config);
@@ -658,8 +656,8 @@ TYPED_TEST(T_GarbageCollector, KeepLastThreeRevisions) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepOnlyNamedSnapshots) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;
 
   typename TestFixture::MyGarbageCollector gc(config);
@@ -704,8 +702,8 @@ TYPED_TEST(T_GarbageCollector, KeepOnlyNamedSnapshots) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = TraversalParams::kFullHistory;
   typename TestFixture::MyGarbageCollector gc(config);
 
@@ -740,8 +738,8 @@ TYPED_TEST(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
 }
 
 TYPED_TEST(T_GarbageCollector, UnreachableNestedCatalog) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 1;
   typename TestFixture::MyGarbageCollector gc(config);
 
@@ -844,8 +842,8 @@ TYPED_TEST(T_GarbageCollector, UnreachableNestedCatalog) {
 }
 
 TYPED_TEST(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;  // no history preservation
   typename TestFixture::MyGarbageCollector gc(config);
 
@@ -922,8 +920,8 @@ TYPED_TEST(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
 }
 
 TYPED_TEST(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_timestamp = t(24, 12, 2004) - 1;  // just before rev 3
   config.keep_history_depth = TestFixture::GcConfiguration::kFullHistory;
 
@@ -1131,8 +1129,8 @@ TYPED_TEST(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 TYPED_TEST(T_GarbageCollector, KeepOnlyFutureRevisions) {
   // checks what happens if a future time stamp was given
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_timestamp = t(1, 1, 2014);
   config.keep_history_depth = TestFixture::GcConfiguration::kFullHistory;
 
@@ -1174,8 +1172,8 @@ TYPED_TEST(T_GarbageCollector, KeepOnlyFutureRevisions) {
 }
 
 TYPED_TEST(T_GarbageCollector, UseReflogTimestamps) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_timestamp = t(24, 12, 2004) - 1;  // just before rev 3
   config.keep_history_depth = TestFixture::GcConfiguration::kFullHistory;
 
@@ -1187,8 +1185,8 @@ TYPED_TEST(T_GarbageCollector, UseReflogTimestamps) {
 }
 
 TYPED_TEST(T_GarbageCollector, NamedTagsInRecycleBin) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;
 
   // wire up std::set<> deleted_hashes in uploader with the MockObjectFetcher
@@ -1273,8 +1271,8 @@ TYPED_TEST(T_GarbageCollector, LogDeletionToFile) {
   ASSERT_TRUE(deletion_log != NULL);
   UnlinkGuard unlink_guard(dest_path);
 
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   config.keep_history_depth = 0;                  // no history preservation
   config.deleted_objects_logfile = deletion_log;  // log deletion to tmp file
 
@@ -1368,8 +1366,8 @@ TYPED_TEST(T_GarbageCollector, LogDeletionToFile) {
 }
 
 TYPED_TEST(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
-  typename TestFixture::GcConfiguration config =
-    this->GetStandardGarbageCollectorConfiguration();
+  typename TestFixture::GcConfiguration
+      config = this->GetStandardGarbageCollectorConfiguration();
   typename TestFixture::MyGarbageCollector gc(config);
 
   GC_MockUploader *upl = static_cast<GC_MockUploader *>(config.uploader);
@@ -1414,10 +1412,10 @@ TYPED_TEST(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
   history->Remove("Revision2");
   history->EmptyRecycleBin();
 
-  shash::Any old_hist_hash =
-      h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7", shash::kSuffixHistory);
-  shash::Any initial_hist_hash =
-      h("963f943b84c478731329709ff90d64978f7feeb4", shash::kSuffixHistory);
+  shash::Any old_hist_hash = h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7",
+                               shash::kSuffixHistory);
+  shash::Any initial_hist_hash = h("963f943b84c478731329709ff90d64978f7feeb4",
+                                   shash::kSuffixHistory);
 
   history->SetPreviousRevision(old_hist_hash);
   old_history->SetPreviousRevision(initial_hist_hash);

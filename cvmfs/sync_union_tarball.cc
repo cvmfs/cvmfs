@@ -39,16 +39,16 @@ SyncUnionTarball::SyncUnionTarball(AbstractSyncMediator *mediator,
                                    const std::string &to_delete,
                                    const bool create_catalog_on_root,
                                    const std::string &path_delimiter)
-    : SyncUnion(mediator, rdonly_path, "", ""),
-      src(NULL),
-      tarball_path_(tarball_path),
-      base_directory_(base_directory),
-      uid_(uid),
-      gid_(gid),
-      to_delete_(to_delete),
-      create_catalog_on_root_(create_catalog_on_root),
-      path_delimiter_(path_delimiter),
-      read_archive_signal_(new Signal) {}
+    : SyncUnion(mediator, rdonly_path, "", "")
+    , src(NULL)
+    , tarball_path_(tarball_path)
+    , base_directory_(base_directory)
+    , uid_(uid)
+    , gid_(gid)
+    , to_delete_(to_delete)
+    , create_catalog_on_root_(create_catalog_on_root)
+    , path_delimiter_(path_delimiter)
+    , read_archive_signal_(new Signal) { }
 
 SyncUnionTarball::~SyncUnionTarball() { delete read_archive_signal_; }
 
@@ -112,22 +112,26 @@ void SyncUnionTarball::Traverse() {
    * As first step we eliminate the requested directories.
    */
   if (to_delete_ != "") {
-    vector<std::string> to_eliminate_vec = SplitStringMultiChar(to_delete_, path_delimiter_);
+    vector<std::string> to_eliminate_vec = SplitStringMultiChar(
+        to_delete_, path_delimiter_);
 
     for (vector<string>::iterator s = to_eliminate_vec.begin();
-         s != to_eliminate_vec.end(); ++s) {
+         s != to_eliminate_vec.end();
+         ++s) {
       std::string parent_path;
       std::string filename;
       SplitPath(*s, &parent_path, &filename);
-      if (parent_path == ".") parent_path = "";
-      SharedPtr<SyncItem> sync_entry =
-          CreateSyncItem(parent_path, filename, kItemDir);
+      if (parent_path == ".")
+        parent_path = "";
+      SharedPtr<SyncItem> sync_entry = CreateSyncItem(parent_path, filename,
+                                                      kItemDir);
       mediator_->Remove(sync_entry);
     }
   }
 
   // we are simply deleting entity from  the repo
-  if (NULL == src) return;
+  if (NULL == src)
+    return;
 
   struct archive_entry *entry = archive_entry_new();
   while (true) {
@@ -160,7 +164,8 @@ void SyncUnionTarball::Traverse() {
           to_create_catalog_dirs_.insert(base_directory_);
         }
         for (set<string>::iterator dir = to_create_catalog_dirs_.begin();
-             dir != to_create_catalog_dirs_.end(); ++dir) {
+             dir != to_create_catalog_dirs_.end();
+             ++dir) {
           assert(dirs_.find(*dir) != dirs_.end());
           SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
@@ -198,21 +203,22 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
   archive_file_path = SanitizePath(archive_file_path);
 
-  std::string complete_path =
-      base_directory_ != "/"
-          ? MakeCanonicalPath(base_directory_ + "/" + archive_file_path)
-          : MakeCanonicalPath(archive_file_path);
+  std::string complete_path = base_directory_ != "/"
+                                  ? MakeCanonicalPath(base_directory_ + "/"
+                                                      + archive_file_path)
+                                  : MakeCanonicalPath(archive_file_path);
 
   std::string parent_path;
   std::string filename;
   SplitPath(complete_path, &parent_path, &filename);
-  if (parent_path == ".") parent_path.clear();
+  if (parent_path == ".")
+    parent_path.clear();
 
   CreateDirectories(parent_path);
 
-  SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(new SyncItemTar(
-                                       parent_path, filename, src, entry,
-                                       read_archive_signal_, this, uid_, gid_));
+  SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
+      new SyncItemTar(parent_path, filename, src, entry, read_archive_signal_,
+                      this, uid_, gid_));
 
   if (NULL != archive_entry_hardlink(entry)) {
     const std::string hardlink_name(
@@ -254,9 +260,9 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
       to_create_catalog_dirs_.insert(parent_path);
     }
 
-  } else if (sync_entry->IsSymlink() || sync_entry->IsFifo() ||
-             sync_entry->IsSocket() || sync_entry->IsCharacterDevice() ||
-             sync_entry->IsBlockDevice()) {
+  } else if (sync_entry->IsSymlink() || sync_entry->IsFifo()
+             || sync_entry->IsSocket() || sync_entry->IsCharacterDevice()
+             || sync_entry->IsBlockDevice()) {
     // we avoid to add an entity called as a catalog marker if it is not a
     // regular file
     if (filename != ".cvmfscatalog") {
@@ -329,15 +335,18 @@ bool SyncUnionTarball::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
  * as soon as the real directory is found in the tarball
  */
 void SyncUnionTarball::CreateDirectories(const std::string &target) {
-  if (know_directories_.find(target) != know_directories_.end()) return;
-  if (target == ".") return;
+  if (know_directories_.find(target) != know_directories_.end())
+    return;
+  if (target == ".")
+    return;
 
   std::string dirname = "";
   std::string filename = "";
   SplitPath(target, &dirname, &filename);
   CreateDirectories(dirname);
 
-  if (dirname == ".") dirname = "";
+  if (dirname == ".")
+    dirname = "";
   SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummyDir(dirname, filename, this, kItemDir, uid_, gid_));
 

@@ -11,18 +11,18 @@
 
 namespace receiver {
 
-std::string GetSpoolerTempDir(const std::string& spooler_config) {
+std::string GetSpoolerTempDir(const std::string &spooler_config) {
   const std::vector<std::string> tokens = SplitString(spooler_config, ',');
   assert(tokens.size() == 3);
   return tokens[1];
 }
 
-bool GetParamsFromFile(const std::string& repo_name, Params* params) {
-  const std::string repo_config_file =
-      "/etc/cvmfs/repositories.d/" + repo_name + "/server.conf";
+bool GetParamsFromFile(const std::string &repo_name, Params *params) {
+  const std::string repo_config_file = "/etc/cvmfs/repositories.d/" + repo_name
+                                       + "/server.conf";
 
   SimpleOptionsParser parser = SimpleOptionsParser(
-    new DefaultOptionsTemplateManager(repo_name));
+      new DefaultOptionsTemplateManager(repo_name));
   if (!parser.TryParsePath(repo_config_file)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not parse repository configuration: %s.",

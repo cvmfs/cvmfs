@@ -15,16 +15,16 @@
 #include "util/posix.h"
 
 
-const char* CvmfsEnvironment::kSandboxEnvVariable = "CVMFS_UT_SANDBOX";
+const char *CvmfsEnvironment::kSandboxEnvVariable = "CVMFS_UT_SANDBOX";
 
 
 CvmfsEnvironment::CvmfsEnvironment(const int argc, char **argv)
-  : is_death_test_execution_(CvmfsEnvironment::IsDeathTestExecution(argc, argv))
-  { }
+    : is_death_test_execution_(
+          CvmfsEnvironment::IsDeathTestExecution(argc, argv)) { }
 
 
 bool CvmfsEnvironment::IsDeathTestExecution(const int argc, char **argv) {
-  const char* death_test_flag = "--gtest_internal_run_death_test";
+  const char *death_test_flag = "--gtest_internal_run_death_test";
 
   for (int i = 0; i < argc; ++i) {
     if (strncmp(argv[i], death_test_flag, strlen(death_test_flag)) == 0) {
@@ -68,7 +68,8 @@ void CvmfsEnvironment::CreateSandbox() {
   if (sandbox.empty()) {
     fprintf(stderr,
             "Unittest Setup: Failed to create sandbox directory in /tmp "
-            "(errno %d)\n", errno);
+            "(errno %d)\n",
+            errno);
     abort();
   }
   sandbox_ = sandbox;
@@ -78,7 +79,8 @@ void CvmfsEnvironment::CreateSandbox() {
   if (setenv(kSandboxEnvVariable, sandbox_.c_str(), 1) != 0) {
     fprintf(stderr,
             "Unittest Setup: Failed to append sandbox path to environment "
-            "'%s' (errno: %d)\n", kSandboxEnvVariable, errno);
+            "'%s' (errno: %d)\n",
+            kSandboxEnvVariable, errno);
     abort();
   }
 }
@@ -91,14 +93,16 @@ void CvmfsEnvironment::AdoptSandboxFromParent() {
   if (NULL == sandbox) {
     fprintf(stderr,
             "Unittest Setup: Failed to read sandbox path from environment "
-            "'%s' (errno: %d)\n", kSandboxEnvVariable, errno);
+            "'%s' (errno: %d)\n",
+            kSandboxEnvVariable, errno);
     abort();
   }
 
   if (!DirectoryExists(sandbox)) {
     fprintf(stderr,
             "Unittest Setup: Failed to find sandbox directory '%s' "
-            "pointed to by '%s'\n", sandbox, kSandboxEnvVariable);
+            "pointed to by '%s'\n",
+            sandbox, kSandboxEnvVariable);
     abort();
   }
 
@@ -120,7 +124,8 @@ void CvmfsEnvironment::ChangeDirectoryToSandbox() const {
   if (chdir(sandbox_.c_str()) != 0) {
     fprintf(stderr,
             "Unittest Setup: Failed to chdir() into sandbox directory '%s' "
-            "(errno: %d)\n", sandbox_.c_str(), errno);
+            "(errno: %d)\n",
+            sandbox_.c_str(), errno);
     abort();
   }
 }

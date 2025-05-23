@@ -93,6 +93,7 @@ class CallGuard {
     while (atomic_read32(&num_inflight_calls_) != 0)
       SafeSleepMs(50);
   }
+
  private:
   bool drainout_;
   static atomic_int32 global_drainout_;
@@ -164,13 +165,12 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (transaction->size != transaction->expected_size) {
     // Allow size to be zero if alien cache, because hadoop-fuse-dfs returns
     // size zero for a while
-    if ( (transaction->expected_size != kSizeUnknown) &&
-         (reports_correct_filesize_ || (transaction->size != 0)) )
-    {
+    if ((transaction->expected_size != kSizeUnknown)
+        && (reports_correct_filesize_ || (transaction->size != 0))) {
       LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                "size check failure for %s, expected %lu, got %lu",
-               transaction->id.ToString().c_str(),
-               transaction->expected_size, transaction->size);
+               transaction->id.ToString().c_str(), transaction->expected_size,
+               transaction->size);
       CopyPath2Path(transaction->tmp_path,
                     cache_path_ + "/quarantaine/" + transaction->id.ToString());
       unlink(transaction->tmp_path.c_str());
@@ -180,12 +180,11 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
 
-  if ((transaction->label.flags & kLabelPinned) ||
-      (transaction->label.flags & kLabelCatalog))
-  {
-    bool retval = quota_mgr_->Pin(
-      transaction->id, transaction->size, transaction->label.GetDescription(),
-      (transaction->label.flags & kLabelCatalog));
+  if ((transaction->label.flags & kLabelPinned)
+      || (transaction->label.flags & kLabelCatalog)) {
+    bool retval = quota_mgr_->Pin(transaction->id, transaction->size,
+                                  transaction->label.GetDescription(),
+                                  (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -201,14 +200,13 @@ int PosixCacheManager::CommitTxn(void *txn) {
     int retval = chmod(transaction->tmp_path.c_str(), 0660);
     assert(retval == 0);
   }
-  result =
-    Rename(transaction->tmp_path.c_str(), transaction->final_path.c_str());
+  result = Rename(transaction->tmp_path.c_str(),
+                  transaction->final_path.c_str());
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
-    if ((transaction->label.flags & kLabelPinned) ||
-        (transaction->label.flags & kLabelCatalog))
-    {
+    if ((transaction->label.flags & kLabelPinned)
+        || (transaction->label.flags & kLabelCatalog)) {
       quota_mgr_->Remove(transaction->id);
     }
   } else {
@@ -216,9 +214,8 @@ int PosixCacheManager::CommitTxn(void *txn) {
     if (transaction->label.flags & kLabelVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
                                  transaction->label.GetDescription());
-    } else if (!transaction->label.IsCatalog() &&
-               !transaction->label.IsPinned())
-    {
+    } else if (!transaction->label.IsCatalog()
+               && !transaction->label.IsPinned()) {
       quota_mgr_->Insert(transaction->id, transaction->size,
                          transaction->label.GetDescription());
     }
@@ -244,13 +241,12 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
     switch (fs_info.type) {
       case kFsTypeNFS:
         rename_workaround_ = kRenameLink;
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Alien cache is on NFS.");
+        LogCvmfs(kLogCache, kLogDebug | kLogSyslog, "Alien cache is on NFS.");
         break;
       case kFsTypeBeeGFS:
         rename_workaround_ = kRenameSamedir;
         LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
-             "Alien cache is on BeeGFS.");
+                 "Alien cache is on BeeGFS.");
         break;
       default:
         break;
@@ -270,13 +266,12 @@ bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
 }
 
 PosixCacheManager *PosixCacheManager::Create(
-  const string &cache_path,
-  const bool alien_cache,
-  const RenameWorkarounds rename_workaround,
-  const bool do_refcount)
-{
+    const string &cache_path,
+    const bool alien_cache,
+    const RenameWorkarounds rename_workaround,
+    const bool do_refcount) {
   UniquePtr<PosixCacheManager> cache_manager(
-    new PosixCacheManager(cache_path, alien_cache, do_refcount));
+      new PosixCacheManager(cache_path, alien_cache, do_refcount));
   assert(cache_manager.IsValid());
 
   cache_manager->rename_workaround_ = rename_workaround;
@@ -290,11 +285,9 @@ PosixCacheManager *PosixCacheManager::Create(
 }
 
 
-void PosixCacheManager::CtrlTxn(
-  const Label &label,
-  const int flags,
-  void *txn)
-{
+void PosixCacheManager::CtrlTxn(const Label &label,
+                                const int flags,
+                                void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->label = label;
 }
@@ -304,7 +297,8 @@ string PosixCacheManager::Describe() {
   string msg;
   if (do_refcount_) {
     msg = "Refcounting Posix cache manager"
-          "(cache directory: " + cache_path_ + ")\n";
+          "(cache directory: "
+          + cache_path_ + ")\n";
   } else {
     msg = "Posix cache manager (cache directory: " + cache_path_ + ")\n";
   }
@@ -313,7 +307,7 @@ string PosixCacheManager::Describe() {
 
 
 /**
- * If not refcounting, nothing to do, the kernel keeps the state 
+ * If not refcounting, nothing to do, the kernel keeps the state
  * of open file descriptors.  Return a dummy memory location.
  */
 void *PosixCacheManager::DoSaveState() {
@@ -333,13 +327,15 @@ int PosixCacheManager::DoRestoreState(void *data) {
   if (do_refcount_) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
     if (state->magic_number == kMagicRefcount) {
-      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
-                                    "refcounted posix cache manager");
+      LogCvmfs(kLogCache, kLogDebug,
+               "Restoring refcount cache manager from "
+               "refcounted posix cache manager");
 
       fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
     } else {
-      LogCvmfs(kLogCache, kLogDebug, "Restoring refcount cache manager from "
-                                    "non-refcounted posix cache manager");
+      LogCvmfs(kLogCache, kLogDebug,
+               "Restoring refcount cache manager from "
+               "non-refcounted posix cache manager");
     }
     return -1;
   }
@@ -348,9 +344,10 @@ int PosixCacheManager::DoRestoreState(void *data) {
   assert(*c == kMagicNoRefcount || *c == kMagicRefcount);
   if (*c == kMagicRefcount) {
     SavedState *state = reinterpret_cast<SavedState *>(data);
-    LogCvmfs(kLogCache, kLogDebug, "Restoring non-refcount cache manager from "
-                                    "refcounted posix cache manager - this "
-                                    " is not possible, keep refcounting.");
+    LogCvmfs(kLogCache, kLogDebug,
+             "Restoring non-refcount cache manager from "
+             "refcounted posix cache manager - this "
+             " is not possible, keep refcounting.");
     fd_mgr_->AssignFrom(state->fd_mgr.weak_ref());
     do_refcount_ = true;
   }
@@ -372,7 +369,6 @@ bool PosixCacheManager::DoFreeState(void *data) {
 }
 
 
-
 int PosixCacheManager::Dup(int fd) {
   int new_fd = do_refcount_ ? fd_mgr_->Dup(fd) : dup(fd);
   if (new_fd < 0)
@@ -384,8 +380,8 @@ int PosixCacheManager::Dup(int fd) {
 int PosixCacheManager::Flush(Transaction *transaction) {
   if (transaction->buf_pos == 0)
     return 0;
-  int written =
-    write(transaction->fd, transaction->buffer, transaction->buf_pos);
+  int written = write(transaction->fd, transaction->buffer,
+                      transaction->buf_pos);
   if (written < 0)
     return -errno;
   if (static_cast<unsigned>(written) != transaction->buf_pos) {
@@ -449,12 +445,10 @@ int PosixCacheManager::OpenFromTxn(void *txn) {
 }
 
 
-int64_t PosixCacheManager::Pread(
-  int fd,
-  void *buf,
-  uint64_t size,
-  uint64_t offset)
-{
+int64_t PosixCacheManager::Pread(int fd,
+                                 void *buf,
+                                 uint64_t size,
+                                 uint64_t offset) {
   int64_t result;
   do {
     errno = 0;
@@ -528,11 +522,9 @@ int PosixCacheManager::Reset(void *txn) {
 }
 
 
-int PosixCacheManager::StartTxn(
-  const shash::Any &id,
-  uint64_t size,
-  void *txn)
-{
+int PosixCacheManager::StartTxn(const shash::Any &id,
+                                uint64_t size,
+                                void *txn) {
   atomic_inc32(&no_inflight_txns_);
   if (cache_mode_ == kCacheReadOnly) {
     atomic_dec32(&no_inflight_txns_);
@@ -541,7 +533,8 @@ int PosixCacheManager::StartTxn(
 
   if (size != kSizeUnknown) {
     if (size > quota_mgr_->GetMaxFileSize()) {
-      LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%" PRIu64 " "
+      LogCvmfs(kLogCache, kLogDebug,
+               "file too big for lru cache (%" PRIu64 " "
                "requested but only %" PRIu64 " bytes free)",
                size, quota_mgr_->GetMaxFileSize());
       atomic_dec32(&no_inflight_txns_);
@@ -554,8 +547,8 @@ int PosixCacheManager::StartTxn(
       uint64_t cache_capacity = quota_mgr_->GetCapacity();
       assert(cache_capacity >= size);
       if ((cache_size + size) > cache_capacity) {
-        uint64_t leave_size =
-          std::min(cache_capacity / 2, cache_capacity - size);
+        uint64_t leave_size = std::min(cache_capacity / 2,
+                                       cache_capacity - size);
         quota_mgr_->Cleanup(leave_size);
       }
     }
@@ -593,8 +586,8 @@ int PosixCacheManager::StartTxn(
 }
 
 
-manifest::Breadcrumb PosixCacheManager::LoadBreadcrumb(const std::string &fqrn)
-{
+manifest::Breadcrumb PosixCacheManager::LoadBreadcrumb(
+    const std::string &fqrn) {
   return manifest::Manifest::ReadBreadcrumb(fqrn, cache_path_);
 }
 
@@ -644,8 +637,8 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       }
     }
     uint64_t remaining = size - written;
-    uint64_t space_in_buffer =
-      sizeof(transaction->buffer) - transaction->buf_pos;
+    uint64_t space_in_buffer = sizeof(transaction->buffer)
+                               - transaction->buf_pos;
     uint64_t batch_size = std::min(remaining, space_in_buffer);
     memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
     transaction->buf_pos += batch_size;

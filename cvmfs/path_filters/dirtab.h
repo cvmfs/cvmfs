@@ -50,7 +50,7 @@ namespace catalog {
  */
 class Dirtab {
  public:
-  static const char kCommentMarker  = '#';
+  static const char kCommentMarker = '#';
   static const char kNegationMarker = '!';
 
   /**
@@ -59,10 +59,10 @@ class Dirtab {
    * spec should be seen as a negation rule.
    */
   struct Rule {
-    Rule(const Pathspec &pathspec, const bool is_negation) :
-      pathspec(pathspec), is_negation(is_negation) {}
-    Pathspec  pathspec;
-    bool      is_negation;
+    Rule(const Pathspec &pathspec, const bool is_negation)
+        : pathspec(pathspec), is_negation(is_negation) { }
+    Pathspec pathspec;
+    bool is_negation;
   };
 
   typedef std::vector<Rule> Rules;
@@ -72,7 +72,7 @@ class Dirtab {
    */
   Dirtab();
 
-  virtual ~Dirtab() {}
+  virtual ~Dirtab() { }
 
   /**
    * Returns an already filled Dirtab
@@ -81,7 +81,7 @@ class Dirtab {
    *                    the Dirtab object
    * @return the already filled Dirtab
    */
-  static Dirtab* Create(const std::string &dirtab_path) {
+  static Dirtab *Create(const std::string &dirtab_path) {
     Dirtab *dt = new Dirtab();
     dt->Open(dirtab_path);
     return dt;
@@ -118,13 +118,13 @@ class Dirtab {
    */
   virtual bool IsOpposing(const std::string &path) const;
 
-  const Rules& positive_rules() const { return positive_rules_; }
-  const Rules& negative_rules() const { return negative_rules_; }
+  const Rules &positive_rules() const { return positive_rules_; }
+  const Rules &negative_rules() const { return negative_rules_; }
 
   size_t RuleCount() const { return NegativeRuleCount() + PositiveRuleCount(); }
   size_t NegativeRuleCount() const { return negative_rules_.size(); }
   size_t PositiveRuleCount() const { return positive_rules_.size(); }
-  bool   IsValid() const { return valid_; }
+  bool IsValid() const { return valid_; }
 
  protected:
   /**
@@ -136,16 +136,15 @@ class Dirtab {
   void AddRule(const Rule &rule);
 
  private:
-  void SkipWhitespace(
-    const std::string::const_iterator &end,
-    std::string::const_iterator *itr) const
-  {
-    for (; *itr != end && **itr == ' '; ++(*itr)) { }
+  void SkipWhitespace(const std::string::const_iterator &end,
+                      std::string::const_iterator *itr) const {
+    for (; *itr != end && **itr == ' '; ++(*itr)) {
+    }
   }
   bool CheckRuleValidity() const;
 
  private:
-  bool  valid_;
+  bool valid_;
   Rules positive_rules_;
   Rules negative_rules_;
 };
@@ -153,4 +152,3 @@ class Dirtab {
 }  // namespace catalog
 
 #endif  // CVMFS_PATH_FILTERS_DIRTAB_H_
-

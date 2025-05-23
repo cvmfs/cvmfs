@@ -18,8 +18,7 @@ namespace publish {
 
 class T_Session : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
 };
@@ -65,8 +64,8 @@ TEST_F(T_Session, Acquire) {
 
   gateway.next_response_.code = 200;
   gateway.next_response_.reason = "OK";
-  gateway.next_response_.body =
-    "{ \"status\" : \"error\", \"reason\" : \"XXX\"}";
+  gateway.next_response_
+      .body = "{ \"status\" : \"error\", \"reason\" : \"XXX\"}";
   try {
     session.Acquire();
     EXPECT_TRUE(false);
@@ -74,8 +73,8 @@ TEST_F(T_Session, Acquire) {
     EXPECT_EQ(EPublish::kFailLeaseBody, e.failure()) << e.what();
   }
 
-  gateway.next_response_.body =
-    "{ \"status\" : \"path_busy\", \"time_remaining\" : 42}";
+  gateway.next_response_
+      .body = "{ \"status\" : \"path_busy\", \"time_remaining\" : 42}";
   try {
     session.Acquire();
     EXPECT_TRUE(false);
@@ -83,8 +82,8 @@ TEST_F(T_Session, Acquire) {
     EXPECT_EQ(EPublish::kFailLeaseBusy, e.failure()) << e.what();
   }
 
-  gateway.next_response_.body =
-    "{ \"status\" : \"ok\", \"session_token\" : \"ABC\" }";
+  gateway.next_response_
+      .body = "{ \"status\" : \"ok\", \"session_token\" : \"ABC\" }";
   try {
     session.Acquire();
     session.SetKeepAlive(true);
@@ -139,8 +138,8 @@ TEST_F(T_Session, Drop) {
 
   gateway.next_response_.code = 200;
   gateway.next_response_.reason = "OK";
-  gateway.next_response_.body =
-    "{ \"status\" : \"error\", \"reason\" : \"XXX\"}";
+  gateway.next_response_
+      .body = "{ \"status\" : \"error\", \"reason\" : \"XXX\"}";
   try {
     session.Drop();
     EXPECT_TRUE(false);
@@ -148,8 +147,7 @@ TEST_F(T_Session, Drop) {
     EXPECT_EQ(EPublish::kFailLeaseBody, e.failure()) << e.what();
   }
 
-  gateway.next_response_.body =
-    "{ \"status\" : \"ok\" }";
+  gateway.next_response_.body = "{ \"status\" : \"ok\" }";
   try {
     session.Drop();
   } catch (...) {

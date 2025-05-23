@@ -37,9 +37,7 @@ class T_CachePlugin : public ::testing::Test {
     cache_mgr_->AcquireQuotaManager(quota_mgr_);
   }
 
-  virtual void TearDown() {
-    delete cache_mgr_;
-  }
+  virtual void TearDown() { delete cache_mgr_; }
 
   int Connect() {
     vector<string> tokens = SplitString(g_plugin_locator, '=');
@@ -50,7 +48,7 @@ class T_CachePlugin : public ::testing::Test {
       if (tcp_address.size() != 2) {
         printf("invalid locator: %s\n", g_plugin_locator.c_str());
         abort();
-       }
+      }
       return ConnectTcpEndpoint(tcp_address[0], String2Uint64(tcp_address[1]));
     } else {
       printf("invalid locator: %s\n", g_plugin_locator.c_str());
@@ -59,8 +57,7 @@ class T_CachePlugin : public ::testing::Test {
   }
 
   CacheManager::LabeledObject LabelWithPath(const shash::Any &id,
-                                            const std::string &path)
-  {
+                                            const std::string &path) {
     CacheManager::Label label;
     label.path = path;
     return CacheManager::LabeledObject(id, label);
@@ -79,8 +76,8 @@ TEST_F(T_CachePlugin, Connection) {
 
   int fd_second = Connect();
   ASSERT_GE(fd_second, 0);
-  ExternalCacheManager *cache_mgr_second =
-    ExternalCacheManager::Create(fd_second, nfiles, "test 2nd");
+  ExternalCacheManager *cache_mgr_second = ExternalCacheManager::Create(
+      fd_second, nfiles, "test 2nd");
   ASSERT_TRUE(cache_mgr_second != NULL);
   EXPECT_GE(cache_mgr_second->session_id(), 0);
 
@@ -97,9 +94,9 @@ TEST_F(T_CachePlugin, OpenClose) {
   string content = "foo";
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        data, content.length()));
+      reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), data,
+                                        content.length()));
   unsigned char *buffer;
   uint64_t size;
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id, "test"), &buffer, &size));
@@ -112,13 +109,13 @@ TEST_F(T_CachePlugin, StoreEmpty) {
   shash::Any empty_id(shash::kSha1);
   string empty;
   shash::HashString(empty, &empty_id);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(empty_id, "enpty"),
-                                        NULL, 0));
+  EXPECT_TRUE(
+      cache_mgr_->CommitFromMem(LabelWithPath(empty_id, "enpty"), NULL, 0));
 
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(empty_id, "test"),
-                                   &buffer, &size));
+  EXPECT_TRUE(
+      cache_mgr_->Open2Mem(LabelWithPath(empty_id, "test"), &buffer, &size));
   EXPECT_EQ(0U, size);
   EXPECT_EQ(NULL, buffer);
   free(buffer);
@@ -141,21 +138,21 @@ TEST_F(T_CachePlugin, HashAlgorithms) {
   HashString(content, &id_rmd160);
   HashString(content, &id_shake128);
   unsigned char *data = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_sha1, "sha1"),
-                                        data, content.length()));
+      reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_sha1, "sha1"), data,
+                                        content.length()));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_rmd160, "rmd160"),
                                         data, content.length()));
   EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_shake128, "shake128"),
                                         data, content.length()));
   unsigned char *buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_sha1, "sha1"),
-                                   &buffer, &size));
+  EXPECT_TRUE(
+      cache_mgr_->Open2Mem(LabelWithPath(id_sha1, "sha1"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_rmd160, "rmd160"),
-                                   &buffer, &size));
+  EXPECT_TRUE(
+      cache_mgr_->Open2Mem(LabelWithPath(id_rmd160, "rmd160"), &buffer, &size));
   EXPECT_EQ(content, string(reinterpret_cast<char *>(buffer), size));
   free(buffer);
   EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_shake128, "id_shake128"),
@@ -169,26 +166,26 @@ TEST_F(T_CachePlugin, Read) {
   unsigned size_even = 24 * 1024 * 1024;
   unsigned size_odd = 24 * 1024 * 1024 + 1;
   unsigned char *buffer = reinterpret_cast<unsigned char *>(
-    scalloc(size_odd, 1));
+      scalloc(size_odd, 1));
   memset(buffer, 1, size_odd);
   shash::Any id_even(shash::kSha1);
   shash::Any id_odd(shash::kSha1);
   shash::HashMem(buffer, size_even, &id_even);
   shash::HashMem(buffer, size_odd, &id_odd);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_even, "even"),
-                                        buffer, size_even));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_odd, "odd"),
-                                        buffer, size_odd));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_even, "even"), buffer,
+                                        size_even));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_odd, "odd"), buffer,
+                                        size_odd));
 
   unsigned char *read_buffer;
   uint64_t size;
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_even, "even"),
-                                   &read_buffer, &size));
+  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_even, "even"), &read_buffer,
+                                   &size));
   EXPECT_EQ(size, size_even);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_even));
   free(read_buffer);
-  EXPECT_TRUE(cache_mgr_->Open2Mem(LabelWithPath(id_odd, "odd"),
-                                   &read_buffer, &size));
+  EXPECT_TRUE(
+      cache_mgr_->Open2Mem(LabelWithPath(id_odd, "odd"), &read_buffer, &size));
   EXPECT_EQ(size, size_odd);
   EXPECT_EQ(0, memcmp(read_buffer, buffer, size_odd));
   free(read_buffer);
@@ -197,8 +194,8 @@ TEST_F(T_CachePlugin, Read) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Pread(fd, NULL, 0, 0));
 
-  read_buffer = reinterpret_cast<unsigned char *> (
-    smalloc(2 * cache_mgr_->max_object_size()));
+  read_buffer = reinterpret_cast<unsigned char *>(
+      smalloc(2 * cache_mgr_->max_object_size()));
   EXPECT_EQ(0, cache_mgr_->Pread(fd, read_buffer, 0, size_odd));
   EXPECT_EQ(-EINVAL, cache_mgr_->Pread(fd, read_buffer, 1, size_odd + 1));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, read_buffer, 1, size_odd - 1));
@@ -214,8 +211,9 @@ TEST_F(T_CachePlugin, Read) {
     EXPECT_EQ(0, memcmp(read_buffer, buffer, bytes_read));
     total_size += bytes_read;
     EXPECT_TRUE((bytes_read == next_size) || (total_size == size_odd))
-      << next_size << " bytes requested, " << bytes_read << " bytes received, "
-      << "read so far: " << total_size << "/" << size_odd << " bytes";
+        << next_size << " bytes requested, " << bytes_read
+        << " bytes received, " << "read so far: " << total_size << "/"
+        << size_odd << " bytes";
   }
 
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -308,9 +306,9 @@ TEST_F(T_CachePlugin, Info) {
   string content = "foo";
   HashString(content, &id);
   unsigned char *data = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(content.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"),
-                                        data, content.length()));
+      reinterpret_cast<const unsigned char *>(content.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id, "test"), data,
+                                        content.length()));
   int fd = cache_mgr_->Open(CacheManager::LabeledObject(id));
   EXPECT_GE(fd, 0);
   EXPECT_GT(quota_mgr_->GetSizePinned(), size_pinned);
@@ -340,21 +338,21 @@ TEST_F(T_CachePlugin, Shrink) {
   HashString(str_clg, &id_clg);
   HashString(str_txn, &id_txn);
   unsigned char *dat_vol = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(str_vol.data()));
+      reinterpret_cast<const unsigned char *>(str_vol.data()));
   unsigned char *dat_reg = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(str_reg.data()));
+      reinterpret_cast<const unsigned char *>(str_reg.data()));
   unsigned char *dat_clg = const_cast<unsigned char *>(
-    reinterpret_cast<const unsigned char *>(str_clg.data()));
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_vol, ""),
-                                        dat_vol, str_vol.length()));
+      reinterpret_cast<const unsigned char *>(str_clg.data()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_vol, ""), dat_vol,
+                                        str_vol.length()));
   uint64_t size_with1 = quota_mgr_->GetSize();
   EXPECT_GT(size_with1, size_vanilla);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_reg, ""),
-                                        dat_reg, str_reg.length()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_reg, ""), dat_reg,
+                                        str_reg.length()));
   uint64_t size_with2 = quota_mgr_->GetSize();
   EXPECT_GT(size_with2, size_with1);
-  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_clg, ""),
-                                        dat_clg, str_clg.length()));
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(LabelWithPath(id_clg, ""), dat_clg,
+                                        str_clg.length()));
   uint64_t size_with3 = quota_mgr_->GetSize();
   EXPECT_GT(size_with3, size_with2);
   void *txn = alloca(cache_mgr_->SizeOfTxn());
@@ -423,8 +421,7 @@ TEST_F(T_CachePlugin, List) {
   }
   EXPECT_TRUE(descriptions.empty());
   for (set<int>::const_iterator i = open_fds.begin(), i_end = open_fds.end();
-       i != i_end; ++i)
-  {
+       i != i_end; ++i) {
     EXPECT_EQ(0, cache_mgr_->Close(*i));
   }
 }

@@ -4,8 +4,6 @@
 
 #include "subscriber_sse.h"
 
-
-
 #include <vector>
 
 #include "url.h"
@@ -15,23 +13,23 @@
 
 namespace {
 
-const LogFacilities& kLogInfo = DefaultLogging::info;
-const LogFacilities& kLogError = DefaultLogging::error;
+const LogFacilities &kLogInfo = DefaultLogging::info;
+const LogFacilities &kLogError = DefaultLogging::error;
 
 }  // namespace
 
 namespace notify {
 
-SubscriberSSE::SubscriberSSE(const std::string& server_url)
-    : Subscriber(),
-      server_url_(server_url + "/notifications/subscribe"),
-      topic_(),
-      buffer_(),
-      should_quit_(false) {}
+SubscriberSSE::SubscriberSSE(const std::string &server_url)
+    : Subscriber()
+    , server_url_(server_url + "/notifications/subscribe")
+    , topic_()
+    , buffer_()
+    , should_quit_(false) { }
 
-SubscriberSSE::~SubscriberSSE() {}
+SubscriberSSE::~SubscriberSSE() { }
 
-bool SubscriberSSE::Subscribe(const std::string& topic) {
+bool SubscriberSSE::Subscribe(const std::string &topic) {
   UniquePtr<Url> url(Url::Parse(server_url_));
 
   if (!url.IsValid()) {
@@ -45,9 +43,9 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
 
   std::string request = "{\"version\":1,\"repository\":\"" + topic + "\"}";
 
-  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
+  const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
-  CURL* h_curl = curl_easy_init();
+  CURL *h_curl = curl_easy_init();
   if (h_curl == NULL) {
     LogCvmfs(kLogCvmfs, kLogError, "Could not create Curl handle\n");
     return false;
@@ -91,15 +89,11 @@ bool SubscriberSSE::Subscribe(const std::string& topic) {
   return success;
 }
 
-void SubscriberSSE::Unsubscribe() {
-  atomic_write32(&should_quit_, 1);
-}
+void SubscriberSSE::Unsubscribe() { atomic_write32(&should_quit_, 1); }
 
-bool SubscriberSSE::ShouldQuit() const {
-  return atomic_read32(&should_quit_);
-}
+bool SubscriberSSE::ShouldQuit() const { return atomic_read32(&should_quit_); }
 
-void SubscriberSSE::AppendToBuffer(const std::string& s) {
+void SubscriberSSE::AppendToBuffer(const std::string &s) {
   size_t start = 0;
   if (s.substr(0, 6) == "data: ") {
     start = 6;
@@ -109,15 +103,15 @@ void SubscriberSSE::AppendToBuffer(const std::string& s) {
 
 void SubscriberSSE::ClearBuffer() { buffer_.clear(); }
 
-size_t SubscriberSSE::CurlRecvCB(void* buffer, size_t size, size_t nmemb,
-                                 void* userp) {
-  notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(userp);
+size_t SubscriberSSE::CurlRecvCB(void *buffer, size_t size, size_t nmemb,
+                                 void *userp) {
+  notify::SubscriberSSE *sub = static_cast<notify::SubscriberSSE *>(userp);
 
   if (size * nmemb < 1) {
     return 0;
   }
 
-  std::string buf(static_cast<char*>(buffer));
+  std::string buf(static_cast<char *>(buffer));
 
   std::vector<std::string> lines = SplitString(buf, '\n');
 
@@ -146,10 +140,10 @@ size_t SubscriberSSE::CurlRecvCB(void* buffer, size_t size, size_t nmemb,
   return size * nmemb;
 }
 
-int SubscriberSSE::CurlProgressCB(void* clientp, curl_off_t dltotal,
+int SubscriberSSE::CurlProgressCB(void *clientp, curl_off_t dltotal,
                                   curl_off_t dlnow, curl_off_t ultotal,
                                   curl_off_t ulnow) {
-  notify::SubscriberSSE* sub = static_cast<notify::SubscriberSSE*>(clientp);
+  notify::SubscriberSSE *sub = static_cast<notify::SubscriberSSE *>(clientp);
   if (sub->ShouldQuit()) {
     LogCvmfs(kLogCvmfs, kLogInfo,
              "SubscriberSSE - quit request received. Stopping\n");

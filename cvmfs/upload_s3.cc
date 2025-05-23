@@ -25,16 +25,14 @@ namespace upload {
 /*
  * Allowed values of x-amz-acl according to S3 API
  */
-static const char* x_amz_acl_allowed_values_[8] = {
-    "private",
-    "public-read",
-    "public-write",
-    "authenticated-read",
-    "aws-exec-read",
-    "bucket-owner-read",
-    "bucket-owner-full-control",
-    ""
-};
+static const char *x_amz_acl_allowed_values_[8] = {"private",
+                                                   "public-read",
+                                                   "public-write",
+                                                   "authenticated-read",
+                                                   "aws-exec-read",
+                                                   "bucket-owner-read",
+                                                   "bucket-owner-full-control",
+                                                   ""};
 
 void S3Uploader::RequestCtrl::WaitFor() {
   char c;
@@ -45,20 +43,19 @@ void S3Uploader::RequestCtrl::WaitFor() {
 
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
-  : AbstractUploader(spooler_definition)
-  , dns_buckets_(true)
-  , num_parallel_uploads_(kDefaultNumParallelUploads)
-  , num_retries_(kDefaultNumRetries)
-  , timeout_sec_(kDefaultTimeoutSec)
-  , authz_method_(s3fanout::kAuthzAwsV2)
-  , peek_before_put_(true)
-  , use_https_(false)
-  , proxy_("")
-  , temporary_path_(spooler_definition.temporary_path)
-  , x_amz_acl_("public-read")
-{
-  assert(spooler_definition.IsValid() &&
-         spooler_definition.driver_type == SpoolerDefinition::S3);
+    : AbstractUploader(spooler_definition)
+    , dns_buckets_(true)
+    , num_parallel_uploads_(kDefaultNumParallelUploads)
+    , num_retries_(kDefaultNumRetries)
+    , timeout_sec_(kDefaultTimeoutSec)
+    , authz_method_(s3fanout::kAuthzAwsV2)
+    , peek_before_put_(true)
+    , use_https_(false)
+    , proxy_("")
+    , temporary_path_(spooler_definition.temporary_path)
+    , x_amz_acl_("public-read") {
+  assert(spooler_definition.IsValid()
+         && spooler_definition.driver_type == SpoolerDefinition::S3);
 
   atomic_init32(&io_errors_);
 
@@ -92,8 +89,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
 
-  int retval = pthread_create(
-    &thread_collect_results_, NULL, MainCollectResults, this);
+  int retval = pthread_create(&thread_collect_results_, NULL,
+                              MainCollectResults, this);
   assert(retval == 0);
 }
 
@@ -106,10 +103,9 @@ S3Uploader::~S3Uploader() {
 
 
 bool S3Uploader::ParseSpoolerDefinition(
-  const SpoolerDefinition &spooler_definition)
-{
-  const std::vector<std::string> config =
-      SplitString(spooler_definition.spooler_configuration, '@');
+    const SpoolerDefinition &spooler_definition) {
+  const std::vector<std::string> config = SplitString(
+      spooler_definition.spooler_configuration, '@');
   if (config.size() != 2) {
     LogCvmfs(kLogUploadS3, kLogStderr,
              "Failed to parse spooler configuration string '%s'.\n"
@@ -117,26 +113,24 @@ bool S3Uploader::ParseSpoolerDefinition(
              spooler_definition.spooler_configuration.c_str());
     return false;
   }
-  repository_alias_              = config[0];
+  repository_alias_ = config[0];
   const std::string &config_path = config[1];
 
   if (!FileExists(config_path)) {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Cannot find S3 config file at '%s'",
+    LogCvmfs(kLogUploadS3, kLogStderr, "Cannot find S3 config file at '%s'",
              config_path.c_str());
     return false;
   }
 
   // Parse S3 configuration
   BashOptionsManager options_manager = BashOptionsManager(
-    new DefaultOptionsTemplateManager(repository_alias_));
+      new DefaultOptionsTemplateManager(repository_alias_));
   options_manager.ParsePath(config_path, false);
   std::string parameter;
 
   if (!options_manager.GetValue("CVMFS_S3_HOST", &host_name_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to parse CVMFS_S3_HOST from '%s'",
-             config_path.c_str());
+             "Failed to parse CVMFS_S3_HOST from '%s'", config_path.c_str());
     return false;
   }
   if (!options_manager.GetValue("CVMFS_S3_ACCESS_KEY", &access_key_)) {
@@ -153,8 +147,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
   if (!options_manager.GetValue("CVMFS_S3_BUCKET", &bucket_)) {
     LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to parse CVMFS_S3_BUCKET from '%s'.",
-             config_path.c_str());
+             "Failed to parse CVMFS_S3_BUCKET from '%s'.", config_path.c_str());
     return false;
   }
   if (options_manager.GetValue("CVMFS_S3_DNS_BUCKETS", &parameter)) {
@@ -163,8 +156,7 @@ bool S3Uploader::ParseSpoolerDefinition(
     }
   }
   if (options_manager.GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
-                               &parameter))
-  {
+                               &parameter)) {
     num_parallel_uploads_ = String2Uint64(parameter);
   }
   if (options_manager.GetValue("CVMFS_S3_MAX_RETRIES", &parameter)) {
@@ -184,11 +176,11 @@ bool S3Uploader::ParseSpoolerDefinition(
     } else if (flavor_ == "awsv4") {
       authz_method_ = s3fanout::kAuthzAwsV4;
     } else {
-    LogCvmfs(kLogUploadS3, kLogStderr,
-             "Failed to parse CVMFS_S3_FLAVOR from '%s', "
-             "valid options are azure, awsv2 or awsv4",
-             config_path.c_str());
-    return false;
+      LogCvmfs(kLogUploadS3, kLogStderr,
+               "Failed to parse CVMFS_S3_FLAVOR from '%s', "
+               "valid options are azure, awsv2 or awsv4",
+               config_path.c_str());
+      return false;
     }
   }
   if (options_manager.GetValue("CVMFS_S3_PEEK_BEFORE_PUT", &parameter)) {
@@ -196,8 +188,8 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
   if (options_manager.GetValue("CVMFS_S3_X_AMZ_ACL", &parameter)) {
     bool isAllowed = false;
-    size_t const len = sizeof(x_amz_acl_allowed_values_) /
-                       sizeof(x_amz_acl_allowed_values_[0]);
+    size_t const len = sizeof(x_amz_acl_allowed_values_)
+                       / sizeof(x_amz_acl_allowed_values_[0]);
     for (size_t i = 0; i < len; i++) {
       if (x_amz_acl_allowed_values_[i] == parameter) {
         isAllowed = true;
@@ -207,7 +199,7 @@ bool S3Uploader::ParseSpoolerDefinition(
     if (!isAllowed) {
       LogCvmfs(kLogUploadS3, kLogStderr,
                "%s is not an allowed value for CVMFS_S3_X_AMZ_ACL",
-                    parameter.c_str());
+               parameter.c_str());
       return false;
     }
     x_amz_acl_ = parameter;
@@ -244,19 +236,20 @@ bool S3Uploader::Create() {
   info->request = s3fanout::JobInfo::kReqPutBucket;
   std::string request_content;
   if (!region_.empty()) {
-    request_content =
-      std::string("<CreateBucketConfiguration xmlns="
-        "\"http://s3.amazonaws.com/doc/2006-03-01/\">"
-        "<LocationConstraint>") + region_ + "</LocationConstraint>"
-        "</CreateBucketConfiguration>";
+    request_content = std::string("<CreateBucketConfiguration xmlns="
+                                  "\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+                                  "<LocationConstraint>")
+                      + region_
+                      + "</LocationConstraint>"
+                        "</CreateBucketConfiguration>";
     info->origin->Append(request_content.data(), request_content.length());
     info->origin->Commit();
   }
 
   RequestCtrl req_ctrl;
   MakePipe(req_ctrl.pipe_wait);
-  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+  info->callback = const_cast<void *>(static_cast<void const *>(
+      MakeClosure(&S3Uploader::OnReqComplete, this, &req_ctrl)));
 
   IncJobsInFlight();
   UploadJobInfo(info);
@@ -285,12 +278,11 @@ void *S3Uploader::MainCollectResults(void *data) {
     // Report completed job
     int reply_code = 0;
     if (info->error_code != s3fanout::kFailOk) {
-      if ((info->request != s3fanout::JobInfo::kReqHeadOnly) ||
-          (info->error_code != s3fanout::kFailNotFound)) {
+      if ((info->request != s3fanout::JobInfo::kReqHeadOnly)
+          || (info->error_code != s3fanout::kFailNotFound)) {
         LogCvmfs(kLogUploadS3, kLogStderr,
                  "Upload job for '%s' failed. (error code: %d - %s)",
-                 info->object_key.c_str(),
-                 info->error_code,
+                 info->object_key.c_str(), info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
         reply_code = 99;
         atomic_inc32(&uploader->io_errors_);
@@ -299,10 +291,10 @@ void *S3Uploader::MainCollectResults(void *data) {
     if (info->request == s3fanout::JobInfo::kReqDelete) {
       uploader->Respond(NULL, UploaderResults());
     } else if (info->request == s3fanout::JobInfo::kReqHeadOnly) {
-      if (info->error_code == s3fanout::kFailNotFound) reply_code = 1;
-      uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                        UploaderResults(UploaderResults::kLookup,
-                                        reply_code));
+      if (info->error_code == s3fanout::kFailNotFound)
+        reply_code = 1;
+      uploader->Respond(static_cast<CallbackTN *>(info->callback),
+                        UploaderResults(UploaderResults::kLookup, reply_code));
     } else {
       if (info->request == s3fanout::JobInfo::kReqHeadPut) {
         // The HEAD request was not transformed into a PUT request, thus this
@@ -313,9 +305,9 @@ void *S3Uploader::MainCollectResults(void *data) {
         uploader->DecUploadedChunks();
         uploader->CountUploadedBytes(-(info->payload_size));
       }
-      uploader->Respond(static_cast<CallbackTN*>(info->callback),
-                        UploaderResults(UploaderResults::kChunkCommit,
-                                        reply_code));
+      uploader->Respond(
+          static_cast<CallbackTN *>(info->callback),
+          UploaderResults(UploaderResults::kChunkCommit, reply_code));
 
       assert(!info->origin.IsValid());
     }
@@ -327,11 +319,9 @@ void *S3Uploader::MainCollectResults(void *data) {
 }
 
 
-void S3Uploader::DoUpload(
-  const std::string &remote_path,
-  IngestionSource *source,
-  const CallbackTN *callback
-) {
+void S3Uploader::DoUpload(const std::string &remote_path,
+                          IngestionSource *source,
+                          const CallbackTN *callback) {
   bool rvb = source->Open();
   if (!rvb) {
     Respond(callback, UploaderResults(100, source->GetPath()));
@@ -341,15 +331,15 @@ void S3Uploader::DoUpload(
   rvb = source->GetSize(&size);
   assert(rvb);
 
-  FileBackedBuffer *origin =
-    FileBackedBuffer::Create(kInMemoryObjectThreshold,
-                             spooler_definition().temporary_path);
+  FileBackedBuffer *origin = FileBackedBuffer::Create(
+      kInMemoryObjectThreshold, spooler_definition().temporary_path);
 
   unsigned char buffer[kPageSize];
   ssize_t nbytes;
   do {
     nbytes = source->Read(buffer, kPageSize);
-    if (nbytes > 0) origin->Append(buffer, nbytes);
+    if (nbytes > 0)
+      origin->Append(buffer, nbytes);
     if (nbytes < 0) {
       source->Close();
       delete origin;
@@ -360,11 +350,10 @@ void S3Uploader::DoUpload(
   source->Close();
   origin->Commit();
 
-  s3fanout::JobInfo *info =
-    new s3fanout::JobInfo(repository_alias_ + "/" + remote_path,
-                          const_cast<void*>(
-                              static_cast<void const*>(callback)),
-                          origin);
+  s3fanout::JobInfo *info = new s3fanout::JobInfo(
+      repository_alias_ + "/" + remote_path,
+      const_cast<void *>(static_cast<void const *>(callback)),
+      origin);
 
   if (HasPrefix(remote_path, ".cvmfs", false /*ignore_case*/)) {
     info->request = s3fanout::JobInfo::kReqPutDotCvmfs;
@@ -379,8 +368,8 @@ void S3Uploader::DoUpload(
   MakePipe(req_ctrl.pipe_wait);
   req_ctrl.callback_forward = callback;
   req_ctrl.original_path = source->GetPath();
-  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+  info->callback = const_cast<void *>(static_cast<void const *>(
+      MakeClosure(&S3Uploader::OnReqComplete, this, &req_ctrl)));
 
   UploadJobInfo(info);
   req_ctrl.WaitFor();
@@ -395,9 +384,7 @@ void S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
            "--> Object: '%s'\n"
            "--> Bucket: '%s'\n"
            "--> Host:   '%s'\n",
-           info->object_key.c_str(),
-           bucket_.c_str(),
-           host_name_port_.c_str());
+           info->object_key.c_str(), bucket_.c_str(), host_name_port_.c_str());
 
   s3fanout_mgr_->PushNewJob(info);
 }
@@ -409,23 +396,19 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
 }
 
 
-void S3Uploader::StreamedUpload(
-  UploadStreamHandle  *handle,
-  UploadBuffer        buffer,
-  const CallbackTN    *callback)
-{
-  S3StreamHandle *s3_handle = static_cast<S3StreamHandle*>(handle);
+void S3Uploader::StreamedUpload(UploadStreamHandle *handle,
+                                UploadBuffer buffer,
+                                const CallbackTN *callback) {
+  S3StreamHandle *s3_handle = static_cast<S3StreamHandle *>(handle);
 
   s3_handle->buffer->Append(buffer.data, buffer.size);
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
 
-void S3Uploader::FinalizeStreamedUpload(
-  UploadStreamHandle  *handle,
-  const shash::Any    &content_hash)
-{
-  S3StreamHandle *s3_handle = static_cast<S3StreamHandle*>(handle);
+void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                        const shash::Any &content_hash) {
+  S3StreamHandle *s3_handle = static_cast<S3StreamHandle *>(handle);
 
   // New file name based on content hash or remote_path override
   std::string final_path;
@@ -439,23 +422,21 @@ void S3Uploader::FinalizeStreamedUpload(
 
   size_t bytes_uploaded = s3_handle->buffer->GetSize();
 
-  s3fanout::JobInfo *info =
-      new s3fanout::JobInfo(final_path,
-                            const_cast<void*>(
-                                static_cast<void const*>(
-                                    handle->commit_callback)),
-                            s3_handle->buffer.Release());
+  s3fanout::JobInfo *info = new s3fanout::JobInfo(
+      final_path,
+      const_cast<void *>(static_cast<void const *>(handle->commit_callback)),
+      s3_handle->buffer.Release());
 
   if (peek_before_put_)
-      info->request = s3fanout::JobInfo::kReqHeadPut;
+    info->request = s3fanout::JobInfo::kReqHeadPut;
   UploadJobInfo(info);
 
   // Remove the temporary file
   delete s3_handle;
 
   // Update statistics counters
-  if (!content_hash.HasSuffix() ||
-      content_hash.suffix == shash::kSuffixPartial) {
+  if (!content_hash.HasSuffix()
+      || content_hash.suffix == shash::kSuffixPartial) {
     CountUploadedChunks();
     CountUploadedBytes(bytes_uploaded);
   } else if (content_hash.suffix == shash::kSuffixCatalog) {
@@ -465,13 +446,13 @@ void S3Uploader::FinalizeStreamedUpload(
 }
 
 
-s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
+s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string &path) const {
   FileBackedBuffer *buf = FileBackedBuffer::Create(kInMemoryObjectThreshold);
   return new s3fanout::JobInfo(path, NULL, buf);
 }
 
 
-void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
+void S3Uploader::DoRemoveAsync(const std::string &file_to_delete) {
   const std::string mangled_path = repository_alias_ + "/" + file_to_delete;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
@@ -483,10 +464,8 @@ void S3Uploader::DoRemoveAsync(const std::string& file_to_delete) {
 }
 
 
-void S3Uploader::OnReqComplete(
-  const upload::UploaderResults &results,
-  RequestCtrl *ctrl)
-{
+void S3Uploader::OnReqComplete(const upload::UploaderResults &results,
+                               RequestCtrl *ctrl) {
   ctrl->return_code = results.return_code;
   if (ctrl->callback_forward != NULL) {
     // We are already in Respond() so we must not call it again
@@ -500,15 +479,15 @@ void S3Uploader::OnReqComplete(
 }
 
 
-bool S3Uploader::Peek(const std::string& path) {
+bool S3Uploader::Peek(const std::string &path) {
   const std::string mangled_path = repository_alias_ + "/" + path;
   s3fanout::JobInfo *info = CreateJobInfo(mangled_path);
 
   RequestCtrl req_ctrl;
   MakePipe(req_ctrl.pipe_wait);
   info->request = s3fanout::JobInfo::kReqHeadOnly;
-  info->callback = const_cast<void*>(static_cast<void const*>(MakeClosure(
-    &S3Uploader::OnReqComplete, this, &req_ctrl)));
+  info->callback = const_cast<void *>(static_cast<void const *>(
+      MakeClosure(&S3Uploader::OnReqComplete, this, &req_ctrl)));
 
   IncJobsInFlight();
   UploadJobInfo(info);
@@ -519,9 +498,7 @@ bool S3Uploader::Peek(const std::string& path) {
 
 
 // noop: no mkdir needed in S3 storage
-bool S3Uploader::Mkdir(const std::string &path) {
-  return true;
-}
+bool S3Uploader::Mkdir(const std::string &path) { return true; }
 
 
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) {

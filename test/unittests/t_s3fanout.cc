@@ -40,15 +40,14 @@ TEST(T_S3Fanout, DetectThrottleIndicator) {
   EXPECT_EQ(13U, info.throttle_ms);
   s3fanout::S3FanoutManager::DetectThrottleIndicator("retry-after:27Ms", &info);
   EXPECT_EQ(27U, info.throttle_ms);
-  s3fanout::S3FanoutManager::DetectThrottleIndicator(
-    "retry-after:12000ms", &info);
+  s3fanout::S3FanoutManager::DetectThrottleIndicator("retry-after:12000ms",
+                                                     &info);
   EXPECT_EQ(10000U, info.throttle_ms);
 
-  s3fanout::S3FanoutManager::DetectThrottleIndicator(
-    "X-Retry-In: 10ms\n", &info);
+  s3fanout::S3FanoutManager::DetectThrottleIndicator("X-Retry-In: 10ms\n",
+                                                     &info);
   EXPECT_EQ(10U, info.throttle_ms);
-  s3fanout::S3FanoutManager::DetectThrottleIndicator(
-    "X-Retry-In: 12ms\r\n", &info);
+  s3fanout::S3FanoutManager::DetectThrottleIndicator("X-Retry-In: 12ms\r\n",
+                                                     &info);
   EXPECT_EQ(12U, info.throttle_ms);
 }
-

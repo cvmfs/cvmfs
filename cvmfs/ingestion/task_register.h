@@ -16,18 +16,15 @@
  * Encapsulated in a task so that only a single thread operates on the file
  * catalog, which is serialized anyway.
  */
-class TaskRegister
-  : public TubeConsumer<FileItem>
-  , public Observable<upload::SpoolerResult>
-{
+class TaskRegister : public TubeConsumer<FileItem>,
+                     public Observable<upload::SpoolerResult> {
  public:
   TaskRegister(Tube<FileItem> *tube_in,
                Tube<FileItem> *tube_ctr_inflight_pre,
                Tube<FileItem> *tube_ctr_inflight_post)
-    : TubeConsumer<FileItem>(tube_in)
-    , tube_ctr_inflight_pre_(tube_ctr_inflight_pre)
-    , tube_ctr_inflight_post_(tube_ctr_inflight_post)
-  { }
+      : TubeConsumer<FileItem>(tube_in)
+      , tube_ctr_inflight_pre_(tube_ctr_inflight_pre)
+      , tube_ctr_inflight_post_(tube_ctr_inflight_post) { }
 
  protected:
   virtual void Process(FileItem *file_item);

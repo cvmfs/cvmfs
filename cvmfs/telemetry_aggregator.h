@@ -54,24 +54,24 @@ class TelemetryAggregator : SingleCopy {
    *
    * Returns the newly created TelemetryAggregator or NULL if the creation
    * was not successful.
-  */
-  static TelemetryAggregator* Create(Statistics* statistics,
+   */
+  static TelemetryAggregator *Create(Statistics *statistics,
                                      int send_rate,
                                      OptionsManager *options_mgr,
-                                     MountPoint* mount_point,
+                                     MountPoint *mount_point,
                                      const std::string &fqrn,
                                      const TelemetrySelector type);
   virtual ~TelemetryAggregator();
 
   /**
    * Spawns the telemetry thread.
-  */
+   */
   void Spawn();
 
  protected:
-  Statistics* statistics_;
+  Statistics *statistics_;
   const int send_rate_sec_;
-  MountPoint* mount_point_;
+  MountPoint *mount_point_;
   int pipe_terminate_[2];
   pthread_t thread_telemetry_;
   std::string fqrn_;
@@ -91,21 +91,21 @@ class TelemetryAggregator : SingleCopy {
    * PushMetrics() is defined by the custom telemetry classes and performs all
    * operation on the statistic counters to send/store them.
    *
-  */
+   */
   static void *MainTelemetry(void *data);
 
   /**
    * Base constructor taking care of threading infrastructure.
    * Must always be called in the constructor of the custom telemetry classes.
-  */
-  TelemetryAggregator(Statistics* statistics, int send_rate_sec,
-                      MountPoint* mount_point, const std::string &fqrn) :
-                      statistics_(statistics),
-                      send_rate_sec_(send_rate_sec),
-                      mount_point_(mount_point),
-                      fqrn_(fqrn),
-                      is_zombie_(true),
-                      timestamp_(0) {
+   */
+  TelemetryAggregator(Statistics *statistics, int send_rate_sec,
+                      MountPoint *mount_point, const std::string &fqrn)
+      : statistics_(statistics)
+      , send_rate_sec_(send_rate_sec)
+      , mount_point_(mount_point)
+      , fqrn_(fqrn)
+      , is_zombie_(true)
+      , timestamp_(0) {
     pipe_terminate_[0] = pipe_terminate_[1] = -1;
     memset(&thread_telemetry_, 0, sizeof(thread_telemetry_));
   }
@@ -116,7 +116,7 @@ class TelemetryAggregator : SingleCopy {
    * sending/storing of the counters.
    *
    * Needs to be implemented in the custom telemetry class.
-  */
+   */
   virtual void PushMetrics() = 0;
 
  private:

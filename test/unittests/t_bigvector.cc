@@ -104,7 +104,7 @@ TEST_F(T_BigVector, Replace) {
     vec_->PushBack(i);
   }
   for (unsigned i = 0; i < N; ++i) {
-    vec_->Replace(i, 2*i);
+    vec_->Replace(i, 2 * i);
   }
   EXPECT_EQ(vec_->size(), N);
   EXPECT_GE(vec_->capacity(), vec_->size());

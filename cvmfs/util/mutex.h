@@ -38,15 +38,15 @@ struct RAII_Polymorphism {
  *
  * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
  */
-template <typename T, RAII_Polymorphism::T P = RAII_Polymorphism::None>
+template<typename T, RAII_Polymorphism::T P = RAII_Polymorphism::None>
 class RAII : SingleCopy {
  public:
-  inline explicit RAII(T &object) : ref_(object)  { Enter(); }
+  inline explicit RAII(T &object) : ref_(object) { Enter(); }
   inline explicit RAII(T *object) : ref_(*object) { Enter(); }
-  inline ~RAII()                         { Leave(); }
+  inline ~RAII() { Leave(); }
 
  protected:
-  inline void Enter() { ref_.Lock();   }
+  inline void Enter() { ref_.Lock(); }
   inline void Leave() { ref_.Unlock(); }
 
  private:
@@ -65,41 +65,41 @@ class RAII : SingleCopy {
  *
  * TODO(jblomer): C++11 replace this by a type alias to RAII
  */
-template <typename LockableT>
+template<typename LockableT>
 class LockGuard : public RAII<LockableT> {
  public:
-  inline explicit LockGuard(LockableT *object) : RAII<LockableT>(object) {}
+  inline explicit LockGuard(LockableT *object) : RAII<LockableT>(object) { }
 };
 
 
-template <>
-inline void RAII<pthread_mutex_t>::Enter() { pthread_mutex_lock(&ref_);   }
-template <>
-inline void RAII<pthread_mutex_t>::Leave() { pthread_mutex_unlock(&ref_); }
+template<>
+inline void RAII<pthread_mutex_t>::Enter() {
+  pthread_mutex_lock(&ref_);
+}
+template<>
+inline void RAII<pthread_mutex_t>::Leave() {
+  pthread_mutex_unlock(&ref_);
+}
 typedef RAII<pthread_mutex_t> MutexLockGuard;
 
 
-template <>
-inline void RAII<pthread_rwlock_t,
-                 RAII_Polymorphism::ReadLock>::Enter() {
+template<>
+inline void RAII<pthread_rwlock_t, RAII_Polymorphism::ReadLock>::Enter() {
   pthread_rwlock_rdlock(&ref_);
 }
-template <>
-inline void RAII<pthread_rwlock_t,
-                 RAII_Polymorphism::ReadLock>::Leave() {
+template<>
+inline void RAII<pthread_rwlock_t, RAII_Polymorphism::ReadLock>::Leave() {
   pthread_rwlock_unlock(&ref_);
 }
-template <>
-inline void RAII<pthread_rwlock_t,
-                 RAII_Polymorphism::WriteLock>::Enter() {
+template<>
+inline void RAII<pthread_rwlock_t, RAII_Polymorphism::WriteLock>::Enter() {
   pthread_rwlock_wrlock(&ref_);
 }
-template <>
-inline void RAII<pthread_rwlock_t,
-                 RAII_Polymorphism::WriteLock>::Leave() {
+template<>
+inline void RAII<pthread_rwlock_t, RAII_Polymorphism::WriteLock>::Leave() {
   pthread_rwlock_unlock(&ref_);
 }
-typedef RAII<pthread_rwlock_t, RAII_Polymorphism::ReadLock>  ReadLockGuard;
+typedef RAII<pthread_rwlock_t, RAII_Polymorphism::ReadLock> ReadLockGuard;
 typedef RAII<pthread_rwlock_t, RAII_Polymorphism::WriteLock> WriteLockGuard;
 
 #ifdef CVMFS_NAMESPACE_GUARD

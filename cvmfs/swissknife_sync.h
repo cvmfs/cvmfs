@@ -24,45 +24,45 @@ struct SyncParameters {
   static const unsigned kDefaultFileMbyteLimit = 1024;
 
   SyncParameters()
-      : spooler(NULL),
-        union_fs_type("aufs"),
-        to_delete(""),
-        cache_dir(""),
-        print_changeset(false),
-        dry_run(false),
-        mucatalogs(false),
-        use_file_chunking(false),
-        generate_legacy_bulk_chunks(false),
-        ignore_xdir_hardlinks(false),
-        stop_for_catalog_tweaks(false),
-        include_xattrs(false),
-        enable_mtime_ns(false),
-        external_data(false),
-        direct_io(false),
-        voms_authz(false),
-        virtual_dir_actions(0),
-        ignore_special_files(false),
-        branched_catalog(false),
-        compression_alg(zlib::kZlibDefault),
-        enforce_limits(false),
-        nested_kcatalog_limit(0),
-        root_kcatalog_limit(0),
-        file_mbyte_limit(0),
-        min_file_chunk_size(kDefaultMinFileChunkSize),
-        avg_file_chunk_size(kDefaultAvgFileChunkSize),
-        max_file_chunk_size(kDefaultMaxFileChunkSize),
-        manual_revision(0),
-        ttl_seconds(0),
-        max_concurrent_write_jobs(0),
-        num_upload_tasks(1),
-        is_balanced(false),
-        max_weight(kDefaultMaxWeight),
-        min_weight(kDefaultMinWeight),
-        gid(-1u),
-        uid(-1u),
-        session_token_file(),
-        key_file(),
-        repo_tag() {}
+      : spooler(NULL)
+      , union_fs_type("aufs")
+      , to_delete("")
+      , cache_dir("")
+      , print_changeset(false)
+      , dry_run(false)
+      , mucatalogs(false)
+      , use_file_chunking(false)
+      , generate_legacy_bulk_chunks(false)
+      , ignore_xdir_hardlinks(false)
+      , stop_for_catalog_tweaks(false)
+      , include_xattrs(false)
+      , enable_mtime_ns(false)
+      , external_data(false)
+      , direct_io(false)
+      , voms_authz(false)
+      , virtual_dir_actions(0)
+      , ignore_special_files(false)
+      , branched_catalog(false)
+      , compression_alg(zlib::kZlibDefault)
+      , enforce_limits(false)
+      , nested_kcatalog_limit(0)
+      , root_kcatalog_limit(0)
+      , file_mbyte_limit(0)
+      , min_file_chunk_size(kDefaultMinFileChunkSize)
+      , avg_file_chunk_size(kDefaultAvgFileChunkSize)
+      , max_file_chunk_size(kDefaultMaxFileChunkSize)
+      , manual_revision(0)
+      , ttl_seconds(0)
+      , max_concurrent_write_jobs(0)
+      , num_upload_tasks(1)
+      , is_balanced(false)
+      , max_weight(kDefaultMaxWeight)
+      , min_weight(kDefaultMinWeight)
+      , gid(-1u)
+      , uid(-1u)
+      , session_token_file()
+      , key_file()
+      , repo_tag() { }
 
   upload::Spooler *spooler;
   std::string repo_name;
@@ -129,7 +129,7 @@ namespace swissknife {
 
 class CommandCreate : public Command {
  public:
-  ~CommandCreate() {}
+  ~CommandCreate() { }
   virtual std::string GetName() const { return "create"; }
   virtual std::string GetDescription() const {
     return "Bootstraps a fresh repository.";
@@ -159,7 +159,7 @@ class CommandCreate : public Command {
 
 class CommandUpload : public Command {
  public:
-  ~CommandUpload() {}
+  ~CommandUpload() { }
   virtual std::string GetName() const { return "upload"; }
   virtual std::string GetDescription() const {
     return "Uploads a local file to the repository.";
@@ -177,7 +177,7 @@ class CommandUpload : public Command {
 
 class CommandPeek : public Command {
  public:
-  ~CommandPeek() {}
+  ~CommandPeek() { }
   virtual std::string GetName() const { return "peek"; }
   virtual std::string GetDescription() const {
     return "Checks whether a file exists in the repository.";
@@ -193,7 +193,7 @@ class CommandPeek : public Command {
 
 class CommandRemove : public Command {
  public:
-  ~CommandRemove() {}
+  ~CommandRemove() { }
   virtual std::string GetName() const { return "remove"; }
   virtual std::string GetDescription() const {
     return "Removes a file in the repository storage.";
@@ -209,8 +209,8 @@ class CommandRemove : public Command {
 
 class CommandApplyDirtab : public Command {
  public:
-  CommandApplyDirtab() : verbose_(false) {}
-  ~CommandApplyDirtab() {}
+  CommandApplyDirtab() : verbose_(false) { }
+  ~CommandApplyDirtab() { }
   virtual std::string GetName() const { return "dirtab"; }
   virtual std::string GetDescription() const {
     return "Parses the dirtab file and produces nested catalog markers.";
@@ -249,7 +249,7 @@ class CommandApplyDirtab : public Command {
 
 class CommandSync : public Command {
  public:
-  ~CommandSync() {}
+  ~CommandSync() { }
   virtual std::string GetName() const { return "sync"; }
   virtual std::string GetDescription() const {
     return "Pushes changes from scratch area back to the repository.";
@@ -299,8 +299,8 @@ class CommandSync : public Command {
 
     r.push_back(
         Parameter::Switch('G', "Use persistent caching for all catalogs "
-                                 "used during the publishing process"
-                                 " Warning: No automatic garbage collection!"));
+                               "used during the publishing process"
+                               " Warning: No automatic garbage collection!"));
     r.push_back(Parameter::Switch('d',
                                   "pause publishing to allow for catalog "
                                   "tweaks"));

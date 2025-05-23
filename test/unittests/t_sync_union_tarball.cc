@@ -3,8 +3,8 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <unistd.h>
+
 #include <cassert>
 #include <string>
 
@@ -20,12 +20,10 @@ namespace {
 
 class T_SyncUnionTarball : public ::testing::Test {
  protected:
-  void SetUp() {
-    m_sync_mediator_ = new publish::MockSyncMediator();
-  }
+  void SetUp() { m_sync_mediator_ = new publish::MockSyncMediator(); }
 
-  std::string CreateTarFile(const std::string& tar_filename,
-                            const std::string& base64_data) {
+  std::string CreateTarFile(const std::string &tar_filename,
+                            const std::string &base64_data) {
     std::string data_binary;
     Debase64(base64_data, &data_binary);
 
@@ -38,9 +36,7 @@ class T_SyncUnionTarball : public ::testing::Test {
     return tmp_tar_filename_;
   }
 
-  virtual void TearDown() {
-    unlink(tmp_tar_filename_.c_str());
-  }
+  virtual void TearDown() { unlink(tmp_tar_filename_.c_str()); }
 
   UniquePtr<publish::MockSyncMediator> m_sync_mediator_;
   std::string tmp_tar_filename_;
@@ -48,9 +44,9 @@ class T_SyncUnionTarball : public ::testing::Test {
 
 TEST_F(T_SyncUnionTarball, Simple) {
   std::string tar_filename = CreateTarFile("tar.tar", simple_tar);
-  publish::SyncUnionTarball sync_union(
-                                  m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u, "", false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.weak_ref(), "",
+                                       tar_filename, "tmpsync", -1u, -1u, "",
+                                       false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -62,9 +58,9 @@ TEST_F(T_SyncUnionTarball, Simple) {
 
 TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
   std::string tar_filename = CreateTarFile("tar.tar", four_empty_files);
-  publish::SyncUnionTarball sync_union(
-                                  m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u, "", false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.weak_ref(), "",
+                                       tar_filename, "tmpsync", -1u, -1u, "",
+                                       false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);
@@ -76,9 +72,9 @@ TEST_F(T_SyncUnionTarball, FourEmptyFiles) {
 
 TEST_F(T_SyncUnionTarball, Complex) {
   std::string tar_filename = CreateTarFile("tar.tar", complex_tar);
-  publish::SyncUnionTarball sync_union(
-                                  m_sync_mediator_.weak_ref(), "", tar_filename,
-                                  "tmpsync", -1u, -1u, "", false);
+  publish::SyncUnionTarball sync_union(m_sync_mediator_.weak_ref(), "",
+                                       tar_filename, "tmpsync", -1u, -1u, "",
+                                       false);
 
   EXPECT_TRUE(sync_union.Initialize());
   EXPECT_EQ(1, m_sync_mediator_->n_register);

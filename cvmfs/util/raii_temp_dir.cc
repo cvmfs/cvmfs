@@ -6,8 +6,8 @@
 
 #include "util/posix.h"
 
-RaiiTempDir* RaiiTempDir::Create(const std::string& prefix) {
-  RaiiTempDir* tmp = new RaiiTempDir(prefix);
+RaiiTempDir *RaiiTempDir::Create(const std::string &prefix) {
+  RaiiTempDir *tmp = new RaiiTempDir(prefix);
   if (tmp->dir() != "") {
     return tmp;
   } else {
@@ -16,7 +16,7 @@ RaiiTempDir* RaiiTempDir::Create(const std::string& prefix) {
   }
 }
 
-RaiiTempDir::RaiiTempDir(const std::string& prefix)
-    : dir_(CreateTempDir(prefix)) {}
+RaiiTempDir::RaiiTempDir(const std::string &prefix)
+    : dir_(CreateTempDir(prefix)) { }
 
 RaiiTempDir::~RaiiTempDir() { RemoveTree(dir_); }

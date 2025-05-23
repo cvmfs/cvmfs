@@ -3,13 +3,12 @@
  */
 
 
-#include "publish/repository.h"
-
 #include <unistd.h>
 
 #include <string>
 
 #include "publish/except.h"
+#include "publish/repository.h"
 #include "publish/repository_util.h"
 #include "publish/settings.h"
 #include "util/logging.h"
@@ -18,18 +17,17 @@
 namespace {
 
 void TrySessionDrop(publish::Publisher::Session *session,
-                    bool ignore_invalid_lease)
-{
+                    bool ignore_invalid_lease) {
   try {
     session->Drop();
   } catch (const publish::EPublish &e) {
-    if (ignore_invalid_lease &&
-        ((e.failure() == e.kFailLeaseBody) ||
-        (e.failure() == e.kFailLeaseNoEntry)))
-    {
+    if (ignore_invalid_lease
+        && ((e.failure() == e.kFailLeaseBody)
+            || (e.failure() == e.kFailLeaseNoEntry))) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogWarn,
                "force abort, continue despite error while trying to drop lease,"
-               " removing session token. Error: %s", e.msg().c_str());
+               " removing session token. Error: %s",
+               e.msg().c_str());
       unlink(session->token_path().c_str());
       return;
     }
@@ -59,8 +57,8 @@ void Publisher::Abort() {
       TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
     }
     throw EPublish(
-      "Repository " + settings_.fqrn() + " is not in a transaction",
-      EPublish::kFailTransactionState);
+        "Repository " + settings_.fqrn() + " is not in a transaction",
+        EPublish::kFailTransactionState);
   }
 
   TrySessionDrop(session_.weak_ref(), settings_.ignore_invalid_lease());
@@ -69,15 +67,16 @@ void Publisher::Abort() {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
     // in transaction
-    EUnionMountRepairMode repair_mode =
-      settings_.transaction().spool_area().repair_mode();
+    EUnionMountRepairMode
+        repair_mode = settings_.transaction().spool_area().repair_mode();
     if (repair_mode == kUnionMountRepairSafe) {
       settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(
-        kUnionMountRepairAlways);
+          kUnionMountRepairAlways);
     }
     int rvi = managed_node_->Check(false /* is_quiet */);
     settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(repair_mode);
-    if (rvi != 0) throw EPublish("publisher file system mount state is broken");
+    if (rvi != 0)
+      throw EPublish("publisher file system mount state is broken");
 
     managed_node_->Unmount();
     managed_node_->ClearScratch();

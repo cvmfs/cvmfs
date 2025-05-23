@@ -8,8 +8,7 @@
 
 class T_Sanitizer : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 };
 
 

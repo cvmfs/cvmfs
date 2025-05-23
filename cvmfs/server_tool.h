@@ -34,7 +34,7 @@ class ServerTool {
       const std::string &repository_url, const std::string &repository_name,
       const shash::Any &base_hash = shash::Any()) const;
 
-  template <class ObjectFetcherT>
+  template<class ObjectFetcherT>
   manifest::Reflog *FetchReflog(ObjectFetcherT *object_fetcher,
                                 const std::string &repo_name,
                                 const shash::Any &reflog_hash);

@@ -13,10 +13,8 @@ using namespace std;  // NOLINT
 
 class T_FileChunk : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
-  virtual void TearDown() {
-  }
+  virtual void SetUp() { }
+  virtual void TearDown() { }
 
   FileChunkReflist NewChunks() {
     FileChunkReflist result;

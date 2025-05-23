@@ -5,14 +5,13 @@
 #ifndef CVMFS_SWISSKNIFE_FILESTATS_H_
 #define CVMFS_SWISSKNIFE_FILESTATS_H_
 
-#include "swissknife.h"
-
 #include <pthread.h>
 
 #include <string>
 
 #include "catalog_traversal.h"
 #include "sql.h"
+#include "swissknife.h"
 #include "util/atomic.h"
 
 using namespace std;  // NOLINT
@@ -48,15 +47,14 @@ class FileStatsDatabase : public sqlite::Database<FileStatsDatabase> {
   sqlite::Sql *query_insert_symlink;
   sqlite::Sql *query_lookup_object;
   friend class sqlite::Database<FileStatsDatabase>;
-  FileStatsDatabase(const std::string &filename,
-                    const OpenMode     open_mode)
-    : sqlite::Database<FileStatsDatabase>(filename, open_mode) { }
+  FileStatsDatabase(const std::string &filename, const OpenMode open_mode)
+      : sqlite::Database<FileStatsDatabase>(filename, open_mode) { }
 };
 
 
 class CommandFileStats : public Command {
  public:
-  ~CommandFileStats() {}
+  ~CommandFileStats() { }
   virtual std::string GetName() const { return "filestats"; }
   virtual std::string GetDescription() const {
     return "CernVM File System repository statistics exporter.";
@@ -67,13 +65,13 @@ class CommandFileStats : public Command {
  protected:
   string db_path_;
   string tmp_db_path_;
-  FileStatsDatabase* db_;
+  FileStatsDatabase *db_;
 
   pthread_t thread_processing_;
   atomic_int32 num_downloaded_;
   atomic_int32 finished_;
 
-  template <class ObjectFetcherT>
+  template<class ObjectFetcherT>
   bool Run(ObjectFetcherT *object_fetcher);
 
   void CatalogCallback(const CatalogTraversalData<catalog::Catalog> &data);

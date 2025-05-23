@@ -17,9 +17,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "KeccakHash.h"
 #include "crypto/openssl_version.h"
 #include "util/exception.h"
-#include "KeccakHash.h"
 
 
 using namespace std;  // NOLINT
@@ -30,8 +30,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] =
-  {"", "", "-rmd160", "-shake128", ""};
+const char *kAlgorithmIds[] = {"", "", "-rmd160", "-shake128", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -39,9 +38,9 @@ bool HexPtr::IsValid() const {
   if (l == 0)
     return false;
   const char *c = str->data();  // Walks through the string
-  unsigned i = 0;  // String position of *c
+  unsigned i = 0;               // String position of *c
 
-  for ( ; i < l; ++i, ++c) {
+  for (; i < l; ++i, ++c) {
     if (*c == '-')
       break;
     if ((*c < '0') || (*c > 'f') || ((*c > '9') && (*c < 'a')))
@@ -50,12 +49,12 @@ bool HexPtr::IsValid() const {
 
   // Walk through all algorithms
   for (unsigned j = 0; j < kAny; ++j) {
-    const unsigned hex_length = 2*kDigestSizes[j];
+    const unsigned hex_length = 2 * kDigestSizes[j];
     const unsigned algo_id_length = kAlgorithmIdSizes[j];
     if (i == hex_length) {
       // Right suffix?
-      for ( ; (i < l) && (i-hex_length < algo_id_length); ++i, ++c) {
-        if (*c != kAlgorithmIds[j][i-hex_length])
+      for (; (i < l) && (i - hex_length < algo_id_length); ++i, ++c) {
+        if (*c != kAlgorithmIds[j][i - hex_length])
           break;
       }
       if ((i == l) && (l == hex_length + algo_id_length))
@@ -84,14 +83,14 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
   Any result;
 
   const unsigned length = hex.str->length();
-  if (length == 2*kDigestSizes[kMd5])
+  if (length == 2 * kDigestSizes[kMd5])
     result = Any(kMd5, hex);
-  if (length == 2*kDigestSizes[kSha1])
+  if (length == 2 * kDigestSizes[kSha1])
     result = Any(kSha1, hex);
   // TODO(jblomer) compare -rmd160, -shake128
-  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
+  if ((length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
-  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]))
+  if ((length == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]))
     result = Any(kShake128, hex);
 
   result.suffix = suffix;
@@ -106,35 +105,38 @@ Any MkFromSuffixedHexPtr(const HexPtr hex) {
   Any result;
 
   const unsigned length = hex.str->length();
-  if ((length == 2*kDigestSizes[kMd5]) || (length == 2*kDigestSizes[kMd5] + 1))
-  {
-    Suffix suffix = (length == 2*kDigestSizes[kMd5] + 1) ?
-      *(hex.str->rbegin()) : kSuffixNone;
+  if ((length == 2 * kDigestSizes[kMd5])
+      || (length == 2 * kDigestSizes[kMd5] + 1)) {
+    Suffix suffix = (length == 2 * kDigestSizes[kMd5] + 1)
+                        ? *(hex.str->rbegin())
+                        : kSuffixNone;
     result = Any(kMd5, hex, suffix);
   }
-  if ((length == 2*kDigestSizes[kSha1]) ||
-      (length == 2*kDigestSizes[kSha1] + 1))
-  {
-    Suffix suffix = (length == 2*kDigestSizes[kSha1] + 1) ?
-      *(hex.str->rbegin()) : kSuffixNone;
+  if ((length == 2 * kDigestSizes[kSha1])
+      || (length == 2 * kDigestSizes[kSha1] + 1)) {
+    Suffix suffix = (length == 2 * kDigestSizes[kSha1] + 1)
+                        ? *(hex.str->rbegin())
+                        : kSuffixNone;
     result = Any(kSha1, hex, suffix);
   }
-  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]) ||
-      (length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1))
-  {
-    Suffix suffix =
-      (length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)
-        ? *(hex.str->rbegin())
-        : kSuffixNone;
+  if ((length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160])
+      || (length
+          == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)) {
+    Suffix suffix = (length
+                     == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]
+                            + 1)
+                        ? *(hex.str->rbegin())
+                        : kSuffixNone;
     result = Any(kRmd160, hex, suffix);
   }
-  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]) ||
-      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1))
-  {
-    Suffix suffix =
-      (length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)
-        ? *(hex.str->rbegin())
-        : kSuffixNone;
+  if ((length == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128])
+      || (length
+          == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)) {
+    Suffix suffix = (length
+                     == 2 * kDigestSizes[kShake128]
+                            + kAlgorithmIdSizes[kShake128] + 1)
+                        ? *(hex.str->rbegin())
+                        : kSuffixNone;
     result = Any(kShake128, hex, suffix);
   }
 
@@ -179,7 +181,7 @@ void Init(ContextPtr context) {
     case kShake128:
       assert(context.size == sizeof(Keccak_HashInstance));
       keccak_result = Keccak_HashInitialize_SHAKE128(
-        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+          reinterpret_cast<Keccak_HashInstance *>(context.buffer));
       assert(keccak_result == SUCCESS);
       break;
     default:
@@ -188,19 +190,18 @@ void Init(ContextPtr context) {
 }
 
 void Update(const unsigned char *buffer, const unsigned buffer_length,
-            ContextPtr context)
-{
+            ContextPtr context) {
   HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
-      MD5_Update(reinterpret_cast<MD5_CTX *>(context.buffer),
-                 buffer, buffer_length);
+      MD5_Update(reinterpret_cast<MD5_CTX *>(context.buffer), buffer,
+                 buffer_length);
       break;
     case kSha1:
       assert(context.size == sizeof(SHA_CTX));
-      SHA1_Update(reinterpret_cast<SHA_CTX *>(context.buffer),
-                  buffer, buffer_length);
+      SHA1_Update(reinterpret_cast<SHA_CTX *>(context.buffer), buffer,
+                  buffer_length);
       break;
     case kRmd160:
       assert(context.size == sizeof(RIPEMD160_CTX));
@@ -209,8 +210,9 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       break;
     case kShake128:
       assert(context.size == sizeof(Keccak_HashInstance));
-      keccak_result = Keccak_HashUpdate(reinterpret_cast<Keccak_HashInstance *>(
-                        context.buffer), buffer, buffer_length * 8);
+      keccak_result = Keccak_HashUpdate(
+          reinterpret_cast<Keccak_HashInstance *>(context.buffer), buffer,
+          buffer_length * 8);
       assert(keccak_result == SUCCESS);
       break;
     default:
@@ -238,12 +240,12 @@ void Final(ContextPtr context, Any *any_digest) {
       break;
     case kShake128:
       assert(context.size == sizeof(Keccak_HashInstance));
-      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
-                        context.buffer), NULL);
+      keccak_result = Keccak_HashFinal(
+          reinterpret_cast<Keccak_HashInstance *>(context.buffer), NULL);
       assert(keccak_result == SUCCESS);
-      keccak_result =
-        Keccak_HashSqueeze(reinterpret_cast<Keccak_HashInstance *>(
-          context.buffer), any_digest->digest, kDigestSizes[kShake128] * 8);
+      keccak_result = Keccak_HashSqueeze(
+          reinterpret_cast<Keccak_HashInstance *>(context.buffer),
+          any_digest->digest, kDigestSizes[kShake128] * 8);
       break;
     default:
       PANIC(NULL);  // Undefined hash
@@ -253,8 +255,7 @@ void Final(ContextPtr context, Any *any_digest) {
 
 
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
-             Any *any_digest)
-{
+             Any *any_digest) {
   Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
   context.buffer = alloca(context.size);
@@ -271,12 +272,10 @@ void HashString(const std::string &content, Any *any_digest) {
 }
 
 
-void Hmac(
-  const string &key,
-  const unsigned char *buffer,
-  const unsigned buffer_size,
-  Any *any_digest
-) {
+void Hmac(const string &key,
+          const unsigned char *buffer,
+          const unsigned buffer_size,
+          Any *any_digest) {
   Algorithms algorithm = any_digest->algorithm;
   assert(algorithm != kAny);
 
@@ -285,8 +284,8 @@ void Hmac(
   memset(key_block, 0, block_size);
   if (key.length() > block_size) {
     Any hash_key(algorithm);
-    HashMem(reinterpret_cast<const unsigned char *>(key.data()),
-            key.length(), &hash_key);
+    HashMem(reinterpret_cast<const unsigned char *>(key.data()), key.length(),
+            &hash_key);
     memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
   } else {
     if (key.length() > 0)
@@ -379,12 +378,12 @@ Md5::Md5(const char *chars, const unsigned length) {
 Md5::Md5(const uint64_t lo, const uint64_t hi) {
   algorithm = kMd5;
   memcpy(digest, &lo, 8);
-  memcpy(digest+8, &hi, 8);
+  memcpy(digest + 8, &hi, 8);
 }
 
 void Md5::ToIntPair(uint64_t *lo, uint64_t *hi) const {
   memcpy(lo, digest, 8);
-  memcpy(hi, digest+8, 8);
+  memcpy(hi, digest + 8, 8);
 }
 
 
@@ -455,11 +454,9 @@ string Sha256String(const string &content) {
 }
 
 
-std::string Hmac256(
-  const std::string &key,
-  const std::string &content,
-  bool raw_output)
-{
+std::string Hmac256(const std::string &key,
+                    const std::string &content,
+                    bool raw_output) {
 #ifdef OPENSSL_API_INTERFACE_V09
   PANIC(NULL);
 #else

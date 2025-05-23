@@ -23,16 +23,16 @@ static inline uint32_t hasher_uint64t(const uint64_t &value) {
 unsigned FileChunkReflist::FindChunkIdx(const uint64_t off) {
   assert(list && (list->size() > 0));
   unsigned idx_low = 0;
-  unsigned idx_high = list->size()-1;
-  unsigned chunk_idx = idx_high/2;
+  unsigned idx_high = list->size() - 1;
+  unsigned chunk_idx = idx_high / 2;
   while (idx_low < idx_high) {
     if (static_cast<uint64_t>(list->AtPtr(chunk_idx)->offset()) > off) {
       assert(idx_high > 0);
       idx_high = chunk_idx - 1;
     } else {
-      if ((chunk_idx == list->size() - 1) ||
-          (static_cast<uint64_t>(list->AtPtr(chunk_idx + 1)->offset()) > off))
-      {
+      if ((chunk_idx == list->size() - 1)
+          || (static_cast<uint64_t>(list->AtPtr(chunk_idx + 1)->offset())
+              > off)) {
         break;
       }
       idx_low = chunk_idx + 1;
@@ -52,9 +52,8 @@ shash::Any FileChunkReflist::HashChunkList() {
   ctx.buffer = alloca(ctx.size);
   shash::Init(ctx);
   for (unsigned i = 0; i < list->size(); ++i) {
-    shash::Update(list->AtPtr(i)->content_hash().digest,
-                  shash::kDigestSizes[algo],
-                  ctx);
+    shash::Update(
+        list->AtPtr(i)->content_hash().digest, shash::kDigestSizes[algo], ctx);
   }
   shash::Any result(algo);
   shash::Final(ctx, &result);
@@ -66,14 +65,13 @@ shash::Any FileChunkReflist::HashChunkList() {
 
 
 void ChunkTables::InitLocks() {
-  lock =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock, NULL);
   assert(retval == 0);
 
   for (unsigned i = 0; i < kNumHandleLocks; ++i) {
-    pthread_mutex_t *m =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    pthread_mutex_t *m = reinterpret_cast<pthread_mutex_t *>(
+        smalloc(sizeof(pthread_mutex_t)));
     int retval = pthread_mutex_init(m, NULL);
     assert(retval == 0);
     handle_locks.PushBack(m);
@@ -115,7 +113,7 @@ ChunkTables::ChunkTables(const ChunkTables &other) {
 }
 
 
-ChunkTables &ChunkTables::operator= (const ChunkTables &other) {
+ChunkTables &ChunkTables::operator=(const ChunkTables &other) {
   if (&other == this)
     return *this;
 
@@ -140,9 +138,9 @@ void ChunkTables::CopyFrom(const ChunkTables &other) {
 
 pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
   const uint32_t hash = hasher_uint64t(handle);
-  const double bucket =
-    static_cast<double>(hash) * static_cast<double>(kNumHandleLocks) /
-    static_cast<double>((uint32_t)(-1));
+  const double bucket = static_cast<double>(hash)
+                        * static_cast<double>(kNumHandleLocks)
+                        / static_cast<double>((uint32_t)(-1));
   return handle_locks.At((uint32_t)bucket % kNumHandleLocks);
 }
 
@@ -151,8 +149,7 @@ pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
 
 
 SimpleChunkTables::SimpleChunkTables() {
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }

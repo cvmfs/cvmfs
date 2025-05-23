@@ -43,7 +43,7 @@ class Reflog {
   static void HashDatabase(const std::string &database_path,
                            shash::Any *hash_reflog);
 
-  static bool ReadChecksum(const std::string &path, shash::Any* checksum);
+  static bool ReadChecksum(const std::string &path, shash::Any *checksum);
   static bool WriteChecksum(const std::string &path, const shash::Any &value);
 
   bool AddCertificate(const shash::Any &certificate);
@@ -82,12 +82,12 @@ class Reflog {
   std::string database_file() const;
 
  protected:
-  bool AddReference(const shash::Any               &hash,
-                    const SqlReflog::ReferenceType  type);
-  bool ContainsReference(const shash::Any               &hash,
-                         const SqlReflog::ReferenceType  type) const;
-  bool GetReferenceTimestamp(const shash::Any               &hash,
-                             const SqlReflog::ReferenceType  type,
+  bool AddReference(const shash::Any &hash,
+                    const SqlReflog::ReferenceType type);
+  bool ContainsReference(const shash::Any &hash,
+                         const SqlReflog::ReferenceType type) const;
+  bool GetReferenceTimestamp(const shash::Any &hash,
+                             const SqlReflog::ReferenceType type,
                              uint64_t *timestamp) const;
 
  private:
@@ -98,14 +98,14 @@ class Reflog {
   void PrepareQueries();
 
  private:
-  UniquePtr<ReflogDatabase>       database_;
+  UniquePtr<ReflogDatabase> database_;
 
-  UniquePtr<SqlInsertReference>   insert_reference_;
-  UniquePtr<SqlCountReferences>   count_references_;
-  UniquePtr<SqlListReferences>    list_references_;
-  UniquePtr<SqlRemoveReference>   remove_reference_;
+  UniquePtr<SqlInsertReference> insert_reference_;
+  UniquePtr<SqlCountReferences> count_references_;
+  UniquePtr<SqlListReferences> list_references_;
+  UniquePtr<SqlRemoveReference> remove_reference_;
   UniquePtr<SqlContainsReference> contains_reference_;
-  UniquePtr<SqlGetTimestamp>      get_timestamp_;
+  UniquePtr<SqlGetTimestamp> get_timestamp_;
 };
 
 }  // namespace manifest

@@ -4,7 +4,6 @@
 
 #include "swissknife_history.h"
 
-
 #include <algorithm>
 #include <cassert>
 #include <ctime>
@@ -23,8 +22,8 @@ const std::string CommandTag::kHeadTag = "trunk";
 const std::string CommandTag::kPreviousHeadTag = "trunk-previous";
 
 const std::string CommandTag::kHeadTagDescription = "current HEAD";
-const std::string CommandTag::kPreviousHeadTagDescription =
-    "default undo target";
+const std::string
+    CommandTag::kPreviousHeadTagDescription = "default undo target";
 
 static void InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Mandatory('w', "repository directory / url"));
@@ -45,27 +44,28 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
     const ArgumentList &args, const bool read_write) {
   const string repository_url = MakeCanonicalPath(*args.find('w')->second);
   const string tmp_path = MakeCanonicalPath(*args.find('t')->second);
-  const string spl_definition =
-      (args.find('r') == args.end())
-          ? ""
-          : MakeCanonicalPath(*args.find('r')->second);
+  const string spl_definition = (args.find('r') == args.end())
+                                    ? ""
+                                    : MakeCanonicalPath(
+                                          *args.find('r')->second);
   const string manifest_path = (args.find('m') == args.end())
                                    ? ""
                                    : MakeCanonicalPath(*args.find('m')->second);
-  const shash::Algorithms hash_algo =
-      (args.find('e') == args.end())
-          ? shash::kSha1
-          : shash::ParseHashAlgorithm(*args.find('e')->second);
+  const shash::Algorithms hash_algo = (args.find('e') == args.end())
+                                          ? shash::kSha1
+                                          : shash::ParseHashAlgorithm(
+                                                *args.find('e')->second);
   const string pubkey_path = (args.find('p') == args.end())
                                  ? ""
                                  : MakeCanonicalPath(*args.find('p')->second);
-  const shash::Any base_hash =
-      (args.find('b') == args.end())
-          ? shash::Any()
-          : shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
-                                shash::kSuffixCatalog);
-  const string repo_name =
-      (args.find('f') == args.end()) ? "" : *args.find('f')->second;
+  const shash::Any base_hash = (args.find('b') == args.end())
+                                   ? shash::Any()
+                                   : shash::MkFromHexPtr(
+                                         shash::HexPtr(*args.find('b')->second),
+                                         shash::kSuffixCatalog);
+  const string repo_name = (args.find('f') == args.end())
+                               ? ""
+                               : *args.find('f')->second;
 
   string session_token_file;
   if (args.find('P') != args.end()) {
@@ -100,9 +100,8 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   if (HasPrefix(spl_definition, "gw", false)) {
     if (session_token_file.empty()) {
-      PrintError(
-          "Session token file has to be provided "
-          "when upstream type is gw.");
+      PrintError("Session token file has to be provided "
+                 "when upstream type is gw.");
       return NULL;
     }
   }
@@ -117,8 +116,8 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // initialize the (swissknife global) download manager
   const bool follow_redirects = (args.count('L') > 0);
-  const std::string &proxy = (args.count('@') > 0) ?
-                              *args.find('@')->second : "";
+  const std::string &proxy = (args.count('@') > 0) ? *args.find('@')->second
+                                                   : "";
   if (!this->InitDownloadManager(follow_redirects, proxy)) {
     return NULL;
   }
@@ -130,10 +129,10 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
-  env->manifest =
-      (FileExists(env->manifest_path.path()))
-          ? OpenLocalManifest(env->manifest_path.path())
-          : FetchRemoteManifest(env->repository_url, repo_name, base_hash);
+  env->manifest = (FileExists(env->manifest_path.path()))
+                      ? OpenLocalManifest(env->manifest_path.path())
+                      : FetchRemoteManifest(env->repository_url, repo_name,
+                                            base_hash);
 
   if (!env->manifest.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
@@ -142,8 +141,8 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
 
   // figure out the hash of the history from the previous revision if needed
   if (read_write && env->manifest->history().IsNull() && !base_hash.IsNull()) {
-    env->previous_manifest =
-        FetchRemoteManifest(env->repository_url, repo_name, base_hash);
+    env->previous_manifest = FetchRemoteManifest(env->repository_url, repo_name,
+                                                 base_hash);
     if (!env->previous_manifest.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
       return NULL;
@@ -172,11 +171,10 @@ CommandTag::Environment *CommandTag::InitializeEnvironment(
   if (read_write) {
     const bool use_file_chunking = false;
     const bool generate_legacy_bulk_chunks = false;
-    const upload::SpoolerDefinition sd(spl_definition, hash_algo,
-                                       zlib::kZlibDefault,
-                                       generate_legacy_bulk_chunks,
-                                       use_file_chunking, 0, 0, 0,
-                                       session_token_file);
+    const upload::SpoolerDefinition sd(
+        spl_definition, hash_algo, zlib::kZlibDefault,
+        generate_legacy_bulk_chunks, use_file_chunking, 0, 0, 0,
+        session_token_file);
     env->spooler = upload::Spooler::Construct(sd);
     if (!env->spooler.IsValid()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
@@ -405,9 +403,8 @@ catalog::Catalog *CommandTag::GetCatalog(const std::string &repository_url,
 void CommandTag::PrintTagMachineReadable(
     const history::History::Tag &tag) const {
   LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %" PRIu64 " %" PRIu64 " %ld %s %s",
-           tag.name.c_str(),
-           tag.root_hash.ToString().c_str(), tag.size, tag.revision,
-           tag.timestamp,
+           tag.name.c_str(), tag.root_hash.ToString().c_str(), tag.size,
+           tag.revision, tag.timestamp,
            (tag.branch == "") ? "(default)" : tag.branch.c_str(),
            tag.description.c_str());
 }
@@ -420,13 +417,14 @@ std::string CommandTag::AddPadding(const std::string &str, const size_t padding,
   result.resize(padding);
   const size_t pos = (align_right) ? 0 : str.size();
   const size_t padding_width = padding - str.size();
-  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
+  for (size_t i = 0; i < padding_width; ++i)
+    result.insert(pos, fill_char);
   return result;
 }
 
 bool CommandTag::IsUndoTagName(const std::string &tag_name) const {
-  return tag_name == CommandTag::kHeadTag ||
-         tag_name == CommandTag::kPreviousHeadTag;
+  return tag_name == CommandTag::kHeadTag
+         || tag_name == CommandTag::kPreviousHeadTag;
 }
 
 //------------------------------------------------------------------------------
@@ -446,8 +444,8 @@ ParameterList CommandEditTag::GetParams() const {
 }
 
 int CommandEditTag::Main(const ArgumentList &args) {
-  if ((args.find('d') == args.end()) && (args.find('a') == args.end()) &&
-      (args.find('x') == args.end())) {
+  if ((args.find('d') == args.end()) && (args.find('a') == args.end())
+      && (args.find('x') == args.end())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "nothing to do");
     return 1;
   }
@@ -463,11 +461,13 @@ int CommandEditTag::Main(const ArgumentList &args) {
   int retval;
   if (args.find('d') != args.end()) {
     retval = RemoveTags(args, env.weak_ref());
-    if (retval != 0) return retval;
+    if (retval != 0)
+      return retval;
   }
   if ((args.find('a') != args.end()) || (args.find('x') != args.end())) {
     retval = AddNewTag(args, env.weak_ref());
-    if (retval != 0) return retval;
+    if (retval != 0)
+      return retval;
   }
 
   // finalize processing and upload new history database
@@ -478,17 +478,22 @@ int CommandEditTag::Main(const ArgumentList &args) {
 }
 
 int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
-  const std::string tag_name =
-      (args.find('a') != args.end()) ? *args.find('a')->second : "";
-  const std::string tag_description =
-      (args.find('D') != args.end()) ? *args.find('D')->second : "";
+  const std::string tag_name = (args.find('a') != args.end())
+                                   ? *args.find('a')->second
+                                   : "";
+  const std::string tag_description = (args.find('D') != args.end())
+                                          ? *args.find('D')->second
+                                          : "";
   const bool undo_tags = (args.find('x') != args.end());
-  const std::string root_hash_string =
-      (args.find('h') != args.end()) ? *args.find('h')->second : "";
-  const std::string branch_name =
-    (args.find('B') != args.end()) ? *args.find('B')->second : "";
-  const std::string previous_branch_name =
-    (args.find('P') != args.end()) ? *args.find('P')->second : "";
+  const std::string root_hash_string = (args.find('h') != args.end())
+                                           ? *args.find('h')->second
+                                           : "";
+  const std::string branch_name = (args.find('B') != args.end())
+                                      ? *args.find('B')->second
+                                      : "";
+  const std::string previous_branch_name = (args.find('P') != args.end())
+                                               ? *args.find('P')->second
+                                               : "";
 
   if (tag_name.find(" ") != std::string::npos) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag names must not contain spaces");
@@ -547,9 +552,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
 
     if (!env->history->ExistsBranch(tag_template.branch)) {
       history::History::Branch branch(
-        tag_template.branch,
-        previous_branch_name,
-        tag_template.revision);
+          tag_template.branch, previous_branch_name, tag_template.revision);
       if (!env->history->InsertBranch(branch)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "cannot insert branch '%s'",
                  tag_template.branch.c_str());
@@ -617,8 +620,7 @@ bool CommandEditTag::ManipulateTag(Environment *env,
 }
 
 bool CommandEditTag::MoveTag(Environment *env,
-                             const history::History::Tag &tag_template)
-{
+                             const history::History::Tag &tag_template) {
   const std::string &tag_name = tag_template.name;
   history::History::Tag new_tag = tag_template;
 
@@ -769,14 +771,13 @@ void CommandListTags::PrintHumanReadableTagList(
   for (; i != iend; ++i) {
     max_name_len = std::max(max_name_len, i->name.size());
     max_rev_len = std::max(max_rev_len, StringifyInt(i->revision).size());
-    max_time_len =
-        std::max(max_time_len, StringifyTime(i->timestamp, true).size());
+    max_time_len = std::max(max_time_len,
+                            StringifyTime(i->timestamp, true).size());
     max_branch_len = std::max(max_branch_len, i->branch.size());
   }
 
   // print the list header
-  LogCvmfs(kLogCvmfs, kLogStdout,
-           "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
            AddPadding(name_label, max_name_len).c_str(),
            AddPadding(rev_label, max_rev_len).c_str(),
            AddPadding(time_label, max_time_len).c_str(),
@@ -795,13 +796,11 @@ void CommandListTags::PrintHumanReadableTagList(
   i = tags.rbegin();
   for (; i != iend; ++i) {
     LogCvmfs(
-        kLogCvmfs, kLogStdout,
-        "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+        kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
         AddPadding(i->name, max_name_len).c_str(),
         AddPadding(StringifyInt(i->revision), max_rev_len, true).c_str(),
         AddPadding(StringifyTime(i->timestamp, true), max_time_len).c_str(),
-        AddPadding(i->branch, max_branch_len).c_str(),
-        i->description.c_str());
+        AddPadding(i->branch, max_branch_len).c_str(), i->description.c_str());
   }
 
   // print the list footer
@@ -828,8 +827,7 @@ void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
 
 
 void CommandListTags::PrintHumanReadableBranchList(
-  const BranchHierarchy &branches) const
-{
+    const BranchHierarchy &branches) const {
   unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
     for (unsigned l = 0; l < branches[i].level; ++l) {
@@ -844,12 +842,10 @@ void CommandListTags::PrintHumanReadableBranchList(
 
 
 void CommandListTags::PrintMachineReadableBranchList(
-  const BranchHierarchy &branches) const
-{
+    const BranchHierarchy &branches) const {
   unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%" PRIu64,
-             branches[i].level,
+    LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%" PRIu64, branches[i].level,
              AddPadding("", branches[i].level, false, " ").c_str(),
              branches[i].branch.branch.c_str(),
              branches[i].branch.initial_revision);
@@ -858,11 +854,10 @@ void CommandListTags::PrintMachineReadableBranchList(
 
 
 void CommandListTags::SortBranchesRecursively(
-  unsigned level,
-  const string &parent_branch,
-  const BranchList &branches,
-  BranchHierarchy *hierarchy) const
-{
+    unsigned level,
+    const string &parent_branch,
+    const BranchList &branches,
+    BranchHierarchy *hierarchy) const {
   // For large numbers of branches, this should be turned into the O(n) version
   // using a linked list
   unsigned N = branches.size();
@@ -871,19 +866,18 @@ void CommandListTags::SortBranchesRecursively(
       continue;
     if (branches[i].parent == parent_branch) {
       hierarchy->push_back(BranchLevel(branches[i], level));
-      SortBranchesRecursively(
-          level + 1, branches[i].branch, branches, hierarchy);
+      SortBranchesRecursively(level + 1, branches[i].branch, branches,
+                              hierarchy);
     }
   }
 }
 
 
 CommandListTags::BranchHierarchy CommandListTags::SortBranches(
-  const BranchList &branches) const
-{
+    const BranchList &branches) const {
   BranchHierarchy hierarchy;
   hierarchy.push_back(
-    BranchLevel(history::History::Branch("(default)", "", 0), 0));
+      BranchLevel(history::History::Branch("(default)", "", 0), 0));
   SortBranchesRecursively(1, "", branches, &hierarchy);
   return hierarchy;
 }
@@ -973,10 +967,8 @@ void CommandInfoTag::PrintHumanReadableInfo(
            "%s",
            tag.name.c_str(), tag.revision,
            StringifyTime(tag.timestamp, true /* utc */).c_str(),
-           tag.branch.c_str(),
-           tag.root_hash.ToString().c_str(),
-           HumanReadableFilesize(tag.size).c_str(),
-           tag.description.c_str());
+           tag.branch.c_str(), tag.root_hash.ToString().c_str(),
+           HumanReadableFilesize(tag.size).c_str(), tag.description.c_str());
 }
 
 int CommandInfoTag::Main(const ArgumentList &args) {
@@ -1020,8 +1012,8 @@ ParameterList CommandRollbackTag::GetParams() const {
 
 int CommandRollbackTag::Main(const ArgumentList &args) {
   const bool undo_rollback = (args.find('n') == args.end());
-  const std::string tag_name =
-      (!undo_rollback) ? *args.find('n')->second : CommandTag::kPreviousHeadTag;
+  const std::string tag_name = (!undo_rollback) ? *args.find('n')->second
+                                                : CommandTag::kPreviousHeadTag;
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
@@ -1085,8 +1077,8 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   }
 
   // check if the catalog has a supported schema version
-  if (catalog->schema() < catalog::CatalogDatabase::kLatestSupportedSchema -
-                              catalog::CatalogDatabase::kSchemaEpsilon) {
+  if (catalog->schema() < catalog::CatalogDatabase::kLatestSupportedSchema
+                              - catalog::CatalogDatabase::kSchemaEpsilon) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "not rolling back to outdated and "
              "incompatible catalog schema (%.1f < %.1f)",

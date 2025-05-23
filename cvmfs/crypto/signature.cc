@@ -46,7 +46,8 @@ const char *kDefaultPublicKey = "/etc/cvmfs/keys/cern.ch/cern-it4.pub";
 
 static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
   LogCvmfs(kLogCvmfs, kLogDebug, "certificate chain verification: %d", ok);
-  if (ok) return ok;
+  if (ok)
+    return ok;
 
   int error = X509_STORE_CTX_get_error(ctx);
   X509 *current_cert = X509_STORE_CTX_get_current_cert(ctx);
@@ -60,8 +61,8 @@ static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
     }
   }
   LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
-           "certificate verification error: %s, error %s (%d)",
-           subject.c_str(), X509_verify_cert_error_string(error), error);
+           "certificate verification error: %s, error %s (%d)", subject.c_str(),
+           X509_verify_cert_error_string(error), error);
   return ok;
 }
 
@@ -78,14 +79,14 @@ SignatureManager::SignatureManager() {
 
 
 void SignatureManager::InitX509Store() {
-  if (x509_store_) X509_STORE_free(x509_store_);
+  if (x509_store_)
+    X509_STORE_free(x509_store_);
   x509_lookup_ = NULL;
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
   unsigned long verify_flags =  // NOLINT(runtime/int)
-    X509_V_FLAG_CRL_CHECK |
-    X509_V_FLAG_CRL_CHECK_ALL;
+      X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL;
 #ifdef OPENSSL_API_INTERFACE_V09
   X509_STORE_set_flags(x509_store_, verify_flags);
 #else
@@ -118,7 +119,8 @@ void SignatureManager::Fini() {
   UnloadPrivateMasterKey();
   UnloadPublicRsaKeys();
   // Lookup is freed automatically
-  if (x509_store_) X509_STORE_free(x509_store_);
+  if (x509_store_)
+    X509_STORE_free(x509_store_);
 
   EVP_cleanup();
 
@@ -150,8 +152,7 @@ string SignatureManager::GetCryptoError() {
  *     Password is not saved internally, but the private key is.
  * \return True on success, false otherwise
  */
-bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
-{
+bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem) {
   UnloadPrivateMasterKey();
   FILE *fp;
   if ((fp = fopen(file_pem.c_str(), "r")) == NULL)
@@ -161,8 +162,7 @@ bool SignatureManager::LoadPrivateMasterKeyPath(const string &file_pem)
   return (private_master_key_ != NULL);
 }
 
-bool SignatureManager::LoadPrivateMasterKeyMem(const string &key)
-{
+bool SignatureManager::LoadPrivateMasterKeyMem(const string &key) {
   UnloadPrivateMasterKey();
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
@@ -183,8 +183,7 @@ bool SignatureManager::LoadPrivateMasterKeyMem(const string &key)
  * \return True on success, false otherwise
  */
 bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
-                                          const string &password)
-{
+                                          const string &password) {
   UnloadPrivateKey();
   bool result;
   FILE *fp = NULL;
@@ -197,8 +196,7 @@ bool SignatureManager::LoadPrivateKeyPath(const string &file_pem,
   return result;
 }
 
-bool SignatureManager::LoadPrivateKeyMem(const std::string &key)
-{
+bool SignatureManager::LoadPrivateKeyMem(const std::string &key) {
   UnloadPrivateKey();
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
@@ -216,13 +214,15 @@ bool SignatureManager::LoadPrivateKeyMem(const std::string &key)
  * Clears the memory storing the private key.
  */
 void SignatureManager::UnloadPrivateKey() {
-  if (private_key_) EVP_PKEY_free(private_key_);
+  if (private_key_)
+    EVP_PKEY_free(private_key_);
   private_key_ = NULL;
 }
 
 
 void SignatureManager::UnloadCertificate() {
-  if (certificate_) X509_free(certificate_);
+  if (certificate_)
+    X509_free(certificate_);
   certificate_ = NULL;
 }
 
@@ -231,7 +231,8 @@ void SignatureManager::UnloadCertificate() {
  * Clears the memory storing the private RSA master key (whitelist signing).
  */
 void SignatureManager::UnloadPrivateMasterKey() {
-  if (private_master_key_) RSA_free(private_master_key_);
+  if (private_master_key_)
+    RSA_free(private_master_key_);
   private_master_key_ = NULL;
 }
 
@@ -270,8 +271,7 @@ bool SignatureManager::LoadCertificatePath(const string &file_pem) {
  * See the function that loads the certificate from file.
  */
 bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
-                                          const unsigned buffer_size)
-{
+                                          const unsigned buffer_size) {
   if (certificate_) {
     X509_free(certificate_);
     certificate_ = NULL;
@@ -281,7 +281,8 @@ bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
   char *nopwd = strdupa("");
 
   BIO *mem = BIO_new(BIO_s_mem());
-  if (!mem) return false;
+  if (!mem)
+    return false;
   if (BIO_write(mem, buffer, buffer_size) <= 0) {
     BIO_free(mem);
     return false;
@@ -313,13 +314,14 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
   FILE *fp;
 
   for (unsigned i = 0; i < pem_files.size(); ++i) {
-    const char* pubkey_file = pem_files[i].c_str();
+    const char *pubkey_file = pem_files[i].c_str();
 
     // open public key file
     fp = fopen(pubkey_file, "r");
     if (fp == NULL) {
-      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to open "
-                                                         "public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+               "failed to open "
+               "public key '%s'",
                pubkey_file);
       return false;
     }
@@ -328,8 +330,9 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     EVP_PKEY *this_key = PEM_read_PUBKEY(fp, NULL, NULL, nopwd);
     fclose(fp);
     if (this_key == NULL) {
-      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to load "
-                                                         "public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+               "failed to load "
+               "public key '%s'",
                pubkey_file);
       return false;
     }
@@ -338,8 +341,9 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     RSA *key = EVP_PKEY_get1_RSA(this_key);
     EVP_PKEY_free(this_key);
     if (key == NULL) {
-      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to read "
-                                                         "public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+               "failed to read "
+               "public key '%s'",
                pubkey_file);
       return false;
     }
@@ -360,16 +364,20 @@ void SignatureManager::UnloadPublicRsaKeys() {
 
 
 std::string SignatureManager::GenerateKeyText(RSA *pubkey) const {
-  if (!pubkey) {return "";}
+  if (!pubkey) {
+    return "";
+  }
 
   BIO *bp = BIO_new(BIO_s_mem());
   if (bp == NULL) {
-    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to allocate"
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+             "Failed to allocate"
              " memory for pubkey");
     return "";
   }
   if (!PEM_write_bio_RSA_PUBKEY(bp, pubkey)) {
-    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to write"
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr,
+             "Failed to write"
              " pubkey to memory");
     return "";
   }
@@ -407,7 +415,8 @@ std::vector<std::string> SignatureManager::GetActivePubkeysAsVector() const {
 }
 
 std::string SignatureManager::GetCertificate() const {
-  if (!certificate_) return "";
+  if (!certificate_)
+    return "";
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
@@ -423,7 +432,8 @@ std::string SignatureManager::GetCertificate() const {
 
 
 std::string SignatureManager::GetPrivateKey() {
-  if (!private_key_) return "";
+  if (!private_key_)
+    return "";
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
@@ -439,12 +449,13 @@ std::string SignatureManager::GetPrivateKey() {
 
 
 std::string SignatureManager::GetPrivateMasterKey() {
-  if (!private_master_key_) return "";
+  if (!private_master_key_)
+    return "";
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
-  bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_,
-                                         NULL, NULL, 0, 0, NULL);
+  bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_, NULL, NULL, 0,
+                                         0, NULL);
   assert(rvb);
   char *bio_master_privkey_text;
   long bytes = BIO_get_mem_data(bp, &bio_master_privkey_text);  // NOLINT
@@ -507,27 +518,30 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
 
   Prng prng;
   prng.InitLocaltime();
-  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));  //NOLINT
-  rnd_serial_no = rnd_serial_no |
-    uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
+  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));  // NOLINT
+  rnd_serial_no = rnd_serial_no
+                  | uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
   ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
 
   // valid as of now
-  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
-    X509_get_notBefore(certificate_)), 0);
+  X509_gmtime_adj(
+      reinterpret_cast<ASN1_TIME *>(X509_get_notBefore(certificate_)), 0);
   // valid for 1 year (validity range is unused)
-  X509_gmtime_adj(reinterpret_cast<ASN1_TIME *>(
-    X509_get_notAfter(certificate_)), 3600 * 24 * 365);
+  X509_gmtime_adj(
+      reinterpret_cast<ASN1_TIME *>(X509_get_notAfter(certificate_)),
+      3600 * 24 * 365);
 
   X509_NAME *name = X509_get_subject_name(certificate_);
 #ifdef OPENSSL_API_INTERFACE_V09
-  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
-    const_cast<unsigned char *>(
-      reinterpret_cast<const unsigned char *>(cn.c_str())),
-    -1, -1, 0);
+  X509_NAME_add_entry_by_txt(
+      name, "CN", MBSTRING_ASC,
+      const_cast<unsigned char *>(
+          reinterpret_cast<const unsigned char *>(cn.c_str())),
+      -1, -1, 0);
 #else
-  X509_NAME_add_entry_by_txt(name, "CN",  MBSTRING_ASC,
-    reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
+  X509_NAME_add_entry_by_txt(
+      name, "CN", MBSTRING_ASC,
+      reinterpret_cast<const unsigned char *>(cn.c_str()), -1, -1, 0);
 #endif
   retval = X509_set_issuer_name(certificate_, name);
   assert(retval == 1);
@@ -544,10 +558,8 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
 /**
  * Loads a list of blacklisted certificates (fingerprints) from a file.
  */
-bool SignatureManager::LoadBlacklist(
-  const std::string &path_blacklist,
-  bool append)
-{
+bool SignatureManager::LoadBlacklist(const std::string &path_blacklist,
+                                     bool append) {
   MutexLockGuard lock_guard(&lock_blacklist_);
   LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
            path_blacklist.c_str());
@@ -611,8 +623,7 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
  * Empty string on failure.
  */
 shash::Any SignatureManager::HashCertificate(
-  const shash::Algorithms hash_algorithm)
-{
+    const shash::Algorithms hash_algorithm) {
   shash::Any result;
   if (!certificate_)
     return result;
@@ -638,8 +649,7 @@ shash::Any SignatureManager::HashCertificate(
  * Empty string on failure.
  */
 string SignatureManager::FingerprintCertificate(
-  const shash::Algorithms hash_algorithm)
-{
+    const shash::Algorithms hash_algorithm) {
   shash::Any hash = HashCertificate(hash_algorithm);
   if (hash.IsNull())
     return "";
@@ -647,8 +657,9 @@ string SignatureManager::FingerprintCertificate(
   const string hash_str = hash.ToString();
   string result;
   for (unsigned i = 0; i < hash_str.length(); ++i) {
-    if (i < 2*shash::kDigestSizes[hash_algorithm]) {
-      if ((i > 0) && (i%2 == 0)) result += ":";
+    if (i < 2 * shash::kDigestSizes[hash_algorithm]) {
+      if ((i > 0) && (i % 2 == 0))
+        result += ":";
     }
     result += toupper(hash_str[i]);
   }
@@ -662,9 +673,8 @@ string SignatureManager::FingerprintCertificate(
 shash::Any SignatureManager::MkFromFingerprint(const std::string &fingerprint) {
   string convert;
   for (unsigned i = 0; i < fingerprint.length(); ++i) {
-    if ((fingerprint[i] == ' ') || (fingerprint[i] == '\t') ||
-        (fingerprint[i] == '#'))
-    {
+    if ((fingerprint[i] == ' ') || (fingerprint[i] == '\t')
+        || (fingerprint[i] == '#')) {
       break;
     }
     if (fingerprint[i] != ':')
@@ -679,7 +689,8 @@ shash::Any SignatureManager::MkFromFingerprint(const std::string &fingerprint) {
  * \return Some human-readable information about the loaded certificate.
  */
 string SignatureManager::Whois() {
-  if (!certificate_) return "No certificate loaded";
+  if (!certificate_)
+    return "No certificate loaded";
 
   string result;
   X509_NAME *subject = X509_get_subject_name(certificate_);
@@ -700,10 +711,10 @@ string SignatureManager::Whois() {
 
 
 bool SignatureManager::WriteCertificateMem(unsigned char **buffer,
-                                           unsigned *buffer_size)
-{
+                                           unsigned *buffer_size) {
   BIO *mem = BIO_new(BIO_s_mem());
-  if (!mem) return false;
+  if (!mem)
+    return false;
   if (!PEM_write_bio_X509(mem, certificate_)) {
     BIO_free(mem);
     return false;
@@ -728,16 +739,16 @@ bool SignatureManager::KeysMatch() {
     return false;
 
   bool result = false;
-  const unsigned char *sign_me = reinterpret_cast<const unsigned char *>
-                                   ("sign me");
+  const unsigned char *sign_me = reinterpret_cast<const unsigned char *>(
+      "sign me");
   unsigned char *signature = NULL;
   unsigned signature_size;
-  if (Sign(sign_me, 7, &signature, &signature_size) &&
-      Verify(sign_me, 7, signature, signature_size))
-  {
+  if (Sign(sign_me, 7, &signature, &signature_size)
+      && Verify(sign_me, 7, signature, signature_size)) {
     result = true;
   }
-  if (signature) free(signature);
+  if (signature)
+    free(signature);
   return result;
 }
 
@@ -769,8 +780,7 @@ bool SignatureManager::VerifyCaChain() {
 bool SignatureManager::Sign(const unsigned char *buffer,
                             const unsigned buffer_size,
                             unsigned char **signature,
-                            unsigned *signature_size)
-{
+                            unsigned *signature_size) {
   if (!private_key_) {
     *signature_size = 0;
     *signature = NULL;
@@ -787,11 +797,10 @@ bool SignatureManager::Sign(const unsigned char *buffer,
 #endif
 
   *signature = reinterpret_cast<unsigned char *>(
-                 smalloc(EVP_PKEY_size(private_key_)));
-  if (EVP_SignInit(ctx_ptr, EVP_sha1()) &&
-      EVP_SignUpdate(ctx_ptr, buffer, buffer_size) &&
-      EVP_SignFinal(ctx_ptr, *signature, signature_size, private_key_))
-  {
+      smalloc(EVP_PKEY_size(private_key_)));
+  if (EVP_SignInit(ctx_ptr, EVP_sha1())
+      && EVP_SignUpdate(ctx_ptr, buffer, buffer_size)
+      && EVP_SignFinal(ctx_ptr, *signature, signature_size, private_key_)) {
     result = true;
   }
 #ifdef OPENSSL_API_INTERFACE_V11
@@ -817,8 +826,7 @@ bool SignatureManager::Sign(const unsigned char *buffer,
 bool SignatureManager::SignRsa(const unsigned char *buffer,
                                const unsigned buffer_size,
                                unsigned char **signature,
-                               unsigned *signature_size)
-{
+                               unsigned *signature_size) {
   if (!private_master_key_) {
     *signature_size = 0;
     *signature = NULL;
@@ -829,8 +837,8 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
   unsigned char *from = (unsigned char *)smalloc(buffer_size);
   memcpy(from, buffer, buffer_size);
 
-  int size = RSA_private_encrypt(buffer_size, from, to,
-                                 private_master_key_, RSA_PKCS1_PADDING);
+  int size = RSA_private_encrypt(buffer_size, from, to, private_master_key_,
+                                 RSA_PKCS1_PADDING);
   free(from);
   if (size < 0) {
     *signature_size = 0;
@@ -851,9 +859,9 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
 bool SignatureManager::Verify(const unsigned char *buffer,
                               const unsigned buffer_size,
                               const unsigned char *signature,
-                              const unsigned signature_size)
-{
-  if (!certificate_) return false;
+                              const unsigned signature_size) {
+  if (!certificate_)
+    return false;
 
   bool result = false;
 #ifdef OPENSSL_API_INTERFACE_V11
@@ -865,17 +873,15 @@ bool SignatureManager::Verify(const unsigned char *buffer,
 #endif
 
   EVP_PKEY *pubkey = X509_get_pubkey(certificate_);
-  if (EVP_VerifyInit(ctx_ptr, EVP_sha1()) &&
-      EVP_VerifyUpdate(ctx_ptr, buffer, buffer_size) &&
+  if (EVP_VerifyInit(ctx_ptr, EVP_sha1())
+      && EVP_VerifyUpdate(ctx_ptr, buffer, buffer_size) &&
 #ifdef OPENSSL_API_INTERFACE_V09
-      EVP_VerifyFinal(ctx_ptr,
-                      const_cast<unsigned char *>(signature), signature_size,
-                      pubkey)
+      EVP_VerifyFinal(ctx_ptr, const_cast<unsigned char *>(signature),
+                      signature_size, pubkey)
 #else
       EVP_VerifyFinal(ctx_ptr, signature, signature_size, pubkey)
 #endif
-    )
-  {
+  ) {
     result = true;
   }
   if (pubkey != NULL)
@@ -893,13 +899,13 @@ bool SignatureManager::Verify(const unsigned char *buffer,
 /**
  * Verifies a signature against all loaded public keys.
  *
- * \return True if signature is valid with any public key, false on error or otherwise
+ * \return True if signature is valid with any public key, false on error or
+ * otherwise
  */
 bool SignatureManager::VerifyRsa(const unsigned char *buffer,
                                  const unsigned buffer_size,
                                  const unsigned char *signature,
-                                 const unsigned signature_size)
-{
+                                 const unsigned signature_size) {
   for (unsigned i = 0, s = public_keys_.size(); i < s; ++i) {
     if (buffer_size > (unsigned)RSA_size(public_keys_[i]))
       continue;
@@ -908,12 +914,11 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
     unsigned char *from = (unsigned char *)smalloc(signature_size);
     memcpy(from, signature, signature_size);
 
-    int size = RSA_public_decrypt(signature_size, from, to,
-                                  public_keys_[i], RSA_PKCS1_PADDING);
+    int size = RSA_public_decrypt(signature_size, from, to, public_keys_[i],
+                                  RSA_PKCS1_PADDING);
     free(from);
-    if ((size >= 0) && (unsigned(size) == buffer_size) &&
-        (memcmp(buffer, to, size) == 0))
-    {
+    if ((size >= 0) && (unsigned(size) == buffer_size)
+        && (memcmp(buffer, to, size) == 0)) {
       free(to);
       return true;
     }
@@ -933,8 +938,7 @@ void SignatureManager::CutLetter(const unsigned char *buffer,
                                  const unsigned buffer_size,
                                  const char separator,
                                  unsigned *letter_length,
-                                 unsigned *pos_after_mark)
-{
+                                 unsigned *pos_after_mark) {
   unsigned pos = 0;
   *letter_length = *pos_after_mark = 0;
   do {
@@ -944,11 +948,10 @@ void SignatureManager::CutLetter(const unsigned char *buffer,
       break;
     }
 
-    if ((buffer[pos] == '\n') && (pos+4 <= buffer_size) &&
-        (buffer[pos+1] == separator) && (buffer[pos+2] == separator) &&
-        (buffer[pos+3] == '\n'))
-    {
-      *letter_length = pos+1;
+    if ((buffer[pos] == '\n') && (pos + 4 <= buffer_size)
+        && (buffer[pos + 1] == separator) && (buffer[pos + 2] == separator)
+        && (buffer[pos + 3] == '\n')) {
+      *letter_length = pos + 1;
       pos += 4;
       break;
     }
@@ -967,8 +970,7 @@ void SignatureManager::CutLetter(const unsigned char *buffer,
  */
 bool SignatureManager::VerifyLetter(const unsigned char *buffer,
                                     const unsigned buffer_size,
-                                    const bool by_rsa)
-{
+                                    const bool by_rsa) {
   unsigned pos = 0;
   unsigned letter_length = 0;
   CutLetter(buffer, buffer_size, '-', &letter_length, &pos);
@@ -993,11 +995,11 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     return false;
 
   if (by_rsa) {
-    return VerifyRsa(&buffer[hash_pos], hash_str.length(),
-                     &buffer[pos], buffer_size-pos);
+    return VerifyRsa(&buffer[hash_pos], hash_str.length(), &buffer[pos],
+                     buffer_size - pos);
   } else {
-    return Verify(&buffer[hash_pos], hash_str.length(),
-                  &buffer[pos], buffer_size-pos);
+    return Verify(&buffer[hash_pos], hash_str.length(), &buffer[pos],
+                  buffer_size - pos);
   }
 }
 
@@ -1010,13 +1012,13 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
                                    const unsigned buffer_size,
                                    unsigned char **content,
                                    unsigned *content_size,
-                                   vector<string> *alt_uris)
-{
+                                   vector<string> *alt_uris) {
   *content = NULL;
   *content_size = 0;
 
   BIO *bp_pkcs7 = BIO_new(BIO_s_mem());
-  if (!bp_pkcs7) return false;
+  if (!bp_pkcs7)
+    return false;
   if (BIO_write(bp_pkcs7, buffer, buffer_size) <= 0) {
     BIO_free(bp_pkcs7);
     return false;
@@ -1050,7 +1052,7 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
   BUF_MEM *bufmem_content;
   BIO_get_mem_ptr(bp_content, &bufmem_content);
   // BIO_free() leaves BUF_MEM alone
-  (void) BIO_set_close(bp_content, BIO_NOCLOSE);
+  (void)BIO_set_close(bp_content, BIO_NOCLOSE);
   BIO_free(bp_content);
   *content = reinterpret_cast<unsigned char *>(bufmem_content->data);
   *content_size = bufmem_content->length;
@@ -1068,10 +1070,10 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
 
   // Extract alternative names
   for (int i = 0; i < sk_X509_num(signers); ++i) {
-    X509* this_signer = sk_X509_value(signers, i);
+    X509 *this_signer = sk_X509_value(signers, i);
     GENERAL_NAMES *subject_alt_names = NULL;
     subject_alt_names = reinterpret_cast<GENERAL_NAMES *>(
-      X509_get_ext_d2i(this_signer, NID_subject_alt_name, NULL, NULL));
+        X509_get_ext_d2i(this_signer, NID_subject_alt_name, NULL, NULL));
     if (subject_alt_names != NULL) {
       for (int j = 0; j < sk_GENERAL_NAME_num(subject_alt_names); ++j) {
         GENERAL_NAME *this_name = sk_GENERAL_NAME_value(subject_alt_names, j);
@@ -1080,12 +1082,12 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
 
         const char *name_ptr = reinterpret_cast<const char *>(
 #ifdef OPENSSL_API_INTERFACE_V11
-          ASN1_STRING_get0_data(this_name->d.uniformResourceIdentifier));
+            ASN1_STRING_get0_data(this_name->d.uniformResourceIdentifier));
 #else
-          ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
+            ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
 #endif
-        int name_len =
-          ASN1_STRING_length(this_name->d.uniformResourceIdentifier);
+        int name_len = ASN1_STRING_length(
+            this_name->d.uniformResourceIdentifier);
         if (!name_ptr || (name_len <= 0))
           continue;
         alt_uris->push_back(string(name_ptr, name_len));

@@ -6,8 +6,8 @@
 #include "letter.h"
 
 #include <inttypes.h>
-#include <cassert>
 
+#include <cassert>
 #include <map>
 
 #include "crypto/signature.h"
@@ -19,12 +19,8 @@ namespace letter {
 
 Letter::Letter(const string &fqrn,
                const string &text,
-               signature::SignatureManager *signature_manager) :
-  fqrn_(fqrn),
-  text_(text),
-  signature_manager_(signature_manager)
-{
-}
+               signature::SignatureManager *signature_manager)
+    : fqrn_(fqrn), text_(text), signature_manager_(signature_manager) { }
 
 
 string Letter::Sign(const shash::Algorithms hash_algorithm) {
@@ -33,16 +29,13 @@ string Letter::Sign(const shash::Algorithms hash_algorithm) {
   bool retval = signature_manager_->WriteCertificateMem(&cert_buf,
                                                         &cert_buf_size);
   assert(retval);
-  string cert_base64 = Base64(string(reinterpret_cast<char *>(cert_buf),
-                                     cert_buf_size));
+  string cert_base64 = Base64(
+      string(reinterpret_cast<char *>(cert_buf), cert_buf_size));
   free(cert_buf);
 
   string output = text_;
-  output += string("\n##\n") +
-            "V1" + "\n" +
-            "N" + fqrn_ + "\n" +
-            "T" + StringifyInt(time(NULL)) + "\n" +
-            "X" + cert_base64 + "\n";
+  output += string("\n##\n") + "V1" + "\n" + "N" + fqrn_ + "\n" + "T"
+            + StringifyInt(time(NULL)) + "\n" + "X" + cert_base64 + "\n";
   shash::Any output_hash(hash_algorithm);
   shash::HashMem(reinterpret_cast<const unsigned char *>(output.data()),
                  output.length(), &output_hash);
@@ -51,8 +44,8 @@ string Letter::Sign(const shash::Algorithms hash_algorithm) {
   unsigned char *sig;
   unsigned sig_size;
   retval = signature_manager_->Sign(
-    reinterpret_cast<const unsigned char *>(output_hash.ToString().data()),
-    output_hash.GetHexSize(), &sig, &sig_size);
+      reinterpret_cast<const unsigned char *>(output_hash.ToString().data()),
+      output_hash.GetHexSize(), &sig, &sig_size);
   assert(retval);
   output.append(reinterpret_cast<char *>(sig), sig_size);
   free(sig);
@@ -77,23 +70,23 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
   unsigned sig_pos = 0;
   unsigned msg_len = 0;
   unsigned env_len = 0;
-  const unsigned char *data_ptr =
-    reinterpret_cast<const unsigned char *>(dec.data());
-  signature::SignatureManager::CutLetter(
-    data_ptr, dec.length(), '#', &msg_len, &env_pos);
+  const unsigned char *data_ptr = reinterpret_cast<const unsigned char *>(
+      dec.data());
+  signature::SignatureManager::CutLetter(data_ptr, dec.length(), '#', &msg_len,
+                                         &env_pos);
   if (env_pos >= dec.length())
     return kFailMalformed;
   // Sign adds a newline
   if (msg_len == 0)
     return kFailMalformed;
-  *msg = dec.substr(0, msg_len-1);
+  *msg = dec.substr(0, msg_len - 1);
   signature::SignatureManager::CutLetter(
-    data_ptr+env_pos, dec.length()-env_pos, '-', &env_len, &sig_pos);
+      data_ptr + env_pos, dec.length() - env_pos, '-', &env_len, &sig_pos);
   if (sig_pos >= dec.length())
     return kFailMalformed;
 
   map<char, string> env;
-  ParseKeyvalMem(data_ptr+env_pos, env_len, &env);
+  ParseKeyvalMem(data_ptr + env_pos, env_len, &env);
   map<char, string>::const_iterator iter;
   if ((iter = env.find('T')) == env.end())
     return kFailMalformed;
@@ -113,12 +106,11 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
   if (!retval)
     return kFailMalformed;
   retval = signature_manager_->LoadCertificateMem(
-    reinterpret_cast<const unsigned char *>(cert->data()), cert->length());
+      reinterpret_cast<const unsigned char *>(cert->data()), cert->length());
   if (!retval)
     return kFailBadCertificate;
 
-  retval = signature_manager_->VerifyLetter(
-    data_ptr, dec.length(), false);
+  retval = signature_manager_->VerifyLetter(data_ptr, dec.length(), false);
   if (!retval)
     return kFailBadSignature;
 

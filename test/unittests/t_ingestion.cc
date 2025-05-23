@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -13,6 +11,7 @@
 #include "c_mock_uploader.h"
 #include "compression/compression.h"
 #include "crypto/hash.h"
+#include "gtest/gtest.h"
 #include "ingestion/item.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
@@ -227,9 +226,9 @@ TEST_F(T_Ingestion, TaskRead) {
       EXPECT_GT(BlockItem::managed_bytes(), 0U);
     }
     EXPECT_EQ(BlockItem::kBlockData, item_data->type());
-    EXPECT_EQ(string(TaskRead::kBlockSize, static_cast<char>(i)),
-              string(reinterpret_cast<char *>(item_data->data()),
-                                              item_data->size()));
+    EXPECT_EQ(
+        string(TaskRead::kBlockSize, static_cast<char>(i)),
+        string(reinterpret_cast<char *>(item_data->data()), item_data->size()));
     delete item_data;
   }
   EXPECT_EQ(size, file_large.size());
@@ -297,7 +296,7 @@ TEST_F(T_Ingestion, TaskChunkDispatch) {
 
   TubeConsumerGroup<BlockItem> task_group;
   task_group.TakeConsumer(
-    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
+      new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
@@ -370,7 +369,7 @@ TEST_F(T_Ingestion, TaskChunk) {
 
   TubeConsumerGroup<BlockItem> task_group;
   task_group.TakeConsumer(
-    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
+      new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   // Tuned for ~100ms test with many blocks
@@ -452,7 +451,7 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
 
   TubeConsumerGroup<BlockItem> task_group;
   task_group.TakeConsumer(
-    new TaskChunk(&tube_in, &tube_group_out, &allocator_));
+      new TaskChunk(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   // File does not exist
@@ -465,8 +464,8 @@ TEST_F(T_Ingestion, TaskChunkCornerCases) {
   assert((file_large.size() % block_size) == 0);
   assert(((file_large.size() / 2) % block_size) == 0);
   for (unsigned i = 0; i < (file_large.size() / block_size); ++i) {
-    unsigned char *buf =
-      reinterpret_cast<unsigned char *>(scalloc(1, block_size));
+    unsigned char *buf = reinterpret_cast<unsigned char *>(
+        scalloc(1, block_size));
     BlockItem *b = new BlockItem(1, &allocator_);
     b->SetFileItem(&file_large);
     b->MakeDataCopy(buf, block_size);
@@ -513,7 +512,7 @@ TEST_F(T_Ingestion, TaskCompressNull) {
 
   TubeConsumerGroup<BlockItem> task_group;
   task_group.TakeConsumer(
-    new TaskCompress(&tube_in, &tube_group_out, &allocator_));
+      new TaskCompress(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   FileItem file_null(new FileIngestionSource(std::string("/dev/null")));
@@ -558,7 +557,7 @@ TEST_F(T_Ingestion, TaskCompress) {
 
   TubeConsumerGroup<BlockItem> task_group;
   task_group.TakeConsumer(
-    new TaskCompress(&tube_in, &tube_group_out, &allocator_));
+      new TaskCompress(&tube_in, &tube_group_out, &allocator_));
   task_group.Spawn();
 
   unsigned size = 16 * 1024 * 1024;
@@ -575,7 +574,7 @@ TEST_F(T_Ingestion, TaskCompress) {
   for (unsigned i = 0; i < nblocks; ++i) {
     string str_content(block_size, static_cast<char>(i));
     for (unsigned j = 1; j < block_size; ++j)
-      str_content[j] = i * str_content[j-1] + j;
+      str_content[j] = i * str_content[j - 1] + j;
 
     BlockItem *b = new BlockItem(1, &allocator_);
     b->SetFileItem(&file_large);
@@ -594,13 +593,12 @@ TEST_F(T_Ingestion, TaskCompress) {
 
   void *ptr_zlib_large = NULL;
   uint64_t sz_zlib_large = 0;
-  EXPECT_TRUE(zlib::CompressMem2Mem(
-    block_raw.data(), block_raw.size(),
-    &ptr_zlib_large, &sz_zlib_large));
+  EXPECT_TRUE(zlib::CompressMem2Mem(block_raw.data(), block_raw.size(),
+                                    &ptr_zlib_large, &sz_zlib_large));
   free(buf);
 
   unsigned char *ptr_read_large = reinterpret_cast<unsigned char *>(
-    smalloc(sz_zlib_large));
+      smalloc(sz_zlib_large));
   unsigned read_pos = 0;
 
   BlockItem *b = NULL;
@@ -742,7 +740,7 @@ TEST_F(T_Ingestion, TaskWriteLarge) {
   shash::Any hash_zeros(shash::kSha1);
   hash_zeros.suffix = shash::kSuffixPartial;
   unsigned char *dummy_buffer = reinterpret_cast<unsigned char *>(
-    scalloc(1, chunk_size));
+      scalloc(1, chunk_size));
   shash::HashMem(dummy_buffer, chunk_size, &hash_zeros);
   free(dummy_buffer);
 
@@ -787,10 +785,10 @@ TEST_F(T_Ingestion, PipelineNull) {
   spooler_definition.compression_alg = zlib::kNoCompression;
 
   UniquePtr<IngestionPipeline> pipeline_straight(
-    new IngestionPipeline(uploader_, spooler_definition));
+      new IngestionPipeline(uploader_, spooler_definition));
   FnFileProcessed fn_processed;
-  pipeline_straight->RegisterListener(
-    &FnFileProcessed::OnFileProcessed, &fn_processed);
+  pipeline_straight->RegisterListener(&FnFileProcessed::OnFileProcessed,
+                                      &fn_processed);
   pipeline_straight->Spawn();
 
   pipeline_straight->Process(new FileIngestionSource(std::string("/dev/null")),
@@ -817,7 +815,7 @@ TEST_F(T_Ingestion, PipelineNull) {
   void *compressed_null = NULL;
   uint64_t sz_compressed_null;
   EXPECT_TRUE(
-    zlib::CompressMem2Mem(NULL, 0, &compressed_null, &sz_compressed_null));
+      zlib::CompressMem2Mem(NULL, 0, &compressed_null, &sz_compressed_null));
   shash::Any hash_compressed_null(spooler_definition.hash_algorithm);
   shash::HashMem(reinterpret_cast<unsigned char *>(compressed_null),
                  sz_compressed_null, &hash_compressed_null);

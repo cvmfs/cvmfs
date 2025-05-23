@@ -5,9 +5,9 @@
 #ifndef CVMFS_SWISSKNIFE_NOTIFY_H_
 #define CVMFS_SWISSKNIFE_NOTIFY_H_
 
-#include "swissknife.h"
-
 #include <string>
+
+#include "swissknife.h"
 
 namespace swissknife {
 

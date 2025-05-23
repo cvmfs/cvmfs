@@ -3,7 +3,6 @@
  */
 
 #include "gtest/gtest.h"
-
 #include "json_document.h"
 #include "json_document_write.h"
 #include "statistics.h"
@@ -28,7 +27,7 @@ TEST(T_Statistics, Counter) {
   counter.Dec();
   EXPECT_EQ(-1, counter.Get());
 
-  counter.Set(1024*1024);
+  counter.Set(1024 * 1024);
   EXPECT_EQ("1048576", counter.Print());
   EXPECT_EQ("1024", counter.PrintKi());
   EXPECT_EQ("1048", counter.PrintK());
@@ -196,9 +195,8 @@ TEST(T_Statistics, GenerateJSONStatisticsTemplates) {
   cnt3->Set(-42);
 
   std::string json_observed = stats.PrintJSON();
-  std::string json_expected =
-    "{\"template1\":{\"valueA\":420,\"valueB\":0},"
-    "\"template2\":{\"valueC\":-42}}";
+  std::string json_expected = "{\"template1\":{\"valueA\":420,\"valueB\":0},"
+                              "\"template2\":{\"valueC\":-42}}";
 
   EXPECT_EQ(json_expected, json_observed);
 }

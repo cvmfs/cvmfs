@@ -20,15 +20,14 @@ using namespace std;  // NOLINT
 
 namespace whitelist {
 
-const int Whitelist::kFlagVerifyRsa     = 0x01;
-const int Whitelist::kFlagVerifyPkcs7   = 0x02;
+const int Whitelist::kFlagVerifyRsa = 0x01;
+const int Whitelist::kFlagVerifyPkcs7 = 0x02;
 const int Whitelist::kFlagVerifyCaChain = 0x04;
 
 
 void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
-                            unsigned *pkcs7_size, unsigned char **pkcs7_buf)
-  const
-{
+                            unsigned *pkcs7_size,
+                            unsigned char **pkcs7_buf) const {
   *plain_size = plain_size_;
   *pkcs7_size = pkcs7_size_;
   *plain_buf = NULL;
@@ -45,16 +44,17 @@ void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
 
 
 std::string Whitelist::CreateString(
-  const std::string &fqrn,
-  int validity_days,
-  shash::Algorithms hash_algorithm,
-  signature::SignatureManager *signature_manager)
-{
-  std::string to_sign =
-    WhitelistTimestamp(time(NULL)) + "\n" +
-    "E" + WhitelistTimestamp(time(NULL) + validity_days * 24 * 3600) + "\n" +
-    "N" + fqrn + "\n" +
-    signature_manager->FingerprintCertificate(hash_algorithm) + "\n";
+    const std::string &fqrn,
+    int validity_days,
+    shash::Algorithms hash_algorithm,
+    signature::SignatureManager *signature_manager) {
+  std::string to_sign = WhitelistTimestamp(time(NULL)) + "\n" + "E"
+                        + WhitelistTimestamp(time(NULL)
+                                             + validity_days * 24 * 3600)
+                        + "\n" + "N" + fqrn + "\n"
+                        + signature_manager->FingerprintCertificate(
+                            hash_algorithm)
+                        + "\n";
   shash::Any hash(hash_algorithm);
   shash::HashString(to_sign, &hash);
   std::string hash_str = hash.ToString();
@@ -64,8 +64,8 @@ std::string Whitelist::CreateString(
   unsigned char *signature;
   unsigned signature_size;
   bool retval = signature_manager->SignRsa(
-    reinterpret_cast<const unsigned char *>(hash_str.data()), hash_str.length(),
-    &signature, &signature_size);
+      reinterpret_cast<const unsigned char *>(hash_str.data()),
+      hash_str.length(), &signature, &signature_size);
   assert(retval);
   whitelist += std::string(reinterpret_cast<char *>(signature), signature_size);
   free(signature);
@@ -75,7 +75,8 @@ std::string Whitelist::CreateString(
 
 
 std::string Whitelist::ExportString() const {
-  if (plain_buf_ == NULL) return "";
+  if (plain_buf_ == NULL)
+    return "";
   return std::string(reinterpret_cast<char *>(plain_buf_), plain_size_);
 }
 
@@ -97,8 +98,8 @@ Failures Whitelist::VerifyLoadedCertificate() const {
 
   vector<string> blacklist = signature_manager_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {
-    shash::Any this_hash =
-      signature::SignatureManager::MkFromFingerprint(blacklist[i]);
+    shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(
+        blacklist[i]);
     if (this_hash.IsNull())
       continue;
 
@@ -144,11 +145,9 @@ Failures Whitelist::VerifyWhitelist() {
     unsigned char *extracted_whitelist;
     unsigned extracted_whitelist_size;
     vector<string> alt_uris;
-    retval_b =
-      signature_manager_->VerifyPkcs7(pkcs7_buf_, pkcs7_size_,
-                                      &extracted_whitelist,
-                                      &extracted_whitelist_size,
-                                      &alt_uris);
+    retval_b = signature_manager_->VerifyPkcs7(
+        pkcs7_buf_, pkcs7_size_, &extracted_whitelist,
+        &extracted_whitelist_size, &alt_uris);
     if (!retval_b) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "failed to verify repository whitelist (pkcs#7): %s",
@@ -178,7 +177,8 @@ Failures Whitelist::VerifyWhitelist() {
     Reset();
     LogCvmfs(kLogCvmfs, kLogDebug, "Extracted pkcs#7 whitelist:\n%s",
              string(reinterpret_cast<char *>(extracted_whitelist),
-                    extracted_whitelist_size).c_str());
+                    extracted_whitelist_size)
+                 .c_str());
     retval_wl = ParseWhitelist(extracted_whitelist, extracted_whitelist_size);
     if (retval_wl != kFailOk) {
       LogCvmfs(kLogCvmfs, kLogDebug,
@@ -239,11 +239,11 @@ Failures Whitelist::LoadUrl(const std::string &base_url) {
 
   if (verification_flags_ & kFlagVerifyPkcs7) {
     // Load the separate whitelist pkcs7 structure
-    const string whitelist_pkcs7_url =
-      base_url + string("cvmfswhitelist.pkcs7");
+    const string whitelist_pkcs7_url = base_url
+                                       + string("cvmfswhitelist.pkcs7");
     cvmfs::MemSink pkcs7_memsink;
-    download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
-                                             probe_hosts, NULL, &pkcs7_memsink);
+    download::JobInfo download_whitelist_pkcs7(
+        &whitelist_pkcs7_url, false, probe_hosts, NULL, &pkcs7_memsink);
     retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
     if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
@@ -266,20 +266,26 @@ bool Whitelist::IsBefore(time_t now, const struct tm &t_whitelist) {
   struct tm t_local;
   if (gmtime_r(&now, &t_local) == NULL)
     return false;
-  if (t_local.tm_year < t_whitelist.tm_year) return true;
-  if (t_local.tm_year > t_whitelist.tm_year) return false;
-  if (t_local.tm_mon < t_whitelist.tm_mon) return true;
-  if (t_local.tm_mon > t_whitelist.tm_mon) return false;
-  if (t_local.tm_mday < t_whitelist.tm_mday) return true;
-  if (t_local.tm_mday > t_whitelist.tm_mday) return false;
-  if (t_local.tm_hour < t_whitelist.tm_hour) return true;
+  if (t_local.tm_year < t_whitelist.tm_year)
+    return true;
+  if (t_local.tm_year > t_whitelist.tm_year)
+    return false;
+  if (t_local.tm_mon < t_whitelist.tm_mon)
+    return true;
+  if (t_local.tm_mon > t_whitelist.tm_mon)
+    return false;
+  if (t_local.tm_mday < t_whitelist.tm_mday)
+    return true;
+  if (t_local.tm_mday > t_whitelist.tm_mday)
+    return false;
+  if (t_local.tm_hour < t_whitelist.tm_hour)
+    return true;
   return false;
 }
 
 
 Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
-                                   const unsigned whitelist_size)
-{
+                                   const unsigned whitelist_size) {
   time_t local_timestamp = time(NULL);
   string line;
   unsigned payload_bytes = 0;
@@ -295,15 +301,15 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   payload_bytes += 15;
 
   // Expiry date
-  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                    whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                    whitelist_size - payload_bytes);
   if (line.length() != 15) {
     LogCvmfs(kLogSignature, kLogDebug, "invalid timestamp format");
     return kFailMalformed;
   }
   struct tm tm_wl;
   memset(&tm_wl, 0, sizeof(struct tm));
-  tm_wl.tm_year = String2Int64(line.substr(1, 4))-1900;
+  tm_wl.tm_year = String2Int64(line.substr(1, 4)) - 1900;
   tm_wl.tm_mon = String2Int64(line.substr(5, 2)) - 1;
   tm_wl.tm_mday = String2Int64(line.substr(7, 2));
   tm_wl.tm_hour = String2Int64(line.substr(9, 2));
@@ -312,8 +318,8 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   LogCvmfs(kLogSignature, kLogDebug,
            "whitelist UTC expiry timestamp in localtime: %s",
            StringifyTime(timestamp, false).c_str());
-  LogCvmfs(kLogSignature, kLogDebug,  "local time: %s",
-          StringifyTime(local_timestamp, true).c_str());
+  LogCvmfs(kLogSignature, kLogDebug, "local time: %s",
+           StringifyTime(local_timestamp, true).c_str());
   // Makeshift solution to deal with whitelists valid after Y2038 on 32bit
   // machines.  Still unclear how glibc is going to treat the problem.
   if (!IsBefore(local_timestamp, tm_wl)) {
@@ -334,8 +340,8 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   payload_bytes += 16;
 
   // Check repository name
-  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                    whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                    whitelist_size - payload_bytes);
   if ((fqrn_ != "") && ("N" + fqrn_ != line)) {
     LogCvmfs(kLogSignature, kLogDebug,
              "repository name on the whitelist does not match "
@@ -346,37 +352,38 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   payload_bytes += line.length() + 1;
 
   // Check for PKCS7
-  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                    whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                    whitelist_size - payload_bytes);
   if (line == "Vpkcs7") {
     LogCvmfs(kLogSignature, kLogDebug, "whitelist verification: pkcs#7");
     verify_pkcs7 = true;
     payload_bytes += line.length() + 1;
-    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                      whitelist_size-payload_bytes);
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                      whitelist_size - payload_bytes);
   }
 
   // Check for CA chain verification
-  line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                    whitelist_size-payload_bytes);
+  line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                    whitelist_size - payload_bytes);
   if (line == "Wcachain") {
     LogCvmfs(kLogSignature, kLogDebug,
              "whitelist imposes ca chain verification of manifest signature");
     verify_cachain = true;
     payload_bytes += line.length() + 1;
-    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                      whitelist_size-payload_bytes);
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                      whitelist_size - payload_bytes);
   }
 
   do {
-    if (line == "--") break;
+    if (line == "--")
+      break;
     shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(line);
     if (!this_hash.IsNull())
       fingerprints_.push_back(this_hash);
 
     payload_bytes += line.length() + 1;
-    line = GetLineMem(reinterpret_cast<const char *>(whitelist)+payload_bytes,
-                      whitelist_size-payload_bytes);
+    line = GetLineMem(reinterpret_cast<const char *>(whitelist) + payload_bytes,
+                      whitelist_size - payload_bytes);
   } while (payload_bytes < whitelist_size);
 
   verification_flags_ = verify_pkcs7 ? kFlagVerifyPkcs7 : kFlagVerifyRsa;
@@ -404,47 +411,43 @@ void Whitelist::Reset() {
 
 Whitelist::Whitelist(const string &fqrn,
                      download::DownloadManager *download_manager,
-                     signature::SignatureManager *signature_manager) :
-  fqrn_(fqrn),
-  download_manager_(download_manager),
-  signature_manager_(signature_manager),
-  plain_buf_(NULL),
-  plain_size_(0),
-  pkcs7_buf_(NULL),
-  pkcs7_size_(0)
-{
+                     signature::SignatureManager *signature_manager)
+    : fqrn_(fqrn)
+    , download_manager_(download_manager)
+    , signature_manager_(signature_manager)
+    , plain_buf_(NULL)
+    , plain_size_(0)
+    , pkcs7_buf_(NULL)
+    , pkcs7_size_(0) {
   Reset();
 }
 
 
-Whitelist::Whitelist(const Whitelist &other) :
-  fqrn_(other.fqrn_),
-  download_manager_(other.download_manager_),
-  signature_manager_(other.signature_manager_),
-  status_(other.status_),
-  fingerprints_(other.fingerprints_),
-  expires_(other.expires_),
-  verification_flags_(other.verification_flags_)
-{
+Whitelist::Whitelist(const Whitelist &other)
+    : fqrn_(other.fqrn_)
+    , download_manager_(other.download_manager_)
+    , signature_manager_(other.signature_manager_)
+    , status_(other.status_)
+    , fingerprints_(other.fingerprints_)
+    , expires_(other.expires_)
+    , verification_flags_(other.verification_flags_) {
   other.CopyBuffers(&plain_size_, &plain_buf_, &pkcs7_size_, &pkcs7_buf_);
 }
 
 
 // Testing only
 Whitelist::Whitelist()
-  : download_manager_(NULL)
-  , signature_manager_(NULL)
-  , status_(kStNone)
-  , expires_(0)
-  , verification_flags_(0)
-  , plain_buf_(NULL)
-  , plain_size_(0)
-  , pkcs7_buf_(NULL)
-  , pkcs7_size_(0)
-{
-}
+    : download_manager_(NULL)
+    , signature_manager_(NULL)
+    , status_(kStNone)
+    , expires_(0)
+    , verification_flags_(0)
+    , plain_buf_(NULL)
+    , plain_size_(0)
+    , pkcs7_buf_(NULL)
+    , pkcs7_size_(0) { }
 
-Whitelist &Whitelist::operator= (const Whitelist &other) {
+Whitelist &Whitelist::operator=(const Whitelist &other) {
   if (&other == this)
     return *this;
 
@@ -462,8 +465,6 @@ Whitelist &Whitelist::operator= (const Whitelist &other) {
 }
 
 
-Whitelist::~Whitelist() {
-  Reset();
-}
+Whitelist::~Whitelist() { Reset(); }
 
 }  // namespace whitelist

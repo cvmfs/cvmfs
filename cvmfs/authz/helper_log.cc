@@ -24,7 +24,7 @@ FILE *file_debug = NULL;
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
-}
+}  // namespace
 
 
 void SetLogAuthzDebug(const string &path) {
@@ -102,7 +102,7 @@ void SetLogAuthzSyslogPrefix(const string &prefix) {
     unsigned len = prefix.length() + 1;
     syslog_prefix = static_cast<char *>(malloc(len));
     assert(syslog_prefix != NULL);
-    syslog_prefix[len-1] = '\0';
+    syslog_prefix[len - 1] = '\0';
     memcpy(syslog_prefix, &prefix[0], prefix.length());
   }
 }
@@ -122,15 +122,17 @@ void LogAuthz(const int flags, const char *format, ...) {
     struct tm now;
     localtime_r(&rawtime, &now);
     fprintf(file_debug, "%s    [%02d-%02d-%04d %02d:%02d:%02d %s]\n", msg,
-            (now.tm_mon)+1, now.tm_mday, (now.tm_year)+1900, now.tm_hour,
+            (now.tm_mon) + 1, now.tm_mday, (now.tm_year) + 1900, now.tm_hour,
             now.tm_min, now.tm_sec, now.tm_zone);
     fflush(file_debug);
   }
 
   if (flags & (kLogAuthzSyslog | kLogAuthzSyslogWarn | kLogAuthzSyslogErr)) {
     int level = syslog_level;
-    if (flags & kLogAuthzSyslogWarn) level = LOG_WARNING;
-    if (flags & kLogAuthzSyslogErr) level = LOG_ERR;
+    if (flags & kLogAuthzSyslogWarn)
+      level = LOG_WARNING;
+    if (flags & kLogAuthzSyslogErr)
+      level = LOG_ERR;
     if (syslog_prefix) {
       syslog(syslog_facility | level, "(%s) %s", syslog_prefix, msg);
     } else {

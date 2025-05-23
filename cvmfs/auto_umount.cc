@@ -43,7 +43,8 @@ void UmountOnCrash() {
 
   std::vector<std::string> all_mountpoints = platform_mountlist();
   if (all_mountpoints.empty()) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: "
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "crash cleanup handler: "
              "failed to read mount point list");
     return;
   }
@@ -75,23 +76,29 @@ void UmountOnCrash() {
 #endif
   DIR *dirp = opendir(mountpoint_->c_str());
   if (dirp || (errno != expected_error)) {
-    if (dirp) closedir(dirp);
-    LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: "
-             "%s seems not to be stalled (%d)", mountpoint_->c_str(), errno);
+    if (dirp)
+      closedir(dirp);
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "crash cleanup handler: "
+             "%s seems not to be stalled (%d)",
+             mountpoint_->c_str(), errno);
     return;
   }
 
   // sudo umount -l *mountpoint_
   if (!SwitchCredentials(0, getegid(), true)) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: "
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "crash cleanup handler: "
              "failed to re-gain root privileges");
     return;
   }
   const bool lazy = true;
   bool retval = platform_umount(mountpoint_->c_str(), lazy);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: "
-             "failed to unmount %s", mountpoint_->c_str());
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "crash cleanup handler: "
+             "failed to unmount %s",
+             mountpoint_->c_str());
     return;
   }
 

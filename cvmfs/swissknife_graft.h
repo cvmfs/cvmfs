@@ -29,13 +29,14 @@ class CommandGraft : public Command {
   virtual ParameterList GetParams() const {
     ParameterList r;
     r.push_back(Parameter::Mandatory('i', "Input file to process "
-                                       "('-' for reading from stdin)"));
+                                          "('-' for reading from stdin)"));
     r.push_back(Parameter::Optional('o', "Output location for graft file"));
     r.push_back(Parameter::Switch('v', "Verbose output"));
     r.push_back(Parameter::Optional('Z', "Compression algorithm "
-                                    "(default: none)"));
-    r.push_back(Parameter::Optional('c', "Chunk size (in MB; default: " +
-                                    StringifyUint(kDefaultChunkSize) + ")"));
+                                         "(default: none)"));
+    r.push_back(Parameter::Optional(
+        'c', "Chunk size (in MB; default: " + StringifyUint(kDefaultChunkSize)
+                 + ")"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Switch('b', "Generate bulk hash for chunked file"));
     return r;

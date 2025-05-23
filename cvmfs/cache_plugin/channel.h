@@ -32,11 +32,10 @@ class SessionCtx : SingleCopy {
  public:
   struct ThreadLocalStorage {
     ThreadLocalStorage(uint64_t id, char *reponame, char *client_instance)
-      : id(id)
-      , reponame(reponame)
-      , client_instance(client_instance)
-      , is_set(true)
-    { }
+        : id(id)
+        , reponame(reponame)
+        , client_instance(client_instance)
+        , is_set(true) { }
 
     uint64_t id;
     char *reponame;
@@ -72,10 +71,10 @@ class CachePlugin {
 
   struct ObjectInfo {
     ObjectInfo()
-      : id()
-      , size(kSizeUnknown)
-      , object_type(cvmfs::OBJECT_REGULAR)
-      , pinned(false) { }
+        : id()
+        , size(kSizeUnknown)
+        , object_type(cvmfs::OBJECT_REGULAR)
+        , pinned(false) { }
     shash::Any id;
     uint64_t size;
     cvmfs::EnumObjectType object_type;
@@ -127,29 +126,28 @@ class CachePlugin {
                                    uint64_t *used_bytes) = 0;
   virtual cvmfs::EnumStatus ListingBegin(uint64_t lst_id,
                                          cvmfs::EnumObjectType type) = 0;
-  virtual cvmfs::EnumStatus ListingNext(int64_t lst_id,
-                                        ObjectInfo *item) = 0;
+  virtual cvmfs::EnumStatus ListingNext(int64_t lst_id, ObjectInfo *item) = 0;
   virtual cvmfs::EnumStatus ListingEnd(int64_t lst_id) = 0;
 
   virtual cvmfs::EnumStatus LoadBreadcrumb(
-    const std::string &fqrn, manifest::Breadcrumb *breadcrumb) = 0;
+      const std::string &fqrn, manifest::Breadcrumb *breadcrumb) = 0;
   virtual cvmfs::EnumStatus StoreBreadcrumb(
-    const std::string &fqrn, const manifest::Breadcrumb &breadcrumb) = 0;
+      const std::string &fqrn, const manifest::Breadcrumb &breadcrumb) = 0;
 
  private:
   static const unsigned kDefaultMaxObjectSize = 256 * 1024;  // 256kB
-  static const unsigned kListingSize = 4 * 1024 * 1024;  // 4MB
+  static const unsigned kListingSize = 4 * 1024 * 1024;      // 4MB
   static const char kSignalTerminate = 'q';
   static const char kSignalDetach = 'd';
 
   struct UniqueRequest {
     UniqueRequest() : session_id(-1), req_id(-1) { }
     UniqueRequest(int64_t s, int64_t r) : session_id(s), req_id(r) { }
-    bool operator ==(const UniqueRequest &other) const {
-      return (this->session_id == other.session_id) &&
-             (this->req_id == other.req_id);
+    bool operator==(const UniqueRequest &other) const {
+      return (this->session_id == other.session_id)
+             && (this->req_id == other.req_id);
     }
-    bool operator !=(const UniqueRequest &other) const {
+    bool operator!=(const UniqueRequest &other) const {
       return !(*this == other);
     }
 
@@ -181,8 +179,8 @@ class CachePlugin {
     SessionCtxGuard(uint64_t session_id, CachePlugin *plugin) {
       char *reponame = NULL;
       char *client_instance = NULL;
-      std::map<uint64_t, SessionInfo>::const_iterator iter =
-        plugin->sessions_.find(session_id);
+      std::map<uint64_t, SessionInfo>::const_iterator
+          iter = plugin->sessions_.find(session_id);
       if (iter != plugin->sessions_.end()) {
         reponame = iter->second.reponame;
         client_instance = iter->second.client_instance;
@@ -204,25 +202,19 @@ class CachePlugin {
   inline uint64_t NextSessionId() {
     return atomic_xadd64(&next_session_id_, 1);
   }
-  inline uint64_t NextTxnId() {
-    return atomic_xadd64(&next_txn_id_, 1);
-  }
-  inline uint64_t NextLstId() {
-    return atomic_xadd64(&next_lst_id_, 1);
-  }
+  inline uint64_t NextTxnId() { return atomic_xadd64(&next_txn_id_, 1); }
+  inline uint64_t NextLstId() { return atomic_xadd64(&next_lst_id_, 1); }
   static inline uint32_t HashUniqueRequest(const UniqueRequest &req) {
     return MurmurHash2(&req, sizeof(req), 0x07387a4f);
   }
 
   bool HandleRequest(int fd_con);
-  void HandleHandshake(cvmfs::MsgHandshake *msg_req,
-                       CacheTransport *transport);
+  void HandleHandshake(cvmfs::MsgHandshake *msg_req, CacheTransport *transport);
   void HandleRefcount(cvmfs::MsgRefcountReq *msg_req,
                       CacheTransport *transport);
   void HandleObjectInfo(cvmfs::MsgObjectInfoReq *msg_req,
                         CacheTransport *transport);
-  void HandleRead(cvmfs::MsgReadReq *msg_req,
-                     CacheTransport *transport);
+  void HandleRead(cvmfs::MsgReadReq *msg_req, CacheTransport *transport);
   void HandleStore(cvmfs::MsgStoreReq *msg_req,
                    CacheTransport::Frame *frame,
                    CacheTransport *transport);

@@ -2,10 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <alloca.h>
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/resource.h>
@@ -41,25 +40,26 @@ class T_Util : public ::testing::Test {
     path_without_slash = "/my/path";
     fake_path = "mypath";
     to_write = "Hello, world!\n";
-    while (to_write_large.size() < 1024*1024) {
+    while (to_write_large.size() < 1024 * 1024) {
       to_write_large += to_write;
     }
     sandbox = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_util");
     socket_address = sandbox + "/mysocket";
-    string long_dir = sandbox +
-      "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
-        "path_path_path_path_path_path_path_path_path_path_path_path_path";
+    string long_dir =
+        sandbox
+        + "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
+          "path_path_path_path_path_path_path_path_path_path_path_path_path";
     int retval = mkdir(long_dir.c_str(), 0700);
     ASSERT_EQ(0, retval);
     long_path = long_dir + "/deepsocket";
-    too_long_path = long_dir +
-      "/socket_socket_socket_socket_socket_socket_socket_socket_socket_socket_"
-      "socket_socket_socket_socket_socket_socket_socket_socket";
+    too_long_path = long_dir
+                    + "/socket_socket_socket_socket_socket_socket_socket_"
+                      "socket_socket_socket_"
+                      "socket_socket_socket_socket_socket_socket_socket_socket";
 
     struct sockaddr_un sock_addr;
-    EXPECT_GT(sizeof(sock_addr.sun_path),
-              socket_address.length()) << "Socket path '" << socket_address
-                                       << "' seems to be bogus";
+    EXPECT_GT(sizeof(sock_addr.sun_path), socket_address.length())
+        << "Socket path '" << socket_address << "' seems to be bogus";
   }
 
   virtual void TearDown() {
@@ -79,8 +79,7 @@ class T_Util : public ::testing::Test {
     return GetExecutablePath("lldb");
   }
 
-  string CreateFileWithContent(const string &filename,
-      const string &content) {
+  string CreateFileWithContent(const string &filename, const string &content) {
     string complete_path = sandbox + "/" + filename;
     FILE *myfile = fopen(complete_path.c_str(), "w");
     fprintf(myfile, "%s", content.c_str());
@@ -391,7 +390,7 @@ TEST_F(T_Util, GetFileName) {
 
   EXPECT_EQ(NameString(empty), GetFileName(PathString(path_with_slash)));
   EXPECT_EQ(NameString(NameString("path")),
-      GetFileName(PathString(path_without_slash)));
+            GetFileName(PathString(path_without_slash)));
   EXPECT_EQ(NameString(fake_path), GetFileName(PathString(fake_path)));
 }
 
@@ -443,21 +442,29 @@ TEST_F(T_Util, SplitPath) {
   string dirname;
   string filename;
   SplitPath("/a/b/c", &dirname, &filename);
-  EXPECT_EQ("/a/b", dirname);  EXPECT_EQ("c", filename);
+  EXPECT_EQ("/a/b", dirname);
+  EXPECT_EQ("c", filename);
   SplitPath("a/b/c", &dirname, &filename);
-  EXPECT_EQ("a/b", dirname);  EXPECT_EQ("c", filename);
+  EXPECT_EQ("a/b", dirname);
+  EXPECT_EQ("c", filename);
   SplitPath("a/b", &dirname, &filename);
-  EXPECT_EQ("a", dirname);  EXPECT_EQ("b", filename);
+  EXPECT_EQ("a", dirname);
+  EXPECT_EQ("b", filename);
   SplitPath("b", &dirname, &filename);
-  EXPECT_EQ(".", dirname);  EXPECT_EQ("b", filename);
+  EXPECT_EQ(".", dirname);
+  EXPECT_EQ("b", filename);
   SplitPath("a//b", &dirname, &filename);
-  EXPECT_EQ("a/", dirname);  EXPECT_EQ("b", filename);
+  EXPECT_EQ("a/", dirname);
+  EXPECT_EQ("b", filename);
   SplitPath("/a", &dirname, &filename);
-  EXPECT_EQ("", dirname);  EXPECT_EQ("a", filename);
+  EXPECT_EQ("", dirname);
+  EXPECT_EQ("a", filename);
   SplitPath("/", &dirname, &filename);
-  EXPECT_EQ("", dirname);  EXPECT_EQ("", filename);
+  EXPECT_EQ("", dirname);
+  EXPECT_EQ("", filename);
   SplitPath("", &dirname, &filename);
-  EXPECT_EQ(".", dirname);  EXPECT_EQ("", filename);
+  EXPECT_EQ(".", dirname);
+  EXPECT_EQ("", filename);
 }
 
 
@@ -466,8 +473,8 @@ TEST_F(T_Util, CreateFile) {
                std::runtime_error);
   string filename = sandbox + "/createfile.txt";
   CreateFile(filename, 0600);
-  FILE* myfile = fopen(filename.c_str(), "w");
-  EXPECT_NE(static_cast<FILE*>(NULL), myfile);
+  FILE *myfile = fopen(filename.c_str(), "w");
+  EXPECT_NE(static_cast<FILE *>(NULL), myfile);
   fclose(myfile);
 }
 
@@ -516,8 +523,8 @@ TEST_F(T_Util, MakePipe) {
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(MakePipe(static_cast<int*>(NULL)), ".*");
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
+  ASSERT_DEATH(MakePipe(static_cast<int *>(NULL)), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
@@ -530,9 +537,8 @@ TEST_F(T_Util, WritePipe) {
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()),
-      ".*");
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
+  ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
@@ -545,12 +551,11 @@ TEST_F(T_Util, ReadPipe) {
   EXPECT_EQ(bytes_write, write(fd[1], to_write.c_str(), bytes_write));
   ReadPipe(fd[0], buffer_output, to_write.length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
   ASSERT_DEATH(ReadPipe(-1, buffer_output, to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
-
 
 
 TEST_F(T_Util, ReadHalfPipe) {
@@ -563,7 +568,7 @@ TEST_F(T_Util, ReadHalfPipe) {
   ReadHalfPipe(fd[0], buffer_output, to_write.length());
 
   EXPECT_EQ(0,
-    memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
+            memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
   ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -600,8 +605,8 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
   info.length = size;
   info.dst = buffer_output;
   pthread_t thread_read;
-  const int retval =
-    pthread_create(&thread_read, NULL, MainReadHalfPipe, &info);
+  const int retval = pthread_create(&thread_read, NULL, MainReadHalfPipe,
+                                    &info);
   assert(retval == 0);
 
   SafeSleepMs(250);
@@ -610,7 +615,7 @@ TEST_F(T_Util, ReadHalfPipeTimeout) {
   pthread_join(thread_read, NULL);
 
   EXPECT_EQ(0,
-    memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
+            memcmp(const_cast<char *>(to_write.data()), buffer_output, size));
   free(buffer_output);
   ClosePipe(fd);
 }
@@ -642,11 +647,11 @@ TEST_F(T_Util, SafeWrite) {
   SafeWrite(fd[1], to_write.c_str(), to_write.length());
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
   free(buffer_output);
 
   // Large write
-  int size = 1024*1024;  // 1M
+  int size = 1024 * 1024;  // 1M
   buffer_output = scalloc(size, 1);
   pthread_t thread;
   int retval = pthread_create(&thread, NULL, MainReadPipe, &fd[0]);
@@ -681,7 +686,7 @@ TEST_F(T_Util, SafeWriteV) {
   SafeWriteV(fd[1], iov, 1);
   ssize_t bytes_read = read(fd[0], buffer_output, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
   free(buffer_output);
 
   buffer_output = scalloc(60, sizeof(char));
@@ -693,7 +698,7 @@ TEST_F(T_Util, SafeWriteV) {
   free(buffer_output);
 
   // Large write
-  int size = 1024*1024;  // 1M
+  int size = 1024 * 1024;  // 1M
   buffer_output = scalloc(size, 1);
   pthread_t thread;
   int retval = pthread_create(&thread, NULL, MainReadPipe, &fd[0]);
@@ -720,8 +725,8 @@ struct write_pipe_data {
 };
 
 static void *MainWritePipe(void *void_data) {
-  struct write_pipe_data *data =
-    reinterpret_cast<struct write_pipe_data *>(void_data);
+  struct write_pipe_data *data = reinterpret_cast<struct write_pipe_data *>(
+      void_data);
   EXPECT_TRUE(SafeWrite(data->fd, data->data, data->dlen));
   close(data->fd);
   return NULL;
@@ -735,15 +740,15 @@ TEST_F(T_Util, SafeRead) {
   MakePipe(fd);
   SafeWrite(fd[1], to_write.c_str(), to_write.length());
   close(fd[1]);
-  EXPECT_EQ(SafeRead(fd[0], buffer_output, 2*to_write.length()),
-                     static_cast<ssize_t>(to_write.length()));
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_EQ(SafeRead(fd[0], buffer_output, 2 * to_write.length()),
+            static_cast<ssize_t>(to_write.length()));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer_output));
   free(buffer_output);
   close(fd[0]);
 
   // Large read
   int size = to_write_large.size() + 1024;
-  EXPECT_GE(size, 1024*1024);
+  EXPECT_GE(size, 1024 * 1024);
   MakePipe(fd);
   buffer_output = scalloc(size, 1);
   pthread_t thread;
@@ -814,14 +819,14 @@ TEST_F(T_Util, SendMes2Socket) {
   ASSERT_LE(0, client_fd);
   FdGuard fd_guard_client(client_fd);
   SendMsg2Socket(client_fd, to_write);
-  int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
+  int new_connection = accept(server_fd, (struct sockaddr *)&client_addr,
                               &client_length);
   ASSERT_LE(0, new_connection);
   FdGuard fd_guard_connection(new_connection);
   ssize_t bytes_read = read(new_connection, buffer, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer));
 }
 
 
@@ -838,7 +843,7 @@ TEST_F(T_Util, SendRecvFd) {
     case 0:
       struct sockaddr_un client_addr;
       unsigned int client_length = sizeof(client_addr);
-      int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+      int fd_conn = accept(fd_server, (struct sockaddr *)&client_addr,
                            &client_length);
       if (fd_conn < 0)
         _exit(1);
@@ -865,9 +870,7 @@ TEST_F(T_Util, SendRecvFd) {
 }
 
 
-TEST_F(T_Util, GetHostname) {
-  EXPECT_FALSE(GetHostname().empty());
-}
+TEST_F(T_Util, GetHostname) { EXPECT_FALSE(GetHostname().empty()); }
 
 
 TEST_F(T_Util, TcpEndpoints) {
@@ -890,14 +893,14 @@ TEST_F(T_Util, TcpEndpoints) {
   SendMsg2Socket(fd_client, to_write);
   struct sockaddr_in client_addr;
   unsigned client_addr_len = sizeof(client_addr);
-  int fd_conn = accept(fd_server, (struct sockaddr *) &client_addr,
+  int fd_conn = accept(fd_server, (struct sockaddr *)&client_addr,
                        &client_addr_len);
   EXPECT_GE(fd_conn, 0);
   void *buffer = alloca(20);
   memset(buffer, 0, 20);
   ssize_t bytes_read = read(fd_conn, buffer, to_write.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), to_write.length());
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char *>(buffer));
 
   close(fd_conn);
   close(fd_client);
@@ -923,7 +926,7 @@ TEST_F(T_Util, SwitchCredentials) {
 
 TEST_F(T_Util, FileExists) {
   string filename = sandbox + "/" + "fileexists.txt";
-  FILE* myfile = fopen(filename.c_str(), "w");
+  FILE *myfile = fopen(filename.c_str(), "w");
   fclose(myfile);
 
   EXPECT_FALSE(FileExists("/my/fake/path/to/file.txt"));
@@ -967,8 +970,7 @@ TEST_F(T_Util, MkdirDeep) {
 
   EXPECT_FALSE(MkdirDeep(empty, 0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));
-  EXPECT_TRUE(MkdirDeep(sandbox + "/another/another/mydirectory",
-      0777));
+  EXPECT_TRUE(MkdirDeep(sandbox + "/another/another/mydirectory", 0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));  // already exists, but writable
   EXPECT_FALSE(MkdirDeep(myfile, 0777));
 }
@@ -1066,14 +1068,15 @@ TEST_F(T_Util, UnlockFile) {
 }
 
 TEST_F(T_Util, CreateTempFile) {
-  FILE* file = NULL;
+  FILE *file = NULL;
   string final_path;
 
-  EXPECT_EQ(static_cast<FILE*>(NULL), CreateTempFile("/fakepath/fakefile.txt",
-      0600, "w+", &final_path));
+  EXPECT_EQ(static_cast<FILE *>(NULL),
+            CreateTempFile("/fakepath/fakefile.txt", 0600, "w+", &final_path));
   EXPECT_FALSE(FileExists(final_path));
-  EXPECT_NE(static_cast<FILE*>(NULL), file = CreateTempFile(
-      sandbox + "/mytempfile.txt", 0600, "w+", &final_path));
+  EXPECT_NE(static_cast<FILE *>(NULL),
+            file = CreateTempFile(sandbox + "/mytempfile.txt", 0600, "w+",
+                                  &final_path));
   EXPECT_TRUE(FileExists(final_path));
   fclose(file);
 }
@@ -1083,8 +1086,7 @@ TEST_F(T_Util, CreateTempPath) {
 
   EXPECT_EQ("", file = CreateTempPath("/fakepath/myfakefile.txt", 0600));
   EXPECT_FALSE(FileExists(file));
-  EXPECT_NE("", file = CreateTempPath(sandbox + "/createmppath.txt",
-      0600));
+  EXPECT_NE("", file = CreateTempPath(sandbox + "/createmppath.txt", 0600));
   EXPECT_TRUE(FileExists(file));
 }
 
@@ -1094,13 +1096,13 @@ TEST_F(T_Util, CreateTempDir) {
   EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory"));
   EXPECT_FALSE(DirectoryExists(directory));
   EXPECT_NE("", directory = CreateTempDir(sandbox + "/creatempdirectory"))
-    << errno;
+      << errno;
   EXPECT_TRUE(DirectoryExists(directory)) << errno;
 }
 
 TEST_F(T_Util, FindFilesBySuffix) {
   vector<string> result;
-  string files[] = { "file1.txt", "file2.txt", "file3.conf" };
+  string files[] = {"file1.txt", "file2.txt", "file3.conf"};
   const unsigned size = 3;
   for (unsigned i = 0; i < size; ++i)
     CreateFileWithContent(files[i], files[i]);
@@ -1130,7 +1132,7 @@ TEST_F(T_Util, FindFilesBySuffix) {
 
 TEST_F(T_Util, FindFilesByPrefix) {
   vector<string> result;
-  string files[] = { "file.txt", "file.conf", "foo.conf" };
+  string files[] = {"file.txt", "file.conf", "foo.conf"};
   const unsigned size = 3;
   for (unsigned i = 0; i < size; ++i)
     CreateFileWithContent(files[i], files[i]);
@@ -1283,7 +1285,7 @@ TEST_F(T_Util, StringifyTime) {
 
 TEST_F(T_Util, StringifyLocalTime) {
   struct stat tmpbuf;
-  if(stat("/usr/share/zoneinfo", &tmpbuf)) {
+  if (stat("/usr/share/zoneinfo", &tmpbuf)) {
     // TODO(vvolkl): use GTEST_SKIP once externals are updated
     printf("Skipping test, no tzdata available.\n");
   } else {
@@ -1314,12 +1316,9 @@ TEST_F(T_Util, RfcTimestamp) {
 TEST_F(T_Util, IsoTimestamp) {
   time_t now = time(NULL);
   string timestamp = IsoTimestamp();
-  timestamp = timestamp.substr(0, 4) + "-" +
-              timestamp.substr(4, 2) + "-" +
-              timestamp.substr(6, 2) + "T" +
-              timestamp.substr(9, 2) + ":" +
-              timestamp.substr(11, 2) + ":" +
-              timestamp.substr(13, 2) + "Z";
+  timestamp = timestamp.substr(0, 4) + "-" + timestamp.substr(4, 2) + "-"
+              + timestamp.substr(6, 2) + "T" + timestamp.substr(9, 2) + ":"
+              + timestamp.substr(11, 2) + ":" + timestamp.substr(13, 2) + "Z";
   time_t converted = IsoTimestamp2UtcTime(timestamp);
   EXPECT_GT(converted, 0);
   EXPECT_GE(converted, now - 5);
@@ -1473,23 +1472,22 @@ TEST_F(T_Util, JoinStrings) {
 
 TEST_F(T_Util, ParseKeyvalMem) {
   map<char, string> map;
-  string cvmfs_published =
-      "Cf3bc68897a32278da5b5b0e4b5e4711a9102dde5\n"
-      "B75834368\n"
-      "Zfirst\n"
-      "Zsecond\n"
-      "Rd41d8cd98f00b204e9800998ecf8427e\n"
-      "D900\n"
-      "S8418\n"
-      "Natlas.cern.ch\n"
-      "Ncms.cern.ch\n"
-      "X0b457ac12225018e0a15330364c20529e15012ab\n"
-      "H70a5de156ee5eaf4f8e191591b6ade378f1120bd\n"
-      "T1431669806\n"
-      "--\n"
-      "EEXTRA-CONTENT\n";
-  const unsigned char *buffer =
-      reinterpret_cast<const unsigned char *>(cvmfs_published.c_str());
+  string cvmfs_published = "Cf3bc68897a32278da5b5b0e4b5e4711a9102dde5\n"
+                           "B75834368\n"
+                           "Zfirst\n"
+                           "Zsecond\n"
+                           "Rd41d8cd98f00b204e9800998ecf8427e\n"
+                           "D900\n"
+                           "S8418\n"
+                           "Natlas.cern.ch\n"
+                           "Ncms.cern.ch\n"
+                           "X0b457ac12225018e0a15330364c20529e15012ab\n"
+                           "H70a5de156ee5eaf4f8e191591b6ade378f1120bd\n"
+                           "T1431669806\n"
+                           "--\n"
+                           "EEXTRA-CONTENT\n";
+  const unsigned char *buffer = reinterpret_cast<const unsigned char *>(
+      cvmfs_published.c_str());
   ParseKeyvalMem(buffer, cvmfs_published.length(), &map);
 
   EXPECT_EQ(10u, map.size());  // including the end() node in the map
@@ -1511,21 +1509,20 @@ TEST_F(T_Util, ParseKeyvalPath) {
   char *big_buffer = reinterpret_cast<char *>(scalloc(8000, sizeof(char)));
   string big_file = "bigfile.txt";
   string content_file = "contentfile.txt";
-  string cvmfs_published =
-      "Cf3bc68897a32278da5b5b0e4b5e4711a9102dde5\n"
-      "B75834368\n"
-      "Zfirst\n"
-      "Zsecond\n"
-      "Rd41d8cd98f00b204e9800998ecf8427e\n"
-      "D900\n"
-      "S8418\n"
-      "Natlas.cern.ch\n"
-      "Ncms.cern.ch\n"
-      "X0b457ac12225018e0a15330364c20529e15012ab\n"
-      "H70a5de156ee5eaf4f8e191591b6ade378f1120bd\n"
-      "T1431669806\n"
-      "--\n"
-      "EEXTRA-CONTENT\n";
+  string cvmfs_published = "Cf3bc68897a32278da5b5b0e4b5e4711a9102dde5\n"
+                           "B75834368\n"
+                           "Zfirst\n"
+                           "Zsecond\n"
+                           "Rd41d8cd98f00b204e9800998ecf8427e\n"
+                           "D900\n"
+                           "S8418\n"
+                           "Natlas.cern.ch\n"
+                           "Ncms.cern.ch\n"
+                           "X0b457ac12225018e0a15330364c20529e15012ab\n"
+                           "H70a5de156ee5eaf4f8e191591b6ade378f1120bd\n"
+                           "T1431669806\n"
+                           "--\n"
+                           "EEXTRA-CONTENT\n";
   CreateFileWithContent(big_file, string(big_buffer));
   CreateFileWithContent(content_file, cvmfs_published);
 
@@ -1565,10 +1562,10 @@ TEST_F(T_Util, GetLineFile) {
   string file2 = CreateFileWithContent("file2.txt", "\ncontent\ncontent2\n");
   string file3 = CreateFileWithContent("file3.txt", "mycompletestring");
   string file4 = CreateFileWithContent("file4.txt", "");
-  FILE* fd1 = fopen(file1.c_str(), "r");
-  FILE* fd2 = fopen(file2.c_str(), "r");
-  FILE* fd3 = fopen(file3.c_str(), "r");
-  FILE* fd4 = fopen(file4.c_str(), "r");
+  FILE *fd1 = fopen(file1.c_str(), "r");
+  FILE *fd2 = fopen(file2.c_str(), "r");
+  FILE *fd3 = fopen(file3.c_str(), "r");
+  FILE *fd4 = fopen(file4.c_str(), "r");
 
   EXPECT_DEATH(GetLineFile(NULL, &result), ".*");
   EXPECT_TRUE(GetLineFile(fd1, &result));
@@ -1641,8 +1638,8 @@ TEST_F(T_Util, ReplaceAll) {
   EXPECT_EQ("mystring", ReplaceAll("mystring", "", ""));
   EXPECT_EQ("??? ???my?string???", ReplaceAll("... ...my.string...", ".", "?"));
   EXPECT_EQ("it's for REPLACED or for @not-replace@",
-      ReplaceAll("it's for @replace@ or for @not-replace@", "@replace@",
-          "REPLACED"));
+            ReplaceAll("it's for @replace@ or for @not-replace@", "@replace@",
+                       "REPLACED"));
 }
 
 TEST_F(T_Util, ProcessExists) {
@@ -1676,8 +1673,11 @@ TEST_F(T_Util, WaitForChild) {
 
   pid_t pid = fork();
   switch (pid) {
-    case -1: ASSERT_TRUE(false);
-    case 0: while (true) { }
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      while (true) {
+      }
     default:
       kill(pid, SIGTERM);
       EXPECT_EQ(-1, WaitForChild(pid));
@@ -1685,23 +1685,28 @@ TEST_F(T_Util, WaitForChild) {
 
   pid = fork();
   switch (pid) {
-    case -1: ASSERT_TRUE(false);
-    case 0: _exit(0);
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      _exit(0);
     default:
       EXPECT_EQ(0, WaitForChild(pid));
   }
 
   pid = fork();
   switch (pid) {
-    case -1: ASSERT_TRUE(false);
-    case 0: _exit(1);
+    case -1:
+      ASSERT_TRUE(false);
+    case 0:
+      _exit(1);
     default:
       EXPECT_EQ(1, WaitForChild(pid));
   }
 
   pid = fork();
   switch (pid) {
-    case -1: ASSERT_TRUE(false);
+    case -1:
+      ASSERT_TRUE(false);
     case 0: {
       int max_fd = sysconf(_SC_OPEN_MAX);
       for (int fd = 0; fd < max_fd; fd++)
@@ -1752,13 +1757,7 @@ TEST_F(T_Util, ExecuteBinary) {
   pid_t gdb_pid = 0;
 
   result = ExecuteBinary(
-      &fd_stdin,
-      &fd_stdout,
-      &fd_stderr,
-      "/bin/echo",
-      argv,
-      false,
-      &gdb_pid);
+      &fd_stdin, &fd_stdout, &fd_stderr, "/bin/echo", argv, false, &gdb_pid);
   EXPECT_TRUE(result);
   ssize_t bytes_read = read(fd_stdout, buffer, message.length());
   EXPECT_EQ(static_cast<size_t>(bytes_read), message.length());
@@ -1771,11 +1770,11 @@ TEST_F(T_Util, Shell) {
   int fd_stdout;
   int fd_stderr;
   const int buffer_size = 100;
-  char *buffer = static_cast<char*>(scalloc(buffer_size, sizeof(char)));
+  char *buffer = static_cast<char *>(scalloc(buffer_size, sizeof(char)));
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
   string path = sandbox + "/newfolder";
-  string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
+  string command = "mkdir -p " + path + " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());
   string result(buffer, 0, path.length());
@@ -1792,8 +1791,8 @@ TEST_F(T_Util, ManagedExecCommandLine) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(
-    scalloc(100, 1)));
+  UniquePtr<unsigned char> buffer(
+      static_cast<unsigned char *>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   string message = "CVMFS";
@@ -1809,8 +1808,7 @@ TEST_F(T_Util, ManagedExecCommandLine) {
 
   success = ManagedExec(command_line, preserve_filedes, fd_map,
                         true /* drop_credentials */, false /* clear_env */,
-                        true /* double_fork */,
-                        &pid);
+                        true /* double_fork */, &pid);
   ASSERT_TRUE(success);
   close(fd_stdout[1]);
   ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), message.length());
@@ -1826,7 +1824,8 @@ TEST_F(T_Util, ManagedExecClearEnv) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  UniquePtr<unsigned char> buffer(static_cast<unsigned char*>(scalloc(100, 1)));
+  UniquePtr<unsigned char> buffer(
+      static_cast<unsigned char *>(scalloc(100, 1)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   vector<string> command_line;
@@ -1840,8 +1839,7 @@ TEST_F(T_Util, ManagedExecClearEnv) {
 
   success = ManagedExec(command_line, preserve_filedes, fd_map,
                         true /* drop_credentials */, true /* clear_env */,
-                        true /* double_fork */,
-                        &pid);
+                        true /* double_fork */, &pid);
   close(fd_stdout[1]);
   ASSERT_TRUE(success);
   ssize_t bytes_read = read(fd_stdout[0], buffer.weak_ref(), 64);
@@ -1889,9 +1887,9 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
-                               gdb,
-                               std::vector<std::string>(),
-                               double_fork,
+                              gdb,
+                              std::vector<std::string>(),
+                              double_fork,
                               &child_pid);
   // check if process is running
   ASSERT_TRUE(retval);
@@ -1946,9 +1944,9 @@ TEST_F(T_Util, ManagedExecExecuteBinaryAsChild) {
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
-                               gdb,
-                               std::vector<std::string>(),
-                               double_fork,
+                              gdb,
+                              std::vector<std::string>(),
+                              double_fork,
                               &child_pid);
 
   // check that the process is running
@@ -1991,8 +1989,8 @@ TEST_F(T_Util, SafeSleepMs) {
   sw.Start();
   SafeSleepMs(time);
   sw.Stop();
-  ASSERT_LE(static_cast<double>(time / 1000)-50, sw.GetTime());
-  ASSERT_GE(static_cast<double>(time / 1000)+50, sw.GetTime());
+  ASSERT_LE(static_cast<double>(time / 1000) - 50, sw.GetTime());
+  ASSERT_GE(static_cast<double>(time / 1000) + 50, sw.GetTime());
 }
 
 TEST_F(T_Util, Base64) {
@@ -2045,7 +2043,7 @@ TEST_F(T_Util, Tail) {
 
 TEST_F(T_Util, MemoryMappedFile) {
   string filepath = CreateFileWithContent("mappedfile.txt",
-      "some dummy content\n");
+                                          "some dummy content\n");
   MemoryMappedFile mf(filepath);
 
   EXPECT_FALSE(mf.IsMapped());

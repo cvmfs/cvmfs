@@ -33,52 +33,46 @@ class Command {
      * comparison with / search of existing parameters.
      */
     explicit Parameter(const std::string &key)
-      : key(key)
-      , short_key('?')
-      , arg_name("")
-      , description("")
-      , is_switch(false)
-      , is_optional(false)
-    { }
+        : key(key)
+        , short_key('?')
+        , arg_name("")
+        , description("")
+        , is_switch(false)
+        , is_optional(false) { }
 
-    Parameter(
-      const std::string &key,
-      char short_key,
-      const std::string &arg_name,
-      const std::string &desc,
-      bool is_switch,
-      bool is_optional)
-      : key(key)
-      , short_key(short_key)
-      , arg_name(arg_name)
-      , description(desc)
-      , is_switch(is_switch)
-      , is_optional(is_optional)
-    {
+    Parameter(const std::string &key,
+              char short_key,
+              const std::string &arg_name,
+              const std::string &desc,
+              bool is_switch,
+              bool is_optional)
+        : key(key)
+        , short_key(short_key)
+        , arg_name(arg_name)
+        , description(desc)
+        , is_switch(is_switch)
+        , is_optional(is_optional) {
       assert(!key.empty());
       assert(!is_switch || is_optional);  // switches are always optional
       assert(is_optional || !arg_name.empty());
     }
 
-    bool operator ==(const Parameter &other) const { return key == other.key; }
-    bool operator !=(const Parameter &other) const { return key != other.key; }
-    bool operator <(const Parameter &other) const { return key < other.key; }
+    bool operator==(const Parameter &other) const { return key == other.key; }
+    bool operator!=(const Parameter &other) const { return key != other.key; }
+    bool operator<(const Parameter &other) const { return key < other.key; }
 
     static Parameter Mandatory(const std::string &key, char short_key,
                                const std::string &arg_name,
-                               const std::string &desc)
-    {
+                               const std::string &desc) {
       return Parameter(key, short_key, arg_name, desc, false, false);
     }
     static Parameter Optional(const std::string &key, char short_key,
                               const std::string &arg_name,
-                              const std::string &desc)
-    {
+                              const std::string &desc) {
       return Parameter(key, short_key, arg_name, desc, false, true);
     }
     static Parameter Switch(const std::string &key, char short_key,
-                            const std::string &desc)
-    {
+                            const std::string &desc) {
       return Parameter(key, short_key, "", desc, true, true);
     }
 
@@ -99,7 +93,7 @@ class Command {
   struct Argument {
     Argument() : value_int(0) { }
     explicit Argument(const std::string &v)
-      : value_str(v), value_int(String2Int64(v)) { }
+        : value_str(v), value_int(String2Int64(v)) { }
     std::string value_str;
     int64_t value_int;
   };
@@ -114,9 +108,7 @@ class Command {
     bool Has(const std::string &key) const {
       return map_.count(Parameter(key)) > 0;
     }
-    bool HasNot(const std::string &key) const {
-      return !Has(key);
-    }
+    bool HasNot(const std::string &key) const { return !Has(key); }
     Argument Get(const std::string &key) const {
       return map_.find(Parameter(key))->second;
     }
@@ -124,8 +116,7 @@ class Command {
       return map_.find(Parameter(key))->second.value_str;
     }
     std::string GetStringDefault(const std::string &key,
-                                 const std::string &default_value) const
-    {
+                                 const std::string &default_value) const {
       if (Has(key))
         return map_.find(Parameter(key))->second.value_str;
       return default_value;
@@ -134,7 +125,7 @@ class Command {
       return map_.find(Parameter(key))->second.value_int;
     }
     unsigned GetSize() const { return map_.size(); }
-    const std::vector<Argument>& plain_args() const { return plain_args_; }
+    const std::vector<Argument> &plain_args() const { return plain_args_; }
 
    private:
     std::map<Parameter, Argument> map_;
@@ -171,7 +162,7 @@ class Command {
    */
   virtual bool IsHidden() const { return false; }
 
-  Options ParseOptions(int argc, char** argv);
+  Options ParseOptions(int argc, char **argv);
 
   /**
    * The dictionary of passed arguments can be obtained by a call to
@@ -200,7 +191,7 @@ class CommandList : SingleCopy {
   void TakeCommand(Command *command);
   Command *Find(const std::string &name);
 
-  const std::vector<Command *>& commands() const { return commands_; }
+  const std::vector<Command *> &commands() const { return commands_; }
 
  private:
   std::vector<Command *> commands_;

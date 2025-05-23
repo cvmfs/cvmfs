@@ -33,9 +33,7 @@ namespace cvmfs {
 class TransactionSink : public Sink {
  public:
   TransactionSink(CacheManager *cache_mgr, void *open_txn)
-    : Sink(false),
-      cache_mgr_(cache_mgr),
-      open_txn_(open_txn) { }
+      : Sink(false), cache_mgr_(cache_mgr), open_txn_(open_txn) { }
   virtual ~TransactionSink() { }
 
   /**
@@ -54,9 +52,7 @@ class TransactionSink : public Sink {
    * @returns Success = 0
    *          Failure = -errno
    */
-  virtual int Reset() {
-    return cache_mgr_->Reset(open_txn_);
-  }
+  virtual int Reset() { return cache_mgr_->Reset(open_txn_); }
 
   /**
    * Purges all resources leaving the sink in an invalid state.
@@ -66,15 +62,11 @@ class TransactionSink : public Sink {
    * @returns Success = 0
    *          Failure = -errno
    */
-  virtual int Purge() {
-    return Reset();
-  }
+  virtual int Purge() { return Reset(); }
   /**
-    * @returns true if the object is correctly initialized.
-    */
-  virtual bool IsValid() {
-    return cache_mgr_ != NULL && open_txn_ != NULL;
-  }
+   * @returns true if the object is correctly initialized.
+   */
+  virtual bool IsValid() { return cache_mgr_ != NULL && open_txn_ != NULL; }
 
   virtual int Flush() { return 0; }
   virtual bool Reserve(size_t /*size*/) { return true; }
@@ -82,10 +74,10 @@ class TransactionSink : public Sink {
 
   /**
    * Return a string representation describing the type of sink and its status
-  */
+   */
   virtual std::string Describe() {
     std::string result = "Transaction sink that is ";
-    result += IsValid() ? "valid"  : "invalid";
+    result += IsValid() ? "valid" : "invalid";
     return result;
   }
 
@@ -167,7 +159,7 @@ class Fetcher : SingleCopy {
    * enqueue itself to such an other_pipes_waiting list and gets informed when
    * the download is completed.
    */
-  typedef std::map< shash::Any, std::vector<int> * > ThreadQueues;
+  typedef std::map<shash::Any, std::vector<int> *> ThreadQueues;
 
   ThreadLocalStorage *GetTls();
   void CleanupTls(ThreadLocalStorage *tls);

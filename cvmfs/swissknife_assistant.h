@@ -36,16 +36,11 @@ class Assistant {
     kOpenReadWrite
   };
 
-  Assistant(
-    download::DownloadManager *d,
-    manifest::Manifest *m,
-    const std::string &r,
-    const std::string &t)
-    : download_mgr_(d)
-    , manifest_(m)
-    , repository_url_(r)
-    , tmp_dir_(t)
-  { }
+  Assistant(download::DownloadManager *d,
+            manifest::Manifest *m,
+            const std::string &r,
+            const std::string &t)
+      : download_mgr_(d), manifest_(m), repository_url_(r), tmp_dir_(t) { }
 
   history::History *GetHistory(OpenMode open_mode);
   catalog::Catalog *GetCatalog(const shash::Any &catalog_hash,

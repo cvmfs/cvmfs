@@ -66,7 +66,7 @@ TEST_F(T_RelaxedPathFilter, RelaxedPathFilterSubtrees) {
   EXPECT_FALSE(path_filter.IsMatching("/software/releases/misc/external"));
   EXPECT_FALSE(path_filter.IsMatching("/software/releases/experimental/misc"));
   EXPECT_FALSE(
-    path_filter.IsMatching("/software/releases/experimental/misc/foo"));
+      path_filter.IsMatching("/software/releases/experimental/misc/foo"));
 }
 
 
@@ -93,8 +93,8 @@ TEST_F(T_RelaxedPathFilter, Parsing) {
   ASSERT_TRUE(f != NULL);
   fwrite(filter.data(), filter.size(), 1, f);
   fclose(f);
-  catalog::RelaxedPathFilter *pf_from_file =
-    catalog::RelaxedPathFilter::Create(filter_path);
+  catalog::RelaxedPathFilter *pf_from_file = catalog::RelaxedPathFilter::Create(
+      filter_path);
 
   EXPECT_TRUE(pf_from_file->IsValid());
   EXPECT_TRUE(pf_from_file->IsMatching("/sw/repo/ASG"));

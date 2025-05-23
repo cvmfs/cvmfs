@@ -18,14 +18,13 @@ void FreeList(char **list, size_t len);
 
 XattrList *CreateSampleXattrlist(std::string var);
 
-struct cvmfs_attr *CreateSampleStat(
-  const char *name,
-  ino_t st_ino,
-  mode_t st_mode,
-  off_t st_size,
-  XattrList *xlist,
-  shash::Any *content_hash = NULL,
-  const char *link = NULL);
+struct cvmfs_attr *CreateSampleStat(const char *name,
+                                    ino_t st_ino,
+                                    mode_t st_mode,
+                                    off_t st_size,
+                                    XattrList *xlist,
+                                    shash::Any *content_hash = NULL,
+                                    const char *link = NULL);
 
 bool SupportsXattrs(const std::string &directory);
 

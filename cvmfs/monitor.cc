@@ -19,9 +19,9 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 #ifdef __APPLE__
-  #include <sys/ucontext.h>
+#include <sys/ucontext.h>
 #else
-  #include <ucontext.h>
+#include <ucontext.h>
 #endif
 #include <sys/uio.h>
 #include <sys/wait.h>
@@ -57,15 +57,12 @@ using namespace std;  // NOLINT
 
 Watchdog *Watchdog::instance_ = NULL;
 
-int Watchdog::g_suppressed_signals[] = { SIGHUP, SIGINT, SIGQUIT,
-                                SIGILL, SIGABRT, SIGBUS,
-                                SIGFPE, SIGUSR1, SIGSEGV,
-                                SIGUSR2, SIGTERM, SIGXCPU,
-                                SIGXFSZ};
+int Watchdog::g_suppressed_signals[] = {
+    SIGHUP,  SIGINT,  SIGQUIT, SIGILL,  SIGABRT, SIGBUS, SIGFPE,
+    SIGUSR1, SIGSEGV, SIGUSR2, SIGTERM, SIGXCPU, SIGXFSZ};
 
-int Watchdog::g_crash_signals[] = { SIGQUIT, SIGILL, SIGABRT,
-                                  SIGFPE, SIGSEGV, SIGBUS,
-                                  SIGPIPE, SIGXFSZ };
+int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
+                                   SIGSEGV, SIGBUS, SIGPIPE, SIGXFSZ};
 
 Watchdog *Watchdog::Create(FnOnCrash on_crash) {
   assert(instance_ == NULL);
@@ -102,12 +99,12 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
                          &fd_stdout,
                          &fd_stderr,
 #ifdef __APPLE__
-                          "lldb",
+                         "lldb",
 #else
-                          "gdb",
+                         "gdb",
 #endif
-                          argv,
-                          double_fork,
+                         argv,
+                         double_fork,
                          &gdb_pid);
   assert(retval);
 
@@ -117,16 +114,20 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
 
   // Send stacktrace command to gdb
 #ifdef __APPLE__
-  const string gdb_cmd = "bt all\n" "quit\n";
+  const string gdb_cmd = "bt all\n"
+                         "quit\n";
 #else
-  const string gdb_cmd = "thread apply all bt\n" "quit\n";
+  const string gdb_cmd = "thread apply all bt\n"
+                         "quit\n";
 #endif
   // The execve can have failed, which can't be detected in ExecuteBinary.
   // Instead, writing to the pipe will fail.
   ssize_t nbytes = write(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
   if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != gdb_cmd.length())) {
-    result += "failed to start gdb/lldb (" + StringifyInt(nbytes) + " bytes "
-              "written, errno " + StringifyInt(errno) + ")\n";
+    result += "failed to start gdb/lldb (" + StringifyInt(nbytes)
+              + " bytes "
+                "written, errno "
+              + StringifyInt(errno) + ")\n";
     return result;
   }
 
@@ -189,8 +190,8 @@ void Watchdog::LogEmergency(string msg) {
       time_t now = time(NULL);
       msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
       if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length()) {
-        msg +=
-            " (failed to report into crash dump file " + crash_dump_path_ + ")";
+        msg += " (failed to report into crash dump file " + crash_dump_path_
+               + ")";
       } else {
         msg += "\n Crash logged also on file: " + crash_dump_path_ + "\n";
       }
@@ -216,17 +217,18 @@ string Watchdog::ReadUntilGdbPrompt(int fd_pipe) {
   static const string gdb_prompt = "\n(gdb) ";
 #endif
 
-  string        result;
-  char          mini_buffer;
-  int           chars_io;
-  unsigned int  ring_buffer_pos = 0;
+  string result;
+  char mini_buffer;
+  int chars_io;
+  unsigned int ring_buffer_pos = 0;
 
   // read from stdout of gdb until gdb prompt occurs --> (gdb)
   while (1) {
     chars_io = read(fd_pipe, &mini_buffer, 1);
 
     // in case something goes wrong...
-    if (chars_io <= 0) break;
+    if (chars_io <= 0)
+      break;
 
     result += mini_buffer;
 
@@ -255,10 +257,10 @@ string Watchdog::ReportStacktrace() {
   }
 
   string debug = "--\n";
-  debug += "Signal: "    + StringifyInt(crash_data.signal);
-  debug += ", errno: "   + StringifyInt(crash_data.sys_errno);
+  debug += "Signal: " + StringifyInt(crash_data.signal);
+  debug += ", errno: " + StringifyInt(crash_data.sys_errno);
   debug += ", version: " + string(CVMFS_VERSION);
-  debug += ", PID: "     + StringifyInt(crash_data.pid) + "\n";
+  debug += ", PID: " + StringifyInt(crash_data.pid) + "\n";
   debug += "Executable path: " + exe_path_ + "\n";
 
   debug += GenerateStackTrace(crash_data.pid);
@@ -286,12 +288,11 @@ string Watchdog::ReportStacktrace() {
 }
 
 
-void Watchdog::ReportSignalAndContinue(
-  int sig, siginfo_t *siginfo, void * /* context */)
-{
+void Watchdog::ReportSignalAndContinue(int sig, siginfo_t *siginfo,
+                                       void * /* context */) {
   LogCvmfs(kLogMonitor, kLogSyslogErr,
-           "watchdog: received unexpected signal %d from PID %d / UID %d",
-           sig, siginfo->si_pid, siginfo->si_uid);
+           "watchdog: received unexpected signal %d from PID %d / UID %d", sig,
+           siginfo->si_pid, siginfo->si_uid);
 }
 
 
@@ -299,12 +300,13 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
   int send_errno = errno;
   if (platform_spinlock_trylock(&Me()->lock_handler_) != 0) {
     // Concurrent call, wait for the first one to exit the process
-    while (true) {}
+    while (true) {
+    }
   }
 
   // Set the original signal handler for the raised signal in
   // SIGQUIT (watchdog process will raise SIGQUIT)
-  (void) sigaction(SIGQUIT, &(Me()->old_signal_handlers_[sig]), NULL);
+  (void)sigaction(SIGQUIT, &(Me()->old_signal_handlers_[sig]), NULL);
 
   // Inform the watchdog that CernVM-FS crashed
   if (!Me()->pipe_watchdog_->Write(ControlFlow::kProduceStacktrace)) {
@@ -313,9 +315,9 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
 
   // Send crash information to the watchdog
   CrashData crash_data;
-  crash_data.signal     = sig;
-  crash_data.sys_errno  = send_errno;
-  crash_data.pid        = getpid();
+  crash_data.signal = sig;
+  crash_data.sys_errno = send_errno;
+  crash_data.pid = getpid();
   if (!Me()->pipe_watchdog_->Write<CrashData>(crash_data)) {
     _exit(1);
   }
@@ -330,16 +332,16 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "stack trace generation failed");
       // Last attempt to log something useful
 #if defined(CVMFS_FUSE_MODULE)
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
-               sig, send_errno);
+      LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d", sig,
+               send_errno);
       void *addr[kMaxBacktrace];
       // Note: this doesn't work due to the signal stack on OS X (it works on
       // Linux).  Since anyway lldb is supposed to produce the backtrace, we
       // consider it more important to protect cvmfs against stack overflows.
       int num_addr = backtrace(addr, kMaxBacktrace);
       char **symbols = backtrace_symbols(addr, num_addr);
-      string backtrace = "Backtrace (" + StringifyInt(num_addr) +
-                         " symbols):\n";
+      string backtrace = "Backtrace (" + StringifyInt(num_addr)
+                         + " symbols):\n";
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
@@ -363,11 +365,10 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
  * @return                 a SigactionMap containing the old handlers
  */
 Watchdog::SigactionMap Watchdog::SetSignalHandlers(
-  const SigactionMap &signal_handlers)
-{
+    const SigactionMap &signal_handlers) {
   SigactionMap old_signal_handlers;
-  SigactionMap::const_iterator i     = signal_handlers.begin();
-  SigactionMap::const_iterator iend  = signal_handlers.end();
+  SigactionMap::const_iterator i = signal_handlers.begin();
+  SigactionMap::const_iterator iend = signal_handlers.end();
   for (; i != iend; ++i) {
     struct sigaction old_signal_handler;
     if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
@@ -391,11 +392,13 @@ void Watchdog::Fork() {
   pid_t pid;
   int statloc;
   switch (pid = fork()) {
-    case -1: PANIC(NULL);
+    case -1:
+      PANIC(NULL);
     case 0:
       // Double fork to avoid zombie
       switch (fork()) {
-        case -1: _exit(1);
+        case -1:
+          _exit(1);
         case 0: {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
@@ -424,7 +427,7 @@ void Watchdog::Fork() {
           preserve_fds.insert(pipe_listener_->GetWriteFd());
           CloseAllFildes(preserve_fds);
           SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
-          SetLogDebugFile(debuglog_save);  // no-op if debug log not used
+          SetLogDebugFile(debuglog_save);   // no-op if debug log not used
 
           if (WaitForSupervisee())
             Supervise();
@@ -440,8 +443,10 @@ void Watchdog::Fork() {
       pipe_watchdog_->CloseReadFd();
       pipe_listener_->CloseWriteFd();
       pipe_pid.CloseWriteFd();
-      if (waitpid(pid, &statloc, 0) != pid) PANIC(NULL);
-      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc)) PANIC(NULL);
+      if (waitpid(pid, &statloc, 0) != pid)
+        PANIC(NULL);
+      if (!WIFEXITED(statloc) || WEXITSTATUS(statloc))
+        PANIC(NULL);
   }
 
   // retrieve the watchdog PID from the pipe
@@ -464,7 +469,7 @@ bool Watchdog::WaitForSupervisee() {
   sigfillset(&sa.sa_mask);
 
   SigactionMap signal_handlers;
-  for (size_t i = 0; i < sizeof(g_suppressed_signals)/sizeof(int); i++) {
+  for (size_t i = 0; i < sizeof(g_suppressed_signals) / sizeof(int); i++) {
     signal_handlers[g_suppressed_signals[i]] = sa;
   }
   SetSignalHandlers(signal_handlers);
@@ -494,8 +499,8 @@ bool Watchdog::WaitForSupervisee() {
 
     int retval = chdir(GetParentPath(crash_dump_path_).c_str());
     if (retval != 0) {
-      LogEmergency(std::string("Cannot change to crash dump directory: ") +
-                   crash_dump_path_);
+      LogEmergency(std::string("Cannot change to crash dump directory: ")
+                   + crash_dump_path_);
       return false;
     }
     crash_dump_path_ = GetFileName(crash_dump_path_);
@@ -531,14 +536,14 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   sigfillset(&sa.sa_mask);
 
   SigactionMap signal_handlers;
-  for (size_t i = 0; i < sizeof(g_crash_signals)/sizeof(int); i++) {
+  for (size_t i = 0; i < sizeof(g_crash_signals) / sizeof(int); i++) {
     signal_handlers[g_crash_signals[i]] = sa;
   }
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
   pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  int retval =
-    pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
+  int retval = pthread_create(&thread_listener_, NULL, MainWatchdogListener,
+                              this);
   assert(retval == 0);
 
   pipe_watchdog_->Write(ControlFlow::kSupervise);
@@ -574,10 +579,8 @@ void *Watchdog::MainWatchdogListener(void *data) {
       break;
 
     if (watch_fds[0].revents) {
-      if ((watch_fds[0].revents & POLLERR) ||
-          (watch_fds[0].revents & POLLHUP) ||
-          (watch_fds[0].revents & POLLNVAL))
-      {
+      if ((watch_fds[0].revents & POLLERR) || (watch_fds[0].revents & POLLHUP)
+          || (watch_fds[0].revents & POLLNVAL)) {
         LogCvmfs(kLogMonitor, kLogDebug | kLogSyslogErr,
                  "watchdog disappeared, disabling stack trace reporting "
                  "(revents: %d / %d|%d|%d)",
@@ -598,14 +601,16 @@ void Watchdog::Supervise() {
   ControlFlow::Flags control_flow = ControlFlow::kUnknown;
 
   if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
-    LogEmergency("watchdog: unexpected termination (" +
-                 StringifyInt(control_flow) + ")");
-    if (on_crash_) on_crash_();
+    LogEmergency("watchdog: unexpected termination ("
+                 + StringifyInt(control_flow) + ")");
+    if (on_crash_)
+      on_crash_();
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
-        if (on_crash_) on_crash_();
+        if (on_crash_)
+          on_crash_();
         break;
 
       case ControlFlow::kQuit:
@@ -620,11 +625,10 @@ void Watchdog::Supervise() {
 
 
 Watchdog::Watchdog(FnOnCrash on_crash)
-  : spawned_(false)
-  , exe_path_(string(platform_getexepath()))
-  , watchdog_pid_(0)
-  , on_crash_(on_crash)
-{
+    : spawned_(false)
+    , exe_path_(string(platform_getexepath()))
+    , watchdog_pid_(0)
+    , on_crash_(on_crash) {
   int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));

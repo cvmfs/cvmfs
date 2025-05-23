@@ -77,7 +77,7 @@ class MallocArena {
   static inline MallocArena *GetMallocArena(void *ptr, unsigned arena_size) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
     void *arena = reinterpret_cast<void *>(
-      uintptr_t(ptr) & ~(uintptr_t(arena_size) - uintptr_t(1)));
+        uintptr_t(ptr) & ~(uintptr_t(arena_size) - uintptr_t(1)));
     return *reinterpret_cast<MallocArena **>(arena);
   }
 
@@ -116,7 +116,7 @@ class MallocArena {
       size = smaller_size;
       new (AvailBlockTag::GetTagLocation(this)) AvailBlockTag(smaller_size);
     }
-    int32_t size;  // always positive
+    int32_t size;       // always positive
     int32_t link_next;  // offset in the arena; saves 4 bytes on 64bit archs
     int32_t link_prev;  // offset in the arena; saves 4 bytes on 64bit archs
   };
@@ -127,8 +127,8 @@ class MallocArena {
   struct AvailBlockTag {
     explicit AvailBlockTag(int32_t s) : size(s), tag(kTagAvail) { }
     static void *GetTagLocation(AvailBlockCtl *block) {
-      return
-        reinterpret_cast<char *>(block) + block->size - sizeof(AvailBlockTag);
+      return reinterpret_cast<char *>(block) + block->size
+             - sizeof(AvailBlockTag);
     }
     int32_t size;
     char padding[3];
@@ -145,7 +145,10 @@ class MallocArena {
       char *base = reinterpret_cast<char *>(this);
       *(base + s - 1) = kTagReserved;
     }
-    int32_t size() const { assert(size_ <= 0);  return -size_; }
+    int32_t size() const {
+      assert(size_ <= 0);
+      return -size_;
+    }
 
    private:
     int32_t size_;  // always negative

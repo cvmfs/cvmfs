@@ -9,7 +9,7 @@
 
 class T_SwissknifeLeaseJson : public ::testing::Test {
  protected:
-  void SetUp() {}
+  void SetUp() { }
 
   CurlBuffer buffer_;
   std::string session_token_;
@@ -22,14 +22,13 @@ TEST_F(T_SwissknifeLeaseJson, ParseAcquireOk) {
 }
 
 TEST_F(T_SwissknifeLeaseJson, ParseAcquireBusy) {
-  buffer_.data =
-      "{ \"status\" : \"path_busy\", \"time_remaining\" : 1234 }";
+  buffer_.data = "{ \"status\" : \"path_busy\", \"time_remaining\" : 1234 }";
   EXPECT_EQ(kLeaseReplyBusy, ParseAcquireReply(buffer_, &session_token_));
 }
 
 TEST_F(T_SwissknifeLeaseJson, ParseAcquireError) {
-  buffer_.data =
-      "{ \"status\" : \"error\", \"reason\" : \"reason_for_failure\" }";
+  buffer_
+      .data = "{ \"status\" : \"error\", \"reason\" : \"reason_for_failure\" }";
   EXPECT_EQ(kLeaseReplyFailure, ParseAcquireReply(buffer_, &session_token_));
 }
 
@@ -58,8 +57,8 @@ TEST_F(T_SwissknifeLeaseJson, ParseDropInvalidSessionToken) {
 }
 
 TEST_F(T_SwissknifeLeaseJson, ParseDropError) {
-  buffer_.data =
-      "{ \"status\" : \"error\", \"reason\" : \"reason_for_failure\" }";
+  buffer_
+      .data = "{ \"status\" : \"error\", \"reason\" : \"reason_for_failure\" }";
   EXPECT_EQ(kLeaseReplyFailure, ParseDropReply(buffer_));
 }
 

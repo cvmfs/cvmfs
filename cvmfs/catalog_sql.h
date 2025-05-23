@@ -46,25 +46,24 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   static const unsigned kLatestSchemaRevision;
 
   bool CreateEmptyDatabase();
-  bool InsertInitialValues(const std::string     &root_path,
-                           const bool             volatile_content,
-                           const std::string     &voms_authz,
-                           const DirectoryEntry  &root_entry
-                                             = DirectoryEntry(kDirentNegative));
+  bool InsertInitialValues(
+      const std::string &root_path,
+      const bool volatile_content,
+      const std::string &voms_authz,
+      const DirectoryEntry &root_entry = DirectoryEntry(kDirentNegative));
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
   bool CompactDatabase() const;
 
   double GetRowIdWasteRatio() const;
-  bool SetVOMSAuthz(const std::string&);
+  bool SetVOMSAuthz(const std::string &);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<CatalogDatabase>;
-  CatalogDatabase(const std::string  &filename,
-                  const OpenMode      open_mode)
-    : sqlite::Database<CatalogDatabase>(filename, open_mode) { }
+  CatalogDatabase(const std::string &filename, const OpenMode open_mode)
+      : sqlite::Database<CatalogDatabase>(filename, open_mode) { }
 };
 
 
@@ -100,17 +99,16 @@ class SqlCatalog : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a blob field.
    */
   inline shash::Any RetrieveHashBlob(
-    const int                idx_column,
-    const shash::Algorithms  hash_algo,
-    const char               hash_suffix = shash::kSuffixNone) const
-  {
+      const int idx_column,
+      const shash::Algorithms hash_algo,
+      const char hash_suffix = shash::kSuffixNone) const {
     // Note: SQLite documentation advises to first define the data type of BLOB
     //       by calling sqlite3_column_XXX() on the column and _afterwards_ get
     //       the number of bytes using sqlite3_column_bytes().
     //
     //  See: https://www.sqlite.org/c3ref/column_blob.html
     const unsigned char *buffer = static_cast<const unsigned char *>(
-      RetrieveBlob(idx_column));
+        RetrieveBlob(idx_column));
     const int byte_count = RetrieveBytes(idx_column);
     return (byte_count > 0) ? shash::Any(hash_algo, buffer, hash_suffix)
                             : shash::Any(hash_algo);
@@ -120,11 +118,9 @@ class SqlCatalog : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a text field.
    */
   inline shash::Any RetrieveHashHex(
-    const int  idx_column,
-    const char hash_suffix = shash::kSuffixNone) const
-  {
-    const std::string hash_string = std::string(reinterpret_cast<const char *>(
-      RetrieveText(idx_column)));
+      const int idx_column, const char hash_suffix = shash::kSuffixNone) const {
+    const std::string hash_string = std::string(
+        reinterpret_cast<const char *>(RetrieveText(idx_column)));
     return shash::MkFromHexPtr(shash::HexPtr(hash_string), hash_suffix);
   }
 
@@ -136,12 +132,11 @@ class SqlCatalog : public sqlite::Sql {
    * @result true on success, false otherwise
    */
   inline bool BindMd5(const int idx_high, const int idx_low,
-                      const shash::Md5 &hash)
-  {
+                      const shash::Md5 &hash) {
     uint64_t high, low;
     hash.ToIntPair(&high, &low);
-    const bool retval = BindInt64(idx_high, static_cast<int64_t>(high)) &&
-                        BindInt64(idx_low, static_cast<int64_t>(low));
+    const bool retval = BindInt64(idx_high, static_cast<int64_t>(high))
+                        && BindInt64(idx_low, static_cast<int64_t>(low));
     return retval;
   }
 
@@ -161,7 +156,7 @@ class SqlCatalog : public sqlite::Sql {
   }
 
  protected:
-  SqlCatalog() : sqlite::Sql() {}
+  SqlCatalog() : sqlite::Sql() { }
 };
 
 
@@ -175,45 +170,45 @@ class SqlDirent : public SqlCatalog {
  public:
   // Definition of bit positions for the flags field of a DirectoryEntry
   // All other bit positions are unused
-  static const int kFlagDir                 = 1;
+  static const int kFlagDir = 1;
   // Link in the parent catalog
   static const int kFlagDirNestedMountpoint = 2;
   // Link in the child catalog
-  static const int kFlagDirNestedRoot       = 32;
-  static const int kFlagFile                = 4;
-  static const int kFlagLink                = 8;
-  static const int kFlagFileSpecial         = 16;
-  static const int kFlagFileChunk           = 64;
+  static const int kFlagDirNestedRoot = 32;
+  static const int kFlagFile = 4;
+  static const int kFlagLink = 8;
+  static const int kFlagFileSpecial = 16;
+  static const int kFlagFileChunk = 64;
   /**
    * The file is not natively stored in cvmfs but on a different storage system,
    * for instance on HTTPS data federation services.
    * NOTE: used as magic number in SqlListContentHashes::SqlListContentHashes
    */
-  static const int kFlagFileExternal        = 128;
+  static const int kFlagFileExternal = 128;
   // as of 2^8: 3 bit for hashes
   //   - 0: SHA-1
   //   - 1: RIPEMD-160
   //   - ...
   // Corresponds to shash::algorithms with offset in order to support future
   // hashes
-  static const int kFlagPosHash             = 8;
+  static const int kFlagPosHash = 8;
   // Compression methods, 3 bits starting at 2^11
   // Corresponds to zlib::Algorithms
-  static const int kFlagPosCompression      = 11;
+  static const int kFlagPosCompression = 11;
   /**
    * A transition point to a root catalog (instead of a nested catalog).  Used
    * to link previous snapshots into the catalog structure.
    */
-  static const int kFlagDirBindMountpoint   = 0x4000;  // 2^14
+  static const int kFlagDirBindMountpoint = 0x4000;  // 2^14
   /**
    * An entry that should not appear in listings.  Used for the /.cvmfs
    * directory.
    */
-  static const int kFlagHidden              = 0x8000;  // 2^15
+  static const int kFlagHidden = 0x8000;  // 2^15
   /**
    * For regular files, indicates that the file should be opened with direct I/O
    */
-  static const int kFlagDirectIo            = 0x10000;  // 2^16
+  static const int kFlagDirectIo = 0x10000;  // 2^16
 
 
  protected:
@@ -360,7 +355,8 @@ class SqlLookupInode : public SqlLookup {
  *       reference for the found dangling mountpoints. If so, we also have a
  *       bogus state, but it is not reliably fixable automatically. The child-
  *       DirectoryEntrys would be masked by the mounting nested catalog but it
- *       is not clear if we can simply delete them or if this would destroy data.
+ *       is not clear if we can simply delete them or if this would destroy
+ * data.
  */
 class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
  public:
@@ -545,6 +541,7 @@ class SqlGetCounter : public SqlCatalog {
   explicit SqlGetCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   uint64_t GetCounter() const;
+
  private:
   bool compat_;
 };

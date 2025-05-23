@@ -3,13 +3,12 @@
  */
 
 
-#include "publish/repository.h"
-
 #include <cstdio>
 
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "publish/except.h"
+#include "publish/repository.h"
 #include "publish/repository_util.h"
 #include "upload.h"
 #include "upload_spooler_definition.h"
@@ -54,17 +53,21 @@ void Publisher::ManagedNode::Mount() {
 }
 
 void Publisher::ManagedNode::ClearScratch() {
-  const std::string scratch_dir =
-    publisher_->settings_.transaction().spool_area().scratch_dir();
-  const std::string scratch_wastebin =
-    publisher_->settings_.transaction().spool_area().scratch_wastebin();
-  const std::string tmp_dir =
-    publisher_->settings_.transaction().spool_area().tmp_dir();
+  const std::string scratch_dir = publisher_->settings_.transaction()
+                                      .spool_area()
+                                      .scratch_dir();
+  const std::string scratch_wastebin = publisher_->settings_.transaction()
+                                           .spool_area()
+                                           .scratch_wastebin();
+  const std::string
+      tmp_dir = publisher_->settings_.transaction().spool_area().tmp_dir();
 
   std::string waste_dir = CreateTempDir(scratch_wastebin + "/waste");
-  if (waste_dir.empty()) throw EPublish("cannot create wastebin directory");
+  if (waste_dir.empty())
+    throw EPublish("cannot create wastebin directory");
   int rvi = rename(scratch_dir.c_str(), (waste_dir + "/delete-me").c_str());
-  if (rvi != 0) throw EPublish("cannot move scratch directory to wastebin");
+  if (rvi != 0)
+    throw EPublish("cannot move scratch directory to wastebin");
 
   publisher_->CreateDirectoryAsOwner(scratch_dir, kDefaultDirMode);
 
@@ -84,19 +87,21 @@ void Publisher::ManagedNode::ClearScratch() {
 
 int Publisher::ManagedNode::Check(bool is_quiet) {
   ServerLockFileCheck publish_check(publisher_->is_publishing_);
-  const std::string rdonly_mnt =
-    publisher_->settings_.transaction().spool_area().readonly_mnt();
-  const std::string union_mnt =
-    publisher_->settings_.transaction().spool_area().union_mnt();
+  const std::string rdonly_mnt = publisher_->settings_.transaction()
+                                     .spool_area()
+                                     .readonly_mnt();
+  const std::string
+      union_mnt = publisher_->settings_.transaction().spool_area().union_mnt();
   const std::string fqrn = publisher_->settings_.fqrn();
-  EUnionMountRepairMode repair_mode =
-    publisher_->settings_.transaction().spool_area().repair_mode();
+  EUnionMountRepairMode repair_mode = publisher_->settings_.transaction()
+                                          .spool_area()
+                                          .repair_mode();
 
   int result = kFailOk;
 
   shash::Any expected_hash = publisher_->manifest()->catalog_hash();
   UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
-    publisher_->settings_.transaction().spool_area().checkout_marker()));
+      publisher_->settings_.transaction().spool_area().checkout_marker()));
   if (marker.IsValid())
     expected_hash = marker->hash();
 
@@ -109,7 +114,7 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
                                     &root_hash_str);
     if (retval) {
       shash::Any root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_str),
-                                               shash::kSuffixCatalog);
+                                                 shash::kSuffixCatalog);
       if (expected_hash != root_hash) {
         if (marker.IsValid()) {
           result |= kFailRdOnlyWrongRevision;
@@ -156,8 +161,8 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
              "%s is not based on the newest published revision", fqrn.c_str());
   }
   if (result & kFailRdOnlyWrongRevision) {
-    LogCvmfs(kLogCvmfs, logFlags,
-             "%s is not based on the checked out revision", fqrn.c_str());
+    LogCvmfs(kLogCvmfs, logFlags, "%s is not based on the checked out revision",
+             fqrn.c_str());
   }
   if (result & kFailUnionBroken) {
     LogCvmfs(kLogCvmfs, logFlags, "%s is not mounted properly",
@@ -183,20 +188,22 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
       break;
     case kUnionMountRepairSafe:
       if (!publish_check.owns_lock()) {
-        LogCvmfs(kLogCvmfs, logFlags,
-          "WARNING: The repository %s is currently publishing and should not\n"
-          "be touched. If you are absolutely sure, that this is _not_ the "
-          "case,\nplease run the following command and retry:\n\n"
-          "    rm -fR %s\n",
-          fqrn.c_str(), publisher_->is_publishing_.path().c_str());
+        LogCvmfs(
+            kLogCvmfs, logFlags,
+            "WARNING: The repository %s is currently publishing and should "
+            "not\n"
+            "be touched. If you are absolutely sure, that this is _not_ the "
+            "case,\nplease run the following command and retry:\n\n"
+            "    rm -fR %s\n",
+            fqrn.c_str(), publisher_->is_publishing_.path().c_str());
         return result;
       }
 
       if (publisher_->in_transaction_.IsSet()) {
         LogCvmfs(kLogCvmfs, logFlags,
-          "Repository %s is in a transaction and cannot be repaired.\n"
-          "--> Run `cvmfs_server abort $name` to revert and repair.",
-          fqrn.c_str());
+                 "Repository %s is in a transaction and cannot be repaired.\n"
+                 "--> Run `cvmfs_server abort $name` to revert and repair.",
+                 fqrn.c_str());
         return result;
       }
 
@@ -273,9 +280,8 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   return result;
 }
 
-void Publisher::ManagedNode::AlterMountpoint(
-  EMountpointAlterations how, int log_level)
-{
+void Publisher::ManagedNode::AlterMountpoint(EMountpointAlterations how,
+                                             int log_level) {
   std::string mountpoint;
   std::string info_msg;
   std::string suid_helper_verb;
@@ -291,20 +297,23 @@ void Publisher::ManagedNode::AlterMountpoint(
       suid_helper_verb = "rw_lazy_umount";
       break;
     case kAlterRdOnlyUnmount:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      mountpoint = publisher_->settings_.transaction()
+                       .spool_area()
+                       .readonly_mnt();
       info_msg = "Trying to unmount " + mountpoint;
       suid_helper_verb = "rdonly_umount";
       break;
     case kAlterRdOnlyKillUnmount:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      mountpoint = publisher_->settings_.transaction()
+                       .spool_area()
+                       .readonly_mnt();
       info_msg = "Trying to forcefully stop " + mountpoint;
       suid_helper_verb = "kill_cvmfs";
       break;
     case kAlterRdOnlyLazyUnmount:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      mountpoint = publisher_->settings_.transaction()
+                       .spool_area()
+                       .readonly_mnt();
       info_msg = "Trying to lazily unmount " + mountpoint;
       suid_helper_verb = "rdonly_lazy_umount";
       break;
@@ -314,8 +323,9 @@ void Publisher::ManagedNode::AlterMountpoint(
       suid_helper_verb = "rw_mount";
       break;
     case kAlterRdOnlyMount:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().readonly_mnt();
+      mountpoint = publisher_->settings_.transaction()
+                       .spool_area()
+                       .readonly_mnt();
       info_msg = "Trying to mount " + mountpoint;
       suid_helper_verb = "rdonly_mount";
       break;
@@ -325,14 +335,14 @@ void Publisher::ManagedNode::AlterMountpoint(
       suid_helper_verb = "open";
       break;
     case kAlterUnionLock:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().union_mnt();
+      mountpoint = publisher_->settings_.transaction().spool_area().union_mnt();
       info_msg = "Trying to remount " + mountpoint + " read-only";
       suid_helper_verb = "lock";
       break;
     case kAlterScratchWipe:
-      mountpoint =
-        publisher_->settings_.transaction().spool_area().scratch_dir();
+      mountpoint = publisher_->settings_.transaction()
+                       .spool_area()
+                       .scratch_dir();
       info_msg = "Trying to wipe out " + mountpoint + " (async cleanup)";
       suid_helper_verb = "clear_scratch_async";
       break;
@@ -351,7 +361,7 @@ void Publisher::ManagedNode::AlterMountpoint(
              info_msg.c_str());
     if (log_level & kLogStdout)
       LogCvmfs(kLogCvmfs, kLogStdout, "success");
-  } catch (const EPublish&) {
+  } catch (const EPublish &) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s... fail",
              info_msg.c_str());
     throw EPublish(info_msg + "... fail");
@@ -360,8 +370,9 @@ void Publisher::ManagedNode::AlterMountpoint(
 
 
 void Publisher::ManagedNode::SetRootHash(const shash::Any &hash) {
-  const std::string config_path =
-    publisher_->settings_.transaction().spool_area().client_lconfig();
+  const std::string config_path = publisher_->settings_.transaction()
+                                      .spool_area()
+                                      .client_lconfig();
   SetInConfig(config_path, "CVMFS_ROOT_HASH", hash.ToString());
 }
 

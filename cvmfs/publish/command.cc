@@ -37,14 +37,15 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
 
   string shortopts;
   struct option *longopts = reinterpret_cast<option *>(
-    smalloc((params.size() + 1) * sizeof(struct option)));
+      smalloc((params.size() + 1) * sizeof(struct option)));
   struct option lastopt;
   memset(&lastopt, 0, sizeof(lastopt));
   longopts[params.size()] = lastopt;
 
   for (unsigned i = 0; i < params.size(); ++i) {
     shortopts.push_back(params[i].short_key);
-    if (!params[i].is_switch) shortopts.push_back(':');
+    if (!params[i].is_switch)
+      shortopts.push_back(':');
 
     longopts[i].name = strdup(params[i].key.c_str());
     longopts[i].has_arg = params[i].is_switch ? no_argument : required_argument;
@@ -56,8 +57,8 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
   int c;
   opterr = 0;  // Don't print error messages in getopt
   optind = 2;  // Skip the command itself
-  while ((c = getopt_long(argc, argv, shortopts.c_str(), longopts, &idx)) != -1)
-  {
+  while ((c = getopt_long(argc, argv, shortopts.c_str(), longopts, &idx))
+         != -1) {
     bool found = false;
     for (unsigned i = 0; i < params.size(); ++i) {
       if (c == params[i].short_key) {
@@ -80,8 +81,9 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
       }
       free(longopts);
 
-      throw EPublish(GetName() + ": unrecognized parameter '" +
-                     argv[optind - 1] + "'", EPublish::kFailInvocation);
+      throw EPublish(
+          GetName() + ": unrecognized parameter '" + argv[optind - 1] + "'",
+          EPublish::kFailInvocation);
     }
   }
 
@@ -93,8 +95,8 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
   for (unsigned i = 0; i < params.size(); ++i) {
     if (!params[i].is_optional && !result.Has(params[i].key)) {
       throw EPublish(
-        GetName() + ": missing mandatory parameter '" + params[i].key + "'",
-        EPublish::kFailInvocation);
+          GetName() + ": missing mandatory parameter '" + params[i].key + "'",
+          EPublish::kFailInvocation);
     }
   }
 
@@ -103,8 +105,8 @@ Command::Options Command::ParseOptions(int argc, char **argv) {
   }
 
   if (result.plain_args().size() < GetMinPlainArgs()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Usage: %s %s %s",
-             progname().c_str(), GetName().c_str(), GetUsage().c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Usage: %s %s %s", progname().c_str(),
+             GetName().c_str(), GetUsage().c_str());
     throw EPublish(GetName() + ": missing argument", EPublish::kFailInvocation);
   }
 

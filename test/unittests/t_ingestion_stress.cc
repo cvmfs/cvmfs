@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <cassert>
 #include <cstdlib>
 #include <set>
@@ -15,6 +13,7 @@
 #include "c_mock_uploader.h"
 #include "crypto/hash.h"
 #include "file_chunk.h"
+#include "gtest/gtest.h"
 #include "ingestion/item_mem.h"
 #include "ingestion/pipeline.h"
 #include "testutil.h"
@@ -29,7 +28,7 @@ class T_IngestionStress : public FileSandbox {
   typedef std::vector<ExpectedHashString> ExpectedHashStrings;
 
   T_IngestionStress()
-    : FileSandbox(IngestionMockUploader::sandbox_path), uploader_(NULL) { }
+      : FileSandbox(IngestionMockUploader::sandbox_path), uploader_(NULL) { }
 
  protected:
   virtual void SetUp() {
@@ -44,13 +43,13 @@ class T_IngestionStress : public FileSandbox {
     delete uploader_;
   }
 
-  template <class VectorT>
+  template<class VectorT>
   void AppendVectorToVector(const VectorT &appendee, VectorT *vector) const {
     vector->insert(vector->end(), appendee.begin(), appendee.end());
   }
 
   ExpectedHashString GetEmptyFileBulkHash(
-    const shash::Suffix suffix = shash::kSuffixNone) const {
+      const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", suffix);
   }
 
@@ -225,12 +224,10 @@ class T_IngestionStress : public FileSandbox {
     return h;
   }
 
-  void TestProcessFile(
-    const std::string &file_path,
-    const ExpectedHashString &reference_hash,
-    const bool generate_legacy_bulk_hashes = true,
-    const bool use_chunking = true)
-  {
+  void TestProcessFile(const std::string &file_path,
+                       const ExpectedHashString &reference_hash,
+                       const bool generate_legacy_bulk_hashes = true,
+                       const bool use_chunking = true) {
     ExpectedHashStrings reference_hash_strings;
     reference_hash_strings.push_back(reference_hash);
     TestProcessFile(file_path,
@@ -239,12 +236,10 @@ class T_IngestionStress : public FileSandbox {
                     use_chunking);
   }
 
-  void TestProcessFile(
-    const std::string &file_path,
-    const ExpectedHashStrings &reference_hash_strings,
-    const bool generate_legacy_bulk_hashes = true,
-    const bool use_chunking = true)
-  {
+  void TestProcessFile(const std::string &file_path,
+                       const ExpectedHashStrings &reference_hash_strings,
+                       const bool generate_legacy_bulk_hashes = true,
+                       const bool use_chunking = true) {
     std::vector<std::string> file_paths;
     file_paths.push_back(file_path);
     TestProcessFiles(file_paths,
@@ -253,14 +248,12 @@ class T_IngestionStress : public FileSandbox {
                      use_chunking);
   }
 
-  void TestProcessFiles(
-     const std::vector<std::string> &file_paths,
-     const ExpectedHashStrings &reference_hash_strings,
-     const bool generate_legacy_bulk_hashes = true,
-     const bool use_chunking = true)
-  {
+  void TestProcessFiles(const std::vector<std::string> &file_paths,
+                        const ExpectedHashStrings &reference_hash_strings,
+                        const bool generate_legacy_bulk_hashes = true,
+                        const bool use_chunking = true) {
     IngestionPipeline pipeline(
-      uploader_, MockSpoolerDefinition(generate_legacy_bulk_hashes));
+        uploader_, MockSpoolerDefinition(generate_legacy_bulk_hashes));
     pipeline.Spawn();
 
     for (unsigned i = 0; i < file_paths.size(); ++i) {
@@ -271,33 +264,32 @@ class T_IngestionStress : public FileSandbox {
     CheckHashes(uploader_->results, reference_hash_strings);
   }
 
-  void CheckHash(
-    const IngestionMockUploader::Results &results,
-    const ExpectedHashString &expected_hash) const
-  {
+  void CheckHash(const IngestionMockUploader::Results &results,
+                 const ExpectedHashString &expected_hash) const {
     ExpectedHashStrings expected_hashes;
     expected_hashes.push_back(expected_hash);
     CheckHashes(results, expected_hashes);
   }
 
-  void CheckHashes(
-    const IngestionMockUploader::Results &results,
-    const ExpectedHashStrings &reference_hash_strings) const
-  {
+  void CheckHashes(const IngestionMockUploader::Results &results,
+                   const ExpectedHashStrings &reference_hash_strings) const {
     std::set<std::string> reference_set;
     std::set<std::string> result_set;
-    for (ExpectedHashStrings::const_iterator i = reference_hash_strings.begin(),
-         i_end = reference_hash_strings.end(); i != i_end; ++i)
-    {
+    for (ExpectedHashStrings::const_iterator
+             i = reference_hash_strings.begin(),
+             i_end = reference_hash_strings.end();
+         i != i_end;
+         ++i) {
       reference_set.insert(i->first);
     }
     for (IngestionMockUploader::Results::const_iterator i = results.begin(),
-         i_end = results.end(); i != i_end; ++i)
-    {
+                                                        i_end = results.end();
+         i != i_end;
+         ++i) {
       result_set.insert(i->computed_hash.ToString());
     }
     EXPECT_EQ(reference_set.size(), result_set.size())
-              << "number of generated chunks did not match";
+        << "number of generated chunks did not match";
 
     // convert hash strings into shash::Any structs
     typedef std::vector<std::pair<shash::Any, shash::Suffix> > ExpectedHashes;
@@ -306,7 +298,7 @@ class T_IngestionStress : public FileSandbox {
     ExpectedHashStrings::const_iterator iend = reference_hash_strings.end();
     for (; i != iend; ++i) {
       reference_hashes.push_back(std::make_pair(
-      shash::Any(shash::kSha1, shash::HexPtr(i->first)), i->second));
+          shash::Any(shash::kSha1, shash::HexPtr(i->first)), i->second));
     }
 
     // check if we can find the computed hashes in the expected hashes
@@ -320,7 +312,7 @@ class T_IngestionStress : public FileSandbox {
       for (; k != kend; ++k) {
         if (k->first == j->computed_hash) {
           EXPECT_EQ(k->second, j->computed_hash.suffix)
-                    << "hash suffix does not fit";
+              << "hash suffix does not fit";
           found = true;
           break;
         }
@@ -355,8 +347,8 @@ TEST_F(T_IngestionStress, ProcessSmallZeroFile) {
 TEST_F(T_IngestionStress, ProcessSmallFileForcedBulk) {
   // Only one chunk created, promoted to bulk chunk
   TestProcessFile(GetSmallFile(), GetSmallFileBulkHash(),
-                  false,  /* legacy bulk hash */
-                  true   /* chunking */);
+                  false, /* legacy bulk hash */
+                  true /* chunking */);
 }
 
 TEST_F(T_IngestionStress, ProcessBigFile) {
@@ -374,16 +366,15 @@ TEST_F(T_IngestionStress, ProcessBigZeroFile) {
 TEST_F(T_IngestionStress, ProcessBigFileForcedBulk) {
   // No chunking, hence bulk chunk must be created
   TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
-                  false,  /* legacy bulk hash */
-                  false   /* chunking */);
+                  false, /* legacy bulk hash */
+                  false /* chunking */);
 }
 
 TEST_F(T_IngestionStress, ProcessBigFileOnlyChunks) {
   // No bulk hash in the reference list
   ExpectedHashStrings hs = GetBigFileChunkHashes();
-  TestProcessFile(GetBigFile(), hs,
-                  false,  /* legacy bulk hash */
-                  true   /* chunking */);
+  TestProcessFile(GetBigFile(), hs, false, /* legacy bulk hash */
+                  true /* chunking */);
 }
 
 TEST_F(T_IngestionStress, ProcessHugeFileSlow) {
@@ -400,8 +391,8 @@ TEST_F(T_IngestionStress, ProcessHugeZeroFileSlow) {
 
 TEST_F(T_IngestionStress, ProcessBigFileWithoutChunks) {
   TestProcessFile(GetBigFile(), GetBigFileBulkHash(),
-                  true,  /* legacy bulk hash */
-                  false  /* chunking */);
+                  true, /* legacy bulk hash */
+                  false /* chunking */);
 }
 
 TEST_F(T_IngestionStress, ProcessMultipleFilesSlow) {
@@ -461,9 +452,8 @@ TEST_F(T_IngestionStress, ProcessMultipeFilesWithoutChunkingSlow) {
   pathes.push_back(GetBigFile());
   hs.push_back(GetBigFileBulkHash());
 
-  TestProcessFiles(pathes, hs,
-                   true,  /* legacy bulk */
-                   false  /* chunking */);
+  TestProcessFiles(pathes, hs, true, /* legacy bulk */
+                   false /* chunking */);
 }
 
 TEST_F(T_IngestionStress, ProcessMultipleFilesInSeparateWavesSlow) {
@@ -588,8 +578,8 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
   }
 
   uploader_->keep_results = false;
-  IngestionPipeline pipeline(
-    uploader_, MockSpoolerDefinition(false /* bulk chunks */));
+  IngestionPipeline pipeline(uploader_,
+                             MockSpoolerDefinition(false /* bulk chunks */));
 
   int N = 250000;
   pipeline.Spawn();
@@ -598,7 +588,7 @@ TEST_F(T_IngestionStress, RealWorldSlow) {
   // Process
   for (int i = 0; i < N; ++i) {
     MemoryIngestionSource *s = new MemoryIngestionSource(
-      StringifyInt(i), buffers[i % S], buffer_sizes[i % S]);
+        StringifyInt(i), buffers[i % S], buffer_sizes[i % S]);
     pipeline.Process(s, true /* allow_chunking */);
   }
   pipeline.WaitFor();

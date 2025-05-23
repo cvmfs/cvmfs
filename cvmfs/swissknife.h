@@ -54,10 +54,10 @@ class Parameter {
  protected:
   Parameter(const char key, const std::string &desc, const bool opt,
             const bool switch_only)
-      : key_(key),
-        description_(desc),
-        optional_(opt),
-        switch_only_(switch_only) {
+      : key_(key)
+      , description_(desc)
+      , optional_(opt)
+      , switch_only_(switch_only) {
     assert(!switch_only_ || optional_);  // switches are optional by definition
   }
 

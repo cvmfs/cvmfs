@@ -45,12 +45,12 @@ std::string GetField(std::string str, char delim, int idx) {
  * @param delim2 param value ends with this char
  * @return -1 if not found, otherwise value
  */
-int GetValue(std::string body, std::string param,
-              char delim1 = ':', char delim2 = ' ') {
-  for (unsigned int i = 0; body.size()-param.size() > i; i++) {
+int GetValue(std::string body, std::string param, char delim1 = ':',
+             char delim2 = ' ') {
+  for (unsigned int i = 0; body.size() - param.size() > i; i++) {
     unsigned int j = 0;
     for (j = 0; param.size() > j; j++) {
-      if (body.at(i+j) != param.at(j))
+      if (body.at(i + j) != param.at(j))
         break;
     }
     if (j == param.size()) {
@@ -86,12 +86,11 @@ int main() {
     // Wait for traffic
     FD_ZERO(&rfds);
     FD_SET(listen_sockfd, &rfds);
-    retval = select(listen_sockfd+1, &rfds, NULL, NULL, NULL);
+    retval = select(listen_sockfd + 1, &rfds, NULL, NULL, NULL);
     assert(retval > 0);
 
-    accept_sockfd = accept(listen_sockfd,
-                            (struct sockaddr *) &cli_addr,
-                            &clilen);
+    accept_sockfd = accept(
+        listen_sockfd, (struct sockaddr *)&cli_addr, &clilen);
     assert(accept_sockfd >= 0);
 
     // Get header
@@ -100,9 +99,10 @@ int main() {
     int nread = read(accept_sockfd, buf, 10000);
     buf[nread] = 0;
     char *occ = strstr(buf, "\r\n\r\n");
-    if (!occ) occ = strstr(buf, "\n\n");
+    if (!occ)
+      occ = strstr(buf, "\n\n");
     assert(occ);
-    req_header += std::string(buf, occ-buf);
+    req_header += std::string(buf, occ - buf);
 
     // Parse header
     std::string req_type = "";

@@ -6,7 +6,6 @@
 
 #include "swissknife_graft.h"
 
-
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -104,9 +103,8 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
   }
 
   // Zero-size chunks are not allowed; except if there is only one chunk
-  if (do_chunk && (chunk_offsets->back() == *file_size) &&
-      (chunk_offsets->size() > 1))
-  {
+  if (do_chunk && (chunk_offsets->back() == *file_size)
+      && (chunk_offsets->size() > 1)) {
     chunk_offsets->pop_back();
     chunk_checksums->pop_back();
   }
@@ -128,12 +126,12 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
   if (!output_file_.size()) {
     return true;
   }
-  std::string full_output_path = output_file_ + "/" +
-                                 (relative_path.size() ? relative_path : ".") +
-                                 "/" + dir_name;
-  std::string full_input_path = input_file_ + "/" +
-                                (relative_path.size() ? relative_path : ".") +
-                                "/" + dir_name;
+  std::string full_output_path = output_file_ + "/"
+                                 + (relative_path.size() ? relative_path : ".")
+                                 + "/" + dir_name;
+  std::string full_input_path = input_file_ + "/"
+                                + (relative_path.size() ? relative_path : ".")
+                                + "/" + dir_name;
   platform_stat64 sbuf;
   if (-1 == platform_stat(full_input_path.c_str(), &sbuf)) {
     return false;
@@ -143,31 +141,32 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
 
 void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
                                             const std::string &file_name) {
-  std::string full_input_path = input_file_ + "/" +
-                                (relative_path.size() ? relative_path : ".") +
-                                "/" + file_name;
+  std::string full_input_path = input_file_ + "/"
+                                + (relative_path.size() ? relative_path : ".")
+                                + "/" + file_name;
   std::string full_output_path;
   if (output_file_.size()) {
-    full_output_path = output_file_ + "/" +
-                       (relative_path.size() ? relative_path : ".") + "/" +
-                       file_name;
+    full_output_path = output_file_ + "/"
+                       + (relative_path.size() ? relative_path : ".") + "/"
+                       + file_name;
   }
   Publish(full_input_path, full_output_path, false, false);
 }
 
 int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   const std::string &input_file = *args.find('i')->second;
-  const std::string output_file =
-      (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
+  const std::string output_file = (args.find('o') == args.end())
+                                      ? ""
+                                      : *(args.find('o')->second);
   verbose_ = args.find('v') != args.end();
   generate_bulk_hash_ = args.find('b') != args.end();
   hash_alg_ = (args.find('a') == args.end())
                   ? shash::kSha1
                   : shash::ParseHashAlgorithm(*args.find('a')->second);
-  compression_alg_ =
-      (args.find('Z') == args.end())
-          ? zlib::kNoCompression
-          : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  compression_alg_ = (args.find('Z') == args.end())
+                         ? zlib::kNoCompression
+                         : zlib::ParseCompressionAlgorithm(
+                               *args.find('Z')->second);
 
   if (args.find('c') == args.end()) {
     chunk_size_ = kDefaultChunkSize;
@@ -182,9 +181,9 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   chunk_size_ *= 1024 * 1024;  // Convert to MB.
 
   platform_stat64 sbuf;
-  bool output_file_is_dir = output_file.size() &&
-                            (0 == platform_stat(output_file.c_str(), &sbuf)) &&
-                            S_ISDIR(sbuf.st_mode);
+  bool output_file_is_dir = output_file.size()
+                            && (0 == platform_stat(output_file.c_str(), &sbuf))
+                            && S_ISDIR(sbuf.st_mode);
   if (output_file_is_dir && (input_file == "-")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Output file (%s): Is a directory\n",
              output_file.c_str());
@@ -192,8 +191,8 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   }
 
   if (input_file != "-") {
-    bool input_file_is_dir = (0 == platform_stat(input_file.c_str(), &sbuf)) &&
-                             S_ISDIR(sbuf.st_mode);
+    bool input_file_is_dir = (0 == platform_stat(input_file.c_str(), &sbuf))
+                             && S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
         LogCvmfs(kLogCvmfs, kLogStderr,
@@ -250,9 +249,9 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   std::vector<shash::Any> chunk_checksums;
   zlib::Compressor *compressor = zlib::Compressor::Construct(compression_alg_);
 
-  bool retval =
-      ChecksumFdWithChunks(fd, compressor, &processed_size, &file_hash,
-                           &chunk_offsets, &chunk_checksums);
+  bool retval = ChecksumFdWithChunks(fd, compressor, &processed_size,
+                                     &file_hash, &chunk_offsets,
+                                     &chunk_checksums);
 
   if (!input_file_is_stdin) {
     close(fd);
@@ -284,10 +283,10 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     fd = 1;
   }
   const bool with_suffix = true;
-  std::string graft_contents =
-    "size=" + StringifyInt(processed_size) + "\n" +
-    "checksum=" + file_hash.ToString(with_suffix) + "\n" +
-    "compression=" + zlib::AlgorithmName(compression_alg_) + "\n";
+  std::string graft_contents = "size=" + StringifyInt(processed_size) + "\n"
+                               + "checksum=" + file_hash.ToString(with_suffix)
+                               + "\n" + "compression="
+                               + zlib::AlgorithmName(compression_alg_) + "\n";
   if (!chunk_offsets.empty()) {
     std::vector<std::string> chunk_off_str;
     chunk_off_str.reserve(chunk_offsets.size());
@@ -298,8 +297,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
       chunk_ck_str.push_back(chunk_checksums[idx].ToStringWithSuffix());
     }
     graft_contents += "chunk_offsets=" + JoinStrings(chunk_off_str, ",") + "\n";
-    graft_contents +=
-        "chunk_checksums=" + JoinStrings(chunk_ck_str, ",") + "\n";
+    graft_contents += "chunk_checksums=" + JoinStrings(chunk_ck_str, ",")
+                      + "\n";
   }
   size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
@@ -322,8 +321,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   } else {
     output_fname = output_file;
   }
-  fd =
-      open(output_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, input_file_mode);
+  fd = open(output_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY,
+            input_file_mode);
   if (fd < 0) {
     std::string errmsg = "Unable to open output file (" + output_file + ")";
     perror(errmsg.c_str());

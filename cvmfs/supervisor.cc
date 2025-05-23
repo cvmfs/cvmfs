@@ -8,9 +8,9 @@
 #include "util/platform.h"
 
 Supervisor::Supervisor(uint64_t max_retries, uint64_t interval_sec)
-    : max_retries_(max_retries), interval_(interval_sec) {}
+    : max_retries_(max_retries), interval_(interval_sec) { }
 
-Supervisor::~Supervisor() {}
+Supervisor::~Supervisor() { }
 
 bool Supervisor::Run() {
   uint64_t retries = 0;

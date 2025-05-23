@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <unistd.h>
 
 #include <cstdlib>
@@ -37,8 +36,8 @@ int UF_MockStreamHandle::instances = 0;
 class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
  public:
   explicit UF_MockUploader(const SpoolerDefinition &spooler_definition)
-      : AbstractMockUploader<UF_MockUploader>(spooler_definition),
-        initialize_called(false) {}
+      : AbstractMockUploader<UF_MockUploader>(spooler_definition)
+      , initialize_called(false) { }
 
   virtual std::string name() const { return "UFMock"; }
 
@@ -59,8 +58,8 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
   void StreamedUpload(upload::UploadStreamHandle *abstract_handle,
                       upload::AbstractUploader::UploadBuffer buffer,
                       const CallbackTN *callback = NULL) {
-    UF_MockStreamHandle *handle =
-        static_cast<UF_MockStreamHandle *>(abstract_handle);
+    UF_MockStreamHandle *handle = static_cast<UF_MockStreamHandle *>(
+        abstract_handle);
     handle->uploads++;
     last_buffer = buffer;
     Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
@@ -69,15 +68,15 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
                               const shash::Any &content_hash) {
-    UF_MockStreamHandle *handle =
-        static_cast<UF_MockStreamHandle *>(abstract_handle);
+    UF_MockStreamHandle *handle = static_cast<UF_MockStreamHandle *>(
+        abstract_handle);
     handle->commits++;
     const UF_MockStreamHandle::CallbackTN *callback = handle->commit_callback;
     delete handle;
     Respond(callback, UploaderResults(UploaderResults::kChunkCommit, 0));
   }
 
-  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
+  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0; }
 
  public:
   static upload::AbstractUploader::UploadBuffer last_buffer;
@@ -139,10 +138,10 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(0, buffer_upload_complete_callback_calls);
 
   unsigned char b1[1000];
-  uploader->ScheduleUpload(
-    handle,
-    AbstractUploader::UploadBuffer(1000, b1),
-    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
+  uploader->ScheduleUpload(handle,
+                           AbstractUploader::UploadBuffer(1000, b1),
+                           AbstractUploader::MakeCallback(
+                               &BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
 
@@ -150,10 +149,10 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(1, buffer_upload_complete_callback_calls);
 
   unsigned char b2[1000];
-  uploader->ScheduleUpload(
-    handle,
-    AbstractUploader::UploadBuffer(1000, b2),
-    AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Callbacks));
+  uploader->ScheduleUpload(handle,
+                           AbstractUploader::UploadBuffer(1000, b2),
+                           AbstractUploader::MakeCallback(
+                               &BufferUploadCompleteCallback_T_Callbacks));
 
   sleep(1);
 
@@ -222,9 +221,10 @@ TEST(T_UploadFacility, DataBlockBasicOrdering) {
 
   for (unsigned i = 0; i < 10; ++i) {
     uploader->ScheduleUpload(
-      handle,
-      AbstractUploader::UploadBuffer(sizes[i], buffers[i]),
-      AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Ordering));
+        handle,
+        AbstractUploader::UploadBuffer(sizes[i], buffers[i]),
+        AbstractUploader::MakeCallback(
+            &BufferUploadCompleteCallback_T_Ordering));
   }
 
   uploader->ScheduleCommit(handle, shash::Any());

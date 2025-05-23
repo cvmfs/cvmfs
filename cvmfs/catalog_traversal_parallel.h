@@ -30,19 +30,19 @@ template<class ObjectFetcherT>
 class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
  public:
   typedef CatalogTraversalBase<ObjectFetcherT> Base;
-  typedef ObjectFetcherT                      ObjectFetcherTN;
-  typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
-  typedef typename ObjectFetcherT::HistoryTN  HistoryTN;
-  typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
+  typedef ObjectFetcherT ObjectFetcherTN;
+  typedef typename ObjectFetcherT::CatalogTN CatalogTN;
+  typedef typename ObjectFetcherT::HistoryTN HistoryTN;
+  typedef CatalogTraversalData<CatalogTN> CallbackDataTN;
   typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
   typedef typename Base::Parameters Parameters;
   typedef typename Base::TraversalType TraversalType;
   typedef std::vector<shash::Any> HashList;
 
   explicit CatalogTraversalParallel(const Parameters &params)
-    : CatalogTraversalBase<ObjectFetcherT>(params)
-    , num_threads_(params.num_threads)
-    , serialize_callbacks_(params.serialize_callbacks) {
+      : CatalogTraversalBase<ObjectFetcherT>(params)
+      , num_threads_(params.num_threads)
+      , serialize_callbacks_(params.serialize_callbacks) {
     atomic_init32(&num_errors_);
     shash::Any null_hash;
     null_hash.SetNull();
@@ -61,15 +61,13 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
                         const shash::Any &hash,
                         const unsigned tree_level,
                         const uint64_t history_depth,
-                        CatalogTN *parent = NULL) :
-      CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
-                                                   history_depth, parent) {
+                        CatalogTN *parent = NULL)
+        : CatalogTraversal<ObjectFetcherT>::CatalogJob(path, hash, tree_level,
+                                                       history_depth, parent) {
       atomic_init32(&children_unprocessed);
     }
 
-    void WakeParents() {
-      this->NotifyListeners(0);
-    }
+    void WakeParents() { this->NotifyListeners(0); }
 
     atomic_int32 children_unprocessed;
   };
@@ -102,8 +100,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
                 const TraversalType type = Base::kBreadthFirst) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    if (this->no_repeat_history_ &&
-        catalogs_done_.Contains(root_catalog_hash)) {
+    if (this->no_repeat_history_
+        && catalogs_done_.Contains(root_catalog_hash)) {
       return true;
     }
     effective_traversal_type_ = type;
@@ -156,10 +154,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
    * @param root_catalog_hash  the entry point into the catalog traversal
    * @return                   true when catalogs were successfully traversed
    */
-  bool TraverseRevision(
-    const shash::Any &root_catalog_hash,
-    const TraversalType type = Base::kBreadthFirst)
-  {
+  bool TraverseRevision(const shash::Any &root_catalog_hash,
+                        const TraversalType type = Base::kBreadthFirst) {
     effective_history_depth_ = Parameters::kNoHistory;
     effective_timestamp_threshold_ = Parameters::kNoTimestampThreshold;
     bool result = Traverse(root_catalog_hash, type);
@@ -171,18 +167,19 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
  protected:
   static uint32_t hasher(const shash::Any &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+    return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
   }
 
   bool DoTraverse() {
     // Optimal number of threads is yet to be determined. The main event loop
     // contains a spin-lock, so it should not be more than number of cores.
-    threads_process_ = reinterpret_cast<pthread_t *>
-                        (smalloc(sizeof(pthread_t)*num_threads_));
+    threads_process_ = reinterpret_cast<pthread_t *>(
+        smalloc(sizeof(pthread_t) * num_threads_));
     for (unsigned int i = 0; i < num_threads_; ++i) {
-      int retval = pthread_create(&threads_process_[i], NULL,
-                                  MainProcessQueue, this);
-      if (retval != 0) PANIC(kLogStderr, "failed to create thread");
+      int retval = pthread_create(&threads_process_[i], NULL, MainProcessQueue,
+                                  this);
+      if (retval != 0)
+        PANIC(kLogStderr, "failed to create thread");
     }
 
     for (unsigned int i = 0; i < num_threads_; ++i) {
@@ -201,8 +198,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
   }
 
   static void *MainProcessQueue(void *data) {
-    CatalogTraversalParallel<ObjectFetcherT> *traversal =
-      reinterpret_cast<CatalogTraversalParallel<ObjectFetcherT> *>(data);
+    CatalogTraversalParallel<ObjectFetcherT> *traversal = reinterpret_cast<
+        CatalogTraversalParallel<ObjectFetcherT> *>(data);
     CatalogJob *current_job;
     while (true) {
       current_job = traversal->post_job_queue_.TryPopFront();
@@ -257,11 +254,11 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
     {
       MutexLockGuard m(&catalogs_lock_);
       if (effective_traversal_type_ == Base::kBreadthFirst) {
-        num_children = PushPreviousRevision(job) +
-                       PushNestedCatalogs(job, catalog_list);
+        num_children = PushPreviousRevision(job)
+                       + PushNestedCatalogs(job, catalog_list);
       } else {
-        num_children = PushNestedCatalogs(job, catalog_list) +
-                       PushPreviousRevision(job);
+        num_children = PushNestedCatalogs(job, catalog_list)
+                       + PushPreviousRevision(job);
         atomic_write32(&job->children_unprocessed, num_children);
       }
       if (!this->CloseCatalog(false, job)) {
@@ -272,8 +269,7 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
 
     // breadth-first: can post-process immediately
     // depth-first: no children -> can post-process immediately
-    if (effective_traversal_type_ == Base::kBreadthFirst ||
-        num_children == 0) {
+    if (effective_traversal_type_ == Base::kBreadthFirst || num_children == 0) {
       ProcessJobPost(job);
       return;
     }
@@ -290,8 +286,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       }
 
       CatalogJob *child;
-      if (!this->no_repeat_history_ ||
-          !catalogs_processing_.Lookup(i->hash, &child)) {
+      if (!this->no_repeat_history_
+          || !catalogs_processing_.Lookup(i->hash, &child)) {
         CatalogTN *parent = (this->no_close_) ? job->catalog : NULL;
         child = new CatalogJob(i->mountpoint.ToString(),
                                i->hash,
@@ -331,22 +327,22 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       return 0;
     }
 
-    if (this->no_repeat_history_ &&
-        catalogs_done_.Contains(previous_revision)) {
+    if (this->no_repeat_history_
+        && catalogs_done_.Contains(previous_revision)) {
       return 0;
     }
 
     CatalogJob *prev_job;
-    if (!this->no_repeat_history_ ||
-        !catalogs_processing_.Lookup(previous_revision, &prev_job)) {
-      prev_job =
-        new CatalogJob("", previous_revision, 0, job->history_depth + 1);
+    if (!this->no_repeat_history_
+        || !catalogs_processing_.Lookup(previous_revision, &prev_job)) {
+      prev_job = new CatalogJob("", previous_revision, 0,
+                                job->history_depth + 1);
       PushJobUnlocked(prev_job);
     }
 
     if (effective_traversal_type_ == Base::kDepthFirst) {
       prev_job->RegisterListener(&CatalogTraversalParallel::OnChildFinished,
-                              this, job);
+                                 this, job);
     }
     return 1;
   }
@@ -382,8 +378,8 @@ class CatalogTraversalParallel : public CatalogTraversalBase<ObjectFetcherT> {
       catalogs_processing_.Erase(job->hash);
       catalogs_done_.Insert(job->hash, true);
       // No more catalogs to process -> finish
-      if (catalogs_processing_.size() == 0 && pre_job_queue_.IsEmpty() &&
-          post_job_queue_.IsEmpty()) {
+      if (catalogs_processing_.size() == 0 && pre_job_queue_.IsEmpty()
+          && post_job_queue_.IsEmpty()) {
         NotifyFinished();
       }
     }

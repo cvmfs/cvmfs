@@ -4,12 +4,11 @@
 
 #include "kvstore.h"
 
-#include <unistd.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <algorithm>
 
@@ -24,7 +23,7 @@ namespace {
 static inline uint32_t hasher_any(const shash::Any &key) {
   // We'll just do the same thing as hasher_md5, since every hash is at
   // least as large.
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 }  // anonymous namespace
@@ -32,26 +31,24 @@ static inline uint32_t hasher_any(const shash::Any &key) {
 const double MemoryKvStore::kCompactThreshold = 0.8;
 
 
-MemoryKvStore::MemoryKvStore(
-  unsigned int cache_entries,
-  MemoryAllocator alloc,
-  unsigned alloc_size,
-  perf::StatisticsTemplate statistics)
-  : allocator_(alloc)
-  , used_bytes_(0)
-  , entry_count_(0)
-  , max_entries_(cache_entries)
-  , entries_(cache_entries, shash::Any(), hasher_any,
-             perf::StatisticsTemplate("lru", statistics))
-  , heap_(NULL)
-  , counters_(statistics)
-{
+MemoryKvStore::MemoryKvStore(unsigned int cache_entries,
+                             MemoryAllocator alloc,
+                             unsigned alloc_size,
+                             perf::StatisticsTemplate statistics)
+    : allocator_(alloc)
+    , used_bytes_(0)
+    , entry_count_(0)
+    , max_entries_(cache_entries)
+    , entries_(cache_entries, shash::Any(), hasher_any,
+               perf::StatisticsTemplate("lru", statistics))
+    , heap_(NULL)
+    , counters_(statistics) {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
   switch (alloc) {
     case kMallocHeap:
-      heap_ = new MallocHeap(alloc_size,
-          this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
+      heap_ = new MallocHeap(
+          alloc_size, this->MakeCallback(&MemoryKvStore::OnBlockMove, this));
       break;
     default:
       break;
@@ -105,14 +102,15 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
     switch (allocator_) {
       case kMallocLibc:
         tmp.address = malloc(tmp.size);
-        if (!tmp.address) return -errno;
+        if (!tmp.address)
+          return -errno;
         break;
       case kMallocHeap:
         assert(heap_);
         a.id = tmp.id;
-        tmp.address =
-          heap_->Allocate(tmp.size + sizeof(a), &a, sizeof(a));
-        if (!tmp.address) return -ENOMEM;
+        tmp.address = heap_->Allocate(tmp.size + sizeof(a), &a, sizeof(a));
+        if (!tmp.address)
+          return -ENOMEM;
         tmp.address = static_cast<char *>(tmp.address) + sizeof(a);
         break;
       default:
@@ -129,7 +127,8 @@ void MemoryKvStore::DoFree(MemoryBuffer *buf) {
   AllocHeader a;
 
   assert(buf);
-  if (!buf->address) return;
+  if (!buf->address)
+    return;
   switch (allocator_) {
     case kMallocLibc:
       free(buf->address);
@@ -152,7 +151,8 @@ bool MemoryKvStore::CompactMemory() {
       if (utilization < kCompactThreshold) {
         LogCvmfs(kLogKvStore, kLogDebug, "compacting heap");
         heap_->Compact();
-        if (heap_->utilization() > utilization) return true;
+        if (heap_->utilization() > utilization)
+          return true;
       }
       return false;
     default:
@@ -226,19 +226,16 @@ bool MemoryKvStore::Unref(const shash::Any &id) {
              id.ToString().c_str(), mem.refcount);
     return true;
   } else {
-    LogCvmfs(kLogKvStore, kLogDebug, "miss %s on Unref",
-             id.ToString().c_str());
+    LogCvmfs(kLogKvStore, kLogDebug, "miss %s on Unref", id.ToString().c_str());
     return false;
   }
 }
 
 
-int64_t MemoryKvStore::Read(
-  const shash::Any &id,
-  void *buf,
-  size_t size,
-  size_t offset
-) {
+int64_t MemoryKvStore::Read(const shash::Any &id,
+                            void *buf,
+                            size_t size,
+                            size_t offset) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_read);
   ReadLockGuard guard(rwlock_);
@@ -304,7 +301,7 @@ int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   }
   if (DoMalloc(&mem) < 0) {
     LogCvmfs(kLogKvStore, kLogDebug, "failed to allocate %s",
-      buf.id.ToString().c_str());
+             buf.id.ToString().c_str());
     return -EIO;
   }
   assert(SSIZE_MAX - mem.size > used_bytes_);
@@ -363,7 +360,8 @@ bool MemoryKvStore::ShrinkTo(size_t size) {
   LogCvmfs(kLogKvStore, kLogDebug, "shrinking to %zu B", size);
   entries_.FilterBegin();
   while (entries_.FilterNext()) {
-    if (used_bytes_ <= size) break;
+    if (used_bytes_ <= size)
+      break;
     entries_.FilterGet(&key, &buf);
     if (buf.refcount > 0) {
       LogCvmfs(kLogKvStore, kLogDebug, "skip %s, nonzero refcount",

@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <stdint.h>
 
 #include <string>
@@ -16,8 +15,7 @@ namespace publish {
 
 class T_Settings : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
 };

@@ -47,8 +47,7 @@ static void Usage(int output_dest) {
 
 
 static void AddMountOption(const string &option,
-                           vector<string> *mount_options)
-{
+                           vector<string> *mount_options) {
   mount_options->push_back(option);
 }
 
@@ -71,10 +70,11 @@ static string MkFqrn(const string &repository) {
 #if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
 static bool IsFuseTInstalled() {
   return true;
-  string fuseTComponentsPaths[] = { "/usr/local/bin/go-nfsv4", 
-                                          "/usr/local/lib/libfuse-t.dylib",
-                                           "/usr/local/lib/libfuse-t.a" };
-  const int pathsNumber = sizeof(fuseTComponentsPaths) / sizeof(fuseTComponentsPaths[0]);
+  string fuseTComponentsPaths[] = {"/usr/local/bin/go-nfsv4",
+                                   "/usr/local/lib/libfuse-t.dylib",
+                                   "/usr/local/lib/libfuse-t.a"};
+  const int pathsNumber = sizeof(fuseTComponentsPaths)
+                          / sizeof(fuseTComponentsPaths[0]);
   platform_stat64 info;
   for (int idx = 0; idx < pathsNumber; ++idx) {
     bzero(&info, sizeof(platform_stat64));
@@ -91,15 +91,16 @@ static bool CheckFuse() {
 #if defined(__APPLE__) && !defined(USE_MACFUSE_KEXT)
   bool is_fuse_t_installed = IsFuseTInstalled();
   if (!is_fuse_t_installed) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "FUSE-T installation check failed. FUSE not loaded"); 
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "FUSE-T installation check failed. FUSE not loaded");
   }
   return is_fuse_t_installed;
-#else 
+#else
   string fuse_device;
   int retval;
 #ifdef __APPLE__
   fuse_device = "/dev/macfuse0";
-#else 
+#else
   fuse_device = "/dev/fuse";
 #endif
   platform_stat64 info;
@@ -115,12 +116,11 @@ static bool CheckFuse() {
 
 static bool CheckStrictMount(const string &fqrn) {
   string param_strict_mount;
-  if (options_manager_.GetValue("CVMFS_STRICT_MOUNT", &param_strict_mount) &&
-      options_manager_.IsOn(param_strict_mount))
-  {
+  if (options_manager_.GetValue("CVMFS_STRICT_MOUNT", &param_strict_mount)
+      && options_manager_.IsOn(param_strict_mount)) {
     string repository_list;
-    bool retval =
-      options_manager_.GetValue("CVMFS_REPOSITORIES", &repository_list);
+    bool retval = options_manager_.GetValue("CVMFS_REPOSITORIES",
+                                            &repository_list);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_REPOSITORIES missing");
       return false;
@@ -131,12 +131,14 @@ static bool CheckStrictMount(const string &fqrn) {
         return true;
     }
     string config_repository;
-    retval =
-      options_manager_.GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
+    retval = options_manager_.GetValue("CVMFS_CONFIG_REPOSITORY",
+                                       &config_repository);
     if (retval && (config_repository == fqrn))
       return true;
-    LogCvmfs(kLogCvmfs, kLogStderr, "Not allowed to mount %s, "
-             "add it to CVMFS_REPOSITORIES", fqrn.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "Not allowed to mount %s, "
+             "add it to CVMFS_REPOSITORIES",
+             fqrn.c_str());
     return false;
   }
   return true;
@@ -176,9 +178,8 @@ static bool CheckConcurrentMount(const string &fqrn,
   return true;
 }
 
-static int GetExistingFuseFd(
-  const string &fqrn, const string &workspace, uid_t cvmfs_uid)
-{
+static int GetExistingFuseFd(const string &fqrn, const string &workspace,
+                             uid_t cvmfs_uid) {
   // Try connecting to cvmfs_io socket
   int talk_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (talk_fd < 0)
@@ -192,9 +193,8 @@ static int GetExistingFuseFd(
   }
   std::string recv_sock_path = recv_sock_dir + "/sock";
   int recv_sock_fd = MakeSocket(recv_sock_path, 0660);
-  if ((recv_sock_fd < 0) ||
-      (chown(recv_sock_path.c_str(), cvmfs_uid, getegid()) != 0))
-  {
+  if ((recv_sock_fd < 0)
+      || (chown(recv_sock_path.c_str(), cvmfs_uid, getegid()) != 0)) {
     if (recv_sock_fd >= 0)
       close(recv_sock_fd);
     close(talk_fd);
@@ -218,8 +218,8 @@ static int GetExistingFuseFd(
   if (result == "OK") {
     struct sockaddr_un addr;
     unsigned int len = sizeof(addr);
-    int con_fd =
-      accept(recv_sock_fd, reinterpret_cast<struct sockaddr *>(&addr), &len);
+    int con_fd = accept(recv_sock_fd,
+                        reinterpret_cast<struct sockaddr *>(&addr), &len);
     fuse_fd = RecvFdFromSocket(con_fd);
     close(con_fd);
   }
@@ -244,9 +244,8 @@ static bool GetCacheDir(const string &fqrn, string *cachedir) {
     return false;
 
   *cachedir = MakeCanonicalPath(param);
-  if (options_manager_.GetValue("CVMFS_SHARED_CACHE", &param) &&
-      options_manager_.IsOn(param))
-  {
+  if (options_manager_.GetValue("CVMFS_SHARED_CACHE", &param)
+      && options_manager_.IsOn(param)) {
     *cachedir = *cachedir + "/shared";
   } else {
     *cachedir = *cachedir + "/" + fqrn;
@@ -326,7 +325,7 @@ static std::string GetCvmfsBinary() {
 #endif
 
   // TODO(reneme): C++11 range based for loop
-        vector<string>::const_iterator i    = paths.begin();
+  vector<string>::const_iterator i = paths.begin();
   const vector<string>::const_iterator iend = paths.end();
   for (; i != iend; ++i) {
     const std::string cvmfs2 = *i + "/cvmfs2";
@@ -340,12 +339,11 @@ static std::string GetCvmfsBinary() {
 }
 
 static int AttachMount(const std::string &mountpoint, const std::string &fqrn,
-                       int fuse_fd)
-{
+                       int fuse_fd) {
 #ifdef __APPLE__
-  (void) mountpoint;
-  (void) fqrn;
-  (void) fuse_fd;
+  (void)mountpoint;
+  (void)fqrn;
+  (void)fuse_fd;
   return 1;
 #else
   platform_stat64 info;
@@ -355,8 +353,8 @@ static int AttachMount(const std::string &mountpoint, const std::string &fqrn,
 
   char mntopt[100];
   snprintf(mntopt, sizeof(mntopt),
-           "ro,fd=%i,rootmode=%o,user_id=%d,group_id=%d",
-           fuse_fd, info.st_mode & S_IFMT, geteuid(), getegid());
+           "ro,fd=%i,rootmode=%o,user_id=%d,group_id=%d", fuse_fd,
+           info.st_mode & S_IFMT, geteuid(), getegid());
   // TODO(jblomer): remove NOSUID according to options
   retval = mount("cvmfs2", mountpoint.c_str(), "fuse",
                  MS_NODEV | MS_RDONLY | MS_NOSUID, mntopt);
@@ -387,7 +385,8 @@ int main(int argc, char **argv) {
         dry_run = true;
         break;
       case 'n':
-        LogCvmfs(kLogCvmfs, kLogStdout, "Note: fusermount _does_ modify "
+        LogCvmfs(kLogCvmfs, kLogStdout,
+                 "Note: fusermount _does_ modify "
                  "/etc/mtab in case it is writable.");
         // Fall through
       case 'v':
@@ -408,7 +407,7 @@ int main(int argc, char **argv) {
         return 1;
     }
   }
-  if (optind+2 != argc) {
+  if (optind + 2 != argc) {
     Usage(kLogStderr);
     return 1;
   }
@@ -423,12 +422,12 @@ int main(int argc, char **argv) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Invalid repository: %s", device.c_str());
     return 1;
   }
-  string mountpoint = argv[optind+1];
+  string mountpoint = argv[optind + 1];
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
   options_manager_.SwitchTemplateManager(
-    new DefaultOptionsTemplateManager(fqrn));
+      new DefaultOptionsTemplateManager(fqrn));
   options_manager_.ParseDefault(fqrn);
 
   string optarg;
@@ -450,19 +449,25 @@ int main(int argc, char **argv) {
   string workspace;
   // Environment checks
   retval = WaitForReload(mountpoint);
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
   retval = GetWorkspace(fqrn, &workspace);
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
   retval = GetCacheDir(fqrn, &cachedir);
   dedicated_cachedir = (retval && (cachedir != workspace));
   retval = GetCvmfsUser(&cvmfs_user);
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
   retval = CheckFuse();
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
   retval = CheckStrictMount(fqrn);
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
   retval = CheckProxy();
-  if (!retval) return 1;
+  if (!retval)
+    return 1;
 
   // Retrieve cvmfs uid/gid and fuse gid if exists
   uid_t uid_cvmfs;
@@ -546,8 +551,8 @@ int main(int argc, char **argv) {
     sysret = chown(cachedir.c_str(), uid_cvmfs, getegid());
     if (sysret != 0) {
       LogCvmfs(kLogCvmfs, kLogStderr,
-               "Failed to transfer ownership of %s to %s",
-               cachedir.c_str(), cvmfs_user.c_str());
+               "Failed to transfer ownership of %s to %s", cachedir.c_str(),
+               cvmfs_user.c_str());
       return 1;
     }
   }
@@ -626,8 +631,8 @@ int main(int argc, char **argv) {
 
   // Dry run early exit
   if (dry_run) {
-    string cmd = cvmfs_binary + " -o " + JoinStrings(mount_options, ",") +
-                 " " + fqrn + " " + mountpoint;
+    string cmd = cvmfs_binary + " -o " + JoinStrings(mount_options, ",") + " "
+                 + fqrn + " " + mountpoint;
     if (has_fuse_group) {
       cmd = "sg fuse -c \"" + cmd + "\"";
     }
@@ -639,7 +644,8 @@ int main(int argc, char **argv) {
   if (has_fuse_group) {
     retval = AddGroup2Persona(gid_fuse);
     if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to add fuse to "
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "Failed to add fuse to "
                " the list of supplementary groups");
       return 1;
     }
@@ -653,8 +659,8 @@ int main(int argc, char **argv) {
   cvmfs_args.push_back(JoinStrings(mount_options, ","));
   cvmfs_args.push_back(fqrn);
   cvmfs_args.push_back(mountpoint);
-  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr,
-                         cvmfs_binary, cvmfs_args, false, &pid_cvmfs);
+  retval = ExecuteBinary(&fd_stdin, &fd_stdout, &fd_stderr, cvmfs_binary,
+                         cvmfs_args, false, &pid_cvmfs);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to launch %s",
              cvmfs_binary.c_str());
@@ -672,8 +678,10 @@ int main(int argc, char **argv) {
 
   do {
     FD_ZERO(&readfds);
-    if (stdout_open) FD_SET(fd_stdout, &readfds);
-    if (stderr_open) FD_SET(fd_stderr, &readfds);
+    if (stdout_open)
+      FD_SET(fd_stdout, &readfds);
+    if (stderr_open)
+      FD_SET(fd_stderr, &readfds);
 
     struct timeval timeout;
     timeout.tv_sec = 0;

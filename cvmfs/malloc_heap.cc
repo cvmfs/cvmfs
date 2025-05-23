@@ -13,11 +13,7 @@
 
 using namespace std;  // NOLINT
 
-void *MallocHeap::Allocate(
-  uint64_t size,
-  void *header,
-  unsigned header_size)
-{
+void *MallocHeap::Allocate(uint64_t size, void *header, unsigned header_size) {
   assert(size > 0);
   assert(header_size <= size);
   uint64_t rounded_size = RoundUp8(size);
@@ -57,8 +53,8 @@ void MallocHeap::Compact() {
         // new free tag at the end of the moved block
         int64_t free_space = current_tag->size;
         current_tag->size = next_tag->size;
-        memmove(current_tag->GetBlock(),
-                next_tag->GetBlock(), next_tag->GetSize());
+        memmove(current_tag->GetBlock(), next_tag->GetBlock(),
+                next_tag->GetSize());
         (*callback_ptr_)(BlockPtr(current_tag->GetBlock()));
         next_tag = current_tag->JumpToNext();
         next_tag->size = free_space;
@@ -111,12 +107,11 @@ uint64_t MallocHeap::GetSize(void *block) {
 
 
 MallocHeap::MallocHeap(uint64_t capacity, CallbackPtr callback_ptr)
-  : callback_ptr_(callback_ptr)
-  , capacity_(capacity)
-  , gauge_(0)
-  , stored_(0)
-  , num_blocks_(0)
-{
+    : callback_ptr_(callback_ptr)
+    , capacity_(capacity)
+    , gauge_(0)
+    , stored_(0)
+    , num_blocks_(0) {
   assert(capacity_ > kMinCapacity);
   // Ensure 8-byte alignment
   assert((capacity_ % 8) == 0);
@@ -125,6 +120,4 @@ MallocHeap::MallocHeap(uint64_t capacity, CallbackPtr callback_ptr)
 }
 
 
-MallocHeap::~MallocHeap() {
-  sxunmap(heap_, capacity_);
-}
+MallocHeap::~MallocHeap() { sxunmap(heap_, capacity_); }

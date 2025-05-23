@@ -9,8 +9,6 @@
 #ifndef CVMFS_SYNC_UNION_TARBALL_H_
 #define CVMFS_SYNC_UNION_TARBALL_H_
 
-#include "sync_union.h"
-
 #include <pthread.h>
 
 #include <list>
@@ -19,6 +17,7 @@
 #include <string>
 
 #include "duplex_libarchive.h"
+#include "sync_union.h"
 #include "util/concurrency.h"
 
 namespace publish {
@@ -35,7 +34,7 @@ class SyncUnionTarball : public SyncUnion {
                    const gid_t gid,
                    const std::string &to_delete,
                    const bool create_catalog_on_root,
-                   const std::string &path_delimiter=":");
+                   const std::string &path_delimiter = ":");
 
   ~SyncUnionTarball();
 
@@ -70,7 +69,7 @@ class SyncUnionTarball : public SyncUnion {
   const gid_t gid_;
   const std::string to_delete_;  ///< entity to delete before to extract the tar
   const bool create_catalog_on_root_;
-  const std::string path_delimiter_; ///< delimiter used to split paths
+  const std::string path_delimiter_;  ///< delimiter used to split paths
   std::set<std::string>
       know_directories_;  ///< directory that we know already exist
 

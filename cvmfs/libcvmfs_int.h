@@ -45,11 +45,11 @@ class Statistics;
 }
 
 namespace cvmfs {
-extern pid_t         pid_;
-extern std::string  *repository_name_;
-extern bool          foreground_;
+extern pid_t pid_;
+extern std::string *repository_name_;
+extern bool foreground_;
 class Fetcher;
-}
+}  // namespace cvmfs
 
 struct cvmfs_stat_t;
 
@@ -62,7 +62,7 @@ class LibGlobals : SingleCopy {
  public:
   static loader::Failures Initialize(OptionsManager *options_mgr);
   static void CleanupInstance();
-  static LibGlobals* GetInstance();
+  static LibGlobals *GetInstance();
 
   FileSystem *file_system() { return file_system_; }
   void set_options_mgr(OptionsManager *value) { options_mgr_ = value; }
@@ -130,16 +130,16 @@ class LibContext : SingleCopy {
   LibContext();
   FileSystem *file_system() { return LibGlobals::GetInstance()->file_system(); }
 
-  void AppendStringToList(char const   *str,
-                          char       ***buf,
-                          size_t       *listlen,
-                          size_t       *buflen);
-  void AppendStatToList(const cvmfs_stat_t   st,
-                        cvmfs_stat_t       **buf,
-                        size_t              *listlen,
-                        size_t              *buflen);
-  bool GetDirentForPath(const PathString         &path,
-                        catalog::DirectoryEntry  *dirent);
+  void AppendStringToList(char const *str,
+                          char ***buf,
+                          size_t *listlen,
+                          size_t *buflen);
+  void AppendStatToList(const cvmfs_stat_t st,
+                        cvmfs_stat_t **buf,
+                        size_t *listlen,
+                        size_t *buflen);
+  bool GetDirentForPath(const PathString &path,
+                        catalog::DirectoryEntry *dirent);
   void CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
                            struct cvmfs_attr *attr);
 

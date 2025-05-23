@@ -19,14 +19,12 @@ class TaskCompress : public TubeConsumer<BlockItem> {
  public:
   static const unsigned kCompressedBlockSize = kPageSize * 2;
 
-  TaskCompress(
-    Tube<BlockItem> *tube_in,
-    TubeGroup<BlockItem> *tubes_out,
-    ItemAllocator *allocator)
-    : TubeConsumer<BlockItem>(tube_in)
-    , tubes_out_(tubes_out)
-    , allocator_(allocator)
-  {
+  TaskCompress(Tube<BlockItem> *tube_in,
+               TubeGroup<BlockItem> *tubes_out,
+               ItemAllocator *allocator)
+      : TubeConsumer<BlockItem>(tube_in)
+      , tubes_out_(tubes_out)
+      , allocator_(allocator) {
     tag_map_.Init(16, -1, hasher_int64t);
   }
 

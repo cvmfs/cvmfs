@@ -2,18 +2,16 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <cstdlib>
 
+#include "gtest/gtest.h"
 #include "options.h"
-#include "util/file_guard.h"
-#include "util/posix.h"
-#include "util/string.h"
-
 #include "statistics.h"
 #include "telemetry_aggregator.h"
 #include "telemetry_aggregator_influx.h"
+#include "util/file_guard.h"
+#include "util/posix.h"
+#include "util/string.h"
 
 using namespace std;  // NOLINT
 
@@ -47,10 +45,10 @@ class T_TelemetryAggregator : public ::testing::Test {
 
   /**
    * Remove elements from vector that just consist of whitespace
-  */
+   */
   void RemoveWhitespace(std::vector<std::string> *vec) {
     for (std::vector<std::string>::iterator itr = vec->begin();
-                                          itr != vec->end();) {
+         itr != vec->end();) {
       if (Trim(*itr).size() < 1) {
         itr = vec->erase(itr);
       } else {
@@ -69,11 +67,8 @@ class T_TelemetryAggregator : public ::testing::Test {
 
 TEST_F(T_TelemetryAggregator, EmptyCounters) {
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
-                                                   telemetry_send_rate_sec,
-                                                   &options_manager_,
-                                                   NULL,
-                                                   fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
@@ -99,11 +94,8 @@ TEST_F(T_TelemetryAggregator, EmptyCounters) {
 TEST_F(T_TelemetryAggregator, FailCreate) {
   int telemetry_send_rate_sec = 10;
   options_manager_.UnsetValue("CVMFS_INFLUX_HOST");
-  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
-                                                   telemetry_send_rate_sec,
-                                                   &options_manager_,
-                                                   NULL,
-                                                   fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
   EXPECT_TRUE(telemetry_influx.is_zombie_);
 }
 
@@ -112,11 +104,8 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
-                                                   telemetry_send_rate_sec,
-                                                   &options_manager_,
-                                                   NULL,
-                                                   fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
@@ -124,7 +113,7 @@ TEST_F(T_TelemetryAggregator, ExtraFields_Tags) {
   string payload = telemetry_influx.MakePayload();
 
 
-  string payload_header = "influx_test_absolute,repo=" + fqrn_+ ",test_tag=1";
+  string payload_header = "influx_test_absolute,repo=" + fqrn_ + ",test_tag=1";
   string payload_fields = "test_field=5";
   // fields are empty because counters are 0
 
@@ -146,11 +135,8 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   options_manager_.SetValue("CVMFS_INFLUX_EXTRA_FIELDS", "test_field=5");
 
   int telemetry_send_rate_sec = 10;
-  perf::TelemetryAggregatorInflux telemetry_influx(&statistics_,
-                                                   telemetry_send_rate_sec,
-                                                   &options_manager_,
-                                                   NULL,
-                                                   fqrn_);
+  perf::TelemetryAggregatorInflux telemetry_influx(
+      &statistics_, telemetry_send_rate_sec, &options_manager_, NULL, fqrn_);
   EXPECT_FALSE(telemetry_influx.is_zombie_);
   statistics_.SnapshotCounters(&telemetry_influx.counters_,
                                &telemetry_influx.timestamp_);
@@ -158,7 +144,7 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   string payload = telemetry_influx.MakePayload();
 
 
-  string payload_header = "influx_test_absolute,repo=" + fqrn_+ ",test_tag=1";
+  string payload_header = "influx_test_absolute,repo=" + fqrn_ + ",test_tag=1";
   string payload_fields = "test_field=5";
   // fields are empty because counters are 0
 
@@ -199,11 +185,11 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   // DELTA VALUES
   string delta_payload_header = "influx_test_delta,repo=" + fqrn_
                                 + ",test_tag=1";
-  string delta_payload_fields ="test.c1=1,test.c3=10";
+  string delta_payload_fields = "test.c1=1,test.c3=10";
 
   string delta_payload = telemetry_influx.MakeDeltaPayload();
-  std::vector<std::string> delta_payload_split
-                                              = SplitString(delta_payload, ' ');
+  std::vector<std::string> delta_payload_split = SplitString(delta_payload,
+                                                             ' ');
 
   EXPECT_EQ(delta_payload_split.size(), 3u);
   EXPECT_STREQ(delta_payload_header.c_str(), delta_payload_split[0].c_str());
@@ -232,8 +218,8 @@ TEST_F(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags) {
   EXPECT_NO_FATAL_FAILURE(String2Uint64(payload_split[2]));
 
   // DELTA VALUES
-  delta_payload_header = "influx_test_delta,repo=" + fqrn_+ ",test_tag=1";
-  delta_payload_fields ="test.c1=0,test.c2=1,test.c3=5";
+  delta_payload_header = "influx_test_delta,repo=" + fqrn_ + ",test_tag=1";
+  delta_payload_fields = "test.c1=0,test.c2=1,test.c3=5";
 
   delta_payload = telemetry_influx.MakeDeltaPayload();
   delta_payload_split = SplitString(delta_payload, ' ');

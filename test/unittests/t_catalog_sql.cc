@@ -13,15 +13,15 @@ using namespace std;  // NOLINT
 
 class T_CatalogSql : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 };
 
 static void RevertToRevision6(catalog::CatalogDatabase *db) {
   string table_sql;
   string indexes_sql;
-  sqlite::Sql sql_schema(db->sqlite_db(),
-    "SELECT sql FROM sqlite_master WHERE tbl_name='catalog';");
+  sqlite::Sql sql_schema(
+      db->sqlite_db(),
+      "SELECT sql FROM sqlite_master WHERE tbl_name='catalog';");
   ASSERT_TRUE(sql_schema.FetchRow());
   table_sql = sql_schema.RetrieveString(0);
   while (sql_schema.FetchRow()) {
@@ -37,56 +37,78 @@ static void RevertToRevision6(catalog::CatalogDatabase *db) {
 
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DROP TABLE catalog;").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "ALTER TABLE catalog_r1 RENAME TO catalog;").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(), "ALTER TABLE catalog_r1 RENAME TO catalog;")
+          .Execute());
   if (!indexes_sql.empty()) {
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
   }
 
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=6 WHERE key='schema_revision';").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=6 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision5(catalog::CatalogDatabase *db) {
   RevertToRevision6(db);
 
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=5 WHERE key='schema_revision';").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=5 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision4(catalog::CatalogDatabase *db) {
   RevertToRevision5(db);
 
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='self_special';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='subtree_special';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=4 WHERE key='schema_revision';").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "DELETE FROM statistics WHERE counter='self_special';")
+          .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "DELETE FROM statistics WHERE counter='subtree_special';")
+          .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=4 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision3(catalog::CatalogDatabase *db) {
   RevertToRevision4(db);
 
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DROP TABLE bind_mountpoints;").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=3 WHERE key='schema_revision';").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(), "DROP TABLE bind_mountpoints;").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=3 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision2(catalog::CatalogDatabase *db) {
   RevertToRevision3(db);
 
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='self_external';").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "DELETE FROM statistics WHERE counter='self_external';")
+          .Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
-    "counter='self_external_file_size';").Execute());
+                                           "counter='self_external_file_size';")
+                  .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "DELETE FROM statistics WHERE counter='subtree_external';")
+          .Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='subtree_external';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
-    "counter='subtree_external_file_size';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=2 WHERE key='schema_revision';").Execute());
+                          "DELETE FROM statistics WHERE "
+                          "counter='subtree_external_file_size';")
+                  .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=2 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision1(catalog::CatalogDatabase *db) {
@@ -94,8 +116,9 @@ static void RevertToRevision1(catalog::CatalogDatabase *db) {
 
   string table_sql;
   string indexes_sql;
-  sqlite::Sql sql_schema(db->sqlite_db(),
-    "SELECT sql FROM sqlite_master WHERE tbl_name='catalog';");
+  sqlite::Sql sql_schema(
+      db->sqlite_db(),
+      "SELECT sql FROM sqlite_master WHERE tbl_name='catalog';");
   ASSERT_TRUE(sql_schema.FetchRow());
   table_sql = sql_schema.RetrieveString(0);
   while (sql_schema.FetchRow()) {
@@ -111,17 +134,23 @@ static void RevertToRevision1(catalog::CatalogDatabase *db) {
 
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DROP TABLE catalog;").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "ALTER TABLE catalog_r1 RENAME TO catalog;").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(), "ALTER TABLE catalog_r1 RENAME TO catalog;")
+          .Execute());
   if (!indexes_sql.empty()) {
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
   }
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='self_xattr';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='subtree_xattr';").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "UPDATE properties SET value=1 WHERE key='schema_revision';").Execute());
+                          "DELETE FROM statistics WHERE counter='self_xattr';")
+                  .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "DELETE FROM statistics WHERE counter='subtree_xattr';")
+          .Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "UPDATE properties SET value=1 WHERE key='schema_revision';")
+          .Execute());
 }
 
 static void RevertToRevision0(catalog::CatalogDatabase *db) {
@@ -129,8 +158,9 @@ static void RevertToRevision0(catalog::CatalogDatabase *db) {
 
   string table_sql;
   string indexes_sql;
-  sqlite::Sql sql_schema(db->sqlite_db(),
-    "SELECT sql FROM sqlite_master WHERE tbl_name='nested_catalogs';");
+  sqlite::Sql sql_schema(
+      db->sqlite_db(),
+      "SELECT sql FROM sqlite_master WHERE tbl_name='nested_catalogs';");
   ASSERT_TRUE(sql_schema.FetchRow());
   table_sql = sql_schema.RetrieveString(0);
   while (sql_schema.FetchRow()) {
@@ -145,15 +175,18 @@ static void RevertToRevision0(catalog::CatalogDatabase *db) {
                             "CREATE TABLE nested_catalogs_r0 ");
 
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), table_sql_r1).Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DROP TABLE nested_catalogs;").Execute());
-  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "ALTER TABLE nested_catalogs_r0 RENAME TO nested_catalogs;").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(), "DROP TABLE nested_catalogs;").Execute());
+  ASSERT_TRUE(
+      sqlite::Sql(db->sqlite_db(),
+                  "ALTER TABLE nested_catalogs_r0 RENAME TO nested_catalogs;")
+          .Execute());
   if (!indexes_sql.empty()) {
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
   }
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM properties WHERE key='schema_revision';").Execute());
+                          "DELETE FROM properties WHERE key='schema_revision';")
+                  .Execute());
 }
 
 
@@ -166,8 +199,8 @@ TEST_F(T_CatalogSql, SchemaMigration) {
 
   // Revision 1 --> 7
   {
-    UniquePtr<catalog::CatalogDatabase>
-      db(catalog::CatalogDatabase::Create(path));
+    UniquePtr<catalog::CatalogDatabase> db(
+        catalog::CatalogDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
     catalog::Counters counters;
     EXPECT_TRUE(counters.InsertIntoDatabase(*db));
@@ -175,32 +208,35 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   }
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
-      path, catalog::CatalogDatabase::kOpenReadWrite));
+        path, catalog::CatalogDatabase::kOpenReadWrite));
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog;");
     ASSERT_TRUE(sql1.FetchRow());
     EXPECT_EQ(0, sql1.RetrieveInt(0));
-    sqlite::Sql sql2(db->sqlite_db(),
-      "SELECT value FROM properties WHERE key='schema_revision'");
+    sqlite::Sql sql2(
+        db->sqlite_db(),
+        "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
     EXPECT_EQ(7, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_xattr'");
+                     "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql3.FetchRow());
     EXPECT_EQ(0, sql3.RetrieveInt(0));
-    sqlite::Sql sql4(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_xattr'");
+    sqlite::Sql sql4(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='subtree_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
     EXPECT_EQ(0, sql4.RetrieveInt(0));
-    sqlite::Sql sql5(db->sqlite_db(),
-      "SELECT COUNT(*) FROM bind_mountpoints");
+    sqlite::Sql sql5(db->sqlite_db(), "SELECT COUNT(*) FROM bind_mountpoints");
     ASSERT_TRUE(sql5.FetchRow());
     EXPECT_EQ(0, sql5.RetrieveInt(0));
-    sqlite::Sql sql6(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_special'");
+    sqlite::Sql sql6(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='self_special'");
     ASSERT_TRUE(sql6.FetchRow());
     EXPECT_EQ(0, sql6.RetrieveInt(0));
-    sqlite::Sql sql7(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_special'");
+    sqlite::Sql sql7(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='subtree_special'");
     ASSERT_TRUE(sql7.FetchRow());
     EXPECT_EQ(0, sql7.RetrieveInt(0));
     sqlite::Sql sql8(db->sqlite_db(), "SELECT COUNT(mtimens) FROM catalog;");
@@ -211,13 +247,13 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   // Revision 0 --> 7
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
-      path, catalog::CatalogDatabase::kOpenReadWrite));
+        path, catalog::CatalogDatabase::kOpenReadWrite));
     ASSERT_TRUE(db.IsValid());
     RevertToRevision0(db.weak_ref());
   }
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
-      path, catalog::CatalogDatabase::kOpenReadWrite));
+        path, catalog::CatalogDatabase::kOpenReadWrite));
     ASSERT_TRUE(db.IsValid());
     sqlite::Sql sql1(db->sqlite_db(), "SELECT COUNT(xattr) FROM catalog");
     ASSERT_TRUE(sql1.FetchRow());
@@ -226,40 +262,47 @@ TEST_F(T_CatalogSql, SchemaMigration) {
                      "SELECT COUNT(size) FROM nested_catalogs");
     ASSERT_TRUE(sql2.FetchRow());
     EXPECT_EQ(0, sql2.RetrieveInt(0));
-    sqlite::Sql sql3(db->sqlite_db(),
-      "SELECT value FROM properties WHERE key='schema_revision'");
+    sqlite::Sql sql3(
+        db->sqlite_db(),
+        "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
     EXPECT_EQ(7, sql3.RetrieveInt(0));
     sqlite::Sql sql4(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_xattr'");
+                     "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
     EXPECT_EQ(0, sql4.RetrieveInt(0));
-    sqlite::Sql sql5(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_xattr'");
+    sqlite::Sql sql5(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='subtree_xattr'");
     ASSERT_TRUE(sql5.FetchRow());
     EXPECT_EQ(0, sql5.RetrieveInt(0));
-    sqlite::Sql sql6(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_external'");
+    sqlite::Sql sql6(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='self_external'");
     ASSERT_TRUE(sql6.FetchRow());
     EXPECT_EQ(0, sql6.RetrieveInt(0));
-    sqlite::Sql sql7(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_external_file_size'");
+    sqlite::Sql sql7(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='self_external_file_size'");
     ASSERT_TRUE(sql7.FetchRow());
     EXPECT_EQ(0, sql7.RetrieveInt(0));
-    sqlite::Sql sql8(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_external'");
+    sqlite::Sql sql8(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='subtree_external'");
     ASSERT_TRUE(sql8.FetchRow());
     EXPECT_EQ(0, sql8.RetrieveInt(0));
     sqlite::Sql sql9(db->sqlite_db(), "SELECT value FROM statistics WHERE "
-      "counter='subtree_external_file_size'");
+                                      "counter='subtree_external_file_size'");
     ASSERT_TRUE(sql9.FetchRow());
     EXPECT_EQ(0, sql9.RetrieveInt(0));
-    sqlite::Sql sql10(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_special'");
+    sqlite::Sql sql10(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='self_special'");
     ASSERT_TRUE(sql10.FetchRow());
     EXPECT_EQ(0, sql10.RetrieveInt(0));
-    sqlite::Sql sql11(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_special'");
+    sqlite::Sql sql11(
+        db->sqlite_db(),
+        "SELECT value FROM statistics WHERE counter='subtree_special'");
     ASSERT_TRUE(sql11.FetchRow());
     EXPECT_EQ(0, sql11.RetrieveInt(0));
     sqlite::Sql sql12(db->sqlite_db(), "SELECT COUNT(mtimens) FROM catalog;");

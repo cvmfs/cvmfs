@@ -21,7 +21,7 @@ class DeltaCounters;
 class DirectoryEntry;
 class SimpleCatalogManager;
 class WritableCatalogManager;
-}
+}  // namespace catalog
 namespace download {
 class DownloadManager;
 }
@@ -31,11 +31,11 @@ class SqliteHistory;
 namespace manifest {
 class Manifest;
 class Reflog;
-}
+}  // namespace manifest
 namespace perf {
 class Statistics;
 class StatisticsTemplate;
-}
+}  // namespace perf
 namespace signature {
 class SignatureManager;
 }
@@ -57,7 +57,7 @@ class SyncUnion;
  */
 class __attribute__((visibility("default"))) DiffListener {
  public:
-  virtual ~DiffListener() {}
+  virtual ~DiffListener() { }
   virtual void OnInit(const history::History::Tag &from_tag,
                       const history::History::Tag &to_tag) = 0;
   virtual void OnStats(const catalog::DeltaCounters &delta) = 0;
@@ -74,10 +74,10 @@ class __attribute__((visibility("default"))) DiffListener {
 class __attribute__((visibility("default"))) Env {
  public:
   /**
-   * Depending on the desired course of action, the permitted capabilities of the
-   * binary (cap_dac_read_search, cap_sys_admin) needs to be dropped or gained.
-   * Dropped for creating user namespaces in `enter`, gained for walking through
-   * overlayfs.
+   * Depending on the desired course of action, the permitted capabilities of
+   * the binary (cap_dac_read_search, cap_sys_admin) needs to be dropped or
+   * gained. Dropped for creating user namespaces in `enter`, gained for walking
+   * through overlayfs.
    */
   static void DropCapabilities();
 
@@ -128,10 +128,9 @@ class __attribute__((visibility("default"))) Repository : SingleCopy {
   std::string meta_info() const { return meta_info_; }
 
  protected:
-  void DownloadRootObjects(
-    const std::string &url,
-    const std::string &fqrn,
-    const std::string &tmp_dir);
+  void DownloadRootObjects(const std::string &url,
+                           const std::string &fqrn,
+                           const std::string &tmp_dir);
   catalog::SimpleCatalogManager *GetSimpleCatalogManager();
 
   const SettingsRepository settings_;
@@ -162,16 +161,16 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * Collection of publisher failure states (see Check())
      */
     enum EFailures {
-      kFailOk                   = 0,
-      kFailRdOnlyBroken         = 0x01,
-      kFailRdOnlyOutdated       = 0x02,
-      kFailRdOnlyWrongRevision  = 0x04,
-      kFailUnionBroken          = 0x08,
-      kFailUnionWritable        = 0x10,
-      kFailUnionLocked          = 0x20,
+      kFailOk = 0,
+      kFailRdOnlyBroken = 0x01,
+      kFailRdOnlyOutdated = 0x02,
+      kFailRdOnlyWrongRevision = 0x04,
+      kFailUnionBroken = 0x08,
+      kFailUnionWritable = 0x10,
+      kFailUnionLocked = 0x20,
     };
 
-    explicit ManagedNode(Publisher *p) : publisher_(p) {}
+    explicit ManagedNode(Publisher *p) : publisher_(p) { }
     /**
      * Verifies the mountpoints and the transaction status. Returns a bit map
      * of EFailures codes.
@@ -230,7 +229,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   class Session : ::SingleCopy {
    public:
     struct Settings {
-      Settings() : llvl(0) {}
+      Settings() : llvl(0) { }
       std::string service_endpoint;
       /**
        * $fqrn/$lease_path
@@ -245,7 +244,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
      * For non-gateway nodes, we have an implicit lease for the entire
      * repository
      */
-    Session() : keep_alive_(false), has_lease_(true) {}
+    Session() : keep_alive_(false), has_lease_(true) { }
     explicit Session(const Settings &settings_session);
     explicit Session(const SettingsPublisher &settings_publisher, int llvl = 0);
     /**
@@ -292,9 +291,9 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
 
   /**
    * Automatically exit the ephemeral shell after abort or commit.
-   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI class.
-   * We should move at least the core functionality to libcvmfs_server and this includes
-   * the ExitShell() method.
+   * TODO(avalenzu): Most of the logic of the enter shell is in the CmdEnter UI
+   * class. We should move at least the core functionality to libcvmfs_server
+   * and this includes the ExitShell() method.
    */
   void ExitShell();
 
@@ -359,7 +358,7 @@ class __attribute__((visibility("default"))) Publisher : public Repository {
   void CheckTagName(const std::string &name);
 
   void TransactionRetry();
-  void TransactionImpl(bool waiting_on_lease=false);
+  void TransactionImpl(bool waiting_on_lease = false);
 
   SettingsPublisher settings_;
   UniquePtr<perf::StatisticsTemplate> statistics_publish_;

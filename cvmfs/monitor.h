@@ -86,7 +86,7 @@ class Watchdog : SingleCopy {
   static void *MainWatchdogListener(void *data);
 
   static void ReportSignalAndContinue(int sig, siginfo_t *siginfo,
-                                       void *context);
+                                      void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
   explicit Watchdog(FnOnCrash on_crash);

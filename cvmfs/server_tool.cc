@@ -6,7 +6,7 @@
 
 #include "util/posix.h"
 
-ServerTool::ServerTool() {}
+ServerTool::ServerTool() { }
 
 ServerTool::~ServerTool() {
   if (signature_manager_.IsValid()) {
@@ -21,8 +21,8 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
     return true;
   }
 
-  download_manager_ = new download::DownloadManager(max_pool_handles,
-                            perf::StatisticsTemplate("download", statistics()));
+  download_manager_ = new download::DownloadManager(
+      max_pool_handles, perf::StatisticsTemplate("download", statistics()));
   assert(download_manager_.IsValid());
 
   download_manager_->SetTimeout(kDownloadTimeout, kDownloadTimeout);
@@ -41,11 +41,9 @@ bool ServerTool::InitDownloadManager(const bool follow_redirects,
   return true;
 }
 
-bool ServerTool::InitSignatureManager(
-    const std::string &pubkey_path,
-    const std::string &certificate_path,
-    const std::string &private_key_path)
-{
+bool ServerTool::InitSignatureManager(const std::string &pubkey_path,
+                                      const std::string &certificate_path,
+                                      const std::string &private_key_path) {
   if (signature_manager_.IsValid()) {
     return true;
   }

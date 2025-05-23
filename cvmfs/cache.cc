@@ -27,9 +27,7 @@ const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 CacheManager::CacheManager() : quota_mgr_(new NoopQuotaManager()) { }
 
 
-CacheManager::~CacheManager() {
-  delete quota_mgr_;
-}
+CacheManager::~CacheManager() { delete quota_mgr_; }
 
 
 /**
@@ -76,11 +74,9 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
  * Commits the memory blob buffer to the given chunk id.  No checking!
  * The hash and the memory blob need to match.
  */
-bool CacheManager::CommitFromMem(
-  const LabeledObject &object,
-  const unsigned char *buffer,
-  const uint64_t size)
-{
+bool CacheManager::CommitFromMem(const LabeledObject &object,
+                                 const unsigned char *buffer,
+                                 const uint64_t size) {
   void *txn = alloca(this->SizeOfTxn());
   int fd = this->StartTxn(object.id, size, txn);
   if (fd < 0)
@@ -123,11 +119,9 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
  * @param[out] size Size of the file
  * \return True if successful, false otherwise.
  */
-bool CacheManager::Open2Mem(
-  const LabeledObject &object,
-  unsigned char **buffer,
-  uint64_t *size)
-{
+bool CacheManager::Open2Mem(const LabeledObject &object,
+                            unsigned char **buffer,
+                            uint64_t *size) {
   *size = 0;
   *buffer = NULL;
 
@@ -173,9 +167,9 @@ int CacheManager::OpenPinned(const LabeledObject &object) {
       this->Close(fd);
       return size;
     }
-    bool retval = quota_mgr_->Pin(
-      object.id, static_cast<uint64_t>(size),
-      object.label.GetDescription(), object.label.IsCatalog());
+    bool retval = quota_mgr_->Pin(object.id, static_cast<uint64_t>(size),
+                                  object.label.GetDescription(),
+                                  object.label.IsCatalog());
     if (!retval) {
       this->Close(fd);
       return -ENOSPC;
@@ -201,10 +195,12 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
   }
   int new_root_fd = DoRestoreState(state->concrete_state);
   if (new_root_fd < -1) {
-    if (fd_progress >= 0) SendMsg2Socket(fd_progress, "FAILED!\n");
+    if (fd_progress >= 0)
+      SendMsg2Socket(fd_progress, "FAILED!\n");
     abort();
   }
-  if (fd_progress >= 0) SendMsg2Socket(fd_progress, "done\n");
+  if (fd_progress >= 0)
+    SendMsg2Socket(fd_progress, "done\n");
   return new_root_fd;
 }
 
@@ -220,8 +216,9 @@ void *CacheManager::SaveState(const int fd_progress) {
   state->concrete_state = DoSaveState();
   if (state->concrete_state == NULL) {
     if (fd_progress >= 0) {
-      SendMsg2Socket(fd_progress,
-        "  *** This cache manager does not support saving state!\n");
+      SendMsg2Socket(
+          fd_progress,
+          "  *** This cache manager does not support saving state!\n");
     }
     abort();
   }

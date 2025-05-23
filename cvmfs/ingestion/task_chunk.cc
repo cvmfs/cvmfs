@@ -2,11 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
+#include "ingestion/task_chunk.h"
+
 #include <unistd.h>
 
 #include <cassert>
 
-#include "ingestion/task_chunk.h"
 #include "util/exception.h"
 
 /**
@@ -62,13 +63,14 @@ void TaskChunk::Process(BlockItem *input_block) {
     case BlockItem::kBlockStop:
       // End of the file, no more new chunks
       file_item->set_is_fully_chunked();
-      if (output_block_bulk) output_block_bulk->MakeStop();
+      if (output_block_bulk)
+        output_block_bulk->MakeStop();
       if (chunk_info.next_chunk != NULL) {
         assert(file_item->size() >= chunk_info.next_chunk->offset());
-        chunk_info.next_chunk->set_size(
-          file_item->size() - chunk_info.next_chunk->offset());
-        BlockItem *block_stop =
-          new BlockItem(chunk_info.output_tag_chunk, allocator_);
+        chunk_info.next_chunk->set_size(file_item->size()
+                                        - chunk_info.next_chunk->offset());
+        BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk,
+                                              allocator_);
         block_stop->SetFileItem(file_item);
         block_stop->SetChunkItem(chunk_info.next_chunk);
         block_stop->MakeStop();
@@ -100,8 +102,8 @@ void TaskChunk::Process(BlockItem *input_block) {
           unsigned tail_size = cut_mark_in_block - offset_in_block;
 
           if (tail_size > 0) {
-            BlockItem *block_tail =
-              new BlockItem(chunk_info.output_tag_chunk, allocator_);
+            BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk,
+                                                  allocator_);
             block_tail->SetFileItem(file_item);
             block_tail->SetChunkItem(chunk_info.next_chunk);
             block_tail->MakeDataCopy(input_block->data() + offset_in_block,
@@ -113,10 +115,10 @@ void TaskChunk::Process(BlockItem *input_block) {
           // If the cut mark happens to at the end of file, let the final
           // incoming stop block schedule dispatch of the chunk stop block
           if (cut_mark < file_item->size()) {
-            chunk_info.next_chunk->set_size(
-              cut_mark - chunk_info.next_chunk->offset());
-            BlockItem *block_stop =
-              new BlockItem(chunk_info.output_tag_chunk, allocator_);
+            chunk_info.next_chunk->set_size(cut_mark
+                                            - chunk_info.next_chunk->offset());
+            BlockItem *block_stop = new BlockItem(chunk_info.output_tag_chunk,
+                                                  allocator_);
             block_stop->SetFileItem(file_item);
             block_stop->SetChunkItem(chunk_info.next_chunk);
             block_stop->MakeStop();
@@ -132,8 +134,8 @@ void TaskChunk::Process(BlockItem *input_block) {
         assert(input_block->size() >= offset_in_block);
         unsigned tail_size = input_block->size() - offset_in_block;
         if (tail_size > 0) {
-          BlockItem *block_tail =
-            new BlockItem(chunk_info.output_tag_chunk, allocator_);
+          BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk,
+                                                allocator_);
           block_tail->SetFileItem(file_item);
           block_tail->SetChunkItem(chunk_info.next_chunk);
           block_tail->MakeDataCopy(input_block->data() + offset_in_block,
@@ -154,5 +156,6 @@ void TaskChunk::Process(BlockItem *input_block) {
   }
 
   delete input_block;
-  if (output_block_bulk) tubes_out_->Dispatch(output_block_bulk);
+  if (output_block_bulk)
+    tubes_out_->Dispatch(output_block_bulk);
 }

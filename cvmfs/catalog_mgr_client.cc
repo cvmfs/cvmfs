@@ -27,7 +27,8 @@ namespace catalog {
  * Triggered when the catalog is attached (db file opened)
  */
 void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
-  const Counters &counters = const_cast<const Catalog*>(catalog)->GetCounters();
+  const Counters &counters = const_cast<const Catalog *>(catalog)
+                                 ->GetCounters();
   if (catalog->IsRoot()) {
     all_inodes_ = counters.GetAllEntries();
   }
@@ -36,23 +37,22 @@ void ClientCatalogManager::ActivateCatalog(Catalog *catalog) {
 
 
 ClientCatalogManager::ClientCatalogManager(MountPoint *mountpoint)
-  : AbstractCatalogManager<Catalog>(mountpoint->statistics())
-  , repo_name_(mountpoint->fqrn())
-  , fetcher_(mountpoint->fetcher())
-  , signature_mgr_(mountpoint->signature_mgr())
-  , workspace_(mountpoint->file_system()->workspace())
-  , offline_mode_(false)
-  , all_inodes_(0)
-  , loaded_inodes_(0)
-  , fixed_root_catalog_()
-  , fixed_alt_root_catalog_(false)
-  , root_fd_(-1)
-{
+    : AbstractCatalogManager<Catalog>(mountpoint->statistics())
+    , repo_name_(mountpoint->fqrn())
+    , fetcher_(mountpoint->fetcher())
+    , signature_mgr_(mountpoint->signature_mgr())
+    , workspace_(mountpoint->file_system()->workspace())
+    , offline_mode_(false)
+    , all_inodes_(0)
+    , loaded_inodes_(0)
+    , fixed_root_catalog_()
+    , fixed_alt_root_catalog_(false)
+    , root_fd_(-1) {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
   n_certificate_hits_ = mountpoint->statistics()->Register(
-    "cache.n_certificate_hits", "Number of certificate hits");
+      "cache.n_certificate_hits", "Number of certificate hits");
   n_certificate_misses_ = mountpoint->statistics()->Register(
-    "cache.n_certificate_misses", "Number of certificate misses");
+      "cache.n_certificate_misses", "Number of certificate misses");
 }
 
 
@@ -60,18 +60,17 @@ ClientCatalogManager::~ClientCatalogManager() {
   LogCvmfs(kLogCache, kLogDebug, "unpinning / unloading all catalogs");
 
   for (map<PathString, shash::Any>::iterator i = mounted_catalogs_.begin(),
-       iend = mounted_catalogs_.end(); i != iend; ++i)
-  {
+                                             iend = mounted_catalogs_.end();
+       i != iend;
+       ++i) {
     fetcher_->cache_mgr()->quota_mgr()->Unpin(i->second);
   }
 }
 
 
-Catalog *ClientCatalogManager::CreateCatalog(
-  const PathString  &mountpoint,
-  const shash::Any  &catalog_hash,
-  catalog::Catalog  *parent_catalog
-) {
+Catalog *ClientCatalogManager::CreateCatalog(const PathString &mountpoint,
+                                             const shash::Any &catalog_hash,
+                                             catalog::Catalog *parent_catalog) {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
   loaded_catalogs_.erase(mountpoint);
   return new Catalog(mountpoint, catalog_hash, parent_catalog);
@@ -92,10 +91,8 @@ shash::Any ClientCatalogManager::GetRootHash() {
  * @returns true  - root catalog was successfully mounted
  *          false - otherwise
  */
-bool ClientCatalogManager::InitFixed(
-  const shash::Any &root_hash,
-  bool alternative_path)
-{
+bool ClientCatalogManager::InitFixed(const shash::Any &root_hash,
+                                     bool alternative_path) {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog with fixed root hash %s",
            root_hash.ToString().c_str());
   WriteLock();
@@ -128,7 +125,7 @@ bool ClientCatalogManager::InitFixed(
  *         kLoadNew     - otherwise
  */
 LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
-                                                       CatalogContext *result) {
+    CatalogContext *result) {
   result->SetMountpoint(PathString("", 0));
 
   // quick escape if we have a fixed catalog
@@ -156,19 +153,20 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
 
-  manifest::Breadcrumb breadcrumb =
-                              fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
+  manifest::Breadcrumb breadcrumb = fetcher_->cache_mgr()->LoadBreadcrumb(
+      repo_name_);
   if (breadcrumb.IsValid()) {
     local_newest_hash = breadcrumb.catalog_hash;
     local_newest_timestamp = breadcrumb.timestamp;
     local_newest_revision = breadcrumb.revision;
     LogCvmfs(kLogCache, kLogDebug,
-      "Cached copy publish date %s (hash %s, revision %" PRIu64 ")",
-      StringifyTime(static_cast<int64_t>(local_newest_timestamp), true).c_str(),
-      local_newest_hash.ToString().c_str(), breadcrumb.revision);
+             "Cached copy publish date %s (hash %s, revision %" PRIu64 ")",
+             StringifyTime(static_cast<int64_t>(local_newest_timestamp), true)
+                 .c_str(),
+             local_newest_hash.ToString().c_str(), breadcrumb.revision);
   } else {
     LogCvmfs(kLogCache, kLogDebug, "Unable to read local checksum %s",
-                                   breadcrumb.ToString().c_str());
+             breadcrumb.ToString().c_str());
   }
 
   // 2) Select local newest catalog: mounted vs alien
@@ -177,21 +175,22 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   LoadReturn success_code = catalog::kLoadNew;
 
   if (mounted_catalogs_.size() > 0) {
-    const std::map<PathString, shash::Any>::iterator curr_hash_itr =
-                                      mounted_catalogs_.find(PathString("", 0));
+    const std::map<PathString, shash::Any>::iterator
+        curr_hash_itr = mounted_catalogs_.find(PathString("", 0));
     mounted_hash = curr_hash_itr->second;
   }
 
   // We only look for currently loaded catalog if the revision is newer than
   // the breadcrumb revision and both revision numbers are valid (!= -1ul).
   if ((local_newest_revision <= GetRevisionNoLock()
-     || local_newest_revision == manifest::Breadcrumb::kInvalidRevision)
-     && mounted_catalogs_.size() > 0) {
+       || local_newest_revision == manifest::Breadcrumb::kInvalidRevision)
+      && mounted_catalogs_.size() > 0) {
     local_newest_hash = mounted_hash;
     local_newest_revision = GetRevisionNoLock();
     // if needed for integration test 707: breadcrumb_timestamp_newer()
-    local_newest_timestamp = GetTimestampNoLock() > local_newest_timestamp ?
-                                  GetTimestampNoLock() : local_newest_timestamp;
+    local_newest_timestamp = GetTimestampNoLock() > local_newest_timestamp
+                                 ? GetTimestampNoLock()
+                                 : local_newest_timestamp;
     result->SetRootCtlgLocation(kCtlgLocationMounted);
     success_code = catalog::kLoadUp2Date;
   } else if (local_newest_revision == 0 && mounted_catalogs_.size() > 0) {
@@ -212,37 +211,35 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   // 3) Get remote root catalog (fails if remote catalog is older)
   manifest::Failures manifest_failure;
   UniquePtr<CachedManifestEnsemble> ensemble(
-                       new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
-  manifest_failure = manifest::Fetch("", repo_name_, local_newest_timestamp,
-                                     &local_newest_hash, signature_mgr_,
-                                     fetcher_->download_mgr(),
-                                     ensemble.weak_ref());
+      new CachedManifestEnsemble(fetcher_->cache_mgr(), this));
+  manifest_failure = manifest::Fetch(
+      "", repo_name_, local_newest_timestamp, &local_newest_hash,
+      signature_mgr_, fetcher_->download_mgr(), ensemble.weak_ref());
 
   if (manifest_failure == manifest::kFailOk) {
     // server has newest revision or no valid local revision
     if (ensemble->manifest->revision() > local_newest_revision
-          || local_newest_revision == manifest::Breadcrumb::kInvalidRevision
-          // if revision is 0 both local and server, load catalog from server
-          // as local is most likely just "initialized" without valid value
-          || (ensemble->manifest->revision() == 0 &&
-              local_newest_revision == 0)) {
+        || local_newest_revision == manifest::Breadcrumb::kInvalidRevision
+        // if revision is 0 both local and server, load catalog from server
+        // as local is most likely just "initialized" without valid value
+        || (ensemble->manifest->revision() == 0
+            && local_newest_revision == 0)) {
       result->SetHash(ensemble->manifest->catalog_hash());
       result->SetRootCtlgRevision(ensemble->manifest->revision());
       result->SetRootCtlgLocation(kCtlgLocationServer);
       fixed_alt_root_catalog_ = ensemble->manifest->has_alt_catalog_path();
 
       result->TakeManifestEnsemble(
-                    static_cast<manifest::ManifestEnsemble*>(
-                                                           ensemble.Release()));
+          static_cast<manifest::ManifestEnsemble *>(ensemble.Release()));
       offline_mode_ = false;
 
       return catalog::kLoadNew;
     }
   }
   LogCvmfs(kLogCache, kLogDebug,
-            "Failed fetch manifest from server: "
-            "manifest too old or server unreachable (%d - %s)",
-            manifest_failure, manifest::Code2Ascii(manifest_failure));
+           "Failed fetch manifest from server: "
+           "manifest too old or server unreachable (%d - %s)",
+           manifest_failure, manifest::Code2Ascii(manifest_failure));
 
   // total failure: server not reachable and no valid local hash
   if ((manifest_failure != manifest::kFailOk) && local_newest_hash.IsNull()) {
@@ -252,7 +249,7 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 
   if (manifest_failure == manifest::kFailOk
       && ensemble->manifest->revision() == local_newest_revision) {
-      offline_mode_ = false;
+    offline_mode_ = false;
   } else {
     offline_mode_ = true;
   }
@@ -268,19 +265,19 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
 }
 
 std::string ClientCatalogManager::GetCatalogDescription(
-  const PathString &mountpoint, const shash::Any &hash)
-{
-  return "file catalog at " + repo_name_ + ":" +
-    (mountpoint.IsEmpty() ? "/"
-                          : string(mountpoint.GetChars(),
-                                   mountpoint.GetLength())) +
-    " (" + hash.ToString() + ")";
+    const PathString &mountpoint, const shash::Any &hash) {
+  return "file catalog at " + repo_name_ + ":"
+         + (mountpoint.IsEmpty()
+                ? "/"
+                : string(mountpoint.GetChars(), mountpoint.GetLength()))
+         + " (" + hash.ToString() + ")";
 }
 
 /**
  * Loads (and fetches) a catalog by hash for a given mountpoint.
  *
- * Special case for root catalog: ctlg_context->root_ctlg_location must be given.
+ * Special case for root catalog: ctlg_context->root_ctlg_location must be
+ * given.
  *
  * @param [in, out] ctlg_context mandatory fields (input): mountpoint, hash
  *         additional mandatory fields for root catalog: root_ctlg_location
@@ -290,7 +287,7 @@ std::string ClientCatalogManager::GetCatalogDescription(
  *         kLoadFail on failure
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(
-                                                 CatalogContext *ctlg_context) {
+    CatalogContext *ctlg_context) {
   string catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
                                                ctlg_context->hash());
   string alt_root_catalog_path = "";
@@ -300,9 +297,9 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
     alt_root_catalog_path = ctlg_context->hash().MakeAlternativePath();
   }
 
-  const LoadReturn load_ret = FetchCatalogByHash(ctlg_context->hash(),
-                                           catalog_descr, alt_root_catalog_path,
-                                           ctlg_context->GetSqlitePathPtr());
+  const LoadReturn load_ret = FetchCatalogByHash(
+      ctlg_context->hash(), catalog_descr, alt_root_catalog_path,
+      ctlg_context->GetSqlitePathPtr());
   if (load_ret == catalog::kLoadNew) {
     loaded_catalogs_[ctlg_context->mountpoint()] = ctlg_context->hash();
 
@@ -313,20 +310,20 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
 
       // if coming from server: update breadcrumb
       if (ctlg_context->root_ctlg_location() == kCtlgLocationServer) {
-          // Store new manifest and certificate
-          CacheManager::Label label;
-          label.path = repo_name_;
-          label.flags |= CacheManager::kLabelCertificate;
-          if (ctlg_context->manifest_ensemble()->cert_size > 0) {
-            fetcher_->cache_mgr()->CommitFromMem(
-                  CacheManager::LabeledObject(ctlg_context->manifest_ensemble()->
-                                                          manifest->certificate(),
-                                              label),
-                                    ctlg_context->manifest_ensemble()->cert_buf,
-                                    ctlg_context->manifest_ensemble()->cert_size);
-          }
-          fetcher_->cache_mgr()->StoreBreadcrumb(
-                                  *ctlg_context->manifest_ensemble()->manifest);
+        // Store new manifest and certificate
+        CacheManager::Label label;
+        label.path = repo_name_;
+        label.flags |= CacheManager::kLabelCertificate;
+        if (ctlg_context->manifest_ensemble()->cert_size > 0) {
+          fetcher_->cache_mgr()->CommitFromMem(
+              CacheManager::LabeledObject(
+                  ctlg_context->manifest_ensemble()->manifest->certificate(),
+                  label),
+              ctlg_context->manifest_ensemble()->cert_buf,
+              ctlg_context->manifest_ensemble()->cert_size);
+        }
+        fetcher_->cache_mgr()->StoreBreadcrumb(
+            *ctlg_context->manifest_ensemble()->manifest);
       }
     }
   }
@@ -345,11 +342,10 @@ LoadReturn ClientCatalogManager::LoadCatalogByHash(
  *         kLoadFail on all other failures
  */
 LoadReturn ClientCatalogManager::FetchCatalogByHash(
-  const shash::Any &hash,
-  const string &name,
-  const std::string &alt_root_catalog_path,
-  std::string *sqlite_path)
-{
+    const shash::Any &hash,
+    const string &name,
+    const std::string &alt_root_catalog_path,
+    std::string *sqlite_path) {
   assert(hash.suffix == shash::kSuffixCatalog);
   CacheManager::Label label;
   label.path = name;
@@ -361,8 +357,8 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
       root_fd_ = fd;
     }
 
-    LogCvmfs(kLogCatalog, kLogDebug,
-                                    "FetchCatalogByHash filedescriptor %d", fd);
+    LogCvmfs(kLogCatalog, kLogDebug, "FetchCatalogByHash filedescriptor %d",
+             fd);
     *sqlite_path = "@" + StringifyInt(fd);
     return kLoadNew;
   }
@@ -374,9 +370,7 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
 }
 
 void ClientCatalogManager::StageNestedCatalogByHash(
-  const shash::Any &hash,
-  const PathString &mountpoint)
-{
+    const shash::Any &hash, const PathString &mountpoint) {
   assert(hash.suffix == shash::kSuffixCatalog);
 
   CacheManager::Label label;
@@ -391,8 +385,8 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->mountpoint().c_str());
 
-  map<PathString, shash::Any>::iterator iter =
-    mounted_catalogs_.find(catalog->mountpoint());
+  map<PathString, shash::Any>::iterator iter = mounted_catalogs_.find(
+      catalog->mountpoint());
   assert(iter != mounted_catalogs_.end());
   fetcher_->cache_mgr()->quota_mgr()->Unpin(iter->second);
   mounted_catalogs_.erase(iter);
@@ -412,8 +406,9 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
 bool ClientCatalogManager::IsRevisionBlacklisted() {
   uint64_t revision = GetRevision();
 
-  LogCvmfs(kLogCache, kLogDebug, "checking if %s revision %" PRIu64
-           " is blacklisted", repo_name_.c_str(), revision);
+  LogCvmfs(kLogCache, kLogDebug,
+           "checking if %s revision %" PRIu64 " is blacklisted",
+           repo_name_.c_str(), revision);
 
   vector<string> blacklist = signature_mgr_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {

@@ -45,15 +45,14 @@ bool SqliteMemoryManager::LookasideBufferArena::IsEmpty() {
 bool SqliteMemoryManager::LookasideBufferArena::Contains(void *buffer) {
   if ((buffer == NULL) || (buffer < arena_))
     return false;
-  return (static_cast<uint64_t>(
-    (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))) <
-    kArenaSize);
+  return (static_cast<uint64_t>((reinterpret_cast<char *>(buffer)
+                                 - reinterpret_cast<char *>(arena_)))
+          < kArenaSize);
 }
 
 
 SqliteMemoryManager::LookasideBufferArena::LookasideBufferArena()
-  : arena_(sxmmap(kArenaSize))
-{
+    : arena_(sxmmap(kArenaSize)) {
   // All buffers unused, i.e. all bits set
   memset(freemap_, 0xFF, kNoBitmaps * sizeof(int));
 }
@@ -66,9 +65,9 @@ SqliteMemoryManager::LookasideBufferArena::~LookasideBufferArena() {
 
 void SqliteMemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
   assert(buffer >= arena_);
-  ptrdiff_t nbuffer =
-    (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_))
-    / kBufferSize;
+  ptrdiff_t nbuffer = (reinterpret_cast<char *>(buffer)
+                       - reinterpret_cast<char *>(arena_))
+                      / kBufferSize;
   assert(static_cast<uint64_t>(nbuffer) < kBuffersPerArena);
   const int nfreemap = nbuffer / (sizeof(int) * 8);
   freemap_[nfreemap] |= 1 << (nbuffer % (sizeof(int) * 8));
@@ -92,9 +91,7 @@ void *SqliteMemoryManager::xMalloc(int size) {
 /**
  * Sqlite ensures that ptr != NULL.
  */
-void SqliteMemoryManager::xFree(void *ptr) {
-  instance_->PutMemory(ptr);
-}
+void SqliteMemoryManager::xFree(void *ptr) { instance_->PutMemory(ptr); }
 
 
 /**
@@ -120,9 +117,7 @@ int SqliteMemoryManager::xSize(void *ptr) {
 }
 
 
-int SqliteMemoryManager::xRoundup(int size) {
-  return RoundUp8(size);
-}
+int SqliteMemoryManager::xRoundup(int size) { return RoundUp8(size); }
 
 
 int SqliteMemoryManager::xInit(void *app_data __attribute__((unused))) {
@@ -130,12 +125,12 @@ int SqliteMemoryManager::xInit(void *app_data __attribute__((unused))) {
 }
 
 
-void SqliteMemoryManager::xShutdown(void *app_data __attribute__((unused))) {
-}
+void SqliteMemoryManager::xShutdown(void *app_data __attribute__((unused))) { }
 
 
 void SqliteMemoryManager::AssignGlobalArenas() {
-  if (assigned_) return;
+  if (assigned_)
+    return;
   int retval;
 
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, page_cache_memory_,
@@ -160,8 +155,8 @@ void *SqliteMemoryManager::AssignLookasideBuffer(sqlite3 *db) {
 
   void *buffer = GetLookasideBuffer();
   assert(buffer != NULL);
-  int retval = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE,
-    buffer, kLookasideSlotSize, kLookasideSlotsPerDb);
+  int retval = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, buffer,
+                                 kLookasideSlotSize, kLookasideSlotsPerDb);
   assert(retval == SQLITE_OK);
   return buffer;
 }
@@ -178,10 +173,10 @@ void SqliteMemoryManager::CleanupInstance() {
  */
 void *SqliteMemoryManager::GetLookasideBuffer() {
   void *result;
-  vector<LookasideBufferArena *>::reverse_iterator reverse_iter =
-    lookaside_buffer_arenas_.rbegin();
-  vector<LookasideBufferArena *>::reverse_iterator i_rend =
-    lookaside_buffer_arenas_.rend();
+  vector<LookasideBufferArena *>::reverse_iterator
+      reverse_iter = lookaside_buffer_arenas_.rbegin();
+  vector<LookasideBufferArena *>::reverse_iterator
+      i_rend = lookaside_buffer_arenas_.rend();
   for (; reverse_iter != i_rend; ++reverse_iter) {
     result = (*reverse_iter)->GetBuffer();
     if (result != NULL)
@@ -224,10 +219,9 @@ void *SqliteMemoryManager::GetMemory(int size) {
 
 
 SqliteMemoryManager::SqliteMemoryManager()
-  : assigned_(false)
-  , page_cache_memory_(sxmmap(kPageCacheSize))
-  , idx_last_arena_(0)
-{
+    : assigned_(false)
+    , page_cache_memory_(sxmmap(kPageCacheSize))
+    , idx_last_arena_(0) {
   memset(&sqlite3_mem_vanilla_, 0, sizeof(sqlite3_mem_vanilla_));
   int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);

@@ -18,33 +18,36 @@ class SettingsPublisher;
 class CmdEnter : public Command {
  public:
   CmdEnter()
-    : settings_spool_area_("unset")  // will be set by SetSpoolArea in Main()
-    , cvmfs2_binary_("/usr/bin/cvmfs2")
-    , overlayfs_binary_("/usr/bin/fuse-overlayfs")
-  { }
+      : settings_spool_area_("unset")  // will be set by SetSpoolArea in Main()
+      , cvmfs2_binary_("/usr/bin/cvmfs2")
+      , overlayfs_binary_("/usr/bin/fuse-overlayfs") { }
   virtual std::string GetName() const { return "enter"; }
   virtual std::string GetBrief() const {
     return "Open an ephemeral namespace to publish content";
   }
   virtual std::string GetUsage() const {
-    return \
-        "[options] <fully qualified repository name> [-- <command> <params>]";
+    return "[options] <fully qualified repository name> [-- <command> "
+           "<params>]";
   }
   virtual ParameterList GetParams() const {
     ParameterList p;
-    p.push_back(Parameter::Optional("stratum0", 'w', "stratum0 url",
-      "HTTP endpoint of the authoritative storage"));
+    p.push_back(
+        Parameter::Optional("stratum0", 'w', "stratum0 url",
+                            "HTTP endpoint of the authoritative storage"));
     p.push_back(Parameter::Optional("cvmfs2", 'c', "path",
-      "Path to the cvmfs2 binary"));
-    p.push_back(Parameter::Optional("cvmfs-config", 'C', "path",
-      "Path to extra configuration for the CernVM-FS client"));
+                                    "Path to the cvmfs2 binary"));
+    p.push_back(Parameter::Optional(
+        "cvmfs-config", 'C', "path",
+        "Path to extra configuration for the CernVM-FS client"));
     p.push_back(Parameter::Switch("root", 'r', "Run as fake root"));
-    p.push_back(Parameter::Switch("keep-session", 'k',
-      "Do not remove the session directory when the shell exits"));
-    p.push_back(Parameter::Switch("keep-logs", 'l',
-      "Clean the session directory on shell exit except for the logs"));
-    p.push_back(Parameter::Switch("transaction", 't',
-      "Open a transaction within the ephemeral shell"));
+    p.push_back(Parameter::Switch(
+        "keep-session", 'k',
+        "Do not remove the session directory when the shell exits"));
+    p.push_back(Parameter::Switch(
+        "keep-logs", 'l',
+        "Clean the session directory on shell exit except for the logs"));
+    p.push_back(Parameter::Switch(
+        "transaction", 't', "Open a transaction within the ephemeral shell"));
     p.push_back(
         Parameter::Optional("repo-config", 'x', "repository configuration",
                             "Path to the configuration of the repository as in "
@@ -75,8 +78,8 @@ class CmdEnter : public Command {
   std::string repo_config_;
   std::string overlayfs_binary_;
   std::string session_dir_;  ///< In $HOME/.cvmfs/fqrn, container spool area
-  std::string env_conf_;  ///< Stores the session directory environment
-  std::string rootfs_dir_;  ///< Destination to chroot() to in the namespace
+  std::string env_conf_;     ///< Stores the session directory environment
+  std::string rootfs_dir_;   ///< Destination to chroot() to in the namespace
   std::string stdout_path_;  ///< Logs stdout of background commands
   std::string stderr_path_;  ///< Logs stdout of background commands
 };

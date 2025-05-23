@@ -12,4 +12,3 @@ unsigned fuse_lowlevel_notify_inval_entry_cnt = 0;
 }
 
 #endif  // CVMFS_LIBCVMFS
-

@@ -10,7 +10,7 @@
 // We are testing the utility functions used for testing...
 
 TEST(T_TestUtilities, GetParentPid) {
-  const pid_t my_pid        = getpid();
+  const pid_t my_pid = getpid();
   const pid_t my_parent_pid = getppid();
 
   ASSERT_GT(my_pid, 1);

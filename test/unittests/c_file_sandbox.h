@@ -21,11 +21,11 @@ class FileSandbox : public ::testing::Test {
   typedef std::pair<std::string, shash::Suffix> ExpectedHashString;
 
  public:
-  explicit FileSandbox(const std::string &sandbox_path) :
-    sandbox_path_(sandbox_path) {}
+  explicit FileSandbox(const std::string &sandbox_path)
+      : sandbox_path_(sandbox_path) { }
 
  protected:
-  const std::string& GetEmptyFile() {
+  const std::string &GetEmptyFile() {
     LazilyCreateDummyFile(sandbox_path_, 0, &empty_file_, 42);
     return empty_file_;
   }
@@ -41,22 +41,23 @@ class FileSandbox : public ::testing::Test {
   }
 
   const std::string GetBigFile() {
-    LazilyCreateDummyFile(sandbox_path_, 4*1024, &big_file_, 1337);
+    LazilyCreateDummyFile(sandbox_path_, 4 * 1024, &big_file_, 1337);
     return big_file_;
   }
 
   const std::string GetBigZeroFile() {
-    LazilyCreateDummyFile(sandbox_path_, 4*1024, &big_zero_file_, uint64_t(-1));
+    LazilyCreateDummyFile(sandbox_path_, 4 * 1024, &big_zero_file_,
+                          uint64_t(-1));
     return big_zero_file_;
   }
 
   const std::string GetHugeFile() {
-    LazilyCreateDummyFile(sandbox_path_, 100*1024, &huge_file_, 1);
+    LazilyCreateDummyFile(sandbox_path_, 100 * 1024, &huge_file_, 1);
     return huge_file_;
   }
 
   const std::string GetHugeZeroFile() {
-    LazilyCreateDummyFile(sandbox_path_, 100*1024, &huge_zero_file_,
+    LazilyCreateDummyFile(sandbox_path_, 100 * 1024, &huge_zero_file_,
                           uint64_t(-1));
     return huge_zero_file_;
   }
@@ -69,7 +70,7 @@ class FileSandbox : public ::testing::Test {
     return content;
   }
 
-  template <class VectorT>
+  template<class VectorT>
   void AppendVectorToVector(const VectorT &appendee, VectorT *vector) const {
     vector->insert(vector->end(), appendee.begin(), appendee.end());
   }
@@ -106,9 +107,9 @@ class FileSandbox : public ::testing::Test {
   }
 
   void LazilyCreateDummyFile(const std::string &sandbox_path,
-                             const size_t       file_size_kb,
-                                   std::string *file_name,
-                             const uint64_t     seed) {
+                             const size_t file_size_kb,
+                             std::string *file_name,
+                             const uint64_t seed) {
     static const size_t kb = 1024;
 
     // if file was already created, we do not do it again!
@@ -118,7 +119,7 @@ class FileSandbox : public ::testing::Test {
 
     // create a temporary file
     FILE *file = CreateTempFile(sandbox_path + "/dummy", 0600, "r+", file_name);
-    ASSERT_NE(static_cast<FILE*>(0), file) << "failed to create tmp file";
+    ASSERT_NE(static_cast<FILE *>(0), file) << "failed to create tmp file";
 
     // fill the temporary file with the requested number of (pseudo) random data
     // or zero bytes
@@ -138,7 +139,7 @@ class FileSandbox : public ::testing::Test {
         CreateRandomBuffer(kb, buffer, &rng);
         const size_t written = fwrite(buffer, sizeof(buffer_type), kb, file);
         ASSERT_EQ(written, kb * sizeof(buffer_type))
-          << "failed to write to tmp (errno: " << errno << ")";
+            << "failed to write to tmp (errno: " << errno << ")";
       }
     }
 
@@ -150,13 +151,13 @@ class FileSandbox : public ::testing::Test {
  protected:
   const std::string sandbox_path_;
 
-  std::string       empty_file_;
-  std::string       small_file_;
-  std::string       small_zero_file_;
-  std::string       big_file_;
-  std::string       big_zero_file_;
-  std::string       huge_file_;
-  std::string       huge_zero_file_;
+  std::string empty_file_;
+  std::string small_file_;
+  std::string small_zero_file_;
+  std::string big_file_;
+  std::string big_zero_file_;
+  std::string huge_file_;
+  std::string huge_zero_file_;
 };
 
 #endif  // TEST_UNITTESTS_C_FILE_SANDBOX_H_

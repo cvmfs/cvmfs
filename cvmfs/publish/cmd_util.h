@@ -15,9 +15,9 @@ namespace publish {
  * Returns the exit code of the hook.
  */
 int CallServerHook(
-  const std::string &func,
-  const std::string &fqrn,
-  const std::string &path_hooks = "/etc/cvmfs/cvmfs_server_hooks.sh");
+    const std::string &func,
+    const std::string &fqrn,
+    const std::string &path_hooks = "/etc/cvmfs/cvmfs_server_hooks.sh");
 
 }  // namespace publish
 

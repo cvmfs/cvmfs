@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <fcntl.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -27,8 +26,7 @@ class T_FileGuard : public ::testing::Test {
   }
 
   std::string GetFilename() const {
-    const std::string path = CreateTempPath(sandbox + "/catalog",
-                                            0600);
+    const std::string path = CreateTempPath(sandbox + "/catalog", 0600);
     CheckEmpty(path);
     CheckExistence(path);
     return path;
@@ -40,15 +38,13 @@ class T_FileGuard : public ::testing::Test {
   }
 
  private:
-  void CheckEmpty(const std::string &str) const {
-    ASSERT_FALSE(str.empty());
-  }
+  void CheckEmpty(const std::string &str) const { ASSERT_FALSE(str.empty()); }
 };
 
 const std::string T_FileGuard::sandbox = "./cvmfs_ut_unlink_guard";
 
 
-TEST_F(T_FileGuard, Initialize) {}
+TEST_F(T_FileGuard, Initialize) { }
 
 
 TEST_F(T_FileGuard, SimpleUnlink) {
@@ -116,9 +112,7 @@ TEST_F(T_FileGuard, MultipleUnlinkGuards) {
     UnlinkGuard d2(file_path2);
     {
       UnlinkGuard d4(file_path4);
-      {
-        UnlinkGuard d5(file_path5);
-      }
+      { UnlinkGuard d5(file_path5); }
 
       EXPECT_FALSE(FileExists(file_path5));
     }

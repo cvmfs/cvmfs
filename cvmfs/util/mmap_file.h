@@ -29,18 +29,18 @@ class CVMFS_EXPORT MemoryMappedFile : SingleCopy {
   bool Map();
   void Unmap();
 
-  inline unsigned char*      buffer()    const { return mapped_file_; }
-  inline size_t              size()      const { return mapped_size_; }
-  inline const std::string&  file_path() const { return file_path_; }
+  inline unsigned char *buffer() const { return mapped_file_; }
+  inline size_t size() const { return mapped_size_; }
+  inline const std::string &file_path() const { return file_path_; }
 
   inline bool IsMapped() const { return mapped_; }
 
  private:
-  const std::string  file_path_;
-  int                file_descriptor_;
-  unsigned char     *mapped_file_;
-  size_t             mapped_size_;
-  bool               mapped_;
+  const std::string file_path_;
+  int file_descriptor_;
+  unsigned char *mapped_file_;
+  size_t mapped_size_;
+  bool mapped_;
 };
 
 

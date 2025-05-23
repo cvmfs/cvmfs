@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <errno.h>
+#include <gtest/gtest.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -13,32 +12,29 @@
 
 
 struct thread_args {
-  int                            state;
+  int state;
   SynchronizingCounter<int64_t> *counter;
 };
 
 
 class T_SynchronizingCounter : public ::testing::Test {
  public:
-  T_SynchronizingCounter() :
-    threads_(NULL), states_(NULL), n_threads_(0) {}
-  virtual ~T_SynchronizingCounter() {
-    Clear();
-  }
+  T_SynchronizingCounter() : threads_(NULL), states_(NULL), n_threads_(0) { }
+  virtual ~T_SynchronizingCounter() { Clear(); }
 
  protected:
-  void StartThreads(const unsigned int             number_of_threads,
-                    SynchronizingCounter<int64_t>  *counter_to_test,
-                    void *(*thread_function)(void*)) {
+  void StartThreads(const unsigned int number_of_threads,
+                    SynchronizingCounter<int64_t> *counter_to_test,
+                    void *(*thread_function)(void *)) {
     n_threads_ = number_of_threads;
-    threads_   = new pthread_t[n_threads_];
-    states_    = new thread_args[n_threads_];
+    threads_ = new pthread_t[n_threads_];
+    states_ = new thread_args[n_threads_];
 
     for (unsigned int i = 0; i < n_threads_; ++i) {
-      states_[i].state   = 0;
+      states_[i].state = 0;
       states_[i].counter = counter_to_test;
-      const int r = pthread_create(&threads_[i], NULL,
-                                   thread_function, &states_[i]);
+      const int r = pthread_create(&threads_[i], NULL, thread_function,
+                                   &states_[i]);
       ASSERT_EQ(0, r) << "Failed to spawn thread";
     }
   }
@@ -69,7 +65,7 @@ class T_SynchronizingCounter : public ::testing::Test {
   }
 
  private:
-  pthread_t   *threads_;
+  pthread_t *threads_;
   thread_args *states_;
   unsigned int n_threads_;
 };
@@ -154,7 +150,7 @@ TEST_F(T_SynchronizingCounter, Decrement) {
 
 
 void *thread_wait_for_assignment(void *arg) {
-  thread_args &state = *static_cast<thread_args*>(arg);
+  thread_args &state = *static_cast<thread_args *>(arg);
   state.state = 1;
 
   state.counter->WaitForZero();
@@ -184,7 +180,7 @@ TEST_F(T_SynchronizingCounter, WaitForAssignment) {
 
 
 void *thread_wait_for_decrement(void *arg) {
-  thread_args &state = *static_cast<thread_args*>(arg);
+  thread_args &state = *static_cast<thread_args *>(arg);
   state.state = 1;
 
   state.counter->WaitForZero();
@@ -250,7 +246,7 @@ TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
 
 
 void *thread_wait_for_increment(void *arg) {
-  thread_args &state = *static_cast<thread_args*>(arg);
+  thread_args &state = *static_cast<thread_args *>(arg);
   state.state = 1;
 
   state.counter->WaitForZero();
@@ -320,7 +316,7 @@ TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
 
 
 void *concurrent_increment(void *arg) {
-  const thread_args &state = *static_cast<thread_args*>(arg);
+  const thread_args &state = *static_cast<thread_args *>(arg);
 
   for (int i = 0; i < state.state; ++i) {
     state.counter->Increment();
@@ -330,7 +326,7 @@ void *concurrent_increment(void *arg) {
 }
 
 void *concurrent_decrement(void *arg) {
-  const thread_args &state = *static_cast<thread_args*>(arg);
+  const thread_args &state = *static_cast<thread_args *>(arg);
 
   for (int i = 0; i < state.state; ++i) {
     state.counter->Decrement();
@@ -348,20 +344,17 @@ TEST_F(T_SynchronizingCounter, MultiThreadCountingSlow) {
   EXPECT_EQ(0, counter.Get());
   EXPECT_FALSE(counter.HasMaximalValue());
 
-  pthread_t   threads[thread_count];
+  pthread_t threads[thread_count];
   thread_args states[thread_count];
 
   for (int i = 0; i < thread_count; ++i) {
     states[i].counter = &counter;
-    states[i].state   = 14452394;
+    states[i].state = 14452394;
 
-    void *(*start_routine) (void *) = (i % 2 == 0)
-                                    ? &concurrent_increment
-                                    : &concurrent_decrement;
-    const int ret = pthread_create(&threads[i],
-                                    NULL,
-                                    start_routine,
-                                    static_cast<void*>(&states[i]));
+    void *(*start_routine)(void *) = (i % 2 == 0) ? &concurrent_increment
+                                                  : &concurrent_decrement;
+    const int ret = pthread_create(
+        &threads[i], NULL, start_routine, static_cast<void *>(&states[i]));
     ASSERT_EQ(0, ret);
   }
 

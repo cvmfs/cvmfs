@@ -12,7 +12,6 @@
 #define __STDC_FORMAT_MACROS
 
 
-
 #include <errno.h>
 #include <inttypes.h>
 
@@ -28,12 +27,11 @@
 
 #define TEST_LINE_MAX 1024
 
-typedef std::map<std::string, cvmfs_context*> RepoMap;
+typedef std::map<std::string, cvmfs_context *> RepoMap;
 static RepoMap attached_repos;
 cvmfs_option_map *cvmfs_opts = NULL;
 
-void cvmfs_test_help()
-{
+void cvmfs_test_help() {
   printf("commands are:\n");
   printf("   attach <repo name (without .cern.ch)>\n");
   printf("   detach <repo name (without .cern.ch)>\n");
@@ -47,8 +45,7 @@ static void cvmfs_log_ignore(const char *msg) {
   // fprintf(stderr, "%s\n", msg);
 }
 
-int cvmfs_test_list(cvmfs_context *ctx, const char *path)
-{
+int cvmfs_test_list(cvmfs_context *ctx, const char *path) {
   if (ctx == NULL) {
     fprintf(stderr, "%s\n", "please attach a repo first!");
     return -1;
@@ -71,8 +68,8 @@ int cvmfs_test_list(cvmfs_context *ctx, const char *path)
   for (i = 0; buffer[i]; i++) {
     snprintf(filepath, TEST_LINE_MAX, "%s/%s", path, buffer[i]);
     cvmfs_stat(ctx, filepath, &info);
-    printf("%10" PRIu64 " %s\n",
-           static_cast<uint64_t>(info.st_size), buffer[i]);
+    printf("%10" PRIu64 " %s\n", static_cast<uint64_t>(info.st_size),
+           buffer[i]);
   }
 
   free(buffer);
@@ -80,8 +77,7 @@ int cvmfs_test_list(cvmfs_context *ctx, const char *path)
   return 0;
 }
 
-int cvmfs_test_cat(cvmfs_context *ctx, const char *path)
-{
+int cvmfs_test_cat(cvmfs_context *ctx, const char *path) {
   if (ctx == NULL) {
     fprintf(stderr, "%s\n", "please attach a repo first!");
     return -1;
@@ -97,7 +93,8 @@ int cvmfs_test_cat(cvmfs_context *ctx, const char *path)
 
   while (1) {
     int length = read(fd, buffer, sizeof(buffer));
-    if (length <= 0) break;
+    if (length <= 0)
+      break;
     int retval = write(1, buffer, length);
     assert(retval == length);
   }
@@ -107,8 +104,7 @@ int cvmfs_test_cat(cvmfs_context *ctx, const char *path)
   return 0;
 }
 
-cvmfs_context* cvmfs_test_attach(const char *repo_name)
-{
+cvmfs_context *cvmfs_test_attach(const char *repo_name) {
   cvmfs_context *ctx = NULL;
 
   RepoMap::const_iterator i = attached_repos.find(repo_name);
@@ -116,9 +112,9 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
     std::string fqrn = std::string(repo_name) + ".cern.ch";
     cvmfs_option_map *repo_opts = cvmfs_options_clone(cvmfs_opts);
     cvmfs_options_set(repo_opts, "CVMFS_SERVER_URL",
-      "http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;"
-      "http://cernvmfs.gridpp.rl.ac.uk/cvmfs/@fqrn@;"
-      "http://cvmfs.racf.bnl.gov/cvmfs/@fqrn@");
+                      "http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;"
+                      "http://cernvmfs.gridpp.rl.ac.uk/cvmfs/@fqrn@;"
+                      "http://cvmfs.racf.bnl.gov/cvmfs/@fqrn@");
     cvmfs_options_set(repo_opts, "CVMFS_PUBLIC_KEY",
                       "/etc/cvmfs/keys/cern.ch/cern-it4.pub");
 
@@ -160,8 +156,7 @@ void cvmfs_test_detach(const char *repo_name, const cvmfs_context *active_ctx) {
 }
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   char line[TEST_LINE_MAX];
   char path[TEST_LINE_MAX];
   char repo_name[TEST_LINE_MAX];
@@ -188,9 +183,10 @@ int main(int argc, char *argv[])
     printf("cvmfs> ");
     fflush(stdout);
 
-    if (!fgets(line, sizeof(line), stdin)) break;
+    if (!fgets(line, sizeof(line), stdin))
+      break;
 
-    line[strlen(line)-1] = 0;
+    line[strlen(line) - 1] = 0;
 
     if (sscanf(line, "list %s", path) == 1) {
       cvmfs_test_list(ctx, path);
@@ -212,4 +208,3 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-

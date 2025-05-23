@@ -27,7 +27,7 @@ class SyncItemNative;
 class SyncItemTar;
 class SyncItemDummyDir;
 class SyncItemDummyCatalog;
-}
+}  // namespace publish
 namespace swissknife {
 class CommandMigrate;
 }
@@ -41,7 +41,7 @@ class MockCatalogManager;
 class Catalog;
 class WritableCatalogManager;
 
-template <class CatalogMgrT>
+template<class CatalogMgrT>
 class CatalogBalancer;
 typedef uint64_t inode_t;
 
@@ -81,24 +81,24 @@ class DirectoryEntryBase {
    * and CommandCheck::CompareEntries
    */
   struct Difference {
-    static const unsigned int kIdentical                    = 0x00000;
-    static const unsigned int kName                         = 0x00001;
-    static const unsigned int kLinkcount                    = 0x00002;
-    static const unsigned int kSize                         = 0x00004;
-    static const unsigned int kMode                         = 0x00008;
-    static const unsigned int kMtime                        = 0x00010;
-    static const unsigned int kSymlink                      = 0x00020;
-    static const unsigned int kChecksum                     = 0x00040;
-    static const unsigned int kHardlinkGroup                = 0x00080;
+    static const unsigned int kIdentical = 0x00000;
+    static const unsigned int kName = 0x00001;
+    static const unsigned int kLinkcount = 0x00002;
+    static const unsigned int kSize = 0x00004;
+    static const unsigned int kMode = 0x00008;
+    static const unsigned int kMtime = 0x00010;
+    static const unsigned int kSymlink = 0x00020;
+    static const unsigned int kChecksum = 0x00040;
+    static const unsigned int kHardlinkGroup = 0x00080;
     static const unsigned int kNestedCatalogTransitionFlags = 0x00100;
-    static const unsigned int kChunkedFileFlag              = 0x00200;
-    static const unsigned int kHasXattrsFlag                = 0x00400;
-    static const unsigned int kExternalFileFlag             = 0x00800;
-    static const unsigned int kBindMountpointFlag           = 0x01000;
-    static const unsigned int kHiddenFlag                   = 0x02000;
-    static const unsigned int kDirectIoFlag                 = 0x04000;
-    static const unsigned int kUid                          = 0x08000;
-    static const unsigned int kGid                          = 0x10000;
+    static const unsigned int kChunkedFileFlag = 0x00200;
+    static const unsigned int kHasXattrsFlag = 0x00400;
+    static const unsigned int kExternalFileFlag = 0x00800;
+    static const unsigned int kBindMountpointFlag = 0x01000;
+    static const unsigned int kHiddenFlag = 0x02000;
+    static const unsigned int kDirectIoFlag = 0x04000;
+    static const unsigned int kUid = 0x08000;
+    static const unsigned int kGid = 0x10000;
   };
   typedef unsigned int Differences;
 
@@ -106,45 +106,44 @@ class DirectoryEntryBase {
    * Zero-constructed DirectoryEntry objects are unusable as such.
    */
   inline DirectoryEntryBase()
-    : inode_(kInvalidInode)
-    , mode_(0)
-    , uid_(0)
-    , gid_(0)
-    , size_(0)
-    , mtime_(0)
-    , mtime_ns_(-1)
-    , linkcount_(1)  // generally a normal file has linkcount 1 -> default
-    , has_xattrs_(false)
-    , is_external_file_(false)
-    , is_direct_io_(false)
-    , compression_algorithm_(zlib::kZlibDefault)
-    { }
+      : inode_(kInvalidInode)
+      , mode_(0)
+      , uid_(0)
+      , gid_(0)
+      , size_(0)
+      , mtime_(0)
+      , mtime_ns_(-1)
+      , linkcount_(1)  // generally a normal file has linkcount 1 -> default
+      , has_xattrs_(false)
+      , is_external_file_(false)
+      , is_direct_io_(false)
+      , compression_algorithm_(zlib::kZlibDefault) { }
 
-  inline bool IsRegular() const                 { return S_ISREG(mode_); }
-  inline bool IsLink() const                    { return S_ISLNK(mode_); }
-  inline bool IsDirectory() const               { return S_ISDIR(mode_); }
-  inline bool IsFifo() const                    { return S_ISFIFO(mode_); }
-  inline bool IsSocket() const                  { return S_ISSOCK(mode_); }
-  inline bool IsCharDev() const                 { return S_ISCHR(mode_); }
-  inline bool IsBlockDev() const                { return S_ISBLK(mode_); }
+  inline bool IsRegular() const { return S_ISREG(mode_); }
+  inline bool IsLink() const { return S_ISLNK(mode_); }
+  inline bool IsDirectory() const { return S_ISDIR(mode_); }
+  inline bool IsFifo() const { return S_ISFIFO(mode_); }
+  inline bool IsSocket() const { return S_ISSOCK(mode_); }
+  inline bool IsCharDev() const { return S_ISCHR(mode_); }
+  inline bool IsBlockDev() const { return S_ISBLK(mode_); }
   inline bool IsSpecial() const {
     return IsFifo() || IsSocket() || IsCharDev() || IsBlockDev();
   }
-  inline bool IsExternalFile() const            { return is_external_file_; }
-  inline bool IsDirectIo() const                { return is_direct_io_; }
-  inline bool HasXattrs() const                 { return has_xattrs_;    }
-  inline bool HasMtimeNs() const                { return mtime_ns_ >= 0; }
+  inline bool IsExternalFile() const { return is_external_file_; }
+  inline bool IsDirectIo() const { return is_direct_io_; }
+  inline bool HasXattrs() const { return has_xattrs_; }
+  inline bool HasMtimeNs() const { return mtime_ns_ >= 0; }
 
-  inline inode_t inode() const                  { return inode_; }
-  inline uint32_t linkcount() const             { return linkcount_; }
-  inline NameString name() const                { return name_; }
-  inline LinkString symlink() const             { return symlink_; }
-  inline time_t mtime() const                   { return mtime_; }
-  inline int32_t mtime_ns() const               { return mtime_ns_; }
-  inline unsigned int mode() const              { return mode_; }
-  inline uid_t uid() const                      { return uid_; }
-  inline gid_t gid() const                      { return gid_; }
-  inline shash::Any checksum() const            { return checksum_; }
+  inline inode_t inode() const { return inode_; }
+  inline uint32_t linkcount() const { return linkcount_; }
+  inline NameString name() const { return name_; }
+  inline LinkString symlink() const { return symlink_; }
+  inline time_t mtime() const { return mtime_; }
+  inline int32_t mtime_ns() const { return mtime_ns_; }
+  inline unsigned int mode() const { return mode_; }
+  inline uid_t uid() const { return uid_; }
+  inline gid_t gid() const { return gid_; }
+  inline shash::Any checksum() const { return checksum_; }
   inline const shash::Any *checksum_ptr() const { return &checksum_; }
   inline shash::Algorithms hash_algorithm() const {
     return checksum_.algorithm;
@@ -172,9 +171,7 @@ class DirectoryEntryBase {
     assert(linkcount > 0);
     linkcount_ = linkcount;
   }
-  inline void set_symlink(const LinkString &symlink) {
-    symlink_ = symlink;
-  }
+  inline void set_symlink(const LinkString &symlink) { symlink_ = symlink; }
   inline void set_has_xattrs(const bool has_xattrs) {
     has_xattrs_ = has_xattrs;
   }
@@ -218,10 +215,10 @@ class DirectoryEntryBase {
   }
 
   Differences CompareTo(const DirectoryEntryBase &other) const;
-  inline bool operator ==(const DirectoryEntryBase &other) const {
+  inline bool operator==(const DirectoryEntryBase &other) const {
     return CompareTo(other) == Difference::kIdentical;
   }
-  inline bool operator !=(const DirectoryEntryBase &other) const {
+  inline bool operator!=(const DirectoryEntryBase &other) const {
     return !(*this == other);
   }
 
@@ -288,43 +285,45 @@ class DirectoryEntry : public DirectoryEntryBase {
    * constructor of DirectoryEntryBase and initializes the additional fields of
    * DirectoryEntry.
    */
-  inline explicit DirectoryEntry(const DirectoryEntryBase& base)
-    : DirectoryEntryBase(base)
-    , hardlink_group_(0)
-    , is_nested_catalog_root_(false)
-    , is_nested_catalog_mountpoint_(false)
-    , is_bind_mountpoint_(false)
-    , is_chunked_file_(false)
-    , is_hidden_(false)
-    , is_negative_(false) { }
+  inline explicit DirectoryEntry(const DirectoryEntryBase &base)
+      : DirectoryEntryBase(base)
+      , hardlink_group_(0)
+      , is_nested_catalog_root_(false)
+      , is_nested_catalog_mountpoint_(false)
+      , is_bind_mountpoint_(false)
+      , is_chunked_file_(false)
+      , is_hidden_(false)
+      , is_negative_(false) { }
 
   inline DirectoryEntry()
-    : hardlink_group_(0)
-    , is_nested_catalog_root_(false)
-    , is_nested_catalog_mountpoint_(false)
-    , is_bind_mountpoint_(false)
-    , is_chunked_file_(false)
-    , is_hidden_(false)
-    , is_negative_(false) { }
+      : hardlink_group_(0)
+      , is_nested_catalog_root_(false)
+      , is_nested_catalog_mountpoint_(false)
+      , is_bind_mountpoint_(false)
+      , is_chunked_file_(false)
+      , is_hidden_(false)
+      , is_negative_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
-    : hardlink_group_(0)
-    , is_nested_catalog_root_(false)
-    , is_nested_catalog_mountpoint_(false)
-    , is_bind_mountpoint_(false)
-    , is_chunked_file_(false)
-    , is_hidden_(false)
-    , is_negative_(true) { assert(special_type == kDirentNegative); }
+      : hardlink_group_(0)
+      , is_nested_catalog_root_(false)
+      , is_nested_catalog_mountpoint_(false)
+      , is_bind_mountpoint_(false)
+      , is_chunked_file_(false)
+      , is_hidden_(false)
+      , is_negative_(true) {
+    assert(special_type == kDirentNegative);
+  }
 
   inline SpecialDirents GetSpecial() const {
     return is_negative_ ? kDirentNegative : kDirentNormal;
   }
 
   Differences CompareTo(const DirectoryEntry &other) const;
-  inline bool operator ==(const DirectoryEntry &other) const {
+  inline bool operator==(const DirectoryEntry &other) const {
     return CompareTo(other) == Difference::kIdentical;
   }
-  inline bool operator !=(const DirectoryEntry &other) const {
+  inline bool operator!=(const DirectoryEntry &other) const {
     return !(*this == other);
   }
 
@@ -350,12 +349,8 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline void set_is_bind_mountpoint(const bool val) {
     is_bind_mountpoint_ = val;
   }
-  inline void set_is_chunked_file(const bool val) {
-    is_chunked_file_ = val;
-  }
-  inline void set_is_hidden(const bool val) {
-    is_hidden_ = val;
-  }
+  inline void set_is_chunked_file(const bool val) { is_chunked_file_ = val; }
+  inline void set_is_hidden(const bool val) { is_hidden_ = val; }
 
  private:
   /**

@@ -27,10 +27,10 @@ namespace catalog {
 
 class VirtualCatalog {
  public:
-  static const char *kVirtualPath;  // = ".cvmfs"
-  static const int kActionNone;  // = 0x00
+  static const char *kVirtualPath;            // = ".cvmfs"
+  static const int kActionNone;               // = 0x00
   static const int kActionGenerateSnapshots;  // = 0x01
-  static const int kActionRemove;  // 0x02;
+  static const int kActionRemove;             // 0x02;
 
   static bool ParseActions(const std::string &action_desc, int *actions);
 
@@ -46,12 +46,15 @@ class VirtualCatalog {
   struct TagId {
     TagId() { }
     TagId(const std::string &n, const shash::Any &h) : name(n), hash(h) { }
-    bool operator ==(const TagId &other) const {
+    bool operator==(const TagId &other) const {
       return (this->name == other.name) && (this->hash == other.hash);
     }
-    bool operator <(const TagId &other) const {
-      if (this->name < other.name) { return true; }
-      else if (this->name > other.name) { return false; }
+    bool operator<(const TagId &other) const {
+      if (this->name < other.name) {
+        return true;
+      } else if (this->name > other.name) {
+        return false;
+      }
       return this->hash < other.hash;
     }
 

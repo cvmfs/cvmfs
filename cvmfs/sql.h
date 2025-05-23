@@ -16,27 +16,26 @@ namespace sqlite {
 
 struct MemStatistics {
   MemStatistics()
-    : lookaside_slots_used(-1)
-    , lookaside_slots_max(-1)
-    , lookaside_hit(-1)
-    , lookaside_miss_size(-1)
-    , lookaside_miss_full(-1)
-    , page_cache_used(-1)
-    , page_cache_hit(-1)
-    , page_cache_miss(-1)
-    , schema_used(-1)
-    , stmt_used(-1)
-  { }
+      : lookaside_slots_used(-1)
+      , lookaside_slots_max(-1)
+      , lookaside_hit(-1)
+      , lookaside_miss_size(-1)
+      , lookaside_miss_full(-1)
+      , page_cache_used(-1)
+      , page_cache_hit(-1)
+      , page_cache_miss(-1)
+      , schema_used(-1)
+      , stmt_used(-1) { }
   int lookaside_slots_used;
   int lookaside_slots_max;
   int lookaside_hit;
   int lookaside_miss_size;
   int lookaside_miss_full;
-  int page_cache_used;   ///< Bytes used for caching pages
+  int page_cache_used;  ///< Bytes used for caching pages
   int page_cache_hit;
   int page_cache_miss;
   int schema_used;  ///< Bytes used to store db schema
-  int stmt_used;  ///< Bytes used for prepared statmements (lookaside + heap)
+  int stmt_used;    ///< Bytes used for prepared statmements (lookaside + heap)
 };
 
 class Sql;
@@ -94,7 +93,7 @@ class Sql;
  *
  * TODO(rmeusel): C++11 Move Constructors to allow for stack allocated databases
  */
-template <class DerivedT>
+template<class DerivedT>
 class Database : SingleCopy {
  public:
   enum OpenMode {
@@ -112,7 +111,7 @@ class Database : SingleCopy {
    *                  (file does not need to exist)
    * @return          an empty database of type DerivedT (or NULL on failure)
    */
-  static DerivedT* Create(const std::string  &filename);
+  static DerivedT *Create(const std::string &filename);
 
   /**
    * Opens a database file and assumes it to be of type DerivedT. This method
@@ -125,30 +124,29 @@ class Database : SingleCopy {
    * @param open_mode  kOpenReadOnly or kOpenReadWrite open modes
    * @return           a database of type DerivedT (or NULL on failure)
    */
-  static DerivedT* Open(const std::string  &filename,
-                        const OpenMode      open_mode);
+  static DerivedT *Open(const std::string &filename, const OpenMode open_mode);
 
   bool IsEqualSchema(const float value, const float compare) const {
-    return (value > compare - kSchemaEpsilon &&
-            value < compare + kSchemaEpsilon);
+    return (value > compare - kSchemaEpsilon
+            && value < compare + kSchemaEpsilon);
   }
 
   bool BeginTransaction() const;
   bool CommitTransaction() const;
 
-  template <typename T>
+  template<typename T>
   T GetProperty(const std::string &key) const;
-  template <typename T>
+  template<typename T>
   T GetPropertyDefault(const std::string &key, const T default_value) const;
-  template <typename T>
+  template<typename T>
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
-  sqlite3*            sqlite_db()       const { return database_.database();  }
-  const std::string&  filename()        const { return database_.filename();  }
-  float               schema_version()  const { return schema_version_;       }
-  unsigned            schema_revision() const { return schema_revision_;      }
-  bool                read_write()      const { return read_write_;           }
+  sqlite3 *sqlite_db() const { return database_.database(); }
+  const std::string &filename() const { return database_.filename(); }
+  float schema_version() const { return schema_version_; }
+  unsigned schema_revision() const { return schema_revision_; }
+  bool read_write() const { return read_write_; }
 
   /**
    * Provides the number of rows modified by INSERT, UPDATE or DELETE statements
@@ -172,10 +170,10 @@ class Database : SingleCopy {
   void GetMemStatistics(MemStatistics *stats) const;
 
   /**
-   * Performs a VACUUM call on the opened database file to compacts the database.
-   * As a first step it runs DerivedT::CompactDatabase() to allow for implement-
-   * ation dependent cleanup actions. Vacuum() assumes that the SQLite database
-   * was opened in read/write mode.
+   * Performs a VACUUM call on the opened database file to compacts the
+   * database. As a first step it runs DerivedT::CompactDatabase() to allow for
+   * implement- ation dependent cleanup actions. Vacuum() assumes that the
+   * SQLite database was opened in read/write mode.
    * @return  true on success
    */
   bool Vacuum() const;
@@ -234,8 +232,7 @@ class Database : SingleCopy {
    * Private constructor! Use the factory methods DerivedT::Create() or
    * DerivedT::Open() to instantiate a database object of type DerivedT.
    */
-  Database(const std::string  &filename,
-           const OpenMode      open_mode);
+  Database(const std::string &filename, const OpenMode open_mode);
 
   bool Initialize();
 
@@ -249,7 +246,7 @@ class Database : SingleCopy {
   void ReadSchemaRevision();
   bool StoreSchemaRevision();
 
-  void set_schema_version(const float ver)     { schema_version_  = ver; }
+  void set_schema_version(const float ver) { schema_version_ = ver; }
   void set_schema_revision(const unsigned rev) { schema_revision_ = rev; }
 
  private:
@@ -259,27 +256,27 @@ class Database : SingleCopy {
    * in an RAII fashion.
    */
   struct DatabaseRaiiWrapper {
-    DatabaseRaiiWrapper(const std::string   &filename,
-                        Database<DerivedT>  *delegate)
-      : sqlite_db(NULL)
-      , lookaside_buffer(NULL)
-      , db_file_guard(filename, UnlinkGuard::kDisabled)
-      , delegate_(delegate) {}
+    DatabaseRaiiWrapper(const std::string &filename,
+                        Database<DerivedT> *delegate)
+        : sqlite_db(NULL)
+        , lookaside_buffer(NULL)
+        , db_file_guard(filename, UnlinkGuard::kDisabled)
+        , delegate_(delegate) { }
     ~DatabaseRaiiWrapper();
 
-    sqlite3*           database() const { return sqlite_db;            }
-    const std::string& filename() const { return db_file_guard.path(); }
+    sqlite3 *database() const { return sqlite_db; }
+    const std::string &filename() const { return db_file_guard.path(); }
 
     bool Close();
 
-    void TakeFileOwnership() { db_file_guard.Enable();           }
-    void DropFileOwnership() { db_file_guard.Disable();          }
-    bool OwnsFile() const    { return db_file_guard.IsEnabled(); }
+    void TakeFileOwnership() { db_file_guard.Enable(); }
+    void DropFileOwnership() { db_file_guard.Disable(); }
+    bool OwnsFile() const { return db_file_guard.IsEnabled(); }
 
-    sqlite3             *sqlite_db;
-    void                *lookaside_buffer;
-    UnlinkGuard          db_file_guard;
-    Database<DerivedT>  *delegate_;
+    sqlite3 *sqlite_db;
+    void *lookaside_buffer;
+    UnlinkGuard db_file_guard;
+    Database<DerivedT> *delegate_;
   };
 
   static const char *kSchemaVersionKey;
@@ -287,16 +284,16 @@ class Database : SingleCopy {
 
   DatabaseRaiiWrapper database_;
 
-  const bool          read_write_;
-  float               schema_version_;
-  unsigned            schema_revision_;
+  const bool read_write_;
+  float schema_version_;
+  unsigned schema_revision_;
 
-  UniquePtr<Sql>      begin_transaction_;
-  UniquePtr<Sql>      commit_transaction_;
+  UniquePtr<Sql> begin_transaction_;
+  UniquePtr<Sql> commit_transaction_;
 
-  UniquePtr<Sql>      has_property_;
-  UniquePtr<Sql>      set_property_;
-  UniquePtr<Sql>      get_property_;
+  UniquePtr<Sql> has_property_;
+  UniquePtr<Sql> set_property_;
+  UniquePtr<Sql> get_property_;
 };
 
 
@@ -352,20 +349,18 @@ class Sql {
    */
   std::string GetLastErrorMsg() const;
 
-  bool BindBlob(const int index, const void* value, const unsigned size) {
+  bool BindBlob(const int index, const void *value, const unsigned size) {
     LazyInit();
-    last_error_code_ =
-      sqlite3_bind_blob(statement_, index, value, static_cast<int>(size),
-                        SQLITE_STATIC);
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value,
+                                         static_cast<int>(size), SQLITE_STATIC);
     return Successful();
   }
-  bool BindBlobTransient(const int index, const void* value,
-                         const unsigned size)
-  {
+  bool BindBlobTransient(const int index, const void *value,
+                         const unsigned size) {
     LazyInit();
-    last_error_code_ =
-      sqlite3_bind_blob(statement_, index, value, static_cast<int>(size),
-                        SQLITE_TRANSIENT);  // NOLINT
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value,
+                                         static_cast<int>(size),
+                                         SQLITE_TRANSIENT);  // NOLINT
     return Successful();
   }
   bool BindDouble(const int index, const double value) {
@@ -389,8 +384,8 @@ class Sql {
     return Successful();
   }
   bool BindTextTransient(const int index, const std::string &value) {
-    return BindTextTransient(
-      index, value.data(), static_cast<int>(value.length()));
+    return BindTextTransient(index, value.data(),
+                             static_cast<int>(value.length()));
   }
   bool BindTextTransient(const int index, const char *value, const int size) {
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -400,10 +395,10 @@ class Sql {
     return BindText(index, value.data(), static_cast<int>(value.length()),
                     SQLITE_STATIC);
   }
-  bool BindText(const int   index,
-                const char* value,
-                const int   size,
-                void(*dtor)(void*) = SQLITE_STATIC) {
+  bool BindText(const int index,
+                const char *value,
+                const int size,
+                void (*dtor)(void *) = SQLITE_STATIC) {
     LazyInit();
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
@@ -414,7 +409,7 @@ class Sql {
    * NOTE: For strings this is suboptimal, since it needs to assume that the
    *       provided buffer is transient and copy it to be sure.
    */
-  template <typename T>
+  template<typename T>
   inline bool Bind(const int index, const T &value);
 
 
@@ -454,17 +449,17 @@ class Sql {
     return sqlite3_column_text(statement_, idx_column);
   }
   std::string RetrieveString(const int idx_column) const {
-    return reinterpret_cast<const char*>(RetrieveText(idx_column));
+    return reinterpret_cast<const char *>(RetrieveText(idx_column));
   }
-  template <typename T>
+  template<typename T>
   inline T Retrieve(const int index);
 
  protected:
   Sql()
-    : database_(NULL)
-    , statement_(NULL)
-    , query_string_(NULL)
-    , last_error_code_(0) { }
+      : database_(NULL)
+      , statement_(NULL)
+      , query_string_(NULL)
+      , last_error_code_(0) { }
 
   bool IsInitialized() const { return statement_ != NULL; }
 
@@ -492,9 +487,8 @@ class Sql {
    * @return true if last action succeeded otherwise false
    */
   inline bool Successful() const {
-    return SQLITE_OK   == last_error_code_ ||
-           SQLITE_ROW  == last_error_code_ ||
-           SQLITE_DONE == last_error_code_;
+    return SQLITE_OK == last_error_code_ || SQLITE_ROW == last_error_code_
+           || SQLITE_DONE == last_error_code_;
   }
 
  private:
@@ -508,10 +502,10 @@ class Sql {
     }
   }
 
-  sqlite3       *database_;
-  sqlite3_stmt  *statement_;
-  const char    *query_string_;
-  int            last_error_code_;
+  sqlite3 *database_;
+  sqlite3_stmt *statement_;
+  const char *query_string_;
+  int last_error_code_;
 };
 
 }  // namespace sqlite

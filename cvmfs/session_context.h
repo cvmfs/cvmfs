@@ -20,13 +20,13 @@
 namespace upload {
 
 struct CurlSendPayload {
-  const std::string* json_message;
-  ObjectPackProducer* pack_serializer;
+  const std::string *json_message;
+  ObjectPackProducer *pack_serializer;
   size_t index;
 };
 
-size_t SendCB(void* ptr, size_t size, size_t nmemb, void* userp);
-size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp);
+size_t SendCB(void *ptr, size_t size, size_t nmemb, void *userp);
+size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp);
 
 /**
  * This class implements a context for a single publish operation
@@ -46,23 +46,22 @@ class SessionContextBase {
 
   virtual ~SessionContextBase();
 
-// By default, the maximum number of queued jobs is limited to 10,
-// representing 10 * 200 MB = 2GB max memory used by the queue
-bool Initialize(const std::string& api_url, const std::string& session_token,
-                  const std::string& key_id, const std::string& secret,
+  // By default, the maximum number of queued jobs is limited to 10,
+  // representing 10 * 200 MB = 2GB max memory used by the queue
+  bool Initialize(const std::string &api_url, const std::string &session_token,
+                  const std::string &key_id, const std::string &secret,
                   uint64_t max_pack_size = ObjectPack::kDefaultLimit,
                   uint64_t max_queue_size = 10);
-  bool Finalize(bool commit, const std::string& old_root_hash,
-                const std::string& new_root_hash,
-                const RepositoryTag& tag);
+  bool Finalize(bool commit, const std::string &old_root_hash,
+                const std::string &new_root_hash, const RepositoryTag &tag);
 
-  void WaitForUpload() {}
+  void WaitForUpload() { }
 
   ObjectPack::BucketHandle NewBucket();
 
   bool CommitBucket(const ObjectPack::BucketContentType type,
-                    const shash::Any& id, const ObjectPack::BucketHandle handle,
-                    const std::string& name = "",
+                    const shash::Any &id, const ObjectPack::BucketHandle handle,
+                    const std::string &name = "",
                     const bool force_dispatch = false);
 
  protected:
@@ -70,11 +69,11 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
 
   virtual bool FinalizeDerived() = 0;
 
-  virtual bool Commit(const std::string& old_root_hash,
-                      const std::string& new_root_hash,
-                      const RepositoryTag& tag) = 0;
+  virtual bool Commit(const std::string &old_root_hash,
+                      const std::string &new_root_hash,
+                      const RepositoryTag &tag) = 0;
 
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) = 0;
+  virtual Future<bool> *DispatchObjectPack(ObjectPack *pack) = 0;
 
   Tube<Future<bool> > upload_results_;
 
@@ -90,7 +89,7 @@ bool Initialize(const std::string& api_url, const std::string& session_token,
 
   std::vector<ObjectPack::BucketHandle> active_handles_;
 
-  ObjectPack* current_pack_;
+  ObjectPack *current_pack_;
   pthread_mutex_t current_pack_mtx_;
 
   uint64_t bytes_committed_;
@@ -105,24 +104,24 @@ class SessionContext : public SessionContextBase {
 
  protected:
   struct UploadJob {
-    ObjectPack* pack;
-    Future<bool>* result;
+    ObjectPack *pack;
+    Future<bool> *result;
   };
 
   virtual bool InitializeDerived(uint64_t max_queue_size);
 
   virtual bool FinalizeDerived();
 
-  virtual bool Commit(const std::string& old_root_hash,
-                      const std::string& new_root_hash,
-                      const RepositoryTag& tag);
+  virtual bool Commit(const std::string &old_root_hash,
+                      const std::string &new_root_hash,
+                      const RepositoryTag &tag);
 
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack);
+  virtual Future<bool> *DispatchObjectPack(ObjectPack *pack);
 
-  virtual bool DoUpload(const UploadJob* job);
+  virtual bool DoUpload(const UploadJob *job);
 
  private:
-  static void* UploadLoop(void* data);
+  static void *UploadLoop(void *data);
 
   UniquePtr<Tube<UploadJob> > upload_jobs_;
 

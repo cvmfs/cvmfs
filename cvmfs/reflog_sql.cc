@@ -9,9 +9,9 @@
 
 #include "util/string.h"
 
-const float    ReflogDatabase::kLatestSchema          = 1.0;
-const float    ReflogDatabase::kLatestSupportedSchema = 1.0;
-const unsigned ReflogDatabase::kLatestSchemaRevision  = 0;
+const float ReflogDatabase::kLatestSchema = 1.0;
+const float ReflogDatabase::kLatestSupportedSchema = 1.0;
+const unsigned ReflogDatabase::kLatestSchemaRevision = 0;
 
 /**
  * Database Schema ChangeLog:
@@ -27,7 +27,8 @@ bool ReflogDatabase::CreateEmptyDatabase() {
   return sqlite::Sql(sqlite_db(),
                      "CREATE TABLE refs (hash TEXT, type INTEGER, "
                      "timestamp INTEGER, "
-                     "CONSTRAINT pk_refs PRIMARY KEY (hash));").Execute();
+                     "CONSTRAINT pk_refs PRIMARY KEY (hash));")
+      .Execute();
 }
 
 
@@ -54,21 +55,16 @@ bool ReflogDatabase::InsertInitialValues(const std::string &repo_name) {
 #define DB_FIELDS_V1R0  "hash, type, timestamp"
 #define DB_PLACEHOLDERS ":hash, :type, :timestamp"
 
-#define MAKE_STATEMENT(STMT_TMPL, REV)       \
-static const std::string REV =               \
-    ReplaceAll(                              \
-      ReplaceAll(STMT_TMPL,                  \
-        "@DB_FIELDS@", DB_FIELDS_ ## REV),   \
+#define MAKE_STATEMENT(STMT_TMPL, REV)                       \
+  static const std::string REV = ReplaceAll(                 \
+      ReplaceAll(STMT_TMPL, "@DB_FIELDS@", DB_FIELDS_##REV), \
       "@DB_PLACEHOLDERS@", DB_PLACEHOLDERS)
 
-#define MAKE_STATEMENTS(STMT_TMPL) \
-  MAKE_STATEMENT(STMT_TMPL, V1R0)
+#define MAKE_STATEMENTS(STMT_TMPL) MAKE_STATEMENT(STMT_TMPL, V1R0)
 
-#define DEFERRED_INIT(DB, REV) \
-  DeferredInit((DB)->sqlite_db(), (REV).c_str())
+#define DEFERRED_INIT(DB, REV) DeferredInit((DB)->sqlite_db(), (REV).c_str())
 
-#define DEFERRED_INITS(DB) \
-  DEFERRED_INIT((DB), V1R0)
+#define DEFERRED_INITS(DB) DEFERRED_INIT((DB), V1R0)
 
 
 shash::Suffix SqlReflog::ToSuffix(const ReferenceType type) {
@@ -96,12 +92,11 @@ SqlInsertReference::SqlInsertReference(const ReflogDatabase *database) {
   DEFERRED_INITS(database);
 }
 
-bool SqlInsertReference::BindReference(const shash::Any    &reference_hash,
-                                       const ReferenceType  type) {
-  return
-    BindTextTransient(1, reference_hash.ToString()) &&
-    BindInt64(2, static_cast<uint64_t>(type))       &&
-    BindInt64(3, static_cast<uint64_t>(time(NULL)));
+bool SqlInsertReference::BindReference(const shash::Any &reference_hash,
+                                       const ReferenceType type) {
+  return BindTextTransient(1, reference_hash.ToString())
+         && BindInt64(2, static_cast<uint64_t>(type))
+         && BindInt64(3, static_cast<uint64_t>(time(NULL)));
 }
 
 
@@ -140,7 +135,7 @@ bool SqlListReferences::BindOlderThan(const uint64_t timestamp) {
 }
 
 shash::Any SqlListReferences::RetrieveHash() const {
-  const ReferenceType type   = static_cast<ReferenceType>(RetrieveInt64(1));
+  const ReferenceType type = static_cast<ReferenceType>(RetrieveInt64(1));
   const shash::Suffix suffix = ToSuffix(type);
   return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)), suffix);
 }
@@ -154,11 +149,10 @@ SqlRemoveReference::SqlRemoveReference(const ReflogDatabase *database) {
                                       "AND type = :type;");
 }
 
-bool SqlRemoveReference::BindReference(const shash::Any    &reference_hash,
-                                       const ReferenceType  type) {
-  return
-    BindTextTransient(1, reference_hash.ToString()) &&
-    BindInt64(2, static_cast<uint64_t>(type));
+bool SqlRemoveReference::BindReference(const shash::Any &reference_hash,
+                                       const ReferenceType type) {
+  return BindTextTransient(1, reference_hash.ToString())
+         && BindInt64(2, static_cast<uint64_t>(type));
 }
 
 
@@ -171,11 +165,10 @@ SqlContainsReference::SqlContainsReference(const ReflogDatabase *database) {
                                       "  AND hash = :hash");
 }
 
-bool SqlContainsReference::BindReference(const shash::Any    &reference_hash,
-                                         const ReferenceType  type) {
-  return
-    BindInt64(1, static_cast<uint64_t>(type)) &&
-    BindTextTransient(2, reference_hash.ToString());
+bool SqlContainsReference::BindReference(const shash::Any &reference_hash,
+                                         const ReferenceType type) {
+  return BindInt64(1, static_cast<uint64_t>(type))
+         && BindTextTransient(2, reference_hash.ToString());
 }
 
 bool SqlContainsReference::RetrieveAnswer() {
@@ -194,13 +187,10 @@ SqlGetTimestamp::SqlGetTimestamp(const ReflogDatabase *database) {
                                       "  AND hash = :hash");
 }
 
-bool SqlGetTimestamp::BindReference(const shash::Any    &reference_hash,
-                                    const ReferenceType  type) {
-  return
-    BindInt64(1, static_cast<uint64_t>(type)) &&
-    BindTextTransient(2, reference_hash.ToString());
+bool SqlGetTimestamp::BindReference(const shash::Any &reference_hash,
+                                    const ReferenceType type) {
+  return BindInt64(1, static_cast<uint64_t>(type))
+         && BindTextTransient(2, reference_hash.ToString());
 }
 
-uint64_t SqlGetTimestamp::RetrieveTimestamp() {
-  return RetrieveInt64(0);
-}
+uint64_t SqlGetTimestamp::RetrieveTimestamp() { return RetrieveInt64(0); }

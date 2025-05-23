@@ -5,14 +5,14 @@
 #ifndef CVMFS_SWISSKNIFE_REFLOG_H_
 #define CVMFS_SWISSKNIFE_REFLOG_H_
 
-#include "swissknife.h"
-
 #include <string>
+
+#include "swissknife.h"
 
 namespace manifest {
 class Reflog;
 class Manifest;
-}
+}  // namespace manifest
 
 namespace swissknife {
 
@@ -27,8 +27,8 @@ class CommandReconstructReflog : public Command {
   int Main(const ArgumentList &args);
 
  protected:
-  void AddStaticManifestObjects(manifest::Reflog    *reflog,
-                                manifest::Manifest  *manifest) const;
+  void AddStaticManifestObjects(manifest::Reflog *reflog,
+                                manifest::Manifest *manifest) const;
 };
 
 };  // namespace swissknife

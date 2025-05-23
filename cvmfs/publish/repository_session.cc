@@ -3,8 +3,6 @@
  */
 
 
-#include "publish/repository.h"
-
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -19,6 +17,7 @@
 #include "gateway_util.h"
 #include "json_document.h"
 #include "publish/except.h"
+#include "publish/repository.h"
 #include "ssl.h"
 #include "upload.h"
 #include "util/logging.h"
@@ -38,10 +37,10 @@ enum LeaseReply {
   kLeaseReplyFailure
 };
 
-static CURL* PrepareCurl(const std::string& method) {
-  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
+static CURL *PrepareCurl(const std::string &method) {
+  const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
-  CURL* h_curl = curl_easy_init();
+  CURL *h_curl = curl_easy_init();
   assert(h_curl != NULL);
 
   curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);
@@ -52,33 +51,31 @@ static CURL* PrepareCurl(const std::string& method) {
   return h_curl;
 }
 
-static size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
-  CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
+static size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+  CurlBuffer *my_buffer = static_cast<CurlBuffer *>(userp);
 
   if (size * nmemb < 1) {
     return 0;
   }
 
-  my_buffer->data = static_cast<char*>(buffer);
+  my_buffer->data = static_cast<char *>(buffer);
 
   return my_buffer->data.size();
 }
 
-static void MakeAcquireRequest(
-  const gateway::GatewayKey &key,
-  const std::string& repo_path,
-  const std::string& repo_service_url,
-  int llvl,
-  CurlBuffer* buffer)
-{
+static void MakeAcquireRequest(const gateway::GatewayKey &key,
+                               const std::string &repo_path,
+                               const std::string &repo_service_url,
+                               int llvl,
+                               CurlBuffer *buffer) {
   CURLcode ret = static_cast<CURLcode>(0);
 
-  CURL* h_curl = PrepareCurl("POST");
+  CURL *h_curl = PrepareCurl("POST");
 
-  const std::string payload = "{\"path\" : \"" + repo_path +
-                              "\", \"api_version\" : \"" +
-                              StringifyInt(gateway::APIVersion()) + "\", " +
-                              "\"hostname\" : \"" + GetHostname() + "\"}";
+  const std::string payload = "{\"path\" : \"" + repo_path
+                              + "\", \"api_version\" : \""
+                              + StringifyInt(gateway::APIVersion()) + "\", "
+                              + "\"hostname\" : \"" + GetHostname() + "\"}";
 
   shash::Any hmac(shash::kSha1);
   shash::HmacString(key.secret(), payload, &hmac);
@@ -86,10 +83,9 @@ static void MakeAcquireRequest(
   cs.UseSystemCertificatePath();
   cs.ApplySslCertificatePath(h_curl);
 
-  const std::string header_str =
-    std::string("Authorization: ") + key.id() + " " +
-    Base64(hmac.ToString(false));
-  struct curl_slist* auth_header = NULL;
+  const std::string header_str = std::string("Authorization: ") + key.id() + " "
+                                 + Base64(hmac.ToString(false));
+  struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
 
@@ -114,13 +110,11 @@ static void MakeAcquireRequest(
 
 // TODO(jblomer): This should eventually also handle the POST request for
 // committing a transaction
-static void MakeDropRequest(
-  const gateway::GatewayKey &key,
-  const std::string &session_token,
-  const std::string &repo_service_url,
-  int llvl,
-  CurlBuffer *reply)
-{
+static void MakeDropRequest(const gateway::GatewayKey &key,
+                            const std::string &session_token,
+                            const std::string &repo_service_url,
+                            int llvl,
+                            CurlBuffer *reply) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL *h_curl = PrepareCurl("DELETE");
@@ -131,9 +125,8 @@ static void MakeDropRequest(
   cs.UseSystemCertificatePath();
   cs.ApplySslCertificatePath(h_curl);
 
-  const std::string header_str =
-    std::string("Authorization: ") + key.id() + " " +
-    Base64(hmac.ToString(false));
+  const std::string header_str = std::string("Authorization: ") + key.id() + " "
+                                 + Base64(hmac.ToString(false));
   struct curl_slist *auth_header = NULL;
   auth_header = curl_slist_append(auth_header, header_str.c_str());
   curl_easy_setopt(h_curl, CURLOPT_HTTPHEADER, auth_header);
@@ -150,18 +143,16 @@ static void MakeDropRequest(
   curl_easy_cleanup(h_curl);
   if (ret != CURLE_OK) {
     LogCvmfs(kLogUploadGateway, llvl | kLogStderr,
-             "Make lease drop request failed: %d. Reply: '%s'",
-             ret, reply->data.c_str());
+             "Make lease drop request failed: %d. Reply: '%s'", ret,
+             reply->data.c_str());
     throw publish::EPublish("cannot drop lease",
                             publish::EPublish::kFailLeaseHttp);
   }
 }
 
-static LeaseReply ParseAcquireReply(
-  const CurlBuffer &buffer,
-  std::string *session_token,
-  int llvl)
-{
+static LeaseReply ParseAcquireReply(const CurlBuffer &buffer,
+                                    std::string *session_token,
+                                    int llvl) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
@@ -171,8 +162,8 @@ static LeaseReply ParseAcquireReply(
     return kLeaseReplyFailure;
   }
 
-  const JSON *result =
-      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
+                                                    JSON_STRING);
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
@@ -188,13 +179,13 @@ static LeaseReply ParseAcquireReply(
     } else if (status == "path_busy") {
       const JSON *time_remaining = JsonDocument::SearchInObject(
           reply->root(), "time_remaining", JSON_STRING);
-      LogCvmfs(kLogCvmfs, llvl | kLogStdout,
-               "Path busy. Time remaining = %s", (time_remaining != NULL) ?
-               time_remaining->string_value : "UNKNOWN");
+      LogCvmfs(
+          kLogCvmfs, llvl | kLogStdout, "Path busy. Time remaining = %s",
+          (time_remaining != NULL) ? time_remaining->string_value : "UNKNOWN");
       return kLeaseReplyBusy;
     } else if (status == "error") {
-      const JSON *reason =
-          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
+                                                        JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: '%s'",
                (reason != NULL) ? reason->string_value : "");
     } else {
@@ -217,8 +208,8 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     return kLeaseReplyFailure;
   }
 
-  const JSON *result =
-      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
+                                                    JSON_STRING);
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
@@ -227,8 +218,8 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
     } else if (status == "invalid_token") {
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error: invalid session token");
     } else if (status == "error") {
-      const JSON *reason =
-          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
+                                                        JSON_STRING);
       LogCvmfs(kLogCvmfs, llvl | kLogStdout, "Error from gateway: '%s'",
                (reason != NULL) ? reason->string_value : "");
     } else {
@@ -245,30 +236,28 @@ static LeaseReply ParseDropReply(const CurlBuffer &buffer, int llvl) {
 namespace publish {
 
 Publisher::Session::Session(const Settings &settings_session)
-  : settings_(settings_session)
-  , keep_alive_(false)
-  // TODO(jblomer): it would be better to actually read & validate the token
-  , has_lease_(FileExists(settings_.token_path))
-{
-}
+    : settings_(settings_session)
+    , keep_alive_(false)
+    // TODO(jblomer): it would be better to actually read & validate the token
+    , has_lease_(FileExists(settings_.token_path)) { }
 
 
 Publisher::Session::Session(const SettingsPublisher &settings_publisher,
-                            int llvl)
-{
+                            int llvl) {
   keep_alive_ = false;
-  if (settings_publisher.storage().type() != upload::SpoolerDefinition::Gateway)
-  {
+  if (settings_publisher.storage().type()
+      != upload::SpoolerDefinition::Gateway) {
     has_lease_ = true;
     return;
   }
 
   settings_.service_endpoint = settings_publisher.storage().endpoint();
-  settings_.repo_path = settings_publisher.fqrn() + "/" +
-                        settings_publisher.transaction().lease_path();
+  settings_.repo_path = settings_publisher.fqrn() + "/"
+                        + settings_publisher.transaction().lease_path();
   settings_.gw_key_path = settings_publisher.keychain().gw_key_path();
-  settings_.token_path =
-    settings_publisher.transaction().spool_area().gw_session_token();
+  settings_.token_path = settings_publisher.transaction()
+                             .spool_area()
+                             .gw_session_token();
   settings_.llvl = llvl;
 
   // TODO(jblomer): it would be better to actually read & validate the token
@@ -278,9 +267,7 @@ Publisher::Session::Session(const SettingsPublisher &settings_publisher,
 }
 
 
-void Publisher::Session::SetKeepAlive(bool value) {
-  keep_alive_ = value;
-}
+void Publisher::Session::SetKeepAlive(bool value) { keep_alive_ = value; }
 
 
 void Publisher::Session::Acquire() {
@@ -299,18 +286,13 @@ void Publisher::Session::Acquire() {
   std::string session_token;
   LeaseReply rep = ParseAcquireReply(buffer, &session_token, settings_.llvl);
   switch (rep) {
-    case kLeaseReplySuccess:
-      {
-        has_lease_ = true;
-        bool rvb = SafeWriteToFile(
-          session_token,
-          settings_.token_path,
-          0600);
-        if (!rvb) {
-          throw EPublish("cannot write session token: " + settings_.token_path);
-        }
+    case kLeaseReplySuccess: {
+      has_lease_ = true;
+      bool rvb = SafeWriteToFile(session_token, settings_.token_path, 0600);
+      if (!rvb) {
+        throw EPublish("cannot write session token: " + settings_.token_path);
       }
-      break;
+    } break;
     case kLeaseReplyBusy:
       throw EPublish("lease path busy", EPublish::kFailLeaseBusy);
       break;

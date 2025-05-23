@@ -12,9 +12,9 @@ namespace catalog {
 void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
   if (dirent.IsRegular()) {
     self.regular_files += delta;
-    self.file_size     += delta * dirent.size();
+    self.file_size += delta * dirent.size();
     if (dirent.IsChunkedFile()) {
-      self.chunked_files     += delta;
+      self.chunked_files += delta;
       self.chunked_file_size += delta * dirent.size();
     }
     if (dirent.IsExternalFile()) {
@@ -70,8 +70,8 @@ Counters_t Counters::GetSelfEntries() const {
 
 
 Counters_t Counters::GetSubtreeEntries() const {
-  return subtree.regular_files + subtree.symlinks + subtree.specials +
-         subtree.directories;
+  return subtree.regular_files + subtree.symlinks + subtree.specials
+         + subtree.directories;
 }
 
 

@@ -78,8 +78,8 @@ void SettingsTransaction::SetHashAlgorithm(const std::string &algorithm) {
   hash_algorithm_ = shash::ParseHashAlgorithm(algorithm);
 }
 
-void SettingsTransaction::SetCompressionAlgorithm(const std::string &algorithm)
-{
+void SettingsTransaction::SetCompressionAlgorithm(
+    const std::string &algorithm) {
   compression_algorithm_ = zlib::ParseCompressionAlgorithm(algorithm);
 }
 
@@ -119,9 +119,7 @@ void SettingsTransaction::SetPrintChangeset(bool value) {
   print_changeset_ = value;
 }
 
-void SettingsTransaction::SetDryRun(bool value) {
-  dry_run_ = value;
-}
+void SettingsTransaction::SetDryRun(bool value) { dry_run_ = value; }
 
 void SettingsTransaction::SetUnionFsType(const std::string &union_fs) {
   if (union_fs == "aufs") {
@@ -155,9 +153,7 @@ bool SettingsTransaction::ValidateUnionFs() {
   return true;
 }
 
-void SettingsTransaction::SetTimeout(unsigned seconds) {
-  timeout_s_ = seconds;
-}
+void SettingsTransaction::SetTimeout(unsigned seconds) { timeout_s_ = seconds; }
 
 int SettingsTransaction::GetTimeoutS() const {
   if (timeout_s_.is_default())
@@ -169,9 +165,8 @@ void SettingsTransaction::SetLeasePath(const std::string &path) {
   lease_path_ = path;
 }
 
-void SettingsTransaction::SetTemplate(
-  const std::string &from, const std::string &to)
-{
+void SettingsTransaction::SetTemplate(const std::string &from,
+                                      const std::string &to) {
   if (from.empty())
     throw EPublish("template transaction's 'from' path must not be empty");
   if (to.empty())
@@ -184,15 +179,12 @@ void SettingsTransaction::SetTemplate(
 
 
 std::string SettingsStorage::GetLocator() const {
-  return std::string(upload::SpoolerDefinition::kDriverNames[type_()]) +
-    "," + tmp_dir_() +
-    "," + endpoint_();
+  return std::string(upload::SpoolerDefinition::kDriverNames[type_()]) + ","
+         + tmp_dir_() + "," + endpoint_();
 }
 
-void SettingsStorage::MakeS3(
-  const std::string &s3_config,
-  const std::string &tmp_dir)
-{
+void SettingsStorage::MakeS3(const std::string &s3_config,
+                             const std::string &tmp_dir) {
   type_ = upload::SpoolerDefinition::S3;
   tmp_dir_ = tmp_dir;
   endpoint_ = "cvmfs/" + fqrn_() + "@" + s3_config;
@@ -204,11 +196,9 @@ void SettingsStorage::MakeLocal(const std::string &path) {
   tmp_dir_ = path + "/data/txn";
 }
 
-void SettingsStorage::MakeGateway(
-  const std::string &host,
-  unsigned int port,
-  const std::string &tmp_dir)
-{
+void SettingsStorage::MakeGateway(const std::string &host,
+                                  unsigned int port,
+                                  const std::string &tmp_dir) {
   type_ = upload::SpoolerDefinition::Gateway;
   endpoint_ = "http://" + host + ":" + StringifyInt(port) + "/api/v1";
   tmp_dir_ = tmp_dir_;
@@ -247,30 +237,28 @@ void SettingsKeychain::SetKeychainDir(const std::string &keychain_dir) {
 
 
 bool SettingsKeychain::HasDanglingMasterKeys() const {
-  return (FileExists(master_private_key_path_()) &&
-          !FileExists(master_public_key_path_())) ||
-         (!FileExists(master_private_key_path_()) &&
-          FileExists(master_public_key_path_()));
+  return (FileExists(master_private_key_path_())
+          && !FileExists(master_public_key_path_()))
+         || (!FileExists(master_private_key_path_())
+             && FileExists(master_public_key_path_()));
 }
 
 
 bool SettingsKeychain::HasMasterKeys() const {
-  return FileExists(master_private_key_path_()) &&
-         FileExists(master_public_key_path_());
+  return FileExists(master_private_key_path_())
+         && FileExists(master_public_key_path_());
 }
 
 
 bool SettingsKeychain::HasDanglingRepositoryKeys() const {
-  return (FileExists(private_key_path_()) &&
-          !FileExists(certificate_path_())) ||
-         (!FileExists(private_key_path_()) &&
-          FileExists(certificate_path_()));
+  return (FileExists(private_key_path_()) && !FileExists(certificate_path_()))
+         || (!FileExists(private_key_path_())
+             && FileExists(certificate_path_()));
 }
 
 
 bool SettingsKeychain::HasRepositoryKeys() const {
-  return FileExists(private_key_path_()) &&
-         FileExists(certificate_path_());
+  return FileExists(private_key_path_()) && FileExists(certificate_path_());
 }
 
 bool SettingsKeychain::HasGatewayKey() const {
@@ -281,24 +269,20 @@ bool SettingsKeychain::HasGatewayKey() const {
 
 
 SettingsRepository::SettingsRepository(
-  const SettingsPublisher &settings_publisher)
-  : fqrn_(settings_publisher.fqrn())
-  , url_(settings_publisher.url())
-  , proxy_(settings_publisher.proxy())
-  , tmp_dir_(settings_publisher.transaction().spool_area().tmp_dir())
-  , keychain_(settings_publisher.fqrn())
-{
+    const SettingsPublisher &settings_publisher)
+    : fqrn_(settings_publisher.fqrn())
+    , url_(settings_publisher.url())
+    , proxy_(settings_publisher.proxy())
+    , tmp_dir_(settings_publisher.transaction().spool_area().tmp_dir())
+    , keychain_(settings_publisher.fqrn()) {
   keychain_.SetKeychainDir(settings_publisher.keychain().keychain_dir());
 }
 
 
-SettingsRepository::SettingsRepository(
-  const SettingsReplica &settings_replica)
-  : fqrn_(settings_replica.fqrn())
-  , url_(settings_replica.url())
-  , keychain_(settings_replica.fqrn())
-{
-}
+SettingsRepository::SettingsRepository(const SettingsReplica &settings_replica)
+    : fqrn_(settings_replica.fqrn())
+    , url_(settings_replica.url())
+    , keychain_(settings_replica.fqrn()) { }
 
 
 void SettingsRepository::SetUrl(const std::string &url) {
@@ -307,9 +291,7 @@ void SettingsRepository::SetUrl(const std::string &url) {
 }
 
 
-void SettingsRepository::SetProxy(const std::string &proxy) {
-  proxy_ = proxy;
-}
+void SettingsRepository::SetProxy(const std::string &proxy) { proxy_ = proxy; }
 
 
 void SettingsRepository::SetTmpDir(const std::string &tmp_dir) {
@@ -329,19 +311,18 @@ const unsigned SettingsPublisher::kDefaultWhitelistValidity = 30;
 
 
 SettingsPublisher::SettingsPublisher(
-  const SettingsRepository &settings_repository)
-  : fqrn_(settings_repository.fqrn())
-  , url_(settings_repository.url())
-  , proxy_(settings_repository.proxy())
-  , owner_uid_(0)
-  , owner_gid_(0)
-  , whitelist_validity_days_(kDefaultWhitelistValidity)
-  , is_silent_(false)
-  , is_managed_(false)
-  , storage_(fqrn_())
-  , transaction_(fqrn_())
-  , keychain_(fqrn_())
-{
+    const SettingsRepository &settings_repository)
+    : fqrn_(settings_repository.fqrn())
+    , url_(settings_repository.url())
+    , proxy_(settings_repository.proxy())
+    , owner_uid_(0)
+    , owner_gid_(0)
+    , whitelist_validity_days_(kDefaultWhitelistValidity)
+    , is_silent_(false)
+    , is_managed_(false)
+    , storage_(fqrn_())
+    , transaction_(fqrn_())
+    , keychain_(fqrn_()) {
   keychain_.SetKeychainDir(settings_repository.keychain().keychain_dir());
 }
 
@@ -352,9 +333,7 @@ void SettingsPublisher::SetUrl(const std::string &url) {
 }
 
 
-void SettingsPublisher::SetProxy(const std::string &proxy) {
-  proxy_ = proxy;
-}
+void SettingsPublisher::SetProxy(const std::string &proxy) { proxy_ = proxy; }
 
 
 void SettingsPublisher::SetOwner(const std::string &user_name) {
@@ -369,13 +348,9 @@ void SettingsPublisher::SetOwner(uid_t uid, gid_t gid) {
   owner_gid_ = gid;
 }
 
-void SettingsPublisher::SetIsSilent(bool value) {
-  is_silent_ = value;
-}
+void SettingsPublisher::SetIsSilent(bool value) { is_silent_ = value; }
 
-void SettingsPublisher::SetIsManaged(bool value) {
-  is_managed_ = value;
-}
+void SettingsPublisher::SetIsManaged(bool value) { is_managed_ = value; }
 
 void SettingsPublisher::SetIgnoreInvalidLease(bool value) {
   ignore_invalid_lease_ = value;
@@ -385,9 +360,7 @@ void SettingsPublisher::SetIgnoreInvalidLease(bool value) {
 //------------------------------------------------------------------------------
 
 
-SettingsBuilder::~SettingsBuilder() {
-  delete options_mgr_;
-}
+SettingsBuilder::~SettingsBuilder() { delete options_mgr_; }
 
 
 std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
@@ -431,8 +404,8 @@ std::string SettingsBuilder::GetSingleAlias() {
     repositories[i] = GetFileName(repositories[i]);
   }
   if (repositories.size() > 1) {
-    throw EPublish("multiple repositories available in " + config_path_ +
-                   ":\n  " + JoinStrings(repositories, "\n  "),
+    throw EPublish("multiple repositories available in " + config_path_
+                       + ":\n  " + JoinStrings(repositories, "\n  "),
                    EPublish::kFailInvocation);
   }
   return repositories[0];
@@ -440,12 +413,10 @@ std::string SettingsBuilder::GetSingleAlias() {
 
 
 SettingsRepository SettingsBuilder::CreateSettingsRepository(
-  const std::string &ident)
-{
-  if (HasPrefix(ident, "http://", true /* ignore case */) ||
-      HasPrefix(ident, "https://", true /* ignore case */) ||
-      HasPrefix(ident, "file://", true /* ignore case */))
-  {
+    const std::string &ident) {
+  if (HasPrefix(ident, "http://", true /* ignore case */)
+      || HasPrefix(ident, "https://", true /* ignore case */)
+      || HasPrefix(ident, "file://", true /* ignore case */)) {
     std::string fqrn = Repository::GetFqrnFromUrl(ident);
     sanitizer::RepositorySanitizer sanitizer;
     if (!sanitizer.IsValid(fqrn)) {
@@ -501,7 +472,7 @@ std::string SettingsPublisher::GetReadOnlyXAttr(const std::string &attr) {
   return value;
 }
 
-SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
+SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::string session_dir = Env::GetEnterSessionDir();
   std::map<std::string, std::string> session_env = GetSessionEnvironment();
   std::string fqrn = session_env["CVMFS_FQRN"];
@@ -511,10 +482,10 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   // TODO(jblomer): work in progress
   settings_publisher->GetTransaction()->SetInEnterSession(true);
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
-    session_dir);
+      session_dir);
 
-  std::string base_hash =
-    settings_publisher->GetReadOnlyXAttr("user.root_hash");
+  std::string base_hash = settings_publisher->GetReadOnlyXAttr(
+      "user.root_hash");
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -524,13 +495,13 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::string arg;
   settings_publisher->SetUrl(settings_publisher->GetReadOnlyXAttr("user.host"));
   settings_publisher->SetProxy(
-    settings_publisher->GetReadOnlyXAttr("user.proxy"));
+      settings_publisher->GetReadOnlyXAttr("user.proxy"));
   if (omgr.GetValue("CVMFS_KEYS_DIR", &arg))
     settings_publisher->GetKeychain()->SetKeychainDir(arg);
   settings_publisher->GetTransaction()->SetLayoutRevision(
-    Publisher::kRequiredLayoutRevision);
-  settings_publisher->GetTransaction()->SetBaseHash(shash::MkFromHexPtr(
-    shash::HexPtr(base_hash), shash::kSuffixCatalog));
+      Publisher::kRequiredLayoutRevision);
+  settings_publisher->GetTransaction()->SetBaseHash(
+      shash::MkFromHexPtr(shash::HexPtr(base_hash), shash::kSuffixCatalog));
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 
@@ -538,8 +509,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
 }
 
 void SettingsBuilder::ApplyOptionsFromServerPath(
-    const OptionsManager &options_mgr_,
-    SettingsPublisher* settings_publisher) {
+    const OptionsManager &options_mgr_, SettingsPublisher *settings_publisher) {
   std::string arg;
   if (options_mgr_.GetValue("CVMFS_CREATOR_VERSION", &arg)) {
     settings_publisher->GetTransaction()->SetLayoutRevision(String2Uint64(arg));
@@ -599,9 +569,8 @@ void SettingsBuilder::ApplyOptionsFromServerPath(
   }
 }
 
-SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
-  const std::string &ident, bool needs_managed)
-{
+SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
+    const std::string &ident, bool needs_managed) {
   // we are creating a publisher, it need to have the `server.conf` file
   // present, otherwise something is wrong and we should exit early
   const std::string alias(ident.empty() ? GetSingleAlias() : ident);
@@ -614,8 +583,8 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
 
   // Instead of returning the Settings from session, we need more processing
   if (!session_env.empty() && (session_env["CVMFS_FQRN"] == alias)) {
-    SettingsPublisher *settings_publisher =
-        CreateSettingsPublisherFromSession();
+    SettingsPublisher
+        *settings_publisher = CreateSettingsPublisherFromSession();
     if (FileExists(server_path)) {
       delete options_mgr_;
       options_mgr_ = new BashOptionsManager();
@@ -629,7 +598,8 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   if (FileExists(server_path) == false) {
     throw EPublish(
         "Unable to find the configuration file `server.conf` for the cvmfs "
-        "publisher: " + alias,
+        "publisher: "
+            + alias,
         EPublish::kFailRepositoryNotFound);
   }
 
@@ -649,7 +619,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
     std::string xattr = settings_publisher->GetReadOnlyXAttr("user.root_hash");
     settings_publisher->GetTransaction()->SetBaseHash(
         shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
-  } catch (const EPublish& e) {
+  } catch (const EPublish &e) {
     // We ignore the exception.
     // In case of exception, the base hash remains unset.
   }
@@ -657,7 +627,7 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   settings_publisher->SetIsManaged(IsManagedRepository());
   settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher->GetStorage()->SetLocator(
-    options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
+      options_mgr_->GetValueOrDie("CVMFS_UPSTREAM_STORAGE"));
 
   ApplyOptionsFromServerPath(*options_mgr_, &*settings_publisher);
 

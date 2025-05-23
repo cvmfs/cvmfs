@@ -13,7 +13,7 @@
 namespace swissknife {
 class Ingest : public Command {
  public:
-  ~Ingest() {}
+  ~Ingest() { }
   virtual std::string GetName() const { return "ingest"; }
   virtual std::string GetDescription() const {
     return "Pushes the content of the tarball to the repository";
@@ -33,8 +33,8 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional('T', "tar file to extract"));
     r.push_back(Parameter::Optional(
         'B', "base directory where to extract the tarfile"));
-    r.push_back(Parameter::Optional(
-        'D', "entity to delete before to extract the tar"));
+    r.push_back(
+        Parameter::Optional('D', "entity to delete before to extract the tar"));
     r.push_back(Parameter::Optional(
         'C', "create a new catalog where the tar file is extracted"));
 
@@ -42,10 +42,12 @@ class Ingest : public Command {
     r.push_back(Parameter::Optional('H', "key file for HTTP API"));
     r.push_back(Parameter::Optional('@', "proxy url"));
     r.push_back(Parameter::Switch('I', "upload updated statistics DB file"));
-    r.push_back(Parameter::Optional('U',
-          "uid of new owner of the ingested data (-1 for keep tarball owner)"));
-    r.push_back(Parameter::Optional('G',
-          "gid of new owner of the ingested data (-1 for keep tarball owner)"));
+    r.push_back(Parameter::Optional(
+        'U',
+        "uid of new owner of the ingested data (-1 for keep tarball owner)"));
+    r.push_back(Parameter::Optional(
+        'G',
+        "gid of new owner of the ingested data (-1 for keep tarball owner)"));
     r.push_back(Parameter::Switch('j', "enable nanosecond timestamps"));
 
     return r;

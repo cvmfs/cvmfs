@@ -20,9 +20,10 @@ typedef HttpObjectFetcher<> ObjectFetcher;
 
 }  // namespace
 
-SigningTool::SigningTool(ServerTool *server_tool) : server_tool_(server_tool) {}
+SigningTool::SigningTool(ServerTool *server_tool)
+    : server_tool_(server_tool) { }
 
-SigningTool::~SigningTool() {}
+SigningTool::~SigningTool() { }
 
 SigningTool::Result SigningTool::Run(
     const std::string &manifest_path, const std::string &repo_url,
@@ -30,9 +31,9 @@ SigningTool::Result SigningTool::Run(
     const std::string &certificate, const std::string &priv_key,
     const std::string &repo_name, const std::string &pwd,
     const std::string &meta_info, const std::string &reflog_chksum_path,
-    const std::string &proxy,
-    const bool garbage_collectable, const bool bootstrap_shortcuts,
-    const bool return_early, const std::vector<shash::Any> reflog_catalogs) {
+    const std::string &proxy, const bool garbage_collectable,
+    const bool bootstrap_shortcuts, const bool return_early,
+    const std::vector<shash::Any> reflog_catalogs) {
   shash::Any reflog_hash;
   if (reflog_chksum_path != "") {
     if (!manifest::Reflog::ReadChecksum(reflog_chksum_path, &reflog_hash)) {
@@ -51,8 +52,8 @@ SigningTool::Result SigningTool::Run(
 
   // prepare global manager modules
   const bool follow_redirects = false;
-  if (!server_tool_->InitDownloadManager(follow_redirects, proxy) ||
-      !server_tool_->InitSignatureManager("", certificate, priv_key)) {
+  if (!server_tool_->InitDownloadManager(follow_redirects, proxy)
+      || !server_tool_->InitSignatureManager("", certificate, priv_key)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
     return kInitError;
   }
@@ -103,8 +104,8 @@ SigningTool::Result SigningTool::Run(
   // From here on things are potentially put in backend storage
 
   // Register callback for retrieving the certificate hash
-  upload::Spooler::CallbackPtr callback =
-      spooler->RegisterListener(&SigningTool::CertificateUploadCallback, this);
+  upload::Spooler::CallbackPtr callback = spooler->RegisterListener(
+      &SigningTool::CertificateUploadCallback, this);
 
   // Safe certificate (and wait for the upload through a Future)
   spooler->ProcessCertificate(certificate);
@@ -119,8 +120,8 @@ SigningTool::Result SigningTool::Run(
   // Safe repository meta info file
   shash::Any metainfo_hash = manifest->meta_info();
   if (!meta_info.empty()) {
-    upload::Spooler::CallbackPtr callback =
-        spooler->RegisterListener(&SigningTool::MetainfoUploadCallback, this);
+    upload::Spooler::CallbackPtr callback = spooler->RegisterListener(
+        &SigningTool::MetainfoUploadCallback, this);
     spooler->ProcessMetainfo(meta_info);
     metainfo_hash = metainfo_hash_.Get();
     spooler->UnregisterListener(callback);
@@ -220,13 +221,16 @@ SigningTool::Result SigningTool::Run(
 
   // Create alternative bootstrapping symlinks for VOMS secured repos
   if (manifest->has_alt_catalog_path()) {
-    const bool success =
-        spooler->PlaceBootstrappingShortcut(manifest->certificate()) &&
-        spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
-        (manifest->history().IsNull() ||
-         spooler->PlaceBootstrappingShortcut(manifest->history())) &&
-        (metainfo_hash.IsNull() ||
-         spooler->PlaceBootstrappingShortcut(metainfo_hash));
+    const bool success = spooler->PlaceBootstrappingShortcut(
+                             manifest->certificate())
+                         && spooler->PlaceBootstrappingShortcut(
+                             manifest->catalog_hash())
+                         && (manifest->history().IsNull()
+                             || spooler->PlaceBootstrappingShortcut(
+                                 manifest->history()))
+                         && (metainfo_hash.IsNull()
+                             || spooler->PlaceBootstrappingShortcut(
+                                 metainfo_hash));
 
     if (!success) {
       LogCvmfs(kLogCvmfs, kLogStderr,

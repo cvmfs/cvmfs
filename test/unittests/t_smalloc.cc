@@ -17,35 +17,35 @@ const size_t kBigAllocation = std::numeric_limits<size_t>::max();
 
 TEST(T_Smalloc, SmallAlloc) {
   void *mem = smalloc(kSmallAllocation);
-  EXPECT_NE(static_cast<void*>(NULL), mem);
+  EXPECT_NE(static_cast<void *>(NULL), mem);
   free(mem);
 }
 
 TEST(T_Smalloc, BigAlloc) {
   void *mem = NULL;
   EXPECT_DEATH(mem = smalloc(kBigAllocation), ".*");
-  EXPECT_EQ(static_cast<void*>(NULL), mem);
+  EXPECT_EQ(static_cast<void *>(NULL), mem);
 }
 
 TEST(T_Smalloc, SmallRealloc) {
   void *mem = smalloc(kSmallAllocation);
   mem = srealloc(mem, kSmallAllocation * 2);
-  EXPECT_NE(static_cast<void*>(NULL), mem);
+  EXPECT_NE(static_cast<void *>(NULL), mem);
   mem = srealloc(mem, kSmallAllocation / 2);
-  EXPECT_NE(static_cast<void*>(NULL), mem);
+  EXPECT_NE(static_cast<void *>(NULL), mem);
   free(mem);
 }
 
 TEST(T_Smalloc, BigRealloc) {
   UniquePtr<void> mem(smalloc(kSmallAllocation));
   ASSERT_DEATH(mem = srealloc(mem.weak_ref(), kBigAllocation), ".*");
-  EXPECT_NE(static_cast<void*>(NULL), mem.weak_ref());
+  EXPECT_NE(static_cast<void *>(NULL), mem.weak_ref());
 }
 
 TEST(T_Smalloc, SmallCalloc) {
   int size = sizeof(char);
   void *mem = scalloc(kSmallAllocation, size);
-  EXPECT_NE(static_cast<void*>(NULL), mem);
+  EXPECT_NE(static_cast<void *>(NULL), mem);
   free(mem);
 }
 
@@ -53,13 +53,13 @@ TEST(T_Smalloc, BigCalloc) {
   int size = sizeof(char);
   void *mem = NULL;
   ASSERT_DEATH(mem = scalloc(kBigAllocation, size), ".*");
-  EXPECT_EQ(static_cast<void*>(NULL), mem);
+  EXPECT_EQ(static_cast<void *>(NULL), mem);
 }
 
 TEST(T_Smalloc, SmallMmap) {
   void *mem = smmap(kSmallAllocation);
   EXPECT_NE(MAP_FAILED, mem);
-  size_t *details = reinterpret_cast<size_t*>(mem);
+  size_t *details = reinterpret_cast<size_t *>(mem);
   size_t pages = ((kSmallAllocation + 2 * sizeof(size_t)) + 4095) / 4096;
   EXPECT_EQ(pages, *(details - 1));
   EXPECT_EQ(0xAAAAAAAA, *(details - 2));
@@ -90,14 +90,14 @@ TEST(T_Smalloc, Xmmap) {
 
 TEST(T_Smalloc, XmmapAlign) {
   vector<size_t> sizes;
-  sizes.push_back(2*1024*1024);
-  sizes.push_back(4*1024*1024);
-  sizes.push_back(6*1024*1024);
-  sizes.push_back(8*1024*1024);
-  sizes.push_back(10*1024*1024);
-  sizes.push_back(12*1024*1024);
-  sizes.push_back(14*1024*1024);
-  sizes.push_back(16*1024*1024);
+  sizes.push_back(2 * 1024 * 1024);
+  sizes.push_back(4 * 1024 * 1024);
+  sizes.push_back(6 * 1024 * 1024);
+  sizes.push_back(8 * 1024 * 1024);
+  sizes.push_back(10 * 1024 * 1024);
+  sizes.push_back(12 * 1024 * 1024);
+  sizes.push_back(14 * 1024 * 1024);
+  sizes.push_back(16 * 1024 * 1024);
 
   for (unsigned i = 0; i < 25; ++i) {
     for (unsigned j = 0; j < sizes.size(); ++j) {

@@ -5,11 +5,10 @@
 #include <gtest/gtest.h>
 
 #include "notify/messages.h"
-
 #include "util/logging.h"
 #include "util/string.h"
 
-class T_Messages : public ::testing::Test {};
+class T_Messages : public ::testing::Test { };
 
 TEST_F(T_Messages, kPackUnpackActivity) {
   notify::msg::Activity msg_in;
@@ -28,10 +27,9 @@ TEST_F(T_Messages, kPackUnpackActivity) {
 }
 
 TEST_F(T_Messages, kIncompleteJSON) {
-  std::string packed =
-      "{ \"version\" : 1,\"type\" : \"activity\","
-      "\"repository\" : \"test.cern.ch\",\"manifest\" : \"" +
-      Base64("XSCXSCXXSZZZXSCXSC") + "\"}";
+  std::string packed = "{ \"version\" : 1,\"type\" : \"activity\","
+                       "\"repository\" : \"test.cern.ch\",\"manifest\" : \""
+                       + Base64("XSCXSCXXSZZZXSCXSC") + "\"}";
 
   notify::msg::Activity msg_out;
   EXPECT_FALSE(msg_out.FromJSONString(packed));

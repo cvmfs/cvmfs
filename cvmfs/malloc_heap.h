@@ -43,7 +43,7 @@ class MallocHeap {
 
   // Pointer to the callback method invoked for each memory block that gets
   // compacted.
-  typedef Callbackable<BlockPtr>::CallbackTN* CallbackPtr;
+  typedef Callbackable<BlockPtr>::CallbackTN *CallbackPtr;
 
   MallocHeap(uint64_t capacity, CallbackPtr callback_ptr);
   ~MallocHeap();
@@ -80,13 +80,14 @@ class MallocHeap {
     Tag() : size(0) { }
     explicit Tag(int64_t s) : size(s) { }
     inline uint64_t GetSize() {
-      if (size < 0) return -size;
+      if (size < 0)
+        return -size;
       return size;
     }
     inline bool IsFree() { return size < 0; }
     inline Tag *JumpToNext() {
-      return reinterpret_cast<Tag *>(
-        reinterpret_cast<unsigned char *>(this) + sizeof(Tag) + GetSize());
+      return reinterpret_cast<Tag *>(reinterpret_cast<unsigned char *>(this)
+                                     + sizeof(Tag) + GetSize());
     }
     inline unsigned char *GetBlock() {
       return reinterpret_cast<unsigned char *>(this) + sizeof(Tag);

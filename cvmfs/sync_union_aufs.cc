@@ -4,12 +4,12 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include <string>
-
-#include "sync_union.h"
 #include "sync_union_aufs.h"
 
+#include <string>
+
 #include "sync_mediator.h"
+#include "sync_union.h"
 #include "util/fs_traversal.h"
 
 namespace publish {
@@ -54,8 +54,8 @@ void SyncUnionAufs::Traverse() {
 }
 
 bool SyncUnionAufs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
-  return entry->filename().substr(0, whiteout_prefix_.length()) ==
-         whiteout_prefix_;
+  return entry->filename().substr(0, whiteout_prefix_.length())
+         == whiteout_prefix_;
 }
 
 bool SyncUnionAufs::IsOpaqueDirectory(SharedPtr<SyncItem> directory) const {
@@ -69,7 +69,7 @@ string SyncUnionAufs::UnwindWhiteoutFilename(SharedPtr<SyncItem> entry) const {
 
 bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
                                         const string &filename) {
-  return SyncUnion::IgnoreFilePredicate(parent_dir, filename) ||
-         (ignore_filenames_.find(filename) != ignore_filenames_.end());
+  return SyncUnion::IgnoreFilePredicate(parent_dir, filename)
+         || (ignore_filenames_.find(filename) != ignore_filenames_.end());
 }
 }  // namespace publish

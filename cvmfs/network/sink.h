@@ -6,6 +6,7 @@
 #define CVMFS_NETWORK_SINK_H_
 
 #include <stdint.h>
+
 #include <string>
 
 namespace cvmfs {
@@ -22,7 +23,7 @@ class Sink {
   virtual ~Sink() { }
   /**
    * Appends data to the sink
-   * 
+   *
    * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
@@ -30,7 +31,7 @@ class Sink {
 
   /**
    * Truncate all written data and start over at position zero.
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
@@ -39,7 +40,7 @@ class Sink {
   /**
    * Purges all resources leaving the sink in an invalid state.
    * More aggressive version of Reset().
-   * For some sinks and depending on owner status it might do 
+   * For some sinks and depending on owner status it might do
    * the same as Reset().
    *
    * @returns Success = 0
@@ -48,8 +49,8 @@ class Sink {
   virtual int Purge() = 0;
 
   /**
-    * @returns true if the object is correctly initialized.
-    */
+   * @returns true if the object is correctly initialized.
+   */
   virtual bool IsValid() = 0;
 
   /**
@@ -84,7 +85,7 @@ class Sink {
 
   /**
    * Returns if the specific sink type needs reservation of (data) space
-   * 
+   *
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
@@ -96,7 +97,7 @@ class Sink {
   virtual std::string Describe() = 0;
 
  protected:
-    bool is_owner_;
+  bool is_owner_;
 };
 
 }  // namespace cvmfs

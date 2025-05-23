@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
-**/
+ **/
 
 #include <signal.h>
 #include <sys/types.h>
@@ -49,10 +49,11 @@ struct Listing {
 };
 
 struct Settings {
-  Settings() :
-    is_alien(false), cache_base_defined(false),
-    cache_dir_defined(false), quota_limit(0)
-    { }
+  Settings()
+      : is_alien(false)
+      , cache_base_defined(false)
+      , cache_dir_defined(false)
+      , quota_limit(0) { }
 
   bool IsValid() {
     if (is_alien && quota_limit > 0) {
@@ -63,9 +64,9 @@ struct Settings {
       error_reason = "Workspace option needs to be set for alien cache";
       return false;
     }
-    if ((is_alien ? 1 : 0) +
-        (cache_base_defined ? 1 : 0) +
-        (cache_dir_defined ? 1 : 0) != 1) {
+    if ((is_alien ? 1 : 0) + (cache_base_defined ? 1 : 0)
+            + (cache_dir_defined ? 1 : 0)
+        != 1) {
       error_reason = "CVMFS_CACHE_DIR, CVMFS_CACHE_BASE and CVMFS_CACHE_ALIEN "
                      "are mutually exclusive. Exactly one needs to be defined.";
       return false;
@@ -104,7 +105,7 @@ Settings GetSettings(cvmcache_option_map *options) {
   if ((optarg = cvmcache_options_get(options, "CVMFS_CACHE_BASE"))) {
     settings.cache_base_defined = true;
     settings.cache_path = MakeCanonicalPath(optarg);
-    settings.cache_path += "/shared";  // this cache is always shared
+    settings.cache_path += "/shared";          // this cache is always shared
     settings.workspace = settings.cache_path;  // default value for workspace
     cvmcache_options_free(optarg);
   }
@@ -130,12 +131,10 @@ Settings GetSettings(cvmcache_option_map *options) {
 }
 
 uint32_t cvmcache_hash_hasher(const struct cvmcache_hash &key) {
-  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
-uint32_t uint64_hasher(const uint64_t &key) {
-  return (uint32_t) key;
-}
+uint32_t uint64_hasher(const uint64_t &key) { return (uint32_t)key; }
 
 shash::Any Chash2Cpphash(const struct cvmcache_hash *h) {
   shash::Any hash;
@@ -197,7 +196,7 @@ int posix_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
 // Only gives info for opened objects.
 // Should be fine, since cvmfs only requests info for opened objects.
 int posix_obj_info(struct cvmcache_hash *id,
-                          struct cvmcache_object_info *info) {
+                   struct cvmcache_object_info *info) {
   CacheObject object;
   if (!g_opened_objects->Lookup(*id, &object)) {
     return CVMCACHE_STATUS_NOENTRY;
@@ -207,8 +206,8 @@ int posix_obj_info(struct cvmcache_hash *id,
   return CVMCACHE_STATUS_OK;
 }
 
-int posix_pread(struct cvmcache_hash *id, uint64_t offset,
-                       uint32_t *size, unsigned char *buffer) {
+int posix_pread(struct cvmcache_hash *id, uint64_t offset, uint32_t *size,
+                unsigned char *buffer) {
   CacheObject object;
   if (!g_opened_objects->Lookup(*id, &object)) {
     return CVMCACHE_STATUS_NOENTRY;
@@ -225,8 +224,8 @@ int posix_pread(struct cvmcache_hash *id, uint64_t offset,
 }
 
 int posix_start_txn(struct cvmcache_hash *id,
-                           uint64_t txn_id,
-                           struct cvmcache_object_info *info) {
+                    uint64_t txn_id,
+                    struct cvmcache_object_info *info) {
   // cachemgr deletes txn in commit_txn
   void *txn = malloc(g_cache_mgr->SizeOfTxn());
   int fd = g_cache_mgr->StartTxn(Chash2Cpphash(id), info->size, txn);
@@ -254,8 +253,7 @@ int posix_start_txn(struct cvmcache_hash *id,
   return CVMCACHE_STATUS_OK;
 }
 
-int posix_write_txn(uint64_t txn_id, unsigned char *buffer,
-                           uint32_t size) {
+int posix_write_txn(uint64_t txn_id, unsigned char *buffer, uint32_t size) {
   Txn transaction;
   if (!g_transactions->Lookup(txn_id, &transaction)) {
     return CVMCACHE_STATUS_NOENTRY;
@@ -320,7 +318,7 @@ int posix_info(struct cvmcache_info *info) {
 }
 
 int posix_breadcrumb_store(const char *fqrn,
-                                  const cvmcache_breadcrumb *breadcrumb) {
+                           const cvmcache_breadcrumb *breadcrumb) {
   manifest::Breadcrumb bc(Chash2Cpphash(&breadcrumb->catalog_hash),
                           breadcrumb->timestamp, breadcrumb->revision);
   if (!g_cache_mgr->StoreBreadcrumb(fqrn, bc)) {
@@ -329,8 +327,7 @@ int posix_breadcrumb_store(const char *fqrn,
   return CVMCACHE_STATUS_OK;
 }
 
-int posix_breadcrumb_load(const char *fqrn,
-                                 cvmcache_breadcrumb *breadcrumb) {
+int posix_breadcrumb_load(const char *fqrn, cvmcache_breadcrumb *breadcrumb) {
   manifest::Breadcrumb bc = g_cache_mgr->LoadBreadcrumb(fqrn);
   if (!bc.IsValid()) {
     return CVMCACHE_STATUS_NOENTRY;
@@ -362,8 +359,8 @@ int main(int argc, char **argv) {
              "cannot parse options file %s", argv[1]);
     return 1;
   }
-  char *debug_log =
-    cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_DEBUGLOG");
+  char *debug_log = cvmcache_options_get(options,
+                                         "CVMFS_CACHE_PLUGIN_DEBUGLOG");
   if (debug_log != NULL) {
     SetLogDebugFile(debug_log);
     cvmcache_options_free(debug_log);
@@ -379,8 +376,8 @@ int main(int argc, char **argv) {
   }
   char *test_mode = cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_TEST");
   if (!test_mode) {
-    char *watchdog_crash_dump_path =
-      cvmcache_options_get(options, "CVMFS_CACHE_PLUGIN_CRASH_DUMP");
+    char *watchdog_crash_dump_path = cvmcache_options_get(
+        options, "CVMFS_CACHE_PLUGIN_CRASH_DUMP");
     cvmcache_spawn_watchdog(watchdog_crash_dump_path);
     if (watchdog_crash_dump_path)
       cvmcache_options_free(watchdog_crash_dump_path);
@@ -390,7 +387,7 @@ int main(int argc, char **argv) {
   if (!settings.IsValid()) {
     LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
              "Invalid config in file %s: %s", argv[1],
-                                              settings.error_reason.c_str());
+             settings.error_reason.c_str());
     return 1;
   }
 
@@ -422,14 +419,14 @@ int main(int argc, char **argv) {
   callbacks.cvmcache_info = posix_info;
   callbacks.cvmcache_breadcrumb_store = posix_breadcrumb_store;
   callbacks.cvmcache_breadcrumb_load = posix_breadcrumb_load;
-  callbacks.capabilities = CVMCACHE_CAP_WRITE + CVMCACHE_CAP_REFCOUNT +
-                           CVMCACHE_CAP_INFO + CVMCACHE_CAP_BREADCRUMB;
+  callbacks.capabilities = CVMCACHE_CAP_WRITE + CVMCACHE_CAP_REFCOUNT
+                           + CVMCACHE_CAP_INFO + CVMCACHE_CAP_BREADCRUMB;
 
   g_ctx = cvmcache_init(&callbacks);
   int retval = cvmcache_listen(g_ctx, locator);
   if (!retval) {
-    LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
-             "failed to listen on %s", locator);
+    LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr, "failed to listen on %s",
+             locator);
     return 1;
   }
 
@@ -473,7 +470,8 @@ int main(int argc, char **argv) {
              "Running unsupervised. Quit by SIGINT (CTRL+C)");
     atomic_init32(&g_terminated);
     signal(SIGINT, handle_sigint);
-    while (atomic_read32(&g_terminated) == 0) sleep(1);
+    while (atomic_read32(&g_terminated) == 0)
+      sleep(1);
   }
 
   cvmcache_wait_for(g_ctx);

@@ -5,13 +5,12 @@
 #include <gtest/gtest.h>
 
 #include "gateway_util.h"
-
 #include "util/string.h"
 
 class T_GatewayKeyParser : public ::testing::Test {
  protected:
-  virtual void SetUp() {}
-  virtual void TearDown() {}
+  virtual void SetUp() { }
+  virtual void TearDown() { }
 };
 
 TEST_F(T_GatewayKeyParser, ValidIdeal) {
@@ -44,8 +43,8 @@ TEST_F(T_GatewayKeyParser, ValidTabsSpacesAndNewlines) {
 TEST_F(T_GatewayKeyParser, ValidRepeatingChars) {
   std::string key_id;
   std::string secret;
-  ASSERT_TRUE(gateway::ParseKey("plain_text key111 sseeccrreett",
-                                &key_id, &secret));
+  ASSERT_TRUE(
+      gateway::ParseKey("plain_text key111 sseeccrreett", &key_id, &secret));
   ASSERT_EQ("key111", key_id);
   ASSERT_EQ("sseeccrreett", secret);
 }

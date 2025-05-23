@@ -15,8 +15,8 @@
 static inline uint32_t hasher_any(const shash::Any &key) {
   // We'll just do the same thing as hasher_md5, since every hash is at
   // least as large.
-  return *const_cast<uint32_t *>(
-             reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *const_cast<uint32_t *>(reinterpret_cast<const uint32_t *>(key.digest)
+                                 + 1);
 }
 static inline uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
@@ -28,43 +28,42 @@ class FdRefcountMgr {
    * Helper class containing the values for the map: fd -> refcount+id
    */
   struct FdRefcountInfo {
-    int refcount;  /// refcount for the times the fd was opened in the cache
+    int refcount;   /// refcount for the times the fd was opened in the cache
     shash::Any id;  /// hash of the object opened through the fd
 
-    FdRefcountInfo(): refcount(-1) { }
+    FdRefcountInfo() : refcount(-1) { }
   };
 
   FdRefcountMgr();
 
   ~FdRefcountMgr();
 
-  FdRefcountMgr(
-        const SmallHashDynamic<int, FdRefcountInfo> &map_refcount,
-        const SmallHashDynamic<shash::Any, int> &map_fd);
+  FdRefcountMgr(const SmallHashDynamic<int, FdRefcountInfo> &map_refcount,
+                const SmallHashDynamic<shash::Any, int> &map_fd);
 
   void AssignFrom(FdRefcountMgr *other);
 
-  SmallHashDynamic<int, FdRefcountInfo>* GetRefcountMapPtr();
+  SmallHashDynamic<int, FdRefcountInfo> *GetRefcountMapPtr();
 
-  SmallHashDynamic<shash::Any, int>* GetFdMapPtr();
+  SmallHashDynamic<shash::Any, int> *GetFdMapPtr();
 
-  int Open(const shash::Any id, const std::string& path);
+  int Open(const shash::Any id, const std::string &path);
 
   int Close(int fd);
 
   int Dup(int fd);
 
-  FdRefcountMgr* Clone();
+  FdRefcountMgr *Clone();
 
  private:
-  /** 
+  /**
    * map for fd -> refcount lookups. A backreference
-   * to the object id is included in FdRefcountInfo in order 
+   * to the object id is included in FdRefcountInfo in order
    * to be able to remove the file descriptor from map_fd_.
    */
   SmallHashDynamic<int, FdRefcountInfo> map_refcount_;
-  /** 
-   * map for object id -> fd lookups, used when 
+  /**
+   * map for object id -> fd lookups, used when
    * opening files in the cache. The fd is used as key
    * in the refcount map.
    */

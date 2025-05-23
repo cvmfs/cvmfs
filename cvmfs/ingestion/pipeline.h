@@ -19,17 +19,17 @@
 namespace upload {
 class AbstractUploader;
 struct SpoolerDefinition;
-}
+}  // namespace upload
 
 class IngestionPipeline : public Observable<upload::SpoolerResult> {
  public:
   explicit IngestionPipeline(
-    upload::AbstractUploader *uploader,
-    const upload::SpoolerDefinition &spooler_definition);
+      upload::AbstractUploader *uploader,
+      const upload::SpoolerDefinition &spooler_definition);
   ~IngestionPipeline();
 
   void Spawn();
-  void Process(IngestionSource* source, bool allow_chunking,
+  void Process(IngestionSource *source, bool allow_chunking,
                shash::Suffix hash_suffix = shash::kSuffixNone);
   void WaitFor();
 
@@ -92,22 +92,17 @@ class IngestionPipeline : public Observable<upload::SpoolerResult> {
 struct ScrubbingResult {
   ScrubbingResult() { }
   ScrubbingResult(const std::string &p, const shash::Any &h)
-    : path(p), hash(h) { }
+      : path(p), hash(h) { }
   std::string path;
   shash::Any hash;
 };
 
 
-class TaskScrubbingCallback
-  : public TubeConsumer<BlockItem>
-  , public Observable<ScrubbingResult>
-{
+class TaskScrubbingCallback : public TubeConsumer<BlockItem>,
+                              public Observable<ScrubbingResult> {
  public:
-  TaskScrubbingCallback(Tube<BlockItem> *tube_in,
-                        Tube<FileItem> *tube_counter)
-    : TubeConsumer<BlockItem>(tube_in)
-    , tube_counter_(tube_counter)
-  { }
+  TaskScrubbingCallback(Tube<BlockItem> *tube_in, Tube<FileItem> *tube_counter)
+      : TubeConsumer<BlockItem>(tube_in), tube_counter_(tube_counter) { }
 
  protected:
   virtual void Process(BlockItem *block_item);
@@ -123,7 +118,7 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
   ~ScrubbingPipeline();
 
   void Spawn();
-  void Process(IngestionSource* source,
+  void Process(IngestionSource *source,
                shash::Algorithms hash_algorithm,
                shash::Suffix hash_suffix);
   void WaitFor();

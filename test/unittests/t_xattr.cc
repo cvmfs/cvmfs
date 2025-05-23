@@ -2,10 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
-#include <algorithm>
-
-#include <cerrno>
 #include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cerrno>
 
 #include "util/file_guard.h"
 #include "util/platform.h"
@@ -70,7 +70,8 @@ TEST_F(T_Xattr, CreateFromFile) {
 
   string value;
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"))
-    << "failed to set user defined extended attribute (errno: " << errno << ")";
+      << "failed to set user defined extended attribute (errno: " << errno
+      << ")";
   UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file2.IsValid());
   EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
@@ -199,17 +200,17 @@ TEST_F(T_Xattr, ListKeys) {
 
 TEST_F(T_Xattr, ListKeysPosix) {
   const char base_list[] = "user.a\0user.b\0keya\0";
-  string existing_list(base_list, sizeof(base_list)-1);
+  string existing_list(base_list, sizeof(base_list) - 1);
   XattrList empty;
   EXPECT_EQ("", empty.ListKeysPosix(""));
   const char expect1[] = "user.a\0user.b\0keya\0";
-  EXPECT_EQ(string(expect1, sizeof(expect1)-1),
+  EXPECT_EQ(string(expect1, sizeof(expect1) - 1),
             empty.ListKeysPosix(existing_list));
   const char expect2[] = "empty_key\0keya\0keyb\0";
-  EXPECT_EQ(string(expect2, sizeof(expect2)-1),
+  EXPECT_EQ(string(expect2, sizeof(expect2) - 1),
             default_list.ListKeysPosix(""));
   const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0";
-  EXPECT_EQ(string(expect3, sizeof(expect3)-1),
+  EXPECT_EQ(string(expect3, sizeof(expect3) - 1),
             default_list.ListKeysPosix(existing_list));
 }
 

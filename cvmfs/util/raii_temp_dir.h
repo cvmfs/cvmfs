@@ -20,14 +20,14 @@
  */
 class CVMFS_EXPORT RaiiTempDir {
  public:
-  static RaiiTempDir* Create(const std::string& prefix);
+  static RaiiTempDir *Create(const std::string &prefix);
 
   std::string dir() const { return dir_; }
 
   ~RaiiTempDir();
 
  private:
-  explicit RaiiTempDir(const std::string& prefix);
+  explicit RaiiTempDir(const std::string &prefix);
 
   std::string dir_;
 };

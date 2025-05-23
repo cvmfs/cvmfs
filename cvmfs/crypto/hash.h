@@ -50,14 +50,14 @@ enum Algorithms {
  * NOTE: when adding a suffix here, one must edit `cvmfs_swissknife scrub`
  *       accordingly, that checks for invalid hash suffixes
  */
-const char kSuffixNone         = 0;
-const char kSuffixCatalog      = 'C';
-const char kSuffixHistory      = 'H';
+const char kSuffixNone = 0;
+const char kSuffixCatalog = 'C';
+const char kSuffixHistory = 'H';
 const char kSuffixMicroCatalog = 'L';  // currently unused
-const char kSuffixPartial      = 'P';
-const char kSuffixTemporary    = 'T';
-const char kSuffixCertificate  = 'X';
-const char kSuffixMetainfo     = 'M';
+const char kSuffixPartial = 'P';
+const char kSuffixTemporary = 'T';
+const char kSuffixCertificate = 'X';
+const char kSuffixMetainfo = 'M';
 
 
 /**
@@ -66,8 +66,7 @@ const char kSuffixMetainfo     = 'M';
  * When the maximum digest size changes, the memory layout of DirectoryEntry and
  * PosixQuotaManager::LruCommand changes, too!
  */
-const unsigned kDigestSizes[] =
-  {16,  20,   20,     20,       20};
+const unsigned kDigestSizes[] = {16, 20, 20, 20, 20};
 // Md5  Sha1  Rmd160  Shake128  Any
 const unsigned kMaxDigestSize = 20;
 
@@ -83,8 +82,7 @@ const unsigned kMaxContextSize = 256;
  * like const char *kAlgorithmIds[] = {"", "", "-rmd160", ...
  */
 CVMFS_EXPORT extern const char *kAlgorithmIds[];
-const unsigned kAlgorithmIdSizes[] =
-  {0,   0,    7,       9,         0};
+const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 9, 0};
 // Md5  Sha1  -rmd160  -shake128  Any
 const unsigned kMaxAlgorithmIdentifierSize = 9;
 
@@ -92,8 +90,7 @@ const unsigned kMaxAlgorithmIdentifierSize = 9;
  * Corresponds to Algorithms.  There is no block size for Any.
  * Is an HMAC for SHAKE well-defined?
  */
-const unsigned kBlockSizes[] =
-  {64,  64,   64,     168};
+const unsigned kBlockSizes[] = {64, 64, 64, 168};
 // Md5  Sha1  Rmd160  Shake128
 
 /**
@@ -122,31 +119,30 @@ typedef char Suffix;
 template<unsigned digest_size_, Algorithms algorithm_>
 struct CVMFS_EXPORT Digest {
   unsigned char digest[digest_size_];
-  Algorithms    algorithm;
-  Suffix        suffix;
+  Algorithms algorithm;
+  Suffix suffix;
 
   class Hex {
    public:
-    explicit Hex(const Digest<digest_size_, algorithm_> *digest) :
-      digest_(*digest),
-      hash_length_(2 * kDigestSizes[digest_.algorithm]),
-      algo_id_length_(kAlgorithmIdSizes[digest_.algorithm]) {}
+    explicit Hex(const Digest<digest_size_, algorithm_> *digest)
+        : digest_(*digest)
+        , hash_length_(2 * kDigestSizes[digest_.algorithm])
+        , algo_id_length_(kAlgorithmIdSizes[digest_.algorithm]) { }
 
     unsigned int length() const { return hash_length_ + algo_id_length_; }
 
     char operator[](const unsigned int position) const {
       assert(position < length());
-      return (position < hash_length_)
-        ? GetHashChar(position)
-        : GetAlgorithmIdentifierChar(position);
+      return (position < hash_length_) ? GetHashChar(position)
+                                       : GetAlgorithmIdentifierChar(position);
     }
 
    protected:
     char GetHashChar(const unsigned int position) const {
       assert(position < hash_length_);
       const char digit = (position % 2 == 0)
-        ? digest_.digest[position / 2] / 16
-        : digest_.digest[position / 2] % 16;
+                             ? digest_.digest[position / 2] / 16
+                             : digest_.digest[position / 2] % 16;
       return ToHex(digit);
     }
 
@@ -160,44 +156,40 @@ struct CVMFS_EXPORT Digest {
     }
 
    private:
-    const Digest<digest_size_, algorithm_>  &digest_;
-    const unsigned int                       hash_length_;
-    const unsigned int                       algo_id_length_;
+    const Digest<digest_size_, algorithm_> &digest_;
+    const unsigned int hash_length_;
+    const unsigned int algo_id_length_;
   };
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
-    return 2*kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
+    return 2 * kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
   }
 
-  Digest() :
-    algorithm(algorithm_), suffix(kSuffixNone)
-  {
-    SetNull();
-  }
+  Digest() : algorithm(algorithm_), suffix(kSuffixNone) { SetNull(); }
 
-  explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0) :
-    algorithm(a), suffix(s)
-  {
+  explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0)
+      : algorithm(a), suffix(s) {
     assert((algorithm_ == kAny) || (a == algorithm_));
-    const unsigned char_size = 2*kDigestSizes[a];
+    const unsigned char_size = 2 * kDigestSizes[a];
 
     const std::string *str = hex.str;
     const unsigned length = str->length();
     assert(length >= char_size);  // A suffix won't hurt
 
     for (unsigned i = 0; i < char_size; i += 2) {
-      this->digest[i/2] =
-        ((*str)[i] <= '9' ? (*str)[i] -'0' : (*str)[i] - 'a' + 10)*16 +
-        ((*str)[i+1] <= '9' ? (*str)[i+1] - '0' : (*str)[i+1] - 'a' + 10);
+      this->digest[i / 2] = ((*str)[i] <= '9' ? (*str)[i] - '0'
+                                              : (*str)[i] - 'a' + 10)
+                                * 16
+                            + ((*str)[i + 1] <= '9' ? (*str)[i + 1] - '0'
+                                                    : (*str)[i + 1] - 'a' + 10);
     }
   }
 
   Digest(const Algorithms a,
          const unsigned char *digest_buffer,
-         const Suffix s = kSuffixNone) :
-    algorithm(a), suffix(s)
-  {
+         const Suffix s = kSuffixNone)
+      : algorithm(a), suffix(s) {
     memcpy(digest, digest_buffer, kDigestSizes[a]);
   }
 
@@ -248,7 +240,7 @@ struct CVMFS_EXPORT Digest {
    */
   std::string ToString(const bool with_suffix = false) const {
     Hex hex(this);
-    const bool     use_suffix  = with_suffix && HasSuffix();
+    const bool use_suffix = with_suffix && HasSuffix();
     const unsigned string_length = hex.length() + use_suffix;
     std::string result(string_length, 0);
 
@@ -274,9 +266,9 @@ struct CVMFS_EXPORT Digest {
    */
   std::string ToFingerprint(const bool with_suffix = false) const {
     Hex hex(this);
-    const bool     use_suffix  = with_suffix && HasSuffix();
-    const unsigned string_length =
-      hex.length() + kDigestSizes[algorithm] - 1 + use_suffix;
+    const bool use_suffix = with_suffix && HasSuffix();
+    const unsigned string_length = hex.length() + kDigestSizes[algorithm] - 1
+                                   + use_suffix;
     std::string result(string_length, 0);
 
     unsigned l = hex.length();
@@ -301,9 +293,7 @@ struct CVMFS_EXPORT Digest {
    *
    * @return  a string representation including the hash suffix of the digest
    */
-  std::string ToStringWithSuffix() const {
-    return ToString(true);
-  }
+  std::string ToStringWithSuffix() const { return ToString(true); }
 
   /**
    * Generate the standard relative path from the hexified digest to be used in
@@ -313,9 +303,7 @@ struct CVMFS_EXPORT Digest {
    *
    * @return  a relative path representation of the digest including the suffix
    */
-  std::string MakePath() const {
-    return MakePathExplicit(1, 2, suffix);
-  }
+  std::string MakePath() const { return MakePathExplicit(1, 2, suffix); }
 
   /**
    * The alternative path is used to symlink the root catalog from the webserver
@@ -350,7 +338,7 @@ struct CVMFS_EXPORT Digest {
    */
   std::string MakePathExplicit(const unsigned dir_levels,
                                const unsigned digits_per_level,
-                               const Suffix   hash_suffix = kSuffixNone) const {
+                               const Suffix hash_suffix = kSuffixNone) const {
     Hex hex(this);
 
     // figure out how big the output string needs to be
@@ -360,11 +348,11 @@ struct CVMFS_EXPORT Digest {
     result.resize(string_length);
 
     // build hexified hash and path delimiters
-    unsigned i   = 0;
+    unsigned i = 0;
     unsigned pos = 0;
     for (; i < hex.length(); ++i) {
       if (i > 0 && (i % digits_per_level == 0)
-                && (i / digits_per_level <= dir_levels)) {
+          && (i / digits_per_level <= dir_levels)) {
         result[pos++] = '/';
       }
       result[pos++] = hex[i];
@@ -375,7 +363,7 @@ struct CVMFS_EXPORT Digest {
       result[pos++] = hash_suffix;
     }
 
-    assert(i   == hex.length());
+    assert(i == hex.length());
     assert(pos == string_length);
     return result;
   }
@@ -397,12 +385,10 @@ struct CVMFS_EXPORT Digest {
   }
 
 
-  void SetNull() {
-    memset(digest, 0, digest_size_);
-  }
+  void SetNull() { memset(digest, 0, digest_size_); }
 
 
-  bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return false;
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
@@ -412,11 +398,11 @@ struct CVMFS_EXPORT Digest {
     return true;
   }
 
-  bool operator !=(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator!=(const Digest<digest_size_, algorithm_> &other) const {
     return !(*this == other);
   }
 
-  bool operator <(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator<(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm < other.algorithm);
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
@@ -428,7 +414,7 @@ struct CVMFS_EXPORT Digest {
     return false;
   }
 
-  bool operator >(const Digest<digest_size_, algorithm_> &other) const {
+  bool operator>(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm > other.algorithm);
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
@@ -467,19 +453,21 @@ struct CVMFS_EXPORT Shake128 : public Digest<20, kShake128> { };
 struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Any() : Digest<kMaxDigestSize, kAny>() { }
 
-  explicit Any(const Algorithms a,
-               const char       s = kSuffixNone) :
-    Digest<kMaxDigestSize, kAny>() { algorithm = a; suffix = s; }
+  explicit Any(const Algorithms a, const char s = kSuffixNone)
+      : Digest<kMaxDigestSize, kAny>() {
+    algorithm = a;
+    suffix = s;
+  }
 
-  Any(const Algorithms     a,
+  Any(const Algorithms a,
       const unsigned char *digest_buffer,
-      const Suffix         suffix = kSuffixNone) :
-    Digest<kMaxDigestSize, kAny>(a, digest_buffer, suffix) { }
+      const Suffix suffix = kSuffixNone)
+      : Digest<kMaxDigestSize, kAny>(a, digest_buffer, suffix) { }
 
-  explicit Any(const Algorithms  a,
-               const HexPtr      hex,
-               const char        suffix = kSuffixNone) :
-    Digest<kMaxDigestSize, kAny>(a, hex, suffix) { }
+  explicit Any(const Algorithms a,
+               const HexPtr hex,
+               const char suffix = kSuffixNone)
+      : Digest<kMaxDigestSize, kAny>(a, hex, suffix) { }
 
   Md5 CastToMd5();
 };
@@ -497,16 +485,16 @@ CVMFS_EXPORT unsigned GetContextSize(const Algorithms algorithm);
  */
 class CVMFS_EXPORT ContextPtr {
  public:
-  Algorithms  algorithm;
-  void       *buffer;
-  unsigned    size;
+  Algorithms algorithm;
+  void *buffer;
+  unsigned size;
 
-  ContextPtr() : algorithm(kAny), buffer(NULL), size(0) {}
+  ContextPtr() : algorithm(kAny), buffer(NULL), size(0) { }
 
-  explicit ContextPtr(const Algorithms a) :
-    algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
-  ContextPtr(const Algorithms a, void *b) :
-    algorithm(a), buffer(b), size(GetContextSize(a)) {}
+  explicit ContextPtr(const Algorithms a)
+      : algorithm(a), buffer(NULL), size(GetContextSize(a)) { }
+  ContextPtr(const Algorithms a, void *b)
+      : algorithm(a), buffer(b), size(GetContextSize(a)) { }
 };
 
 CVMFS_EXPORT void Init(ContextPtr context);
@@ -525,8 +513,7 @@ CVMFS_EXPORT void Hmac(const std::string &key,
                        const unsigned buffer_size,
                        Any *any_digest);
 inline void HmacString(const std::string &key, const std::string &content,
-                       Any *any_digest)
-{
+                       Any *any_digest) {
   Hmac(key,
        reinterpret_cast<const unsigned char *>(content.data()),
        content.size(),

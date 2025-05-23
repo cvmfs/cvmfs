@@ -33,10 +33,10 @@
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollectorAux {
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
-  typedef typename ObjectFetcherTN::ReflogTN          ReflogTN;
-  typedef typename
-    GarbageCollector<CatalogTraversalT, HashFilterT>::Configuration
-    ConfigurationTN;
+  typedef typename ObjectFetcherTN::ReflogTN ReflogTN;
+  typedef
+      typename GarbageCollector<CatalogTraversalT, HashFilterT>::Configuration
+          ConfigurationTN;
 
  public:
   explicit GarbageCollectorAux(const ConfigurationTN &config);

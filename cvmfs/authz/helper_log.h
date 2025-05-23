@@ -7,10 +7,10 @@
 
 #include <string>
 
-const unsigned kLogAuthzDebug      = 0x01;
-const unsigned kLogAuthzSyslog     = 0x02;
+const unsigned kLogAuthzDebug = 0x01;
+const unsigned kLogAuthzSyslog = 0x02;
 const unsigned kLogAuthzSyslogWarn = 0x04;
-const unsigned kLogAuthzSyslogErr  = 0x08;
+const unsigned kLogAuthzSyslogErr = 0x08;
 
 void SetLogAuthzDebug(const std::string &path);
 void SetLogAuthzSyslogLevel(const int level);

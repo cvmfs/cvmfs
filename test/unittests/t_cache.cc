@@ -2,10 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <errno.h>
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -37,17 +36,17 @@ class T_CacheManager : public ::testing::Test {
     ASSERT_TRUE(alien_cache_mgr_ != NULL);
 
     ASSERT_TRUE(cache_mgr_->CommitFromMem(
-      CacheManager::LabeledObject(hash_null_), NULL, 0));
+        CacheManager::LabeledObject(hash_null_), NULL, 0));
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
     ASSERT_TRUE(cache_mgr_->CommitFromMem(
-      CacheManager::LabeledObject(hash_one_), &buf, 1));
+        CacheManager::LabeledObject(hash_one_), &buf, 1));
 
     unsigned char *zero_page;
     hash_page_.digest[0] = 2;
     zero_page = reinterpret_cast<unsigned char *>(scalloc(4096, 1));
     bool retval = cache_mgr_->CommitFromMem(
-      CacheManager::LabeledObject(hash_page_), zero_page, 4096);
+        CacheManager::LabeledObject(hash_page_), zero_page, 4096);
     free(zero_page);
     ASSERT_TRUE(retval);
   }
@@ -130,11 +129,7 @@ class TestQuotaManager : public QuotaManager {
   };
 
   struct LastCommand {
-    LastCommand()
-      : cmd(kCmdUnknown)
-      , size(0)
-      , is_catalog(false)
-    { }
+    LastCommand() : cmd(kCmdUnknown), size(0), is_catalog(false) { }
 
     Command cmd;
     shash::Any hash;
@@ -148,8 +143,7 @@ class TestQuotaManager : public QuotaManager {
   virtual bool HasCapability(Capabilities capability) { return true; }
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
-                      const std::string &description)
-  {
+                      const std::string &description) {
     last_cmd = LastCommand();
     last_cmd.cmd = kCmdInsert;
     last_cmd.hash = hash;
@@ -158,8 +152,7 @@ class TestQuotaManager : public QuotaManager {
   }
 
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
-                              const std::string &description)
-  {
+                              const std::string &description) {
     last_cmd = LastCommand();
     last_cmd.cmd = kCmdInsertVolatile;
     last_cmd.hash = hash;
@@ -167,8 +160,7 @@ class TestQuotaManager : public QuotaManager {
     last_cmd.description = description;
   }
   virtual bool Pin(const shash::Any &hash, const uint64_t size,
-                   const std::string &description, const bool is_catalog)
-  {
+                   const std::string &description, const bool is_catalog) {
     last_cmd = LastCommand();
     last_cmd.cmd = kCmdPin;
     last_cmd.hash = hash;
@@ -214,11 +206,11 @@ class TestQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListVolatile() {
     return std::vector<std::string>();
   }
-  virtual uint64_t GetMaxFileSize() { return 50*1024*1024; }
-  virtual uint64_t GetCapacity() { return 100*1024*1024; }
+  virtual uint64_t GetMaxFileSize() { return 50 * 1024 * 1024; }
+  virtual uint64_t GetCapacity() { return 100 * 1024 * 1024; }
   virtual uint64_t GetSize() { return size; }
   virtual uint64_t GetSizePinned() { return 0; }
-  virtual bool     SetLimit(uint64_t limit) { return false; } // NOLINT
+  virtual bool SetLimit(uint64_t limit) { return false; }  // NOLINT
   virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }
@@ -266,18 +258,15 @@ class TestCacheManager : public CacheManager {
     return -EIO;
   }
   virtual int Reset(void *txn) { return 0; }
-  virtual int AbortTxn(void *txn) {
-    return close(*static_cast<int *>(txn));
-  }
+  virtual int AbortTxn(void *txn) { return close(*static_cast<int *>(txn)); }
   virtual int OpenFromTxn(void *txn) { return open("/dev/null", O_RDONLY); }
-  virtual int CommitTxn(void *txn) {
-    return 0;
-  }
+  virtual int CommitTxn(void *txn) { return 0; }
   virtual void Spawn() { }
 
   virtual void *DoSaveState() { return state; }
   virtual int DoRestoreState(void *data) {
-    if (data == this) return -1;
+    if (data == this)
+      return -1;
     return -2;
   }
   virtual bool DoFreeState(void *data) { return data == this; }
@@ -344,8 +333,8 @@ TEST_F(T_CacheManager, Open2Mem) {
   uint64_t retrieve_size;
 
   EXPECT_FALSE(
-    cache_mgr_->Open2Mem(CacheManager::LabeledObject(shash::Any(shash::kMd5)),
-                         &retrieve_buf, &retrieve_size));
+      cache_mgr_->Open2Mem(CacheManager::LabeledObject(shash::Any(shash::kMd5)),
+                           &retrieve_buf, &retrieve_size));
 
   EXPECT_TRUE(cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash_null_),
                                    &retrieve_buf, &retrieve_size));
@@ -370,15 +359,16 @@ TEST_F(T_CacheManager, OpenPinned) {
   rnd_hash.Randomize();
   CacheManager::Label label;
   label.flags |= CacheManager::kLabelPinned;
-  EXPECT_EQ(-ENOENT,
-    cache_mgr_->OpenPinned(CacheManager::LabeledObject(rnd_hash, label)));
+  EXPECT_EQ(
+      -ENOENT,
+      cache_mgr_->OpenPinned(CacheManager::LabeledObject(rnd_hash, label)));
 
   delete cache_mgr_->quota_mgr_;
   TestQuotaManager *quota_mgr = new TestQuotaManager();
   cache_mgr_->quota_mgr_ = quota_mgr;
 
-  int fd =
-    cache_mgr_->OpenPinned(CacheManager::LabeledObject(hash_null_, label));
+  int fd = cache_mgr_->OpenPinned(
+      CacheManager::LabeledObject(hash_null_, label));
   EXPECT_GE(fd, 0);
   EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
   EXPECT_EQ(hash_null_, quota_mgr->last_cmd.hash);
@@ -547,7 +537,7 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   delete cache_mgr_->quota_mgr_;
   cache_mgr_->quota_mgr_ = new TestQuotaManager();
   TestQuotaManager *quota_mgr = reinterpret_cast<TestQuotaManager *>(
-    cache_mgr_->quota_mgr());
+      cache_mgr_->quota_mgr());
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 0, txn), 0);
   CacheManager::Label label;
@@ -643,7 +633,7 @@ TEST_F(T_CacheManager, Open) {
   delete cache_mgr_->quota_mgr_;
   cache_mgr_->quota_mgr_ = new TestQuotaManager();
   TestQuotaManager *quota_mgr = reinterpret_cast<TestQuotaManager *>(
-    cache_mgr_->quota_mgr());
+      cache_mgr_->quota_mgr());
 
   shash::Any rnd_hash;
   rnd_hash.Randomize();
@@ -676,8 +666,8 @@ TEST_F(T_CacheManager, OpenFromTxn) {
   EXPECT_EQ('A', buf);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 
-  PosixCacheManager::Transaction *transaction =
-    reinterpret_cast<PosixCacheManager::Transaction *>(txn);
+  PosixCacheManager::Transaction
+      *transaction = reinterpret_cast<PosixCacheManager::Transaction *>(txn);
   EXPECT_EQ(0, unlink(transaction->tmp_path.c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->OpenFromTxn(txn));
 
@@ -789,8 +779,9 @@ TEST_F(T_CacheManager, StartTxn) {
   delete cache_mgr_->quota_mgr_;
   TestQuotaManager *quota_mgr = new TestQuotaManager();
   cache_mgr_->quota_mgr_ = quota_mgr;
-  EXPECT_EQ(-ENOSPC,
-    cache_mgr_->StartTxn(rnd_hash, quota_mgr->GetMaxFileSize() + 1, txn));
+  EXPECT_EQ(
+      -ENOSPC,
+      cache_mgr_->StartTxn(rnd_hash, quota_mgr->GetMaxFileSize() + 1, txn));
   quota_mgr->size = quota_mgr->GetCapacity() - 1;
   fd = cache_mgr_->StartTxn(rnd_hash, PosixCacheManager::kBigFile + 1, txn);
   EXPECT_GE(fd, 0);

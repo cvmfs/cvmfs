@@ -15,11 +15,11 @@ SyncUnion::SyncUnion(AbstractSyncMediator *mediator,
                      const std::string &rdonly_path,
                      const std::string &union_path,
                      const std::string &scratch_path)
-    : rdonly_path_(rdonly_path),
-      scratch_path_(scratch_path),
-      union_path_(union_path),
-      mediator_(mediator),
-      initialized_(false) {}
+    : rdonly_path_(rdonly_path)
+    , scratch_path_(scratch_path)
+    , union_path_(union_path)
+    , mediator_(mediator)
+    , initialized_(false) { }
 
 bool SyncUnion::Initialize() {
   mediator_->RegisterUnionEngine(this);
@@ -108,8 +108,8 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
                                const string &link_name) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, link_name,
+                                             kItemSymlink);
   ProcessFile(entry);
 }
 
@@ -149,8 +149,8 @@ void SyncUnion::ProcessCharacterDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                             kItemCharacterDevice);
   ProcessFile(entry);
 }
 
@@ -159,8 +159,8 @@ void SyncUnion::ProcessBlockDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)", parent_dir.c_str(),
            filename.c_str());
-  SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemBlockDevice);
+  SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                             kItemBlockDevice);
   ProcessFile(entry);
 }
 

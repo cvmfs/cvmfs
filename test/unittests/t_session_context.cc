@@ -9,38 +9,36 @@
 #include "util/posix.h"
 
 namespace {
-  RepositoryTag TestRepositoryTag() {
-    return RepositoryTag("tag_name", "");
-  }
-}
+RepositoryTag TestRepositoryTag() { return RepositoryTag("tag_name", ""); }
+}  // namespace
 
 class SessionContextMocked : public upload::SessionContext {
  public:
-  SessionContextMocked() : num_jobs_dispatched_(0), num_jobs_finished_(0) {}
+  SessionContextMocked() : num_jobs_dispatched_(0), num_jobs_finished_(0) { }
 
   int num_jobs_dispatched_;
   int num_jobs_finished_;
 
  protected:
-  virtual Future<bool>* DispatchObjectPack(ObjectPack* pack) {
-    Future<bool>* ret = SessionContext::DispatchObjectPack(pack);
+  virtual Future<bool> *DispatchObjectPack(ObjectPack *pack) {
+    Future<bool> *ret = SessionContext::DispatchObjectPack(pack);
     num_jobs_dispatched_++;
     return ret;
   }
 
-  virtual bool Commit(const std::string& /*old_catalog*/,
-                      const std::string& /*new_catalog*/,
-                      const RepositoryTag& /*tag_name*/) {
+  virtual bool Commit(const std::string & /*old_catalog*/,
+                      const std::string & /*new_catalog*/,
+                      const RepositoryTag & /*tag_name*/) {
     return true;
   }
 
-  virtual bool DoUpload(const UploadJob* /*job*/) {
+  virtual bool DoUpload(const UploadJob * /*job*/) {
     num_jobs_finished_++;
     return true;
   }
 };
 
-class T_SessionContext : public ::testing::Test {};
+class T_SessionContext : public ::testing::Test { };
 
 TEST_F(T_SessionContext, BasicLifeCycle) {
   SessionContextMocked ctx;
@@ -235,8 +233,8 @@ TEST_F(T_SessionContext, CurlUploadCallback) {
 
   const std::string message = "FAKE JSON MESSAGE";
 
-  const size_t payload_size =
-      message.size() + pack.size() + serializer.GetHeaderSize();
+  const size_t payload_size = message.size() + pack.size()
+                              + serializer.GetHeaderSize();
 
   std::string text1;
   {
@@ -249,12 +247,13 @@ TEST_F(T_SessionContext, CurlUploadCallback) {
       std::copy(buffer.begin(), buffer.begin() + nbytes,
                 std::back_inserter(payload));
     } while (nbytes > 0);
-    text1 = message +
-            std::string(reinterpret_cast<char*>(&payload[0]), payload.size());
+    text1 = message
+            + std::string(reinterpret_cast<char *>(&payload[0]),
+                          payload.size());
   }
 
   shash::Any hash1(shash::kSha1);
-  shash::HashMem(reinterpret_cast<const unsigned char*>(text1.data()),
+  shash::HashMem(reinterpret_cast<const unsigned char *>(text1.data()),
                  text1.size(), &hash1);
   const std::string digest1 = hash1.ToString(true);
 
@@ -274,7 +273,7 @@ TEST_F(T_SessionContext, CurlUploadCallback) {
   } while (nbytes > 0);
 
   shash::Any hash2(shash::kSha1);
-  shash::HashMem(reinterpret_cast<const unsigned char*>(output.data()),
+  shash::HashMem(reinterpret_cast<const unsigned char *>(output.data()),
                  output.size(), &hash2);
   const std::string digest2 = hash2.ToString(true);
 

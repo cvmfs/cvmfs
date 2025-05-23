@@ -2,10 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <string>
 
+#include "gtest/gtest.h"
 #include "util/tube.h"
 
 using namespace std;  // NOLINT

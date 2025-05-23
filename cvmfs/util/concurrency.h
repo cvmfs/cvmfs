@@ -27,7 +27,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  * Uses conditional variables to block when threads try to pop from the empty
  * channel.
  */
-template <class ItemT>
+template<class ItemT>
 class Channel : SingleCopy {
  public:
   Channel() {
@@ -105,17 +105,17 @@ class Channel : SingleCopy {
 };
 
 /**
- * Implements a simple interface to lock objects of derived classes. Classes that
- * inherit from Lockable are also usable with the LockGuard template for scoped
- * locking semantics.
+ * Implements a simple interface to lock objects of derived classes. Classes
+ * that inherit from Lockable are also usable with the LockGuard template for
+ * scoped locking semantics.
  */
 class CVMFS_EXPORT Lockable : SingleCopy {
  public:
-  inline virtual ~Lockable() {        pthread_mutex_destroy(&mutex_); }
+  inline virtual ~Lockable() { pthread_mutex_destroy(&mutex_); }
 
-  void Lock()    const       {        pthread_mutex_lock(&mutex_);    }
-  int  TryLock() const       { return pthread_mutex_trylock(&mutex_); }
-  void Unlock()  const       {        pthread_mutex_unlock(&mutex_);  }
+  void Lock() const { pthread_mutex_lock(&mutex_); }
+  int TryLock() const { return pthread_mutex_trylock(&mutex_); }
+  void Unlock() const { pthread_mutex_unlock(&mutex_); }
 
  protected:
   Lockable() {
@@ -146,16 +146,13 @@ class CVMFS_EXPORT Lockable : SingleCopy {
  * Caveat: This implementation uses a simple mutex mechanism and therefore might
  *         become a scalability bottle neck!
  */
-template <typename T>
+template<typename T>
 class SynchronizingCounter : SingleCopy {
  public:
-  SynchronizingCounter() :
-    value_(T(0)), maximal_value_(T(0)) { Initialize(); }
+  SynchronizingCounter() : value_(T(0)), maximal_value_(T(0)) { Initialize(); }
 
   explicit SynchronizingCounter(const T maximal_value)
-    : value_(T(0))
-    , maximal_value_(maximal_value)
-  {
+      : value_(T(0)), maximal_value_(maximal_value) {
     assert(maximal_value > T(0));
     Initialize();
   }
@@ -184,11 +181,11 @@ class SynchronizingCounter : SingleCopy {
   }
 
   bool HasMaximalValue() const { return maximal_value_ != T(0); }
-  T      maximal_value() const { return maximal_value_;         }
+  T maximal_value() const { return maximal_value_; }
 
-  T operator++()          { return Increment();        }
+  T operator++() { return Increment(); }
   const T operator++(int) { return Increment() - T(1); }
-  T operator--()          { return Decrement();        }
+  T operator--() { return Decrement(); }
   const T operator--(int) { return Decrement() + T(1); }
 
   T Get() const {
@@ -196,7 +193,7 @@ class SynchronizingCounter : SingleCopy {
     return value_;
   }
 
-  SynchronizingCounter<T>& operator=(const T &other) {
+  SynchronizingCounter<T> &operator=(const T &other) {
     MutexLockGuard l(mutex_);
     SetValueUnprotected(other);
     return *this;
@@ -211,12 +208,12 @@ class SynchronizingCounter : SingleCopy {
   void Destroy();
 
  private:
-        T                 value_;
-  const T                 maximal_value_;
+  T value_;
+  const T maximal_value_;
 
   mutable pthread_mutex_t mutex_;
-  mutable pthread_cond_t  became_zero_;
-          pthread_cond_t  free_slot_;
+  mutable pthread_cond_t became_zero_;
+  pthread_cond_t free_slot_;
 };
 
 
@@ -225,15 +222,15 @@ class SynchronizingCounter : SingleCopy {
 //
 
 
-template <typename ParamT>
+template<typename ParamT>
 class Observable;
 
 
 /**
  * This is a base class for classes that need to expose a callback interface for
  * asynchronous callback methods. One can register an arbitrary number of
- * observers on an Observable that get notified when the method NotifyListeners()
- * is invoked.
+ * observers on an Observable that get notified when the method
+ * NotifyListeners() is invoked.
  *
  * Note: the registration and invocation of callbacks in Observable is thread-
  *       safe, but be aware that the callbacks of observing classes might run in
@@ -247,13 +244,13 @@ class Observable;
  * @param ParamT   the type of the parameter that is passed to every callback
  *                 invocation.
  */
-template <typename ParamT>
-class Observable : public Callbackable<ParamT>,
-                   SingleCopy {
+template<typename ParamT>
+class Observable : public Callbackable<ParamT>, SingleCopy {
  public:
-  typedef typename Callbackable<ParamT>::CallbackTN*  CallbackPtr;
+  typedef typename Callbackable<ParamT>::CallbackTN *CallbackPtr;
+
  protected:
-  typedef std::set<CallbackPtr>                       Callbacks;
+  typedef std::set<CallbackPtr> Callbacks;
 
  public:
   virtual ~Observable();
@@ -271,13 +268,12 @@ class Observable : public Callbackable<ParamT>,
    * @param closure    something to be passed to `method`
    * @return  a handle to the registered callback
    */
-  template <class DelegateT, class ClosureDataT>
+  template<class DelegateT, class ClosureDataT>
   CallbackPtr RegisterListener(
-          typename BoundClosure<ParamT,
-                                DelegateT,
-                                ClosureDataT>::CallbackMethod   method,
-          DelegateT                                            *delegate,
-          ClosureDataT                                          data);
+      typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod
+          method,
+      DelegateT *delegate,
+      ClosureDataT data);
 
   /**
    * Registers a method of a specific object as a listener to the Observable
@@ -289,10 +285,10 @@ class Observable : public Callbackable<ParamT>,
    * @param delegate   a pointer to the object to invoke the callback on
    * @return  a handle to the registered callback
    */
-  template <class DelegateT>
+  template<class DelegateT>
   CallbackPtr RegisterListener(
-          typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
-          DelegateT *delegate);
+      typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
+      DelegateT *delegate);
 
   /**
    * Registers a static class member or a C-like function as a callback to the
@@ -332,9 +328,9 @@ class Observable : public Callbackable<ParamT>,
   void NotifyListeners(const ParamT &parameter);
 
  private:
-  Callbacks                    listeners_;         //!< the set of registered
-                                                   //!< callback objects
-  mutable pthread_rwlock_t     listeners_rw_lock_;
+  Callbacks listeners_;  //!< the set of registered
+                         //!< callback objects
+  mutable pthread_rwlock_t listeners_rw_lock_;
 };
 
 
@@ -383,7 +379,7 @@ class CVMFS_EXPORT Signal : SingleCopy {
  *
  * @param T   the data type to be enqueued in the queue
  */
-template <class T>
+template<class T>
 class FifoChannel : protected std::queue<T> {
  public:
   /**
@@ -393,8 +389,7 @@ class FifoChannel : protected std::queue<T> {
    * @param drainout_threshold  if less than xx elements are in the queue it is
    *                            considered to be "not full"
    */
-  FifoChannel(const size_t maximal_length,
-              const size_t drainout_threshold);
+  FifoChannel(const size_t maximal_length, const size_t drainout_threshold);
   virtual ~FifoChannel();
 
   /**
@@ -422,18 +417,18 @@ class FifoChannel : protected std::queue<T> {
   unsigned int Drop();
 
   inline size_t GetItemCount() const;
-  inline bool   IsEmpty() const;
+  inline bool IsEmpty() const;
   inline size_t GetMaximalItemCount() const;
 
  private:
   // general configuration
-  const   size_t             maximal_queue_length_;
-  const   size_t             queue_drainout_threshold_;
+  const size_t maximal_queue_length_;
+  const size_t queue_drainout_threshold_;
 
   // thread synchronisation structures
-  mutable pthread_mutex_t    mutex_;
-  mutable pthread_cond_t     queue_is_not_empty_;
-  mutable pthread_cond_t     queue_is_not_full_;
+  mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t queue_is_not_empty_;
+  mutable pthread_cond_t queue_is_not_full_;
 };
 
 
@@ -455,41 +450,37 @@ class FifoChannel : protected std::queue<T> {
  * @param WorkerT   the class to be used as a worker for a concurrent worker
  *                  swarm
  */
-template <class WorkerT>
+template<class WorkerT>
 class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  public:
   // these data types must be defined by the worker class
   /**
    * Input data type
    */
-  typedef typename WorkerT::expected_data  expected_data_t;
+  typedef typename WorkerT::expected_data expected_data_t;
   /**
    * Output data type
    */
-  typedef typename WorkerT::returned_data  returned_data_t;
+  typedef typename WorkerT::returned_data returned_data_t;
   /**
    * Common context type
    */
   typedef typename WorkerT::worker_context worker_context_t;
 
  protected:
-  typedef std::vector<pthread_t>           WorkerThreads;
+  typedef std::vector<pthread_t> WorkerThreads;
 
   /**
    * This is a simple wrapper structure to piggy-back control information on
    * scheduled jobs. Job structures are scheduled into a central FIFO queue and
    * are then processed concurrently by the workers.
    */
-  template <class DataT>
+  template<class DataT>
   struct Job {
-    explicit Job(const DataT &data) :
-      data(data),
-      is_death_sentence(false) {}
-    Job() :
-      data(),
-      is_death_sentence(true) {}
-    const DataT  data;               //!< job payload
-    const bool   is_death_sentence;  //!< death sentence flag
+    explicit Job(const DataT &data) : data(data), is_death_sentence(false) { }
+    Job() : data(), is_death_sentence(true) { }
+    const DataT data;              //!< job payload
+    const bool is_death_sentence;  //!< death sentence flag
   };
   typedef Job<expected_data_t> WorkerJob;
   typedef Job<returned_data_t> CallbackJob;
@@ -502,21 +493,20 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * spawned.
    */
   struct RunBinding {
-    explicit RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
-      delegate(delegate) {}
-    ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
-                                                //!<  Workers master
+    explicit RunBinding(ConcurrentWorkers<WorkerT> *delegate)
+        : delegate(delegate) { }
+    ConcurrentWorkers<WorkerT> *delegate;  //!< delegate to the Concurrent-
+                                           //!<  Workers master
   };
 
   struct WorkerRunBinding : RunBinding {
     WorkerRunBinding(ConcurrentWorkers<WorkerT> *delegate,
-                     const worker_context_t     *worker_context) :
-      RunBinding(delegate),
-      worker_context(worker_context) {}
+                     const worker_context_t *worker_context)
+        : RunBinding(delegate), worker_context(worker_context) { }
     /**
      * WorkerT defined context objects for worker init.
      */
-    const worker_context_t     *worker_context;
+    const worker_context_t *worker_context;
   };
 
  public:
@@ -527,10 +517,11 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * @param number_of_workers     the number of concurrent workers to be spawned
    * @param maximal_queue_length  the maximal length of the job queue
    *                              (>= number_of_workers)
-   * @param worker_context        a pointer to the WorkerT defined context object
+   * @param worker_context        a pointer to the WorkerT defined context
+   * object
    */
-  ConcurrentWorkers(const size_t      number_of_workers,
-                    const size_t      maximal_queue_length,
+  ConcurrentWorkers(const size_t number_of_workers,
+                    const size_t maximal_queue_length,
                     worker_context_t *worker_context = NULL);
   virtual ~ConcurrentWorkers();
 
@@ -544,7 +535,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
   /**
    * Schedules a new job for processing into the internal job queue. This method
-   * will block in case the job queue is already full and wait for an empty slot.
+   * will block in case the job queue is already full and wait for an empty
+   * slot.
    *
    * @param data  the data to be processed
    */
@@ -589,7 +581,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be returned back to the user
    */
-  inline void JobSuccessful(const returned_data_t& data) {
+  inline void JobSuccessful(const returned_data_t &data) {
     JobDone(data, true);
   }
 
@@ -603,7 +595,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be returned back to the user
    */
-  inline void JobFailed(const returned_data_t& data) { JobDone(data, false); }
+  inline void JobFailed(const returned_data_t &data) { JobDone(data, false); }
 
   void RunCallbackThread();
 
@@ -618,9 +610,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * @param run_binding  void pointer to a RunBinding structure (C interface)
    * @return  NULL in any case
    */
-  static void* RunWorker(void *run_binding);
+  static void *RunWorker(void *run_binding);
 
-  static void* RunCallbackThreadWrapper(void *run_binding);
+  static void *RunCallbackThreadWrapper(void *run_binding);
 
   /**
    * Tells the master that a worker thread did start. This does not mean, that
@@ -634,7 +626,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   /**
    * Empties the job queue
    *
-   * @param forget_pending  controls if cancelled jobs should be seen as finished
+   * @param forget_pending  controls if cancelled jobs should be seen as
+   * finished
    */
   void TruncateJobQueue(const bool forget_pending = false);
 
@@ -654,13 +647,13 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * @param data     the data to be returned to the user
    * @param success  flag if job was successful
    */
-  void JobDone(const returned_data_t& data, const bool success = true);
+  void JobDone(const returned_data_t &data, const bool success = true);
 
-  inline void StartRunning()    {
+  inline void StartRunning() {
     MutexLockGuard guard(status_mutex_);
     running_ = true;
   }
-  inline void StopRunning()     {
+  inline void StopRunning() {
     MutexLockGuard guard(status_mutex_);
     running_ = false;
   }
@@ -679,27 +672,27 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
   WorkerRunBinding thread_context_;
 
   // status information
-  bool                     initialized_;
-  bool                     running_;
-  mutable unsigned int     workers_started_;
-  mutable pthread_mutex_t  status_mutex_;
-  mutable pthread_cond_t   worker_started_;
-  mutable pthread_mutex_t  jobs_all_done_mutex_;
-  mutable pthread_cond_t   jobs_all_done_;
+  bool initialized_;
+  bool running_;
+  mutable unsigned int workers_started_;
+  mutable pthread_mutex_t status_mutex_;
+  mutable pthread_cond_t worker_started_;
+  mutable pthread_mutex_t jobs_all_done_mutex_;
+  mutable pthread_cond_t jobs_all_done_;
 
   // worker threads
-  WorkerThreads            worker_threads_;       //!< list of worker threads
-  pthread_t                callback_thread_;      //!< handles callback invokes
+  WorkerThreads worker_threads_;  //!< list of worker threads
+  pthread_t callback_thread_;     //!< handles callback invokes
 
   // job queue
-  typedef FifoChannel<WorkerJob > JobQueue;
-  JobQueue                 jobs_queue_;
-  mutable atomic_int32     jobs_pending_;
-  mutable atomic_int32     jobs_failed_;
-  mutable atomic_int64     jobs_processed_;
+  typedef FifoChannel<WorkerJob> JobQueue;
+  JobQueue jobs_queue_;
+  mutable atomic_int32 jobs_pending_;
+  mutable atomic_int32 jobs_failed_;
+  mutable atomic_int64 jobs_processed_;
 
   // callback channel
-  typedef FifoChannel<CallbackJob > CallbackQueue;
+  typedef FifoChannel<CallbackJob> CallbackQueue;
   CallbackQueue results_queue_;
 };
 
@@ -747,10 +740,10 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  * @param DerivedWorkerT  the class name of the inheriting class
  *        (f.e.   class AwesomeWorker : public ConcurrentWorker<AwesomeWorker>)
  */
-template <class DerivedWorkerT>
+template<class DerivedWorkerT>
 class ConcurrentWorker : SingleCopy {
  public:
-  virtual ~ConcurrentWorker() {}
+  virtual ~ConcurrentWorker() { }
 
   /**
    * Does general initialization before any jobs will get scheduled. You do not
@@ -764,11 +757,11 @@ class ConcurrentWorker : SingleCopy {
    * Does general clean-up after the last job was processed in the worker object
    * and it is about to vanish. You do not need to up-call this method.
    */
-  virtual void TearDown() {}
+  virtual void TearDown() { }
 
   /**
-   * The actual job-processing entry point. See the description of the inheriting
-   * class requirements to learn about the semantics of this methods.
+   * The actual job-processing entry point. See the description of the
+   * inheriting class requirements to learn about the semantics of this methods.
    * DO NOT FORGET TO CALL master()->JobSuccessful() OR master()->JobFinished()
    * at the end of thismethod!!
    *
@@ -778,17 +771,17 @@ class ConcurrentWorker : SingleCopy {
    * @param data  the data to be processed.
    */
   // void operator()(const expected_data &data); // do the actual job of the
-                                                 // worker
+  // worker
 
  protected:
-  ConcurrentWorker() : master_(NULL) {}
+  ConcurrentWorker() : master_(NULL) { }
 
   /**
    * Gets a pointer to the ConcurrentWorkers object that this worker resides in
    *
    * @returns  a pointer to the ConcurrentWorkers object
    */
-  inline ConcurrentWorkers<DerivedWorkerT>* master() const { return master_; }
+  inline ConcurrentWorkers<DerivedWorkerT> *master() const { return master_; }
 
  private:
   friend class ConcurrentWorkers<DerivedWorkerT>;

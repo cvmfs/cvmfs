@@ -9,6 +9,6 @@
 
 publish::Publisher *GetTestPublisher();
 publish::Repository *GetRepositoryFromPublisher(
-  const publish::Publisher &publisher);
+    const publish::Publisher &publisher);
 
 #endif  // TEST_UNITTESTS_PUBLISH_C_REPOSITORY_H_

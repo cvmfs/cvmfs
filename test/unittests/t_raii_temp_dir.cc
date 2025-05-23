@@ -4,19 +4,18 @@
 
 #include <gtest/gtest.h>
 
+#include "util/platform.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/raii_temp_dir.h"
 
-#include "util/platform.h"
-#include "util/posix.h"
-
-static bool DirExists(const std::string& dir) {
+static bool DirExists(const std::string &dir) {
   platform_stat64 dir_stat;
   int ret = platform_stat(dir.c_str(), &dir_stat);
   return ret == 0;
 }
 
-class T_RaiiTempDir : public ::testing::Test {};
+class T_RaiiTempDir : public ::testing::Test { };
 
 TEST_F(T_RaiiTempDir, Basic) {
   UniquePtr<RaiiTempDir> temp_dir(

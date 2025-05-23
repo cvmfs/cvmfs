@@ -5,13 +5,12 @@
 #ifndef CVMFS_SWISSKNIFE_SCRUB_H_
 #define CVMFS_SWISSKNIFE_SCRUB_H_
 
-#include "swissknife.h"
-
 #include <cassert>
 #include <string>
 
 #include "crypto/hash.h"
 #include "ingestion/pipeline.h"
+#include "swissknife.h"
 
 namespace swissknife {
 
@@ -42,7 +41,7 @@ class CommandScrub : public Command {
       kNumberOfErrorTypes  // This should _always_ stay the last entry!
     };
 
-    static const char* ToString(const Type t);
+    static const char *ToString(const Type t);
   };
 
   void FileCallback(const std::string &relative_path,
@@ -54,9 +53,9 @@ class CommandScrub : public Command {
 
   void OnFileHashed(const ScrubbingResult &scrubbing_result);
 
-  void PrintAlert(const Alerts::Type   type,
-                  const std::string   &path,
-                  const std::string   &affected_hash = "") const;
+  void PrintAlert(const Alerts::Type type,
+                  const std::string &path,
+                  const std::string &affected_hash = "") const;
   void ShowAlertsHelpMessage() const;
 
  private:
@@ -70,12 +69,12 @@ class CommandScrub : public Command {
                            const std::string &file_name) const;
   std::string MakeRelativePath(const std::string &full_path);
 
-  ScrubbingPipeline             pipeline_scrubbing_;
-  std::string                   repo_path_;
-  bool                          machine_readable_output_;
+  ScrubbingPipeline pipeline_scrubbing_;
+  std::string repo_path_;
+  bool machine_readable_output_;
 
-  mutable unsigned int          alerts_;
-  mutable pthread_mutex_t       alerts_mutex_;
+  mutable unsigned int alerts_;
+  mutable pthread_mutex_t alerts_mutex_;
 };
 
 }  // namespace swissknife

@@ -6,7 +6,6 @@
 
 #include "swissknife_scrub.h"
 
-
 #include "util/fs_traversal.h"
 #include "util/logging.h"
 #include "util/posix.h"
@@ -20,18 +19,13 @@ namespace swissknife {
 const size_t kHashSubtreeLength = 2;
 const std::string kTxnDirectoryName = "txn";
 
-CommandScrub::CommandScrub()
-  : machine_readable_output_(false)
-  , alerts_(0)
-{
+CommandScrub::CommandScrub() : machine_readable_output_(false), alerts_(0) {
   int retval = pthread_mutex_init(&alerts_mutex_, NULL);
   assert(retval == 0);
 }
 
 
-CommandScrub::~CommandScrub() {
-  pthread_mutex_destroy(&alerts_mutex_);
-}
+CommandScrub::~CommandScrub() { pthread_mutex_destroy(&alerts_mutex_); }
 
 
 swissknife::ParameterList CommandScrub::GetParams() const {
@@ -62,10 +56,8 @@ const char *CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
   }
 }
 
-void CommandScrub::FileCallback(
-  const std::string &relative_path,
-  const std::string &file_name)
-{
+void CommandScrub::FileCallback(const std::string &relative_path,
+                                const std::string &file_name) {
   assert(!file_name.empty());
 
   if (relative_path.empty()) {
@@ -78,8 +70,8 @@ void CommandScrub::FileCallback(
   }
 
   const string full_path = MakeFullPath(relative_path, file_name);
-  const std::string hash_string =
-      CheckPathAndExtractHash(relative_path, file_name, full_path);
+  const std::string hash_string = CheckPathAndExtractHash(relative_path,
+                                                          file_name, full_path);
   if (hash_string.empty()) {
     return;
   }
@@ -89,20 +81,16 @@ void CommandScrub::FileCallback(
     return;
   }
 
-  shash::Any hash_from_name =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string));
-  IngestionSource* full_path_source = new FileIngestionSource(full_path);
+  shash::Any hash_from_name = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(hash_string));
+  IngestionSource *full_path_source = new FileIngestionSource(full_path);
   pipeline_scrubbing_.Process(
-    full_path_source,
-    hash_from_name.algorithm,
-    hash_from_name.suffix);
+      full_path_source, hash_from_name.algorithm, hash_from_name.suffix);
 }
 
 
-void CommandScrub::DirCallback(
-  const std::string &relative_path,
-  const std::string &dir_name)
-{
+void CommandScrub::DirCallback(const std::string &relative_path,
+                               const std::string &dir_name) {
   const string full_path = MakeFullPath(relative_path, dir_name);
 
   // The directory "/srv/cvmfs/<REPO_NAME>/data/txn/receiver" is whitelisted
@@ -117,8 +105,8 @@ void CommandScrub::DirCallback(
   }
 
   // Check CAS hash subdirectory name length
-  if (!dir_name.empty() && dir_name.size() != kHashSubtreeLength &&
-      dir_name != kTxnDirectoryName) {
+  if (!dir_name.empty() && dir_name.size() != kHashSubtreeLength
+      && dir_name != kTxnDirectoryName) {
     PrintAlert(Alerts::kMalformedCasSubdir, full_path);
   }
 }
@@ -136,15 +124,14 @@ void CommandScrub::OnFileHashed(const ScrubbingResult &scrubbing_result) {
   const string relative_path = MakeRelativePath(parent_path);
   assert(!file_name.empty());
 
-  const std::string hash_string =
-    CheckPathAndExtractHash(relative_path, file_name, full_path);
+  const std::string hash_string = CheckPathAndExtractHash(relative_path,
+                                                          file_name, full_path);
   assert(!hash_string.empty());
   assert(shash::HexPtr(hash_string).IsValid());
 
 
-  if (scrubbing_result.hash !=
-      shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string)))
-  {
+  if (scrubbing_result.hash
+      != shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string))) {
     PrintAlert(Alerts::kContentHashMismatch, full_path,
                scrubbing_result.hash.ToString());
   }
@@ -153,28 +140,28 @@ void CommandScrub::OnFileHashed(const ScrubbingResult &scrubbing_result) {
 std::string CommandScrub::CheckPathAndExtractHash(
     const std::string &relative_path,
     const std::string &file_name,
-    const std::string &full_path) const
-{
+    const std::string &full_path) const {
   // check for a valid object modifier on the end of the file name
   const char last_character = *(file_name.end() - 1);
   bool has_object_modifier = false;
   if (std::isupper(last_character)) {
     has_object_modifier = true;
   }
-  if (has_object_modifier && last_character != shash::kSuffixHistory &&
-      last_character != shash::kSuffixCatalog &&
-      last_character != shash::kSuffixPartial &&
-      last_character != shash::kSuffixCertificate &&
-      last_character != shash::kSuffixMicroCatalog &&
-      last_character != shash::kSuffixMetainfo) {
+  if (has_object_modifier && last_character != shash::kSuffixHistory
+      && last_character != shash::kSuffixCatalog
+      && last_character != shash::kSuffixPartial
+      && last_character != shash::kSuffixCertificate
+      && last_character != shash::kSuffixMicroCatalog
+      && last_character != shash::kSuffixMetainfo) {
     PrintAlert(Alerts::kUnexpectedModifier, full_path);
     return "";
   }
 
-  const string hash_string =
-      GetFileName(GetParentPath(full_path)) +
-      (has_object_modifier ? file_name.substr(0, file_name.length() - 1)
-                           : file_name);
+  const string hash_string = GetFileName(GetParentPath(full_path))
+                             + (has_object_modifier
+                                    ? file_name.substr(0,
+                                                       file_name.length() - 1)
+                                    : file_name);
   return hash_string;
 }
 
@@ -199,11 +186,9 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
   return (alerts_ == 0) ? 0 : 1;
 }
 
-void CommandScrub::PrintAlert(
-  const Alerts::Type type,
-  const std::string &path,
-  const std::string &affected_hash) const
-{
+void CommandScrub::PrintAlert(const Alerts::Type type,
+                              const std::string &path,
+                              const std::string &affected_hash) const {
   MutexLockGuard l(alerts_mutex_);
 
   const char *msg = Alerts::ToString(type);

@@ -33,8 +33,8 @@ void AppendItemToHeader(ObjectPack::BucketContentType object_type,
                         const std::string &hash_str, const size_t object_size,
                         const std::string &object_name, std::string *header) {
   // If the item type is kName, the "item_name" parameter should not be empty
-  assert((object_type == ObjectPack::kCas) ||
-         ((object_type == ObjectPack::kNamed) && (!object_name.empty())));
+  assert((object_type == ObjectPack::kCas)
+         || ((object_type == ObjectPack::kNamed) && (!object_name.empty())));
   std::string line_prefix = "";
   std::string line_suffix = "";
   switch (object_type) {
@@ -49,22 +49,23 @@ void AppendItemToHeader(ObjectPack::BucketContentType object_type,
       PANIC(kLogStderr, "Unknown object pack type to be added to header.");
   }
   if (header) {
-    *header += line_prefix + hash_str + " " + StringifyInt(object_size) +
-               line_suffix + "\n";
+    *header += line_prefix + hash_str + " " + StringifyInt(object_size)
+               + line_suffix + "\n";
   }
 }
 
 }  // namespace
 
 ObjectPack::Bucket::Bucket()
-    : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize))),
-      size(0),
-      capacity(kInitialSize),
-      content_type(kEmpty),
-      name() {}
+    : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize)))
+    , size(0)
+    , capacity(kInitialSize)
+    , content_type(kEmpty)
+    , name() { }
 
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
-  if (buf_size == 0) return;
+  if (buf_size == 0)
+    return;
 
   while (size + buf_size > capacity) {
     capacity *= 2;
@@ -85,11 +86,13 @@ ObjectPack::ObjectPack(const uint64_t limit) : limit_(limit), size_(0) {
 ObjectPack::~ObjectPack() {
   for (std::set<BucketHandle>::const_iterator i = open_buckets_.begin(),
                                               iEnd = open_buckets_.end();
-       i != iEnd; ++i) {
+       i != iEnd;
+       ++i) {
     delete *i;
   }
 
-  for (unsigned i = 0; i < buckets_.size(); ++i) delete buckets_[i];
+  for (unsigned i = 0; i < buckets_.size(); ++i)
+    delete buckets_[i];
   pthread_mutex_destroy(lock_);
   free(lock_);
 }
@@ -122,8 +125,10 @@ bool ObjectPack::CommitBucket(const BucketContentType type,
   }
 
   MutexLockGuard mutex_guard(lock_);
-  if (buckets_.size() >= kMaxObjects) return false;
-  if (size_ + handle->size > limit_) return false;
+  if (buckets_.size() >= kMaxObjects)
+    return false;
+  if (size_ + handle->size > limit_)
+    return false;
   open_buckets_.erase(handle);
   buckets_.push_back(handle);
   size_ += handle->size;
@@ -215,8 +220,9 @@ ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file,
  */
 unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
                                          unsigned char *buf) {
-  const unsigned remaining_in_header =
-      (pos_ < header_.size()) ? (header_.size() - pos_) : 0;
+  const unsigned remaining_in_header = (pos_ < header_.size())
+                                           ? (header_.size() - pos_)
+                                           : 0;
   const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
   if (nbytes_header) {
     memcpy(buf, header_.data() + pos_, nbytes_header);
@@ -224,7 +230,8 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
   }
 
   unsigned remaining_in_buf = buf_size - nbytes_header;
-  if (remaining_in_buf == 0) return nbytes_header;
+  if (remaining_in_buf == 0)
+    return nbytes_header;
   unsigned nbytes_payload = 0;
 
   if (big_file_) {
@@ -234,8 +241,8 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
   } else if (idx_ < pack_->GetNoObjects()) {
     // Copy a few buckets more
     while ((remaining_in_buf) > 0 && (idx_ < pack_->GetNoObjects())) {
-      const unsigned remaining_in_bucket =
-          pack_->BucketSize(idx_) - pos_in_bucket_;
+      const unsigned remaining_in_bucket = pack_->BucketSize(idx_)
+                                           - pos_in_bucket_;
       const unsigned nbytes = std::min(remaining_in_buf, remaining_in_bucket);
       memcpy(buf + nbytes_header + nbytes_payload,
              pack_->BucketContent(idx_) + pos_in_bucket_, nbytes);
@@ -257,14 +264,14 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
 
 ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
                                        const unsigned expected_header_size)
-    : expected_digest_(expected_digest),
-      expected_header_size_(expected_header_size),
-      pos_(0),
-      idx_(0),
-      pos_in_object_(0),
-      pos_in_accu_(0),
-      state_(ObjectPackBuild::kStateContinue),
-      size_(0) {
+    : expected_digest_(expected_digest)
+    , expected_header_size_(expected_header_size)
+    , pos_(0)
+    , idx_(0)
+    , pos_in_object_(0)
+    , pos_in_accu_(0)
+    , state_(ObjectPackBuild::kStateContinue)
+    , size_(0) {
   // Upper limit of 100B per entry
   if (expected_header_size > (100 * ObjectPack::kMaxObjects)) {
     state_ = ObjectPackBuild::kStateHeaderTooBig;
@@ -280,22 +287,26 @@ ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest,
  */
 ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
     const unsigned buf_size, const unsigned char *buf) {
-  if (buf_size == 0) return state_;
+  if (buf_size == 0)
+    return state_;
   if (state_ == ObjectPackBuild::kStateDone) {
     state_ = ObjectPackBuild::kStateTrailingBytes;
     return state_;
   }
-  if (state_ != ObjectPackBuild::kStateContinue) return state_;
+  if (state_ != ObjectPackBuild::kStateContinue)
+    return state_;
 
-  const unsigned remaining_in_header =
-      (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
+  const unsigned remaining_in_header = (pos_ < expected_header_size_)
+                                           ? (expected_header_size_ - pos_)
+                                           : 0;
   const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
   if (nbytes_header) {
     raw_header_ += string(reinterpret_cast<const char *>(buf), nbytes_header);
     pos_ += nbytes_header;
   }
 
-  if (pos_ < expected_header_size_) return ObjectPackBuild::kStateContinue;
+  if (pos_ < expected_header_size_)
+    return ObjectPackBuild::kStateContinue;
 
   // This condition can only be true once through the lifetime of the
   // Consumer.
@@ -338,8 +349,8 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
 ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
     const unsigned buf_size, const unsigned char *buf) {
   uint64_t pos_in_buf = 0;
-  while ((idx_ < index_.size()) &&
-         ((pos_in_buf < buf_size) || (index_[idx_].size == 0))) {
+  while ((idx_ < index_.size())
+         && ((pos_in_buf < buf_size) || (index_[idx_].size == 0))) {
     // Fill the accumulator or process next small object
     uint64_t nbytes;  // How many bytes are consumed in this iteration
     const uint64_t remaining_in_buf = buf_size - pos_in_buf;
@@ -349,8 +360,8 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
     // We use the accumulator if there is already something in or if we have a
     // small piece of data of a larger object.
     nbytes = std::min(remaining_in_object, remaining_in_buf);
-    if ((pos_in_accu_ > 0) ||
-        ((remaining_in_buf < remaining_in_object) && is_small_rest)) {
+    if ((pos_in_accu_ > 0)
+        || ((remaining_in_buf < remaining_in_object) && is_small_rest)) {
       const uint64_t remaining_in_accu = kAccuSize - pos_in_accu_;
       nbytes = std::min(remaining_in_accu, nbytes);
       memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
@@ -387,28 +398,34 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumePayload(
 
 bool ObjectPackConsumer::ParseHeader() {
   map<char, string> header;
-  const unsigned char *data =
-      reinterpret_cast<const unsigned char *>(raw_header_.data());
+  const unsigned char *data = reinterpret_cast<const unsigned char *>(
+      raw_header_.data());
   ParseKeyvalMem(data, raw_header_.size(), &header);
-  if (header.find('V') == header.end()) return false;
-  if (header['V'] != "2") return false;
+  if (header.find('V') == header.end())
+    return false;
+  if (header['V'] != "2")
+    return false;
   size_ = String2Uint64(header['S']);
   unsigned nobjects = String2Uint64(header['N']);
 
-  if (nobjects == 0) return true;
+  if (nobjects == 0)
+    return true;
 
   // Build the object index
   const size_t separator_idx = raw_header_.find("--\n");
-  if (separator_idx == string::npos) return false;
+  if (separator_idx == string::npos)
+    return false;
   unsigned index_idx = separator_idx + 3;
-  if (index_idx >= raw_header_.size()) return false;
+  if (index_idx >= raw_header_.size())
+    return false;
 
   uint64_t sum_size = 0;
   do {
     const unsigned remaining_in_header = raw_header_.size() - index_idx;
-    string line =
-        GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
-    if (line == "") break;
+    string line = GetLineMem(raw_header_.data() + index_idx,
+                             remaining_in_header);
+    if (line == "")
+      break;
 
     IndexEntry entry;
     if (!ParseItem(line, &entry, &sum_size)) {
@@ -462,13 +479,13 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
 
     // Second separator, before the name field
     const size_t separator2 = line.find(' ', separator1 + 1);
-    if ((separator1 == 0) || (separator1 == string::npos) ||
-        (separator1 == (line.size() - 1))) {
+    if ((separator1 == 0) || (separator1 == string::npos)
+        || (separator1 == (line.size() - 1))) {
       return false;
     }
 
-    uint64_t size =
-        String2Uint64(line.substr(separator1 + 1, separator2 - separator1 - 1));
+    uint64_t size = String2Uint64(
+        line.substr(separator1 + 1, separator2 - separator1 - 1));
 
     std::string name;
     if (!Debase64(line.substr(separator2 + 1), &name)) {

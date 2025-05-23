@@ -47,7 +47,7 @@ enum cvmcache_status {
   CVMCACHE_STATUS_CORRUPTED,  // Crc32 verification failed
   // Certain parts of a multipart request never arrived
   CVMCACHE_STATUS_TIMEOUT,
-  CVMCACHE_STATUS_BADCOUNT,   // Attempt to set a negative reference count
+  CVMCACHE_STATUS_BADCOUNT,  // Attempt to set a negative reference count
   // Attempt to read from an offset larger than the object size
   CVMCACHE_STATUS_OUTOFBOUNDS,
   // Cache content could not be evicted to requested size
@@ -63,19 +63,19 @@ enum cvmcache_object_type {
 
 // Mirrors cvmfs::EnumCapability protobuf definition
 enum cvmcache_capabilities {
-  CVMCACHE_CAP_NONE        = 0,
+  CVMCACHE_CAP_NONE = 0,
   // A read-only cache needs to be pre-populated by other means
-  CVMCACHE_CAP_WRITE       = 1,
+  CVMCACHE_CAP_WRITE = 1,
   // Proper refcounting is implemented; for lower tier caches, this capability
   // can be unset and reference counting can simply beomce file existence check
-  CVMCACHE_CAP_REFCOUNT    = 2,
-  CVMCACHE_CAP_SHRINK      = 4,   // clients can ask the cache to shrink
-  CVMCACHE_CAP_INFO        = 8,   // cache plugin knows about its fill level
+  CVMCACHE_CAP_REFCOUNT = 2,
+  CVMCACHE_CAP_SHRINK = 4,        // clients can ask the cache to shrink
+  CVMCACHE_CAP_INFO = 8,          // cache plugin knows about its fill level
   CVMCACHE_CAP_SHRINK_RATE = 16,  // cache knows number of cleanup operations
-  CVMCACHE_CAP_LIST        = 32,  // cache can return a list of objects
-  CVMCACHE_CAP_ALL_V1      = 63,
-  CVMCACHE_CAP_BREADCRUMB  = 64,  // cache can load and store breadcrumps
-  CVMCACHE_CAP_ALL_V2      = 127,
+  CVMCACHE_CAP_LIST = 32,         // cache can return a list of objects
+  CVMCACHE_CAP_ALL_V1 = 63,
+  CVMCACHE_CAP_BREADCRUMB = 64,  // cache can load and store breadcrumps
+  CVMCACHE_CAP_ALL_V2 = 127,
 };
 
 #define CVMCACHE_SIZE_UNKNOWN (uint64_t(-1))
@@ -255,8 +255,8 @@ void cvmcache_options_fini(cvmcache_option_map *opts);
  * Fills a cvmfs_options_map.  Use the same key/value pairs as the configuration
  * parameters used by the fuse module in /etc/cvmfs/...
  */
-void cvmcache_options_set(cvmcache_option_map *opts,
-                          const char *key, const char *value);
+void cvmcache_options_set(cvmcache_option_map *opts, const char *key,
+                          const char *value);
 /**
  * Sets options from a file with linewise KEY=VALUE pairs.  Returns 0 on success
  * and -1 otherwise.

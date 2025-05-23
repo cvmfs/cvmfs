@@ -39,26 +39,23 @@ using namespace std;  // NOLINT
 static inline uint32_t hasher_any(const shash::Any &key) {
   // We'll just do the same thing as hasher_md5, since every hash is at
   // least as large.
-  return *const_cast<uint32_t *>(
-             reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return *const_cast<uint32_t *>(reinterpret_cast<const uint32_t *>(key.digest)
+                                 + 1);
 }
 
 
 namespace swissknife {
 
 CommandCheck::CommandCheck()
-    : check_chunks_(false)
-    , no_duplicates_map_(false)
-    , is_remote_(false) {
-    const shash::Any hash_null;
-    duplicates_map_.Init(16, hash_null, hasher_any);
+    : check_chunks_(false), no_duplicates_map_(false), is_remote_(false) {
+  const shash::Any hash_null;
+  duplicates_map_.Init(16, hash_null, hasher_any);
 }
 
 bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const catalog::DirectoryEntry &b,
                                   const bool compare_names,
-                                  const bool is_transition_point)
-{
+                                  const bool is_transition_point) {
   typedef catalog::DirectoryEntry::Difference Difference;
 
   catalog::DirectoryEntry::Differences diffs = a.CompareTo(b);
@@ -68,22 +65,22 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
 
   // in case of a nested catalog transition point the controlling flags are
   // supposed to differ. If this is the only difference we are done...
-  if (is_transition_point &&
-      (diffs ^ Difference::kNestedCatalogTransitionFlags) == 0) {
+  if (is_transition_point
+      && (diffs ^ Difference::kNestedCatalogTransitionFlags) == 0) {
     return true;
   }
 
   bool retval = true;
   if (compare_names) {
     if (diffs & Difference::kName) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s",
-               a.name().c_str(), b.name().c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "names differ: %s / %s", a.name().c_str(),
+               b.name().c_str());
       retval = false;
     }
   }
   if (diffs & Difference::kLinkcount) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %u / %u",
-             a.linkcount(), b.linkcount());
+    LogCvmfs(kLogCvmfs, kLogStderr, "linkcounts differ: %u / %u", a.linkcount(),
+             b.linkcount());
     retval = false;
   }
   if (diffs & Difference::kHardlinkGroup) {
@@ -97,13 +94,13 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kMode) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %u / %u",
-             a.mode(), b.mode());
+    LogCvmfs(kLogCvmfs, kLogStderr, "modes differ: %u / %u", a.mode(),
+             b.mode());
     retval = false;
   }
   if (diffs & Difference::kMtime) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu",
-             a.mtime(), b.mtime());
+    LogCvmfs(kLogCvmfs, kLogStderr, "timestamps differ: %lu / %lu", a.mtime(),
+             b.mtime());
     retval = false;
   }
   if (diffs & Difference::kChecksum) {
@@ -117,42 +114,44 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kExternalFileFlag) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs: %d / %d "
-             "(%s / %s)", a.IsExternalFile(), b.IsExternalFile(),
-             a.name().c_str(), b.name().c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "external file flag differs: %d / %d "
+             "(%s / %s)",
+             a.IsExternalFile(), b.IsExternalFile(), a.name().c_str(),
+             b.name().c_str());
     retval = false;
   }
   if (diffs & Difference::kHasXattrsFlag) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "extended attributes differ: %d / %d "
-             "(%s / %s)", a.HasXattrs(), b.HasXattrs(),
-             a.name().c_str(), b.name().c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "extended attributes differ: %d / %d "
+             "(%s / %s)",
+             a.HasXattrs(), b.HasXattrs(), a.name().c_str(), b.name().c_str());
     retval = false;
   }
   if (!is_transition_point) {
-      if (diffs & Difference::kUid) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)",
-                 a.uid(), b.uid(), a.name().c_str(), b.name().c_str());
-        retval = false;
-      }
-      if (diffs & Difference::kGid) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)",
-                 a.gid(), b.gid(), a.name().c_str(), b.name().c_str());
-        retval = false;
-      }
+    if (diffs & Difference::kUid) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "uids differ: %d / %d (%s / %s)", a.uid(),
+               b.uid(), a.name().c_str(), b.name().c_str());
+      retval = false;
     }
+    if (diffs & Difference::kGid) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "gids differ: %d / %d (%s / %s)", a.gid(),
+               b.gid(), a.name().c_str(), b.name().c_str());
+      retval = false;
+    }
+  }
 
   return retval;
 }
 
 
 bool CommandCheck::CompareCounters(const catalog::Counters &a,
-                                   const catalog::Counters &b)
-{
+                                   const catalog::Counters &b) {
   const catalog::Counters::FieldsMap map_a = a.GetFieldsMap();
   const catalog::Counters::FieldsMap map_b = b.GetFieldsMap();
 
   bool retval = true;
-  catalog::Counters::FieldsMap::const_iterator i    = map_a.begin();
+  catalog::Counters::FieldsMap::const_iterator i = map_a.begin();
   catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
   for (; i != iend; ++i) {
     catalog::Counters::FieldsMap::const_iterator comp = map_b.find(i->first);
@@ -174,8 +173,7 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 /**
  * Checks for existence of a file either locally or via HTTP head
  */
-bool CommandCheck::Exists(const string &file)
-{
+bool CommandCheck::Exists(const string &file) {
   if (!is_remote_) {
     return FileExists(file) || SymlinkExists(file);
   } else {
@@ -220,10 +218,8 @@ string CommandCheck::FetchPath(const string &path) {
  * Verifies reflog checksum and looks for presence of the entry points
  * referenced in the manifest.
  */
-bool CommandCheck::InspectReflog(
-  const shash::Any &reflog_hash,
-  manifest::Manifest *manifest)
-{
+bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
+                                 manifest::Manifest *manifest) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting log of references");
   string reflog_path = FetchPath(".cvmfsreflog");
   shash::Any computed_hash(reflog_hash.algorithm);
@@ -254,18 +250,16 @@ bool CommandCheck::InspectReflog(
     return false;
   }
 
-  if (!manifest->history().IsNull() &&
-      !reflog->ContainsHistory(manifest->history()))
-  {
+  if (!manifest->history().IsNull()
+      && !reflog->ContainsHistory(manifest->history())) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to find tag database's hash %s in .cvmfsreflog",
              manifest->history().ToString().c_str());
     return false;
   }
 
-  if (!manifest->meta_info().IsNull() &&
-      !reflog->ContainsMetainfo(manifest->meta_info()))
-  {
+  if (!manifest->meta_info().IsNull()
+      && !reflog->ContainsMetainfo(manifest->meta_info())) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to find meta info hash %s in .cvmfsreflog",
              manifest->meta_info().ToString().c_str());
@@ -312,16 +306,17 @@ bool CommandCheck::InspectHistory(history::History *history) {
   // TODO(jblomer): same root hash implies same size and revision
   for (unsigned i = 0; i < tags.size(); ++i) {
     used_branches.insert(tags[i].branch);
-    const map<string, uint64_t>::const_iterator iter =
-      initial_revisions.find(tags[i].branch);
+    const map<string, uint64_t>::const_iterator iter = initial_revisions.find(
+        tags[i].branch);
     if (iter == initial_revisions.end()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch %s in tag %s",
                tags[i].branch.c_str(), tags[i].name.c_str());
       result = false;
     } else {
       if (tags[i].revision < iter->second) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "invalid revision %" PRIu64
-                 " of tag %s", tags[i].revision, tags[i].name.c_str());
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "invalid revision %" PRIu64 " of tag %s", tags[i].revision,
+                 tags[i].name.c_str());
         result = false;
       }
     }
@@ -346,38 +341,37 @@ bool CommandCheck::InspectHistory(history::History *history) {
 bool CommandCheck::Find(const catalog::Catalog *catalog,
                         const PathString &path,
                         catalog::DeltaCounters *computed_counters,
-                        set<PathString> *bind_mountpoints)
-{
+                        set<PathString> *bind_mountpoints) {
   catalog::DirectoryEntryList entries;
   catalog::DirectoryEntry this_directory;
 
   if (!catalog->LookupPath(path, &this_directory)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup %s",
-             path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup %s", path.c_str());
     return false;
   }
   if (!catalog->ListingPath(path, &entries)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list %s",
-             path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list %s", path.c_str());
     return false;
   }
 
   uint32_t num_subdirs = 0;
   bool retval = true;
-  typedef map< uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
+  typedef map<uint32_t, vector<catalog::DirectoryEntry> > HardlinkMap;
   HardlinkMap hardlinks;
   bool found_nested_marker = false;
 
   for (unsigned i = 0; i < entries.size(); ++i) {
     // for performance reasons, keep track of files already checked
     // and only run requests once per hash
-    const bool entry_needs_check =
-          !entries[i].checksum().IsNull() && !entries[i].IsExternalFile() &&
-         // fallback cli option can force the entry to be checked
-          (no_duplicates_map_ ||
-             !duplicates_map_.Contains(entries[i].checksum()));
+    const bool entry_needs_check = !entries[i].checksum().IsNull()
+                                   && !entries[i].IsExternalFile() &&
+                                   // fallback cli option can force the entry to
+                                   // be checked
+                                   (no_duplicates_map_
+                                    || !duplicates_map_.Contains(
+                                        entries[i].checksum()));
     if (entry_needs_check && !no_duplicates_map_)
-        duplicates_map_.Insert(entries[i].checksum(), 1);
+      duplicates_map_.Insert(entries[i].checksum(), 1);
 
     PathString full_path(path);
     full_path.Append("/", 1);
@@ -389,8 +383,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Name must not be empty
     if (entries[i].name().IsEmpty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "empty path at %s",
-               full_path.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "empty path at %s", full_path.c_str());
       retval = false;
     }
 
@@ -406,17 +399,15 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if checksum is not null
-    if (entries[i].IsRegular() && !entries[i].IsChunkedFile() &&
-        entries[i].checksum().IsNull())
-    {
+    if (entries[i].IsRegular() && !entries[i].IsChunkedFile()
+        && entries[i].checksum().IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "regular file pointing to zero-hash: '%s'", full_path.c_str());
       retval = false;
     }
 
     // Check if the chunk is there
-    if (check_chunks_ && entry_needs_check)
-    {
+    if (check_chunks_ && entry_needs_check) {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
         chunk_path += shash::kSuffixMicroCatalog;
@@ -434,8 +425,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       } else {
-        HardlinkMap::iterator hardlink_group =
-          hardlinks.find(entries[i].hardlink_group());
+        HardlinkMap::iterator hardlink_group = hardlinks.find(
+            entries[i].hardlink_group());
         if (hardlink_group == hardlinks.end()) {
           hardlinks[entries[i].hardlink_group()];
           hardlinks[entries[i].hardlink_group()].push_back(entries[i]);
@@ -480,9 +471,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       }
-      if (entries[i].IsNestedCatalogMountpoint() ||
-          entries[i].IsBindMountpoint())
-      {
+      if (entries[i].IsNestedCatalogMountpoint()
+          || entries[i].IsBindMountpoint()) {
         // Find transition point
         if (entries[i].IsNestedCatalogMountpoint())
           computed_counters->self.nested_catalogs++;
@@ -497,10 +487,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
         // check that the nested mountpoint is empty in the current catalog
         catalog::DirectoryEntryList nested_entries;
-        if (catalog->ListingPath(full_path, &nested_entries) &&
-            !nested_entries.empty()) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "non-empty nested catalog mountpoint "
-                                          "at %s.",
+        if (catalog->ListingPath(full_path, &nested_entries)
+            && !nested_entries.empty()) {
+          LogCvmfs(kLogCvmfs, kLogStderr,
+                   "non-empty nested catalog mountpoint "
+                   "at %s.",
                    full_path.c_str());
           retval = false;
         }
@@ -510,7 +501,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           if (entries[i].IsNestedCatalogMountpoint()) {
             LogCvmfs(kLogCvmfs, kLogStderr,
                      "bind mountpoint and nested mountpoint mutually exclusive"
-                     " at %s.", full_path.c_str());
+                     " at %s.",
+                     full_path.c_str());
             retval = false;
           }
         }
@@ -529,9 +521,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
       // Right size of symbolic link?
       if (entries[i].size() != entries[i].symlink().GetLength()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "wrong symbolic link size for %s; "
-                 "expected %u, got %lu", full_path.c_str(),
-                 entries[i].symlink().GetLength(), entries[i].size());
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "wrong symbolic link size for %s; "
+                 "expected %u, got %lu",
+                 full_path.c_str(), entries[i].symlink().GetLength(),
+                 entries[i].size());
         retval = false;
       }
     } else if (entries[i].IsRegular()) {
@@ -542,8 +536,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       // Size zero for special files
       if (entries[i].size() != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr,
-                 "unexpected non-zero special file size %s",
-                 full_path.c_str());
+                 "unexpected non-zero special file size %s", full_path.c_str());
         retval = false;
       }
       // No hash for special files
@@ -585,7 +578,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
       computed_counters->self.chunked_files++;
       computed_counters->self.chunked_file_size += entries[i].size();
-      computed_counters->self.file_chunks       += chunks.size();
+      computed_counters->self.file_chunks += chunks.size();
 
       // do we find file chunks for the chunked file in this catalog?
       if (chunks.size() == 0) {
@@ -595,7 +588,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       }
 
       size_t aggregated_file_size = 0;
-      off_t  next_offset          = 0;
+      off_t next_offset = 0;
 
       for (unsigned j = 0; j < chunks.size(); ++j) {
         FileChunk this_chunk = chunks.At(j);
@@ -620,13 +613,13 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
             chunk_needs_check = false;
           }
           if (chunk_needs_check) {
-           const string chunk_path = "data/" + chunk_hash.MakePath();
-           if (!Exists(chunk_path)) {
-              LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
+            const string chunk_path = "data/" + chunk_hash.MakePath();
+            if (!Exists(chunk_path)) {
+              LogCvmfs(kLogCvmfs, kLogStderr,
+                       "partial data chunk %s (%s -> "
                        "offset: %ld | size: %lu) missing",
                        this_chunk.content_hash().ToStringWithSuffix().c_str(),
-                       full_path.c_str(),
-                       this_chunk.offset(),
+                       full_path.c_str(), this_chunk.offset(),
                        this_chunk.size());
               retval = false;
             }
@@ -636,21 +629,19 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
       // is the aggregated chunk size equal to the actual file size?
       if (aggregated_file_size != entries[i].size()) {
-        LogCvmfs(kLogCvmfs, kLogStderr, "chunks of file %s produce a size "
-                                        "mismatch. Calculated %zu bytes | %lu "
-                                        "bytes expected",
-                 full_path.c_str(),
-                 aggregated_file_size,
-                 entries[i].size());
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "chunks of file %s produce a size "
+                 "mismatch. Calculated %zu bytes | %lu "
+                 "bytes expected",
+                 full_path.c_str(), aggregated_file_size, entries[i].size());
         retval = false;
       }
     }
   }  // Loop through entries
 
   // Check if nested catalog marker has been found
-  if (!path.IsEmpty() && (path == catalog->mountpoint()) &&
-      !found_nested_marker)
-  {
+  if (!path.IsEmpty() && (path == catalog->mountpoint())
+      && !found_nested_marker) {
     LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog without marker at %s",
              path.c_str());
     retval = false;
@@ -658,7 +649,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
   // Check directory linkcount
   if (this_directory.linkcount() != num_subdirs + 2) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "wrong linkcount for %s; "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "wrong linkcount for %s; "
              "expected %u, got %u",
              path.c_str(), num_subdirs + 2, this_directory.linkcount());
     retval = false;
@@ -666,10 +658,12 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
   // Check hardlink linkcounts
   for (HardlinkMap::const_iterator i = hardlinks.begin(),
-       iEnd = hardlinks.end(); i != iEnd; ++i)
-  {
+                                   iEnd = hardlinks.end();
+       i != iEnd;
+       ++i) {
     if (i->second[0].linkcount() != i->second.size()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "hardlink linkcount wrong for %s, "
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "hardlink linkcount wrong for %s, "
                "expected %lu, got %u",
                (path.ToString() + "/" + i->second[0].name().ToString()).c_str(),
                i->second.size(), i->second[0].linkcount());
@@ -710,9 +704,9 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
 }
 
 
-catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
-                                             const shash::Any  &catalog_hash,
-                                             const uint64_t     catalog_size) {
+catalog::Catalog *CommandCheck::FetchCatalog(const string &path,
+                                             const shash::Any &catalog_hash,
+                                             const uint64_t catalog_size) {
   string tmp_file;
   if (!is_remote_)
     tmp_file = DecompressPiece(catalog_hash);
@@ -725,19 +719,19 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
     return NULL;
   }
 
-  catalog::Catalog *catalog =
-                   catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
+  catalog::Catalog *catalog = catalog::Catalog::AttachFreely(path, tmp_file,
+                                                             catalog_hash);
   int64_t catalog_file_size = GetFileSize(tmp_file);
   if (catalog_file_size <= 0) {
-
     LogCvmfs(kLogCvmfs, kLogStderr, "Error downloading catalog %s at %s %s",
-             catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str() );
+             catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str());
     assert(catalog_file_size > 0);
   }
   unlink(tmp_file.c_str());
 
   if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "catalog file size mismatch, "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "catalog file size mismatch, "
              "expected %" PRIu64 ", got %" PRIu64,
              catalog_size, catalog_file_size);
     delete catalog;
@@ -749,8 +743,8 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
 
 
 bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
-                                          shash::Any   *root_hash,
-                                          uint64_t     *root_size) {
+                                          shash::Any *root_hash,
+                                          uint64_t *root_size) {
   catalog::Catalog *current_catalog = FetchCatalog("", *root_hash);
   if (current_catalog == NULL) {
     return false;
@@ -761,7 +755,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
 
   string current_path = "";
 
-  Tokens::const_iterator i    = path_tokens.begin();
+  Tokens::const_iterator i = path_tokens.begin();
   Tokens::const_iterator iend = path_tokens.end();
   for (; i != iend; ++i) {
     if (i->empty()) {
@@ -769,9 +763,8 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
     }
 
     current_path += "/" + *i;
-    if (current_catalog->FindNested(PathString(current_path),
-                                    root_hash,
-                                    root_size)) {
+    if (current_catalog->FindNested(
+            PathString(current_path), root_hash, root_size)) {
       delete current_catalog;
 
       if (current_path.length() < subtree_path.length()) {
@@ -791,19 +784,17 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
-bool CommandCheck::InspectTree(const string                  &path,
-                               const shash::Any              &catalog_hash,
-                               const uint64_t                 catalog_size,
-                               const bool                     is_nested_catalog,
+bool CommandCheck::InspectTree(const string &path,
+                               const shash::Any &catalog_hash,
+                               const uint64_t catalog_size,
+                               const bool is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters        *computed_counters)
-{
+                               catalog::DeltaCounters *computed_counters) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
-  const catalog::Catalog *catalog = FetchCatalog(path,
-                                                 catalog_hash,
-                                                 catalog_size);
+  const catalog::Catalog *catalog = FetchCatalog(
+      path, catalog_hash, catalog_size);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -813,7 +804,8 @@ bool CommandCheck::InspectTree(const string                  &path,
   int retval = true;
 
   if (catalog->root_prefix() != PathString(path.data(), path.length())) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "root prefix mismatch; "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "root prefix mismatch; "
              "expected %s, got %s",
              path.c_str(), catalog->root_prefix().c_str());
     retval = false;
@@ -832,8 +824,8 @@ bool CommandCheck::InspectTree(const string                  &path,
     retval = false;
   }
   if (is_nested_catalog) {
-    if (transition_point != NULL &&
-        !CompareEntries(*transition_point, root_entry, true, true)) {
+    if (transition_point != NULL
+        && !CompareEntries(*transition_point, root_entry, true, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "transition point and root entry differ (%s)", path.c_str());
       retval = false;
@@ -853,45 +845,45 @@ bool CommandCheck::InspectTree(const string                  &path,
 
   // Traverse the catalog
   set<PathString> bind_mountpoints;
-  if (!Find(catalog, PathString(path.data(), path.length()),
-            computed_counters, &bind_mountpoints))
-  {
+  if (!Find(catalog, PathString(path.data(), path.length()), computed_counters,
+            &bind_mountpoints)) {
     retval = false;
   }
 
   // Check number of entries
   if (root_entry.HasXattrs())
     computed_counters->self.xattrs++;
-  const uint64_t num_found_entries =
-    1 +
-    computed_counters->self.regular_files +
-    computed_counters->self.symlinks +
-    computed_counters->self.specials +
-    computed_counters->self.directories;
+  const uint64_t num_found_entries = 1 + computed_counters->self.regular_files
+                                     + computed_counters->self.symlinks
+                                     + computed_counters->self.specials
+                                     + computed_counters->self.directories;
   if (num_found_entries != catalog->GetNumEntries()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "dangling entries in catalog, "
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "dangling entries in catalog, "
              "expected %" PRIu64 ", got %" PRIu64,
              catalog->GetNumEntries(), num_found_entries);
     retval = false;
   }
 
   // Recurse into nested catalogs
-  const catalog::Catalog::NestedCatalogList &nested_catalogs =
-    catalog->ListNestedCatalogs();
-  const catalog::Catalog::NestedCatalogList own_nested_catalogs =
-    catalog->ListOwnNestedCatalogs();
-  if (own_nested_catalogs.size() !=
-      static_cast<uint64_t>(computed_counters->self.nested_catalogs))
-  {
-    LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
-             " expected %lu, got %lu", computed_counters->self.nested_catalogs,
+  const catalog::Catalog::NestedCatalogList
+      &nested_catalogs = catalog->ListNestedCatalogs();
+  const catalog::Catalog::NestedCatalogList
+      own_nested_catalogs = catalog->ListOwnNestedCatalogs();
+  if (own_nested_catalogs.size()
+      != static_cast<uint64_t>(computed_counters->self.nested_catalogs)) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "number of nested catalogs does not match;"
+             " expected %lu, got %lu",
+             computed_counters->self.nested_catalogs,
              own_nested_catalogs.size());
     retval = false;
   }
   set<PathString> nested_catalog_paths;
-  for (catalog::Catalog::NestedCatalogList::const_iterator i =
-       nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
-  {
+  for (catalog::Catalog::NestedCatalogList::const_iterator
+           i = nested_catalogs.begin(),
+           iEnd = nested_catalogs.end();
+       i != iEnd; ++i) {
     nested_catalog_paths.insert(i->mountpoint);
   }
   if (nested_catalog_paths.size() != nested_catalogs.size()) {
@@ -900,9 +892,10 @@ bool CommandCheck::InspectTree(const string                  &path,
     retval = false;
   }
 
-  for (catalog::Catalog::NestedCatalogList::const_iterator i =
-       nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
-  {
+  for (catalog::Catalog::NestedCatalogList::const_iterator
+           i = nested_catalogs.begin(),
+           iEnd = nested_catalogs.end();
+       i != iEnd; ++i) {
     if (bind_mountpoints.find(i->mountpoint) != bind_mountpoints.end()) {
       catalog::DirectoryEntry bind_mountpoint;
       PathString mountpoint("/" + i->mountpoint.ToString().substr(1));
@@ -963,8 +956,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (args.find('d') != args.end())
     no_duplicates_map_ = true;
   if (args.find('l') != args.end()) {
-    unsigned log_level =
-      kLogLevel0 << String2Uint64(*args.find('l')->second);
+    unsigned log_level = kLogLevel0 << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
@@ -996,8 +988,9 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     }
 
     if (pubkey_path.empty() || repo_name.empty()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "please provide pubkey and repo name for "
-                                      "remote repositories");
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "please provide pubkey and repo name for "
+               "remote repositories");
       return 1;
     }
 
@@ -1134,9 +1127,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   const bool is_nested_catalog = (!subtree_path.empty());
-  if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
-                                                   &root_hash,
-                                                   &root_size)) {
+  if (is_nested_catalog
+      && !FindSubtreeRootCatalog(subtree_path, &root_hash, &root_size)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "cannot find nested catalog at %s",
              subtree_path.c_str());
     return 1;
@@ -1149,7 +1141,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                            root_size,
                            is_nested_catalog,
                            NULL,
-                           &computed_counters) && successful;
+                           &computed_counters)
+               && successful;
 
   if (!successful) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CATALOG PROBLEMS OR OTHER ERRORS FOUND");

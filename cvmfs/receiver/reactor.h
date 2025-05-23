@@ -39,11 +39,11 @@ class Reactor {
     kTestCrash  // use to test the gateway
   };
 
-  static Request ReadRequest(int fd, std::string* data);
-  static bool WriteRequest(int fd, Request req, const std::string& data);
+  static Request ReadRequest(int fd, std::string *data);
+  static bool WriteRequest(int fd, Request req, const std::string &data);
 
-  static bool ReadReply(int fd, std::string* data);
-  static bool WriteReply(int fd, const std::string& data);
+  static bool ReadReply(int fd, std::string *data);
+  static bool WriteReply(int fd, const std::string &data);
 
   static bool ExtractStatsFromReq(JsonDocument *req,
                                   perf::Statistics *stats,
@@ -57,23 +57,23 @@ class Reactor {
  protected:
   // NOTE: These methods are virtual such that they can be mocked for the
   // purpose of unit testing
-  virtual bool HandleGenerateToken(const std::string& req, std::string* reply);
-  virtual bool HandleGetTokenId(const std::string& req, std::string* reply);
-  virtual bool HandleCheckToken(const std::string& req, std::string* reply);
-  virtual bool HandleSubmitPayload(int fdin, const std::string& req,
-                                   std::string* reply);
-  virtual bool HandleCommit(const std::string& req, std::string* reply);
+  virtual bool HandleGenerateToken(const std::string &req, std::string *reply);
+  virtual bool HandleGetTokenId(const std::string &req, std::string *reply);
+  virtual bool HandleCheckToken(const std::string &req, std::string *reply);
+  virtual bool HandleSubmitPayload(int fdin, const std::string &req,
+                                   std::string *reply);
+  virtual bool HandleCommit(const std::string &req, std::string *reply);
 
-  virtual PayloadProcessor* MakePayloadProcessor();
-  virtual CommitProcessor* MakeCommitProcessor();
+  virtual PayloadProcessor *MakePayloadProcessor();
+  virtual CommitProcessor *MakeCommitProcessor();
 
  private:
-  bool HandleRequest(Request req, const std::string& data);
+  bool HandleRequest(Request req, const std::string &data);
 
   int fdin_;
   int fdout_;
 
-  std::map<std::string, perf::Statistics*> statistics_map_;
+  std::map<std::string, perf::Statistics *> statistics_map_;
 };
 
 }  // namespace receiver

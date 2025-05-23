@@ -36,20 +36,20 @@ class WritableCatalogManager;
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
   friend class swissknife::CommandMigrate;  // needed for catalog migrations
-  friend class VirtualCatalog;  // needed for /.cvmfs creation
+  friend class VirtualCatalog;              // needed for /.cvmfs creation
 
  public:
   WritableCatalog(const std::string &path,
-                  const shash::Any  &catalog_hash,
-                        Catalog     *parent,
-                  const bool         is_not_root = false);
+                  const shash::Any &catalog_hash,
+                  Catalog *parent,
+                  const bool is_not_root = false);
   virtual ~WritableCatalog();
 
   static WritableCatalog *AttachFreely(const std::string &root_path,
                                        const std::string &file,
-                                       const shash::Any  &catalog_hash,
-                                             Catalog     *parent      = NULL,
-                                       const bool         is_not_root = false);
+                                       const shash::Any &catalog_hash,
+                                       Catalog *parent = NULL,
+                                       const bool is_not_root = false);
 
   void Transaction();
   void Commit();
@@ -65,11 +65,9 @@ class WritableCatalog : public Catalog {
   void TouchEntry(const DirectoryEntryBase &entry,
                   const XattrList &xattrs,
                   const shash::Md5 &path_hash);
-  inline void TouchEntry(
-    const DirectoryEntryBase &entry,
-    const XattrList &xattrs,
-    const std::string &path)
-  {
+  inline void TouchEntry(const DirectoryEntryBase &entry,
+                         const XattrList &xattrs,
+                         const std::string &path) {
     TouchEntry(entry, xattrs, shash::Md5(shash::AsciiPtr(path)));
   }
   void RemoveEntry(const std::string &entry_path);
@@ -90,9 +88,9 @@ class WritableCatalog : public Catalog {
   void InsertBindMountpoint(const std::string &mountpoint,
                             const shash::Any content_hash,
                             const uint64_t size);
-  void UpdateNestedCatalog(const std::string   &path,
-                           const shash::Any    &hash,
-                           const uint64_t       size,
+  void UpdateNestedCatalog(const std::string &path,
+                           const shash::Any &hash,
+                           const uint64_t size,
                            const DeltaCounters &child_counters);
   void RemoveNestedCatalog(const std::string &mountpoint,
                            Catalog **attached_reference);
@@ -107,7 +105,7 @@ class WritableCatalog : public Catalog {
   bool SetVOMSAuthz(const std::string &voms_authz);
 
  protected:
-  static const double kMaximalFreePageRatio;  // = 0.2
+  static const double kMaximalFreePageRatio;    // = 0.2
   static const double kMaximalRowIdWasteRatio;  // = 0.25;
 
   CatalogDatabase::OpenMode DatabaseOpenMode() const {
@@ -115,25 +113,21 @@ class WritableCatalog : public Catalog {
   }
 
   void UpdateEntry(const DirectoryEntry &entry, const shash::Md5 &path_hash);
-  inline void UpdateEntry(
-    const DirectoryEntry &entry,
-    const std::string &path)
-  {
+  inline void UpdateEntry(const DirectoryEntry &entry,
+                          const std::string &path) {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
-  inline void AddEntry(
-    const DirectoryEntry &entry,
-    const XattrList &xattrs,
-    const std::string &path)
-  {
+  inline void AddEntry(const DirectoryEntry &entry,
+                       const XattrList &xattrs,
+                       const std::string &path) {
     AddEntry(entry, xattrs, path, GetParentPath(path));
   }
 
   void InitPreparedStatements();
   void FinalizePreparedStatements();
 
-  inline WritableCatalog* GetWritableParent() const {
+  inline WritableCatalog *GetWritableParent() const {
     Catalog *parent = this->parent();
     assert(parent->IsWritable());
     return static_cast<WritableCatalog *>(parent);
@@ -148,17 +142,17 @@ class WritableCatalog : public Catalog {
   }
 
  private:
-  SqlDirentInsert     *sql_insert_;
-  SqlDirentUnlink     *sql_unlink_;
-  SqlDirentTouch      *sql_touch_;
-  SqlDirentUpdate     *sql_update_;
-  SqlChunkInsert      *sql_chunk_insert_;
-  SqlChunksRemove     *sql_chunks_remove_;
-  SqlChunksCount      *sql_chunks_count_;
+  SqlDirentInsert *sql_insert_;
+  SqlDirentUnlink *sql_unlink_;
+  SqlDirentTouch *sql_touch_;
+  SqlDirentUpdate *sql_update_;
+  SqlChunkInsert *sql_chunk_insert_;
+  SqlChunksRemove *sql_chunks_remove_;
+  SqlChunksCount *sql_chunks_count_;
   SqlMaxHardlinkGroup *sql_max_link_id_;
-  SqlIncLinkcount     *sql_inc_linkcount_;
+  SqlIncLinkcount *sql_inc_linkcount_;
 
-  bool dirty_;  /**< Indicates if the catalog has been changed */
+  bool dirty_; /**< Indicates if the catalog has been changed */
 
   DeltaCounters delta_counters_;
 
@@ -174,24 +168,21 @@ class WritableCatalog : public Catalog {
   // Helpers for nested catalog creation and removal
   void MakeTransitionPoint(const std::string &mountpoint);
   void MakeNestedRoot();
-  inline void MoveToNested(
-    const std::string &dir_structure_root,
-    WritableCatalog *new_nested_catalog,
-    std::vector<std::string> *grand_child_mountpoints)
-  {
-    MoveToNestedRecursively(dir_structure_root,
-                            new_nested_catalog,
-                            grand_child_mountpoints);
+  inline void MoveToNested(const std::string &dir_structure_root,
+                           WritableCatalog *new_nested_catalog,
+                           std::vector<std::string> *grand_child_mountpoints) {
+    MoveToNestedRecursively(
+        dir_structure_root, new_nested_catalog, grand_child_mountpoints);
   }
   void MoveToNestedRecursively(
-    const std::string dir_structure_root,
-    WritableCatalog *new_nested_catalog,
-    std::vector<std::string> *grand_child_mountpoints);
+      const std::string dir_structure_root,
+      WritableCatalog *new_nested_catalog,
+      std::vector<std::string> *grand_child_mountpoints);
   void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
                             WritableCatalog *new_nested_catalog);
-  void MoveFileChunksToNested(const std::string       &full_path,
-                              const shash::Algorithms  algorithm,
-                              WritableCatalog         *new_nested_catalog);
+  void MoveFileChunksToNested(const std::string &full_path,
+                              const shash::Algorithms algorithm,
+                              WritableCatalog *new_nested_catalog);
 
   void CopyToParent();
   void CopyCatalogsToParent();

@@ -22,26 +22,34 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class UnlinkGuard : SingleCopy {
  public:
-  enum InitialState { kEnabled, kDisabled };
+  enum InitialState {
+    kEnabled,
+    kDisabled
+  };
 
-  inline UnlinkGuard() : enabled_(false) {}
+  inline UnlinkGuard() : enabled_(false) { }
   inline explicit UnlinkGuard(const std::string &path,
                               const InitialState state = kEnabled)
-            : path_(path)
-            , enabled_(state == kEnabled) {}
-  inline ~UnlinkGuard() { if (IsEnabled()) unlink(path_.c_str()); }
+      : path_(path), enabled_(state == kEnabled) { }
+  inline ~UnlinkGuard() {
+    if (IsEnabled())
+      unlink(path_.c_str());
+  }
 
-  inline void Set(const std::string &path) { path_ = path; Enable(); }
+  inline void Set(const std::string &path) {
+    path_ = path;
+    Enable();
+  }
 
-  inline bool IsEnabled() const { return enabled_;  }
-  inline void Enable()          { enabled_ = true;  }
-  inline void Disable()         { enabled_ = false; }
+  inline bool IsEnabled() const { return enabled_; }
+  inline void Enable() { enabled_ = true; }
+  inline void Disable() { enabled_ = false; }
 
-  const std::string& path() const { return path_; }
+  const std::string &path() const { return path_; }
 
  private:
-  std::string  path_;
-  bool         enabled_;
+  std::string path_;
+  bool enabled_;
 };
 
 
@@ -52,7 +60,10 @@ class FdGuard : SingleCopy {
  public:
   inline FdGuard() : fd_(-1) { }
   explicit inline FdGuard(const int fd) : fd_(fd) { }
-  inline ~FdGuard() { if (fd_ >= 0) close(fd_); }
+  inline ~FdGuard() {
+    if (fd_ >= 0)
+      close(fd_);
+  }
   int fd() const { return fd_; }
 
  private:
@@ -67,7 +78,10 @@ class FileGuard : SingleCopy {
  public:
   inline FileGuard() : file_(NULL) { }
   explicit inline FileGuard(FILE *file) : file_(file) { }
-  inline ~FileGuard() { if (file_ != NULL) fclose(file_); }
+  inline ~FileGuard() {
+    if (file_ != NULL)
+      fclose(file_);
+  }
   const FILE *file() const { return file_; }
 
  private:

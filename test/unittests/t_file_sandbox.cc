@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <errno.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -20,17 +19,12 @@ class T_FileSandbox : public FileSandbox {
  public:
   typedef std::vector<ExpectedHashString> ExpectedHashStrings;
 
-  T_FileSandbox() :
-    FileSandbox(T_FileSandbox::sandbox_path) {}
+  T_FileSandbox() : FileSandbox(T_FileSandbox::sandbox_path) { }
 
  protected:
-  void SetUp() {
-    CreateSandbox(T_FileSandbox::sandbox_path);
-  }
+  void SetUp() { CreateSandbox(T_FileSandbox::sandbox_path); }
 
-  void TearDown() {
-    RemoveSandbox(T_FileSandbox::sandbox_path);
-  }
+  void TearDown() { RemoveSandbox(T_FileSandbox::sandbox_path); }
 
   shash::Any HashFile(const std::string &file_path) const {
     shash::Any sha_result(shash::kSha1);
@@ -44,8 +38,8 @@ class T_FileSandbox : public FileSandbox {
    * googletest requires functions that have ASSERTs inside to return void, thus
    * we do a wrapper of the wrapper of the wrapper here :o)
    */
-  void HashFileInternal(const std::string &file_path, shash::Any *digest) const
-  {
+  void HashFileInternal(const std::string &file_path,
+                        shash::Any *digest) const {
     const bool retval = shash::HashFile(file_path, digest);
     ASSERT_TRUE(retval) << "failed to hash file: " << file_path;
   }
@@ -65,7 +59,7 @@ TEST_F(T_FileSandbox, CreateRandomBufferMethod) {
 
   const uint64_t buffer_size = 10 * 1024 * 1024;
   char *buffer = reinterpret_cast<char *>(malloc(buffer_size));
-  ASSERT_NE(static_cast<char*>(NULL), buffer);
+  ASSERT_NE(static_cast<char *>(NULL), buffer);
   memset(buffer, 0, buffer_size);
 
   // count number of zero-bytes in the random buffer as 'checksum'

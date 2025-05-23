@@ -32,12 +32,12 @@ class ClientCtx {
  public:
   struct ThreadLocalStorage {
     ThreadLocalStorage(uid_t u, gid_t g, pid_t p, InterruptCue *ic)
-      : uid(u), gid(g), pid(p), interrupt_cue(ic), is_set(true) { }
+        : uid(u), gid(g), pid(p), interrupt_cue(ic), is_set(true) { }
     uid_t uid;
     gid_t gid;
     pid_t pid;
     InterruptCue *interrupt_cue;  ///< A non-owning pointer
-    bool is_set;  ///< either not yet set or deliberately unset
+    bool is_set;                  ///< either not yet set or deliberately unset
   };
 
   static ClientCtx *GetInstance();
@@ -69,12 +69,11 @@ class ClientCtx {
 class ClientCtxGuard {
  public:
   ClientCtxGuard(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic)
-    : set_on_construction_(false)
-    , old_uid_(-1)
-    , old_gid_(-1)
-    , old_pid_(-1)
-    , old_interrupt_cue_(NULL)
-  {
+      : set_on_construction_(false)
+      , old_uid_(-1)
+      , old_gid_(-1)
+      , old_pid_(-1)
+      , old_interrupt_cue_(NULL) {
     // Implementation guarantees old_ctx is not null.
     ClientCtx *old_ctx = ClientCtx::GetInstance();
     assert(old_ctx);

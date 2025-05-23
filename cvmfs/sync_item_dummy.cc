@@ -10,8 +10,7 @@
 namespace publish {
 
 catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent(
-  bool /* enable_mtime_ns */) const
-{
+    bool /* enable_mtime_ns */) const {
   catalog::DirectoryEntryBase dirent;
 
   dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
@@ -36,8 +35,6 @@ catalog::DirectoryEntryBase SyncItemDummyDir::CreateBasicCatalogDirent(
 }
 
 
-SyncItemType SyncItemDummyDir::GetScratchFiletype() const {
-  return kItemDir;
-}
+SyncItemType SyncItemDummyDir::GetScratchFiletype() const { return kItemDir; }
 
 }  // namespace publish

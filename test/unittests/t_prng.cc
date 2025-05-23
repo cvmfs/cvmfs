@@ -18,9 +18,7 @@ class T_Prng : public ::testing::Test {
     prng_ = new Prng();
   }
 
-  virtual void TearDown() {
-    delete prng_;
-  }
+  virtual void TearDown() { delete prng_; }
 
  protected:
   static const uint32_t buf_size = 100000;
@@ -89,9 +87,9 @@ TEST_F(T_Prng, NormalDistribution) {
   EXPECT_TRUE(-0.05 < mean && mean < 0.05);
   double variance = 0;
   for (int i = 0; i < n; ++i) {
-    variance += (rands[i] - mean)*(rands[i] - mean);
+    variance += (rands[i] - mean) * (rands[i] - mean);
   }
-  variance /= n-1;
+  variance /= n - 1;
   // Margin of error wide enough to pass every time
   EXPECT_TRUE(0.95 < variance && variance < 1.05);
 }

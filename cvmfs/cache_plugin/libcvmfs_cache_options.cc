@@ -5,13 +5,12 @@
  */
 
 
-#include "libcvmfs_cache.h"
-
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
+#include "libcvmfs_cache.h"
 #include "options.h"
 
 using namespace std;  // NOLINT
@@ -19,19 +18,15 @@ using namespace std;  // NOLINT
 
 SimpleOptionsParser *cvmcache_options_clone(SimpleOptionsParser *opts) {
   SimpleOptionsParser *result = new SimpleOptionsParser(
-    *reinterpret_cast<SimpleOptionsParser *>(opts));
+      *reinterpret_cast<SimpleOptionsParser *>(opts));
   return result;
 }
 
 
-void cvmcache_options_fini(SimpleOptionsParser *opts) {
-  delete opts;
-}
+void cvmcache_options_fini(SimpleOptionsParser *opts) { delete opts; }
 
 
-void cvmcache_options_free(char *value) {
-  free(value);
-}
+void cvmcache_options_free(char *value) { free(value); }
 
 
 char *cvmcache_options_get(SimpleOptionsParser *opts, const char *key) {
@@ -63,11 +58,8 @@ SimpleOptionsParser *cvmcache_options_init() {
 }
 
 
-void cvmcache_options_set(
-  SimpleOptionsParser *opts,
-  const char *key, const
-  char *value)
-{
+void cvmcache_options_set(SimpleOptionsParser *opts, const char *key,
+                          const char *value) {
   opts->SetValue(key, value);
 }
 

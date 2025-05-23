@@ -41,26 +41,25 @@ uint64_t StaticOffsetDetector::DoFindNextCutMark(BlockItem *buffer) {
 //------------------------------------------------------------------------------
 
 
-
 // This defines the center of the interval where the xor32 rolling checksum is
 // queried. You should never change this number, since it affects the definition
 // of cut marks.
-const int32_t Xor32Detector::kMagicNumber =
-  std::numeric_limits<uint32_t>::max() / 2;
+const int32_t Xor32Detector::kMagicNumber = std::numeric_limits<uint32_t>::max()
+                                            / 2;
 
 
 Xor32Detector::Xor32Detector(const uint64_t minimal_chunk_size,
                              const uint64_t average_chunk_size,
                              const uint64_t maximal_chunk_size)
-  : minimal_chunk_size_(minimal_chunk_size)
-  , average_chunk_size_(average_chunk_size)
-  , maximal_chunk_size_(maximal_chunk_size)
-  , threshold_((average_chunk_size > 0)
-               ? (std::numeric_limits<uint32_t>::max() / average_chunk_size)
-               : 0)
-  , xor32_ptr_(0)
-  , xor32_(0)
-{
+    : minimal_chunk_size_(minimal_chunk_size)
+    , average_chunk_size_(average_chunk_size)
+    , maximal_chunk_size_(maximal_chunk_size)
+    , threshold_(
+          (average_chunk_size > 0)
+              ? (std::numeric_limits<uint32_t>::max() / average_chunk_size)
+              : 0)
+    , xor32_ptr_(0)
+    , xor32_(0) {
   assert((average_chunk_size_ == 0) || (minimal_chunk_size_ > 0));
   if (minimal_chunk_size_ > 0) {
     assert(minimal_chunk_size_ >= kXor32Window);
@@ -78,11 +77,9 @@ uint64_t Xor32Detector::DoFindNextCutMark(BlockItem *buffer) {
   // Note: this could be after collecting at least kMinChunkSize bytes in the
   //       current chunk, or directly at the beginning of the buffer, when a
   //       cut mark is currently searched
-  const uint64_t global_offset =
-    std::max(
-           last_cut() +
-           static_cast<uint64_t>(minimal_chunk_size_ - kXor32Window),
-           xor32_ptr_);
+  const uint64_t global_offset = std::max(
+      last_cut() + static_cast<uint64_t>(minimal_chunk_size_ - kXor32Window),
+      xor32_ptr_);
 
   // Check if the next xor32 computation is taking place in the current buffer
   if (global_offset >= offset() + static_cast<uint64_t>(buffer->size())) {
@@ -98,25 +95,23 @@ uint64_t Xor32Detector::DoFindNextCutMark(BlockItem *buffer) {
   //       for the current rolling checksum
   //       (internal_precompute_end will be negative --> loop is not entered)
   const uint64_t precompute_end = last_cut() + minimal_chunk_size_;
-  const int64_t internal_precompute_end =
-    std::min(static_cast<int64_t>(precompute_end - offset()),
-             static_cast<int64_t>(buffer->size()));
-  assert(internal_precompute_end - static_cast<int64_t>(internal_offset) <=
-         static_cast<int64_t>(kXor32Window));
+  const int64_t internal_precompute_end = std::min(
+      static_cast<int64_t>(precompute_end - offset()),
+      static_cast<int64_t>(buffer->size()));
+  assert(internal_precompute_end - static_cast<int64_t>(internal_offset)
+         <= static_cast<int64_t>(kXor32Window));
   for (; static_cast<int64_t>(internal_offset) < internal_precompute_end;
-       ++internal_offset)
-  {
+       ++internal_offset) {
     xor32(data[internal_offset]);
   }
 
   // Do the actual computation and try to find a xor32 based cut mark
   // Note: this loop is bound either by kMaxChunkSize or by the size of the
   //       current buffer, thus the computation would continue later
-  const uint64_t internal_max_chunk_size_end =
-    last_cut() + maximal_chunk_size_ - offset();
-  const uint64_t internal_compute_end =
-    std::min(internal_max_chunk_size_end,
-             static_cast<uint64_t>(buffer->size()));
+  const uint64_t internal_max_chunk_size_end = last_cut() + maximal_chunk_size_
+                                               - offset();
+  const uint64_t internal_compute_end = std::min(
+      internal_max_chunk_size_end, static_cast<uint64_t>(buffer->size()));
   for (; internal_offset < internal_compute_end; ++internal_offset) {
     xor32(data[internal_offset]);
 

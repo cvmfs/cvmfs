@@ -20,9 +20,8 @@ namespace {
  * @param address_type Type of IP address desired; Can be either 4 or 6
  * @param address (out) The first address found
  */
-bool GetFirstAddress(
-    const ResolvConfEventHandler::AddressList& address_list,
-    int address_type, std::string* address) {
+bool GetFirstAddress(const ResolvConfEventHandler::AddressList &address_list,
+                     int address_type, std::string *address) {
   bool found = false;
 
   for (size_t i = 0u; i < address_list.size(); ++i) {
@@ -38,16 +37,16 @@ bool GetFirstAddress(
 }  // namespace
 
 ResolvConfEventHandler::ResolvConfEventHandler(
-    download::DownloadManager* download_manager,
-    download::DownloadManager* external_download_manager)
-    : download_manager_(download_manager),
-      external_download_manager_(external_download_manager) {}
+    download::DownloadManager *download_manager,
+    download::DownloadManager *external_download_manager)
+    : download_manager_(download_manager)
+    , external_download_manager_(external_download_manager) { }
 
-ResolvConfEventHandler::~ResolvConfEventHandler() {}
+ResolvConfEventHandler::~ResolvConfEventHandler() { }
 
-bool ResolvConfEventHandler::Handle(const std::string& file_path,
+bool ResolvConfEventHandler::Handle(const std::string &file_path,
                                     file_watcher::Event /*event*/,
-                                    bool* clear_handler) {
+                                    bool *clear_handler) {
   AddressList addresses;
   GetDnsAddresses(file_path, &addresses);
   if (!addresses.empty()) {
@@ -64,12 +63,12 @@ bool ResolvConfEventHandler::Handle(const std::string& file_path,
  * Reads a file, line by line. Returns the IP addresses corresponding
  * to nameservers (i.e. from lines "nameserver <IP_ADDRESS>")
  */
-void ResolvConfEventHandler::GetDnsAddresses(
-    const std::string& resolv_file, AddressList* addresses) {
+void ResolvConfEventHandler::GetDnsAddresses(const std::string &resolv_file,
+                                             AddressList *addresses) {
   bool done = false;
   BackoffThrottle throttle(100, 1000, 5000);
   while (!done) {
-    FILE* f = std::fopen(resolv_file.c_str(), "r");
+    FILE *f = std::fopen(resolv_file.c_str(), "r");
     if (!f) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "ResolvConfEventHandler - Could not open: %s",
@@ -97,19 +96,19 @@ void ResolvConfEventHandler::GetDnsAddresses(
 }
 
 void ResolvConfEventHandler::SetDnsAddress(
-    download::DownloadManager* download_manager,
-    const AddressList& addresses) {
+    download::DownloadManager *download_manager, const AddressList &addresses) {
   // Default to IPv4 addresses unless kIpPreferV6 is specified
-  const int address_type =
-    download_manager->opt_ip_preference() == dns::kIpPreferV6 ? 6 : 4;
+  const int address_type = download_manager->opt_ip_preference()
+                                   == dns::kIpPreferV6
+                               ? 6
+                               : 4;
 
   std::string new_address;
   if (GetFirstAddress(addresses, address_type, &new_address)) {
     LogCvmfs(kLogCvmfs, kLogDebug,
-        "ResolvConfEventhandler - resolv.conf file changed. "
-        "Setting new DNS address: %s",
-        new_address.c_str());
+             "ResolvConfEventhandler - resolv.conf file changed. "
+             "Setting new DNS address: %s",
+             new_address.c_str());
     download_manager->SetDnsServer(new_address);
   }
 }
-

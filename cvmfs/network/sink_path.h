@@ -17,11 +17,11 @@ namespace cvmfs {
 
 /**
  * PathSink is a data sink that writes to a file given by a path.
- * 
+ *
  * Internally it uses a FileSink that has ownership of the file.
  * (Though as PathSink is owner of the FileSink, to the outside also PathSink
  *  is considered to be the owner.)
- * 
+ *
  * Like FileSink, PathSink does not require to reserve space.
  * Contrary to FileSink, PathSink does not allow to adopt and write to a
  * different file path.
@@ -34,7 +34,7 @@ class PathSink : public Sink {
 
   /**
    * Appends data to the sink
-   * 
+   *
    * @returns on success: number of bytes written (can be less than requested)
    *          on failure: -errno.
    */
@@ -44,31 +44,25 @@ class PathSink : public Sink {
 
   /**
    * Truncate all written data and start over at position zero.
-   * 
+   *
    * @returns Success = 0
    *          Failure = -errno
    */
-  virtual int Reset() {
-    return sink_->Reset();
-  }
+  virtual int Reset() { return sink_->Reset(); }
 
   virtual int Purge();
 
   /**
    * @returns true if the object is correctly initialized.
    */
-  virtual bool IsValid() {
-    return sink_->IsValid();
-  }
+  virtual bool IsValid() { return sink_->IsValid(); }
 
   /**
    * Commit data to the sink
    * @returns success = 0
    *          failure = -errno
    */
-  virtual int Flush() {
-    return sink_->Flush();
-  }
+  virtual int Flush() { return sink_->Flush(); }
 
   /**
    * Reserves new space in sinks that require reservation (see RequiresReserve)
@@ -86,19 +80,15 @@ class PathSink : public Sink {
    * @returns success = true
    *          failure = false
    */
-  virtual bool Reserve(size_t size) {
-    return sink_->Reserve(size);
-  }
+  virtual bool Reserve(size_t size) { return sink_->Reserve(size); }
 
   /**
    * Returns if the specific sink type needs reservation of (data) space
-   * 
+   *
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
-  virtual bool RequiresReserve() {
-    return sink_->RequiresReserve();
-  }
+  virtual bool RequiresReserve() { return sink_->RequiresReserve(); }
 
   /**
    * Return a string representation describing the type of sink and its status

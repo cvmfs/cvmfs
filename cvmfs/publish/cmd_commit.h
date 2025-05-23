@@ -24,9 +24,7 @@ class CmdCommit : public Command {
     return "Commit new content from the ephemeral shell";
   }
 
-  virtual std::string GetUsage() const {
-    return "[options] <repository name>";
-  }
+  virtual std::string GetUsage() const { return "[options] <repository name>"; }
 
   virtual ParameterList GetParams() const {
     ParameterList p;
@@ -38,9 +36,8 @@ class CmdCommit : public Command {
 
   virtual std::vector<std::string> GetExamples() const {
     std::vector<std::string> e;
-    e.push_back(
-        "commit myrepo.cvmfs.io "
-        "# commit changes to myrepo.cvmfs.io");
+    e.push_back("commit myrepo.cvmfs.io "
+                "# commit changes to myrepo.cvmfs.io");
     return e;
   }
 

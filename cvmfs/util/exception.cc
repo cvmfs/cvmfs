@@ -16,9 +16,9 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-void Panic(const char* coordinates, const LogSource source, const int mask,
-           const char* format, ...) {
-  char* msg = NULL;
+void Panic(const char *coordinates, const LogSource source, const int mask,
+           const char *format, ...) {
+  char *msg = NULL;
   va_list variadic_list;
 
   // Format the message string
@@ -28,7 +28,7 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
   va_end(variadic_list);
 
   // Add the coordinates
-  char* msg_with_coordinates = NULL;
+  char *msg_with_coordinates = NULL;
   retval = asprintf(&msg_with_coordinates, "%s\n%s", coordinates, msg);
   if (retval == -1) {
     free(msg_with_coordinates);
@@ -40,8 +40,8 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 
   // Either throw the exception or log + abort
 #ifdef CVMFS_RAISE_EXCEPTIONS
-  (void) source;
-  (void) mask;
+  (void)source;
+  (void)mask;
   throw ECvmfsException(msg);
 #else
   LogCvmfs(source, mask, "%s", msg);
@@ -49,7 +49,7 @@ void Panic(const char* coordinates, const LogSource source, const int mask,
 #endif
 }
 
-void Panic(const char* coordinates, const LogSource _source, const char *nul) {
+void Panic(const char *coordinates, const LogSource _source, const char *nul) {
   assert(nul == NULL);
   Panic(coordinates, _source, kLogDebug | kLogStderr | kLogSyslogErr, "");
 }

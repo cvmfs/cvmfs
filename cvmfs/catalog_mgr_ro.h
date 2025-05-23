@@ -31,26 +31,25 @@ namespace catalog {
 
 class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
  public:
-  SimpleCatalogManager(
-    const shash::Any           &base_hash,
-    const std::string          &stratum0,
-    const std::string          &dir_temp,
-    download::DownloadManager  *download_manager,
-    perf::Statistics           *statistics,
-    const bool                  manage_catalog_files = false,
-    const std::string           &dir_cache = "",
-    const bool                  copy_to_tmp_dir = false);
+  SimpleCatalogManager(const shash::Any &base_hash,
+                       const std::string &stratum0,
+                       const std::string &dir_temp,
+                       download::DownloadManager *download_manager,
+                       perf::Statistics *statistics,
+                       const bool manage_catalog_files = false,
+                       const std::string &dir_cache = "",
+                       const bool copy_to_tmp_dir = false);
 
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
   virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
-  virtual Catalog* CreateCatalog(const PathString  &mountpoint,
-                                 const shash::Any  &catalog_hash,
-                                 Catalog           *parent_catalog);
+  virtual Catalog *CreateCatalog(const PathString &mountpoint,
+                                 const shash::Any &catalog_hash,
+                                 Catalog *parent_catalog);
 
-  const shash::Any&  base_hash() const { return base_hash_; }
-  void           set_base_hash(const shash::Any &hash) { base_hash_ = hash; }
-  const std::string& dir_temp() const  { return dir_temp_;  }
+  const shash::Any &base_hash() const { return base_hash_; }
+  void set_base_hash(const shash::Any &hash) { base_hash_ = hash; }
+  const std::string &dir_temp() const { return dir_temp_; }
 
   /**
    * Makes the given path relative to the catalog structure
@@ -64,21 +63,21 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
 
   bool UseLocalCache() const { return !dir_cache_.empty(); }
 
-  std::string                dir_cache_;  // absolute path to local cache
-                                                // directory
-  bool                       copy_to_tmp_dir_;  // only relevant if using local
-                                                // cache directory:
-                                                // for writeable catalogs a copy
-                                                // must be created in dir_temp_
+  std::string dir_cache_;  // absolute path to local cache
+                           // directory
+  bool copy_to_tmp_dir_;   // only relevant if using local
+                           // cache directory:
+                           // for writeable catalogs a copy
+                           // must be created in dir_temp_
 
  private:
   std::string CopyCatalogToTempFile(const std::string &cache_path);
 
-  shash::Any                 base_hash_;
-  std::string                stratum0_;
-  std::string                dir_temp_;
+  shash::Any base_hash_;
+  std::string stratum0_;
+  std::string dir_temp_;
   download::DownloadManager *download_manager_;
-  const bool                 manage_catalog_files_;
+  const bool manage_catalog_files_;
 };  // class SimpleCatalogManager
 
 }  // namespace catalog

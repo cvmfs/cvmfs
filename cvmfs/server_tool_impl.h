@@ -7,14 +7,14 @@
 
 #include <string>
 
-template <class ObjectFetcherT>
+template<class ObjectFetcherT>
 manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
                                           const std::string &repo_name,
                                           const shash::Any &reflog_hash) {
   // try to fetch the Reflog from the backend storage first
   manifest::Reflog *reflog = NULL;
-  typename ObjectFetcherT::Failures f =
-      object_fetcher->FetchReflog(reflog_hash, &reflog);
+  typename ObjectFetcherT::Failures f = object_fetcher->FetchReflog(reflog_hash,
+                                                                    &reflog);
 
   switch (f) {
     case ObjectFetcherT::kFailOk:
@@ -38,8 +38,8 @@ manifest::Reflog *ServerTool::FetchReflog(ObjectFetcherT *object_fetcher,
       return NULL;
 
     default:
-      LogCvmfs(kLogCvmfs, kLogStderr,
-               "failed loading reflog (%d - %s)", f, Code2Ascii(f));
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed loading reflog (%d - %s)", f,
+               Code2Ascii(f));
       return NULL;
   }
 

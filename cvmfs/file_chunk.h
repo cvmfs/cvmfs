@@ -31,45 +31,39 @@
 class FileChunk {
  public:
   FileChunk() : content_hash_(shash::Any(shash::kAny)), offset_(0), size_(0) { }
-  FileChunk(const shash::Any &hash,
-            const off_t       offset,
-            const size_t      size) :
-    content_hash_(hash),
-    offset_(offset),
-    size_(size) { }
+  FileChunk(const shash::Any &hash, const off_t offset, const size_t size)
+      : content_hash_(hash), offset_(offset), size_(size) { }
 
-  inline const shash::Any& content_hash() const { return content_hash_; }
-  inline off_t             offset()       const { return offset_; }
-  inline size_t            size()         const { return size_; }
+  inline const shash::Any &content_hash() const { return content_hash_; }
+  inline off_t offset() const { return offset_; }
+  inline size_t size() const { return size_; }
 
  protected:
   shash::Any content_hash_;  //!< content hash of the compressed file chunk
-  off_t      offset_;        //!< byte offset in the uncompressed input file
-  size_t     size_;          //!< uncompressed size of the data chunk
+  off_t offset_;             //!< byte offset in the uncompressed input file
+  size_t size_;              //!< uncompressed size of the data chunk
 };
 
 typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
-  FileChunkReflist() : list(NULL)
-                     , compression_alg(zlib::kZlibDefault)
-                     , external_data(false) { }
-  FileChunkReflist(FileChunkList     *l,
-                   const PathString  &p,
-                   zlib::Algorithms   alg,
-                   bool               external)
-    : list(l)
-    , path(p)
-    , compression_alg(alg)
-    , external_data(external) { }
+  FileChunkReflist()
+      : list(NULL)
+      , compression_alg(zlib::kZlibDefault)
+      , external_data(false) { }
+  FileChunkReflist(FileChunkList *l,
+                   const PathString &p,
+                   zlib::Algorithms alg,
+                   bool external)
+      : list(l), path(p), compression_alg(alg), external_data(external) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
   shash::Any HashChunkList();
 
-  FileChunkList     *list;
-  PathString         path;
-  zlib::Algorithms   compression_alg;
-  bool               external_data;
+  FileChunkList *list;
+  PathString path;
+  zlib::Algorithms compression_alg;
+  bool external_data;
 };
 
 
@@ -91,7 +85,7 @@ struct ChunkTables {
   ChunkTables();
   ~ChunkTables();
   ChunkTables(const ChunkTables &other);
-  ChunkTables &operator= (const ChunkTables &other);
+  ChunkTables &operator=(const ChunkTables &other);
   void CopyFrom(const ChunkTables &other);
   void InitLocks();
   void InitHashmaps();

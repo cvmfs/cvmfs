@@ -10,7 +10,7 @@
 using namespace std;  // NOLINT
 
 TEST(T_FileBackedBuffer, SimpleWriteAndRead) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(39);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(39);
 
   char source[] = "0123456789";
   buf->Append(source, 10);
@@ -41,13 +41,14 @@ TEST(T_FileBackedBuffer, SimpleWriteAndRead) {
 
   EXPECT_EQ(50LL, buf->Read(sink, 100));
   EXPECT_EQ(
-    memcmp("01234567890123456789012345678901234567890123456789", sink, 50), 0);
+      memcmp("01234567890123456789012345678901234567890123456789", sink, 50),
+      0);
   free(sink);
   delete buf;
 }
 
 TEST(T_FileBackedBuffer, EmptyWrite) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(0);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(0);
   char source[] = "aa";
   buf->Append(source, 0);
   EXPECT_EQ(FileBackedBuffer::kMemoryMode, buf->mode_);
@@ -70,7 +71,7 @@ TEST(T_FileBackedBuffer, EmptyWrite) {
 }
 
 TEST(T_FileBackedBuffer, EmptyBuffer) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(0);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(0);
 
   buf->Commit();
 
@@ -88,7 +89,7 @@ TEST(T_FileBackedBuffer, EmptyBuffer) {
 }
 
 TEST(T_FileBackedBuffer, StraightToFile) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(0);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(0);
 
   EXPECT_EQ(FileBackedBuffer::kMemoryMode, buf->mode_);
 
@@ -120,7 +121,7 @@ TEST(T_FileBackedBuffer, StraightToFile) {
 }
 
 TEST(T_FileBackedBuffer, OnlyInMemory) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(40);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(40);
 
   char source[] = "0123456789";
   buf->Append(source, 10);
@@ -145,7 +146,7 @@ TEST(T_FileBackedBuffer, OnlyInMemory) {
 }
 
 TEST(T_FileBackedBuffer, OutOfBoundsRead) {
-  FileBackedBuffer* buf = FileBackedBuffer::Create(40);
+  FileBackedBuffer *buf = FileBackedBuffer::Create(40);
 
   char source[] = "0123456789";
   buf->Append(source, 10);

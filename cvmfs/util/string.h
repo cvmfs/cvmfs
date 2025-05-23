@@ -41,19 +41,20 @@ CVMFS_EXPORT uint64_t String2Uint64(const std::string &value);
 CVMFS_EXPORT bool String2Uint64Parse(const std::string &value,
                                      uint64_t *result);
 
-CVMFS_EXPORT void String2Uint64Pair(const std::string &value,
-                                    uint64_t *a, uint64_t *b);
+CVMFS_EXPORT void String2Uint64Pair(const std::string &value, uint64_t *a,
+                                    uint64_t *b);
 CVMFS_EXPORT bool HasPrefix(const std::string &str, const std::string &prefix,
                             const bool ignore_case);
 CVMFS_EXPORT bool HasSuffix(const std::string &str, const std::string &suffix,
                             const bool ignore_case);
 
-CVMFS_EXPORT std::vector<std::string> SplitStringBounded(
-  unsigned max_chunks, const std::string &str, char delim);
+CVMFS_EXPORT std::vector<std::string> SplitStringBounded(unsigned max_chunks,
+                                                         const std::string &str,
+                                                         char delim);
 CVMFS_EXPORT std::vector<std::string> SplitString(const std::string &str,
                                                   char delim);
-CVMFS_EXPORT std::vector<std::string> SplitStringMultiChar(const std::string &str,
-                                                  const std::string &delim);
+CVMFS_EXPORT std::vector<std::string> SplitStringMultiChar(
+    const std::string &str, const std::string &delim);
 
 CVMFS_EXPORT std::string JoinStrings(const std::vector<std::string> &strings,
                                      const std::string &joint);
@@ -68,8 +69,8 @@ CVMFS_EXPORT bool GetLineFile(FILE *f, std::string *line);
 CVMFS_EXPORT bool GetLineFd(const int fd, std::string *line);
 CVMFS_EXPORT std::string Trim(const std::string &raw,
                               bool trim_newline = false);
-CVMFS_EXPORT std::string TrimString(const std::string& path,
-                                    const std::string& toTrim,
+CVMFS_EXPORT std::string TrimString(const std::string &path,
+                                    const std::string &toTrim,
                                     const int trimMode = kTrimAll);
 
 CVMFS_EXPORT std::string ToUpper(const std::string &mixed_case);
@@ -82,7 +83,7 @@ CVMFS_EXPORT std::string Base64(const std::string &data);
 CVMFS_EXPORT std::string Base64Url(const std::string &data);
 CVMFS_EXPORT bool Debase64(const std::string &data, std::string *decoded);
 CVMFS_EXPORT std::string GetGMTimestamp(
-  const std::string &format = "%Y-%m-%d %H:%M:%S");
+    const std::string &format = "%Y-%m-%d %H:%M:%S");
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

@@ -13,17 +13,16 @@ using namespace receiver;  // NOLINT
 
 class MockPayloadProcessor : public PayloadProcessor {
  public:
-  MockPayloadProcessor() : PayloadProcessor(), num_files_received_(0) {}
-  virtual ~MockPayloadProcessor() {}
+  MockPayloadProcessor() : PayloadProcessor(), num_files_received_(0) { }
+  virtual ~MockPayloadProcessor() { }
 
   virtual Result Initialize() { return kSuccess; }
 
   virtual Result Finalize() { return kSuccess; }
 
-  virtual void Upload(const std::string& source,
-                      const std::string& dest) {}
+  virtual void Upload(const std::string &source, const std::string &dest) { }
 
-  virtual void ConsumerEventCallback(const ObjectPackBuild::Event& /*event*/) {
+  virtual void ConsumerEventCallback(const ObjectPackBuild::Event & /*event*/) {
     num_files_received_++;
   }
 
@@ -33,12 +32,12 @@ class MockPayloadProcessor : public PayloadProcessor {
 class T_PayloadProcessor : public ::testing::Test {
  protected:
   T_PayloadProcessor()
-      : ready_(1, 1),
-        thread_(),
-        read_fd_(),
-        write_fd_(),
-        serializer_(NULL),
-        digest_(shash::kSha1) {}
+      : ready_(1, 1)
+      , thread_()
+      , read_fd_()
+      , write_fd_()
+      , serializer_(NULL)
+      , digest_(shash::kSha1) { }
 
   virtual void SetUp() {
     int fds[2];
@@ -63,7 +62,7 @@ class T_PayloadProcessor : public ::testing::Test {
     write_fd_ = fds[1];
 
     ASSERT_EQ(0, pthread_create(&thread_, NULL, T_PayloadProcessor::Worker,
-                                static_cast<void*>(this)));
+                                static_cast<void *>(this)));
 
     ASSERT_EQ(true, ready_.Dequeue());
   }
@@ -76,8 +75,8 @@ class T_PayloadProcessor : public ::testing::Test {
     delete serializer_;
   }
 
-  static void* Worker(void* data) {
-    T_PayloadProcessor* ctx = static_cast<T_PayloadProcessor*>(data);
+  static void *Worker(void *data) {
+    T_PayloadProcessor *ctx = static_cast<T_PayloadProcessor *>(data);
 
     ctx->ready_.Enqueue(true);
 
@@ -99,7 +98,7 @@ class T_PayloadProcessor : public ::testing::Test {
   int read_fd_;
   int write_fd_;
   ObjectPack pack_;
-  ObjectPackProducer* serializer_;
+  ObjectPackProducer *serializer_;
   shash::Any digest_;
 };
 

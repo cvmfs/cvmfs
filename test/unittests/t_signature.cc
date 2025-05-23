@@ -16,13 +16,9 @@ namespace signature {
 
 class T_Signature : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-    sign_mgr_.Init();
-  }
+  virtual void SetUp() { sign_mgr_.Init(); }
 
-  virtual void TearDown() {
-    sign_mgr_.Fini();
-  }
+  virtual void TearDown() { sign_mgr_.Fini(); }
 
   SignatureManager sign_mgr_;
 };
@@ -49,7 +45,7 @@ TEST_F(T_Signature, Certificate) {
   std::string cert = sign_mgr_.GetCertificate();
   EXPECT_FALSE(cert.empty());
   EXPECT_TRUE(sign_mgr_.LoadCertificateMem(
-    reinterpret_cast<const unsigned char *>(cert.data()), cert.length()));
+      reinterpret_cast<const unsigned char *>(cert.data()), cert.length()));
   EXPECT_TRUE(sign_mgr_.KeysMatch());
 }
 
@@ -60,7 +56,7 @@ TEST_F(T_Signature, Export) {
   std::string cert = sign_mgr_.GetCertificate();
   std::string privkey = sign_mgr_.GetPrivateKey();
   EXPECT_TRUE(sign_mgr_.LoadCertificateMem(
-    reinterpret_cast<const unsigned char *>(cert.data()), cert.length()));
+      reinterpret_cast<const unsigned char *>(cert.data()), cert.length()));
   SafeWriteToFile(privkey, "test.crt", 0600);
   EXPECT_TRUE(sign_mgr_.LoadPrivateKeyPath("test.crt", ""));
   unlink("test.crt");
@@ -100,7 +96,7 @@ TEST_F(T_Signature, GetSetKeys) {
   free(signature);
 
   EXPECT_TRUE(
-    sign_mgr_.LoadPrivateMasterKeyMem(sign_mgr_.GetPrivateMasterKey()));
+      sign_mgr_.LoadPrivateMasterKeyMem(sign_mgr_.GetPrivateMasterKey()));
   EXPECT_TRUE(sign_mgr_.LoadPrivateKeyMem(sign_mgr_.GetPrivateKey()));
   EXPECT_TRUE(sign_mgr_.SignRsa(buffer, 3, &signature, &signature_size));
   EXPECT_TRUE(sign_mgr_.VerifyRsa(buffer, 3, signature, signature_size));

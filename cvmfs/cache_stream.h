@@ -22,7 +22,7 @@ class DownloadManager;
 namespace perf {
 class Counter;
 class Statistics;
-}
+}  // namespace perf
 
 /**
  * Cache manager that streams regular files using a download manager and stores
@@ -83,8 +83,7 @@ class StreamingCacheManager : public CacheManager {
   virtual void CtrlTxn(const Label &label, const int flags, void *txn) {
     cache_mgr_->CtrlTxn(label, flags, txn);
   }
-  virtual int64_t Write(const void *buf, uint64_t size, void *txn)
-  {
+  virtual int64_t Write(const void *buf, uint64_t size, void *txn) {
     return cache_mgr_->Write(buf, size, txn);
   }
   virtual int Reset(void *txn) { return cache_mgr_->Reset(txn); }
@@ -123,18 +122,16 @@ class StreamingCacheManager : public CacheManager {
     shash::Any object_id;
     CacheManager::Label label;
 
-    FdInfo() : fd_in_cache_mgr(-1) {}
-    explicit FdInfo(int fd) : fd_in_cache_mgr(fd) {}
+    FdInfo() : fd_in_cache_mgr(-1) { }
+    explicit FdInfo(int fd) : fd_in_cache_mgr(fd) { }
     explicit FdInfo(const CacheManager::LabeledObject &object)
-      : fd_in_cache_mgr(-1), object_id(object.id), label(object.label) {}
+        : fd_in_cache_mgr(-1), object_id(object.id), label(object.label) { }
 
-    bool operator ==(const FdInfo &other) const {
-      return this->fd_in_cache_mgr == other.fd_in_cache_mgr &&
-             this->object_id == other.object_id;
+    bool operator==(const FdInfo &other) const {
+      return this->fd_in_cache_mgr == other.fd_in_cache_mgr
+             && this->object_id == other.object_id;
     }
-    bool operator !=(const FdInfo &other) const {
-      return !(*this == other);
-    }
+    bool operator!=(const FdInfo &other) const { return !(*this == other); }
 
     bool IsValid() const { return fd_in_cache_mgr >= 0 || !object_id.IsNull(); }
   };

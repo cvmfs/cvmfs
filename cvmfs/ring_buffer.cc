@@ -15,19 +15,16 @@ const RingBuffer::ObjectHandle_t RingBuffer::kInvalidObjectHandle = size_t(-1);
 
 
 RingBuffer::RingBuffer(size_t total_size)
-  : total_size_(total_size)
-  , free_space_(total_size)
-  , front_(0)
-  , back_(0)
-  , buffer_(reinterpret_cast<unsigned char *>(sxmmap(total_size_)))
-{
+    : total_size_(total_size)
+    , free_space_(total_size)
+    , front_(0)
+    , back_(0)
+    , buffer_(reinterpret_cast<unsigned char *>(sxmmap(total_size_))) {
   assert(total_size_ >= sizeof(size_t));
 }
 
 
-RingBuffer::~RingBuffer() {
-  sxunmap(buffer_, total_size_);
-}
+RingBuffer::~RingBuffer() { sxunmap(buffer_, total_size_); }
 
 
 void RingBuffer::Put(const void *data, size_t size) {
@@ -100,8 +97,7 @@ RingBuffer::ObjectHandle_t RingBuffer::RemoveBack() {
 }
 
 
-void RingBuffer::CopyObject(ObjectHandle_t handle, void *to) const
-{
+void RingBuffer::CopyObject(ObjectHandle_t handle, void *to) const {
   size_t size_tag = GetObjectSize(handle);
   ObjectHandle_t object = (handle + sizeof(size_tag)) % total_size_;
   Get(object, size_tag, to);
@@ -109,8 +105,7 @@ void RingBuffer::CopyObject(ObjectHandle_t handle, void *to) const
 
 
 void RingBuffer::CopySlice(ObjectHandle_t handle, size_t size, size_t offset,
-                           void *to) const
-{
+                           void *to) const {
   ObjectHandle_t begin = (handle + sizeof(size_t) + offset) % total_size_;
   Get(begin, size, to);
 }

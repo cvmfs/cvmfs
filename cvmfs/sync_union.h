@@ -64,7 +64,7 @@ class SyncUnion {
    */
   SyncUnion(AbstractSyncMediator *mediator, const std::string &rdonly_path,
             const std::string &union_path, const std::string &scratch_path);
-  virtual ~SyncUnion() {}
+  virtual ~SyncUnion() { }
 
   /**
    * Initialize internal state of the synchronisation. This needs to be called

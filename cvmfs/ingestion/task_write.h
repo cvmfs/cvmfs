@@ -12,13 +12,12 @@
 
 class TaskWrite : public TubeConsumer<BlockItem> {
  public:
-  TaskWrite(
-    Tube<BlockItem> *tube_in,
-    TubeGroup<FileItem> *tubes_out,
-    upload::AbstractUploader *uploader)
-    : TubeConsumer<BlockItem>(tube_in)
-    , tubes_out_(tubes_out)
-    , uploader_(uploader) { }
+  TaskWrite(Tube<BlockItem> *tube_in,
+            TubeGroup<FileItem> *tubes_out,
+            upload::AbstractUploader *uploader)
+      : TubeConsumer<BlockItem>(tube_in)
+      , tubes_out_(tubes_out)
+      , uploader_(uploader) { }
 
  protected:
   virtual void Process(BlockItem *input_block);

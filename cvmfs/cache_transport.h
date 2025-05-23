@@ -18,23 +18,34 @@ struct Any;
 
 inline const char *CacheTransportCode2Ascii(const cvmfs::EnumStatus code) {
   switch (code) {
-    case cvmfs::STATUS_UNKNOWN: return "unknown cache protocol error";
-    case cvmfs::STATUS_OK: return "OK";
+    case cvmfs::STATUS_UNKNOWN:
+      return "unknown cache protocol error";
+    case cvmfs::STATUS_OK:
+      return "OK";
     case cvmfs::STATUS_NOSUPPORT:
       return "operation not implemented by cache plugin";
-    case cvmfs::STATUS_FORBIDDEN: return "cache plugin denied the operation";
-    case cvmfs::STATUS_NOSPACE: return "no space in cache";
-    case cvmfs::STATUS_NOENTRY: return "object not found in cache";
-    case cvmfs::STATUS_MALFORMED: return "malformed cache protocol message";
-    case cvmfs::STATUS_IOERR: return "I/O error";
-    case cvmfs::STATUS_CORRUPTED: return "corrupted data detected";
-    case cvmfs::STATUS_TIMEOUT: return "multipart request timed out";
+    case cvmfs::STATUS_FORBIDDEN:
+      return "cache plugin denied the operation";
+    case cvmfs::STATUS_NOSPACE:
+      return "no space in cache";
+    case cvmfs::STATUS_NOENTRY:
+      return "object not found in cache";
+    case cvmfs::STATUS_MALFORMED:
+      return "malformed cache protocol message";
+    case cvmfs::STATUS_IOERR:
+      return "I/O error";
+    case cvmfs::STATUS_CORRUPTED:
+      return "corrupted data detected";
+    case cvmfs::STATUS_TIMEOUT:
+      return "multipart request timed out";
     case cvmfs::STATUS_BADCOUNT:
       return "invalid attempt to set negative reference count";
-    case cvmfs::STATUS_OUTOFBOUNDS: return "out of bounds";
+    case cvmfs::STATUS_OUTOFBOUNDS:
+      return "out of bounds";
     case cvmfs::STATUS_PARTIAL:
       return "cache could not be cleaned up to the given limit";
-    default: return "unexpected cache protocol error";
+    default:
+      return "unexpected cache protocol error";
   }
 }
 
@@ -80,7 +91,7 @@ class CacheTransport {
   static const unsigned kInnerHeaderSize = 2;
 
   static const uint32_t kFlagSendIgnoreFailure = 0x01;
-  static const uint32_t kFlagSendNonBlocking   = 0x02;
+  static const uint32_t kFlagSendNonBlocking = 0x02;
 
 
   /**

@@ -3,7 +3,6 @@
  */
 #define __STDC_FORMAT_MACROS
 #include <benchmark/benchmark.h>
-
 #include <inttypes.h>
 #include <stdint.h>
 
@@ -31,8 +30,7 @@ class BM_SmallHash : public benchmark::Fixture {
     }
   }
 
-  virtual void TearDown(const benchmark::State &st) {
-  }
+  virtual void TearDown(const benchmark::State &st) { }
 
   static inline uint32_t hasher_uint64t(const uint64_t &value) {
     return MurmurHash2(&value, sizeof(value), 0x07387a4f);
@@ -40,19 +38,18 @@ class BM_SmallHash : public benchmark::Fixture {
 
   static inline uint32_t hasher_md5(const shash::Md5 &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+    return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
   }
 
   void SetCollisionLabel(uint64_t num_collisions,
                          uint32_t max_collisions,
                          size_t iterations,
-                         benchmark::State *st)
-  {
+                         benchmark::State *st) {
     char label[64];
-    snprintf(label, sizeof(label), "collisions (avg/max) %f / %" PRIu32,
-             static_cast<float>(num_collisions) /
-               static_cast<float>(iterations),
-             max_collisions);
+    snprintf(
+        label, sizeof(label), "collisions (avg/max) %f / %" PRIu32,
+        static_cast<float>(num_collisions) / static_cast<float>(iterations),
+        max_collisions);
     st->SetLabel(label);
   }
 

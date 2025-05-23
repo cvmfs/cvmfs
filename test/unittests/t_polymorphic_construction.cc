@@ -12,30 +12,31 @@
 #include "util/prng.h"
 
 struct DecisionType {
-  DecisionType() : type(-1), fail(false) {}
-  int   type;
-  bool  fail;
+  DecisionType() : type(-1), fail(false) { }
+  int type;
+  bool fail;
 };
 
 struct IntrospectionType {
-  IntrospectionType(const int type, const std::string &message) :
-    message(message), type(type) {}
-  std::string  message;
-  int          type;
+  IntrospectionType(const int type, const std::string &message)
+      : message(message), type(type) { }
+  std::string message;
+  int type;
 };
 
-class AbstractPolyCtorMock : public
-  PolymorphicConstruction<AbstractPolyCtorMock, DecisionType, IntrospectionType>
-{
+class AbstractPolyCtorMock
+    : public PolymorphicConstruction<AbstractPolyCtorMock,
+                                     DecisionType,
+                                     IntrospectionType> {
  public:
   static unsigned int constructor_calls;
   static unsigned int initialize_calls;
   static unsigned int initializes_failed;
   static unsigned int register_plugin_calls;
   static void Reset() {
-    AbstractPolyCtorMock::constructor_calls     = 0;
-    AbstractPolyCtorMock::initialize_calls      = 0;
-    AbstractPolyCtorMock::initializes_failed    = 0;
+    AbstractPolyCtorMock::constructor_calls = 0;
+    AbstractPolyCtorMock::initialize_calls = 0;
+    AbstractPolyCtorMock::initializes_failed = 0;
     AbstractPolyCtorMock::register_plugin_calls = 0;
   }
 
@@ -59,9 +60,9 @@ class AbstractPolyCtorMock : public
  protected:
   const DecisionType param_;
 };
-unsigned int AbstractPolyCtorMock::constructor_calls     = 0;
-unsigned int AbstractPolyCtorMock::initialize_calls      = 0;
-unsigned int AbstractPolyCtorMock::initializes_failed    = 0;
+unsigned int AbstractPolyCtorMock::constructor_calls = 0;
+unsigned int AbstractPolyCtorMock::initialize_calls = 0;
+unsigned int AbstractPolyCtorMock::initializes_failed = 0;
 unsigned int AbstractPolyCtorMock::register_plugin_calls = 0;
 
 
@@ -70,13 +71,11 @@ unsigned int AbstractPolyCtorMock::register_plugin_calls = 0;
 
 class FirstPolyCtorMock : public AbstractPolyCtorMock {
  public:
-  static const int          type_id = 0;
-  static const std::string  message;
+  static const int type_id = 0;
+  static const std::string message;
 
   static unsigned int constructor_calls;
-  static void Reset() {
-    FirstPolyCtorMock::constructor_calls = 0;
-  }
+  static void Reset() { FirstPolyCtorMock::constructor_calls = 0; }
 
  public:
   static bool WillHandle(const DecisionType &param) {
@@ -84,8 +83,7 @@ class FirstPolyCtorMock : public AbstractPolyCtorMock {
   }
 
   explicit FirstPolyCtorMock(const DecisionType &param)
-    : AbstractPolyCtorMock(param)
-  {
+      : AbstractPolyCtorMock(param) {
     FirstPolyCtorMock::constructor_calls++;
   }
 
@@ -94,8 +92,8 @@ class FirstPolyCtorMock : public AbstractPolyCtorMock {
                              FirstPolyCtorMock::message);
   }
 };
-unsigned int      FirstPolyCtorMock::constructor_calls = 0;
-const std::string FirstPolyCtorMock::message           = "Hello from First.";
+unsigned int FirstPolyCtorMock::constructor_calls = 0;
+const std::string FirstPolyCtorMock::message = "Hello from First.";
 
 
 //------------------------------------------------------------------------------
@@ -103,13 +101,11 @@ const std::string FirstPolyCtorMock::message           = "Hello from First.";
 
 class SecondPolyCtorMock : public AbstractPolyCtorMock {
  public:
-  static const int          type_id = 1;
-  static const std::string  message;
+  static const int type_id = 1;
+  static const std::string message;
 
   static unsigned int constructor_calls;
-  static void Reset() {
-    SecondPolyCtorMock::constructor_calls = 0;
-  }
+  static void Reset() { SecondPolyCtorMock::constructor_calls = 0; }
 
  public:
   static bool WillHandle(const DecisionType &param) {
@@ -117,8 +113,7 @@ class SecondPolyCtorMock : public AbstractPolyCtorMock {
   }
 
   explicit SecondPolyCtorMock(const DecisionType &param)
-    : AbstractPolyCtorMock(param)
-  {
+      : AbstractPolyCtorMock(param) {
     SecondPolyCtorMock::constructor_calls++;
   }
 
@@ -127,8 +122,8 @@ class SecondPolyCtorMock : public AbstractPolyCtorMock {
                              SecondPolyCtorMock::message);
   }
 };
-unsigned int      SecondPolyCtorMock::constructor_calls = 0;
-const std::string SecondPolyCtorMock::message           = "Second calling!";
+unsigned int SecondPolyCtorMock::constructor_calls = 0;
+const std::string SecondPolyCtorMock::message = "Second calling!";
 
 
 //------------------------------------------------------------------------------
@@ -136,14 +131,14 @@ const std::string SecondPolyCtorMock::message           = "Second calling!";
 
 class ThirdPolyCtorMock : public AbstractPolyCtorMock {
  public:
-  static const int          type_id = 2;
-  static const std::string  message;
+  static const int type_id = 2;
+  static const std::string message;
 
   static unsigned int constructor_calls;
   static unsigned int initialize_calls;
   static void Reset() {
     ThirdPolyCtorMock::constructor_calls = 0;
-    ThirdPolyCtorMock::initialize_calls  = 0;
+    ThirdPolyCtorMock::initialize_calls = 0;
   }
 
  public:
@@ -152,8 +147,7 @@ class ThirdPolyCtorMock : public AbstractPolyCtorMock {
   }
 
   explicit ThirdPolyCtorMock(const DecisionType &param)
-    : AbstractPolyCtorMock(param)
-  {
+      : AbstractPolyCtorMock(param) {
     ThirdPolyCtorMock::constructor_calls++;
   }
 
@@ -167,9 +161,9 @@ class ThirdPolyCtorMock : public AbstractPolyCtorMock {
     return AbstractPolyCtorMock::Initialize();
   }
 };
-unsigned int      ThirdPolyCtorMock::constructor_calls = 0;
-unsigned int      ThirdPolyCtorMock::initialize_calls  = 0;
-const std::string ThirdPolyCtorMock::message           = "Third à l'appareil.";
+unsigned int ThirdPolyCtorMock::constructor_calls = 0;
+unsigned int ThirdPolyCtorMock::initialize_calls = 0;
+const std::string ThirdPolyCtorMock::message = "Third à l'appareil.";
 
 
 //------------------------------------------------------------------------------
@@ -198,8 +192,8 @@ typedef AbstractPolyCtorMock::IntrospectionData IntrospectionData;
 class T_PolymorphicConstruction : public ::testing::Test {
  protected:
   void SetUp() {
-    PolymorphicConstructionUnittestAdapter::
-      UnregisterAllPlugins<AbstractPolyCtorMock>();
+    PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<
+        AbstractPolyCtorMock>();
     AbstractPolyCtorMock::ResetAll();
   }
 };
@@ -224,21 +218,23 @@ TEST_F(T_PolymorphicConstruction, Introspect) {
   EXPECT_EQ(0u, ThirdPolyCtorMock::constructor_calls);
 
   EXPECT_EQ(3u, v.size());
-  bool found_1 = false; bool found_2 = false; bool found_3 = false;
+  bool found_1 = false;
+  bool found_2 = false;
+  bool found_3 = false;
   EXPECT_TRUE(!found_1 && !found_2 && !found_3);
-  IntrospectionData::const_iterator i    = v.begin();
+  IntrospectionData::const_iterator i = v.begin();
   IntrospectionData::const_iterator iend = v.end();
   for (; i != iend; ++i) {
-    if (i->type    == FirstPolyCtorMock::type_id &&
-        i->message == FirstPolyCtorMock::message) {
+    if (i->type == FirstPolyCtorMock::type_id
+        && i->message == FirstPolyCtorMock::message) {
       found_1 = true;
     }
-    if (i->type    == SecondPolyCtorMock::type_id &&
-        i->message == SecondPolyCtorMock::message) {
+    if (i->type == SecondPolyCtorMock::type_id
+        && i->message == SecondPolyCtorMock::message) {
       found_2 = true;
     }
-    if (i->type    == ThirdPolyCtorMock::type_id &&
-        i->message == ThirdPolyCtorMock::message) {
+    if (i->type == ThirdPolyCtorMock::type_id
+        && i->message == ThirdPolyCtorMock::message) {
       found_3 = true;
     }
   }
@@ -255,7 +251,7 @@ TEST_F(T_PolymorphicConstruction, CreateFirst) {
   DecisionType t;
   t.type = 0;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::initialize_calls);
@@ -273,7 +269,7 @@ TEST_F(T_PolymorphicConstruction, CreateSecond) {
   DecisionType t;
   t.type = 1;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::initialize_calls);
@@ -291,7 +287,7 @@ TEST_F(T_PolymorphicConstruction, CreateThird) {
   DecisionType t;
   t.type = 2;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::initialize_calls);
@@ -310,7 +306,7 @@ TEST_F(T_PolymorphicConstruction, CreateUnknown) {
   DecisionType t;
   t.type = -1;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_EQ(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(0u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(0u, AbstractPolyCtorMock::initialize_calls);
@@ -327,7 +323,7 @@ TEST_F(T_PolymorphicConstruction, CreateAll) {
     DecisionType t;
     t.type = i;
     AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-    EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+    EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
     delete mock;
   }
 
@@ -345,7 +341,7 @@ TEST_F(T_PolymorphicConstruction, CreateMany) {
   EXPECT_EQ(0u, AbstractPolyCtorMock::register_plugin_calls);
 
   const unsigned int runs = 100000;
-  unsigned int ctors[] = { 0, 0, 0, 0 };
+  unsigned int ctors[] = {0, 0, 0, 0};
 
   Prng prng;
   prng.InitLocaltime();
@@ -354,9 +350,9 @@ TEST_F(T_PolymorphicConstruction, CreateMany) {
     t.type = prng.Next(4);
     AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
     if (t.type == 3) {
-      EXPECT_EQ(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+      EXPECT_EQ(static_cast<AbstractPolyCtorMock *>(NULL), mock);
     } else {
-      EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+      EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
       delete mock;
     }
     ++ctors[t.type];
@@ -365,14 +361,14 @@ TEST_F(T_PolymorphicConstruction, CreateMany) {
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
 
   const unsigned int all_ctors = ctors[0] + ctors[1] + ctors[2];
-  const unsigned int fails     = runs - all_ctors;
+  const unsigned int fails = runs - all_ctors;
   EXPECT_EQ(all_ctors, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(all_ctors, AbstractPolyCtorMock::initialize_calls);
-  EXPECT_EQ(ctors[0],  FirstPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[1],  SecondPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[2],  ThirdPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[2],  ThirdPolyCtorMock::initialize_calls);
-  EXPECT_EQ(ctors[3],  fails);
+  EXPECT_EQ(ctors[0], FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[1], SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[2], ThirdPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[2], ThirdPolyCtorMock::initialize_calls);
+  EXPECT_EQ(ctors[3], fails);
 }
 
 
@@ -383,7 +379,7 @@ TEST_F(T_PolymorphicConstruction, FailedInitOfFirst) {
   t.type = 0;
   t.fail = true;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_EQ(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::initialize_calls);
@@ -400,7 +396,7 @@ TEST_F(T_PolymorphicConstruction, FailedInitOfThird) {
   t.type = 2;
   t.fail = true;
   AbstractPolyCtorMock *mock = AbstractPolyCtorMock::Construct(t);
-  EXPECT_EQ(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+  EXPECT_EQ(static_cast<AbstractPolyCtorMock *>(NULL), mock);
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(1u, AbstractPolyCtorMock::initialize_calls);
@@ -415,8 +411,8 @@ TEST_F(T_PolymorphicConstruction, CreateManyWithFailures) {
   EXPECT_EQ(0u, AbstractPolyCtorMock::register_plugin_calls);
 
   const unsigned int runs = 100000;
-  unsigned int ctors[] = { 0, 0, 0, 0 };
-  unsigned int fails   = 0;
+  unsigned int ctors[] = {0, 0, 0, 0};
+  unsigned int fails = 0;
 
   Prng prng;
   prng.InitLocaltime();
@@ -429,9 +425,9 @@ TEST_F(T_PolymorphicConstruction, CreateManyWithFailures) {
       ++fails;
     }
     if (t.type == 3 || t.fail) {
-      EXPECT_EQ(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+      EXPECT_EQ(static_cast<AbstractPolyCtorMock *>(NULL), mock);
     } else {
-      EXPECT_NE(static_cast<AbstractPolyCtorMock*>(NULL), mock);
+      EXPECT_NE(static_cast<AbstractPolyCtorMock *>(NULL), mock);
       delete mock;
     }
     ++ctors[t.type];
@@ -440,13 +436,13 @@ TEST_F(T_PolymorphicConstruction, CreateManyWithFailures) {
   EXPECT_EQ(1u, AbstractPolyCtorMock::register_plugin_calls);
 
   const unsigned int all_ctors = ctors[0] + ctors[1] + ctors[2];
-  const unsigned int unknowns  = runs - all_ctors;
+  const unsigned int unknowns = runs - all_ctors;
   EXPECT_EQ(all_ctors, AbstractPolyCtorMock::constructor_calls);
   EXPECT_EQ(all_ctors, AbstractPolyCtorMock::initialize_calls);
-  EXPECT_EQ(ctors[0],  FirstPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[1],  SecondPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[2],  ThirdPolyCtorMock::constructor_calls);
-  EXPECT_EQ(ctors[2],  ThirdPolyCtorMock::initialize_calls);
-  EXPECT_EQ(ctors[3],  unknowns);
-  EXPECT_EQ(fails,     AbstractPolyCtorMock::initializes_failed);
+  EXPECT_EQ(ctors[0], FirstPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[1], SecondPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[2], ThirdPolyCtorMock::constructor_calls);
+  EXPECT_EQ(ctors[2], ThirdPolyCtorMock::initialize_calls);
+  EXPECT_EQ(ctors[3], unknowns);
+  EXPECT_EQ(fails, AbstractPolyCtorMock::initializes_failed);
 }

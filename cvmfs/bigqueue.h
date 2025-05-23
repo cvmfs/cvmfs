@@ -29,11 +29,9 @@ class BigQueue {
     size_ = 0;
   }
 
-  BigQueue(const BigQueue<Item> &other) {
-    CopyFrom(other);
-  }
+  BigQueue(const BigQueue<Item> &other) { CopyFrom(other); }
 
-  BigQueue<Item> &operator= (const BigQueue<Item> &other) {
+  BigQueue<Item> &operator=(const BigQueue<Item> &other) {
     if (&other == this)
       return *this;
 
@@ -42,9 +40,7 @@ class BigQueue {
     return *this;
   }
 
-  ~BigQueue() {
-    Dealloc();
-  }
+  ~BigQueue() { Dealloc(); }
 
   void PushBack(const Item &item) {
     if (GetAvailableSpace() == 0) {
@@ -70,9 +66,7 @@ class BigQueue {
     return true;
   }
 
-  bool IsEmpty() const {
-    return size_ == 0;
-  }
+  bool IsEmpty() const { return size_ == 0; }
 
   void Clear() {
     Dealloc();

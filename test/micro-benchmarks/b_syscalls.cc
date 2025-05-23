@@ -2,7 +2,6 @@
  * This file is part of the CernVM File System.
  */
 #include <benchmark/benchmark.h>
-
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/mman.h>
@@ -18,11 +17,9 @@
 
 class BM_Syscalls : public benchmark::Fixture {
  protected:
-  virtual void SetUp(const benchmark::State &st) {
-  }
+  virtual void SetUp(const benchmark::State &st) { }
 
-  virtual void TearDown(const benchmark::State &st) {
-  }
+  virtual void TearDown(const benchmark::State &st) { }
 };
 
 BENCHMARK_DEFINE_F(BM_Syscalls, FileOpenClose)(benchmark::State &st) {
@@ -33,8 +30,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, FileOpenClose)(benchmark::State &st) {
   st.SetItemsProcessed(st.iterations());
   st.SetLabel("/dev/null");
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, FileOpenClose)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Syscalls, FileOpenClose)->Repetitions(3)->UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Syscalls, Stat)(benchmark::State &st) {
@@ -46,8 +42,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Stat)(benchmark::State &st) {
   st.SetItemsProcessed(st.iterations());
   st.SetLabel("/dev/null");
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Syscalls, Stat)->Repetitions(3)->UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Syscalls, Read)(benchmark::State &st) {
@@ -66,8 +61,11 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Read)(benchmark::State &st) {
 
   close(fd);
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, Read)->Repetitions(3)->
-  UseRealTime()->Arg(4096)->Arg(128*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, Read)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(4096)
+    ->Arg(128 * 1024);
 
 
 /**
@@ -83,8 +81,9 @@ BENCHMARK_DEFINE_F(BM_Syscalls, InprocMakePipe)(benchmark::State &st) {
 
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, InprocMakePipe)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Syscalls, InprocMakePipe)
+    ->Repetitions(3)
+    ->UseRealTime();
 
 
 /**
@@ -107,9 +106,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, ReadHalfPipe)(benchmark::State &st) {
   unlink(kFifoPath);
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, ReadHalfPipe)->Repetitions(3)->
-  UseRealTime();
-
+BENCHMARK_REGISTER_F(BM_Syscalls, ReadHalfPipe)->Repetitions(3)->UseRealTime();
 
 
 void *MainPipeReader(void *data) {
@@ -132,8 +129,8 @@ BENCHMARK_DEFINE_F(BM_Syscalls, InprocPipe)(benchmark::State &st) {
   int pipe_test[2];
   MakePipe(pipe_test);
   pthread_t thread_reader;
-  int retval =
-    pthread_create(&thread_reader, NULL, MainPipeReader, &pipe_test[0]);
+  int retval = pthread_create(&thread_reader, NULL, MainPipeReader,
+                              &pipe_test[0]);
   assert(retval == 0);
   char data_buf[st.range(0)];
 
@@ -145,8 +142,13 @@ BENCHMARK_DEFINE_F(BM_Syscalls, InprocPipe)(benchmark::State &st) {
   pthread_join(thread_reader, NULL);
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, InprocPipe)->Repetitions(3)->
-  UseRealTime()->Arg(20)->Arg(100)->Arg(4*1024)->Arg(128*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, InprocPipe)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(20)
+    ->Arg(100)
+    ->Arg(4 * 1024)
+    ->Arg(128 * 1024);
 
 
 /**
@@ -191,8 +193,12 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Pipe)(benchmark::State &st) {
   WritePipe(pipe_cmd[1], cmd_buf, sizeof(cmd_buf));
   close(pipe_cmd[1]);
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, Pipe)->Repetitions(3)->
-  UseRealTime()->Arg(4096)->Arg(128*1024)->Arg(1024*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, Pipe)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(4096)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024);
 
 BENCHMARK_DEFINE_F(BM_Syscalls, Socket)(benchmark::State &st) {
   int rc;
@@ -236,8 +242,12 @@ BENCHMARK_DEFINE_F(BM_Syscalls, Socket)(benchmark::State &st) {
   WritePipe(sock_cmd[1], cmd_buf, sizeof(cmd_buf));
   close(sock_cmd[1]);
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, Socket)->Repetitions(3)->
-  UseRealTime()->Arg(4*1024)->Arg(128*1024)->Arg(1024*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, Socket)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(4 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024);
 
 BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
   int rc;
@@ -247,7 +257,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
   char data_buf[st.range(0)];
 
   const char *shm_path = "/cvmfs_socketfd.test";
-  int memfd = shm_open(shm_path, O_RDWR|O_CREAT|O_TRUNC, 0666);
+  int memfd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
   assert(memfd >= 0);
   rc = shm_unlink(shm_path);
   assert(rc == 0);
@@ -259,14 +269,14 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
   rc = socketpair(AF_UNIX, SOCK_STREAM, 0, sock_data);
   assert(rc == 0);
 
-  struct msghdr msg = { 0 };
+  struct msghdr msg = {0};
   struct cmsghdr *cmsg;
   int *fdptr;
   union {
     char buf[CMSG_SPACE(sizeof(int))];
     struct cmsghdr align;
   } u;
-  struct iovec io = { .iov_base = const_cast<char *>(""), .iov_len = 1 };
+  struct iovec io = {.iov_base = const_cast<char *>(""), .iov_len = 1};
   msg.msg_iov = &io;
   msg.msg_iovlen = 1;
   msg.msg_control = u.buf;
@@ -327,8 +337,8 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
       }
     }
     assert(cmsg);
-    void *mapped_buf = mmap(NULL, st.range(0), PROT_READ,
-                            MAP_PRIVATE, memfd, 0);
+    void *mapped_buf = mmap(NULL, st.range(0), PROT_READ, MAP_PRIVATE, memfd,
+                            0);
     assert(mapped_buf != MAP_FAILED);
     close(memfd);
     memcpy(data_buf, mapped_buf, st.range(0));
@@ -344,8 +354,12 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFd)(benchmark::State &st) {
   WritePipe(sock_cmd[1], cmd_buf, sizeof(cmd_buf));
   close(sock_cmd[1]);
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, SocketFd)->Repetitions(3)->
-  UseRealTime()->Arg(4*1024)->Arg(128*1024)->Arg(1024*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, SocketFd)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(4 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024);
 
 
 BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
@@ -356,7 +370,7 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
   char data_buf[st.range(0)];
 
   const char *shm_path = "/cvmfs_socketfd.test";
-  int memfd = shm_open(shm_path, O_RDWR|O_CREAT|O_TRUNC, 0666);
+  int memfd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
   assert(memfd >= 0);
   rc = shm_unlink(shm_path);
   assert(rc == 0);
@@ -368,14 +382,14 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
   rc = socketpair(AF_UNIX, SOCK_STREAM, 0, sock_data);
   assert(rc == 0);
 
-  struct msghdr msg = { 0 };
+  struct msghdr msg = {0};
   struct cmsghdr *cmsg;
   int *fdptr;
   union {
     char buf[CMSG_SPACE(sizeof(int))];
     struct cmsghdr align;
   } u;
-  struct iovec io = { .iov_base = const_cast<char *>(""), .iov_len = 1 };
+  struct iovec io = {.iov_base = const_cast<char *>(""), .iov_len = 1};
   msg.msg_iov = &io;
   msg.msg_iovlen = 1;
   msg.msg_control = u.buf;
@@ -449,5 +463,9 @@ BENCHMARK_DEFINE_F(BM_Syscalls, SocketFdRead)(benchmark::State &st) {
   WritePipe(sock_cmd[1], cmd_buf, sizeof(cmd_buf));
   close(sock_cmd[1]);
 }
-BENCHMARK_REGISTER_F(BM_Syscalls, SocketFdRead)->Repetitions(3)->
-  UseRealTime()->Arg(4*1024)->Arg(128*1024)->Arg(1024*1024);
+BENCHMARK_REGISTER_F(BM_Syscalls, SocketFdRead)
+    ->Repetitions(3)
+    ->UseRealTime()
+    ->Arg(4 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024);

@@ -2,10 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <unistd.h>
 
+#include "gtest/gtest.h"
 #include "util/file_guard.h"
 #include "util/pointer.h"
 #include "util/posix.h"
@@ -79,8 +78,8 @@ TEST(T_Uuid, FromCache) {
   UniquePtr<Uuid> uuid_cached(Uuid::Create(path));
   EXPECT_TRUE(uuid_cached.IsValid());
   EXPECT_EQ(uuid_cached->uuid(), uuid_valid->uuid());
-  EXPECT_EQ(0, memcmp(uuid_cached->data(), uuid_valid->data(),
-                      uuid_valid->size()));
+  EXPECT_EQ(
+      0, memcmp(uuid_cached->data(), uuid_valid->data(), uuid_valid->size()));
 }
 
 TEST(T_Uuid, FailWrite) {

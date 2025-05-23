@@ -17,15 +17,13 @@ using namespace std;  // NOLINT
 
 void BackoffThrottle::Init(const unsigned init_delay_ms,
                            const unsigned max_delay_ms,
-                           const unsigned reset_after_ms)
-{
+                           const unsigned reset_after_ms) {
   init_delay_ms_ = init_delay_ms;
   max_delay_ms_ = max_delay_ms;
   reset_after_ms_ = reset_after_ms;
   prng_.InitLocaltime();
 
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
@@ -51,7 +49,7 @@ void BackoffThrottle::Throttle() {
   time_t now = time(NULL);
 
   pthread_mutex_lock(lock_);
-  if (unsigned(now - last_throttle_) < reset_after_ms_/1000) {
+  if (unsigned(now - last_throttle_) < reset_after_ms_ / 1000) {
     if (delay_range_ < max_delay_ms_) {
       if (delay_range_ == 0)
         delay_range_ = init_delay_ms_;

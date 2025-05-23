@@ -39,11 +39,7 @@ struct AllocHeader {
  */
 struct MemoryBuffer {
   MemoryBuffer()
-    : address(NULL)
-    , size(0)
-    , refcount(0)
-    , object_flags(0)
-    , id() {}
+      : address(NULL), size(0), refcount(0), object_flags(0), id() { }
   void *address;
   size_t size;
   unsigned int refcount;
@@ -88,33 +84,32 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
     explicit Counters(perf::StatisticsTemplate statistics) {
       sz_size = statistics.RegisterTemplated("sz_size", "Total size");
       n_getsize = statistics.RegisterTemplated("n_getsize",
-        "Number of GetSize calls");
-      n_getrefcount = statistics.RegisterTemplated("n_getrefcount",
-        "Number of GetRefcount calls");
+                                               "Number of GetSize calls");
+      n_getrefcount = statistics.RegisterTemplated(
+          "n_getrefcount", "Number of GetRefcount calls");
       n_incref = statistics.RegisterTemplated("n_incref",
-        "Number of IncRef calls");
+                                              "Number of IncRef calls");
       n_unref = statistics.RegisterTemplated("n_unref",
-        "Number of Unref calls");
+                                             "Number of Unref calls");
       n_read = statistics.RegisterTemplated("n_read", "Number of Read calls");
       n_commit = statistics.RegisterTemplated("n_commit",
-        "Number of Commit calls");
+                                              "Number of Commit calls");
       n_delete = statistics.RegisterTemplated("n_delete",
-        "Number of Delete calls");
+                                              "Number of Delete calls");
       n_shrinkto = statistics.RegisterTemplated("n_shrinkto",
-        "Number of ShrinkTo calls");
+                                                "Number of ShrinkTo calls");
       sz_read = statistics.RegisterTemplated("sz_read", "Bytes read");
       sz_committed = statistics.RegisterTemplated("sz_committed",
-        "Bytes committed");
+                                                  "Bytes committed");
       sz_deleted = statistics.RegisterTemplated("sz_deleted", "Bytes deleted");
       sz_shrunk = statistics.RegisterTemplated("sz_shrunk", "Bytes shrunk");
     }
   };
 
-  MemoryKvStore(
-    unsigned int cache_entries,
-    MemoryAllocator alloc,
-    unsigned alloc_size,
-    perf::StatisticsTemplate statistics);
+  MemoryKvStore(unsigned int cache_entries,
+                MemoryAllocator alloc,
+                unsigned alloc_size,
+                perf::StatisticsTemplate statistics);
 
   ~MemoryKvStore();
 
@@ -149,7 +144,8 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   bool IncRef(const shash::Any &id);
 
   /**
-   * Decrease the reference count on the entry at id. If the refcount is zero, no effect
+   * Decrease the reference count on the entry at id. If the refcount is zero,
+   * no effect
    * @param id The hash key
    * @returns True if the entry exists and was updated
    */
@@ -164,11 +160,7 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
    * @returns The number of bytes copied
    * @retval -ENOENT The entry is absent
    */
-  int64_t Read(
-    const shash::Any &id,
-    void *buf,
-    size_t size,
-    size_t offset);
+  int64_t Read(const shash::Any &id, void *buf, size_t size, size_t offset);
 
   /**
    * Insert a new memory buffer. The KvStore copies the referred memory, so
@@ -180,7 +172,8 @@ class MemoryKvStore : SingleCopy, public Callbackable<MallocHeap::BlockPtr> {
   int Commit(const MemoryBuffer &buf);
 
   /**
-   * Delete an entry, free()ing its memory. Note that the entry not have any references
+   * Delete an entry, free()ing its memory. Note that the entry not have any
+   * references
    * @param id The hash key
    * @returns True iff the entry was successfully deleted
    */

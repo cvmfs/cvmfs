@@ -14,36 +14,32 @@
 #include "util/concurrency.h"
 #include "util/smalloc.h"
 
-FileItem::FileItem(
-  IngestionSource* source,
-  uint64_t min_chunk_size,
-  uint64_t avg_chunk_size,
-  uint64_t max_chunk_size,
-  zlib::Algorithms compression_algorithm,
-  shash::Algorithms hash_algorithm,
-  shash::Suffix hash_suffix,
-  bool may_have_chunks,
-  bool has_legacy_bulk_chunk)
-  : source_(source)
-  , compression_algorithm_(compression_algorithm)
-  , hash_algorithm_(hash_algorithm)
-  , hash_suffix_(hash_suffix)
-  , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
-  , size_(kSizeUnknown)
-  , may_have_chunks_(may_have_chunks)
-  , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
-  , bulk_hash_(hash_algorithm)
-  , chunks_(1)
-{
+FileItem::FileItem(IngestionSource *source,
+                   uint64_t min_chunk_size,
+                   uint64_t avg_chunk_size,
+                   uint64_t max_chunk_size,
+                   zlib::Algorithms compression_algorithm,
+                   shash::Algorithms hash_algorithm,
+                   shash::Suffix hash_suffix,
+                   bool may_have_chunks,
+                   bool has_legacy_bulk_chunk)
+    : source_(source)
+    , compression_algorithm_(compression_algorithm)
+    , hash_algorithm_(hash_algorithm)
+    , hash_suffix_(hash_suffix)
+    , has_legacy_bulk_chunk_(has_legacy_bulk_chunk)
+    , size_(kSizeUnknown)
+    , may_have_chunks_(may_have_chunks)
+    , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
+    , bulk_hash_(hash_algorithm)
+    , chunks_(1) {
   int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
 }
 
-FileItem::~FileItem() {
-  pthread_mutex_destroy(&lock_);
-}
+FileItem::~FileItem() { pthread_mutex_destroy(&lock_); }
 
 void FileItem::RegisterChunk(const FileChunk &file_chunk) {
   MutexLockGuard lock_guard(lock_);
@@ -67,13 +63,12 @@ void FileItem::RegisterChunk(const FileChunk &file_chunk) {
 
 
 ChunkItem::ChunkItem(FileItem *file_item, uint64_t offset)
-  : file_item_(file_item)
-  , offset_(offset)
-  , size_(0)
-  , is_bulk_chunk_(false)
-  , upload_handle_(NULL)
-  , compressor_(NULL)
-{
+    : file_item_(file_item)
+    , offset_(offset)
+    , size_(0)
+    , is_bulk_chunk_(false)
+    , upload_handle_(NULL)
+    , compressor_(NULL) {
   hash_ctx_.algorithm = file_item->hash_algorithm();
   hash_ctx_.size = shash::GetContextSize(hash_ctx_.algorithm);
   hash_ctx_.buffer = hash_ctx_buffer_;
@@ -92,16 +87,14 @@ void ChunkItem::MakeBulkChunk() {
 
 zlib::Compressor *ChunkItem::GetCompressor() {
   if (!compressor_.IsValid()) {
-    compressor_ =
-      zlib::Compressor::Construct(file_item_->compression_algorithm());
+    compressor_ = zlib::Compressor::Construct(
+        file_item_->compression_algorithm());
   }
   return compressor_.weak_ref();
 }
 
 
-void ChunkItem::ReleaseCompressor() {
-  compressor_.Destroy();
-}
+void ChunkItem::ReleaseCompressor() { compressor_.Destroy(); }
 
 
 //------------------------------------------------------------------------------
@@ -110,27 +103,25 @@ atomic_int64 BlockItem::managed_bytes_ = 0;
 
 
 BlockItem::BlockItem(ItemAllocator *allocator)
-  : allocator_(allocator)
-  , type_(kBlockHollow)
-  , tag_(-1)
-  , file_item_(NULL)
-  , chunk_item_(NULL)
-  , data_(NULL)
-  , capacity_(0)
-  , size_(0)
-{ }
+    : allocator_(allocator)
+    , type_(kBlockHollow)
+    , tag_(-1)
+    , file_item_(NULL)
+    , chunk_item_(NULL)
+    , data_(NULL)
+    , capacity_(0)
+    , size_(0) { }
 
 
 BlockItem::BlockItem(int64_t tag, ItemAllocator *allocator)
-  : allocator_(allocator)
-  , type_(kBlockHollow)
-  , tag_(tag)
-  , file_item_(NULL)
-  , chunk_item_(NULL)
-  , data_(NULL)
-  , capacity_(0)
-  , size_(0)
-{
+    : allocator_(allocator)
+    , type_(kBlockHollow)
+    , tag_(tag)
+    , file_item_(NULL)
+    , chunk_item_(NULL)
+    , data_(NULL)
+    , capacity_(0)
+    , size_(0) {
   assert(tag_ >= 0);
 }
 
@@ -186,10 +177,7 @@ void BlockItem::MakeDataMove(BlockItem *other) {
 /**
  * Copy a piece of one block's data into a new block.
  */
-void BlockItem::MakeDataCopy(
-  const unsigned char *data,
-  uint32_t size)
-{
+void BlockItem::MakeDataCopy(const unsigned char *data, uint32_t size) {
   assert(type_ == kBlockHollow);
   assert(allocator_ != NULL);
   assert(size > 0);

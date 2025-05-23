@@ -7,7 +7,7 @@
 #include "receiver/lease_path_util.h"
 #include "shortstring.h"
 
-class T_LeasePathUtil : public ::testing::Test {};
+class T_LeasePathUtil : public ::testing::Test { };
 
 TEST_F(T_LeasePathUtil, RootLease) {
   const PathString lease("");

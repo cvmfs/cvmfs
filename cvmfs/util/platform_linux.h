@@ -67,7 +67,8 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     // crash unmount handlers (removing the lock file would result in a race)
     std::string lockfile = std::string(_PATH_MOUNTED) + ".cvmfslock";
     const int fd_lockfile = open(lockfile.c_str(), O_RDONLY | O_CREAT, 0600);
-    if (fd_lockfile < 0) return false;
+    if (fd_lockfile < 0)
+      return false;
     int timeout = 10;
     while ((flock(fd_lockfile, LOCK_EX | LOCK_NB) != 0) && (timeout > 0)) {
       if (errno != EWOULDBLOCK) {
@@ -94,8 +95,8 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
       return false;
     }
     FILE *fmntnew = setmntent(mntnew.c_str(), "w+");
-    if (!fmntnew && (chmod(mntnew.c_str(), mtab_info.st_mode) != 0) &&
-        (chown(mntnew.c_str(), mtab_info.st_uid, mtab_info.st_gid) != 0)) {
+    if (!fmntnew && (chmod(mntnew.c_str(), mtab_info.st_mode) != 0)
+        && (chown(mntnew.c_str(), mtab_info.st_uid, mtab_info.st_gid) != 0)) {
       endmntent(fmntold);
       flock(fd_lockfile, LOCK_UN);
       close(fd_lockfile);
@@ -120,12 +121,13 @@ inline bool platform_umount(const char *mountpoint, const bool lazy) {
     retval = rename(mntnew.c_str(), _PATH_MOUNTED);
     flock(fd_lockfile, LOCK_UN);
     close(fd_lockfile);
-    if (retval != 0) return false;
+    if (retval != 0)
+      return false;
     // Best effort
     retval = chmod(_PATH_MOUNTED, mtab_info.st_mode);
-    (void) retval;
+    (void)retval;
     retval = chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
-    (void) retval;
+    (void)retval;
     // We pickup these values only to silent warnings
   }
 
@@ -249,15 +251,15 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 // TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_setxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
-  int retval =
-      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
+  int retval = setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(),
+                        0);
   return retval == 0;
 }
 
 inline bool platform_lsetxattr(const std::string &path, const std::string &name,
-                              const std::string &value) {
-  int retval =
-      lsetxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
+                               const std::string &value) {
+  int retval = lsetxattr(path.c_str(), name.c_str(), value.c_str(),
+                         value.size(), 0);
   return retval == 0;
 }
 
@@ -338,19 +340,19 @@ inline uint64_t platform_monotonic_time() {
 
 inline uint64_t platform_monotonic_time_ns() {
   struct timespec tp = platform_time_with_clock(CLOCK_MONOTONIC);
-  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
-                               static_cast<double>(tp.tv_nsec));
+  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9
+                               + static_cast<double>(tp.tv_nsec));
 }
 
 inline uint64_t platform_realtime_ns() {
   struct timespec tp = platform_time_with_clock(CLOCK_REALTIME);
-  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9 +
-                               static_cast<double>(tp.tv_nsec));
+  return static_cast<uint64_t>(static_cast<double>(tp.tv_sec) * 1e9
+                               + static_cast<double>(tp.tv_nsec));
 }
 
 inline uint64_t platform_memsize() {
-  return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES)) *
-         static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
+  return static_cast<uint64_t>(sysconf(_SC_PHYS_PAGES))
+         * static_cast<uint64_t>(sysconf(_SC_PAGE_SIZE));
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

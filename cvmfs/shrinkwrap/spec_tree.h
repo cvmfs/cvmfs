@@ -14,12 +14,11 @@ enum SPEC_READ_ST {
 
 class SpecTreeNode {
  public:
-  explicit SpecTreeNode(char modeParam)
-    : mode(modeParam) {}
+  explicit SpecTreeNode(char modeParam) : mode(modeParam) { }
   ~SpecTreeNode() {
-    for (std::map<std::string, SpecTreeNode*>::iterator it = nodes_.begin();
-      it != nodes_.end();
-      it++) {
+    for (std::map<std::string, SpecTreeNode *>::iterator it = nodes_.begin();
+         it != nodes_.end();
+         it++) {
       delete it->second;
     }
   }
@@ -32,29 +31,23 @@ class SpecTreeNode {
    * 0: include this file
    * *: include deep copy from here on
    * ^: include flat copy from here on
-   * 
+   *
    * _: passby directory
    * -: NOT passby directory (for internal purposes, can be overwritten by _)
-   * 
+   *
    * !: Do not include this file
    */
   char mode;
 
  private:
-  std::map<std::string, SpecTreeNode*> nodes_;
+  std::map<std::string, SpecTreeNode *> nodes_;
 };
 
 class SpecTree {
  public:
-  explicit SpecTree(char mode = 0) {
-    root_ = new SpecTreeNode(mode);
-  }
-  SpecTree(const SpecTree &tree) {
-    root_ = tree.root_;
-  }
-  ~SpecTree() {
-    delete root_;
-  }
+  explicit SpecTree(char mode = 0) { root_ = new SpecTreeNode(mode); }
+  SpecTree(const SpecTree &tree) { root_ = tree.root_; }
+  ~SpecTree() { delete root_; }
   static SpecTree *Create(const std::string &path);
 
   bool IsMatching(std::string path);
@@ -62,9 +55,9 @@ class SpecTree {
   /**
    * Method which returns a list over the given directory or asks the caller
    * to read from the file system.
-   * 
+   *
    * Memory for buf is only allocated if the return value is 0
-   * 
+   *
    * @param[in] dir The directory over which should be iterated
    * @param[out] buf The list of the paths to the elements in the directory
    * @param[out] len Length of the output list
@@ -73,9 +66,7 @@ class SpecTree {
    *    -1 if directory should not be listed (because excluded)
    *    SPEC_READ_FS if listing should be read from source filesystem
    */
-  int ListDir(const char *dir,
-                char ***buf,
-                size_t *len);
+  int ListDir(const char *dir, char ***buf, size_t *len);
 
  private:
   void Open(const std::string &path);
@@ -83,7 +74,6 @@ class SpecTree {
 
   SpecTreeNode *root_;
 };
-
 
 
 #endif  // CVMFS_SHRINKWRAP_SPEC_TREE_H_

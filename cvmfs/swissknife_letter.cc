@@ -27,24 +27,24 @@ static void ReadStdinBytes(unsigned char *buf, const uint16_t num_bytes) {
   unsigned read_all = 0;
 
   do {
-    if ((read_chunk = read(0, buf+read_all, num_bytes-read_all)) <= 0)
+    if ((read_chunk = read(0, buf + read_all, num_bytes - read_all)) <= 0)
       break;
     read_all += read_chunk;
   } while (read_all < num_bytes);
 
-  if (read_chunk == 0) exit(0);
+  if (read_chunk == 0)
+    exit(0);
   assert(read_all == num_bytes);
 }
 
 
 static void WriteStdoutBytes(const unsigned char *buf,
-                             const uint16_t num_bytes)
-{
+                             const uint16_t num_bytes) {
   int wrote_chunk;
   unsigned wrote_all = 0;
 
   do {
-    if ((wrote_chunk = write(1, buf+wrote_all, num_bytes-wrote_all)) <= 0)
+    if ((wrote_chunk = write(1, buf + wrote_all, num_bytes - wrote_all)) <= 0)
       break;
     wrote_all += wrote_chunk;
   } while (wrote_all < num_bytes);
@@ -78,7 +78,8 @@ static void WriteErlang(const unsigned char *buf, int len) {
 
 int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   bool verify = false;
-  if (args.find('v') != args.end()) verify = true;
+  if (args.find('v') != args.end())
+    verify = true;
   if ((args.find('s') != args.end()) && verify) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "invalid option combination (sign + verify)");
@@ -94,7 +95,8 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   if (verify) {
     repository_url = *args.find('r')->second;
     max_age = String2Uint64(*args.find('m')->second);
-    if (args.find('e') != args.end()) erlang = true;
+    if (args.find('e') != args.end())
+      erlang = true;
   } else {
     certificate_path = *args.find('c')->second;
     if (args.find('p') != args.end())
@@ -112,7 +114,8 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   string key_path;
   fqrn = *args.find('f')->second;
   key_path = *args.find('k')->second;
-  if (args.find('t') != args.end()) text = *args.find('t')->second;
+  if (args.find('t') != args.end())
+    text = *args.find('t')->second;
 
   whitelist::Failures retval_wl;
   letter::Failures retval_ltr;
@@ -122,10 +125,11 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       return 2;
     }
 
-    const bool     follow_redirects = false;
+    const bool follow_redirects = false;
     const unsigned max_pool_handles = 2;
-    const string proxy =
-      (args.find('@') != args.end()) ? *args.find('@')->second : "";
+    const string proxy = (args.find('@') != args.end())
+                             ? *args.find('@')->second
+                             : "";
     if (!this->InitDownloadManager(follow_redirects, proxy, max_pool_handles)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to init repo connection");
       return 2;
@@ -160,11 +164,12 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
               break;
             text.push_back(c);
           }
-          if (num_read != 1) return exit_code;
+          if (num_read != 1)
+            return exit_code;
         }
       }
 
-      if ((time(NULL) + 3600*24*3) > whitelist.expires()) {
+      if ((time(NULL) + 3600 * 24 * 3) > whitelist.expires()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
         whitelist::Whitelist refresh(fqrn, download_manager(),
                                      signature_manager());

@@ -9,7 +9,7 @@
 
 namespace {
 
-bool ValidateArgs(const swissknife::ArgumentList& args) {
+bool ValidateArgs(const swissknife::ArgumentList &args) {
   const bool publish = args.count('p') > 0;
   const bool subscribe = args.count('s') > 0;
 
@@ -37,7 +37,7 @@ bool ValidateArgs(const swissknife::ArgumentList& args) {
   return true;
 }
 
-uint64_t GetMinRevision(const swissknife::ArgumentList& args) {
+uint64_t GetMinRevision(const swissknife::ArgumentList &args) {
   if (args.count('m') > 0) {
     return std::atoi(args.find('m')->second->c_str());
   } else {
@@ -49,7 +49,7 @@ uint64_t GetMinRevision(const swissknife::ArgumentList& args) {
 
 namespace swissknife {
 
-CommandNotify::~CommandNotify() {}
+CommandNotify::~CommandNotify() { }
 
 ParameterList CommandNotify::GetParams() const {
   ParameterList l;
@@ -66,7 +66,7 @@ ParameterList CommandNotify::GetParams() const {
   return l;
 }
 
-int CommandNotify::Main(const ArgumentList& args) {
+int CommandNotify::Main(const ArgumentList &args) {
   if (!ValidateArgs(args)) {
     return 1;
   }

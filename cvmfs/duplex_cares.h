@@ -6,9 +6,9 @@
 #define CVMFS_DUPLEX_CARES_H_
 
 #ifdef _BUILT_IN_CARES
-  #include "ares.h"
+#include "ares.h"
 #else
-  #include <ares.h>
+#include <ares.h>
 #endif
 
 #endif  // CVMFS_DUPLEX_CARES_H_

@@ -38,21 +38,21 @@ class TreeCountersBase {
   FRIEND_TEST(T_CatalogCounters, FieldsMap);
 
  protected:
-  typedef std::map<std::string, const FieldT*> FieldsMap;
+  typedef std::map<std::string, const FieldT *> FieldsMap;
   struct Fields {
     Fields()
-      : regular_files(0)
-      , symlinks(0)
-      , specials(0)
-      , directories(0)
-      , nested_catalogs(0)
-      , chunked_files(0)
-      , file_chunks(0)
-      , file_size(0)
-      , chunked_file_size(0)
-      , xattrs(0)
-      , externals(0)
-      , external_file_size(0) { }
+        : regular_files(0)
+        , symlinks(0)
+        , specials(0)
+        , directories(0)
+        , nested_catalogs(0)
+        , chunked_files(0)
+        , file_chunks(0)
+        , file_size(0)
+        , chunked_file_size(0)
+        , xattrs(0)
+        , externals(0)
+        , external_file_size(0) { }
 
     // typname U is another TreeCountersBase (eg: add DeltaCounters to Counters)
     template<typename U>
@@ -67,32 +67,32 @@ class TreeCountersBase {
 
     template<typename U, int factor>
     void Combine(const U &other) {
-      regular_files      += factor * other.regular_files;
-      symlinks           += factor * other.symlinks;
-      specials           += factor * other.specials;
-      directories        += factor * other.directories;
-      nested_catalogs    += factor * other.nested_catalogs;
-      chunked_files      += factor * other.chunked_files;
-      file_chunks        += factor * other.file_chunks;
-      file_size          += factor * other.file_size;
-      chunked_file_size  += factor * other.chunked_file_size;
-      xattrs             += factor * other.xattrs;
-      externals          += factor * other.externals;
+      regular_files += factor * other.regular_files;
+      symlinks += factor * other.symlinks;
+      specials += factor * other.specials;
+      directories += factor * other.directories;
+      nested_catalogs += factor * other.nested_catalogs;
+      chunked_files += factor * other.chunked_files;
+      file_chunks += factor * other.file_chunks;
+      file_size += factor * other.file_size;
+      chunked_file_size += factor * other.chunked_file_size;
+      xattrs += factor * other.xattrs;
+      externals += factor * other.externals;
       external_file_size += factor * other.external_file_size;
     }
 
     void FillFieldsMap(const std::string &prefix, FieldsMap *map) const {
-      (*map)[prefix + "regular"]            = &regular_files;
-      (*map)[prefix + "symlink"]            = &symlinks;
-      (*map)[prefix + "special"]            = &specials;
-      (*map)[prefix + "dir"]                = &directories;
-      (*map)[prefix + "nested"]             = &nested_catalogs;
-      (*map)[prefix + "chunked"]            = &chunked_files;
-      (*map)[prefix + "chunks"]             = &file_chunks;
-      (*map)[prefix + "file_size"]          = &file_size;
-      (*map)[prefix + "chunked_size"]       = &chunked_file_size;
-      (*map)[prefix + "xattr"]              = &xattrs;
-      (*map)[prefix + "external"]           = &externals;
+      (*map)[prefix + "regular"] = &regular_files;
+      (*map)[prefix + "symlink"] = &symlinks;
+      (*map)[prefix + "special"] = &specials;
+      (*map)[prefix + "dir"] = &directories;
+      (*map)[prefix + "nested"] = &nested_catalogs;
+      (*map)[prefix + "chunked"] = &chunked_files;
+      (*map)[prefix + "chunks"] = &file_chunks;
+      (*map)[prefix + "file_size"] = &file_size;
+      (*map)[prefix + "chunked_size"] = &chunked_file_size;
+      (*map)[prefix + "xattr"] = &xattrs;
+      (*map)[prefix + "external"] = &externals;
       (*map)[prefix + "external_file_size"] = &external_file_size;
     }
 
@@ -112,10 +112,10 @@ class TreeCountersBase {
 
  public:
   FieldT Get(const std::string &key) const;
-  bool ReadFromDatabase(const CatalogDatabase  &database,
-                        const LegacyMode::Type  legacy = LegacyMode::kNoLegacy);
-  bool WriteToDatabase(const CatalogDatabase     &database) const;
-  bool InsertIntoDatabase(const CatalogDatabase  &database) const;
+  bool ReadFromDatabase(const CatalogDatabase &database,
+                        const LegacyMode::Type legacy = LegacyMode::kNoLegacy);
+  bool WriteToDatabase(const CatalogDatabase &database) const;
+  bool InsertIntoDatabase(const CatalogDatabase &database) const;
 
   void SetZero();
 
@@ -138,7 +138,7 @@ class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
  public:
   void PopulateToParent(DeltaCounters *parent) const;
   void RemoveFromSubtree(const DeltaCounters &child);
-  void Increment(const DirectoryEntry &dirent) { ApplyDelta(dirent,  1); }
+  void Increment(const DirectoryEntry &dirent) { ApplyDelta(dirent, 1); }
   void Decrement(const DirectoryEntry &dirent) { ApplyDelta(dirent, -1); }
 
  private:

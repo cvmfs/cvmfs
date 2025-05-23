@@ -34,36 +34,32 @@ const int AuthzExternalFetcher::kMinTtl = 0;
 const uint32_t AuthzExternalFetcher::kProtocolVersion = 1;
 
 
-AuthzExternalFetcher::AuthzExternalFetcher(
-  const string &fqrn,
-  const string &progname,
-  const string &search_path,
-  OptionsManager *options_manager)
-  : fqrn_(fqrn)
-  , progname_(progname)
-  , search_path_(search_path)
-  , fd_send_(-1)
-  , fd_recv_(-1)
-  , pid_(-1)
-  , fail_state_(false)
-  , options_manager_(options_manager)
-  , next_start_(-1)
-{
+AuthzExternalFetcher::AuthzExternalFetcher(const string &fqrn,
+                                           const string &progname,
+                                           const string &search_path,
+                                           OptionsManager *options_manager)
+    : fqrn_(fqrn)
+    , progname_(progname)
+    , search_path_(search_path)
+    , fd_send_(-1)
+    , fd_recv_(-1)
+    , pid_(-1)
+    , fail_state_(false)
+    , options_manager_(options_manager)
+    , next_start_(-1) {
   InitLock();
 }
 
-AuthzExternalFetcher::AuthzExternalFetcher(
-  const string &fqrn,
-  int fd_send,
-  int fd_recv)
-  : fqrn_(fqrn)
-  , fd_send_(fd_send)
-  , fd_recv_(fd_recv)
-  , pid_(-1)
-  , fail_state_(false)
-  , options_manager_(NULL)
-  , next_start_(-1)
-{
+AuthzExternalFetcher::AuthzExternalFetcher(const string &fqrn,
+                                           int fd_send,
+                                           int fd_recv)
+    : fqrn_(fqrn)
+    , fd_send_(fd_send)
+    , fd_recv_(fd_recv)
+    , pid_(-1)
+    , fail_state_(false)
+    , options_manager_(NULL)
+    , next_start_(-1) {
   InitLock();
 }
 
@@ -75,9 +71,8 @@ AuthzExternalFetcher::~AuthzExternalFetcher() {
   // Allow helper to gracefully terminate
   if ((fd_send_ >= 0) && !fail_state_) {
     LogCvmfs(kLogAuthz, kLogDebug, "shutting down authz helper");
-    Send(string("{\"cvmfs_authz_v1\":{") +
-      "\"msgid\":" + StringifyInt(kAuthzMsgQuit) + "," +
-      "\"revision\":0}}");
+    Send(string("{\"cvmfs_authz_v1\":{") + "\"msgid\":"
+         + StringifyInt(kAuthzMsgQuit) + "," + "\"revision\":0}}");
   }
 
   ReapHelper();
@@ -105,10 +100,10 @@ void AuthzExternalFetcher::ReapHelper() {
         retval = kill(pid_, SIGKILL);
         if (retval == 0) {
           // Pick up client return status
-          (void) waitpid(pid_, &statloc, 0);
+          (void)waitpid(pid_, &statloc, 0);
         } else {
           // Process might have been terminated just before the kill() call
-          (void) waitpid(pid_, &statloc, WNOHANG);
+          (void)waitpid(pid_, &statloc, WNOHANG);
         }
         break;
       }
@@ -147,8 +142,8 @@ void AuthzExternalFetcher::ExecHelper() {
   char *argv[] = {argv0, NULL};
 
   const bool strip_prefix = true;
-  vector<string> authz_env =
-    options_manager_->GetEnvironmentSubset("CVMFS_AUTHZ_", strip_prefix);
+  vector<string> authz_env = options_manager_->GetEnvironmentSubset(
+      "CVMFS_AUTHZ_", strip_prefix);
   vector<char *> envp;
   for (unsigned i = 0; i < authz_env.size(); ++i)
     envp.push_back(strdupa(authz_env[i].c_str()));
@@ -193,7 +188,7 @@ void AuthzExternalFetcher::ExecHelper() {
       close(open_fds[i]);
 #endif
 
-    for (size_t i = 0; i < sizeof(Watchdog::g_suppressed_signals)/sizeof(int);
+    for (size_t i = 0; i < sizeof(Watchdog::g_suppressed_signals) / sizeof(int);
          i++) {
       struct sigaction signal_handler;
       signal_handler.sa_handler = SIG_DFL;
@@ -201,8 +196,8 @@ void AuthzExternalFetcher::ExecHelper() {
     }
 
     execve(argv0, argv, &envp[0]);
-    syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)",
-           argv0, errno);
+    syslog(LOG_USER | LOG_ERR, "failed to start authz helper %s (%d)", argv0,
+           errno);
     _exit(1);
   }
   assert(pid > 0);
@@ -217,11 +212,9 @@ void AuthzExternalFetcher::ExecHelper() {
 }
 
 
-AuthzStatus AuthzExternalFetcher::Fetch(
-  const QueryInfo &query_info,
-  AuthzToken *authz_token,
-  unsigned *ttl)
-{
+AuthzStatus AuthzExternalFetcher::Fetch(const QueryInfo &query_info,
+                                        AuthzToken *authz_token,
+                                        unsigned *ttl) {
   *ttl = kDefaultTtl;
 
   MutexLockGuard lock_guard(lock_);
@@ -249,14 +242,12 @@ AuthzStatus AuthzExternalFetcher::Fetch(
   string authz_schema;
   string pure_membership;
   StripAuthzSchema(query_info.membership, &authz_schema, &pure_membership);
-  string json_msg = string("{\"cvmfs_authz_v1\":{") +
-    "\"msgid\":" + StringifyInt(kAuthzMsgVerify) + "," +
-    "\"revision\":0," +
-    "\"uid\":" +  StringifyInt(query_info.uid) + "," +
-    "\"gid\":" +  StringifyInt(query_info.gid) + "," +
-    "\"pid\":" +  StringifyInt(query_info.pid) + "," +
-    "\"membership\":\"" + Base64(pure_membership) +
-      "\"}}";
+  string json_msg = string("{\"cvmfs_authz_v1\":{") + "\"msgid\":"
+                    + StringifyInt(kAuthzMsgVerify) + "," + "\"revision\":0,"
+                    + "\"uid\":" + StringifyInt(query_info.uid) + ","
+                    + "\"gid\":" + StringifyInt(query_info.gid) + ","
+                    + "\"pid\":" + StringifyInt(query_info.pid) + ","
+                    + "\"membership\":\"" + Base64(pure_membership) + "\"}}";
   retval = Send(json_msg) && Recv(&json_msg);
   if (!retval)
     return kAuthzNoHelper;
@@ -304,15 +295,12 @@ bool AuthzExternalFetcher::Handshake() {
   string json_debug_log;
   if (debug_log != "")
     json_debug_log = ",\"debug_log\":\"" + debug_log + "\"";
-  string json_msg = string("{") +
-    "\"cvmfs_authz_v1\":{" +
-    "\"msgid\":" + StringifyInt(0) + "," +
-    "\"revision\":0," +
-    "\"fqrn\":\"" + fqrn_ + "\"," +
-    "\"syslog_facility\":" + StringifyInt(GetLogSyslogFacility()) + "," +
-    "\"syslog_level\":" + StringifyInt(GetLogSyslogLevel()) +
-    json_debug_log +
-    "}}";
+  string json_msg = string("{") + "\"cvmfs_authz_v1\":{"
+                    + "\"msgid\":" + StringifyInt(0) + "," + "\"revision\":0,"
+                    + "\"fqrn\":\"" + fqrn_ + "\"," + "\"syslog_facility\":"
+                    + StringifyInt(GetLogSyslogFacility()) + ","
+                    + "\"syslog_level\":" + StringifyInt(GetLogSyslogLevel())
+                    + json_debug_log + "}}";
   bool retval = Send(json_msg);
   if (!retval)
     return false;
@@ -345,7 +333,7 @@ bool AuthzExternalFetcher::Send(const string &msg) {
   header.length = msg.length();
   unsigned raw_length = sizeof(header) + msg.length();
   unsigned char *raw_msg = reinterpret_cast<unsigned char *>(
-    alloca(raw_length));
+      alloca(raw_length));
   memcpy(raw_msg, &header, sizeof(header));
   memcpy(raw_msg + sizeof(header), msg.data(), header.length);
 
@@ -369,24 +357,22 @@ bool AuthzExternalFetcher::Send(const string &msg) {
  * The contents of "cvmfs_authz_v1" depends on the msgid.  Additional fields
  * are ignored.  The protocol revision should indicate changes in the fields.
  */
-bool AuthzExternalFetcher::ParseMsg(
-  const std::string &json_msg,
-  const AuthzExternalMsgIds expected_msgid,
-  AuthzExternalMsg *binary_msg)
-{
+bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
+                                    const AuthzExternalMsgIds expected_msgid,
+                                    AuthzExternalMsg *binary_msg) {
   assert(binary_msg != NULL);
 
   UniquePtr<JsonDocument> json_document(JsonDocument::Create(json_msg));
   if (!json_document.IsValid()) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
-             "invalid json from authz helper %s: %s",
-             progname_.c_str(), json_msg.c_str());
+             "invalid json from authz helper %s: %s", progname_.c_str(),
+             json_msg.c_str());
     EnterFailState();
     return false;
   }
 
   JSON *json_authz = JsonDocument::SearchInObject(
-    json_document->root(), "cvmfs_authz_v1", JSON_OBJECT);
+      json_document->root(), "cvmfs_authz_v1", JSON_OBJECT);
   if (json_authz == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"cvmfs_authz_v1\" not found in json from authz helper %s: %s",
@@ -395,9 +381,8 @@ bool AuthzExternalFetcher::ParseMsg(
     return false;
   }
 
-  if (!ParseMsgId(json_authz, binary_msg) ||
-      (binary_msg->msgid != expected_msgid))
-  {
+  if (!ParseMsgId(json_authz, binary_msg)
+      || (binary_msg->msgid != expected_msgid)) {
     EnterFailState();
     return false;
   }
@@ -415,12 +400,10 @@ bool AuthzExternalFetcher::ParseMsg(
 }
 
 
-bool AuthzExternalFetcher::ParseMsgId(
-  JSON *json_authz,
-  AuthzExternalMsg *binary_msg)
-{
-  JSON *json_msgid = JsonDocument::SearchInObject(
-    json_authz, "msgid", JSON_INT);
+bool AuthzExternalFetcher::ParseMsgId(JSON *json_authz,
+                                      AuthzExternalMsg *binary_msg) {
+  JSON *json_msgid = JsonDocument::SearchInObject(json_authz, "msgid",
+                                                  JSON_INT);
   if (json_msgid == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"msgid\" not found in json from authz helper %s",
@@ -429,9 +412,8 @@ bool AuthzExternalFetcher::ParseMsgId(
     return false;
   }
 
-  if ((json_msgid->int_value < 0) ||
-      (json_msgid->int_value >= kAuthzMsgInvalid))
-  {
+  if ((json_msgid->int_value < 0)
+      || (json_msgid->int_value >= kAuthzMsgInvalid)) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid \"msgid\" in json from authz helper %s: %d",
              progname_.c_str(), json_msgid->int_value);
@@ -448,12 +430,10 @@ bool AuthzExternalFetcher::ParseMsgId(
  * A permit must contain the authorization status.  Optionally it can come with
  * a "time to live" of the answer and a token (e.g. X.509 proxy certificate).
  */
-bool AuthzExternalFetcher::ParsePermit(
-  JSON *json_authz,
-  AuthzExternalMsg *binary_msg)
-{
-  JSON *json_status =
-    JsonDocument::SearchInObject(json_authz, "status", JSON_INT);
+bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
+                                       AuthzExternalMsg *binary_msg) {
+  JSON *json_status = JsonDocument::SearchInObject(json_authz, "status",
+                                                   JSON_INT);
   if (json_status == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"status\" not found in json from authz helper %s",
@@ -461,12 +441,12 @@ bool AuthzExternalFetcher::ParsePermit(
     EnterFailState();
     return false;
   }
-  if ((json_status->int_value < 0) || (json_status->int_value > kAuthzUnknown))
-  {
+  if ((json_status->int_value < 0)
+      || (json_status->int_value > kAuthzUnknown)) {
     binary_msg->permit.status = kAuthzUnknown;
   } else {
     binary_msg->permit.status = static_cast<AuthzStatus>(
-      json_status->int_value);
+        json_status->int_value);
   }
 
   JSON *json_ttl = JsonDocument::SearchInObject(json_authz, "ttl", JSON_INT);
@@ -477,8 +457,8 @@ bool AuthzExternalFetcher::ParsePermit(
     binary_msg->permit.ttl = std::max(kMinTtl, json_ttl->int_value);
   }
 
-  JSON *json_token =
-    JsonDocument::SearchInObject(json_authz, "x509_proxy", JSON_STRING);
+  JSON *json_token = JsonDocument::SearchInObject(json_authz, "x509_proxy",
+                                                  JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
     string token_binary;
@@ -528,20 +508,18 @@ bool AuthzExternalFetcher::ParsePermit(
     // No auth token returned, so authz should do... what exactly?
     // Log error message
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
-               "No auth token found in returned JSON from Authz helper %s",
-               progname_.c_str());
+             "No auth token found in returned JSON from Authz helper %s",
+             progname_.c_str());
   }
 
   return true;
 }
 
 
-bool AuthzExternalFetcher::ParseRevision(
-  JSON *json_authz,
-  AuthzExternalMsg *binary_msg)
-{
-  JSON *json_revision = JsonDocument::SearchInObject(
-    json_authz, "revision", JSON_INT);
+bool AuthzExternalFetcher::ParseRevision(JSON *json_authz,
+                                         AuthzExternalMsg *binary_msg) {
+  JSON *json_revision = JsonDocument::SearchInObject(json_authz, "revision",
+                                                     JSON_INT);
   if (json_revision == NULL) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "\"revision\" not found in json from authz helper %s",
@@ -604,11 +582,9 @@ bool AuthzExternalFetcher::Recv(string *msg) {
 }
 
 
-void AuthzExternalFetcher::StripAuthzSchema(
-  const string &membership,
-  string *authz_schema,
-  string *pure_membership)
-{
+void AuthzExternalFetcher::StripAuthzSchema(const string &membership,
+                                            string *authz_schema,
+                                            string *pure_membership) {
   vector<string> components = SplitString(membership, '%');
   *authz_schema = components[0];
   if (components.size() < 2) {

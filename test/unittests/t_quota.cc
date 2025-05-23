@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <pthread.h>
 #include <signal.h>
 
@@ -28,6 +27,7 @@ class CountPipeHelper {
     num_pipes_++;
   }
   unsigned num_pipes() { return num_pipes_; }
+
  private:
   unsigned num_pipes_;
 };
@@ -45,17 +45,16 @@ class T_QuotaManager : public ::testing::Test {
     delete PosixCacheManager::Create(tmp_path_, false);
     delete PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);
 
-    limit_ = 10*1024*1024;  // 10M
-    threshold_ = 5*1024*1024;  // 5M
+    limit_ = 10 * 1024 * 1024;     // 10M
+    threshold_ = 5 * 1024 * 1024;  // 5M
 
-    quota_mgr_ =
-      PosixQuotaManager::Create(tmp_path_, limit_, threshold_, false);
+    quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_,
+                                           false);
     ASSERT_TRUE(quota_mgr_ != NULL);
     quota_mgr_->Spawn();
 
-    quota_mgr_not_spawned_ =
-      PosixQuotaManager::Create(tmp_path_ + "/not_spawned", limit_, threshold_,
-                                false);
+    quota_mgr_not_spawned_ = PosixQuotaManager::Create(
+        tmp_path_ + "/not_spawned", limit_, threshold_, false);
     ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
 
     for (unsigned i = 0; i < 50002; ++i) {
@@ -72,8 +71,8 @@ class T_QuotaManager : public ::testing::Test {
   }
 
   int DecodeFromHash(const shash::Any &hash) {
-    return static_cast<int>(hash.digest[1]) +
-           static_cast<int>(hash.digest[0]) * 256;
+    return static_cast<int>(hash.digest[1])
+           + static_cast<int>(hash.digest[0]) * 256;
   }
 
   virtual void TearDown() {
@@ -222,19 +221,20 @@ TEST_F(T_QuotaManager, CleanupLru) {
   unsigned N = hashes_.size();
   vector<shash::Any> shuffled_hashes = Shuffle(hashes_, &prng_);
   for (unsigned i = 0; i < N; ++i) {
-    quota_mgr_->Insert(shuffled_hashes[i], 1,
-      StringifyIntLeadingZeros(DecodeFromHash(shuffled_hashes[i])));
+    quota_mgr_->Insert(
+        shuffled_hashes[i], 1,
+        StringifyIntLeadingZeros(DecodeFromHash(shuffled_hashes[i])));
   }
   for (unsigned i = 0; i < N; ++i) {
     quota_mgr_->Touch(hashes_[i]);
   }
 
-  EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
+  EXPECT_TRUE(quota_mgr_->Cleanup(N / 2));
   vector<string> remaining = quota_mgr_->List();
-  EXPECT_EQ(N/2, remaining.size());
+  EXPECT_EQ(N / 2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
-    EXPECT_EQ(StringifyIntLeadingZeros(N/2 + i), remaining[i]);
+    EXPECT_EQ(StringifyIntLeadingZeros(N / 2 + i), remaining[i]);
   }
 }
 
@@ -254,29 +254,29 @@ TEST_F(T_QuotaManager, CleanupTouchPinnedOnExit) {
 
 TEST_F(T_QuotaManager, CleanupVolatile) {
   unsigned N = hashes_.size();
-  for (unsigned i = 0; i < N-2; ++i)
+  for (unsigned i = 0; i < N - 2; ++i)
     quota_mgr_->Insert(hashes_[i], 1, StringifyIntLeadingZeros(i));
   // Two last ones are volatile
-  for (unsigned i = N-2; i < N; ++i)
+  for (unsigned i = N - 2; i < N; ++i)
     quota_mgr_->InsertVolatile(hashes_[i], 1, StringifyIntLeadingZeros(i));
 
   // Remove one out of two volatile entries
-  EXPECT_TRUE(quota_mgr_->Cleanup(N-1));
+  EXPECT_TRUE(quota_mgr_->Cleanup(N - 1));
   vector<string> remaining = quota_mgr_->List();
-  EXPECT_EQ(N-1, remaining.size());
+  EXPECT_EQ(N - 1, remaining.size());
   sort(remaining.begin(), remaining.end());
-  for (unsigned i = 0; i < N-2; ++i) {
+  for (unsigned i = 0; i < N - 2; ++i) {
     EXPECT_EQ(StringifyIntLeadingZeros(i), remaining[i]);
   }
-  EXPECT_EQ(StringifyIntLeadingZeros(N-1), remaining[N-2]);
+  EXPECT_EQ(StringifyIntLeadingZeros(N - 1), remaining[N - 2]);
 
   // Remove half of the entries, volatile entries first
-  EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
+  EXPECT_TRUE(quota_mgr_->Cleanup(N / 2));
   remaining = quota_mgr_->List();
-  EXPECT_EQ(N/2, remaining.size());
+  EXPECT_EQ(N / 2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
-    EXPECT_EQ(StringifyIntLeadingZeros(N/2 + i - 2), remaining[i]);
+    EXPECT_EQ(StringifyIntLeadingZeros(N / 2 + i - 2), remaining[i]);
   }
 }
 
@@ -290,8 +290,7 @@ TEST_F(T_QuotaManager, CloseDatabase) {
   EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "/b", false));
 
   delete quota_mgr_;
-  quota_mgr_ =
-    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, false);
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_, false);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
   vector<string> content = quota_mgr_->List();
@@ -309,8 +308,8 @@ TEST_F(T_QuotaManager, Workspace) {
   // Only ., ..
   EXPECT_EQ(2U, dir_entries.size());
   delete quota_mgr_;
-  quota_mgr_ =
-    PosixQuotaManager::Create(cache_workspace, limit_, threshold_, false);
+  quota_mgr_ = PosixQuotaManager::Create(cache_workspace, limit_, threshold_,
+                                         false);
   quota_mgr_->Spawn();
   EXPECT_GE(dir_entries.size(), 2U);
 
@@ -321,8 +320,8 @@ TEST_F(T_QuotaManager, Workspace) {
   EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "/b", false));
 
   delete quota_mgr_;
-  quota_mgr_ =
-    PosixQuotaManager::Create(cache_workspace, limit_, threshold_, false);
+  quota_mgr_ = PosixQuotaManager::Create(cache_workspace, limit_, threshold_,
+                                         false);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
   vector<string> content = quota_mgr_->List();
@@ -358,8 +357,9 @@ TEST_F(T_QuotaManager, Create) {
 
 TEST_F(T_QuotaManager, CreateShared) {
   delete quota_mgr_;
-  EXPECT_EQ(NULL,
-    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5, false));
+  EXPECT_EQ(
+      NULL,
+      PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5, false));
 
   // Forking fails
   EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5, true));
@@ -475,9 +475,8 @@ TEST_F(T_QuotaManager, PinUnpin) {
 
   // Unpin on destruction
   delete quota_mgr_not_spawned_;
-  quota_mgr_not_spawned_ =
-    PosixQuotaManager::Create(tmp_path_ + "/not_spawned", limit_, threshold_,
-                              false);
+  quota_mgr_not_spawned_ = PosixQuotaManager::Create(tmp_path_ + "/not_spawned",
+                                                     limit_, threshold_, false);
   ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
   EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[2], 1, "z", false));
   quota_mgr_not_spawned_->Spawn();
@@ -494,8 +493,8 @@ TEST_F(T_QuotaManager, PinUnpin) {
 
   // Unpin removes a file that does not exist anymore
   uint64_t size_before_unpin = quota_mgr_not_spawned_->GetSize();
-  string remove_me =
-    tmp_path_ + "/not_spawned/" + hashes_[0].MakePathWithoutSuffix();
+  string remove_me = tmp_path_ + "/not_spawned/"
+                     + hashes_[0].MakePathWithoutSuffix();
   quota_mgr_not_spawned_->Unpin(hashes_[0]);
   uint64_t size_after_unpin = quota_mgr_not_spawned_->GetSize();
   EXPECT_LT(size_after_unpin, size_before_unpin);
@@ -507,12 +506,11 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
   delete quota_mgr_;
   quota_mgr_ = NULL;
   EXPECT_TRUE(MkdirDeep(tmp_path_ + "/new", 0700));
-  quota_mgr_ =
-    PosixQuotaManager::Create(tmp_path_ + "/new", limit_, threshold_, true);
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_ + "/new", limit_, threshold_,
+                                         true);
   EXPECT_EQ(NULL, quota_mgr_);
 
-  quota_mgr_ =
-    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
   EXPECT_EQ(0U, quota_mgr_->GetSize());
@@ -524,8 +522,7 @@ TEST_F(T_QuotaManager, RebuildDatabase) {
   CreateFile(tmp_path_ + "/" + hashes_[1].MakePath(), 0600);
   unsigned char buf = 'x';
   EXPECT_TRUE(CopyMem2Path(&buf, 1, tmp_path_ + "/" + hashes_[1].MakePath()));
-  quota_mgr_ =
-    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
   ASSERT_TRUE(quota_mgr_ != NULL);
   quota_mgr_->Spawn();
   // The empty file was removed during rebuild

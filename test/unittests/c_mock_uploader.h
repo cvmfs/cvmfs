@@ -15,11 +15,10 @@
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
   explicit MockStreamHandle(const CallbackTN *commit_callback)
-    : UploadStreamHandle(commit_callback)
-    , data(NULL)
-    , nbytes(0)
-    , marker(0)
-  { }
+      : UploadStreamHandle(commit_callback)
+      , data(NULL)
+      , nbytes(0)
+      , marker(0) { }
 
   virtual ~MockStreamHandle() {
     free(data);
@@ -56,15 +55,14 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
  * inspection (if keep_results is not set to false).
  */
 class IngestionMockUploader
-  : public AbstractMockUploader<IngestionMockUploader> {
+    : public AbstractMockUploader<IngestionMockUploader> {
  public:
   struct Result {
     Result(MockStreamHandle *handle, const shash::Any &computed_hash)
-      : computed_hash(computed_hash)
-    {
+        : computed_hash(computed_hash) {
       EXPECT_EQ(RecomputeContentHash(handle->data, handle->nbytes),
                 computed_hash)
-        << "returned content hash differs from recomputed content hash";
+          << "returned content hash differs from recomputed content hash";
     }
 
     shash::Any RecomputeContentHash(unsigned char *data, const size_t sz) {
@@ -79,10 +77,9 @@ class IngestionMockUploader
 
  public:
   explicit IngestionMockUploader(
-    const upload::SpoolerDefinition &spooler_definition)
-    : AbstractMockUploader<IngestionMockUploader>(spooler_definition)
-    , keep_results(true)
-  { }
+      const upload::SpoolerDefinition &spooler_definition)
+      : AbstractMockUploader<IngestionMockUploader>(spooler_definition)
+      , keep_results(true) { }
 
   virtual std::string name() const { return "IngestionMockUploader"; }
   void ClearResults() { results.clear(); }
@@ -90,16 +87,13 @@ class IngestionMockUploader
   virtual bool Create() { return true; }
 
   upload::UploadStreamHandle *InitStreamedUpload(
-    const CallbackTN *callback = NULL)
-  {
+      const CallbackTN *callback = NULL) {
     return new MockStreamHandle(callback);
   }
 
-  void StreamedUpload(
-    upload::UploadStreamHandle *handle,
-    upload::AbstractUploader::UploadBuffer buffer,
-    const CallbackTN *callback = NULL)
-  {
+  void StreamedUpload(upload::UploadStreamHandle *handle,
+                      upload::AbstractUploader::UploadBuffer buffer,
+                      const CallbackTN *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
     assert(local_handle != NULL);
     local_handle->Append(buffer);
@@ -107,10 +101,8 @@ class IngestionMockUploader
             upload::UploaderResults(upload::UploaderResults::kBufferUpload, 0));
   }
 
-  void FinalizeStreamedUpload(
-    upload::UploadStreamHandle *handle,
-    const shash::Any &content_hash)
-  {
+  void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
+                              const shash::Any &content_hash) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle *>(handle);
     assert(local_handle != NULL);
     if (keep_results)
@@ -121,7 +113,7 @@ class IngestionMockUploader
             upload::UploaderResults(upload::UploaderResults::kChunkCommit, 0));
   }
 
-  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0;}
+  virtual int64_t DoGetObjectSize(const std::string &file_name) { return 0; }
 
   Results results;
   bool keep_results;

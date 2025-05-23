@@ -17,8 +17,7 @@
 
 int publish::CallServerHook(const std::string &func,
                             const std::string &fqrn,
-                            const std::string &path_hooks)
-{
+                            const std::string &path_hooks) {
   if (!FileExists(path_hooks))
     return 0;
 
@@ -46,10 +45,8 @@ int publish::CallServerHook(const std::string &func,
   }
   close(pipe_stdin[0]);
 
-  const std::string callout =
-    func + "() { :; }\n" +
-    ". " + path_hooks + "\n" +
-    func + " " + fqrn + "\n";
+  const std::string callout = func + "() { :; }\n" + ". " + path_hooks + "\n"
+                              + func + " " + fqrn + "\n";
   WritePipe(pipe_stdin[1], callout.data(), callout.length());
   close(pipe_stdin[1]);
 

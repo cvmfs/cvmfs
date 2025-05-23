@@ -10,33 +10,30 @@
 #include "pathspec/pathspec.h"
 
 PathspecElementPattern::PathspecElementPattern(
-  const std::string::const_iterator begin,
-  const std::string::const_iterator &end)
-  : valid_(true)
-{
+    const std::string::const_iterator begin,
+    const std::string::const_iterator &end)
+    : valid_(true) {
   Parse(begin, end);
 }
 
 PathspecElementPattern::PathspecElementPattern(
-  const PathspecElementPattern& other)
-  : valid_(other.valid_)
-{
+    const PathspecElementPattern &other)
+    : valid_(other.valid_) {
   subpatterns_.reserve(other.subpatterns_.size());
-  SubPatterns::const_iterator i    = other.subpatterns_.begin();
+  SubPatterns::const_iterator i = other.subpatterns_.begin();
   SubPatterns::const_iterator iend = other.subpatterns_.end();
   for (; i != iend; ++i) {
     subpatterns_.push_back((*i)->Clone());
   }
 }
 
-PathspecElementPattern& PathspecElementPattern::operator=(
-                                            const PathspecElementPattern& other)
-{
+PathspecElementPattern &PathspecElementPattern::operator=(
+    const PathspecElementPattern &other) {
   if (this != &other) {
     valid_ = other.valid_;
     subpatterns_.clear();
     subpatterns_.reserve(other.subpatterns_.size());
-    SubPatterns::const_iterator i    = other.subpatterns_.begin();
+    SubPatterns::const_iterator i = other.subpatterns_.begin();
     SubPatterns::const_iterator iend = other.subpatterns_.end();
     for (; i != iend; ++i) {
       subpatterns_.push_back((*i)->Clone());
@@ -48,7 +45,7 @@ PathspecElementPattern& PathspecElementPattern::operator=(
 
 
 PathspecElementPattern::~PathspecElementPattern() {
-  SubPatterns::const_iterator i    = subpatterns_.begin();
+  SubPatterns::const_iterator i = subpatterns_.begin();
   SubPatterns::const_iterator iend = subpatterns_.end();
   for (; i != iend; ++i) {
     delete *i;
@@ -57,13 +54,12 @@ PathspecElementPattern::~PathspecElementPattern() {
 }
 
 
-void PathspecElementPattern::Parse(const std::string::const_iterator  &begin,
-                                   const std::string::const_iterator  &end) {
+void PathspecElementPattern::Parse(const std::string::const_iterator &begin,
+                                   const std::string::const_iterator &end) {
   std::string::const_iterator i = begin;
   while (i != end) {
-    SubPattern* next = (Pathspec::IsSpecialChar(*i))
-                       ? ParseSpecialChar(end, &i)
-                       : ParsePlaintext(end, &i);
+    SubPattern *next = (Pathspec::IsSpecialChar(*i)) ? ParseSpecialChar(end, &i)
+                                                     : ParsePlaintext(end, &i);
     if (next->IsEmpty()) {
       valid_ = false;
       delete next;
@@ -74,10 +70,8 @@ void PathspecElementPattern::Parse(const std::string::const_iterator  &begin,
 }
 
 
-PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
-  const std::string::const_iterator &end,
-  std::string::const_iterator *i
-) {
+PathspecElementPattern::SubPattern *PathspecElementPattern::ParsePlaintext(
+    const std::string::const_iterator &end, std::string::const_iterator *i) {
   PlaintextSubPattern *pattern = new PlaintextSubPattern();
   bool next_is_escaped = false;
 
@@ -106,10 +100,8 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
   return pattern;
 }
 
-PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
-  const std::string::const_iterator &end,
-  std::string::const_iterator *i
-) {
+PathspecElementPattern::SubPattern *PathspecElementPattern::ParseSpecialChar(
+    const std::string::const_iterator &end, std::string::const_iterator *i) {
   assert(Pathspec::IsSpecialChar(**i));
   const char chr = **i;
   ++(*i);
@@ -125,9 +117,9 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
 }
 
 std::string PathspecElementPattern::GenerateRegularExpression(
-                                                  const bool is_relaxed) const {
+    const bool is_relaxed) const {
   std::string result;
-        SubPatterns::const_iterator i    = subpatterns_.begin();
+  SubPatterns::const_iterator i = subpatterns_.begin();
   const SubPatterns::const_iterator iend = subpatterns_.end();
   for (; i != iend; ++i) {
     result += (*i)->GenerateRegularExpression(is_relaxed);
@@ -137,7 +129,7 @@ std::string PathspecElementPattern::GenerateRegularExpression(
 
 std::string PathspecElementPattern::GenerateGlobString() const {
   std::string result;
-        SubPatterns::const_iterator i    = subpatterns_.begin();
+  SubPatterns::const_iterator i = subpatterns_.begin();
   const SubPatterns::const_iterator iend = subpatterns_.end();
   for (; i != iend; ++i) {
     result += (*i)->GenerateGlobString();
@@ -145,17 +137,16 @@ std::string PathspecElementPattern::GenerateGlobString() const {
   return result;
 }
 
-bool PathspecElementPattern::operator== (
-  const PathspecElementPattern &other) const
-{
-  if (subpatterns_.size() != other.subpatterns_.size() ||
-      IsValid()           != other.IsValid()) {
+bool PathspecElementPattern::operator==(
+    const PathspecElementPattern &other) const {
+  if (subpatterns_.size() != other.subpatterns_.size()
+      || IsValid() != other.IsValid()) {
     return false;
   }
 
-        SubPatterns::const_iterator i    = subpatterns_.begin();
+  SubPatterns::const_iterator i = subpatterns_.begin();
   const SubPatterns::const_iterator iend = subpatterns_.end();
-        SubPatterns::const_iterator j    = other.subpatterns_.begin();
+  SubPatterns::const_iterator j = other.subpatterns_.begin();
   const SubPatterns::const_iterator jend = other.subpatterns_.end();
 
   for (; i != iend && j != jend; ++i, ++j) {
@@ -176,11 +167,10 @@ void PathspecElementPattern::PlaintextSubPattern::AddChar(const char chr) {
 }
 
 std::string
-  PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression(
-  const bool is_relaxed) const
-{
+PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression(
+    const bool is_relaxed) const {
   // Note: strict and relaxed regex are the same!
-        std::string::const_iterator i    = chars_.begin();
+  std::string::const_iterator i = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
   std::string regex;
   for (; i != iend; ++i) {
@@ -193,9 +183,8 @@ std::string
 }
 
 
-std::string
-  PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const
-{
+std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString()
+    const {
   std::string::const_iterator i = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
   std::string glob_string;
@@ -209,77 +198,58 @@ std::string
 }
 
 bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(
-  const char chr) const
-{
-  return (chr == '.'  ||
-          chr == '\\' ||
-          chr == '*'  ||
-          chr == '?'  ||
-          chr == '['  ||
-          chr == ']'  ||
-          chr == '('  ||
-          chr == ')'  ||
-          chr == '{'  ||
-          chr == '}'  ||
-          chr == '^'  ||
-          chr == '$'  ||
-          chr == '+');
+    const char chr) const {
+  return (chr == '.' || chr == '\\' || chr == '*' || chr == '?' || chr == '['
+          || chr == ']' || chr == '(' || chr == ')' || chr == '{' || chr == '}'
+          || chr == '^' || chr == '$' || chr == '+');
 }
 
 bool PathspecElementPattern::PlaintextSubPattern::Compare(
-  const SubPattern *other) const
-{
+    const SubPattern *other) const {
   if (!other->IsPlaintext()) {
     return false;
   }
 
-  const PlaintextSubPattern *pt_other =
-                                dynamic_cast<const PlaintextSubPattern*>(other);
+  const PlaintextSubPattern
+      *pt_other = dynamic_cast<const PlaintextSubPattern *>(other);
   assert(pt_other != NULL);
   return chars_ == pt_other->chars_;
 }
 
 
 std::string
-  PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression(
-  const bool is_relaxed) const
-{
-  return (is_relaxed)
-         ? std::string(".*")
-         : std::string("[^") + Pathspec::kSeparator + "]*";
+PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression(
+    const bool is_relaxed) const {
+  return (is_relaxed) ? std::string(".*")
+                      : std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
 
-std::string
-  PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const
-{
+std::string PathspecElementPattern::WildcardSubPattern::GenerateGlobString()
+    const {
   return "*";
 }
 
 
 bool PathspecElementPattern::WildcardSubPattern::Compare(
-  const SubPattern *other) const
-{
+    const SubPattern *other) const {
   return other->IsWildcard();
 }
 
 
 std::string
-  PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression(
-  const bool is_relaxed) const
-{
+PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression(
+    const bool is_relaxed) const {
   // Note: strict and relaxed regex are the same!
   return std::string("[^") + Pathspec::kSeparator + "]";
 }
 
-std::string
-  PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString() const
-{
+std::string PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString()
+    const {
   return "?";
 }
 
 bool PathspecElementPattern::PlaceholderSubPattern::Compare(
-  const SubPattern *other) const
-{
+    const SubPattern *other) const {
   return other->IsPlaceholder();
 }

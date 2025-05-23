@@ -29,15 +29,14 @@ class CommandTest : public Command {
 
 class T_Command : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
   CommandTest cmd_;
 };
 
 TEST_F(T_Command, ParseOptions) {
-  const char* cmdline[] = {"progname", "test", "-s", "--mandatory", "foo", "x"};
+  const char *cmdline[] = {"progname", "test", "-s", "--mandatory", "foo", "x"};
   Command::Options options = cmd_.ParseOptions(6, const_cast<char **>(cmdline));
   EXPECT_EQ(2U, options.GetSize());
   EXPECT_TRUE(options.Has("switch"));

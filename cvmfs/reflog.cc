@@ -14,7 +14,7 @@
 
 namespace manifest {
 
-Reflog* Reflog::Open(const std::string &database_path) {
+Reflog *Reflog::Open(const std::string &database_path) {
   Reflog *reflog = new Reflog();
   if (NULL == reflog || !reflog->OpenDatabase(database_path)) {
     delete reflog;
@@ -29,7 +29,7 @@ Reflog* Reflog::Open(const std::string &database_path) {
 }
 
 
-Reflog* Reflog::Create(const std::string &database_path,
+Reflog *Reflog::Create(const std::string &database_path,
                        const std::string &repo_name) {
   Reflog *reflog = new Reflog();
   if (NULL == reflog || !reflog->CreateDatabase(database_path, repo_name)) {
@@ -37,14 +37,15 @@ Reflog* Reflog::Create(const std::string &database_path,
     return NULL;
   }
 
-  LogCvmfs(kLogReflog, kLogDebug, "created empty reflog database '%s' for "
-                                  "repository '%s'",
+  LogCvmfs(kLogReflog, kLogDebug,
+           "created empty reflog database '%s' for "
+           "repository '%s'",
            database_path.c_str(), repo_name.c_str());
   return reflog;
 }
 
 
-bool Reflog::ReadChecksum(const std::string &path, shash::Any* checksum) {
+bool Reflog::ReadChecksum(const std::string &path, shash::Any *checksum) {
   int fd = open(path.c_str(), O_RDONLY);
   if (fd < 0) {
     return false;
@@ -82,8 +83,7 @@ bool Reflog::CreateDatabase(const std::string &database_path,
   assert(!database_.IsValid());
   database_ = ReflogDatabase::Create(database_path);
   if (!database_.IsValid() || !database_->InsertInitialValues(repo_name)) {
-    LogCvmfs(kLogReflog, kLogDebug,
-             "failed to initialize empty database '%s'",
+    LogCvmfs(kLogReflog, kLogDebug, "failed to initialize empty database '%s'",
              database_path.c_str());
     return false;
   }
@@ -109,18 +109,18 @@ bool Reflog::OpenDatabase(const std::string &database_path) {
 
 void Reflog::PrepareQueries() {
   assert(database_.IsValid());
-  insert_reference_   = new SqlInsertReference(database_.weak_ref());
-  count_references_   = new SqlCountReferences(database_.weak_ref());
-  list_references_    = new SqlListReferences(database_.weak_ref());
-  remove_reference_   = new SqlRemoveReference(database_.weak_ref());
+  insert_reference_ = new SqlInsertReference(database_.weak_ref());
+  count_references_ = new SqlCountReferences(database_.weak_ref());
+  list_references_ = new SqlListReferences(database_.weak_ref());
+  remove_reference_ = new SqlRemoveReference(database_.weak_ref());
   contains_reference_ = new SqlContainsReference(database_.weak_ref());
-  get_timestamp_      = new SqlGetTimestamp(database_.weak_ref());
+  get_timestamp_ = new SqlGetTimestamp(database_.weak_ref());
 }
 
 
 bool Reflog::AddCertificate(const shash::Any &certificate) {
-  assert(certificate.HasSuffix() &&
-         certificate.suffix == shash::kSuffixCertificate);
+  assert(certificate.HasSuffix()
+         && certificate.suffix == shash::kSuffixCertificate);
   return AddReference(certificate, SqlReflog::kRefCertificate);
 }
 
@@ -154,19 +154,15 @@ uint64_t Reflog::CountEntries() {
 }
 
 
-bool Reflog::List(
-  SqlReflog::ReferenceType type,
-  std::vector<shash::Any> *hashes) const
-{
+bool Reflog::List(SqlReflog::ReferenceType type,
+                  std::vector<shash::Any> *hashes) const {
   return ListOlderThan(type, static_cast<uint64_t>(-1), hashes);
 }
 
 
-bool Reflog::ListOlderThan(
-  SqlReflog::ReferenceType type,
-  uint64_t timestamp,
-  std::vector<shash::Any> *hashes) const
-{
+bool Reflog::ListOlderThan(SqlReflog::ReferenceType type,
+                           uint64_t timestamp,
+                           std::vector<shash::Any> *hashes) const {
   assert(database_.IsValid());
   assert(NULL != hashes);
 
@@ -205,16 +201,14 @@ bool Reflog::Remove(const shash::Any &hash) {
       return false;
   }
 
-  return
-    remove_reference_->BindReference(hash, type) &&
-    remove_reference_->Execute()                 &&
-    remove_reference_->Reset();
+  return remove_reference_->BindReference(hash, type)
+         && remove_reference_->Execute() && remove_reference_->Reset();
 }
 
 
 bool Reflog::ContainsCertificate(const shash::Any &certificate) const {
-  assert(certificate.HasSuffix() &&
-         certificate.suffix == shash::kSuffixCertificate);
+  assert(certificate.HasSuffix()
+         && certificate.suffix == shash::kSuffixCertificate);
   return ContainsReference(certificate, SqlReflog::kRefCertificate);
 }
 
@@ -225,10 +219,8 @@ bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
 }
 
 
-bool Reflog::GetCatalogTimestamp(
-  const shash::Any &catalog,
-  uint64_t *timestamp) const
-{
+bool Reflog::GetCatalogTimestamp(const shash::Any &catalog,
+                                 uint64_t *timestamp) const {
   assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
   bool result = GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog,
                                       timestamp);
@@ -248,20 +240,17 @@ bool Reflog::ContainsMetainfo(const shash::Any &metainfo) const {
 }
 
 
-bool Reflog::AddReference(const shash::Any               &hash,
-                          const SqlReflog::ReferenceType  type) {
-  return
-    insert_reference_->BindReference(hash, type) &&
-    insert_reference_->Execute()                 &&
-    insert_reference_->Reset();
+bool Reflog::AddReference(const shash::Any &hash,
+                          const SqlReflog::ReferenceType type) {
+  return insert_reference_->BindReference(hash, type)
+         && insert_reference_->Execute() && insert_reference_->Reset();
 }
 
 
-bool Reflog::ContainsReference(const shash::Any               &hash,
-                               const SqlReflog::ReferenceType  type) const {
-  const bool fetching =
-    contains_reference_->BindReference(hash, type) &&
-    contains_reference_->FetchRow();
+bool Reflog::ContainsReference(const shash::Any &hash,
+                               const SqlReflog::ReferenceType type) const {
+  const bool fetching = contains_reference_->BindReference(hash, type)
+                        && contains_reference_->FetchRow();
   assert(fetching);
 
   const bool answer = contains_reference_->RetrieveAnswer();
@@ -272,14 +261,11 @@ bool Reflog::ContainsReference(const shash::Any               &hash,
 }
 
 
-bool Reflog::GetReferenceTimestamp(
-  const shash::Any &hash,
-  const SqlReflog::ReferenceType type,
-  uint64_t *timestamp) const
-{
-  bool retval =
-    get_timestamp_->BindReference(hash, type) &&
-    get_timestamp_->FetchRow();
+bool Reflog::GetReferenceTimestamp(const shash::Any &hash,
+                                   const SqlReflog::ReferenceType type,
+                                   uint64_t *timestamp) const {
+  bool retval = get_timestamp_->BindReference(hash, type)
+                && get_timestamp_->FetchRow();
 
   if (retval) {
     *timestamp = get_timestamp_->RetrieveTimestamp();
@@ -319,10 +305,8 @@ void Reflog::DropDatabaseFileOwnership() {
 /**
  * Use only once the database was closed.
  */
-void Reflog::HashDatabase(
-  const std::string &database_path,
-  shash::Any *hash_reflog)
-{
+void Reflog::HashDatabase(const std::string &database_path,
+                          shash::Any *hash_reflog) {
   bool retval = HashFile(database_path, hash_reflog);
   assert(retval);
 }

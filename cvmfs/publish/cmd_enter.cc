@@ -13,10 +13,8 @@
 #include <sched.h>
 #include <signal.h>
 #include <sys/mount.h>
-#include <unistd.h>
-
-
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -55,16 +53,19 @@ static AnchorPid EnterRootContainer() {
   uid_t egid = getegid();
   NamespaceFailures failure = CreateUserNamespace(0, 0);
   if (failure != kFailNsOk) {
-    throw publish::EPublish("cannot create root user namespace (" +
-      StringifyInt(failure) + " / " + StringifyInt(errno) + ") [euid=" +
-      StringifyInt(euid) + ", egid=" + StringifyInt(egid) + "]");
+    throw publish::EPublish(
+        "cannot create root user namespace (" + StringifyInt(failure) + " / "
+        + StringifyInt(errno) + ") [euid=" + StringifyInt(euid)
+        + ", egid=" + StringifyInt(egid) + "]");
   }
 
   bool rvb = CreateMountNamespace();
-  if (!rvb) throw publish::EPublish("cannot create mount namespace");
+  if (!rvb)
+    throw publish::EPublish("cannot create mount namespace");
   int fd;
   rvb = CreatePidNamespace(&fd);
-  if (!rvb) throw publish::EPublish("cannot create pid namespace");
+  if (!rvb)
+    throw publish::EPublish("cannot create pid namespace");
   AnchorPid anchor_pid;
   int rvi = SafeRead(fd, &anchor_pid.parent_pid, sizeof(pid_t));
   if (rvi != sizeof(pid_t))
@@ -100,14 +101,13 @@ static void RemoveSingle(const std::string &path) {
   if (rv == 0 || errno == ENOENT)
     return;
 
-  throw publish::EPublish(
-    "cannot remove " + path + " (" + StringifyInt(errno) + ")");
+  throw publish::EPublish("cannot remove " + path + " (" + StringifyInt(errno)
+                          + ")");
 }
 
 
-static void RemoveUnderlay(
-  const std::string &path, const std::vector<std::string> &new_paths)
-{
+static void RemoveUnderlay(const std::string &path,
+                           const std::vector<std::string> &new_paths) {
   std::vector<std::string> all_mounts = platform_mountlist();
   std::vector<std::string> umount_targets;
   for (unsigned i = 0; i < all_mounts.size(); ++i) {
@@ -122,8 +122,8 @@ static void RemoveUnderlay(
     bool rvb = platform_umount_lazy(iter->c_str());
     // Some sub mounts, e.g. /sys/kernel/tracing, cannot be unmounted
     if (!rvb && errno != EINVAL && errno != EACCES) {
-      throw publish::EPublish(
-        "cannot unmount " + *iter + " (" + StringifyInt(errno) + ")");
+      throw publish::EPublish("cannot unmount " + *iter + " ("
+                              + StringifyInt(errno) + ")");
     }
   }
 
@@ -153,12 +153,10 @@ static void RemoveUnderlay(
 
 namespace publish {
 
-void CmdEnter::CreateUnderlay(
-  const std::string &source_dir,
-  const std::string &dest_dir,
-  const std::vector<std::string> &empty_dirs,
-  std::vector<std::string> *new_paths)
-{
+void CmdEnter::CreateUnderlay(const std::string &source_dir,
+                              const std::string &dest_dir,
+                              const std::vector<std::string> &empty_dirs,
+                              std::vector<std::string> *new_paths) {
   LogCvmfs(kLogCvmfs, kLogDebug, "underlay: entry %s --> %s",
            source_dir.c_str(), dest_dir.c_str());
 
@@ -206,8 +204,8 @@ void CmdEnter::CreateUnderlay(
   //   3. File become empty regular files and are bind-mounted
   for (unsigned i = 0; i < names.size(); ++i) {
     if (std::find(empty_toplevel_dirs.begin(), empty_toplevel_dirs.end(),
-        std::string("/") + names[i]) != empty_toplevel_dirs.end())
-    {
+                  std::string("/") + names[i])
+        != empty_toplevel_dirs.end()) {
       continue;
     }
 
@@ -227,12 +225,12 @@ void CmdEnter::CreateUnderlay(
       } else {
         CreateFile(dest, 0600, false /* ignore_failure */);
       }
-      LogCvmfs(kLogCvmfs, kLogDebug, "underlay: %s --> %s",
-               source.c_str(), dest.c_str());
+      LogCvmfs(kLogCvmfs, kLogDebug, "underlay: %s --> %s", source.c_str(),
+               dest.c_str());
       bool rv = BindMount(source, dest);
       if (!rv) {
-        throw EPublish("cannot bind mount " + source + " --> " + dest +
-                       " (" + StringifyInt(errno) + ")");
+        throw EPublish("cannot bind mount " + source + " --> " + dest + " ("
+                       + StringifyInt(errno) + ")");
       }
     }
   }
@@ -253,8 +251,7 @@ void CmdEnter::CreateUnderlay(
 }
 
 void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
-  BashOptionsManager options_manager(
-    new DefaultOptionsTemplateManager(fqrn_));
+  BashOptionsManager options_manager(new DefaultOptionsTemplateManager(fqrn_));
   options_manager.ParseDefault(fqrn_);
   if (!extra_config.empty())
     options_manager.ParsePath(extra_config, false /* external */);
@@ -281,8 +278,8 @@ void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
                             settings_spool_area_.client_config(),
                             kPrivateFileMode);
   if (!rv) {
-    throw EPublish("cannot write client config to " +
-                   settings_spool_area_.client_config());
+    throw EPublish("cannot write client config to "
+                   + settings_spool_area_.client_config());
   }
 }
 
@@ -316,8 +313,7 @@ void CmdEnter::MountCvmfs() {
   pid_t pid_child;
   bool rvb = ManagedExec(cmdline, preserved_fds, map_fds,
                          false /* drop_credentials */, false /* clear_env */,
-                         false /* double_fork */,
-                         &pid_child);
+                         false /* double_fork */, &pid_child);
   if (!rvb) {
     close(fd_stdout);
     close(fd_stderr);
@@ -327,9 +323,9 @@ void CmdEnter::MountCvmfs() {
   close(fd_stdout);
   close(fd_stderr);
   if (exit_code != 0) {
-    throw EPublish("cannot mount cvmfs read-only branch (" +
-          StringifyInt(exit_code) + ")\n" +
-          "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
+    throw EPublish("cannot mount cvmfs read-only branch ("
+                   + StringifyInt(exit_code) + ")\n" + "  command: `"
+                   + JoinStrings(cmdline, " ").c_str() + "`");
   }
 
   rvb = BindMount(settings_spool_area_.readonly_mnt(),
@@ -353,9 +349,9 @@ void CmdEnter::MountOverlayfs() {
   std::vector<std::string> cmdline;
   cmdline.push_back(overlayfs_binary_);
   cmdline.push_back("-o");
-  cmdline.push_back(string("lowerdir=") + settings_spool_area_.readonly_mnt() +
-                           ",upperdir=" + settings_spool_area_.scratch_dir() +
-                           ",workdir=" + settings_spool_area_.ovl_work_dir());
+  cmdline.push_back(string("lowerdir=") + settings_spool_area_.readonly_mnt()
+                    + ",upperdir=" + settings_spool_area_.scratch_dir()
+                    + ",workdir=" + settings_spool_area_.ovl_work_dir());
   cmdline.push_back(rootfs_dir_ + settings_spool_area_.union_mnt());
   std::set<int> preserved_fds;
   preserved_fds.insert(0);
@@ -367,8 +363,7 @@ void CmdEnter::MountOverlayfs() {
   pid_t pid_child;
   bool rvb = ManagedExec(cmdline, preserved_fds, map_fds,
                          true /* drop_credentials */, false /* clear_env */,
-                         false /* double_fork */,
-                         &pid_child);
+                         false /* double_fork */, &pid_child);
   if (!rvb) {
     close(fd_stdout);
     close(fd_stderr);
@@ -378,9 +373,9 @@ void CmdEnter::MountOverlayfs() {
   close(fd_stdout);
   close(fd_stderr);
   if (exit_code != 0) {
-    throw EPublish("cannot mount overlay file system (" +
-          StringifyInt(exit_code) + ")\n" +
-          "  command: `" + JoinStrings(cmdline, " ").c_str() + "`");
+    throw EPublish("cannot mount overlay file system ("
+                   + StringifyInt(exit_code) + ")\n" + "  command: `"
+                   + JoinStrings(cmdline, " ").c_str() + "`");
   }
 }
 
@@ -390,22 +385,21 @@ std::string CmdEnter::GetCvmfsXattr(const std::string &name) {
   bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(),
                                std::string("user.") + name, &xattr);
   if (!rvb) {
-    throw EPublish("cannot get extrended attribute " + name + " from " +
-                   settings_spool_area_.readonly_mnt());
+    throw EPublish("cannot get extrended attribute " + name + " from "
+                   + settings_spool_area_.readonly_mnt());
   }
   return xattr;
 }
 
 
-void CmdEnter::CleanupSession(
-  bool keep_logs, const std::vector<std::string> &new_paths)
-{
+void CmdEnter::CleanupSession(bool keep_logs,
+                              const std::vector<std::string> &new_paths) {
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
            "Cleaning out session directory... ");
 
   std::string pid_xattr;
-  bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(),
-                               "user.pid", &pid_xattr);
+  bool rvb = platform_getxattr(settings_spool_area_.readonly_mnt(), "user.pid",
+                               &pid_xattr);
   if (!rvb)
     throw EPublish("cannot find CernVM-FS process");
   pid_t pid_cvmfs = String2Uint64(GetCvmfsXattr("pid"));
@@ -415,15 +409,15 @@ void CmdEnter::CleanupSession(
   if (!rvb)
     throw EPublish("cannot unmount overlayfs on " + union_mnt);
   rvb = platform_umount_lazy(
-    (rootfs_dir_ + settings_spool_area_.readonly_mnt()).c_str());
+      (rootfs_dir_ + settings_spool_area_.readonly_mnt()).c_str());
   if (!rvb) {
-    throw EPublish("cannot unmount mapped CernVM-FS on " +
-                   rootfs_dir_ + settings_spool_area_.readonly_mnt());
+    throw EPublish("cannot unmount mapped CernVM-FS on " + rootfs_dir_
+                   + settings_spool_area_.readonly_mnt());
   }
   rvb = platform_umount_lazy(settings_spool_area_.readonly_mnt().c_str());
   if (!rvb) {
-    throw EPublish("cannot unmount CernVM-FS on " +
-                   settings_spool_area_.readonly_mnt());
+    throw EPublish("cannot unmount CernVM-FS on "
+                   + settings_spool_area_.readonly_mnt());
   }
 
   BackoffThrottle backoff;
@@ -548,8 +542,8 @@ int CmdEnter::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "done");
 
   env_conf_ = session_dir_ + "/env.conf";
-  rvb = SafeWriteToFile(std::string("CVMFS_FQRN=") + fqrn_ + "\n",
-                        env_conf_, kPrivateFileMode);
+  rvb = SafeWriteToFile(std::string("CVMFS_FQRN=") + fqrn_ + "\n", env_conf_,
+                        kPrivateFileMode);
   if (!rvb)
     throw EPublish("cannot create session environment file");
 
@@ -567,15 +561,16 @@ int CmdEnter::Main(const Options &options) {
     if (!options.Has("root")) {
       NamespaceFailures failure = CreateUserNamespace(uid, gid);
       if (failure != kFailNsOk) {
-        throw publish::EPublish("cannot create user namespace for " +
-          StringifyInt(uid) + ":" + StringifyInt(gid) + " (" +
-          StringifyInt(failure) + " / " + StringifyInt(errno) + ") [euid=" +
-          StringifyInt(geteuid()) + ", egid=" + StringifyInt(getegid()) + "]");
+        throw publish::EPublish(
+            "cannot create user namespace for " + StringifyInt(uid) + ":"
+            + StringifyInt(gid) + " (" + StringifyInt(failure) + " / "
+            + StringifyInt(errno) + ") [euid=" + StringifyInt(geteuid())
+            + ", egid=" + StringifyInt(getegid()) + "]");
       }
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             "Switching to %s... ", rootfs_dir_.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Switching to %s... ",
+             rootfs_dir_.c_str());
     int rvi = chroot(rootfs_dir_.c_str());
     if (rvi != 0)
       throw EPublish("cannot chroot to " + rootfs_dir_);
@@ -607,8 +602,8 @@ int CmdEnter::Main(const Options &options) {
         builder.SetConfigPath(session_dir_);
       }
 
-      SettingsPublisher *settings_publisher =
-          builder.CreateSettingsPublisher(fqrn_, false);
+      SettingsPublisher *settings_publisher = builder.CreateSettingsPublisher(
+          fqrn_, false);
       publisher = new Publisher(*settings_publisher);
       publisher->Transaction();
     }
@@ -620,8 +615,10 @@ int CmdEnter::Main(const Options &options) {
                cwd.c_str());
     }
 
-    LogCvmfs(kLogCvmfs, kLogStdout, "\n"
-      "You can attach to this shell from another another terminal with\n");
+    LogCvmfs(
+        kLogCvmfs, kLogStdout,
+        "\n"
+        "You can attach to this shell from another another terminal with\n");
     if (options.Has("root")) {
       LogCvmfs(kLogCvmfs, kLogStdout,
                "    nsenter --preserve-credentials -U -p -m -t %u\n"
@@ -649,8 +646,7 @@ int CmdEnter::Main(const Options &options) {
     pid_t pid_child = 0;
     rvb = ManagedExec(cmdline, preserved_fds, std::map<int, int>(),
                       false /* drop_credentials */, false /* clear_env */,
-                      false /* double_fork */,
-                      &pid_child);
+                      false /* double_fork */, &pid_child);
     std::string s = StringifyInt(pid_child);
     SafeWriteToFile(s, session_dir_ + "/session_pid", 0600);
 
@@ -659,8 +655,8 @@ int CmdEnter::Main(const Options &options) {
     exit_code = WaitForChild(pid_child, sigs);
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Closing CernVM-FS shell...");
-    if (options.Has("transaction") &&
-        !FileExists(session_dir_ + "/shellaction.marker")) {
+    if (options.Has("transaction")
+        && !FileExists(session_dir_ + "/shellaction.marker")) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Closing current transaction...");
       publisher->session()->SetKeepAlive(false);
     }

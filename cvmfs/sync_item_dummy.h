@@ -5,12 +5,11 @@
 #ifndef CVMFS_SYNC_ITEM_DUMMY_H_
 #define CVMFS_SYNC_ITEM_DUMMY_H_
 
-#include "sync_item.h"
-
 #include <ctime>
 #include <string>
 
 #include "ingestion/ingestion_source.h"
+#include "sync_item.h"
 #include "sync_union_tarball.h"
 
 namespace publish {
@@ -22,7 +21,7 @@ class SyncItemDummyCatalog : public SyncItem {
   SyncItemDummyCatalog(const std::string &relative_parent_path,
                        const SyncUnion *union_engine)
       : SyncItem(relative_parent_path, ".cvmfscatalog", union_engine,
-                 kItemFile) {}
+                 kItemFile) { }
 
  public:
   bool IsType(const SyncItemType expected_type) const {
@@ -30,14 +29,12 @@ class SyncItemDummyCatalog : public SyncItem {
   }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent(
-    bool /* enable_mtime_ns */) const
-  {
+      bool /* enable_mtime_ns */) const {
     catalog::DirectoryEntryBase dirent;
     std::string name(".cvmfscatalog");
     dirent.inode_ = catalog::DirectoryEntry::kInvalidInode;
     dirent.linkcount_ = 1;
-    dirent.mode_ =
-        S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
+    dirent.mode_ = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH;
     dirent.uid_ = getuid();
     dirent.gid_ = getgid();
     dirent.size_ = 0;
@@ -59,7 +56,7 @@ class SyncItemDummyCatalog : public SyncItem {
 
   SyncItemType GetScratchFiletype() const { return kItemFile; }
 
-  void MakePlaceholderDirectory() const {}
+  void MakePlaceholderDirectory() const { }
 };
 
 /*
@@ -73,7 +70,7 @@ class SyncItemDummyDir : public SyncItemNative {
 
  public:
   virtual catalog::DirectoryEntryBase CreateBasicCatalogDirent(
-    bool enable_mtime_ns) const;
+      bool enable_mtime_ns) const;
   SyncItemType GetScratchFiletype() const;
   virtual void MakePlaceholderDirectory() const { rdonly_type_ = kItemDir; }
 
@@ -106,8 +103,8 @@ class SyncItemDummyDir : public SyncItemNative {
   }
 
  private:
-  static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR |
-                                   S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+  static const mode_t kPermision = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR
+                                   | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 };
 
 }  // namespace publish

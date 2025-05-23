@@ -33,7 +33,7 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   // Parse the \0 separated list of extended attribute keys
   char *list;
   ssize_t sz_list = platform_llistxattr(path.c_str(), NULL, 0);
-  if ((sz_list < 0) || (sz_list > 64*1024)) {
+  if ((sz_list < 0) || (sz_list > 64 * 1024)) {
     return NULL;
   } else if (sz_list == 0) {
     // No extended attributes
@@ -56,8 +56,8 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    ssize_t sz_value =
-      platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
+    ssize_t sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), value,
+                                          256);
     if (sz_value < 0)
       continue;
     result->Set(keys[i], string(value, sz_value));
@@ -66,10 +66,8 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
 }
 
 
-XattrList *XattrList::Deserialize(
-  const unsigned char *inbuf,
-  const unsigned size)
-{
+XattrList *XattrList::Deserialize(const unsigned char *inbuf,
+                                  const unsigned size) {
   if (inbuf == NULL)
     return new XattrList();
 
@@ -121,8 +119,9 @@ bool XattrList::Get(const string &key, string *value) const {
 vector<string> XattrList::ListKeys() const {
   vector<string> result;
   for (map<string, string>::const_iterator i = xattrs_.begin(),
-       iEnd = xattrs_.end(); i != iEnd; ++i)
-  {
+                                           iEnd = xattrs_.end();
+       i != iEnd;
+       ++i) {
     result.push_back(i->first);
   }
   return result;
@@ -150,8 +149,9 @@ string XattrList::ListKeysPosix(const string &merge_with) const {
     }
   }
   for (map<string, string>::const_iterator i = xattrs_.begin(),
-       iEnd = xattrs_.end(); i != iEnd; ++i)
-  {
+                                           iEnd = xattrs_.end();
+       i != iEnd;
+       ++i) {
     result += i->first;
     result.push_back('\0');
   }
@@ -195,11 +195,9 @@ bool XattrList::Remove(const string &key) {
  * If the list of attributes is empty, Serialize returns NULL.  Deserialize
  * can deal with NULL pointers.
  */
-void XattrList::Serialize(
-  unsigned char **outbuf,
-  unsigned *size,
-  const std::vector<std::string> *blacklist) const
-{
+void XattrList::Serialize(unsigned char **outbuf,
+                          unsigned *size,
+                          const std::vector<std::string> *blacklist) const {
   if (xattrs_.empty()) {
     *size = 0;
     *outbuf = NULL;
@@ -211,23 +209,24 @@ void XattrList::Serialize(
 
   // Determine size of the buffer (allocate space for max num of attributes)
   XattrEntry *entries = reinterpret_cast<XattrEntry *>(
-    smalloc(header.num_xattrs * sizeof(XattrEntry)));
+      smalloc(header.num_xattrs * sizeof(XattrEntry)));
   unsigned ientries = 0;
   for (map<string, string>::const_iterator it_att = xattrs_.begin(),
-       it_att_end = xattrs_.end(); it_att != it_att_end; ++it_att)
-  {
+                                           it_att_end = xattrs_.end();
+       it_att != it_att_end;
+       ++it_att) {
     // Only serialize non-blacklist items
     if (blacklist != NULL) {
       bool skip = false;
       for (unsigned i_bl = 0; i_bl < blacklist->size(); ++i_bl) {
         if (HasPrefix(it_att->first, (*blacklist)[i_bl],
-            true /* ignore_case */))
-        {
+                      true /* ignore_case */)) {
           skip = true;
           break;
         }
       }
-      if (skip) continue;
+      if (skip)
+        continue;
     }
     /*entries[ientries] =*/
     new (entries + ientries) XattrEntry(it_att->first, it_att->second);
@@ -269,8 +268,8 @@ string XattrList::XattrEntry::GetKey() const {
 
 
 uint16_t XattrList::XattrEntry::GetSize() const {
-  return sizeof(len_key) + sizeof(len_value) +
-         uint16_t(len_key) + uint16_t(len_value);
+  return sizeof(len_key) + sizeof(len_value) + uint16_t(len_key)
+         + uint16_t(len_value);
 }
 
 
@@ -282,9 +281,7 @@ string XattrList::XattrEntry::GetValue() const {
 
 
 XattrList::XattrEntry::XattrEntry(const string &key, const string &value)
-  : len_key(key.size())
-  , len_value(value.size())
-{
+    : len_key(key.size()), len_value(value.size()) {
   memcpy(data, key.data(), len_key);
-  memcpy(data+len_key, value.data(), len_value);
+  memcpy(data + len_key, value.data(), len_value);
 }

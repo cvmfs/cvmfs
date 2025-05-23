@@ -38,13 +38,9 @@ class Fence : public SingleCopy {
     atomic_inc64(&counter_);
   }
 
-  void Leave() {
-    atomic_dec64(&counter_);
-  }
+  void Leave() { atomic_dec64(&counter_); }
 
-  void Close() {
-    atomic_cas32(&blocking_, 0, 1);
-  }
+  void Close() { atomic_cas32(&blocking_, 0, 1); }
 
   /**
    * Close and let live critical regions exit
@@ -56,9 +52,7 @@ class Fence : public SingleCopy {
     }
   }
 
-  void Open() {
-    atomic_cas32(&blocking_, 1, 0);
-  }
+  void Open() { atomic_cas32(&blocking_, 1, 0); }
 
  private:
   static const unsigned kBusyWaitBackoffMs = 100;
@@ -81,12 +75,9 @@ class Fence : public SingleCopy {
  */
 class FenceGuard {
  public:
-  explicit FenceGuard(Fence *fence) : fence_(fence) {
-    fence_->Enter();
-  }
-  ~FenceGuard() {
-    fence_->Leave();
-  }
+  explicit FenceGuard(Fence *fence) : fence_(fence) { fence_->Enter(); }
+  ~FenceGuard() { fence_->Leave(); }
+
  private:
   Fence *fence_;
 };

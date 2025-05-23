@@ -19,8 +19,7 @@ namespace publish {
 
 class T_Diff : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
 };
@@ -31,33 +30,26 @@ class DiffTester : public DiffListener {
   int n_rem_;
   int n_mod_;
 
-  DiffTester() : n_add_(0), n_rem_(0), n_mod_(0) {}
-  virtual ~DiffTester() {}
+  DiffTester() : n_add_(0), n_rem_(0), n_mod_(0) { }
+  virtual ~DiffTester() { }
   virtual void OnInit(const history::History::Tag &from_tag,
-                      const history::History::Tag &to_tag)
-  {
-  }
+                      const history::History::Tag &to_tag) { }
 
-  virtual void OnStats(const catalog::DeltaCounters &delta)
-  {
-  }
+  virtual void OnStats(const catalog::DeltaCounters &delta) { }
 
   virtual void OnAdd(const std::string &path,
-                     const catalog::DirectoryEntry &entry)
-  {
+                     const catalog::DirectoryEntry &entry) {
     n_add_++;
   }
 
   virtual void OnRemove(const std::string &path,
-                        const catalog::DirectoryEntry &entry)
-  {
+                        const catalog::DirectoryEntry &entry) {
     n_rem_++;
   }
 
   virtual void OnModify(const std::string &path,
                         const catalog::DirectoryEntry &entry_from,
-                        const catalog::DirectoryEntry &entry_to)
-  {
+                        const catalog::DirectoryEntry &entry_to) {
     n_mod_++;
   }
 };

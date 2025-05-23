@@ -2,12 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <cache_posix.h>
 #include <cache_stream.h>
 #include <compression/compression.h>
 #include <crypto/hash.h>
+#include <gtest/gtest.h>
 #include <network/download.h>
 #include <statistics.h>
 #include <util/pointer.h>
@@ -19,8 +18,8 @@ class T_StreamingCacheManager : public ::testing::Test {
     void *zipped_buf;
     uint64_t zipped_size;
     zlib::CompressMem2Mem(content.data(),
-                          static_cast<int64_t>(content.length()),
-                          &zipped_buf, &zipped_size);
+                          static_cast<int64_t>(content.length()), &zipped_buf,
+                          &zipped_size);
     std::string zipped_data(reinterpret_cast<char *>(zipped_buf), zipped_size);
     HashString(zipped_data, hash);
     EXPECT_TRUE(SafeWriteToFile(zipped_data, "data/" + hash->MakePath(), 0600));
@@ -28,15 +27,14 @@ class T_StreamingCacheManager : public ::testing::Test {
 
   virtual void SetUp() {
     statistics_ = new perf::Statistics();
-    download_mgr_ = new download::DownloadManager(16,
-                  perf::StatisticsTemplate("download", statistics_.weak_ref()));
+    download_mgr_ = new download::DownloadManager(
+        16, perf::StatisticsTemplate("download", statistics_.weak_ref()));
     download_mgr_->SetHostChain("file://" + GetCurrentWorkingDirectory());
-    backing_cache_ =
-      PosixCacheManager::Create("cache", true /* alien_cache */);
+    backing_cache_ = PosixCacheManager::Create("cache", true /* alien_cache */);
     backing_cache_ref_ = backing_cache_.weak_ref();
-    streaming_cache_ = new StreamingCacheManager(
-      32, backing_cache_.Release(), download_mgr_.weak_ref(), NULL, 1000,
-      statistics_.weak_ref());
+    streaming_cache_ = new StreamingCacheManager(32, backing_cache_.Release(),
+                                                 download_mgr_.weak_ref(), NULL,
+                                                 1000, statistics_.weak_ref());
 
     EXPECT_TRUE(MkdirDeep("data", 0700));
     EXPECT_TRUE(MakeCacheDirectories("data", 0700));

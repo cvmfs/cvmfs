@@ -64,50 +64,48 @@ class RamCacheManager : public CacheManager {
 
     explicit Counters(perf::StatisticsTemplate statistics) {
       n_getsize = statistics.RegisterTemplated("n_getsize",
-        "Number of GetSize calls");
+                                               "Number of GetSize calls");
       n_close = statistics.RegisterTemplated("n_close",
-        "Number of Close calls");
+                                             "Number of Close calls");
       n_pread = statistics.RegisterTemplated("n_pread",
-        "Number of Pread calls");
-      n_dup = statistics.RegisterTemplated("n_dup",
-        "Number of Dup calls");
+                                             "Number of Pread calls");
+      n_dup = statistics.RegisterTemplated("n_dup", "Number of Dup calls");
       n_readahead = statistics.RegisterTemplated("n_readahead",
-        "Number of ReadAhead calls");
+                                                 "Number of ReadAhead calls");
       n_starttxn = statistics.RegisterTemplated("n_starttxn",
-        "Number of StartTxn calls");
+                                                "Number of StartTxn calls");
       n_write = statistics.RegisterTemplated("n_write",
-        "Number of Write calls");
+                                             "Number of Write calls");
       n_reset = statistics.RegisterTemplated("n_reset",
-        "Number of Reset calls");
+                                             "Number of Reset calls");
       n_aborttxn = statistics.RegisterTemplated("n_aborttxn",
-        "Number of AbortTxn calls");
+                                                "Number of AbortTxn calls");
       n_committxn = statistics.RegisterTemplated("n_committxn",
-        "Number of Commit calls");
-      n_enfile = statistics.RegisterTemplated("n_enfile",
-        "Number of times the limit on handles was reached");
-      n_openregular = statistics.RegisterTemplated("n_openregular",
-        "Number of opens from the regular cache");
-      n_openvolatile = statistics.RegisterTemplated("n_openvolatile",
-        "Number of opens from the volatile cache");
+                                                 "Number of Commit calls");
+      n_enfile = statistics.RegisterTemplated(
+          "n_enfile", "Number of times the limit on handles was reached");
+      n_openregular = statistics.RegisterTemplated(
+          "n_openregular", "Number of opens from the regular cache");
+      n_openvolatile = statistics.RegisterTemplated(
+          "n_openvolatile", "Number of opens from the volatile cache");
       n_openmiss = statistics.RegisterTemplated("n_openmiss",
-        "Number of missed opens");
+                                                "Number of missed opens");
       n_realloc = statistics.RegisterTemplated("n_realloc",
-        "Number of reallocs");
-      n_overrun = statistics.RegisterTemplated("n_overrun",
-        "Number of cache limit overruns");
-      n_full = statistics.RegisterTemplated("n_full",
-        "Number of overruns that could not be resolved");
+                                               "Number of reallocs");
+      n_overrun = statistics.RegisterTemplated(
+          "n_overrun", "Number of cache limit overruns");
+      n_full = statistics.RegisterTemplated(
+          "n_full", "Number of overruns that could not be resolved");
     }
   };
 
   virtual CacheManagerIds id() { return kRamCacheManager; }
   virtual std::string Describe();
 
-  RamCacheManager(
-    uint64_t max_size,
-    unsigned max_entries,
-    MemoryKvStore::MemoryAllocator alloc,
-    perf::StatisticsTemplate statistics);
+  RamCacheManager(uint64_t max_size,
+                  unsigned max_entries,
+                  MemoryKvStore::MemoryAllocator alloc,
+                  perf::StatisticsTemplate statistics);
 
   virtual ~RamCacheManager();
 
@@ -243,18 +241,12 @@ class RamCacheManager : public CacheManager {
   static const shash::Any kInvalidHandle;
 
   struct ReadOnlyHandle {
-    ReadOnlyHandle()
-      : handle(kInvalidHandle)
-      , is_volatile(false)
-      { }
-    ReadOnlyHandle(const shash::Any &h, bool v)
-      : handle(h)
-      , is_volatile(v)
-      { }
-    bool operator ==(const ReadOnlyHandle &other) const {
+    ReadOnlyHandle() : handle(kInvalidHandle), is_volatile(false) { }
+    ReadOnlyHandle(const shash::Any &h, bool v) : handle(h), is_volatile(v) { }
+    bool operator==(const ReadOnlyHandle &other) const {
       return this->handle == other.handle;
     }
-    bool operator !=(const ReadOnlyHandle &other) const {
+    bool operator!=(const ReadOnlyHandle &other) const {
       return this->handle != other.handle;
     }
 
@@ -263,10 +255,7 @@ class RamCacheManager : public CacheManager {
   };
 
   struct Transaction {
-    Transaction()
-      : buffer()
-      , expected_size(0)
-      , pos(0) { }
+    Transaction() : buffer(), expected_size(0), pos(0) { }
     MemoryBuffer buffer;
     uint64_t expected_size;
     uint64_t pos;

@@ -79,9 +79,7 @@ class BaseMagicXattr {
    * Mark a Xattr protected so that only certain users with the correct gid
    * can access it.
    */
-  void MarkProtected() {
-    is_protected_ = true;
-  }
+  void MarkProtected() { is_protected_ = true; }
 
 
   // TODO(hereThereBeDragons) from C++11 should be marked final
@@ -131,18 +129,18 @@ class BaseMagicXattr {
     assert(retval == 0);
   }
 
-  virtual ~BaseMagicXattr() {}
+  virtual ~BaseMagicXattr() { }
 
   // how many chars per page (with some leeway). system maximum would be 64k
   static const uint32_t kMaxCharsPerPage = 40000;
 
  protected:
   /**
-  * This function is used to obtain the necessary information while
-  * inside FuseRemounter::fence(), which should prevent data races.
-  */
+   * This function is used to obtain the necessary information while
+   * inside FuseRemounter::fence(), which should prevent data races.
+   */
   virtual bool PrepareValueFenced() { return true; }
-  virtual void FinalizeValue() {}
+  virtual void FinalizeValue() { }
 
   std::string HeaderMultipageHuman(uint32_t requested_page);
 
@@ -159,27 +157,29 @@ class BaseMagicXattr {
  * This wrapper ensures that the attribute instance "ptr_" is
  * released after the user finishes using it (on wrapper destruction).
  */
-class MagicXattrRAIIWrapper: public SingleCopy {
+class MagicXattrRAIIWrapper : public SingleCopy {
  public:
   inline MagicXattrRAIIWrapper() : ptr_(NULL) { }
 
-  inline explicit MagicXattrRAIIWrapper(
-    BaseMagicXattr *ptr,
-    PathString path,
-    catalog::DirectoryEntry *d)
-    : ptr_(ptr)
-  {
-    if (ptr_ != NULL) ptr_->Lock(path, d);
+  inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ptr,
+                                        PathString path,
+                                        catalog::DirectoryEntry *d)
+      : ptr_(ptr) {
+    if (ptr_ != NULL)
+      ptr_->Lock(path, d);
   }
   /// Wraps around a BaseMagicXattr* that is already locked (or NULL)
   inline explicit MagicXattrRAIIWrapper(BaseMagicXattr *ptr) : ptr_(ptr) { }
 
-  inline ~MagicXattrRAIIWrapper() { if (ptr_ != NULL) ptr_->Release(); }
+  inline ~MagicXattrRAIIWrapper() {
+    if (ptr_ != NULL)
+      ptr_->Release();
+  }
 
-  inline BaseMagicXattr* operator->() const { return ptr_; }
+  inline BaseMagicXattr *operator->() const { return ptr_; }
   inline bool IsNull() const { return ptr_ == NULL; }
-  inline BaseMagicXattr* Move() {
-    BaseMagicXattr* ret = ptr_;
+  inline BaseMagicXattr *Move() {
+    BaseMagicXattr *ret = ptr_;
     ptr_ = NULL;
     return ret;
   }
@@ -219,14 +219,18 @@ class SymlinkMagicXattr : public BaseMagicXattr {
  */
 class MagicXattrManager : public SingleCopy {
  public:
-  enum EVisibility { kVisibilityAlways, kVisibilityNever, kVisibilityRootOnly };
+  enum EVisibility {
+    kVisibilityAlways,
+    kVisibilityNever,
+    kVisibilityRootOnly
+  };
 
   MagicXattrManager(MountPoint *mountpoint, EVisibility visibility,
                     const std::set<std::string> &protected_xattrs,
                     const std::set<gid_t> &privileged_xattr_gids);
   /// The returned BaseMagicXattr* is supposed to be wrapped by a
   /// MagicXattrRAIIWrapper
-  BaseMagicXattr* GetLocked(const std::string &name, PathString path,
+  BaseMagicXattr *GetLocked(const std::string &name, PathString path,
                             catalog::DirectoryEntry *d);
   std::string GetListString(catalog::DirectoryEntry *dirent);
   /**
@@ -241,14 +245,16 @@ class MagicXattrManager : public SingleCopy {
    * Only after freezing MagicXattrManager can registered attributes be
    * accessed.
    */
-  void Freeze() { is_frozen_ = true; SanityCheckProtectedXattrs(); }
+  void Freeze() {
+    is_frozen_ = true;
+    SanityCheckProtectedXattrs();
+  }
   bool IsPrivilegedGid(gid_t gid);
 
 
   EVisibility visibility() { return visibility_; }
-  std::set<gid_t> privileged_xattr_gids()
-                                { return privileged_xattr_gids_; }
-  MountPoint* mount_point() { return mount_point_; }
+  std::set<gid_t> privileged_xattr_gids() { return privileged_xattr_gids_; }
+  MountPoint *mount_point() { return mount_point_; }
   bool is_frozen() const { return is_frozen_; }
 
  protected:
@@ -288,7 +294,7 @@ class ChunkListMagicXattr : public RegularMagicXattr {
   virtual void FinalizeValue();
 
  private:
-    std::vector<std::string> chunk_list_;
+  std::vector<std::string> chunk_list_;
 };
 
 class ChunksMagicXattr : public RegularMagicXattr {

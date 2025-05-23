@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <pthread.h>
 
 #include <cstdio>
@@ -52,11 +51,11 @@ TEST_F(T_Manifest, Breadcrumb) {
   EXPECT_FALSE(Breadcrumb("T1").IsValid());
   EXPECT_FALSE(Breadcrumb("0T").IsValid());
   EXPECT_TRUE(
-    Breadcrumb("0000000000000000000000000000000000000001T1").IsValid());
+      Breadcrumb("0000000000000000000000000000000000000001T1").IsValid());
   EXPECT_TRUE(
-    Breadcrumb("0000000000000000000000000000000000000001T1R10").IsValid());
+      Breadcrumb("0000000000000000000000000000000000000001T1R10").IsValid());
   EXPECT_FALSE(
-    Breadcrumb("0000000000000000000000000000000000000001T0").IsValid());
+      Breadcrumb("0000000000000000000000000000000000000001T0").IsValid());
 }
 
 

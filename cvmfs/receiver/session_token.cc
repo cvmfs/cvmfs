@@ -27,12 +27,12 @@ namespace receiver {
  *
  * Returns the session token, the (public) token_id and the token secret.
  */
-bool GenerateSessionToken(const std::string& key_id, const std::string& path,
-                          uint64_t max_lease_time, std::string* session_token,
-                          std::string* public_token_id,
-                          std::string* token_secret) {
-  if (session_token == NULL || public_token_id == NULL ||
-      token_secret == NULL) {
+bool GenerateSessionToken(const std::string &key_id, const std::string &path,
+                          uint64_t max_lease_time, std::string *session_token,
+                          std::string *public_token_id,
+                          std::string *token_secret) {
+  if (session_token == NULL || public_token_id == NULL
+      || token_secret == NULL) {
     return false;
   }
 
@@ -67,8 +67,9 @@ bool GenerateSessionToken(const std::string& key_id, const std::string& path,
     return false;
   }
 
-  *session_token = Base64("{\"token_id\" : \"" + *public_token_id +
-                          "\", \"blob\" : \"" + Base64(encrypted_body) + "\"}");
+  *session_token = Base64("{\"token_id\" : \"" + *public_token_id
+                          + "\", \"blob\" : \"" + Base64(encrypted_body)
+                          + "\"}");
 
   return true;
 }
@@ -77,7 +78,7 @@ bool GenerateSessionToken(const std::string& key_id, const std::string& path,
  * Obtain the public_id from a session token
  */
 
-bool GetTokenPublicId(const std::string& token, std::string* public_id) {
+bool GetTokenPublicId(const std::string &token, std::string *public_id) {
   if (public_id == NULL) {
     return false;
   }
@@ -92,10 +93,10 @@ bool GetTokenPublicId(const std::string& token, std::string* public_id) {
     return false;
   }
 
-  const JSON* token_id =
-      JsonDocument::SearchInObject(token_json->root(), "token_id", JSON_STRING);
-  const JSON* blob =
-      JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
+  const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
+                                                      "token_id", JSON_STRING);
+  const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
+                                                  JSON_STRING);
 
   if (token_id == NULL || blob == NULL) {
     return false;
@@ -109,8 +110,8 @@ bool GetTokenPublicId(const std::string& token, std::string* public_id) {
 /*
  * Check the validity of a session token using the associated secret
  */
-TokenCheckResult CheckToken(const std::string& token, const std::string& secret,
-                            std::string* lease_path) {
+TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
+                            std::string *lease_path) {
   if (!lease_path) {
     return kInvalid;
   }
@@ -125,10 +126,10 @@ TokenCheckResult CheckToken(const std::string& token, const std::string& secret,
     return kInvalid;
   }
 
-  const JSON* token_id =
-      JsonDocument::SearchInObject(token_json->root(), "token_id", JSON_STRING);
-  const JSON* blob =
-      JsonDocument::SearchInObject(token_json->root(), "blob", JSON_STRING);
+  const JSON *token_id = JsonDocument::SearchInObject(token_json->root(),
+                                                      "token_id", JSON_STRING);
+  const JSON *blob = JsonDocument::SearchInObject(token_json->root(), "blob",
+                                                  JSON_STRING);
   if (token_id == NULL || blob == NULL) {
     return kInvalid;
   }
@@ -157,10 +158,10 @@ TokenCheckResult CheckToken(const std::string& token, const std::string& secret,
     return kInvalid;
   }
 
-  const JSON* path =
-      JsonDocument::SearchInObject(body_json->root(), "path", JSON_STRING);
-  const JSON* expiry =
-      JsonDocument::SearchInObject(body_json->root(), "expiry", JSON_STRING);
+  const JSON *path = JsonDocument::SearchInObject(body_json->root(), "path",
+                                                  JSON_STRING);
+  const JSON *expiry = JsonDocument::SearchInObject(body_json->root(), "expiry",
+                                                    JSON_STRING);
   if (path == NULL || expiry == NULL) {
     return kInvalid;
   }

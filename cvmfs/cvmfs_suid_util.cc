@@ -49,8 +49,8 @@ string EscapeSystemdUnit(const string &path) {
     } else {
       result.push_back('\\');
       result.push_back('x');
-      result.push_back((c / 16) + ((c / 16 <= 9) ? '0' : 'a'-10));
-      result.push_back((c % 16) + ((c % 16 <= 9) ? '0' : 'a'-10));
+      result.push_back((c / 16) + ((c / 16 <= 9) ? '0' : 'a' - 10));
+      result.push_back((c % 16) + ((c % 16 <= 9) ? '0' : 'a' - 10));
     }
   }
 
@@ -68,7 +68,8 @@ bool PathExists(const std::string &path) {
 string ResolvePath(const std::string &path) {
   char buf[PATH_MAX];
   char *retval = realpath(path.c_str(), buf);
-  if (retval == NULL) return "";
+  if (retval == NULL)
+    return "";
   return string(buf);
 }
 

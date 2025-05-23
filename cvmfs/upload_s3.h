@@ -21,12 +21,10 @@
 namespace upload {
 
 struct S3StreamHandle : public UploadStreamHandle {
-  S3StreamHandle(
-    const CallbackTN *commit_callback,
-    uint64_t in_memory_threshold,
-    const std::string &tmp_dir = "/tmp/")
-    : UploadStreamHandle(commit_callback)
-  {
+  S3StreamHandle(const CallbackTN *commit_callback,
+                 uint64_t in_memory_threshold,
+                 const std::string &tmp_dir = "/tmp/")
+      : UploadStreamHandle(commit_callback) {
     buffer = FileBackedBuffer::Create(in_memory_threshold, tmp_dir);
   }
 
@@ -62,7 +60,7 @@ class S3Uploader : public AbstractUploader {
                         const CallbackTN *callback);
 
   virtual UploadStreamHandle *InitStreamedUpload(
-    const CallbackTN *callback = NULL);
+      const CallbackTN *callback = NULL);
   virtual void StreamedUpload(UploadStreamHandle *handle, UploadBuffer buffer,
                               const CallbackTN *callback);
   virtual void FinalizeStreamedUpload(UploadStreamHandle *handle,
@@ -89,7 +87,7 @@ class S3Uploader : public AbstractUploader {
   static const unsigned kDefaultTimeoutSec = 60;
   static const unsigned kDefaultBackoffInitMs = 100;
   static const unsigned kDefaultBackoffMaxMs = 2000;
-  static const unsigned kInMemoryObjectThreshold = 500*1024;  // 500KiB
+  static const unsigned kInMemoryObjectThreshold = 500 * 1024;  // 500KiB
 
   // Used to make the async HTTP requests synchronous in Peek() Create(),
   // and Upload() of single bits

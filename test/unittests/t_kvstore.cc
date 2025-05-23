@@ -3,9 +3,9 @@
  */
 
 #include <errno.h>
+#include <gtest/gtest.h>
 #include <stdint.h>
 #include <string.h>
-#include <gtest/gtest.h>
 
 #include "cache.h"
 #include "crypto/hash.h"
@@ -22,14 +22,14 @@ namespace kvstore {
 class T_MemoryKvStore : public ::testing::Test {
  public:
   T_MemoryKvStore()
-    : store_(cache_size,
-             MemoryKvStore::kMallocLibc,
-             128*malloc_size,
-             perf::StatisticsTemplate("test", &statistics_))
-    , m1_(shash::AsciiPtr("!"))
-    , a1_(m1_.algorithm, m1_.digest, m1_.suffix)
-    , m2_(shash::AsciiPtr("i"))
-    , a2_(m2_.algorithm, m2_.digest, m2_.suffix) {}
+      : store_(cache_size,
+               MemoryKvStore::kMallocLibc,
+               128 * malloc_size,
+               perf::StatisticsTemplate("test", &statistics_))
+      , m1_(shash::AsciiPtr("!"))
+      , a1_(m1_.algorithm, m1_.digest, m1_.suffix)
+      , m2_(shash::AsciiPtr("i"))
+      , a2_(m2_.algorithm, m2_.digest, m2_.suffix) { }
 
  protected:
   virtual void SetUp() {
@@ -39,7 +39,7 @@ class T_MemoryKvStore : public ::testing::Test {
     buf_.object_flags = 0;
   }
 
-  virtual void TearDown() {}
+  virtual void TearDown() { }
 
   perf::Statistics statistics_;
   MemoryKvStore store_;
@@ -52,17 +52,17 @@ class T_MemoryKvStore : public ::testing::Test {
 
 TEST_F(T_MemoryKvStore, Commit) {
   EXPECT_EQ(-ENOENT, store_.GetSize(a1_));
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
   buf_.id = a1_;
   EXPECT_EQ(0, store_.Commit(buf_));
-  EXPECT_EQ((int64_t) malloc_size, store_.GetSize(a1_));
+  EXPECT_EQ((int64_t)malloc_size, store_.GetSize(a1_));
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
   free(buf_.address);
 }
 
 TEST_F(T_MemoryKvStore, Delete) {
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
   buf_.id = a1_;
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
@@ -70,13 +70,13 @@ TEST_F(T_MemoryKvStore, Delete) {
   buf_.address = malloc(malloc_size);
   buf_.id = a2_;
   EXPECT_EQ(0, store_.Commit(buf_));
-  EXPECT_EQ(2*malloc_size, store_.GetUsed());
+  EXPECT_EQ(2 * malloc_size, store_.GetUsed());
   memset(buf_.address, 42, malloc_size);
   EXPECT_TRUE(store_.Delete(a1_));
   EXPECT_FALSE(store_.Delete(a1_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
   EXPECT_TRUE(store_.Delete(a2_));
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
 }
 
 TEST_F(T_MemoryKvStore, Read) {
@@ -86,12 +86,12 @@ TEST_F(T_MemoryKvStore, Read) {
   memset(correct, 24, malloc_size);
   memset(out, 0, malloc_size);
 
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
   buf_.id = a1_;
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
 
-  EXPECT_EQ((int64_t) malloc_size, store_.Read(a1_, out, malloc_size, 0));
+  EXPECT_EQ((int64_t)malloc_size, store_.Read(a1_, out, malloc_size, 0));
   EXPECT_GT(strncmp(out, correct, malloc_size), 0);
   memset(correct, 42, malloc_size);
   memset(out, 0, malloc_size);
@@ -100,18 +100,18 @@ TEST_F(T_MemoryKvStore, Read) {
   EXPECT_EQ(0, strncmp(&out[2], &correct[2], 4));
   memset(out, 0, malloc_size);
 
-  EXPECT_EQ((int64_t) malloc_size - 3, store_.Read(a1_, out, 1111, 3));
+  EXPECT_EQ((int64_t)malloc_size - 3, store_.Read(a1_, out, 1111, 3));
   EXPECT_EQ(0, strncmp(out, correct, malloc_size - 3));
   memset(out, 0, malloc_size);
 
   EXPECT_TRUE(store_.Delete(a1_));
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
 }
 
 TEST_F(T_MemoryKvStore, Refcount) {
   EXPECT_FALSE(store_.IncRef(a1_));
   EXPECT_FALSE(store_.Unref(a1_));
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
   buf_.id = a1_;
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
@@ -131,12 +131,12 @@ TEST_F(T_MemoryKvStore, Refcount) {
   EXPECT_EQ(0, store_.GetRefcount(a1_));
 
   EXPECT_TRUE(store_.Delete(a1_));
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
 }
 
 TEST_F(T_MemoryKvStore, ShrinkTo) {
   buf_.refcount = 1;
-  EXPECT_EQ(0, (int64_t) store_.GetUsed());
+  EXPECT_EQ(0, (int64_t)store_.GetUsed());
   buf_.id = a1_;
   EXPECT_EQ(0, store_.Commit(buf_));
   EXPECT_EQ(malloc_size, store_.GetUsed());
@@ -146,17 +146,17 @@ TEST_F(T_MemoryKvStore, ShrinkTo) {
     buf_.address = malloc(malloc_size);
     store_.Commit(buf_);
   }
-  EXPECT_EQ(100*malloc_size, store_.GetUsed());
+  EXPECT_EQ(100 * malloc_size, store_.GetUsed());
 
-  EXPECT_TRUE(store_.ShrinkTo(1000*malloc_size));
-  EXPECT_TRUE(store_.ShrinkTo(100*malloc_size));
-  EXPECT_EQ(100*malloc_size, store_.GetUsed());
-  EXPECT_TRUE(store_.ShrinkTo(94*malloc_size));
-  EXPECT_EQ(94*malloc_size, store_.GetUsed());
-  EXPECT_TRUE(store_.ShrinkTo(60*malloc_size - 1));
-  EXPECT_EQ(59*malloc_size, store_.GetUsed());
+  EXPECT_TRUE(store_.ShrinkTo(1000 * malloc_size));
+  EXPECT_TRUE(store_.ShrinkTo(100 * malloc_size));
+  EXPECT_EQ(100 * malloc_size, store_.GetUsed());
+  EXPECT_TRUE(store_.ShrinkTo(94 * malloc_size));
+  EXPECT_EQ(94 * malloc_size, store_.GetUsed());
+  EXPECT_TRUE(store_.ShrinkTo(60 * malloc_size - 1));
+  EXPECT_EQ(59 * malloc_size, store_.GetUsed());
   EXPECT_TRUE(store_.ShrinkTo(90));
-  EXPECT_EQ((90/malloc_size)*malloc_size, store_.GetUsed());
+  EXPECT_EQ((90 / malloc_size) * malloc_size, store_.GetUsed());
   EXPECT_FALSE(store_.ShrinkTo(0));
   EXPECT_EQ(malloc_size, store_.GetUsed());
 }

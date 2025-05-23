@@ -14,7 +14,6 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-
 #include <string>
 #include <vector>
 
@@ -29,7 +28,7 @@ using namespace std;  // NOLINT
 
 namespace glue {
 
-PathStore &PathStore::operator= (const PathStore &other) {
+PathStore &PathStore::operator=(const PathStore &other) {
   if (&other == this)
     return *this;
 
@@ -39,9 +38,7 @@ PathStore &PathStore::operator= (const PathStore &other) {
 }
 
 
-PathStore::PathStore(const PathStore &other) {
-  CopyFrom(other);
-}
+PathStore::PathStore(const PathStore &other) { CopyFrom(other); }
 
 
 void PathStore::CopyFrom(const PathStore &other) {
@@ -51,9 +48,8 @@ void PathStore::CopyFrom(const PathStore &other) {
   shash::Md5 empty_path = map_.empty_key();
   for (unsigned i = 0; i < map_.capacity(); ++i) {
     if (map_.keys()[i] != empty_path) {
-      (map_.values() + i)->name =
-      string_heap_->AddString(map_.values()[i].name.length(),
-                              map_.values()[i].name.data());
+      (map_.values() + i)->name = string_heap_->AddString(
+          map_.values()[i].name.length(), map_.values()[i].name.data());
     }
   }
 }
@@ -63,8 +59,7 @@ void PathStore::CopyFrom(const PathStore &other) {
 
 
 void InodeTracker::InitLock() {
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
@@ -92,7 +87,7 @@ InodeTracker::InodeTracker(const InodeTracker &other) {
 }
 
 
-InodeTracker &InodeTracker::operator= (const InodeTracker &other) {
+InodeTracker &InodeTracker::operator=(const InodeTracker &other) {
   if (&other == this)
     return *this;
 
@@ -136,7 +131,7 @@ DentryTracker::DentryTracker(const DentryTracker &other) {
 }
 
 
-DentryTracker &DentryTracker::operator= (const DentryTracker &other) {
+DentryTracker &DentryTracker::operator=(const DentryTracker &other) {
   if (&other == this)
     return *this;
 
@@ -170,7 +165,8 @@ DentryTracker *DentryTracker::Move() {
 void DentryTracker::SpawnCleaner(unsigned interval_s) {
   assert(pipe_terminate_[0] == -1);
   cleaning_interval_ms_ = interval_s * 1000;
-  if (cleaning_interval_ms_ == 0) cleaning_interval_ms_ = -1;
+  if (cleaning_interval_ms_ == 0)
+    cleaning_interval_ms_ = -1;
   MakePipe(pipe_terminate_);
   int retval = pthread_create(&thread_cleaner_, NULL, MainCleaner, this);
   assert(retval == 0);
@@ -184,7 +180,8 @@ void *DentryTracker::MainCleaner(void *data) {
   struct pollfd watch_term;
   watch_term.fd = tracker->pipe_terminate_[0];
   watch_term.events = POLLIN | POLLPRI;
-  int timeout_ms = tracker->cleaning_interval_ms_;;
+  int timeout_ms = tracker->cleaning_interval_ms_;
+  ;
   uint64_t deadline = platform_monotonic_time() + timeout_ms / 1000;
   while (true) {
     watch_term.revents = 0;
@@ -221,8 +218,7 @@ void *DentryTracker::MainCleaner(void *data) {
 
 
 void DentryTracker::InitLock() {
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
@@ -243,9 +239,8 @@ DentryTracker::Cursor DentryTracker::BeginEnumerate() {
 }
 
 
-bool DentryTracker::NextEntry(Cursor *cursor,
-  uint64_t *inode_parent, NameString *name)
-{
+bool DentryTracker::NextEntry(Cursor *cursor, uint64_t *inode_parent,
+                              NameString *name) {
   if (cursor->head == NULL)
     return false;
   if (cursor->pos >= entries_.size())
@@ -258,9 +253,7 @@ bool DentryTracker::NextEntry(Cursor *cursor,
 }
 
 
-void DentryTracker::EndEnumerate(Cursor * /* cursor */) {
-  Unlock();
-}
+void DentryTracker::EndEnumerate(Cursor * /* cursor */) { Unlock(); }
 
 
 //------------------------------------------------------------------------------
@@ -284,7 +277,7 @@ PageCacheTracker::PageCacheTracker(const PageCacheTracker &other) {
 }
 
 
-PageCacheTracker &PageCacheTracker::operator= (const PageCacheTracker &other) {
+PageCacheTracker &PageCacheTracker::operator=(const PageCacheTracker &other) {
   if (&other == this)
     return *this;
 
@@ -308,15 +301,13 @@ void PageCacheTracker::CopyFrom(const PageCacheTracker &other) {
 
 
 void PageCacheTracker::InitLock() {
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
 PageCacheTracker::OpenDirectives PageCacheTracker::Open(
-  uint64_t inode, const shash::Any &hash, const struct stat &info)
-{
+    uint64_t inode, const shash::Any &hash, const struct stat &info) {
   assert(inode == info.st_ino);
 
   OpenDirectives open_directives;
@@ -327,8 +318,8 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
   if (inode != info.st_ino) {
     PANIC(kLogStderr | kLogDebug,
           "invalid entry on open: %" PRIu64 " with st_ino=%" PRIu64,
-          " hash=%s size=%" PRIu64,
-          inode, info.st_ino, hash.ToString().c_str(), info.st_size);
+          " hash=%s size=%" PRIu64, inode, info.st_ino, hash.ToString().c_str(),
+          info.st_size);
   }
 
   MutexLockGuard guard(lock_);
@@ -444,7 +435,8 @@ void PageCacheTracker::Close(uint64_t inode) {
     if (!retval) {
       PANIC(kLogSyslogErr | kLogDebug,
             "invalid inode in page cache tracker: inode %" PRIu64
-            ", replacing %" PRIu64, inode_update, inode);
+            ", replacing %" PRIu64,
+            inode_update, inode);
     }
     assert(retval);
     entry_update.idx_stat = entry.idx_stat;
@@ -454,9 +446,7 @@ void PageCacheTracker::Close(uint64_t inode) {
   map_.Insert(inode, entry);
 }
 
-PageCacheTracker::EvictRaii::EvictRaii(PageCacheTracker *t)
-  : tracker_(t)
-{
+PageCacheTracker::EvictRaii::EvictRaii(PageCacheTracker *t) : tracker_(t) {
   int retval = pthread_mutex_lock(tracker_->lock_);
   assert(retval == 0);
 }

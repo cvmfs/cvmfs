@@ -35,19 +35,18 @@ class History {
   struct Branch {
     Branch() : initial_revision(0) { }
     Branch(const std::string &b, const std::string &p, uint64_t r)
-      : branch(b), parent(p), initial_revision(r) { }
+        : branch(b), parent(p), initial_revision(r) { }
     std::string branch;
     std::string parent;
     uint64_t initial_revision;
 
-    bool operator ==(const Branch &other) const {
-      return (this->branch == other.branch) &&
-             (this->parent == other.parent) &&
-             (this->initial_revision == other.initial_revision);
+    bool operator==(const Branch &other) const {
+      return (this->branch == other.branch) && (this->parent == other.parent)
+             && (this->initial_revision == other.initial_revision);
     }
 
     // Used for sorting in unit tests
-    bool operator <(const Branch &other) const {
+    bool operator<(const Branch &other) const {
       return (this->branch < other.branch);
     }
   };
@@ -60,48 +59,53 @@ class History {
    * using this struct as a container.
    */
   struct Tag {
-    Tag() : size(0), revision(0), timestamp(0) {}
+    Tag() : size(0), revision(0), timestamp(0) { }
 
     Tag(const std::string &n, const shash::Any &h, const uint64_t s,
         const uint64_t r, const time_t t, const std::string &d,
-        const std::string &b) :
-      name(n), root_hash(h), size(s), revision(r), timestamp(t),
-      description(d), branch(b) {}
+        const std::string &b)
+        : name(n)
+        , root_hash(h)
+        , size(s)
+        , revision(r)
+        , timestamp(t)
+        , description(d)
+        , branch(b) { }
 
-    bool operator ==(const Tag &other) const {
-      return (this->branch == other.branch) &&
-             (this->revision == other.revision);
+    bool operator==(const Tag &other) const {
+      return (this->branch == other.branch)
+             && (this->revision == other.revision);
     }
 
-    bool operator <(const Tag &other) const {
+    bool operator<(const Tag &other) const {
       if (this->timestamp == other.timestamp)
         return this->revision < other.revision;
       return this->timestamp < other.timestamp;
     }
 
-    bool operator >(const Tag &other) const {
+    bool operator>(const Tag &other) const {
       if (this->timestamp == other.timestamp)
         return this->revision > other.revision;
       return this->timestamp > other.timestamp;
     }
 
-    std::string    name;
-    shash::Any     root_hash;
-    uint64_t       size;
-    uint64_t       revision;
-    time_t         timestamp;
-    std::string    description;
+    std::string name;
+    shash::Any root_hash;
+    uint64_t size;
+    uint64_t revision;
+    time_t timestamp;
+    std::string description;
     /**
      * The default branch is the empty string.
      */
-    std::string    branch;
+    std::string branch;
   };  // struct Tag
 
 
  public:
   virtual ~History() { }
 
-  virtual bool IsWritable() const     = 0;
+  virtual bool IsWritable() const = 0;
   virtual unsigned GetNumberOfTags() const = 0;
 
   /**
@@ -109,7 +113,7 @@ class History {
    * This can greatly improve performance when used before inserting or
    * removing multiple tags.
    */
-  virtual bool BeginTransaction()  const = 0;
+  virtual bool BeginTransaction() const = 0;
 
   /**
    * Closes a transaction (see BeginTransaction())
@@ -122,18 +126,18 @@ class History {
    *
    * @param history_hash  the content hash of the previous revision
    */
-  virtual bool SetPreviousRevision(const shash::Any &history_hash)   = 0;
-  virtual shash::Any previous_revision() const                       = 0;
+  virtual bool SetPreviousRevision(const shash::Any &history_hash) = 0;
+  virtual shash::Any previous_revision() const = 0;
 
-  virtual bool Insert(const Tag &tag)                                = 0;
-  virtual bool Remove(const std::string &name)                       = 0;
-  virtual bool Exists(const std::string &name) const                 = 0;
-  virtual bool GetByName(const std::string &name, Tag *tag) const    = 0;
-  virtual bool GetByDate(const time_t timestamp, Tag *tag) const     = 0;
-  virtual bool List(std::vector<Tag> *tags) const                    = 0;
+  virtual bool Insert(const Tag &tag) = 0;
+  virtual bool Remove(const std::string &name) = 0;
+  virtual bool Exists(const std::string &name) const = 0;
+  virtual bool GetByName(const std::string &name, Tag *tag) const = 0;
+  virtual bool GetByDate(const time_t timestamp, Tag *tag) const = 0;
+  virtual bool List(std::vector<Tag> *tags) const = 0;
 
-  virtual bool GetBranchHead(const std::string &branch_name, Tag *tag)
-    const = 0;
+  virtual bool GetBranchHead(const std::string &branch_name,
+                             Tag *tag) const = 0;
   virtual bool ExistsBranch(const std::string &branch_name) const = 0;
   virtual bool InsertBranch(const Branch &branch) = 0;
   /**
@@ -148,7 +152,7 @@ class History {
    * preserved for migration and testing.
    */
   virtual bool ListRecycleBin(std::vector<shash::Any> *hashes) const = 0;
-  virtual bool EmptyRecycleBin()                                     = 0;
+  virtual bool EmptyRecycleBin() = 0;
 
   /**
    * Rolls back the history to the provided target tag and deletes all tags
@@ -172,8 +176,8 @@ class History {
    * @param tags             pointer to the result tag list to be filled
    * @return                 true on success
    */
-  virtual bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
-                                          std::vector<Tag>   *tags) const = 0;
+  virtual bool ListTagsAffectedByRollback(const std::string &target_tag_name,
+                                          std::vector<Tag> *tags) const = 0;
 
   /**
    * Provides a list of all referenced catalog hashes in this History.
@@ -186,17 +190,17 @@ class History {
   // database file management controls
   virtual void TakeDatabaseFileOwnership() = 0;
   virtual void DropDatabaseFileOwnership() = 0;
-  virtual bool OwnsDatabaseFile() const    = 0;
+  virtual bool OwnsDatabaseFile() const = 0;
 
   virtual bool Vacuum() = 0;
 
-  const std::string& fqrn() const { return fqrn_; }
+  const std::string &fqrn() const { return fqrn_; }
 
  protected:
   void set_fqrn(const std::string &fqrn) { fqrn_ = fqrn; }
 
  private:
-  std::string   fqrn_;
+  std::string fqrn_;
 };
 
 }  // namespace history

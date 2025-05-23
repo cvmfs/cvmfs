@@ -28,8 +28,8 @@ int CmdCommit::Main(const Options &options) {
   std::string fqrn;
 
   if (!options.plain_args().empty()) {
-    std::vector<std::string> tokens =
-      SplitStringBounded(2, options.plain_args()[0].value_str, '/');
+    std::vector<std::string> tokens = SplitStringBounded(
+        2, options.plain_args()[0].value_str, '/');
     fqrn = tokens[0];
   }
 
@@ -50,8 +50,7 @@ int CmdCommit::Main(const Options &options) {
   }
 
   if (!SwitchCredentials(settings->owner_uid(), settings->owner_gid(),
-                         false /* temporarily */))
-  {
+                         false /* temporarily */)) {
     throw EPublish("No write permission to repository");
   }
 
@@ -67,19 +66,19 @@ int CmdCommit::Main(const Options &options) {
                      EPublish::kFailWhitelistExpired);
     }
   } catch (const EPublish &e) {
-    if (e.failure() == EPublish::kFailLayoutRevision ||
-        e.failure() == EPublish::kFailWhitelistExpired)
-    {
+    if (e.failure() == EPublish::kFailLayoutRevision
+        || e.failure() == EPublish::kFailWhitelistExpired) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s", e.msg().c_str());
       return EINVAL;
     }
   }
 
-  double whitelist_valid_s =
-    difftime(publisher->whitelist()->expires(), time(NULL));
+  double whitelist_valid_s = difftime(publisher->whitelist()->expires(),
+                                      time(NULL));
   if (whitelist_valid_s < (12 * 60 * 60)) {
-    LogCvmfs(kLogCvmfs, kLogStdout,
-      "Warning: Repository whitelist stays valid for less than 12 hours!");
+    LogCvmfs(
+        kLogCvmfs, kLogStdout,
+        "Warning: Repository whitelist stays valid for less than 12 hours!");
   }
 
   publisher->Sync();

@@ -41,21 +41,20 @@ enum DataTubeAction {
  * Wrapper for the data tube to transfer data from CallbackCurlData() that is
  * executed in MainDownload() Thread to Fetch() called by a fuse thread
  *
- * TODO(heretherebedragons): do we want to have a pool of those datatubeelements?
+ * TODO(heretherebedragons): do we want to have a pool of those
+ * datatubeelements?
  */
 struct DataTubeElement : SingleCopy {
-  char* data;
+  char *data;
   size_t size;
   DataTubeAction action;
 
-  explicit DataTubeElement(DataTubeAction xact) :
-                                           data(NULL), size(0), action(xact) { }
-  DataTubeElement(char* mov_data, size_t xsize, DataTubeAction xact) :
-                                   data(mov_data), size(xsize), action(xact) { }
+  explicit DataTubeElement(DataTubeAction xact)
+      : data(NULL), size(0), action(xact) { }
+  DataTubeElement(char *mov_data, size_t xsize, DataTubeAction xact)
+      : data(mov_data), size(xsize), action(xact) { }
 
-  ~DataTubeElement() {
-    delete data;
-  }
+  ~DataTubeElement() { delete data; }
 };
 
 /**
@@ -139,18 +138,14 @@ class JobInfo {
     pipe_job_results = new Pipe<kPipeDownloadJobsResults>();
   }
 
-  bool IsValidPipeJobResults() {
-    return pipe_job_results.IsValid();
-  }
+  bool IsValidPipeJobResults() { return pipe_job_results.IsValid(); }
 
   void CreateDataTube() {
     // TODO(heretherebedragons) change to weighted queue
     data_tube_ = new Tube<DataTubeElement>(500);
   }
 
-  bool IsValidDataTube() {
-    return data_tube_.IsValid();
-  }
+  bool IsValidDataTube() { return data_tube_.IsValid(); }
 
   /**
    * Tells whether the error is because of a non-existing file. Should only
@@ -169,10 +164,11 @@ class JobInfo {
   CURL **GetCurlHandle() { return &curl_handle_; }
   shash::ContextPtr *GetHashContextPtr() { return &hash_context_; }
   Pipe<kPipeDownloadJobsResults> *GetPipeJobResultPtr() {
-                                           return pipe_job_results.weak_ref(); }
+    return pipe_job_results.weak_ref();
+  }
   Tube<DataTubeElement> *GetDataTubePtr() { return data_tube_.weak_ref(); }
 
-  const std::string* url() const { return url_; }
+  const std::string *url() const { return url_; }
   bool compressed() const { return compressed_; }
   bool probe_hosts() const { return probe_hosts_; }
   bool head_request() const { return head_request_; }
@@ -209,7 +205,8 @@ class JobInfo {
   unsigned char num_retries() const { return num_retries_; }
   unsigned backoff_ms() const { return backoff_ms_; }
   int current_metalink_chain_index() const {
-                                         return current_metalink_chain_index_; }
+    return current_metalink_chain_index_;
+  }
   int current_host_chain_index() const { return current_host_chain_index_; }
 
   bool allow_failure() const { return allow_failure_; }
@@ -220,21 +217,22 @@ class JobInfo {
   void SetCompressed(bool compressed) { compressed_ = compressed; }
   void SetProbeHosts(bool probe_hosts) { probe_hosts_ = probe_hosts; }
   void SetHeadRequest(bool head_request) { head_request_ = head_request; }
-  void SetFollowRedirects(bool follow_redirects)
-                                      { follow_redirects_ = follow_redirects; }
+  void SetFollowRedirects(bool follow_redirects) {
+    follow_redirects_ = follow_redirects;
+  }
   void SetForceNocache(bool force_nocache) { force_nocache_ = force_nocache; }
   void SetPid(pid_t pid) { pid_ = pid; }
   void SetUid(uid_t uid) { uid_ = uid; }
   void SetGid(gid_t gid) { gid_ = gid; }
   void SetCredData(void *cred_data) { cred_data_ = cred_data; }
-  void SetInterruptCue(InterruptCue *interrupt_cue)
-                                             { interrupt_cue_ = interrupt_cue; }
-  void SetSink(cvmfs::Sink *sink)
-                                       { sink_ = sink; }
-  void SetExpectedHash(const shash::Any *expected_hash)
-                                             { expected_hash_ = expected_hash; }
-  void SetExtraInfo(const std::string *extra_info)
-                                                   { extra_info_ = extra_info; }
+  void SetInterruptCue(InterruptCue *interrupt_cue) {
+    interrupt_cue_ = interrupt_cue;
+  }
+  void SetSink(cvmfs::Sink *sink) { sink_ = sink; }
+  void SetExpectedHash(const shash::Any *expected_hash) {
+    expected_hash_ = expected_hash;
+  }
+  void SetExtraInfo(const std::string *extra_info) { extra_info_ = extra_info; }
 
   void SetRangeOffset(off_t range_offset) { range_offset_ = range_offset; }
   void SetRangeSize(off_t range_size) { range_size_ = range_size; }
@@ -242,32 +240,41 @@ class JobInfo {
   void SetCurlHandle(CURL *curl_handle) { curl_handle_ = curl_handle; }
   void SetHeaders(curl_slist *headers) { headers_ = headers; }
   void SetInfoHeader(char *info_header) { info_header_ = info_header; }
-  void SetTracingHeaderPid(char *tracing_header_pid)
-                                  { tracing_header_pid_ = tracing_header_pid; };
-  void SetTracingHeaderGid(char *tracing_header_gid)
-                                  { tracing_header_gid_ = tracing_header_gid; };
-  void SetTracingHeaderUid(char *tracing_header_uid)
-                                  { tracing_header_uid_ = tracing_header_uid; };
+  void SetTracingHeaderPid(char *tracing_header_pid) {
+    tracing_header_pid_ = tracing_header_pid;
+  };
+  void SetTracingHeaderGid(char *tracing_header_gid) {
+    tracing_header_gid_ = tracing_header_gid;
+  };
+  void SetTracingHeaderUid(char *tracing_header_uid) {
+    tracing_header_uid_ = tracing_header_uid;
+  };
   void SetZstream(z_stream zstream) { zstream_ = zstream; }
-  void SetHashContext(shash::ContextPtr hash_context)
-                                               { hash_context_ = hash_context; }
+  void SetHashContext(shash::ContextPtr hash_context) {
+    hash_context_ = hash_context;
+  }
   void SetProxy(const std::string &proxy) { proxy_ = proxy; }
   void SetLink(const std::string &link) { link_ = link; }
   void SetNocache(bool nocache) { nocache_ = nocache; }
   void SetErrorCode(Failures error_code) { error_code_ = error_code; }
   void SetHttpCode(int http_code) { http_code_ = http_code; }
-  void SetNumUsedProxies(unsigned char num_used_proxies)
-                                       { num_used_proxies_ = num_used_proxies; }
-  void SetNumUsedMetalinks(unsigned char num_used_metalinks)
-                                   { num_used_metalinks_ = num_used_metalinks; }
-  void SetNumUsedHosts(unsigned char num_used_hosts)
-                                           { num_used_hosts_ = num_used_hosts; }
+  void SetNumUsedProxies(unsigned char num_used_proxies) {
+    num_used_proxies_ = num_used_proxies;
+  }
+  void SetNumUsedMetalinks(unsigned char num_used_metalinks) {
+    num_used_metalinks_ = num_used_metalinks;
+  }
+  void SetNumUsedHosts(unsigned char num_used_hosts) {
+    num_used_hosts_ = num_used_hosts;
+  }
   void SetNumRetries(unsigned char num_retries) { num_retries_ = num_retries; }
   void SetBackoffMs(unsigned backoff_ms) { backoff_ms_ = backoff_ms; }
-  void SetCurrentMetalinkChainIndex(int current_metalink_chain_index)
-               { current_metalink_chain_index_ = current_metalink_chain_index; }
-  void SetCurrentHostChainIndex(int current_host_chain_index)
-                       { current_host_chain_index_ = current_host_chain_index; }
+  void SetCurrentMetalinkChainIndex(int current_metalink_chain_index) {
+    current_metalink_chain_index_ = current_metalink_chain_index;
+  }
+  void SetCurrentHostChainIndex(int current_host_chain_index) {
+    current_host_chain_index_ = current_host_chain_index;
+  }
 
   void SetAllowFailure(bool allow_failure) { allow_failure_ = allow_failure; }
 

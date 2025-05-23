@@ -6,7 +6,7 @@
 
 namespace receiver {
 
-bool IsSubPath(const PathString& parent, const PathString& path) {
+bool IsSubPath(const PathString &parent, const PathString &path) {
   // If parent is "", then any path is a subpath
   if (parent.GetLength() == 0) {
     return true;
@@ -15,10 +15,10 @@ bool IsSubPath(const PathString& parent, const PathString& path) {
   // If the parent string is the prefix of the path string and either
   // the strings are identical or the separator character is a "/",
   // then the path is a subpath
-  if (path.StartsWith(parent) &&
-      ((path.GetLength() == parent.GetLength()) ||
-       (path.GetChars()[parent.GetLength()] == '/') ||
-       (path.GetChars()[parent.GetLength() - 1] == '/'))) {
+  if (path.StartsWith(parent)
+      && ((path.GetLength() == parent.GetLength())
+          || (path.GetChars()[parent.GetLength()] == '/')
+          || (path.GetChars()[parent.GetLength() - 1] == '/'))) {
     return true;
   }
 

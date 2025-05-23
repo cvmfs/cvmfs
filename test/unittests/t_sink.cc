@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <unistd.h>
 
 #include <cassert>
@@ -11,6 +9,7 @@
 
 #include "c_file_sandbox.h"
 #include "c_http_server.h"
+#include "gtest/gtest.h"
 #include "network/sink.h"
 #include "network/sink_file.h"
 #include "network/sink_mem.h"
@@ -25,22 +24,18 @@ namespace download {
 
 class T_Sink : public FileSandbox {
  public:
-  T_Sink() : FileSandbox(string(tmp_path) + "/server_dir") {}
+  T_Sink() : FileSandbox(string(tmp_path) + "/server_dir") { }
 
  protected:
-  virtual void SetUp() {
-    CreateSandbox();
-  }
+  virtual void SetUp() { CreateSandbox(); }
 
-  virtual void TearDown() {
-    RemoveSandbox();
-  }
+  virtual void TearDown() { RemoveSandbox(); }
 
   virtual ~T_Sink() { }
 
   FILE *CreateTemporaryFile(std::string *path) const {
-    return CreateTempFile(GetCurrentWorkingDirectory() + "/cvmfs_uT_Sink",
-                          0600, "w+", path);
+    return CreateTempFile(GetCurrentWorkingDirectory() + "/cvmfs_uT_Sink", 0600,
+                          "w+", path);
   }
 
   static const char tmp_path[];
@@ -60,7 +55,7 @@ TEST_F(T_Sink, MemSinkWrite) {
 
   ASSERT_EQ(ret, static_cast<int64_t>(src_content.length()));
   ASSERT_EQ(sink.pos(), src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(sink.data()), src_content.c_str());
+  EXPECT_STREQ(reinterpret_cast<char *>(sink.data()), src_content.c_str());
 }
 
 
@@ -82,7 +77,7 @@ TEST_F(T_Sink, MemSinkResetOrPurge) {
   ASSERT_EQ(ret, static_cast<int64_t>(src_content.length()));
   ASSERT_GT(sink.size(), 0ul);
   ASSERT_EQ(sink.pos(), src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(sink.data()), src_content.c_str());
+  EXPECT_STREQ(reinterpret_cast<char *>(sink.data()), src_content.c_str());
 }
 
 TEST_F(T_Sink, MemSinkTooSmall) {
@@ -110,21 +105,21 @@ TEST_F(T_Sink, MemSinkUnprivAdopt) {
   string src_path = GetSmallFile();
   string src_content = GetFileContents(src_path);
 
-  unsigned char* buf =
-                      static_cast<unsigned char*>(malloc(src_content.length()));
+  unsigned char *buf = static_cast<unsigned char *>(
+      malloc(src_content.length()));
   memcpy(buf, src_content.c_str(), src_content.length());
 
   cvmfs::MemSink sink;
   sink.Adopt(src_content.length(), src_content.length(), buf, false);
 
   ASSERT_EQ(sink.pos(), src_content.length());
-  EXPECT_STREQ(reinterpret_cast<char*>(sink.data()), src_content.c_str());
+  EXPECT_STREQ(reinterpret_cast<char *>(sink.data()), src_content.c_str());
 
   free(buf);
 }
 
 TEST_F(T_Sink, MemSinkNotValid) {
-  unsigned char* buf = static_cast<unsigned char*>(malloc(10));
+  unsigned char *buf = static_cast<unsigned char *>(malloc(10));
   cvmfs::MemSink sink;
   EXPECT_TRUE(sink.IsValid());
 

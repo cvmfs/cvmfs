@@ -6,6 +6,7 @@
 #define CVMFS_NOTIFY_CMD_SUB_H_
 
 #include <stdint.h>
+
 #include <string>
 
 namespace notify {
@@ -19,7 +20,7 @@ namespace notify {
  * will be delivered. Setting "continuous" to false will cancel the subscription
  * after the first message is delivered.
  */
-int DoSubscribe(const std::string& server_url, const std::string& repo,
+int DoSubscribe(const std::string &server_url, const std::string &repo,
                 uint64_t min_revision, bool continuous, bool verbose);
 
 }  // namespace notify

@@ -26,17 +26,16 @@ const shash::Md5 Catalog::kMd5PathEmpty("", 0);
 /**
  * Open a catalog outside the framework of a catalog manager.
  */
-Catalog* Catalog::AttachFreely(const string     &imaginary_mountpoint,
-                               const string     &file,
+Catalog *Catalog::AttachFreely(const string &imaginary_mountpoint,
+                               const string &file,
                                const shash::Any &catalog_hash,
-                                     Catalog    *parent,
-                               const bool        is_nested) {
-  Catalog *catalog =
-    new Catalog(PathString(imaginary_mountpoint.data(),
-                           imaginary_mountpoint.length()),
-                catalog_hash,
-                parent,
-                is_nested);
+                               Catalog *parent,
+                               const bool is_nested) {
+  Catalog *catalog = new Catalog(
+      PathString(imaginary_mountpoint.data(), imaginary_mountpoint.length()),
+      catalog_hash,
+      parent,
+      is_nested);
   const bool successful_init = catalog->InitStandalone(file);
   if (!successful_init) {
     delete catalog;
@@ -48,19 +47,18 @@ Catalog* Catalog::AttachFreely(const string     &imaginary_mountpoint,
 
 Catalog::Catalog(const PathString &mountpoint,
                  const shash::Any &catalog_hash,
-                       Catalog    *parent,
-                 const bool        is_nested) :
-  catalog_hash_(catalog_hash),
-  mountpoint_(mountpoint),
-  is_regular_mountpoint_(mountpoint_ == root_prefix_),
-  volatile_flag_(false),
-  is_root_(parent == NULL && !is_nested),
-  managed_database_(false),
-  parent_(parent),
-  nested_catalog_cache_dirty_(true),
-  voms_authz_status_(kVomsUnknown),
-  initialized_(false)
-{
+                 Catalog *parent,
+                 const bool is_nested)
+    : catalog_hash_(catalog_hash)
+    , mountpoint_(mountpoint)
+    , is_regular_mountpoint_(mountpoint_ == root_prefix_)
+    , volatile_flag_(false)
+    , is_root_(parent == NULL && !is_nested)
+    , managed_database_(false)
+    , parent_(parent)
+    , nested_catalog_cache_dirty_(true)
+    , voms_authz_status_(kVomsUnknown)
+    , initialized_(false) {
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -96,14 +94,14 @@ Catalog::~Catalog() {
  * the WritableCatalog and the Catalog destructor
  */
 void Catalog::InitPreparedStatements() {
-  sql_listing_          = new SqlListing(database());
-  sql_lookup_md5path_   = new SqlLookupPathHash(database());
-  sql_lookup_nested_    = new SqlNestedCatalogLookup(database());
-  sql_list_nested_      = new SqlNestedCatalogListing(database());
-  sql_own_list_nested_  = new SqlOwnNestedCatalogListing(database());
-  sql_all_chunks_       = new SqlAllChunks(database());
-  sql_chunks_listing_   = new SqlChunksListing(database());
-  sql_lookup_xattrs_    = new SqlLookupXattrs(database());
+  sql_listing_ = new SqlListing(database());
+  sql_lookup_md5path_ = new SqlLookupPathHash(database());
+  sql_lookup_nested_ = new SqlNestedCatalogLookup(database());
+  sql_list_nested_ = new SqlNestedCatalogListing(database());
+  sql_own_list_nested_ = new SqlOwnNestedCatalogListing(database());
+  sql_all_chunks_ = new SqlAllChunks(database());
+  sql_chunks_listing_ = new SqlChunksListing(database());
+  sql_lookup_xattrs_ = new SqlLookupXattrs(database());
 }
 
 
@@ -135,20 +133,19 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 bool Catalog::ReadCatalogCounters() {
   assert(database_ != NULL);
   bool statistics_loaded;
-  if (database().schema_version() <
-      CatalogDatabase::kLatestSupportedSchema - CatalogDatabase::kSchemaEpsilon)
-  {
-    statistics_loaded =
-      counters_.ReadFromDatabase(database(), LegacyMode::kLegacy);
+  if (database().schema_version() < CatalogDatabase::kLatestSupportedSchema
+                                        - CatalogDatabase::kSchemaEpsilon) {
+    statistics_loaded = counters_.ReadFromDatabase(database(),
+                                                   LegacyMode::kLegacy);
   } else if (database().schema_revision() < 2) {
-    statistics_loaded =
-      counters_.ReadFromDatabase(database(), LegacyMode::kNoXattrs);
+    statistics_loaded = counters_.ReadFromDatabase(database(),
+                                                   LegacyMode::kNoXattrs);
   } else if (database().schema_revision() < 3) {
-    statistics_loaded =
-      counters_.ReadFromDatabase(database(), LegacyMode::kNoExternals);
+    statistics_loaded = counters_.ReadFromDatabase(database(),
+                                                   LegacyMode::kNoExternals);
   } else if (database().schema_revision() < 5) {
-    statistics_loaded =
-      counters_.ReadFromDatabase(database(), LegacyMode::kNoSpecials);
+    statistics_loaded = counters_.ReadFromDatabase(database(),
+                                                   LegacyMode::kNoSpecials);
   } else {
     statistics_loaded = counters_.ReadFromDatabase(database());
   }
@@ -170,9 +167,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
   if (database_->IsEqualSchema(database_->schema_version(), 1.0)) {
     // Possible fix-up for database layout lacking the content hash of
     // nested catalogs
-    SqlCatalog sql_has_nested_sha1(database(),
-      "SELECT count(*) FROM sqlite_master "
-      "WHERE type='table' AND name='nested_catalogs' AND sql LIKE '%sha1%';");
+    SqlCatalog sql_has_nested_sha1(
+        database(),
+        "SELECT count(*) FROM sqlite_master "
+        "WHERE type='table' AND name='nested_catalogs' AND sql LIKE '%sha1%';");
     bool retval = sql_has_nested_sha1.FetchRow();
     assert(retval == true);
     bool has_nested_sha1 = sql_has_nested_sha1.RetrieveInt64(0);
@@ -201,16 +199,16 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (database_->HasProperty("root_prefix")) {
-    const std::string root_prefix =
-                           database_->GetProperty<std::string>("root_prefix");
+    const std::string root_prefix = database_->GetProperty<std::string>(
+        "root_prefix");
     root_prefix_.Assign(root_prefix.data(), root_prefix.size());
     LogCvmfs(kLogCatalog, kLogDebug,
              "found root prefix %s in root catalog file %s",
              root_prefix_.c_str(), db_path.c_str());
     is_regular_mountpoint_ = (root_prefix_ == mountpoint_);
   } else {
-    LogCvmfs(kLogCatalog, kLogDebug,
-             "no root prefix for root catalog file %s", db_path.c_str());
+    LogCvmfs(kLogCatalog, kLogDebug, "no root prefix for root catalog file %s",
+             db_path.c_str());
   }
 
   // Get volatile content flag
@@ -248,14 +246,13 @@ shash::Md5 Catalog::NormalizePath(const PathString &path) const {
   ctx.buffer = alloca(ctx.size);
   shash::Init(ctx);
   shash::Update(
-    reinterpret_cast<const unsigned char *>(root_prefix_.GetChars()),
-    root_prefix_.GetLength(),
-    ctx);
-  shash::Update(
-    reinterpret_cast<const unsigned char *>(path.GetChars()) +
-      mountpoint_.GetLength(),
-    path.GetLength() - mountpoint_.GetLength(),
-    ctx);
+      reinterpret_cast<const unsigned char *>(root_prefix_.GetChars()),
+      root_prefix_.GetLength(),
+      ctx);
+  shash::Update(reinterpret_cast<const unsigned char *>(path.GetChars())
+                    + mountpoint_.GetLength(),
+                path.GetLength() - mountpoint_.GetLength(),
+                ctx);
   shash::Final(ctx, &result);
   return result.CastToMd5();
 }
@@ -301,8 +298,7 @@ PathString Catalog::PlantPath(const PathString &path) const {
  * @return true if DirectoryEntry was successfully found, false otherwise
  */
 bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
-                          DirectoryEntry *dirent) const
-{
+                          DirectoryEntry *dirent) const {
   assert(IsInitialized());
 
   MutexLockGuard m(lock_);
@@ -325,15 +321,13 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
  * @return true if DirectoryEntry was successfully found, false otherwise
  */
 bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
-                            DirectoryEntry *dirent) const
-{
+                            DirectoryEntry *dirent) const {
   return LookupEntry(md5path, true, dirent);
 }
 
 
 bool Catalog::LookupRawSymlink(const PathString &path,
-                               LinkString *raw_symlink) const
-{
+                               LinkString *raw_symlink) const {
   DirectoryEntry dirent;
   bool result = (LookupEntry(NormalizePath(path), false, &dirent));
   if (result)
@@ -342,10 +336,8 @@ bool Catalog::LookupRawSymlink(const PathString &path,
 }
 
 
-bool Catalog::LookupXattrsMd5Path(
-  const shash::Md5 &md5path,
-  XattrList *xattrs) const
-{
+bool Catalog::LookupXattrsMd5Path(const shash::Md5 &md5path,
+                                  XattrList *xattrs) const {
   assert(IsInitialized());
 
   MutexLockGuard m(lock_);
@@ -367,8 +359,7 @@ bool Catalog::LookupXattrsMd5Path(
  * @return true on successful listing, false otherwise
  */
 bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
-                                 StatEntryList *listing) const
-{
+                                 StatEntryList *listing) const {
   assert(IsInitialized());
 
   DirectoryEntry dirent;
@@ -401,8 +392,7 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
  */
 bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
                              DirectoryEntryList *listing,
-                             const bool expand_symlink) const
-{
+                             const bool expand_symlink) const {
   assert(IsInitialized());
 
   MutexLockGuard m(lock_);
@@ -419,20 +409,16 @@ bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
 }
 
 
-bool Catalog::AllChunksBegin() {
-  return sql_all_chunks_->Open();
-}
+bool Catalog::AllChunksBegin() { return sql_all_chunks_->Open(); }
 
 
-bool Catalog::AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg)
-{
+bool Catalog::AllChunksNext(shash::Any *hash,
+                            zlib::Algorithms *compression_alg) {
   return sql_all_chunks_->Next(hash, compression_alg);
 }
 
 
-bool Catalog::AllChunksEnd() {
-  return sql_all_chunks_->Close();
-}
+bool Catalog::AllChunksEnd() { return sql_all_chunks_->Close(); }
 
 
 /**
@@ -440,10 +426,9 @@ bool Catalog::AllChunksEnd() {
  * Could be figured out by a join but it is faster if the user of this
  * method tells us.
  */
-bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
+bool Catalog::ListMd5PathChunks(const shash::Md5 &md5path,
                                 const shash::Algorithms interpret_hashes_as,
-                                FileChunkList    *chunks) const
-{
+                                FileChunkList *chunks) const {
   assert(IsInitialized() && chunks->IsEmpty());
 
   MutexLockGuard m(lock_);
@@ -461,7 +446,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
 /**
  * Only used by the garbage collection
  */
-const Catalog::HashVector& Catalog::GetReferencedObjects() const {
+const Catalog::HashVector &Catalog::GetReferencedObjects() const {
   if (!referenced_hashes_.empty()) {
     return referenced_hashes_;
   }
@@ -508,14 +493,18 @@ bool Catalog::GetVOMSAuthz(string *authz) const {
   bool result;
   MutexLockGuard m(lock_);
   if (voms_authz_status_ == kVomsPresent) {
-    if (authz) {*authz = voms_authz_;}
+    if (authz) {
+      *authz = voms_authz_;
+    }
     result = true;
   } else if (voms_authz_status_ == kVomsNone) {
     result = false;
   } else {
     if (database().HasProperty("voms_authz")) {
       voms_authz_ = database().GetProperty<string>("voms_authz");
-      if (authz) {*authz = voms_authz_;}
+      if (authz) {
+        *authz = voms_authz_;
+      }
       voms_authz_status_ = kVomsPresent;
     } else {
       voms_authz_status_ = kVomsNone;
@@ -533,8 +522,8 @@ uint64_t Catalog::GetRevision() const {
 uint64_t Catalog::GetLastModified() const {
   const std::string prop_name = "last_modified";
   return (database().HasProperty(prop_name))
-    ? database().GetProperty<int>(prop_name)
-    : 0u;
+             ? database().GetProperty<int>(prop_name)
+             : 0u;
 }
 
 
@@ -554,11 +543,12 @@ uint64_t Catalog::GetNumEntries() const {
 
 shash::Any Catalog::GetPreviousRevision() const {
   MutexLockGuard m(lock_);
-  const std::string hash_string =
-    database().GetPropertyDefault<std::string>("previous_revision", "");
+  const std::string hash_string = database().GetPropertyDefault<std::string>(
+      "previous_revision", "");
   return (!hash_string.empty())
-    ? shash::MkFromHexPtr(shash::HexPtr(hash_string), shash::kSuffixCatalog)
-    : shash::Any();
+             ? shash::MkFromHexPtr(shash::HexPtr(hash_string),
+                                   shash::kSuffixCatalog)
+             : shash::Any();
 }
 
 
@@ -568,17 +558,17 @@ string Catalog::PrintMemStatistics() const {
     MutexLockGuard m(lock_);
     database().GetMemStatistics(&stats);
   }
-  return string(mountpoint().GetChars(), mountpoint().GetLength()) + ": " +
-    StringifyInt(stats.lookaside_slots_used) + " / " +
-      StringifyInt(stats.lookaside_slots_max) + " slots -- " +
-      StringifyInt(stats.lookaside_hit) + " hits, " +
-      StringifyInt(stats.lookaside_miss_size) + " misses-size, " +
-      StringifyInt(stats.lookaside_miss_full) + " misses-full -- " +
-    StringifyInt(stats.page_cache_used / 1024) + " kB pages -- " +
-      StringifyInt(stats.page_cache_hit) + " hits, " +
-      StringifyInt(stats.page_cache_miss) + " misses -- " +
-    StringifyInt(stats.schema_used / 1024) + " kB schema -- " +
-    StringifyInt(stats.stmt_used / 1024) + " kB statements";
+  return string(mountpoint().GetChars(), mountpoint().GetLength()) + ": "
+         + StringifyInt(stats.lookaside_slots_used) + " / "
+         + StringifyInt(stats.lookaside_slots_max) + " slots -- "
+         + StringifyInt(stats.lookaside_hit) + " hits, "
+         + StringifyInt(stats.lookaside_miss_size) + " misses-size, "
+         + StringifyInt(stats.lookaside_miss_full) + " misses-full -- "
+         + StringifyInt(stats.page_cache_used / 1024) + " kB pages -- "
+         + StringifyInt(stats.page_cache_hit) + " hits, "
+         + StringifyInt(stats.page_cache_miss) + " misses -- "
+         + StringifyInt(stats.schema_used / 1024) + " kB schema -- "
+         + StringifyInt(stats.stmt_used / 1024) + " kB statements";
 }
 
 
@@ -603,8 +593,8 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
   // Hardlinks are encoded in catalog-wide unique hard link group ids.
   // These ids must be resolved to actual inode relationships at runtime.
   if (hardlink_group > 0) {
-    HardlinkGroupMap::const_iterator inode_iter =
-      hardlink_groups_.find(hardlink_group);
+    HardlinkGroupMap::const_iterator inode_iter = hardlink_groups_.find(
+        hardlink_group);
 
     // Use cached entry if possible
     if (inode_iter == hardlink_groups_.end()) {
@@ -627,7 +617,7 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
  * catalog.
  * @return  a list of all nested catalog and bind mountpoints.
  */
-const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
+const Catalog::NestedCatalogList &Catalog::ListNestedCatalogs() const {
   MutexLockGuard m(lock_);
 
   if (nested_catalog_cache_dirty_) {
@@ -687,9 +677,8 @@ void Catalog::ResetNestedCatalogCacheUnprotected() {
 /**
  * Looks for a specific registered nested catalog based on a path.
  */
-bool Catalog::FindNested(const PathString &mountpoint,
-                         shash::Any *hash, uint64_t *size) const
-{
+bool Catalog::FindNested(const PathString &mountpoint, shash::Any *hash,
+                         uint64_t *size) const {
   MutexLockGuard m(lock_);
   PathString normalized_mountpoint = NormalizePath2(mountpoint);
   sql_lookup_nested_->BindSearchPath(normalized_mountpoint);
@@ -754,8 +743,9 @@ CatalogList Catalog::GetChildren() const {
 
   MutexLockGuard m(lock_);
   for (NestedCatalogMap::const_iterator i = children_.begin(),
-       iEnd = children_.end(); i != iEnd; ++i)
-  {
+                                        iEnd = children_.end();
+       i != iEnd;
+       ++i) {
     result.push_back(i->second);
   }
 
@@ -770,7 +760,7 @@ CatalogList Catalog::GetChildren() const {
  * @param path the path to find a best fitting catalog for
  * @return a pointer to the best fitting child or NULL if it does not fit at all
  */
-Catalog* Catalog::FindSubtree(const PathString &path) const {
+Catalog *Catalog::FindSubtree(const PathString &path) const {
   // Check if this catalog fits the beginning of the path.
   if (!path.StartsWith(mountpoint_))
     return NULL;
@@ -805,13 +795,13 @@ Catalog* Catalog::FindSubtree(const PathString &path) const {
  * Looks for a child catalog, which is a subset of all registered nested
  * catalogs.
  */
-Catalog* Catalog::FindChild(const PathString &mountpoint) const {
+Catalog *Catalog::FindChild(const PathString &mountpoint) const {
   NestedCatalogMap::const_iterator nested_iter;
 
   MutexLockGuard m(lock_);
   nested_iter = children_.find(mountpoint);
-  Catalog* result =
-    (nested_iter == children_.end()) ? NULL : nested_iter->second;
+  Catalog *result = (nested_iter == children_.end()) ? NULL
+                                                     : nested_iter->second;
 
   return result;
 }
@@ -825,8 +815,7 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
  * @param dirent the DirectoryEntry to perform coherence fixes on
  */
 void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
-                                 DirectoryEntry *dirent) const
-{
+                                 DirectoryEntry *dirent) const {
   if (!HasParent())
     return;
 

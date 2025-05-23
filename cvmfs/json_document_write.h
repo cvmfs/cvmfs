@@ -27,7 +27,12 @@ namespace CVMFS_NAMESPACE_GUARD {
  * object with the `AddJsonObject`. This will take care of all the escaping.
  */
 class JsonStringGenerator {
-  enum JsonVariant { kString, kInteger, kFloat, kJsonObject };
+  enum JsonVariant {
+    kString,
+    kInteger,
+    kFloat,
+    kJsonObject
+  };
 
   struct JsonEntry {
     JsonVariant variant;
@@ -36,41 +41,41 @@ class JsonStringGenerator {
     int64_t int_val;
     float float_val;
 
-    JsonEntry(const std::string& key_escaped, const std::string& val)
-        : variant(kString),
-          key_escaped(key_escaped),
-          str_val_escaped(val),
-          int_val(0),
-          float_val(0.0) {}
+    JsonEntry(const std::string &key_escaped, const std::string &val)
+        : variant(kString)
+        , key_escaped(key_escaped)
+        , str_val_escaped(val)
+        , int_val(0)
+        , float_val(0.0) { }
 
-    JsonEntry(const std::string& key_escaped, const std::string& val,
+    JsonEntry(const std::string &key_escaped, const std::string &val,
               const JsonVariant variant)
-        : variant(variant),
-          key_escaped(key_escaped),
-          str_val_escaped(val),
-          int_val(0),
-          float_val(0.0) {}
+        : variant(variant)
+        , key_escaped(key_escaped)
+        , str_val_escaped(val)
+        , int_val(0)
+        , float_val(0.0) { }
 
-    JsonEntry(const std::string& key_escaped, const int val)
-        : variant(kInteger),
-          key_escaped(key_escaped),
-          str_val_escaped(),
-          int_val(val),
-          float_val(0.0) {}
+    JsonEntry(const std::string &key_escaped, const int val)
+        : variant(kInteger)
+        , key_escaped(key_escaped)
+        , str_val_escaped()
+        , int_val(val)
+        , float_val(0.0) { }
 
-    JsonEntry(const std::string& key_escaped, const float val)
-        : variant(kFloat),
-          key_escaped(key_escaped),
-          str_val_escaped(),
-          int_val(0),
-          float_val(val) {}
+    JsonEntry(const std::string &key_escaped, const float val)
+        : variant(kFloat)
+        , key_escaped(key_escaped)
+        , str_val_escaped()
+        , int_val(0)
+        , float_val(val) { }
 
-    JsonEntry(const std::string& key_escaped, const int64_t val)
-        : variant(kInteger),
-          key_escaped(key_escaped),
-          str_val_escaped(),
-          int_val(val),
-          float_val(0.0) {}
+    JsonEntry(const std::string &key_escaped, const int64_t val)
+        : variant(kInteger)
+        , key_escaped(key_escaped)
+        , str_val_escaped()
+        , int_val(val)
+        , float_val(0.0) { }
 
     std::string Format() const {
       switch (variant) {
@@ -89,27 +94,27 @@ class JsonStringGenerator {
   };
 
  public:
-  void Add(const std::string& key, const std::string& val) {
+  void Add(const std::string &key, const std::string &val) {
     const JsonEntry entry(Escape(key), Escape(val));
     entries.push_back(entry);
   }
 
-  void Add(const std::string& key, const int val) {
+  void Add(const std::string &key, const int val) {
     const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void Add(const std::string& key, const float val) {
+  void Add(const std::string &key, const float val) {
     const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void Add(const std::string& key, const int64_t val) {
+  void Add(const std::string &key, const int64_t val) {
     const JsonEntry entry(Escape(key), val);
     entries.push_back(entry);
   }
 
-  void AddJsonObject(const std::string& key, const std::string& json) {
+  void AddJsonObject(const std::string &key, const std::string &json) {
     // we **do not escape** the value here
     const JsonEntry entry(Escape(key), json, kJsonObject);
     entries.push_back(entry);
@@ -129,16 +134,14 @@ class JsonStringGenerator {
     return output;
   }
 
-  void Clear() {
-    entries.clear();
-  }
+  void Clear() { entries.clear(); }
 
  private:
   // this escape procedure is not as complete as it should be.
   // we should manage ALL control chars from '\x00' to '\x1f'
   // however this are the one that we can expect to happen
   // More info: https://stackoverflow.com/a/33799784/869271
-  const std::string Escape(const std::string& input) const {
+  const std::string Escape(const std::string &input) const {
     std::string result;
     result.reserve(input.size());
     for (size_t i = 0; i < input.size(); i++) {

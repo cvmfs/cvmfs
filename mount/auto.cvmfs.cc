@@ -15,8 +15,8 @@ static bool IsInRange(const char c, const char begin, const char end) {
 }
 
 static bool IsAlphanum(const char c) {
-  return IsInRange(c, 'a', 'z') || IsInRange(c, 'A', 'Z') ||
-         IsInRange(c, '0', '9');
+  return IsInRange(c, 'a', 'z') || IsInRange(c, 'A', 'Z')
+         || IsInRange(c, '0', '9');
 }
 
 
@@ -37,17 +37,15 @@ int main(int argc, char **argv) {
       has_dot = true;
       continue;
     }
-    if (IsAlphanum(hostname[i]) ||
-        (hostname[i] == '-') ||
-        (hostname[i] == '_'))
-    {
+    if (IsAlphanum(hostname[i]) || (hostname[i] == '-')
+        || (hostname[i] == '_')) {
       continue;
     }
     return 1;
   }
   if (!has_dot)
     return 1;
-  if (hostname[hostname.length()-1] == '.')
+  if (hostname[hostname.length() - 1] == '.')
     return 1;
 
   printf("-fstype=cvmfs :%s\n", hostname.c_str());

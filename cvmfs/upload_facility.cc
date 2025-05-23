@@ -15,27 +15,23 @@ namespace upload {
 
 atomic_int64 UploadStreamHandle::g_upload_stream_tag = 0;
 
-AbstractUploader::UploadJob::UploadJob(
-  UploadStreamHandle *handle,
-  UploadBuffer buffer,
-  const CallbackTN *callback)
-  : type(Upload)
-  , stream_handle(handle)
-  , tag_(handle->tag)
-  , buffer(buffer)
-  , callback(callback)
-{ }
+AbstractUploader::UploadJob::UploadJob(UploadStreamHandle *handle,
+                                       UploadBuffer buffer,
+                                       const CallbackTN *callback)
+    : type(Upload)
+    , stream_handle(handle)
+    , tag_(handle->tag)
+    , buffer(buffer)
+    , callback(callback) { }
 
-AbstractUploader::UploadJob::UploadJob(
-  UploadStreamHandle *handle,
-  const shash::Any &content_hash)
-  : type(Commit)
-  , stream_handle(handle)
-  , tag_(handle->tag)
-  , buffer()
-  , callback(NULL)
-  , content_hash(content_hash)
-{ }
+AbstractUploader::UploadJob::UploadJob(UploadStreamHandle *handle,
+                                       const shash::Any &content_hash)
+    : type(Commit)
+    , stream_handle(handle)
+    , tag_(handle->tag)
+    , buffer()
+    , callback(NULL)
+    , content_hash(content_hash) { }
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
@@ -44,10 +40,9 @@ void AbstractUploader::RegisterPlugins() {
 }
 
 AbstractUploader::AbstractUploader(const SpoolerDefinition &spooler_definition)
-  : spooler_definition_(spooler_definition)
-  , num_upload_tasks_(spooler_definition.num_upload_tasks)
-  , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads)
-{ }
+    : spooler_definition_(spooler_definition)
+    , num_upload_tasks_(spooler_definition.num_upload_tasks)
+    , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) { }
 
 
 bool AbstractUploader::Initialize() {
@@ -70,8 +65,8 @@ bool AbstractUploader::FinalizeSession(bool /*commit*/,
 
 
 int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
-  const std::string tmp_path =
-      CreateTempPath(spooler_definition_.temporary_path + "/" + "chunk", 0644);
+  const std::string tmp_path = CreateTempPath(
+      spooler_definition_.temporary_path + "/" + "chunk", 0644);
   if (tmp_path.empty()) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to create temp file in %s for upload of file chunk"
@@ -94,9 +89,7 @@ int AbstractUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   return tmp_fd;
 }
 
-void AbstractUploader::TearDown() {
-  tasks_upload_.Terminate();
-}
+void AbstractUploader::TearDown() { tasks_upload_.Terminate(); }
 
 void AbstractUploader::WaitForUpload() const { jobs_in_flight_.WaitForZero(); }
 
@@ -146,13 +139,13 @@ void AbstractUploader::CountUploadedCatalogBytes(int64_t bytes_written) const {
 void TaskUpload::Process(AbstractUploader::UploadJob *upload_job) {
   switch (upload_job->type) {
     case AbstractUploader::UploadJob::Upload:
-      uploader_->StreamedUpload(
-        upload_job->stream_handle, upload_job->buffer, upload_job->callback);
+      uploader_->StreamedUpload(upload_job->stream_handle, upload_job->buffer,
+                                upload_job->callback);
       break;
 
     case AbstractUploader::UploadJob::Commit:
-      uploader_->FinalizeStreamedUpload(
-        upload_job->stream_handle, upload_job->content_hash);
+      uploader_->FinalizeStreamedUpload(upload_job->stream_handle,
+                                        upload_job->content_hash);
       break;
 
     default:

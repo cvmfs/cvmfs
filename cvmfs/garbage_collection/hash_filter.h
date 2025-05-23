@@ -19,7 +19,7 @@
  */
 class AbstractHashFilter {
  public:
-  virtual ~AbstractHashFilter() {}
+  virtual ~AbstractHashFilter() { }
 
   /**
    * Adds the given hash to the filter
@@ -46,7 +46,7 @@ class AbstractHashFilter {
    * of the AbstractHashFilter.
    * Note: After Freeze() has been called, Fill() should fail!
    */
-  virtual void Freeze() {}
+  virtual void Freeze() { }
 
   /**
    * Returns the number of objects already inserted into the filter.
@@ -65,7 +65,7 @@ class AbstractHashFilter {
  */
 class SimpleHashFilter : public AbstractHashFilter {
  public:
-  SimpleHashFilter() : frozen_(false) {}
+  SimpleHashFilter() : frozen_(false) { }
 
   void Fill(const shash::Any &hash) {
     assert(!frozen_);
@@ -80,8 +80,8 @@ class SimpleHashFilter : public AbstractHashFilter {
   size_t Count() const { return hashes_.size(); }
 
  private:
-  std::set<shash::Any>  hashes_;
-  bool                  frozen_;
+  std::set<shash::Any> hashes_;
+  bool frozen_;
 };
 
 
@@ -96,7 +96,7 @@ class SmallhashFilter : public AbstractHashFilter {
  protected:
   static uint32_t hasher(const shash::Any &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
+    return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
   }
 
  public:
@@ -116,12 +116,12 @@ class SmallhashFilter : public AbstractHashFilter {
     return hashmap_.Contains(hash);
   }
 
-  void   Freeze()      { frozen_ = true;         }
+  void Freeze() { frozen_ = true; }
   size_t Count() const { return hashmap_.size(); }
 
  private:
-  SmallHashDynamic<shash::Any, bool>  hashmap_;
-  bool                                frozen_;
+  SmallHashDynamic<shash::Any, bool> hashmap_;
+  bool frozen_;
 };
 
 #endif  // CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H_

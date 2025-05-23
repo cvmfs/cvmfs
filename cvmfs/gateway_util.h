@@ -11,8 +11,9 @@ namespace gateway {
 
 struct GatewayKey {
  public:
-  GatewayKey() {}
-  GatewayKey(const std::string &i, const std::string &s) : id_(i), secret_(s) {}
+  GatewayKey() { }
+  GatewayKey(const std::string &i, const std::string &s)
+      : id_(i), secret_(s) { }
 
   bool IsValid() const { return !id_.empty(); }
   std::string id() const { return id_; }
@@ -25,13 +26,13 @@ struct GatewayKey {
 
 int APIVersion();
 
-GatewayKey ReadGatewayKey(const std::string& key_file_name);
+GatewayKey ReadGatewayKey(const std::string &key_file_name);
 
-bool ReadKeys(const std::string& key_file_name, std::string* key_id,
-              std::string* secret);
+bool ReadKeys(const std::string &key_file_name, std::string *key_id,
+              std::string *secret);
 
-bool ParseKey(const std::string& body, std::string* key_id,
-              std::string* secret);
+bool ParseKey(const std::string &body, std::string *key_id,
+              std::string *secret);
 
 }  // namespace gateway
 

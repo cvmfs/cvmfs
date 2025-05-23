@@ -14,9 +14,7 @@ namespace publish {
 class CmdLsof : public Command {
  public:
   virtual std::string GetName() const { return "lsof"; }
-  virtual std::string GetBrief() const {
-    return "Internal helper";
-  }
+  virtual std::string GetBrief() const { return "Internal helper"; }
   virtual std::string GetDescription() const {
     return "Internal helper. Will be removed. Don't use.";
   }

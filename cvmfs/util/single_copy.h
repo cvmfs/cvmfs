@@ -16,13 +16,13 @@ namespace CVMFS_NAMESPACE_GUARD {
 class SingleCopy {
  protected:
   // Prevent SingleCopy from being instantiated on its own
-  SingleCopy() {}
+  SingleCopy() { }
 
  private:
   // Provoke a linker error by not implementing copy constructor and
   // assignment operator.
   SingleCopy(const SingleCopy &other);
-  SingleCopy& operator=(const SingleCopy &rhs);
+  SingleCopy &operator=(const SingleCopy &rhs);
 };
 
 

@@ -1,9 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include <gtest/gtest.h>
-
 #include <errno.h>
+#include <gtest/gtest.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -13,10 +12,9 @@
 #include "shrinkwrap/fs_traversal_interface.h"
 #include "shrinkwrap/posix/interface.h"
 #include "shrinkwrap/util.h"
+#include "testutil_shrinkwrap.h"
 #include "util/platform.h"
 #include "util/posix.h"
-
-#include "testutil_shrinkwrap.h"
 
 
 class T_FsPosix : public ::testing::Test {
@@ -24,10 +22,11 @@ class T_FsPosix : public ::testing::Test {
   virtual void SetUp() {
     // TODO(jblomer): put in namespace, code style
     interface_ = posix_get_interface();
-    const char *test_name
-      = ::testing::UnitTest::GetInstance()->current_test_info()->name();
-    interface_->context_ = interface_->initialize(test_name,
-      "./", NULL, NULL, 0);
+    const char *test_name = ::testing::UnitTest::GetInstance()
+                                ->current_test_info()
+                                ->name();
+    interface_->context_ = interface_->initialize(test_name, "./", NULL, NULL,
+                                                  0);
   }
 
   virtual void TearDown() {
@@ -46,8 +45,8 @@ TEST_F(T_FsPosix, Init) {
   EXPECT_TRUE(DirectoryExists("./.data"));
   EXPECT_TRUE(DirectoryExists("./.data/ff/ff"));
   interface_->finalize(interface_->context_);
-  interface_->context_ = interface_->initialize("TestInit-2",
-      "./", "./.data-TestInit", NULL, 0);
+  interface_->context_ = interface_->initialize("TestInit-2", "./",
+                                                "./.data-TestInit", NULL, 0);
   EXPECT_TRUE(DirectoryExists("./TestInit-2"));
   EXPECT_TRUE(DirectoryExists("./.data-TestInit"));
   EXPECT_TRUE(DirectoryExists("./.data-TestInit/ff/ff"));
@@ -93,15 +92,11 @@ TEST_F(T_FsPosix, Stat) {
 
   struct cvmfs_attr *stat_traversal = cvmfs_attr_init();
   EXPECT_EQ(-1,
-    interface_->get_stat(
-      interface_->context_,
-      "/abc/testfile1.txt",
-      stat_traversal, true));
+            interface_->get_stat(interface_->context_, "/abc/testfile1.txt",
+                                 stat_traversal, true));
   EXPECT_EQ(0,
-    interface_->get_stat(
-      interface_->context_,
-      "/abc/testfile1.txt",
-      stat_traversal, false));
+            interface_->get_stat(interface_->context_, "/abc/testfile1.txt",
+                                 stat_traversal, false));
   // Check empty checksum
   EXPECT_EQ(NULL, stat_traversal->cvm_checksum);
   EXPECT_EQ(stat_reference.st_mode, stat_traversal->st_mode);
@@ -114,10 +109,8 @@ TEST_F(T_FsPosix, Stat) {
 
   stat_traversal = cvmfs_attr_init();
   EXPECT_EQ(-1,
-    interface_->get_stat(
-      interface_->context_,
-      "/abc/idontexist.txt",
-      stat_traversal, true));
+            interface_->get_stat(interface_->context_, "/abc/idontexist.txt",
+                                 stat_traversal, true));
   EXPECT_EQ(ENOENT, errno);
   cvmfs_attr_free(stat_traversal);
 }
@@ -129,11 +122,8 @@ TEST_F(T_FsPosix, SetMetaData) {
   const bool ignore_failure = false;
   CreateFile("./SetMetaData/abc/foo", 0644, ignore_failure);
   struct cvmfs_attr *stat = cvmfs_attr_init();
-  ASSERT_EQ(0,
-    interface_->get_stat(
-      interface_->context_,
-      "/abc/foo",
-      stat, false));
+  ASSERT_EQ(
+      0, interface_->get_stat(interface_->context_, "/abc/foo", stat, false));
 
   // Change a few easily modifiable values...
   stat->st_mode = 0600;
@@ -150,11 +140,8 @@ TEST_F(T_FsPosix, SetMetaData) {
   stat->st_mode = 0;
   cvmfs_attr_free(stat);
   stat = cvmfs_attr_init();
-  EXPECT_EQ(0,
-    interface_->get_stat(
-      interface_->context_,
-      "/abc/foo",
-      stat, false));
+  EXPECT_EQ(
+      0, interface_->get_stat(interface_->context_, "/abc/foo", stat, false));
 
   EXPECT_EQ(mode_t(0600), (~S_IFMT) & stat->st_mode);
   if (supports_xattrs) {
@@ -170,11 +157,11 @@ TEST_F(T_FsPosix, SetMetaData) {
 TEST_F(T_FsPosix, GetIdentifier) {
   struct cvmfs_attr *stat = cvmfs_attr_init();
   stat->cvm_checksum = strdup("da39a3ee5e6b4b0d3255bfef95601890afd80709");
-  char* res = interface_->get_identifier(interface_->context_, stat);
+  char *res = interface_->get_identifier(interface_->context_, stat);
   shash::Any result = HashMeta(stat);
-  std::string result_path
-    = std::string("/da/39/a3ee5e6b4b0d3255bfef95601890afd80709.")
-      + result.ToString();
+  std::string result_path = std::string(
+                                "/da/39/a3ee5e6b4b0d3255bfef95601890afd80709.")
+                            + result.ToString();
   EXPECT_STREQ(result_path.c_str(), res);
   free(res);
   cvmfs_attr_free(stat);
@@ -195,7 +182,7 @@ TEST_F(T_FsPosix, TouchLinkUnlink) {
   EXPECT_EQ(-1, interface_->do_link(interface_->context_, "/foo.txt", ident1));
   EXPECT_EQ(ENOENT, errno);
   EXPECT_EQ(-1,
-    interface_->do_link(interface_->context_, "/abc/foo.txt", ident1));
+            interface_->do_link(interface_->context_, "/abc/foo.txt", ident1));
   EXPECT_EQ(ENOENT, errno);
   EXPECT_EQ(-1, interface_->do_unlink(interface_->context_, "/foo.txt"));
   EXPECT_EQ(ENOENT, errno);
@@ -238,24 +225,18 @@ TEST_F(T_FsPosix, TouchLinkUnlink) {
 
 TEST_F(T_FsPosix, Symlink) {
   struct cvmfs_attr *stat = cvmfs_attr_init();
-  EXPECT_EQ(0, interface_->do_symlink(interface_->context_,
-    "/asymlink",
-    "somedestination",
-    stat));
+  EXPECT_EQ(0, interface_->do_symlink(
+                   interface_->context_, "/asymlink", "somedestination", stat));
   platform_stat64 buf;
   EXPECT_EQ(0, platform_lstat("./Symlink/asymlink", &buf));
   EXPECT_TRUE(S_ISLNK(buf.st_mode));
   char strbuf[17];
-  size_t read_len
-    = readlink("./Symlink/asymlink", strbuf, sizeof(strbuf)-1);
+  size_t read_len = readlink("./Symlink/asymlink", strbuf, sizeof(strbuf) - 1);
   strbuf[read_len] = '\0';
   EXPECT_STREQ("somedestination", strbuf);
-  EXPECT_EQ(0, interface_->do_symlink(interface_->context_,
-    "/asymlink",
-    "anotherdestinat",
-    stat));
-  read_len
-    = readlink("./Symlink/asymlink", strbuf, sizeof(strbuf)-1);
+  EXPECT_EQ(0, interface_->do_symlink(
+                   interface_->context_, "/asymlink", "anotherdestinat", stat));
+  read_len = readlink("./Symlink/asymlink", strbuf, sizeof(strbuf) - 1);
   strbuf[read_len] = '\0';
   EXPECT_STREQ("anotherdestinat", strbuf);
   cvmfs_attr_free(stat);
@@ -353,17 +334,16 @@ TEST_F(T_FsPosix, MkDirRmDir) {
 
 TEST_F(T_FsPosix, HasFile) {
   CreateFile("./.data/ff/ff/test.txt", 0744, false);
-  EXPECT_TRUE(interface_->has_file(
-    interface_->context_, "/ff/ff/test.txt"));
-  EXPECT_FALSE(interface_->has_file(
-    interface_->context_, "/ff/ff/test.txt.notavail"));
+  EXPECT_TRUE(interface_->has_file(interface_->context_, "/ff/ff/test.txt"));
+  EXPECT_FALSE(
+      interface_->has_file(interface_->context_, "/ff/ff/test.txt.notavail"));
 }
 
 
 TEST_F(T_FsPosix, GarbageCollection) {
   struct fs_traversal *dest = posix_get_interface();
-  struct fs_traversal_context *context =
-    dest->initialize("./", "posix", "./data", NULL, 4);
+  struct fs_traversal_context *context = dest->initialize("./", "posix",
+                                                          "./data", NULL, 4);
   const bool supports_xattrs = SupportsXattrs(".");
 
   std::string content1 = "a";
@@ -383,13 +363,13 @@ TEST_F(T_FsPosix, GarbageCollection) {
     xlist22 = CreateSampleXattrlist("TestGarbageCollection2");
   }
   struct cvmfs_attr *stat1 = CreateSampleStat("foo", 0, 0777, 0, xlist1,
-    &content1_hash);
-  struct cvmfs_attr *stat2 = CreateSampleStat("foo", 0, 0777, 0,
-    xlist11, &content2_hash);
+                                              &content1_hash);
+  struct cvmfs_attr *stat2 = CreateSampleStat("foo", 0, 0777, 0, xlist11,
+                                              &content2_hash);
   struct cvmfs_attr *stat3 = CreateSampleStat("foo", 0, 0777, 0, xlist2,
-    &content1_hash);
-  struct cvmfs_attr *stat4 = CreateSampleStat("foo", 0, 0777, 0,
-    xlist22, &content2_hash);
+                                              &content1_hash);
+  struct cvmfs_attr *stat4 = CreateSampleStat("foo", 0, 0777, 0, xlist22,
+                                              &content2_hash);
 
   EXPECT_EQ(0, dest->touch(context, stat1));
   char *ident1 = dest->get_identifier(context, stat1);

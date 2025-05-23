@@ -9,24 +9,23 @@
 #include "util/logging.h"
 #include "util/smalloc.h"
 
-Pathspec::Pathspec(const std::string &spec) :
-  regex_(NULL),
-  relaxed_regex_(NULL),
-  prefix_regex_(NULL),
-  regex_compiled_(false),
-  relaxed_regex_compiled_(false),
-  prefix_regex_compiled_(false),
-  glob_string_compiled_(false),
-  glob_string_sequence_compiled_(false),
-  valid_(true),
-  absolute_(false)
-{
+Pathspec::Pathspec(const std::string &spec)
+    : regex_(NULL)
+    , relaxed_regex_(NULL)
+    , prefix_regex_(NULL)
+    , regex_compiled_(false)
+    , relaxed_regex_compiled_(false)
+    , prefix_regex_compiled_(false)
+    , glob_string_compiled_(false)
+    , glob_string_sequence_compiled_(false)
+    , valid_(true)
+    , absolute_(false) {
   Parse(spec);
   if (patterns_.size() == 0) {
     valid_ = false;
   }
 
-        ElementPatterns::const_iterator i    = patterns_.begin();
+  ElementPatterns::const_iterator i = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
   for (; i != iend; ++i) {
     if (!i->IsValid()) {
@@ -37,37 +36,35 @@ Pathspec::Pathspec(const std::string &spec) :
 
 // Compiled regex structure cannot be duplicated and needs to be re-compiled
 // Note: the copy-constructed object will perform a lazy evaluation again
-Pathspec::Pathspec(const Pathspec &other) :
-  patterns_(other.patterns_),
-  regex_(NULL),
-  relaxed_regex_(NULL),
-  prefix_regex_(NULL),
-  glob_string_(other.glob_string_),
-  glob_string_sequence_(other.glob_string_sequence_),
-  regex_compiled_(false),
-  relaxed_regex_compiled_(false),
-  prefix_regex_compiled_(false),
-  glob_string_compiled_(other.glob_string_compiled_),
-  glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
-  valid_(other.valid_),
-  absolute_(other.absolute_) {}
+Pathspec::Pathspec(const Pathspec &other)
+    : patterns_(other.patterns_)
+    , regex_(NULL)
+    , relaxed_regex_(NULL)
+    , prefix_regex_(NULL)
+    , glob_string_(other.glob_string_)
+    , glob_string_sequence_(other.glob_string_sequence_)
+    , regex_compiled_(false)
+    , relaxed_regex_compiled_(false)
+    , prefix_regex_compiled_(false)
+    , glob_string_compiled_(other.glob_string_compiled_)
+    , glob_string_sequence_compiled_(other.glob_string_sequence_compiled_)
+    , valid_(other.valid_)
+    , absolute_(other.absolute_) { }
 
-Pathspec::~Pathspec() {
-  DestroyRegularExpressions();
-}
+Pathspec::~Pathspec() { DestroyRegularExpressions(); }
 
-Pathspec& Pathspec::operator=(const Pathspec &other) {
+Pathspec &Pathspec::operator=(const Pathspec &other) {
   if (this != &other) {
     DestroyRegularExpressions();  // see: copy c'tor for details
     patterns_ = other.patterns_;
 
     glob_string_compiled_ = other.glob_string_compiled_;
-    glob_string_          = other.glob_string_;
+    glob_string_ = other.glob_string_;
 
     glob_string_sequence_compiled_ = other.glob_string_sequence_compiled_;
-    glob_string_sequence_          = other.glob_string_sequence_;
+    glob_string_sequence_ = other.glob_string_sequence_;
 
-    valid_    = other.valid_;
+    valid_ = other.valid_;
     absolute_ = other.absolute_;
   }
 
@@ -79,7 +76,7 @@ void Pathspec::Parse(const std::string &spec) {
   // parsing is done using std::string iterators to walk through the entire
   // pathspec parameter. Thus, all parsing methods receive references to these
   // iterators and increment itr as they pass along.
-        std::string::const_iterator itr = spec.begin();
+  std::string::const_iterator itr = spec.begin();
   const std::string::const_iterator end = spec.end();
 
   absolute_ = (*itr == kSeparator);
@@ -92,10 +89,8 @@ void Pathspec::Parse(const std::string &spec) {
   }
 }
 
-void Pathspec::ParsePathElement(
-  const std::string::const_iterator &end,
-  std::string::const_iterator  *itr
-) {
+void Pathspec::ParsePathElement(const std::string::const_iterator &end,
+                                std::string::const_iterator *itr) {
   // find the end of the current pattern element (next directory boundary)
   const std::string::const_iterator begin_element = *itr;
   while (*itr != end && **itr != kSeparator) {
@@ -115,8 +110,8 @@ bool Pathspec::IsMatching(const std::string &query_path) const {
   }
 
   const bool query_is_absolute = (query_path[0] == kSeparator);
-  return (!query_is_absolute || this->IsAbsolute()) &&
-         IsPathspecMatching(query_path);
+  return (!query_is_absolute || this->IsAbsolute())
+         && IsPathspecMatching(query_path);
 }
 
 bool Pathspec::IsPrefixMatching(const std::string &query_path) const {
@@ -153,8 +148,8 @@ bool Pathspec::IsPathspecMatchingRelaxed(const std::string &query_path) const {
   return ApplyRegularExpression(query_path, GetRelaxedRegularExpression());
 }
 
-bool Pathspec::ApplyRegularExpression(const std::string  &query_path,
-                                            regex_t      *regex) const {
+bool Pathspec::ApplyRegularExpression(const std::string &query_path,
+                                      regex_t *regex) const {
   const char *path = query_path.c_str();
   const int retval = regexec(regex, path, 0, NULL, 0);
 
@@ -165,7 +160,7 @@ bool Pathspec::ApplyRegularExpression(const std::string  &query_path,
   return (retval == 0);
 }
 
-regex_t* Pathspec::GetRegularExpression() const {
+regex_t *Pathspec::GetRegularExpression() const {
   if (!regex_compiled_) {
     const bool is_relaxed = false;
     const std::string regex = GenerateRegularExpression(is_relaxed);
@@ -178,7 +173,7 @@ regex_t* Pathspec::GetRegularExpression() const {
   return regex_;
 }
 
-regex_t* Pathspec::GetPrefixRegularExpression() const {
+regex_t *Pathspec::GetPrefixRegularExpression() const {
   if (!prefix_regex_compiled_) {
     const bool is_relaxed = false;
     const bool is_prefix = true;
@@ -192,7 +187,7 @@ regex_t* Pathspec::GetPrefixRegularExpression() const {
   return prefix_regex_;
 }
 
-regex_t* Pathspec::GetRelaxedRegularExpression() const {
+regex_t *Pathspec::GetRelaxedRegularExpression() const {
   if (!relaxed_regex_compiled_) {
     const bool is_relaxed = true;
     const std::string regex = GenerateRegularExpression(is_relaxed);
@@ -206,10 +201,8 @@ regex_t* Pathspec::GetRelaxedRegularExpression() const {
   return relaxed_regex_;
 }
 
-std::string Pathspec::GenerateRegularExpression(
-  const bool is_relaxed,
-  const bool is_prefix) const
-{
+std::string Pathspec::GenerateRegularExpression(const bool is_relaxed,
+                                                const bool is_prefix) const {
   // start matching at the first character
   std::string regex = "^";
 
@@ -219,7 +212,7 @@ std::string Pathspec::GenerateRegularExpression(
   }
 
   // concatenate the regular expressions of the compiled path elements
-        ElementPatterns::const_iterator i    = patterns_.begin();
+  ElementPatterns::const_iterator i = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
   for (; i != iend; ++i) {
     regex += i->GenerateRegularExpression(is_relaxed);
@@ -242,7 +235,7 @@ std::string Pathspec::GenerateRegularExpression(
   return regex;
 }
 
-regex_t* Pathspec::CompileRegularExpression(const std::string &regex) const {
+regex_t *Pathspec::CompileRegularExpression(const std::string &regex) const {
   regex_t *result = reinterpret_cast<regex_t *>(smalloc(sizeof(regex_t)));
   const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
   const int retval = regcomp(result, regex.c_str(), flags);
@@ -259,28 +252,27 @@ void Pathspec::DestroyRegularExpressions() {
   if (regex_compiled_) {
     assert(regex_ != NULL);
     regfree(regex_);
-    regex_          = NULL;
+    regex_ = NULL;
     regex_compiled_ = false;
   }
 
   if (relaxed_regex_compiled_) {
     assert(relaxed_regex_ != NULL);
     regfree(relaxed_regex_);
-    relaxed_regex_          = NULL;
+    relaxed_regex_ = NULL;
     relaxed_regex_compiled_ = false;
   }
 }
 
 bool Pathspec::operator==(const Pathspec &other) const {
-  if (patterns_.size() != other.patterns_.size() ||
-      IsValid()        != other.IsValid()        ||
-      IsAbsolute()     != other.IsAbsolute()) {
+  if (patterns_.size() != other.patterns_.size() || IsValid() != other.IsValid()
+      || IsAbsolute() != other.IsAbsolute()) {
     return false;
   }
 
-        ElementPatterns::const_iterator i    = patterns_.begin();
+  ElementPatterns::const_iterator i = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
-        ElementPatterns::const_iterator j    = other.patterns_.begin();
+  ElementPatterns::const_iterator j = other.patterns_.begin();
   const ElementPatterns::const_iterator jend = other.patterns_.end();
 
   for (; i != iend && j != jend; ++i, ++j) {
@@ -300,7 +292,7 @@ void Pathspec::PrintRegularExpressionError(const int error_code) const {
   LogCvmfs(kLogPathspec, kLogStderr, "RegEx Error: %d - %s", error_code, error);
 }
 
-const Pathspec::GlobStringSequence& Pathspec::GetGlobStringSequence() const {
+const Pathspec::GlobStringSequence &Pathspec::GetGlobStringSequence() const {
   if (!glob_string_sequence_compiled_) {
     GenerateGlobStringSequence();
     glob_string_sequence_compiled_ = true;
@@ -311,7 +303,7 @@ const Pathspec::GlobStringSequence& Pathspec::GetGlobStringSequence() const {
 
 void Pathspec::GenerateGlobStringSequence() const {
   assert(glob_string_sequence_.empty());
-        ElementPatterns::const_iterator i    = patterns_.begin();
+  ElementPatterns::const_iterator i = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
   for (; i != iend; ++i) {
     const std::string glob_string = i->GenerateGlobString();
@@ -320,7 +312,7 @@ void Pathspec::GenerateGlobStringSequence() const {
 }
 
 
-const std::string& Pathspec::GetGlobString() const {
+const std::string &Pathspec::GetGlobString() const {
   if (!glob_string_compiled_) {
     GenerateGlobString();
     glob_string_compiled_ = true;
@@ -334,7 +326,7 @@ void Pathspec::GenerateGlobString() const {
 
   bool is_first = true;
   const GlobStringSequence &seq = GetGlobStringSequence();
-        GlobStringSequence::const_iterator i    = seq.begin();
+  GlobStringSequence::const_iterator i = seq.begin();
   const GlobStringSequence::const_iterator iend = seq.end();
   for (; i != iend; ++i) {
     if (!is_first || IsAbsolute()) {

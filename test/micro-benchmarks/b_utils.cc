@@ -10,11 +10,9 @@
 
 class BM_Utils : public benchmark::Fixture {
  protected:
-  virtual void SetUp(const benchmark::State &st) {
-  }
+  virtual void SetUp(const benchmark::State &st) { }
 
-  virtual void TearDown(const benchmark::State &st) {
-  }
+  virtual void TearDown(const benchmark::State &st) { }
 };
 
 
@@ -26,8 +24,7 @@ BENCHMARK_DEFINE_F(BM_Utils, GetMonotonicTime)(benchmark::State &st) {
   }
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Utils, GetMonotonicTime)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Utils, GetMonotonicTime)->Repetitions(3)->UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Utils, GetPreciseTime)(benchmark::State &st) {
@@ -38,8 +35,7 @@ BENCHMARK_DEFINE_F(BM_Utils, GetPreciseTime)(benchmark::State &st) {
   }
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Utils, GetPreciseTime)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Utils, GetPreciseTime)->Repetitions(3)->UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimer)(benchmark::State &st) {
@@ -52,8 +48,9 @@ BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimer)(benchmark::State &st) {
   }
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimer)->Repetitions(3)->
-  UseRealTime();
+BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimer)
+    ->Repetitions(3)
+    ->UseRealTime();
 
 
 BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimerIdle)(benchmark::State &st) {
@@ -66,6 +63,6 @@ BENCHMARK_DEFINE_F(BM_Utils, HighPrecisionTimerIdle)(benchmark::State &st) {
   }
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimerIdle)->Repetitions(3)->
-  UseRealTime();
-
+BENCHMARK_REGISTER_F(BM_Utils, HighPrecisionTimerIdle)
+    ->Repetitions(3)
+    ->UseRealTime();

@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <pthread.h>
 
 #include "util/atomic.h"
@@ -216,9 +215,9 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   int pthread_result;
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result =
-        pthread_create(&threads32[i], NULL, &T_Atomic::concurrent_assigner32,
-                       static_cast<void *>(&atomic32_));
+    pthread_result = pthread_create(&threads32[i], NULL,
+                                    &T_Atomic::concurrent_assigner32,
+                                    static_cast<void *>(&atomic32_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -232,9 +231,9 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   // ----
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result =
-        pthread_create(&threads64[i], NULL, &T_Atomic::concurrent_assigner64,
-                       static_cast<void *>(&atomic64_));
+    pthread_result = pthread_create(&threads64[i], NULL,
+                                    &T_Atomic::concurrent_assigner64,
+                                    static_cast<void *>(&atomic64_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -255,9 +254,9 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   int pthread_result;
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result =
-        pthread_create(&threads32[i], NULL, &T_Atomic::concurrent_writer32,
-                       static_cast<void *>(&atomic32_));
+    pthread_result = pthread_create(&threads32[i], NULL,
+                                    &T_Atomic::concurrent_writer32,
+                                    static_cast<void *>(&atomic32_));
     ASSERT_EQ(0, pthread_result);
   }
 
@@ -269,9 +268,9 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   EXPECT_EQ(T_Atomic::concurrent_writer_result * pthreads, result32);
 
   for (int i = 0; i < pthreads; ++i) {
-    pthread_result =
-        pthread_create(&threads64[i], NULL, &T_Atomic::concurrent_writer64,
-                       static_cast<void *>(&atomic64_));
+    pthread_result = pthread_create(&threads64[i], NULL,
+                                    &T_Atomic::concurrent_writer64,
+                                    static_cast<void *>(&atomic64_));
     ASSERT_EQ(0, pthread_result);
   }
 

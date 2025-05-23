@@ -43,15 +43,17 @@ class TieredCacheManager : public CacheManager {
   }
 
   virtual int Open(const LabeledObject &object);
-  virtual int64_t GetSize(int fd) {return upper_->GetSize(fd);}
-  virtual int Close(int fd) {return upper_->Close(fd);}
-  virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset)
-  { return upper_->Pread(fd, buf, size, offset); }
+  virtual int64_t GetSize(int fd) { return upper_->GetSize(fd); }
+  virtual int Close(int fd) { return upper_->Close(fd); }
+  virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) {
+    return upper_->Pread(fd, buf, size, offset);
+  }
   virtual int Dup(int fd) { return upper_->Dup(fd); }
   virtual int Readahead(int fd) { return upper_->Readahead(fd); }
 
-  virtual uint32_t SizeOfTxn()
-  { return upper_->SizeOfTxn() + lower_->SizeOfTxn(); }
+  virtual uint32_t SizeOfTxn() {
+    return upper_->SizeOfTxn() + lower_->SizeOfTxn();
+  }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const Label &label, const int flags, void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
@@ -79,9 +81,8 @@ class TieredCacheManager : public CacheManager {
   };
 
   // NOTE: TieredCacheManager takes ownership of both caches passed.
-  TieredCacheManager(CacheManager *upper_cache,
-                     CacheManager *lower_cache)
-    : upper_(upper_cache), lower_(lower_cache), lower_readonly_(false) { }
+  TieredCacheManager(CacheManager *upper_cache, CacheManager *lower_cache)
+      : upper_(upper_cache), lower_(lower_cache), lower_readonly_(false) { }
 
   CacheManager *upper_;
   CacheManager *lower_;

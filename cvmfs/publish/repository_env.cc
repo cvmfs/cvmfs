@@ -3,13 +3,12 @@
  */
 
 
-#include "repository.h"
-
 #include <sys/capability.h>
 #include <sys/prctl.h>
 #include <unistd.h>
 
 #include "publish/except.h"
+#include "repository.h"
 #include "util/posix.h"
 
 namespace publish {

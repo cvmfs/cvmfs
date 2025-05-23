@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -17,12 +16,9 @@ using namespace std;  // NOLINT
 
 class T_Namespace : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-    ns_features_ = CheckNamespaceFeatures();
-  }
+  virtual void SetUp() { ns_features_ = CheckNamespaceFeatures(); }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 
  protected:
   int WaitForChild(pid_t pid) {
@@ -48,7 +44,8 @@ TEST_F(T_Namespace, Check) {
 
 
 TEST_F(T_Namespace, User) {
-  if (!(ns_features_ & kNsFeatureUserEnabled)) return;
+  if (!(ns_features_ & kNsFeatureUserEnabled))
+    return;
 
   int pid = fork();
   ASSERT_GE(pid, 0);
@@ -73,8 +70,10 @@ TEST_F(T_Namespace, User) {
 
 
 TEST_F(T_Namespace, UserMount) {
-  if (!(ns_features_ & kNsFeatureUserEnabled)) return;
-  if (!(ns_features_ & kNsFeatureMount)) return;
+  if (!(ns_features_ & kNsFeatureUserEnabled))
+    return;
+  if (!(ns_features_ & kNsFeatureMount))
+    return;
 
   int pid = fork();
   ASSERT_GE(pid, 0);
@@ -99,9 +98,12 @@ TEST_F(T_Namespace, UserMount) {
 
 
 TEST_F(T_Namespace, UserMountPid) {
-  if (!(ns_features_ & kNsFeatureUserEnabled)) return;
-  if (!(ns_features_ & kNsFeatureMount)) return;
-  if (!(ns_features_ & kNsFeaturePid)) return;
+  if (!(ns_features_ & kNsFeatureUserEnabled))
+    return;
+  if (!(ns_features_ & kNsFeatureMount))
+    return;
+  if (!(ns_features_ & kNsFeaturePid))
+    return;
 
   pid_t pid = fork();
   ASSERT_GE(pid, 0);
@@ -117,7 +119,8 @@ TEST_F(T_Namespace, UserMountPid) {
 
   char procpid[128];
   int len = readlink("/proc/self", procpid, 127);
-  if (len < 0) len = 0;
+  if (len < 0)
+    len = 0;
   procpid[len] = '\0';
   EXPECT_EQ(StringifyInt(getpid()), std::string(procpid));
   EXPECT_EQ(pid_t(1), getpid());

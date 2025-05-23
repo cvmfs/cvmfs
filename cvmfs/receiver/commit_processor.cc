@@ -31,10 +31,10 @@
 
 namespace {
 
-PathString RemoveRepoName(const PathString& lease_path) {
+PathString RemoveRepoName(const PathString &lease_path) {
   std::string abs_path = lease_path.ToString();
-  std::string::const_iterator it =
-      std::find(abs_path.begin(), abs_path.end(), '/');
+  std::string::const_iterator it = std::find(abs_path.begin(), abs_path.end(),
+                                             '/');
   if (it != abs_path.end()) {
     size_t idx = it - abs_path.begin() + 1;
     return lease_path.Suffix(idx);
@@ -43,11 +43,11 @@ PathString RemoveRepoName(const PathString& lease_path) {
   }
 }
 
-bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
-                  const receiver::Params& params, const std::string& temp_dir,
-                  const std::string& manifest_path,
-                  const std::string& public_key_path,
-                  const std::string& proxy) {
+bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
+                  const receiver::Params &params, const std::string &temp_dir,
+                  const std::string &manifest_path,
+                  const std::string &public_key_path,
+                  const std::string &proxy) {
   swissknife::ArgumentList args;
   args['r'].Reset(new std::string(params.spooler_configuration));
   args['w'].Reset(new std::string(params.stratum0));
@@ -78,9 +78,9 @@ bool CreateNewTag(const RepositoryTag& repo_tag, const std::string& repo_name,
 
 namespace receiver {
 
-CommitProcessor::CommitProcessor() : num_errors_(0), statistics_(NULL) {}
+CommitProcessor::CommitProcessor() : num_errors_(0), statistics_(NULL) { }
 
-CommitProcessor::~CommitProcessor() {}
+CommitProcessor::~CommitProcessor() { }
 
 /**
  * Applies the changes from the new catalog onto the repository.
@@ -99,8 +99,8 @@ CommitProcessor::~CommitProcessor() {}
  * repository manifest.
  */
 CommitProcessor::Result CommitProcessor::Process(
-    const std::string& lease_path, const shash::Any& old_root_hash,
-    const shash::Any& new_root_hash, const RepositoryTag& tag,
+    const std::string &lease_path, const shash::Any &old_root_hash,
+    const shash::Any &new_root_hash, const RepositoryTag &tag,
     uint64_t *final_revision) {
   RepositoryTag final_tag = tag;
   // If tag_name is a generic tag, update the time stamp
@@ -115,8 +115,8 @@ CommitProcessor::Result CommitProcessor::Process(
            new_root_hash.ToString(true).c_str(), final_tag.name().c_str(),
            final_tag.description().c_str());
 
-  const std::vector<std::string> lease_path_tokens =
-      SplitString(lease_path, '/');
+  const std::vector<std::string> lease_path_tokens = SplitString(lease_path,
+                                                                 '/');
 
   const std::string repo_name = lease_path_tokens.front();
 
@@ -140,8 +140,8 @@ CommitProcessor::Result CommitProcessor::Process(
   const std::string public_key = "/etc/cvmfs/keys/" + repo_name + ".pub";
   const std::string certificate = "/etc/cvmfs/keys/" + repo_name + ".crt";
   const std::string private_key = "/etc/cvmfs/keys/" + repo_name + ".key";
-  if (!server_tool->InitSignatureManager(public_key, certificate, private_key))
-  {
+  if (!server_tool->InitSignatureManager(public_key, certificate,
+                                         private_key)) {
     LogCvmfs(
         kLogReceiver, kLogSyslogErr,
         "CommitProcessor - error: Could not initialize the signature manager");
@@ -150,8 +150,8 @@ CommitProcessor::Result CommitProcessor::Process(
 
   shash::Any manifest_base_hash;
   const UniquePtr<manifest::Manifest> manifest_tgt(
-    server_tool->FetchRemoteManifest(
-      params.stratum0, repo_name, manifest_base_hash));
+      server_tool->FetchRemoteManifest(params.stratum0, repo_name,
+                                       manifest_base_hash));
 
   // Current catalog from the gateway machine
   if (!manifest_tgt.IsValid()) {
@@ -171,12 +171,12 @@ CommitProcessor::Result CommitProcessor::Process(
     cache_dir_ = "/var/spool/cvmfs/" + repo_name + "/cache.server";
   }
 
-  const std::string spooler_temp_dir =
-                                GetSpoolerTempDir(params.spooler_configuration);
+  const std::string spooler_temp_dir = GetSpoolerTempDir(
+      params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   assert(MkdirDeep(spooler_temp_dir + "/receiver", 0755, true));
-  const std::string temp_dir_root =
-      spooler_temp_dir + "/receiver/commit_processor";
+  const std::string temp_dir_root = spooler_temp_dir
+                                    + "/receiver/commit_processor";
 
   const PathString relative_lease_path = RemoveRepoName(PathString(lease_path));
 
@@ -198,7 +198,8 @@ CommitProcessor::Result CommitProcessor::Process(
 
   std::string new_manifest_path;
   shash::Any new_manifest_hash;
-  if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash, final_revision)) {
+  if (!merge_tool.Run(params, &new_manifest_path, &new_manifest_hash,
+                      final_revision)) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "CommitProcessor - error: Catalog merge failed");
     return kMergeFailure;
@@ -251,8 +252,7 @@ CommitProcessor::Result CommitProcessor::Process(
 
   LogCvmfs(kLogReceiver, kLogSyslog,
            "CommitProcessor - lease_path: %s, new root hash: %s",
-           lease_path.c_str(),
-           new_manifest_hash.ToString(false).c_str());
+           lease_path.c_str(), new_manifest_hash.ToString(false).c_str());
 
   // Ensure CVMFS_ROOT_HASH is not set in
   // /var/spool/cvmfs/<REPO_NAME>/client.local
@@ -267,14 +267,14 @@ CommitProcessor::Result CommitProcessor::Process(
   if (stats_db != NULL) {
     if (!stats_db->StorePublishStatistics(statistics_, start_time_, true)) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
-        "Could not store publish statistics");
+               "Could not store publish statistics");
     }
     if (params.upload_stats_db) {
       upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny);
       upload::Spooler *spooler = upload::Spooler::Construct(sd);
       if (!stats_db->UploadStatistics(spooler)) {
         LogCvmfs(kLogReceiver, kLogSyslogErr,
-          "Could not upload statistics DB to upstream storage");
+                 "Could not upload statistics DB to upstream storage");
       }
       delete spooler;
     }
@@ -288,8 +288,7 @@ CommitProcessor::Result CommitProcessor::Process(
 }
 
 void CommitProcessor::SetStatistics(perf::Statistics *st,
-                                    const std::string &start_time)
-{
+                                    const std::string &start_time) {
   statistics_ = st;
   statistics_->Register("publish.revision", "");
   start_time_ = start_time;

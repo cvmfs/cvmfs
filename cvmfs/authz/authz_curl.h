@@ -28,8 +28,8 @@ class AuthzAttachment : public download::CredentialsAttachment {
   static void LogOpenSSLErrors(const char *top_message);
   static CURLcode CallbackSslCtx(CURL *curl, void *sslctx, void *parm);
   bool ConfigureSciTokenCurl(CURL *curl_handle,
-                                    const AuthzToken &token,
-                                    void **info_data);
+                             const AuthzToken &token,
+                             void **info_data);
 
   static bool ssl_strings_loaded_;
 

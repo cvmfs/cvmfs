@@ -36,8 +36,8 @@ static void *MainUnpinListener(void *data) {
   LogCvmfs(kLogQuota, kLogDebug, "starting unpin listener for %s",
            handle->repository_name.c_str());
 
-  struct pollfd *watch_fds =
-    static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
+  struct pollfd *watch_fds = static_cast<struct pollfd *>(
+      smalloc(2 * sizeof(struct pollfd)));
   watch_fds[0].fd = handle->pipe_terminate[0];
   watch_fds[0].events = POLLIN | POLLPRI;
   watch_fds[0].revents = 0;
@@ -78,8 +78,8 @@ static void *MainWatchdogListener(void *data) {
   LogCvmfs(kLogQuota, kLogDebug, "starting cache manager watchdog for %s",
            handle->repository_name.c_str());
 
-  struct pollfd *watch_fds =
-  static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
+  struct pollfd *watch_fds = static_cast<struct pollfd *>(
+      smalloc(2 * sizeof(struct pollfd)));
   watch_fds[0].fd = handle->pipe_terminate[0];
   watch_fds[0].events = POLLIN | POLLPRI;
   watch_fds[0].revents = 0;
@@ -98,10 +98,8 @@ static void *MainWatchdogListener(void *data) {
 
     // Release pinned catalogs
     if (watch_fds[1].revents) {
-      if ((watch_fds[1].revents & POLLERR) ||
-          (watch_fds[1].revents & POLLHUP) ||
-          (watch_fds[1].revents & POLLNVAL))
-      {
+      if ((watch_fds[1].revents & POLLERR) || (watch_fds[1].revents & POLLHUP)
+          || (watch_fds[1].revents & POLLNVAL)) {
         PANIC(kLogDebug | kLogSyslogErr, "cache manager disappeared, aborting");
       }
       // Clean the pipe
@@ -121,11 +119,9 @@ static void *MainWatchdogListener(void *data) {
 /**
  * Registers a back channel that reacts on high watermark of pinned chunks
  */
-ListenerHandle *
-RegisterUnpinListener(QuotaManager *quota_manager,
-                      CatalogManager *catalog_manager,
-                      const string &repository_name)
-{
+ListenerHandle *RegisterUnpinListener(QuotaManager *quota_manager,
+                                      CatalogManager *catalog_manager,
+                                      const string &repository_name) {
   ListenerHandle *handle = new ListenerHandle();
   quota_manager->RegisterBackChannel(handle->pipe_backchannel, repository_name);
   MakePipe(handle->pipe_terminate);
@@ -143,11 +139,8 @@ RegisterUnpinListener(QuotaManager *quota_manager,
  * Registers a back channel that kills the fuse module if the cache manager
  * disappears
  */
-ListenerHandle *
-RegisterWatchdogListener(
-  QuotaManager *quota_manager,
-  const string &repository_name)
-{
+ListenerHandle *RegisterWatchdogListener(QuotaManager *quota_manager,
+                                         const string &repository_name) {
   ListenerHandle *handle = new ListenerHandle();
   quota_manager->RegisterBackChannel(handle->pipe_backchannel, repository_name);
   MakePipe(handle->pipe_terminate);
@@ -168,8 +161,8 @@ void UnregisterListener(ListenerHandle *handle) {
   pthread_join(handle->thread_listener, NULL);
   ClosePipe(handle->pipe_terminate);
 
-  handle->quota_manager->UnregisterBackChannel(
-    handle->pipe_backchannel, handle->repository_name);
+  handle->quota_manager->UnregisterBackChannel(handle->pipe_backchannel,
+                                               handle->repository_name);
 
   delete handle;
 }

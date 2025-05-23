@@ -16,11 +16,11 @@ const int kDelay = 2;
 class TestSupervisor : public Supervisor {
  public:
   TestSupervisor(int num_retries, uint64_t interval_sec)
-      : Supervisor(num_retries, interval_sec),
-        delay_(false),
-        result_(true),
-        runs_(0) {}
-  virtual ~TestSupervisor() {}
+      : Supervisor(num_retries, interval_sec)
+      , delay_(false)
+      , result_(true)
+      , runs_(0) { }
+  virtual ~TestSupervisor() { }
 
   virtual bool Task() {
     if (runs_ < kMaxRuns) {
@@ -40,7 +40,7 @@ class TestSupervisor : public Supervisor {
   int max_runs_;
 };
 
-class T_Supervisor : public ::testing::Test {};
+class T_Supervisor : public ::testing::Test { };
 
 TEST_F(T_Supervisor, kNoRetryForSuccess) {
   TestSupervisor r(2, 1);

@@ -2,13 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
 #include <pthread.h>
 
 #include <cassert>
 #include <cstdio>
 
+#include "gtest/gtest.h"
 #include "tracer.h"
 #include "util/posix.h"
 #include "util/string.h"
@@ -24,9 +23,7 @@ class T_Tracer : public ::testing::Test {
     EXPECT_NE("", trace_file_);
   }
 
-  virtual void TearDown() {
-    unlink(trace_file_.c_str());
-  }
+  virtual void TearDown() { unlink(trace_file_.c_str()); }
 
   unsigned GetNol() {
     FILE *f = fopen(trace_file_.c_str(), "r");

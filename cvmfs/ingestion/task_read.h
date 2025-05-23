@@ -22,16 +22,16 @@ class TaskRead : public TubeConsumer<FileItem> {
   static const unsigned kThrottleResetMs = 2000;
   static const unsigned kBlockSize = kPageSize * 4;
 
-  TaskRead(
-    Tube<FileItem> *tube_in,
-    TubeGroup<BlockItem> *tubes_out,
-    ItemAllocator *allocator)
-    : TubeConsumer<FileItem>(tube_in)
-    , tubes_out_(tubes_out)
-    , allocator_(allocator)
-    , low_watermark_(0)
-    , high_watermark_(0)
-  { atomic_init64(&n_block_); }
+  TaskRead(Tube<FileItem> *tube_in,
+           TubeGroup<BlockItem> *tubes_out,
+           ItemAllocator *allocator)
+      : TubeConsumer<FileItem>(tube_in)
+      , tubes_out_(tubes_out)
+      , allocator_(allocator)
+      , low_watermark_(0)
+      , high_watermark_(0) {
+    atomic_init64(&n_block_);
+  }
 
   void SetWatermarks(uint64_t low, uint64_t high);
 

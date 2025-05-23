@@ -16,16 +16,16 @@
 #include "util/logging.h"
 #include "util/string.h"
 
-MagicXattrManager::MagicXattrManager(MountPoint *mountpoint,
-                        EVisibility visibility,
-                        const std::set<std::string> &protected_xattrs,
-                        const std::set<gid_t> &priviledged_xattr_gids)
-  : mount_point_(mountpoint),
-    visibility_(visibility),
-    protected_xattrs_(protected_xattrs),
-    privileged_xattr_gids_(priviledged_xattr_gids),
-    is_frozen_(false)
-{
+MagicXattrManager::MagicXattrManager(
+    MountPoint *mountpoint,
+    EVisibility visibility,
+    const std::set<std::string> &protected_xattrs,
+    const std::set<gid_t> &priviledged_xattr_gids)
+    : mount_point_(mountpoint)
+    , visibility_(visibility)
+    , protected_xattrs_(protected_xattrs)
+    , privileged_xattr_gids_(priviledged_xattr_gids)
+    , is_frozen_(false) {
   Register("user.catalog_counters", new CatalogCountersMagicXattr());
   Register("user.external_host", new ExternalHostMagicXattr());
   Register("user.external_timeout", new ExternalTimeoutMagicXattr());
@@ -92,19 +92,24 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
       case kXattrBase:
         break;
       case kXattrWithHash:
-        if (dirent->checksum().IsNull()) continue;
+        if (dirent->checksum().IsNull())
+          continue;
         break;
       case kXattrRegular:
-        if (!dirent->IsRegular()) continue;
+        if (!dirent->IsRegular())
+          continue;
         break;
       case kXattrExternal:
-        if (!(dirent->IsRegular() && dirent->IsExternalFile())) continue;
+        if (!(dirent->IsRegular() && dirent->IsExternalFile()))
+          continue;
         break;
       case kXattrSymlink:
-        if (!dirent->IsLink()) continue;
+        if (!dirent->IsLink())
+          continue;
         break;
       case kXattrAuthz:
-        if (!mount_point_->has_membership_req()) continue;
+        if (!mount_point_->has_membership_req())
+          continue;
         break;
       default:
         PANIC("unknown magic xattr flavor");
@@ -116,10 +121,9 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   return result;
 }
 
-BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
+BaseMagicXattr *MagicXattrManager::GetLocked(const std::string &name,
                                              PathString path,
-                                             catalog::DirectoryEntry *d)
-{
+                                             catalog::DirectoryEntry *d) {
   BaseMagicXattr *result;
   if (xattr_list_.count(name) > 0) {
     result = xattr_list_[name];
@@ -133,8 +137,7 @@ BaseMagicXattr* MagicXattrManager::GetLocked(const std::string &name,
 }
 
 void MagicXattrManager::Register(const std::string &name,
-                                 BaseMagicXattr *magic_xattr)
-{
+                                 BaseMagicXattr *magic_xattr) {
   assert(!is_frozen_);
   if (xattr_list_.count(name) > 0) {
     PANIC(kLogSyslogErr,
@@ -167,8 +170,8 @@ bool BaseMagicXattr::PrepareValueFencedProtected(gid_t gid) {
 void MagicXattrManager::SanityCheckProtectedXattrs() {
   std::set<std::string>::const_iterator iter;
   std::vector<string> tmp;
-  for (iter = protected_xattrs_.begin();
-       iter != protected_xattrs_.end(); iter++) {
+  for (iter = protected_xattrs_.begin(); iter != protected_xattrs_.end();
+       iter++) {
     if (xattr_list_.find(*iter) == xattr_list_.end()) {
       tmp.push_back(*iter);
     }
@@ -177,33 +180,35 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   if (tmp.size() > 0) {
     std::string msg = JoinStrings(tmp, ",");
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-                                "Following CVMFS_XATTR_PROTECTED_XATTRS are "
-                                "set but not recognized: %s", msg.c_str());
+             "Following CVMFS_XATTR_PROTECTED_XATTRS are "
+             "set but not recognized: %s",
+             msg.c_str());
   }
 
   tmp.clear();
   std::set<gid_t>::const_iterator iter_gid;
   for (iter_gid = privileged_xattr_gids_.begin();
-       iter_gid != privileged_xattr_gids_.end(); iter_gid++) {
+       iter_gid != privileged_xattr_gids_.end();
+       iter_gid++) {
     tmp.push_back(StringifyUint(*iter_gid));
   }
 
   if (tmp.size() > 0) {
     std::string msg = JoinStrings(tmp, ",");
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
-            "Following CVMFS_XATTR_PRIVILEGED_GIDS are set: %s", msg.c_str());
+             "Following CVMFS_XATTR_PRIVILEGED_GIDS are set: %s", msg.c_str());
   }
 }
 
 std::string BaseMagicXattr::HeaderMultipageHuman(uint32_t requested_page) {
-  return "# Access page at idx: " + StringifyUint(requested_page) + ". " +
-         "Total num pages: " + StringifyUint(result_pages_.size()) +
-         " (access other pages: xattr~<page_num>, starting " +
-         " with 0; number of pages available: xattr~?)\n";
+  return "# Access page at idx: " + StringifyUint(requested_page) + ". "
+         + "Total num pages: " + StringifyUint(result_pages_.size())
+         + " (access other pages: xattr~<page_num>, starting "
+         + " with 0; number of pages available: xattr~?)\n";
 }
 
-std::pair<bool, std::string> BaseMagicXattr::GetValue(int32_t requested_page,
-                                     const MagicXattrMode mode) {
+std::pair<bool, std::string> BaseMagicXattr::GetValue(
+    int32_t requested_page, const MagicXattrMode mode) {
   assert(requested_page >= -1);
   result_pages_.clear();
   FinalizeValue();
@@ -211,36 +216,38 @@ std::pair<bool, std::string> BaseMagicXattr::GetValue(int32_t requested_page,
   std::string res = "";
   if (mode == kXattrMachineMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
-      return std::pair<bool, std::string> (false, "");
+      return std::pair<bool, std::string>(false, "");
     }
     if (requested_page == -1) {
-      return std::pair<bool, std::string> (true,
-                           "num_pages, " + StringifyUint(result_pages_.size()));
+      return std::pair<bool, std::string>(
+          true, "num_pages, " + StringifyUint(result_pages_.size()));
     }
   } else if (mode == kXattrHumanMode) {
     if (requested_page >= static_cast<int32_t>(result_pages_.size())) {
-      return std::pair<bool, std::string> (true,
-             "Page requested does not exists. There are "
-             + StringifyUint(result_pages_.size()) + " pages available.\n"
-             + "Access them with xattr~<page_num> (machine-readable mode) "
-             + "or xattr@<page_num> (human-readable mode).\n"
-             + "Use xattr@? or xattr~? to get extra info about the attribute");
+      return std::pair<bool, std::string>(
+          true,
+          "Page requested does not exists. There are "
+              + StringifyUint(result_pages_.size()) + " pages available.\n"
+              + "Access them with xattr~<page_num> (machine-readable mode) "
+              + "or xattr@<page_num> (human-readable mode).\n"
+              + "Use xattr@? or xattr~? to get extra info about the attribute");
     } else if (requested_page == -1) {
-      return std::pair<bool, std::string> (true,
-             "Access xattr with xattr~<page_num> (machine-readable mode) or "
-             + std::string(" xattr@<page_num> (human-readable mode).\n")
-             + "Pages available: " + StringifyUint(result_pages_.size()));
+      return std::pair<bool, std::string>(
+          true,
+          "Access xattr with xattr~<page_num> (machine-readable mode) or "
+              + std::string(" xattr@<page_num> (human-readable mode).\n")
+              + "Pages available: " + StringifyUint(result_pages_.size()));
     } else {
       res = HeaderMultipageHuman(requested_page);
     }
   } else {
     PANIC(kLogStderr | kLogSyslogErr,
-            "Unknown mode of magic xattr requested: %d", mode);
+          "Unknown mode of magic xattr requested: %d", mode);
   }
 
   res += result_pages_[requested_page];
 
-  return std::pair<bool, std::string> (true, res);
+  return std::pair<bool, std::string>(true, res);
 }
 
 bool AuthzMagicXattr::PrepareValueFenced() {
@@ -251,14 +258,11 @@ void AuthzMagicXattr::FinalizeValue() {
   result_pages_.push_back(xattr_mgr_->mount_point()->membership_req());
 }
 
-MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() {
-  return kXattrAuthz;
-}
+MagicXattrFlavor AuthzMagicXattr::GetXattrFlavor() { return kXattrAuthz; }
 
 bool CatalogCountersMagicXattr::PrepareValueFenced() {
-  counters_ =
-    xattr_mgr_->mount_point()->catalog_mgr()->
-      LookupCounters(path_, &subcatalog_path_, &hash_);
+  counters_ = xattr_mgr_->mount_point()->catalog_mgr()->LookupCounters(
+      path_, &subcatalog_path_, &hash_);
   return true;
 }
 
@@ -282,12 +286,13 @@ bool ChunkListMagicXattr::PrepareValueFenced() {
   }
   if (dirent_->IsChunkedFile()) {
     FileChunkList chunks;
-    if (!xattr_mgr_->mount_point()->catalog_mgr()
-                     ->ListFileChunks(path_, dirent_->hash_algorithm(), &chunks)
-        || chunks.IsEmpty())
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
-                "'chunked', but no chunks found.", path_.c_str());
+    if (!xattr_mgr_->mount_point()->catalog_mgr()->ListFileChunks(
+            path_, dirent_->hash_algorithm(), &chunks)
+        || chunks.IsEmpty()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "file %s is marked as "
+               "'chunked', but no chunks found.",
+               path_.c_str());
       return false;
     } else {
       for (size_t i = 0; i < chunks.size(); ++i) {
@@ -315,9 +320,7 @@ bool ChunkListMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-void ChunkListMagicXattr::FinalizeValue() {
-  result_pages_ = chunk_list_;
-}
+void ChunkListMagicXattr::FinalizeValue() { result_pages_ = chunk_list_; }
 
 bool ChunksMagicXattr::PrepareValueFenced() {
   if (!dirent_->IsRegular()) {
@@ -325,13 +328,14 @@ bool ChunksMagicXattr::PrepareValueFenced() {
   }
   if (dirent_->IsChunkedFile()) {
     FileChunkList chunks;
-    if (!xattr_mgr_->mount_point()->catalog_mgr()
-                     ->ListFileChunks(path_, dirent_->hash_algorithm(), &chunks)
-        || chunks.IsEmpty())
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "file %s is marked as "
-                 "'chunked', but no chunks found.", path_.c_str());
-       return false;
+    if (!xattr_mgr_->mount_point()->catalog_mgr()->ListFileChunks(
+            path_, dirent_->hash_algorithm(), &chunks)
+        || chunks.IsEmpty()) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "file %s is marked as "
+               "'chunked', but no chunks found.",
+               path_.c_str());
+      return false;
     } else {
       n_chunks_ = chunks.size();
     }
@@ -351,13 +355,11 @@ bool CompressionMagicXattr::PrepareValueFenced() {
 }
 
 void CompressionMagicXattr::FinalizeValue() {
-  result_pages_.push_back(zlib::AlgorithmName(
-                                             dirent_->compression_algorithm()));
+  result_pages_.push_back(
+      zlib::AlgorithmName(dirent_->compression_algorithm()));
 }
 
-bool DirectIoMagicXattr::PrepareValueFenced() {
-  return dirent_->IsRegular();
-}
+bool DirectIoMagicXattr::PrepareValueFenced() { return dirent_->IsRegular(); }
 
 void DirectIoMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
@@ -376,7 +378,7 @@ void ExternalHostMagicXattr::FinalizeValue() {
   std::vector<int> rtt;
   unsigned current_host;
   xattr_mgr_->mount_point()->external_download_mgr()->GetHostInfo(
-    &host_chain, &rtt, &current_host);
+      &host_chain, &rtt, &current_host);
   if (host_chain.size()) {
     result_pages_.push_back(std::string(host_chain[current_host]));
   } else {
@@ -386,8 +388,8 @@ void ExternalHostMagicXattr::FinalizeValue() {
 
 void ExternalTimeoutMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
-  xattr_mgr_->mount_point()->external_download_mgr()->
-                                      GetTimeout(&seconds, &seconds_direct);
+  xattr_mgr_->mount_point()->external_download_mgr()->GetTimeout(
+      &seconds, &seconds_direct);
   result_pages_.push_back(StringifyUint(seconds_direct));
 }
 
@@ -407,8 +409,8 @@ void HostMagicXattr::FinalizeValue() {
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
-  xattr_mgr_->mount_point()->download_mgr()->
-                                GetHostInfo(&host_chain, &rtt, &current_host);
+  xattr_mgr_->mount_point()->download_mgr()->GetHostInfo(&host_chain, &rtt,
+                                                         &current_host);
   if (host_chain.size()) {
     result_pages_.push_back(std::string(host_chain[current_host]));
   } else {
@@ -421,13 +423,12 @@ void HostListMagicXattr::FinalizeValue() {
   std::vector<std::string> host_chain;
   std::vector<int> rtt;
   unsigned current_host;
-  xattr_mgr_->mount_point()->download_mgr()->
-                                GetHostInfo(&host_chain, &rtt, &current_host);
+  xattr_mgr_->mount_point()->download_mgr()->GetHostInfo(&host_chain, &rtt,
+                                                         &current_host);
   if (host_chain.size()) {
     result = host_chain[current_host];
     for (unsigned i = 1; i < host_chain.size(); ++i) {
-      result +=
-        ";" + host_chain[(i+current_host) % host_chain.size()];
+      result += ";" + host_chain[(i + current_host) % host_chain.size()];
     }
   } else {
     result = "internal error: no hosts defined";
@@ -446,14 +447,15 @@ void LHashMagicXattr::FinalizeValue() {
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
     label.flags = CacheManager::kLabelVolatile;
   int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
-    CacheManager::LabeledObject(dirent_->checksum(), label));
+      CacheManager::LabeledObject(dirent_->checksum(), label));
   if (fd < 0) {
     result = "Not in cache";
   } else {
     shash::Any hash(dirent_->checksum().algorithm);
-    int retval_i =
-      xattr_mgr_->mount_point()->file_system()->cache_mgr()
-                                              ->ChecksumFd(fd, &hash);
+    int retval_i = xattr_mgr_->mount_point()
+                       ->file_system()
+                       ->cache_mgr()
+                       ->ChecksumFd(fd, &hash);
     if (retval_i != 0)
       result = "I/O error (" + StringifyInt(retval_i) + ")";
     else
@@ -470,21 +472,23 @@ void LogBufferXattr::FinalizeValue() {
   std::vector<LogBufferEntry> buffer = GetLogBuffer();
   std::string result;
   for (std::vector<LogBufferEntry>::reverse_iterator itr = buffer.rbegin();
-       itr != buffer.rend(); ++itr)
-  {
+       itr != buffer.rend();
+       ++itr) {
     if (itr->message.size() > kMaxLogLine) {
       itr->message.resize(kMaxLogLine);
       itr->message += " <snip>";
     }
-    result += "[" + StringifyLocalTime(itr->timestamp) + "] " +
-              itr->message + "\n";
+    result += "[" + StringifyLocalTime(itr->timestamp) + "] " + itr->message
+              + "\n";
   }
   result_pages_.push_back(result);
 }
 
 void NCleanup24MagicXattr::FinalizeValue() {
-  QuotaManager *quota_mgr =
-    xattr_mgr_->mount_point()->file_system()->cache_mgr()->quota_mgr();
+  QuotaManager *quota_mgr = xattr_mgr_->mount_point()
+                                ->file_system()
+                                ->cache_mgr()
+                                ->quota_mgr();
   if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectCleanupRate)) {
     result_pages_.push_back(StringifyInt(-1));
   } else {
@@ -504,46 +508,53 @@ void NClgMagicXattr::FinalizeValue() {
 }
 
 void NDirOpenMagicXattr::FinalizeValue() {
-  result_pages_.push_back(xattr_mgr_->mount_point()->
-                                    file_system()->n_fs_dir_open()->ToString());
+  result_pages_.push_back(
+      xattr_mgr_->mount_point()->file_system()->n_fs_dir_open()->ToString());
 }
 
 void NDownloadMagicXattr::FinalizeValue() {
-  result_pages_.push_back(xattr_mgr_->mount_point()->statistics()
-                                        ->Lookup("fetch.n_downloads")->Print());
+  result_pages_.push_back(xattr_mgr_->mount_point()
+                              ->statistics()
+                              ->Lookup("fetch.n_downloads")
+                              ->Print());
 }
 
 void NIOErrMagicXattr::FinalizeValue() {
-  result_pages_.push_back(StringifyInt(xattr_mgr_->mount_point()->file_system()
-                                                   ->io_error_info()->count()));
+  result_pages_.push_back(StringifyInt(
+      xattr_mgr_->mount_point()->file_system()->io_error_info()->count()));
 }
 
 void NOpenMagicXattr::FinalizeValue() {
-  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->n_fs_open()
-                                                                  ->ToString());
+  result_pages_.push_back(
+      xattr_mgr_->mount_point()->file_system()->n_fs_open()->ToString());
 }
 
 void HitrateMagicXattr::FinalizeValue() {
-  int64_t n_invocations =
-    xattr_mgr_->mount_point()->statistics()->Lookup("fetch.n_invocations")
-                                                                      ->Get();
+  int64_t n_invocations = xattr_mgr_->mount_point()
+                              ->statistics()
+                              ->Lookup("fetch.n_invocations")
+                              ->Get();
   if (n_invocations == 0) {
     result_pages_.push_back("n/a");
     return;
   }
 
-  int64_t n_downloads =
-    xattr_mgr_->mount_point()->statistics()->Lookup("fetch.n_downloads")->Get();
-  float hitrate = 100. * (1. -
-    (static_cast<float>(n_downloads) / static_cast<float>(n_invocations)));
+  int64_t n_downloads = xattr_mgr_->mount_point()
+                            ->statistics()
+                            ->Lookup("fetch.n_downloads")
+                            ->Get();
+  float hitrate = 100.
+                  * (1.
+                     - (static_cast<float>(n_downloads)
+                        / static_cast<float>(n_invocations)));
   result_pages_.push_back(StringifyDouble(hitrate));
 }
 
 void ProxyMagicXattr::FinalizeValue() {
-  vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+  vector<vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
-  xattr_mgr_->mount_point()->download_mgr()->GetProxyInfo(
-    &proxy_chain, &current_group, NULL);
+  xattr_mgr_->mount_point()->download_mgr()->GetProxyInfo(&proxy_chain,
+                                                          &current_group, NULL);
   if (proxy_chain.size()) {
     result_pages_.push_back(proxy_chain[current_group][0].url);
   } else {
@@ -553,7 +564,7 @@ void ProxyMagicXattr::FinalizeValue() {
 
 static void ListProxy(download::DownloadManager *dm,
                       std::vector<std::string> *result_pages) {
-  vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+  vector<vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned current_group;
   dm->GetProxyInfo(&proxy_chain, &current_group, NULL);
   std::string buf = "";
@@ -583,8 +594,9 @@ void ProxyListExternalMagicXattr::FinalizeValue() {
 }
 
 bool PubkeysMagicXattr::PrepareValueFenced() {
-  pubkeys_ = xattr_mgr_->mount_point()->signature_mgr()
-                                                   ->GetActivePubkeysAsVector();
+  pubkeys_ = xattr_mgr_->mount_point()
+                 ->signature_mgr()
+                 ->GetActivePubkeysAsVector();
   return true;
 }
 
@@ -617,17 +629,17 @@ void PubkeysMagicXattr::FinalizeValue() {
   }
 }
 
-bool RawlinkMagicXattr::PrepareValueFenced() {
-  return dirent_->IsLink();
-}
+bool RawlinkMagicXattr::PrepareValueFenced() { return dirent_->IsLink(); }
 
 void RawlinkMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->symlink().ToString());
 }
 
 bool RepoCountersMagicXattr::PrepareValueFenced() {
-  counters_ = xattr_mgr_->mount_point()->catalog_mgr()->GetRootCatalog()
-                                                              ->GetCounters();
+  counters_ = xattr_mgr_->mount_point()
+                  ->catalog_mgr()
+                  ->GetRootCatalog()
+                  ->GetCounters();
   return true;
 }
 
@@ -643,8 +655,10 @@ bool RepoMetainfoMagicXattr::PrepareValueFenced() {
     return true;
   }
 
-  metainfo_hash_ = xattr_mgr_->mount_point()->catalog_mgr()->manifest()
-                                                              ->meta_info();
+  metainfo_hash_ = xattr_mgr_->mount_point()
+                       ->catalog_mgr()
+                       ->manifest()
+                       ->meta_info();
   if (metainfo_hash_.IsNull()) {
     error_reason_ = "metainfo not available";
     return true;
@@ -659,26 +673,28 @@ void RepoMetainfoMagicXattr::FinalizeValue() {
   }
 
   CacheManager::Label label;
-  label.path = xattr_mgr_->mount_point()->fqrn() +
-               "(" + metainfo_hash_.ToString() + ")";
+  label.path = xattr_mgr_->mount_point()->fqrn() + "("
+               + metainfo_hash_.ToString() + ")";
   label.flags = CacheManager::kLabelMetainfo;
   int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
-    CacheManager::LabeledObject(metainfo_hash_, label));
+      CacheManager::LabeledObject(metainfo_hash_, label));
   if (fd < 0) {
     result_pages_.push_back("Failed to open metadata file");
     return;
   }
-  uint64_t actual_size = xattr_mgr_->mount_point()->file_system()->cache_mgr()
-                                                                 ->GetSize(fd);
+  uint64_t actual_size = xattr_mgr_->mount_point()
+                             ->file_system()
+                             ->cache_mgr()
+                             ->GetSize(fd);
   if (actual_size > kMaxMetainfoLength) {
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
     result_pages_.push_back("Failed to open: metadata file is too big");
     return;
   }
   char buffer[kMaxMetainfoLength];
-  int64_t bytes_read =
-    xattr_mgr_->mount_point()->file_system()->cache_mgr()
-                                            ->Pread(fd, buffer, actual_size, 0);
+  int64_t
+      bytes_read = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Pread(
+          fd, buffer, actual_size, 0);
   xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
   if (bytes_read < 0) {
     result_pages_.push_back("Failed to read metadata file");
@@ -708,7 +724,7 @@ void RootHashMagicXattr::FinalizeValue() {
 void RxMagicXattr::FinalizeValue() {
   perf::Statistics *statistics = xattr_mgr_->mount_point()->statistics();
   int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
-  result_pages_.push_back(StringifyInt(rx/1024));
+  result_pages_.push_back(StringifyInt(rx / 1024));
 }
 
 void SpeedMagicXattr::FinalizeValue() {
@@ -718,7 +734,7 @@ void SpeedMagicXattr::FinalizeValue() {
   if (time == 0) {
     result_pages_.push_back("n/a");
   } else {
-    result_pages_.push_back(StringifyInt((1000 * (rx/1024))/time));
+    result_pages_.push_back(StringifyInt((1000 * (rx / 1024)) / time));
   }
 }
 
@@ -727,42 +743,42 @@ bool TagMagicXattr::PrepareValueFenced() {
   return true;
 }
 
-void TagMagicXattr::FinalizeValue() {
-  result_pages_.push_back(tag_);
-}
+void TagMagicXattr::FinalizeValue() { result_pages_.push_back(tag_); }
 
 void TimeoutMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
-  xattr_mgr_->mount_point()->download_mgr()
-                           ->GetTimeout(&seconds, &seconds_direct);
+  xattr_mgr_->mount_point()->download_mgr()->GetTimeout(&seconds,
+                                                        &seconds_direct);
   result_pages_.push_back(StringifyUint(seconds));
 }
 
 void TimeoutDirectMagicXattr::FinalizeValue() {
   unsigned seconds, seconds_direct;
-  xattr_mgr_->mount_point()->download_mgr()
-                           ->GetTimeout(&seconds, &seconds_direct);
+  xattr_mgr_->mount_point()->download_mgr()->GetTimeout(&seconds,
+                                                        &seconds_direct);
   result_pages_.push_back(StringifyUint(seconds_direct));
 }
 
 void TimestampLastIOErrMagicXattr::FinalizeValue() {
-  result_pages_.push_back(StringifyInt(xattr_mgr_->mount_point()->
-                             file_system()->io_error_info()->timestamp_last()));
+  result_pages_.push_back(StringifyInt(xattr_mgr_->mount_point()
+                                           ->file_system()
+                                           ->io_error_info()
+                                           ->timestamp_last()));
 }
 
 void UsedFdMagicXattr::FinalizeValue() {
-  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->
-                                                   no_open_files()->ToString());
+  result_pages_.push_back(
+      xattr_mgr_->mount_point()->file_system()->no_open_files()->ToString());
 }
 
 void UsedDirPMagicXattr::FinalizeValue() {
-  result_pages_.push_back(xattr_mgr_->mount_point()->file_system()->
-                                                    no_open_dirs()->ToString());
+  result_pages_.push_back(
+      xattr_mgr_->mount_point()->file_system()->no_open_dirs()->ToString());
 }
 
 void VersionMagicXattr::FinalizeValue() {
   result_pages_.push_back(std::string(CVMFS_VERSION) + "."
-                                              + std::string(CVMFS_PATCH_LEVEL));
+                          + std::string(CVMFS_PATCH_LEVEL));
 }
 
 void ExternalURLMagicXattr::FinalizeValue() {
@@ -771,7 +787,7 @@ void ExternalURLMagicXattr::FinalizeValue() {
   unsigned current_host;
   if (xattr_mgr_->mount_point()->external_download_mgr() != NULL) {
     xattr_mgr_->mount_point()->external_download_mgr()->GetHostInfo(
-      &host_chain, &rtt, &current_host);
+        &host_chain, &rtt, &current_host);
     if (host_chain.size()) {
       result_pages_.push_back(std::string(host_chain[current_host])
                               + std::string(path_.c_str()));

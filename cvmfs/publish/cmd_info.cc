@@ -20,7 +20,7 @@ namespace publish {
 int CmdInfo::Main(const Options &options) {
   SettingsBuilder builder;
   SettingsRepository settings = builder.CreateSettingsRepository(
-    options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
+      options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
 
   if (options.Has("keychain")) {
     settings.GetKeychain()->SetKeychainDir(options.GetString("keychain"));
@@ -32,8 +32,7 @@ int CmdInfo::Main(const Options &options) {
   if (builder.IsManagedRepository()) {
     std::string creator_version;
     if (builder.options_mgr()->GetValue("CVMFS_CREATOR_VERSION",
-                                        &creator_version))
-    {
+                                        &creator_version)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Created by CernVM-FS %s",
                creator_version.c_str());
     } else {
@@ -52,17 +51,17 @@ int CmdInfo::Main(const Options &options) {
              delta_d);
   }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "\nClient configuration:\n"
-    "Add %s to CVMFS_REPOSITORIES in /etc/cvmfs/default.local\n"
-    "Create /etc/cvmfs/config.d/%s.conf and set\n"
-    "  CVMFS_SERVER_URL=%s\n"
-    "  CVMFS_PUBLIC_KEY=%s\n"
-    "Copy %s to the client",
-    settings.fqrn().c_str(),
-    settings.fqrn().c_str(),
-    settings.url().c_str(),
-    settings.keychain().master_public_key_path().c_str(),
-    settings.keychain().master_public_key_path().c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "\nClient configuration:\n"
+           "Add %s to CVMFS_REPOSITORIES in /etc/cvmfs/default.local\n"
+           "Create /etc/cvmfs/config.d/%s.conf and set\n"
+           "  CVMFS_SERVER_URL=%s\n"
+           "  CVMFS_PUBLIC_KEY=%s\n"
+           "Copy %s to the client",
+           settings.fqrn().c_str(), settings.fqrn().c_str(),
+           settings.url().c_str(),
+           settings.keychain().master_public_key_path().c_str(),
+           settings.keychain().master_public_key_path().c_str());
 
   if (options.Has("meta-info")) {
     LogCvmfs(kLogCvmfs, kLogStdout, "\nMeta info:\n%s",

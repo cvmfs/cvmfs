@@ -17,11 +17,11 @@ namespace CVMFS_NAMESPACE_GUARD {
 //
 
 
-template <typename T>
+template<typename T>
 void SynchronizingCounter<T>::SetValueUnprotected(const T new_value) {
   // make sure that 0 <= new_value <= maximal_value_ if maximal_value_ != 0
-  assert(!HasMaximalValue() ||
-         (new_value >= T(0) && new_value <= maximal_value_));
+  assert(!HasMaximalValue()
+         || (new_value >= T(0) && new_value <= maximal_value_));
 
   value_ = new_value;
 
@@ -35,7 +35,7 @@ void SynchronizingCounter<T>::SetValueUnprotected(const T new_value) {
 }
 
 
-template <typename T>
+template<typename T>
 void SynchronizingCounter<T>::WaitForFreeSlotUnprotected() {
   while (HasMaximalValue() && value_ >= maximal_value_) {
     pthread_cond_wait(&free_slot_, &mutex_);
@@ -44,17 +44,16 @@ void SynchronizingCounter<T>::WaitForFreeSlotUnprotected() {
 }
 
 
-template <typename T>
+template<typename T>
 void SynchronizingCounter<T>::Initialize() {
-  const bool init_successful = (
-    pthread_mutex_init(&mutex_,       NULL) == 0 &&
-    pthread_cond_init(&became_zero_, NULL) == 0 &&
-    pthread_cond_init(&free_slot_,   NULL) == 0);
+  const bool init_successful = (pthread_mutex_init(&mutex_, NULL) == 0
+                                && pthread_cond_init(&became_zero_, NULL) == 0
+                                && pthread_cond_init(&free_slot_, NULL) == 0);
   assert(init_successful);
 }
 
 
-template <typename T>
+template<typename T>
 void SynchronizingCounter<T>::Destroy() {
   pthread_mutex_destroy(&mutex_);
   pthread_cond_destroy(&became_zero_);
@@ -68,61 +67,59 @@ void SynchronizingCounter<T>::Destroy() {
 //
 
 
-template <typename ParamT>
+template<typename ParamT>
 Observable<ParamT>::Observable() {
   const int ret = pthread_rwlock_init(&listeners_rw_lock_, NULL);
   assert(ret == 0);
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 Observable<ParamT>::~Observable() {
   UnregisterListeners();
   pthread_rwlock_destroy(&listeners_rw_lock_);
 }
 
 
-template <typename ParamT>
-template <class DelegateT, class ClosureDataT>
+template<typename ParamT>
+template<class DelegateT, class ClosureDataT>
 typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
-        typename BoundClosure<ParamT,
-                              DelegateT,
-                              ClosureDataT>::CallbackMethod   method,
-        DelegateT                                            *delegate,
-        ClosureDataT                                          data) {
+    typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod
+        method,
+    DelegateT *delegate,
+    ClosureDataT data) {
   // create a new BoundClosure, register it and return the handle
-  CallbackBase<ParamT> *callback =
-    Observable<ParamT>::MakeClosure(method, delegate, data);
+  CallbackBase<ParamT> *callback = Observable<ParamT>::MakeClosure(
+      method, delegate, data);
   RegisterListener(callback);
   return callback;
 }
 
 
-template <typename ParamT>
-template <class DelegateT>
+template<typename ParamT>
+template<class DelegateT>
 typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
     typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
     DelegateT *delegate) {
   // create a new BoundCallback, register it and return the handle
-  CallbackBase<ParamT> *callback =
-    Observable<ParamT>::MakeCallback(method, delegate);
+  CallbackBase<ParamT> *callback = Observable<ParamT>::MakeCallback(method,
+                                                                    delegate);
   RegisterListener(callback);
   return callback;
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
     typename Callback<ParamT>::CallbackFunction fn) {
   // create a new Callback, register it and return the handle
-  CallbackBase<ParamT> *callback =
-    Observable<ParamT>::MakeCallback(fn);
+  CallbackBase<ParamT> *callback = Observable<ParamT>::MakeCallback(fn);
   RegisterListener(callback);
   return callback;
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 void Observable<ParamT>::RegisterListener(
     Observable<ParamT>::CallbackPtr callback_object) {
   // register a generic CallbackBase callback
@@ -131,7 +128,7 @@ void Observable<ParamT>::RegisterListener(
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 void Observable<ParamT>::UnregisterListener(
     typename Observable<ParamT>::CallbackPtr callback_object) {
   // remove a callback handle from the callbacks list
@@ -143,12 +140,12 @@ void Observable<ParamT>::UnregisterListener(
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 void Observable<ParamT>::UnregisterListeners() {
   WriteLockGuard guard(listeners_rw_lock_);
 
   // remove all callbacks from the list
-  typename Callbacks::const_iterator i    = listeners_.begin();
+  typename Callbacks::const_iterator i = listeners_.begin();
   typename Callbacks::const_iterator iend = listeners_.end();
   for (; i != iend; ++i) {
     delete *i;
@@ -157,12 +154,12 @@ void Observable<ParamT>::UnregisterListeners() {
 }
 
 
-template <typename ParamT>
+template<typename ParamT>
 void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
   ReadLockGuard guard(listeners_rw_lock_);
 
   // invoke all callbacks and inform them about new data
-  typename Callbacks::const_iterator i    = listeners_.begin();
+  typename Callbacks::const_iterator i = listeners_.begin();
   typename Callbacks::const_iterator iend = listeners_.end();
   for (; i != iend; ++i) {
     (**i)(parameter);
@@ -176,25 +173,24 @@ void Observable<ParamT>::NotifyListeners(const ParamT &parameter) {
 //
 
 
-template <class T>
+template<class T>
 FifoChannel<T>::FifoChannel(const size_t maximal_length,
-                            const size_t drainout_threshold) :
-  maximal_queue_length_(maximal_length),
-  queue_drainout_threshold_(drainout_threshold)
-{
+                            const size_t drainout_threshold)
+    : maximal_queue_length_(maximal_length)
+    , queue_drainout_threshold_(drainout_threshold) {
   assert(drainout_threshold <= maximal_length);
-  assert(drainout_threshold >  0);
+  assert(drainout_threshold > 0);
 
-  const bool successful = (
-    pthread_mutex_init(&mutex_, NULL)              == 0 &&
-    pthread_cond_init(&queue_is_not_empty_, NULL)  == 0 &&
-    pthread_cond_init(&queue_is_not_full_, NULL)   == 0);
+  const bool successful = (pthread_mutex_init(&mutex_, NULL) == 0
+                           && pthread_cond_init(&queue_is_not_empty_, NULL) == 0
+                           && pthread_cond_init(&queue_is_not_full_, NULL)
+                                  == 0);
 
   assert(successful);
 }
 
 
-template <class T>
+template<class T>
 FifoChannel<T>::~FifoChannel() {
   pthread_cond_destroy(&queue_is_not_empty_);
   pthread_cond_destroy(&queue_is_not_full_);
@@ -202,7 +198,7 @@ FifoChannel<T>::~FifoChannel() {
 }
 
 
-template <class T>
+template<class T>
 void FifoChannel<T>::Enqueue(const T &data) {
   MutexLockGuard lock(mutex_);
 
@@ -219,7 +215,7 @@ void FifoChannel<T>::Enqueue(const T &data) {
 }
 
 
-template <class T>
+template<class T>
 const T FifoChannel<T>::Dequeue() {
   MutexLockGuard lock(mutex_);
 
@@ -229,7 +225,8 @@ const T FifoChannel<T>::Dequeue() {
   }
 
   // get the item from the queue
-  T data = this->front(); this->pop();
+  T data = this->front();
+  this->pop();
 
   // signal waiting threads about the free space
   if (this->size() < queue_drainout_threshold_) {
@@ -241,7 +238,7 @@ const T FifoChannel<T>::Dequeue() {
 }
 
 
-template <class T>
+template<class T>
 unsigned int FifoChannel<T>::Drop() {
   MutexLockGuard lock(mutex_);
 
@@ -257,21 +254,21 @@ unsigned int FifoChannel<T>::Drop() {
 }
 
 
-template <class T>
+template<class T>
 size_t FifoChannel<T>::GetItemCount() const {
   MutexLockGuard lock(mutex_);
   return this->size();
 }
 
 
-template <class T>
+template<class T>
 bool FifoChannel<T>::IsEmpty() const {
   MutexLockGuard lock(mutex_);
   return this->empty();
 }
 
 
-template <class T>
+template<class T>
 size_t FifoChannel<T>::GetMaximalItemCount() const {
   return maximal_queue_length_;
 }
@@ -283,22 +280,21 @@ size_t FifoChannel<T>::GetMaximalItemCount() const {
 //
 
 
-template <class WorkerT>
+template<class WorkerT>
 ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
-          const size_t                                  number_of_workers,
-          const size_t                                  maximal_queue_length,
-          ConcurrentWorkers<WorkerT>::worker_context_t *worker_context) :
-  number_of_workers_(number_of_workers),
-  worker_context_(worker_context),
-  thread_context_(this, worker_context_),
-  initialized_(false),
-  running_(false),
-  workers_started_(0),
-  jobs_queue_(maximal_queue_length, maximal_queue_length / 4 + 1),
-  results_queue_(maximal_queue_length, 1)
-{
+    const size_t number_of_workers,
+    const size_t maximal_queue_length,
+    ConcurrentWorkers<WorkerT>::worker_context_t *worker_context)
+    : number_of_workers_(number_of_workers)
+    , worker_context_(worker_context)
+    , thread_context_(this, worker_context_)
+    , initialized_(false)
+    , running_(false)
+    , workers_started_(0)
+    , jobs_queue_(maximal_queue_length, maximal_queue_length / 4 + 1)
+    , results_queue_(maximal_queue_length, 1) {
   assert(maximal_queue_length >= number_of_workers);
-  assert(number_of_workers >  0);
+  assert(number_of_workers > 0);
 
   atomic_init32(&jobs_pending_);
   atomic_init32(&jobs_failed_);
@@ -306,7 +302,7 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
   if (IsRunning()) {
     Terminate();
@@ -320,21 +316,22 @@ ConcurrentWorkers<WorkerT>::~ConcurrentWorkers() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 bool ConcurrentWorkers<WorkerT>::Initialize() {
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Initializing ConcurrentWorker "
-                                            "object with %lu worker threads "
-                                            "and a queue length of %zu",
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg,
+           "Initializing ConcurrentWorker "
+           "object with %lu worker threads "
+           "and a queue length of %zu",
            number_of_workers_, jobs_queue_.GetMaximalItemCount());
   // LogCvmfs(kLogConcurrency, kLogStdout, "sizeof(expected_data_t): %d\n"
   //                                           "sizeof(returned_data_t): %d",
   //          sizeof(expected_data_t), sizeof(returned_data_t));
 
   // initialize synchronisation for job queue (Workers)
-  if (pthread_mutex_init(&status_mutex_, NULL)          != 0 ||
-      pthread_mutex_init(&jobs_all_done_mutex_, NULL)   != 0 ||
-      pthread_cond_init(&worker_started_, NULL)         != 0 ||
-      pthread_cond_init(&jobs_all_done_, NULL)          != 0) {
+  if (pthread_mutex_init(&status_mutex_, NULL) != 0
+      || pthread_mutex_init(&jobs_all_done_mutex_, NULL) != 0
+      || pthread_cond_init(&worker_started_, NULL) != 0
+      || pthread_cond_init(&jobs_all_done_, NULL) != 0) {
     return false;
   }
 
@@ -350,7 +347,7 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   assert(worker_threads_.size() == 0);
   worker_threads_.resize(number_of_workers_);
@@ -360,15 +357,15 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
 
   // spawn the swarm and make them work
   bool success = true;
-  WorkerThreads::iterator i          = worker_threads_.begin();
+  WorkerThreads::iterator i = worker_threads_.begin();
   WorkerThreads::const_iterator iend = worker_threads_.end();
   for (; i != iend; ++i) {
-    pthread_t* thread = &(*i);
+    pthread_t *thread = &(*i);
     const int retval = pthread_create(
-      thread,
-      NULL,
-      &ConcurrentWorkers<WorkerT>::RunWorker,
-      reinterpret_cast<void *>(&thread_context_));
+        thread,
+        NULL,
+        &ConcurrentWorkers<WorkerT>::RunWorker,
+        reinterpret_cast<void *>(&thread_context_));
     if (retval != 0) {
       LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn a Worker");
       success = false;
@@ -376,17 +373,17 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   }
 
   // spawn the callback processing thread
-  const int retval =
-    pthread_create(
+  const int retval = pthread_create(
       &callback_thread_,
       NULL,
       &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
       reinterpret_cast<void *>(&thread_context_));
-    if (retval != 0) {
-      LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn the callback "
-                                             "worker thread");
-      success = false;
-    }
+  if (retval != 0) {
+    LogCvmfs(kLogConcurrency, kLogWarning,
+             "Failed to spawn the callback "
+             "worker thread");
+    success = false;
+  }
 
   // wait for all workers to report in...
   {
@@ -402,8 +399,8 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
 }
 
 
-template <class WorkerT>
-void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
+template<class WorkerT>
+void *ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   // NOTE: This is the actual worker thread code!
 
   //
@@ -411,10 +408,10 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   /////////////////
 
   // get contextual information
-  const WorkerRunBinding &binding =
-    *(static_cast<WorkerRunBinding*>(run_binding));
-  ConcurrentWorkers<WorkerT> *master         = binding.delegate;
-  const worker_context_t     *worker_context = binding.worker_context;
+  const WorkerRunBinding &binding = *(
+      static_cast<WorkerRunBinding *>(run_binding));
+  ConcurrentWorkers<WorkerT> *master = binding.delegate;
+  const worker_context_t *worker_context = binding.worker_context;
 
   // boot up the worker object and make sure it works
   WorkerT worker(worker_context);
@@ -425,8 +422,9 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
   master->ReportStartedWorker();
 
   if (!init_success) {
-    LogCvmfs(kLogConcurrency, kLogWarning, "Worker was not initialized "
-                                           "properly... it will die now!");
+    LogCvmfs(kLogConcurrency, kLogWarning,
+             "Worker was not initialized "
+             "properly... it will die now!");
     return NULL;
   }
 
@@ -461,9 +459,9 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
 }
 
 
-template <class WorkerT>
-void* ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper(void *run_binding) {
-  const RunBinding &binding = *(static_cast<RunBinding*>(run_binding));
+template<class WorkerT>
+void *ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper(void *run_binding) {
+  const RunBinding &binding = *(static_cast<RunBinding *>(run_binding));
   ConcurrentWorkers<WorkerT> *master = binding.delegate;
 
   master->ReportStartedWorker();
@@ -477,7 +475,7 @@ void* ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper(void *run_binding) {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
   while (IsRunning()) {
     const CallbackJob callback_job = results_queue_.Dequeue();
@@ -502,7 +500,7 @@ void ConcurrentWorkers<WorkerT>::RunCallbackThread() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::ReportStartedWorker() const {
   MutexLockGuard lock(status_mutex_);
   ++workers_started_;
@@ -510,15 +508,16 @@ void ConcurrentWorkers<WorkerT>::ReportStartedWorker() const {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::Schedule(WorkerJob job) {
   // Note: This method can be called from arbitrary threads. Thus we do not
   //       necessarily have just one producer in the system.
 
   // check if it makes sense to schedule this job
   if (!IsRunning() && !job.is_death_sentence) {
-    LogCvmfs(kLogConcurrency, kLogWarning, "Tried to schedule a job but "
-                                           "concurrency was not running...");
+    LogCvmfs(kLogConcurrency, kLogWarning,
+             "Tried to schedule a job but "
+             "concurrency was not running...");
     return;
   }
 
@@ -529,7 +528,7 @@ void ConcurrentWorkers<WorkerT>::Schedule(WorkerJob job) {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
   assert(!IsRunning());
 
@@ -547,17 +546,16 @@ void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 typename ConcurrentWorkers<WorkerT>::WorkerJob
-  ConcurrentWorkers<WorkerT>::Acquire()
-{
+ConcurrentWorkers<WorkerT>::Acquire() {
   // Note: This method is exclusively called inside the worker threads!
   //       Any other usage might produce undefined behavior.
   return jobs_queue_.Dequeue();
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::TruncateJobQueue(const bool forget_pending) {
   // Note: This method will throw away all jobs currently waiting in the job
   //       queue. These jobs will not be processed!
@@ -570,7 +568,7 @@ void ConcurrentWorkers<WorkerT>::TruncateJobQueue(const bool forget_pending) {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::Terminate() {
   // Note: this method causes workers to die immediately after they finished
   //       their last acquired job. To make sure that each worker will check
@@ -586,7 +584,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   ScheduleDeathSentences();
 
   // wait for the worker threads to return
-  WorkerThreads::const_iterator i    = worker_threads_.begin();
+  WorkerThreads::const_iterator i = worker_threads_.begin();
   WorkerThreads::const_iterator iend = worker_threads_.end();
   for (; i != iend; ++i) {
     pthread_join(*i, NULL);
@@ -598,17 +596,17 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   // check if we finished all pending jobs
   const int pending = atomic_read32(&jobs_pending_);
   if (pending > 0) {
-    LogCvmfs(kLogConcurrency, kLogWarning, "Job queue was not fully processed. "
-                                           "Still %d jobs were pending and "
-                                           "will not be executed anymore.",
+    LogCvmfs(kLogConcurrency, kLogWarning,
+             "Job queue was not fully processed. "
+             "Still %d jobs were pending and "
+             "will not be executed anymore.",
              pending);
   }
 
   // check if we had failed jobs
   const int failed = atomic_read32(&jobs_failed_);
   if (failed > 0) {
-    LogCvmfs(kLogConcurrency, kLogWarning, "We've had %d failed jobs.",
-             failed);
+    LogCvmfs(kLogConcurrency, kLogWarning, "We've had %d failed jobs.", failed);
   }
 
   // thanks, and good bye...
@@ -618,7 +616,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
   LogCvmfs(kLogConcurrency, kLogVerboseMsg,
            "Waiting for %d jobs to be finished", atomic_read32(&jobs_pending_));
@@ -635,7 +633,7 @@ void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::WaitForTermination() {
   if (!IsRunning())
     return;
@@ -645,10 +643,10 @@ void ConcurrentWorkers<WorkerT>::WaitForTermination() {
 }
 
 
-template <class WorkerT>
+template<class WorkerT>
 void ConcurrentWorkers<WorkerT>::JobDone(
-              const ConcurrentWorkers<WorkerT>::returned_data_t& data,
-              const bool                                         success) {
+    const ConcurrentWorkers<WorkerT>::returned_data_t &data,
+    const bool success) {
   // BEWARE!
   // This is a callback method that might be called from a different thread!
 

@@ -15,7 +15,7 @@ namespace notify {
  * Publish the manifest of a CernVM-FS repository located at "repository_url" to
  * a CernVM-FS notification server located at "server_url"
  */
-int DoPublish(const std::string& server_url, const std::string& repository_url,
+int DoPublish(const std::string &server_url, const std::string &repository_url,
               bool verbose);
 
 }  // namespace notify

@@ -3,18 +3,18 @@
  */
 
 
-#include "publish/repository.h"
-
 #include <vector>
 
 #include "history_sqlite.h"
 #include "publish/except.h"
+#include "publish/repository.h"
 #include "sanitizer.h"
 
 namespace publish {
 
 void Publisher::CheckTagName(const std::string &name) {
-  if (name.empty()) throw EPublish("the empty string is not a valid tag name");
+  if (name.empty())
+    throw EPublish("the empty string is not a valid tag name");
   if (name == "trunk")
     throw EPublish("'trunk' is not allowed as a custom tag name");
   if (name == "trunk-previous")
@@ -25,8 +25,7 @@ void Publisher::CheckTagName(const std::string &name) {
 
 
 void Publisher::EditTags(const std::vector<history::History::Tag> &add_tags,
-                         const std::vector<std::string> &rm_tags)
-{
+                         const std::vector<std::string> &rm_tags) {
   if (!in_transaction_.IsSet())
     throw EPublish("cannot edit tags outside transaction");
 
@@ -41,7 +40,8 @@ void Publisher::EditTags(const std::vector<history::History::Tag> &add_tags,
     CheckTagName(name);
     if (history_->Exists(name)) {
       bool retval = history_->Remove(name);
-      if (!retval) throw EPublish("cannot remove tag " + name);
+      if (!retval)
+        throw EPublish("cannot remove tag " + name);
     }
   }
 

@@ -16,13 +16,13 @@ namespace download {
  * Must be used by a specific implementation.
  * From the layout it is expected that the specific health check implementation
  * creates a thread/fork where the health check is continuously performed.
- * 
+ *
  * @note compile-time interfaces are work in progress
  */
 class HealthCheck : SingleCopy {
  public:
-  HealthCheck() {}
-  virtual ~HealthCheck() {}
+  HealthCheck() { }
+  virtual ~HealthCheck() { }
   virtual void StartHealthcheck() = 0;
   virtual void StopHealthcheck() = 0;
 };

@@ -71,7 +71,6 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
-
 struct Statistics {
   double transferred_bytes;
   double transfer_time;
@@ -97,11 +96,11 @@ struct Statistics {
 struct JobInfo : SingleCopy {
   enum RequestType {
     kReqHeadOnly = 0,  // peek
-    kReqHeadPut,  // conditional upload of content-addressed objects
-    kReqPutCas,  // immutable data object
-    kReqPutDotCvmfs,  // one of the /.cvmfs... top level files
-    kReqPutHtml,  // HTML file - display instead of downloading
-    kReqPutBucket,  // bucket creation
+    kReqHeadPut,       // conditional upload of content-addressed objects
+    kReqPutCas,        // immutable data object
+    kReqPutDotCvmfs,   // one of the /.cvmfs... top level files
+    kReqPutHtml,       // HTML file - display instead of downloading
+    kReqPutBucket,     // bucket creation
     kReqDelete,
   };
 
@@ -110,13 +109,10 @@ struct JobInfo : SingleCopy {
   UniquePtr<FileBackedBuffer> origin;
 
   // One constructor per destination
-  JobInfo(
-    const std::string &object_key,
-    void *callback,
-    FileBackedBuffer *origin)
-    : object_key(object_key),
-      origin(origin)
-  {
+  JobInfo(const std::string &object_key,
+          void *callback,
+          FileBackedBuffer *origin)
+      : object_key(object_key), origin(origin) {
     JobInfoInit();
     this->callback = callback;
   }
@@ -131,12 +127,10 @@ struct JobInfo : SingleCopy {
     backoff_ms = 0;
     throttle_ms = 0;
     throttle_timestamp = 0;
-    errorbuffer =
-        reinterpret_cast<char *>(smalloc(sizeof(char) * CURL_ERROR_SIZE));
+    errorbuffer = reinterpret_cast<char *>(
+        smalloc(sizeof(char) * CURL_ERROR_SIZE));
   }
-  ~JobInfo() {
-    free(errorbuffer);
-  }
+  ~JobInfo() { free(errorbuffer); }
 
   // Internal state, don't touch
   CURL *curl_handle;
@@ -156,8 +150,13 @@ struct JobInfo : SingleCopy {
 };  // JobInfo
 
 struct S3FanOutDnsEntry {
-  S3FanOutDnsEntry() : counter(0), dns_name(), ip(), port("80"),
-     clist(NULL), sharehandle(NULL) {}
+  S3FanOutDnsEntry()
+      : counter(0)
+      , dns_name()
+      , ip()
+      , port("80")
+      , clist(NULL)
+      , sharehandle(NULL) { }
   unsigned int counter;
   std::string dns_name;
   std::string ip;
@@ -227,22 +226,21 @@ class S3FanoutManager : SingleCopy {
 
  private:
   // Reflects the default Apache configuration of the local backend
-  static const char *kCacheControlCas;  // Cache-Control: max-age=259200
-  static const char *kCacheControlDotCvmfs;  // Cache-Control: max-age=61
+  static const char *kCacheControlCas;          // Cache-Control: max-age=259200
+  static const char *kCacheControlDotCvmfs;     // Cache-Control: max-age=61
   static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
-  std::vector<s3fanout::JobInfo*> jobs_todo_;
+  std::vector<s3fanout::JobInfo *> jobs_todo_;
   pthread_mutex_t *jobs_todo_lock_;
   pthread_mutex_t *curl_handle_lock_;
 
   CURL *AcquireCurlHandle() const;
   void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
   void InitPipeWatchFds();
-  int InitializeDnsSettings(CURL *handle,
-                            std::string remote_host) const;
+  int InitializeDnsSettings(CURL *handle, std::string remote_host) const;
   void InitializeDnsSettingsCurl(CURL *handle, CURLSH *sharehandle,
                                  curl_slist *clist) const;
   Failures InitializeRequest(JobInfo *info, CURL *handle) const;
@@ -256,18 +254,16 @@ class S3FanoutManager : SingleCopy {
   std::string GetUriEncode(const std::string &val, bool encode_slash) const;
   std::string GetAwsV4SigningKey(const std::string &date) const;
   bool MkPayloadHash(const JobInfo &info, std::string *hex_hash) const;
-  bool MkV2Authz(const JobInfo &info,
-                 std::vector<std::string> *headers) const;
-  bool MkV4Authz(const JobInfo &info,
-                 std::vector<std::string> *headers) const;
+  bool MkV2Authz(const JobInfo &info, std::vector<std::string> *headers) const;
+  bool MkV4Authz(const JobInfo &info, std::vector<std::string> *headers) const;
   bool MkAzureAuthz(const JobInfo &info,
-                 std::vector<std::string> *headers) const;
+                    std::vector<std::string> *headers) const;
   std::string MkUrl(const std::string &objkey) const {
     if (config_.dns_buckets) {
       return config_.protocol + "://" + complete_hostname_ + "/" + objkey;
     } else {
-      return config_.protocol + "://" + complete_hostname_ + "/" +
-             config_.bucket + "/" + objkey;
+      return config_.protocol + "://" + complete_hostname_ + "/"
+             + config_.bucket + "/" + objkey;
     }
   }
   std::string MkCompleteHostname() {

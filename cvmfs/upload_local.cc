@@ -4,7 +4,6 @@
 
 #include "upload_local.h"
 
-
 #include <errno.h>
 
 #include <string>
@@ -16,14 +15,13 @@
 namespace upload {
 
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition)
-    : AbstractUploader(spooler_definition),
-      backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
-      backend_dir_mode_(default_backend_dir_mode_ ^ GetUmask()),
-      upstream_path_(spooler_definition.spooler_configuration),
-      temporary_path_(spooler_definition.temporary_path)
-{
-  assert(spooler_definition.IsValid() &&
-         spooler_definition.driver_type == SpoolerDefinition::Local);
+    : AbstractUploader(spooler_definition)
+    , backend_file_mode_(default_backend_file_mode_ ^ GetUmask())
+    , backend_dir_mode_(default_backend_dir_mode_ ^ GetUmask())
+    , upstream_path_(spooler_definition.spooler_configuration)
+    , temporary_path_(spooler_definition.temporary_path) {
+  assert(spooler_definition.IsValid()
+         && spooler_definition.driver_type == SpoolerDefinition::Local);
 
   atomic_init32(&copy_errors_);
 }
@@ -37,8 +35,8 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 }
 
 bool LocalUploader::Create() {
-  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_) &&
-         MkdirDeep(upstream_path_ + "/stats", backend_dir_mode_, false);
+  return MakeCacheDirectories(upstream_path_ + "/data", backend_dir_mode_)
+         && MkdirDeep(upstream_path_ + "/stats", backend_dir_mode_, false);
 }
 
 void LocalUploader::DoUpload(const std::string &remote_path,
@@ -123,15 +121,14 @@ void LocalUploader::StreamedUpload(UploadStreamHandle *handle,
                                    const CallbackTN *callback) {
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle *>(handle);
 
-  const size_t bytes_written =
-      write(local_handle->file_descriptor, buffer.data, buffer.size);
+  const size_t bytes_written = write(local_handle->file_descriptor, buffer.data,
+                                     buffer.size);
   if (bytes_written != buffer.size) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to write %lu bytes to '%s' "
              "(errno: %d)",
-             buffer.size, local_handle->temporary_path.c_str(),
-             cpy_errno);
+             buffer.size, local_handle->temporary_path.c_str(), cpy_errno);
     atomic_inc32(&copy_errors_);
     Respond(callback,
             UploaderResults(UploaderResults::kBufferUpload, cpy_errno));

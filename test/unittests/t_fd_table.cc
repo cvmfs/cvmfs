@@ -13,13 +13,9 @@ using namespace std;  // NOLINT
 
 class T_FdTable : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-    fd_table_ = new FdTable<int>(5, -1);
-  }
+  virtual void SetUp() { fd_table_ = new FdTable<int>(5, -1); }
 
-  virtual void TearDown() {
-    delete fd_table_;
-  }
+  virtual void TearDown() { delete fd_table_; }
 
   FdTable<int> *fd_table_;
 };
@@ -71,10 +67,11 @@ TEST_F(T_FdTable, Stress) {
         EXPECT_EQ(-1, fd_table_->GetHandle(fd));
         EXPECT_EQ(-EBADF, fd_table_->CloseFd(fd));
       } else {
-        unsigned fd_idx =
-          (open_fds.size() > 1) ? prng.Next(open_fds.size()) : 0;
+        unsigned fd_idx = (open_fds.size() > 1) ? prng.Next(open_fds.size())
+                                                : 0;
         map<int, int>::const_iterator iter = open_fds.begin();
-        for (unsigned i = 0; i < fd_idx; ++i, ++iter) { }
+        for (unsigned i = 0; i < fd_idx; ++i, ++iter) {
+        }
         EXPECT_EQ(iter->second, fd_table_->GetHandle(iter->first));
         EXPECT_EQ(0, fd_table_->CloseFd(iter->first));
         open_fds.erase(iter->first);

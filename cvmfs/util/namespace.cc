@@ -44,7 +44,8 @@ int CheckNamespaceFeatures() {
   return 0;
 #else
   int result = kNsFeatureMount;  // available since kernel 2.4
-  if (SymlinkExists("/proc/self/ns/pid")) result |= kNsFeaturePid;
+  if (SymlinkExists("/proc/self/ns/pid"))
+    result |= kNsFeaturePid;
   int fd = open("/proc/sys/kernel/unprivileged_userns_clone", O_RDONLY);
   if (fd < 0)
     return result;
@@ -63,7 +64,8 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   std::string gid_str = StringifyInt(getegid());
 
   int rvi = unshare(CLONE_NEWUSER);
-  if (rvi != 0) return kFailNsUnshare;
+  if (rvi != 0)
+    return kFailNsUnshare;
 
   std::string uid_map = StringifyInt(map_uid_to) + " " + uid_str + " 1";
   std::string gid_map = StringifyInt(map_gid_to) + " " + gid_str + " 1";
@@ -71,20 +73,24 @@ NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
   int fd;
   ssize_t nbytes;
   fd = open("/proc/self/setgroups", O_WRONLY);
-  if (fd < 0) return kFailNsSetgroupsOpen;
+  if (fd < 0)
+    return kFailNsSetgroupsOpen;
   nbytes = write(fd, "deny", 4);
   close(fd);
-  if (nbytes != 4) return kFailNsSetgroupsWrite;
+  if (nbytes != 4)
+    return kFailNsSetgroupsWrite;
 
   fd = open("/proc/self/uid_map", O_WRONLY);
-  if (fd < 0) return kFailNsMapUidOpen;
+  if (fd < 0)
+    return kFailNsMapUidOpen;
   nbytes = write(fd, uid_map.data(), uid_map.length());
   close(fd);
   if (nbytes != static_cast<ssize_t>(uid_map.length()))
     return kFailNsMapUidWrite;
 
   fd = open("/proc/self/gid_map", O_WRONLY);
-  if (fd < 0) return kFailNsMapGidOpen;
+  if (fd < 0)
+    return kFailNsMapGidOpen;
   nbytes = write(fd, gid_map.data(), gid_map.length());
   close(fd);
   if (nbytes != static_cast<ssize_t>(gid_map.length()))
@@ -122,7 +128,8 @@ bool CreateMountNamespace() {
   std::string cwd = GetCurrentWorkingDirectory();
 
   int rvi = unshare(CLONE_NEWNS);
-  if (rvi != 0) return false;
+  if (rvi != 0)
+    return false;
 
   rvi = chdir(cwd.c_str());
   return rvi == 0;
@@ -155,7 +162,8 @@ static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
 bool CreatePidNamespace(int *fd_parent) {
 #ifdef CVMFS_HAS_UNSHARE
   int rvi = unshare(CLONE_NEWPID);
-  if (rvi != 0) return false;
+  if (rvi != 0)
+    return false;
 
   int pipe_parent[2];
   MakePipe(pipe_parent);

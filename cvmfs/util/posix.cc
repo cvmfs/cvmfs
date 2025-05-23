@@ -60,7 +60,7 @@
 #include "util/platform.h"
 #include "util/string.h"
 
-//using namespace std;  // NOLINT
+// using namespace std;  // NOLINT
 
 #ifndef ST_RDONLY
 // On Linux, this is in sys/statvfs.h
@@ -96,10 +96,11 @@ static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
  * Removes a trailing "/" from a path.
  */
 std::string MakeCanonicalPath(const std::string &path) {
-  if (path.length() == 0) return path;
+  if (path.length() == 0)
+    return path;
 
-  if (path[path.length()-1] == '/') {
-    return path.substr(0, path.length()-1);
+  if (path[path.length() - 1] == '/') {
+    return path.substr(0, path.length() - 1);
   } else {
     return path;
   }
@@ -110,15 +111,13 @@ std::string MakeCanonicalPath(const std::string &path) {
  *
  * NOTE: If only a filename is given, the directory is returned as "."
  */
-void SplitPath(
-  const std::string &path,
-  std::string *dirname,
-  std::string *filename)
-{
+void SplitPath(const std::string &path,
+               std::string *dirname,
+               std::string *filename) {
   size_t dir_sep = path.rfind('/');
   if (dir_sep != std::string::npos) {
     *dirname = path.substr(0, dir_sep);
-    *filename = path.substr(dir_sep+1);
+    *filename = path.substr(dir_sep + 1);
   } else {
     *dirname = ".";
     *filename = path;
@@ -145,7 +144,7 @@ std::string GetParentPath(const std::string &path) {
 std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
   if (idx != std::string::npos) {
-    return path.substr(idx+1);
+    return path.substr(idx + 1);
   } else {
     return path;
   }
@@ -215,7 +214,6 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
 #endif
 
 
-
   return result;
 }
 
@@ -277,11 +275,9 @@ bool IsMountPoint(const std::string &path) {
 /**
  * By default PANIC(NULL) on failure
  */
-void CreateFile(
-  const std::string &path,
-  const int mode,
-  const bool ignore_failure)
-{
+void CreateFile(const std::string &path,
+                const int mode,
+                const bool ignore_failure) {
   int fd = open(path.c_str(), O_CREAT, mode);
   if (fd >= 0) {
     close(fd);
@@ -339,8 +335,7 @@ int MakeSocket(const std::string &path, const int mode) {
       return -1;
   }
   sock_addr.sun_family = AF_UNIX;
-  strncpy(sock_addr.sun_path, short_path.c_str(),
-          sizeof(sock_addr.sun_path));
+  strncpy(sock_addr.sun_path, short_path.c_str(), sizeof(sock_addr.sun_path));
 
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
@@ -353,13 +348,13 @@ int MakeSocket(const std::string &path, const int mode) {
 #endif
 
   if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
-           sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
-  {
+           sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path))
+      < 0) {
     if ((errno == EADDRINUSE) && (unlink(path.c_str()) == 0)) {
       // Second try, perhaps the file was left over
       if (bind(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
-               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
-      {
+               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path))
+          < 0) {
         LogCvmfs(kLogCvmfs, kLogDebug, "binding socket failed (%d)", errno);
         goto make_socket_failure;
       }
@@ -374,7 +369,7 @@ int MakeSocket(const std::string &path, const int mode) {
 
   return socket_fd;
 
- make_socket_failure:
+make_socket_failure:
   close(socket_fd);
   if (short_path != path)
     RemoveShortSocketLink(short_path);
@@ -440,9 +435,9 @@ int ConnectSocket(const std::string &path) {
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
 
-  int retval =
-    connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
-            sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
+  int retval = connect(
+      socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
+      sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
 
@@ -473,9 +468,9 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
   }
   endpoint_addr.sin_port = htons(portno);
 
-  retval =
-  connect(socket_fd, reinterpret_cast<struct sockaddr *>(&endpoint_addr),
-          sizeof(endpoint_addr));
+  retval = connect(socket_fd,
+                   reinterpret_cast<struct sockaddr *>(&endpoint_addr),
+                   sizeof(endpoint_addr));
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "failed to connect to TCP endpoint (%d)",
              errno);
@@ -543,11 +538,13 @@ bool ReadHalfPipe(int fd, void *buf, size_t nbyte, unsigned timeout_ms) {
     if ((i > 3000) && (num_bytes == 0)) {
       // The BackoffThrottle would pull in too many dependencies
       SafeSleepMs(backoff_ms);
-      if (backoff_ms < max_backoff_ms) backoff_ms *= 2;
+      if (backoff_ms < max_backoff_ms)
+        backoff_ms *= 2;
     }
     if ((timeout_ms != 0) && (num_bytes == 0)) {
-      duration_ms = (platform_monotonic_time_ns() - timestamp) / (1000UL * 1000UL);
-      if (duration_ms  > timeout_ms)
+      duration_ms = (platform_monotonic_time_ns() - timestamp)
+                    / (1000UL * 1000UL);
+      if (duration_ms > timeout_ms)
         return false;
     }
   } while (num_bytes == 0);
@@ -576,7 +573,8 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   std::vector<std::string> subdirs;
 
   DIR *dirp_a = opendir(path_a.c_str());
-  if (dirp_a == NULL) return false;
+  if (dirp_a == NULL)
+    return false;
   DIR *dirp_b = opendir(path_b.c_str());
   if (dirp_b == NULL) {
     closedir(dirp_a);
@@ -598,7 +596,8 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
       closedir(dirp_b);
       return false;
     }
-    if (S_ISDIR(info.st_mode)) subdirs.push_back(name);
+    if (S_ISDIR(info.st_mode))
+      subdirs.push_back(name);
   }
   while ((dirent = platform_readdir(dirp_b))) {
     const std::string name(dirent->d_name);
@@ -615,18 +614,19 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   if (ls_a.size() != ls_b.size())
     return false;
   for (unsigned i = 0; i < ls_a.size(); ++i) {
-    if (GetFileName(ls_a[i]) != GetFileName(ls_b[i])) return false;
+    if (GetFileName(ls_a[i]) != GetFileName(ls_b[i]))
+      return false;
     platform_stat64 info_a;
     platform_stat64 info_b;
     retval = platform_lstat(ls_a[i].c_str(), &info_a);
-    if (retval != 0) return false;
+    if (retval != 0)
+      return false;
     retval = platform_lstat(ls_b[i].c_str(), &info_b);
-    if (retval != 0) return false;
-    if ((info_a.st_mode != info_b.st_mode) ||
-        (info_a.st_uid != info_b.st_uid) ||
-        (info_a.st_gid != info_b.st_gid) ||
-        ((info_a.st_size != info_b.st_size) && !S_ISDIR(info_a.st_mode)))
-    {
+    if (retval != 0)
+      return false;
+    if ((info_a.st_mode != info_b.st_mode) || (info_a.st_uid != info_b.st_uid)
+        || (info_a.st_gid != info_b.st_gid)
+        || ((info_a.st_size != info_b.st_size) && !S_ISDIR(info_a.st_mode))) {
       return false;
     }
   }
@@ -634,7 +634,8 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   for (unsigned i = 0; i < subdirs.size(); ++i) {
     bool retval_subtree = DiffTree(path_a + "/" + subdirs[i],
                                    path_b + "/" + subdirs[i]);
-    if (!retval_subtree) return false;
+    if (!retval_subtree)
+      return false;
   }
 
   return true;
@@ -770,9 +771,9 @@ std::string GetHostname() {
  * set(e){g/u}id wrapper.
  */
 bool SwitchCredentials(const uid_t uid, const gid_t gid,
-                       const bool temporarily)
-{
-  LogCvmfs(kLogCvmfs, kLogDebug, "current credentials uid %d gid %d "
+                       const bool temporarily) {
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "current credentials uid %d gid %d "
            "euid %d egid %d, switching to %d %d (temp: %d)",
            getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
   int retval = 0;
@@ -790,8 +791,8 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)",
-           retval, errno);
+  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", retval,
+           errno);
   return retval == 0;
 }
 
@@ -801,8 +802,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
  */
 bool FileExists(const std::string &path) {
   platform_stat64 info;
-  return ((platform_lstat(path.c_str(), &info) == 0) &&
-          S_ISREG(info.st_mode));
+  return ((platform_lstat(path.c_str(), &info) == 0) && S_ISREG(info.st_mode));
 }
 
 
@@ -823,8 +823,7 @@ int64_t GetFileSize(const std::string &path) {
  */
 bool DirectoryExists(const std::string &path) {
   platform_stat64 info;
-  return ((platform_lstat(path.c_str(), &info) == 0) &&
-          S_ISDIR(info.st_mode));
+  return ((platform_lstat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode));
 }
 
 
@@ -833,8 +832,7 @@ bool DirectoryExists(const std::string &path) {
  */
 bool SymlinkExists(const std::string &path) {
   platform_stat64 info;
-  return ((platform_lstat(path.c_str(), &info) == 0) &&
-          S_ISLNK(info.st_mode));
+  return ((platform_lstat(path.c_str(), &info) == 0) && S_ISLNK(info.st_mode));
 }
 
 
@@ -854,19 +852,18 @@ bool SymlinkForced(const std::string &src, const std::string &dest) {
  * The mkdir -p command.  Additionally checks if the directory is writable
  * if it exists.
  */
-bool MkdirDeep(
-  const std::string &path,
-  const mode_t mode,
-  bool verify_writable)
-{
-  if (path == "") return false;
+bool MkdirDeep(const std::string &path,
+               const mode_t mode,
+               bool verify_writable) {
+  if (path == "")
+    return false;
 
   int retval = mkdir(path.c_str(), mode);
-  if (retval == 0) return true;
+  if (retval == 0)
+    return true;
 
-  if ((errno == ENOENT) &&
-      (MkdirDeep(GetParentPath(path), mode, verify_writable)))
-  {
+  if ((errno == ENOENT)
+      && (MkdirDeep(GetParentPath(path), mode, verify_writable))) {
     return MkdirDeep(path, mode, verify_writable);
   }
 
@@ -894,7 +891,8 @@ bool MakeCacheDirectories(const std::string &path, const mode_t mode) {
   const std::string canonical_path = MakeCanonicalPath(path);
 
   std::string this_path = canonical_path + "/quarantaine";
-  if (!MkdirDeep(this_path, mode, false)) return false;
+  if (!MkdirDeep(this_path, mode, false))
+    return false;
 
   this_path = canonical_path + "/ff";
 
@@ -964,8 +962,7 @@ int WritePidFile(const std::string &path) {
   char buf[64];
 
   snprintf(buf, sizeof(buf), "%" PRId64 "\n", static_cast<uint64_t>(getpid()));
-  bool retval =
-    (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
+  bool retval = (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
   if (!retval) {
     UnlockFile(fd);
     return -1;
@@ -1014,8 +1011,7 @@ void UnlockFile(const int filedes) {
  * Wrapper around mkstemp.
  */
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
-                     const char *open_flags, std::string *final_path)
-{
+                     const char *open_flags, std::string *final_path) {
   *final_path = path_prefix + ".XXXXXX";
   char *tmp_file = strdupa(final_path->c_str());
   int tmp_fd = mkstemp(tmp_file);
@@ -1080,9 +1076,7 @@ std::string GetCurrentWorkingDirectory() {
 class RemoveTreeHelper {
  public:
   bool success;
-  RemoveTreeHelper() {
-    success = true;
-  }
+  RemoveTreeHelper() { success = true; }
   void RemoveFile(const std::string &parent_path, const std::string &name) {
     int retval = unlink((parent_path + "/" + name).c_str());
     if (retval != 0)
@@ -1112,8 +1106,7 @@ bool RemoveTree(const std::string &path) {
     return false;
 
   RemoveTreeHelper *remove_tree_helper = new RemoveTreeHelper();
-  FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "",
-                                                  true);
+  FileSystemTraversal<RemoveTreeHelper> traversal(remove_tree_helper, "", true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_character_dev = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
@@ -1132,10 +1125,8 @@ bool RemoveTree(const std::string &path) {
 /**
  * Returns ls $dir/GLOB$suffix
  */
-std::vector<std::string> FindFilesBySuffix(
-  const std::string &dir,
-  const std::string &suffix)
-{
+std::vector<std::string> FindFilesBySuffix(const std::string &dir,
+                                           const std::string &suffix) {
   std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
@@ -1144,9 +1135,8 @@ std::vector<std::string> FindFilesBySuffix(
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
     const std::string name(dirent->d_name);
-    if ((name.length() >= suffix.length()) &&
-        (name.substr(name.length()-suffix.length()) == suffix))
-    {
+    if ((name.length() >= suffix.length())
+        && (name.substr(name.length() - suffix.length()) == suffix)) {
       result.push_back(dir + "/" + name);
     }
   }
@@ -1159,10 +1149,8 @@ std::vector<std::string> FindFilesBySuffix(
 /**
  * Returns ls $dir/$prefixGLOB
  */
-std::vector<std::string> FindFilesByPrefix(
-  const std::string &dir,
-  const std::string &prefix)
-{
+std::vector<std::string> FindFilesByPrefix(const std::string &dir,
+                                           const std::string &prefix) {
   std::vector<std::string> result;
   DIR *dirp = opendir(dir.c_str());
   if (!dirp)
@@ -1171,9 +1159,8 @@ std::vector<std::string> FindFilesByPrefix(
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
     const std::string name(dirent->d_name);
-    if ((name.length() >= prefix.length()) &&
-        (name.substr(0, prefix.length()) == prefix))
-    {
+    if ((name.length() >= prefix.length())
+        && (name.substr(0, prefix.length()) == prefix)) {
       result.push_back(dir + "/" + name);
     }
   }
@@ -1218,8 +1205,7 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
  */
 bool ListDirectory(const std::string &directory,
                    std::vector<std::string> *names,
-                   std::vector<mode_t> *modes)
-{
+                   std::vector<mode_t> *modes) {
   DIR *dirp = opendir(directory.c_str());
   if (!dirp)
     return false;
@@ -1413,7 +1399,7 @@ bool AddGroup2Persona(const gid_t gid) {
   int ngroups = getgroups(0, NULL);
   if (ngroups < 0)
     return false;
-  gid_t *groups = static_cast<gid_t *>(smalloc((ngroups+1) * sizeof(gid_t)));
+  gid_t *groups = static_cast<gid_t *>(smalloc((ngroups + 1) * sizeof(gid_t)));
   int retval = getgroups(ngroups, groups);
   if (retval < 0) {
     free(groups);
@@ -1426,7 +1412,7 @@ bool AddGroup2Persona(const gid_t gid) {
     }
   }
   groups[ngroups] = gid;
-  retval = setgroups(ngroups+1, groups);
+  retval = setgroups(ngroups + 1, groups);
   free(groups);
   return retval == 0;
 }
@@ -1523,7 +1509,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
     std::vector<std::string> fd_names;
     std::vector<mode_t> fd_modes;
     std::string proc_dir = "/proc/" + proc_names[i];
-    std::string fd_dir   = proc_dir + "/fd";
+    std::string fd_dir = proc_dir + "/fd";
     bool rvb = ListDirectory(fd_dir, &fd_names, &fd_modes);
     uid_t proc_uid = 0;
 
@@ -1608,7 +1594,8 @@ void WaitForSignal(int signum) {
 /**
  * Returns -1 if the child crashed or the exit code otherwise.
  * @param pid Process identifier.
- * @param sig_ok List of signals that are still considered a successful termination.
+ * @param sig_ok List of signals that are still considered a successful
+ * termination.
  */
 int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);
@@ -1618,16 +1605,16 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
     if (retval == -1) {
       if (errno == EINTR)
         continue;
-      PANIC(kLogSyslogErr | kLogDebug,
-            "waitpid failed with errno %d", errno);
+      PANIC(kLogSyslogErr | kLogDebug, "waitpid failed with errno %d", errno);
     }
     assert(retval == pid);
     break;
   }
   if (WIFEXITED(statloc))
     return WEXITSTATUS(statloc);
-  if (WIFSIGNALED(statloc) && (std::find(sig_ok.begin(), sig_ok.end(),
-                                         WTERMSIG(statloc)) != sig_ok.end()))
+  if (WIFSIGNALED(statloc)
+      && (std::find(sig_ok.begin(), sig_ok.end(), WTERMSIG(statloc))
+          != sig_ok.end()))
     return 0;
   return -1;
 }
@@ -1636,8 +1623,8 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
  * Exec a command as a daemon.
  */
 
-bool ExecAsDaemon(const std::vector<std::string>  &command_line,
-                       pid_t           *child_pid) {
+bool ExecAsDaemon(const std::vector<std::string> &command_line,
+                  pid_t *child_pid) {
   assert(command_line.size() >= 1);
 
   Pipe<kPipeDetachedChild> pipe_fork;
@@ -1656,7 +1643,7 @@ bool ExecAsDaemon(const std::vector<std::string>  &command_line,
     pid_grand_child = fork();
     assert(pid_grand_child >= 0);
 
-    if (pid_grand_child != 0){
+    if (pid_grand_child != 0) {
       pipe_fork.Write<pid_t>(pid_grand_child);
       _exit(0);
     } else {
@@ -1686,14 +1673,9 @@ bool ExecAsDaemon(const std::vector<std::string>  &command_line,
   pipe_fork.CloseReadFd();
 
   LogCvmfs(kLogCvmfs, kLogDebug, "exec'd as daemon %s (PID: %d)",
-           command_line[0].c_str(),
-           static_cast<int>(*child_pid));
+           command_line[0].c_str(), static_cast<int>(*child_pid));
   return true;
-
 }
-
-
-
 
 
 /**
@@ -1730,15 +1712,13 @@ void Daemonize() {
 }
 
 
-bool ExecuteBinary(
-  int *fd_stdin,
-  int *fd_stdout,
-  int *fd_stderr,
-  const std::string &binary_path,
-  const std::vector<std::string> &argv,
-  const bool double_fork,
-  pid_t *child_pid
-) {
+bool ExecuteBinary(int *fd_stdin,
+                   int *fd_stdout,
+                   int *fd_stderr,
+                   const std::string &binary_path,
+                   const std::vector<std::string> &argv,
+                   const bool double_fork,
+                   pid_t *child_pid) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -1751,7 +1731,7 @@ bool ExecuteBinary(
   preserve_fildes.insert(1);
   preserve_fildes.insert(2);
   std::map<int, int> map_fildes;
-  map_fildes[pipe_stdin[0]] = 0;  // Reading end of pipe_stdin
+  map_fildes[pipe_stdin[0]] = 0;   // Reading end of pipe_stdin
   map_fildes[pipe_stdout[1]] = 1;  // Writing end of pipe_stdout
   map_fildes[pipe_stderr[1]] = 2;  // Writing end of pipe_stderr
   std::vector<std::string> cmd_line;
@@ -1764,8 +1744,7 @@ bool ExecuteBinary(
                    true /* drop_credentials */,
                    false /* clear_env */,
                    double_fork,
-                   child_pid))
-  {
+                   child_pid)) {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -1831,10 +1810,8 @@ struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
 /**
  *  Loop through all possible FDs and close them.
  */
-static bool CloseAllFildesUntilMaxFD(
-  const std::set<int> &preserve_fildes,
-  int max_fd
-) {
+static bool CloseAllFildesUntilMaxFD(const std::set<int> &preserve_fildes,
+                                     int max_fd) {
   for (int fd = 0; fd < max_fd; fd++) {
     if (preserve_fildes.count(fd) == 0) {
       close(fd);
@@ -1849,8 +1826,7 @@ static bool CloseAllFildesUntilMaxFD(
  * Not used on macOS.
  */
 #ifndef __APPLE__
-static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
-{
+static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
   DIR *dirp = opendir("/proc/self/fd");
   if (!dirp)
     return false;
@@ -1884,8 +1860,7 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes)
  * Closes all file descriptors except the ones in preserve_fildes.
  * To be used after fork but before exec.
  */
-bool CloseAllFildes(const std::set<int> &preserve_fildes)
-{
+bool CloseAllFildes(const std::set<int> &preserve_fildes) {
   int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
   if (max_fd < 0) {
     return false;
@@ -1917,14 +1892,13 @@ bool CloseAllFildes(const std::set<int> &preserve_fildes)
  * Using the optional parameter *pid it is possible to retrieve the process ID
  * of the spawned process.
  */
-bool ManagedExec(const std::vector<std::string>  &command_line,
-                 const std::set<int>        &preserve_fildes,
-                 const std::map<int, int>   &map_fildes,
-                 const bool             drop_credentials,
-                 const bool             clear_env,
-                 const bool             double_fork,
-                       pid_t           *child_pid)
-{
+bool ManagedExec(const std::vector<std::string> &command_line,
+                 const std::set<int> &preserve_fildes,
+                 const std::map<int, int> &map_fildes,
+                 const bool drop_credentials,
+                 const bool clear_env,
+                 const bool double_fork,
+                 pid_t *child_pid) {
   assert(command_line.size() >= 1);
 
   Pipe<kPipeDetachedChild> pipe_fork;
@@ -1954,8 +1928,9 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
     // Child, map file descriptors
     for (std::map<int, int>::const_iterator i = map_fildes.begin(),
-         iEnd = map_fildes.end(); i != iEnd; ++i)
-    {
+                                            iEnd = map_fildes.end();
+         i != iEnd;
+         ++i) {
       int retval = dup2(i->first, i->second);
       if (retval == -1) {
         failed = ForkFailures::kFailDupFd;
@@ -1973,7 +1948,8 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     if (double_fork) {
       pid_grand_child = fork();
       assert(pid_grand_child >= 0);
-      if (pid_grand_child != 0) _exit(0);
+      if (pid_grand_child != 0)
+        _exit(0);
     }
 
     fd_flags = fcntl(pipe_fork.GetWriteFd(), F_GETFD);
@@ -2006,7 +1982,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
     failed = ForkFailures::kFailExec;
 
-   fork_failure:
+  fork_failure:
     pipe_fork.Write<ForkFailures::Names>(failed);
     _exit(1);
   }
@@ -2036,8 +2012,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
     *child_pid = buf_child_pid;
   pipe_fork.CloseReadFd();
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
-           command_line[0].c_str(),
-           static_cast<int>(buf_child_pid));
+           command_line[0].c_str(), static_cast<int>(buf_child_pid));
   return true;
 }
 
@@ -2082,8 +2057,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
   unsigned iov_idx = 0;
 
   while (nbytes) {
-    ssize_t retval =
-      writev(fd, &iov[iov_idx], static_cast<int>(iovcnt - iov_idx));
+    ssize_t retval = writev(fd, &iov[iov_idx],
+                            static_cast<int>(iovcnt - iov_idx));
     if (retval < 0) {
       if (errno == EINTR)
         continue;
@@ -2093,9 +2068,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
     nbytes -= retval;
 
     unsigned sum_written_blocks = 0;
-    while ((sum_written_blocks + iov[iov_idx].iov_len) <=
-           static_cast<size_t>(retval))
-    {
+    while ((sum_written_blocks + iov[iov_idx].iov_len)
+           <= static_cast<size_t>(retval)) {
       sum_written_blocks += iov[iov_idx].iov_len;
       iov_idx++;
       if (iov_idx == iovcnt) {
@@ -2105,8 +2079,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
     }
     unsigned offset = retval - sum_written_blocks;
     iov[iov_idx].iov_len -= offset;
-    iov[iov_idx].iov_base =
-      reinterpret_cast<char *>(iov[iov_idx].iov_base) + offset;
+    iov[iov_idx].iov_base = reinterpret_cast<char *>(iov[iov_idx].iov_base)
+                            + offset;
   }
 
   return true;
@@ -2140,7 +2114,9 @@ ssize_t SafeRead(int fd, void *buf, size_t nbyte) {
  * Pull file contents into a string
  */
 bool SafeReadToString(int fd, std::string *final_result) {
-  if (!final_result) {return false;}
+  if (!final_result) {
+    return false;
+  }
 
   std::string tmp_result;
   static const int buf_size = 4096;
@@ -2148,7 +2124,9 @@ bool SafeReadToString(int fd, std::string *final_result) {
   ssize_t total_bytes = -1;
   do {
     total_bytes = SafeRead(fd, buf, buf_size);
-    if (total_bytes < 0) {return false;}
+    if (total_bytes < 0) {
+      return false;
+    }
     tmp_result.append(buf, total_bytes);
   } while (total_bytes == buf_size);
   final_result->swap(tmp_result);
@@ -2159,7 +2137,8 @@ bool SafeWriteToFile(const std::string &content,
                      const std::string &path,
                      int mode) {
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-  if (fd < 0) return false;
+  if (fd < 0)
+    return false;
   bool retval = SafeWrite(fd, content.data(), content.size());
   close(fd);
   return retval;

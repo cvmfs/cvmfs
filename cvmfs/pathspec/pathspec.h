@@ -46,9 +46,9 @@
  */
 class Pathspec {
  public:
-  static const char kSeparator   = '/';
-  static const char kEscaper     = '\\';
-  static const char kWildcard    = '*';
+  static const char kSeparator = '/';
+  static const char kEscaper = '\\';
+  static const char kWildcard = '*';
   static const char kPlaceholder = '?';
 
  protected:
@@ -103,7 +103,7 @@ class Pathspec {
    * Checks if the parsed Pathspec is valid and can be used.
    * @return   true if this Pathspec is valid
    */
-  bool IsValid()    const { return valid_;    }
+  bool IsValid() const { return valid_; }
 
   /**
    * Checks if this Pathspec is defining an absolute path (i.e. starts with /)
@@ -118,7 +118,7 @@ class Pathspec {
    *
    * @return  an ordered list of unixoid glob strings (usable in glob())
    */
-  const GlobStringSequence& GetGlobStringSequence() const;
+  const GlobStringSequence &GetGlobStringSequence() const;
 
   /**
    * Generates a single glob string out of this Pathspec. This string can be
@@ -126,11 +126,11 @@ class Pathspec {
    *
    * @return  a unix-compatible glob string
    */
-  const std::string& GetGlobString() const;
+  const std::string &GetGlobString() const;
 
-  Pathspec& operator=(const Pathspec &other);
-  bool operator== (const Pathspec &other) const;
-  bool operator!= (const Pathspec &other) const { return !(*this == other); }
+  Pathspec &operator=(const Pathspec &other);
+  bool operator==(const Pathspec &other) const;
+  bool operator!=(const Pathspec &other) const { return !(*this == other); }
 
   static bool IsSpecialChar(const char chr) {
     return (chr == kWildcard || chr == kPlaceholder);
@@ -145,16 +145,16 @@ class Pathspec {
   bool IsPathspecPrefixMatching(const std::string &query_path) const;
   bool IsPathspecMatchingRelaxed(const std::string &query_path) const;
 
-  bool ApplyRegularExpression(const std::string  &query_path,
-                                    regex_t      *regex) const;
+  bool ApplyRegularExpression(const std::string &query_path,
+                              regex_t *regex) const;
 
-  regex_t* GetRegularExpression() const;
-  regex_t* GetPrefixRegularExpression() const;
-  regex_t* GetRelaxedRegularExpression() const;
+  regex_t *GetRegularExpression() const;
+  regex_t *GetPrefixRegularExpression() const;
+  regex_t *GetRelaxedRegularExpression() const;
 
   std::string GenerateRegularExpression(const bool is_relaxed = false,
                                         const bool is_prefix = false) const;
-  regex_t* CompileRegularExpression(const std::string &regex) const;
+  regex_t *CompileRegularExpression(const std::string &regex) const;
 
   void PrintRegularExpressionError(const int error_code) const;
 
@@ -164,19 +164,19 @@ class Pathspec {
   void DestroyRegularExpressions();
 
  private:
-  ElementPatterns             patterns_;
+  ElementPatterns patterns_;
 
-  mutable regex_t            *regex_;
-  mutable regex_t            *relaxed_regex_;
-  mutable regex_t            *prefix_regex_;
-  mutable std::string         glob_string_;
-  mutable GlobStringSequence  glob_string_sequence_;
+  mutable regex_t *regex_;
+  mutable regex_t *relaxed_regex_;
+  mutable regex_t *prefix_regex_;
+  mutable std::string glob_string_;
+  mutable GlobStringSequence glob_string_sequence_;
 
-  mutable bool                regex_compiled_;
-  mutable bool                relaxed_regex_compiled_;
-  mutable bool                prefix_regex_compiled_;
-  mutable bool                glob_string_compiled_;
-  mutable bool                glob_string_sequence_compiled_;
+  mutable bool regex_compiled_;
+  mutable bool relaxed_regex_compiled_;
+  mutable bool prefix_regex_compiled_;
+  mutable bool glob_string_compiled_;
+  mutable bool glob_string_sequence_compiled_;
 
   bool valid_;
   bool absolute_;

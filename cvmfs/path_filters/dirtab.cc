@@ -15,7 +15,7 @@
 
 namespace catalog {
 
-Dirtab::Dirtab() : valid_(true) {}
+Dirtab::Dirtab() : valid_(true) { }
 
 
 bool Dirtab::Open(const std::string &dirtab_path) {
@@ -28,8 +28,9 @@ bool Dirtab::Open(const std::string &dirtab_path) {
 
   FILE *dirtab_file = fopen(dirtab_path.c_str(), "r");
   if (dirtab_file == NULL) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Cannot open dirtab for reading at '%s' "
-                                      "(errno: %d)",
+    LogCvmfs(kLogCatalog, kLogStderr,
+             "Cannot open dirtab for reading at '%s' "
+             "(errno: %d)",
              dirtab_path.c_str(), errno);
     valid_ = false;
     return valid_;
@@ -73,7 +74,7 @@ bool Dirtab::ParseLine(const std::string &line) {
   // line parsing is done using std::string iterators. Each parsing method ex-
   // pects an iterator and the end iterator. While parsing itr is constantly
   // incremented to walk through the given .cvmfsdirtab line.
-        std::string::const_iterator itr  = line.begin();
+  std::string::const_iterator itr = line.begin();
   const std::string::const_iterator iend = line.end();
   bool negation = false;
 
@@ -100,8 +101,7 @@ bool Dirtab::ParsePathspec(const std::string &pathspec_str, bool negation) {
 
   // all generated Pathspecs need to be valid and positive rules must be
   // absolute. Otherwise the .cvmfsdirtab is not valid.
-  if ( !pathspec.IsValid() ||
-      (!negation && !pathspec.IsAbsolute())) {
+  if (!pathspec.IsValid() || (!negation && !pathspec.IsAbsolute())) {
     return false;
   }
 
@@ -123,11 +123,11 @@ void Dirtab::AddRule(const Rule &rule) {
 
 bool Dirtab::CheckRuleValidity() const {
   // check if there are contradicting positive and negative rules
-        Rules::const_iterator p    = positive_rules_.begin();
+  Rules::const_iterator p = positive_rules_.begin();
   const Rules::const_iterator pend = positive_rules_.end();
   for (; p != pend; ++p) {
     assert(!p->is_negation);
-          Rules::const_iterator n    = negative_rules_.begin();
+    Rules::const_iterator n = negative_rules_.begin();
     const Rules::const_iterator nend = negative_rules_.end();
     for (; n != nend; ++n) {
       assert(n->is_negation);
@@ -144,7 +144,7 @@ bool Dirtab::CheckRuleValidity() const {
 bool Dirtab::IsMatching(const std::string &path) const {
   // check if path has a positive match
   bool has_positive_match = false;
-        Rules::const_iterator p    = positive_rules_.begin();
+  Rules::const_iterator p = positive_rules_.begin();
   const Rules::const_iterator pend = positive_rules_.end();
   for (; p != pend; ++p) {
     assert(!p->is_negation);
@@ -159,7 +159,7 @@ bool Dirtab::IsMatching(const std::string &path) const {
 
 
 bool Dirtab::IsOpposing(const std::string &path) const {
-        Rules::const_iterator n    = negative_rules_.begin();
+  Rules::const_iterator n = negative_rules_.begin();
   const Rules::const_iterator nend = negative_rules_.end();
   for (; n != nend; ++n) {
     assert(n->is_negation);

@@ -33,12 +33,12 @@ class CacheManager;
 namespace catalog {
 class ClientCatalogManager;
 class InodeAnnotation;
-}
+}  // namespace catalog
 struct ChunkTables;
 namespace cvmfs {
 class Fetcher;
 class Uuid;
-}
+}  // namespace cvmfs
 namespace download {
 class DownloadManager;
 }
@@ -46,19 +46,19 @@ namespace glue {
 class InodeTracker;
 class DentryTracker;
 class PageCacheTracker;
-}
+}  // namespace glue
 namespace lru {
 class InodeCache;
 class Md5PathCache;
 class PathCache;
-}
+}  // namespace lru
 class NfsMaps;
 class OptionsManager;
 namespace perf {
 class Counter;
 class Statistics;
 class TelemetryAggregator;
-}
+}  // namespace perf
 namespace signature {
 class SignatureManager;
 }
@@ -109,10 +109,10 @@ class FileSystem : SingleCopy, public BootFactory {
 
   struct FileSystemInfo {
     FileSystemInfo()
-      : type(kFsFuse)
-      , options_mgr(NULL)
-      , wait_workspace(false)
-      , foreground(false) { }
+        : type(kFsFuse)
+        , options_mgr(NULL)
+        , wait_workspace(false)
+        , foreground(false) { }
     /**
      * Name can is used to identify this particular instance of cvmfs in the
      * cache (directory).  Normally it is the fully qualified repository name.
@@ -189,8 +189,8 @@ class FileSystem : SingleCopy, public BootFactory {
   ~FileSystem();
 
   // Used to setup logging before the file system object is created
-  static void SetupLoggingStandalone(
-    const OptionsManager &options_mgr, const std::string &prefix);
+  static void SetupLoggingStandalone(const OptionsManager &options_mgr,
+                                     const std::string &prefix);
 
   bool IsNfsSource() { return nfs_mode_ & kNfsMaps; }
   bool IsHaNfsSource() { return nfs_mode_ & kNfsMapsHa; }
@@ -244,7 +244,7 @@ class FileSystem : SingleCopy, public BootFactory {
   perf::Counter *n_eio_06() { return n_eio_06_; }
   perf::Counter *n_eio_07() { return n_eio_07_; }
   perf::Counter *n_eio_08() { return n_eio_08_; }
-  perf::Counter *n_emfile()  { return n_emfile_; }
+  perf::Counter *n_emfile() { return n_emfile_; }
   OptionsManager *options_mgr() { return options_mgr_; }
   perf::Statistics *statistics() { return statistics_; }
   Type type() { return type_; }
@@ -262,11 +262,15 @@ class FileSystem : SingleCopy, public BootFactory {
   static const char *kDefaultCacheMgrInstance;  // "default"
 
   struct PosixCacheSettings {
-    PosixCacheSettings() :
-      is_shared(false), is_alien(false), is_managed(false),
-      avoid_rename(false), cache_base_defined(false), cache_dir_defined(false),
-      quota_limit(0), do_refcount(true)
-      { }
+    PosixCacheSettings()
+        : is_shared(false)
+        , is_alien(false)
+        , is_managed(false)
+        , avoid_rename(false)
+        , cache_base_defined(false)
+        , cache_dir_defined(false)
+        , quota_limit(0)
+        , do_refcount(true) { }
     bool is_shared;
     bool is_alien;
     bool is_managed;
@@ -443,11 +447,11 @@ class FileSystem : SingleCopy, public BootFactory {
  */
 class StatfsCache : SingleCopy {
  public:
-  explicit StatfsCache(uint64_t cacheValid) : expiry_deadline_(0),
-                                     cache_timeout_(cacheValid) {
+  explicit StatfsCache(uint64_t cacheValid)
+      : expiry_deadline_(0), cache_timeout_(cacheValid) {
     memset(&info_, 0, sizeof(info_));
-    lock_ =
-      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+    lock_ = reinterpret_cast<pthread_mutex_t *>(
+        smalloc(sizeof(pthread_mutex_t)));
     int retval = pthread_mutex_init(lock_, NULL);
     assert(retval == 0);
   }
@@ -506,7 +510,7 @@ class MountPoint : SingleCopy, public BootFactory {
   download::DownloadManager *external_download_mgr() {
     return external_download_mgr_;
   }
-  file_watcher::FileWatcher* resolv_conf_watcher() {
+  file_watcher::FileWatcher *resolv_conf_watcher() {
     return resolv_conf_watcher_;
   }
   cvmfs::Fetcher *fetcher() { return fetcher_; }
@@ -520,9 +524,7 @@ class MountPoint : SingleCopy, public BootFactory {
   bool enforce_acls() { return enforce_acls_; }
   bool cache_symlinks() { return cache_symlinks_; }
   bool fuse_expire_entry() { return fuse_expire_entry_; }
-  catalog::InodeAnnotation *inode_annotation() {
-    return inode_annotation_;
-  }
+  catalog::InodeAnnotation *inode_annotation() { return inode_annotation_; }
   glue::InodeTracker *inode_tracker() { return inode_tracker_; }
   lru::InodeCache *inode_cache() { return inode_cache_; }
   double kcache_timeout_sec() { return kcache_timeout_sec_; }
@@ -592,9 +594,9 @@ class MountPoint : SingleCopy, public BootFactory {
   static const char *kDefaultBlacklist;  // "/etc/cvmfs/blacklist"
   /**
    * Default values for telemetry aggregator
-  */
+   */
   static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
-  static const int kMinimumTelemetrySendRateSec = 5;  // 5sec
+  static const int kMinimumTelemetrySendRateSec = 5;       // 5sec
 
   MountPoint(const std::string &fqrn,
              FileSystem *file_system,
@@ -657,7 +659,7 @@ class MountPoint : SingleCopy, public BootFactory {
   MagicXattrManager *magic_xattr_mgr_;
   StatfsCache *statfs_cache_;
 
-  file_watcher::FileWatcher* resolv_conf_watcher_;
+  file_watcher::FileWatcher *resolv_conf_watcher_;
 
   unsigned max_ttl_sec_;
   pthread_mutex_t lock_max_ttl_;

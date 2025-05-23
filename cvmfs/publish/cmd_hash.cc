@@ -47,8 +47,8 @@ int publish::CmdHash::Main(const Options &options) {
     md5_hash.ToIntPair(&high, &low);
     // SQLite uses int64, not uint64
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-             " [%" PRId64 " %" PRId64 "]",
-             static_cast<int64_t>(high), static_cast<int64_t>(low));
+             " [%" PRId64 " %" PRId64 "]", static_cast<int64_t>(high),
+             static_cast<int64_t>(low));
   }
   LogCvmfs(kLogCvmfs, kLogStdout, "");
 

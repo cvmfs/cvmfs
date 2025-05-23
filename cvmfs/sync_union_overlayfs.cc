@@ -4,14 +4,15 @@
 
 #define __STDC_FORMAT_MACROS
 
-#include "sync_union.h"
 #include "sync_union_overlayfs.h"
 
 #include <sys/capability.h>
+
 #include <string>
 #include <vector>
 
 #include "sync_mediator.h"
+#include "sync_union.h"
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/shared_ptr.h"
@@ -22,8 +23,8 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
                                        const string &rdonly_path,
                                        const string &union_path,
                                        const string &scratch_path)
-    : SyncUnion(mediator, rdonly_path, union_path, scratch_path),
-      hardlink_lower_inode_(0) {}
+    : SyncUnion(mediator, rdonly_path, union_path, scratch_path)
+    , hardlink_lower_inode_(0) { }
 
 bool SyncUnionOverlayfs::Initialize() {
   // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
@@ -123,8 +124,8 @@ void SyncUnionOverlayfs::PreprocessSyncItem(SharedPtr<SyncItem> entry) const {
 
 void SyncUnionOverlayfs::CheckForBrokenHardlink(
     SharedPtr<SyncItem> entry) const {
-  if (!entry->IsNew() && !entry->WasDirectory() &&
-      entry->GetRdOnlyLinkcount() > 1) {
+  if (!entry->IsNew() && !entry->WasDirectory()
+      && entry->GetRdOnlyLinkcount() > 1) {
     PANIC(kLogStderr,
           "OverlayFS has copied-up a file (%s) "
           "with existing hardlinks in lowerdir "
@@ -139,8 +140,8 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(
 }
 
 void SyncUnionOverlayfs::MaskFileHardlinks(SharedPtr<SyncItem> entry) const {
-  assert(entry->IsRegularFile() || entry->IsSymlink() ||
-         entry->IsSpecialFile());
+  assert(entry->IsRegularFile() || entry->IsSymlink()
+         || entry->IsSpecialFile());
   if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr,
              "Warning: Found file with linkcount > 1 "
@@ -240,19 +241,22 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
    * 3. whiteouts are marked as .wh. (as in aufs)
    */
 
-  bool is_chardev_whiteout = entry->IsCharacterDevice() &&
-                             entry->GetRdevMajor() == 0 &&
-                             entry->GetRdevMinor() == 0;
-  if (is_chardev_whiteout) return true;
+  bool is_chardev_whiteout = entry->IsCharacterDevice()
+                             && entry->GetRdevMajor() == 0
+                             && entry->GetRdevMinor() == 0;
+  if (is_chardev_whiteout)
+    return true;
 
   std::string whiteout_prefix_ = ".wh.";
-  bool has_wh_prefix =
-      HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
-  if (has_wh_prefix) return true;
+  bool has_wh_prefix = HasPrefix(entry->filename().c_str(), whiteout_prefix_,
+                                 true);
+  if (has_wh_prefix)
+    return true;
 
-  bool is_symlink_whiteout =
-      entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
-  if (is_symlink_whiteout) return true;
+  bool is_symlink_whiteout = entry->IsSymlink()
+                             && IsWhiteoutSymlinkPath(entry->GetScratchPath());
+  if (is_symlink_whiteout)
+    return true;
 
   return false;
 }

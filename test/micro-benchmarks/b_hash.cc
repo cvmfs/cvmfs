@@ -14,8 +14,9 @@ class BM_Hash : public benchmark::Fixture {
  protected:
   virtual void SetUp(const benchmark::State &st) {
     short_path_ = strdup("/short/path");
-    long_path_ = strdup("/this/is/a/longer/path/that/resembles"
-                 "/paths/found/in/some/or/many/experiment/software/frameworks");
+    long_path_ = strdup(
+        "/this/is/a/longer/path/that/resembles"
+        "/paths/found/in/some/or/many/experiment/software/frameworks");
   }
 
   virtual void TearDown(const benchmark::State &st) {
@@ -61,5 +62,8 @@ BENCHMARK_DEFINE_F(BM_Hash, Sha1)(benchmark::State &st) {
   }
   st.SetItemsProcessed(st.iterations());
 }
-BENCHMARK_REGISTER_F(BM_Hash, Sha1)->Repetitions(3)->Arg(100)->Arg(4096)->
-  Arg(100*1024);
+BENCHMARK_REGISTER_F(BM_Hash, Sha1)
+    ->Repetitions(3)
+    ->Arg(100)
+    ->Arg(4096)
+    ->Arg(100 * 1024);

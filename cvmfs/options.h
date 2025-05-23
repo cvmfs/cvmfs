@@ -25,6 +25,7 @@ class OptionsTemplateManager {
   std::string GetTemplate(std::string name);
   bool HasTemplate(std::string name);
   bool ParseString(std::string *input);
+
  private:
   std::map<std::string, std::string> templates_;
 };
@@ -32,6 +33,7 @@ class OptionsTemplateManager {
 class DefaultOptionsTemplateManager : public OptionsTemplateManager {
  public:
   explicit DefaultOptionsTemplateManager(std::string fqrn);
+
  private:
   static const char *kTemplateIdentFqrn;
   static const char *kTemplateIdentOrg;
@@ -55,7 +57,7 @@ class OptionsManager {
     }
   }
 
-  OptionsManager(const OptionsManager& opt_mgr) {
+  OptionsManager(const OptionsManager &opt_mgr) {
     config_ = opt_mgr.config_;
     protected_parameters_ = opt_mgr.protected_parameters_;
     templatable_values_ = opt_mgr.templatable_values_;
@@ -64,9 +66,7 @@ class OptionsManager {
     opt_templ_mgr_ = new OptionsTemplateManager(*(opt_mgr.opt_templ_mgr_));
   }
 
-  virtual ~OptionsManager() {
-    delete opt_templ_mgr_;
-  }
+  virtual ~OptionsManager() { delete opt_templ_mgr_; }
 
   /**
    * Switches the Options Templating Manager and reparses the set options
@@ -158,9 +158,8 @@ class OptionsManager {
    * Returns key=value strings from the options array for all keys that match
    * key_prefix.  Can be used to construct an environment pointer for execve.
    */
-  std::vector<std::string> GetEnvironmentSubset(
-    const std::string &key_prefix,
-    bool strip_prefix);
+  std::vector<std::string> GetEnvironmentSubset(const std::string &key_prefix,
+                                                bool strip_prefix);
 
   /**
    * Gets all stored key-values of the map in an string format. This format
@@ -200,9 +199,9 @@ class OptionsManager {
 
  protected:
   /**
-    * The ConfigValue structure contains a concrete value of a variable, as well
-    * as the source (complete path) of the config file where it was obtained
-    */
+   * The ConfigValue structure contains a concrete value of a variable, as well
+   * as the source (complete path) of the config file where it was obtained
+   */
   struct ConfigValue {
     std::string value;
     std::string source;
@@ -210,11 +209,10 @@ class OptionsManager {
 
   std::string TrimParameter(const std::string &parameter);
   std::string SanitizeParameterAssignment(std::string *line,
-                                          std::vector <std::string> *tokens);
+                                          std::vector<std::string> *tokens);
   void PopulateParameter(const std::string &param, const ConfigValue val);
   void ParseValue(const std::string param, ConfigValue *val);
-  void UpdateEnvironment(
-    const std::string &param, ConfigValue val);
+  void UpdateEnvironment(const std::string &param, ConfigValue val);
   std::map<std::string, ConfigValue> config_;
   std::map<std::string, std::string> protected_parameters_;
   std::map<std::string, std::string> templatable_values_;
@@ -228,7 +226,7 @@ class OptionsManager {
 
  private:
   // NOLINTNEXTLINE(bugprone-unhandled-self-assignment,cert-oop54-cpp)
-  OptionsManager & operator= (const OptionsManager & /* other */) {
+  OptionsManager &operator=(const OptionsManager & /* other */) {
     assert(false);
   }
 };  // class OptionManager
@@ -252,12 +250,11 @@ class OptionsManager {
 class SimpleOptionsParser : public OptionsManager {
  public:
   explicit SimpleOptionsParser(
-    OptionsTemplateManager *opt_templ_mgr_param = NULL)
-    : OptionsManager(opt_templ_mgr_param) { }
-  virtual void ParsePath(
-    const std::string &config_file,
-    const bool external __attribute__((unused))) {
-    (void) TryParsePath(config_file);
+      OptionsTemplateManager *opt_templ_mgr_param = NULL)
+      : OptionsManager(opt_templ_mgr_param) { }
+  virtual void ParsePath(const std::string &config_file,
+                         const bool external __attribute__((unused))) {
+    (void)TryParsePath(config_file);
   }
   // Libcvmfs returns success or failure, the fuse module fails silently
   bool TryParsePath(const std::string &config_file);
@@ -273,11 +270,10 @@ class SimpleOptionsParser : public OptionsManager {
 class BashOptionsManager : public OptionsManager {
  public:
   explicit BashOptionsManager(
-    OptionsTemplateManager *opt_templ_mgr_param = NULL)
-    : OptionsManager(opt_templ_mgr_param) { }
+      OptionsTemplateManager *opt_templ_mgr_param = NULL)
+      : OptionsManager(opt_templ_mgr_param) { }
   void ParsePath(const std::string &config_file, const bool external);
 };  // class BashOptionsManager
-
 
 
 #ifdef CVMFS_NAMESPACE_GUARD

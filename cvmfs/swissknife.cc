@@ -8,7 +8,6 @@
 
 #include "swissknife.h"
 
-
 #include <unistd.h>
 
 #include <cassert>
@@ -22,8 +21,8 @@ using namespace std;  // NOLINT
 
 namespace swissknife {
 
-Command::Command() {}
+Command::Command() { }
 
-Command::~Command() {}
+Command::~Command() { }
 
 }  // namespace swissknife

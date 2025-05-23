@@ -4,9 +4,9 @@
 
 #include <alloca.h>
 #include <errno.h>
+#include <gtest/gtest.h>
 #include <stdint.h>
 #include <string.h>
-#include <gtest/gtest.h>
 
 #include "cache.h"
 #include "cache_ram.h"
@@ -22,16 +22,16 @@ static const unsigned alloc_size = 16;
 class T_RamCacheManager : public ::testing::Test {
  public:
   T_RamCacheManager()
-    : ramcache_(4*alloc_size,
-                cache_size,
-                MemoryKvStore::kMallocLibc,
-                perf::StatisticsTemplate("test", &statistics_)) {
+      : ramcache_(4 * alloc_size,
+                  cache_size,
+                  MemoryKvStore::kMallocLibc,
+                  perf::StatisticsTemplate("test", &statistics_)) {
     a_.digest[1] = 1;
   }
 
  protected:
-  virtual void SetUp() {}
-  virtual void TearDown() {}
+  virtual void SetUp() { }
+  virtual void TearDown() { }
 
   perf::Statistics statistics_;
   shash::Any a_;
@@ -63,12 +63,12 @@ TEST_F(T_RamCacheManager, TransactionReset) {
 
 TEST_F(T_RamCacheManager, TransactionWrite) {
   char buf[alloc_size];
-  memset(buf, 42, alloc_size/2);
-  memset(buf + alloc_size/2, 24, alloc_size/2);
+  memset(buf, 42, alloc_size / 2);
+  memset(buf + alloc_size / 2, 24, alloc_size / 2);
   void *txn = alloca(ramcache_.SizeOfTxn());
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn));
-  EXPECT_EQ(alloc_size/2, ramcache_.Write(buf, alloc_size/2, txn));
-  EXPECT_EQ(-EFBIG, ramcache_.Write(buf + alloc_size/2, alloc_size, txn));
+  EXPECT_EQ(alloc_size / 2, ramcache_.Write(buf, alloc_size / 2, txn));
+  EXPECT_EQ(-EFBIG, ramcache_.Write(buf + alloc_size / 2, alloc_size, txn));
   EXPECT_EQ(0, ramcache_.CommitTxn(txn));
 }
 
@@ -296,7 +296,7 @@ TEST_F(T_RamCacheManager, LargeCommit) {
   a_.digest[1] = 2;
   EXPECT_EQ(0, ramcache_.StartTxn(a_, alloc_size, txn2));
   a_.digest[1] = 3;
-  EXPECT_EQ(0, ramcache_.StartTxn(a_, 4*alloc_size, txn3));
+  EXPECT_EQ(0, ramcache_.StartTxn(a_, 4 * alloc_size, txn3));
 
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn1));
   EXPECT_EQ(alloc_size, ramcache_.Write(buf, alloc_size, txn2));

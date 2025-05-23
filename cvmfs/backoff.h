@@ -29,8 +29,7 @@ class BackoffThrottle : public SingleCopy {
   }
   BackoffThrottle(const unsigned init_delay_ms,
                   const unsigned max_delay_ms,
-                  const unsigned reset_after_ms)
-  {
+                  const unsigned reset_after_ms) {
     Init(init_delay_ms, max_delay_ms, reset_after_ms);
   }
   ~BackoffThrottle();

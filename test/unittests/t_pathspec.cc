@@ -15,10 +15,14 @@ TEST(T_Pathspec, ParseSimpleRelative) {
   const Pathspec p3("foo/bar.baz");
   const Pathspec p4("foo/bar/baz.foo");
 
-  EXPECT_TRUE(p1.IsValid()); EXPECT_FALSE(p1.IsAbsolute());
-  EXPECT_TRUE(p2.IsValid()); EXPECT_FALSE(p2.IsAbsolute());
-  EXPECT_TRUE(p3.IsValid()); EXPECT_FALSE(p3.IsAbsolute());
-  EXPECT_TRUE(p4.IsValid()); EXPECT_FALSE(p4.IsAbsolute());
+  EXPECT_TRUE(p1.IsValid());
+  EXPECT_FALSE(p1.IsAbsolute());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_FALSE(p2.IsAbsolute());
+  EXPECT_TRUE(p3.IsValid());
+  EXPECT_FALSE(p3.IsAbsolute());
+  EXPECT_TRUE(p4.IsValid());
+  EXPECT_FALSE(p4.IsAbsolute());
 }
 
 
@@ -29,11 +33,16 @@ TEST(T_Pathspec, ParseSimpleAbsolute) {
   const Pathspec p4("/foo/bar.baz");
   const Pathspec p5("/foo/bar/baz.foo");
 
-  EXPECT_FALSE(p1.IsValid()); EXPECT_TRUE(p1.IsAbsolute());
-  EXPECT_TRUE(p2.IsValid()); EXPECT_TRUE(p2.IsAbsolute());
-  EXPECT_TRUE(p3.IsValid()); EXPECT_TRUE(p3.IsAbsolute());
-  EXPECT_TRUE(p4.IsValid()); EXPECT_TRUE(p4.IsAbsolute());
-  EXPECT_TRUE(p5.IsValid()); EXPECT_TRUE(p5.IsAbsolute());
+  EXPECT_FALSE(p1.IsValid());
+  EXPECT_TRUE(p1.IsAbsolute());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_TRUE(p2.IsAbsolute());
+  EXPECT_TRUE(p3.IsValid());
+  EXPECT_TRUE(p3.IsAbsolute());
+  EXPECT_TRUE(p4.IsValid());
+  EXPECT_TRUE(p4.IsAbsolute());
+  EXPECT_TRUE(p5.IsValid());
+  EXPECT_TRUE(p5.IsAbsolute());
 }
 
 
@@ -44,11 +53,16 @@ TEST(T_Pathspec, ParsePlaceholders) {
   const Pathspec p4("/foo/bar/ba?");
   const Pathspec p5("/fo?/b?r/?az");
 
-  EXPECT_TRUE(p1.IsValid()); EXPECT_TRUE(p1.IsAbsolute());
-  EXPECT_TRUE(p2.IsValid()); EXPECT_FALSE(p2.IsAbsolute());
-  EXPECT_TRUE(p3.IsValid()); EXPECT_FALSE(p3.IsAbsolute());
-  EXPECT_TRUE(p4.IsValid()); EXPECT_TRUE(p4.IsAbsolute());
-  EXPECT_TRUE(p5.IsValid()); EXPECT_TRUE(p5.IsAbsolute());
+  EXPECT_TRUE(p1.IsValid());
+  EXPECT_TRUE(p1.IsAbsolute());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_FALSE(p2.IsAbsolute());
+  EXPECT_TRUE(p3.IsValid());
+  EXPECT_FALSE(p3.IsAbsolute());
+  EXPECT_TRUE(p4.IsValid());
+  EXPECT_TRUE(p4.IsAbsolute());
+  EXPECT_TRUE(p5.IsValid());
+  EXPECT_TRUE(p5.IsAbsolute());
 }
 
 
@@ -59,11 +73,16 @@ TEST(T_Pathspec, ParseWildcards) {
   const Pathspec p4("/foo/b*r");
   const Pathspec p5("/foo/*/bar");
 
-  EXPECT_TRUE(p1.IsValid()); EXPECT_TRUE(p1.IsAbsolute());
-  EXPECT_TRUE(p2.IsValid()); EXPECT_FALSE(p2.IsAbsolute());
-  EXPECT_TRUE(p3.IsValid()); EXPECT_FALSE(p3.IsAbsolute());
-  EXPECT_TRUE(p4.IsValid()); EXPECT_TRUE(p4.IsAbsolute());
-  EXPECT_TRUE(p5.IsValid()); EXPECT_TRUE(p5.IsAbsolute());
+  EXPECT_TRUE(p1.IsValid());
+  EXPECT_TRUE(p1.IsAbsolute());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_FALSE(p2.IsAbsolute());
+  EXPECT_TRUE(p3.IsValid());
+  EXPECT_FALSE(p3.IsAbsolute());
+  EXPECT_TRUE(p4.IsValid());
+  EXPECT_TRUE(p4.IsAbsolute());
+  EXPECT_TRUE(p5.IsValid());
+  EXPECT_TRUE(p5.IsAbsolute());
 }
 
 
@@ -73,10 +92,14 @@ TEST(T_Pathspec, ParseEscapes) {
   const Pathspec p3("moep\\\\test");
   const Pathspec p4("moep\\xtest");
 
-  EXPECT_TRUE(p1.IsValid()); EXPECT_TRUE(p1.IsAbsolute());
-  EXPECT_TRUE(p2.IsValid()); EXPECT_TRUE(p2.IsAbsolute());
-  EXPECT_TRUE(p3.IsValid()); EXPECT_FALSE(p3.IsAbsolute());
-  EXPECT_FALSE(p4.IsValid()); EXPECT_FALSE(p3.IsAbsolute());
+  EXPECT_TRUE(p1.IsValid());
+  EXPECT_TRUE(p1.IsAbsolute());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_TRUE(p2.IsAbsolute());
+  EXPECT_TRUE(p3.IsValid());
+  EXPECT_FALSE(p3.IsAbsolute());
+  EXPECT_FALSE(p4.IsValid());
+  EXPECT_FALSE(p3.IsAbsolute());
 }
 
 
@@ -461,15 +484,15 @@ TEST(T_Pathspec, ComparePathspecs) {
 
 
 TEST(T_Pathspec, GetGlobString) {
-  const std::string s1  = "/hallo.welt";
-  const std::string s2  = "foo.bar\\?";
-  const std::string s3  = "foo/bar/baz.\\*";
-  const std::string s4  = "/foo[bar]";
-  const std::string s5  = "foo(bar)";
-  const std::string s6  = "/foo/bar{baz}";
-  const std::string s7  = "foo/^bar";
-  const std::string s8  = "foo/bar$";
-  const std::string s9  = "/moep+test/foo";
+  const std::string s1 = "/hallo.welt";
+  const std::string s2 = "foo.bar\\?";
+  const std::string s3 = "foo/bar/baz.\\*";
+  const std::string s4 = "/foo[bar]";
+  const std::string s5 = "foo(bar)";
+  const std::string s6 = "/foo/bar{baz}";
+  const std::string s7 = "foo/^bar";
+  const std::string s8 = "foo/bar$";
+  const std::string s9 = "/moep+test/foo";
   const std::string s10 = "moep\\\\atest/foo";
   // escaped escapes are not rebuilt!
   const std::string s10a = "moep\\atest/foo";
@@ -499,17 +522,17 @@ TEST(T_Pathspec, GetGlobString) {
   EXPECT_TRUE(p10.IsValid());
   EXPECT_TRUE(p11.IsValid());
 
-  EXPECT_EQ(s1,   p1.GetGlobString());
-  EXPECT_EQ(s2,   p2.GetGlobString());
-  EXPECT_EQ(s3,   p3.GetGlobString());
-  EXPECT_EQ(s4,   p4.GetGlobString());
-  EXPECT_EQ(s5,   p5.GetGlobString());
-  EXPECT_EQ(s6,   p6.GetGlobString());
-  EXPECT_EQ(s7,   p7.GetGlobString());
-  EXPECT_EQ(s8,   p8.GetGlobString());
-  EXPECT_EQ(s9,   p9.GetGlobString());
+  EXPECT_EQ(s1, p1.GetGlobString());
+  EXPECT_EQ(s2, p2.GetGlobString());
+  EXPECT_EQ(s3, p3.GetGlobString());
+  EXPECT_EQ(s4, p4.GetGlobString());
+  EXPECT_EQ(s5, p5.GetGlobString());
+  EXPECT_EQ(s6, p6.GetGlobString());
+  EXPECT_EQ(s7, p7.GetGlobString());
+  EXPECT_EQ(s8, p8.GetGlobString());
+  EXPECT_EQ(s9, p9.GetGlobString());
   EXPECT_EQ(s10a, p10.GetGlobString());
-  EXPECT_EQ(s11,  p11.GetGlobString());
+  EXPECT_EQ(s11, p11.GetGlobString());
 }
 
 
@@ -631,7 +654,7 @@ TEST(T_Pathspec, CopyConstructor) {
 
   const std::string s3("/heap/path?spec");
   Pathspec *p3 = new Pathspec(s3);
-  ASSERT_NE(static_cast<Pathspec*>(NULL), p3);
+  ASSERT_NE(static_cast<Pathspec *>(NULL), p3);
   EXPECT_TRUE(p3->IsValid());
   EXPECT_TRUE(p3->IsMatching("/heap/path.spec"));
   EXPECT_EQ(s3, p3->GetGlobString());
@@ -648,7 +671,7 @@ TEST(T_Pathspec, CopyConstructor) {
   EXPECT_EQ(s3, p4.GetGlobString());
 
   Pathspec *p5 = new Pathspec("/another/heap/*.spec");
-  ASSERT_NE(static_cast<Pathspec*>(NULL), p5);
+  ASSERT_NE(static_cast<Pathspec *>(NULL), p5);
   EXPECT_TRUE(p5->IsValid());
   EXPECT_TRUE(p5->IsMatching("/another/heap/path.spec"));
 
@@ -686,7 +709,7 @@ TEST(T_Pathspec, AssignmentOperator) {
 
   const std::string s3("/heap/path?spec");
   Pathspec *p3 = new Pathspec(s3);
-  ASSERT_NE(static_cast<Pathspec*>(NULL), p3);
+  ASSERT_NE(static_cast<Pathspec *>(NULL), p3);
   EXPECT_TRUE(p3->IsValid());
   EXPECT_TRUE(p3->IsMatching("/heap/path.spec"));
   EXPECT_EQ(s3, p3->GetGlobString());
@@ -709,7 +732,7 @@ TEST(T_Pathspec, AssignmentOperator) {
   EXPECT_EQ(s3, p4.GetGlobString());
 
   Pathspec *p5 = new Pathspec("/another/heap/*.spec");
-  ASSERT_NE(static_cast<Pathspec*>(NULL), p5);
+  ASSERT_NE(static_cast<Pathspec *>(NULL), p5);
   EXPECT_TRUE(p5->IsValid());
   EXPECT_TRUE(p5->IsMatching("/another/heap/path.spec"));
 

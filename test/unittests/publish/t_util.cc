@@ -2,9 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include <gtest/gtest.h>
-
 #include <fcntl.h>
+#include <gtest/gtest.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -24,8 +23,7 @@ namespace publish {
 
 class T_Util : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
 };
@@ -34,8 +32,8 @@ TEST_F(T_Util, CheckoutMarker3) {
   EXPECT_EQ(NULL, CheckoutMarker::CreateFrom("/no/such/path"));
 
   shash::Any hash = shash::MkFromHexPtr(
-    shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
-    shash::kSuffixCatalog);
+      shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
+      shash::kSuffixCatalog);
   CheckoutMarker m("tag", "branch", hash, "");
   m.SaveAs("cvmfs_test_checkout_marker");
 
@@ -53,8 +51,8 @@ TEST_F(T_Util, CheckoutMarker4) {
   EXPECT_EQ(NULL, CheckoutMarker::CreateFrom("/no/such/path"));
 
   shash::Any hash = shash::MkFromHexPtr(
-    shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
-    shash::kSuffixCatalog);
+      shash::HexPtr("0123456789abcdef0123456789abcdef01234567"),
+      shash::kSuffixCatalog);
   CheckoutMarker m("tag", "branch", hash, "prev");
   m.SaveAs("cvmfs_test_checkout_marker");
 
@@ -164,15 +162,12 @@ TEST_F(T_Util, CallServerHook) {
   EXPECT_EQ(0, CallServerHook("hookX", "t.cvmfs.io", "no/such/file"));
 
   EXPECT_TRUE(SafeWriteToFile(
-    "hookY() { if [ $1 = \"t.cvmfs.io\" ]; then return 0; fi; return 42; }\n",
-    "cvmfs_test_hooks.sh", 0644));
+      "hookY() { if [ $1 = \"t.cvmfs.io\" ]; then return 0; fi; return 42; }\n",
+      "cvmfs_test_hooks.sh", 0644));
 
-  EXPECT_EQ(0, CallServerHook("hookX", "t.cvmfs.io",
-                              "./cvmfs_test_hooks.sh"));
-  EXPECT_EQ(0, CallServerHook("hookY", "t.cvmfs.io",
-                              "./cvmfs_test_hooks.sh"));
-  EXPECT_EQ(42, CallServerHook("hookY", "x.cvmfs.io",
-                               "./cvmfs_test_hooks.sh"));
+  EXPECT_EQ(0, CallServerHook("hookX", "t.cvmfs.io", "./cvmfs_test_hooks.sh"));
+  EXPECT_EQ(0, CallServerHook("hookY", "t.cvmfs.io", "./cvmfs_test_hooks.sh"));
+  EXPECT_EQ(42, CallServerHook("hookY", "x.cvmfs.io", "./cvmfs_test_hooks.sh"));
 }
 
 namespace {

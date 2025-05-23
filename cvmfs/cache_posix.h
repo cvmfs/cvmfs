@@ -27,7 +27,7 @@
 namespace catalog {
 class DirectoryEntry;
 class Catalog;
-}
+}  // namespace catalog
 
 namespace download {
 class DownloadManager;
@@ -70,10 +70,10 @@ class PosixCacheManager : public CacheManager {
   virtual std::string Describe();
 
   static PosixCacheManager *Create(
-    const std::string &cache_path,
-    const bool alien_cache,
-    const RenameWorkarounds rename_workaround = kRenameNormal,
-    const bool do_refcount = true);
+      const std::string &cache_path,
+      const bool alien_cache,
+      const RenameWorkarounds rename_workaround = kRenameNormal,
+      const bool do_refcount = true);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -86,9 +86,7 @@ class PosixCacheManager : public CacheManager {
 
   virtual uint32_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
-  virtual void CtrlTxn(const Label &label,
-                       const int flags,
-                       void *txn);
+  virtual void CtrlTxn(const Label &label, const int flags, void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int OpenFromTxn(void *txn);
@@ -118,15 +116,14 @@ class PosixCacheManager : public CacheManager {
 
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
-      : buf_pos(0)
-      , size(0)
-      , expected_size(kSizeUnknown)
-      , fd(-1)
-      , label()
-      , tmp_path()
-      , final_path(final_path)
-      , id(id)
-    { }
+        : buf_pos(0)
+        , size(0)
+        , expected_size(kSizeUnknown)
+        , fd(-1)
+        , label()
+        , tmp_path()
+        , final_path(final_path)
+        , id(id) { }
 
     unsigned char buffer[4096];
     unsigned buf_pos;
@@ -141,16 +138,15 @@ class PosixCacheManager : public CacheManager {
 
   PosixCacheManager(const std::string &cache_path, const bool alien_cache,
                     const bool do_refcount = true)
-    : cache_path_(cache_path)
-    , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
-    , alien_cache_(alien_cache)
-    , rename_workaround_(kRenameNormal)
-    , cache_mode_(kCacheReadWrite)
-    , reports_correct_filesize_(true)
-    , is_tmpfs_(false)
-    , do_refcount_(do_refcount)
-    , fd_mgr_(new FdRefcountMgr())
-  {
+      : cache_path_(cache_path)
+      , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
+      , alien_cache_(alien_cache)
+      , rename_workaround_(kRenameNormal)
+      , cache_mode_(kCacheReadWrite)
+      , reports_correct_filesize_(true)
+      , is_tmpfs_(false)
+      , do_refcount_(do_refcount)
+      , fd_mgr_(new FdRefcountMgr()) {
     atomic_init32(&no_inflight_txns_);
   }
 

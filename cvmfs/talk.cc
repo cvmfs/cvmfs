@@ -76,13 +76,11 @@ void TalkManager::AnswerStringList(int con_fd, const vector<string> &list) {
 }
 
 
-TalkManager *TalkManager::Create(
-  const string &socket_path,
-  MountPoint *mount_point,
-  FuseRemounter *remounter)
-{
-  UniquePtr<TalkManager>
-    talk_manager(new TalkManager(socket_path, mount_point, remounter));
+TalkManager *TalkManager::Create(const string &socket_path,
+                                 MountPoint *mount_point,
+                                 FuseRemounter *remounter) {
+  UniquePtr<TalkManager> talk_manager(
+      new TalkManager(socket_path, mount_point, remounter));
 
   talk_manager->socket_fd_ = MakeSocket(socket_path, 0660);
   if (talk_manager->socket_fd_ == -1)
@@ -97,8 +95,8 @@ TalkManager *TalkManager::Create(
 }
 
 
-string TalkManager::FormatMetalinkInfo(download::DownloadManager *download_mgr)
-{
+string TalkManager::FormatMetalinkInfo(
+    download::DownloadManager *download_mgr) {
   vector<string> metalink_chain;
   unsigned active_metalink;
 
@@ -110,8 +108,8 @@ string TalkManager::FormatMetalinkInfo(download::DownloadManager *download_mgr)
   for (unsigned i = 0; i < metalink_chain.size(); ++i) {
     metalink_str += "  [" + StringifyInt(i) + "] " + metalink_chain[i] + "\n";
   }
-  metalink_str += "Active metalink " + StringifyInt(active_metalink) + ": " +
-              metalink_chain[active_metalink] + "\n";
+  metalink_str += "Active metalink " + StringifyInt(active_metalink) + ": "
+                  + metalink_chain[active_metalink] + "\n";
   return metalink_str;
 }
 
@@ -137,13 +135,13 @@ string TalkManager::FormatHostInfo(download::DownloadManager *download_mgr) {
       host_str += StringifyInt(rtt[i]) + " ms";
     host_str += ")\n";
   }
-  host_str += "Active host " + StringifyInt(active_host) + ": " +
-              host_chain[active_host] + "\n";
+  host_str += "Active host " + StringifyInt(active_host) + ": "
+              + host_chain[active_host] + "\n";
   return host_str;
 }
 
 string TalkManager::FormatProxyInfo(download::DownloadManager *download_mgr) {
-  vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+  vector<vector<download::DownloadManager::ProxyInfo> > proxy_chain;
   unsigned active_group;
   unsigned fallback_group;
 
@@ -156,14 +154,14 @@ string TalkManager::FormatProxyInfo(download::DownloadManager *download_mgr) {
       for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
         urls.push_back(proxy_chain[i][j].Print());
       }
-      proxy_str +=
-        "[" + StringifyInt(i) + "] " + JoinStrings(urls, ", ") + "\n";
+      proxy_str += "[" + StringifyInt(i) + "] " + JoinStrings(urls, ", ")
+                   + "\n";
     }
-    proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
-                 proxy_chain[active_group][0].url + "\n";
+    proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] "
+                 + proxy_chain[active_group][0].url + "\n";
     if (fallback_group < proxy_chain.size())
-      proxy_str += "First fallback group: [" +
-                   StringifyInt(fallback_group) + "]\n";
+      proxy_str += "First fallback group: [" + StringifyInt(fallback_group)
+                   + "]\n";
   } else {
     proxy_str = "No proxies defined\n";
   }
@@ -192,10 +190,9 @@ void *TalkManager::MainResponder(void *data) {
     }
     LogCvmfs(kLogTalk, kLogDebug, "accepting connections on socketfd %d",
              talk_mgr->socket_fd_);
-    if ((con_fd = accept(talk_mgr->socket_fd_,
-                         (struct sockaddr *)&remote,
-                         &socket_size)) < 0)
-    {
+    if ((con_fd = accept(
+             talk_mgr->socket_fd_, (struct sockaddr *)&remote, &socket_size))
+        < 0) {
       LogCvmfs(kLogTalk, kLogDebug, "terminating talk thread (fd %d, errno %d)",
                con_fd, errno);
       break;
@@ -206,11 +203,11 @@ void *TalkManager::MainResponder(void *data) {
     if ((bytes_read = recv(con_fd, buf, sizeof(buf), 0)) <= 0)
       continue;
 
-    if (buf[bytes_read-1] == '\0')
+    if (buf[bytes_read - 1] == '\0')
       bytes_read--;
     const string line = string(buf, bytes_read);
-    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %lu)",
-             line.c_str(), line.length());
+    LogCvmfs(kLogTalk, kLogDebug, "received %s (length %lu)", line.c_str(),
+             line.length());
 
     if (line == "tracebuffer flush") {
       mount_point->tracer()->Flush();
@@ -222,11 +219,13 @@ void *TalkManager::MainResponder(void *data) {
       } else {
         uint64_t size_unpinned = quota_mgr->GetSize();
         uint64_t size_pinned = quota_mgr->GetSizePinned();
-        const string size_str = "Current cache size is " +
-          StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
-          StringifyInt(size_unpinned) + " Bytes), pinned: " +
-          StringifyInt(size_pinned / (1024*1024)) + "MB (" +
-          StringifyInt(size_pinned) + " Bytes)\n";
+        const string size_str = "Current cache size is "
+                                + StringifyInt(size_unpinned / (1024 * 1024))
+                                + "MB (" + StringifyInt(size_unpinned)
+                                + " Bytes), pinned: "
+                                + StringifyInt(size_pinned / (1024 * 1024))
+                                + "MB (" + StringifyInt(size_pinned)
+                                + " Bytes)\n";
         talk_mgr->Answer(con_fd, size_str);
       }
     } else if (line == "cache instance") {
@@ -275,20 +274,22 @@ void *TalkManager::MainResponder(void *data) {
         QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
         const uint64_t size = String2Uint64(line.substr(16));
         if (size < 1000) {
-            talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
+          talk_mgr->Answer(con_fd, "New limit too low (minimum 1000)\n");
         } else {
-          if(quota_mgr->SetLimit(size * 1024*1024)) {
-              file_system->options_mgr()->SetValueFromTalk("CVMFS_QUOTA_LIMIT", StringifyUint(size));
-              talk_mgr->Answer(con_fd, "OK\n");
+          if (quota_mgr->SetLimit(size * 1024 * 1024)) {
+            file_system->options_mgr()->SetValueFromTalk("CVMFS_QUOTA_LIMIT",
+                                                         StringifyUint(size));
+            talk_mgr->Answer(con_fd, "OK\n");
           } else {
-              talk_mgr->Answer(con_fd, "Limit not reset\n");
+            talk_mgr->Answer(con_fd, "Limit not reset\n");
           }
         }
       }
     } else if (line == "cache limit get") {
       std::string limit_from_options;
-      file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT", &limit_from_options);
-            talk_mgr->Answer(con_fd, limit_from_options + "\n");
+      file_system->options_mgr()->GetValue("CVMFS_QUOTA_LIMIT",
+                                           &limit_from_options);
+      talk_mgr->Answer(con_fd, limit_from_options + "\n");
     } else if (line.substr(0, 7) == "cleanup") {
       QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
       if (!quota_mgr->HasCapability(QuotaManager::kCapShrink)) {
@@ -297,7 +298,7 @@ void *TalkManager::MainResponder(void *data) {
         if (line.length() < 9) {
           talk_mgr->Answer(con_fd, "Usage: cleanup <MB>\n");
         } else {
-          const uint64_t size = String2Uint64(line.substr(8))*1024*1024;
+          const uint64_t size = String2Uint64(line.substr(8)) * 1024 * 1024;
           if (quota_mgr->Cleanup(size)) {
             talk_mgr->Answer(con_fd, "OK\n");
           } else {
@@ -380,7 +381,7 @@ void *TalkManager::MainResponder(void *data) {
       } else {
         std::string root_hash = Trim(line.substr(7), true /* trim_newline */);
         FuseRemounter::Status status = remounter->ChangeRoot(
-          MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
+            MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
         switch (status) {
           case FuseRemounter::kStatusUp2Date:
             talk_mgr->Answer(con_fd, "OK\n");
@@ -414,9 +415,10 @@ void *TalkManager::MainResponder(void *data) {
       }
     } else if (line.substr(0, 14) == "nameserver get") {
       const string dns_server = mount_point->download_mgr()->GetDnsServer();
-      const string reply = !dns_server.empty() ?
-        std::string("DNS server address: ") + dns_server + "\n":
-        std::string("DNS server not set.\n");
+      const string reply = !dns_server.empty()
+                               ? std::string("DNS server address: ")
+                                     + dns_server + "\n"
+                               : std::string("DNS server not set.\n");
       talk_mgr->Answer(con_fd, reply);
     } else if (line.substr(0, 14) == "nameserver set") {
       if (line.length() < 16) {
@@ -426,24 +428,24 @@ void *TalkManager::MainResponder(void *data) {
         mount_point->download_mgr()->SetDnsServer(host);
         talk_mgr->Answer(con_fd, "OK\n");
       }
-    } else if (line.substr(0,22) == "__testing_freeze_cvmfs") {
-      const std::string fs_dir=line.substr(23)+"/dir";
-      mkdir(fs_dir.c_str(),0700);
+    } else if (line.substr(0, 22) == "__testing_freeze_cvmfs") {
+      const std::string fs_dir = line.substr(23) + "/dir";
+      mkdir(fs_dir.c_str(), 0700);
     } else if (line == "external metalink info") {
-      const string external_metalink_info =
-        talk_mgr->FormatMetalinkInfo(mount_point->external_download_mgr());
+      const string external_metalink_info = talk_mgr->FormatMetalinkInfo(
+          mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_metalink_info);
     } else if (line == "metalink info") {
-      const string metalink_info =
-        talk_mgr->FormatMetalinkInfo(mount_point->download_mgr());
+      const string metalink_info = talk_mgr->FormatMetalinkInfo(
+          mount_point->download_mgr());
       talk_mgr->Answer(con_fd, metalink_info);
     } else if (line == "external host info") {
-      const string external_host_info =
-        talk_mgr->FormatHostInfo(mount_point->external_download_mgr());
+      const string external_host_info = talk_mgr->FormatHostInfo(
+          mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_host_info);
     } else if (line == "host info") {
-      const string host_info =
-        talk_mgr->FormatHostInfo(mount_point->download_mgr());
+      const string host_info = talk_mgr->FormatHostInfo(
+          mount_point->download_mgr());
       talk_mgr->Answer(con_fd, host_info);
     } else if (line == "host probe") {
       mount_point->download_mgr()->ProbeHosts();
@@ -499,12 +501,12 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       }
     } else if (line == "external proxy info") {
-      string external_proxy_info =
-        talk_mgr->FormatProxyInfo(mount_point->external_download_mgr());
+      string external_proxy_info = talk_mgr->FormatProxyInfo(
+          mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_proxy_info);
     } else if (line == "proxy info") {
-      string proxy_info =
-        talk_mgr->FormatProxyInfo(mount_point->download_mgr());
+      string proxy_info = talk_mgr->FormatProxyInfo(
+          mount_point->download_mgr());
       talk_mgr->Answer(con_fd, proxy_info);
     } else if (line == "proxy rebalance") {
       mount_point->download_mgr()->RebalanceProxies();
@@ -518,7 +520,7 @@ void *TalkManager::MainResponder(void *data) {
       } else {
         string external_proxies = line.substr(19);
         mount_point->external_download_mgr()->SetProxyChain(
-          external_proxies, "", download::DownloadManager::kSetProxyRegular);
+            external_proxies, "", download::DownloadManager::kSetProxyRegular);
         talk_mgr->Answer(con_fd, "OK\n");
       }
     } else if (line.substr(0, 9) == "proxy set") {
@@ -526,14 +528,13 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "Usage: proxy set <proxy list>\n");
       } else {
         string proxies = line.substr(10);
-        proxies =
-          download::ResolveProxyDescription(proxies, "",
-                                            mount_point->download_mgr());
+        proxies = download::ResolveProxyDescription(
+            proxies, "", mount_point->download_mgr());
         if (proxies == "") {
-            talk_mgr->Answer(con_fd, "Failed, no valid proxies\n");
+          talk_mgr->Answer(con_fd, "Failed, no valid proxies\n");
         } else {
           mount_point->download_mgr()->SetProxyChain(
-            proxies, "", download::DownloadManager::kSetProxyRegular);
+              proxies, "", download::DownloadManager::kSetProxyRegular);
           talk_mgr->Answer(con_fd, "OK\n");
         }
       }
@@ -543,14 +544,14 @@ void *TalkManager::MainResponder(void *data) {
       } else {
         string fallback_proxies = line.substr(15);
         mount_point->download_mgr()->SetProxyChain(
-          "", fallback_proxies, download::DownloadManager::kSetProxyFallback);
+            "", fallback_proxies, download::DownloadManager::kSetProxyFallback);
         talk_mgr->Answer(con_fd, "OK\n");
       }
     } else if (line == "timeout info") {
       unsigned timeout;
       unsigned timeout_direct;
       mount_point->download_mgr()->GetTimeout(&timeout, &timeout_direct);
-      string timeout_str =  "Timeout with proxy: ";
+      string timeout_str = "Timeout with proxy: ";
       if (timeout)
         timeout_str += StringifyInt(timeout) + "s\n";
       else
@@ -593,58 +594,77 @@ void *TalkManager::MainResponder(void *data) {
       result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
 
       // Manually setting the values of the ShortString counters
-      mount_point->statistics()->Lookup("pathstring.n_instances")->
-          Set(PathString::num_instances());
-      mount_point->statistics()->Lookup("pathstring.n_overflows")->
-          Set(PathString::num_overflows());
-      mount_point->statistics()->Lookup("namestring.n_instances")->
-          Set(NameString::num_instances());
-      mount_point->statistics()->Lookup("namestring.n_overflows")->
-          Set(NameString::num_overflows());
-      mount_point->statistics()->Lookup("linkstring.n_instances")->
-          Set(LinkString::num_instances());
-      mount_point->statistics()->Lookup("linkstring.n_overflows")->
-          Set(LinkString::num_overflows());
+      mount_point->statistics()
+          ->Lookup("pathstring.n_instances")
+          ->Set(PathString::num_instances());
+      mount_point->statistics()
+          ->Lookup("pathstring.n_overflows")
+          ->Set(PathString::num_overflows());
+      mount_point->statistics()
+          ->Lookup("namestring.n_instances")
+          ->Set(NameString::num_instances());
+      mount_point->statistics()
+          ->Lookup("namestring.n_overflows")
+          ->Set(NameString::num_overflows());
+      mount_point->statistics()
+          ->Lookup("linkstring.n_instances")
+          ->Set(LinkString::num_instances());
+      mount_point->statistics()
+          ->Lookup("linkstring.n_overflows")
+          ->Set(LinkString::num_overflows());
 
       // Manually setting the inode tracker numbers
-      glue::InodeTracker::Statistics inode_stats =
-        mount_point->inode_tracker()->GetStatistics();
-      glue::DentryTracker::Statistics dentry_stats =
-        mount_point->dentry_tracker()->GetStatistics();
-      glue::PageCacheTracker::Statistics page_cache_stats =
-        mount_point->page_cache_tracker()->GetStatistics();
-      mount_point->statistics()->Lookup("inode_tracker.n_insert")->Set(
-        atomic_read64(&inode_stats.num_inserts));
-      mount_point->statistics()->Lookup("inode_tracker.n_remove")->Set(
-        atomic_read64(&inode_stats.num_removes));
-      mount_point->statistics()->Lookup("inode_tracker.no_reference")->Set(
-        atomic_read64(&inode_stats.num_references));
-      mount_point->statistics()->Lookup("inode_tracker.n_hit_inode")->Set(
-        atomic_read64(&inode_stats.num_hits_inode));
-      mount_point->statistics()->Lookup("inode_tracker.n_hit_path")->Set(
-        atomic_read64(&inode_stats.num_hits_path));
-      mount_point->statistics()->Lookup("inode_tracker.n_miss_path")->Set(
-        atomic_read64(&inode_stats.num_misses_path));
-      mount_point->statistics()->Lookup("dentry_tracker.n_insert")->Set(
-        dentry_stats.num_insert);
-      mount_point->statistics()->Lookup("dentry_tracker.n_remove")->Set(
-        dentry_stats.num_remove);
-      mount_point->statistics()->Lookup("dentry_tracker.n_prune")->Set(
-        dentry_stats.num_prune);
-      mount_point->statistics()->Lookup("page_cache_tracker.n_insert")->Set(
-        page_cache_stats.n_insert);
-      mount_point->statistics()->Lookup("page_cache_tracker.n_remove")->Set(
-        page_cache_stats.n_remove);
-      mount_point->statistics()->Lookup("page_cache_tracker.n_open_direct")->
-        Set(page_cache_stats.n_open_direct);
-      mount_point->statistics()->Lookup("page_cache_tracker.n_open_flush")->
-        Set(page_cache_stats.n_open_flush);
-      mount_point->statistics()->Lookup("page_cache_tracker.n_open_cached")->
-        Set(page_cache_stats.n_open_cached);
+      glue::InodeTracker::Statistics inode_stats = mount_point->inode_tracker()
+                                                       ->GetStatistics();
+      glue::DentryTracker::Statistics
+          dentry_stats = mount_point->dentry_tracker()->GetStatistics();
+      glue::PageCacheTracker::Statistics
+          page_cache_stats = mount_point->page_cache_tracker()->GetStatistics();
+      mount_point->statistics()
+          ->Lookup("inode_tracker.n_insert")
+          ->Set(atomic_read64(&inode_stats.num_inserts));
+      mount_point->statistics()
+          ->Lookup("inode_tracker.n_remove")
+          ->Set(atomic_read64(&inode_stats.num_removes));
+      mount_point->statistics()
+          ->Lookup("inode_tracker.no_reference")
+          ->Set(atomic_read64(&inode_stats.num_references));
+      mount_point->statistics()
+          ->Lookup("inode_tracker.n_hit_inode")
+          ->Set(atomic_read64(&inode_stats.num_hits_inode));
+      mount_point->statistics()
+          ->Lookup("inode_tracker.n_hit_path")
+          ->Set(atomic_read64(&inode_stats.num_hits_path));
+      mount_point->statistics()
+          ->Lookup("inode_tracker.n_miss_path")
+          ->Set(atomic_read64(&inode_stats.num_misses_path));
+      mount_point->statistics()
+          ->Lookup("dentry_tracker.n_insert")
+          ->Set(dentry_stats.num_insert);
+      mount_point->statistics()
+          ->Lookup("dentry_tracker.n_remove")
+          ->Set(dentry_stats.num_remove);
+      mount_point->statistics()
+          ->Lookup("dentry_tracker.n_prune")
+          ->Set(dentry_stats.num_prune);
+      mount_point->statistics()
+          ->Lookup("page_cache_tracker.n_insert")
+          ->Set(page_cache_stats.n_insert);
+      mount_point->statistics()
+          ->Lookup("page_cache_tracker.n_remove")
+          ->Set(page_cache_stats.n_remove);
+      mount_point->statistics()
+          ->Lookup("page_cache_tracker.n_open_direct")
+          ->Set(page_cache_stats.n_open_direct);
+      mount_point->statistics()
+          ->Lookup("page_cache_tracker.n_open_flush")
+          ->Set(page_cache_stats.n_open_flush);
+      mount_point->statistics()
+          ->Lookup("page_cache_tracker.n_open_cached")
+          ->Set(page_cache_stats.n_open_cached);
 
       if (file_system->cache_mgr()->id() == kPosixCacheManager) {
-        PosixCacheManager *cache_mgr =
-          reinterpret_cast<PosixCacheManager *>(
+        PosixCacheManager *cache_mgr = reinterpret_cast<PosixCacheManager *>(
             file_system->cache_mgr());
         result += "\nCache Mode: ";
         switch (cache_mgr->cache_mode()) {
@@ -674,39 +694,38 @@ void *TalkManager::MainResponder(void *data) {
       result += "  Number of allocations " + StringifyInt(current) + "\n";
 
       sqlite3_status(SQLITE_STATUS_MEMORY_USED, &current, &highwater, 0);
-      result += "  General purpose allocator " +StringifyInt(current/1024) +
-                " KB / " + StringifyInt(highwater/1024) + " KB\n";
+      result += "  General purpose allocator " + StringifyInt(current / 1024)
+                + " KB / " + StringifyInt(highwater / 1024) + " KB\n";
 
       sqlite3_status(SQLITE_STATUS_MALLOC_SIZE, &current, &highwater, 0);
       result += "  Largest malloc " + StringifyInt(highwater) + " Bytes\n";
 
       sqlite3_status(SQLITE_STATUS_PAGECACHE_USED, &current, &highwater, 0);
-      result += "  Page cache allocations " + StringifyInt(current) + " / " +
-                StringifyInt(highwater) + "\n";
+      result += "  Page cache allocations " + StringifyInt(current) + " / "
+                + StringifyInt(highwater) + "\n";
 
-      sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW,
-                     &current, &highwater, 0);
-      result += "  Page cache overflows " + StringifyInt(current/1024) +
-                " KB / " + StringifyInt(highwater/1024) + " KB\n";
+      sqlite3_status(SQLITE_STATUS_PAGECACHE_OVERFLOW, &current, &highwater, 0);
+      result += "  Page cache overflows " + StringifyInt(current / 1024)
+                + " KB / " + StringifyInt(highwater / 1024) + " KB\n";
 
       sqlite3_status(SQLITE_STATUS_PAGECACHE_SIZE, &current, &highwater, 0);
-      result += "  Largest page cache allocation " + StringifyInt(highwater) +
-                " Bytes\n";
+      result += "  Largest page cache allocation " + StringifyInt(highwater)
+                + " Bytes\n";
 
       sqlite3_status(SQLITE_STATUS_SCRATCH_USED, &current, &highwater, 0);
-      result += "  Scratch allocations " + StringifyInt(current) + " / " +
-                StringifyInt(highwater) + "\n";
+      result += "  Scratch allocations " + StringifyInt(current) + " / "
+                + StringifyInt(highwater) + "\n";
 
       sqlite3_status(SQLITE_STATUS_SCRATCH_OVERFLOW, &current, &highwater, 0);
-      result += "  Scratch overflows " + StringifyInt(current) + " / " +
-                StringifyInt(highwater) + "\n";
+      result += "  Scratch overflows " + StringifyInt(current) + " / "
+                + StringifyInt(highwater) + "\n";
 
       sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
-      result += "  Largest scratch allocation " + StringifyInt(highwater/1024)
+      result += "  Largest scratch allocation " + StringifyInt(highwater / 1024)
                 + " KB\n";
 
-      result += "\nPer-Connection Memory Statistics:\n" +
-                mount_point->catalog_mgr()->PrintAllMemStatistics();
+      result += "\nPer-Connection Memory Statistics:\n"
+                + mount_point->catalog_mgr()->PrintAllMemStatistics();
 
       result += "\nLatency distribution of system calls:\n";
 
@@ -723,8 +742,9 @@ void *TalkManager::MainResponder(void *data) {
       result += "Read\n" + file_system->hist_fs_read()->ToString();
       result += "Release\n" + file_system->hist_fs_release()->ToString();
 
-      result += "\nRaw Counters:\n" +
-        mount_point->statistics()->PrintList(perf::Statistics::kPrintHeader);
+      result += "\nRaw Counters:\n"
+                + mount_point->statistics()->PrintList(
+                    perf::Statistics::kPrintHeader);
 
       talk_mgr->Answer(con_fd, result);
     } else if (line == "reset error counters") {
@@ -734,8 +754,10 @@ void *TalkManager::MainResponder(void *data) {
       const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
       talk_mgr->Answer(con_fd, pid_str);
     } else if (line == "pid cachemgr") {
-      const string pid_str =
-        StringifyInt(file_system->cache_mgr()->quota_mgr()->GetPid()) + "\n";
+      const string pid_str = StringifyInt(file_system->cache_mgr()
+                                              ->quota_mgr()
+                                              ->GetPid())
+                             + "\n";
       talk_mgr->Answer(con_fd, pid_str);
     } else if (line == "pid watchdog") {
       const string pid_str = StringifyInt(Watchdog::GetPid()) + "\n";
@@ -743,23 +765,24 @@ void *TalkManager::MainResponder(void *data) {
     } else if (line == "parameters") {
       talk_mgr->Answer(con_fd, file_system->options_mgr()->Dump());
     } else if (line == "hotpatch history") {
-      string history_str =
-        StringifyTime(cvmfs::loader_exports_->boot_time, true) +
-        "    (start of CernVM-FS loader " +
-        cvmfs::loader_exports_->loader_version + ")\n";
-      for (loader::EventList::const_iterator i =
-           cvmfs::loader_exports_->history.begin(),
-           iEnd = cvmfs::loader_exports_->history.end(); i != iEnd; ++i)
-      {
-        history_str += StringifyTime((*i)->timestamp, true) +
-          "    (loaded CernVM-FS Fuse Module " +
-          (*i)->so_version + ")\n";
+      string history_str = StringifyTime(cvmfs::loader_exports_->boot_time,
+                                         true)
+                           + "    (start of CernVM-FS loader "
+                           + cvmfs::loader_exports_->loader_version + ")\n";
+      for (loader::EventList::const_iterator
+               i = cvmfs::loader_exports_->history.begin(),
+               iEnd = cvmfs::loader_exports_->history.end();
+           i != iEnd;
+           ++i) {
+        history_str += StringifyTime((*i)->timestamp, true)
+                       + "    (loaded CernVM-FS Fuse Module " + (*i)->so_version
+                       + ")\n";
       }
       talk_mgr->Answer(con_fd, history_str);
     } else if (line == "vfs inodes") {
       string result;
       glue::InodeTracker::Cursor cursor(
-        mount_point->inode_tracker()->BeginEnumerate());
+          mount_point->inode_tracker()->BeginEnumerate());
       uint64_t inode;
       while (mount_point->inode_tracker()->NextInode(&cursor, &inode)) {
         result += StringifyInt(inode) + "\n";
@@ -769,20 +792,21 @@ void *TalkManager::MainResponder(void *data) {
     } else if (line == "vfs entries") {
       string result;
       glue::InodeTracker::Cursor cursor(
-        mount_point->inode_tracker()->BeginEnumerate());
+          mount_point->inode_tracker()->BeginEnumerate());
       uint64_t inode_parent;
       NameString name;
-      while (mount_point->inode_tracker()->NextEntry(
-        &cursor, &inode_parent, &name))
-      {
-        result += "<" + StringifyInt(inode_parent) + ">/" + name.ToString() +
-                  "\n";
+      while (mount_point->inode_tracker()->NextEntry(&cursor, &inode_parent,
+                                                     &name)) {
+        result += "<" + StringifyInt(inode_parent) + ">/" + name.ToString()
+                  + "\n";
       }
       mount_point->inode_tracker()->EndEnumerate(&cursor);
       talk_mgr->Answer(con_fd, result);
     } else if (line == "version") {
-      const string version_str = string(CVMFS_VERSION) + " (CernVM-FS Fuse Module)\n" +
-        cvmfs::loader_exports_->loader_version + " (Loader)\n";
+      const string version_str = string(CVMFS_VERSION)
+                                 + " (CernVM-FS Fuse Module)\n"
+                                 + cvmfs::loader_exports_->loader_version
+                                 + " (Loader)\n";
       talk_mgr->Answer(con_fd, version_str);
     } else if (line == "version patchlevel") {
       talk_mgr->Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
@@ -831,9 +855,9 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
 
   string repo(mount_point.fqrn());
 
-  unsigned int format_index =
-      snprintf(buffer, bufSize, "\"%s\",\"%s\",\"%s\",\"%s\"", "repository",
-               "action", "total_count", "time_unit");
+  unsigned int format_index = snprintf(
+      buffer, bufSize, "\"%s\",\"%s\",\"%s\",\"%s\"", "repository", "action",
+      "total_count", "time_unit");
   for (unsigned int i = 0; i < qs.size(); i++) {
     format_index += snprintf(buffer + format_index, bufSize - format_index,
                              ",%0.5f", qs[i]);
@@ -872,15 +896,15 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
 
   for (unsigned int j = 0; j < hist.size(); j++) {
     Log2Histogram *h = hist[j];
-    unsigned int format_index =
-      snprintf(buffer, bufSize, "\"%s\",\"%s\",%" PRIu64 ",\"nanoseconds\"",
-               repo.c_str(), names[j].c_str(), h->N());
+    unsigned int format_index = snprintf(
+        buffer, bufSize, "\"%s\",\"%s\",%" PRIu64 ",\"nanoseconds\"",
+        repo.c_str(), names[j].c_str(), h->N());
     for (unsigned int i = 0; i < qs.size(); i++) {
       format_index += snprintf(buffer + format_index, bufSize - format_index,
                                ",%u", h->GetQuantile(qs[i]));
     }
-    format_index +=
-        snprintf(buffer + format_index, bufSize - format_index, "\n");
+    format_index += snprintf(buffer + format_index, bufSize - format_index,
+                             "\n");
     assert(format_index < bufSize);
 
     result += buffer;
@@ -890,16 +914,14 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   return result;
 }
 
-TalkManager::TalkManager(
-  const string &socket_path,
-  MountPoint *mount_point,
-  FuseRemounter *remounter)
-  : socket_path_(socket_path)
-  , socket_fd_(-1)
-  , mount_point_(mount_point)
-  , remounter_(remounter)
-  , spawned_(false)
-{
+TalkManager::TalkManager(const string &socket_path,
+                         MountPoint *mount_point,
+                         FuseRemounter *remounter)
+    : socket_path_(socket_path)
+    , socket_fd_(-1)
+    , mount_point_(mount_point)
+    , remounter_(remounter)
+    , spawned_(false) {
   memset(&thread_talk_, 0, sizeof(thread_talk_));
 }
 

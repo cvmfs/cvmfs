@@ -24,10 +24,9 @@ class TaskChunk : public TubeConsumer<BlockItem> {
   TaskChunk(Tube<BlockItem> *tube_in,
             TubeGroup<BlockItem> *tubes_out,
             ItemAllocator *allocator)
-    : TubeConsumer<BlockItem>(tube_in)
-    , tubes_out_(tubes_out)
-    , allocator_(allocator)
-  {
+      : TubeConsumer<BlockItem>(tube_in)
+      , tubes_out_(tubes_out)
+      , allocator_(allocator) {
     tag_map_.Init(16, -1, hasher_int64t);
   }
 
@@ -44,12 +43,11 @@ class TaskChunk : public TubeConsumer<BlockItem> {
    */
   struct ChunkInfo {
     ChunkInfo()
-      : offset(0)
-      , output_tag_chunk(-1)
-      , output_tag_bulk(-1)
-      , next_chunk(NULL)
-      , bulk_chunk(NULL)
-    { }
+        : offset(0)
+        , output_tag_chunk(-1)
+        , output_tag_bulk(-1)
+        , next_chunk(NULL)
+        , bulk_chunk(NULL) { }
     /**
      * Sum of input block size of the file that has been processed so far
      */

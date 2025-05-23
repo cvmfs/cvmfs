@@ -19,18 +19,21 @@ namespace {
 
 bool HasCertificates(const std::string &directory) {
   DIR *dirp = opendir(directory.c_str());
-  if (!dirp) return false;
+  if (!dirp)
+    return false;
 
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
     const std::string filename(directory + "/" + std::string(dirent->d_name));
 
     platform_stat64 stat;
-    if (platform_stat(filename.c_str(), &stat) != 0) continue;
-    if (!(S_ISREG(stat.st_mode) || S_ISLNK(stat.st_mode))) continue;
+    if (platform_stat(filename.c_str(), &stat) != 0)
+      continue;
+    if (!(S_ISREG(stat.st_mode) || S_ISLNK(stat.st_mode)))
+      continue;
 
-    if (HasSuffix(filename, ".pem", /* ignore case = */ false) ||
-        HasSuffix(filename, ".crt", /* ignore case = */ false)) {
+    if (HasSuffix(filename, ".pem", /* ignore case = */ false)
+        || HasSuffix(filename, ".crt", /* ignore case = */ false)) {
       closedir(dirp);
       return true;
     }
@@ -78,9 +81,9 @@ void SslCertificateStore::UseSystemCertificatePath() {
   for (unsigned i = 0; i < candidates.size(); ++i) {
     if (HasCertificates(candidates[i])) {
       const std::string bundle_candidate = candidates[i] + "/ca-bundle.crt";
-      if (ca_bundle_.empty() &&
-          (FileExists(bundle_candidate) || SymlinkExists(bundle_candidate)))
-      {
+      if (ca_bundle_.empty()
+          && (FileExists(bundle_candidate)
+              || SymlinkExists(bundle_candidate))) {
         ca_bundle_ = bundle_candidate;
       }
       ca_path_ = candidates[i];

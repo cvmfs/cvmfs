@@ -11,7 +11,9 @@ namespace notify {
 
 namespace msg {
 
-enum Version { kProtocolVersion = 1 };
+enum Version {
+  kProtocolVersion = 1
+};
 
 /**
  * The base class of all notification messages
@@ -21,10 +23,10 @@ enum Version { kProtocolVersion = 1 };
  */
 class Message {
  public:
-  virtual void ToJSONString(std::string* s) = 0;
-  virtual bool FromJSONString(const std::string& s) = 0;
+  virtual void ToJSONString(std::string *s) = 0;
+  virtual bool FromJSONString(const std::string &s) = 0;
 
-  virtual ~Message() {}
+  virtual ~Message() { }
 };
 
 /**
@@ -38,10 +40,10 @@ class Activity : public Message {
   Activity();
   virtual ~Activity();
 
-  bool operator==(const Activity& other) const;
+  bool operator==(const Activity &other) const;
 
-  virtual void ToJSONString(std::string* s);
-  virtual bool FromJSONString(const std::string& s);
+  virtual void ToJSONString(std::string *s);
+  virtual bool FromJSONString(const std::string &s);
 
   int version_;
   std::string timestamp_;

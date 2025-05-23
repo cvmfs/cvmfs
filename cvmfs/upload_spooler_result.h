@@ -22,27 +22,27 @@ namespace upload {
  */
 struct SpoolerResult {
   explicit SpoolerResult(
-      const int             return_code = -1,
-      const std::string     &local_path  = "",
-      const shash::Any      &digest      = shash::Any(),
-      const FileChunkList   &file_chunks = FileChunkList(),
-      const zlib::Algorithms  compression_alg = zlib::kZlibDefault)
-    : return_code(return_code)
-    , local_path(local_path)
-    , content_hash(digest)
-    , file_chunks(file_chunks)
-    , compression_alg(compression_alg) {}
+      const int return_code = -1,
+      const std::string &local_path = "",
+      const shash::Any &digest = shash::Any(),
+      const FileChunkList &file_chunks = FileChunkList(),
+      const zlib::Algorithms compression_alg = zlib::kZlibDefault)
+      : return_code(return_code)
+      , local_path(local_path)
+      , content_hash(digest)
+      , file_chunks(file_chunks)
+      , compression_alg(compression_alg) { }
 
   inline bool IsChunked() const { return !file_chunks.IsEmpty(); }
 
-  int           return_code;   //!< the return value of the spooler operation
-  std::string   local_path;    //!< the local_path previously given as input
+  int return_code;         //!< the return value of the spooler operation
+  std::string local_path;  //!< the local_path previously given as input
   /**
    * The content_hash of the bulk file derived during processing
    */
-  shash::Any    content_hash;
-  FileChunkList file_chunks;   //!< the file chunks generated during processing
-  zlib::Algorithms  compression_alg;
+  shash::Any content_hash;
+  FileChunkList file_chunks;  //!< the file chunks generated during processing
+  zlib::Algorithms compression_alg;
 };
 
 }  // namespace upload

@@ -19,9 +19,9 @@ namespace upload {
 struct LocalStreamHandle : public UploadStreamHandle {
   LocalStreamHandle(const CallbackTN *commit_callback, const int tmp_fd,
                     const std::string &tmp_path)
-      : UploadStreamHandle(commit_callback),
-        file_descriptor(tmp_fd),
-        temporary_path(tmp_path) {}
+      : UploadStreamHandle(commit_callback)
+      , file_descriptor(tmp_fd)
+      , temporary_path(tmp_path) { }
 
   const int file_descriptor;
   const std::string temporary_path;

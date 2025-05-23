@@ -11,11 +11,10 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include <limits> // NOLINT
-
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <limits>  // NOLINT
 
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -28,13 +27,9 @@ namespace CVMFS_NAMESPACE_GUARD {
 class Prng {
  public:
   // Cannot throw an exception
-  Prng() throw() {
-    state_ = 0;
-  }
+  Prng() throw() { state_ = 0; }
 
-  void InitSeed(const uint64_t seed) {
-    state_ = seed;
-  }
+  void InitSeed(const uint64_t seed) { state_ = seed; }
 
   void InitLocaltime() {
     struct timeval tv_now;
@@ -47,10 +42,10 @@ class Prng {
    * Returns random number in [0..boundary-1]
    */
   uint32_t Next(const uint64_t boundary) {
-    state_ = a*state_ + c;
-    double scaled_val =
-      static_cast<double>(state_) * static_cast<double>(boundary) /
-      static_cast<double>(18446744073709551616.0);
+    state_ = a * state_ + c;
+    double scaled_val = static_cast<double>(state_)
+                        * static_cast<double>(boundary)
+                        / static_cast<double>(18446744073709551616.0);
     return static_cast<uint32_t>(static_cast<uint64_t>(scaled_val) % boundary);
   }
 
@@ -58,9 +53,9 @@ class Prng {
    * Returns random double in range [0, 1]
    */
   double NextDouble() {
-    state_ = a*state_ + c;
-    double unit_val = static_cast<double>(state_) /
-      static_cast<double>(18446744073709551616.0);
+    state_ = a * state_ + c;
+    double unit_val = static_cast<double>(state_)
+                      / static_cast<double>(18446744073709551616.0);
     return unit_val;
   }
   /**

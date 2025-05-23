@@ -10,11 +10,9 @@ namespace catalog {
 
 class T_VirtualCatalog : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 };
 
 
@@ -28,14 +26,14 @@ TEST_F(T_VirtualCatalog, ParseActions) {
   EXPECT_TRUE(VirtualCatalog::ParseActions("snapshots", &actions));
   EXPECT_EQ(VirtualCatalog::kActionGenerateSnapshots, actions);
   EXPECT_TRUE(VirtualCatalog::ParseActions("snapshots,remove", &actions));
-  EXPECT_EQ(VirtualCatalog::kActionGenerateSnapshots |
-            VirtualCatalog::kActionRemove,
-            actions);
-  EXPECT_TRUE(VirtualCatalog::ParseActions("snapshots,remove,remove",
-              &actions));
-  EXPECT_EQ(VirtualCatalog::kActionGenerateSnapshots |
-            VirtualCatalog::kActionRemove,
-            actions);
+  EXPECT_EQ(
+      VirtualCatalog::kActionGenerateSnapshots | VirtualCatalog::kActionRemove,
+      actions);
+  EXPECT_TRUE(
+      VirtualCatalog::ParseActions("snapshots,remove,remove", &actions));
+  EXPECT_EQ(
+      VirtualCatalog::kActionGenerateSnapshots | VirtualCatalog::kActionRemove,
+      actions);
   EXPECT_FALSE(VirtualCatalog::ParseActions("snapshots,abc", &actions));
 }
 

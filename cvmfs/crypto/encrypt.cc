@@ -115,8 +115,7 @@ string Key::ToBase64() const {
 
 
 MemoryKeyDatabase::MemoryKeyDatabase() {
-  lock_ =
-    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
@@ -168,11 +167,9 @@ Cipher *Cipher::Create(const Algorithms a) {
 }
 
 
-bool Cipher::Encrypt(
-  const string &plaintext,
-  const Key &key,
-  string *ciphertext)
-{
+bool Cipher::Encrypt(const string &plaintext,
+                     const Key &key,
+                     string *ciphertext) {
   ciphertext->clear();
   if (key.size() != key_size())
     return false;
@@ -186,11 +183,9 @@ bool Cipher::Encrypt(
 }
 
 
-bool Cipher::Decrypt(
-  const string &ciphertext,
-  const Key &key,
-  string *plaintext)
-{
+bool Cipher::Decrypt(const string &ciphertext,
+                     const Key &key,
+                     string *plaintext) {
   plaintext->clear();
   if (ciphertext.size() < 1)
     return false;
@@ -220,11 +215,11 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
     return "";
 
   const unsigned char *iv = reinterpret_cast<const unsigned char *>(
-    ciphertext.data());
+      ciphertext.data());
 
   // See OpenSSL documentation for the size
   unsigned char *plaintext = reinterpret_cast<unsigned char *>(
-    smalloc(kBlockSize + ciphertext.size() - kIvSize));
+      smalloc(kBlockSize + ciphertext.size() - kIvSize));
   int plaintext_len;
   int tail_len;
 #ifdef OPENSSL_API_INTERFACE_V11
@@ -236,11 +231,10 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
 #endif
   retval = EVP_DecryptInit_ex(ctx_ptr, EVP_aes_256_cbc(), NULL, key.data(), iv);
   assert(retval == 1);
-  retval = EVP_DecryptUpdate(ctx_ptr,
-             plaintext, &plaintext_len,
-             reinterpret_cast<const unsigned char *>(
-               ciphertext.data() + kIvSize),
-             ciphertext.length() - kIvSize);
+  retval = EVP_DecryptUpdate(
+      ctx_ptr, plaintext, &plaintext_len,
+      reinterpret_cast<const unsigned char *>(ciphertext.data() + kIvSize),
+      ciphertext.length() - kIvSize);
   if (retval != 1) {
     free(plaintext);
 #ifdef OPENSSL_API_INTERFACE_V11
@@ -285,7 +279,7 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   // See OpenSSL documentation as for the size.  Additionally, we prepend the
   // initialization vector.
   unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
-    smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
+      smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
   memcpy(ciphertext, iv, kIvSize);
   int cipher_len = 0;
   int tail_len = 0;
@@ -300,10 +294,10 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
   assert(retval == 1);
   // Older versions of OpenSSL don't allow empty input buffers
   if (!plaintext.empty()) {
-    retval = EVP_EncryptUpdate(ctx_ptr,
-               ciphertext + kIvSize, &cipher_len,
-               reinterpret_cast<const unsigned char *>(plaintext.data()),
-               plaintext.length());
+    retval = EVP_EncryptUpdate(
+        ctx_ptr, ciphertext + kIvSize, &cipher_len,
+        reinterpret_cast<const unsigned char *>(plaintext.data()),
+        plaintext.length());
     assert(retval == 1);
   }
   retval = EVP_EncryptFinal_ex(ctx_ptr, ciphertext + kIvSize + cipher_len,

@@ -63,37 +63,41 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  const uint64_t revisions = (args.count('h') > 0) ?
-    String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
-  const time_t timestamp  = (args.count('z') > 0)
-    ? static_cast<time_t>(String2Int64(*args.find('z')->second))
-    : GcConfig::kNoTimestamp;
-  std::string repo_keys = (args.count('k') > 0) ?
-    *args.find('k')->second : "";
+  const uint64_t revisions = (args.count('h') > 0)
+                                 ? String2Int64(*args.find('h')->second)
+                                 : GcConfig::kFullHistory;
+  const time_t timestamp = (args.count('z') > 0)
+                               ? static_cast<time_t>(
+                                     String2Int64(*args.find('z')->second))
+                               : GcConfig::kNoTimestamp;
+  std::string repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
     repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
   const bool dry_run = (args.count('d') > 0);
   const bool list_condemned_objects = (args.count('l') > 0);
-  const std::string temp_directory = (args.count('t') > 0) ?
-    *args.find('t')->second : "/tmp";
-  const std::string deletion_log_path = (args.count('L') > 0) ?
-    *args.find('L')->second : "";
+  const std::string temp_directory = (args.count('t') > 0)
+                                         ? *args.find('t')->second
+                                         : "/tmp";
+  const std::string deletion_log_path = (args.count('L') > 0)
+                                            ? *args.find('L')->second
+                                            : "";
   const bool upload_statsdb = (args.count('I') > 0);
-  const unsigned int num_threads = (args.count('N') > 0) ?
-    String2Uint64(*args.find('N')->second) : 8;
+  const unsigned int num_threads = (args.count('N') > 0)
+                                       ? String2Uint64(*args.find('N')->second)
+                                       : 8;
 
-  if (timestamp == GcConfig::kNoTimestamp &&
-      revisions == GcConfig::kFullHistory) {
+  if (timestamp == GcConfig::kNoTimestamp
+      && revisions == GcConfig::kFullHistory) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "neither a timestamp nor history threshold given");
     return 1;
   }
 
   const bool follow_redirects = false;
-  const std::string proxy = ((args.count('@') > 0) ?
-                             *args.find('@')->second : "");
-  if (!this->InitDownloadManager(follow_redirects, proxy) ||
-      !this->InitSignatureManager(repo_keys)) {
+  const std::string proxy = ((args.count('@') > 0) ? *args.find('@')->second
+                                                   : "");
+  if (!this->InitDownloadManager(follow_redirects, proxy)
+      || !this->InitSignatureManager(repo_keys)) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to init repo connection");
     return 1;
   }
@@ -107,9 +111,10 @@ int CommandGc::Main(const ArgumentList &args) {
   UniquePtr<manifest::Manifest> manifest;
   ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);
   if (retval != ObjectFetcher::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest "
-                                    "(%d - %s)",
-                                    retval, Code2Ascii(retval));
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to load repository manifest "
+             "(%d - %s)",
+             retval, Code2Ascii(retval));
     return 1;
   }
 
@@ -125,7 +130,7 @@ int CommandGc::Main(const ArgumentList &args) {
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
   UniquePtr<upload::AbstractUploader> uploader(
-                       upload::AbstractUploader::Construct(spooler_definition));
+      upload::AbstractUploader::Construct(spooler_definition));
 
   if (!uploader.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
@@ -137,8 +142,10 @@ int CommandGc::Main(const ArgumentList &args) {
   if (!deletion_log_path.empty()) {
     deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
     if (NULL == deletion_log_file) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
-                                      "(errno: %d)", errno);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to open deletion log file "
+               "(errno: %d)",
+               errno);
       uploader->TearDown();
       return 1;
     }
@@ -149,26 +156,27 @@ int CommandGc::Main(const ArgumentList &args) {
   reflog->BeginTransaction();
 
   GcConfig config;
-  config.uploader                = uploader.weak_ref();
-  config.keep_history_depth      = revisions;
-  config.keep_history_timestamp  = timestamp;
-  config.dry_run                 = dry_run;
-  config.verbose                 = list_condemned_objects;
-  config.object_fetcher          = &object_fetcher;
-  config.reflog                  = reflog.weak_ref();
+  config.uploader = uploader.weak_ref();
+  config.keep_history_depth = revisions;
+  config.keep_history_timestamp = timestamp;
+  config.dry_run = dry_run;
+  config.verbose = list_condemned_objects;
+  config.object_fetcher = &object_fetcher;
+  config.reflog = reflog.weak_ref();
   config.deleted_objects_logfile = deletion_log_file;
-  config.statistics              = statistics();
-  config.extended_stats          = extended_stats;
-  config.num_threads             = num_threads;
+  config.statistics = statistics();
+  config.extended_stats = extended_stats;
+  config.num_threads = num_threads;
 
   if (deletion_log_file != NULL) {
     const int bytes_written = fprintf(deletion_log_file,
                                       "# Garbage Collection started at %s\n",
                                       StringifyTime(time(NULL), true).c_str());
     if (bytes_written < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to write to deletion log '%s' "
-                                      "(errno: %d)",
-                                      deletion_log_path.c_str(), errno);
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to write to deletion log '%s' "
+               "(errno: %d)",
+               deletion_log_path.c_str(), errno);
       uploader->TearDown();
       return 1;
     }
@@ -199,8 +207,8 @@ int CommandGc::Main(const ArgumentList &args) {
   preserved_objects.Fill(manifest->history());
   preserved_objects.Fill(manifest->meta_info());
   GCAux collector_aux(config);
-  success = collector_aux.CollectOlderThan(
-    collector.oldest_trunk_catalog(), preserved_objects);
+  success = collector_aux.CollectOlderThan(collector.oldest_trunk_catalog(),
+                                           preserved_objects);
   if (!success) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "garbage collection of auxiliary files failed");

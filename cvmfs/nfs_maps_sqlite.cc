@@ -35,16 +35,15 @@
 using namespace std;  // NOLINT
 
 
-const char *NfsMapsSqlite::kSqlCreateTable =
-  "CREATE TABLE IF NOT EXISTS inodes (path TEXT PRIMARY KEY);";
-const char *NfsMapsSqlite::kSqlAddRoot =
-  "INSERT INTO inodes (oid, path) VALUES (?, ?);";
-const char *NfsMapsSqlite::kSqlAddInode =
-  "INSERT INTO inodes VALUES (?);";
-const char *NfsMapsSqlite::kSqlGetInode =
-  "SELECT rowid FROM inodes where path = ?;";
-const char *NfsMapsSqlite::kSqlGetPath =
-  "SELECT path FROM inodes where rowid = ?;";
+const char *NfsMapsSqlite::kSqlCreateTable = "CREATE TABLE IF NOT EXISTS "
+                                             "inodes (path TEXT PRIMARY KEY);";
+const char *NfsMapsSqlite::
+    kSqlAddRoot = "INSERT INTO inodes (oid, path) VALUES (?, ?);";
+const char *NfsMapsSqlite::kSqlAddInode = "INSERT INTO inodes VALUES (?);";
+const char
+    *NfsMapsSqlite::kSqlGetInode = "SELECT rowid FROM inodes where path = ?;";
+const char
+    *NfsMapsSqlite::kSqlGetPath = "SELECT path FROM inodes where rowid = ?;";
 
 
 int NfsMapsSqlite::BusyHandler(void *data, int attempt) {
@@ -53,8 +52,8 @@ int NfsMapsSqlite::BusyHandler(void *data, int attempt) {
   if (attempt == 0)
     handler_info->accumulated_ms = 0;
   LogCvmfs(kLogNfsMaps, kLogDebug,
-           "busy handler, attempt %d, accumulated waiting time %u",
-           attempt, handler_info->accumulated_ms);
+           "busy handler, attempt %d, accumulated waiting time %u", attempt,
+           handler_info->accumulated_ms);
   if (handler_info->accumulated_ms >= handler_info->kMaxWaitMs)
     return 0;
 
@@ -73,22 +72,20 @@ int NfsMapsSqlite::BusyHandler(void *data, int attempt) {
 }
 
 
-NfsMapsSqlite *NfsMapsSqlite::Create(
-  const string &db_dir,
-  const uint64_t root_inode,
-  const bool rebuild,
-  perf::Statistics *statistics)
-{
+NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
+                                     const uint64_t root_inode,
+                                     const bool rebuild,
+                                     perf::Statistics *statistics) {
   assert(root_inode > 0);
   UniquePtr<NfsMapsSqlite> maps(new NfsMapsSqlite());
-  maps->n_db_added_ = statistics->Register(
-    "nfs.sqlite.n_added", "total number of issued inode");
-  maps->n_db_seq_ = statistics->Register(
-    "nfs.sqlite.n_seq", "last inode issued");
-  maps->n_db_path_found_ = statistics->Register(
-    "nfs.sqlite.n_path_hit", "inode --> path hits");
-  maps->n_db_inode_found_ = statistics->Register(
-    "nfs.sqlite.n_inode_hit", "path --> inode hits");
+  maps->n_db_added_ = statistics->Register("nfs.sqlite.n_added",
+                                           "total number of issued inode");
+  maps->n_db_seq_ = statistics->Register("nfs.sqlite.n_seq",
+                                         "last inode issued");
+  maps->n_db_path_found_ = statistics->Register("nfs.sqlite.n_path_hit",
+                                                "inode --> path hits");
+  maps->n_db_inode_found_ = statistics->Register("nfs.sqlite.n_inode_hit",
+                                                 "path --> inode hits");
 
   string db_path = db_dir + "/inode_maps.db";
 
@@ -101,25 +98,23 @@ NfsMapsSqlite *NfsMapsSqlite::Create(
   int retval = sqlite3_enable_shared_cache(0);
   assert(retval == SQLITE_OK);
 
-  retval = sqlite3_open_v2(db_path.c_str(), &maps->db_,
-                           SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
-                           | SQLITE_OPEN_CREATE, NULL);
+  retval = sqlite3_open_v2(
+      db_path.c_str(), &maps->db_,
+      SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
   if (retval != SQLITE_OK) {
-    LogCvmfs(kLogNfsMaps, kLogDebug,
-             "Failed to create inode_maps file (%s)",
+    LogCvmfs(kLogNfsMaps, kLogDebug, "Failed to create inode_maps file (%s)",
              db_path.c_str());
     return NULL;
   }
   // Be prepared to wait for up to 1 minute for transactions to complete
   // Being stuck for a long time is far more favorable than failing
   // TODO(jblomer): another busy handler.  This one conflicts with SIGALRM
-  retval = sqlite3_busy_handler(
-    maps->db_, BusyHandler, &maps->busy_handler_info_);
+  retval = sqlite3_busy_handler(maps->db_, BusyHandler,
+                                &maps->busy_handler_info_);
   assert(retval == SQLITE_OK);
 
   // Set-up the main inode table if it doesn't exist
-  retval = sqlite3_prepare_v2(
-    maps->db_, kSqlCreateTable, -1, &stmt, NULL);
+  retval = sqlite3_prepare_v2(maps->db_, kSqlCreateTable, -1, &stmt, NULL);
   if (retval != SQLITE_OK) {
     LogCvmfs(kLogNfsMaps, kLogDebug | kLogSyslogErr,
              "Failed to prepare create table statement: %s",
@@ -136,14 +131,14 @@ NfsMapsSqlite *NfsMapsSqlite::Create(
   sqlite3_finalize(stmt);
 
   // Prepare lookup and add-inode statements
-  retval = sqlite3_prepare_v2(
-    maps->db_, kSqlGetPath, -1, &maps->stmt_get_path_, NULL);
+  retval = sqlite3_prepare_v2(maps->db_, kSqlGetPath, -1, &maps->stmt_get_path_,
+                              NULL);
   assert(retval == SQLITE_OK);
   retval = sqlite3_prepare_v2(maps->db_, kSqlGetInode, -1,
                               &maps->stmt_get_inode_, NULL);
   assert(retval == SQLITE_OK);
-  retval = sqlite3_prepare_v2(maps->db_, kSqlAddInode, -1,
-                              &maps->stmt_add_, NULL);
+  retval = sqlite3_prepare_v2(maps->db_, kSqlAddInode, -1, &maps->stmt_add_,
+                              NULL);
   assert(retval == SQLITE_OK);
 
   // Check the root inode exists, if not create it
@@ -206,16 +201,16 @@ uint64_t NfsMapsSqlite::IssueInode(const PathString &path) {
   sqlite_state = sqlite3_bind_text(stmt_add_, 1, path.GetChars(),
                                    path.GetLength(), SQLITE_TRANSIENT);
   if (sqlite_state != SQLITE_OK) {
-    LogCvmfs(kLogNfsMaps, kLogDebug,
-             "Failed to bind path in IssueInode (%s)", path.c_str());
+    LogCvmfs(kLogNfsMaps, kLogDebug, "Failed to bind path in IssueInode (%s)",
+             path.c_str());
     sqlite3_reset(stmt_add_);
     return 0;
   }
   sqlite_state = sqlite3_step(stmt_add_);
   if (sqlite_state != SQLITE_DONE) {
     LogCvmfs(kLogNfsMaps, kLogDebug,
-             "Failed to execute SQL for IssueInode (%s): %s",
-             path.c_str(), sqlite3_errmsg(db_));
+             "Failed to execute SQL for IssueInode (%s): %s", path.c_str(),
+             sqlite3_errmsg(db_));
     sqlite3_reset(stmt_add_);
     return 0;
   }
@@ -270,7 +265,7 @@ uint64_t NfsMapsSqlite::GetInode(const PathString &path) {
  */
 bool NfsMapsSqlite::GetPath(const uint64_t inode, PathString *path) {
   int sqlite_state;
-    MutexLockGuard m(lock_);
+  MutexLockGuard m(lock_);
 
   sqlite_state = sqlite3_bind_int64(stmt_get_path_, 1, inode);
   assert(sqlite_state == SQLITE_OK);
@@ -293,16 +288,15 @@ bool NfsMapsSqlite::GetPath(const uint64_t inode, PathString *path) {
 
 
 NfsMapsSqlite::NfsMapsSqlite()
-  : db_(NULL)
-  , stmt_get_path_(NULL)
-  , stmt_get_inode_(NULL)
-  , stmt_add_(NULL)
-  , lock_(NULL)
-  , n_db_seq_(NULL)
-  , n_db_added_(NULL)
-  , n_db_path_found_(NULL)
-  , n_db_inode_found_(NULL)
-{
+    : db_(NULL)
+    , stmt_get_path_(NULL)
+    , stmt_get_inode_(NULL)
+    , stmt_add_(NULL)
+    , lock_(NULL)
+    , n_db_seq_(NULL)
+    , n_db_added_(NULL)
+    , n_db_path_found_(NULL)
+    , n_db_inode_found_(NULL) {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
@@ -310,9 +304,12 @@ NfsMapsSqlite::NfsMapsSqlite()
 
 
 NfsMapsSqlite::~NfsMapsSqlite() {
-  if (stmt_add_) sqlite3_finalize(stmt_add_);
-  if (stmt_get_path_) sqlite3_finalize(stmt_get_path_);
-  if (stmt_get_inode_) sqlite3_finalize(stmt_get_inode_);
+  if (stmt_add_)
+    sqlite3_finalize(stmt_add_);
+  if (stmt_get_path_)
+    sqlite3_finalize(stmt_get_path_);
+  if (stmt_get_inode_)
+    sqlite3_finalize(stmt_get_inode_);
   // Close the handles, it is explicitly OK to call close with NULL
   sqlite3_close_v2(db_);
   pthread_mutex_destroy(lock_);

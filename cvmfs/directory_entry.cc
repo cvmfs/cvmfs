@@ -7,8 +7,7 @@
 namespace catalog {
 
 DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
-  const DirectoryEntryBase &other) const
-{
+    const DirectoryEntryBase &other) const {
   Differences result = Difference::kIdentical;
 
   if (name() != other.name()) {
@@ -46,15 +45,14 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
 }
 
 DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
-  const DirectoryEntry &other) const
-{
+    const DirectoryEntry &other) const {
   Differences result = DirectoryEntryBase::CompareTo(other);
 
   if (hardlink_group() != other.hardlink_group()) {
     result |= Difference::kHardlinkGroup;
   }
-  if ( (IsNestedCatalogRoot() != other.IsNestedCatalogRoot()) ||
-       (IsNestedCatalogMountpoint() != other.IsNestedCatalogMountpoint()) ) {
+  if ((IsNestedCatalogRoot() != other.IsNestedCatalogRoot())
+      || (IsNestedCatalogMountpoint() != other.IsNestedCatalogMountpoint())) {
     result |= Difference::kNestedCatalogTransitionFlags;
   }
   if (IsChunkedFile() != other.IsChunkedFile()) {

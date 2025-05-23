@@ -34,7 +34,7 @@ namespace receiver {
 // we would need to make sure that the types are actually the same.
 // It is simpler to send `4` bytes.
 
-Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
+Reactor::Request Reactor::ReadRequest(int fd, std::string *data) {
   using namespace receiver;  // NOLINT
 
   // First, read the command identifier
@@ -68,7 +68,7 @@ Reactor::Request Reactor::ReadRequest(int fd, std::string* data) {
   return static_cast<Request>(req_id);
 }
 
-bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
+bool Reactor::WriteRequest(int fd, Request req, const std::string &data) {
   const int32_t msg_size = data.size();
   const int32_t total_size = 8 + data.size();  // req + msg_size + data
 
@@ -84,7 +84,7 @@ bool Reactor::WriteRequest(int fd, Request req, const std::string& data) {
   return SafeWrite(fd, &buffer[0], total_size);
 }
 
-bool Reactor::ReadReply(int fd, std::string* data) {
+bool Reactor::ReadReply(int fd, std::string *data) {
   int32_t msg_size(0);
   int nb = SafeRead(fd, &msg_size, 4);
 
@@ -104,7 +104,7 @@ bool Reactor::ReadReply(int fd, std::string* data) {
   return true;
 }
 
-bool Reactor::WriteReply(int fd, const std::string& data) {
+bool Reactor::WriteReply(int fd, const std::string &data) {
   const int32_t msg_size = data.size();
   const int32_t total_size = 4 + data.size();
 
@@ -119,21 +119,21 @@ bool Reactor::WriteReply(int fd, const std::string& data) {
   return SafeWrite(fd, &buffer[0], total_size);
 }
 
-bool Reactor::ExtractStatsFromReq(JsonDocument* req, perf::Statistics* stats,
-                                  std::string* start_time) {
+bool Reactor::ExtractStatsFromReq(JsonDocument *req, perf::Statistics *stats,
+                                  std::string *start_time) {
   perf::StatisticsTemplate stats_tmpl("publish", stats);
   upload::UploadCounters counters(stats_tmpl);
 
-  const JSON* statistics =
-      JsonDocument::SearchInObject(req->root(), "statistics", JSON_OBJECT);
+  const JSON *statistics = JsonDocument::SearchInObject(
+      req->root(), "statistics", JSON_OBJECT);
   if (statistics == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Could not find 'statistics' field in request");
     return false;
   }
 
-  const JSON* publish_ctrs =
-      JsonDocument::SearchInObject(statistics, "publish", JSON_OBJECT);
+  const JSON *publish_ctrs = JsonDocument::SearchInObject(statistics, "publish",
+                                                          JSON_OBJECT);
 
   if (publish_ctrs == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -141,23 +141,23 @@ bool Reactor::ExtractStatsFromReq(JsonDocument* req, perf::Statistics* stats,
     return false;
   }
 
-  const JSON* n_chunks_added =
-      JsonDocument::SearchInObject(publish_ctrs, "n_chunks_added", JSON_INT);
-  const JSON* n_chunks_duplicated = JsonDocument::SearchInObject(
+  const JSON *n_chunks_added = JsonDocument::SearchInObject(
+      publish_ctrs, "n_chunks_added", JSON_INT);
+  const JSON *n_chunks_duplicated = JsonDocument::SearchInObject(
       publish_ctrs, "n_chunks_duplicated", JSON_INT);
-  const JSON* n_catalogs_added =
-      JsonDocument::SearchInObject(publish_ctrs, "n_catalogs_added", JSON_INT);
-  const JSON* sz_uploaded_bytes =
-      JsonDocument::SearchInObject(publish_ctrs, "sz_uploaded_bytes", JSON_INT);
-  const JSON* sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
+  const JSON *n_catalogs_added = JsonDocument::SearchInObject(
+      publish_ctrs, "n_catalogs_added", JSON_INT);
+  const JSON *sz_uploaded_bytes = JsonDocument::SearchInObject(
+      publish_ctrs, "sz_uploaded_bytes", JSON_INT);
+  const JSON *sz_uploaded_catalog_bytes = JsonDocument::SearchInObject(
       publish_ctrs, "sz_uploaded_catalog_bytes", JSON_INT);
 
-  const JSON* start_time_json =
-      JsonDocument::SearchInObject(statistics, "start_time", JSON_STRING);
+  const JSON *start_time_json = JsonDocument::SearchInObject(
+      statistics, "start_time", JSON_STRING);
 
-  if (n_chunks_added == NULL || n_chunks_duplicated == NULL ||
-      n_catalogs_added == NULL || sz_uploaded_bytes == NULL ||
-      sz_uploaded_catalog_bytes == NULL || start_time_json == NULL) {
+  if (n_chunks_added == NULL || n_chunks_duplicated == NULL
+      || n_catalogs_added == NULL || sz_uploaded_bytes == NULL
+      || sz_uploaded_catalog_bytes == NULL || start_time_json == NULL) {
     return false;
   }
 
@@ -173,9 +173,9 @@ bool Reactor::ExtractStatsFromReq(JsonDocument* req, perf::Statistics* stats,
   return true;
 }
 
-Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) {}
+Reactor::Reactor(int fdin, int fdout) : fdin_(fdin), fdout_(fdout) { }
 
-Reactor::~Reactor() {}
+Reactor::~Reactor() { }
 
 bool Reactor::Run() {
   std::string msg_body;
@@ -193,7 +193,7 @@ bool Reactor::Run() {
   return true;
 }
 
-bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
+bool Reactor::HandleGenerateToken(const std::string &req, std::string *reply) {
   if (reply == NULL) {
     PANIC(kLogSyslogErr, "HandleGenerateToken: Invalid reply pointer.");
   }
@@ -204,11 +204,11 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
     return false;
   }
 
-  const JSON* key_id =
-      JsonDocument::SearchInObject(req_json->root(), "key_id", JSON_STRING);
-  const JSON* path =
-      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
-  const JSON* max_lease_time = JsonDocument::SearchInObject(
+  const JSON *key_id = JsonDocument::SearchInObject(req_json->root(), "key_id",
+                                                    JSON_STRING);
+  const JSON *path = JsonDocument::SearchInObject(req_json->root(), "path",
+                                                  JSON_STRING);
+  const JSON *max_lease_time = JsonDocument::SearchInObject(
       req_json->root(), "max_lease_time", JSON_INT);
 
   if (key_id == NULL || path == NULL || max_lease_time == NULL) {
@@ -239,7 +239,7 @@ bool Reactor::HandleGenerateToken(const std::string& req, std::string* reply) {
   return true;
 }
 
-bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
+bool Reactor::HandleGetTokenId(const std::string &req, std::string *reply) {
   if (reply == NULL) {
     PANIC(kLogSyslogErr, "HandleGetTokenId: Invalid reply pointer.");
   }
@@ -259,7 +259,7 @@ bool Reactor::HandleGetTokenId(const std::string& req, std::string* reply) {
   return true;
 }
 
-bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
+bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
   if (reply == NULL) {
     PANIC(kLogSyslogErr, "HandleCheckToken: Invalid reply pointer.");
   }
@@ -271,10 +271,10 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
     return false;
   }
 
-  const JSON* token =
-      JsonDocument::SearchInObject(req_json->root(), "token", JSON_STRING);
-  const JSON* secret =
-      JsonDocument::SearchInObject(req_json->root(), "secret", JSON_STRING);
+  const JSON *token = JsonDocument::SearchInObject(req_json->root(), "token",
+                                                   JSON_STRING);
+  const JSON *secret = JsonDocument::SearchInObject(req_json->root(), "secret",
+                                                    JSON_STRING);
 
   if (token == NULL || secret == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -284,8 +284,8 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 
   std::string path;
   JsonStringGenerator input;
-  TokenCheckResult ret =
-      CheckToken(token->string_value, secret->string_value, &path);
+  TokenCheckResult ret = CheckToken(token->string_value, secret->string_value,
+                                    &path);
   switch (ret) {
     case kExpired:
       // Expired token
@@ -316,8 +316,8 @@ bool Reactor::HandleCheckToken(const std::string& req, std::string* reply) {
 
 // This is a special handler. We need to continue reading the payload from the
 // fdin_
-bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
-                                  std::string* reply) {
+bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
+                                  std::string *reply) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleSubmitPayload: Invalid reply pointer.");
   }
@@ -331,12 +331,12 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
     return false;
   }
 
-  const JSON* path_json =
-      JsonDocument::SearchInObject(req_json->root(), "path", JSON_STRING);
-  const JSON* digest_json =
-      JsonDocument::SearchInObject(req_json->root(), "digest", JSON_STRING);
-  const JSON* header_size_json =
-      JsonDocument::SearchInObject(req_json->root(), "header_size", JSON_INT);
+  const JSON *path_json = JsonDocument::SearchInObject(req_json->root(), "path",
+                                                       JSON_STRING);
+  const JSON *digest_json = JsonDocument::SearchInObject(req_json->root(),
+                                                         "digest", JSON_STRING);
+  const JSON *header_size_json = JsonDocument::SearchInObject(
+      req_json->root(), "header_size", JSON_INT);
 
   if (path_json == NULL || digest_json == NULL || header_size_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
@@ -349,9 +349,9 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
   proc->SetStatistics(&statistics);
   JsonStringGenerator reply_input;
-  PayloadProcessor::Result res =
-      proc->Process(fdin, digest_json->string_value, path_json->string_value,
-                    header_size_json->int_value);
+  PayloadProcessor::Result res = proc->Process(fdin, digest_json->string_value,
+                                               path_json->string_value,
+                                               header_size_json->int_value);
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
@@ -386,7 +386,7 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string& req,
   return true;
 }
 
-bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
+bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
   if (!reply) {
     PANIC(kLogSyslogErr, "HandleCommit: Invalid reply pointer.");
   }
@@ -398,19 +398,19 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
     return false;
   }
 
-  const JSON* lease_path_json =
-      JsonDocument::SearchInObject(req_json->root(), "lease_path", JSON_STRING);
-  const JSON* old_root_hash_json = JsonDocument::SearchInObject(
+  const JSON *lease_path_json = JsonDocument::SearchInObject(
+      req_json->root(), "lease_path", JSON_STRING);
+  const JSON *old_root_hash_json = JsonDocument::SearchInObject(
       req_json->root(), "old_root_hash", JSON_STRING);
-  const JSON* new_root_hash_json = JsonDocument::SearchInObject(
+  const JSON *new_root_hash_json = JsonDocument::SearchInObject(
       req_json->root(), "new_root_hash", JSON_STRING);
-  const JSON* tag_name_json =
-      JsonDocument::SearchInObject(req_json->root(), "tag_name", JSON_STRING);
-  const JSON* tag_description_json = JsonDocument::SearchInObject(
+  const JSON *tag_name_json = JsonDocument::SearchInObject(
+      req_json->root(), "tag_name", JSON_STRING);
+  const JSON *tag_description_json = JsonDocument::SearchInObject(
       req_json->root(), "tag_description", JSON_STRING);
 
-  if (lease_path_json == NULL || old_root_hash_json == NULL ||
-      new_root_hash_json == NULL) {
+  if (lease_path_json == NULL || old_root_hash_json == NULL
+      || new_root_hash_json == NULL) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "HandleCommit: Missing fields in request.");
     return false;
@@ -435,9 +435,9 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
       shash::HexPtr(new_root_hash_json->string_value));
   RepositoryTag repo_tag(tag_name_json->string_value,
                          tag_description_json->string_value);
-  CommitProcessor::Result res =
-      proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
-                    repo_tag, &final_revision);
+  CommitProcessor::Result res = proc->Process(lease_path_json->string_value,
+                                              old_root_hash, new_root_hash,
+                                              repo_tag, &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {
@@ -469,15 +469,15 @@ bool Reactor::HandleCommit(const std::string& req, std::string* reply) {
   return true;
 }
 
-PayloadProcessor* Reactor::MakePayloadProcessor() {
+PayloadProcessor *Reactor::MakePayloadProcessor() {
   return new PayloadProcessor();
 }
 
-CommitProcessor* Reactor::MakeCommitProcessor() {
+CommitProcessor *Reactor::MakeCommitProcessor() {
   return new CommitProcessor();
 }
 
-bool Reactor::HandleRequest(Request req, const std::string& data) {
+bool Reactor::HandleRequest(Request req, const std::string &data) {
   bool ok = true;
   std::string reply;
   try {
@@ -521,7 +521,7 @@ bool Reactor::HandleRequest(Request req, const std::string& data) {
       default:
         break;
     }
-  } catch (const ECvmfsException& e) {
+  } catch (const ECvmfsException &e) {
     reply.clear();
 
     std::string error("runtime error: ");

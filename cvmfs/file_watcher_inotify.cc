@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include "file_watcher_inotify.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
@@ -15,23 +17,23 @@
 #include <string>
 #include <vector>
 
-#include "file_watcher_inotify.h"
 #include "util/logging.h"
 #include "util/posix.h"
 
 namespace file_watcher {
 
-FileWatcherInotify::FileWatcherInotify() {}
+FileWatcherInotify::FileWatcherInotify() { }
 
-FileWatcherInotify::~FileWatcherInotify() {}
+FileWatcherInotify::~FileWatcherInotify() { }
 
-bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
+bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap &handlers,
                                       int read_pipe, int write_pipe) {
   inotify_fd_ = inotify_init1(IN_NONBLOCK);
   assert(inotify_fd_ >= 0);
 
   for (FileWatcher::HandlerMap::const_iterator it = handlers.begin();
-       it != handlers.end(); ++it) {
+       it != handlers.end();
+       ++it) {
     RegisterFilter(it->first, it->second);
   }
 
@@ -85,10 +87,11 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
       assert(len > 0);
       int i = 0;
       while (i < len) {
-        struct inotify_event* inotify_event =
-            reinterpret_cast<struct inotify_event*>(&buffer[i]);
-        std::map<int, WatchRecord>::const_iterator it =
-            watch_records_.find(inotify_event->wd);
+        struct inotify_event
+            *inotify_event = reinterpret_cast<struct inotify_event *>(
+                &buffer[i]);
+        std::map<int, WatchRecord>::const_iterator it = watch_records_.find(
+            inotify_event->wd);
         if (it != watch_records_.end()) {
           WatchRecord current_record = it->second;
           file_watcher::Event event = file_watcher::kInvalid;
@@ -109,8 +112,8 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
             event = file_watcher::kIgnored;
           }
           bool clear_handler = true;
-          if (event != file_watcher::kInvalid &&
-              event != file_watcher::kIgnored) {
+          if (event != file_watcher::kInvalid
+              && event != file_watcher::kIgnored) {
             current_record.handler_->Handle(current_record.file_path_, event,
                                             &clear_handler);
           } else {
@@ -145,7 +148,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap& handlers,
   return true;
 }
 
-int FileWatcherInotify::TryRegisterFilter(const std::string& file_path) {
+int FileWatcherInotify::TryRegisterFilter(const std::string &file_path) {
   return inotify_add_watch(
       inotify_fd_, file_path.c_str(),
       IN_ATTRIB | IN_CLOSE_WRITE | IN_DELETE_SELF | IN_MOVE_SELF);

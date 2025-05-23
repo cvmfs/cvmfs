@@ -10,15 +10,12 @@ using namespace std;  // NOLINT
 
 class T_Backoff : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 
   BackoffThrottle throttle_;
 };
 
 
-TEST_F(T_Backoff, Create) {
-}
+TEST_F(T_Backoff, Create) { }

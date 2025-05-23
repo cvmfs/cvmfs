@@ -3,7 +3,6 @@
  */
 
 #include <gtest/gtest.h>
-
 #include <unistd.h>
 
 #include "util/exception.h"

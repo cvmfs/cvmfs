@@ -24,8 +24,8 @@ using namespace std;  // NOLINT
 TEST(T_Shash, ContextSize) {
   unsigned max_size = 0;
   for (int i = 0; i < shash::kAny; ++i) {
-    max_size = std::max(max_size,
-      shash::GetContextSize(static_cast<shash::Algorithms>(i)));
+    max_size = std::max(
+        max_size, shash::GetContextSize(static_cast<shash::Algorithms>(i)));
   }
   EXPECT_EQ(max_size, shash::kMaxContextSize);
 }
@@ -42,10 +42,10 @@ TEST(T_Shash, TestVectors) {
   HashString("", &shake128);
   EXPECT_EQ("d41d8cd98f00b204e9800998ecf8427e", md5.ToString());
   EXPECT_EQ("da39a3ee5e6b4b0d3255bfef95601890afd80709", sha1.ToString());
-  EXPECT_EQ(
-    "9c1185a5c5e9fc54612808977ee8f548b2258d31-rmd160", rmd160.ToString());
-  EXPECT_EQ(
-    "7f9c2ba4e88f827d616045507605853ed73b8093-shake128", shake128.ToString());
+  EXPECT_EQ("9c1185a5c5e9fc54612808977ee8f548b2258d31-rmd160",
+            rmd160.ToString());
+  EXPECT_EQ("7f9c2ba4e88f827d616045507605853ed73b8093-shake128",
+            shake128.ToString());
 
   HashString("abc", &md5);
   HashString("abc", &sha1);
@@ -53,38 +53,42 @@ TEST(T_Shash, TestVectors) {
   HashString("abc", &shake128);
   EXPECT_EQ("900150983cd24fb0d6963f7d28e17f72", md5.ToString());
   EXPECT_EQ("a9993e364706816aba3e25717850c26c9cd0d89d", sha1.ToString());
-  EXPECT_EQ(
-    "8eb208f7e05d987a9b044a8e98c6b087f15a0bfc-rmd160", rmd160.ToString());
-  EXPECT_EQ(
-    "5881092dd818bf5cf8a3ddb793fbcba74097d5c5-shake128", shake128.ToString());
+  EXPECT_EQ("8eb208f7e05d987a9b044a8e98c6b087f15a0bfc-rmd160",
+            rmd160.ToString());
+  EXPECT_EQ("5881092dd818bf5cf8a3ddb793fbcba74097d5c5-shake128",
+            shake128.ToString());
 
   HashString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", &md5);
   HashString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", &sha1);
-  HashString(
-    "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", &rmd160);
-  HashString(
-    "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", &shake128);
+  HashString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+             &rmd160);
+  HashString("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+             &shake128);
   EXPECT_EQ("8215ef0796a20bcaaae116d3876c664a", md5.ToString());
   EXPECT_EQ("84983e441c3bd26ebaae4aa1f95129e5e54670f1", sha1.ToString());
-  EXPECT_EQ(
-    "12a053384a9c0c88e405a06c27dcf49ada62eb2b-rmd160", rmd160.ToString());
-  EXPECT_EQ(
-    "1a96182b50fb8c7e74e0a707788f55e98209b8d9-shake128", shake128.ToString());
+  EXPECT_EQ("12a053384a9c0c88e405a06c27dcf49ada62eb2b-rmd160",
+            rmd160.ToString());
+  EXPECT_EQ("1a96182b50fb8c7e74e0a707788f55e98209b8d9-shake128",
+            shake128.ToString());
 
   HashString("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoi"
-             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", &md5);
+             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+             &md5);
   HashString("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoi"
-             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", &sha1);
+             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+             &sha1);
   HashString("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoi"
-             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", &rmd160);
+             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+             &rmd160);
   HashString("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoi"
-             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", &shake128);
+             "jklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+             &shake128);
   EXPECT_EQ("03dd8807a93175fb062dfb55dc7d359c", md5.ToString());
   EXPECT_EQ("a49b2446a02c645bf419f995b67091253a04a259", sha1.ToString());
-  EXPECT_EQ(
-    "6f3fa39b6b503c384f919a49a7aa5c2c08bdfb45-rmd160", rmd160.ToString());
-  EXPECT_EQ(
-    "7b6df6ff181173b6d7898d7ff63fb07b7c237daf-shake128", shake128.ToString());
+  EXPECT_EQ("6f3fa39b6b503c384f919a49a7aa5c2c08bdfb45-rmd160",
+            rmd160.ToString());
+  EXPECT_EQ("7b6df6ff181173b6d7898d7ff63fb07b7c237daf-shake128",
+            shake128.ToString());
 
   HashString("The quick brown fox jumps over the lazy dog", &md5);
   HashString("The quick brown fox jumps over the lazy dog", &sha1);
@@ -92,10 +96,10 @@ TEST(T_Shash, TestVectors) {
   HashString("The quick brown fox jumps over the lazy dog", &shake128);
   EXPECT_EQ("9e107d9d372bb6826bd81d3542a419d6", md5.ToString());
   EXPECT_EQ("2fd4e1c67a2d28fced849ee1bb76e7391b93eb12", sha1.ToString());
-  EXPECT_EQ(
-    "37f332f68db77bd9d7edd4969571ad671cf9dd3b-rmd160", rmd160.ToString());
-  EXPECT_EQ(
-    "f4202e3c5852f9182a0430fd8144f0a74b95e741-shake128", shake128.ToString());
+  EXPECT_EQ("37f332f68db77bd9d7edd4969571ad671cf9dd3b-rmd160",
+            rmd160.ToString());
+  EXPECT_EQ("f4202e3c5852f9182a0430fd8144f0a74b95e741-shake128",
+            shake128.ToString());
 
   void *a_1m = smalloc(1000000);
   memset(a_1m, 'a', 1000000);
@@ -107,12 +111,12 @@ TEST(T_Shash, TestVectors) {
   EXPECT_EQ("34aa973cd4c4daa4f61eeb2bdbad27316534016f", sha1.ToString());
 
   HashMem(reinterpret_cast<const unsigned char *>(a_1m), 1000000, &rmd160);
-  EXPECT_EQ(
-    "52783243c1697bdbe16d37f97f68f08325dc1528-rmd160", rmd160.ToString());
+  EXPECT_EQ("52783243c1697bdbe16d37f97f68f08325dc1528-rmd160",
+            rmd160.ToString());
 
   HashMem(reinterpret_cast<const unsigned char *>(a_1m), 1000000, &shake128);
-  EXPECT_EQ(
-    "9d222c79c4ff9d092cf6ca86143aa411e3699738-shake128", shake128.ToString());
+  EXPECT_EQ("9d222c79c4ff9d092cf6ca86143aa411e3699738-shake128",
+            shake128.ToString());
   free(a_1m);
 }
 
@@ -122,7 +126,7 @@ TEST(T_Shash, LongTestVectorsSlow) {
   unsigned rep_s = 16777216;
   unsigned char zeros[1024];
   memset(zeros, 0, 1024);
-  unsigned rep_zeros = 1024*1024*6;  // 6GB of zeros
+  unsigned rep_zeros = 1024 * 1024 * 6;  // 6GB of zeros
 
   shash::Any md5(shash::kMd5);
   shash::Any sha1(shash::kSha1);
@@ -159,8 +163,8 @@ TEST(T_Shash, LongTestVectorsSlow) {
                   context_ptr_rmd160);
   }
   shash::Final(context_ptr_rmd160, &rmd160);
-  EXPECT_EQ(
-    "29b6df855772aa9a95442bf83b282b495f9f6541-rmd160", rmd160.ToString());
+  EXPECT_EQ("29b6df855772aa9a95442bf83b282b495f9f6541-rmd160",
+            rmd160.ToString());
 
   shash::Init(context_ptr_shake128);
   for (unsigned i = 0; i < rep_s; ++i) {
@@ -168,8 +172,8 @@ TEST(T_Shash, LongTestVectorsSlow) {
                   context_ptr_shake128);
   }
   shash::Final(context_ptr_shake128, &shake128);
-  EXPECT_EQ(
-    "f4e546891fa8bacea5a159301feebaa4b67c9dd8-shake128", shake128.ToString());
+  EXPECT_EQ("f4e546891fa8bacea5a159301feebaa4b67c9dd8-shake128",
+            shake128.ToString());
 
   shash::Init(context_ptr_md5);
   for (unsigned i = 0; i < rep_zeros; ++i) {
@@ -190,16 +194,16 @@ TEST(T_Shash, LongTestVectorsSlow) {
     shash::Update(zeros, 1024, context_ptr_rmd160);
   }
   shash::Final(context_ptr_rmd160, &rmd160);
-  EXPECT_EQ(
-    "c10dc655d66e1eddd503c4540579d3aa163123a0-rmd160", rmd160.ToString());
+  EXPECT_EQ("c10dc655d66e1eddd503c4540579d3aa163123a0-rmd160",
+            rmd160.ToString());
 
   shash::Init(context_ptr_shake128);
   for (unsigned i = 0; i < rep_zeros; ++i) {
     shash::Update(zeros, 1024, context_ptr_shake128);
   }
   shash::Final(context_ptr_shake128, &shake128);
-  EXPECT_EQ(
-    "89037f62987385ffd69f4b3c3a97c43ac72de761-shake128", shake128.ToString());
+  EXPECT_EQ("89037f62987385ffd69f4b3c3a97c43ac72de761-shake128",
+            shake128.ToString());
 
   free(context_ptr_md5.buffer);
   free(context_ptr_sha1.buffer);
@@ -217,56 +221,59 @@ TEST(T_Shash, VerifyHex) {
   EXPECT_EQ(shash::HexPtr("8b329da9893e34099c7d8ad5cb9c940-").IsValid(), false);
   EXPECT_EQ(shash::HexPtr("8b329da9893e34099c7d8ad5cb9c940-rmd160").IsValid(),
             false);
-  EXPECT_EQ(shash::HexPtr("68b329da9893e34099c7d8ad5cb9c940").IsValid(),
-            true);
+  EXPECT_EQ(shash::HexPtr("68b329da9893e34099c7d8ad5cb9c940").IsValid(), true);
 
   EXPECT_EQ(
-    shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fcX").IsValid(),
-    false);
+      shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fcX").IsValid(),
+      false);
   EXPECT_EQ(
-    shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-NO").IsValid(),
-    false);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-longsuffix").IsValid(),
-    false);
-  EXPECT_EQ(
-    shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd161").IsValid(),
-    false);
+      shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-NO").IsValid(),
+      false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-longsuffix")
+                .IsValid(),
+            false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd161")
+                .IsValid(),
+            false);
 
   EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc").IsValid(),
             true);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd160").IsValid(),
-    true);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592f-rmd160").IsValid(),
-    false);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd1600").IsValid(),
-    false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd160")
+                .IsValid(),
+            true);
+  EXPECT_EQ(
+      shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592f-rmd160").IsValid(),
+      false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd1600")
+                .IsValid(),
+            false);
 
-  EXPECT_EQ(shash::HexPtr(
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").
-      IsValid(), false);
-  EXPECT_EQ(shash::HexPtr(
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-sha224").
-      IsValid(), false);
-  EXPECT_EQ(shash::HexPtr(
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-rmd160").
-      IsValid(), false);
+  EXPECT_EQ(
+      shash::HexPtr(
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+          .IsValid(),
+      false);
+  EXPECT_EQ(shash::HexPtr("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495"
+                          "991b7852b855-sha224")
+                .IsValid(),
+            false);
+  EXPECT_EQ(shash::HexPtr("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495"
+                          "991b7852b855-rmd160")
+                .IsValid(),
+            false);
 
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-shake128").IsValid(),
-    true);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-shake256").IsValid(),
-    false);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592f-shake128").IsValid(),
-    false);
-  EXPECT_EQ(shash::HexPtr(
-    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fcc-shake128").IsValid(),
-    false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-shake128")
+                .IsValid(),
+            true);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-shake256")
+                .IsValid(),
+            false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592f-shake128")
+                .IsValid(),
+            false);
+  EXPECT_EQ(shash::HexPtr("adc83b19e793491b1c6ea0fd8b46cd9f32e592fcc-shake128")
+                .IsValid(),
+            false);
 }
 
 
@@ -306,10 +313,14 @@ TEST(T_Shash, MkFromSuffixedHexPtr) {
   shash::Any sha1S(shash::kSha1);
   shash::Any rmd160S(shash::kRmd160);
   shash::Any shake128S(shash::kShake128);
-  md5.Randomize();  md5S.Randomize();
-  sha1.Randomize();  sha1S.Randomize();
-  rmd160.Randomize();  rmd160S.Randomize();
-  shake128.Randomize();  shake128S.Randomize();
+  md5.Randomize();
+  md5S.Randomize();
+  sha1.Randomize();
+  sha1S.Randomize();
+  rmd160.Randomize();
+  rmd160S.Randomize();
+  shake128.Randomize();
+  shake128S.Randomize();
   md5S.suffix = shash::kSuffixCatalog;
   sha1S.suffix = shash::kSuffixHistory;
   rmd160S.suffix = shash::kSuffixPartial;
@@ -317,28 +328,33 @@ TEST(T_Shash, MkFromSuffixedHexPtr) {
 
   shash::Any constructed;
   constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(md5.ToString(true)));
-  EXPECT_EQ(md5, constructed);  EXPECT_EQ(md5.suffix, constructed.suffix);
+  EXPECT_EQ(md5, constructed);
+  EXPECT_EQ(md5.suffix, constructed.suffix);
   constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(sha1.ToString(true)));
-  EXPECT_EQ(sha1, constructed);  EXPECT_EQ(sha1.suffix, constructed.suffix);
-  constructed =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(rmd160.ToString(true)));
-  EXPECT_EQ(rmd160, constructed);  EXPECT_EQ(rmd160.suffix, constructed.suffix);
-  constructed =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(shake128.ToString(true)));
+  EXPECT_EQ(sha1, constructed);
+  EXPECT_EQ(sha1.suffix, constructed.suffix);
+  constructed = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(rmd160.ToString(true)));
+  EXPECT_EQ(rmd160, constructed);
+  EXPECT_EQ(rmd160.suffix, constructed.suffix);
+  constructed = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(shake128.ToString(true)));
   EXPECT_EQ(shake128, constructed);
   EXPECT_EQ(shake128.suffix, constructed.suffix);
 
   constructed = shash::MkFromSuffixedHexPtr(shash::HexPtr(md5S.ToString(true)));
-  EXPECT_EQ(md5S, constructed);  EXPECT_EQ(md5S.suffix, constructed.suffix);
-  constructed =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(sha1S.ToString(true)));
-  EXPECT_EQ(sha1S, constructed);  EXPECT_EQ(sha1S.suffix, constructed.suffix);
-  constructed =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(rmd160S.ToString(true)));
+  EXPECT_EQ(md5S, constructed);
+  EXPECT_EQ(md5S.suffix, constructed.suffix);
+  constructed = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(sha1S.ToString(true)));
+  EXPECT_EQ(sha1S, constructed);
+  EXPECT_EQ(sha1S.suffix, constructed.suffix);
+  constructed = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(rmd160S.ToString(true)));
   EXPECT_EQ(rmd160S, constructed);
   EXPECT_EQ(rmd160S.suffix, constructed.suffix);
-  constructed =
-    shash::MkFromSuffixedHexPtr(shash::HexPtr(shake128S.ToString(true)));
+  constructed = shash::MkFromSuffixedHexPtr(
+      shash::HexPtr(shake128S.ToString(true)));
   EXPECT_EQ(shake128S, constructed);
   EXPECT_EQ(shake128S.suffix, constructed.suffix);
 }
@@ -435,80 +451,83 @@ TEST(T_Shash, ToStringWithSuffix) {
   hash_shake128.Randomize(&prng);
   hash_shake128.suffix = 'L';
   ASSERT_FALSE(hash_shake128.IsNull());
-  EXPECT_EQ(
-    "ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128L",
-    hash_shake128.ToStringWithSuffix());
-  EXPECT_EQ(
-    "ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128",
-    hash_shake128.ToString());
+  EXPECT_EQ("ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128L",
+            hash_shake128.ToStringWithSuffix());
+  EXPECT_EQ("ea99bef923dd717df9309639b9480bbdf14f1d2a-shake128",
+            hash_shake128.ToString());
 }
 
 
 TEST(T_Shash, ToFingerprint) {
-  shash::Any md5(
-    shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
+  shash::Any md5(shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"),
+                 'H');
   EXPECT_EQ("9F:D5:2A:9F:04:D1:AC:67:35:40:3D:16:D7:55:C9:4A",
             md5.ToFingerprint(false));
   EXPECT_EQ("9F:D5:2A:9F:04:D1:AC:67:35:40:3D:16:D7:55:C9:4AH",
             md5.ToFingerprint(true));
 
-  shash::Any
-    sha1(shash::kSha1,
-         shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"), 'F');
+  shash::Any sha1(shash::kSha1,
+                  shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"),
+                  'F');
   EXPECT_EQ("CF:95:C1:82:BB:92:14:BC:B9:A2:3F:ED:66:58:C6:0D:06:1B:45:B5",
             sha1.ToFingerprint(false));
   EXPECT_EQ("CF:95:C1:82:BB:92:14:BC:B9:A2:3F:ED:66:58:C6:0D:06:1B:45:B5F",
             sha1.ToFingerprint(true));
 
-  shash::Any
-    rmd160(shash::kRmd160,
-           shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"), 'M');
+  shash::Any rmd160(shash::kRmd160,
+                    shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"),
+                    'M');
   EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
-            "-RMD160", rmd160.ToFingerprint(false));
+            "-RMD160",
+            rmd160.ToFingerprint(false));
   EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
-            "-RMD160M", rmd160.ToFingerprint(true));
+            "-RMD160M",
+            rmd160.ToFingerprint(true));
 
-  shash::Any shake128(shash::kShake128,
-    shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128"), 'L');
+  shash::Any shake128(
+      shash::kShake128,
+      shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128"), 'L');
   EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
-            "-SHAKE128", shake128.ToFingerprint(false));
+            "-SHAKE128",
+            shake128.ToFingerprint(false));
   EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
-            "-SHAKE128L", shake128.ToFingerprint(true));
+            "-SHAKE128L",
+            shake128.ToFingerprint(true));
 }
 
 
 TEST(T_Shash, InitializeAnyWithSuffix) {
-  shash::Any hash_md5(
-    shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
+  shash::Any hash_md5(shash::kMd5,
+                      shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
   ASSERT_FALSE(hash_md5.IsNull());
   EXPECT_EQ("9fd52a9f04d1ac6735403d16d755c94aH", hash_md5.ToStringWithSuffix());
   EXPECT_EQ("9fd52a9f04d1ac6735403d16d755c94a", hash_md5.ToString());
 
-  shash::Any
-    hash_sha1(shash::kSha1,
-              shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"), 'F');
+  shash::Any hash_sha1(
+      shash::kSha1, shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"),
+      'F');
   ASSERT_FALSE(hash_sha1.IsNull());
   EXPECT_EQ("cf95c182bb9214bcb9a23fed6658c60d061b45b5F",
             hash_sha1.ToStringWithSuffix());
-  EXPECT_EQ("cf95c182bb9214bcb9a23fed6658c60d061b45b5",
-            hash_sha1.ToString());
+  EXPECT_EQ("cf95c182bb9214bcb9a23fed6658c60d061b45b5", hash_sha1.ToString());
 
-  shash::Any
-    hash_rmd160(shash::kRmd160,
-                shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"), 'M');
+  shash::Any hash_rmd160(
+      shash::kRmd160, shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"),
+      'M');
   ASSERT_FALSE(hash_rmd160.IsNull());
   EXPECT_EQ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-rmd160M",
             hash_rmd160.ToStringWithSuffix());
   EXPECT_EQ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-rmd160",
             hash_rmd160.ToString());
 
-  shash::Any hash_shake128(shash::kShake128,
-    shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128"), 'L');
+  shash::Any hash_shake128(
+      shash::kShake128,
+      shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128"), 'L');
   ASSERT_FALSE(hash_shake128.IsNull());
   EXPECT_EQ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128L",
-           hash_shake128.ToStringWithSuffix());
+            hash_shake128.ToStringWithSuffix());
   EXPECT_EQ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-shake128",
-           hash_shake128.ToString());
+            hash_shake128.ToString());
 }
 
 
@@ -697,28 +716,23 @@ TEST(T_Shash, HashSuffix) {
   hash_md5.suffix = 'A';
   ASSERT_FALSE(hash_md5.IsNull());
   ASSERT_TRUE(hash_md5.HasSuffix());
-  EXPECT_EQ("2ec5fe3c17045abdb136a5e6a913e32a",
-            hash_md5.ToString());
-  EXPECT_EQ("2ec5fe3c17045abdb136a5e6a913e32aA",
-            hash_md5.ToStringWithSuffix());
+  EXPECT_EQ("2ec5fe3c17045abdb136a5e6a913e32a", hash_md5.ToString());
+  EXPECT_EQ("2ec5fe3c17045abdb136a5e6a913e32aA", hash_md5.ToStringWithSuffix());
   EXPECT_EQ("2e/c5fe3c17045abdb136a5e6a913e32a",
             hash_md5.MakePathWithoutSuffix());
-  EXPECT_EQ("2e/c5fe3c17045abdb136a5e6a913e32aA",
-            hash_md5.MakePath());
+  EXPECT_EQ("2e/c5fe3c17045abdb136a5e6a913e32aA", hash_md5.MakePath());
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(&prng);
   hash_sha1.suffix = 'B';
   ASSERT_FALSE(hash_sha1.IsNull());
   ASSERT_TRUE(hash_sha1.HasSuffix());
-  EXPECT_EQ("b75ae68b53d2fc149b77e504132d37569b7e766b",
-            hash_sha1.ToString());
+  EXPECT_EQ("b75ae68b53d2fc149b77e504132d37569b7e766b", hash_sha1.ToString());
   EXPECT_EQ("b75ae68b53d2fc149b77e504132d37569b7e766bB",
             hash_sha1.ToStringWithSuffix());
   EXPECT_EQ("b7/5ae68b53d2fc149b77e504132d37569b7e766b",
             hash_sha1.MakePathWithoutSuffix());
-  EXPECT_EQ("b7/5ae68b53d2fc149b77e504132d37569b7e766bB",
-            hash_sha1.MakePath());
+  EXPECT_EQ("b7/5ae68b53d2fc149b77e504132d37569b7e766bB", hash_sha1.MakePath());
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(&prng);
@@ -737,149 +751,255 @@ TEST(T_Shash, HashSuffix) {
 
 
 TEST(T_Shash, Equality) {
-  shash::Any hash_md5_1(shash::kMd5); ASSERT_TRUE(hash_md5_1.IsNull());
-  shash::Any hash_md5_2(shash::kMd5); ASSERT_TRUE(hash_md5_2.IsNull());
-  shash::Any hash_md5_3(shash::kMd5); hash_md5_3.Randomize(1337);
-  shash::Any hash_md5_4(shash::kMd5); hash_md5_4.Randomize(1337);
-  shash::Any hash_md5_5(shash::kMd5); hash_md5_5.Randomize(42);
-  shash::Any hash_md5_6(shash::kMd5); hash_md5_6.Randomize(42);
-  shash::Any hash_md5_7(shash::kMd5); ASSERT_TRUE(hash_md5_7.IsNull());
+  shash::Any hash_md5_1(shash::kMd5);
+  ASSERT_TRUE(hash_md5_1.IsNull());
+  shash::Any hash_md5_2(shash::kMd5);
+  ASSERT_TRUE(hash_md5_2.IsNull());
+  shash::Any hash_md5_3(shash::kMd5);
+  hash_md5_3.Randomize(1337);
+  shash::Any hash_md5_4(shash::kMd5);
+  hash_md5_4.Randomize(1337);
+  shash::Any hash_md5_5(shash::kMd5);
+  hash_md5_5.Randomize(42);
+  shash::Any hash_md5_6(shash::kMd5);
+  hash_md5_6.Randomize(42);
+  shash::Any hash_md5_7(shash::kMd5);
+  ASSERT_TRUE(hash_md5_7.IsNull());
   hash_md5_7.suffix = 'A';
-  shash::Any hash_md5_8(shash::kMd5); ASSERT_TRUE(hash_md5_8.IsNull());
+  shash::Any hash_md5_8(shash::kMd5);
+  ASSERT_TRUE(hash_md5_8.IsNull());
   hash_md5_8.suffix = 'A';
-  shash::Any hash_md5_9(shash::kMd5); hash_md5_9.Randomize(7);
+  shash::Any hash_md5_9(shash::kMd5);
+  hash_md5_9.Randomize(7);
   hash_md5_9.suffix = 'A';
-  shash::Any hash_md5_0(shash::kMd5); hash_md5_0.Randomize(7);
+  shash::Any hash_md5_0(shash::kMd5);
+  hash_md5_0.Randomize(7);
   hash_md5_0.suffix = 'A';
 
-  EXPECT_EQ(hash_md5_1, hash_md5_2); EXPECT_EQ(hash_md5_1, hash_md5_1);
-  EXPECT_EQ(hash_md5_3, hash_md5_4); EXPECT_EQ(hash_md5_3, hash_md5_3);
-  EXPECT_EQ(hash_md5_5, hash_md5_6); EXPECT_EQ(hash_md5_5, hash_md5_5);
-  EXPECT_EQ(hash_md5_7, hash_md5_8); EXPECT_EQ(hash_md5_7, hash_md5_7);
-  EXPECT_EQ(hash_md5_9, hash_md5_0); EXPECT_EQ(hash_md5_9, hash_md5_9);
+  EXPECT_EQ(hash_md5_1, hash_md5_2);
+  EXPECT_EQ(hash_md5_1, hash_md5_1);
+  EXPECT_EQ(hash_md5_3, hash_md5_4);
+  EXPECT_EQ(hash_md5_3, hash_md5_3);
+  EXPECT_EQ(hash_md5_5, hash_md5_6);
+  EXPECT_EQ(hash_md5_5, hash_md5_5);
+  EXPECT_EQ(hash_md5_7, hash_md5_8);
+  EXPECT_EQ(hash_md5_7, hash_md5_7);
+  EXPECT_EQ(hash_md5_9, hash_md5_0);
+  EXPECT_EQ(hash_md5_9, hash_md5_9);
 
-  EXPECT_EQ(hash_md5_1, hash_md5_7); EXPECT_EQ(hash_md5_1, hash_md5_8);
-  EXPECT_EQ(hash_md5_7, hash_md5_1); EXPECT_EQ(hash_md5_7, hash_md5_2);
+  EXPECT_EQ(hash_md5_1, hash_md5_7);
+  EXPECT_EQ(hash_md5_1, hash_md5_8);
+  EXPECT_EQ(hash_md5_7, hash_md5_1);
+  EXPECT_EQ(hash_md5_7, hash_md5_2);
 
-  EXPECT_NE(hash_md5_1, hash_md5_3); EXPECT_NE(hash_md5_1, hash_md5_4);
-  EXPECT_NE(hash_md5_1, hash_md5_5); EXPECT_NE(hash_md5_1, hash_md5_6);
-  EXPECT_NE(hash_md5_1, hash_md5_9); EXPECT_NE(hash_md5_1, hash_md5_0);
+  EXPECT_NE(hash_md5_1, hash_md5_3);
+  EXPECT_NE(hash_md5_1, hash_md5_4);
+  EXPECT_NE(hash_md5_1, hash_md5_5);
+  EXPECT_NE(hash_md5_1, hash_md5_6);
+  EXPECT_NE(hash_md5_1, hash_md5_9);
+  EXPECT_NE(hash_md5_1, hash_md5_0);
 
-  EXPECT_NE(hash_md5_3, hash_md5_1); EXPECT_NE(hash_md5_3, hash_md5_2);
-  EXPECT_NE(hash_md5_3, hash_md5_5); EXPECT_NE(hash_md5_3, hash_md5_6);
-  EXPECT_NE(hash_md5_3, hash_md5_7); EXPECT_NE(hash_md5_3, hash_md5_8);
-  EXPECT_NE(hash_md5_3, hash_md5_9); EXPECT_NE(hash_md5_3, hash_md5_0);
+  EXPECT_NE(hash_md5_3, hash_md5_1);
+  EXPECT_NE(hash_md5_3, hash_md5_2);
+  EXPECT_NE(hash_md5_3, hash_md5_5);
+  EXPECT_NE(hash_md5_3, hash_md5_6);
+  EXPECT_NE(hash_md5_3, hash_md5_7);
+  EXPECT_NE(hash_md5_3, hash_md5_8);
+  EXPECT_NE(hash_md5_3, hash_md5_9);
+  EXPECT_NE(hash_md5_3, hash_md5_0);
 
-  EXPECT_NE(hash_md5_5, hash_md5_1); EXPECT_NE(hash_md5_5, hash_md5_2);
-  EXPECT_NE(hash_md5_5, hash_md5_3); EXPECT_NE(hash_md5_5, hash_md5_4);
-  EXPECT_NE(hash_md5_5, hash_md5_7); EXPECT_NE(hash_md5_5, hash_md5_8);
-  EXPECT_NE(hash_md5_5, hash_md5_9); EXPECT_NE(hash_md5_5, hash_md5_0);
+  EXPECT_NE(hash_md5_5, hash_md5_1);
+  EXPECT_NE(hash_md5_5, hash_md5_2);
+  EXPECT_NE(hash_md5_5, hash_md5_3);
+  EXPECT_NE(hash_md5_5, hash_md5_4);
+  EXPECT_NE(hash_md5_5, hash_md5_7);
+  EXPECT_NE(hash_md5_5, hash_md5_8);
+  EXPECT_NE(hash_md5_5, hash_md5_9);
+  EXPECT_NE(hash_md5_5, hash_md5_0);
 
-  EXPECT_NE(hash_md5_7, hash_md5_3); EXPECT_NE(hash_md5_7, hash_md5_4);
-  EXPECT_NE(hash_md5_7, hash_md5_5); EXPECT_NE(hash_md5_7, hash_md5_6);
-  EXPECT_NE(hash_md5_7, hash_md5_9); EXPECT_NE(hash_md5_7, hash_md5_0);
+  EXPECT_NE(hash_md5_7, hash_md5_3);
+  EXPECT_NE(hash_md5_7, hash_md5_4);
+  EXPECT_NE(hash_md5_7, hash_md5_5);
+  EXPECT_NE(hash_md5_7, hash_md5_6);
+  EXPECT_NE(hash_md5_7, hash_md5_9);
+  EXPECT_NE(hash_md5_7, hash_md5_0);
 
-  EXPECT_NE(hash_md5_9, hash_md5_1); EXPECT_NE(hash_md5_9, hash_md5_2);
-  EXPECT_NE(hash_md5_9, hash_md5_3); EXPECT_NE(hash_md5_9, hash_md5_4);
-  EXPECT_NE(hash_md5_9, hash_md5_5); EXPECT_NE(hash_md5_9, hash_md5_6);
-  EXPECT_NE(hash_md5_9, hash_md5_7); EXPECT_NE(hash_md5_9, hash_md5_8);
+  EXPECT_NE(hash_md5_9, hash_md5_1);
+  EXPECT_NE(hash_md5_9, hash_md5_2);
+  EXPECT_NE(hash_md5_9, hash_md5_3);
+  EXPECT_NE(hash_md5_9, hash_md5_4);
+  EXPECT_NE(hash_md5_9, hash_md5_5);
+  EXPECT_NE(hash_md5_9, hash_md5_6);
+  EXPECT_NE(hash_md5_9, hash_md5_7);
+  EXPECT_NE(hash_md5_9, hash_md5_8);
 
-  shash::Any hash_sha1_1(shash::kSha1); ASSERT_TRUE(hash_sha1_1.IsNull());
-  shash::Any hash_sha1_2(shash::kSha1); ASSERT_TRUE(hash_sha1_2.IsNull());
-  shash::Any hash_sha1_3(shash::kSha1); hash_sha1_3.Randomize(153);
-  shash::Any hash_sha1_4(shash::kSha1); hash_sha1_4.Randomize(153);
-  shash::Any hash_sha1_5(shash::kSha1); hash_sha1_5.Randomize(8761);
-  shash::Any hash_sha1_6(shash::kSha1); hash_sha1_6.Randomize(8761);
+  shash::Any hash_sha1_1(shash::kSha1);
+  ASSERT_TRUE(hash_sha1_1.IsNull());
+  shash::Any hash_sha1_2(shash::kSha1);
+  ASSERT_TRUE(hash_sha1_2.IsNull());
+  shash::Any hash_sha1_3(shash::kSha1);
+  hash_sha1_3.Randomize(153);
+  shash::Any hash_sha1_4(shash::kSha1);
+  hash_sha1_4.Randomize(153);
+  shash::Any hash_sha1_5(shash::kSha1);
+  hash_sha1_5.Randomize(8761);
+  shash::Any hash_sha1_6(shash::kSha1);
+  hash_sha1_6.Randomize(8761);
   shash::Any hash_sha1_7(shash::kSha1);
-  ASSERT_TRUE(hash_sha1_7.IsNull()); hash_sha1_7.suffix = 'B';
+  ASSERT_TRUE(hash_sha1_7.IsNull());
+  hash_sha1_7.suffix = 'B';
   shash::Any hash_sha1_8(shash::kSha1);
-  ASSERT_TRUE(hash_sha1_8.IsNull()); hash_sha1_8.suffix = 'B';
-  shash::Any hash_sha1_9(shash::kSha1); hash_sha1_9.Randomize(1);
+  ASSERT_TRUE(hash_sha1_8.IsNull());
+  hash_sha1_8.suffix = 'B';
+  shash::Any hash_sha1_9(shash::kSha1);
+  hash_sha1_9.Randomize(1);
   hash_sha1_9.suffix = 'B';
-  shash::Any hash_sha1_0(shash::kSha1); hash_sha1_0.Randomize(1);
+  shash::Any hash_sha1_0(shash::kSha1);
+  hash_sha1_0.Randomize(1);
   hash_sha1_0.suffix = 'B';
 
-  EXPECT_EQ(hash_sha1_1, hash_sha1_2); EXPECT_EQ(hash_sha1_1, hash_sha1_1);
-  EXPECT_EQ(hash_sha1_3, hash_sha1_4); EXPECT_EQ(hash_sha1_3, hash_sha1_3);
-  EXPECT_EQ(hash_sha1_5, hash_sha1_6); EXPECT_EQ(hash_sha1_5, hash_sha1_5);
-  EXPECT_EQ(hash_sha1_7, hash_sha1_8); EXPECT_EQ(hash_sha1_7, hash_sha1_7);
-  EXPECT_EQ(hash_sha1_9, hash_sha1_0); EXPECT_EQ(hash_sha1_9, hash_sha1_9);
+  EXPECT_EQ(hash_sha1_1, hash_sha1_2);
+  EXPECT_EQ(hash_sha1_1, hash_sha1_1);
+  EXPECT_EQ(hash_sha1_3, hash_sha1_4);
+  EXPECT_EQ(hash_sha1_3, hash_sha1_3);
+  EXPECT_EQ(hash_sha1_5, hash_sha1_6);
+  EXPECT_EQ(hash_sha1_5, hash_sha1_5);
+  EXPECT_EQ(hash_sha1_7, hash_sha1_8);
+  EXPECT_EQ(hash_sha1_7, hash_sha1_7);
+  EXPECT_EQ(hash_sha1_9, hash_sha1_0);
+  EXPECT_EQ(hash_sha1_9, hash_sha1_9);
 
-  EXPECT_EQ(hash_sha1_1, hash_sha1_7); EXPECT_EQ(hash_sha1_1, hash_sha1_8);
-  EXPECT_EQ(hash_sha1_7, hash_sha1_1); EXPECT_EQ(hash_sha1_7, hash_sha1_2);
+  EXPECT_EQ(hash_sha1_1, hash_sha1_7);
+  EXPECT_EQ(hash_sha1_1, hash_sha1_8);
+  EXPECT_EQ(hash_sha1_7, hash_sha1_1);
+  EXPECT_EQ(hash_sha1_7, hash_sha1_2);
 
-  EXPECT_NE(hash_sha1_1, hash_sha1_3); EXPECT_NE(hash_sha1_1, hash_sha1_4);
-  EXPECT_NE(hash_sha1_1, hash_sha1_5); EXPECT_NE(hash_sha1_1, hash_sha1_6);
-  EXPECT_NE(hash_sha1_1, hash_sha1_9); EXPECT_NE(hash_sha1_1, hash_sha1_0);
+  EXPECT_NE(hash_sha1_1, hash_sha1_3);
+  EXPECT_NE(hash_sha1_1, hash_sha1_4);
+  EXPECT_NE(hash_sha1_1, hash_sha1_5);
+  EXPECT_NE(hash_sha1_1, hash_sha1_6);
+  EXPECT_NE(hash_sha1_1, hash_sha1_9);
+  EXPECT_NE(hash_sha1_1, hash_sha1_0);
 
-  EXPECT_NE(hash_sha1_3, hash_sha1_1); EXPECT_NE(hash_sha1_3, hash_sha1_2);
-  EXPECT_NE(hash_sha1_3, hash_sha1_5); EXPECT_NE(hash_sha1_3, hash_sha1_6);
-  EXPECT_NE(hash_sha1_3, hash_sha1_7); EXPECT_NE(hash_sha1_3, hash_sha1_8);
-  EXPECT_NE(hash_sha1_3, hash_sha1_9); EXPECT_NE(hash_sha1_3, hash_sha1_0);
+  EXPECT_NE(hash_sha1_3, hash_sha1_1);
+  EXPECT_NE(hash_sha1_3, hash_sha1_2);
+  EXPECT_NE(hash_sha1_3, hash_sha1_5);
+  EXPECT_NE(hash_sha1_3, hash_sha1_6);
+  EXPECT_NE(hash_sha1_3, hash_sha1_7);
+  EXPECT_NE(hash_sha1_3, hash_sha1_8);
+  EXPECT_NE(hash_sha1_3, hash_sha1_9);
+  EXPECT_NE(hash_sha1_3, hash_sha1_0);
 
-  EXPECT_NE(hash_sha1_5, hash_sha1_1); EXPECT_NE(hash_sha1_5, hash_sha1_2);
-  EXPECT_NE(hash_sha1_5, hash_sha1_3); EXPECT_NE(hash_sha1_5, hash_sha1_4);
-  EXPECT_NE(hash_sha1_5, hash_sha1_7); EXPECT_NE(hash_sha1_5, hash_sha1_8);
-  EXPECT_NE(hash_sha1_5, hash_sha1_9); EXPECT_NE(hash_sha1_5, hash_sha1_0);
+  EXPECT_NE(hash_sha1_5, hash_sha1_1);
+  EXPECT_NE(hash_sha1_5, hash_sha1_2);
+  EXPECT_NE(hash_sha1_5, hash_sha1_3);
+  EXPECT_NE(hash_sha1_5, hash_sha1_4);
+  EXPECT_NE(hash_sha1_5, hash_sha1_7);
+  EXPECT_NE(hash_sha1_5, hash_sha1_8);
+  EXPECT_NE(hash_sha1_5, hash_sha1_9);
+  EXPECT_NE(hash_sha1_5, hash_sha1_0);
 
-  EXPECT_NE(hash_sha1_7, hash_sha1_3); EXPECT_NE(hash_sha1_7, hash_sha1_4);
-  EXPECT_NE(hash_sha1_7, hash_sha1_5); EXPECT_NE(hash_sha1_7, hash_sha1_6);
-  EXPECT_NE(hash_sha1_7, hash_sha1_9); EXPECT_NE(hash_sha1_7, hash_sha1_0);
+  EXPECT_NE(hash_sha1_7, hash_sha1_3);
+  EXPECT_NE(hash_sha1_7, hash_sha1_4);
+  EXPECT_NE(hash_sha1_7, hash_sha1_5);
+  EXPECT_NE(hash_sha1_7, hash_sha1_6);
+  EXPECT_NE(hash_sha1_7, hash_sha1_9);
+  EXPECT_NE(hash_sha1_7, hash_sha1_0);
 
-  EXPECT_NE(hash_sha1_9, hash_sha1_1); EXPECT_NE(hash_sha1_9, hash_sha1_2);
-  EXPECT_NE(hash_sha1_9, hash_sha1_3); EXPECT_NE(hash_sha1_9, hash_sha1_4);
-  EXPECT_NE(hash_sha1_9, hash_sha1_5); EXPECT_NE(hash_sha1_9, hash_sha1_6);
-  EXPECT_NE(hash_sha1_9, hash_sha1_7); EXPECT_NE(hash_sha1_9, hash_sha1_8);
+  EXPECT_NE(hash_sha1_9, hash_sha1_1);
+  EXPECT_NE(hash_sha1_9, hash_sha1_2);
+  EXPECT_NE(hash_sha1_9, hash_sha1_3);
+  EXPECT_NE(hash_sha1_9, hash_sha1_4);
+  EXPECT_NE(hash_sha1_9, hash_sha1_5);
+  EXPECT_NE(hash_sha1_9, hash_sha1_6);
+  EXPECT_NE(hash_sha1_9, hash_sha1_7);
+  EXPECT_NE(hash_sha1_9, hash_sha1_8);
 
-  shash::Any hash_rmd_1(shash::kRmd160); ASSERT_TRUE(hash_rmd_1.IsNull());
-  shash::Any hash_rmd_2(shash::kRmd160); ASSERT_TRUE(hash_rmd_2.IsNull());
-  shash::Any hash_rmd_3(shash::kRmd160); hash_rmd_3.Randomize(234);
-  shash::Any hash_rmd_4(shash::kRmd160); hash_rmd_4.Randomize(234);
-  shash::Any hash_rmd_5(shash::kRmd160); hash_rmd_5.Randomize(883);
-  shash::Any hash_rmd_6(shash::kRmd160); hash_rmd_6.Randomize(883);
-  shash::Any hash_rmd_7(shash::kRmd160); ASSERT_TRUE(hash_rmd_7.IsNull());
+  shash::Any hash_rmd_1(shash::kRmd160);
+  ASSERT_TRUE(hash_rmd_1.IsNull());
+  shash::Any hash_rmd_2(shash::kRmd160);
+  ASSERT_TRUE(hash_rmd_2.IsNull());
+  shash::Any hash_rmd_3(shash::kRmd160);
+  hash_rmd_3.Randomize(234);
+  shash::Any hash_rmd_4(shash::kRmd160);
+  hash_rmd_4.Randomize(234);
+  shash::Any hash_rmd_5(shash::kRmd160);
+  hash_rmd_5.Randomize(883);
+  shash::Any hash_rmd_6(shash::kRmd160);
+  hash_rmd_6.Randomize(883);
+  shash::Any hash_rmd_7(shash::kRmd160);
+  ASSERT_TRUE(hash_rmd_7.IsNull());
   hash_rmd_7.suffix = 'C';
-  shash::Any hash_rmd_8(shash::kRmd160); ASSERT_TRUE(hash_rmd_8.IsNull());
+  shash::Any hash_rmd_8(shash::kRmd160);
+  ASSERT_TRUE(hash_rmd_8.IsNull());
   hash_rmd_8.suffix = 'C';
-  shash::Any hash_rmd_9(shash::kRmd160); hash_rmd_9.Randomize(8);
+  shash::Any hash_rmd_9(shash::kRmd160);
+  hash_rmd_9.Randomize(8);
   hash_rmd_9.suffix = 'C';
-  shash::Any hash_rmd_0(shash::kRmd160); hash_rmd_0.Randomize(8);
+  shash::Any hash_rmd_0(shash::kRmd160);
+  hash_rmd_0.Randomize(8);
   hash_rmd_0.suffix = 'C';
 
-  EXPECT_EQ(hash_rmd_1, hash_rmd_2); EXPECT_EQ(hash_rmd_1, hash_rmd_1);
-  EXPECT_EQ(hash_rmd_3, hash_rmd_4); EXPECT_EQ(hash_rmd_3, hash_rmd_3);
-  EXPECT_EQ(hash_rmd_5, hash_rmd_6); EXPECT_EQ(hash_rmd_5, hash_rmd_5);
-  EXPECT_EQ(hash_rmd_7, hash_rmd_8); EXPECT_EQ(hash_rmd_7, hash_rmd_7);
-  EXPECT_EQ(hash_rmd_9, hash_rmd_0); EXPECT_EQ(hash_rmd_9, hash_rmd_9);
+  EXPECT_EQ(hash_rmd_1, hash_rmd_2);
+  EXPECT_EQ(hash_rmd_1, hash_rmd_1);
+  EXPECT_EQ(hash_rmd_3, hash_rmd_4);
+  EXPECT_EQ(hash_rmd_3, hash_rmd_3);
+  EXPECT_EQ(hash_rmd_5, hash_rmd_6);
+  EXPECT_EQ(hash_rmd_5, hash_rmd_5);
+  EXPECT_EQ(hash_rmd_7, hash_rmd_8);
+  EXPECT_EQ(hash_rmd_7, hash_rmd_7);
+  EXPECT_EQ(hash_rmd_9, hash_rmd_0);
+  EXPECT_EQ(hash_rmd_9, hash_rmd_9);
 
-  EXPECT_EQ(hash_rmd_1, hash_rmd_7); EXPECT_EQ(hash_rmd_1, hash_rmd_8);
-  EXPECT_EQ(hash_rmd_7, hash_rmd_1); EXPECT_EQ(hash_rmd_7, hash_rmd_2);
+  EXPECT_EQ(hash_rmd_1, hash_rmd_7);
+  EXPECT_EQ(hash_rmd_1, hash_rmd_8);
+  EXPECT_EQ(hash_rmd_7, hash_rmd_1);
+  EXPECT_EQ(hash_rmd_7, hash_rmd_2);
 
-  EXPECT_NE(hash_rmd_1, hash_rmd_3); EXPECT_NE(hash_rmd_1, hash_rmd_4);
-  EXPECT_NE(hash_rmd_1, hash_rmd_5); EXPECT_NE(hash_rmd_1, hash_rmd_6);
-  EXPECT_NE(hash_rmd_1, hash_rmd_9); EXPECT_NE(hash_rmd_1, hash_rmd_0);
+  EXPECT_NE(hash_rmd_1, hash_rmd_3);
+  EXPECT_NE(hash_rmd_1, hash_rmd_4);
+  EXPECT_NE(hash_rmd_1, hash_rmd_5);
+  EXPECT_NE(hash_rmd_1, hash_rmd_6);
+  EXPECT_NE(hash_rmd_1, hash_rmd_9);
+  EXPECT_NE(hash_rmd_1, hash_rmd_0);
 
-  EXPECT_NE(hash_rmd_3, hash_rmd_1); EXPECT_NE(hash_rmd_3, hash_rmd_2);
-  EXPECT_NE(hash_rmd_3, hash_rmd_5); EXPECT_NE(hash_rmd_3, hash_rmd_6);
-  EXPECT_NE(hash_rmd_3, hash_rmd_7); EXPECT_NE(hash_rmd_3, hash_rmd_8);
-  EXPECT_NE(hash_rmd_3, hash_rmd_9); EXPECT_NE(hash_rmd_3, hash_rmd_0);
+  EXPECT_NE(hash_rmd_3, hash_rmd_1);
+  EXPECT_NE(hash_rmd_3, hash_rmd_2);
+  EXPECT_NE(hash_rmd_3, hash_rmd_5);
+  EXPECT_NE(hash_rmd_3, hash_rmd_6);
+  EXPECT_NE(hash_rmd_3, hash_rmd_7);
+  EXPECT_NE(hash_rmd_3, hash_rmd_8);
+  EXPECT_NE(hash_rmd_3, hash_rmd_9);
+  EXPECT_NE(hash_rmd_3, hash_rmd_0);
 
-  EXPECT_NE(hash_rmd_5, hash_rmd_1); EXPECT_NE(hash_rmd_5, hash_rmd_2);
-  EXPECT_NE(hash_rmd_5, hash_rmd_3); EXPECT_NE(hash_rmd_5, hash_rmd_4);
-  EXPECT_NE(hash_rmd_5, hash_rmd_7); EXPECT_NE(hash_rmd_5, hash_rmd_8);
-  EXPECT_NE(hash_rmd_5, hash_rmd_9); EXPECT_NE(hash_rmd_5, hash_rmd_0);
+  EXPECT_NE(hash_rmd_5, hash_rmd_1);
+  EXPECT_NE(hash_rmd_5, hash_rmd_2);
+  EXPECT_NE(hash_rmd_5, hash_rmd_3);
+  EXPECT_NE(hash_rmd_5, hash_rmd_4);
+  EXPECT_NE(hash_rmd_5, hash_rmd_7);
+  EXPECT_NE(hash_rmd_5, hash_rmd_8);
+  EXPECT_NE(hash_rmd_5, hash_rmd_9);
+  EXPECT_NE(hash_rmd_5, hash_rmd_0);
 
-  EXPECT_NE(hash_rmd_7, hash_rmd_3); EXPECT_NE(hash_rmd_7, hash_rmd_4);
-  EXPECT_NE(hash_rmd_7, hash_rmd_5); EXPECT_NE(hash_rmd_7, hash_rmd_6);
-  EXPECT_NE(hash_rmd_7, hash_rmd_9); EXPECT_NE(hash_rmd_7, hash_rmd_0);
+  EXPECT_NE(hash_rmd_7, hash_rmd_3);
+  EXPECT_NE(hash_rmd_7, hash_rmd_4);
+  EXPECT_NE(hash_rmd_7, hash_rmd_5);
+  EXPECT_NE(hash_rmd_7, hash_rmd_6);
+  EXPECT_NE(hash_rmd_7, hash_rmd_9);
+  EXPECT_NE(hash_rmd_7, hash_rmd_0);
 
-  EXPECT_NE(hash_rmd_9, hash_rmd_1); EXPECT_NE(hash_rmd_9, hash_rmd_2);
-  EXPECT_NE(hash_rmd_9, hash_rmd_3); EXPECT_NE(hash_rmd_9, hash_rmd_4);
-  EXPECT_NE(hash_rmd_9, hash_rmd_5); EXPECT_NE(hash_rmd_9, hash_rmd_6);
-  EXPECT_NE(hash_rmd_9, hash_rmd_7); EXPECT_NE(hash_rmd_9, hash_rmd_8);
+  EXPECT_NE(hash_rmd_9, hash_rmd_1);
+  EXPECT_NE(hash_rmd_9, hash_rmd_2);
+  EXPECT_NE(hash_rmd_9, hash_rmd_3);
+  EXPECT_NE(hash_rmd_9, hash_rmd_4);
+  EXPECT_NE(hash_rmd_9, hash_rmd_5);
+  EXPECT_NE(hash_rmd_9, hash_rmd_6);
+  EXPECT_NE(hash_rmd_9, hash_rmd_7);
+  EXPECT_NE(hash_rmd_9, hash_rmd_8);
 
   shash::Shake128 shake128_null;
-  shash::Shake128 shake128_random;  shake128_random.Randomize(42);
+  shash::Shake128 shake128_random;
+  shake128_random.Randomize(42);
   EXPECT_EQ(shake128_random, shake128_random);
   EXPECT_NE(shake128_random, shake128_null);
   shash::Any hash_shake128_1(shash::kShake128);
@@ -888,7 +1008,7 @@ TEST(T_Shash, Equality) {
 }
 
 
-template <shash::Algorithms algo_>
+template<shash::Algorithms algo_>
 static shash::Any make_hash(const std::string &hash, const char suffix) {
   shash::Any any_hash(algo_, shash::HexPtr(hash));
   any_hash.suffix = suffix;
@@ -972,12 +1092,10 @@ TEST(T_Shash, LowerThan) {
   EXPECT_EQ(rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'),
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
 
-  EXPECT_LT(
-    shake128("0000000000000000000000000000000000000000"),
-    shake128("ffffffffffffffffffffffffffffffffffffffff"));
-  EXPECT_EQ(
-    shake128("0000000000000000000000000000000000000000", 'A'),
-    shake128("0000000000000000000000000000000000000000", 'B'));
+  EXPECT_LT(shake128("0000000000000000000000000000000000000000"),
+            shake128("ffffffffffffffffffffffffffffffffffffffff"));
+  EXPECT_EQ(shake128("0000000000000000000000000000000000000000", 'A'),
+            shake128("0000000000000000000000000000000000000000", 'B'));
 }
 
 
@@ -1043,14 +1161,13 @@ TEST(T_Shash, GreaterThan) {
   EXPECT_EQ(rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'),
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
 
-  EXPECT_GT(
-    shake128("ffffffffffffffffffffffffffffffffffffffff"),
-    shake128("0000000000000000000000000000000000000000"));
+  EXPECT_GT(shake128("ffffffffffffffffffffffffffffffffffffffff"),
+            shake128("0000000000000000000000000000000000000000"));
 }
 
 TEST(T_Shash, Hmac) {
   const unsigned char *fox = reinterpret_cast<const unsigned char *>(
-    "The quick brown fox jumps over the lazy dog");
+      "The quick brown fox jumps over the lazy dog");
   unsigned len_fox = strlen("The quick brown fox jumps over the lazy dog");
 
   shash::Any md5(shash::kMd5);
@@ -1062,16 +1179,16 @@ TEST(T_Shash, Hmac) {
   shash::Hmac("", NULL, 0, &sha1);
   EXPECT_EQ("fbdb1d1b18aa6c08324b7d64b71fb76370690e1d", sha1.ToString());
   shash::Hmac("", NULL, 0, &rmd160);
-  EXPECT_EQ(
-    "44d86b658a3e7cbc1a2010848b53e35c917720ca-rmd160", rmd160.ToString());
+  EXPECT_EQ("44d86b658a3e7cbc1a2010848b53e35c917720ca-rmd160",
+            rmd160.ToString());
 
   shash::Hmac("key", fox, len_fox, &md5);
   EXPECT_EQ("80070713463e7749b90c2dc24911e275", md5.ToString());
   shash::Hmac("key", fox, len_fox, &sha1);
   EXPECT_EQ("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9", sha1.ToString());
   shash::Hmac("key", fox, len_fox, &rmd160);
-  EXPECT_EQ(
-    "50278a77d4d7670561ab72e867383aef6ce50b3e-rmd160", rmd160.ToString());
+  EXPECT_EQ("50278a77d4d7670561ab72e867383aef6ce50b3e-rmd160",
+            rmd160.ToString());
 
   shash::Any sha1_hmacstring(shash::kSha1);
   shash::HmacString("key", string(reinterpret_cast<const char *>(fox)),
@@ -1087,28 +1204,27 @@ TEST(T_Shash, Hmac256) {
   string hash = shash::Hmac256("the shared secret key here",
                                "the message to hash here");
   EXPECT_STREQ(
-    "4643978965ffcec6e6d73b36a39ae43ceb15f7ef8131b8307862ebc560e7f988",
-    hash.c_str());
+      "4643978965ffcec6e6d73b36a39ae43ceb15f7ef8131b8307862ebc560e7f988",
+      hash.c_str());
 
   EXPECT_EQ(
-    "9190a36badc1748978b7e6aece38aca4862012db8260009e1d055bd9abb69e31",
-    shash::Hmac256(
-      "a secret key that is very long: a secret key that is very long....",
-      "the message to hash here"));
+      "9190a36badc1748978b7e6aece38aca4862012db8260009e1d055bd9abb69e31",
+      shash::Hmac256(
+          "a secret key that is very long: a secret key that is very long....",
+          "the message to hash here"));
 
-  string kdate = shash::Hmac256(
-    "AWS4wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "20130524", true);
+  string kdate = shash::Hmac256("AWS4wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                                "20130524", true);
   string kregion = shash::Hmac256(kdate, "us-east-1", true);
   string kservice = shash::Hmac256(kregion, "s3", true);
   string ksigning = shash::Hmac256(kservice, "aws4_request", true);
-  string signee =
-    "AWS4-HMAC-SHA256\n"
-    "20130524T000000Z\n"
-    "20130524/us-east-1/s3/aws4_request\n"
-    "7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc43964946972";
-  EXPECT_EQ(
-    "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
-    shash::Hmac256(ksigning, signee));
+  string signee = "AWS4-HMAC-SHA256\n"
+                  "20130524T000000Z\n"
+                  "20130524/us-east-1/s3/aws4_request\n"
+                  "7344ae5b7ee6c3e7e6b0fe0640412a37625d1fbfff95c48bbb2dc4396494"
+                  "6972";
+  EXPECT_EQ("f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
+            shash::Hmac256(ksigning, signee));
 #endif
 }
 
@@ -1120,17 +1236,17 @@ TEST(T_Shash, Sha256) {
   string dog = "The quick brown fox jumps over the lazy dog";
   string hash = shash::Sha256String(dog);
   EXPECT_STREQ(
-    "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
-    hash.c_str());
+      "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
+      hash.c_str());
 
   hash = shash::Sha256File("/dev/null");
   EXPECT_STREQ(
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    hash.c_str());
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      hash.c_str());
 
   hash = shash::Sha256Mem(NULL, 0);
   EXPECT_STREQ(
-    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    hash.c_str());
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      hash.c_str());
 #endif
 }

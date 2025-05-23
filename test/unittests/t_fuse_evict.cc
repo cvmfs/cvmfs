@@ -13,14 +13,12 @@
 class T_FuseInvalidator : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    invalidator_ =
-      new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
+    invalidator_ = new FuseInvalidator(
+        &inode_tracker_, &dentry_tracker_, NULL, true);
     invalidator_->Spawn();
   }
 
-  virtual void TearDown() {
-    delete invalidator_;
-  }
+  virtual void TearDown() { delete invalidator_; }
 
  protected:
   glue::InodeTracker inode_tracker_;
@@ -30,13 +28,13 @@ class T_FuseInvalidator : public ::testing::Test {
 
 
 TEST_F(T_FuseInvalidator, StartStop) {
-  FuseInvalidator *idle_invalidator =
-    new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
+  FuseInvalidator *idle_invalidator = new FuseInvalidator(
+      &inode_tracker_, &dentry_tracker_, NULL, true);
   EXPECT_FALSE(idle_invalidator->spawned_);
   delete idle_invalidator;
 
-  FuseInvalidator *noop_invalidator =
-    new FuseInvalidator(&inode_tracker_, &dentry_tracker_, NULL, true);
+  FuseInvalidator *noop_invalidator = new FuseInvalidator(
+      &inode_tracker_, &dentry_tracker_, NULL, true);
   noop_invalidator->Spawn();
   EXPECT_TRUE(noop_invalidator->spawned_);
   delete noop_invalidator;
@@ -61,8 +59,8 @@ TEST_F(T_FuseInvalidator, InvalidateTimeout) {
 
 TEST_F(T_FuseInvalidator, InvalidateOps) {
   invalidator_->fuse_channel_or_session_ = reinterpret_cast<void **>(this);
-  inode_tracker_.VfsGet(
-    glue::InodeEx(1, glue::InodeEx::kDirectory), PathString(""));
+  inode_tracker_.VfsGet(glue::InodeEx(1, glue::InodeEx::kDirectory),
+                        PathString(""));
   for (unsigned i = 2; i <= 1024; ++i) {
     inode_tracker_.VfsGet(glue::InodeEx(i, glue::InodeEx::kRegular),
                           PathString("/" + StringifyInt(i)));

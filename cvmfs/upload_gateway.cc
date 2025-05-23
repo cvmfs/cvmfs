@@ -15,18 +15,18 @@
 
 namespace upload {
 
-GatewayStreamHandle::GatewayStreamHandle(const CallbackTN* commit_callback,
+GatewayStreamHandle::GatewayStreamHandle(const CallbackTN *commit_callback,
                                          ObjectPack::BucketHandle bkt)
-    : UploadStreamHandle(commit_callback), bucket(bkt) {}
+    : UploadStreamHandle(commit_callback), bucket(bkt) { }
 
-bool GatewayUploader::WillHandle(const SpoolerDefinition& spooler_definition) {
+bool GatewayUploader::WillHandle(const SpoolerDefinition &spooler_definition) {
   return spooler_definition.driver_type == SpoolerDefinition::Gateway;
 }
 
 bool GatewayUploader::ParseSpoolerDefinition(
-    const SpoolerDefinition& spooler_definition,
-    GatewayUploader::Config* config) {
-  const std::string& config_string = spooler_definition.spooler_configuration;
+    const SpoolerDefinition &spooler_definition,
+    GatewayUploader::Config *config) {
+  const std::string &config_string = spooler_definition.spooler_configuration;
   if (!config) {
     LogCvmfs(kLogUploadGateway, kLogStderr, "\"config\" argument is NULL");
     return false;
@@ -54,12 +54,12 @@ bool GatewayUploader::ParseSpoolerDefinition(
   return true;
 }
 
-GatewayUploader::GatewayUploader(const SpoolerDefinition& spooler_definition)
-    : AbstractUploader(spooler_definition),
-      config_(),
-      session_context_(new SessionContext()) {
-  assert(spooler_definition.IsValid() &&
-         spooler_definition.driver_type == SpoolerDefinition::Gateway);
+GatewayUploader::GatewayUploader(const SpoolerDefinition &spooler_definition)
+    : AbstractUploader(spooler_definition)
+    , config_()
+    , session_context_(new SessionContext()) {
+  assert(spooler_definition.IsValid()
+         && spooler_definition.driver_type == SpoolerDefinition::Gateway);
 
   if (!ParseSpoolerDefinition(spooler_definition, &config_)) {
     PANIC(kLogStderr, "Error in parsing the spooler definition");
@@ -98,9 +98,9 @@ bool GatewayUploader::Initialize() {
 }
 
 bool GatewayUploader::FinalizeSession(bool commit,
-                                      const std::string& old_root_hash,
-                                      const std::string& new_root_hash,
-                                      const RepositoryTag& tag) {
+                                      const std::string &old_root_hash,
+                                      const std::string &new_root_hash,
+                                      const RepositoryTag &tag) {
   return session_context_->Finalize(commit, old_root_hash, new_root_hash, tag);
 }
 
@@ -110,19 +110,18 @@ void GatewayUploader::WaitForUpload() const {
 
 std::string GatewayUploader::name() const { return "HTTP"; }
 
-void GatewayUploader::DoRemoveAsync(const std::string& /*file_to_delete*/) {
+void GatewayUploader::DoRemoveAsync(const std::string & /*file_to_delete*/) {
   atomic_inc32(&num_errors_);
   Respond(NULL, UploaderResults());
 }
 
-bool GatewayUploader::Peek(const std::string& /*path*/) { return false; }
+bool GatewayUploader::Peek(const std::string & /*path*/) { return false; }
 
 // TODO(jpriessn): implement Mkdir on gateway server-side
-bool GatewayUploader::Mkdir(const std::string &path) {
-  return true;
-}
+bool GatewayUploader::Mkdir(const std::string &path) { return true; }
 
-bool GatewayUploader::PlaceBootstrappingShortcut(const shash::Any& /*object*/) {
+bool GatewayUploader::PlaceBootstrappingShortcut(
+    const shash::Any & /*object*/) {
   return false;
 }
 
@@ -130,9 +129,9 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
   return atomic_read32(&num_errors_);
 }
 
-void GatewayUploader::DoUpload(const std::string& remote_path,
+void GatewayUploader::DoUpload(const std::string &remote_path,
                                IngestionSource *source,
-                               const CallbackTN* callback) {
+                               const CallbackTN *callback) {
   UniquePtr<GatewayStreamHandle> handle(
       new GatewayStreamHandle(callback, session_context_->NewBucket()));
 
@@ -173,15 +172,15 @@ void GatewayUploader::DoUpload(const std::string& remote_path,
   Respond(callback, UploaderResults(0, source->GetPath()));
 }
 
-UploadStreamHandle* GatewayUploader::InitStreamedUpload(
-    const CallbackTN* callback) {
+UploadStreamHandle *GatewayUploader::InitStreamedUpload(
+    const CallbackTN *callback) {
   return new GatewayStreamHandle(callback, session_context_->NewBucket());
 }
 
-void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
+void GatewayUploader::StreamedUpload(UploadStreamHandle *handle,
                                      UploadBuffer buffer,
-                                     const CallbackTN* callback) {
-  GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
+                                     const CallbackTN *callback) {
+  GatewayStreamHandle *hd = dynamic_cast<GatewayStreamHandle *>(handle);
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Streamed upload - incompatible upload handle");
@@ -195,9 +194,9 @@ void GatewayUploader::StreamedUpload(UploadStreamHandle* handle,
   Respond(callback, UploaderResults(UploaderResults::kBufferUpload, 0));
 }
 
-void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
-                                             const shash::Any& content_hash) {
-  GatewayStreamHandle* hd = dynamic_cast<GatewayStreamHandle*>(handle);
+void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
+                                             const shash::Any &content_hash) {
+  GatewayStreamHandle *hd = dynamic_cast<GatewayStreamHandle *>(handle);
   if (!hd) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "Finalize streamed upload - incompatible upload handle");
@@ -229,12 +228,12 @@ void GatewayUploader::FinalizeStreamedUpload(UploadStreamHandle* handle,
           UploaderResults(UploaderResults::kChunkCommit, 0));
 }
 
-void GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
-                                           std::string* token) {
+void GatewayUploader::ReadSessionTokenFile(const std::string &token_file_name,
+                                           std::string *token) {
   assert(token);
   *token = "INVALIDTOKEN";  // overwritten if reading from file works
 
-  FILE* token_file = std::fopen(token_file_name.c_str(), "r");
+  FILE *token_file = std::fopen(token_file_name.c_str(), "r");
   if (!token_file) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "HTTP Uploader - Could not open session token file.");
@@ -245,8 +244,8 @@ void GatewayUploader::ReadSessionTokenFile(const std::string& token_file_name,
   fclose(token_file);
 }
 
-bool GatewayUploader::ReadKey(const std::string& key_file, std::string* key_id,
-                              std::string* secret) {
+bool GatewayUploader::ReadKey(const std::string &key_file, std::string *key_id,
+                              std::string *secret) {
   return gateway::ReadKeys(key_file, key_id, secret);
 }
 

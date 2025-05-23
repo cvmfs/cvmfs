@@ -9,10 +9,11 @@
 
 class Foo {
  public:
-  explicit Foo(const int identifier) :
-    identifier(identifier), local_constructor_calls(0),
-    local_destructor_calls(0), local_method_calls(0)
-  {
+  explicit Foo(const int identifier)
+      : identifier(identifier)
+      , local_constructor_calls(0)
+      , local_destructor_calls(0)
+      , local_method_calls(0) {
     ++local_constructor_calls;
     ++Foo::global_constructor_calls;
   }
@@ -30,26 +31,26 @@ class Foo {
 
   const int identifier;
 
-          unsigned int  local_constructor_calls;
-          unsigned int  local_destructor_calls;
-  mutable unsigned int  local_method_calls;
+  unsigned int local_constructor_calls;
+  unsigned int local_destructor_calls;
+  mutable unsigned int local_method_calls;
 
-  static unsigned int   global_constructor_calls;
-  static unsigned int   global_destructor_calls;
-  static unsigned int   global_method_calls;
+  static unsigned int global_constructor_calls;
+  static unsigned int global_destructor_calls;
+  static unsigned int global_method_calls;
 };
 
 unsigned int Foo::global_constructor_calls = 0;
-unsigned int Foo::global_destructor_calls  = 0;
-unsigned int Foo::global_method_calls      = 0;
+unsigned int Foo::global_destructor_calls = 0;
+unsigned int Foo::global_method_calls = 0;
 
 
 class T_UniquePtr : public ::testing::Test {
  protected:
   void SetUp() {
     Foo::global_constructor_calls = 0;
-    Foo::global_destructor_calls  = 0;
-    Foo::global_method_calls      = 0;
+    Foo::global_destructor_calls = 0;
+    Foo::global_method_calls = 0;
   }
 };
 
@@ -127,7 +128,7 @@ TEST_F(T_UniquePtr, PointerDereference) {
     EXPECT_EQ(object, &(*foo));
     EXPECT_EQ(911, foo->identifier);
 
-    const Foo& foo_reference = *foo;
+    const Foo &foo_reference = *foo;
     EXPECT_EQ(1u, foo->local_constructor_calls);
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, foo->local_destructor_calls);
@@ -152,7 +153,7 @@ TEST_F(T_UniquePtr, PointerDereferenceAndMethodCall) {
     EXPECT_EQ(87465, foo->GetIdentifier());
     EXPECT_EQ(87465, (*foo).GetIdentifier());
 
-    const Foo& foo_reference = *foo;
+    const Foo &foo_reference = *foo;
     EXPECT_EQ(1u, foo->local_constructor_calls);
     EXPECT_EQ(1u, Foo::global_constructor_calls);
     EXPECT_EQ(0u, foo->local_destructor_calls);
@@ -257,9 +258,9 @@ TEST_F(T_UniquePtr, SelfAssignment) {
 TEST_F(T_UniquePtr, VoidPtr) {
   UniquePtr<void> p(malloc(1024));
   EXPECT_TRUE(p.IsValid());
-  EXPECT_NE(static_cast<void*>(NULL), p.weak_ref());
+  EXPECT_NE(static_cast<void *>(NULL), p.weak_ref());
 
   UniquePtr<void> p2;
   EXPECT_FALSE(p2.IsValid());
-  EXPECT_EQ(static_cast<void*>(NULL), p2.weak_ref());
+  EXPECT_EQ(static_cast<void *>(NULL), p2.weak_ref());
 }

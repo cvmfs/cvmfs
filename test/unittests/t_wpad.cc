@@ -10,13 +10,10 @@ using namespace std;  // NOLINT
 
 class T_Wpad : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 };
 
 
-TEST_F(T_Wpad, Init) {
-}
+TEST_F(T_Wpad, Init) { }

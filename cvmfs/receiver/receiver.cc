@@ -4,16 +4,13 @@
 
 #include <string>
 
-
-
 #include "monitor.h"
+#include "reactor.h"
 #include "swissknife.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/string.h"
-
-#include "reactor.h"
 
 static const char *kDefaultReceiverLogDir = "/var/log/cvmfs_receiver/";
 static const char *kDefaultDebugLog = "/dev/null";
@@ -27,23 +24,26 @@ swissknife::ParameterList MakeParameterList() {
   params.push_back(swissknife::Parameter::Optional(
       'w', "Watchdog stacktrace output dir, "
            "use without parameter to disable watchdog. "
-           "Default: " + std::string(kDefaultReceiverLogDir)));
+           "Default: "
+               + std::string(kDefaultReceiverLogDir)));
   params.push_back(swissknife::Parameter::Optional(
       'd', "Path to debug log. Ignored if the non-debug version runs, "
-           "Default: " + std::string(kDefaultDebugLog)));
+           "Default: "
+               + std::string(kDefaultDebugLog)));
   return params;
 }
 
-bool ReadCmdLineArguments(int argc, char** argv,
-                          const swissknife::ParameterList& params,
-                          swissknife::ArgumentList* arguments) {
+bool ReadCmdLineArguments(int argc, char **argv,
+                          const swissknife::ParameterList &params,
+                          swissknife::ArgumentList *arguments) {
   // parse the command line arguments for the Command
   optind = 1;
   std::string option_string = "";
 
   for (unsigned j = 0; j < params.size(); ++j) {
     option_string.push_back(params[j].key());
-    if (!params[j].switch_only()) option_string.push_back(':');
+    if (!params[j].switch_only())
+      option_string.push_back(':');
   }
 
   int c;
@@ -84,7 +84,7 @@ bool ReadCmdLineArguments(int argc, char** argv,
   return true;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   swissknife::ArgumentList arguments;
   if (!ReadCmdLineArguments(argc, argv, MakeParameterList(), &arguments)) {
     return 1;
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
                "Error running CVMFS Receiver event loop");
       return 1;
     }
-  } catch (const ECvmfsException& e) {
+  } catch (const ECvmfsException &e) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Runtime error during CVMFS Receiver event loop.\n"
              "%s",
@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
   } catch (...) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
              "Unknown error during CVMFS Receiver event loop.\n");
-      return 3;
+    return 3;
   }
 
   LogCvmfs(kLogReceiver, kLogSyslog, "CVMFS receiver finished");

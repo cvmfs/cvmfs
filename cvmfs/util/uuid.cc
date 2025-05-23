@@ -33,8 +33,9 @@ Uuid *Uuid::Create(const string &store_path) {
     uuid->MkUuid();
     string uuid_str = uuid->uuid();
     string path_tmp;
-    FILE *f_tmp = CreateTempFile(store_path + "_tmp",
-      S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH, "w", &path_tmp);
+    FILE *f_tmp = CreateTempFile(
+        store_path + "_tmp", S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH,
+        "w", &path_tmp);
     if (!f_tmp)
       return NULL;
     int written = fprintf(f_tmp, "%s\n", uuid_str.c_str());
@@ -55,12 +56,13 @@ Uuid *Uuid::Create(const string &store_path) {
   fclose(f);
   if (!retval)
     return NULL;
-  int nitems = sscanf(uuid->uuid_.c_str(),
-    "%08" SCNx32 "-%04" SCNx16 "-%04" SCNx16 "-%04" SCNx16 "-%08" SCNx32 "%04"
-      SCNx16,
-    &uuid->uuid_presentation_.split.a, &uuid->uuid_presentation_.split.b,
-    &uuid->uuid_presentation_.split.c, &uuid->uuid_presentation_.split.d,
-    &uuid->uuid_presentation_.split.e1, &uuid->uuid_presentation_.split.e2);
+  int nitems = sscanf(
+      uuid->uuid_.c_str(),
+      "%08" SCNx32 "-%04" SCNx16 "-%04" SCNx16 "-%04" SCNx16 "-%08" SCNx32
+      "%04" SCNx16,
+      &uuid->uuid_presentation_.split.a, &uuid->uuid_presentation_.split.b,
+      &uuid->uuid_presentation_.split.c, &uuid->uuid_presentation_.split.d,
+      &uuid->uuid_presentation_.split.e1, &uuid->uuid_presentation_.split.e2);
   if (nitems != 6)
     return NULL;
 
@@ -85,7 +87,7 @@ void Uuid::MkUuid() {
   assert(sizeof(new_uuid) == 16);
   memcpy(uuid_presentation_.uuid, new_uuid, sizeof(uuid_presentation_.uuid));
   // Canonical UUID format, including trailing \0
-  unsigned uuid_len = 8+1+4+1+4+1+4+1+12+1;
+  unsigned uuid_len = 8 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 12 + 1;
   char uuid_cstr[uuid_len];
   snprintf(uuid_cstr, uuid_len, "%08x-%04x-%04x-%04x-%08x%04x",
            uuid_presentation_.split.a, uuid_presentation_.split.b,
@@ -95,8 +97,6 @@ void Uuid::MkUuid() {
 }
 
 
-Uuid::Uuid() {
-  memset(&uuid_presentation_, 0, sizeof(uuid_presentation_));
-}
+Uuid::Uuid() { memset(&uuid_presentation_, 0, sizeof(uuid_presentation_)); }
 
 }  // namespace cvmfs

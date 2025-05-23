@@ -25,8 +25,8 @@ namespace cvmfs {
  */
 class MemSink : public Sink {
  public:
-  MemSink() : Sink(true), size_(0), pos_(0),
-              data_(NULL), max_size_(kMaxMemSize) { }
+  MemSink()
+      : Sink(true), size_(0), pos_(0), data_(NULL), max_size_(kMaxMemSize) { }
   explicit MemSink(size_t size);
   virtual ~MemSink() { FreeData(); }
 
@@ -58,12 +58,10 @@ class MemSink : public Sink {
    * @returns Success = 0
    *          Failure = -errno
    */
-  virtual int Purge() {
-    return Reset();
-  }
+  virtual int Purge() { return Reset(); }
 
   /**
-    * @returns true if the object is correctly initialized.
+   * @returns true if the object is correctly initialized.
    */
   virtual bool IsValid();
 
@@ -72,9 +70,7 @@ class MemSink : public Sink {
    * @returns success = 0
    *          failure = -errno
    */
-  virtual int Flush() {
-    return 0;
-  }
+  virtual int Flush() { return 0; }
 
   /**
    * Reserves new space in sinks that require reservation (see RequiresReserve)
@@ -100,9 +96,7 @@ class MemSink : public Sink {
    * @returns true  - reservation is needed
    *          false - no reservation is needed
    */
-  virtual bool RequiresReserve() {
-    return true;
-  }
+  virtual bool RequiresReserve() { return true; }
 
   /**
    * Return a string representation describing the type of sink and its status
@@ -118,7 +112,7 @@ class MemSink : public Sink {
 
   size_t size() { return size_; }
   size_t pos() { return pos_; }
-  unsigned char* data() { return data_; }
+  unsigned char *data() { return data_; }
 
   /**
    * Do not download files larger than 1M into memory.

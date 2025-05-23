@@ -86,19 +86,20 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 
   const int anonymous_fd = -1;
   const off_t offset = 0;
-  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
+  size_t pages = ((size + 2 * sizeof(size_t)) + 4095)
+                 / 4096;  // round to full page
   unsigned char *mem = NULL;
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
   do {
 #endif
     mem = static_cast<unsigned char *>(
-    mmap(NULL,
-         pages*4096,
-         PROT_READ | PROT_WRITE,
-         MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
-         anonymous_fd,
-         offset));
+        mmap(NULL,
+             pages * 4096,
+             PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+             anonymous_fd,
+             offset));
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
   } while (mem == MAP_FAILED);
@@ -108,14 +109,14 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   assert((mem != MAP_FAILED) && "Out Of Memory");
   *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
   *(reinterpret_cast<size_t *>(mem) + 1) = pages;
-  return mem + 2*sizeof(size_t);
+  return mem + 2 * sizeof(size_t);
 }
 
 static inline void __attribute__((used)) smunmap(void *mem) {
   unsigned char *area = static_cast<unsigned char *>(mem);
   area = area - sizeof(size_t);
   size_t pages = *(reinterpret_cast<size_t *>(area));
-  int retval = munmap(area-sizeof(size_t), pages*4096);
+  int retval = munmap(area - sizeof(size_t), pages * 4096);
   // printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
   assert((retval == 0) && "Invalid umnmap");
 }
@@ -133,11 +134,11 @@ static inline void * __attribute__((used)) sxmmap(size_t size) {
   do {
 #endif
     mem = mmap(NULL,
-                   size,
-                   PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
-                   anonymous_fd,
-                   offset);
+               size,
+               PROT_READ | PROT_WRITE,
+               MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS,
+               anonymous_fd,
+               offset);
 
 #ifdef CVMFS_SUPPRESS_ASSERTS
   } while (mem == MAP_FAILED);

@@ -24,7 +24,7 @@ class CommandLetter : public Command {
     r.push_back(Parameter::Optional('a', "hash algorithm"));
     r.push_back(Parameter::Optional('c', "x509 certificate"));
     r.push_back(Parameter::Optional('k', "private key of the certificate "
-                                          "or public master key"));
+                                         "or public master key"));
     r.push_back(Parameter::Optional('p', "password for the private key"));
     r.push_back(Parameter::Switch('v', "verify text"));
     r.push_back(Parameter::Optional('m', "max age (seconds)"));

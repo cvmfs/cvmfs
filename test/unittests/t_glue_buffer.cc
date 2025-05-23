@@ -18,8 +18,7 @@ namespace glue {
 
 class T_GlueBuffer : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
  protected:
   InodeTracker inode_tracker_;
@@ -211,18 +210,18 @@ TEST_F(T_GlueBuffer, StringHeap) {
     {
       pid_t child_pid = fork();
       switch (child_pid) {
-      case 0: {
-        // May crash due to memory constraints
-        StringHeap string_heap(large_size);
-        EXPECT_EQ((uint64_t)(1) << 32, string_heap.GetSizeAlloc());
-        exit(0);
-      }
-      default:
-        ASSERT_GT(child_pid, 0);
-        int status;
-        waitpid(child_pid, &status, 0);
-        EXPECT_TRUE(WIFEXITED(status));
-        EXPECT_EQ(0, WEXITSTATUS(status));
+        case 0: {
+          // May crash due to memory constraints
+          StringHeap string_heap(large_size);
+          EXPECT_EQ((uint64_t)(1) << 32, string_heap.GetSizeAlloc());
+          exit(0);
+        }
+        default:
+          ASSERT_GT(child_pid, 0);
+          int status;
+          waitpid(child_pid, &status, 0);
+          EXPECT_TRUE(WIFEXITED(status));
+          EXPECT_EQ(0, WEXITSTATUS(status));
       }
     }
   } else {

@@ -31,7 +31,7 @@
 class XattrList;
 namespace catalog {
 
-const unsigned kSqliteMemPerThread = 1*1024*1024;
+const unsigned kSqliteMemPerThread = 1 * 1024 * 1024;
 
 
 /**
@@ -65,7 +65,7 @@ enum LoadReturn {
  */
 enum RootCatalogLocation {
   kCtlgNoLocationNeeded = 0,  // hash known, no location needed
-  kCtlgLocationMounted,      // already loaded in mounted_catalogs_
+  kCtlgLocationMounted,       // already loaded in mounted_catalogs_
   kCtlgLocationServer,
   kCtlgLocationBreadcrumb
 };
@@ -91,33 +91,32 @@ enum RootCatalogLocation {
  */
 struct CatalogContext {
  public:
-  CatalogContext() :
-              hash_(shash::Any()),
-              mountpoint_(PathString("invalid", 7)),  // empty str is root ctlg
-              sqlite_path_(""),
-              root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlgNoLocationNeeded),
-              manifest_ensemble_(NULL) { }
-  CatalogContext(const shash::Any &hash, const PathString &mountpoint) :
-              hash_(hash),
-              mountpoint_(mountpoint),
-              sqlite_path_(""),
-              root_ctlg_revision_(-1ul),
-              root_ctlg_location_(kCtlgNoLocationNeeded),
-              manifest_ensemble_(NULL) { }
+  CatalogContext()
+      : hash_(shash::Any())
+      , mountpoint_(PathString("invalid", 7))
+      ,  // empty str is root ctlg
+      sqlite_path_("")
+      , root_ctlg_revision_(-1ul)
+      , root_ctlg_location_(kCtlgNoLocationNeeded)
+      , manifest_ensemble_(NULL) { }
+  CatalogContext(const shash::Any &hash, const PathString &mountpoint)
+      : hash_(hash)
+      , mountpoint_(mountpoint)
+      , sqlite_path_("")
+      , root_ctlg_revision_(-1ul)
+      , root_ctlg_location_(kCtlgNoLocationNeeded)
+      , manifest_ensemble_(NULL) { }
 
   CatalogContext(const shash::Any &hash, const PathString &mountpoint,
-                 const RootCatalogLocation location) :
-              hash_(hash),
-              mountpoint_(mountpoint),
-              sqlite_path_(""),
-              root_ctlg_revision_(-1ul),
-              root_ctlg_location_(location),
-              manifest_ensemble_(NULL)  { }
+                 const RootCatalogLocation location)
+      : hash_(hash)
+      , mountpoint_(mountpoint)
+      , sqlite_path_("")
+      , root_ctlg_revision_(-1ul)
+      , root_ctlg_location_(location)
+      , manifest_ensemble_(NULL) { }
 
-  bool IsRootCatalog() {
-    return mountpoint_.IsEmpty();
-  }
+  bool IsRootCatalog() { return mountpoint_.IsEmpty(); }
 
   std::string *GetSqlitePathPtr() { return &sqlite_path_; }
   shash::Any *GetHashPtr() { return &hash_; }
@@ -126,24 +125,28 @@ struct CatalogContext {
   PathString mountpoint() const { return mountpoint_; }
   std::string sqlite_path() const { return sqlite_path_; }
   uint64_t root_ctlg_revision() const { return root_ctlg_revision_; }
-  RootCatalogLocation root_ctlg_location() const
-                                                 { return root_ctlg_location_; }
-  manifest::ManifestEnsemble *manifest_ensemble() const
-                                       { return manifest_ensemble_.weak_ref(); }
+  RootCatalogLocation root_ctlg_location() const { return root_ctlg_location_; }
+  manifest::ManifestEnsemble *manifest_ensemble() const {
+    return manifest_ensemble_.weak_ref();
+  }
 
   void SetHash(shash::Any hash) { hash_ = hash; }
   void SetMountpoint(const PathString &mountpoint) { mountpoint_ = mountpoint; }
-  void SetSqlitePath(const std::string &sqlite_path)
-                                                 { sqlite_path_ = sqlite_path; }
-  void SetRootCtlgRevision(uint64_t root_ctlg_revision)
-                                   { root_ctlg_revision_ = root_ctlg_revision; }
-  void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location)
-                                   { root_ctlg_location_ = root_ctlg_location; }
+  void SetSqlitePath(const std::string &sqlite_path) {
+    sqlite_path_ = sqlite_path;
+  }
+  void SetRootCtlgRevision(uint64_t root_ctlg_revision) {
+    root_ctlg_revision_ = root_ctlg_revision;
+  }
+  void SetRootCtlgLocation(RootCatalogLocation root_ctlg_location) {
+    root_ctlg_location_ = root_ctlg_location;
+  }
   /**
    * Gives ownership to CatalogContext
    */
-  void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble)
-                                     { manifest_ensemble_ = manifest_ensemble; }
+  void TakeManifestEnsemble(manifest::ManifestEnsemble *manifest_ensemble) {
+    manifest_ensemble_ = manifest_ensemble;
+  }
 
 
  private:
@@ -187,31 +190,33 @@ struct Statistics {
 
   explicit Statistics(perf::Statistics *statistics) {
     n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
-        "Number of inode lookups");
+                                          "Number of inode lookups");
     n_lookup_path = statistics->Register("catalog_mgr.n_lookup_path",
-        "Number of path lookups");
+                                         "Number of path lookups");
     n_lookup_path_negative = statistics->Register(
         "catalog_mgr.n_lookup_path_negative",
         "Number of negative path lookups");
     n_lookup_xattrs = statistics->Register("catalog_mgr.n_lookup_xattrs",
-        "Number of xattrs lookups");
+                                           "Number of xattrs lookups");
     n_listing = statistics->Register("catalog_mgr.n_listing",
-        "Number of listings");
-    n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
+                                     "Number of listings");
+    n_nested_listing = statistics->Register(
+        "catalog_mgr.n_nested_listing",
         "Number of listings of nested catalogs");
-    n_detach_siblings = statistics->Register("catalog_mgr.n_detach_siblings",
+    n_detach_siblings = statistics->Register(
+        "catalog_mgr.n_detach_siblings",
         "Number of times the CVMFS_CATALOG_WATERMARK was hit");
     n_write_lock = statistics->Register("catalog_mgr.n_write_lock",
                                         "number of write lock calls");
     ns_write_lock = statistics->Register("catalog_mgr.ns_write_lock",
-        "time spent in WriteLock() [ns]");
-    catalog_revision = statistics->Register("catalog_revision",
-                                    "Revision number of the root file catalog");
+                                         "time spent in WriteLock() [ns]");
+    catalog_revision = statistics->Register(
+        "catalog_revision", "Revision number of the root file catalog");
   }
 };
 
 
-template <class CatalogT>
+template<class CatalogT>
 class AbstractCatalogManager;
 
 
@@ -231,10 +236,10 @@ class AbstractCatalogManager;
  *   catalog_manager->Init();
  *   catalog_manager->Lookup(<inode>, &<result_entry>);
  */
-template <class CatalogT>
+template<class CatalogT>
 class AbstractCatalogManager : public SingleCopy {
  public:
-  typedef std::vector<CatalogT*> CatalogList;
+  typedef std::vector<CatalogT *> CatalogList;
   typedef CatalogT catalog_t;
 
   static const inode_t kInodeOffset = 255;
@@ -251,8 +256,7 @@ class AbstractCatalogManager : public SingleCopy {
   bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
-                  DirectoryEntry *entry)
-  {
+                  DirectoryEntry *entry) {
     PathString p;
     p.Assign(&path[0], path.length());
     return LookupPath(p, options, entry);
@@ -288,7 +292,10 @@ class AbstractCatalogManager : public SingleCopy {
 
   Statistics statistics() const { return statistics_; }
   uint64_t inode_gauge() {
-    ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
+    ReadLock();
+    uint64_t r = inode_gauge_;
+    Unlock();
+    return r;
   }
   bool volatile_flag() const { return volatile_flag_; }
   uint64_t GetRevision() const;
@@ -306,10 +313,10 @@ class AbstractCatalogManager : public SingleCopy {
    * @return the root inode number
    */
   inline inode_t GetRootInode() const {
-    return inode_annotation_ ?
-      inode_annotation_->Annotate(kInodeOffset + 1) : kInodeOffset + 1;
+    return inode_annotation_ ? inode_annotation_->Annotate(kInodeOffset + 1)
+                             : kInodeOffset + 1;
   }
-  inline CatalogT* GetRootCatalog() const { return catalogs_.front(); }
+  inline CatalogT *GetRootCatalog() const { return catalogs_.front(); }
   /**
    * Inodes are ambiquitous under some circumstances, to prevent problems
    * they must be passed through this method first
@@ -340,7 +347,7 @@ class AbstractCatalogManager : public SingleCopy {
   virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
-  const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
+  const std::vector<CatalogT *> &GetCatalogs() const { return catalogs_; }
 
   /**
    * Opportunistic optimization: the client catalog manager uses this method
@@ -351,8 +358,7 @@ class AbstractCatalogManager : public SingleCopy {
    * Note that this method is never used for root catalogs.
    */
   virtual void StageNestedCatalogByHash(const shash::Any & /*hash*/,
-                                        const PathString & /*mountpoint*/)
-  { }
+                                        const PathString & /*mountpoint*/) { }
   /**
    * Called within the ReadLock(), which will be released before downloading
    * the catalog (and before leaving the method)
@@ -370,8 +376,8 @@ class AbstractCatalogManager : public SingleCopy {
    * @param parent_catalog  the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
-  virtual CatalogT* CreateCatalog(const PathString  &mountpoint,
-                                  const shash::Any  &catalog_hash,
+  virtual CatalogT *CreateCatalog(const PathString &mountpoint,
+                                  const shash::Any &catalog_hash,
                                   CatalogT *parent_catalog) = 0;
 
   CatalogT *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
@@ -388,7 +394,10 @@ class AbstractCatalogManager : public SingleCopy {
   void DetachCatalog(CatalogT *catalog);
   void DetachSubtree(CatalogT *catalog);
   void DetachSiblings(const PathString &current_tree);
-  void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
+  void DetachAll() {
+    if (!catalogs_.empty())
+      DetachSubtree(GetRootCatalog());
+  }
   bool IsAttached(const PathString &root_path,
                   CatalogT **attached_catalog) const;
 
@@ -421,8 +430,8 @@ class AbstractCatalogManager : public SingleCopy {
    * The flat list of all attached catalogs.
    */
   CatalogList catalogs_;
-  int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
-  uint64_t inode_gauge_;  /**< highest issued inode */
+  int inode_watermark_status_; /**< 0: OK, 1: > 32bit */
+  uint64_t inode_gauge_;       /**< highest issued inode */
   uint64_t revision_cache_;
   uint64_t timestamp_cache_;
   /**
@@ -449,7 +458,7 @@ class AbstractCatalogManager : public SingleCopy {
    */
   uint64_t incarnation_;
   // TODO(molina) we could just add an atomic global counter instead
-  InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
+  InodeAnnotation *inode_annotation_; /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
@@ -520,8 +529,8 @@ class InodeNfsGenerationAnnotation : public InodeAnnotation {
   virtual inode_t GetGeneration() { return inode_offset_; }
 
  private:
-  static const uint64_t kRootInode =
-    AbstractCatalogManager<Catalog>::kInodeOffset + 1;
+  static const uint64_t
+      kRootInode = AbstractCatalogManager<Catalog>::kInodeOffset + 1;
   uint64_t inode_offset_;
 };
 

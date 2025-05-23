@@ -77,7 +77,7 @@ class Statistics {
 
  private:
   Statistics(const Statistics &other);
-  Statistics& operator=(const Statistics &other);
+  Statistics &operator=(const Statistics &other);
   struct CounterInfo {
     explicit CounterInfo(const std::string &desc) : desc(desc) {
       atomic_init32(&refcnt);
@@ -100,23 +100,19 @@ class Statistics {
 class StatisticsTemplate {
  public:
   StatisticsTemplate(const std::string &name_major, Statistics *statistics)
-    : name_major_(name_major), statistics_(statistics)
-  { }
+      : name_major_(name_major), statistics_(statistics) { }
   StatisticsTemplate(const std::string &name_sub,
                      const StatisticsTemplate &statistics)
-    : name_major_(statistics.name_major_ + "." + name_sub)
-    , statistics_(statistics.statistics_)
-  { }
+      : name_major_(statistics.name_major_ + "." + name_sub)
+      , statistics_(statistics.statistics_) { }
 
   Counter *RegisterTemplated(const std::string &name_minor,
-                             const std::string &desc)
-  {
+                             const std::string &desc) {
     return statistics_->Register(name_major_ + "." + name_minor, desc);
   }
 
   Counter *RegisterOrLookupTemplated(const std::string &name_minor,
-                                     const std::string &desc)
-  {
+                                     const std::string &desc) {
     Counter *result = statistics_->Lookup(name_major_ + "." + name_minor);
     if (result == NULL) {
       return RegisterTemplated(name_minor, desc);
@@ -147,29 +143,27 @@ struct FsCounters {
 
   explicit FsCounters(StatisticsTemplate statistics) {
     n_files_added = statistics.RegisterTemplated("n_files_added",
-        "Number of files added");
+                                                 "Number of files added");
     n_files_removed = statistics.RegisterTemplated("n_files_removed",
-        "Number of files removed");
+                                                   "Number of files removed");
     n_files_changed = statistics.RegisterTemplated("n_files_changed",
-        "Number of files changed");
-    n_directories_added = statistics.RegisterTemplated("n_directories_added",
-        "Number of directories added");
-    n_directories_removed =
-                  statistics.RegisterTemplated("n_directories_removed",
-                                            "Number of directories removed");
-    n_directories_changed =
-                  statistics.RegisterTemplated("n_directories_changed",
-                                            "Number of directories changed");
+                                                   "Number of files changed");
+    n_directories_added = statistics.RegisterTemplated(
+        "n_directories_added", "Number of directories added");
+    n_directories_removed = statistics.RegisterTemplated(
+        "n_directories_removed", "Number of directories removed");
+    n_directories_changed = statistics.RegisterTemplated(
+        "n_directories_changed", "Number of directories changed");
     n_symlinks_added = statistics.RegisterTemplated("n_symlinks_added",
-        "Number of symlinks added");
-    n_symlinks_removed = statistics.RegisterTemplated("n_symlinks_removed",
-        "Number of symlinks removed");
-    n_symlinks_changed = statistics.RegisterTemplated("n_symlinks_changed",
-        "Number of symlinks changed");
+                                                    "Number of symlinks added");
+    n_symlinks_removed = statistics.RegisterTemplated(
+        "n_symlinks_removed", "Number of symlinks removed");
+    n_symlinks_changed = statistics.RegisterTemplated(
+        "n_symlinks_changed", "Number of symlinks changed");
     sz_added_bytes = statistics.RegisterTemplated("sz_added_bytes",
-                                            "Number of bytes added");
+                                                  "Number of bytes added");
     sz_removed_bytes = statistics.RegisterTemplated("sz_removed_bytes",
-                                            "Number of bytes removed");
+                                                    "Number of bytes removed");
   }
 };  // FsCounters
 

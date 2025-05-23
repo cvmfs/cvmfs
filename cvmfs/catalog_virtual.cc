@@ -25,33 +25,33 @@ namespace catalog {
 
 const char *VirtualCatalog::kVirtualPath = ".cvmfs";
 const char *VirtualCatalog::kSnapshotDirectory = "snapshots";
-const int VirtualCatalog::kActionNone              = 0x00;
+const int VirtualCatalog::kActionNone = 0x00;
 const int VirtualCatalog::kActionGenerateSnapshots = 0x01;
-const int VirtualCatalog::kActionRemove            = 0x02;
+const int VirtualCatalog::kActionRemove = 0x02;
 
 
 void VirtualCatalog::CreateBaseDirectory() {
   // Add /.cvmfs as a nested catalog
   DirectoryEntryBase entry_dir;
   entry_dir.name_ = NameString(string(kVirtualPath));
-  entry_dir.mode_ = S_IFDIR |
-                    S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+  entry_dir.mode_ = S_IFDIR | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH
+                    | S_IXOTH;
   entry_dir.uid_ = 0;
   entry_dir.gid_ = 0;
   entry_dir.size_ = 97;
   entry_dir.mtime_ = time(NULL);
   catalog_mgr_->AddDirectory(entry_dir, XattrList(), "");
-  WritableCatalog *parent_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *parent_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   catalog_mgr_->CreateNestedCatalog(kVirtualPath);
-  WritableCatalog *virtual_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   assert(parent_catalog != virtual_catalog);
 
   // Set hidden flag in parent catalog
   DirectoryEntry entry_parent;
   bool retval = parent_catalog->LookupPath(
-    PathString("/" + string(kVirtualPath)), &entry_parent);
+      PathString("/" + string(kVirtualPath)), &entry_parent);
   assert(retval);
   entry_parent.set_is_hidden(true);
   parent_catalog->UpdateEntry(entry_parent, "/" + string(kVirtualPath));
@@ -74,8 +74,8 @@ void VirtualCatalog::CreateNestedCatalogMarker() {
   shash::Any file_hash(algorithm);
   void *empty_compressed;
   uint64_t sz_empty_compressed;
-  bool retval = zlib::CompressMem2Mem(
-    NULL, 0, &empty_compressed, &sz_empty_compressed);
+  bool retval = zlib::CompressMem2Mem(NULL, 0, &empty_compressed,
+                                      &sz_empty_compressed);
   assert(retval);
   shash::HashMem(static_cast<unsigned char *>(empty_compressed),
                  sz_empty_compressed, &file_hash);
@@ -94,8 +94,8 @@ void VirtualCatalog::CreateNestedCatalogMarker() {
 void VirtualCatalog::CreateSnapshotDirectory() {
   DirectoryEntryBase entry_dir;
   entry_dir.name_ = NameString(string(kSnapshotDirectory));
-  entry_dir.mode_ = S_IFDIR |
-                    S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+  entry_dir.mode_ = S_IFDIR | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH
+                    | S_IXOTH;
   entry_dir.uid_ = 0;
   entry_dir.gid_ = 0;
   entry_dir.size_ = 97;
@@ -111,7 +111,7 @@ void VirtualCatalog::CreateSnapshotDirectory() {
 void VirtualCatalog::EnsurePresence() {
   DirectoryEntry e;
   bool retval = catalog_mgr_->LookupPath("/" + string(kVirtualPath),
-                                        kLookupDefault, &e);
+                                         kLookupDefault, &e);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogDebug, "creating new virtual catalog");
     CreateBaseDirectory();
@@ -189,10 +189,7 @@ void VirtualCatalog::GenerateSnapshots() {
 }
 
 
-bool VirtualCatalog::ParseActions(
-  const string &action_desc,
-  int *actions)
-{
+bool VirtualCatalog::ParseActions(const string &action_desc, int *actions) {
   *actions = kActionNone;
   if (action_desc.empty())
     return true;
@@ -213,14 +210,13 @@ bool VirtualCatalog::ParseActions(
 
 void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
   UniquePtr<history::History> history(
-    assistant_.GetHistory(swissknife::Assistant::kOpenReadOnly));
+      assistant_.GetHistory(swissknife::Assistant::kOpenReadOnly));
   vector<history::History::Tag> tags_history;
   bool retval = history->List(&tags_history);
   assert(retval);
   for (unsigned i = 0, l = tags_history.size(); i < l; ++i) {
-    if ((tags_history[i].name == swissknife::CommandTag::kHeadTag) ||
-        (tags_history[i].name == swissknife::CommandTag::kPreviousHeadTag))
-    {
+    if ((tags_history[i].name == swissknife::CommandTag::kHeadTag)
+        || (tags_history[i].name == swissknife::CommandTag::kPreviousHeadTag)) {
       continue;
     }
     tags->push_back(TagId(tags_history[i].name, tags_history[i].root_hash));
@@ -230,11 +226,11 @@ void VirtualCatalog::GetSortedTagsFromHistory(vector<TagId> *tags) {
 
 
 void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
-  WritableCatalog *virtual_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   assert(virtual_catalog != NULL);
-  Catalog::NestedCatalogList nested_catalogs =
-    virtual_catalog->ListNestedCatalogs();
+  Catalog::NestedCatalogList nested_catalogs = virtual_catalog
+                                                   ->ListNestedCatalogs();
   for (unsigned i = 0, l = nested_catalogs.size(); i < l; ++i) {
     tags->push_back(TagId(GetFileName(nested_catalogs[i].mountpoint).ToString(),
                           nested_catalogs[i].hash));
@@ -246,8 +242,8 @@ void VirtualCatalog::GetSortedTagsFromCatalog(vector<TagId> *tags) {
 void VirtualCatalog::InsertSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug, "add snapshot %s (%s) to virtual catalog",
            tag.name.c_str(), tag.hash.ToString().c_str());
-  UniquePtr<Catalog> catalog(assistant_.GetCatalog(tag.hash,
-                             swissknife::Assistant::kOpenReadOnly));
+  UniquePtr<Catalog> catalog(
+      assistant_.GetCatalog(tag.hash, swissknife::Assistant::kOpenReadOnly));
   assert(catalog.IsValid());
   assert(catalog->root_prefix().IsEmpty());
   DirectoryEntry entry_root;
@@ -257,16 +253,16 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   // Add directory entry
   DirectoryEntryBase entry_dir = entry_root;
   entry_dir.name_ = NameString(tag.name);
-  catalog_mgr_->AddDirectory(entry_dir, XattrList(),
-    string(kVirtualPath) + "/" + string(kSnapshotDirectory));
+  catalog_mgr_->AddDirectory(
+      entry_dir, XattrList(),
+      string(kVirtualPath) + "/" + string(kSnapshotDirectory));
 
   // Set "bind mount" flag
-  WritableCatalog *virtual_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   assert(virtual_catalog != NULL);
-  string mountpoint =
-    "/" + string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/" +
-    tag.name;
+  string mountpoint = "/" + string(kVirtualPath) + "/"
+                      + string(kSnapshotDirectory) + "/" + tag.name;
   DirectoryEntry entry_bind_mountpoint(entry_dir);
   entry_bind_mountpoint.set_is_bind_mountpoint(true);
   virtual_catalog->UpdateEntry(entry_bind_mountpoint, mountpoint);
@@ -282,12 +278,12 @@ void VirtualCatalog::Remove() {
   LogCvmfs(kLogCvmfs, kLogStdout, "Removing .cvmfs virtual catalog");
 
   // Safety check, make sure we don't remove the entire repository
-  WritableCatalog *virtual_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   assert(!virtual_catalog->IsRoot());
   DirectoryEntry entry_virtual;
-  bool retval = catalog_mgr_->LookupPath(
-    PathString("/" + string(kVirtualPath)), kLookupDefault, &entry_virtual);
+  bool retval = catalog_mgr_->LookupPath(PathString("/" + string(kVirtualPath)),
+                                         kLookupDefault, &entry_virtual);
   assert(retval);
   assert(entry_virtual.IsHidden());
 
@@ -319,26 +315,23 @@ void VirtualCatalog::RemoveRecursively(const string &directory) {
 
 void VirtualCatalog::RemoveSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug,
-           "remove snapshot %s (%s) from virtual catalog",
-           tag.name.c_str(), tag.hash.ToString().c_str());
-  string tag_dir =
-    string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/" + tag.name;
+           "remove snapshot %s (%s) from virtual catalog", tag.name.c_str(),
+           tag.hash.ToString().c_str());
+  string tag_dir = string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/"
+                   + tag.name;
   catalog_mgr_->RemoveDirectory(tag_dir);
 
-  WritableCatalog *virtual_catalog =
-    catalog_mgr_->GetHostingCatalog(kVirtualPath);
+  WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
+      kVirtualPath);
   assert(virtual_catalog != NULL);
   virtual_catalog->RemoveBindMountpoint("/" + tag_dir);
 }
 
 
-VirtualCatalog::VirtualCatalog(
-  manifest::Manifest *m,
-  download::DownloadManager *d,
-  catalog::WritableCatalogManager *c,
-  SyncParameters *p)
-  : catalog_mgr_(c)
-  , assistant_(d, m, p->stratum0, p->dir_temp)
-{ }
+VirtualCatalog::VirtualCatalog(manifest::Manifest *m,
+                               download::DownloadManager *d,
+                               catalog::WritableCatalogManager *c,
+                               SyncParameters *p)
+    : catalog_mgr_(c), assistant_(d, m, p->stratum0, p->dir_temp) { }
 
 }  // namespace catalog

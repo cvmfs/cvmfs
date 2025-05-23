@@ -2,10 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
-
-
 #include "compression/compression.h"
+#include "gtest/gtest.h"
 #include "util/pointer.h"
 #include "util/smalloc.h"
 
@@ -54,8 +52,8 @@ TEST_F(T_Compressor, Compression) {
 
   // Compress the output
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
-  bool deflate_finished =
-    compressor->Deflate(true, &input, &size_input, &buf, &buf_size);
+  bool deflate_finished = compressor->Deflate(true, &input, &size_input, &buf,
+                                              &buf_size);
 
   ASSERT_TRUE(deflate_finished);
   ASSERT_GT(buf_size, 0U);
@@ -64,8 +62,8 @@ TEST_F(T_Compressor, Compression) {
   // Decompress it, check if it's still the same
   char *decompress_buf;
   uint64_t decompress_size;
-  DecompressMem2Mem(buf, buf_size,
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
+  DecompressMem2Mem(buf, buf_size, reinterpret_cast<void **>(&decompress_buf),
+                    &decompress_size);
 
   // Check if the string is the same as the beginning
   ASSERT_EQ(0, strcmp(decompress_buf, test_string));
@@ -76,8 +74,8 @@ TEST_F(T_Compressor, Compression) {
 
 TEST_F(T_Compressor, CompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kZlibDefault);
-  unsigned char *compress_buf =
-    new unsigned char[compressor->DeflateBound(long_size)];
+  unsigned char
+      *compress_buf = new unsigned char[compressor->DeflateBound(long_size)];
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
@@ -86,8 +84,8 @@ TEST_F(T_Compressor, CompressionLong) {
 
   while (!deflate_finished) {
     // Compress the output in multiple stages
-    deflate_finished =
-      compressor->Deflate(true, &input, &remaining, &buf, &buf_size);
+    deflate_finished = compressor->Deflate(true, &input, &remaining, &buf,
+                                           &buf_size);
     memcpy(compress_buf + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;
@@ -101,7 +99,8 @@ TEST_F(T_Compressor, CompressionLong) {
   char *decompress_buf;
   uint64_t decompress_size;
   bool retval = DecompressMem2Mem(compress_buf, compress_pos,
-    reinterpret_cast<void **>(&decompress_buf), &decompress_size);
+                                  reinterpret_cast<void **>(&decompress_buf),
+                                  &decompress_size);
   EXPECT_EQ(true, retval);
   EXPECT_EQ(decompress_size, static_cast<uint64_t>(long_size));
   EXPECT_EQ(0, memcmp(decompress_buf, long_string, long_size));
@@ -115,8 +114,8 @@ TEST_F(T_Compressor, EchoCompression) {
   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
 
   unsigned char *input = reinterpret_cast<unsigned char *>(ptr_test_string);
-  bool deflate_finished =
-    compressor->Deflate(true, &input, &size_input, &buf, &buf_size);
+  bool deflate_finished = compressor->Deflate(true, &input, &size_input, &buf,
+                                              &buf_size);
 
   ASSERT_TRUE(deflate_finished);
   ASSERT_GT(buf_size, 0U);
@@ -131,7 +130,7 @@ TEST_F(T_Compressor, EchoCompression) {
 TEST_F(T_Compressor, EchoCompressionLong) {
   compressor = zlib::Compressor::Construct(zlib::kNoCompression);
   UniquePtr<unsigned char> compress_buf(reinterpret_cast<unsigned char *>(
-    smalloc(compressor->DeflateBound(long_size))));
+      smalloc(compressor->DeflateBound(long_size))));
   unsigned compress_pos = 0;
   bool deflate_finished = false;
   unsigned char *input = long_string;
@@ -140,8 +139,8 @@ TEST_F(T_Compressor, EchoCompressionLong) {
 
   while (!deflate_finished) {
     // Compress the output in multiple stages
-    deflate_finished =
-      compressor->Deflate(true, &input, &remaining, &buf, &buf_size);
+    deflate_finished = compressor->Deflate(true, &input, &remaining, &buf,
+                                           &buf_size);
     memcpy(compress_buf.weak_ref() + compress_pos, buf, buf_size);
     compress_pos += buf_size;
     rounds++;

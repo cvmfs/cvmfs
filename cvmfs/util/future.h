@@ -28,7 +28,7 @@ namespace CVMFS_NAMESPACE_GUARD {
  *
  * @param T  the value type wrapped by this Future template
  */
-template <typename T>
+template<typename T>
 class Future : SingleCopy {
  public:
   Future() : object_was_set_(false) {
@@ -63,12 +63,12 @@ class Future : SingleCopy {
    * will automatically block until a different thread calls Set().
    * @return  the containing value object
    */
-  T& Get() {
+  T &Get() {
     Wait();
     return object_;
   }
 
-  const T& Get() const {
+  const T &Get() const {
     Wait();
     return object_;
   }

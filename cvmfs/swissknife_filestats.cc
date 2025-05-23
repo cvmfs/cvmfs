@@ -18,7 +18,7 @@ namespace swissknife {
 ParameterList CommandFileStats::GetParams() const {
   ParameterList r;
   r.push_back(Parameter::Mandatory(
-              'r', "repository URL (absolute local path or remote URL)"));
+      'r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('o', "output database file"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional('k', "repository master key(s) / dir"));
@@ -30,19 +30,18 @@ ParameterList CommandFileStats::GetParams() const {
 
 int CommandFileStats::Main(const ArgumentList &args) {
   shash::Any manual_root_hash;
-  const std::string &repo_url  = *args.find('r')->second;
+  const std::string &repo_url = *args.find('r')->second;
   db_path_ = *args.find('o')->second;
-  const std::string &repo_name =
-    (args.count('n') > 0) ? *args.find('n')->second : "";
-  std::string repo_keys =
-    (args.count('k') > 0) ? *args.find('k')->second : "";
+  const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second
+                                                       : "";
+  std::string repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
   if (DirectoryExists(repo_keys))
     repo_keys = JoinStrings(FindFilesBySuffix(repo_keys, ".pub"), ":");
-  const std::string &tmp_dir   =
-    (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
+  const std::string &tmp_dir = (args.count('l') > 0) ? *args.find('l')->second
+                                                     : "/tmp";
   if (args.count('h') > 0) {
-    manual_root_hash = shash::MkFromHexPtr(shash::HexPtr(
-      *args.find('h')->second), shash::kSuffixCatalog);
+    manual_root_hash = shash::MkFromHexPtr(
+        shash::HexPtr(*args.find('h')->second), shash::kSuffixCatalog);
   }
 
   tmp_db_path_ = tmp_dir + "/cvmfs_filestats/";
@@ -52,18 +51,14 @@ int CommandFileStats::Main(const ArgumentList &args) {
   if (IsHttpUrl(repo_url)) {
     const bool follow_redirects = false;
     const string proxy = (args.count('@') > 0) ? *args.find('@')->second : "";
-    if (!this->InitDownloadManager(follow_redirects, proxy) ||
-        !this->InitSignatureManager(repo_keys)) {
+    if (!this->InitDownloadManager(follow_redirects, proxy)
+        || !this->InitSignatureManager(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to init remote connection");
       return 1;
     }
 
-    HttpObjectFetcher<catalog::Catalog,
-                      history::SqliteHistory> fetcher(repo_name,
-                                                      repo_url,
-                                                      tmp_dir,
-                                                      download_manager(),
-                                                      signature_manager());
+    HttpObjectFetcher<catalog::Catalog, history::SqliteHistory> fetcher(
+        repo_name, repo_url, tmp_dir, download_manager(), signature_manager());
     success = Run(&fetcher);
   } else {
     LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
@@ -73,9 +68,8 @@ int CommandFileStats::Main(const ArgumentList &args) {
   return (success) ? 0 : 1;
 }
 
-template <class ObjectFetcherT>
-bool CommandFileStats::Run(ObjectFetcherT *object_fetcher)
-{
+template<class ObjectFetcherT>
+bool CommandFileStats::Run(ObjectFetcherT *object_fetcher) {
   atomic_init32(&finished_);
 
   string abs_path = GetAbsolutePath(db_path_);
@@ -103,9 +97,9 @@ bool CommandFileStats::Run(ObjectFetcherT *object_fetcher)
 }
 
 void CommandFileStats::CatalogCallback(
-  const CatalogTraversalData<catalog::Catalog> &data) {
+    const CatalogTraversalData<catalog::Catalog> &data) {
   int32_t num = atomic_read32(&num_downloaded_);
-  string out_path =  tmp_db_path_ + StringifyInt(num + 1) + ".db";
+  string out_path = tmp_db_path_ + StringifyInt(num + 1) + ".db";
   assert(CopyPath2Path(data.catalog->database_path(), out_path));
   atomic_inc32(&num_downloaded_);
 }
@@ -120,8 +114,8 @@ void *CommandFileStats::MainProcessing(void *data) {
   while (fin == 0 || processed < downloaded) {
     if (processed < downloaded) {
       LogCvmfs(kLogCatalog, kLogStdout, "Processing catalog %d", processed);
-      string db_path = repo_stats->tmp_db_path_ + "/" +
-                       StringifyInt(processed + 1) + ".db";
+      string db_path = repo_stats->tmp_db_path_ + "/"
+                       + StringifyInt(processed + 1) + ".db";
       repo_stats->ProcessCatalog(db_path);
       ++processed;
     }
@@ -134,12 +128,10 @@ void *CommandFileStats::MainProcessing(void *data) {
 }
 
 
-
 void CommandFileStats::ProcessCatalog(string db_path) {
   sqlite::Database<catalog::CatalogDatabase> *cat_db;
   cat_db = sqlite::Database<catalog::CatalogDatabase>::Open(
-           db_path,
-           sqlite::Database<catalog::CatalogDatabase>::kOpenReadOnly);
+      db_path, sqlite::Database<catalog::CatalogDatabase>::kOpenReadOnly);
   cat_db->TakeFileOwnership();
 
   int64_t file_size = GetFileSize(db_path);
@@ -150,29 +142,26 @@ void CommandFileStats::ProcessCatalog(string db_path) {
                                          file_size);
   delete catalog_count;
 
-  sqlite::Sql *catalog_list =
-    new sqlite::Sql(cat_db->sqlite_db(),
-                    "SELECT hash, size, flags, symlink FROM catalog;");
-  sqlite::Sql *chunks_list =
-    new sqlite::Sql(cat_db->sqlite_db(),
-                    "SELECT md5path_1, md5path_2, size, hash FROM chunks "
-                    "ORDER BY md5path_1 ASC, md5path_2 ASC;");
+  sqlite::Sql *catalog_list = new sqlite::Sql(
+      cat_db->sqlite_db(), "SELECT hash, size, flags, symlink FROM catalog;");
+  sqlite::Sql *chunks_list = new sqlite::Sql(
+      cat_db->sqlite_db(),
+      "SELECT md5path_1, md5path_2, size, hash FROM chunks "
+      "ORDER BY md5path_1 ASC, md5path_2 ASC;");
 
   while (catalog_list->FetchRow()) {
     const void *hash = catalog_list->RetrieveBlob(0);
     int num_bytes = catalog_list->RetrieveBytes(0);
     int64_t size = catalog_list->RetrieveInt64(1);
     int flags = catalog_list->RetrieveInt(2);
-    if ((flags & catalog::SqlDirent::kFlagLink) ==
-                catalog::SqlDirent::kFlagLink) {
+    if ((flags & catalog::SqlDirent::kFlagLink)
+        == catalog::SqlDirent::kFlagLink) {
       int symlink_length = catalog_list->RetrieveBytes(3);
       db_->StoreSymlink(symlink_length);
-    } else if ((flags & catalog::SqlDirent::kFlagFile) ==
-               catalog::SqlDirent::kFlagFile)
-    {
-      if ((flags & catalog::SqlDirent::kFlagFileChunk) !=
-           catalog::SqlDirent::kFlagFileChunk)
-      {
+    } else if ((flags & catalog::SqlDirent::kFlagFile)
+               == catalog::SqlDirent::kFlagFile) {
+      if ((flags & catalog::SqlDirent::kFlagFileChunk)
+          != catalog::SqlDirent::kFlagFileChunk) {
         int object_id = db_->StoreObject(hash, num_bytes, size);
         db_->StoreFile(cur_catalog_id, object_id);
       } else {
@@ -211,55 +200,66 @@ unsigned FileStatsDatabase::kLatestSchemaRevision = 1;
 bool FileStatsDatabase::CreateEmptyDatabase() {
   bool ret = true;
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE TABLE catalogs ("
-    "catalog_id INTEGER PRIMARY KEY,"
-    "num_entries INTEGER,"
-    "file_size INTEGER"
-    ");").Execute();
+                     "CREATE TABLE catalogs ("
+                     "catalog_id INTEGER PRIMARY KEY,"
+                     "num_entries INTEGER,"
+                     "file_size INTEGER"
+                     ");")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE TABLE objects ("
-    "object_id INTEGER PRIMARY KEY,"
-    "hash BLOB,"
-    "size INTEGER"
-    ");").Execute();
+                     "CREATE TABLE objects ("
+                     "object_id INTEGER PRIMARY KEY,"
+                     "hash BLOB,"
+                     "size INTEGER"
+                     ");")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE INDEX idx_object_hash "
-    "ON objects (hash);").Execute();
+                     "CREATE INDEX idx_object_hash "
+                     "ON objects (hash);")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE TABLE files ("
-    "file_id INTEGER PRIMARY KEY,"
-    "catalog_id INTEGER,"
-    "FOREIGN KEY (catalog_id) REFERENCES catalogs (catalog_id)"
-    ");").Execute();
+                     "CREATE TABLE files ("
+                     "file_id INTEGER PRIMARY KEY,"
+                     "catalog_id INTEGER,"
+                     "FOREIGN KEY (catalog_id) REFERENCES catalogs (catalog_id)"
+                     ");")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE TABLE files_objects ("
-    "file_id INTEGER,"
-    "object_id INTEGER,"
-    "FOREIGN KEY (file_id) REFERENCES files (file_id),"
-    "FOREIGN KEY (object_id) REFERENCES objects (object_id));").Execute();
+                     "CREATE TABLE files_objects ("
+                     "file_id INTEGER,"
+                     "object_id INTEGER,"
+                     "FOREIGN KEY (file_id) REFERENCES files (file_id),"
+                     "FOREIGN KEY (object_id) REFERENCES objects (object_id));")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE INDEX idx_file_id ON files_objects (file_id);").Execute();
+                     "CREATE INDEX idx_file_id ON files_objects (file_id);")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE INDEX idx_object_id ON files_objects (object_id);").Execute();
+                     "CREATE INDEX idx_object_id ON files_objects (object_id);")
+             .Execute();
   ret &= sqlite::Sql(sqlite_db(),
-    "CREATE TABLE symlinks ("
-    "length INTEGER);").Execute();
+                     "CREATE TABLE symlinks ("
+                     "length INTEGER);")
+             .Execute();
   return ret;
 }
 
 void FileStatsDatabase::InitStatements() {
-  query_insert_catalog = new sqlite::Sql(sqlite_db(),
-    "INSERT INTO catalogs (num_entries, file_size) VALUES (:num, :size);");
-  query_insert_object = new sqlite::Sql(sqlite_db(),
-    "INSERT INTO objects (hash, size) VALUES (:hash, :size);");
-  query_insert_file = new sqlite::Sql(sqlite_db(),
-    "INSERT INTO files (catalog_id) VALUES (:catalog);");
-  query_insert_file_object = new sqlite::Sql(sqlite_db(),
-    "INSERT INTO files_objects (file_id, object_id) VALUES (:file, :object);");
-  query_insert_symlink = new sqlite::Sql(sqlite_db(),
-    "INSERT INTO symlinks (length) VALUES(:length);");
-  query_lookup_object = new sqlite::Sql(sqlite_db(),
-    "SELECT object_id FROM objects WHERE hash = :hash;");
+  query_insert_catalog = new sqlite::Sql(
+      sqlite_db(),
+      "INSERT INTO catalogs (num_entries, file_size) VALUES (:num, :size);");
+  query_insert_object = new sqlite::Sql(
+      sqlite_db(), "INSERT INTO objects (hash, size) VALUES (:hash, :size);");
+  query_insert_file = new sqlite::Sql(
+      sqlite_db(), "INSERT INTO files (catalog_id) VALUES (:catalog);");
+  query_insert_file_object = new sqlite::Sql(
+      sqlite_db(),
+      "INSERT INTO files_objects (file_id, object_id) VALUES (:file, "
+      ":object);");
+  query_insert_symlink = new sqlite::Sql(
+      sqlite_db(), "INSERT INTO symlinks (length) VALUES(:length);");
+  query_lookup_object = new sqlite::Sql(
+      sqlite_db(), "SELECT object_id FROM objects WHERE hash = :hash;");
 }
 
 void FileStatsDatabase::DestroyStatements() {
@@ -301,7 +301,7 @@ int64_t FileStatsDatabase::StoreChunkedFile(int64_t catalog_id) {
 }
 
 int64_t FileStatsDatabase::StoreChunk(const void *hash, int hash_size,
-                                  int64_t size, int64_t file_id) {
+                                      int64_t size, int64_t file_id) {
   int object_id = StoreObject(hash, hash_size, size);
 
   query_insert_file_object->Reset();
@@ -312,7 +312,7 @@ int64_t FileStatsDatabase::StoreChunk(const void *hash, int hash_size,
 }
 
 int64_t FileStatsDatabase::StoreObject(const void *hash, int hash_size,
-                                   int64_t size) {
+                                       int64_t size) {
   query_lookup_object->Reset();
   query_lookup_object->BindBlob(1, hash, hash_size);
   if (query_lookup_object->FetchRow()) {

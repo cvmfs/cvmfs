@@ -28,7 +28,7 @@ class TubeConsumerGroup;
  * Base class for threads that processes items from a tube one by one.  Concrete
  * implementations overwrite the Process() method.
  */
-template <class ItemT>
+template<class ItemT>
 class TubeConsumer : SingleCopy {
   friend class TubeConsumerGroup<ItemT>;
 
@@ -44,8 +44,8 @@ class TubeConsumer : SingleCopy {
 
  private:
   static void *MainConsumer(void *data) {
-    TubeConsumer<ItemT> *consumer =
-      reinterpret_cast<TubeConsumer<ItemT> *>(data);
+    TubeConsumer<ItemT> *consumer = reinterpret_cast<TubeConsumer<ItemT> *>(
+        data);
 
     while (true) {
       ItemT *item = consumer->tube_->PopFront();
@@ -61,7 +61,7 @@ class TubeConsumer : SingleCopy {
 };
 
 
-template <class ItemT>
+template<class ItemT>
 class TubeConsumerGroup : SingleCopy {
  public:
   TubeConsumerGroup() : is_active_(false) { }
@@ -82,7 +82,7 @@ class TubeConsumerGroup : SingleCopy {
     threads_.resize(N);
     for (unsigned i = 0; i < N; ++i) {
       int retval = pthread_create(
-        &threads_[i], NULL, TubeConsumer<ItemT>::MainConsumer, consumers_[i]);
+          &threads_[i], NULL, TubeConsumer<ItemT>::MainConsumer, consumers_[i]);
       if (retval != 0) {
         PANIC(kLogStderr, "failed to create new thread (error: %d, pid: %d)",
               errno, getpid());

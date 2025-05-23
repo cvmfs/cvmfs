@@ -28,11 +28,9 @@ class BigVector {
     shared_buffer_ = false;
   }
 
-  BigVector(const BigVector<Item> &other) {
-    CopyFrom(other);
-  }
+  BigVector(const BigVector<Item> &other) { CopyFrom(other); }
 
-  BigVector<Item> &operator= (const BigVector<Item> &other) {
+  BigVector<Item> &operator=(const BigVector<Item> &other) {
     if (&other == this)
       return *this;
 
@@ -69,9 +67,7 @@ class BigVector {
     buffer_[index] = item;
   }
 
-  bool IsEmpty() const {
-    return size_ == 0;
-  }
+  bool IsEmpty() const { return size_ == 0; }
 
   void Clear() {
     Dealloc();
@@ -123,7 +119,7 @@ class BigVector {
 
  private:
   static const size_t kNumInit = 16;
-  static const size_t kMmapThreshold = 128*1024;
+  static const size_t kMmapThreshold = 128 * 1024;
 
   Item *Alloc(const size_t num_elements) {
     Item *result;

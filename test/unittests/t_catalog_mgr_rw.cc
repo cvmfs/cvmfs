@@ -15,14 +15,15 @@ using namespace std;  // NOLINT
 namespace {
 
 // Create some default hashes for DirSpec
-const char* g_hashes[] = {"b026324c6904b2a9cb4b88d6d61c81d100000000",
-                          "26ab0db90d72e28ad0ba1e22ee51051000000000",
-                          "6d7fce9fee471194aa8b5b6e47267f0300000000",
-                          "48a24b70a0b376535542b996af51739800000000",
-                          "1dcca23355272056f04fe8bf20edfce000000000",
-                          "1111111111111111111111111111111111111111",
-                          "a34b51ff1b544f7f8d14e0fa5141830f00000000",
-                          "6521257477da480594743cb7b24535ff00000000",
+const char *g_hashes[] = {
+    "b026324c6904b2a9cb4b88d6d61c81d100000000",
+    "26ab0db90d72e28ad0ba1e22ee51051000000000",
+    "6d7fce9fee471194aa8b5b6e47267f0300000000",
+    "48a24b70a0b376535542b996af51739800000000",
+    "1dcca23355272056f04fe8bf20edfce000000000",
+    "1111111111111111111111111111111111111111",
+    "a34b51ff1b544f7f8d14e0fa5141830f00000000",
+    "6521257477da480594743cb7b24535ff00000000",
 };
 
 const size_t g_file_size = 4096;
@@ -38,7 +39,7 @@ DirSpec MakeBaseSpec() {
   EXPECT_TRUE(spec.AddFile("file1", "dir", g_hashes[0], g_file_size));
 
   // adding "/dir/dir"
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir", "dir", g_file_size));
   EXPECT_TRUE(spec.AddDirectory("dir2", "dir", g_file_size));
   EXPECT_TRUE(spec.AddDirectory("dir3", "dir", g_file_size));
 
@@ -55,20 +56,20 @@ DirSpec MakeBaseSpec() {
   EXPECT_TRUE(spec.AddFile("file2", "dir/dir3", g_hashes[4], g_file_size));
 
   // Adding Deeply nested catalog
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir", g_file_size));
-  EXPECT_TRUE(spec.AddDirectory("dir",  "dir/dir/dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir", "dir/dir", g_file_size));
+  EXPECT_TRUE(spec.AddDirectory("dir", "dir/dir/dir", g_file_size));
   EXPECT_TRUE(
-    spec.AddFile("file1",  "dir/dir/dir/dir", g_hashes[0], g_file_size));
+      spec.AddFile("file1", "dir/dir/dir/dir", g_hashes[0], g_file_size));
   EXPECT_TRUE(spec.AddNestedCatalog("dir/dir/dir"));
 
   // adding sub-nested catalogs
   EXPECT_TRUE(spec.AddDirectory("sub1", "dir/dir/dir", g_file_size));
-  EXPECT_TRUE(spec.AddFile("file1", "dir/dir/dir/sub1",
-                           g_hashes[6], g_file_size));
+  EXPECT_TRUE(
+      spec.AddFile("file1", "dir/dir/dir/sub1", g_hashes[6], g_file_size));
   EXPECT_TRUE(spec.AddNestedCatalog("dir/dir/dir/sub1"));
   EXPECT_TRUE(spec.AddDirectory("sub2", "dir/dir/dir", g_file_size));
-  EXPECT_TRUE(spec.AddFile("file2", "dir/dir/dir/sub2",
-                           g_hashes[7], g_file_size));
+  EXPECT_TRUE(
+      spec.AddFile("file2", "dir/dir/dir/sub2", g_hashes[7], g_file_size));
   EXPECT_TRUE(spec.AddNestedCatalog("dir/dir/dir/sub2"));
 
   return spec;
@@ -81,13 +82,10 @@ namespace catalog {
 
 class T_CatalogMgrRw : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-  }
+  virtual void SetUp() { }
 
-  virtual void TearDown() {
-  }
+  virtual void TearDown() { }
 };
-
 
 
 TEST_F(T_CatalogMgrRw, CloneTreeFailSlow) {
@@ -126,8 +124,8 @@ TEST_F(T_CatalogMgrRw, CloneTree) {
   EXPECT_STREQ(g_hashes[0], dirent.checksum().ToString().c_str());
   EXPECT_EQ(g_file_size, dirent.size());
 
-  EXPECT_TRUE(catalog_mgr->LookupPath("/clone/dir/dir",
-                                      kLookupDefault, &dirent));
+  EXPECT_TRUE(
+      catalog_mgr->LookupPath("/clone/dir/dir", kLookupDefault, &dirent));
   EXPECT_TRUE(dirent.IsNestedCatalogRoot());
 }
 
@@ -147,28 +145,28 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalog) {
   shash::Any sub2_hash;
   uint64_t sub1_size;
   uint64_t sub2_size;
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &sub1_hash, &sub1_size));
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"),
-                                        &path, &sub2_hash, &sub2_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"), &path,
+                                        &sub2_hash, &sub2_size));
 
   // Swap sub1 with itself
   DirectoryEntry dirent;
   catalog_mgr->DetachNested();
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size);
-  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1",
-                                      kLookupDefault, &dirent));
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1", kLookupDefault,
+                                      &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 
   // Swap sub1 and sub2
   catalog_mgr->DetachNested();
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub2_hash, sub2_size);
   catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub2", sub1_hash, sub1_size);
-  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file2",
-                                      kLookupDefault, &dirent));
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file2", kLookupDefault,
+                                      &dirent));
   EXPECT_STREQ(g_hashes[7], dirent.checksum().ToString().c_str());
-  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub2/file1",
-                                      kLookupDefault, &dirent));
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub2/file1", kLookupDefault,
+                                      &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
 }
 
@@ -188,10 +186,10 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
   shash::Any sub2_hash;
   uint64_t sub1_size;
   uint64_t sub2_size;
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &sub1_hash, &sub1_size));
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"),
-                                        &path, &sub2_hash, &sub2_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"), &path,
+                                        &sub2_hash, &sub2_size));
 
   // Create nonexistent nested catalog hash
   shash::Any subX_hash(shash::kMd5,
@@ -201,25 +199,25 @@ TEST_F(T_CatalogMgrRw, SwapNestedCatalogFailSlow) {
 
   // Fail if parent catalog does not exist
   catalog_mgr->DetachNested();
-  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("no/such/dir/sub1",
-                                              sub1_hash, sub1_size));
+  EXPECT_ANY_THROW(
+      catalog_mgr->SwapNestedCatalog("no/such/dir/sub1", sub1_hash, sub1_size));
 
   // Fail for directory that is not a nested catalog
   catalog_mgr->DetachNested();
-  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir",
-                                              sub1_hash, sub1_size));
+  EXPECT_ANY_THROW(
+      catalog_mgr->SwapNestedCatalog("dir/dir", sub1_hash, sub1_size));
 
   // Fail for nested catalog that is already attached and modified
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &sub1_hash, &sub1_size));
   catalog_mgr->RemoveFile("dir/dir/dir/sub1/file1");
-  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
-                                              sub1_hash, sub1_size));
+  EXPECT_ANY_THROW(
+      catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size));
 
   // Fail for non-existent catalog
   catalog_mgr->DetachNested();
-  EXPECT_ANY_THROW(catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1",
-                                              subX_hash, subX_size));
+  EXPECT_ANY_THROW(
+      catalog_mgr->SwapNestedCatalog("dir/dir/dir/sub1", subX_hash, subX_size));
 }
 
 TEST_F(T_CatalogMgrRw, GraftNestedCatalog) {
@@ -234,21 +232,21 @@ TEST_F(T_CatalogMgrRw, GraftNestedCatalog) {
   PathString path;
   shash::Any sub1_hash;
   uint64_t sub1_size;
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &sub1_hash, &sub1_size));
 
   catalog_mgr->RemoveNestedCatalog("dir/dir/dir/sub1");
   catalog_mgr->RemoveDirectory("dir/dir/dir/sub1");
   catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size);
 
   DirectoryEntry dirent;
-  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1",
-                                      kLookupDefault, &dirent));
+  EXPECT_TRUE(catalog_mgr->LookupPath("/dir/dir/dir/sub1/file1", kLookupDefault,
+                                      &dirent));
   EXPECT_STREQ(g_hashes[6], dirent.checksum().ToString().c_str());
   shash::Any check_hash;
   uint64_t check_size;
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &check_hash, &check_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &check_hash, &check_size));
   EXPECT_EQ(sub1_hash, check_hash);
   EXPECT_EQ(sub1_size, check_size);
 }
@@ -267,26 +265,26 @@ TEST_F(T_CatalogMgrRw, GraftNestedCatalogFail) {
   uint64_t sub1_size;
   shash::Any sub2_hash;
   uint64_t sub2_size;
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"),
-                                        &path, &sub1_hash, &sub1_size));
-  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"),
-                                        &path, &sub2_hash, &sub2_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub1"), &path,
+                                        &sub1_hash, &sub1_size));
+  EXPECT_TRUE(catalog_mgr->LookupNested(PathString("/dir/dir/dir/sub2"), &path,
+                                        &sub2_hash, &sub2_size));
 
   // Fail if directory is not empty
-  EXPECT_ANY_THROW(
-    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size));
+  EXPECT_ANY_THROW(catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1",
+                                                   sub1_hash, sub1_size));
 
   catalog_mgr->RemoveNestedCatalog("dir/dir/dir/sub1");
   catalog_mgr->RemoveDirectory("dir/dir/dir/sub1");
   // Wrong nested catalog should fail
-  EXPECT_ANY_THROW(
-    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub2_hash, sub2_size));
+  EXPECT_ANY_THROW(catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1",
+                                                   sub2_hash, sub2_size));
 
   // Missing parent should fail
   catalog_mgr->RemoveDirectory("dir/dir/dir");
   EXPECT_DEATH(
-    catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size),
-    ".*");
+      catalog_mgr->GraftNestedCatalog("dir/dir/dir/sub1", sub1_hash, sub1_size),
+      ".*");
 }
 
 }  // namespace catalog

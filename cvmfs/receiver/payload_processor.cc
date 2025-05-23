@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+
 #include <vector>
 
 #include "params.h"
@@ -22,35 +23,32 @@ const size_t kConsumerBuffer = 10 * 1024 * 1024;  // 10 MB
 namespace receiver {
 
 FileInfo::FileInfo()
-  : handle(NULL),
-    total_size(0),
-    current_size(0),
-    hash_context(),
-    hash_buffer()
-{}
+    : handle(NULL)
+    , total_size(0)
+    , current_size(0)
+    , hash_context()
+    , hash_buffer() { }
 
-FileInfo::FileInfo(const ObjectPackBuild::Event& event)
-  : handle(NULL),
-    total_size(event.size),
-    current_size(0),
-    hash_context(shash::ContextPtr(event.id.algorithm)),
-    hash_buffer(hash_context.size, 0)
-{
+FileInfo::FileInfo(const ObjectPackBuild::Event &event)
+    : handle(NULL)
+    , total_size(event.size)
+    , current_size(0)
+    , hash_context(shash::ContextPtr(event.id.algorithm))
+    , hash_buffer(hash_context.size, 0) {
   hash_context.buffer = &hash_buffer[0];
   shash::Init(hash_context);
 }
 
-FileInfo::FileInfo(const FileInfo& other)
-  : handle(other.handle),
-    total_size(other.total_size),
-    current_size(other.current_size),
-    hash_context(other.hash_context),
-    hash_buffer(other.hash_buffer)
-{
+FileInfo::FileInfo(const FileInfo &other)
+    : handle(other.handle)
+    , total_size(other.total_size)
+    , current_size(other.current_size)
+    , hash_context(other.hash_context)
+    , hash_buffer(other.hash_buffer) {
   hash_context.buffer = &hash_buffer[0];
 }
 
-FileInfo& FileInfo::operator=(const FileInfo& other) {
+FileInfo &FileInfo::operator=(const FileInfo &other) {
   handle = other.handle;
   total_size = other.total_size;
   current_size = other.current_size;
@@ -62,17 +60,17 @@ FileInfo& FileInfo::operator=(const FileInfo& other) {
 }
 
 PayloadProcessor::PayloadProcessor()
-    : pending_files_(),
-      current_repo_(),
-      uploader_(),
-      temp_dir_(),
-      num_errors_(0),
-      statistics_(NULL) {}
+    : pending_files_()
+    , current_repo_()
+    , uploader_()
+    , temp_dir_()
+    , num_errors_(0)
+    , statistics_(NULL) { }
 
-PayloadProcessor::~PayloadProcessor() {}
+PayloadProcessor::~PayloadProcessor() { }
 
 PayloadProcessor::Result PayloadProcessor::Process(
-    int fdin, const std::string& header_digest, const std::string& path,
+    int fdin, const std::string &header_digest, const std::string &path,
     uint64_t header_size) {
   LogCvmfs(kLogReceiver, kLogSyslog,
            "PayloadProcessor - lease_path: %s, header digest: %s, header "
@@ -100,8 +98,8 @@ PayloadProcessor::Result PayloadProcessor::Process(
   do {
     nb = read(fdin, &buffer[0], buffer.size());
     consumer_state = deserializer.ConsumeNext(nb, &buffer[0]);
-    if (consumer_state != ObjectPackBuild::kStateContinue &&
-        consumer_state != ObjectPackBuild::kStateDone) {
+    if (consumer_state != ObjectPackBuild::kStateContinue
+        && consumer_state != ObjectPackBuild::kStateDone) {
       LogCvmfs(kLogReceiver, kLogSyslogErr,
                "PayloadProcessor - error: %d encountered when consuming object "
                "pack.",
@@ -120,7 +118,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
 }
 
 void PayloadProcessor::ConsumerEventCallback(
-    const ObjectPackBuild::Event& event) {
+    const ObjectPackBuild::Event &event) {
   std::string path("");
 
   if (event.object_type == ObjectPack::kCas) {
@@ -146,16 +144,17 @@ void PayloadProcessor::ConsumerEventCallback(
     pending_files_[event.id] = info;
   }
 
-  FileInfo& info = pending_files_[event.id];
+  FileInfo &info = pending_files_[event.id];
 
   void *buf_copied = smalloc(event.buf_size);
   memcpy(buf_copied, event.buf, event.buf_size);
   upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
-  uploader_->ScheduleUpload(info.handle, buf,
-    upload::AbstractUploader::MakeClosure(
-      &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
+  uploader_->ScheduleUpload(
+      info.handle, buf,
+      upload::AbstractUploader::MakeClosure(
+          &PayloadProcessor::OnUploadJobComplete, this, buf_copied));
 
-  shash::Update(static_cast<const unsigned char*>(event.buf),
+  shash::Update(static_cast<const unsigned char *>(event.buf),
                 event.buf_size,
                 info.hash_context);
 
@@ -170,8 +169,8 @@ void PayloadProcessor::ConsumerEventCallback(
           kLogReceiver, kLogSyslogErr,
           "PayloadProcessor - error: Hash mismatch for unpacked file: event "
           "size: %ld, file size: %ld, event hash: %s, file hash: %s",
-          event.size, info.current_size,
-          event.id.ToString(true).c_str(), file_hash.ToString(true).c_str());
+          event.size, info.current_size, event.id.ToString(true).c_str(),
+          file_hash.ToString(true).c_str());
       num_errors_++;
       return;
     }
@@ -186,9 +185,7 @@ void PayloadProcessor::ConsumerEventCallback(
 }
 
 void PayloadProcessor::OnUploadJobComplete(
-  const upload::UploaderResults &results,
-  void *buffer)
-{
+    const upload::UploaderResults &results, void *buffer) {
   free(buffer);
 }
 
@@ -205,12 +202,12 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
     return kOtherError;
   }
 
-  const std::string spooler_temp_dir =
-      GetSpoolerTempDir(params.spooler_configuration);
+  const std::string spooler_temp_dir = GetSpoolerTempDir(
+      params.spooler_configuration);
   assert(!spooler_temp_dir.empty());
   assert(MkdirDeep(spooler_temp_dir + "/receiver", 0770, true));
-  temp_dir_ =
-      RaiiTempDir::Create(spooler_temp_dir + "/receiver/payload_processor");
+  temp_dir_ = RaiiTempDir::Create(spooler_temp_dir
+                                  + "/receiver/payload_processor");
 
   upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
@@ -220,7 +217,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
 
   uploader_.Destroy();
 
-    // configure the uploader environment
+  // configure the uploader environment
   uploader_ = upload::AbstractUploader::Construct(definition);
   if (!uploader_.IsValid()) {
     LogCvmfs(kLogSpooler, kLogWarning,
@@ -251,7 +248,8 @@ PayloadProcessor::Result PayloadProcessor::Finalize() {
 
   if (GetNumErrors() > 0) {
     LogCvmfs(kLogReceiver, kLogSyslogErr,
-            "PayloadProcessor - error: %d unpacking error(s).", GetNumErrors());
+             "PayloadProcessor - error: %d unpacking error(s).",
+             GetNumErrors());
     return kOtherError;
   }
 

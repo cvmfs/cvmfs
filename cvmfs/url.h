@@ -21,7 +21,7 @@ class Url {
    *     and port <port>
    */
   static const int kDefaultPort;
-  static const char* kDefaultProtocol;
+  static const char *kDefaultProtocol;
 
   /**
    * Parse an URL string
@@ -31,10 +31,10 @@ class Url {
    * used when the input string doesn't contain these parts. The default
    * protocol is "http" and the default port is 80
    */
-  static Url* Parse(const std::string& url,
-                    const std::string& default_protocol = kDefaultProtocol,
+  static Url *Parse(const std::string &url,
+                    const std::string &default_protocol = kDefaultProtocol,
                     int default_port = kDefaultPort);
-  static bool ValidateHost(const std::string& host);
+  static bool ValidateHost(const std::string &host);
 
   ~Url();
 
@@ -46,8 +46,8 @@ class Url {
 
  private:
   Url();
-  Url(const std::string& protocol, const std::string& host,
-      const std::string& path, int port);
+  Url(const std::string &protocol, const std::string &host,
+      const std::string &path, int port);
 
   std::string protocol_;
   std::string host_;

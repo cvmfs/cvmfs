@@ -26,13 +26,13 @@
 #include "xattr.h"
 
 #ifdef __GLIBC__
-  #if __GLIBC_MINOR__ < 6
-    #warning No lutimes support, glibc >= 2.6 required
-  #else
-    #define CVMFS_HAS_LUTIMES 1
-  #endif
+#if __GLIBC_MINOR__ < 6
+#warning No lutimes support, glibc >= 2.6 required
 #else
-  #define CVMFS_HAS_LUTIMES 1
+#define CVMFS_HAS_LUTIMES 1
+#endif
+#else
+#define CVMFS_HAS_LUTIMES 1
 #endif
 
 
@@ -54,12 +54,11 @@ void InitializeWarningFile(struct fs_traversal_context *ctx) {
     fclose(f);
   } else {
     LogCvmfs(kLogCvmfs, kLogStderr,
-      "Could not write warning file for posix file system!");
+             "Could not write warning file for posix file system!");
   }
 }
 
-std::string BuildPath(struct fs_traversal_context *ctx,
-  const char *dir) {
+std::string BuildPath(struct fs_traversal_context *ctx, const char *dir) {
   std::string result = ctx->base;
   result += ctx->repo;
   if (dir[0] != '/') {
@@ -70,20 +69,22 @@ std::string BuildPath(struct fs_traversal_context *ctx,
 }
 
 std::string BuildHiddenPath(struct fs_traversal_context *ctx,
-  const char *ident) {
+                            const char *ident) {
   std::string cur_path = ctx->data;
   cur_path += ident;
   return cur_path;
 }
 
-int PosixSetMeta(const char *path,
-  const struct cvmfs_attr *stat_info, bool set_permissions/* = true*/) {
+int PosixSetMeta(const char *path, const struct cvmfs_attr *stat_info,
+                 bool set_permissions /* = true*/) {
   int res = 0;
   if (set_permissions) {
     res = chmod(path, stat_info->st_mode);
-    if (res != 0) return -1;
+    if (res != 0)
+      return -1;
     res = chown(path, stat_info->st_uid, stat_info->st_gid);
-    if (res != 0) return -1;
+    if (res != 0)
+      return -1;
   }
   std::string path_str = std::string(path);
   if (stat_info->cvm_xattrs != NULL) {
@@ -92,23 +93,22 @@ int PosixSetMeta(const char *path,
       std::vector<std::string> v = xlist->ListKeys();
       std::string val;
       if (set_permissions) {
-        for (std::vector<std::string>::iterator it = v.begin();
-              it != v.end();
-              ++it) {
+        for (std::vector<std::string>::iterator it = v.begin(); it != v.end();
+             ++it) {
           xlist->Get(*it, &val);
           bool res = platform_lsetxattr(path_str, *it, val);
-          if (!res) return -1;
+          if (!res)
+            return -1;
         }
       }
     }
   }
 #ifdef CVMFS_HAS_LUTIMES
-  const struct timeval times[2] = {
-    {stat_info->mtime, 0},
-    {stat_info->mtime, 0}
-  };
+  const struct timeval times[2] = {{stat_info->mtime, 0},
+                                   {stat_info->mtime, 0}};
   res = lutimes(path, times);
-  if (res != 0) return -1;
+  if (res != 0)
+    return -1;
 #endif
   return 0;
 }
@@ -117,7 +117,8 @@ bool BackupMtimes(std::string path, struct utimbuf *mtimes) {
   // According to valgrind this is necessary due to struct paddings here...
   struct stat stat_buf;
   int res = stat(path.c_str(), &stat_buf);
-  if (res != 0) return false;
+  if (res != 0)
+    return false;
   mtimes->actime = stat_buf.st_mtime;
   mtimes->modtime = stat_buf.st_mtime;
   return true;

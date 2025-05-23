@@ -5,28 +5,25 @@
 #include "publisher_http.h"
 
 #include "duplex_curl.h"
-
-
-
 #include "util/logging.h"
 #include "util/string.h"
 
 namespace {
 
-const LogFacilities& kLogError = DefaultLogging::error;
+const LogFacilities &kLogError = DefaultLogging::error;
 
 struct CurlBuffer {
   std::string data;
 };
 
-size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
-  CurlBuffer* my_buffer = static_cast<CurlBuffer*>(userp);
+size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
+  CurlBuffer *my_buffer = static_cast<CurlBuffer *>(userp);
 
   if (size * nmemb < 1) {
     return 0;
   }
 
-  my_buffer->data = static_cast<char*>(buffer);
+  my_buffer->data = static_cast<char *>(buffer);
 
   return my_buffer->data.size();
 }
@@ -35,15 +32,15 @@ size_t RecvCB(void* buffer, size_t size, size_t nmemb, void* userp) {
 
 namespace notify {
 
-PublisherHTTP::PublisherHTTP(const std::string& server_url)
-    : server_url_(server_url + "/notifications/publish") {}
+PublisherHTTP::PublisherHTTP(const std::string &server_url)
+    : server_url_(server_url + "/notifications/publish") { }
 
-PublisherHTTP::~PublisherHTTP() {}
+PublisherHTTP::~PublisherHTTP() { }
 
-bool PublisherHTTP::Publish(const std::string& msg, const std::string& topic) {
-  const char* user_agent_string = "cvmfs/" CVMFS_VERSION;
+bool PublisherHTTP::Publish(const std::string &msg, const std::string &topic) {
+  const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
-  CURL* h_curl = curl_easy_init();
+  CURL *h_curl = curl_easy_init();
 
   if (h_curl) {
     curl_easy_setopt(h_curl, CURLOPT_NOPROGRESS, 1L);

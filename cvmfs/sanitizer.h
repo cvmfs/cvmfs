@@ -19,6 +19,7 @@ class CharRange {
   CharRange(const char range_begin, const char range_end);
   explicit CharRange(const char single_char);
   bool InRange(const char c) const;
+
  private:
   char range_begin_;
   char range_end_;
@@ -40,9 +41,9 @@ class InputSanitizer {
   bool Sanitize(const std::string &input, std::string *filtered_output) const {
     return Sanitize(input.begin(), input.end(), filtered_output);
   }
-  virtual bool Sanitize(std::string::const_iterator   begin,
-                        std::string::const_iterator   end,
-                        std::string                  *filtered_output) const;
+  virtual bool Sanitize(std::string::const_iterator begin,
+                        std::string::const_iterator end,
+                        std::string *filtered_output) const;
   bool CheckRanges(const char chr) const;
 
  private:
@@ -101,9 +102,9 @@ class IntegerSanitizer : public InputSanitizer {
   IntegerSanitizer() : InputSanitizer("09") { }
 
  protected:
-  virtual bool Sanitize(std::string::const_iterator   begin,
-                        std::string::const_iterator   end,
-                        std::string                  *filtered_output) const;
+  virtual bool Sanitize(std::string::const_iterator begin,
+                        std::string::const_iterator end,
+                        std::string *filtered_output) const;
 };
 
 
@@ -112,9 +113,9 @@ class PositiveIntegerSanitizer : public IntegerSanitizer {
   PositiveIntegerSanitizer() : IntegerSanitizer() { }
 
  protected:
-  virtual bool Sanitize(std::string::const_iterator   begin,
-                        std::string::const_iterator   end,
-                        std::string                  *filtered_output) const;
+  virtual bool Sanitize(std::string::const_iterator begin,
+                        std::string::const_iterator end,
+                        std::string *filtered_output) const;
 };
 
 

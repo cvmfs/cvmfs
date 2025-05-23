@@ -18,24 +18,18 @@ class TestEventHandler : public file_watcher::EventHandler {
  public:
   typedef std::set<file_watcher::Event> EventMask;
 
-  explicit TestEventHandler(Counters* ctrs,
-                            FifoChannel<bool>* chan)
-      : mask_()
-      , counters_(ctrs)
-      , chan_(chan)
-      , clear_(true) {}
+  explicit TestEventHandler(Counters *ctrs, FifoChannel<bool> *chan)
+      : mask_(), counters_(ctrs), chan_(chan), clear_(true) { }
 
-  virtual ~TestEventHandler() {}
+  virtual ~TestEventHandler() { }
 
   // The event mask contains the events which are of interest for the test
   // By default, all events are considered to be of interest
-  void SetEventMask(const EventMask& mask) {
-    mask_ = mask;
-  }
+  void SetEventMask(const EventMask &mask) { mask_ = mask; }
 
-  virtual bool Handle(const std::string& /*file_path*/,
+  virtual bool Handle(const std::string & /*file_path*/,
                       file_watcher::Event event,
-                      bool* clear_handler) {
+                      bool *clear_handler) {
     if (mask_.empty() || (mask_.count(event) == 1)) {
       (*counters_)[event]++;
       *clear_handler = clear_;
@@ -45,8 +39,8 @@ class TestEventHandler : public file_watcher::EventHandler {
   }
 
   EventMask mask_;
-  Counters* counters_;
-  FifoChannel<bool>* chan_;
+  Counters *counters_;
+  FifoChannel<bool> *chan_;
   bool clear_;
 };
 
@@ -62,15 +56,15 @@ class T_FileWatcher : public ::testing::Test {
 };
 
 TEST_F(T_FileWatcher, NoEventStop) {
-  const std::string watched_file_name =
-      GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  const std::string watched_file_name = GetCurrentWorkingDirectory()
+                                        + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(
-    file_watcher::FileWatcher::Create());
+      file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
   watcher->RegisterHandler(watched_file_name, hd);
 
   EXPECT_TRUE(watcher->Spawn());
@@ -79,15 +73,15 @@ TEST_F(T_FileWatcher, NoEventStop) {
 }
 
 TEST_F(T_FileWatcher, ModifiedEvent) {
-  const std::string watched_file_name =
-    GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  const std::string watched_file_name = GetCurrentWorkingDirectory()
+                                        + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(
-    file_watcher::FileWatcher::Create());
+      file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kModified);
   hd->SetEventMask(mask);
@@ -107,15 +101,15 @@ TEST_F(T_FileWatcher, ModifiedEvent) {
 }
 
 TEST_F(T_FileWatcher, DeletedEvent) {
-  const std::string watched_file_name =
-      GetCurrentWorkingDirectory() + "/file_watcher_test2.txt";
+  const std::string watched_file_name = GetCurrentWorkingDirectory()
+                                        + "/file_watcher_test2.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(
-    file_watcher::FileWatcher::Create());
+      file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kDeleted);
   hd->SetEventMask(mask);
@@ -135,15 +129,15 @@ TEST_F(T_FileWatcher, DeletedEvent) {
 }
 
 TEST_F(T_FileWatcher, ModifiedThenDeletedEvent) {
-  const std::string watched_file_name =
-      GetCurrentWorkingDirectory() + "/file_watcher_test.txt";
+  const std::string watched_file_name = GetCurrentWorkingDirectory()
+                                        + "/file_watcher_test.txt";
   SafeWriteToFile("test", watched_file_name, 0600);
 
   UniquePtr<file_watcher::FileWatcher> watcher(
-    file_watcher::FileWatcher::Create());
+      file_watcher::FileWatcher::Create());
   EXPECT_TRUE(watcher.IsValid());
 
-  TestEventHandler* hd(new TestEventHandler(&counters_, channel_.weak_ref()));
+  TestEventHandler *hd(new TestEventHandler(&counters_, channel_.weak_ref()));
   TestEventHandler::EventMask mask;
   mask.insert(file_watcher::kModified);
   mask.insert(file_watcher::kDeleted);

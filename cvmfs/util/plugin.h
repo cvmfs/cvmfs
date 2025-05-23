@@ -29,14 +29,14 @@ namespace CVMFS_NAMESPACE_GUARD {
  * @param InfoT             wrapper type for introspection data of registered
  *                          plugins
  */
-template <class AbstractProductT, typename ParameterT, typename InfoT>
+template<class AbstractProductT, typename ParameterT, typename InfoT>
 class AbstractFactory {
  public:
-  AbstractFactory() {}
-  virtual ~AbstractFactory() {}
+  AbstractFactory() { }
+  virtual ~AbstractFactory() { }
 
   virtual bool WillHandle(const ParameterT &param) const = 0;
-  virtual AbstractProductT* Construct(const ParameterT &param) const = 0;
+  virtual AbstractProductT *Construct(const ParameterT &param) const = 0;
   virtual InfoT Introspect() const = 0;
 };
 
@@ -54,20 +54,16 @@ class AbstractFactory {
  * @param InfoT             wrapper type for introspection data of registered
  *                          plugins
  */
-template <class ConcreteProductT,
-          class AbstractProductT,
-          typename ParameterT,
-          typename InfoT>
-class AbstractFactoryImpl2 : public AbstractFactory<AbstractProductT,
-                                                    ParameterT,
-                                                    InfoT>
-{
+template<class ConcreteProductT, class AbstractProductT, typename ParameterT,
+         typename InfoT>
+class AbstractFactoryImpl2
+    : public AbstractFactory<AbstractProductT, ParameterT, InfoT> {
  public:
   inline bool WillHandle(const ParameterT &param) const {
     return ConcreteProductT::WillHandle(param);
   }
-  inline AbstractProductT* Construct(const ParameterT &param) const {
-    AbstractProductT* product = new ConcreteProductT(param);
+  inline AbstractProductT *Construct(const ParameterT &param) const {
+    AbstractProductT *product = new ConcreteProductT(param);
     return product;
   }
 };
@@ -79,44 +75,29 @@ class AbstractFactoryImpl2 : public AbstractFactory<AbstractProductT,
  * result. However if InfoT = void, this method still needs to be stubbed.
  * (See also the template specialization for InfoT = void below)
  */
-template <class ConcreteProductT,
-          class AbstractProductT,
-          typename ParameterT,
-          typename InfoT>
-class AbstractFactoryImpl :
-  public AbstractFactoryImpl2<ConcreteProductT,
-                              AbstractProductT,
-                              ParameterT,
-                              InfoT>
-{
-  inline InfoT Introspect() const {
-    return ConcreteProductT::GetInfo();
-  }
+template<class ConcreteProductT, class AbstractProductT, typename ParameterT,
+         typename InfoT>
+class AbstractFactoryImpl
+    : public AbstractFactoryImpl2<ConcreteProductT, AbstractProductT,
+                                  ParameterT, InfoT> {
+  inline InfoT Introspect() const { return ConcreteProductT::GetInfo(); }
 };
 
 /**
  * Template specialization for InfoT = void that only stubs the abstract method
  * Introspect().
  */
-template <class ConcreteProductT,
-          class AbstractProductT,
-          typename ParameterT>
-class AbstractFactoryImpl<ConcreteProductT,
-                          AbstractProductT,
-                          ParameterT,
-                          void> :
-  public AbstractFactoryImpl2<ConcreteProductT,
-                              AbstractProductT,
-                              ParameterT,
-                              void>
-{
-  inline void Introspect() const {}
+template<class ConcreteProductT, class AbstractProductT, typename ParameterT>
+class AbstractFactoryImpl<ConcreteProductT, AbstractProductT, ParameterT, void>
+    : public AbstractFactoryImpl2<ConcreteProductT, AbstractProductT,
+                                  ParameterT, void> {
+  inline void Introspect() const { }
 };
 
 /**
  * Template to simplify the polymorphic creation of a number of concrete classes
- * that share the common base class AbstractProductT. Use this to create flexible
- * class hierarchies.
+ * that share the common base class AbstractProductT. Use this to create
+ * flexible class hierarchies.
  *
  * The template assumes a number of things from the user classes:
  *  1. AbstractProductT must implement `static void RegisterPlugins()` which
@@ -134,7 +115,8 @@ class AbstractFactoryImpl<ConcreteProductT,
  *     stance is deleted and the list of plugins is traversed further.
  *  5. (OPTIONAL) The ConcreteProductTs can implement a `static InfoT GetInfo()`
  *     that can be used for run-time introspection of registered plugins using
- *     PolymorphicConstruction<AbstractProductT, ParameterT, InfoT>::Introspect()
+ *     PolymorphicConstruction<AbstractProductT, ParameterT,
+ * InfoT>::Introspect()
  *
  * A possible class hierarchy could look like this:
  *
@@ -173,19 +155,19 @@ class AbstractFactoryImpl<ConcreteProductT,
  *                          morphically instantiate one of the subclasses of
  *                          AbstractProductT
  * @param InfoT             (optional) wrapper type for introspection data of
- *                          registered plugins. InfoT AbstractProductT::GetInfo()
- *                          needs to be implemented for each plugin
+ *                          registered plugins. InfoT
+ * AbstractProductT::GetInfo() needs to be implemented for each plugin
  */
-template <class AbstractProductT, typename ParameterT, typename InfoT>
+template<class AbstractProductT, typename ParameterT, typename InfoT>
 class PolymorphicConstructionImpl {
  protected:
   typedef AbstractFactory<AbstractProductT, ParameterT, InfoT> Factory;
-  typedef std::vector<Factory*> RegisteredPlugins;
+  typedef std::vector<Factory *> RegisteredPlugins;
 
  public:
   virtual ~PolymorphicConstructionImpl() { }
 
-  static AbstractProductT* Construct(const ParameterT &param) {
+  static AbstractProductT *Construct(const ParameterT &param) {
     LazilyRegisterPlugins();
 
     // select and initialize the correct plugin at runtime
@@ -216,7 +198,8 @@ class PolymorphicConstructionImpl {
     //   since a second thread might find a registered_plugins_ list that is
     //   currently under construction and therefore _not_ empty but also _not_
     //   fully initialized!
-    // See StackOverflow: http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
+    // See StackOverflow:
+    // http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
     if (atomic_read32(&needs_init_)) {
       MutexLockGuard m(&init_mutex_);
       if (atomic_read32(&needs_init_)) {
@@ -244,13 +227,11 @@ class PolymorphicConstructionImpl {
    * Note: You shall not need to use this method anywhere in your code
    *       except in AbstractProductT::RegisterPlugins().
    */
-  template <class ConcreteProductT>
+  template<class ConcreteProductT>
   static void RegisterPlugin() {
     registered_plugins_.push_back(
-      new AbstractFactoryImpl<ConcreteProductT,
-                              AbstractProductT,
-                              ParameterT,
-                              InfoT>());
+        new AbstractFactoryImpl<ConcreteProductT, AbstractProductT, ParameterT,
+                                InfoT>());
   }
 
   virtual bool Initialize() { return true; }
@@ -276,8 +257,8 @@ class PolymorphicConstructionImpl {
   static RegisteredPlugins registered_plugins_;
 
  private:
-  static atomic_int32      needs_init_;
-  static pthread_mutex_t   init_mutex_;
+  static atomic_int32 needs_init_;
+  static pthread_mutex_t init_mutex_;
 };
 
 
@@ -288,9 +269,9 @@ class PolymorphicConstructionImpl {
  * Backward compatibility: if InfoT is not defined (i.e. is void), Introspect()
  *                         is not defined at all! (see template specialization)
  */
-template <class AbstractProductT, typename ParameterT, typename InfoT = void>
-class PolymorphicConstruction :
-       public PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> {
+template<class AbstractProductT, typename ParameterT, typename InfoT = void>
+class PolymorphicConstruction
+    : public PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> {
  private:
   typedef PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> T;
   typedef typename T::RegisteredPlugins RegisteredPlugins;
@@ -304,7 +285,7 @@ class PolymorphicConstruction :
     const RegisteredPlugins &plugins = T::registered_plugins_;
 
     T::LazilyRegisterPlugins();
-    typename RegisteredPlugins::const_iterator i    = plugins.begin();
+    typename RegisteredPlugins::const_iterator i = plugins.begin();
     typename RegisteredPlugins::const_iterator iend = plugins.end();
     for (; i != iend; ++i) {
       introspection_data.push_back((*i)->Introspect());
@@ -318,29 +299,28 @@ class PolymorphicConstruction :
  * Template specialization for backward compatibility that _does not_ implement
  * a static Introspect() method when the InfoT parameter is not given or is void
  */
-template <class AbstractProductT, typename ParameterT>
-class PolymorphicConstruction<AbstractProductT, ParameterT, void> :
-      public PolymorphicConstructionImpl<AbstractProductT, ParameterT, void> {};
+template<class AbstractProductT, typename ParameterT>
+class PolymorphicConstruction<AbstractProductT, ParameterT, void>
+    : public PolymorphicConstructionImpl<AbstractProductT, ParameterT, void> {
+};
 
 
+template<class AbstractProductT, typename ParameterT, typename InfoT>
+atomic_int32 PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                         InfoT>::needs_init_ = 1;
 
-template <class AbstractProductT, typename ParameterT, typename InfoT>
-atomic_int32
-PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
-  needs_init_ = 1;
-
-template <class AbstractProductT, typename ParameterT, typename InfoT>
+template<class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
-PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::init_mutex_ =
-                                                      PTHREAD_MUTEX_INITIALIZER;
+    PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                InfoT>::init_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 
 // init the static member registered_plugins_ inside the
 // PolymorphicConstructionImpl template... whoa, what ugly code :o)
-template <class AbstractProductT, typename ParameterT, typename InfoT>
-typename PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
-  RegisteredPlugins
-PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
-  registered_plugins_;
+template<class AbstractProductT, typename ParameterT, typename InfoT>
+typename PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                     InfoT>::RegisteredPlugins
+    PolymorphicConstructionImpl<AbstractProductT, ParameterT,
+                                InfoT>::registered_plugins_;
 
 
 #ifdef CVMFS_NAMESPACE_GUARD

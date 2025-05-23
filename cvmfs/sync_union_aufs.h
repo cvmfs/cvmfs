@@ -9,10 +9,10 @@
 #ifndef CVMFS_SYNC_UNION_AUFS_H_
 #define CVMFS_SYNC_UNION_AUFS_H_
 
-#include "sync_union.h"
-
 #include <set>
 #include <string>
+
+#include "sync_union.h"
 
 namespace publish {
 /**

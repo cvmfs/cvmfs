@@ -19,7 +19,7 @@
 namespace glue {
 class InodeTracker;
 class DentryTracker;
-}
+}  // namespace glue
 
 class MountPoint;
 
@@ -66,9 +66,9 @@ class FuseInvalidator : SingleCopy {
   };
 
   struct Command {
-    virtual ~Command() {}
+    virtual ~Command() { }
   };
-  struct QuitCommand : public Command {};
+  struct QuitCommand : public Command { };
   struct InvalInodesCommand : public Command {
     Handle *handle;
   };
@@ -87,14 +87,14 @@ class FuseInvalidator : SingleCopy {
   void InvalidateDentry(uint64_t parent_ino, const NameString &name);
 
  private:
-   /**
+  /**
    * CONSTRUCTOR ONLY FOR UNITTESTS - mountpoint will illegally be null
    * ( we do not want to construct a full mountpoint in the unittest )
    */
   FuseInvalidator(glue::InodeTracker *inode_tracker,
-                glue::DentryTracker *dentry_tracker,
-                void **fuse_channel_or_session,
-                bool fuse_notify_invalidation);
+                  glue::DentryTracker *dentry_tracker,
+                  void **fuse_channel_or_session,
+                  bool fuse_notify_invalidation);
   /**
    * Add one second to the caller-provided timeout to be on the safe side.
    */

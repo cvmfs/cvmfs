@@ -5,6 +5,7 @@
 #include "cache_ram.h"
 
 #include <errno.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -21,43 +22,39 @@ using namespace std;  // NOLINT
 const shash::Any RamCacheManager::kInvalidHandle;
 
 string RamCacheManager::Describe() {
-  return "Internal in-memory cache manager (size " +
-         StringifyInt(max_size_ / (1024 * 1024)) + "MB)\n";
+  return "Internal in-memory cache manager (size "
+         + StringifyInt(max_size_ / (1024 * 1024)) + "MB)\n";
 }
 
 
-RamCacheManager::RamCacheManager(
-  uint64_t max_size,
-  unsigned max_entries,
-  MemoryKvStore::MemoryAllocator alloc,
-  perf::StatisticsTemplate statistics)
-  : max_size_(max_size)
-  , fd_table_(max_entries, ReadOnlyHandle())
-  // TODO(jblomer): the number of slots in the kv-stores should _not_ be the
-  // number of open files.
-  , regular_entries_(max_entries,
-                     alloc,
-                     max_size,
-                     perf::StatisticsTemplate("kv.regular", statistics))
-  , volatile_entries_(max_entries,
-                      alloc,
-                      max_size,
-                      perf::StatisticsTemplate("kv.volatile", statistics))
-  , counters_(statistics)
-{
+RamCacheManager::RamCacheManager(uint64_t max_size,
+                                 unsigned max_entries,
+                                 MemoryKvStore::MemoryAllocator alloc,
+                                 perf::StatisticsTemplate statistics)
+    : max_size_(max_size)
+    , fd_table_(max_entries, ReadOnlyHandle())
+    // TODO(jblomer): the number of slots in the kv-stores should _not_ be the
+    // number of open files.
+    , regular_entries_(max_entries,
+                       alloc,
+                       max_size,
+                       perf::StatisticsTemplate("kv.regular", statistics))
+    , volatile_entries_(max_entries,
+                        alloc,
+                        max_size,
+                        perf::StatisticsTemplate("kv.volatile", statistics))
+    , counters_(statistics) {
   int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
-  LogCvmfs(kLogCache, kLogDebug, "max %lu B, %u entries",
-           max_size, max_entries);
+  LogCvmfs(kLogCache, kLogDebug, "max %lu B, %u entries", max_size,
+           max_entries);
   LogCvmfs(kLogCache, kLogDebug | kLogSyslogWarn,
            "DEPRECATION WARNING: The RAM cache manager is depcreated and "
            "will be removed from future releases.");
 }
 
 
-RamCacheManager::~RamCacheManager() {
-  pthread_rwlock_destroy(&rwlock_);
-}
+RamCacheManager::~RamCacheManager() { pthread_rwlock_destroy(&rwlock_); }
 
 
 int RamCacheManager::AddFd(const ReadOnlyHandle &handle) {
@@ -94,8 +91,7 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
   } else if (volatile_entries_.Contains(id)) {
     is_volatile = true;
   } else {
-    LogCvmfs(kLogCache, kLogDebug, "miss for %s",
-             id.ToString().c_str());
+    LogCvmfs(kLogCache, kLogDebug, "miss for %s", id.ToString().c_str());
     perf::Inc(counters_.n_openmiss);
     return -ENOENT;
   }
@@ -153,12 +149,10 @@ int RamCacheManager::Close(int fd) {
 }
 
 
-int64_t RamCacheManager::Pread(
-  int fd,
-  void *buf,
-  uint64_t size,
-  uint64_t offset)
-{
+int64_t RamCacheManager::Pread(int fd,
+                               void *buf,
+                               uint64_t size,
+                               uint64_t offset) {
   ReadLockGuard guard(rwlock_);
   ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
@@ -166,8 +160,8 @@ int64_t RamCacheManager::Pread(
     return -EBADF;
   }
   perf::Inc(counters_.n_pread);
-  return GetStore(generic_handle)->Read(
-    generic_handle.handle, buf, size, offset);
+  return GetStore(generic_handle)
+      ->Read(generic_handle.handle, buf, size, offset);
 }
 
 
@@ -181,7 +175,8 @@ int RamCacheManager::Dup(int fd) {
     return -EBADF;
   }
   rc = AddFd(generic_handle);
-  if (rc < 0) return rc;
+  if (rc < 0)
+    return rc;
   ok = GetStore(generic_handle)->IncRef(generic_handle.handle);
   assert(ok);
   LogCvmfs(kLogCache, kLogDebug, "dup fd %d", fd);
@@ -216,9 +211,8 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
   transaction->buffer.size = (size == kSizeUnknown) ? kPageSize : size;
   transaction->buffer.address = malloc(transaction->buffer.size);
   if (!transaction->buffer.address && size > 0) {
-    LogCvmfs(kLogCache, kLogDebug,
-             "failed to allocate %lu B for %s",
-             size, id.ToString().c_str());
+    LogCvmfs(kLogCache, kLogDebug, "failed to allocate %lu B for %s", size,
+             id.ToString().c_str());
     return -errno;
   }
   perf::Inc(counters_.n_starttxn);
@@ -227,8 +221,7 @@ int RamCacheManager::StartTxn(const shash::Any &id, uint64_t size, void *txn) {
 
 
 void RamCacheManager::CtrlTxn(const Label &label, const int /* flags */,
-                              void *txn)
-{
+                              void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = label.GetDescription();
   transaction->buffer.object_flags = label.flags;
@@ -244,15 +237,14 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   if (transaction->pos + size > transaction->buffer.size) {
     if (transaction->expected_size == kSizeUnknown) {
       perf::Inc(counters_.n_realloc);
-      size_t new_size = max(2*transaction->buffer.size,
-        static_cast<size_t>(size + transaction->pos));
+      size_t new_size = max(2 * transaction->buffer.size,
+                            static_cast<size_t>(size + transaction->pos));
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %lu B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
       void *new_ptr = realloc(transaction->buffer.address, new_size);
       if (!new_ptr) {
-        LogCvmfs(kLogCache, kLogDebug,
-                 "failed to allocate %lu B for %s",
+        LogCvmfs(kLogCache, kLogDebug, "failed to allocate %lu B for %s",
                  new_size, transaction->buffer.id.ToString().c_str());
         return -EIO;
       }
@@ -260,8 +252,8 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       transaction->buffer.size = new_size;
     } else {
       LogCvmfs(kLogCache, kLogDebug,
-               "attempted to write more than requested (%lu>%zu)",
-               size, transaction->buffer.size);
+               "attempted to write more than requested (%lu>%zu)", size,
+               transaction->buffer.size);
       return -EFBIG;
     }
   }
@@ -320,7 +312,8 @@ int RamCacheManager::CommitTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   perf::Inc(counters_.n_committxn);
   int64_t rc = CommitToKvStore(transaction);
-  if (rc < 0) return rc;
+  if (rc < 0)
+    return rc;
   free(transaction->buffer.address);
   return rc;
 }
@@ -329,15 +322,13 @@ int RamCacheManager::CommitTxn(void *txn) {
 int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
   MemoryKvStore *store;
 
-  if (transaction->buffer.object_flags & CacheManager::kLabelVolatile)
-  {
+  if (transaction->buffer.object_flags & CacheManager::kLabelVolatile) {
     store = &volatile_entries_;
   } else {
     store = &regular_entries_;
   }
-  if ((transaction->buffer.object_flags & CacheManager::kLabelPinned) ||
-      (transaction->buffer.object_flags & CacheManager::kLabelCatalog))
-  {
+  if ((transaction->buffer.object_flags & CacheManager::kLabelPinned)
+      || (transaction->buffer.object_flags & CacheManager::kLabelCatalog)) {
     transaction->buffer.refcount = 1;
   } else {
     transaction->buffer.refcount = 0;
@@ -345,20 +336,20 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
 
   int64_t regular_size = regular_entries_.GetUsed();
   int64_t volatile_size = volatile_entries_.GetUsed();
-  int64_t overrun = regular_size + volatile_size +
-    transaction->buffer.size - max_size_;
+  int64_t overrun = regular_size + volatile_size + transaction->buffer.size
+                    - max_size_;
 
   if (overrun > 0) {
     // if we're going to clean the cache, try to remove at least 25%
-    overrun = max(overrun, (int64_t) max_size_>>2);
+    overrun = max(overrun, (int64_t)max_size_ >> 2);
     perf::Inc(counters_.n_overrun);
-    volatile_entries_.ShrinkTo(max((int64_t) 0, volatile_size - overrun));
+    volatile_entries_.ShrinkTo(max((int64_t)0, volatile_size - overrun));
   }
   overrun -= volatile_size - volatile_entries_.GetUsed();
   if (overrun > 0) {
-    regular_entries_.ShrinkTo(max((int64_t) 0, regular_size - overrun));
+    regular_entries_.ShrinkTo(max((int64_t)0, regular_size - overrun));
   }
-  overrun -= regular_size -regular_entries_.GetUsed();
+  overrun -= regular_size - regular_entries_.GetUsed();
   if (overrun > 0) {
     LogCvmfs(kLogCache, kLogDebug,
              "transaction for %s would overrun the cache limit by %ld",
@@ -369,8 +360,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
 
   int rc = store->Commit(transaction->buffer);
   if (rc < 0) {
-    LogCvmfs(kLogCache, kLogDebug,
-             "commit on %s failed",
+    LogCvmfs(kLogCache, kLogDebug, "commit on %s failed",
              transaction->buffer.id.ToString().c_str());
     return rc;
   }
