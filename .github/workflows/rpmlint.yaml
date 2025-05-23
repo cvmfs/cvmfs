@@ -23,7 +23,6 @@ jobs:
         run: yum -y  update; yum -y install rpmlint
       - name: Check RPM specs
         run: | 
-           rpmlint  packaging/rpm
            echo "addFilter('no-%check-section')" > /tmp/rpmlintrc
            rpmlint -r /tmp/rpmlintrc packaging/rpm
 
