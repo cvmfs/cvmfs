@@ -507,9 +507,6 @@ EOF
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
 %endif
 
-%check || :
-make check
-
 %post
 if [ $1 -eq 1 ]; then
    mkdir /cvmfs
@@ -763,6 +760,8 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
+* Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
+- Add logrotate config files and tidy to satisfy rpmlint v2.6
 * Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
 - Apply pretrans transaction check to all subpackages that need to
   have their version stay in sync
