@@ -8,7 +8,9 @@
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 
+// clang-format off
 #include <sys/xattr.h>
+// clang-format on
 
 #include "libcvmfs_int.h"
 

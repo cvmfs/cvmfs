@@ -29,7 +29,9 @@
 #endif
 
 // sys/xattr.h conflicts with linux/xattr.h and needs to be loaded very early
+// clang-format off
 #include <sys/xattr.h>  // NOLINT
+// clang-format on
 
 
 #include "cvmfs.h"

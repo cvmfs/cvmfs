@@ -27,7 +27,9 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #include <sys/ucred.h>
+// clang-format off
 #include <sys/xattr.h>
+// clang-format on
 
 #include <cassert>
 #include <cstdio>

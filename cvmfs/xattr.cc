@@ -6,7 +6,9 @@
 #include "xattr.h"
 
 #include <alloca.h>
+// clang-format off
 #include <sys/xattr.h>
+// clang-format on
 
 #include <cassert>
 #include <cstring>

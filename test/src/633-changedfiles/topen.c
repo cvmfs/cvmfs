@@ -2,7 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+// clang-format off
 #include <sys/xattr.h>  // NOLINT
+// clang-format on
 
 #include <fcntl.h>
 #include <sys/mman.h>

@@ -75,7 +75,9 @@ includes_Darwin='
 #include <sys/mount.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+// clang-format off
 #include <sys/xattr.h>
+// clang-format on
 #include <sys/vsock.h>
 #include <net/bpf.h>
 #include <net/if.h>
@@ -201,7 +203,9 @@ struct ltchars {
 #include <sys/select.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
+// clang-format off
 #include <sys/timerfd.h>
+// clang-format on
 #include <sys/uio.h>
 #include <sys/xattr.h>
 #include <netinet/udp.h>

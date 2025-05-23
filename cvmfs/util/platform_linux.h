@@ -8,7 +8,9 @@
 #define CVMFS_UTIL_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+// clang-format off
 #include <sys/xattr.h>
+// clang-format on
 
 #include <dirent.h>
 #include <errno.h>

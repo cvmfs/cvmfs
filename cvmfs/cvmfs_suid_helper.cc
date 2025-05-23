@@ -7,7 +7,9 @@
  * This binary does not use the cvmfs infrastructure code to stay lean.
  */
 
+// clang-format off
 #include <sys/xattr.h>  // NOLINT
+// clang-format on
 
 #include <dirent.h>
 #include <errno.h>
