@@ -1,6 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  */
+#include <cstddef>
 
 #ifndef CVMFS_FUSE_MAIN_H_
 #define CVMFS_FUSE_MAIN_H_

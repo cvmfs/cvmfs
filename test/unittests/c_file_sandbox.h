@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <gtest/gtest.h>
 
 #include <cstring>
 #include <string>
