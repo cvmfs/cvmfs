@@ -11,7 +11,7 @@ RUN dnf install -y rpm-build
 
 RUN echo '%sftnight ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-ENV USER sftnight
+USER sftnight
 
 RUN mkdir -p /home/sftnight/buildpackage
 RUN mkdir -p /home/sftnight/buildpackage_config
