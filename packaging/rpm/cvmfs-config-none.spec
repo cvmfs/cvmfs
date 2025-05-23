@@ -20,8 +20,6 @@ Empty configuration for CernVM-FS, used to fulfill the cvmfs dependency on cvmfs
 
 %install
 
-%check || :
-
 %files
 
 %changelog

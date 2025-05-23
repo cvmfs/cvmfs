@@ -508,6 +508,7 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
 %endif
 
 %check || :
+make check
 
 %post
 if [ $1 -eq 1 ]; then

@@ -17,8 +17,6 @@ See http://cernvm.cern.ch
 
 %install
 
-%check || :
-
 %post
 /usr/bin/cvmfs_config setup
 service autofs status > /dev/null 2>&1
