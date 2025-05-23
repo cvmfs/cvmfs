@@ -1,0 +1,26 @@
+name: cvmfs_rpmlint
+
+on:
+  push:
+      #paths:
+      #  - 'packaging/rpm/**'
+      branches: ['devel', 'cvmfs*']
+  pull_request:
+      paths:
+        - 'packaging/rpm/**'
+      branches: ['devel', 'cvmfs*']
+
+jobs:
+  docker:
+    name: "rpmlint"
+    runs-on: ubuntu-latest
+    container:
+     image: fedora:41
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup rpmlint
+        run: yum -y  update; yum -y install rpmlint
+      - name: Check RPM specs
+        run: | 
+           rpmlint  packaging/rpm

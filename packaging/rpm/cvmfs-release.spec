@@ -44,9 +44,7 @@ install -dm 755 $RPM_BUILD_ROOT%{_sysconfdir}/yum.repos.d
 install -pm 644 %{SOURCE2}  \
     $RPM_BUILD_ROOT%{_sysconfdir}/yum.repos.d
 
-%clean
-rm -rf $RPM_BUILD_ROOT
-
+%check || :
 
 %files
 %defattr(-,root,root,-)

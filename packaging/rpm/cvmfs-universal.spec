@@ -507,8 +507,7 @@ EOF
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
 %endif
 
-%clean
-rm -rf $RPM_BUILD_ROOT
+%check || :
 
 %post
 if [ $1 -eq 1 ]; then
@@ -764,7 +763,7 @@ systemctl daemon-reload
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
 * Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
-- Apply %pretrans transaction check to all subpackages that need to
+- Apply pretrans transaction check to all subpackages that need to
   have their version stay in sync
 * Mon Dec 2 2024 Valentin Volkl <vavolkl@cern.ch> - 2.12
 - Add cvmfs-snapshotter package

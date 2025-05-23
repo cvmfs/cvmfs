@@ -6,6 +6,7 @@ BuildArch: noarch
 Requires: cvmfs >= 2.1
 Group: System/Filesystems
 License: Copyright (c) 2009, CERN.  Distributed under the BSD License.
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 %description
 HTTP File System for Distributing Software to CernVM.
 See http://cernvm.cern.ch
@@ -15,6 +16,8 @@ See http://cernvm.cern.ch
 %build
 
 %install
+
+%check || :
 
 %post
 /usr/bin/cvmfs_config setup

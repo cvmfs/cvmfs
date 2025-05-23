@@ -60,6 +60,8 @@ for conf in %{SOURCE10}; do
 done
 install -D -m 444 "%{SOURCE9}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/README
 
+%check || :
+
 %files
 %dir %{_sysconfdir}/cvmfs/keys/cern.ch
 %dir %{_sysconfdir}/cvmfs/keys/egi.eu
