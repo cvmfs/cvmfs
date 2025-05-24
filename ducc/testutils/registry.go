@@ -62,12 +62,12 @@ func main() {
     time.Sleep(500 * time.Millisecond)
 
     // Create and push a test image
-    if err := createAndPushTestImage(ctx); err != nil {
+    if err := CreateAndPushTestImage(ctx); err != nil {
         log.Fatalf("Failed to create and push test image: %v", err)
     }
 
     // Create and push multi-architecture test image
-    if err := createAndPushMultiArchTestImage(ctx); err != nil {
+    if err := CreateAndPushMultiArchTestImage(ctx, registryPort); err != nil {
         log.Fatalf("Failed to create and push multi-arch test image: %v", err)
     }
 
@@ -140,7 +140,7 @@ func createTarLayer(filePath, content string) (v1.Layer, error) {
     return layer, nil
 }
 
-func createAndPushTestImage(ctx context.Context) error {
+func CreateAndPushTestImage(ctx context.Context) error {
     log.Println("Creating test image...")
 
     // Start with an empty image
@@ -232,7 +232,7 @@ func createAndPushTestImage(ctx context.Context) error {
     return nil
 }
 
-func createAndPushMultiArchTestImage(ctx context.Context) error {
+func CreateAndPushMultiArchTestImage(ctx context.Context, TestRegistryPort int) error {
     log.Println("Creating multi-architecture test image...")
 
     // Define platforms with their specific characteristics
@@ -269,7 +269,7 @@ func createAndPushMultiArchTestImage(ctx context.Context) error {
         }
 
         // Push platform-specific image
-        platformTag, err := name.NewTag(fmt.Sprintf("localhost:%d/multi-arch-test:%s", registryPort, platform.suffix))
+        platformTag, err := name.NewTag(fmt.Sprintf("localhost:%d/multi-arch-test:%s", TestRegistryPort, platform.suffix))
         if err != nil {
             return fmt.Errorf("failed to create platform tag: %w", err)
         }
@@ -325,7 +325,7 @@ func createAndPushMultiArchTestImage(ctx context.Context) error {
     }
 
     // Push the manifest list as the main tag
-    mainTag, err := name.NewTag(fmt.Sprintf("localhost:%d/multi-arch-test:latest", registryPort))
+    mainTag, err := name.NewTag(fmt.Sprintf("localhost:%d/multi-arch-test:latest", TestRegistryPort))
     if err != nil {
         return fmt.Errorf("failed to create main tag: %w", err)
     }
