@@ -1,4 +1,4 @@
-package main
+package testutils
 
 import (
     "archive/tar"

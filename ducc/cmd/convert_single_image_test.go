@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+  "github.com/cvmfs/ducc/testutils"
 )
 
 // For these tests, use a mocked cvmfs_server command that does nothing, just lets
