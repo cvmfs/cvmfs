@@ -36,3 +36,4 @@ ducc/ducc
 ducc/cvmfs_ducc
 snapshotter/out
 gateway/gateway
+vendor
