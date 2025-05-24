@@ -15,14 +15,13 @@ import (
 )
 
 var (
-  TestRegistryPort  int
 	serverOnce         sync.Once
 	serverMutex        sync.RWMutex
 	serverReady        bool
 )
 
 // startTestRegistryServer starts the registry server once
-func StartTestRegistryServer() (TestRegistryServer *http.Server,  err error) {
+func StartTestRegistryServer() (TestRegistryServer *http.Server, TestRegistryPort int,  err error) {
 	var startErr error
 
 	serverOnce.Do(func() {
@@ -64,7 +63,7 @@ func StartTestRegistryServer() (TestRegistryServer *http.Server,  err error) {
 		log.Printf("Test registry server ready at localhost:%d", TestRegistryPort)
 	})
 
-	return TestRegistryServer, startErr
+	return TestRegistryServer, TestRegistryPort, startErr
 }
 
 // stopTestRegistryServer gracefully stops the registry server
@@ -105,29 +104,30 @@ func waitForServerReady(address string, timeout time.Duration) error {
 	}
 }
 
-// getTestRegistryURL returns the test registry URL
-func GetTestRegistryURL() string {
-	serverMutex.RLock()
-	defer serverMutex.RUnlock()
-
-	if !serverReady {
-		panic("test registry server not ready")
-	}
-
-return fmt.Sprintf("localhost:%d", TestRegistryPort)
-}
 
 // Helper function to create test images
-func createTestImageForTests(ctx context.Context, imageName string) error {
+func CreateTestImageForTests(ctx context.Context, TestRegistryPort int, imageName string) error {
 	img, err := createPlatformSpecificImage("linux", "amd64", "", "test")
 	if err != nil {
 		return fmt.Errorf("failed to create test image: %w", err)
 	}
 
-	tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(), imageName))
+	tag, err := name.NewTag(fmt.Sprintf("localhost:%d/%s", TestRegistryPort, imageName))
 	if err != nil {
 		return fmt.Errorf("failed to create tag: %w", err)
 	}
 
 	return remote.Write(tag, img, remote.WithContext(ctx))
 }
+// getTestRegistryURL returns the test registry URL
+func GetTestRegistryURL(TestRegistryPort int) string {
+       serverMutex.RLock()
+       defer serverMutex.RUnlock()
+
+       if !serverReady {
+               panic("test registry server not ready")
+       }
+
+return fmt.Sprintf("localhost:%d", TestRegistryPort)
+}
+

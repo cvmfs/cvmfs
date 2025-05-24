@@ -17,12 +17,14 @@ var (
  )
 
 
+
+
 // TestMain sets up and tears down the test registry server
 func TestMain(m *testing.M) {
 	// Start the registry server
   var MyTestRegistryServer *http.Server
   var err error
-	if MyTestRegistryServer,  err = StartTestRegistryServer(); err != nil {
+	if MyTestRegistryServer, MyTestRegistryPort,  err = StartTestRegistryServer(); err != nil {
 		log.Fatalf("Failed to start test registry server: %v ", err)
 	}
 
@@ -57,12 +59,12 @@ func testPushAndPullImage(t *testing.T) {
 	imageName := "test-image:v1.0.0"
 
 	// Create and push test image
-	if err := createTestImageForTests(ctx, imageName); err != nil {
+	if err := CreateTestImageForTests(ctx,MyTestRegistryPort, imageName); err != nil {
 		t.Fatalf("Failed to push test image: %v", err)
 	}
 
 	// Pull the image back
-	tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(), imageName))
+	tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(MyTestRegistryPort), imageName))
 	if err != nil {
 		t.Fatalf("Failed to create tag: %v", err)
 	}
@@ -96,14 +98,14 @@ func testMultipleImages(t *testing.T) {
 
 	// Push multiple images
 	for _, imageName := range imageNames {
-		if err := createTestImageForTests(ctx, imageName); err != nil {
+		if err := CreateTestImageForTests(ctx,MyTestRegistryPort, imageName); err != nil {
 			t.Fatalf("Failed to push image %s: %v", imageName, err)
 		}
 	}
 
 	// Verify all images can be pulled
 	for _, imageName := range imageNames {
-		tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(), imageName))
+		tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(MyTestRegistryPort), imageName))
 		if err != nil {
 			t.Fatalf("Failed to create tag for %s: %v", imageName, err)
 		}
@@ -122,12 +124,12 @@ func testImageLayers(t *testing.T) {
 	imageName := "layered-image:test"
 
 	// Create and push test image
-	if err := createTestImageForTests(ctx, imageName); err != nil {
+	if err := CreateTestImageForTests(ctx, MyTestRegistryPort, imageName); err != nil {
 		t.Fatalf("Failed to push test image: %v", err)
 	}
 
 	// Pull and verify layers
-	tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(), imageName))
+	tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(MyTestRegistryPort), imageName))
 	if err != nil {
 		t.Fatalf("Failed to create tag: %v", err)
 	}
@@ -173,12 +175,12 @@ func BenchmarkImageOperations(b *testing.B) {
 		imageName := fmt.Sprintf("bench-image:%d", i)
 
 		// Push image
-		if err := createTestImageForTests(ctx, imageName); err != nil {
+		if err := CreateTestImageForTests(ctx, MyTestRegistryPort, imageName); err != nil {
 			b.Fatalf("Failed to push image: %v", err)
 		}
 
 		// Pull image
-		tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(), imageName))
+		tag, err := name.NewTag(fmt.Sprintf("%s/%s", GetTestRegistryURL(MyTestRegistryPort), imageName))
 		if err != nil {
 			b.Fatalf("Failed to create tag: %v", err)
 		}
@@ -206,7 +208,7 @@ func TestParallelOperations(t *testing.T) {
 				t.Parallel()
 
 				imageName := fmt.Sprintf("parallel-image:%d", i)
-				if err := createTestImageForTests(ctx, imageName); err != nil {
+				if err := CreateTestImageForTests(ctx, MyTestRegistryPort, imageName); err != nil {
 					t.Errorf("Failed to push image %s: %v", imageName, err)
 				}
 			})
