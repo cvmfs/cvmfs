@@ -85,6 +85,14 @@ cvmfs_run_test() {
   curl -so mr5 "$(get_repo_url ${replica_name}-5)/.cvmfspublished" || return 13
   curl -so ms0 "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"  || return 14
 
+  echo "*** ms0 ***"
+  cat ms0
+  echo "*** mr0 ***"
+  cat mr0
+  echo "*** mr1 ***"
+  cat mr1
+  echo "*** mr5 ***"
+  cat mr5
   echo "*** checking if snapshot worked on replicas 0, 1 and 5"
   if running_on_s3; then
     echo "skipping pass-through test"
