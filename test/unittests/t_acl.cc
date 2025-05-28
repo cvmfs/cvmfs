@@ -128,7 +128,7 @@ TEST_F(T_Acl, t2) {
 }
 
 TEST_F(T_Acl, t3) {
-  const char *textual = "u:bin:rw,u::rw,g::r,o::-,mask::rwx";
+  const char *textual = "u:1:rw,u::rw,g::r,o::-,mask::rwx";
   unsigned char acl_binary_expected[] = {
     0x02, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x06, 0x00, 0xff, 0xff, 0xff, 0xff,
@@ -142,7 +142,7 @@ TEST_F(T_Acl, t3) {
 }
 
 TEST_F(T_Acl, t5) {
-  const char *textual = "u::-,g::r,o::rwx,mask::rwx,u:bin:rw";
+  const char *textual = "u::-,g::r,o::rwx,mask::rwx,u:1:rw";
   unsigned char acl_binary_expected[] = {
     0x02, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
@@ -157,7 +157,7 @@ TEST_F(T_Acl, t5) {
 }
 
 TEST_F(T_Acl, t6) {
-  const char *textual = "u:bin:rw,u:daemon:r,u::-,g::-,o::-,m::-";
+  const char *textual = "u:1:rw,u:2:r,u::-,g::-,o::-,m::-";
   unsigned char acl_binary_expected[] = {
     0x02, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
@@ -182,7 +182,7 @@ TEST_F(T_Acl, t8) {
 }
 
 TEST_F(T_Acl, t9) {
-  const char *textual = "u:daemon:rx,g:root:rx,g:daemon:rwx,u::-,g::-,o::-,m::-";
+  const char *textual = "u:2:rx,g:root:rx,g:2:rwx,u::-,g::-,o::-,m::-";
   unsigned char acl_binary_expected[] = {
     0x02, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
