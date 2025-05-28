@@ -19,36 +19,39 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 
 # sanity checks
-[ ! -d ${CVMFS_SOURCE_LOCATION}/debian ]   || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/debian exists)"
-[ ! -f ${CVMFS_SOURCE_LOCATION}/Makefile ] || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/Makefile exists)"
+[ ! -d ${CVMFS_RESULT_LOCATION}/cvmfs-config/debian ]   || die "source directory seemed to be built before (${CVMFS_RESULT_LOCATION}/cvmfs-config/debian exists)"
+[ ! -f ${CVMFS_RESULT_LOCATION}/cvmfs-config/Makefile ] || die "source directory seemed to be built before (${CVMFS_RESULT_LOCATION}/cvmfs-config/Makefile exists)"
 
 # build wrapper for cvmfs-config-* package
 build_config_package() {
   local config_package="$1"
 
+  mkdir -p ${CVMFS_RESULT_LOCATION}/cvmfs-config
   echo "preparing source directory for the build ($config_package)..."
   cp -rv ${CVMFS_SOURCE_LOCATION}/packaging/debian/${config_package} \
-         ${CVMFS_SOURCE_LOCATION}/debian
+         ${CVMFS_RESULT_LOCATION}/cvmfs-config/debian
   cp -v ${CVMFS_SOURCE_LOCATION}/packaging/debian/${config_package}/Makefile \
-        ${CVMFS_SOURCE_LOCATION}/Makefile
+        ${CVMFS_RESULT_LOCATION}/cvmfs-config/Makefile
+
+  cp -rv ${CVMFS_SOURCE_LOCATION}/mount \
+         ${CVMFS_RESULT_LOCATION}/cvmfs-config/
 
   echo "switching to the debian source directory..."
-  cd ${CVMFS_SOURCE_LOCATION}/debian
+  cd ${CVMFS_RESULT_LOCATION}/cvmfs-config/debian
 
   echo "running the debian package build ($config_package)..."
-  debuild --check-dirname-regex=cvmfs-config --no-tgz-check -us -uc # -us -uc == skip signing
-  mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-config-*_* ${CVMFS_RESULT_LOCATION}/
+  debuild  --no-tgz-check --check-dirname-level 0 -us -uc # -us -uc == skip signing
+  #mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-config-*_* ${CVMFS_RESULT_LOCATION}/
 
-  echo "switching back to the source directory..."
-  cd ${CVMFS_SOURCE_LOCATION}
+  #echo "switching back to the source directory..."
+  #cd ${CVMFS_SOURCE_LOCATION}
 
   echo "cleaning up..."
-  rm -fR ${CVMFS_SOURCE_LOCATION}/debian
-  rm -f  ${CVMFS_SOURCE_LOCATION}/Makefile
+  rm -fR ${CVMFS_RESULT_LOCATION}/cvmfs-config
 }
 
 echo "build the config packages..."
 build_config_package "config-default"
-build_config_package "config-none"
-build_config_package "config-graphdriver"
-build_config_package "config-shrinkwrap"
+#build_config_package "config-none"
+#build_config_package "config-graphdriver"
+#build_config_package "config-shrinkwrap"
