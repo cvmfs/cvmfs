@@ -10,7 +10,7 @@
 #include <string>
 
 /* Takes textual ACL, outputs binary array fit to be a value of system.posix_acl_access */
-int acl_from_text_to_xattr_value(const std::string textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode);
+int acl_from_text_to_xattr_value(const std::string& textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode);
 
 //#define COMPARE_TO_LIBACL
 #ifdef COMPARE_TO_LIBACL

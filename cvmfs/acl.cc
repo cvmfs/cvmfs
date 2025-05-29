@@ -66,7 +66,7 @@ static int acl_from_text_to_string_entries(const string &acl_string, vector<stri
   while (entry_pos != string::npos) {
     size_t entry_length;
     size_t next_pos;
-    size_t sep_pos = acl_string.find_first_of(",\n", entry_pos);
+    size_t const sep_pos = acl_string.find_first_of(",\n", entry_pos);
     if (sep_pos == string::npos) {
       if (acl_string.length() > entry_pos) {
         entry_length = acl_string.length() - entry_pos;
@@ -95,7 +95,7 @@ static int acl_from_text_to_string_entries(const string &acl_string, vector<stri
       entry = string(entry, 0, comment_pos);
     }
 
-    // TODO trim whitespace on both ends
+    // TODO(autkin): trim whitespace on both ends
 
     // discard empty lines
     if (entry.length() == 0) {
@@ -136,13 +136,13 @@ static int acl_entry_from_text(const string &str, acl_ea_entry &entry)
   if (sep_pos == string::npos) {
     return EINVAL;
   }
-  string type(str, 0, sep_pos);
+  string const type(str, 0, sep_pos);
   size_t next_field_pos = sep_pos + 1;
   sep_pos = str.find(':', next_field_pos);
   if (sep_pos == string::npos) {
     return EINVAL;
   }
-  string qualifier(str, next_field_pos, sep_pos - next_field_pos);
+  string const qualifier(str, next_field_pos, sep_pos - next_field_pos);
   next_field_pos = sep_pos + 1;
   string permissions(str, next_field_pos);
 
@@ -243,11 +243,11 @@ static bool acl_valid_builtin(const vector<acl_ea_entry> &entries)
   if ((types_met[ACL_USER] || types_met[ACL_GROUP]) && !types_met[ACL_MASK]) {
     return false;
   }
-  // TODO ACL_USER, ACL_GROUP uniqueness checks. autkin figures it's not a pressing issue.
+  // TODO(autkin): ACL_USER, ACL_GROUP uniqueness checks. Not a pressing issue.
   return true;
 }
 
-int acl_from_text_to_xattr_value(const string textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode)
+int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode)
 {
   int ret;
 
@@ -291,14 +291,14 @@ int acl_from_text_to_xattr_value(const string textual_acl, char *&o_binary_acl, 
 
   // get one big buffer with all the entries in the "on-disk" xattr format
   size_t acl_entry_count = entries.size();
-  size_t buf_size = sizeof(acl_ea_header) + (acl_entry_count * sizeof(acl_ea_entry));
-  char *buf = (char*) malloc(buf_size);
+  size_t const buf_size = sizeof(acl_ea_header) + (acl_entry_count * sizeof(acl_ea_entry));
+  char *buf = static_cast<char*>(malloc(buf_size));
   if (!buf) {
     return ENOMEM;
   }
-  acl_ea_header* header = (acl_ea_header*)buf;
+  acl_ea_header* header = reinterpret_cast<acl_ea_header*>(buf);
   header->a_version = htole32(ACL_EA_VERSION);
-  acl_ea_entry* ext_entry = (acl_ea_entry*)(header + 1);
+  acl_ea_entry* ext_entry = reinterpret_cast<acl_ea_entry*>(header + 1);
   for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
     *ext_entry = *entry_it;
     ext_entry += 1;
