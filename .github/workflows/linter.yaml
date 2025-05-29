@@ -68,7 +68,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "::add-matcher::.github/scripts/clang_matcher.json" 
-          git diff -U0  HEAD HEAD~ | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  -path ./build -p1 | tee clang-tidy.out
+          git diff -U0  HEAD~ HEAD | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  -path ./build -p1 | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash
       - name: Generate Summary
