@@ -133,6 +133,8 @@ Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
 
+int change_from_commit1 = 0;
+
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
