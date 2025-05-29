@@ -49,6 +49,8 @@
 #include "util/posix.h"
 #include "util/string.h"
 
+int change_from_commit2 = 1;
+
 using namespace std;  // NOLINT
 
 namespace loader {
