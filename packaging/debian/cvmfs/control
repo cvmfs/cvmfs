@@ -68,7 +68,7 @@ Description: CernVM File System Unit Tests
 Package: cvmfs-fuse3
 Architecture: i386 amd64 armhf arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libfuse3-3 (>= 3.3.0), cvmfs (= ${binary:Version})
+Depends: libfuse3-3 (>= 3.3.0) | libfuse3-4, cvmfs (= ${binary:Version})
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
