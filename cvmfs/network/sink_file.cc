@@ -17,7 +17,7 @@ namespace cvmfs {
  *          on failure: -errno.
  */
 int64_t FileSink::Write(const void *buf, uint64_t sz) {
-  size_t ret = fwrite(buf, 1ul, sz, file_);
+  const size_t ret = fwrite(buf, 1ul, sz, file_);
 
   if (ferror(file_) != 0) {
     // ferror does not tell us what exactly the error is
@@ -53,7 +53,7 @@ int FileSink::Reset() {
  */
 int FileSink::Purge() {
   if (is_owner_ && file_) {
-    int ret = fclose(file_);
+    const int ret = fclose(file_);
     file_ = NULL;
     if (ret != 0) {
       return -errno;

@@ -128,7 +128,7 @@ std::string ExtractPort(const std::string &url) {
     return "";
 
   // Do not include path
-  std::size_t pos_port = url.find("/", pos_end);
+  const std::size_t pos_port = url.find("/", pos_end);
   std::string retme;
   if (pos_port == std::string::npos)
     retme = url.substr(pos_end + 2);
@@ -265,7 +265,7 @@ bool Host::IsEquivalent(const Host &other) const {
  * Compares the TTL from a provious call to time() with the current time.
  */
 bool Host::IsExpired() const {
-  time_t now = time(NULL);
+  const time_t now = time(NULL);
   assert(now != static_cast<time_t>(-1));
   return deadline_ < now;
 }
@@ -294,7 +294,7 @@ bool Host::IsValid() const {
  */
 bool Resolver::IsIpv4Address(const string &address) {
   // Are there any unexpected characters?
-  sanitizer::InputSanitizer sanitizer("09 .");
+  const sanitizer::InputSanitizer sanitizer("09 .");
   if (!sanitizer.IsValid(address))
     return false;
 
@@ -303,7 +303,7 @@ bool Resolver::IsIpv4Address(const string &address) {
   if (octets.size() != 4)
     return false;
   for (unsigned i = 0; i < 4; ++i) {
-    uint64_t this_octet = String2Uint64(octets[i]);
+    const uint64_t this_octet = String2Uint64(octets[i]);
     if (this_octet > 255)
       return false;
   }
@@ -318,7 +318,7 @@ bool Resolver::IsIpv4Address(const string &address) {
  */
 bool Resolver::IsIpv6Address(const string &address) {
   // Are there any unexpected characters?
-  sanitizer::InputSanitizer sanitizer("09 af AF :");
+  const sanitizer::InputSanitizer sanitizer("09 af AF :");
   return sanitizer.IsValid(address);
 }
 
@@ -353,7 +353,7 @@ Host Resolver::Resolve(const string &name) {
  * addresses and constructs the Host objects in the same order as the names.
  */
 void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
-  unsigned num = names.size();
+  const unsigned num = names.size();
   if (num == 0)
     return;
 
@@ -473,13 +473,13 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     // Remove surplus IP addresses
     if (throttle_ > 0) {
       while (host.ipv4_addresses_.size() > throttle_) {
-        unsigned random = prng_.Next(host.ipv4_addresses_.size());
+        const unsigned random = prng_.Next(host.ipv4_addresses_.size());
         set<string>::iterator rnd_itr = host.ipv4_addresses_.begin();
         std::advance(rnd_itr, random);
         host.ipv4_addresses_.erase(rnd_itr);
       }
       while (host.ipv6_addresses_.size() > throttle_) {
-        unsigned random = prng_.Next(host.ipv6_addresses_.size());
+        const unsigned random = prng_.Next(host.ipv6_addresses_.size());
         set<string>::iterator rnd_itr = host.ipv6_addresses_.begin();
         std::advance(rnd_itr, random);
         host.ipv6_addresses_.erase(rnd_itr);
@@ -596,7 +596,8 @@ static Failures CaresExtractIpv4(const unsigned char *abuf,
   struct hostent *host_entry = NULL;
   struct ares_addrttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  int retval = ares_parse_a_reply(abuf, alen, &host_entry, records, &naddrttls);
+  const int retval =
+      ares_parse_a_reply(abuf, alen, &host_entry, records, &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
@@ -645,8 +646,8 @@ static Failures CaresExtractIpv6(const unsigned char *abuf,
   struct hostent *host_entry = NULL;
   struct ares_addr6ttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  int retval = ares_parse_aaaa_reply(abuf, alen, &host_entry, records,
-                                     &naddrttls);
+  const int retval =
+      ares_parse_aaaa_reply(abuf, alen, &host_entry, records, &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
@@ -809,7 +810,7 @@ void CaresResolver::DoResolve(const vector<string> &names,
                               vector<Failures> *failures,
                               vector<unsigned> *ttls,
                               vector<string> *fqdns) {
-  unsigned num = names.size();
+  const unsigned num = names.size();
   if (num == 0)
     return;
 
@@ -877,8 +878,8 @@ void CaresResolver::DoResolve(const vector<string> &names,
 
 
 bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
-  string address_list = JoinStrings(resolvers, ",");
-  int retval = ares_set_servers_csv(*channel_, address_list.c_str());
+  const string address_list = JoinStrings(resolvers, ",");
+  const int retval = ares_set_servers_csv(*channel_, address_list.c_str());
   if (retval != ARES_SUCCESS)
     return false;
 
@@ -935,13 +936,13 @@ bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
 
 
 void CaresResolver::SetSystemResolvers() {
-  int retval = SetResolvers(system_resolvers_);
+  const int retval = SetResolvers(system_resolvers_);
   assert(retval == true);
 }
 
 
 void CaresResolver::SetSystemSearchDomains() {
-  int retval = SetSearchDomains(system_domains_);
+  const int retval = SetSearchDomains(system_domains_);
   assert(retval == true);
 }
 
@@ -954,7 +955,7 @@ void CaresResolver::WaitOnCares() {
   // Adapted from libcurl
   ares_socket_t socks[ARES_GETSOCK_MAXNUM];
   struct pollfd pfd[ARES_GETSOCK_MAXNUM];
-  int bitmask = ares_getsock(*channel_, socks, ARES_GETSOCK_MAXNUM);
+  const int bitmask = ares_getsock(*channel_, socks, ARES_GETSOCK_MAXNUM);
   unsigned num = 0;
   for (unsigned i = 0; i < ARES_GETSOCK_MAXNUM; ++i) {
     pfd[i].events = 0;
@@ -1039,8 +1040,8 @@ HostfileResolver *HostfileResolver::Create(const string &path, bool ipv4_only) {
  * sort in descending order.
  */
 static bool SortNameLength(const string &a, const string &b) {
-  unsigned len_a = a.length();
-  unsigned len_b = b.length();
+  const unsigned len_a = a.length();
+  const unsigned len_b = b.length();
   if (len_a != len_b)
     return len_a > len_b;
   return a > b;
@@ -1057,7 +1058,7 @@ void HostfileResolver::DoResolve(const vector<string> &names,
                                  vector<Failures> *failures,
                                  vector<unsigned> *ttls,
                                  vector<string> *fqdns) {
-  unsigned num = names.size();
+  const unsigned num = names.size();
   if (num == 0)
     return;
 
@@ -1082,8 +1083,8 @@ void HostfileResolver::DoResolve(const vector<string> &names,
     (*failures)[i] = kFailUnknownHost;
     (*fqdns)[i] = names[i];
     for (unsigned j = 0; j < effective_names.size(); ++j) {
-      map<string, HostEntry>::iterator iter = host_map_.find(
-          effective_names[j]);
+      const map<string, HostEntry>::iterator iter =
+          host_map_.find(effective_names[j]);
       if (iter != host_map_.end()) {
         (*ipv4_addresses)[i].insert((*ipv4_addresses)[i].end(),
                                     iter->second.ipv4_addresses.begin(),
@@ -1127,7 +1128,7 @@ void HostfileResolver::ParseHostFile() {
     size_t str_offset = 0;
 
     // strip comments
-    size_t hash_pos = line.find_first_of('#');
+    const size_t hash_pos = line.find_first_of('#');
     if (hash_pos != string::npos)
       line = line.substr(0, hash_pos);
 
@@ -1186,7 +1187,7 @@ void HostfileResolver::ParseHostFile() {
       if (hostname[strlen(hostname) - 1] == '.')
         hostname[strlen(hostname) - 1] = 0;  // strip the last character
 
-      map<string, HostEntry>::iterator iter = host_map_.find(hostname);
+      const map<string, HostEntry>::iterator iter = host_map_.find(hostname);
       if (iter == host_map_.end()) {
         HostEntry entry;
         if (IsIpv4Address(address))
@@ -1236,7 +1237,8 @@ NormalResolver *NormalResolver::Create(const bool ipv4_only,
     delete cares_resolver;
     return NULL;
   }
-  bool retval = hostfile_resolver->SetSearchDomains(cares_resolver->domains());
+  const bool retval =
+      hostfile_resolver->SetSearchDomains(cares_resolver->domains());
   assert(retval);
 
   NormalResolver *normal_resolver = new NormalResolver();
@@ -1262,7 +1264,7 @@ bool NormalResolver::SetResolvers(const vector<string> &resolvers) {
  * Set new search domains for both resolvers or for none.
  */
 bool NormalResolver::SetSearchDomains(const vector<string> &domains) {
-  vector<string> old_domains = hostfile_resolver_->domains();
+  const vector<string> old_domains = hostfile_resolver_->domains();
   bool retval = hostfile_resolver_->SetSearchDomains(domains);
   if (!retval)
     return false;
@@ -1283,8 +1285,8 @@ void NormalResolver::SetSystemResolvers() {
 
 void NormalResolver::SetSystemSearchDomains() {
   cares_resolver_->SetSystemSearchDomains();
-  bool retval = hostfile_resolver_->SetSearchDomains(
-      cares_resolver_->domains());
+  const bool retval =
+      hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
   assert(retval);
 }
 
@@ -1300,7 +1302,7 @@ void NormalResolver::DoResolve(const vector<string> &names,
                                vector<Failures> *failures,
                                vector<unsigned> *ttls,
                                vector<string> *fqdns) {
-  unsigned num = names.size();
+  const unsigned num = names.size();
   hostfile_resolver_->DoResolve(names, skip, ipv4_addresses, ipv6_addresses,
                                 failures, ttls, fqdns);
   vector<bool> skip_cares = skip;

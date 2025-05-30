@@ -30,7 +30,7 @@ MemSink::MemSink(size_t size)
 int64_t MemSink::Write(const void *buf, uint64_t sz) {
   if (pos_ + sz > size_) {
     if (is_owner_) {
-      size_t new_size = pos_ + sz < size_ * 2 ? size_ * 2 : pos_ + sz + 1;
+      const size_t new_size = pos_ + sz < size_ * 2 ? size_ * 2 : pos_ + sz + 1;
       data_ = static_cast<unsigned char *>(srealloc(data_, new_size));
       size_ = new_size;
     } else {

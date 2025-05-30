@@ -47,10 +47,10 @@ void S3FanoutManager::DetectThrottleIndicator(const std::string &header,
 
   value_str = Trim(value_str, true /* trim_newline */);
   if (!value_str.empty()) {
-    unsigned value_numeric = String2Uint64(value_str);
-    unsigned value_ms = HasSuffix(value_str, "ms", true /* ignore_case */)
-                            ? value_numeric
-                            : (value_numeric * 1000);
+    const unsigned value_numeric = String2Uint64(value_str);
+    const unsigned value_ms = HasSuffix(value_str, "ms", true /* ignore_case */)
+                                  ? value_numeric
+                                  : (value_numeric * 1000);
     if (value_ms > 0)
       info->throttle_ms = std::min(value_ms, kMax429ThrottleMs);
   }
@@ -137,7 +137,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   if (num_bytes == 0)
     return 0;
 
-  uint64_t read_bytes = info->origin->Read(ptr, num_bytes);
+  const uint64_t read_bytes = info->origin->Read(ptr, num_bytes);
 
   LogCvmfs(kLogS3Fanout, kLogDebug, "source buffer pushed out %lu bytes",
            read_bytes);
@@ -243,7 +243,7 @@ void *S3FanoutManager::MainUpload(void *data) {
 
   while (true) {
     // Check events with 100ms timeout
-    int timeout_ms = 100;
+    const int timeout_ms = 100;
     int retval = poll(s3fanout_mgr->watch_fds_, s3fanout_mgr->watch_fds_inuse_,
                       timeout_ms);
     if (retval == 0) {
@@ -273,8 +273,8 @@ void *S3FanoutManager::MainUpload(void *data) {
       if (handle == NULL) {
         PANIC(kLogStderr, "Failed to acquire CURL handle.");
       }
-      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
-                                                                        handle);
+      const s3fanout::Failures init_failure =
+          s3fanout_mgr->InitializeRequest(info, handle);
       if (init_failure != s3fanout::kFailOk) {
         PANIC(kLogStderr,
               "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
@@ -333,7 +333,7 @@ void *S3FanoutManager::MainUpload(void *data) {
       s3fanout_mgr->statistics_->num_requests++;
       JobInfo *info;
       CURL *easy_handle = curl_msg->easy_handle;
-      int curl_error = curl_msg->data.result;
+      const int curl_error = curl_msg->data.result;
       curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
 
       curl_multi_remove_handle(s3fanout_mgr->curl_multi_, easy_handle);
@@ -377,7 +377,7 @@ void *S3FanoutManager::MainUpload(void *data) {
 CURL *S3FanoutManager::AcquireCurlHandle() const {
   CURL *handle;
 
-  MutexLockGuard guard(curl_handle_lock_);
+  const MutexLockGuard guard(curl_handle_lock_);
 
   if (pool_handles_idle_->empty()) {
     CURLcode retval;
@@ -413,17 +413,17 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
     info->http_headers = NULL;
   }
 
-  MutexLockGuard guard(curl_handle_lock_);
+  const MutexLockGuard guard(curl_handle_lock_);
 
-  set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
+  const set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
 
   if (pool_handles_idle_->size() > config_.pool_max_handles) {
-    CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
+    const CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
     assert(retval == CURLE_OK);
     curl_easy_cleanup(handle);
-    std::map<CURL *, S3FanOutDnsEntry *>::size_type
-        retitems = curl_sharehandles_->erase(handle);
+    const std::map<CURL *, S3FanOutDnsEntry *>::size_type retitems =
+        curl_sharehandles_->erase(handle);
     assert(retitems == 1);
   } else {
     pool_handles_idle_->insert(handle);
@@ -452,13 +452,13 @@ void S3FanoutManager::InitPipeWatchFds() {
 bool S3FanoutManager::MkV2Authz(const JobInfo &info,
                                 vector<string> *headers) const {
   string payload_hash;
-  bool retval = MkPayloadHash(info, &payload_hash);
+  const bool retval = MkPayloadHash(info, &payload_hash);
   if (!retval)
     return false;
-  string content_type = GetContentType(info);
-  string request = GetRequestString(info);
+  const string content_type = GetContentType(info);
+  const string request = GetRequestString(info);
 
-  string timestamp = RfcTimestamp();
+  const string timestamp = RfcTimestamp();
   string to_sign = request + "\n" + payload_hash + "\n" + content_type + "\n"
                    + timestamp + "\n";
   if (config_.x_amz_acl != "") {
@@ -493,7 +493,7 @@ string S3FanoutManager::GetUriEncode(const string &val,
   const unsigned len = val.length();
   result.reserve(len);
   for (unsigned i = 0; i < len; ++i) {
-    char c = val[i];
+    const char c = val[i];
     if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
         || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '~'
         || c == '.') {
@@ -518,9 +518,11 @@ string S3FanoutManager::GetAwsV4SigningKey(const string &date) const {
   if (last_signing_key_.first == date)
     return last_signing_key_.second;
 
-  string date_key = shash::Hmac256("AWS4" + config_.secret_key, date, true);
-  string date_region_key = shash::Hmac256(date_key, config_.region, true);
-  string date_region_service_key = shash::Hmac256(date_region_key, "s3", true);
+  const string date_key =
+      shash::Hmac256("AWS4" + config_.secret_key, date, true);
+  const string date_region_key = shash::Hmac256(date_key, config_.region, true);
+  const string date_region_service_key =
+      shash::Hmac256(date_region_key, "s3", true);
   string signing_key = shash::Hmac256(date_region_service_key, "aws4_request",
                                       true);
   last_signing_key_.first = date;
@@ -536,12 +538,12 @@ string S3FanoutManager::GetAwsV4SigningKey(const string &date) const {
 bool S3FanoutManager::MkV4Authz(const JobInfo &info,
                                 vector<string> *headers) const {
   string payload_hash;
-  bool retval = MkPayloadHash(info, &payload_hash);
+  const bool retval = MkPayloadHash(info, &payload_hash);
   if (!retval)
     return false;
-  string content_type = GetContentType(info);
-  string timestamp = IsoTimestamp();
-  string date = timestamp.substr(0, 8);
+  const string content_type = GetContentType(info);
+  const string timestamp = IsoTimestamp();
+  const string date = timestamp.substr(0, 8);
   vector<string> tokens = SplitString(complete_hostname_, ':');
   assert(tokens.size() <= 2);
   string canonical_hostname = tokens[0];
@@ -572,23 +574,23 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
   canonical_headers += "x-amz-content-sha256:" + payload_hash + "\n"
                        + "x-amz-date:" + timestamp + "\n";
 
-  string scope = date + "/" + config_.region + "/s3/aws4_request";
-  string uri = config_.dns_buckets
-                   ? (string("/") + info.object_key)
-                   : (string("/") + config_.bucket + "/" + info.object_key);
+  const string scope = date + "/" + config_.region + "/s3/aws4_request";
+  const string uri =
+      config_.dns_buckets
+          ? (string("/") + info.object_key)
+          : (string("/") + config_.bucket + "/" + info.object_key);
 
-  string canonical_request = GetRequestString(info) + "\n"
-                             + GetUriEncode(uri, false) + "\n" + "\n"
-                             + canonical_headers + "\n" + signed_headers + "\n"
-                             + payload_hash;
+  const string canonical_request =
+      GetRequestString(info) + "\n" + GetUriEncode(uri, false) + "\n" + "\n" +
+      canonical_headers + "\n" + signed_headers + "\n" + payload_hash;
 
-  string hash_request = shash::Sha256String(canonical_request.c_str());
+  const string hash_request = shash::Sha256String(canonical_request.c_str());
 
-  string string_to_sign = "AWS4-HMAC-SHA256\n" + timestamp + "\n" + scope + "\n"
-                          + hash_request;
+  const string string_to_sign =
+      "AWS4-HMAC-SHA256\n" + timestamp + "\n" + scope + "\n" + hash_request;
 
-  string signing_key = GetAwsV4SigningKey(date);
-  string signature = shash::Hmac256(signing_key, string_to_sign);
+  const string signing_key = GetAwsV4SigningKey(date);
+  const string signature = shash::Hmac256(signing_key, string_to_sign);
 
   headers->push_back("X-Amz-Acl: " + config_.x_amz_acl);
   headers->push_back("X-Amz-Content-Sha256: " + payload_hash);
@@ -611,11 +613,12 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
  */
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
                                    vector<string> *headers) const {
-  string timestamp = RfcTimestamp();
-  string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp
-                             + "\nx-ms-version:2011-08-18";
-  string canonical_resource = "/" + config_.access_key + "/" + config_.bucket
-                              + "/" + info.object_key;
+  const string timestamp = RfcTimestamp();
+  const string canonical_headers =
+      "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp +
+      "\nx-ms-version:2011-08-18";
+  const string canonical_resource =
+      "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
   if ((info.request == JobInfo::kReqHeadOnly)
@@ -632,11 +635,11 @@ bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
   }
 
   string signing_key;
-  int retval = Debase64(config_.secret_key, &signing_key);
+  const int retval = Debase64(config_.secret_key, &signing_key);
   if (!retval)
     return false;
 
-  string signature = shash::Hmac256(signing_key, string_to_sign, true);
+  const string signature = shash::Hmac256(signing_key, string_to_sign, true);
 
   headers->push_back("x-ms-date: " + timestamp);
   headers->push_back("x-ms-version: 2011-08-18");
@@ -659,8 +662,8 @@ void S3FanoutManager::InitializeDnsSettingsCurl(CURL *handle,
 int S3FanoutManager::InitializeDnsSettings(CURL *handle,
                                            std::string host_with_port) const {
   // Use existing handle
-  std::map<CURL *, S3FanOutDnsEntry *>::const_iterator it = curl_sharehandles_
-                                                                ->find(handle);
+  const std::map<CURL *, S3FanOutDnsEntry *>::const_iterator it =
+      curl_sharehandles_->find(handle);
   if (it != curl_sharehandles_->end()) {
     InitializeDnsSettingsCurl(handle, it->second->sharehandle,
                               it->second->clist);
@@ -670,8 +673,8 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
   // Add protocol information for extraction of fields for DNS
   if (!IsHttpUrl(host_with_port))
     host_with_port = config_.protocol + "://" + host_with_port;
-  std::string remote_host = dns::ExtractHost(host_with_port);
-  std::string remote_port = dns::ExtractPort(host_with_port);
+  const std::string remote_host = dns::ExtractHost(host_with_port);
+  const std::string remote_port = dns::ExtractPort(host_with_port);
 
   // If we have the name already resolved, use the least used IP
   S3FanOutDnsEntry *useme = NULL;
@@ -695,7 +698,7 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
 
   // We need to resolve the hostname
   // TODO(ssheikki): support ipv6 also...  if (opt_ipv4_only_)
-  dns::Host host = resolver_->Resolve(remote_host);
+  const dns::Host host = resolver_->Resolve(remote_host);
   set<string> ipv4_addresses = host.ipv4_addresses();
   std::set<string>::iterator its = ipv4_addresses.begin();
   S3FanOutDnsEntry *dnse = NULL;
@@ -711,7 +714,7 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
         (dnse->dns_name + ":" + dnse->port + ":" + dnse->ip).c_str());
     dnse->sharehandle = curl_share_init();
     assert(dnse->sharehandle != NULL);
-    CURLSHcode share_retval = curl_share_setopt(
+    const CURLSHcode share_retval = curl_share_setopt(
         dnse->sharehandle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
     assert(share_retval == CURLSHE_OK);
     sharehandles_->insert(dnse);
@@ -760,8 +763,8 @@ bool S3FanoutManager::MkPayloadHash(const JobInfo &info,
   shash::Any payload_hash(shash::kMd5);
 
   unsigned char *data;
-  unsigned int nbytes = info.origin->Data(reinterpret_cast<void **>(&data),
-                                          info.origin->GetSize(), 0);
+  const unsigned int nbytes = info.origin->Data(
+      reinterpret_cast<void **>(&data), info.origin->GetSize(), 0);
   assert(nbytes == info.origin->GetSize());
 
   switch (config_.authz_method) {
@@ -939,7 +942,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
     assert(retval == CURLE_OK);
-    bool add_cert = ssl_certificate_store_.ApplySslCertificatePath(handle);
+    const bool add_cert =
+        ssl_certificate_store_.ApplySslCertificatePath(handle);
     assert(add_cert);
   }
 
@@ -969,7 +973,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
     assert(retval == CURLE_OK);
   }
 
-  string url = MkUrl(info->object_key);
+  const string url = MkUrl(info->object_key);
   retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
   assert(retval == CURLE_OK);
 
@@ -1014,7 +1018,7 @@ void S3FanoutManager::Backoff(JobInfo *info) {
   if (info->throttle_ms > 0) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "throttling for %d ms",
              info->throttle_ms);
-    uint64_t now = platform_monotonic_time();
+    const uint64_t now = platform_monotonic_time();
     if ((info->throttle_timestamp + (info->throttle_ms / 1000)) >= now) {
       if ((now - timestamp_last_throttle_report_)
           > kThrottleReportIntervalSec) {
@@ -1099,8 +1103,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->request = JobInfo::kReqPutCas;
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
-    s3fanout::Failures init_failure = InitializeRequest(info,
-                                                        info->curl_handle);
+    const s3fanout::Failures init_failure =
+        InitializeRequest(info, info->curl_handle);
 
     if (init_failure != s3fanout::kFailOk) {
       PANIC(kLogStderr,
@@ -1178,7 +1182,7 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   *user_agent_ = "User-Agent: cvmfs " + string(CVMFS_VERSION);
   complete_hostname_ = MkCompleteHostname();
 
-  CURLcode cretval = curl_global_init(CURL_GLOBAL_ALL);
+  const CURLcode cretval = curl_global_init(CURL_GLOBAL_ALL);
   assert(cretval == CURLE_OK);
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
@@ -1269,8 +1273,8 @@ S3FanoutManager::~S3FanoutManager() {
 void S3FanoutManager::Spawn() {
   LogCvmfs(kLogS3Fanout, kLogDebug, "S3FanoutManager spawned");
 
-  int retval = pthread_create(&thread_upload_, NULL, MainUpload,
-                              static_cast<void *>(this));
+  const int retval = pthread_create(&thread_upload_, NULL, MainUpload,
+                                    static_cast<void *>(this));
   assert(retval == 0);
 
   atomic_inc32(&multi_threaded_);
