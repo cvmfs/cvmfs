@@ -10,7 +10,7 @@ PACPARSER_VERSION=1.4.3
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
-GOOGLETEST_VERSION=1.8.0
+GOOGLETEST_VERSION=1.17.0
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
@@ -215,8 +215,7 @@ build_lib() {
       do_build "leveldb"
       ;;
     googletest)
-        do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
-        patch_external "googletest"     "cmake_compatibility.patch"
+        do_extract "googletest"   "googletest-${GOOGLETEST_VERSION}.tar.gz"
         do_build "googletest"
       ;;
     maxminddb)
