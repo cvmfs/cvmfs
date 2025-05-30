@@ -36,13 +36,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
       - name: Restore CI cache
         uses: actions/cache/restore@v4
         id: cvmfs-ci-cache-restore
         with:
           path: /home/runner/.cache/
           key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
-      - name: Create cache directories
+      - name: Create Squid cache directories
         run: |
           sudo mkdir -p /var/cache/squid
           sudo mkdir -p /var/log/squid
