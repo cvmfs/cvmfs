@@ -46,14 +46,14 @@ TEST_F(T_FuseInvalidator, StartStop) {
 TEST_F(T_FuseInvalidator, InvalidateTimeout) {
   FuseInvalidator::Handle handle(0);
   EXPECT_FALSE(handle.IsDone());
-  invalidator_->InvalidateInodes(&handle);
+  invalidator_->InvalidateInodesAndDentries(&handle);
   handle.WaitFor();
   EXPECT_TRUE(handle.IsDone());
 
   invalidator_->terminated_ = 1;
   FuseInvalidator::Handle handle2(1000000);
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateInodes(&handle2);
+  invalidator_->InvalidateInodesAndDentries(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
 }
@@ -73,7 +73,7 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
 
   FuseInvalidator::Handle handle(0);
   EXPECT_FALSE(handle.IsDone());
-  invalidator_->InvalidateInodes(&handle);
+  invalidator_->InvalidateInodesAndDentries(&handle);
   handle.WaitFor();
   EXPECT_TRUE(handle.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps,
@@ -82,7 +82,7 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
 
   FuseInvalidator::Handle handle2(1000000);
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateInodes(&handle2);
+  invalidator_->InvalidateInodesAndDentries(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ(FuseInvalidator::kCheckTimeoutFreqOps + 1024,
@@ -95,7 +95,7 @@ TEST_F(T_FuseInvalidator, InvalidateOps) {
   invalidator_->terminated_ = 1;
   handle2.Reset();
   EXPECT_FALSE(handle2.IsDone());
-  invalidator_->InvalidateInodes(&handle2);
+  invalidator_->InvalidateInodesAndDentries(&handle2);
   handle2.WaitFor();
   EXPECT_TRUE(handle2.IsDone());
   EXPECT_EQ((2 * FuseInvalidator::kCheckTimeoutFreqOps) + 1024,
