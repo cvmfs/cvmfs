@@ -1,8 +1,9 @@
 name: cloudtests_ubuntu
 on:
   pull_request:
+    branches: [devel, cvmfs*]
   push:
-  #  branches: [devel, cvmfs*]
+    branches: [devel, cvmfs*]
   workflow_dispatch:
     inputs:
       inputTestCases:
@@ -312,6 +313,7 @@ jobs:
           echo "Cache size: $(du -sh $HOME/.cache/squid-cache 2>/dev/null || echo '0 B')"
           echo "Log size: $(du -sh $HOME/.cache/squid-logs 2>/dev/null || echo '0 B')"
       - name: Save CI cache
+        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         id: cvmfs-ci-cache-save
         with:
