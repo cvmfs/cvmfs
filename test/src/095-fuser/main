@@ -5,6 +5,7 @@ cvmfs_test_suites="quick"
 
 cleanup() {
   sudo rm -f started
+  sudo cvmfs_config killall
 }
 
 cvmfs_run_test() {
@@ -55,8 +56,7 @@ cvmfs_run_test() {
   ! sudo cvmfs_config fuser grid.cern.ch || return 21
 
   # Bring back repository in a clean state in case anything failed
-  sudo cvmfs_config killall
-
+  cleanup
   return 0
 }
 

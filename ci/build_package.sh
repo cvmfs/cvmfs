@@ -46,8 +46,8 @@ command_tmpl="$build_script ${CVMFS_SOURCE_LOCATION} ${CVMFS_BUILD_LOCATION} $ar
 echo "++ $command_tmpl"
 
 # check if the requested build script is available
-[ -f $build_script ] || die "build script doesn't exist"
-[ -x $build_script ] || die "build script is not executable"
+[ -f $build_script ] || die "build script $build_script doesn't exist"
+[ -x $build_script ] || die "build script $build_script is not executable"
 
 # run the build script
 echo "switching to $CVMFS_BUILD_LOCATION..."

@@ -43,7 +43,25 @@ mkdir -p $CVMFS_RESULT_LOCATION
 copied_source="${CVMFS_RESULT_LOCATION}/wd_src"
 [ ! -d $copied_source ] || die "build directory is not empty"
 mkdir -p $copied_source
-cp -r ${CVMFS_SOURCE_LOCATION}/* $copied_source
+cp -R --dereference ${CVMFS_SOURCE_LOCATION}/AUTHORS            \
+                    ${CVMFS_SOURCE_LOCATION}/CMakeLists.txt     \
+                    ${CVMFS_SOURCE_LOCATION}/COPYING            \
+                    ${CVMFS_SOURCE_LOCATION}/ChangeLog          \
+                    ${CVMFS_SOURCE_LOCATION}/INSTALL            \
+                    ${CVMFS_SOURCE_LOCATION}/README.md          \
+                    ${CVMFS_SOURCE_LOCATION}/add-ons            \
+                    ${CVMFS_SOURCE_LOCATION}/bootstrap.sh       \
+                    ${CVMFS_SOURCE_LOCATION}/cmake              \
+                    ${CVMFS_SOURCE_LOCATION}/cvmfs              \
+                    ${CVMFS_SOURCE_LOCATION}/doc                \
+                    ${CVMFS_SOURCE_LOCATION}/externals          \
+                    ${CVMFS_SOURCE_LOCATION}/gateway            \
+                    ${CVMFS_SOURCE_LOCATION}/snapshotter        \
+                    ${CVMFS_SOURCE_LOCATION}/mount              \
+                    ${CVMFS_SOURCE_LOCATION}/test               \
+                    ${CVMFS_SOURCE_LOCATION}/ducc               \
+                    $copied_source
+
 
 # produce the debian package
 echo "copy packaging meta information and get in place..."
@@ -60,6 +78,9 @@ if [ x"$CVMFS_LINT_PKG" = x ]; then
   DEBUILD_ARGS="--no-lintian"
 fi
 DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild ${DEBUILD_ARGS} --prepend-path=/usr/local/go/bin \
+  -e  CVMFS_EXTERNALS_PREFIX="${CVMFS_EXTERNALS_PREFIX}" \
+  -e  CMAKE_CXX_COMPILER_LAUNCHER="${CMAKE_CXX_COMPILER_LAUNCHER}" \
+  --check-dirname-level 0 \
   -us -uc
 cd ${CVMFS_RESULT_LOCATION}
 

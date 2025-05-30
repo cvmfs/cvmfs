@@ -1,0 +1,322 @@
+name: cloudtests_ubuntu
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+  push:
+    branches: [devel, cvmfs*]
+  workflow_dispatch:
+    inputs:
+      inputTestCases:
+        description: 'Ex. src/0* src/1*'     
+        required: true
+        default: 'src/0* src/1*'
+      inputSuites:
+        description: 'Test scenario tags'
+        required: true
+        default: 'quick'
+
+jobs:
+  cloudtest_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+
+      - id: lsb-release
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            source /etc/lsb-release
+            echo "id=${DISTRIB_ID}" >> $GITHUB_OUTPUT
+            echo "release=${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "codename=${DISTRIB_CODENAME}" >> $GITHUB_OUTPUT
+            echo "description=${DISTRIB_DESCRIPTION}" >> $GITHUB_OUTPUT
+            echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            echo "id-release=macOS-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+      - name: Create Squid cache directories
+        run: |
+          sudo mkdir -p /var/cache/squid
+          sudo mkdir -p /var/log/squid
+          sudo mkdir -p /etc/squid
+
+          # Copy cached data from user space to system directories
+          if [ -d "$HOME/.cache/squidcache/squid-cache" ] && [ "$(ls -A $HOME/.cache/squidcache/squid-cache)" ]; then
+            echo " Restoring squid cache"
+            sudo mv  $HOME/.cache/squidcache/squid-cache/* /var/cache/squid/ 2>/dev/null || true
+          fi
+
+          if [ -d "$HOME/.cache/squidcache/squid-logs" ] && [ "$(ls -A $HOME/.cache/squidcache/squid-logs)" ]; then
+            sudo mv $HOME/.cache/squidcache/squid-logs/* /var/log/squid/ 2>/dev/null || true
+          fi
+
+          # Set proper ownership
+          sudo chown -R proxy:proxy /var/cache/squid
+          sudo chown -R proxy:proxy /var/log/squid
+          sudo chmod -R 755 /var/cache/squid
+      - name: Install Squid
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squid squidclient
+
+      - name: Configure Squid
+        run: |
+          sudo tee /etc/squid/squid.conf > /dev/null <<EOF
+          # Cache configuration
+          cache_dir ufs /var/cache/squid 2000 16 256
+          cache_mem 256 MB
+          maximum_object_size 100 MB
+          maximum_object_size_in_memory 512 KB
+
+          # Access control
+          acl localnet src 10.0.0.0/8
+          acl localnet src 172.16.0.0/12
+          acl localnet src 192.168.0.0/16
+          acl localnet src fc00::/7
+          acl localnet src fe80::/10
+
+          acl SSL_ports port 443
+          acl Safe_ports port 80
+          acl Safe_ports port 21
+          acl Safe_ports port 443
+          acl Safe_ports port 70
+          acl Safe_ports port 210
+          acl Safe_ports port 1025-65535
+          acl Safe_ports port 280
+          acl Safe_ports port 488
+          acl Safe_ports port 591
+          acl Safe_ports port 777
+          acl CONNECT method CONNECT
+
+          # Access rules
+          http_access deny !Safe_ports
+          http_access deny CONNECT !SSL_ports
+          http_access allow localnet
+          http_access allow localhost
+          http_access deny all
+
+          # Network configuration
+          http_port 3128
+
+          # Logging
+          access_log /var/log/squid/access.log
+          cache_log /var/log/squid/cache.log
+
+          # Cache behavior
+           refresh_pattern . 1440 50% 10080 ignore-no-cache ignore-private override-expire ignore-reload
+
+          EOF
+
+      - name: Set permissions for Squid cache
+        run: |
+          sudo chown -R proxy:proxy /var/cache/squid
+          sudo chown -R proxy:proxy /var/log/squid
+          sudo chmod -R 755 /var/cache/squid
+      - name: Initialize Squid cache if needed
+        run: |
+          # Only initialize if cache directory structure doesn't exist
+          #sudo systemctl stop squid
+          #if [ ! -d "/var/cache/squid/00" ]; then
+          #  sudo -u proxy squid -z
+          #fi
+          echo "skip"
+          # Stop and disable auto-started service
+          sudo systemctl stop squid
+          sudo systemctl disable squid
+
+          # Clear any PID files
+          sudo rm -f /run/squid.pid /var/run/squid.pid
+
+          # Kill any remaining processes
+          sudo pkill -f squid || true
+          sleep 2
+
+          # Initialize cache if needed
+          if [ ! -d "/var/cache/squid/00" ]; then
+            sudo -u proxy squid -z -f /etc/squid/squid.conf
+          fi
+      - name: Start Squid service
+        run: |
+          sudo systemctl start squid
+          sudo systemctl enable squid
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
+        run: |
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            # we could add the hash of the control file here
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+      - name: Hash Externals
+        id: get-externals-hash
+        run: |
+          echo "hash=$(ls -Rs externals | sha1sum)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Build packages
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir /tmp/build-ubuntu
+          mkdir /tmp/build-ubuntu-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
+      - name: Install packages
+        run: |
+          sudo apt-get -y remove "cvmfs*"
+          sudo apt-get -y install /tmp/build-ubuntu*/*.deb
+          sudo cvmfs_config setup
+          sudo systemctl start apache2
+          sudo systemctl status apache2
+            
+          geoip_local_url="https://ecsft.cern.ch/dist/cvmfs/geodb/GeoLite2-City.mmdb"
+          dbfile="/var/lib/cvmfs-server/geo/GeoLite2-City-test.mmdb"
+          sudo mkdir -p /var/lib/cvmfs-server/geo/
+          if [ ! -f "/home/runner/.cache/testgeo.mmdb" ]; then
+            echo "Downloading $geoip_local_url ..."
+            curl  $geoip_local_url -o /home/runner/.cache/testgeo.mmdb
+          fi
+          sudo cp /home/runner/.cache/testgeo.mmdb $dbfile
+          if ! [ -f $dbfile ]; then
+            echo "failed to download geodb!"
+            exit 300 
+          fi  
+          sudo mkdir -p /etc/cvmfs
+          echo "CVMFS_GEO_DB_FILE=$dbfile" | sudo tee -a /etc/cvmfs/server.local > /dev/null
+      - name: Check CCache Hits
+        run: |
+          ccache -s
+      - name: Measure Network usage before tests
+        id: network-usage-before
+        run: |
+          interface="eth0"
+          initial_rx=$(awk -v iface="$interface:" '$1 == iface {print $2}' /proc/net/dev)
+          initial_tx=$(awk -v iface="$interface:" '$1 == iface {print $10}' /proc/net/dev)
+          echo "initial_rx=${initial_rx}" >> $GITHUB_OUTPUT
+          echo "initial_tx=${initial_tx}" >> $GITHUB_OUTPUT
+      - name: Run tests
+        run: |
+
+          cd test
+
+          export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"src/0* src/1* src/5* src/6* src/7* src/8*"' }}
+          export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
+          CVMFS_TEST_PROXY=http://localhost:3128 \
+          CVMFS_TEST_USER=$(whoami) \
+          ./run.sh /tmp/test.log    \
+                   -s "${CVMFS_TEST_SUITES}"  \
+                   -x src/095-fuser   \
+                      src/004-davinci                              \
+                      src/005-asetup                               \
+                      src/007-testjobs                             \
+                      src/024-reload-during-asetup                 \
+                      src/056-lowspeedlimit                        \
+                      src/084-premounted                           \
+                      src/094-attachmount                          \
+                      src/104-concurrent_mounts                    \
+                      src/518-hardlinkstresstest                   \
+                      src/593-nestedwhiteout                       \
+                      src/600-securecvmfs                          \
+                      src/628-pythonwrappedcvmfsserver             \
+                      src/647-bearercvmfs                          \
+                      src/672-publish_stats_hardlinks              \
+                      src/673-acl                                  \
+                      src/682-enter                                \
+                      src/684-https_s3                             \
+                      src/686-azureblob_s3                         \
+                      src/687-import_s3                            \
+                      src/692-https_azureblob_s3                   \
+                      src/702-symlink_caching                      \
+                      src/803-repository_gateway_large_files       \
+                      src/811-commit-gateway                       \
+                    --                                             \
+                   "${CVMFS_TESTCASES}"      || exit 1
+
+      - name: Measure Network usage after tests
+        id: network-usage-after
+        run: |
+          interface="eth0"
+          initial_rx=${{ steps.network-usage-before.outputs.initial_rx }}
+          initial_tx=${{ steps.network-usage-before.outputs.initial_tx }}
+          # Get final values
+          final_rx=$(awk -v iface="$interface:" '$1 == iface {print $2}' /proc/net/dev)
+          final_tx=$(awk -v iface="$interface:" '$1 == iface {print $10}' /proc/net/dev)
+
+          # Calculate usage and convert to MB
+          rx_mb=$(awk "BEGIN {printf \"%.2f\", ($final_rx - $initial_rx) / 1048576}")
+          tx_mb=$(awk "BEGIN {printf \"%.2f\", ($final_tx - $initial_tx) / 1048576}")
+          total_mb=$(awk "BEGIN {printf \"%.2f\", $rx_mb + $tx_mb}")
+
+          echo "Received: $rx_mb MB"
+          echo "Transmitted: $tx_mb MB"
+          echo "Total: $total_mb MB"
+
+      - name: Upload logs as artifact
+        if: ${{ always () }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: CVMFS test logs
+          path: |
+              /tmp/test.log
+
+      - name: Analyze cache misses
+        run: |
+          echo "=== Cache Analysis ==="
+          echo "Total objects in cache:"
+          sudo find /var/cache/squid -name "????????" | wc -l
+
+          echo "Cache directory size:"
+          sudo du -sh /var/cache/squid
+
+          echo "Recent cache log entries:"
+          sudo ls -alhR /var/log/squid
+          sudo tail -20 /var/log/squid/cache.log | grep -E "(CACHE_|STORE_|RELEASE)" || true
+
+          echo "Access log analysis:"
+          sudo grep -E "(HIT|MISS)" /var/log/squid/access.log | tail -10 || true
+      - name: Backup squid cache data for next run
+        if: always()
+        run: |
+          # Copy cache data back to user space for GitHub Actions cache
+          mkdir -p $HOME/.cache/squid-cache $HOME/.cache/squid-logs
+          sudo mv /var/cache/squid/* $HOME/.cache/squid-cache/ 2>/dev/null || true
+          sudo mv /var/log/squid/* $HOME/.cache/squid-logs/ 2>/dev/null || true
+
+          # Change ownership to runner user for caching
+          sudo chown -R runner:docker $HOME/.cache/squid-cache $HOME/.cache/squid-logs
+
+          # Display cache statistics
+          echo "Cache size: $(du -sh $HOME/.cache/squid-cache 2>/dev/null || echo '0 B')"
+          echo "Log size: $(du -sh $HOME/.cache/squid-logs 2>/dev/null || echo '0 B')"
+      - name: Save CI cache
+        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        id: cvmfs-ci-cache-save
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+
