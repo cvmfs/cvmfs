@@ -65,7 +65,7 @@ AuthzExternalFetcher::AuthzExternalFetcher(const string &fqrn,
 
 
 AuthzExternalFetcher::~AuthzExternalFetcher() {
-  int retval = pthread_mutex_destroy(&lock_);
+  const int retval = pthread_mutex_destroy(&lock_);
   assert(retval == 0);
 
   // Allow helper to gracefully terminate
@@ -90,7 +90,7 @@ void AuthzExternalFetcher::ReapHelper() {
 
   if (pid_ > 0) {
     int retval;
-    uint64_t now = platform_monotonic_time();
+    const uint64_t now = platform_monotonic_time();
     int statloc;
     do {
       retval = waitpid(pid_, &statloc, WNOHANG);
@@ -173,7 +173,7 @@ void AuthzExternalFetcher::ExecHelper() {
   LogCvmfs(kLogAuthz, kLogDebug | kLogSyslog, "starting authz helper %s",
            argv0);
 
-  pid_t pid = fork();
+  const pid_t pid = fork();
   if (pid == 0) {
     // Child process, close file descriptors and run the helper
     int retval = dup2(pipe_send[0], 0);
@@ -217,9 +217,9 @@ AuthzStatus AuthzExternalFetcher::Fetch(const QueryInfo &query_info,
                                         unsigned *ttl) {
   *ttl = kDefaultTtl;
 
-  MutexLockGuard lock_guard(lock_);
+  const MutexLockGuard lock_guard(lock_);
   if (fail_state_) {
-    uint64_t now = platform_monotonic_time();
+    const uint64_t now = platform_monotonic_time();
     if (now > next_start_) {
       fail_state_ = false;
     } else {
@@ -271,7 +271,7 @@ string AuthzExternalFetcher::FindHelper(const string &membership) {
   string authz_schema;
   string pure_membership;
   StripAuthzSchema(membership, &authz_schema, &pure_membership);
-  sanitizer::AuthzSchemaSanitizer sanitizer;
+  const sanitizer::AuthzSchemaSanitizer sanitizer;
   if (!sanitizer.IsValid(authz_schema)) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug, "invalid authz schema: %s",
              authz_schema.c_str());
@@ -291,7 +291,7 @@ string AuthzExternalFetcher::FindHelper(const string &membership) {
  * Establish communication link with a forked authz helper.
  */
 bool AuthzExternalFetcher::Handshake() {
-  string debug_log = GetLogDebugFile();
+  const string debug_log = GetLogDebugFile();
   string json_debug_log;
   if (debug_log != "")
     json_debug_log = ",\"debug_log\":\"" + debug_log + "\"";
@@ -318,7 +318,7 @@ bool AuthzExternalFetcher::Handshake() {
 
 
 void AuthzExternalFetcher::InitLock() {
-  int retval = pthread_mutex_init(&lock_, NULL);
+  const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
 }
 
@@ -331,13 +331,13 @@ bool AuthzExternalFetcher::Send(const string &msg) {
   } header;
   header.version = kProtocolVersion;
   header.length = msg.length();
-  unsigned raw_length = sizeof(header) + msg.length();
+  const unsigned raw_length = sizeof(header) + msg.length();
   unsigned char *raw_msg = reinterpret_cast<unsigned char *>(
       alloca(raw_length));
   memcpy(raw_msg, &header, sizeof(header));
   memcpy(raw_msg + sizeof(header), msg.data(), header.length);
 
-  bool retval = SafeWrite(fd_send_, raw_msg, raw_length);
+  const bool retval = SafeWrite(fd_send_, raw_msg, raw_length);
   if (!retval)
     EnterFailState();
   return retval;
@@ -362,7 +362,7 @@ bool AuthzExternalFetcher::ParseMsg(const std::string &json_msg,
                                     AuthzExternalMsg *binary_msg) {
   assert(binary_msg != NULL);
 
-  UniquePtr<JsonDocument> json_document(JsonDocument::Create(json_msg));
+  const UniquePtr<JsonDocument> json_document(JsonDocument::Create(json_msg));
   if (!json_document.IsValid()) {
     LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
              "invalid json from authz helper %s: %s", progname_.c_str(),
@@ -462,7 +462,7 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenX509;
     string token_binary;
-    bool valid_base64 = Debase64(json_token->string_value, &token_binary);
+    const bool valid_base64 = Debase64(json_token->string_value, &token_binary);
     if (!valid_base64) {
       LogCvmfs(kLogAuthz, kLogSyslogErr | kLogDebug,
                "invalid Base64 in 'x509_proxy' from authz helper %s",
@@ -470,7 +470,7 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
       EnterFailState();
       return false;
     }
-    unsigned size = token_binary.size();
+    const unsigned size = token_binary.size();
     binary_msg->permit.token.size = size;
     if (size > 0) {
       // The token is passed to the AuthzSessionManager, which takes care of
@@ -484,7 +484,7 @@ bool AuthzExternalFetcher::ParsePermit(JSON *json_authz,
                                             JSON_STRING);
   if (json_token != NULL) {
     binary_msg->permit.token.type = kTokenBearer;
-    unsigned size = strlen(json_token->string_value);
+    const unsigned size = strlen(json_token->string_value);
     binary_msg->permit.token.size = size;
     if (size > 0) {
       // The token is passed to the AuthzSessionManager, which takes care of

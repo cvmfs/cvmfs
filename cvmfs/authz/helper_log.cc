@@ -31,7 +31,7 @@ void SetLogAuthzDebug(const string &path) {
   assert(!path.empty());
   if (fd_debug >= 0)
     close(fd_debug);
-  int fd_debug = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
+  const int fd_debug = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
   if (fd_debug < 0) {
     syslog(LOG_USER | LOG_ERR, "could not open debug log %s (%d), abort",
            path.c_str(), errno);
@@ -99,7 +99,7 @@ void SetLogAuthzSyslogPrefix(const string &prefix) {
   if (prefix == "") {
     syslog_prefix = NULL;
   } else {
-    unsigned len = prefix.length() + 1;
+    const unsigned len = prefix.length() + 1;
     syslog_prefix = static_cast<char *>(malloc(len));
     assert(syslog_prefix != NULL);
     syslog_prefix[len - 1] = '\0';
@@ -112,7 +112,7 @@ void LogAuthz(const int flags, const char *format, ...) {
   char *msg = NULL;
   va_list variadic_list;
   va_start(variadic_list, format);
-  int retval = vasprintf(&msg, format, variadic_list);
+  const int retval = vasprintf(&msg, format, variadic_list);
   assert(retval != -1);  // else: out of memory
   va_end(variadic_list);
 

@@ -51,7 +51,7 @@ void ParseHandshakeInit(const string &msg) {
   assert((string(json->name) == "cvmfs_authz_v1"));
   json = json->first_child;
   while (json) {
-    string name(json->name);
+    const string name(json->name);
     if (name == "debug_log") {
       SetLogAuthzDebug(string(json->string_value) + ".authz");
     } else if (name == "fqrn") {
@@ -79,7 +79,7 @@ void ParseRequest(const string &msg) {
   assert((string(json->name) == "cvmfs_authz_v1"));
   json = json->first_child;
   while (json) {
-    string name(json->name);
+    const string name(json->name);
     if (name == "msgid") {
       if (json->int_value == 4) { /* kAuthzMsgQuit */
         LogAuthz(kLogAuthzDebug, "shut down");

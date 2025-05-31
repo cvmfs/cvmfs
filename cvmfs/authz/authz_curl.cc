@@ -67,7 +67,7 @@ CURLcode AuthzAttachment::CallbackSslCtx(CURL *curl, void *sslctx, void *parm) {
 
   LogCvmfs(kLogAuthz, kLogDebug, "Customizing OpenSSL context.");
 
-  int cert_count = sk_X509_num(chain);
+  const int cert_count = sk_X509_num(chain);
   if (cert_count == 0) {
     LogOpenSSLErrors("No certificate found in chain.");
   }
@@ -130,10 +130,12 @@ bool AuthzAttachment::ConfigureSciTokenCurl(CURL *curl_handle,
   // Create the Bearer token
   // The CURLOPT_XOAUTH2_BEARER option only works "IMAP, POP3 and SMTP"
   // protocols. Not HTTPS
-  std::string auth_preamble = "Authorization: Bearer ";
-  std::string auth_header = auth_preamble + static_cast<char *>(bearer->token);
+  const std::string auth_preamble = "Authorization: Bearer ";
+  const std::string auth_header =
+      auth_preamble + static_cast<char *>(bearer->token);
   bearer->list = curl_slist_append(bearer->list, auth_header.c_str());
-  int retval = curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
+  const int retval =
+      curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, bearer->list);
 
   if (retval != CURLE_OK) {
     LogCvmfs(kLogAuthz, kLogSyslogErr, "Failed to set Oauth2 Bearer Token");
@@ -159,7 +161,7 @@ bool AuthzAttachment::ConfigureCurlHandle(CURL *curl_handle,
   curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
   curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
 
-  UniquePtr<AuthzToken> token(
+  const UniquePtr<AuthzToken> token(
       authz_session_manager_->GetTokenCopy(pid, membership_));
   if (!token.IsValid()) {
     LogCvmfs(kLogAuthz, kLogDebug, "failed to get authz token for pid %d", pid);

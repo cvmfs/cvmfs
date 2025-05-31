@@ -51,7 +51,7 @@ AuthzSessionManager::~AuthzSessionManager() {
   retval = pthread_mutex_destroy(&lock_session2cred_);
   assert(retval == 0);
 
-  SessionKey empty_key;
+  const SessionKey empty_key;
   for (unsigned i = 0; i < session2cred_.capacity(); ++i) {
     if (session2cred_.keys()[i] != empty_key) {
       if ((session2cred_.values() + i)->token.data != NULL)
@@ -62,7 +62,7 @@ AuthzSessionManager::~AuthzSessionManager() {
 
 
 void AuthzSessionManager::ClearSessionCache() {
-  MutexLockGuard m(&lock_session2cred_);
+  const MutexLockGuard m(&lock_session2cred_);
   session2cred_.Clear();
   no_session_->Set(0);
 }
@@ -137,7 +137,7 @@ bool AuthzSessionManager::GetPidInfo(pid_t pid, PidKey *pid_key) {
   }
 
   // The uid and gid can be gathered from /proc/$PID/stat file ownership
-  int fd_stat = fileno(fp_stat);
+  const int fd_stat = fileno(fp_stat);
   platform_stat64 info;
   retval = platform_fstat(fd_stat, &info);
   if (retval != 0) {
@@ -178,7 +178,7 @@ AuthzToken *AuthzSessionManager::GetTokenCopy(const pid_t pid,
                                               const std::string &membership) {
   SessionKey session_key;
   PidKey pid_key;
-  bool retval = LookupSessionKey(pid, &pid_key, &session_key);
+  const bool retval = LookupSessionKey(pid, &pid_key, &session_key);
   if (!retval)
     return NULL;
 
@@ -195,7 +195,7 @@ bool AuthzSessionManager::IsMemberOf(const pid_t pid,
                                      const std::string &membership) {
   SessionKey session_key;
   PidKey pid_key;
-  bool retval = LookupSessionKey(pid, &pid_key, &session_key);
+  const bool retval = LookupSessionKey(pid, &pid_key, &session_key);
   if (!retval)
     return false;
 
@@ -216,7 +216,7 @@ bool AuthzSessionManager::LookupAuthzData(const PidKey &pid_key,
 
   bool found;
   {
-    MutexLockGuard m(&lock_session2cred_);
+    const MutexLockGuard m(&lock_session2cred_);
     MaySweepCreds();
     found = session2cred_.Lookup(session_key, authz_data);
   }
@@ -250,7 +250,7 @@ bool AuthzSessionManager::LookupAuthzData(const PidKey &pid_key,
            authz_data->status, ttl);
 
   {
-    MutexLockGuard m(&lock_session2cred_);
+    const MutexLockGuard m(&lock_session2cred_);
     if (!session2cred_.Contains(session_key))
       perf::Inc(no_session_);
     session2cred_.Insert(session_key, *authz_data);
@@ -279,7 +279,7 @@ bool AuthzSessionManager::LookupSessionKey(pid_t pid,
 
   bool found;
   {
-    MutexLockGuard m(&lock_pid2session_);
+    const MutexLockGuard m(&lock_pid2session_);
     found = pid2session_.Lookup(*pid_key, session_key);
     MaySweepPids();
   }
@@ -306,7 +306,7 @@ bool AuthzSessionManager::LookupSessionKey(pid_t pid,
   session_key->sid = sid_key.pid;
   session_key->sid_bday = sid_key.pid_bday;
   {
-    MutexLockGuard m(&lock_pid2session_);
+    const MutexLockGuard m(&lock_pid2session_);
     pid_key->deadline = platform_monotonic_time() + kPidLifetime;
     if (!pid2session_.Contains(*pid_key))
       perf::Inc(no_pid_);
@@ -324,7 +324,7 @@ bool AuthzSessionManager::LookupSessionKey(pid_t pid,
  * Scan through old sessions only every so often.
  */
 void AuthzSessionManager::MaySweepCreds() {
-  uint64_t now = platform_monotonic_time();
+  const uint64_t now = platform_monotonic_time();
   if (now >= deadline_sweep_creds_) {
     SweepCreds(now);
     deadline_sweep_creds_ = now + kSweepInterval;
@@ -336,7 +336,7 @@ void AuthzSessionManager::MaySweepCreds() {
  * Scan through old PIDs only every so often.
  */
 void AuthzSessionManager::MaySweepPids() {
-  uint64_t now = platform_monotonic_time();
+  const uint64_t now = platform_monotonic_time();
   if (now >= deadline_sweep_pids_) {
     SweepPids(now);
     deadline_sweep_pids_ = now + kSweepInterval;
@@ -349,10 +349,10 @@ void AuthzSessionManager::MaySweepPids() {
  * TODO(jblomer): a generalized sweeping can become part of smallhash
  */
 void AuthzSessionManager::SweepCreds(uint64_t now) {
-  SessionKey empty_key;
+  const SessionKey empty_key;
   vector<SessionKey> trash_bin;
   for (unsigned i = 0; i < session2cred_.capacity(); ++i) {
-    SessionKey this_key = session2cred_.keys()[i];
+    const SessionKey this_key = session2cred_.keys()[i];
     if (this_key != empty_key) {
       if (now >= (session2cred_.values() + i)->deadline)
         trash_bin.push_back(this_key);
@@ -371,10 +371,10 @@ void AuthzSessionManager::SweepCreds(uint64_t now) {
  * TODO(jblomer): a generalized sweeping can become part of smallhash
  */
 void AuthzSessionManager::SweepPids(uint64_t now) {
-  PidKey empty_key;
+  const PidKey empty_key;
   vector<PidKey> trash_bin;
   for (unsigned i = 0; i < pid2session_.capacity(); ++i) {
-    PidKey this_key = pid2session_.keys()[i];
+    const PidKey this_key = pid2session_.keys()[i];
     if (this_key != empty_key) {
       if (now >= this_key.deadline)
         trash_bin.push_back(this_key);
