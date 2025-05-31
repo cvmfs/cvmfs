@@ -107,7 +107,7 @@ void SpecTree::Parse(FILE *spec_file) {
   SpecTreeNode *cur_node;
   // Whether there is a path on the stack disallowing inclusion
   while (GetLineFile(spec_file, &line)) {  // Go through spec file lines
-    std::string raw_line = line;
+    const std::string raw_line = line;
     line = Trim(line);
     if (line.empty() || line[0] == '#')
       continue;

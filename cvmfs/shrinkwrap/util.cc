@@ -16,9 +16,9 @@
 shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   // TODO(steuber): Can we do any better here?
   shash::Any meta_hash(shash::kMd5);
-  unsigned min_buffer_size = sizeof(mode_t) / sizeof(unsigned char) + 1
-                             + sizeof(uid_t) / sizeof(unsigned char) + 1
-                             + sizeof(gid_t) / sizeof(unsigned char) + 1;
+  const unsigned min_buffer_size = sizeof(mode_t) / sizeof(unsigned char) + 1 +
+                                   sizeof(uid_t) / sizeof(unsigned char) + 1 +
+                                   sizeof(gid_t) / sizeof(unsigned char) + 1;
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
   unsigned xlist_buffer_size = 0;
   unsigned char *xlist_buffer;
@@ -63,7 +63,7 @@ void AppendStringToList(char const *str,
                         size_t *listlen,
                         size_t *buflen) {
   if (*listlen + 1 >= *buflen) {
-    size_t newbuflen = (*listlen) * 2 + 5;
+    const size_t newbuflen = (*listlen) * 2 + 5;
     *buf = reinterpret_cast<char **>(realloc(*buf, sizeof(char *) * newbuflen));
     assert(*buf);
     *buflen = newbuflen;

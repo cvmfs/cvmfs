@@ -228,12 +228,9 @@ int main(int argc, char **argv) {
 
   dest->archive_provenance(src->context_, dest->context_);
 
-  int result = shrinkwrap::SyncInit(src,
-                                    dest,
-                                    "", /* spec_base_dir, unused */
-                                    params.spec_trace_path.c_str(),
-                                    params.num_parallel,
-                                    params.stat_period);
+  const int result = shrinkwrap::SyncInit(
+      src, dest, "", /* spec_base_dir, unused */
+      params.spec_trace_path.c_str(), params.num_parallel, params.stat_period);
 
   src->finalize(src->context_);
   if (params.do_garbage_collection) {

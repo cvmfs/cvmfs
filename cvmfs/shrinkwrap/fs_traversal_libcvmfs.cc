@@ -48,7 +48,7 @@ int libcvmfs_get_stat(struct fs_traversal_context *ctx,
 
 char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
                               const struct cvmfs_attr *stat) {
-  int length = 2 + strlen(stat->cvm_parent) + strlen(stat->cvm_name);
+  const int length = 2 + strlen(stat->cvm_parent) + strlen(stat->cvm_name);
   char *res = reinterpret_cast<char *>(smalloc(length));
   snprintf(res, length, "%s/%s", stat->cvm_parent, stat->cvm_name);
   return res;
@@ -58,7 +58,7 @@ char *libcvmfs_get_identifier(struct fs_traversal_context *ctx,
 bool libcvmfs_has_file(struct fs_traversal_context *ctx, const char *ident) {
   cvmfs_context *context = reinterpret_cast<cvmfs_context *>(ctx->ctx);
   struct cvmfs_attr *attr = cvmfs_attr_init();
-  int retval = cvmfs_stat_attr(context, ident, attr);
+  const int retval = cvmfs_stat_attr(context, ident, attr);
   cvmfs_attr_free(attr);
   return retval;
 }
@@ -99,7 +99,7 @@ int libcvmfs_do_fopen(void *file_ctx, fs_open_type op_mode) {
 int libcvmfs_do_fclose(void *file_ctx) {
   struct libcvmfs_file_handle
       *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
-  int res = cvmfs_close(handle->ctx, handle->fd);
+  const int res = cvmfs_close(handle->ctx, handle->fd);
   if (res != 0)
     return -1;
   handle->fd = -1;
@@ -113,7 +113,8 @@ int libcvmfs_do_fread(void *file_ctx,
                       size_t *read_len) {
   struct libcvmfs_file_handle
       *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
-  ssize_t read = cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->off);
+  const ssize_t read =
+      cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->off);
   if (read == -1) {
     return -1;
   }
@@ -158,7 +159,7 @@ struct fs_traversal_context *libcvmfs_initialize(const char *repo,
   snprintf(minor, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_VERSION_MINOR);
   char *rev = reinterpret_cast<char *>(smalloc(MAX_INTEGER_DIGITS));
   snprintf(rev, MAX_INTEGER_DIGITS, "%d", LIBCVMFS_REVISION);
-  size_t len = 3 + strlen(major) + strlen(minor) + strlen(rev);
+  const size_t len = 3 + strlen(major) + strlen(minor) + strlen(rev);
   char *lib_version = reinterpret_cast<char *>(smalloc(len));
   snprintf(lib_version, len, "%s.%s:%s", major, minor, rev);
 
@@ -180,7 +181,7 @@ struct fs_traversal_context *libcvmfs_initialize(const char *repo,
   if (config) {
     result->config = strdup(config);
   } else {
-    size_t len = 8 + strlen(result->repo);
+    const size_t len = 8 + strlen(result->repo);
     char *def_config = reinterpret_cast<char *>(smalloc(len * sizeof(char)));
     snprintf(def_config, len, "%s.config", result->repo);
     result->config = strdup(def_config);

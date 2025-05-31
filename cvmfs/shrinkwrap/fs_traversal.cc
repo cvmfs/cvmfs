@@ -241,7 +241,7 @@ copy_fail:
 }
 
 char *get_full_path(const char *dir, const char *entry) {
-  size_t len = 2 + strlen(dir) + strlen(entry);
+  const size_t len = 2 + strlen(dir) + strlen(entry);
   char *path = reinterpret_cast<char *>(smalloc(len));
   snprintf(path, len, "%s/%s", dir, entry);
   return path;
@@ -254,7 +254,7 @@ bool updateStat(struct fs_traversal *fs,
   cvmfs_attr_free(*st);
   *st = NULL;
   *st = cvmfs_attr_init();
-  int retval = fs->get_stat(fs->context_, entry, *st, get_hash);
+  const int retval = fs->get_stat(fs->context_, entry, *st, get_hash);
   if (retval != 0) {
     return false;
   }
@@ -316,7 +316,7 @@ void list_src_dir(struct fs_traversal *src,
                   const char *dir,
                   char ***buf,
                   size_t *len) {
-  int retval = spec_tree_->ListDir(dir, buf, len);
+  const int retval = spec_tree_->ListDir(dir, buf, len);
 
   if (retval == SPEC_READ_FS) {
     src->list_dir(src->context_, dir, buf, len);
@@ -598,7 +598,7 @@ static void *MainWorker(void *data) {
   while (1) {
     FileCopy next_copy;
     {
-      MutexLockGuard m(&lock_pipe);
+      const MutexLockGuard m(&lock_pipe);
       ReadPipe(pipe_chunks[0], &next_copy, sizeof(next_copy));
     }
     if (next_copy.IsTerminateJob())
@@ -691,9 +691,9 @@ int SyncInit(struct fs_traversal *src,
     for (unsigned i = 0; i < num_parallel_; ++i) {
       specificWorkerContexts[i].mwc = mwc;
       specificWorkerContexts[i].num_thread = i;
-      int retval = pthread_create(
-          &workers[i], NULL, MainWorker,
-          static_cast<void *>(&(specificWorkerContexts[i])));
+      const int retval =
+          pthread_create(&workers[i], NULL, MainWorker,
+                         static_cast<void *>(&(specificWorkerContexts[i])));
       assert(retval == 0);
     }
   }
@@ -705,7 +705,7 @@ int SyncInit(struct fs_traversal *src,
 
   uint64_t last_print_time = 0;
   add_dir_for_sync(base, recursive);
-  int result = !SyncFull(src, dest, pstats, last_print_time);
+  const int result = !SyncFull(src, dest, pstats, last_print_time);
 
   while (atomic_read64(&copy_queue) != 0) {
     if (platform_monotonic_time() - last_print_time > stat_update_period_) {
@@ -725,7 +725,7 @@ int SyncInit(struct fs_traversal *src,
       WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
     }
     for (unsigned i = 0; i < num_parallel_; ++i) {
-      int retval = pthread_join(workers[i], NULL);
+      const int retval = pthread_join(workers[i], NULL);
       assert(retval == 0);
     }
     ClosePipe(pipe_chunks);
@@ -744,9 +744,9 @@ int SyncInit(struct fs_traversal *src,
 
 int GarbageCollect(struct fs_traversal *fs) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Performing garbage collection...");
-  uint64_t start_time = platform_monotonic_time();
-  int retval = fs->garbage_collector(fs->context_);
-  uint64_t end_time = platform_monotonic_time();
+  const uint64_t start_time = platform_monotonic_time();
+  const int retval = fs->garbage_collector(fs->context_);
+  const uint64_t end_time = platform_monotonic_time();
   LogCvmfs(kLogCvmfs, kLogStdout, "Garbage collection took %lu seconds.",
            (end_time - start_time));
   return retval;
