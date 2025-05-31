@@ -23,7 +23,7 @@ atomic_int64 TaskChunk::tag_seq_ = 2 << 28;
  */
 void TaskChunk::Process(BlockItem *input_block) {
   FileItem *file_item = input_block->file_item();
-  int64_t input_tag = input_block->tag();
+  const int64_t input_tag = input_block->tag();
   assert((file_item != NULL) && (input_tag >= 0));
 
   ChunkInfo chunk_info;
@@ -96,10 +96,10 @@ void TaskChunk::Process(BlockItem *input_block) {
         uint64_t cut_mark = 0;
         while ((cut_mark = chunk_detector->FindNextCutMark(input_block)) != 0) {
           assert(cut_mark >= chunk_info.offset + offset_in_block);
-          uint64_t cut_mark_in_block = cut_mark - chunk_info.offset;
+          const uint64_t cut_mark_in_block = cut_mark - chunk_info.offset;
           assert(cut_mark_in_block >= offset_in_block);
           assert(cut_mark_in_block <= input_block->size());
-          unsigned tail_size = cut_mark_in_block - offset_in_block;
+          const unsigned tail_size = cut_mark_in_block - offset_in_block;
 
           if (tail_size > 0) {
             BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk,
@@ -132,7 +132,7 @@ void TaskChunk::Process(BlockItem *input_block) {
         chunk_info.offset += offset_in_block;
 
         assert(input_block->size() >= offset_in_block);
-        unsigned tail_size = input_block->size() - offset_in_block;
+        const unsigned tail_size = input_block->size() - offset_in_block;
         if (tail_size > 0) {
           BlockItem *block_tail = new BlockItem(chunk_info.output_tag_chunk,
                                                 allocator_);

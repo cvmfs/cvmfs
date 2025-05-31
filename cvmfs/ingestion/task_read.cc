@@ -45,7 +45,7 @@ void TaskRead::Process(FileItem *item) {
   }
 
   unsigned char *buffer[kBlockSize];
-  uint64_t tag = atomic_xadd64(&tag_seq_, 1);
+  const uint64_t tag = atomic_xadd64(&tag_seq_, 1);
   ssize_t nbytes = -1;
   unsigned cnt = 0;
   do {

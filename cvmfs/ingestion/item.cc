@@ -33,7 +33,7 @@ FileItem::FileItem(IngestionSource *source,
     , chunk_detector_(min_chunk_size, avg_chunk_size, max_chunk_size)
     , bulk_hash_(hash_algorithm)
     , chunks_(1) {
-  int retval = pthread_mutex_init(&lock_, NULL);
+  const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
   atomic_init64(&nchunks_in_fly_);
   atomic_init32(&is_fully_chunked_);
@@ -42,7 +42,7 @@ FileItem::FileItem(IngestionSource *source,
 FileItem::~FileItem() { pthread_mutex_destroy(&lock_); }
 
 void FileItem::RegisterChunk(const FileChunk &file_chunk) {
-  MutexLockGuard lock_guard(lock_);
+  const MutexLockGuard lock_guard(lock_);
 
   switch (file_chunk.content_hash().suffix) {
     case shash::kSuffixPartial:
@@ -218,8 +218,8 @@ void BlockItem::SetFileItem(FileItem *value) {
 uint32_t BlockItem::Write(void *buf, uint32_t count) {
   assert(type_ == kBlockData);
 
-  uint32_t remaining = capacity_ - size_;
-  uint32_t nbytes = std::min(remaining, count);
+  const uint32_t remaining = capacity_ - size_;
+  const uint32_t nbytes = std::min(remaining, count);
   memcpy(data_ + size_, buf, nbytes);
   size_ += nbytes;
   return nbytes;

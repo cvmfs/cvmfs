@@ -13,7 +13,7 @@
 
 
 uint64_t ChunkDetector::FindNextCutMark(BlockItem *block) {
-  uint64_t result = DoFindNextCutMark(block);
+  const uint64_t result = DoFindNextCutMark(block);
   if (result == 0)
     offset_ += block->size();
   return result;

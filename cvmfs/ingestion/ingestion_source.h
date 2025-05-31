@@ -68,7 +68,7 @@ class FileIngestionSource : public IngestionSource {
 
   ssize_t Read(void *buffer, size_t nbyte) {
     assert(fd_ >= 0);
-    ssize_t read = SafeRead(fd_, buffer, nbyte);
+    const ssize_t read = SafeRead(fd_, buffer, nbyte);
     if (read < 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read the file: %s (%d)\n %s",
                path_.c_str(), errno, strerror(errno));
@@ -84,7 +84,7 @@ class FileIngestionSource : public IngestionSource {
     // foreaseable future.
     (void)platform_invalidate_kcache(fd_, 0, 0);
 
-    int ret = close(fd_);
+    const int ret = close(fd_);
     fd_ = -1;
     return (ret == 0);
   }
@@ -94,7 +94,7 @@ class FileIngestionSource : public IngestionSource {
       *size = stat_.st_size;
       return true;
     }
-    int ret = platform_fstat(fd_, &stat_);
+    const int ret = platform_fstat(fd_, &stat_);
     if (ret == 0) {
       *size = stat_.st_size;
       stat_obtained_ = true;
@@ -124,8 +124,8 @@ class MemoryIngestionSource : public IngestionSource {
   virtual bool IsRealFile() const { return false; }
   virtual bool Open() { return true; }
   virtual ssize_t Read(void *buffer, size_t nbyte) {
-    size_t remaining = size_ - pos_;
-    size_t size = std::min(remaining, nbyte);
+    const size_t remaining = size_ - pos_;
+    const size_t size = std::min(remaining, nbyte);
     if (size > 0)
       memcpy(buffer, data_ + pos_, size);
     pos_ += size;
@@ -195,7 +195,7 @@ class TarIngestionSource : public IngestionSource {
   }
 
   ssize_t Read(void *external_buffer, size_t nbytes) {
-    ssize_t read = archive_read_data(archive_, external_buffer, nbytes);
+    const ssize_t read = archive_read_data(archive_, external_buffer, nbytes);
     if (read < 0) {
       errno = archive_errno(archive_);
       LogCvmfs(kLogCvmfs, kLogStderr,

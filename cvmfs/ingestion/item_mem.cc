@@ -14,11 +14,11 @@ atomic_int64 ItemAllocator::total_allocated_ = 0;
 
 
 void ItemAllocator::Free(void *ptr) {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
 
   MallocArena *M = MallocArena::GetMallocArena(ptr, kArenaSize);
   M->Free(ptr);
-  unsigned N = malloc_arenas_.size();
+  const unsigned N = malloc_arenas_.size();
   if ((N > 1) && M->IsEmpty()) {
     for (unsigned i = 0; i < N; ++i) {
       if (malloc_arenas_[i] == M) {
@@ -35,7 +35,7 @@ void ItemAllocator::Free(void *ptr) {
 
 
 ItemAllocator::ItemAllocator() : idx_last_arena_(0) {
-  int retval = pthread_mutex_init(&lock_, NULL);
+  const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
 
   malloc_arenas_.push_back(new MallocArena(kArenaSize));
@@ -53,12 +53,12 @@ ItemAllocator::~ItemAllocator() {
 
 
 void *ItemAllocator::Malloc(unsigned size) {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
 
   void *p = malloc_arenas_[idx_last_arena_]->Malloc(size);
   if (p != NULL)
     return p;
-  unsigned N = malloc_arenas_.size();
+  const unsigned N = malloc_arenas_.size();
   for (unsigned i = 0; i < N; ++i) {
     p = malloc_arenas_[i]->Malloc(size);
     if (p != NULL) {

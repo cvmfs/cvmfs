@@ -37,7 +37,7 @@ IngestionPipeline::IngestionPipeline(
     , spawned_(false)
     , uploader_(uploader)
     , tube_ctr_inflight_pre_(kMaxFilesInFlight) {
-  unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
+  const unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkRegister; ++i) {
     Tube<FileItem> *tube = new Tube<FileItem>();
@@ -85,7 +85,7 @@ IngestionPipeline::IngestionPipeline(
   if (fixed_limit_mb != NULL) {
     high = String2Uint64(fixed_limit_mb) * 1024 * 1024;
   }
-  uint64_t low = (high * 2) / 3;
+  const uint64_t low = (high * 2) / 3;
   LogCvmfs(kLogCvmfs, kLogDebug,
            "pipeline memory thresholds %" PRIu64 "/%" PRIu64 " M",
            low / (1024 * 1024), high / (1024 * 1024));
@@ -185,7 +185,7 @@ void TaskScrubbingCallback::Process(BlockItem *block_item) {
 
 ScrubbingPipeline::ScrubbingPipeline()
     : spawned_(false), tube_counter_(kMaxFilesInFlight) {
-  unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
+  const unsigned nfork_base = std::max(1U, GetNumberOfCpuCores() / 8);
 
   for (unsigned i = 0; i < nfork_base * kNforkScrubbingCallback; ++i) {
     Tube<BlockItem> *tube = new Tube<BlockItem>();

@@ -82,7 +82,7 @@ class BigVector {
 
   void DoubleCapacity() {
     Item *old_buffer = buffer_;
-    bool old_large_alloc = large_alloc_;
+    const bool old_large_alloc = large_alloc_;
 
     assert(capacity_ > 0);
     buffer_ = Alloc(capacity_ * 2);
