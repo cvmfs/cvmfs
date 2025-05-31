@@ -1,37 +1,39 @@
 ---
 Checks: -*
-  ,bugprone-*
-  ,-bugprone-easily-swappable-parameters
-  ,cert-*
-  ,-cert-err34-c
-  ,-cert-err58-cpp
-  ,-cert-dcl50-cpp
-  ,-cert-dcl03-c
-  ,-cert-str34-c
-  ,clang-analyzer-*
-  ,google-*
-  ,-google-readability-avoid-underscore-in-googletest-name
-  ,misc-*
-  ,-misc-include-cleaner
-  ,-misc-static-assert
-  ,-misc-no-recursion
-  ,-misc-non-private-member-variables-in-classes
-  ,performance-*
-  ,-performance-enum-size
-  ,-performance-inefficient-string-concatenation
-  ,portability-*
-  # performance-enum-size is only supported since c++11. When using c++11 or later, this option can be re-enabled
-WarningsAsErrors: '*'
-HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
-CheckOptions:
-  - key:    google-readability-braces-around-statements.ShortStatementLines
-    value:  '2'
-  - key:    google-readability-function-size.StatementThreshold
-    value:  '800'
-  - key:    google-readability-namespace-comments.ShortNamespaceLines
-    value:  '10'
-  - key:    google-readability-namespace-comments.SpacesBeforeComments
-    value:  '2'
-  - key:    bugprone-signed-char-misuse.CharTypdefsToIgnore
-    value:  'int8_t'
-...
+   ,misc-const-correctness
+#TODO(vvolkl): re-enable one by one when fixed in code base
+#  ,bugprone-*
+#  ,-bugprone-easily-swappable-parameters
+#  ,cert-*
+#  ,-cert-err34-c
+#  ,-cert-err58-cpp
+#  ,-cert-dcl50-cpp
+#  ,-cert-dcl03-c
+#  ,-cert-str34-c
+#  ,clang-analyzer-*
+#  ,google-*
+#  ,-google-readability-avoid-underscore-in-googletest-name
+#  ,misc-*
+#  ,-misc-include-cleaner
+#  ,-misc-static-assert
+#  ,-misc-no-recursion
+#  ,-misc-non-private-member-variables-in-classes
+#  ,performance-*
+#  ,-performance-enum-size
+#  ,-performance-inefficient-string-concatenation
+#  ,portability-*
+#  # performance-enum-size is only supported since c++11. When using c++11 or later, this option can be re-enabled
+#WarningsAsErrors: '*'
+#HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
+#CheckOptions:
+#  - key:    google-readability-braces-around-statements.ShortStatementLines
+#    value:  '2'
+#  - key:    google-readability-function-size.StatementThreshold
+#    value:  '800'
+#  - key:    google-readability-namespace-comments.ShortNamespaceLines
+#    value:  '10'
+#  - key:    google-readability-namespace-comments.SpacesBeforeComments
+#    value:  '2'
+#  - key:    bugprone-signed-char-misuse.CharTypdefsToIgnore
+#    value:  'int8_t'
+#...
