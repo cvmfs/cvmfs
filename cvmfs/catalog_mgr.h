@@ -406,19 +406,19 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevisionNoLock() const;
   uint64_t GetTimestampNoLock() const;
   inline void ReadLock() const {
-    int retval = pthread_rwlock_rdlock(rwlock_);
+    const int retval = pthread_rwlock_rdlock(rwlock_);
     assert(retval == 0);
   }
   inline void WriteLock() const {
-    uint64_t timestamp = platform_monotonic_time_ns();
-    int retval = pthread_rwlock_wrlock(rwlock_);
+    const uint64_t timestamp = platform_monotonic_time_ns();
+    const int retval = pthread_rwlock_wrlock(rwlock_);
     assert(retval == 0);
     perf::Inc(statistics_.n_write_lock);
-    uint64_t duration = platform_monotonic_time_ns() - timestamp;
+    const uint64_t duration = platform_monotonic_time_ns() - timestamp;
     perf::Xadd(statistics_.ns_write_lock, duration);
   }
   inline void Unlock() const {
-    int retval = pthread_rwlock_unlock(rwlock_);
+    const int retval = pthread_rwlock_unlock(rwlock_);
     assert(retval == 0);
   }
   virtual void EnforceSqliteMemLimit();

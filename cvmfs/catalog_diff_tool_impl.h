@@ -18,7 +18,7 @@
 const uint64_t kLastInode = uint64_t(-1);
 
 inline void AppendFirstEntry(catalog::DirectoryEntryList *entry_list) {
-  catalog::DirectoryEntry empty_entry;
+  const catalog::DirectoryEntry empty_entry;
   entry_list->push_back(empty_entry);
 }
 
@@ -31,10 +31,12 @@ inline void AppendLastEntry(catalog::DirectoryEntryList *entry_list) {
 
 inline bool IsSmaller(const catalog::DirectoryEntry &a,
                       const catalog::DirectoryEntry &b) {
-  bool a_is_first = (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
-  bool a_is_last = (a.inode() == kLastInode);
-  bool b_is_first = (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
-  bool b_is_last = (b.inode() == kLastInode);
+  const bool a_is_first =
+      (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  const bool a_is_last = (a.inode() == kLastInode);
+  const bool b_is_first =
+      (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  const bool b_is_last = (b.inode() == kLastInode);
 
   if (a_is_last || b_is_first)
     return false;
@@ -119,7 +121,7 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
   old_path.Append("/", 1);
   PathString new_path(path);
   new_path.Append("/", 1);
-  unsigned length_after_truncate = old_path.GetLength();
+  const unsigned length_after_truncate = old_path.GetLength();
 
   catalog::DirectoryEntryList new_listing;
   AppendFirstEntry(&new_listing);
@@ -192,8 +194,8 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
     i_from++;
     i_to++;
 
-    catalog::DirectoryEntryBase::Differences diff = old_entry.CompareTo(
-        new_entry);
+    const catalog::DirectoryEntryBase::Differences diff =
+        old_entry.CompareTo(new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical)
         && old_entry.IsNestedCatalogMountpoint()) {
       // Early recursion stop if nested catalogs are identical
@@ -214,8 +216,8 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
-      bool recurse = ReportModification(old_path, old_entry, new_entry, xattrs,
-                                        chunks);
+      const bool recurse =
+          ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
       if (!recurse)
         continue;
     }

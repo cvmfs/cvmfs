@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
                watchdog_out_dir.c_str());
       return 1;
     }
-    std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+    const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
     watchdog = Watchdog::Create(NULL);
     if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,

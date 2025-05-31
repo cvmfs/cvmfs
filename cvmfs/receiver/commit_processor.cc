@@ -33,10 +33,10 @@ namespace {
 
 PathString RemoveRepoName(const PathString &lease_path) {
   std::string abs_path = lease_path.ToString();
-  std::string::const_iterator it = std::find(abs_path.begin(), abs_path.end(),
-                                             '/');
+  const std::string::const_iterator it =
+      std::find(abs_path.begin(), abs_path.end(), '/');
   if (it != abs_path.end()) {
-    size_t idx = it - abs_path.begin() + 1;
+    const size_t idx = it - abs_path.begin() + 1;
     return lease_path.Suffix(idx);
   } else {
     return lease_path;
@@ -61,7 +61,7 @@ bool CreateNewTag(const RepositoryTag &repo_tag, const std::string &repo_name,
   args['x'].Reset(new std::string());
   args['@'].Reset(new std::string(proxy));
 
-  UniquePtr<swissknife::CommandEditTag> edit_cmd(
+  const UniquePtr<swissknife::CommandEditTag> edit_cmd(
       new swissknife::CommandEditTag());
   const int ret = edit_cmd->Main(args);
 
@@ -128,7 +128,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  UniquePtr<ServerTool> server_tool(new ServerTool());
+  const UniquePtr<ServerTool> server_tool(new ServerTool());
 
   if (!server_tool->InitDownloadManager(true, params.proxy)) {
     LogCvmfs(
@@ -148,7 +148,7 @@ CommitProcessor::Result CommitProcessor::Process(
     return kError;
   }
 
-  shash::Any manifest_base_hash;
+  const shash::Any manifest_base_hash;
   const UniquePtr<manifest::Manifest> manifest_tgt(
       server_tool->FetchRemoteManifest(params.stratum0, repo_name,
                                        manifest_base_hash));
@@ -205,7 +205,8 @@ CommitProcessor::Result CommitProcessor::Process(
     return kMergeFailure;
   }
 
-  UniquePtr<RaiiTempDir> raii_temp_dir(RaiiTempDir::Create(temp_dir_root));
+  const UniquePtr<RaiiTempDir> raii_temp_dir(
+      RaiiTempDir::Create(temp_dir_root));
   const std::string temp_dir = raii_temp_dir->dir();
 
   if (!CreateNewTag(final_tag, repo_name, params, temp_dir, new_manifest_path,
@@ -225,7 +226,7 @@ CommitProcessor::Result CommitProcessor::Process(
   reflog_catalogs.push_back(new_root_hash);
 
   SigningTool signing_tool(server_tool.weak_ref());
-  SigningTool::Result res = signing_tool.Run(
+  const SigningTool::Result res = signing_tool.Run(
       new_manifest_path, params.stratum0, params.spooler_configuration,
       temp_dir, certificate, private_key, repo_name, "", "",
       "/var/spool/cvmfs/" + repo_name + "/reflog.chksum", params.proxy,
@@ -270,7 +271,8 @@ CommitProcessor::Result CommitProcessor::Process(
                "Could not store publish statistics");
     }
     if (params.upload_stats_db) {
-      upload::SpoolerDefinition sd(params.spooler_configuration, shash::kAny);
+      const upload::SpoolerDefinition sd(params.spooler_configuration,
+                                         shash::kAny);
       upload::Spooler *spooler = upload::Spooler::Construct(sd);
       if (!stats_db->UploadStatistics(spooler)) {
         LogCvmfs(kLogReceiver, kLogSyslogErr,

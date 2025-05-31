@@ -81,13 +81,13 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   current_repo_ = path.substr(0, first_slash_idx);
 
-  Result init_result = Initialize();
+  const Result init_result = Initialize();
   if (init_result != kSuccess) {
     return init_result;
   }
 
   // Set up object pack deserialization
-  shash::Any digest = shash::MkFromHexPtr(shash::HexPtr(header_digest));
+  const shash::Any digest = shash::MkFromHexPtr(shash::HexPtr(header_digest));
 
   ObjectPackConsumer deserializer(digest, header_size);
   deserializer.RegisterListener(&PayloadProcessor::ConsumerEventCallback, this);
@@ -110,7 +110,7 @@ PayloadProcessor::Result PayloadProcessor::Process(
 
   assert(pending_files_.empty());
 
-  Result res = Finalize();
+  const Result res = Finalize();
 
   deserializer.UnregisterListeners();
 
@@ -133,7 +133,7 @@ void PayloadProcessor::ConsumerEventCallback(
     return;
   }
 
-  FileIterator it = pending_files_.find(event.id);
+  const FileIterator it = pending_files_.find(event.id);
   if (it == pending_files_.end()) {
     // Schedule file upload if it's not being uploaded yet.
     // Uploaders later check if the file is already present
@@ -148,7 +148,7 @@ void PayloadProcessor::ConsumerEventCallback(
 
   void *buf_copied = smalloc(event.buf_size);
   memcpy(buf_copied, event.buf, event.buf_size);
-  upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
+  const upload::AbstractUploader::UploadBuffer buf(event.buf_size, buf_copied);
   uploader_->ScheduleUpload(
       info.handle, buf,
       upload::AbstractUploader::MakeClosure(
@@ -209,7 +209,7 @@ PayloadProcessor::Result PayloadProcessor::Initialize() {
   temp_dir_ = RaiiTempDir::Create(spooler_temp_dir
                                   + "/receiver/payload_processor");
 
-  upload::SpoolerDefinition definition(
+  const upload::SpoolerDefinition definition(
       params.spooler_configuration, params.hash_alg, params.compression_alg,
       params.generate_legacy_bulk_chunks, params.use_file_chunking,
       params.min_chunk_size, params.avg_chunk_size, params.max_chunk_size,

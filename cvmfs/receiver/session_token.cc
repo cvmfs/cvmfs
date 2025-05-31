@@ -40,12 +40,13 @@ bool GenerateSessionToken(const std::string &key_id, const std::string &path,
     return false;
   }
 
-  UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
+  const UniquePtr<cipher::Key> secret(cipher::Key::CreateRandomly(32));
   if (!secret.IsValid()) {
     return false;
   }
 
-  UniquePtr<cipher::Cipher> cipher(cipher::Cipher::Create(cipher::kAes256Cbc));
+  const UniquePtr<cipher::Cipher> cipher(
+      cipher::Cipher::Create(cipher::kAes256Cbc));
   if (!cipher.IsValid()) {
     return false;
   }
@@ -88,7 +89,8 @@ bool GetTokenPublicId(const std::string &token, std::string *public_id) {
     return false;
   }
 
-  UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
+  const UniquePtr<JsonDocument> token_json(
+      JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
     return false;
   }
@@ -121,7 +123,8 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  UniquePtr<JsonDocument> token_json(JsonDocument::Create(debased64_token));
+  const UniquePtr<JsonDocument> token_json(
+      JsonDocument::Create(debased64_token));
   if (!token_json.IsValid()) {
     return kInvalid;
   }
@@ -138,7 +141,8 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   if (!Debase64(secret, &debased64_secret)) {
     return kInvalid;
   }
-  UniquePtr<cipher::Key> key(cipher::Key::CreateFromString(debased64_secret));
+  const UniquePtr<cipher::Key> key(
+      cipher::Key::CreateFromString(debased64_secret));
   if (!key.IsValid()) {
     return kInvalid;
   }
@@ -153,7 +157,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
     return kInvalid;
   }
 
-  UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
+  const UniquePtr<JsonDocument> body_json(JsonDocument::Create(body));
   if (!token_json.IsValid()) {
     return kInvalid;
   }
@@ -167,7 +171,7 @@ TokenCheckResult CheckToken(const std::string &token, const std::string &secret,
   }
 
   // TODO(radu): can we still use monotonic time if the process restarts?
-  uint64_t expiry_time = String2Uint64(expiry->string_value);
+  const uint64_t expiry_time = String2Uint64(expiry->string_value);
   const uint64_t current_time = platform_monotonic_time();
   if (current_time > expiry_time) {
     return kExpired;
