@@ -21,7 +21,7 @@ PathspecElementPattern::PathspecElementPattern(
     : valid_(other.valid_) {
   subpatterns_.reserve(other.subpatterns_.size());
   SubPatterns::const_iterator i = other.subpatterns_.begin();
-  SubPatterns::const_iterator iend = other.subpatterns_.end();
+  const SubPatterns::const_iterator iend = other.subpatterns_.end();
   for (; i != iend; ++i) {
     subpatterns_.push_back((*i)->Clone());
   }
@@ -34,7 +34,7 @@ PathspecElementPattern &PathspecElementPattern::operator=(
     subpatterns_.clear();
     subpatterns_.reserve(other.subpatterns_.size());
     SubPatterns::const_iterator i = other.subpatterns_.begin();
-    SubPatterns::const_iterator iend = other.subpatterns_.end();
+    const SubPatterns::const_iterator iend = other.subpatterns_.end();
     for (; i != iend; ++i) {
       subpatterns_.push_back((*i)->Clone());
     }
@@ -46,7 +46,7 @@ PathspecElementPattern &PathspecElementPattern::operator=(
 
 PathspecElementPattern::~PathspecElementPattern() {
   SubPatterns::const_iterator i = subpatterns_.begin();
-  SubPatterns::const_iterator iend = subpatterns_.end();
+  const SubPatterns::const_iterator iend = subpatterns_.end();
   for (; i != iend; ++i) {
     delete *i;
   }

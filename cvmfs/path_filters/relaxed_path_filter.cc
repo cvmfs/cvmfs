@@ -21,7 +21,7 @@ bool RelaxedPathFilter::IsMatching(const std::string &path) const {
   if (!has_positive_match) {
     std::string current_path = path;
     while (current_path.length() > 0) {
-      size_t new_length = current_path.find_last_of("/");
+      const size_t new_length = current_path.find_last_of("/");
       current_path = current_path.substr(0, new_length);
       if (exact_dirtab_.IsMatching(current_path)) {
         has_positive_match = true;
@@ -40,7 +40,7 @@ bool RelaxedPathFilter::IsOpposing(const std::string &path) const {
 
   std::string current_path = path;
   while (current_path.length() > 0) {
-    size_t new_length = current_path.find_last_of("/");
+    const size_t new_length = current_path.find_last_of("/");
     current_path = current_path.substr(0, new_length);
     if (Dirtab::IsOpposing(current_path)) {
       return true;
@@ -73,7 +73,7 @@ bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
   while (current_pathspec_str.length() > 0) {
     if (!Dirtab::ParsePathspec(current_pathspec_str, false))
       success = false;
-    size_t new_length = current_pathspec_str.find_last_of("/");
+    const size_t new_length = current_pathspec_str.find_last_of("/");
     current_pathspec_str = current_pathspec_str.substr(0, new_length);
   }
 

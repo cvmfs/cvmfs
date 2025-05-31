@@ -45,8 +45,8 @@ bool Dirtab::Parse(const std::string &dirtab) {
   valid_ = true;
   off_t line_offset = 0;
   while (line_offset < static_cast<off_t>(dirtab.size())) {
-    std::string line = GetLineMem(dirtab.c_str() + line_offset,
-                                  dirtab.size() - line_offset);
+    const std::string line =
+        GetLineMem(dirtab.c_str() + line_offset, dirtab.size() - line_offset);
     line_offset += line.size() + 1;  // +1 == skipped \n
     if (!ParseLine(line)) {
       valid_ = false;
@@ -89,7 +89,7 @@ bool Dirtab::ParseLine(const std::string &line) {
   }
 
   // extract and parse pathspec
-  std::string pathspec_str(Trim(std::string(itr, iend)));
+  const std::string pathspec_str(Trim(std::string(itr, iend)));
   return this->ParsePathspec(pathspec_str, negation);
 }
 
@@ -97,7 +97,7 @@ bool Dirtab::ParsePathspec(const std::string &pathspec_str, bool negation) {
   if (pathspec_str.empty()) {
     return true;
   }
-  Pathspec pathspec(pathspec_str);
+  const Pathspec pathspec(pathspec_str);
 
   // all generated Pathspecs need to be valid and positive rules must be
   // absolute. Otherwise the .cvmfsdirtab is not valid.
