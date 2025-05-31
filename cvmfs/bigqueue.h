@@ -24,7 +24,7 @@ class BigQueue {
   }
 
   explicit BigQueue(const size_t num_items) {
-    size_t min_items = kNumInit;
+    const size_t min_items = kNumInit;
     Alloc(std::max(num_items, min_items));
     size_ = 0;
   }

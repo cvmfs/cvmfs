@@ -37,7 +37,7 @@ class TieredCacheManager : public CacheManager {
 
   virtual ~TieredCacheManager();
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) {
-    bool result = upper_->AcquireQuotaManager(quota_mgr);
+    const bool result = upper_->AcquireQuotaManager(quota_mgr);
     quota_mgr_ = upper_->quota_mgr();
     return result;
   }

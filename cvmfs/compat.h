@@ -442,14 +442,14 @@ class PathMap {
   PathMap() { assert(false); }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
     PathInfo value;
-    bool found = map_.Lookup(md5path, &value);
+    const bool found = map_.Lookup(md5path, &value);
     path->Assign(value.path);
     return found;
   }
   uint64_t LookupInode(const PathString &path) {
     PathInfo value;
-    bool found = map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()),
-                             &value);
+    const bool found =
+        map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()), &value);
     if (found)
       return value.inode;
     return 0;
@@ -477,7 +477,7 @@ class InodeMap {
  public:
   InodeMap() { assert(false); }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+    const bool found = map_.Lookup(inode, md5path);
     return found;
   }
   void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
@@ -662,7 +662,7 @@ class PathMap {
  public:
   PathMap() { assert(false); }
   bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
-    bool found = path_store_.Lookup(md5path, path);
+    const bool found = path_store_.Lookup(md5path, path);
     return found;
   }
   uint64_t LookupInode(const PathString &path) { assert(false); }
@@ -681,7 +681,7 @@ class InodeMap {
  public:
   InodeMap() { assert(false); }
   bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
-    bool found = map_.Lookup(inode, md5path);
+    const bool found = map_.Lookup(inode, md5path);
     return found;
   }
   void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {

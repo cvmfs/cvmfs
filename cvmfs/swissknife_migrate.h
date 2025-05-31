@@ -56,7 +56,7 @@ class CommandMigrate : public Command {
 
    public:
     inline void Insert(const CatalogStatistics &statistics) {
-      LockGuard<CatalogStatisticsList> lock(this);
+      const LockGuard<CatalogStatisticsList> lock(this);
       this->push_back(statistics);
     }
   };

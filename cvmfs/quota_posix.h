@@ -171,7 +171,7 @@ class PosixQuotaManager : public QuotaManager {
     }
 
     shash::Any RetrieveHash() const {
-      uint64_t algo_flags = size >> (64 - 3);
+      const uint64_t algo_flags = size >> (64 - 3);
       shash::Any result(static_cast<shash::Algorithms>(algo_flags + 1));
       memcpy(result.digest, digest, result.GetDigestSize());
       return result;

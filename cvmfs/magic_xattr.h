@@ -71,7 +71,7 @@ class BaseMagicXattr {
 
  public:
   BaseMagicXattr() : is_protected_(false) {
-    int retval = pthread_mutex_init(&access_mutex_, NULL);
+    const int retval = pthread_mutex_init(&access_mutex_, NULL);
     assert(retval == 0);
   }
 
@@ -119,13 +119,13 @@ class BaseMagicXattr {
   virtual MagicXattrFlavor GetXattrFlavor() { return kXattrBase; }
 
   void Lock(PathString path, catalog::DirectoryEntry *dirent) {
-    int retval = pthread_mutex_lock(&access_mutex_);
+    const int retval = pthread_mutex_lock(&access_mutex_);
     assert(retval == 0);
     path_ = path;
     dirent_ = dirent;
   }
   void Release() {
-    int retval = pthread_mutex_unlock(&access_mutex_);
+    const int retval = pthread_mutex_unlock(&access_mutex_);
     assert(retval == 0);
   }
 

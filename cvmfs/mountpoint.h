@@ -452,7 +452,7 @@ class StatfsCache : SingleCopy {
     memset(&info_, 0, sizeof(info_));
     lock_ = reinterpret_cast<pthread_mutex_t *>(
         smalloc(sizeof(pthread_mutex_t)));
-    int retval = pthread_mutex_init(lock_, NULL);
+    const int retval = pthread_mutex_init(lock_, NULL);
     assert(retval == 0);
   }
   ~StatfsCache() {
