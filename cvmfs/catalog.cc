@@ -62,7 +62,7 @@ Catalog::Catalog(const PathString &mountpoint,
   max_row_id_ = 0;
   inode_annotation_ = NULL;
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
   database_ = NULL;
@@ -118,7 +118,7 @@ void Catalog::FinalizePreparedStatements() {
 
 
 bool Catalog::InitStandalone(const std::string &database_file) {
-  bool retval = OpenDatabase(database_file);
+  const bool retval = OpenDatabase(database_file);
   if (!retval) {
     return false;
   }
@@ -171,9 +171,9 @@ bool Catalog::OpenDatabase(const string &db_path) {
         database(),
         "SELECT count(*) FROM sqlite_master "
         "WHERE type='table' AND name='nested_catalogs' AND sql LIKE '%sha1%';");
-    bool retval = sql_has_nested_sha1.FetchRow();
+    const bool retval = sql_has_nested_sha1.FetchRow();
     assert(retval == true);
-    bool has_nested_sha1 = sql_has_nested_sha1.RetrieveInt64(0);
+    const bool has_nested_sha1 = sql_has_nested_sha1.RetrieveInt64(0);
     if (!has_nested_sha1) {
       database_->EnforceSchema(0.9, 0);
     }
@@ -267,7 +267,7 @@ PathString Catalog::NormalizePath2(const PathString &path) const {
 
   assert(path.GetLength() >= mountpoint_.GetLength());
   PathString result = root_prefix_;
-  PathString suffix = path.Suffix(mountpoint_.GetLength());
+  const PathString suffix = path.Suffix(mountpoint_.GetLength());
   result.Append(suffix.GetChars(), suffix.GetLength());
   return result;
 }
@@ -284,7 +284,7 @@ PathString Catalog::PlantPath(const PathString &path) const {
 
   assert(path.GetLength() >= root_prefix_.GetLength());
   PathString result = mountpoint_;
-  PathString suffix = path.Suffix(root_prefix_.GetLength());
+  const PathString suffix = path.Suffix(root_prefix_.GetLength());
   result.Append(suffix.GetChars(), suffix.GetLength());
   return result;
 }
@@ -301,9 +301,9 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                           DirectoryEntry *dirent) const {
   assert(IsInitialized());
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   sql_lookup_md5path_->BindPathHash(md5path);
-  bool found = sql_lookup_md5path_->FetchRow();
+  const bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, dirent);
@@ -329,7 +329,7 @@ bool Catalog::LookupMd5Path(const shash::Md5 &md5path,
 bool Catalog::LookupRawSymlink(const PathString &path,
                                LinkString *raw_symlink) const {
   DirectoryEntry dirent;
-  bool result = (LookupEntry(NormalizePath(path), false, &dirent));
+  const bool result = (LookupEntry(NormalizePath(path), false, &dirent));
   if (result)
     raw_symlink->Assign(dirent.symlink());
   return result;
@@ -340,9 +340,9 @@ bool Catalog::LookupXattrsMd5Path(const shash::Md5 &md5path,
                                   XattrList *xattrs) const {
   assert(IsInitialized());
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   sql_lookup_xattrs_->BindPathHash(md5path);
-  bool found = sql_lookup_xattrs_->FetchRow();
+  const bool found = sql_lookup_xattrs_->FetchRow();
   if (found && (xattrs != NULL)) {
     *xattrs = sql_lookup_xattrs_->GetXattrs();
   }
@@ -365,7 +365,7 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
   DirectoryEntry dirent;
   StatEntry entry;
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
     dirent = sql_listing_->GetDirent(this);
@@ -395,7 +395,7 @@ bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
                              const bool expand_symlink) const {
   assert(IsInitialized());
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
 
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
@@ -431,7 +431,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5 &md5path,
                                 FileChunkList *chunks) const {
   assert(IsInitialized() && chunks->IsEmpty());
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
 
   sql_chunks_listing_->BindPathHash(md5path);
   while (sql_chunks_listing_->FetchRow()) {
@@ -478,20 +478,20 @@ void Catalog::DropDatabaseFileOwnership() {
 
 
 uint64_t Catalog::GetTTL() const {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   return database().GetPropertyDefault<uint64_t>("TTL", kDefaultTTL);
 }
 
 
 bool Catalog::HasExplicitTTL() const {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   return database().HasProperty("TTL");
 }
 
 
 bool Catalog::GetVOMSAuthz(string *authz) const {
   bool result;
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   if (voms_authz_status_ == kVomsPresent) {
     if (authz) {
       *authz = voms_authz_;
@@ -515,7 +515,7 @@ bool Catalog::GetVOMSAuthz(string *authz) const {
 }
 
 uint64_t Catalog::GetRevision() const {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   return database().GetPropertyDefault<uint64_t>("revision", 0);
 }
 
@@ -535,14 +535,14 @@ uint64_t Catalog::GetNumChunks() const {
 uint64_t Catalog::GetNumEntries() const {
   const string sql = "SELECT count(*) FROM catalog;";
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   SqlCatalog stmt(database(), sql);
   return (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
 }
 
 
 shash::Any Catalog::GetPreviousRevision() const {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   const std::string hash_string = database().GetPropertyDefault<std::string>(
       "previous_revision", "");
   return (!hash_string.empty())
@@ -555,7 +555,7 @@ shash::Any Catalog::GetPreviousRevision() const {
 string Catalog::PrintMemStatistics() const {
   sqlite::MemStatistics stats;
   {
-    MutexLockGuard m(lock_);
+    const MutexLockGuard m(lock_);
     database().GetMemStatistics(&stats);
   }
   return string(mountpoint().GetChars(), mountpoint().GetLength()) + ": "
@@ -593,8 +593,8 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
   // Hardlinks are encoded in catalog-wide unique hard link group ids.
   // These ids must be resolved to actual inode relationships at runtime.
   if (hardlink_group > 0) {
-    HardlinkGroupMap::const_iterator inode_iter = hardlink_groups_.find(
-        hardlink_group);
+    const HardlinkGroupMap::const_iterator inode_iter =
+        hardlink_groups_.find(hardlink_group);
 
     // Use cached entry if possible
     if (inode_iter == hardlink_groups_.end()) {
@@ -618,7 +618,7 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
  * @return  a list of all nested catalog and bind mountpoints.
  */
 const Catalog::NestedCatalogList &Catalog::ListNestedCatalogs() const {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
 
   if (nested_catalog_cache_dirty_) {
     LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
@@ -646,7 +646,7 @@ const Catalog::NestedCatalogList &Catalog::ListNestedCatalogs() const {
 const Catalog::NestedCatalogList Catalog::ListOwnNestedCatalogs() const {
   NestedCatalogList result;
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
 
   while (sql_own_list_nested_->FetchRow()) {
     NestedCatalog nested;
@@ -679,10 +679,10 @@ void Catalog::ResetNestedCatalogCacheUnprotected() {
  */
 bool Catalog::FindNested(const PathString &mountpoint, shash::Any *hash,
                          uint64_t *size) const {
-  MutexLockGuard m(lock_);
-  PathString normalized_mountpoint = NormalizePath2(mountpoint);
+  const MutexLockGuard m(lock_);
+  const PathString normalized_mountpoint = NormalizePath2(mountpoint);
   sql_lookup_nested_->BindSearchPath(normalized_mountpoint);
-  bool found = sql_lookup_nested_->FetchRow();
+  const bool found = sql_lookup_nested_->FetchRow();
   if (found && (hash != NULL)) {
     *hash = sql_lookup_nested_->GetContentHash();
     *size = sql_lookup_nested_->GetSize();
@@ -698,7 +698,7 @@ bool Catalog::FindNested(const PathString &mountpoint, shash::Any *hash,
  * The annotation object is not owned by the catalog.
  */
 void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   // Since annotated inodes could come back to the catalog in order to
   // get stripped, exchanging the annotation is not allowed
   assert((inode_annotation_ == NULL) || (inode_annotation_ == new_annotation));
@@ -719,7 +719,7 @@ void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
 void Catalog::AddChild(Catalog *child) {
   assert(NULL == FindChild(child->mountpoint()));
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   children_[child->mountpoint()] = child;
   child->set_parent(this);
 }
@@ -732,7 +732,7 @@ void Catalog::AddChild(Catalog *child) {
 void Catalog::RemoveChild(Catalog *child) {
   assert(NULL != FindChild(child->mountpoint()));
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   child->set_parent(NULL);
   children_.erase(child->mountpoint());
 }
@@ -741,7 +741,7 @@ void Catalog::RemoveChild(Catalog *child) {
 CatalogList Catalog::GetChildren() const {
   CatalogList result;
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   for (NestedCatalogMap::const_iterator i = children_.begin(),
                                         iEnd = children_.end();
        i != iEnd;
@@ -798,7 +798,7 @@ Catalog *Catalog::FindSubtree(const PathString &path) const {
 Catalog *Catalog::FindChild(const PathString &mountpoint) const {
   NestedCatalogMap::const_iterator nested_iter;
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   nested_iter = children_.find(mountpoint);
   Catalog *result = (nested_iter == children_.end()) ? NULL
                                                      : nested_iter->second;

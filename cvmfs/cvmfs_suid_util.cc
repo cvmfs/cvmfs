@@ -33,11 +33,11 @@ string EscapeSystemdUnit(const string &path) {
   if (normalized_path == "/")
     return "-.mount";
 
-  sanitizer::InputSanitizer sanitizer("az AZ 09 _");
-  unsigned length = normalized_path.length();
+  const sanitizer::InputSanitizer sanitizer("az AZ 09 _");
+  const unsigned length = normalized_path.length();
   string result;
   for (unsigned i = 0; i < length; ++i) {
-    char c = normalized_path[i];
+    const char c = normalized_path[i];
     if (c == '/') {
       if ((i == 0) || (i == length - 1))
         continue;
@@ -60,7 +60,7 @@ string EscapeSystemdUnit(const string &path) {
 
 bool PathExists(const std::string &path) {
   struct stat info;
-  int retval = stat(path.c_str(), &info);
+  const int retval = stat(path.c_str(), &info);
   return retval == 0;
 }
 

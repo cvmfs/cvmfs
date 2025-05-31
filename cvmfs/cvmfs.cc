@@ -255,7 +255,7 @@ std::string PrintInodeGeneration() {
 static bool CheckVoms(const fuse_ctx &fctx) {
   if (!mount_point_->has_membership_req())
     return true;
-  string mreq = mount_point_->membership_req();
+  const string mreq = mount_point_->membership_req();
   LogCvmfs(kLogCvmfs, kLogDebug,
            "Got VOMS authz %s from filesystem "
            "properties",
@@ -320,8 +320,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     return true;
 
   // Look in the catalogs in 2 steps: lookup inode->path, lookup path
-  static catalog::DirectoryEntry dirent_negative = catalog::DirectoryEntry(
-      catalog::kDirentNegative);
+  static const catalog::DirectoryEntry dirent_negative =
+      catalog::DirectoryEntry(catalog::kDirentNegative);
   // Reset directory entry.  If the function returns false and dirent is no
   // the kDirentNegative, it was an I/O error
   *dirent = catalog::DirectoryEntry();
@@ -331,7 +331,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   if (file_system_->IsNfsSource()) {
     // NFS mode
     PathString path;
-    bool retval = file_system_->nfs_maps()->GetPath(ino, &path);
+    const bool retval = file_system_->nfs_maps()->GetPath(ino, &path);
     if (!retval) {
       *dirent = dirent_negative;
       return false;
@@ -348,8 +348,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_mgr->GetRootInode()) {
-    bool retval = catalog_mgr->LookupPath(PathString(), catalog::kLookupDefault,
-                                          dirent);
+    const bool retval =
+        catalog_mgr->LookupPath(PathString(), catalog::kLookupDefault, dirent);
 
     if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
                      "GetDirentForInode: Race condition? Not found dirent %s",
@@ -363,7 +363,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   }
 
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
-  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
+  const bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
   if (!retval) {
     // This may be a retired inode whose stat information is only available
     // in the page cache tracker because there is still an open file
@@ -413,7 +413,7 @@ static uint64_t GetDirentForPath(const PathString &path,
            "GetDirentForPath: live inode for %s: %" PRIu64, path.c_str(),
            live_inode);
 
-  shash::Md5 md5path(path.GetChars(), path.GetLength());
+  const shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent)) {
     if (dirent->GetSpecial() == catalog::kDirentNegative)
       return false;
@@ -476,7 +476,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
 
   LogCvmfs(kLogCvmfs, kLogDebug, "MISS %lu - looking in inode tracker", ino);
   glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
-  bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
+  const bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
 
   if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
                    "GetPathForInode: Race condition? "
@@ -494,7 +494,7 @@ static void DoTraceInode(const int event,
                          fuse_ino_t ino,
                          const std::string &msg) {
   PathString path;
-  bool found = GetPathForInode(ino, &path);
+  const bool found = GetPathForInode(ino, &path);
   if (!found) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "Tracing: Could not find path for inode %" PRIu64, uint64_t(ino));
@@ -517,18 +517,19 @@ static void inline TraceInode(const int event,
  * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_lookup());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_lookup());
 
   perf::Inc(file_system_->n_fs_lookup());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
 
-  fuse_ino_t parent_fuse = parent;
+  const fuse_ino_t parent_fuse = parent;
   parent = catalog_mgr->MangleInode(parent);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_lookup in parent inode: %" PRIu64 " for name: %s",
@@ -541,7 +542,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   struct fuse_entry_param result;
 
   memset(&result, 0, sizeof(result));
-  double timeout = GetKcacheTimeout();
+  const double timeout = GetKcacheTimeout();
   result.attr_timeout = timeout;
   result.entry_timeout = timeout;
 
@@ -595,7 +596,7 @@ lookup_reply_positive:
       assert(dirent.inode() != live_inode);
 
       // The new inode is put in the tracker with refcounter == 0
-      bool replaced = mount_point_->inode_tracker()->ReplaceInode(
+      const bool replaced = mount_point_->inode_tracker()->ReplaceInode(
           live_inode, glue::InodeEx(dirent.inode(), dirent.mode()));
       if (replaced)
         perf::Inc(file_system_->n_fs_inode_replace());
@@ -658,7 +659,7 @@ static void cvmfs_forget(fuse_req_t req,
                          uint64_t nlookup
 #endif
 ) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_forget());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_forget());
 
   perf::Inc(file_system_->n_fs_forget());
 
@@ -675,8 +676,8 @@ static void cvmfs_forget(fuse_req_t req,
            uint64_t(ino), nlookup);
 
   if (!file_system_->IsNfsSource()) {
-    bool removed = mount_point_->inode_tracker()->GetVfsPutRaii().VfsPut(
-        ino, nlookup);
+    const bool removed =
+        mount_point_->inode_tracker()->GetVfsPutRaii().VfsPut(ino, nlookup);
     if (removed)
       mount_point_->page_cache_tracker()->GetEvictRaii().Evict(ino);
   }
@@ -689,7 +690,7 @@ static void cvmfs_forget(fuse_req_t req,
 static void cvmfs_forget_multi(fuse_req_t req,
                                size_t count,
                                struct fuse_forget_data *forgets) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_forget_multi());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_forget_multi());
 
   perf::Xadd(file_system_->n_fs_forget(), count);
   if (file_system_->IsNfsSource()) {
@@ -712,7 +713,8 @@ static void cvmfs_forget_multi(fuse_req_t req,
       LogCvmfs(kLogCvmfs, kLogDebug, "forget on inode %" PRIu64 " by %" PRIu64,
                forgets[i].ino, forgets[i].nlookup);
 
-      bool removed = vfs_put_raii.VfsPut(forgets[i].ino, forgets[i].nlookup);
+      const bool removed =
+          vfs_put_raii.VfsPut(forgets[i].ino, forgets[i].nlookup);
       if (removed)
         evict_raii.Evict(forgets[i].ino);
     }
@@ -754,12 +756,13 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
  */
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_getattr());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_getattr());
 
   perf::Inc(file_system_->n_fs_stat());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -773,7 +776,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
   catalog::DirectoryEntry dirent;
-  bool found = GetDirentForInode(ino, &dirent);
+  const bool found = GetDirentForInode(ino, &dirent);
   TraceInode(Tracer::kEventGetAttr, ino, "getattr()");
   if ((!found && (dirent.inode() == ino)) || MayBeInPageCacheTracker(dirent)) {
     // Serve retired inode from page cache tracker; even if we find it in the
@@ -785,8 +788,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
              ino);
     shash::Any hash;
     struct stat info;
-    bool is_open = mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash,
-                                                                     &info);
+    const bool is_open =
+        mount_point_->page_cache_tracker()->GetInfoIfOpen(ino, &hash, &info);
     if (is_open) {
       fuse_remounter_->fence()->Leave();
       if (found && HasDifferentContent(dirent, hash, info)) {
@@ -812,7 +815,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  struct stat info = dirent.GetStatStructure();
+  struct stat const info = dirent.GetStatStructure();
 
   fuse_reply_attr(req, &info, GetKcacheTimeout());
 }
@@ -822,12 +825,13 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_readlink());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_readlink());
 
   perf::Inc(file_system_->n_fs_readlink());
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
 
   fuse_remounter_->fence()->Enter();
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
@@ -880,11 +884,12 @@ static void AddToDirListing(const fuse_req_t req, const char *name,
  */
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_opendir());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_opendir());
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
   fuse_remounter_->TryFinish();
 
   fuse_remounter_->fence()->Enter();
@@ -941,7 +946,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  bool retval = catalog_mgr->ListingStat(path, &listing_from_catalog);
+  const bool retval = catalog_mgr->ListingStat(path, &listing_from_catalog);
 
   if (!retval) {
     fuse_remounter_->fence()->Leave();
@@ -986,7 +991,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Save the directory listing and return a handle to the listing
   {
-    MutexLockGuard m(&lock_directory_handles_);
+    const MutexLockGuard m(&lock_directory_handles_);
     LogCvmfs(kLogCvmfs, kLogDebug,
              "linking directory handle %lu to dir inode: %" PRIu64,
              next_directory_handle_, uint64_t(ino));
@@ -1014,7 +1019,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
  */
 static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
                              struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_releasedir());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_releasedir());
 
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -1024,8 +1029,9 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
   int reply = 0;
 
   {
-    MutexLockGuard m(&lock_directory_handles_);
-    DirectoryHandles::iterator iter_handle = directory_handles_->find(fi->fh);
+    const MutexLockGuard m(&lock_directory_handles_);
+    const DirectoryHandles::iterator iter_handle =
+        directory_handles_->find(fi->fh);
     if (iter_handle != directory_handles_->end()) {
       if (iter_handle->second.capacity == 0)
         smunmap(iter_handle->second.buffer);
@@ -1063,7 +1069,7 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
  */
 static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
                           off_t off, struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_readdir());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_readdir());
 
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_readdir on inode %" PRIu64
@@ -1073,9 +1079,9 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
   DirectoryListing listing;
 
-  MutexLockGuard m(&lock_directory_handles_);
-  DirectoryHandles::const_iterator iter_handle = directory_handles_->find(
-      fi->fh);
+  const MutexLockGuard m(&lock_directory_handles_);
+  const DirectoryHandles::const_iterator iter_handle =
+      directory_handles_->find(fi->fh);
   if (iter_handle != directory_handles_->end()) {
     listing = iter_handle->second;
 
@@ -1111,11 +1117,12 @@ static const uint64_t kFileHandleIgnore = static_cast<uint64_t>(2) << 60;
  */
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_open());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_open());
 
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
   ino = catalog_mgr->MangleInode(ino);
@@ -1242,16 +1249,16 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables->inode2references.Insert(unique_inode, 1);
       } else {
         uint32_t refctr;
-        bool retval = chunk_tables->inode2references.Lookup(unique_inode,
-                                                            &refctr);
+        const bool retval =
+            chunk_tables->inode2references.Lookup(unique_inode, &refctr);
         assert(retval);
         chunk_tables->inode2references.Insert(unique_inode, refctr + 1);
       }
     } else {
       fuse_remounter_->fence()->Leave();
       uint32_t refctr;
-      bool retval = chunk_tables->inode2references.Lookup(unique_inode,
-                                                          &refctr);
+      const bool retval =
+          chunk_tables->inode2references.Lookup(unique_inode, &refctr);
       assert(retval);
       chunk_tables->inode2references.Insert(unique_inode, refctr + 1);
     }
@@ -1267,8 +1274,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     // Generate artificial content hash as hash over chunk hashes
     // TODO(jblomer): we may want to cache the result in the chunk tables
     FileChunkReflist chunk_reflist;
-    bool retval = chunk_tables->inode2chunks.Lookup(unique_inode,
-                                                    &chunk_reflist);
+    const bool retval =
+        chunk_tables->inode2chunks.Lookup(unique_inode, &chunk_reflist);
     assert(retval);
 
     fi->fh = chunk_tables->next_handle;
@@ -1363,7 +1370,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
  */
 static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                        struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_read());
 
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read inode: %" PRIu64 " reading %lu bytes from offset %ld "
@@ -1383,7 +1390,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
 
-  int64_t fd = static_cast<int64_t>(fi->fh);
+  const int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   ClearBit(glue::PageCacheTracker::kBitDirectIo, &abs_fd);
 
@@ -1416,7 +1423,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
     // Lock chunk handle
     pthread_mutex_t *handle_lock = chunk_tables->Handle2Lock(chunk_handle);
-    MutexLockGuard m(handle_lock);
+    const MutexLockGuard m(handle_lock);
     chunk_tables->Lock();
     retval = chunk_tables->handle2fd.Lookup(chunk_handle, &chunk_fd);
     assert(retval);
@@ -1468,8 +1475,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       const size_t remaining_bytes_in_chunk = chunks.list->AtPtr(chunk_idx)
                                                   ->size()
                                               - offset_in_chunk;
-      size_t bytes_to_read_in_chunk = std::min(bytes_to_read,
-                                               remaining_bytes_in_chunk);
+      const size_t bytes_to_read_in_chunk =
+          std::min(bytes_to_read, remaining_bytes_in_chunk);
       const int64_t bytes_fetched = file_system_->cache_mgr()->Pread(
           chunk_fd.fd,
           data + overall_bytes_fetched,
@@ -1507,11 +1514,12 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     LogCvmfs(kLogCvmfs, kLogDebug, "released chunk file descriptor %d",
              chunk_fd.fd);
   } else {
-    int64_t nbytes = file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
+    const int64_t nbytes =
+        file_system_->cache_mgr()->Pread(abs_fd, data, size, off);
     if (nbytes < 0) {
       if (EIO == errno || EIO == -nbytes) {
         PathString path;
-        bool found = GetPathForInode(ino, &path);
+        const bool found = GetPathForInode(ino, &path);
         if (found) {
           LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                    "EIO (08): Failed to read file %s", path.ToString().c_str());
@@ -1541,7 +1549,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
  */
 static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi) {
-  HighPrecisionTimer guard_timer(file_system_->hist_fs_release());
+  const HighPrecisionTimer guard_timer(file_system_->hist_fs_release());
 
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
@@ -1554,7 +1562,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   }
 #endif
 
-  int64_t fd = static_cast<int64_t>(fi->fh);
+  const int64_t fd = static_cast<int64_t>(fi->fh);
   uint64_t abs_fd = (fd < 0) ? -fd : fd;
   if (!TestBit(glue::PageCacheTracker::kBitDirectIo, abs_fd)) {
     mount_point_->page_cache_tracker()->Close(ino);
@@ -1568,7 +1576,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
              chunk_handle);
     uint64_t unique_inode;
     ChunkFd chunk_fd;
-    FileChunkReflist chunks;
+    const FileChunkReflist chunks;
     uint32_t refctr;
     bool retval;
 
@@ -1637,7 +1645,7 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
     return;
   }
 
-  MutexLockGuard m(mount_point_->statfs_cache()->lock());
+  const MutexLockGuard m(mount_point_->statfs_cache()->lock());
 
   const uint64_t deadline = *mount_point_->statfs_cache()->expiry_deadline();
   struct statvfs *info = mount_point_->statfs_cache()->info();
@@ -1650,8 +1658,9 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
   }
 
   uint64_t available = 0;
-  uint64_t size = file_system_->cache_mgr()->quota_mgr()->GetSize();
-  uint64_t capacity = file_system_->cache_mgr()->quota_mgr()->GetCapacity();
+  const uint64_t size = file_system_->cache_mgr()->quota_mgr()->GetSize();
+  const uint64_t capacity =
+      file_system_->cache_mgr()->quota_mgr()->GetCapacity();
   // Fuse/OS X doesn't like values < 512
   info->f_bsize = info->f_frsize = 512;
 
@@ -1668,8 +1677,8 @@ static void cvmfs_statfs(fuse_req_t req, fuse_ino_t ino) {
 
   // Inodes / entries
   fuse_remounter_->fence()->Enter();
-  uint64_t all_inodes = mount_point_->catalog_mgr()->all_inodes();
-  uint64_t loaded_inode = mount_point_->catalog_mgr()->loaded_inodes();
+  const uint64_t all_inodes = mount_point_->catalog_mgr()->all_inodes();
+  const uint64_t loaded_inode = mount_point_->catalog_mgr()->loaded_inodes();
   info->f_files = all_inodes;
   info->f_ffree = info->f_favail = all_inodes - loaded_inode;
   fuse_remounter_->fence()->Leave();
@@ -1691,7 +1700,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
@@ -1780,8 +1790,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   if (d.IsLink()) {
-    catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
-        catalog::kLookupDefault | catalog::kLookupRawSymlink);
+    const catalog::LookupOptions lookup_options =
+        static_cast<catalog::LookupOptions>(catalog::kLookupDefault |
+                                            catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
     retval = catalog_mgr->LookupPath(path, lookup_options, &raw_symlink);
 
@@ -1810,7 +1821,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   bool magic_xattr_success = true;
-  MagicXattrRAIIWrapper magic_xattr(
+  const MagicXattrRAIIWrapper magic_xattr(
       mount_point_->magic_xattr_mgr()->GetLocked(attr, path, &d));
   if (!magic_xattr.IsNull()) {
     magic_xattr_success = magic_xattr->PrepareValueFencedProtected(
@@ -1852,7 +1863,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
   FuseInterruptCue ic(&req);
-  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid, &ic);
+  const ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid,
+                                 &ic);
 
   fuse_remounter_->fence()->Enter();
   catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
@@ -1959,11 +1971,9 @@ bool Pin(const string &path) {
         PathString(path), dirent.hash_algorithm(), &chunks);
     fuse_remounter_->fence()->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
-      bool retval = file_system_->cache_mgr()->quota_mgr()->Pin(
-          chunks.AtPtr(i)->content_hash(),
-          chunks.AtPtr(i)->size(),
-          "Part of " + path,
-          false);
+      const bool retval = file_system_->cache_mgr()->quota_mgr()->Pin(
+          chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),
+          "Part of " + path, false);
       if (!retval)
         return false;
       int fd = -1;
@@ -1987,7 +1997,7 @@ bool Pin(const string &path) {
     return true;
   }
 
-  bool retval = file_system_->cache_mgr()->quota_mgr()->Pin(
+  const bool retval = file_system_->cache_mgr()->quota_mgr()->Pin(
       dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
@@ -1996,7 +2006,7 @@ bool Pin(const string &path) {
   label.size = dirent.size();
   label.path = path;
   label.zip_algorithm = dirent.compression_algorithm();
-  int fd = this_fetcher->Fetch(
+  const int fd = this_fetcher->Fetch(
       CacheManager::LabeledObject(dirent.checksum(), label));
   if (fd < 0) {
     return false;
@@ -2137,13 +2147,13 @@ bool SendFuseFd(const std::string &socket_path) {
       loader_exports_->fuse_channel_or_session));
 #endif
   assert(fuse_fd >= 0);
-  int sock_fd = ConnectSocket(socket_path);
+  const int sock_fd = ConnectSocket(socket_path);
   if (sock_fd < 0) {
     LogCvmfs(kLogCvmfs, kLogDebug, "cannot connect to socket %s: %d",
              socket_path.c_str(), errno);
     return false;
   }
-  bool retval = SendFd2Socket(sock_fd, fuse_fd);
+  const bool retval = SendFd2Socket(sock_fd, fuse_fd);
   close(sock_fd);
   return retval;
 }
@@ -2173,7 +2183,7 @@ class ExpiresMagicXattr : public BaseMagicXattr {
       result_pages_.push_back("never (fixed root catalog)");
       return;
     } else {
-      time_t now = time(NULL);
+      const time_t now = time(NULL);
       result_pages_.push_back(StringifyInt((catalogs_valid_until_ - now) / 60));
     }
   }
@@ -2202,8 +2212,8 @@ class PidMagicXattr : public BaseMagicXattr {
 
 class UptimeMagicXattr : public BaseMagicXattr {
   virtual void FinalizeValue() {
-    time_t now = time(NULL);
-    uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
+    const time_t now = time(NULL);
+    const uint64_t uptime = now - cvmfs::loader_exports_->boot_time;
     result_pages_.push_back(StringifyUint(uptime / 60));
   }
 };
@@ -2235,7 +2245,8 @@ static FileSystem *InitSystemFs(const string &mount_path,
 
   if (file_system->boot_status() == loader::kFailLockWorkspace) {
     string fqrn_from_xattr;
-    int retval = platform_getxattr(mount_path, "user.fqrn", &fqrn_from_xattr);
+    const int retval =
+        platform_getxattr(mount_path, "user.fqrn", &fqrn_from_xattr);
     if (!retval) {
       // Cvmfs not mounted anymore, but another cvmfs process is still in
       // shutdown procedure.  Try again and wait for lock
@@ -2395,10 +2406,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
       cvmfs::fuse_remounter_);
   if ((cvmfs::mount_point_->talk_socket_uid() != 0)
       || (cvmfs::mount_point_->talk_socket_gid() != 0)) {
-    uid_t tgt_uid = cvmfs::mount_point_->talk_socket_uid();
-    gid_t tgt_gid = cvmfs::mount_point_->talk_socket_gid();
-    int rvi = chown(cvmfs::mount_point_->talk_socket_path().c_str(), tgt_uid,
-                    tgt_gid);
+    const uid_t tgt_uid = cvmfs::mount_point_->talk_socket_uid();
+    const gid_t tgt_gid = cvmfs::mount_point_->talk_socket_gid();
+    const int rvi = chown(cvmfs::mount_point_->talk_socket_path().c_str(),
+                          tgt_uid, tgt_gid);
     if (rvi != 0) {
       *g_boot_error = std::string("failed to set talk socket ownership - ")
                       + "target " + StringifyInt(tgt_uid) + ":"
@@ -2572,7 +2583,7 @@ static bool MaintenanceMode(const int fd_progress) {
 static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   string msg_progress;
 
-  unsigned num_open_dirs = cvmfs::directory_handles_->size();
+  const unsigned num_open_dirs = cvmfs::directory_handles_->size();
   if (num_open_dirs != 0) {
 #ifdef DEBUGMSG
     for (cvmfs::DirectoryHandles::iterator
@@ -2845,12 +2856,12 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
-      int old_root_fd = cvmfs::mount_point_->catalog_mgr()->root_fd();
+      const int old_root_fd = cvmfs::mount_point_->catalog_mgr()->root_fd();
 
       // TODO(jblomer): make this less hacky
 
-      CacheManagerIds saved_type = cvmfs::file_system_->cache_mgr()->PeekState(
-          saved_states[i]->state);
+      const CacheManagerIds saved_type =
+          cvmfs::file_system_->cache_mgr()->PeekState(saved_states[i]->state);
       int fixup_root_fd = -1;
 
       if ((saved_type == kStreamingCacheManager)
@@ -2885,7 +2896,7 @@ static bool RestoreState(const int fd_progress,
             wrapped_cache_mgr);
       }
 
-      int new_root_fd = cvmfs::file_system_->cache_mgr()->RestoreState(
+      const int new_root_fd = cvmfs::file_system_->cache_mgr()->RestoreState(
           fd_progress, saved_states[i]->state);
       LogCvmfs(kLogCvmfs, kLogDebug, "new root file catalog descriptor @%d",
                new_root_fd);
@@ -2910,7 +2921,8 @@ static bool RestoreState(const int fd_progress,
     }
   }
   if (cvmfs::mount_point_->inode_annotation()) {
-    uint64_t saved_generation = cvmfs::inode_generation_info_.inode_generation;
+    const uint64_t saved_generation =
+        cvmfs::inode_generation_info_.inode_generation;
     cvmfs::mount_point_->inode_annotation()->IncGeneration(saved_generation);
   }
 

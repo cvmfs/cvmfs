@@ -122,7 +122,7 @@ string Watchdog::GenerateStackTrace(pid_t pid) {
 #endif
   // The execve can have failed, which can't be detected in ExecuteBinary.
   // Instead, writing to the pipe will fail.
-  ssize_t nbytes = write(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+  const ssize_t nbytes = write(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
   if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != gdb_cmd.length())) {
     result += "failed to start gdb/lldb (" + StringifyInt(nbytes)
               + " bytes "
@@ -187,7 +187,7 @@ void Watchdog::LogEmergency(string msg) {
   if (!crash_dump_path_.empty()) {
     FILE *fp = fopen(crash_dump_path_.c_str(), "a");
     if (fp) {
-      time_t now = time(NULL);
+      const time_t now = time(NULL);
       msg += "\nTimestamp: " + string(ctime_r(&now, ctime_buffer));
       if (fwrite(&msg[0], 1, msg.length(), fp) != msg.length()) {
         msg += " (failed to report into crash dump file " + crash_dump_path_
@@ -297,7 +297,7 @@ void Watchdog::ReportSignalAndContinue(int sig, siginfo_t *siginfo,
 
 
 void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
-  int send_errno = errno;
+  const int send_errno = errno;
   if (platform_spinlock_trylock(&Me()->lock_handler_) != 0) {
     // Concurrent call, wait for the first one to exit the process
     while (true) {
@@ -338,7 +338,7 @@ void Watchdog::SendTrace(int sig, siginfo_t *siginfo, void *context) {
       // Note: this doesn't work due to the signal stack on OS X (it works on
       // Linux).  Since anyway lldb is supposed to produce the backtrace, we
       // consider it more important to protect cvmfs against stack overflows.
-      int num_addr = backtrace(addr, kMaxBacktrace);
+      const int num_addr = backtrace(addr, kMaxBacktrace);
       char **symbols = backtrace_symbols(addr, num_addr);
       string backtrace = "Backtrace (" + StringifyInt(num_addr)
                          + " symbols):\n";
@@ -368,7 +368,7 @@ Watchdog::SigactionMap Watchdog::SetSignalHandlers(
     const SigactionMap &signal_handlers) {
   SigactionMap old_signal_handlers;
   SigactionMap::const_iterator i = signal_handlers.begin();
-  SigactionMap::const_iterator iend = signal_handlers.end();
+  const SigactionMap::const_iterator iend = signal_handlers.end();
   for (; i != iend; ++i) {
     struct sigaction old_signal_handler;
     if (sigaction(i->first, &i->second, &old_signal_handler) != 0) {
@@ -403,15 +403,15 @@ void Watchdog::Fork() {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
           // send the watchdog PID to the supervisee
-          pid_t watchdog_pid = getpid();
+          const pid_t watchdog_pid = getpid();
           pipe_pid.Write(watchdog_pid);
           pipe_pid.CloseWriteFd();
           // Close all unused file descriptors
           // close also usyslog, only get it back if necessary
           // string usyslog_save = GetLogMicroSyslog();
-          string debuglog_save = GetLogDebugFile();
+          const string debuglog_save = GetLogDebugFile();
           SetLogDebugFile("");
-          string usyslog_save = GetLogMicroSyslog();
+          const string usyslog_save = GetLogMicroSyslog();
           SetLogMicroSyslog("");
           // Gracefully close the syslog before closing all fds. The next call
           // to syslog will reopen it.
@@ -497,7 +497,7 @@ bool Watchdog::WaitForSupervisee() {
   if (size > 0) {
     pipe_watchdog_->Read(&crash_dump_path_[0], size);
 
-    int retval = chdir(GetParentPath(crash_dump_path_).c_str());
+    const int retval = chdir(GetParentPath(crash_dump_path_).c_str());
     if (retval != 0) {
       LogEmergency(std::string("Cannot change to crash dump directory: ")
                    + crash_dump_path_);
@@ -521,7 +521,7 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   }
 
   // Extra stack for signal handlers
-  int stack_size = kSignalHandlerStacksize;  // 2 MB
+  const int stack_size = kSignalHandlerStacksize; // 2 MB
   sighandler_stack_.ss_sp = smalloc(stack_size);
   sighandler_stack_.ss_size = stack_size;
   sighandler_stack_.ss_flags = 0;
@@ -542,12 +542,12 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
   pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  int retval = pthread_create(&thread_listener_, NULL, MainWatchdogListener,
-                              this);
+  const int retval =
+      pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
   assert(retval == 0);
 
   pipe_watchdog_->Write(ControlFlow::kSupervise);
-  size_t path_size = crash_dump_path.size();
+  const size_t path_size = crash_dump_path.size();
   pipe_watchdog_->Write(path_size);
   if (path_size > 0) {
     pipe_watchdog_->Write(crash_dump_path.data(), path_size);
@@ -569,7 +569,7 @@ void *Watchdog::MainWatchdogListener(void *data) {
   watch_fds[1].events = POLLIN | POLLPRI;
   watch_fds[1].revents = 0;
   while (true) {
-    int retval = poll(watch_fds, 2, -1);
+    const int retval = poll(watch_fds, 2, -1);
     if (retval < 0) {
       continue;
     }
@@ -629,7 +629,7 @@ Watchdog::Watchdog(FnOnCrash on_crash)
     , exe_path_(string(platform_getexepath()))
     , watchdog_pid_(0)
     , on_crash_(on_crash) {
-  int retval = platform_spinlock_init(&lock_handler_, 0);
+  const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));
 }

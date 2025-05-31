@@ -47,7 +47,7 @@ unsigned FileChunkReflist::FindChunkIdx(const uint64_t off) {
  * Returns a consistent hash over hashes of the chunks. Used by libcvmfs.
  */
 shash::Any FileChunkReflist::HashChunkList() {
-  shash::Algorithms algo = list->AtPtr(0)->content_hash().algorithm;
+  const shash::Algorithms algo = list->AtPtr(0)->content_hash().algorithm;
   shash::ContextPtr ctx(algo);
   ctx.buffer = alloca(ctx.size);
   shash::Init(ctx);
@@ -66,13 +66,13 @@ shash::Any FileChunkReflist::HashChunkList() {
 
 void ChunkTables::InitLocks() {
   lock = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock, NULL);
+  const int retval = pthread_mutex_init(lock, NULL);
   assert(retval == 0);
 
   for (unsigned i = 0; i < kNumHandleLocks; ++i) {
     pthread_mutex_t *m = reinterpret_cast<pthread_mutex_t *>(
         smalloc(sizeof(pthread_mutex_t)));
-    int retval = pthread_mutex_init(m, NULL);
+    const int retval = pthread_mutex_init(m, NULL);
     assert(retval == 0);
     handle_locks.PushBack(m);
   }
@@ -150,7 +150,7 @@ pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
 
 SimpleChunkTables::SimpleChunkTables() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -189,7 +189,7 @@ SimpleChunkTables::OpenChunks SimpleChunkTables::Get(int fd) {
   if (fd < 0)
     return result;
 
-  unsigned idx = static_cast<unsigned>(fd);
+  const unsigned idx = static_cast<unsigned>(fd);
   Lock();
   if (idx < fd_table_.size())
     result = fd_table_[idx];
@@ -203,7 +203,7 @@ void SimpleChunkTables::Release(int fd) {
     return;
 
   Lock();
-  unsigned idx = static_cast<unsigned>(fd);
+  const unsigned idx = static_cast<unsigned>(fd);
   if (idx >= fd_table_.size()) {
     Unlock();
     return;

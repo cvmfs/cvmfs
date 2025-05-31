@@ -89,7 +89,8 @@ void WritableCatalog::Commit() {
 void WritableCatalog::InitPreparedStatements() {
   Catalog::InitPreparedStatements();  // polymorphism: up call
 
-  bool retval = SqlCatalog(database(), "PRAGMA foreign_keys = ON;").Execute();
+  const bool retval =
+      SqlCatalog(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
   sql_insert_ = new SqlDirentInsert(database());
   sql_unlink_ = new SqlDirentUnlink(database());
@@ -148,8 +149,8 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
            entry_path.c_str(), mountpoint().c_str());
 
-  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
-  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
+  const shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  const shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
   DirectoryEntry effective_entry(entry);
   effective_entry.set_has_xattrs(!xattrs.IsEmpty());
 
@@ -190,7 +191,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
   }
 
   // remove the entry itself
-  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(file_path));
+  const shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(file_path));
   retval = sql_unlink_->BindPathHash(path_hash) && sql_unlink_->Execute();
   assert(retval);
   sql_unlink_->Reset();
@@ -203,11 +204,11 @@ void WritableCatalog::IncLinkcount(const string &path_within_group,
                                    const int delta) {
   SetDirty();
 
-  shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(path_within_group));
+  const shash::Md5 path_hash = shash::Md5(shash::AsciiPtr(path_within_group));
 
-  bool retval = sql_inc_linkcount_->BindPathHash(path_hash)
-                && sql_inc_linkcount_->BindDelta(delta)
-                && sql_inc_linkcount_->Execute();
+  const bool retval = sql_inc_linkcount_->BindPathHash(path_hash) &&
+                      sql_inc_linkcount_->BindDelta(delta) &&
+                      sql_inc_linkcount_->Execute();
   assert(retval);
   sql_inc_linkcount_->Reset();
 }
@@ -245,8 +246,8 @@ void WritableCatalog::UpdateEntry(const DirectoryEntry &entry,
                                   const shash::Md5 &path_hash) {
   SetDirty();
 
-  bool retval = sql_update_->BindPathHash(path_hash)
-                && sql_update_->BindDirent(entry) && sql_update_->Execute();
+  const bool retval = sql_update_->BindPathHash(path_hash) &&
+                      sql_update_->BindDirent(entry) && sql_update_->Execute();
   assert(retval);
   sql_update_->Reset();
 }
@@ -255,7 +256,7 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
                                    const FileChunk &chunk) {
   SetDirty();
 
-  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  const shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg,
            "adding chunk for %s from offset %ld "
@@ -264,9 +265,9 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
 
   delta_counters_.self.file_chunks++;
 
-  bool retval = sql_chunk_insert_->BindPathHash(path_hash)
-                && sql_chunk_insert_->BindFileChunk(chunk)
-                && sql_chunk_insert_->Execute();
+  const bool retval = sql_chunk_insert_->BindPathHash(path_hash) &&
+                      sql_chunk_insert_->BindFileChunk(chunk) &&
+                      sql_chunk_insert_->Execute();
   assert(retval);
   sql_chunk_insert_->Reset();
 }
@@ -277,7 +278,7 @@ void WritableCatalog::AddFileChunk(const std::string &entry_path,
  * @param entry_path   the file path to clear from it's file chunks
  */
 void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
-  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  const shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   bool retval;
 
   // subtract the number of chunks from the statistics counters
@@ -364,8 +365,8 @@ void WritableCatalog::Partition(WritableCatalog *new_nested_catalog) {
 void WritableCatalog::MakeTransitionPoint(const string &mountpoint) {
   // Find the directory entry to edit
   DirectoryEntry transition_entry;
-  bool retval = LookupPath(PathString(mountpoint.data(), mountpoint.length()),
-                           &transition_entry);
+  const bool retval = LookupPath(
+      PathString(mountpoint.data(), mountpoint.length()), &transition_entry);
   assert(retval);
 
   assert(transition_entry.IsDirectory()
@@ -378,7 +379,7 @@ void WritableCatalog::MakeTransitionPoint(const string &mountpoint) {
 
 void WritableCatalog::MakeNestedRoot() {
   DirectoryEntry root_entry;
-  bool retval = LookupPath(mountpoint(), &root_entry);
+  const bool retval = LookupPath(mountpoint(), &root_entry);
   assert(retval);
 
   assert(root_entry.IsDirectory() && !root_entry.IsNestedCatalogMountpoint());
@@ -401,7 +402,7 @@ void WritableCatalog::MoveToNestedRecursively(
   assert(retval);
 
   // Go through the listing
-  XattrList empty_xattrs;
+  const XattrList empty_xattrs;
   for (DirectoryEntryList::const_iterator i = listing.begin(),
                                           iEnd = listing.end();
        i != iEnd;
@@ -446,7 +447,7 @@ void WritableCatalog::MoveCatalogsToNested(
        ++i) {
     shash::Any hash_nested;
     uint64_t size_nested;
-    bool retval = FindNested(PathString(*i), &hash_nested, &size_nested);
+    const bool retval = FindNested(PathString(*i), &hash_nested, &size_nested);
     assert(retval);
 
     Catalog *attached_reference = NULL;
@@ -491,8 +492,9 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
 
   SqlCatalog stmt(database(), "INSERT INTO nested_catalogs (path, sha1, size) "
                               "VALUES (:p, :sha1, :size);");
-  bool retval = stmt.BindText(1, mountpoint) && stmt.BindText(2, hash_string)
-                && stmt.BindInt64(3, size) && stmt.Execute();
+  const bool retval = stmt.BindText(1, mountpoint) &&
+                      stmt.BindText(2, hash_string) &&
+                      stmt.BindInt64(3, size) && stmt.Execute();
   assert(retval);
 
   // If a reference of the in-memory object of the newly referenced
@@ -517,9 +519,9 @@ void WritableCatalog::InsertBindMountpoint(const string &mountpoint,
   SqlCatalog stmt(database(),
                   "INSERT INTO bind_mountpoints (path, sha1, size) "
                   "VALUES (:p, :sha1, :size);");
-  bool retval = stmt.BindText(1, mountpoint)
-                && stmt.BindText(2, content_hash.ToString())
-                && stmt.BindInt64(3, size) && stmt.Execute();
+  const bool retval = stmt.BindText(1, mountpoint) &&
+                      stmt.BindText(2, content_hash.ToString()) &&
+                      stmt.BindInt64(3, size) && stmt.Execute();
   assert(retval);
 }
 
@@ -589,7 +591,7 @@ void WritableCatalog::UpdateNestedCatalog(const std::string &path,
                                           const shash::Any &hash,
                                           const uint64_t size,
                                           const DeltaCounters &child_counters) {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   SetDirty();
 
   child_counters.PopulateToParent(&delta_counters_);
@@ -599,8 +601,8 @@ void WritableCatalog::UpdateNestedCatalog(const std::string &path,
                      "WHERE path = :path;";
   SqlCatalog stmt(database(), sql);
 
-  bool retval = stmt.BindText(1, hash_str) && stmt.BindInt64(2, size)
-                && stmt.BindText(3, path) && stmt.Execute();
+  const bool retval = stmt.BindText(1, hash_str) && stmt.BindInt64(2, size) &&
+                      stmt.BindText(3, path) && stmt.Execute();
 
   ResetNestedCatalogCacheUnprotected();
 

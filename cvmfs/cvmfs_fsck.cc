@@ -82,7 +82,7 @@ static void Usage() {
 static bool GetNextFile(string *relative_path, string *hash_name) {
   platform_dirent64 *d = NULL;
 
-  MutexLockGuard m(&g_lock_traverse);
+  const MutexLockGuard m(&g_lock_traverse);
 get_next_file_again:
   while (g_DIRP_current && ((d = platform_readdir(g_DIRP_current)) != NULL)) {
     const string name = d->d_name;
@@ -142,7 +142,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
   while (GetNextFile(&relative_path, &hash_name)) {
     const string path = *g_cache_dir + "/" + relative_path;
 
-    int n = atomic_xadd32(&g_num_files, 1);
+    const int n = atomic_xadd32(&g_num_files, 1);
     if (g_verbose)
       LogCvmfs(kLogCvmfs, kLogStdout, "Checking file %s", path.c_str());
     if (!g_verbose && ((n % 1000) == 0))
@@ -165,7 +165,7 @@ static void *MainCheck(void *data __attribute__((unused))) {
       continue;
     }
 
-    int fd_src = open(relative_path.c_str(), O_RDONLY);
+    const int fd_src = open(relative_path.c_str(), O_RDONLY);
     if (fd_src < 0) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: cannot open %s", path.c_str());
       atomic_inc32(&g_num_err_operational);
@@ -175,7 +175,8 @@ static void *MainCheck(void *data __attribute__((unused))) {
     platform_disable_kcache(fd_src);
 
     // Compress every file and calculate SHA-1 of stream
-    shash::Any expected_hash = shash::MkFromHexPtr(shash::HexPtr(hash_name));
+    const shash::Any expected_hash =
+        shash::MkFromHexPtr(shash::HexPtr(hash_name));
     shash::Any hash(expected_hash.algorithm);
     if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",

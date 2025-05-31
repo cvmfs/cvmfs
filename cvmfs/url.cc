@@ -21,7 +21,7 @@ Url *Url::Parse(const std::string &url, const std::string &default_protocol,
 
   // Is there a protocol prefix?
   std::string protocol = default_protocol;
-  size_t sep_pos = url.find("://");
+  const size_t sep_pos = url.find("://");
   if (sep_pos != std::string::npos) {
     protocol = url.substr(0, sep_pos);
     cursor = sep_pos + 3;
@@ -32,21 +32,21 @@ Url *Url::Parse(const std::string &url, const std::string &default_protocol,
   uint64_t port = default_port;
 
   // Try to find another ":", preceding a port number
-  size_t col_pos = url.find(":", cursor);
+  const size_t col_pos = url.find(":", cursor);
   if (col_pos != std::string::npos) {
     // Port number was given
     host = url.substr(cursor, col_pos - cursor);
     cursor = col_pos + 1;
 
-    size_t slash_pos = url.find("/", cursor);
+    const size_t slash_pos = url.find("/", cursor);
     if (slash_pos == 0) {
       return NULL;
     }
 
     // Check that part between ":" and "/" or the end of the string is an
     // unsigned number
-    size_t port_end = slash_pos == std::string::npos ? std::string::npos
-                                                     : slash_pos - cursor;
+    const size_t port_end =
+        slash_pos == std::string::npos ? std::string::npos : slash_pos - cursor;
     if (!String2Uint64Parse(url.substr(cursor, port_end), &port)) {
       return NULL;
     }
@@ -56,7 +56,7 @@ Url *Url::Parse(const std::string &url, const std::string &default_protocol,
     }
   } else {
     // No port number was given
-    size_t slash_pos = url.find("/", cursor);
+    const size_t slash_pos = url.find("/", cursor);
     if (slash_pos != std::string::npos) {
       host = url.substr(cursor, slash_pos - cursor);
       path = url.substr(slash_pos);

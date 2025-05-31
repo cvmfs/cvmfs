@@ -22,10 +22,10 @@ bool RepositoryTag::HasGenericName() {
  * Set a generic tag name of the form "generic-YYYY-MM-DDThh:mm:ss.sssZ"
  */
 void RepositoryTag::SetGenericName() {
-  uint64_t nanoseconds = platform_realtime_ns();
+  const uint64_t nanoseconds = platform_realtime_ns();
 
   // Use strftime() to format timestamp to one-second resolution
-  time_t seconds = static_cast<time_t>(nanoseconds / 1000000000);
+  const time_t seconds = static_cast<time_t>(nanoseconds / 1000000000);
   struct tm timestamp;
   gmtime_r(&seconds, &timestamp);
   char seconds_buffer[32];
@@ -33,7 +33,7 @@ void RepositoryTag::SetGenericName() {
            &timestamp);
 
   // Append milliseconds
-  unsigned offset_milliseconds = ((nanoseconds / 1000000) % 1000);
+  const unsigned offset_milliseconds = ((nanoseconds / 1000000) % 1000);
   char name_buffer[48];
   snprintf(name_buffer, sizeof(name_buffer), "%s.%03dZ", seconds_buffer,
            offset_milliseconds);

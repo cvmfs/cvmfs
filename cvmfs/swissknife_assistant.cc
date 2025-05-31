@@ -25,7 +25,7 @@ namespace swissknife {
 catalog::Catalog *Assistant::GetCatalog(const shash::Any &catalog_hash,
                                         OpenMode open_mode) {
   assert(shash::kSuffixCatalog == catalog_hash.suffix);
-  string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
+  const string local_path = CreateTempPath(tmp_dir_ + "/catalog", 0600);
   assert(!local_path.empty());
 
   if (!FetchObject(catalog_hash, local_path)) {
@@ -56,7 +56,7 @@ history::History *Assistant::GetHistory(OpenMode open_mode) {
   const shash::Any history_hash = manifest_->history();
   history::History *history;
 
-  string local_path = CreateTempPath(tmp_dir_ + "/history", 0600);
+  const string local_path = CreateTempPath(tmp_dir_ + "/history", 0600);
   assert(!local_path.empty());
 
   if (history_hash.IsNull()) {

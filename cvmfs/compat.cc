@@ -56,14 +56,14 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash) {
 namespace inode_tracker {
 
 bool InodeContainer::ConstructPath(const uint64_t inode, PathString *path) {
-  InodeMap::const_iterator needle = map_.find(inode);
+  const InodeMap::const_iterator needle = map_.find(inode);
   if (needle == map_.end())
     return false;
 
   if (needle->second.name.IsEmpty())
     return true;
 
-  bool retval = ConstructPath(needle->second.parent_inode, path);
+  const bool retval = ConstructPath(needle->second.parent_inode, path);
   path->Append("/", 1);
   path->Append(needle->second.name.GetChars(), needle->second.name.GetLength());
   assert(retval);
@@ -81,8 +81,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
   i = old_tracker->inode2path_.map_.begin();
   iEnd = old_tracker->inode2path_.map_.end();
   for (; i != iEnd; ++i) {
-    uint64_t inode = i->first;
-    uint32_t references = i->second.references;
+    const uint64_t inode = i->first;
+    const uint32_t references = i->second.references;
     PathString path;
     old_tracker->inode2path_.ConstructPath(inode, &path);
     new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
@@ -119,7 +119,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 
     const uint32_t references = old_inodes->values_[i];
     PathString path;
-    bool retval = old_tracker->FindPath(inode, &path);
+    const bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
     new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
                           references, path);
@@ -156,7 +156,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 
     const uint32_t references = old_inodes->values()[i];
     PathString path;
-    bool retval = old_tracker->FindPath(inode, &path);
+    const bool retval = old_tracker->FindPath(inode, &path);
     assert(retval);
     new_tracker->VfsGetBy(glue::InodeEx(inode, glue::InodeEx::kUnknownType),
                           references, path);
@@ -197,15 +197,15 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
     FileChunkList *new_list = new FileChunkList();
     for (unsigned i = 0; i < old_list->size(); ++i) {
       const FileChunk *old_chunk = old_list->AtPtr(i);
-      off_t offset = old_chunk->offset();
-      size_t size = old_chunk->size();
+      const off_t offset = old_chunk->offset();
+      const size_t size = old_chunk->size();
       shash::Any hash;
       shash_v1::MigrateAny(&old_chunk->content_hash_, &hash);
       new_list->PushBack(::FileChunk(hash, offset, size));
     }
     delete old_list;
-    ::FileChunkReflist new_reflist(new_list, old_reflist->path,
-                                   zlib::kZlibDefault, false);
+    const ::FileChunkReflist new_reflist(new_list, old_reflist->path,
+                                         zlib::kZlibDefault, false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
   }
 }
@@ -244,15 +244,15 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
     FileChunkList *new_list = new FileChunkList();
     for (unsigned i = 0; i < old_list->size(); ++i) {
       const FileChunk *old_chunk = old_list->AtPtr(i);
-      off_t offset = old_chunk->offset();
-      size_t size = old_chunk->size();
+      const off_t offset = old_chunk->offset();
+      const size_t size = old_chunk->size();
       shash::Any hash;
       shash_v2::MigrateAny(&old_chunk->content_hash_, &hash);
       new_list->PushBack(::FileChunk(hash, offset, size));
     }
     delete old_list;
-    ::FileChunkReflist new_reflist(new_list, old_reflist->path,
-                                   zlib::kZlibDefault, false);
+    const ::FileChunkReflist new_reflist(new_list, old_reflist->path,
+                                         zlib::kZlibDefault, false);
     new_tables->inode2chunks.Insert(inode, new_reflist);
   }
 }

@@ -164,7 +164,7 @@ catalog::DirectoryEntryBase SyncItemTar::CreateBasicCatalogDirent(
   dirent.name_.Assign(this->filename().data(), this->filename().length());
 
   if (this->IsSymlink()) {
-    std::string symlink(archive_entry_symlink(archive_entry_));
+    const std::string symlink(archive_entry_symlink(archive_entry_));
     dirent.symlink_.Assign(symlink.c_str(), symlink.length());
   }
 

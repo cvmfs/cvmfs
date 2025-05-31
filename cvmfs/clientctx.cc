@@ -24,7 +24,7 @@ void ClientCtx::CleanupInstance() {
 ClientCtx::ClientCtx() {
   lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
+  const int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
 }
 
@@ -37,7 +37,7 @@ ClientCtx::~ClientCtx() {
     delete tls_blocks_[i];
   }
 
-  int retval = pthread_key_delete(thread_local_storage_);
+  const int retval = pthread_key_delete(thread_local_storage_);
   assert(retval == 0);
 }
 
@@ -45,8 +45,8 @@ ClientCtx::~ClientCtx() {
 ClientCtx *ClientCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new ClientCtx();
-    int retval = pthread_key_create(&instance_->thread_local_storage_,
-                                    TlsDestructor);
+    const int retval =
+        pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
     assert(retval == 0);
   }
 
@@ -87,9 +87,9 @@ void ClientCtx::Set(uid_t uid, gid_t gid, pid_t pid, InterruptCue *ic) {
 
   if (tls == NULL) {
     tls = new ThreadLocalStorage(uid, gid, pid, ic);
-    int retval = pthread_setspecific(thread_local_storage_, tls);
+    const int retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
-    MutexLockGuard lock_guard(lock_tls_blocks_);
+    const MutexLockGuard lock_guard(lock_tls_blocks_);
     tls_blocks_.push_back(tls);
   } else {
     tls->uid = uid;
@@ -106,7 +106,7 @@ void ClientCtx::TlsDestructor(void *data) {
   delete tls;
 
   assert(instance_);
-  MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
+  const MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
   for (vector<ThreadLocalStorage *>::iterator
            i = instance_->tls_blocks_.begin(),
            iEnd = instance_->tls_blocks_.end();

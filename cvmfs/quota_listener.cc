@@ -45,7 +45,7 @@ static void *MainUnpinListener(void *data) {
   watch_fds[1].events = POLLIN | POLLPRI;
   watch_fds[1].revents = 0;
   while (true) {
-    int retval = poll(watch_fds, 2, -1);
+    const int retval = poll(watch_fds, 2, -1);
     if (retval < 0) {
       continue;
     }
@@ -87,7 +87,7 @@ static void *MainWatchdogListener(void *data) {
   watch_fds[1].events = POLLIN | POLLPRI;
   watch_fds[1].revents = 0;
   while (true) {
-    int retval = poll(watch_fds, 2, -1);
+    const int retval = poll(watch_fds, 2, -1);
     if (retval < 0) {
       continue;
     }
@@ -128,8 +128,9 @@ ListenerHandle *RegisterUnpinListener(QuotaManager *quota_manager,
   handle->quota_manager = quota_manager;
   handle->catalog_manager = catalog_manager;
   handle->repository_name = repository_name;
-  int retval = pthread_create(&handle->thread_listener, NULL, MainUnpinListener,
-                              static_cast<void *>(handle));
+  const int retval =
+      pthread_create(&handle->thread_listener, NULL, MainUnpinListener,
+                     static_cast<void *>(handle));
   assert(retval == 0);
   return handle;
 }
@@ -147,9 +148,9 @@ ListenerHandle *RegisterWatchdogListener(QuotaManager *quota_manager,
   handle->quota_manager = quota_manager;
   handle->catalog_manager = NULL;
   handle->repository_name = repository_name;
-  int retval = pthread_create(&handle->thread_listener, NULL,
-                              MainWatchdogListener,
-                              static_cast<void *>(handle));
+  const int retval =
+      pthread_create(&handle->thread_listener, NULL, MainWatchdogListener,
+                     static_cast<void *>(handle));
   assert(retval == 0);
   return handle;
 }

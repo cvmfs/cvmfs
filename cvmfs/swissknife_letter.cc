@@ -153,7 +153,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     do {
       if (erlang) {
         unsigned char buf[65000];
-        int length = ReadErlang(buf);
+        const int length = ReadErlang(buf);
         text = string(reinterpret_cast<char *>(buf), length);
       } else {
         if (text == "") {

@@ -139,7 +139,7 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
              "Lease end request - curl_easy_perform failed: %d", ret);
   }
 
-  UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
+  const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply->data));
   const JSON *reply_status = JsonDocument::SearchInObject(
       reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL

@@ -40,7 +40,7 @@ class StreamingSink : public cvmfs::Sink {
       memcpy(object_ + pos_, buf, sz);
     }
 
-    uint64_t old_pos = pos_;
+    const uint64_t old_pos = pos_;
     pos_ += sz;
 
     if (!window_buf_)
@@ -52,11 +52,11 @@ class StreamingSink : public cvmfs::Sink {
     if (old_pos >= (window_offset_ + window_size_))
       return static_cast<int64_t>(sz);
 
-    uint64_t copy_offset = std::max(old_pos, window_offset_);
-    uint64_t inbuf_offset = copy_offset - old_pos;
-    uint64_t outbuf_offset = copy_offset - window_offset_;
-    uint64_t copy_size = std::min(sz - inbuf_offset,
-                                  window_size_ - outbuf_offset);
+    const uint64_t copy_offset = std::max(old_pos, window_offset_);
+    const uint64_t inbuf_offset = copy_offset - old_pos;
+    const uint64_t outbuf_offset = copy_offset - window_offset_;
+    const uint64_t copy_size =
+        std::min(sz - inbuf_offset, window_size_ - outbuf_offset);
 
     memcpy(reinterpret_cast<unsigned char *>(window_buf_) + outbuf_offset,
            reinterpret_cast<const unsigned char *>(buf) + inbuf_offset,
@@ -144,7 +144,7 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
   // Note: objects stored in the ring buffer are prepended by their hash
 
   {
-    MutexLockGuard _(lock_buffer_);
+    const MutexLockGuard _(lock_buffer_);
     RingBuffer::ObjectHandle_t handle;
     if (buffered_objects_.Lookup(info.object_id, &handle)) {
       perf::Inc(counters_->n_buffer_hits);
@@ -172,7 +172,7 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
   } else {
     url = "/data/" + info.object_id.MakePath();
   }
-  bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
+  const bool is_zipped = info.label.zip_algorithm == zlib::kZlibDefault;
 
   download::JobInfo download_job(&url, is_zipped, true /* probe_hosts */,
                                  &info.object_id, &sink);
@@ -188,7 +188,7 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
   }
 
   {
-    uint64_t timestamp = platform_monotonic_time_ns();
+    const uint64_t timestamp = platform_monotonic_time_ns();
     SelectDownloadManager(info)->Fetch(&download_job);
     perf::Xadd(counters_->sz_transfer_ms,
                (platform_monotonic_time_ns() - timestamp) / (1000 * 1000));
@@ -204,9 +204,9 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
 
   if (object) {
     memcpy(object, &info.object_id, sizeof(shash::Any));
-    MutexLockGuard _(lock_buffer_);
+    const MutexLockGuard _(lock_buffer_);
     while (!buffer_->HasSpaceFor(nbytes_in_buffer)) {
-      RingBuffer::ObjectHandle_t deleted_handle = buffer_->RemoveBack();
+      const RingBuffer::ObjectHandle_t deleted_handle = buffer_->RemoveBack();
       // As long as we don't add any new objects, the deleted_handle can still
       // be accessed
       shash::Any deleted_hash;
@@ -215,8 +215,8 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
       perf::Inc(counters_->n_buffer_evicts);
       perf::Dec(counters_->n_buffer_objects);
     }
-    RingBuffer::ObjectHandle_t handle = buffer_->PushFront(object,
-                                                           nbytes_in_buffer);
+    const RingBuffer::ObjectHandle_t handle =
+        buffer_->PushFront(object, nbytes_in_buffer);
     buffered_objects_.Insert(info.object_id, handle);
     perf::Inc(counters_->n_buffer_objects);
   }
@@ -267,16 +267,16 @@ std::string StreamingCacheManager::Describe() {
 }
 
 bool StreamingCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
-  bool result = cache_mgr_->AcquireQuotaManager(quota_mgr);
+  const bool result = cache_mgr_->AcquireQuotaManager(quota_mgr);
   if (result)
     quota_mgr_ = cache_mgr_->quota_mgr();
   return result;
 }
 
 int StreamingCacheManager::Open(const LabeledObject &object) {
-  int fd_in_cache_mgr = cache_mgr_->Open(object);
+  const int fd_in_cache_mgr = cache_mgr_->Open(object);
   if (fd_in_cache_mgr >= 0) {
-    MutexLockGuard lock_guard(lock_fd_table_);
+    const MutexLockGuard lock_guard(lock_fd_table_);
     return fd_table_.OpenFd(FdInfo(fd_in_cache_mgr));
   }
 
@@ -288,19 +288,19 @@ int StreamingCacheManager::Open(const LabeledObject &object) {
     return -ENOENT;
   }
 
-  MutexLockGuard lock_guard(lock_fd_table_);
+  const MutexLockGuard lock_guard(lock_fd_table_);
   return fd_table_.OpenFd(FdInfo(object));
 }
 
 int StreamingCacheManager::PlantFd(int fd_in_cache_mgr) {
-  MutexLockGuard lock_guard(lock_fd_table_);
+  const MutexLockGuard lock_guard(lock_fd_table_);
   return fd_table_.OpenFd(FdInfo(fd_in_cache_mgr));
 }
 
 int64_t StreamingCacheManager::GetSize(int fd) {
   FdInfo info;
   {
-    MutexLockGuard lock_guard(lock_fd_table_);
+    const MutexLockGuard lock_guard(lock_fd_table_);
     info = fd_table_.GetHandle(fd);
   }
 
@@ -316,14 +316,14 @@ int64_t StreamingCacheManager::GetSize(int fd) {
 int StreamingCacheManager::Dup(int fd) {
   FdInfo info;
 
-  MutexLockGuard lock_guard(lock_fd_table_);
+  const MutexLockGuard lock_guard(lock_fd_table_);
   info = fd_table_.GetHandle(fd);
 
   if (!info.IsValid())
     return -EBADF;
 
   if (info.fd_in_cache_mgr >= 0) {
-    int dup_fd = cache_mgr_->Dup(info.fd_in_cache_mgr);
+    const int dup_fd = cache_mgr_->Dup(info.fd_in_cache_mgr);
     if (dup_fd < 0)
       return dup_fd;
     return fd_table_.OpenFd(FdInfo(dup_fd));
@@ -335,7 +335,7 @@ int StreamingCacheManager::Dup(int fd) {
 int StreamingCacheManager::Close(int fd) {
   FdInfo info;
   {
-    MutexLockGuard lock_guard(lock_fd_table_);
+    const MutexLockGuard lock_guard(lock_fd_table_);
     info = fd_table_.GetHandle(fd);
     if (!info.IsValid())
       return -EBADF;
@@ -352,7 +352,7 @@ int64_t StreamingCacheManager::Pread(int fd, void *buf, uint64_t size,
                                      uint64_t offset) {
   FdInfo info;
   {
-    MutexLockGuard lock_guard(lock_fd_table_);
+    const MutexLockGuard lock_guard(lock_fd_table_);
     info = fd_table_.GetHandle(fd);
   }
 
@@ -362,7 +362,7 @@ int64_t StreamingCacheManager::Pread(int fd, void *buf, uint64_t size,
   if (info.fd_in_cache_mgr >= 0)
     return cache_mgr_->Pread(info.fd_in_cache_mgr, buf, size, offset);
 
-  int64_t nbytes_streamed = Stream(info, buf, size, offset);
+  const int64_t nbytes_streamed = Stream(info, buf, size, offset);
   if (nbytes_streamed < 0)
     return nbytes_streamed;
   if (static_cast<uint64_t>(nbytes_streamed) < offset)
@@ -375,7 +375,7 @@ int64_t StreamingCacheManager::Pread(int fd, void *buf, uint64_t size,
 int StreamingCacheManager::Readahead(int fd) {
   FdInfo info;
   {
-    MutexLockGuard lock_guard(lock_fd_table_);
+    const MutexLockGuard lock_guard(lock_fd_table_);
     info = fd_table_.GetHandle(fd);
   }
 
@@ -389,11 +389,11 @@ int StreamingCacheManager::Readahead(int fd) {
 }
 
 int StreamingCacheManager::OpenFromTxn(void *txn) {
-  int fd = cache_mgr_->OpenFromTxn(txn);
+  const int fd = cache_mgr_->OpenFromTxn(txn);
   if (fd < 0)
     return fd;
 
-  MutexLockGuard lock_guard(lock_fd_table_);
+  const MutexLockGuard lock_guard(lock_fd_table_);
   return fd_table_.OpenFd(FdInfo(fd));
 }
 
@@ -411,8 +411,8 @@ int StreamingCacheManager::DoRestoreState(void *data) {
 
   SavedState *state = reinterpret_cast<SavedState *>(data);
 
-  int new_backing_root_fd = cache_mgr_->RestoreState(
-      -1, state->state_backing_cachemgr);
+  const int new_backing_root_fd =
+      cache_mgr_->RestoreState(-1, state->state_backing_cachemgr);
   fd_table_.AssignFrom(*state->fd_table);
 
   int new_root_fd = -1;

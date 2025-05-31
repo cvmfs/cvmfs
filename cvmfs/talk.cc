@@ -217,8 +217,8 @@ void *TalkManager::MainResponder(void *data) {
       if (!quota_mgr->HasCapability(QuotaManager::kCapIntrospectSize)) {
         talk_mgr->Answer(con_fd, "Cache cannot report its size\n");
       } else {
-        uint64_t size_unpinned = quota_mgr->GetSize();
-        uint64_t size_pinned = quota_mgr->GetSizePinned();
+        const uint64_t size_unpinned = quota_mgr->GetSize();
+        const uint64_t size_pinned = quota_mgr->GetSizePinned();
         const string size_str = "Current cache size is "
                                 + StringifyInt(size_unpinned / (1024 * 1024))
                                 + "MB (" + StringifyInt(size_unpinned)
@@ -235,7 +235,7 @@ void *TalkManager::MainResponder(void *data) {
       if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
         talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
-        vector<string> ls = quota_mgr->List();
+        const vector<string> ls = quota_mgr->List();
         talk_mgr->AnswerStringList(con_fd, ls);
       }
     } else if (line == "cache list pinned") {
@@ -243,7 +243,7 @@ void *TalkManager::MainResponder(void *data) {
       if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
         talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
-        vector<string> ls_pinned = quota_mgr->ListPinned();
+        const vector<string> ls_pinned = quota_mgr->ListPinned();
         talk_mgr->AnswerStringList(con_fd, ls_pinned);
       }
     } else if (line == "cache list catalogs") {
@@ -251,7 +251,7 @@ void *TalkManager::MainResponder(void *data) {
       if (!quota_mgr->HasCapability(QuotaManager::kCapList)) {
         talk_mgr->Answer(con_fd, "Cache cannot list its entries\n");
       } else {
-        vector<string> ls_catalogs = quota_mgr->ListCatalogs();
+        const vector<string> ls_catalogs = quota_mgr->ListCatalogs();
         talk_mgr->AnswerStringList(con_fd, ls_catalogs);
       }
     } else if (line.substr(0, 12) == "cleanup rate") {
@@ -343,8 +343,8 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 15) {
         talk_mgr->Answer(con_fd, "EINVAL\n");
       } else {
-        std::string socket_path = line.substr(14);
-        bool retval = cvmfs::SendFuseFd(socket_path);
+        const std::string socket_path = line.substr(14);
+        const bool retval = cvmfs::SendFuseFd(socket_path);
         talk_mgr->Answer(con_fd, retval ? "OK\n" : "Failed\n");
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                  "Attempt to send fuse connection info to new mount (via %s)%s",
@@ -379,8 +379,9 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 8) {
         talk_mgr->Answer(con_fd, "Usage: chroot <hash>\n");
       } else {
-        std::string root_hash = Trim(line.substr(7), true /* trim_newline */);
-        FuseRemounter::Status status = remounter->ChangeRoot(
+        const std::string root_hash =
+            Trim(line.substr(7), true /* trim_newline */);
+        const FuseRemounter::Status status = remounter->ChangeRoot(
             MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
         switch (status) {
           case FuseRemounter::kStatusUp2Date:
@@ -395,7 +396,8 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->catalog_mgr()->DetachNested();
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "revision") {
-      string revision = StringifyInt(mount_point->catalog_mgr()->GetRevision());
+      const string revision =
+          StringifyInt(mount_point->catalog_mgr()->GetRevision());
       talk_mgr->Answer(con_fd, revision + "\n");
     } else if (line == "max ttl info") {
       const unsigned max_ttl = mount_point->GetMaxTtlMn();
@@ -451,7 +453,7 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->download_mgr()->ProbeHosts();
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "host probe geo") {
-      bool retval = mount_point->download_mgr()->ProbeGeo();
+      const bool retval = mount_point->download_mgr()->ProbeGeo();
       if (retval)
         talk_mgr->Answer(con_fd, "OK\n");
       else
@@ -501,12 +503,12 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       }
     } else if (line == "external proxy info") {
-      string external_proxy_info = talk_mgr->FormatProxyInfo(
-          mount_point->external_download_mgr());
+      const string external_proxy_info =
+          talk_mgr->FormatProxyInfo(mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_proxy_info);
     } else if (line == "proxy info") {
-      string proxy_info = talk_mgr->FormatProxyInfo(
-          mount_point->download_mgr());
+      const string proxy_info =
+          talk_mgr->FormatProxyInfo(mount_point->download_mgr());
       talk_mgr->Answer(con_fd, proxy_info);
     } else if (line == "proxy rebalance") {
       mount_point->download_mgr()->RebalanceProxies();
@@ -518,7 +520,7 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 20) {
         talk_mgr->Answer(con_fd, "Usage: external proxy set <proxy list>\n");
       } else {
-        string external_proxies = line.substr(19);
+        const string external_proxies = line.substr(19);
         mount_point->external_download_mgr()->SetProxyChain(
             external_proxies, "", download::DownloadManager::kSetProxyRegular);
         talk_mgr->Answer(con_fd, "OK\n");
@@ -542,7 +544,7 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 15) {
         talk_mgr->Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
       } else {
-        string fallback_proxies = line.substr(15);
+        const string fallback_proxies = line.substr(15);
         mount_point->download_mgr()->SetProxyChain(
             "", fallback_proxies, download::DownloadManager::kSetProxyFallback);
         talk_mgr->Answer(con_fd, "OK\n");
@@ -616,10 +618,10 @@ void *TalkManager::MainResponder(void *data) {
       // Manually setting the inode tracker numbers
       glue::InodeTracker::Statistics inode_stats = mount_point->inode_tracker()
                                                        ->GetStatistics();
-      glue::DentryTracker::Statistics
-          dentry_stats = mount_point->dentry_tracker()->GetStatistics();
-      glue::PageCacheTracker::Statistics
-          page_cache_stats = mount_point->page_cache_tracker()->GetStatistics();
+      const glue::DentryTracker::Statistics dentry_stats =
+          mount_point->dentry_tracker()->GetStatistics();
+      const glue::PageCacheTracker::Statistics page_cache_stats =
+          mount_point->page_cache_tracker()->GetStatistics();
       mount_point->statistics()
           ->Lookup("inode_tracker.n_insert")
           ->Set(atomic_read64(&inode_stats.num_inserts));
@@ -820,7 +822,8 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "In read-only mode\n");
       }
     } else if (line == "latency") {
-      string result = talk_mgr->FormatLatencies(*mount_point, file_system);
+      const string result =
+          talk_mgr->FormatLatencies(*mount_point, file_system);
       talk_mgr->Answer(con_fd, result);
     } else {
       talk_mgr->Answer(con_fd, "unknown command\n");
@@ -853,7 +856,7 @@ string TalkManager::FormatLatencies(const MountPoint &mount_point,
   qs.push_back(.999);
   qs.push_back(.9999);
 
-  string repo(mount_point.fqrn());
+  const string repo(mount_point.fqrn());
 
   unsigned int format_index = snprintf(
       buffer, bufSize, "\"%s\",\"%s\",\"%s\",\"%s\"", "repository", "action",
@@ -928,7 +931,7 @@ TalkManager::TalkManager(const string &socket_path,
 
 TalkManager::~TalkManager() {
   if (!socket_path_.empty()) {
-    int retval = unlink(socket_path_.c_str());
+    const int retval = unlink(socket_path_.c_str());
     if ((retval != 0) && (errno != ENOENT)) {
       LogCvmfs(kLogTalk, kLogSyslogWarn,
                "Could not remove cvmfs_io socket from cache directory (%d)",
@@ -949,7 +952,7 @@ TalkManager::~TalkManager() {
 
 
 void TalkManager::Spawn() {
-  int retval = pthread_create(&thread_talk_, NULL, MainResponder, this);
+  const int retval = pthread_create(&thread_talk_, NULL, MainResponder, this);
   assert(retval == 0);
   spawned_ = true;
 }

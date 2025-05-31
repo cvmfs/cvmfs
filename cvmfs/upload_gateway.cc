@@ -132,10 +132,10 @@ unsigned int GatewayUploader::GetNumberOfErrors() const {
 void GatewayUploader::DoUpload(const std::string &remote_path,
                                IngestionSource *source,
                                const CallbackTN *callback) {
-  UniquePtr<GatewayStreamHandle> handle(
+  const UniquePtr<GatewayStreamHandle> handle(
       new GatewayStreamHandle(callback, session_context_->NewBucket()));
 
-  bool rvb = source->Open();
+  const bool rvb = source->Open();
   if (!rvb) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "File upload - could not open local file.");
@@ -145,7 +145,8 @@ void GatewayUploader::DoUpload(const std::string &remote_path,
   }
 
   unsigned char hash_ctx[shash::kMaxContextSize];
-  shash::ContextPtr hash_ctx_ptr(spooler_definition().hash_algorithm, hash_ctx);
+  const shash::ContextPtr hash_ctx_ptr(spooler_definition().hash_algorithm,
+                                       hash_ctx);
   shash::Init(hash_ctx_ptr);
   std::vector<char> buf(1024);
   ssize_t read_bytes = 0;

@@ -191,9 +191,9 @@ static void Usage(const string &exename) {
 bool CheckPremounted(const std::string &mountpoint) {
   int len;
   unsigned fd;
-  bool retval = (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len) == 1)
-                && (len >= 0)
-                && (static_cast<unsigned>(len) == mountpoint.length());
+  const bool retval =
+      (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len) == 1) &&
+      (len >= 0) && (static_cast<unsigned>(len) == mountpoint.length());
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: pre-mounted on file descriptor %d", fd);
@@ -204,80 +204,80 @@ bool CheckPremounted(const std::string &mountpoint) {
 
 
 static void stub_init(void *userdata, struct fuse_conn_info *conn) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.init(userdata, conn);
 }
 
 
 static void stub_destroy(void *userdata) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.destroy(userdata);
 }
 
 
 static void stub_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.lookup(req, parent, name);
 }
 
 
 static void stub_getattr(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.getattr(req, ino, fi);
 }
 
 
 static void stub_readlink(fuse_req_t req, fuse_ino_t ino) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.readlink(req, ino);
 }
 
 
 static void stub_opendir(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.opendir(req, ino, fi);
 }
 
 
 static void stub_releasedir(fuse_req_t req, fuse_ino_t ino,
                             struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.releasedir(req, ino, fi);
 }
 
 
 static void stub_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                          struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.readdir(req, ino, size, off, fi);
 }
 
 
 static void stub_open(fuse_req_t req, fuse_ino_t ino,
                       struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.open(req, ino, fi);
 }
 
 
 static void stub_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                       struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.read(req, ino, size, off, fi);
 }
 
 
 static void stub_release(fuse_req_t req, fuse_ino_t ino,
                          struct fuse_file_info *fi) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.release(req, ino, fi);
 }
 
 
 static void stub_statfs(fuse_req_t req, fuse_ino_t ino) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.statfs(req, ino);
 }
 
@@ -290,7 +290,7 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                           size_t size)
 #endif
 {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
 #ifdef __APPLE__
   cvmfs_exports_->cvmfs_operations.getxattr(req, ino, name, size, position);
 #else
@@ -300,7 +300,7 @@ static void stub_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.listxattr(req, ino, size);
 }
 
@@ -313,7 +313,7 @@ static void stub_forget(fuse_req_t req,
                         uint64_t nlookup
 #endif
 ) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
 }
 
@@ -322,7 +322,7 @@ static void stub_forget(fuse_req_t req,
 static void stub_forget_multi(fuse_req_t req,
                               size_t count,
                               struct fuse_forget_data *forgets) {
-  FenceGuard fence_guard(fence_reload_);
+  const FenceGuard fence_guard(fence_reload_);
   cvmfs_exports_->cvmfs_operations.forget_multi(req, count, forgets);
 }
 #endif
@@ -345,7 +345,7 @@ static int ParseFuseOptions(void *data __attribute__((unused)), const char *arg,
       if ((arglen > 0) && (arg[0] != '-')) {
         const char **o;
         for (o = (const char **)cvmfs_array_opts; *o; o++) {
-          unsigned olen = strlen(*o);
+          const unsigned olen = strlen(*o);
           if ((arglen > olen && arg[olen] == '=')
               && (strncasecmp(arg, *o, olen) == 0))
             return 0;
@@ -435,7 +435,7 @@ static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
     if (p != NULL) {
       if (p == arg)
         return true;
-      char c = *(p - 1);
+      const char c = *(p - 1);
       if ((c == ',') || (c == ' '))
         return true;
       if ((c == 'o') && (p >= arg + 2) && (*(p - 2) == '-'))
@@ -517,7 +517,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   }
 
   vector<string>::const_iterator i = library_paths.begin();
-  vector<string>::const_iterator iend = library_paths.end();
+  const vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
     library_handle_ = OpenLibrary(*i);
     if (library_handle_ != NULL) {
@@ -592,8 +592,8 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
     return kFailLoadLibrary;
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
-    string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " ("
-                          + StringifyInt(retval) + ")\n";
+    const string msg_progress =
+        cvmfs_exports_->fnGetErrorMsg() + " (" + StringifyInt(retval) + ")\n";
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", msg_progress.c_str());
     SendMsg2Socket(fd_progress, msg_progress);
     return (Failures)retval;
@@ -666,12 +666,12 @@ int FuseMain(int argc, char *argv[]) {
     if (string(argv[1]) == string("__MK_ALIEN_CACHE__")) {
       if (argc < 5)
         return 1;
-      string alien_cache_dir = argv[2];
-      sanitizer::PositiveIntegerSanitizer sanitizer;
+      const string alien_cache_dir = argv[2];
+      const sanitizer::PositiveIntegerSanitizer sanitizer;
       if (!sanitizer.IsValid(argv[3]) || !sanitizer.IsValid(argv[4]))
         return 1;
-      uid_t uid_owner = String2Uint64(argv[3]);
-      gid_t gid_owner = String2Uint64(argv[4]);
+      const uid_t uid_owner = String2Uint64(argv[3]);
+      const gid_t gid_owner = String2Uint64(argv[4]);
 
       int retval = MkdirDeep(alien_cache_dir, 0770);
       if (!retval) {
@@ -772,7 +772,7 @@ int FuseMain(int argc, char *argv[]) {
     }
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: setting CPU Affinity to %s",
              parameter.c_str());
-    int err = sched_setaffinity(0, sizeof(mask), &mask);
+    const int err = sched_setaffinity(0, sizeof(mask), &mask);
     if (err != 0) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogSyslogErr,
                "Setting CPU Affinity failed with error %d", errno);
@@ -828,7 +828,7 @@ int FuseMain(int argc, char *argv[]) {
 
   // Number of file descriptors
   if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
-    int retval = SetLimitNoFile(String2Uint64(parameter));
+    const int retval = SetLimitNoFile(String2Uint64(parameter));
     if (retval == -2) {
       LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
     } else if (retval == -1) {
@@ -852,13 +852,15 @@ int FuseMain(int argc, char *argv[]) {
 
   // Apply OOM score adjustment
   if (options_manager->GetValue("CVMFS_OOM_SCORE_ADJ", &parameter)) {
-    string proc_path = "/proc/" + StringifyInt(getpid()) + "/oom_score_adj";
-    int fd_oom = open(proc_path.c_str(), O_WRONLY);
+    const string proc_path =
+        "/proc/" + StringifyInt(getpid()) + "/oom_score_adj";
+    const int fd_oom = open(proc_path.c_str(), O_WRONLY);
     if (fd_oom < 0) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "failed to open %s",
                proc_path.c_str());
     } else {
-      bool retval = SafeWrite(fd_oom, parameter.data(), parameter.length());
+      const bool retval =
+          SafeWrite(fd_oom, parameter.data(), parameter.length());
       if (!retval) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                  "failed to set OOM score adjustment to %s", parameter.c_str());

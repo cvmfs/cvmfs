@@ -44,7 +44,7 @@ RamCacheManager::RamCacheManager(uint64_t max_size,
                         max_size,
                         perf::StatisticsTemplate("kv.volatile", statistics))
     , counters_(statistics) {
-  int retval = pthread_rwlock_init(&rwlock_, NULL);
+  const int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
   LogCvmfs(kLogCache, kLogDebug, "max %lu B, %u entries", max_size,
            max_entries);
@@ -58,7 +58,7 @@ RamCacheManager::~RamCacheManager() { pthread_rwlock_destroy(&rwlock_); }
 
 
 int RamCacheManager::AddFd(const ReadOnlyHandle &handle) {
-  int result = fd_table_.OpenFd(handle);
+  const int result = fd_table_.OpenFd(handle);
   if (result == -ENFILE) {
     LogCvmfs(kLogCache, kLogDebug, "too many open files");
     perf::Inc(counters_.n_enfile);
@@ -76,7 +76,7 @@ bool RamCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int RamCacheManager::Open(const LabeledObject &object) {
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   return DoOpen(object.id);
 }
 
@@ -84,7 +84,7 @@ int RamCacheManager::Open(const LabeledObject &object) {
 int RamCacheManager::DoOpen(const shash::Any &id) {
   bool ok;
   bool is_volatile;
-  MemoryBuffer buf;
+  const MemoryBuffer buf;
 
   if (regular_entries_.Contains(id)) {
     is_volatile = false;
@@ -95,8 +95,8 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
     perf::Inc(counters_.n_openmiss);
     return -ENOENT;
   }
-  ReadOnlyHandle generic_handle(id, is_volatile);
-  int fd = AddFd(generic_handle);
+  const ReadOnlyHandle generic_handle(id, is_volatile);
+  const int fd = AddFd(generic_handle);
   if (fd < 0) {
     LogCvmfs(kLogCache, kLogDebug, "error while opening %s: %s",
              id.ToString().c_str(), strerror(-fd));
@@ -118,8 +118,8 @@ int RamCacheManager::DoOpen(const shash::Any &id) {
 
 
 int64_t RamCacheManager::GetSize(int fd) {
-  ReadLockGuard guard(rwlock_);
-  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  const ReadLockGuard guard(rwlock_);
+  const ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on GetSize", fd);
     return -EBADF;
@@ -132,8 +132,8 @@ int64_t RamCacheManager::GetSize(int fd) {
 int RamCacheManager::Close(int fd) {
   bool rc;
 
-  WriteLockGuard guard(rwlock_);
-  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  const WriteLockGuard guard(rwlock_);
+  const ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Close", fd);
     return -EBADF;
@@ -141,7 +141,7 @@ int RamCacheManager::Close(int fd) {
   rc = GetStore(generic_handle)->Unref(generic_handle.handle);
   assert(rc);
 
-  int rc_int = fd_table_.CloseFd(fd);
+  const int rc_int = fd_table_.CloseFd(fd);
   assert(rc_int == 0);
   LogCvmfs(kLogCache, kLogDebug, "closed fd %d", fd);
   perf::Inc(counters_.n_close);
@@ -153,8 +153,8 @@ int64_t RamCacheManager::Pread(int fd,
                                void *buf,
                                uint64_t size,
                                uint64_t offset) {
-  ReadLockGuard guard(rwlock_);
-  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  const ReadLockGuard guard(rwlock_);
+  const ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Pread", fd);
     return -EBADF;
@@ -168,8 +168,8 @@ int64_t RamCacheManager::Pread(int fd,
 int RamCacheManager::Dup(int fd) {
   bool ok;
   int rc;
-  WriteLockGuard guard(rwlock_);
-  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  const WriteLockGuard guard(rwlock_);
+  const ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Dup", fd);
     return -EBADF;
@@ -189,8 +189,8 @@ int RamCacheManager::Dup(int fd) {
  * For a RAM cache, read-ahead is a no-op.
  */
 int RamCacheManager::Readahead(int fd) {
-  ReadLockGuard guard(rwlock_);
-  ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
+  const ReadLockGuard guard(rwlock_);
+  const ReadOnlyHandle generic_handle = fd_table_.GetHandle(fd);
   if (generic_handle.handle == kInvalidHandle) {
     LogCvmfs(kLogCache, kLogDebug, "bad fd %d on Readahead", fd);
     return -EBADF;
@@ -237,8 +237,8 @@ int64_t RamCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   if (transaction->pos + size > transaction->buffer.size) {
     if (transaction->expected_size == kSizeUnknown) {
       perf::Inc(counters_.n_realloc);
-      size_t new_size = max(2 * transaction->buffer.size,
-                            static_cast<size_t>(size + transaction->pos));
+      const size_t new_size = max(2 * transaction->buffer.size,
+                                  static_cast<size_t>(size + transaction->pos));
       LogCvmfs(kLogCache, kLogDebug, "reallocate transaction for %s to %lu B",
                transaction->buffer.id.ToString().c_str(),
                transaction->buffer.size);
@@ -281,9 +281,9 @@ int RamCacheManager::Reset(void *txn) {
 
 
 int RamCacheManager::OpenFromTxn(void *txn) {
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  int64_t retval = CommitToKvStore(transaction);
+  const int64_t retval = CommitToKvStore(transaction);
   if (retval < 0) {
     LogCvmfs(kLogCache, kLogDebug,
              "error while committing transaction on %s: %s",
@@ -308,10 +308,10 @@ int RamCacheManager::AbortTxn(void *txn) {
 
 
 int RamCacheManager::CommitTxn(void *txn) {
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   perf::Inc(counters_.n_committxn);
-  int64_t rc = CommitToKvStore(transaction);
+  const int64_t rc = CommitToKvStore(transaction);
   if (rc < 0)
     return rc;
   free(transaction->buffer.address);
@@ -334,8 +334,8 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     transaction->buffer.refcount = 0;
   }
 
-  int64_t regular_size = regular_entries_.GetUsed();
-  int64_t volatile_size = volatile_entries_.GetUsed();
+  const int64_t regular_size = regular_entries_.GetUsed();
+  const int64_t volatile_size = volatile_entries_.GetUsed();
   int64_t overrun = regular_size + volatile_size + transaction->buffer.size
                     - max_size_;
 
@@ -358,7 +358,7 @@ int64_t RamCacheManager::CommitToKvStore(Transaction *transaction) {
     return -ENOSPC;
   }
 
-  int rc = store->Commit(transaction->buffer);
+  const int rc = store->Commit(transaction->buffer);
   if (rc < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit on %s failed",
              transaction->buffer.id.ToString().c_str());

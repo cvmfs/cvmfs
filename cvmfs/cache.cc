@@ -48,7 +48,7 @@ int CacheManager::ChecksumFd(int fd, shash::Any *id) {
   bool eof;
 
   do {
-    int64_t nbytes = Pread(fd, buf, 4096, pos);
+    const int64_t nbytes = Pread(fd, buf, 4096, pos);
     if (nbytes < 0) {
       zlib::CompressFini(&strm);
       return nbytes;
@@ -78,7 +78,7 @@ bool CacheManager::CommitFromMem(const LabeledObject &object,
                                  const unsigned char *buffer,
                                  const uint64_t size) {
   void *txn = alloca(this->SizeOfTxn());
-  int fd = this->StartTxn(object.id, size, txn);
+  const int fd = this->StartTxn(object.id, size, txn);
   if (fd < 0)
     return false;
   this->CtrlTxn(object.label, 0, txn);
@@ -98,7 +98,7 @@ void CacheManager::FreeState(const int fd_progress, void *data) {
     SendMsg2Socket(fd_progress, "Releasing saved open files table\n");
   assert(state->version == kStateVersion);
   assert(state->manager_type == id());
-  bool result = DoFreeState(state->concrete_state);
+  const bool result = DoFreeState(state->concrete_state);
   if (!result) {
     if (fd_progress >= 0) {
       SendMsg2Socket(fd_progress,
@@ -125,11 +125,11 @@ bool CacheManager::Open2Mem(const LabeledObject &object,
   *size = 0;
   *buffer = NULL;
 
-  int fd = this->Open(object);
+  const int fd = this->Open(object);
   if (fd < 0)
     return false;
 
-  int64_t s = this->GetSize(fd);
+  const int64_t s = this->GetSize(fd);
   assert(s >= 0);
   *size = static_cast<uint64_t>(s);
 
@@ -160,16 +160,16 @@ bool CacheManager::Open2Mem(const LabeledObject &object,
  * pins into a no-op, so that the accounting does not get out of sync.)
  */
 int CacheManager::OpenPinned(const LabeledObject &object) {
-  int fd = this->Open(object);
+  const int fd = this->Open(object);
   if (fd >= 0) {
-    int64_t size = this->GetSize(fd);
+    const int64_t size = this->GetSize(fd);
     if (size < 0) {
       this->Close(fd);
       return size;
     }
-    bool retval = quota_mgr_->Pin(object.id, static_cast<uint64_t>(size),
-                                  object.label.GetDescription(),
-                                  object.label.IsCatalog());
+    const bool retval = quota_mgr_->Pin(object.id, static_cast<uint64_t>(size),
+                                        object.label.GetDescription(),
+                                        object.label.IsCatalog());
     if (!retval) {
       this->Close(fd);
       return -ENOSPC;
@@ -193,7 +193,7 @@ int CacheManager::RestoreState(const int fd_progress, void *data) {
       SendMsg2Socket(fd_progress, "switching cache manager unsupported!\n");
     abort();
   }
-  int new_root_fd = DoRestoreState(state->concrete_state);
+  const int new_root_fd = DoRestoreState(state->concrete_state);
   if (new_root_fd < -1) {
     if (fd_progress >= 0)
       SendMsg2Socket(fd_progress, "FAILED!\n");

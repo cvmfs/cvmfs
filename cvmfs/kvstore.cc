@@ -43,7 +43,7 @@ MemoryKvStore::MemoryKvStore(unsigned int cache_entries,
                perf::StatisticsTemplate("lru", statistics))
     , heap_(NULL)
     , counters_(statistics) {
-  int retval = pthread_rwlock_init(&rwlock_, NULL);
+  const int retval = pthread_rwlock_init(&rwlock_, NULL);
   assert(retval == 0);
   switch (alloc) {
     case kMallocHeap:
@@ -124,7 +124,7 @@ int MemoryKvStore::DoMalloc(MemoryBuffer *buf) {
 
 
 void MemoryKvStore::DoFree(MemoryBuffer *buf) {
-  AllocHeader a;
+  const AllocHeader a;
 
   assert(buf);
   if (!buf->address)
@@ -197,7 +197,7 @@ int64_t MemoryKvStore::GetRefcount(const shash::Any &id) {
 
 bool MemoryKvStore::IncRef(const shash::Any &id) {
   perf::Inc(counters_.n_incref);
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {
     assert(mem.refcount < UINT_MAX);
@@ -216,7 +216,7 @@ bool MemoryKvStore::IncRef(const shash::Any &id) {
 
 bool MemoryKvStore::Unref(const shash::Any &id) {
   perf::Inc(counters_.n_unref);
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   MemoryBuffer mem;
   if (entries_.Lookup(id, &mem)) {
     assert(mem.refcount > 0);
@@ -238,7 +238,7 @@ int64_t MemoryKvStore::Read(const shash::Any &id,
                             size_t offset) {
   MemoryBuffer mem;
   perf::Inc(counters_.n_read);
-  ReadLockGuard guard(rwlock_);
+  const ReadLockGuard guard(rwlock_);
   if (!entries_.Lookup(id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "miss %s on Read", id.ToString().c_str());
     return -ENOENT;
@@ -248,7 +248,7 @@ int64_t MemoryKvStore::Read(const shash::Any &id,
              offset, mem.size, id.ToString().c_str());
     return 0;
   }
-  uint64_t copy_size = std::min(mem.size - offset, size);
+  const uint64_t copy_size = std::min(mem.size - offset, size);
   // LogCvmfs(kLogKvStore, kLogDebug, "copy %u B from offset %u of %s",
   //          copy_size, offset, id.ToString().c_str());
   memcpy(buf, static_cast<char *>(mem.address) + offset, copy_size);
@@ -258,7 +258,7 @@ int64_t MemoryKvStore::Read(const shash::Any &id,
 
 
 int MemoryKvStore::Commit(const MemoryBuffer &buf) {
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   return DoCommit(buf);
 }
 
@@ -282,7 +282,7 @@ int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
   LogCvmfs(kLogKvStore, kLogDebug, "commit %s", buf.id.ToString().c_str());
   if (entries_.Lookup(buf.id, &mem)) {
     LogCvmfs(kLogKvStore, kLogDebug, "commit overwrites existing entry");
-    size_t old_size = mem.size;
+    const size_t old_size = mem.size;
     DoFree(&mem);
     used_bytes_ -= old_size;
     counters_.sz_size->Set(used_bytes_);
@@ -317,7 +317,7 @@ int MemoryKvStore::DoCommit(const MemoryBuffer &buf) {
 
 bool MemoryKvStore::Delete(const shash::Any &id) {
   perf::Inc(counters_.n_delete);
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   return DoDelete(id);
 }
 
@@ -348,7 +348,7 @@ bool MemoryKvStore::DoDelete(const shash::Any &id) {
 
 bool MemoryKvStore::ShrinkTo(size_t size) {
   perf::Inc(counters_.n_shrinkto);
-  WriteLockGuard guard(rwlock_);
+  const WriteLockGuard guard(rwlock_);
   shash::Any key;
   MemoryBuffer buf;
 

@@ -28,7 +28,7 @@ namespace upload {
 size_t SendCB(void *ptr, size_t size, size_t nmemb, void *userp) {
   CurlSendPayload *payload = static_cast<CurlSendPayload *>(userp);
 
-  size_t max_chunk_size = size * nmemb;
+  const size_t max_chunk_size = size * nmemb;
   if (max_chunk_size < 1) {
     return 0;
   }
@@ -145,7 +145,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string &old_root_hash,
   }
 
   {
-    MutexLockGuard lock(current_pack_mtx_);
+    const MutexLockGuard lock(current_pack_mtx_);
 
     if (current_pack_ && current_pack_->GetNoObjects() > 0) {
       Dispatch();
@@ -164,7 +164,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string &old_root_hash,
     if (old_root_hash.empty() || new_root_hash.empty()) {
       return false;
     }
-    bool commit_result = Commit(old_root_hash, new_root_hash, tag);
+    const bool commit_result = Commit(old_root_hash, new_root_hash, tag);
     if (!commit_result) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
                "SessionContext: could not commit session. Aborting.");
@@ -185,7 +185,7 @@ bool SessionContextBase::Finalize(bool commit, const std::string &old_root_hash,
 }
 
 ObjectPack::BucketHandle SessionContextBase::NewBucket() {
-  MutexLockGuard lock(current_pack_mtx_);
+  const MutexLockGuard lock(current_pack_mtx_);
   if (!current_pack_) {
     current_pack_ = new ObjectPack(max_pack_size_);
   }
@@ -199,7 +199,7 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
                                       const ObjectPack::BucketHandle handle,
                                       const std::string &name,
                                       const bool force_dispatch) {
-  MutexLockGuard lock(current_pack_mtx_);
+  const MutexLockGuard lock(current_pack_mtx_);
 
   if (!current_pack_) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
@@ -208,14 +208,14 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
     return false;
   }
 
-  uint64_t size0 = current_pack_->size();
-  bool committed = current_pack_->CommitBucket(type, id, handle, name);
+  const uint64_t size0 = current_pack_->size();
+  const bool committed = current_pack_->CommitBucket(type, id, handle, name);
 
   if (committed) {  // Current pack is still not full
     active_handles_.erase(
         std::remove(active_handles_.begin(), active_handles_.end(), handle),
         active_handles_.end());
-    uint64_t size1 = current_pack_->size();
+    const uint64_t size1 = current_pack_->size();
     bytes_committed_ += size1 - size0;
     if (force_dispatch) {
       Dispatch();
@@ -245,7 +245,7 @@ bool SessionContextBase::CommitBucket(const ObjectPack::BucketContentType type,
 }
 
 void SessionContextBase::Dispatch() {
-  MutexLockGuard lock(current_pack_mtx_);
+  const MutexLockGuard lock(current_pack_mtx_);
 
   if (!current_pack_) {
     return;
@@ -262,8 +262,8 @@ bool SessionContext::InitializeDerived(uint64_t max_queue_size) {
   // Start worker thread
   upload_jobs_ = new Tube<UploadJob>(max_queue_size);
 
-  int retval = pthread_create(&worker_, NULL, UploadLoop,
-                              reinterpret_cast<void *>(this));
+  const int retval = pthread_create(&worker_, NULL, UploadLoop,
+                                    reinterpret_cast<void *>(this));
 
   return !retval;
 }
@@ -295,7 +295,7 @@ bool SessionContext::Commit(const std::string &old_root_hash,
   //
   request_input.Add("tag_channel", 0);
   request_input.Add("tag_description", tag.description());
-  std::string request = request_input.GenerateString();
+  const std::string request = request_input.GenerateString();
   CurlBuffer buffer;
   return MakeEndRequest("POST", key_id_, secret_, session_token_, api_url_,
                         request, &buffer);
@@ -367,13 +367,13 @@ bool SessionContext::DoUpload(const SessionContext::UploadJob *job) {
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &reply);
 
   // Perform the Curl POST request
-  CURLcode ret = curl_easy_perform(h_curl);
+  const CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogUploadGateway, kLogStderr,
              "SessionContext::DoUpload - curl_easy_perform failed: %d", ret);
   }
 
-  UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
+  const UniquePtr<JsonDocument> reply_json(JsonDocument::Create(reply));
   const JSON *reply_status = JsonDocument::SearchInObject(
       reply_json->root(), "status", JSON_STRING);
   const bool ok = (reply_status != NULL

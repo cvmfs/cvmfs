@@ -48,13 +48,11 @@ std::string Whitelist::CreateString(
     int validity_days,
     shash::Algorithms hash_algorithm,
     signature::SignatureManager *signature_manager) {
-  std::string to_sign = WhitelistTimestamp(time(NULL)) + "\n" + "E"
-                        + WhitelistTimestamp(time(NULL)
-                                             + validity_days * 24 * 3600)
-                        + "\n" + "N" + fqrn + "\n"
-                        + signature_manager->FingerprintCertificate(
-                            hash_algorithm)
-                        + "\n";
+  const std::string to_sign =
+      WhitelistTimestamp(time(NULL)) + "\n" + "E" +
+      WhitelistTimestamp(time(NULL) + validity_days * 24 * 3600) + "\n" + "N" +
+      fqrn + "\n" + signature_manager->FingerprintCertificate(hash_algorithm) +
+      "\n";
   shash::Any hash(hash_algorithm);
   shash::HashString(to_sign, &hash);
   std::string hash_str = hash.ToString();
@@ -63,7 +61,7 @@ std::string Whitelist::CreateString(
   whitelist += "--\n" + hash_str + "\n";
   unsigned char *signature;
   unsigned signature_size;
-  bool retval = signature_manager->SignRsa(
+  const bool retval = signature_manager->SignRsa(
       reinterpret_cast<const unsigned char *>(hash_str.data()),
       hash_str.length(), &signature, &signature_size);
   assert(retval);
@@ -98,21 +96,21 @@ Failures Whitelist::VerifyLoadedCertificate() const {
 
   vector<string> blacklist = signature_manager_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {
-    shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(
-        blacklist[i]);
+    const shash::Any this_hash =
+        signature::SignatureManager::MkFromFingerprint(blacklist[i]);
     if (this_hash.IsNull())
       continue;
 
-    shash::Algorithms algorithm = this_hash.algorithm;
+    const shash::Algorithms algorithm = this_hash.algorithm;
     if (this_hash == signature_manager_->HashCertificate(algorithm))
       return kFailBlacklisted;
   }
 
   for (unsigned i = 0; i < fingerprints_.size(); ++i) {
-    shash::Algorithms algorithm = fingerprints_[i].algorithm;
+    const shash::Algorithms algorithm = fingerprints_[i].algorithm;
     if (signature_manager_->HashCertificate(algorithm) == fingerprints_[i]) {
       if (verification_flags_ & kFlagVerifyCaChain) {
-        bool retval = signature_manager_->VerifyCaChain();
+        const bool retval = signature_manager_->VerifyCaChain();
         if (!retval)
           return kFailBadCaChain;
       }
@@ -286,7 +284,7 @@ bool Whitelist::IsBefore(time_t now, const struct tm &t_whitelist) {
 
 Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
                                    const unsigned whitelist_size) {
-  time_t local_timestamp = time(NULL);
+  const time_t local_timestamp = time(NULL);
   string line;
   unsigned payload_bytes = 0;
   bool verify_pkcs7 = false;
@@ -314,7 +312,7 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   tm_wl.tm_mday = String2Int64(line.substr(7, 2));
   tm_wl.tm_hour = String2Int64(line.substr(9, 2));
   tm_wl.tm_min = tm_wl.tm_sec = 0;  // exact on hours level
-  time_t timestamp = timegm(&tm_wl);
+  const time_t timestamp = timegm(&tm_wl);
   LogCvmfs(kLogSignature, kLogDebug,
            "whitelist UTC expiry timestamp in localtime: %s",
            StringifyTime(timestamp, false).c_str());
@@ -377,7 +375,8 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   do {
     if (line == "--")
       break;
-    shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(line);
+    const shash::Any this_hash =
+        signature::SignatureManager::MkFromFingerprint(line);
     if (!this_hash.IsNull())
       fingerprints_.push_back(this_hash);
 

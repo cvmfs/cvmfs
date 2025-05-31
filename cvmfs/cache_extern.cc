@@ -74,7 +74,7 @@ const shash::Any ExternalCacheManager::kInvalidHandle;
 
 
 int ExternalCacheManager::AbortTxn(void *txn) {
-  int result = Reset(txn);
+  const int result = Reset(txn);
 #ifdef __APPLE__
   free(reinterpret_cast<Transaction *>(txn)->buffer);
 #endif
@@ -93,11 +93,11 @@ bool ExternalCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
   if (!spawned_) {
     transport_.SendFrame(rpc_job->frame_send());
-    uint32_t save_att_size = rpc_job->frame_recv()->att_size();
+    const uint32_t save_att_size = rpc_job->frame_recv()->att_size();
     bool again;
     do {
       again = false;
-      bool retval = transport_.RecvFrame(rpc_job->frame_recv());
+      const bool retval = transport_.RecvFrame(rpc_job->frame_recv());
       assert(retval);
       if (rpc_job->frame_recv()->IsMsgOutOfBand()) {
         google::protobuf::MessageLite *msg_typed = rpc_job->frame_recv()
@@ -111,11 +111,11 @@ void ExternalCacheManager::CallRemotely(ExternalCacheManager::RpcJob *rpc_job) {
   } else {
     Signal signal;
     {
-      MutexLockGuard guard(lock_inflight_rpcs_);
+      const MutexLockGuard guard(lock_inflight_rpcs_);
       inflight_rpcs_.push_back(RpcInFlight(rpc_job, &signal));
     }
     {
-      MutexLockGuard guard(lock_send_fd_);
+      const MutexLockGuard guard(lock_send_fd_);
       transport_.SendFrame(rpc_job->frame_send());
     }
     signal.Wait();
@@ -143,11 +143,11 @@ int ExternalCacheManager::ChangeRefcount(const shash::Any &id, int change_by) {
 int ExternalCacheManager::Close(int fd) {
   ReadOnlyHandle handle;
   {
-    WriteLockGuard guard(rwlock_fd_table_);
+    const WriteLockGuard guard(rwlock_fd_table_);
     handle = fd_table_.GetHandle(fd);
     if (handle.id == kInvalidHandle)
       return -EBADF;
-    int retval = fd_table_.CloseFd(fd);
+    const int retval = fd_table_.CloseFd(fd);
     assert(retval == 0);
   }
 
@@ -159,11 +159,11 @@ int ExternalCacheManager::CommitTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "committing %s",
            std::string(transaction->id.ToString()).c_str());
-  int retval = Flush(true, transaction);
+  const int retval = Flush(true, transaction);
   if (retval != 0)
     return retval;
 
-  int refcount = transaction->open_fds - 1;
+  const int refcount = transaction->open_fds - 1;
   if (refcount != 0)
     return ChangeRefcount(transaction->id, refcount);
 #ifdef __APPLE__
@@ -219,7 +219,7 @@ ExternalCacheManager *ExternalCacheManager::Create(int fd_connection,
   cache_mgr->transport_.SendFrame(&frame_send);
 
   CacheTransport::Frame frame_recv;
-  bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
+  const bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
   if (!retval)
     return NULL;
   google::protobuf::MessageLite *msg_typed = frame_recv.GetMsgTyped();
@@ -313,7 +313,7 @@ bool ExternalCacheManager::DoFreeState(void *data) {
 int ExternalCacheManager::DoOpen(const shash::Any &id) {
   int fd = -1;
   {
-    WriteLockGuard guard(rwlock_fd_table_);
+    const WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(id));
     if (fd < 0) {
       LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
@@ -322,12 +322,12 @@ int ExternalCacheManager::DoOpen(const shash::Any &id) {
     }
   }
 
-  int status_refcnt = ChangeRefcount(id, 1);
+  const int status_refcnt = ChangeRefcount(id, 1);
   if (status_refcnt == 0)
     return fd;
 
-  WriteLockGuard guard(rwlock_fd_table_);
-  int retval = fd_table_.CloseFd(fd);
+  const WriteLockGuard guard(rwlock_fd_table_);
+  const int retval = fd_table_.CloseFd(fd);
   assert(retval == 0);
   return status_refcnt;
 }
@@ -339,7 +339,7 @@ int ExternalCacheManager::DoRestoreState(void *data) {
   for (unsigned i = 1; i < fd_table_.GetMaxFds(); ++i) {
     assert(fd_table_.GetHandle(i) == ReadOnlyHandle());
   }
-  ReadOnlyHandle handle_root = fd_table_.GetHandle(0);
+  const ReadOnlyHandle handle_root = fd_table_.GetHandle(0);
 
   FdTable<ReadOnlyHandle> *other = reinterpret_cast<FdTable<ReadOnlyHandle> *>(
       data);
@@ -372,7 +372,7 @@ void *ExternalCacheManager::DoSaveState() {
 
 
 int ExternalCacheManager::Dup(int fd) {
-  shash::Any id = GetHandle(fd);
+  const shash::Any id = GetHandle(fd);
   if (id == kInvalidHandle)
     return -EBADF;
   return DoOpen(id);
@@ -459,14 +459,14 @@ int ExternalCacheManager::Flush(bool do_commit, Transaction *transaction) {
 
 
 shash::Any ExternalCacheManager::GetHandle(int fd) {
-  ReadLockGuard guard(rwlock_fd_table_);
-  ReadOnlyHandle handle = fd_table_.GetHandle(fd);
+  const ReadLockGuard guard(rwlock_fd_table_);
+  const ReadOnlyHandle handle = fd_table_.GetHandle(fd);
   return handle.id;
 }
 
 
 int64_t ExternalCacheManager::GetSize(int fd) {
-  shash::Any id = GetHandle(fd);
+  const shash::Any id = GetHandle(fd);
   if (id == kInvalidHandle)
     return -EBADF;
 
@@ -498,7 +498,7 @@ void *ExternalCacheManager::MainRead(void *data) {
   while (true) {
     CacheTransport::Frame frame_recv;
     frame_recv.set_attachment(buffer, cache_mgr->max_object_size_);
-    bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
+    const bool retval = cache_mgr->transport_.RecvFrame(&frame_recv);
     if (!retval)
       break;
 
@@ -533,7 +533,7 @@ void *ExternalCacheManager::MainRead(void *data) {
 
     RpcInFlight rpc_inflight;
     {
-      MutexLockGuard guard(cache_mgr->lock_inflight_rpcs_);
+      const MutexLockGuard guard(cache_mgr->lock_inflight_rpcs_);
       for (unsigned i = 0; i < cache_mgr->inflight_rpcs_.size(); ++i) {
         RpcJob *rpc_job = cache_mgr->inflight_rpcs_[i].rpc_job;
         if ((rpc_job->req_id() == req_id) && (rpc_job->part_nr() == part_nr)) {
@@ -571,13 +571,13 @@ int ExternalCacheManager::OpenFromTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "open fd for transaction %s",
            std::string(transaction->id.ToString()).c_str());
-  int retval = Flush(true, transaction);
+  const int retval = Flush(true, transaction);
   if (retval != 0)
     return retval;
 
   int fd = -1;
   {
-    WriteLockGuard guard(rwlock_fd_table_);
+    const WriteLockGuard guard(rwlock_fd_table_);
     fd = fd_table_.OpenFd(ReadOnlyHandle(transaction->id));
     if (fd < 0) {
       LogCvmfs(kLogCache, kLogDebug, "error while creating new fd: %s",
@@ -594,7 +594,7 @@ int64_t ExternalCacheManager::Pread(int fd,
                                     void *buf,
                                     uint64_t size,
                                     uint64_t offset) {
-  shash::Any id = GetHandle(fd);
+  const shash::Any id = GetHandle(fd);
   if (id == kInvalidHandle)
     return -EBADF;
 
@@ -602,8 +602,8 @@ int64_t ExternalCacheManager::Pread(int fd,
   transport_.FillMsgHash(id, &object_id);
   uint64_t nbytes = 0;
   while (nbytes < size) {
-    uint64_t batch_size = std::min(size - nbytes,
-                                   static_cast<uint64_t>(max_object_size_));
+    const uint64_t batch_size =
+        std::min(size - nbytes, static_cast<uint64_t>(max_object_size_));
     cvmfs::MsgReadReq msg_read;
     msg_read.set_session_id(session_id_);
     msg_read.set_req_id(NextRequestId());
@@ -631,7 +631,7 @@ int64_t ExternalCacheManager::Pread(int fd,
 
 
 int ExternalCacheManager::Readahead(int fd) {
-  shash::Any id = GetHandle(fd);
+  const shash::Any id = GetHandle(fd);
   if (id == kInvalidHandle)
     return -EBADF;
   // No-op
@@ -683,8 +683,8 @@ manifest::Breadcrumb ExternalCacheManager::LoadBreadcrumb(
   if (msg_reply->status() == cvmfs::STATUS_OK) {
     assert(msg_reply->has_breadcrumb());
     assert(msg_reply->breadcrumb().fqrn() == fqrn);
-    bool rv = transport_.ParseMsgHash(msg_reply->breadcrumb().hash(),
-                                      &breadcrumb.catalog_hash);
+    const bool rv = transport_.ParseMsgHash(msg_reply->breadcrumb().hash(),
+                                            &breadcrumb.catalog_hash);
     assert(rv);
     breadcrumb.catalog_hash.suffix = shash::kSuffixCatalog;
     breadcrumb.timestamp = msg_reply->breadcrumb().timestamp();
@@ -724,7 +724,7 @@ bool ExternalCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
 
 
 void ExternalCacheManager::Spawn() {
-  int retval = pthread_create(&thread_read_, NULL, MainRead, this);
+  const int retval = pthread_create(&thread_read_, NULL, MainRead, this);
   assert(retval == 0);
   spawned_ = true;
 }
@@ -743,8 +743,8 @@ bool ExternalCacheManager::SpawnPlugin(const vector<string> &cmd_line) {
   set<int> preserve_filedes;
   preserve_filedes.insert(pipe_ready[1]);
 
-  int fd_null_read = open("/dev/null", O_RDONLY);
-  int fd_null_write = open("/dev/null", O_WRONLY);
+  const int fd_null_read = open("/dev/null", O_RDONLY);
+  const int fd_null_write = open("/dev/null", O_WRONLY);
   assert((fd_null_read >= 0) && (fd_null_write >= 0));
   map<int, int> map_fildes;
   map_fildes[fd_null_read] = 0;
@@ -833,7 +833,7 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       bool do_commit = false;
       if (transaction->expected_size != kSizeUnknown)
         do_commit = (transaction->size + written) == transaction->expected_size;
-      int retval = Flush(do_commit, transaction);
+      const int retval = Flush(do_commit, transaction);
       if (retval != 0) {
         transaction->size += written;
         return retval;
@@ -841,9 +841,9 @@ int64_t ExternalCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       transaction->size += transaction->buf_pos;
       transaction->buf_pos = 0;
     }
-    uint64_t remaining = size - written;
-    uint64_t space_in_buffer = max_object_size_ - transaction->buf_pos;
-    uint64_t batch_size = std::min(remaining, space_in_buffer);
+    const uint64_t remaining = size - written;
+    const uint64_t space_in_buffer = max_object_size_ - transaction->buf_pos;
+    const uint64_t batch_size = std::min(remaining, space_in_buffer);
     memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
     transaction->buf_pos += batch_size;
     written += batch_size;
@@ -936,7 +936,7 @@ int ExternalQuotaManager::GetInfo(QuotaInfo *quota_info) {
 
 uint64_t ExternalQuotaManager::GetCapacity() {
   QuotaInfo info;
-  int retval = GetInfo(&info);
+  const int retval = GetInfo(&info);
   if (retval != 0)
     return uint64_t(-1);
   return info.size;
@@ -945,7 +945,7 @@ uint64_t ExternalQuotaManager::GetCapacity() {
 
 uint64_t ExternalQuotaManager::GetCleanupRate(uint64_t period_s) {
   QuotaInfo info;
-  int retval = GetInfo(&info);
+  const int retval = GetInfo(&info);
   if (retval != 0)
     return 0;
   return info.no_shrink;
@@ -954,7 +954,7 @@ uint64_t ExternalQuotaManager::GetCleanupRate(uint64_t period_s) {
 
 uint64_t ExternalQuotaManager::GetSize() {
   QuotaInfo info;
-  int retval = GetInfo(&info);
+  const int retval = GetInfo(&info);
   if (retval != 0)
     return 0;
   return info.used;
@@ -963,7 +963,7 @@ uint64_t ExternalQuotaManager::GetSize() {
 
 uint64_t ExternalQuotaManager::GetSizePinned() {
   QuotaInfo info;
-  int retval = GetInfo(&info);
+  const int retval = GetInfo(&info);
   if (retval != 0)
     return 0;
   return info.pinned;
@@ -991,7 +991,7 @@ bool ExternalQuotaManager::HasCapability(Capabilities capability) {
 vector<string> ExternalQuotaManager::List() {
   vector<string> result;
   vector<cvmfs::MsgListRecord> raw_list;
-  bool retval = DoListing(cvmfs::OBJECT_REGULAR, &raw_list);
+  const bool retval = DoListing(cvmfs::OBJECT_REGULAR, &raw_list);
   if (!retval)
     return result;
   for (unsigned i = 0; i < raw_list.size(); ++i)
@@ -1003,7 +1003,7 @@ vector<string> ExternalQuotaManager::List() {
 vector<string> ExternalQuotaManager::ListCatalogs() {
   vector<string> result;
   vector<cvmfs::MsgListRecord> raw_list;
-  bool retval = DoListing(cvmfs::OBJECT_CATALOG, &raw_list);
+  const bool retval = DoListing(cvmfs::OBJECT_CATALOG, &raw_list);
   if (!retval)
     return result;
   for (unsigned i = 0; i < raw_list.size(); ++i)
@@ -1037,7 +1037,7 @@ vector<string> ExternalQuotaManager::ListPinned() {
 vector<string> ExternalQuotaManager::ListVolatile() {
   vector<string> result;
   vector<cvmfs::MsgListRecord> raw_list;
-  bool retval = DoListing(cvmfs::OBJECT_VOLATILE, &raw_list);
+  const bool retval = DoListing(cvmfs::OBJECT_VOLATILE, &raw_list);
   if (!retval)
     return result;
   for (unsigned i = 0; i < raw_list.size(); ++i)
@@ -1048,7 +1048,7 @@ vector<string> ExternalQuotaManager::ListVolatile() {
 
 void ExternalQuotaManager::RegisterBackChannel(int back_channel[2],
                                                const string &channel_id) {
-  shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
+  const shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
   MakePipe(back_channel);
   LockBackChannels();
   assert(back_channels_.find(hash_id) == back_channels_.end());
@@ -1059,7 +1059,7 @@ void ExternalQuotaManager::RegisterBackChannel(int back_channel[2],
 
 void ExternalQuotaManager::UnregisterBackChannel(int back_channel[2],
                                                  const string &channel_id) {
-  shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
+  const shash::Md5 hash_id = shash::Md5(shash::AsciiPtr(channel_id));
   LockBackChannels();
   back_channels_.erase(hash_id);
   UnlockBackChannels();

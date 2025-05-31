@@ -45,7 +45,7 @@ void PathStore::CopyFrom(const PathStore &other) {
   map_ = other.map_;
 
   string_heap_ = new StringHeap(other.string_heap_->used());
-  shash::Md5 empty_path = map_.empty_key();
+  const shash::Md5 empty_path = map_.empty_key();
   for (unsigned i = 0; i < map_.capacity(); ++i) {
     if (map_.keys()[i] != empty_path) {
       (map_.values() + i)->name = string_heap_->AddString(
@@ -60,7 +60,7 @@ void PathStore::CopyFrom(const PathStore &other) {
 
 void InodeTracker::InitLock() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -168,7 +168,7 @@ void DentryTracker::SpawnCleaner(unsigned interval_s) {
   if (cleaning_interval_ms_ == 0)
     cleaning_interval_ms_ = -1;
   MakePipe(pipe_terminate_);
-  int retval = pthread_create(&thread_cleaner_, NULL, MainCleaner, this);
+  const int retval = pthread_create(&thread_cleaner_, NULL, MainCleaner, this);
   assert(retval == 0);
 }
 
@@ -185,11 +185,11 @@ void *DentryTracker::MainCleaner(void *data) {
   uint64_t deadline = platform_monotonic_time() + timeout_ms / 1000;
   while (true) {
     watch_term.revents = 0;
-    int retval = poll(&watch_term, 1, timeout_ms);
+    const int retval = poll(&watch_term, 1, timeout_ms);
     if (retval < 0) {
       if (errno == EINTR) {
         if (timeout_ms >= 0) {
-          uint64_t now = platform_monotonic_time();
+          const uint64_t now = platform_monotonic_time();
           timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000;
         }
         continue;
@@ -219,7 +219,7 @@ void *DentryTracker::MainCleaner(void *data) {
 
 void DentryTracker::InitLock() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -281,7 +281,7 @@ PageCacheTracker &PageCacheTracker::operator=(const PageCacheTracker &other) {
   if (&other == this)
     return *this;
 
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   CopyFrom(other);
   return *this;
 }
@@ -302,7 +302,7 @@ void PageCacheTracker::CopyFrom(const PageCacheTracker &other) {
 
 void PageCacheTracker::InitLock() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -322,10 +322,10 @@ PageCacheTracker::OpenDirectives PageCacheTracker::Open(
           info.st_size);
   }
 
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
 
   Entry entry;
-  bool retval = map_.Lookup(inode, &entry);
+  const bool retval = map_.Lookup(inode, &entry);
   if (!retval) {
     open_directives.keep_cache = true;
     open_directives.direct_io = false;
@@ -389,7 +389,7 @@ PageCacheTracker::OpenDirectives PageCacheTracker::OpenDirect() {
   if (!is_active_)
     return open_directives;
 
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   statistics_.n_open_direct++;
   return open_directives;
 }
@@ -398,7 +398,7 @@ void PageCacheTracker::Close(uint64_t inode) {
   if (!is_active_)
     return;
 
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   Entry entry;
   bool retval = map_.Lookup(inode, &entry);
 
@@ -429,7 +429,7 @@ void PageCacheTracker::Close(uint64_t inode) {
             "  -  open counter %d  -  hash %s",
             inode, old_open, entry.hash.ToString().c_str());
     }
-    uint64_t inode_update = stat_store_.Erase(entry.idx_stat);
+    const uint64_t inode_update = stat_store_.Erase(entry.idx_stat);
     Entry entry_update;
     retval = map_.Lookup(inode_update, &entry_update);
     if (!retval) {
@@ -447,12 +447,12 @@ void PageCacheTracker::Close(uint64_t inode) {
 }
 
 PageCacheTracker::EvictRaii::EvictRaii(PageCacheTracker *t) : tracker_(t) {
-  int retval = pthread_mutex_lock(tracker_->lock_);
+  const int retval = pthread_mutex_lock(tracker_->lock_);
   assert(retval == 0);
 }
 
 PageCacheTracker::EvictRaii::~EvictRaii() {
-  int retval = pthread_mutex_unlock(tracker_->lock_);
+  const int retval = pthread_mutex_unlock(tracker_->lock_);
   assert(retval == 0);
 }
 
@@ -460,7 +460,7 @@ void PageCacheTracker::EvictRaii::Evict(uint64_t inode) {
   if (!tracker_->is_active_)
     return;
 
-  bool contained_inode = tracker_->map_.Erase(inode);
+  const bool contained_inode = tracker_->map_.Erase(inode);
   if (contained_inode)
     tracker_->statistics_.n_remove++;
 }

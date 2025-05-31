@@ -4,7 +4,7 @@ on:
     paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', '**.cmake']
   push:
     branches: [devel, cvmfs*]
-    paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', '**.cmake']
+#  paths: ['**.c', '**.cpp', '**.h', '**.hpp', '**.cxx', '**.hxx', '**.cc', '**.hh', '**CMakeLists.txt', '**.cmake']
 
 jobs:
   cpp-linter:
@@ -13,7 +13,7 @@ jobs:
       - name: Set Clang version
         shell: bash
         run: |
-          echo "CLANG_VERSION=18" >> $GITHUB_ENV
+          echo "CLANG_VERSION=19" >> $GITHUB_ENV
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -51,6 +51,9 @@ jobs:
       - name: Generate compilation database
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cd ./build
+          make cache.pb.generated
+          cd ..
       - uses: actions/cache/save@v4
         if: steps.cache-externals-restore.outputs.cache-hit != 'true'
         id: cache-externals-save
@@ -68,7 +71,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "::add-matcher::.github/scripts/clang_matcher.json" 
-          git diff -U0  HEAD~ HEAD | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  -path ./build -p1 | tee clang-tidy.out
+          git diff -U0  HEAD~ HEAD | /usr/lib/llvm-${{ env.CLANG_VERSION }}/share/clang/clang-tidy-diff.py \
+               -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  \
+                -path ./build -p1 \
+                -extra-arg=-I${PWD}/build/cvmfs  \
+                | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash
       - name: Generate Summary

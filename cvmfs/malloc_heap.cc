@@ -16,8 +16,8 @@ using namespace std;  // NOLINT
 void *MallocHeap::Allocate(uint64_t size, void *header, unsigned header_size) {
   assert(size > 0);
   assert(header_size <= size);
-  uint64_t rounded_size = RoundUp8(size);
-  int64_t real_size = rounded_size + sizeof(Tag);
+  const uint64_t rounded_size = RoundUp8(size);
+  const int64_t real_size = rounded_size + sizeof(Tag);
   if (gauge_ + real_size > capacity_)
     return NULL;
 
@@ -51,7 +51,7 @@ void MallocHeap::Compact() {
       } else {
         // Free block followed by a reserved block, move memory and create a
         // new free tag at the end of the moved block
-        int64_t free_space = current_tag->size;
+        const int64_t free_space = current_tag->size;
         current_tag->size = next_tag->size;
         memmove(current_tag->GetBlock(), next_tag->GetBlock(),
                 next_tag->GetSize());
@@ -73,7 +73,7 @@ void MallocHeap::Compact() {
 
 
 void *MallocHeap::Expand(void *block, uint64_t new_size) {
-  uint64_t old_size = GetSize(block);
+  const uint64_t old_size = GetSize(block);
   assert(old_size <= new_size);
   void *new_block = Allocate(new_size, block, old_size);
   if (new_block != NULL)

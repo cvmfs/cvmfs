@@ -83,7 +83,7 @@ const char gCernIt5PublicKey
 static char CheckParameters(const string &params,
                             swissknife::ArgumentList *args) {
   for (unsigned i = 0; i < params.length(); ++i) {
-    char param = params[i];
+    const char param = params[i];
     if (args->find(param) == args->end()) {
       return param;
     }
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
   swissknife::ArgumentList args;
   args['n'].Reset(new string("4"));
 
-  string option_string = "u:r:k:m:x:d:n:t:a:vh";
+  const string option_string = "u:r:k:m:x:d:n:t:a:vh";
   int c;
   while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
     if ((c == 'v') || (c == 'h')) {
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
   }
 
   // check all mandatory parameters are included
-  string necessary_params = "ur";
+  const string necessary_params = "ur";
   char result;
   if ((result = CheckParameters(necessary_params, &args)) != '\0') {
     printf("Argument not included but necessary: -%c\n\n", result);
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (args.find('m') == args.end()) {
-    string fqrn = GetFileName(*args['u']);
+    const string fqrn = GetFileName(*args['u']);
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: guessing fqrn from URL: %s",
              fqrn.c_str());
     args['m'].Reset(new string(fqrn));
@@ -170,10 +170,10 @@ int main(int argc, char *argv[]) {
 
   // if there is no specified public key file we dump the cern.ch public key in
   // the temporary directory
-  string cern_pk_base_path = *args['x'];
-  string cern_pk_it1_path = cern_pk_base_path + "/cern-it1.cern.ch.pub";
-  string cern_pk_it4_path = cern_pk_base_path + "/cern-it4.cern.ch.pub";
-  string cern_pk_it5_path = cern_pk_base_path + "/cern-it5.cern.ch.pub";
+  const string cern_pk_base_path = *args['x'];
+  const string cern_pk_it1_path = cern_pk_base_path + "/cern-it1.cern.ch.pub";
+  const string cern_pk_it4_path = cern_pk_base_path + "/cern-it4.cern.ch.pub";
+  const string cern_pk_it5_path = cern_pk_base_path + "/cern-it5.cern.ch.pub";
   bool keys_created = false;
   if (args.find('k') == args.end()) {
     keys_created = true;
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
     assert(
         CopyMem2Path(reinterpret_cast<const unsigned char *>(gCernIt5PublicKey),
                      sizeof(gCernIt5PublicKey), cern_pk_it5_path));
-    char path_separator = ':';
+    const char path_separator = ':';
     args['k'].Reset(new string(cern_pk_it1_path + path_separator
                                + cern_pk_it4_path + path_separator
                                + cern_pk_it5_path));

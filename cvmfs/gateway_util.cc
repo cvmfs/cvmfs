@@ -28,7 +28,7 @@ int APIVersion() { return 2; }
 GatewayKey ReadGatewayKey(const std::string &key_file_name) {
   std::string id;
   std::string secret;
-  bool retval = ReadKeys(key_file_name, &id, &secret);
+  const bool retval = ReadKeys(key_file_name, &id, &secret);
   if (!retval)
     return GatewayKey();
   return GatewayKey(id, secret);
@@ -40,7 +40,7 @@ bool ReadKeys(const std::string &key_file_name, std::string *key_id,
     return false;
   }
 
-  int key_file_fd = open(key_file_name.c_str(), O_RDONLY);
+  const int key_file_fd = open(key_file_name.c_str(), O_RDONLY);
   if (!key_file_fd) {
     return false;
   }
@@ -58,7 +58,7 @@ bool ReadKeys(const std::string &key_file_name, std::string *key_id,
 
 bool ParseKey(const std::string &body, std::string *key_id,
               std::string *secret) {
-  std::string line = GetLineMem(body.data(), body.size());
+  const std::string line = GetLineMem(body.data(), body.size());
   std::string l = Trim(ReplaceAll(line, "\t", " "));
   l.erase(std::unique(l.begin(), l.end(), BothAreSpaces), l.end());
   std::vector<std::string> tokens = SplitString(l, ' ');

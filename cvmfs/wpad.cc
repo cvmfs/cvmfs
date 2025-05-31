@@ -29,7 +29,7 @@ const char *kAutoPacLocation = "http://wpad/wpad.dat";
 static int PrintPacError(const char *fmt, va_list argp) {
   char *msg = NULL;
 
-  int retval = vasprintf(&msg, fmt, argp);
+  const int retval = vasprintf(&msg, fmt, argp);
   assert(retval != -1);  // else: out of memory
 
   LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "(pacparser) %s", msg);
@@ -40,7 +40,7 @@ static int PrintPacError(const char *fmt, va_list argp) {
 
 static string PacProxy2Cvmfs(const string &pac_proxy,
                              const bool report_errors) {
-  int log_flags = report_errors ? kLogDebug | kLogSyslogWarn : kLogDebug;
+  const int log_flags = report_errors ? kLogDebug | kLogSyslogWarn : kLogDebug;
   if (pac_proxy == "")
     return "DIRECT";
 
@@ -104,11 +104,12 @@ static bool ParsePac(const char *pac_data, const size_t size,
   unsigned current_host;
   download_manager->GetHostInfo(&host_list, &rtt, &current_host);
   for (unsigned i = 0; i < host_list.size(); ++i) {
-    size_t hostname_begin = 7;  // Strip http:// or file://
-    size_t hostname_end = host_list[i].find_first_of(":/", hostname_begin);
-    size_t hostname_len = (hostname_end == string::npos)
-                              ? string::npos
-                              : hostname_end - hostname_begin;
+    const size_t hostname_begin = 7; // Strip http:// or file://
+    const size_t hostname_end =
+        host_list[i].find_first_of(":/", hostname_begin);
+    const size_t hostname_len = (hostname_end == string::npos)
+                                    ? string::npos
+                                    : hostname_end - hostname_begin;
     const string hostname = (hostname_begin > host_list[i].length())
                                 ? "localhost"
                                 : host_list[i].substr(hostname_begin,
@@ -226,9 +227,9 @@ string ResolveProxyDescription(const string &cvmfs_proxies,
   if (!path_fallback_cache.empty()) {
     if (empty_auto != -1) {
       string cached_proxies;
-      int fd = open(path_fallback_cache.c_str(), O_RDONLY);
+      const int fd = open(path_fallback_cache.c_str(), O_RDONLY);
       if (fd >= 0) {
-        bool retval = SafeReadToString(fd, &cached_proxies);
+        const bool retval = SafeReadToString(fd, &cached_proxies);
         close(fd);
         if (retval) {
           LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
@@ -238,8 +239,8 @@ string ResolveProxyDescription(const string &cvmfs_proxies,
         }
       }
     } else {
-      bool retval = SafeWriteToFile(discovered_proxies, path_fallback_cache,
-                                    0660);
+      const bool retval =
+          SafeWriteToFile(discovered_proxies, path_fallback_cache, 0660);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
                  "failed to write proxy settings into %s",
@@ -271,14 +272,14 @@ int MainResolveProxyDescription(int argc, char **argv) {
     return 1;
   }
   perf::Statistics statistics;
-  string proxy_configuration = argv[2];
-  string host_list = argv[3];
+  const string proxy_configuration = argv[2];
+  const string host_list = argv[3];
 
   DownloadManager download_manager(
       1, perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
-  string resolved_proxies = ResolveProxyDescription(proxy_configuration, "",
-                                                    &download_manager);
+  const string resolved_proxies =
+      ResolveProxyDescription(proxy_configuration, "", &download_manager);
 
   LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
   return resolved_proxies == "";

@@ -93,7 +93,7 @@ std::vector<int> *fd_to_ = NULL;
 }  // anonymous namespace
 
 static void ApplyFdMap(VfsRdOnlyFile *pFile) {
-  unsigned N = fd_from_->size();
+  const unsigned N = fd_from_->size();
   for (unsigned i = 0; i < N; ++i) {
     if (pFile->fd == (*fd_from_)[i]) {
       LogCvmfs(kLogSql, kLogDebug, "map fd %d --> %d", (*fd_from_)[i],
@@ -110,7 +110,7 @@ static void ApplyFdMap(VfsRdOnlyFile *pFile) {
 static int VfsRdOnlyClose(sqlite3_file *pFile) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
   ApplyFdMap(p);
-  int retval = p->vfs_rdonly->cache_mgr->Close(p->fd);
+  const int retval = p->vfs_rdonly->cache_mgr->Close(p->fd);
   if (retval == 0) {
     perf::Dec(p->vfs_rdonly->no_open);
     return SQLITE_OK;
@@ -129,7 +129,7 @@ static int VfsRdOnlyRead(sqlite3_file *pFile,
                          sqlite_int64 iOfst) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
   ApplyFdMap(p);
-  ssize_t got = p->vfs_rdonly->cache_mgr->Pread(p->fd, zBuf, iAmt, iOfst);
+  const ssize_t got = p->vfs_rdonly->cache_mgr->Pread(p->fd, zBuf, iAmt, iOfst);
   perf::Inc(p->vfs_rdonly->n_read);
   if (got == iAmt) {
     perf::Xadd(p->vfs_rdonly->sz_read, iAmt);
@@ -257,7 +257,7 @@ static int VfsRdOnlyOpen(sqlite3_vfs *vfs,
   p->fd = String2Int64(string(&zName[1]));
   if (p->fd < 0)
     return SQLITE_IOERR;
-  int64_t size = cache_mgr->GetSize(p->fd);
+  const int64_t size = cache_mgr->GetSize(p->fd);
   if (size < 0) {
     cache_mgr->Close(p->fd);
     p->fd = -1;
@@ -389,7 +389,7 @@ static int VfsRdOnlyCurrentTimeInt64(sqlite3_vfs *vfs, sqlite3_int64 *piNow) {
  */
 static int VfsRdOnlyCurrentTime(sqlite3_vfs *vfs, double *prNow) {
   sqlite3_int64 i = 0;
-  int rc = VfsRdOnlyCurrentTimeInt64(vfs, &i);
+  const int rc = VfsRdOnlyCurrentTimeInt64(vfs, &i);
   *prNow = i / 86400000.0;
   return rc;
 }
@@ -439,7 +439,7 @@ bool RegisterVfsRdOnly(CacheManager *cache_mgr,
   vfs->xCurrentTimeInt64 = VfsRdOnlyCurrentTimeInt64;
   assert(vfs->zName);
 
-  int retval = sqlite3_vfs_register(vfs, options == kVfsOptDefault);
+  const int retval = sqlite3_vfs_register(vfs, options == kVfsOptDefault);
   if (retval != SQLITE_OK) {
     free(const_cast<char *>(vfs->zName));
     delete vfs_rdonly;
@@ -479,7 +479,7 @@ bool UnregisterVfsRdOnly() {
   sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName);
   if (vfs == NULL)
     return false;
-  int retval = sqlite3_vfs_unregister(vfs);
+  const int retval = sqlite3_vfs_unregister(vfs);
   if (retval != SQLITE_OK)
     return false;
 

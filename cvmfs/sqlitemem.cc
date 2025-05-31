@@ -22,7 +22,7 @@ using namespace std;  // NOLINT
 
 void *SqliteMemoryManager::LookasideBufferArena::GetBuffer() {
   for (unsigned i = 0; i < kNoBitmaps; ++i) {
-    int bit_set = ffs(freemap_[i]);
+    const int bit_set = ffs(freemap_[i]);
     if (bit_set != 0) {
       freemap_[i] &= ~(1 << (bit_set - 1));  // set bit to zero
       const int nbuffer = i * sizeof(int) * 8 + bit_set - 1;
@@ -65,9 +65,9 @@ SqliteMemoryManager::LookasideBufferArena::~LookasideBufferArena() {
 
 void SqliteMemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
   assert(buffer >= arena_);
-  ptrdiff_t nbuffer = (reinterpret_cast<char *>(buffer)
-                       - reinterpret_cast<char *>(arena_))
-                      / kBufferSize;
+  const ptrdiff_t nbuffer =
+      (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_)) /
+      kBufferSize;
   assert(static_cast<uint64_t>(nbuffer) < kBuffersPerArena);
   const int nfreemap = nbuffer / (sizeof(int) * 8);
   freemap_[nfreemap] |= 1 << (nbuffer % (sizeof(int) * 8));
@@ -98,7 +98,7 @@ void SqliteMemoryManager::xFree(void *ptr) { instance_->PutMemory(ptr); }
  * Sqlite ensures that ptr != NULL and new_size > 0.
  */
 void *SqliteMemoryManager::xRealloc(void *ptr, int new_size) {
-  int old_size = xSize(ptr);
+  const int old_size = xSize(ptr);
   if (old_size >= new_size)
     return ptr;
 
@@ -151,12 +151,13 @@ void SqliteMemoryManager::AssignGlobalArenas() {
  * location of the buffer.
  */
 void *SqliteMemoryManager::AssignLookasideBuffer(sqlite3 *db) {
-  MutexLockGuard lock_guard(lock_);
+  const MutexLockGuard lock_guard(lock_);
 
   void *buffer = GetLookasideBuffer();
   assert(buffer != NULL);
-  int retval = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, buffer,
-                                 kLookasideSlotSize, kLookasideSlotsPerDb);
+  const int retval =
+      sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, buffer,
+                        kLookasideSlotSize, kLookasideSlotsPerDb);
   assert(retval == SQLITE_OK);
   return buffer;
 }
@@ -175,8 +176,8 @@ void *SqliteMemoryManager::GetLookasideBuffer() {
   void *result;
   vector<LookasideBufferArena *>::reverse_iterator
       reverse_iter = lookaside_buffer_arenas_.rbegin();
-  vector<LookasideBufferArena *>::reverse_iterator
-      i_rend = lookaside_buffer_arenas_.rend();
+  const vector<LookasideBufferArena *>::reverse_iterator i_rend =
+      lookaside_buffer_arenas_.rend();
   for (; reverse_iter != i_rend; ++reverse_iter) {
     result = (*reverse_iter)->GetBuffer();
     if (result != NULL)
@@ -201,7 +202,7 @@ void *SqliteMemoryManager::GetMemory(int size) {
   void *p = malloc_arenas_[idx_last_arena_]->Malloc(size);
   if (p != NULL)
     return p;
-  unsigned N = malloc_arenas_.size();
+  const unsigned N = malloc_arenas_.size();
   for (unsigned i = 0; i < N; ++i) {
     p = malloc_arenas_[i]->Malloc(size);
     if (p != NULL) {
@@ -223,7 +224,7 @@ SqliteMemoryManager::SqliteMemoryManager()
     , page_cache_memory_(sxmmap(kPageCacheSize))
     , idx_last_arena_(0) {
   memset(&sqlite3_mem_vanilla_, 0, sizeof(sqlite3_mem_vanilla_));
-  int retval = pthread_mutex_init(&lock_, NULL);
+  const int retval = pthread_mutex_init(&lock_, NULL);
   assert(retval == 0);
 
   lookaside_buffer_arenas_.push_back(new LookasideBufferArena());
@@ -269,7 +270,7 @@ SqliteMemoryManager::~SqliteMemoryManager() {
  * arrives.  Hence there is no fragmentation.
  */
 void SqliteMemoryManager::PutLookasideBuffer(void *buffer) {
-  unsigned N = lookaside_buffer_arenas_.size();
+  const unsigned N = lookaside_buffer_arenas_.size();
   for (unsigned i = 0; i < N; ++i) {
     if (lookaside_buffer_arenas_[i]->Contains(buffer)) {
       lookaside_buffer_arenas_[i]->PutBuffer(buffer);
@@ -290,7 +291,7 @@ void SqliteMemoryManager::PutLookasideBuffer(void *buffer) {
 void SqliteMemoryManager::PutMemory(void *ptr) {
   MallocArena *M = MallocArena::GetMallocArena(ptr, kArenaSize);
   M->Free(ptr);
-  unsigned N = malloc_arenas_.size();
+  const unsigned N = malloc_arenas_.size();
   if ((N > 1) && M->IsEmpty()) {
     for (unsigned i = 0; i < N; ++i) {
       if (malloc_arenas_[i] == M) {
@@ -309,6 +310,6 @@ void SqliteMemoryManager::PutMemory(void *ptr) {
  * To be used after an sqlite database has been closed.
  */
 void SqliteMemoryManager::ReleaseLookasideBuffer(void *buffer) {
-  MutexLockGuard lock_guard(lock_);
+  const MutexLockGuard lock_guard(lock_);
   PutLookasideBuffer(buffer);
 }

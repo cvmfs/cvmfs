@@ -105,7 +105,7 @@ void ObjectPack::AddToBucket(const void *buf, const uint64_t size,
 ObjectPack::BucketHandle ObjectPack::NewBucket() {
   BucketHandle handle = new Bucket();
 
-  MutexLockGuard mutex_guard(lock_);
+  const MutexLockGuard mutex_guard(lock_);
   open_buckets_.insert(handle);
   return handle;
 }
@@ -124,7 +124,7 @@ bool ObjectPack::CommitBucket(const BucketContentType type,
     handle->name = name;
   }
 
-  MutexLockGuard mutex_guard(lock_);
+  const MutexLockGuard mutex_guard(lock_);
   if (buckets_.size() >= kMaxObjects)
     return false;
   if (size_ + handle->size > limit_)
@@ -136,14 +136,14 @@ bool ObjectPack::CommitBucket(const BucketContentType type,
 }
 
 void ObjectPack::DiscardBucket(const BucketHandle handle) {
-  MutexLockGuard mutex_guard(lock_);
+  const MutexLockGuard mutex_guard(lock_);
   open_buckets_.erase(handle);
   delete handle;
 }
 
 void ObjectPack::InitLock() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -153,7 +153,7 @@ void ObjectPack::InitLock() {
  */
 void ObjectPack::TransferBucket(const ObjectPack::BucketHandle handle,
                                 ObjectPack *other) {
-  MutexLockGuard mutex_guard(lock_);
+  const MutexLockGuard mutex_guard(lock_);
   open_buckets_.erase(handle);
   other->open_buckets_.insert(handle);
 }
@@ -185,7 +185,7 @@ void ObjectPackProducer::GetDigest(shash::Any *hash) {
 
 ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
     : pack_(pack), big_file_(NULL), pos_(0), idx_(0), pos_in_bucket_(0) {
-  unsigned N = pack->GetNoObjects();
+  const unsigned N = pack->GetNoObjects();
   // rough guess, most likely a little too much
   header_.reserve(30 + N * (2 * shash::kMaxDigestSize + 5));
 
@@ -200,10 +200,10 @@ ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
 ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file,
                                        const std::string &file_name)
     : pack_(NULL), big_file_(big_file), pos_(0), idx_(0), pos_in_bucket_(0) {
-  int fd = fileno(big_file_);
+  const int fd = fileno(big_file_);
   assert(fd >= 0);
   platform_stat64 info;
-  int retval = platform_fstat(fd, &info);
+  const int retval = platform_fstat(fd, &info);
   assert(retval == 0);
 
   InitializeHeader(2, 1, info.st_size, &header_);
@@ -235,7 +235,8 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
   unsigned nbytes_payload = 0;
 
   if (big_file_) {
-    size_t nbytes = fread(buf + nbytes_header, 1, remaining_in_buf, big_file_);
+    const size_t nbytes =
+        fread(buf + nbytes_header, 1, remaining_in_buf, big_file_);
     nbytes_payload = nbytes;
     pos_ += nbytes_payload;
   } else if (idx_ < pack_->GetNoObjects()) {
@@ -317,7 +318,7 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
       state_ = ObjectPackBuild::kStateCorrupt;
       return state_;
     } else {
-      bool retval = ParseHeader();
+      const bool retval = ParseHeader();
       if (!retval) {
         state_ = ObjectPackBuild::kStateBadFormat;
         return state_;
@@ -333,7 +334,7 @@ ObjectPackBuild::State ObjectPackConsumer::ConsumeNext(
     }
   }
 
-  unsigned remaining_in_buf = buf_size - nbytes_header;
+  const unsigned remaining_in_buf = buf_size - nbytes_header;
   const unsigned char *payload = buf + nbytes_header;
   return ConsumePayload(remaining_in_buf, payload);
 }
@@ -406,7 +407,7 @@ bool ObjectPackConsumer::ParseHeader() {
   if (header['V'] != "2")
     return false;
   size_ = String2Uint64(header['S']);
-  unsigned nobjects = String2Uint64(header['N']);
+  const unsigned nobjects = String2Uint64(header['N']);
 
   if (nobjects == 0)
     return true;
@@ -422,8 +423,8 @@ bool ObjectPackConsumer::ParseHeader() {
   uint64_t sum_size = 0;
   do {
     const unsigned remaining_in_header = raw_header_.size() - index_idx;
-    string line = GetLineMem(raw_header_.data() + index_idx,
-                             remaining_in_header);
+    const string line =
+        GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
     if (line == "")
       break;
 
@@ -456,13 +457,13 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
       return false;
     }
 
-    uint64_t size = String2Uint64(line.substr(separator + 1));
+    const uint64_t size = String2Uint64(line.substr(separator + 1));
     *sum_size += size;
 
     // Warning do not construct a HexPtr with an rvalue!
     // The constructor takes the address of its argument.
     const std::string hash_string = line.substr(2, separator - 2);
-    shash::HexPtr hex_ptr(hash_string);
+    const shash::HexPtr hex_ptr(hash_string);
 
     entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
     entry->size = size;
@@ -484,8 +485,8 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
       return false;
     }
 
-    uint64_t size = String2Uint64(
-        line.substr(separator1 + 1, separator2 - separator1 - 1));
+    const uint64_t size =
+        String2Uint64(line.substr(separator1 + 1, separator2 - separator1 - 1));
 
     std::string name;
     if (!Debase64(line.substr(separator2 + 1), &name)) {
@@ -497,7 +498,7 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
     // Warning do not construct a HexPtr with an rvalue!
     // The constructor takes the address of its argument.
     const std::string hash_string = line.substr(2, separator1 - 2);
-    shash::HexPtr hex_ptr(hash_string);
+    const shash::HexPtr hex_ptr(hash_string);
 
     entry->id = shash::MkFromSuffixedHexPtr(hex_ptr);
     entry->size = size;

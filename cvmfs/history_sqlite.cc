@@ -312,7 +312,7 @@ bool SqliteHistory::PruneBranches() {
     retval = sql_remaining_rows.FetchRow();
     if (!retval)
       return false;
-    int64_t count = sql_remaining_rows.RetrieveInt64(0);
+    const int64_t count = sql_remaining_rows.RetrieveInt64(0);
     assert(count >= 0);
     if (count == 0)
       break;

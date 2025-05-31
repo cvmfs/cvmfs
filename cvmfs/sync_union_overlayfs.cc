@@ -33,9 +33,10 @@ bool SyncUnionOverlayfs::Initialize() {
 }
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  /*const*/ cap_value_t cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
-                                              // expects a non-const pointer
-                                              // on RHEL 5 and older
+  /*const*/ const cap_value_t cap =
+      CAP_SYS_ADMIN; // is non-const as cap_set_flag()
+                     // expects a non-const pointer
+                     // on RHEL 5 and older
 
 // do sanity-check if supported in <sys/capability.h> otherwise just pray...
 // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
@@ -194,7 +195,7 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
   // Allocate enough space for compare_len and terminating null
   buf = static_cast<char *>(alloca(compare_len + 1));
 
-  ssize_t len = ::readlink(path.c_str(), buf, compare_len);
+  const ssize_t len = ::readlink(path.c_str(), buf, compare_len);
   if (len != -1) {
     buf[len] = '\0';
     // have link, return true if it is equal to compare_value
@@ -219,12 +220,12 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
 bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
-  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  const UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
   assert(xattrs.IsValid());
 
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i = attrs.begin();
-  std::vector<std::string>::const_iterator iend = attrs.end();
+  const std::vector<std::string>::const_iterator iend = attrs.end();
   LogCvmfs(kLogCvmfs, kLogDebug, "Attrs:");
   for (; i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
@@ -241,20 +242,20 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
    * 3. whiteouts are marked as .wh. (as in aufs)
    */
 
-  bool is_chardev_whiteout = entry->IsCharacterDevice()
-                             && entry->GetRdevMajor() == 0
-                             && entry->GetRdevMinor() == 0;
+  const bool is_chardev_whiteout = entry->IsCharacterDevice() &&
+                                   entry->GetRdevMajor() == 0 &&
+                                   entry->GetRdevMinor() == 0;
   if (is_chardev_whiteout)
     return true;
 
-  std::string whiteout_prefix_ = ".wh.";
-  bool has_wh_prefix = HasPrefix(entry->filename().c_str(), whiteout_prefix_,
-                                 true);
+  const std::string whiteout_prefix_ = ".wh.";
+  const bool has_wh_prefix =
+      HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
   if (has_wh_prefix)
     return true;
 
-  bool is_symlink_whiteout = entry->IsSymlink()
-                             && IsWhiteoutSymlinkPath(entry->GetScratchPath());
+  const bool is_symlink_whiteout =
+      entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
   if (is_symlink_whiteout)
     return true;
 
@@ -282,7 +283,7 @@ bool SyncUnionOverlayfs::IsOpaqueDirectory(
 }
 
 bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
-  bool is_opaque = HasXattr(path.c_str(), "trusted.overlay.opaque");
+  const bool is_opaque = HasXattr(path.c_str(), "trusted.overlay.opaque");
   if (is_opaque) {
     LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] has opaque xattr",
              path.c_str());
@@ -292,7 +293,7 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 
 string SyncUnionOverlayfs::UnwindWhiteoutFilename(
     SharedPtr<SyncItem> entry) const {
-  std::string whiteout_prefix_ = ".wh.";
+  const std::string whiteout_prefix_ = ".wh.";
 
   if (HasPrefix(entry->filename().c_str(), whiteout_prefix_, true)) {
     return entry->filename().substr(whiteout_prefix_.length());

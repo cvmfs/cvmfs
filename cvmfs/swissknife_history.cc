@@ -452,7 +452,8 @@ int CommandEditTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  const UniquePtr<Environment> env(
+      InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
@@ -509,7 +510,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
 
   // set the root hash to be tagged to the current HEAD if no other hash was
   // given by the user
-  shash::Any root_hash = GetTagRootHash(env, root_hash_string);
+  const shash::Any root_hash = GetTagRootHash(env, root_hash_string);
   if (root_hash.IsNull()) {
     return 1;
   }
@@ -551,7 +552,7 @@ int CommandEditTag::AddNewTag(const ArgumentList &args, Environment *env) {
     const bool user_provided_hash = (!root_hash_string.empty());
 
     if (!env->history->ExistsBranch(tag_template.branch)) {
-      history::History::Branch branch(
+      const history::History::Branch branch(
           tag_template.branch, previous_branch_name, tag_template.revision);
       if (!env->history->InsertBranch(branch)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "cannot insert branch '%s'",
@@ -655,7 +656,7 @@ bool CommandEditTag::MoveTag(Environment *env,
     LogCvmfs(kLogCvmfs, kLogStderr, "could not prune unused branches");
     return false;
   }
-  bool retval = env->history->Vacuum();
+  const bool retval = env->history->Vacuum();
   assert(retval);
 
   LogCvmfs(kLogCvmfs, kLogStdout, "moving tag '%s' from '%s' to '%s'",
@@ -828,7 +829,7 @@ void CommandListTags::PrintMachineReadableTagList(const TagList &tags) const {
 
 void CommandListTags::PrintHumanReadableBranchList(
     const BranchHierarchy &branches) const {
-  unsigned N = branches.size();
+  const unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
     for (unsigned l = 0; l < branches[i].level; ++l) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
@@ -843,7 +844,7 @@ void CommandListTags::PrintHumanReadableBranchList(
 
 void CommandListTags::PrintMachineReadableBranchList(
     const BranchHierarchy &branches) const {
-  unsigned N = branches.size();
+  const unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "[%u] %s%s @%" PRIu64, branches[i].level,
              AddPadding("", branches[i].level, false, " ").c_str(),
@@ -860,7 +861,7 @@ void CommandListTags::SortBranchesRecursively(
     BranchHierarchy *hierarchy) const {
   // For large numbers of branches, this should be turned into the O(n) version
   // using a linked list
-  unsigned N = branches.size();
+  const unsigned N = branches.size();
   for (unsigned i = 0; i < N; ++i) {
     if (branches[i].branch == "")
       continue;
@@ -889,7 +890,8 @@ int CommandListTags::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  const UniquePtr<Environment> env(
+      InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
@@ -902,7 +904,7 @@ int CommandListTags::Main(const ArgumentList &args) {
                "failed to list branches in history database");
       return 1;
     }
-    BranchHierarchy branch_hierarchy = SortBranches(branch_list);
+    const BranchHierarchy branch_hierarchy = SortBranches(branch_list);
 
     if (machine_readable) {
       PrintMachineReadableBranchList(branch_hierarchy);
@@ -977,7 +979,8 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  const UniquePtr<Environment> env(
+      InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
@@ -1017,7 +1020,8 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  const UniquePtr<Environment> env(
+      InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
@@ -1111,7 +1115,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
              updated_target_tag.name.c_str());
     return 1;
   }
-  bool retval = env->history->Vacuum();
+  const bool retval = env->history->Vacuum();
   assert(retval);
 
   // set the magic undo tags
@@ -1158,7 +1162,8 @@ ParameterList CommandEmptyRecycleBin::GetParams() const {
 int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  const UniquePtr<Environment> env(
+      InitializeEnvironment(args, history_read_write));
   if (!env.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;

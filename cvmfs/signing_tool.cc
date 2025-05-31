@@ -163,7 +163,7 @@ SigningTool::Result SigningTool::Run(
     // Callers of SigningTool may provide a list of additional catalogs that
     // need to be added to reflog (e. g. for later garbage collection)
     std::vector<shash::Any>::const_iterator i = reflog_catalogs.begin();
-    std::vector<shash::Any>::const_iterator iend = reflog_catalogs.end();
+    const std::vector<shash::Any>::const_iterator iend = reflog_catalogs.end();
     for (; i != iend; ++i) {
       if (!reflog->AddCatalog(*i)) {
         LogCvmfs(kLogCvmfs, kLogStderr,

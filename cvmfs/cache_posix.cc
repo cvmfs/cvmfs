@@ -79,7 +79,7 @@ namespace {
 class CallGuard {
  public:
   CallGuard() {
-    int32_t global_drainout = atomic_read32(&global_drainout_);
+    const int32_t global_drainout = atomic_read32(&global_drainout_);
     drainout_ = (global_drainout != 0);
     if (!drainout_)
       atomic_inc32(&num_inflight_calls_);
@@ -115,7 +115,7 @@ int PosixCacheManager::AbortTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "abort %s", transaction->tmp_path.c_str());
   close(transaction->fd);
-  int result = unlink(transaction->tmp_path.c_str());
+  const int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
   atomic_dec32(&no_inflight_txns_);
   if (result == -1)
@@ -139,7 +139,7 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
 
 
 int PosixCacheManager::Close(int fd) {
-  int retval = do_refcount_ ? fd_mgr_->Close(fd) : close(fd);
+  const int retval = do_refcount_ ? fd_mgr_->Close(fd) : close(fd);
   if (retval != 0)
     return -errno;
   return 0;
@@ -182,9 +182,9 @@ int PosixCacheManager::CommitTxn(void *txn) {
 
   if ((transaction->label.flags & kLabelPinned)
       || (transaction->label.flags & kLabelCatalog)) {
-    bool retval = quota_mgr_->Pin(transaction->id, transaction->size,
-                                  transaction->label.GetDescription(),
-                                  (transaction->label.flags & kLabelCatalog));
+    const bool retval = quota_mgr_->Pin(
+        transaction->id, transaction->size, transaction->label.GetDescription(),
+        (transaction->label.flags & kLabelCatalog));
     if (!retval) {
       LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
                transaction->id.ToString().c_str());
@@ -197,7 +197,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
 
   // Move the temporary file into its final location
   if (alien_cache_) {
-    int retval = chmod(transaction->tmp_path.c_str(), 0660);
+    const int retval = chmod(transaction->tmp_path.c_str(), 0660);
     assert(retval == 0);
   }
   result = Rename(transaction->tmp_path.c_str(),
@@ -226,7 +226,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
 }
 
 bool PosixCacheManager::InitCacheDirectory(const string &cache_path) {
-  FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
+  const FileSystemInfo fs_info = GetFileSystemInfo(cache_path);
 
   if (fs_info.type == kFsTypeTmpfs) {
     is_tmpfs_ = true;
@@ -276,7 +276,7 @@ PosixCacheManager *PosixCacheManager::Create(
 
   cache_manager->rename_workaround_ = rename_workaround;
 
-  bool result_ = cache_manager->InitCacheDirectory(cache_path);
+  const bool result_ = cache_manager->InitCacheDirectory(cache_path);
   if (!result_) {
     return NULL;
   }
@@ -370,7 +370,7 @@ bool PosixCacheManager::DoFreeState(void *data) {
 
 
 int PosixCacheManager::Dup(int fd) {
-  int new_fd = do_refcount_ ? fd_mgr_->Dup(fd) : dup(fd);
+  const int new_fd = do_refcount_ ? fd_mgr_->Dup(fd) : dup(fd);
   if (new_fd < 0)
     return -errno;
   return new_fd;
@@ -380,8 +380,8 @@ int PosixCacheManager::Dup(int fd) {
 int PosixCacheManager::Flush(Transaction *transaction) {
   if (transaction->buf_pos == 0)
     return 0;
-  int written = write(transaction->fd, transaction->buffer,
-                      transaction->buf_pos);
+  const int written =
+      write(transaction->fd, transaction->buffer, transaction->buf_pos);
   if (written < 0)
     return -errno;
   if (static_cast<unsigned>(written) != transaction->buf_pos) {
@@ -400,7 +400,7 @@ inline string PosixCacheManager::GetPathInCache(const shash::Any &id) {
 
 int64_t PosixCacheManager::GetSize(int fd) {
   platform_stat64 info;
-  int retval = platform_fstat(fd, &info);
+  const int retval = platform_fstat(fd, &info);
   if (retval != 0)
     return -errno;
   return info.st_size;
@@ -429,7 +429,7 @@ int PosixCacheManager::Open(const LabeledObject &object) {
 
 int PosixCacheManager::OpenFromTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  int retval = Flush(transaction);
+  const int retval = Flush(transaction);
   if (retval < 0)
     return retval;
   int fd_rdonly;
@@ -543,12 +543,12 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
 
     // For large files, ensure enough free cache space before writing the chunk
     if (size > kBigFile) {
-      uint64_t cache_size = quota_mgr_->GetSize();
-      uint64_t cache_capacity = quota_mgr_->GetCapacity();
+      const uint64_t cache_size = quota_mgr_->GetSize();
+      const uint64_t cache_capacity = quota_mgr_->GetCapacity();
       assert(cache_capacity >= size);
       if ((cache_size + size) > cache_capacity) {
-        uint64_t leave_size = std::min(cache_capacity / 2,
-                                       cache_capacity - size);
+        const uint64_t leave_size =
+            std::min(cache_capacity / 2, cache_capacity - size);
         quota_mgr_->Cleanup(leave_size);
       }
     }
@@ -630,16 +630,16 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   const unsigned char *read_pos = reinterpret_cast<const unsigned char *>(buf);
   while (written < size) {
     if (transaction->buf_pos == sizeof(transaction->buffer)) {
-      int retval = Flush(transaction);
+      const int retval = Flush(transaction);
       if (retval != 0) {
         transaction->size += written;
         return retval;
       }
     }
-    uint64_t remaining = size - written;
-    uint64_t space_in_buffer = sizeof(transaction->buffer)
-                               - transaction->buf_pos;
-    uint64_t batch_size = std::min(remaining, space_in_buffer);
+    const uint64_t remaining = size - written;
+    const uint64_t space_in_buffer =
+        sizeof(transaction->buffer) - transaction->buf_pos;
+    const uint64_t batch_size = std::min(remaining, space_in_buffer);
     memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
     transaction->buf_pos += batch_size;
     written += batch_size;

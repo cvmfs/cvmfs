@@ -58,7 +58,7 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
                                   const bool is_transition_point) {
   typedef catalog::DirectoryEntry::Difference Difference;
 
-  catalog::DirectoryEntry::Differences diffs = a.CompareTo(b);
+  const catalog::DirectoryEntry::Differences diffs = a.CompareTo(b);
   if (diffs == Difference::kIdentical) {
     return true;
   }
@@ -152,9 +152,10 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 
   bool retval = true;
   catalog::Counters::FieldsMap::const_iterator i = map_a.begin();
-  catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
+  const catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
   for (; i != iend; ++i) {
-    catalog::Counters::FieldsMap::const_iterator comp = map_b.find(i->first);
+    const catalog::Counters::FieldsMap::const_iterator comp =
+        map_b.find(i->first);
     assert(comp != map_b.end());
 
     if (*(i->second) != *(comp->second)) {
@@ -198,12 +199,12 @@ string CommandCheck::FetchPath(const string &path) {
   if (is_remote_) {
     cvmfs::FileSink filesink(f);
     download::JobInfo download_job(&url, false, false, NULL, &filesink);
-    download::Failures retval = download_manager()->Fetch(&download_job);
+    const download::Failures retval = download_manager()->Fetch(&download_job);
     if (retval != download::kFailOk) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
   } else {
-    bool retval = CopyPath2File(url, f);
+    const bool retval = CopyPath2File(url, f);
     if (!retval) {
       PANIC(kLogStderr, "failed to read %s", url.c_str());
     }
@@ -221,7 +222,7 @@ string CommandCheck::FetchPath(const string &path) {
 bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
                                  manifest::Manifest *manifest) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting log of references");
-  string reflog_path = FetchPath(".cvmfsreflog");
+  const string reflog_path = FetchPath(".cvmfsreflog");
   shash::Any computed_hash(reflog_hash.algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &computed_hash);
   if (computed_hash != reflog_hash) {
@@ -232,7 +233,7 @@ bool CommandCheck::InspectReflog(const shash::Any &reflog_hash,
     return false;
   }
 
-  UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
+  const UniquePtr<manifest::Reflog> reflog(manifest::Reflog::Open(reflog_path));
   assert(reflog.IsValid());
   reflog->TakeDatabaseFileOwnership();
 
@@ -292,7 +293,7 @@ bool CommandCheck::InspectHistory(history::History *history) {
   bool result = true;
 
   map<string, uint64_t> initial_revisions;
-  sanitizer::BranchSanitizer sanitizer;
+  const sanitizer::BranchSanitizer sanitizer;
   for (unsigned i = 0; i < branches.size(); ++i) {
     if (!sanitizer.IsValid(branches[i].branch)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid branch name: %s",
@@ -425,8 +426,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       } else {
-        HardlinkMap::iterator hardlink_group = hardlinks.find(
-            entries[i].hardlink_group());
+        const HardlinkMap::iterator hardlink_group =
+            hardlinks.find(entries[i].hardlink_group());
         if (hardlink_group == hardlinks.end()) {
           hardlinks[entries[i].hardlink_group()];
           hardlinks[entries[i].hardlink_group()].push_back(entries[i]);
@@ -478,7 +479,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
           computed_counters->self.nested_catalogs++;
         shash::Any tmp;
         uint64_t tmp2;
-        PathString mountpoint(full_path);
+        const PathString mountpoint(full_path);
         if (!catalog->FindNested(mountpoint, &tmp, &tmp2)) {
           LogCvmfs(kLogCvmfs, kLogStderr, "nested catalog at %s not registered",
                    full_path.c_str());
@@ -591,7 +592,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       off_t next_offset = 0;
 
       for (unsigned j = 0; j < chunks.size(); ++j) {
-        FileChunk this_chunk = chunks.At(j);
+        const FileChunk this_chunk = chunks.At(j);
         // check if the chunk boundaries fit together...
         if (next_offset != this_chunk.offset()) {
           LogCvmfs(kLogCvmfs, kLogStderr, "misaligned chunk offsets for %s",
@@ -676,14 +677,15 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
 
 string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
-  string source = "data/" + catalog_hash.MakePath();
+  const string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   const string url = repo_base_path_ + "/" + source;
 
   cvmfs::PathSink pathsink(dest);
   download::JobInfo download_catalog(&url, true, false, &catalog_hash,
                                      &pathsink);
-  download::Failures retval = download_manager()->Fetch(&download_catalog);
+  const download::Failures retval =
+      download_manager()->Fetch(&download_catalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
              catalog_hash.ToString().c_str(), retval);
@@ -695,7 +697,7 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
 
 
 string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
-  string source = "data/" + catalog_hash.MakePath();
+  const string source = "data/" + catalog_hash.MakePath();
   const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
     return "";
@@ -721,7 +723,7 @@ catalog::Catalog *CommandCheck::FetchCatalog(const string &path,
 
   catalog::Catalog *catalog = catalog::Catalog::AttachFreely(path, tmp_file,
                                                              catalog_hash);
-  int64_t catalog_file_size = GetFileSize(tmp_file);
+  const int64_t catalog_file_size = GetFileSize(tmp_file);
   if (catalog_file_size <= 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Error downloading catalog %s at %s %s",
              catalog_hash.ToString().c_str(), path.c_str(), tmp_file.c_str());
@@ -756,7 +758,7 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
   string current_path = "";
 
   Tokens::const_iterator i = path_tokens.begin();
-  Tokens::const_iterator iend = path_tokens.end();
+  const Tokens::const_iterator iend = path_tokens.end();
   for (; i != iend; ++i) {
     if (i->empty()) {
       continue;
@@ -898,7 +900,7 @@ bool CommandCheck::InspectTree(const string &path,
        i != iEnd; ++i) {
     if (bind_mountpoints.find(i->mountpoint) != bind_mountpoints.end()) {
       catalog::DirectoryEntry bind_mountpoint;
-      PathString mountpoint("/" + i->mountpoint.ToString().substr(1));
+      const PathString mountpoint("/" + i->mountpoint.ToString().substr(1));
       if (!catalog->LookupPath(mountpoint, &bind_mountpoint)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to lookup bind mountpoint %s",
                  mountpoint.c_str());
@@ -956,7 +958,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   if (args.find('d') != args.end())
     no_duplicates_map_ = true;
   if (args.find('l') != args.end()) {
-    unsigned log_level = kLogLevel0 << String2Uint64(*args.find('l')->second);
+    const unsigned log_level = kLogLevel0
+                               << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
@@ -1051,7 +1054,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
                ".cvmfsreflog present but no checksum provided, aborting");
       return 1;
     }
-    bool retval = InspectReflog(reflog_hash, manifest.weak_ref());
+    const bool retval = InspectReflog(reflog_hash, manifest.weak_ref());
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to verify reflog");
       return 1;

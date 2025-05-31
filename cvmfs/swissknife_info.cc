@@ -76,7 +76,8 @@ ParameterList CommandInfo::GetParams() const {
 
 int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
-    unsigned log_level = kLogLevel0 << String2Uint64(*args.find('l')->second);
+    const unsigned log_level = kLogLevel0
+                               << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
@@ -108,10 +109,10 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   const bool human_readable = (args.count('h') > 0);
 
   if (args.count('e') > 0) {
-    string manifest_path = IsRemote(repository)
-                               ? ".cvmfspublished"
-                               : repository + "/.cvmfspublished";
-    bool is_empty = !Exists(repository, manifest_path);
+    const string manifest_path = IsRemote(repository)
+                                     ? ".cvmfspublished"
+                                     : repository + "/.cvmfspublished";
+    const bool is_empty = !Exists(repository, manifest_path);
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Empty Repository:                " : "",
              StringifyBool(is_empty).c_str());
@@ -131,7 +132,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     cvmfs::MemSink manifest_memsink;
     download::JobInfo download_manifest(&url, false, false, NULL,
                                         &manifest_memsink);
-    download::Failures retval = download_manager()->Fetch(&download_manifest);
+    const download::Failures retval =
+        download_manager()->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -244,7 +246,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.count('M') > 0) {
-    shash::Any meta_info(manifest->meta_info());
+    const shash::Any meta_info(manifest->meta_info());
     if (meta_info.IsNull()) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr, "no meta info available");
@@ -254,7 +256,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_metainfo(&url, true, false, &meta_info,
                                         &metainfo_memsink);
-    download::Failures retval = download_manager()->Fetch(&download_metainfo);
+    const download::Failures retval =
+        download_manager()->Fetch(&download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,
@@ -262,8 +265,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                  download::Code2Ascii(retval));
       return 1;
     }
-    string info(reinterpret_cast<char *>(metainfo_memsink.data()),
-                metainfo_memsink.pos());
+    const string info(reinterpret_cast<char *>(metainfo_memsink.data()),
+                      metainfo_memsink.pos());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s", info.c_str());
   }
 

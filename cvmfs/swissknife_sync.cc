@@ -108,7 +108,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   const string repo_name = *args.find('n')->second;
   const string reflog_chksum_path = *args.find('R')->second;
   if (args.find('l') != args.end()) {
-    unsigned log_level = kLogLevel0 << String2Uint64(*args.find('l')->second);
+    const unsigned log_level = kLogLevel0
+                               << String2Uint64(*args.find('l')->second);
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "invalid log level");
       return 1;
@@ -133,10 +134,10 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm,
                                      zlib::kZlibDefault);
-  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
+  const UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(sd));
   assert(spooler.IsValid());
 
-  UniquePtr<manifest::Manifest> manifest(
+  const UniquePtr<manifest::Manifest> manifest(
       catalog::WritableCatalogManager::CreateRepository(
           dir_temp, volatile_content, voms_authz, spooler.weak_ref()));
   if (!manifest.IsValid()) {
@@ -151,7 +152,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
 
   reflog->DropDatabaseFileOwnership();
-  string reflog_path = reflog->database_file();
+  const string reflog_path = reflog->database_file();
   reflog.Destroy();
   shash::Any reflog_hash(hash_algorithm);
   manifest::Reflog::HashDatabase(reflog_path, &reflog_hash);
@@ -323,7 +324,7 @@ bool GlobCheckPath(const char *name) {
   if (retval == NULL)
     return false;
 
-  std::string resolved(resolved_cstr);
+  const std::string resolved(resolved_cstr);
   if (resolved == *g_glob_uniondir)
     return true;
   if (!HasPrefix(resolved, (*g_glob_uniondir) + "/", false /*ignore_case*/)) {
@@ -562,12 +563,12 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
   // read the arguments
   ChunkArgs::const_iterator i = chunk_args.begin();
-  ChunkArgs::const_iterator iend = chunk_args.end();
+  const ChunkArgs::const_iterator iend = chunk_args.end();
   for (; i != iend; ++i) {
-    swissknife::ArgumentList::const_iterator arg = args.find(i->param);
+    const swissknife::ArgumentList::const_iterator arg = args.find(i->param);
 
     if (arg != args.end()) {
-      size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
+      const size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
       if (arg_value > 0) {
         *i->save_to = arg_value;
       } else {
@@ -581,18 +582,19 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 }
 
 int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
-  string start_time = GetGMTimestamp();
+  const string start_time = GetGMTimestamp();
 
   // Spawn monitoring process (watchdog)
-  std::string watchdog_dir = "/tmp";
+  const std::string watchdog_dir = "/tmp";
   char watchdog_path[PATH_MAX];
-  std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-  int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
-                           "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
-                           watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
+  const int path_size =
+      snprintf(watchdog_path, sizeof(watchdog_path),
+               "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+               watchdog_dir.c_str(), timestamp.c_str(), getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
-  UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
+  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
   watchdog->Spawn(std::string(watchdog_path));
 
   SyncParameters params;
@@ -640,7 +642,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('W') != args.end())
     params.direct_io = true;
   if (args.find('S') != args.end()) {
-    bool retval = catalog::VirtualCatalog::ParseActions(
+    const bool retval = catalog::VirtualCatalog::ParseActions(
         *args.find('S')->second, &params.virtual_dir_actions);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -650,8 +652,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
   }
   if (args.find('z') != args.end()) {
-    unsigned log_level = 1 << (kLogLevel0
-                               + String2Uint64(*args.find('z')->second));
+    const unsigned log_level =
+        1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Swissknife Sync: invalid log level");
       return 1;
@@ -706,7 +708,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('v') != args.end()) {
-    sanitizer::IntegerSanitizer sanitizer;
+    const sanitizer::IntegerSanitizer sanitizer;
     if (!sanitizer.IsValid(*args.find('v')->second)) {
       PrintError("Swissknife Sync: Invalid revision number");
       return 1;
@@ -773,14 +775,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
   spooler_definition.num_upload_tasks = params.num_upload_tasks;
 
-  upload::SpoolerDefinition spooler_definition_catalogs(
+  const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
+  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
   if (!spooler_catalogs.IsValid())
     return 3;
@@ -882,7 +884,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
              "Swissknife Sync: Adding contents of authz file %s to"
              " root catalog.",
              params.authz_file.c_str());
-    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    const int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Swissknife Sync: Unable to open authz file (%s)"

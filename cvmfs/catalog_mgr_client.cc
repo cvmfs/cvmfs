@@ -99,7 +99,7 @@ bool ClientCatalogManager::InitFixed(const shash::Any &root_hash,
   fixed_alt_root_catalog_ = alternative_path;
   fixed_root_catalog_ = root_hash;
 
-  bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
+  const bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
   if (!attached) {
@@ -153,8 +153,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
 
-  manifest::Breadcrumb breadcrumb = fetcher_->cache_mgr()->LoadBreadcrumb(
-      repo_name_);
+  const manifest::Breadcrumb breadcrumb =
+      fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
   if (breadcrumb.IsValid()) {
     local_newest_hash = breadcrumb.catalog_hash;
     local_newest_timestamp = breadcrumb.timestamp;
@@ -288,8 +288,8 @@ std::string ClientCatalogManager::GetCatalogDescription(
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(
     CatalogContext *ctlg_context) {
-  string catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
-                                               ctlg_context->hash());
+  const string catalog_descr =
+      GetCatalogDescription(ctlg_context->mountpoint(), ctlg_context->hash());
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
@@ -350,8 +350,8 @@ LoadReturn ClientCatalogManager::FetchCatalogByHash(
   CacheManager::Label label;
   label.path = name;
   label.flags = CacheManager::kLabelCatalog;
-  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
-                           alt_root_catalog_path);
+  const int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label),
+                                 alt_root_catalog_path);
   if (fd >= 0) {
     if (root_fd_ < 0) {
       root_fd_ = fd;
@@ -376,7 +376,7 @@ void ClientCatalogManager::StageNestedCatalogByHash(
   CacheManager::Label label;
   label.path = GetCatalogDescription(mountpoint, hash);
   label.flags = CacheManager::kLabelCatalog;
-  int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
+  const int fd = fetcher_->Fetch(CacheManager::LabeledObject(hash, label));
   if (fd >= 0)
     fetcher_->cache_mgr()->Close(fd);
 }
@@ -385,8 +385,8 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->mountpoint().c_str());
 
-  map<PathString, shash::Any>::iterator iter = mounted_catalogs_.find(
-      catalog->mountpoint());
+  const map<PathString, shash::Any>::iterator iter =
+      mounted_catalogs_.find(catalog->mountpoint());
   assert(iter != mounted_catalogs_.end());
   fetcher_->cache_mgr()->quota_mgr()->Unpin(iter->second);
   mounted_catalogs_.erase(iter);
@@ -404,7 +404,7 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
  * @return true if it is blacklisted, false otherwise
  */
 bool ClientCatalogManager::IsRevisionBlacklisted() {
-  uint64_t revision = GetRevision();
+  const uint64_t revision = GetRevision();
 
   LogCvmfs(kLogCache, kLogDebug,
            "checking if %s revision %" PRIu64 " is blacklisted",
@@ -446,8 +446,8 @@ void CachedManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   label.flags |= CacheManager::kLabelCertificate;
   label.path = catalog_mgr_->repo_name();
   uint64_t size;
-  bool retval = cache_mgr_->Open2Mem(CacheManager::LabeledObject(hash, label),
-                                     &cert_buf, &size);
+  const bool retval = cache_mgr_->Open2Mem(
+      CacheManager::LabeledObject(hash, label), &cert_buf, &size);
   cert_size = size;
   if (retval)
     perf::Inc(catalog_mgr_->n_certificate_hits_);

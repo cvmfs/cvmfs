@@ -42,7 +42,7 @@ bool swissknife::CommandGraft::ChecksumFdWithChunks(
   chunk_hash_context.buffer = alloca(chunk_hash_context.size);
   shash::Init(chunk_hash_context);
 
-  bool do_chunk = chunk_size_ > 0;
+  const bool do_chunk = chunk_size_ > 0;
   if (do_chunk) {
     if (!chunk_offsets || !chunk_checksums) {
       return false;
@@ -126,12 +126,12 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
   if (!output_file_.size()) {
     return true;
   }
-  std::string full_output_path = output_file_ + "/"
-                                 + (relative_path.size() ? relative_path : ".")
-                                 + "/" + dir_name;
-  std::string full_input_path = input_file_ + "/"
-                                + (relative_path.size() ? relative_path : ".")
-                                + "/" + dir_name;
+  const std::string full_output_path =
+      output_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
+      dir_name;
+  const std::string full_input_path =
+      input_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
+      dir_name;
   platform_stat64 sbuf;
   if (-1 == platform_stat(full_input_path.c_str(), &sbuf)) {
     return false;
@@ -141,9 +141,9 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
 
 void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
                                             const std::string &file_name) {
-  std::string full_input_path = input_file_ + "/"
-                                + (relative_path.size() ? relative_path : ".")
-                                + "/" + file_name;
+  const std::string full_input_path =
+      input_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
+      file_name;
   std::string full_output_path;
   if (output_file_.size()) {
     full_output_path = output_file_ + "/"
@@ -171,7 +171,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   if (args.find('c') == args.end()) {
     chunk_size_ = kDefaultChunkSize;
   } else {
-    std::string chunk_size = *args.find('c')->second;
+    const std::string chunk_size = *args.find('c')->second;
     if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
                chunk_size.c_str());
@@ -181,9 +181,9 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   chunk_size_ *= 1024 * 1024;  // Convert to MB.
 
   platform_stat64 sbuf;
-  bool output_file_is_dir = output_file.size()
-                            && (0 == platform_stat(output_file.c_str(), &sbuf))
-                            && S_ISDIR(sbuf.st_mode);
+  const bool output_file_is_dir =
+      output_file.size() && (0 == platform_stat(output_file.c_str(), &sbuf)) &&
+      S_ISDIR(sbuf.st_mode);
   if (output_file_is_dir && (input_file == "-")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Output file (%s): Is a directory\n",
              output_file.c_str());
@@ -191,8 +191,9 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   }
 
   if (input_file != "-") {
-    bool input_file_is_dir = (0 == platform_stat(input_file.c_str(), &sbuf))
-                             && S_ISDIR(sbuf.st_mode);
+    const bool input_file_is_dir =
+        (0 == platform_stat(input_file.c_str(), &sbuf)) &&
+        S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
         LogCvmfs(kLogCvmfs, kLogStderr,
@@ -229,7 +230,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   } else {
     fd = open(input_file.c_str(), O_RDONLY);
     if (fd < 0) {
-      std::string errmsg = "Unable to open input file (" + input_file + ")";
+      const std::string errmsg =
+          "Unable to open input file (" + input_file + ")";
       perror(errmsg.c_str());
       return 1;
     }
@@ -238,10 +240,10 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   // Get input file mode; output file will be set identically.
   platform_stat64 sbuf;
   if (-1 == platform_fstat(fd, &sbuf)) {
-    std::string errmsg = "Unable to stat input file (" + input_file + ")";
+    const std::string errmsg = "Unable to stat input file (" + input_file + ")";
     perror(errmsg.c_str());
   }
-  mode_t input_file_mode = input_file_is_stdin ? 0644 : sbuf.st_mode;
+  const mode_t input_file_mode = input_file_is_stdin ? 0644 : sbuf.st_mode;
 
   shash::Any file_hash(hash_alg_);
   uint64_t processed_size;
@@ -257,7 +259,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     close(fd);
   }
   if (!retval) {
-    std::string errmsg = "Unable to checksum input file (" + input_file + ")";
+    const std::string errmsg =
+        "Unable to checksum input file (" + input_file + ")";
     perror(errmsg.c_str());
     return 1;
   }
@@ -275,7 +278,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     }
     fd = open(graft_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
-      std::string errmsg = "Unable to open graft file (" + graft_fname + ")";
+      const std::string errmsg =
+          "Unable to open graft file (" + graft_fname + ")";
       perror(errmsg.c_str());
       return 1;
     }
@@ -300,7 +304,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     graft_contents += "chunk_checksums=" + JoinStrings(chunk_ck_str, ",")
                       + "\n";
   }
-  size_t nbytes = graft_contents.size();
+  const size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
   retval = SafeWrite(fd, buf, nbytes);
   if (!retval) {
@@ -324,7 +328,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   fd = open(output_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY,
             input_file_mode);
   if (fd < 0) {
-    std::string errmsg = "Unable to open output file (" + output_file + ")";
+    const std::string errmsg =
+        "Unable to open output file (" + output_file + ")";
     perror(errmsg.c_str());
     return 1;
   }

@@ -194,7 +194,7 @@ void SyncItem::StatGeneric(const string &path,
                            const bool refresh) {
   if (info->obtained && !refresh)
     return;
-  int retval = platform_lstat(path.c_str(), &info->stat);
+  const int retval = platform_lstat(path.c_str(), &info->stat);
   info->error_code = (retval != 0) ? errno : 0;
   info->obtained = true;
 }
@@ -280,7 +280,7 @@ void SyncItem::CheckMarkerFiles() {
 }
 
 void SyncItem::CheckCatalogMarker() {
-  std::string path(GetUnionPath() + "/.cvmfscatalog");
+  const std::string path(GetUnionPath() + "/.cvmfscatalog");
   EntryStat stat;
   StatGeneric(path, &stat, false);
   if (stat.error_code) {
@@ -307,9 +307,9 @@ std::string SyncItem::GetGraftMarkerPath() const {
 void SyncItem::CheckGraft() {
   valid_graft_ = false;
   bool found_checksum = false;
-  std::string checksum_type;
-  std::string checksum_value;
-  std::string graftfile = GetGraftMarkerPath();
+  const std::string checksum_type;
+  const std::string checksum_value;
+  const std::string graftfile = GetGraftMarkerPath();
   LogCvmfs(kLogFsTraversal, kLogDebug, "Checking potential graft path %s.",
            graftfile.c_str());
   FILE *fp = fopen(graftfile.c_str(), "r");
@@ -328,7 +328,7 @@ void SyncItem::CheckGraft() {
   graft_marker_present_ = true;
   valid_graft_ = true;
   std::string line;
-  std::vector<std::string> contents;
+  const std::vector<std::string> contents;
 
   std::vector<off_t> chunk_offsets;
   std::vector<shash::Any> chunk_checksums;
@@ -362,8 +362,8 @@ void SyncItem::CheckGraft() {
       }
       graft_size_ = tmp_size;
     } else if (info[0] == "checksum") {
-      std::string hash_str = info[1];
-      shash::HexPtr hashP(hash_str);
+      const std::string hash_str = info[1];
+      const shash::HexPtr hashP(hash_str);
       if (hashP.IsValid()) {
         content_hash_ = shash::MkFromHexPtr(hashP);
         found_checksum = true;
@@ -391,7 +391,7 @@ void SyncItem::CheckGraft() {
       for (std::vector<std::string>::const_iterator it = csums.begin();
            it != csums.end();
            it++) {
-        shash::HexPtr hashP(*it);
+        const shash::HexPtr hashP(*it);
         if (hashP.IsValid()) {
           chunk_checksums.push_back(shash::MkFromHexPtr(hashP));
         } else {
@@ -431,7 +431,7 @@ void SyncItem::CheckGraft() {
     valid_graft_ = false;
   }
   for (unsigned idx = 1; idx < chunk_offsets.size(); idx++) {
-    off_t cur_offset = chunk_offsets[idx];
+    const off_t cur_offset = chunk_offsets[idx];
     if (last_offset >= cur_offset) {
       LogCvmfs(kLogFsTraversal, kLogWarning,
                "Chunk offsets must be sorted "
@@ -440,7 +440,7 @@ void SyncItem::CheckGraft() {
       valid_graft_ = false;
       break;
     }
-    size_t cur_size = cur_offset - last_offset;
+    const size_t cur_size = cur_offset - last_offset;
     graft_chunklist_->PushBack(
         FileChunk(chunk_checksums[idx - 1], last_offset, cur_size));
     last_offset = cur_offset;

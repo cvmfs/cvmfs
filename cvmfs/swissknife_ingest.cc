@@ -29,7 +29,7 @@
  * be good to consider creating different options handler for each command.
  */
 int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
-  std::string start_time = GetGMTimestamp();
+  const std::string start_time = GetGMTimestamp();
 
   SyncParameters params;
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
@@ -78,7 +78,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     params.gid = static_cast<gid_t>(String2Int64(*args.find('G')->second));
   }
 
-  bool create_catalog = args.find('C') != args.end();
+  const bool create_catalog = args.find('C') != args.end();
 
   params.nested_kcatalog_limit = SyncParameters::kDefaultNestedKcatalogLimit;
   params.root_kcatalog_limit = SyncParameters::kDefaultRootKcatalogLimit;
@@ -114,14 +114,14 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
   // from non-root (!= "/") paths
   params.base_directory = TrimString(params.base_directory, "/", kTrimAll);
 
-  upload::SpoolerDefinition spooler_definition_catalogs(
+  const upload::SpoolerDefinition spooler_definition_catalogs(
       spooler_definition.Dup2DefaultCompression());
 
   params.spooler = upload::Spooler::Construct(spooler_definition,
                                               &publish_statistics);
   if (NULL == params.spooler)
     return 3;
-  UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
+  const UniquePtr<upload::Spooler> spooler_catalogs(upload::Spooler::Construct(
       spooler_definition_catalogs, &publish_statistics));
   if (!spooler_catalogs.IsValid())
     return 3;
@@ -136,8 +136,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  bool with_gateway = spooler_definition.driver_type
-                      == upload::SpoolerDefinition::Gateway;
+  const bool with_gateway =
+      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
 
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();
@@ -190,7 +190,7 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
              "Swissknife Ingest: Adding contents of authz file %s to"
              " root catalog.",
              params.authz_file.c_str());
-    int fd = open(params.authz_file.c_str(), O_RDONLY);
+    const int fd = open(params.authz_file.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Swissknife Ingest: Unable to open authz file (%s)"

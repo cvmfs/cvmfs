@@ -20,7 +20,7 @@ const size_t kHashSubtreeLength = 2;
 const std::string kTxnDirectoryName = "txn";
 
 CommandScrub::CommandScrub() : machine_readable_output_(false), alerts_(0) {
-  int retval = pthread_mutex_init(&alerts_mutex_, NULL);
+  const int retval = pthread_mutex_init(&alerts_mutex_, NULL);
   assert(retval == 0);
 }
 
@@ -81,8 +81,8 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
-  shash::Any hash_from_name = shash::MkFromSuffixedHexPtr(
-      shash::HexPtr(hash_string));
+  const shash::Any hash_from_name =
+      shash::MkFromSuffixedHexPtr(shash::HexPtr(hash_string));
   IngestionSource *full_path_source = new FileIngestionSource(full_path);
   pipeline_scrubbing_.Process(
       full_path_source, hash_from_name.algorithm, hash_from_name.suffix);
@@ -189,7 +189,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 void CommandScrub::PrintAlert(const Alerts::Type type,
                               const std::string &path,
                               const std::string &affected_hash) const {
-  MutexLockGuard l(alerts_mutex_);
+  const MutexLockGuard l(alerts_mutex_);
 
   const char *msg = Alerts::ToString(type);
   if (machine_readable_output_) {

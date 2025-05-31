@@ -91,7 +91,7 @@ void CacheTransport::Frame::MergeFrom(const Frame &other) {
 
 
 bool CacheTransport::Frame::ParseMsgRpc(void *buffer, uint32_t size) {
-  bool retval = msg_rpc_.ParseFromArray(buffer, size);
+  const bool retval = msg_rpc_.ParseFromArray(buffer, size);
   if (!retval)
     return false;
 
@@ -373,7 +373,7 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
     buffer = alloca(size);
   else
     buffer = smalloc(size);
-  ssize_t nbytes = SafeRead(fd_connection_, buffer, size);
+  const ssize_t nbytes = SafeRead(fd_connection_, buffer, size);
   if ((nbytes < 0) || (static_cast<uint32_t>(nbytes) != size)) {
     if (size > kMaxStackAlloc) {
       free(buffer);
@@ -413,7 +413,7 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
   }
 
   if (has_attachment) {
-    uint32_t attachment_size = size - (msg_size + kInnerHeaderSize);
+    const uint32_t attachment_size = size - (msg_size + kInnerHeaderSize);
     if (frame->att_size() < attachment_size) {
       if (size > kMaxStackAlloc) {
         free(buffer);
@@ -436,7 +436,7 @@ bool CacheTransport::RecvFrame(CacheTransport::Frame *frame) {
 
 bool CacheTransport::RecvHeader(uint32_t *size, bool *has_attachment) {
   unsigned char header[kHeaderSize];
-  ssize_t nbytes = SafeRead(fd_connection_, header, kHeaderSize);
+  const ssize_t nbytes = SafeRead(fd_connection_, header, kHeaderSize);
   if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != kHeaderSize))
     return false;
   if ((header[0] & (~kFlagHasAttachment)) != kWireProtocolVersion)
@@ -451,8 +451,8 @@ void CacheTransport::SendData(void *message,
                               uint32_t msg_size,
                               void *attachment,
                               uint32_t att_size) {
-  uint32_t total_size = msg_size + att_size
-                        + ((att_size > 0) ? kInnerHeaderSize : 0);
+  const uint32_t total_size =
+      msg_size + att_size + ((att_size > 0) ? kInnerHeaderSize : 0);
 
   assert(total_size > 0);
   assert(total_size <= kMaxMsgSize);
@@ -489,7 +489,7 @@ void CacheTransport::SendData(void *message,
     SendNonBlocking(iov, (att_size == 0) ? 2 : 4);
     return;
   }
-  bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
+  const bool retval = SafeWriteV(fd_connection_, iov, (att_size == 0) ? 2 : 4);
 
   if (!retval && !(flags_ & kFlagSendIgnoreFailure)) {
     PANIC(kLogSyslogErr | kLogDebug,
@@ -510,7 +510,7 @@ void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
     pos += iov[i].iov_len;
   }
 
-  int retval = send(fd_connection_, buffer, total_size, MSG_DONTWAIT);
+  const int retval = send(fd_connection_, buffer, total_size, MSG_DONTWAIT);
   if (retval < 0) {
     assert(errno != EMSGSIZE);
     if (!(flags_ & kFlagSendIgnoreFailure)) {
@@ -524,14 +524,14 @@ void CacheTransport::SendNonBlocking(struct iovec *iov, unsigned iovcnt) {
 
 void CacheTransport::SendFrame(CacheTransport::Frame *frame) {
   cvmfs::MsgRpc *msg_rpc = frame->GetMsgRpc();
-  int32_t size = msg_rpc->ByteSize();
+  const int32_t size = msg_rpc->ByteSize();
   assert(size > 0);
 #ifdef __APPLE__
   void *buffer = smalloc(size);
 #else
   void *buffer = alloca(size);
 #endif
-  bool retval = msg_rpc->SerializeToArray(buffer, size);
+  const bool retval = msg_rpc->SerializeToArray(buffer, size);
   assert(retval);
   SendData(buffer, size, frame->attachment(), frame->att_size());
 #ifdef __APPLE__

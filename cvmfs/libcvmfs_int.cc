@@ -117,7 +117,7 @@ loader::Failures LibGlobals::Initialize(OptionsManager *options_mgr) {
   // Maximum number of open files, handled otherwise as root by the fuse loader
   string arg;
   if (options_mgr->GetValue("CVMFS_NFILES", &arg)) {
-    int retval = SetLimitNoFile(String2Uint64(arg));
+    const int retval = SetLimitNoFile(String2Uint64(arg));
     if (retval != 0) {
       PrintError("Failed to set maximum number of open files, "
                  "insufficient permissions");
@@ -180,10 +180,10 @@ bool LibContext::GetDirentForPath(const PathString &path,
                                   catalog::DirectoryEntry *dirent) {
   if (path.GetLength() == 1 && path.GetChars()[0] == '/') {
     // root path is expected to be "", not "/"
-    PathString p;
+    const PathString p;
     return GetDirentForPath(p, dirent);
   }
-  shash::Md5 md5path(path.GetChars(), path.GetLength());
+  const shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (mount_point_->md5path_cache()->Lookup(md5path, dirent))
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
@@ -208,7 +208,7 @@ void LibContext::AppendStringToList(char const *str,
                                     size_t *listlen,
                                     size_t *buflen) {
   if (*listlen + 1 >= *buflen) {
-    size_t newbuflen = (*listlen) * 2 + 5;
+    const size_t newbuflen = (*listlen) * 2 + 5;
     *buf = reinterpret_cast<char **>(realloc(*buf, sizeof(char *) * newbuflen));
     assert(*buf);
     *buflen = newbuflen;
@@ -229,7 +229,7 @@ void LibContext::AppendStatToList(const cvmfs_stat_t st,
                                   size_t *listlen,
                                   size_t *buflen) {
   if (*listlen + 1 >= *buflen) {
-    size_t newbuflen = (*listlen) * 2 + 5;
+    const size_t newbuflen = (*listlen) * 2 + 5;
     *buf = reinterpret_cast<cvmfs_stat_t *>(
         realloc(*buf, sizeof(cvmfs_stat_t) * newbuflen));
     assert(*buf);
@@ -242,7 +242,8 @@ void LibContext::AppendStatToList(const cvmfs_stat_t st,
 
 int LibContext::GetAttr(const char *c_path, struct stat *info) {
   perf::Inc(file_system()->n_fs_stat());
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -278,7 +279,8 @@ void LibContext::CvmfsAttrFromDirent(const catalog::DirectoryEntry dirent,
 
 
 int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -309,7 +311,7 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
         free(info->cvm_checksum);
         FileChunkReflist chunks_reflist(
             chunks, p, dirent.compression_algorithm(), dirent.IsExternalFile());
-        std::string hash_str = chunks_reflist.HashChunkList().ToString();
+        const std::string hash_str = chunks_reflist.HashChunkList().ToString();
         info->cvm_checksum = strdup(hash_str.c_str());
       }
       delete chunks;
@@ -329,7 +331,8 @@ int LibContext::GetExtAttr(const char *c_path, struct cvmfs_attr *info) {
 int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
   perf::Inc(file_system()->n_fs_readlink());
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -345,9 +348,9 @@ int LibContext::Readlink(const char *c_path, char *buf, size_t size) {
     return -EINVAL;
   }
 
-  unsigned len = (dirent.symlink().GetLength() >= size)
-                     ? size
-                     : dirent.symlink().GetLength() + 1;
+  const unsigned len = (dirent.symlink().GetLength() >= size)
+                           ? size
+                           : dirent.symlink().GetLength() + 1;
   strncpy(buf, dirent.symlink().c_str(), len - 1);
   buf[len - 1] = '\0';
 
@@ -360,7 +363,8 @@ int LibContext::ListDirectory(const char *c_path,
                               size_t *buflen,
                               bool self_reference) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -390,7 +394,7 @@ int LibContext::ListDirectory(const char *c_path,
     AppendStringToList(".", buf, listlen, buflen);
 
     // Add parent directory link
-    catalog::DirectoryEntry p;
+    const catalog::DirectoryEntry p;
     if (d.inode() != mount_point_->catalog_mgr()->GetRootInode()) {
       AppendStringToList("..", buf, listlen, buflen);
     }
@@ -414,7 +418,8 @@ int LibContext::ListDirectoryStat(const char *c_path,
                                   size_t *listlen,
                                   size_t *buflen) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir_stat on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -452,7 +457,8 @@ int LibContext::ListDirectoryStat(const char *c_path,
 
 int LibContext::GetNestedCatalogAttr(const char *c_path,
                                      struct cvmfs_nc_attr *nc_attr) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_stat_nc (cvmfs_nc_attr) : %s", c_path);
 
   PathString p;
@@ -500,7 +506,8 @@ int LibContext::GetNestedCatalogAttr(const char *c_path,
 int LibContext::ListNestedCatalogs(const char *c_path,
                                    char ***buf,
                                    size_t *buflen) {
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_list_nc on path: %s", c_path);
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
@@ -512,7 +519,8 @@ int LibContext::ListNestedCatalogs(const char *c_path,
   path.Assign(c_path, strlen(c_path));
 
   std::vector<PathString> skein;
-  bool retval = mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
+  const bool retval =
+      mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "cvmfs_list_nc failed to find skein of path: %s", c_path);
@@ -532,7 +540,8 @@ int LibContext::ListNestedCatalogs(const char *c_path,
 
 int LibContext::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid(), &default_interrupt_cue_);
+  const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                            &default_interrupt_cue_);
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -600,14 +609,14 @@ int LibContext::Open(const char *c_path) {
 
 int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
   if (fd & kFdChunked) {
-    ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
-                        &default_interrupt_cue_);
+    const ClientCtxGuard ctxg(geteuid(), getegid(), getpid(),
+                              &default_interrupt_cue_);
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks
         open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
-    zlib::Algorithms compression_alg = open_chunks.chunk_reflist
-                                           .compression_alg;
+    const zlib::Algorithms compression_alg =
+        open_chunks.chunk_reflist.compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -649,8 +658,8 @@ int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
       const size_t remaining_bytes_in_chunk = chunk_list->AtPtr(chunk_idx)
                                                   ->size()
                                               - offset_in_chunk;
-      size_t bytes_to_read_in_chunk = std::min(bytes_to_read,
-                                               remaining_bytes_in_chunk);
+      const size_t bytes_to_read_in_chunk =
+          std::min(bytes_to_read, remaining_bytes_in_chunk);
       const int64_t bytes_fetched = file_system()->cache_mgr()->Pread(
           chunk_fd->fd,
           reinterpret_cast<char *>(buf) + overall_bytes_fetched,
@@ -681,8 +690,8 @@ int LibContext::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
   if (fd & kFdChunked) {
     const int chunk_handle = fd & ~kFdChunked;
-    SimpleChunkTables::OpenChunks
-        open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
+    const SimpleChunkTables::OpenChunks open_chunks =
+        mount_point_->simple_chunk_tables()->Get(chunk_handle);
     if (open_chunks.chunk_reflist.list == NULL)
       return -EBADF;
     if (open_chunks.chunk_fd->fd != -1)

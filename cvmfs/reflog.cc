@@ -46,12 +46,12 @@ Reflog *Reflog::Create(const std::string &database_path,
 
 
 bool Reflog::ReadChecksum(const std::string &path, shash::Any *checksum) {
-  int fd = open(path.c_str(), O_RDONLY);
+  const int fd = open(path.c_str(), O_RDONLY);
   if (fd < 0) {
     return false;
   }
   std::string hex_hash;
-  bool retval = GetLineFd(fd, &hex_hash);
+  const bool retval = GetLineFd(fd, &hex_hash);
   if (retval == 0) {
     close(fd);
     return false;
@@ -63,12 +63,13 @@ bool Reflog::ReadChecksum(const std::string &path, shash::Any *checksum) {
 
 
 bool Reflog::WriteChecksum(const std::string &path, const shash::Any &value) {
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
+  const int fd =
+      open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
   if (fd < 0) {
     return false;
   }
   std::string hex_hash = value.ToString();
-  bool retval = SafeWrite(fd, hex_hash.data(), hex_hash.length());
+  const bool retval = SafeWrite(fd, hex_hash.data(), hex_hash.length());
   if (retval == 0) {
     close(fd);
     return false;
@@ -96,7 +97,7 @@ bool Reflog::CreateDatabase(const std::string &database_path,
 bool Reflog::OpenDatabase(const std::string &database_path) {
   assert(!database_.IsValid());
 
-  ReflogDatabase::OpenMode mode = ReflogDatabase::kOpenReadWrite;
+  const ReflogDatabase::OpenMode mode = ReflogDatabase::kOpenReadWrite;
   database_ = ReflogDatabase::Open(database_path, mode);
   if (!database_.IsValid()) {
     return false;
@@ -222,8 +223,8 @@ bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
 bool Reflog::GetCatalogTimestamp(const shash::Any &catalog,
                                  uint64_t *timestamp) const {
   assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
-  bool result = GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog,
-                                      timestamp);
+  const bool result =
+      GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog, timestamp);
   return result;
 }
 
@@ -264,8 +265,8 @@ bool Reflog::ContainsReference(const shash::Any &hash,
 bool Reflog::GetReferenceTimestamp(const shash::Any &hash,
                                    const SqlReflog::ReferenceType type,
                                    uint64_t *timestamp) const {
-  bool retval = get_timestamp_->BindReference(hash, type)
-                && get_timestamp_->FetchRow();
+  const bool retval =
+      get_timestamp_->BindReference(hash, type) && get_timestamp_->FetchRow();
 
   if (retval) {
     *timestamp = get_timestamp_->RetrieveTimestamp();
@@ -307,7 +308,7 @@ void Reflog::DropDatabaseFileOwnership() {
  */
 void Reflog::HashDatabase(const std::string &database_path,
                           shash::Any *hash_reflog) {
-  bool retval = HashFile(database_path, hash_reflog);
+  const bool retval = HashFile(database_path, hash_reflog);
   assert(retval);
 }
 

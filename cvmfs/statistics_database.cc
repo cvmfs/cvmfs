@@ -123,7 +123,7 @@ std::string PrepareStatementIntoPublish(const perf::Statistics *statistics,
                                         const std::string &start_time,
                                         const std::string &finish_time,
                                         const bool success) {
-  struct PublishStats stats = PublishStats(statistics);
+  struct PublishStats const stats = PublishStats(statistics);
   std::string insert_statement = "INSERT INTO publish_statistics ("
                                  "start_time,"
                                  "finish_time,"
@@ -181,7 +181,7 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
                                    const std::string &finish_time,
                                    const std::string &repo_name,
                                    const bool success) {
-  struct GcStats stats = GcStats(statistics);
+  struct GcStats const stats = GcStats(statistics);
   std::string insert_statement = "";
   if (StatisticsDatabase::GcExtendedStats(repo_name)) {
     insert_statement = "INSERT INTO gc_statistics ("
@@ -229,42 +229,42 @@ std::string PrepareStatementIntoGc(const perf::Statistics *statistics,
 
 bool StatisticsDatabase::CreateEmptyDatabase() {
   ++create_empty_db_calls;
-  bool ret1 = sqlite::Sql(sqlite_db(),
-                          "CREATE TABLE publish_statistics ("
-                          "publish_id INTEGER PRIMARY KEY,"
-                          "start_time TEXT,"
-                          "finish_time TEXT,"
-                          "revision INTEGER,"
-                          "files_added INTEGER,"
-                          "files_removed INTEGER,"
-                          "files_changed INTEGER,"
-                          "chunks_added INTEGER,"
-                          "chunks_duplicated INTEGER,"
-                          "catalogs_added INTEGER,"
-                          "directories_added INTEGER,"
-                          "directories_removed INTEGER,"
-                          "directories_changed INTEGER,"
-                          "symlinks_added INTEGER,"
-                          "symlinks_removed INTEGER,"
-                          "symlinks_changed INTEGER,"
-                          "sz_bytes_added INTEGER,"
-                          "sz_bytes_removed INTEGER,"
-                          "sz_bytes_uploaded INTEGER,"
-                          "sz_catalog_bytes_uploaded INTEGER,"
-                          "success INTEGER);")
-                  .Execute();
-  bool ret2 = sqlite::Sql(sqlite_db(),
-                          "CREATE TABLE gc_statistics ("
-                          "gc_id INTEGER PRIMARY KEY,"
-                          "start_time TEXT,"
-                          "finish_time TEXT,"
-                          "n_preserved_catalogs INTEGER,"
-                          "n_condemned_catalogs INTEGER,"
-                          "n_condemned_objects INTEGER,"
-                          "sz_condemned_bytes INTEGER,"
-                          "n_duplicate_delete_requests INTEGER,"
-                          "success INTEGER);")
-                  .Execute();
+  const bool ret1 =
+      sqlite::Sql(sqlite_db(), "CREATE TABLE publish_statistics ("
+                               "publish_id INTEGER PRIMARY KEY,"
+                               "start_time TEXT,"
+                               "finish_time TEXT,"
+                               "revision INTEGER,"
+                               "files_added INTEGER,"
+                               "files_removed INTEGER,"
+                               "files_changed INTEGER,"
+                               "chunks_added INTEGER,"
+                               "chunks_duplicated INTEGER,"
+                               "catalogs_added INTEGER,"
+                               "directories_added INTEGER,"
+                               "directories_removed INTEGER,"
+                               "directories_changed INTEGER,"
+                               "symlinks_added INTEGER,"
+                               "symlinks_removed INTEGER,"
+                               "symlinks_changed INTEGER,"
+                               "sz_bytes_added INTEGER,"
+                               "sz_bytes_removed INTEGER,"
+                               "sz_bytes_uploaded INTEGER,"
+                               "sz_catalog_bytes_uploaded INTEGER,"
+                               "success INTEGER);")
+          .Execute();
+  const bool ret2 =
+      sqlite::Sql(sqlite_db(), "CREATE TABLE gc_statistics ("
+                               "gc_id INTEGER PRIMARY KEY,"
+                               "start_time TEXT,"
+                               "finish_time TEXT,"
+                               "n_preserved_catalogs INTEGER,"
+                               "n_condemned_catalogs INTEGER,"
+                               "n_condemned_objects INTEGER,"
+                               "sz_condemned_bytes INTEGER,"
+                               "n_duplicate_delete_requests INTEGER,"
+                               "success INTEGER);")
+          .Execute();
   return ret1 & ret2;
 }
 
@@ -457,9 +457,9 @@ bool StatisticsDatabase::StorePublishStatistics(
     const perf::Statistics *statistics,
     const std::string &start_time,
     const bool success) {
-  std::string finish_time = GetGMTimestamp();
-  std::string statement = PrepareStatementIntoPublish(statistics, start_time,
-                                                      finish_time, success);
+  const std::string finish_time = GetGMTimestamp();
+  const std::string statement =
+      PrepareStatementIntoPublish(statistics, start_time, finish_time, success);
   return StoreEntry(statement);
 }
 
@@ -467,8 +467,8 @@ bool StatisticsDatabase::StorePublishStatistics(
 bool StatisticsDatabase::StoreGCStatistics(const perf::Statistics *statistics,
                                            const std::string &start_time,
                                            const bool success) {
-  std::string finish_time = GetGMTimestamp();
-  std::string statement = PrepareStatementIntoGc(
+  const std::string finish_time = GetGMTimestamp();
+  const std::string statement = PrepareStatementIntoGc(
       statistics, start_time, finish_time, repo_name_, success);
   return StoreEntry(statement);
 }
@@ -494,15 +494,15 @@ bool StatisticsDatabase::Prune(uint32_t days) {
   if (days == 0)
     return true;
 
-  std::string
-      publish_stmt = "DELETE FROM publish_statistics WHERE "
-                     "julianday('now','start of day')-julianday(start_time) > "
-                     + StringifyUint(days) + ";";
+  const std::string publish_stmt =
+      "DELETE FROM publish_statistics WHERE "
+      "julianday('now','start of day')-julianday(start_time) > " +
+      StringifyUint(days) + ";";
 
-  std::string
-      gc_stmt = "DELETE FROM gc_statistics WHERE "
-                "julianday('now','start of day')-julianday(start_time) > "
-                + StringifyUint(days) + ";";
+  const std::string gc_stmt =
+      "DELETE FROM gc_statistics WHERE "
+      "julianday('now','start of day')-julianday(start_time) > " +
+      StringifyUint(days) + ";";
 
   sqlite::Sql publish_sql(this->sqlite_db(), publish_stmt);
   sqlite::Sql gc_sql(this->sqlite_db(), gc_stmt);
@@ -530,13 +530,13 @@ bool StatisticsDatabase::UploadStatistics(upload::Spooler *spooler,
   }
 
   spooler->WaitForUpload();
-  unsigned errors_before = spooler->GetNumberOfErrors();
+  const unsigned errors_before = spooler->GetNumberOfErrors();
   spooler->Mkdir("stats");
   spooler->RemoveAsync("stats/stats.db");
   spooler->WaitForUpload();
   spooler->Upload(local_path, "stats/stats.db");
   spooler->WaitForUpload();
-  unsigned errors_after = spooler->GetNumberOfErrors();
+  const unsigned errors_after = spooler->GetNumberOfErrors();
 
   if (errors_before != errors_after) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
@@ -554,13 +554,13 @@ bool StatisticsDatabase::UploadStatistics(upload::AbstractUploader *uploader,
   }
 
   uploader->WaitForUpload();
-  unsigned errors_before = uploader->GetNumberOfErrors();
+  const unsigned errors_before = uploader->GetNumberOfErrors();
 
   uploader->RemoveAsync("stats/stats.db");
   uploader->WaitForUpload();
   uploader->UploadFile(local_path, "stats/stats.db");
   uploader->WaitForUpload();
-  unsigned errors_after = uploader->GetNumberOfErrors();
+  const unsigned errors_after = uploader->GetNumberOfErrors();
   return errors_before == errors_after;
 }
 
@@ -592,9 +592,9 @@ void StatisticsDatabase::GetDBParams(const std::string &repo_name,
              "CVMFS_STATISTICS_DB", db_default_path.c_str());
     *path = db_default_path;
   } else {
-    std::string dirname = GetParentPath(statistics_db);
-    int mode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH
-               | S_IXOTH;  // 755
+    const std::string dirname = GetParentPath(statistics_db);
+    const int mode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH |
+                     S_IXOTH; // 755
     if (!MkdirDeep(dirname, mode, true)) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
                "Couldn't write statistics at the specified path %s.",
@@ -605,7 +605,7 @@ void StatisticsDatabase::GetDBParams(const std::string &repo_name,
     }
   }
 
-  std::string days_to_keep_str = "";
+  const std::string days_to_keep_str = "";
   if (!parser.GetValue("CVMFS_STATS_DB_DAYS_TO_KEEP", &statistics_db)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "Parameter %s was not set in the repository configuration file. "

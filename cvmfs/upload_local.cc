@@ -59,7 +59,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
   }
 
   // copy file into controlled temporary directory location
-  bool rvb = source->Open();
+  const bool rvb = source->Open();
   if (!rvb) {
     fclose(ftmp);
     unlink(tmp_path.c_str());
@@ -88,7 +88,7 @@ void LocalUploader::DoUpload(const std::string &remote_path,
   fclose(ftmp);
 
   // move the file in place (atomic operation)
-  int rvi = Move(tmp_path, remote_path);
+  const int rvi = Move(tmp_path, remote_path);
   if (rvi != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg,
              "failed to move file '%s' from the "
@@ -212,7 +212,7 @@ void LocalUploader::DoRemoveAsync(const std::string &file_to_delete) {
 }
 
 bool LocalUploader::Peek(const std::string &path) {
-  bool retval = FileExists(upstream_path_ + "/" + path);
+  const bool retval = FileExists(upstream_path_ + "/" + path);
   return retval;
 }
 

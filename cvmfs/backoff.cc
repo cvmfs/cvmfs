@@ -24,7 +24,7 @@ void BackoffThrottle::Init(const unsigned init_delay_ms,
   prng_.InitLocaltime();
 
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
   Reset();
@@ -46,7 +46,7 @@ void BackoffThrottle::Reset() {
 
 
 void BackoffThrottle::Throttle() {
-  time_t now = time(NULL);
+  const time_t now = time(NULL);
 
   pthread_mutex_lock(lock_);
   if (unsigned(now - last_throttle_) < reset_after_ms_ / 1000) {

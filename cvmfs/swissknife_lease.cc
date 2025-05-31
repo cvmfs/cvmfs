@@ -84,7 +84,7 @@ int CommandLease::Main(const ArgumentList &args) {
     if (MakeAcquireRequest(key_id, secret, params.lease_path,
                            params.repo_service_url, &buffer)) {
       std::string session_token;
-      LeaseReply rep = ParseAcquireReply(buffer, &session_token);
+      const LeaseReply rep = ParseAcquireReply(buffer, &session_token);
       switch (rep) {
         case kLeaseReplySuccess: {
           const std::string token_file_name = "/var/spool/cvmfs/" + lease_fqdn
@@ -109,8 +109,8 @@ int CommandLease::Main(const ArgumentList &args) {
   } else if (params.action == "drop") {
     // Try to read session token from repository scratch directory
     std::string session_token;
-    std::string token_file_name = "/var/spool/cvmfs/" + lease_fqdn
-                                  + "/session_token";
+    const std::string token_file_name =
+        "/var/spool/cvmfs/" + lease_fqdn + "/session_token";
     FILE *token_file = std::fopen(token_file_name.c_str(), "r");
     if (token_file) {
       GetLineFile(token_file, &session_token);

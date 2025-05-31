@@ -27,7 +27,7 @@ struct InstanceInfo {
     std::string result;
     BashOptionsManager options_mgr;
     options_mgr.ParseDefault("");
-    bool retval = options_mgr.GetValue("CVMFS_DEFAULT_DOMAIN", &result);
+    const bool retval = options_mgr.GetValue("CVMFS_DEFAULT_DOMAIN", &result);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "Error: could not determine CVMFS_DEFAULT_DOMAIN");
@@ -38,7 +38,7 @@ struct InstanceInfo {
   bool DeterminePaths() {
     std::string fqrn = instance_name;
     if (fqrn.find('.') == std::string::npos) {
-      static std::string default_domain = GetDefaultDomain();
+      static const std::string default_domain = GetDefaultDomain();
       fqrn = fqrn + "." + default_domain;
     }
 
@@ -46,7 +46,8 @@ struct InstanceInfo {
     options_mgr.ParseDefault(fqrn);
     if (!options_mgr.GetValue("CVMFS_WORKSPACE", &workspace)) {
       if (!options_mgr.GetValue("CVMFS_CACHE_DIR", &workspace)) {
-        bool retval = options_mgr.GetValue("CVMFS_CACHE_BASE", &workspace);
+        const bool retval =
+            options_mgr.GetValue("CVMFS_CACHE_BASE", &workspace);
         if (!retval) {
           LogCvmfs(kLogCvmfs, kLogStderr,
                    "CVMFS_WORKSPACE, CVMFS_CACHE_DIR, and CVMFS_CACHE_BASE "
@@ -72,7 +73,7 @@ struct InstanceInfo {
     assert(IsDefined());
 
     if (socket_path.empty()) {
-      bool retval = DeterminePaths();
+      const bool retval = DeterminePaths();
       if (!retval)
         return false;
       identifier = "instance '" + instance_name + "' active in " + workspace;
@@ -111,7 +112,7 @@ bool SendCommand(const std::string &command, InstanceInfo instance_info) {
   if (!retval)
     return false;
 
-  int fd = ConnectSocket(instance_info.socket_path);
+  const int fd = ConnectSocket(instance_info.socket_path);
   if (fd < 0) {
     if (errno == ENOENT) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -263,7 +264,7 @@ int main(int argc, char *argv[]) {
       is_empty_repo_list = false;
       instance_info.instance_name = repos[i];
       LogCvmfs(kLogCvmfs, kLogStdout, "%s:", repos[i].c_str());
-      bool retval = SendCommand(command, instance_info);
+      const bool retval = SendCommand(command, instance_info);
       if (!retval)
         retcode = 1;
     }
@@ -275,7 +276,7 @@ int main(int argc, char *argv[]) {
                "    cvmfs_talk -i <repository name> <command>\n");
     }
   } else {
-    bool retval = SendCommand(command, instance_info);
+    const bool retval = SendCommand(command, instance_info);
     if (!retval)
       retcode = 1;
   }

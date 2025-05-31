@@ -77,7 +77,7 @@ RingBuffer::ObjectHandle_t RingBuffer::PushFront(const void *obj, size_t size) {
     return kInvalidObjectHandle;
   }
 
-  ObjectHandle_t result = front_;
+  const ObjectHandle_t result = front_;
 
   Put(&size_tag, sizeof(size_tag));
   Put(obj, size_tag);
@@ -87,9 +87,9 @@ RingBuffer::ObjectHandle_t RingBuffer::PushFront(const void *obj, size_t size) {
 
 
 RingBuffer::ObjectHandle_t RingBuffer::RemoveBack() {
-  ObjectHandle_t result = back_;
+  const ObjectHandle_t result = back_;
 
-  size_t size_tag = GetObjectSize(result);
+  const size_t size_tag = GetObjectSize(result);
   Shrink(sizeof(size_tag));
   Shrink(size_tag);
 
@@ -98,14 +98,14 @@ RingBuffer::ObjectHandle_t RingBuffer::RemoveBack() {
 
 
 void RingBuffer::CopyObject(ObjectHandle_t handle, void *to) const {
-  size_t size_tag = GetObjectSize(handle);
-  ObjectHandle_t object = (handle + sizeof(size_tag)) % total_size_;
+  const size_t size_tag = GetObjectSize(handle);
+  const ObjectHandle_t object = (handle + sizeof(size_tag)) % total_size_;
   Get(object, size_tag, to);
 }
 
 
 void RingBuffer::CopySlice(ObjectHandle_t handle, size_t size, size_t offset,
                            void *to) const {
-  ObjectHandle_t begin = (handle + sizeof(size_t) + offset) % total_size_;
+  const ObjectHandle_t begin = (handle + sizeof(size_t) + offset) % total_size_;
   Get(begin, size, to);
 }

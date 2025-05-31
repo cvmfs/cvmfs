@@ -18,7 +18,7 @@ bool Supervisor::Run() {
   bool result = false;
   do {
     result = Task();
-    uint64_t t1 = platform_monotonic_time();
+    const uint64_t t1 = platform_monotonic_time();
     if (t1 - t0 < interval_) {
       retries += 1;
     } else {

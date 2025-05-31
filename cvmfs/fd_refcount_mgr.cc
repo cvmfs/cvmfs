@@ -16,7 +16,7 @@
 
 int FdRefcountMgr::Open(const shash::Any id, const std::string &path) {
   int result = -1;
-  MutexLockGuard lock_guard(lock_cache_refcount_);
+  const MutexLockGuard lock_guard(lock_cache_refcount_);
   if (!map_fd_.Lookup(id, &result)) {
     result = open(path.c_str(), O_RDONLY);
     if (result >= 0) {
@@ -38,7 +38,7 @@ int FdRefcountMgr::Open(const shash::Any id, const std::string &path) {
 
 int FdRefcountMgr::Close(int fd) {
   int retval = -1;
-  MutexLockGuard lock_guard(lock_cache_refcount_);
+  const MutexLockGuard lock_guard(lock_cache_refcount_);
   FdRefcountInfo refc_info;
   if (map_refcount_.Lookup(fd, &refc_info)) {
     if (refc_info.refcount > 1) {
@@ -63,7 +63,7 @@ int FdRefcountMgr::Close(int fd) {
 
 int FdRefcountMgr::Dup(int fd) {
   int retval = -1;
-  MutexLockGuard lock_guard(lock_cache_refcount_);
+  const MutexLockGuard lock_guard(lock_cache_refcount_);
   FdRefcountInfo refc_info;
   if (map_refcount_.Lookup(fd, &refc_info)) {
     refc_info.refcount += 1;
@@ -110,7 +110,7 @@ FdRefcountMgr::FdRefcountMgr() {
   map_refcount_.Init(16, -1, hasher_int);
   lock_cache_refcount_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
+  const int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
   assert(retval == 0);
 }
 
@@ -124,6 +124,6 @@ FdRefcountMgr::FdRefcountMgr(
   map_fd_ = map_fd;
   lock_cache_refcount_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
+  const int retval = pthread_mutex_init(lock_cache_refcount_, NULL);
   assert(retval == 0);
 }

@@ -50,7 +50,7 @@ static void ExecAsRoot(const char *binary, const char *arg1, const char *arg2,
                   NULL};
   char *environ[] = {NULL};
 
-  int retval = setuid(0);
+  const int retval = setuid(0);
   if (retval != 0) {
     fprintf(stderr, "failed to gain root privileges (%d)\n", errno);
     exit(1);
@@ -64,7 +64,7 @@ static void ExecAsRoot(const char *binary, const char *arg1, const char *arg2,
 static void ForkAndExecAsRoot(const char *binary, const char *arg1,
                               const char *arg2, const char *arg3,
                               const char *arg4) {
-  pid_t child = fork();
+  const pid_t child = fork();
   if (child == -1) {
     fprintf(stderr, "failed to fork %s... (%d)\n", binary, errno);
     exit(1);
@@ -103,14 +103,14 @@ static void Remount(const string &path, const RemountType how) {
 
 static void Mount(const string &path) {
   platform_stat64 info;
-  int retval = platform_stat("/bin/systemctl", &info);
+  const int retval = platform_stat("/bin/systemctl", &info);
   if (retval == 0) {
     string systemd_unit = cvmfs_suid::EscapeSystemdUnit(path);
     // On newer versions of systemd, the mount unit is based on the fully
     // resolved path (discovered on Ubuntu 18.04, test 539)
     if (!cvmfs_suid::PathExists(string("/run/systemd/generator/")
                                 + systemd_unit)) {
-      string resolved_path = cvmfs_suid::ResolvePath(path);
+      const string resolved_path = cvmfs_suid::ResolvePath(path);
       if (resolved_path.empty()) {
         fprintf(stderr, "cannot resolve %s\n", path.c_str());
         exit(1);
@@ -145,7 +145,7 @@ static void KillCvmfs(const string &fqrn) {
   const bool retval = platform_getxattr(mountpoint.c_str(), "user.pid", &pid);
   if (!retval || pid.empty())
     exit(1);
-  sanitizer::PositiveIntegerSanitizer pid_sanitizer;
+  const sanitizer::PositiveIntegerSanitizer pid_sanitizer;
   if (!pid_sanitizer.IsValid(pid))
     exit(1);
   ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL, NULL);
@@ -255,8 +255,8 @@ static int DoAsynchronousScratchCleanup(const string &fqrn) {
     int retval = setsid();
     assert(retval != -1);
     if ((pid = fork()) == 0) {
-      int null_read = open("/dev/null", O_RDONLY);
-      int null_write = open("/dev/null", O_WRONLY);
+      const int null_read = open("/dev/null", O_RDONLY);
+      const int null_write = open("/dev/null", O_WRONLY);
       assert((null_read >= 0) && (null_write >= 0));
       retval = dup2(null_read, 0);
       assert(retval == 0);

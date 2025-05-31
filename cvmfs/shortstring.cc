@@ -12,7 +12,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 PathString GetParentPath(const PathString &path) {
-  int length = static_cast<int>(path.GetLength());
+  const int length = static_cast<int>(path.GetLength());
   if (length == 0)
     return path;
   const char *chars = path.GetChars();
@@ -27,7 +27,7 @@ PathString GetParentPath(const PathString &path) {
 
 NameString GetFileName(const PathString &path) {
   NameString name;
-  int length = static_cast<int>(path.GetLength());
+  const int length = static_cast<int>(path.GetLength());
   const char *chars = path.GetChars();
 
   int i;

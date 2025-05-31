@@ -52,7 +52,7 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap &handlers,
 
   bool stop = false;
   while (!stop) {
-    int ready = poll(poll_set, 2, -1);
+    const int ready = poll(poll_set, 2, -1);
     if (ready == -1) {
       if (errno == EINTR) {
         continue;
@@ -83,15 +83,15 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap &handlers,
     const size_t buffer_size = event_size + PATH_MAX + 1;
     char buffer[buffer_size];
     if (poll_set[1].revents & POLLIN) {
-      int len = read(inotify_fd_, buffer, buffer_size);
+      const int len = read(inotify_fd_, buffer, buffer_size);
       assert(len > 0);
       int i = 0;
       while (i < len) {
         struct inotify_event
             *inotify_event = reinterpret_cast<struct inotify_event *>(
                 &buffer[i]);
-        std::map<int, WatchRecord>::const_iterator it = watch_records_.find(
-            inotify_event->wd);
+        const std::map<int, WatchRecord>::const_iterator it =
+            watch_records_.find(inotify_event->wd);
         if (it != watch_records_.end()) {
           WatchRecord current_record = it->second;
           file_watcher::Event event = file_watcher::kInvalid;

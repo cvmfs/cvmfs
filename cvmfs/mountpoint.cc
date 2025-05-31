@@ -108,7 +108,7 @@ time_t FileSystem::IoErrorInfo::timestamp_last() { return timestamp_last_; }
 bool FileSystem::CheckInstanceName(const std::string &instance) {
   if (instance.length() > 24)
     return false;
-  sanitizer::CacheInstanceSanitizer instance_sanitizer;
+  const sanitizer::CacheInstanceSanitizer instance_sanitizer;
   if (!instance_sanitizer.IsValid(instance)) {
     boot_error_ = "invalid instance name (" + instance + "), "
                   + "only characters a-z, A-Z, 0-9, _ are allowed";
@@ -178,7 +178,7 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
     return file_system.Release();
 
   // Redirect SQlite temp directory to workspace (global variable)
-  unsigned length_tempdir = file_system->workspace_.length() + 1;
+  const unsigned length_tempdir = file_system->workspace_.length() + 1;
   sqlite3_temp_directory = static_cast<char *>(sqlite3_malloc(length_tempdir));
   snprintf(sqlite3_temp_directory,
            length_tempdir,
@@ -190,9 +190,9 @@ FileSystem *FileSystem::Create(const FileSystem::FileSystemInfo &fs_info) {
   file_system->SetupUuid();
   if (!file_system->SetupNfsMaps())
     return file_system.Release();
-  bool retval = sqlite::RegisterVfsRdOnly(file_system->cache_mgr_,
-                                          file_system->statistics_,
-                                          sqlite::kVfsOptDefault);
+  const bool retval = sqlite::RegisterVfsRdOnly(file_system->cache_mgr_,
+                                                file_system->statistics_,
+                                                sqlite::kVfsOptDefault);
   assert(retval);
   file_system->has_custom_sqlitevfs_ = true;
 
@@ -528,7 +528,7 @@ void FileSystem::LogSqliteError(void *user_data __attribute__((unused)),
                                 int sqlite_extended_error,
                                 const char *message) {
   int log_dest = kLogDebug;
-  int sqlite_error = sqlite_extended_error & 0xFF;
+  const int sqlite_error = sqlite_extended_error & 0xFF;
   switch (sqlite_error) {
     case SQLITE_INTERNAL:
     case SQLITE_PERM:
@@ -656,7 +656,7 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
     return NULL;
   }
 
-  UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
+  const UniquePtr<ExternalCacheManager::PluginHandle> plugin_handle(
       ExternalCacheManager::CreatePlugin(optarg, cmd_line));
   if (!plugin_handle->IsValid()) {
     boot_error_ = plugin_handle->error_msg();
@@ -676,7 +676,7 @@ CacheManager *FileSystem::SetupExternalCacheMgr(const string &instance) {
 
 
 CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
-  PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
+  const PosixCacheSettings settings = DeterminePosixCacheSettings(instance);
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
@@ -817,7 +817,7 @@ bool FileSystem::SetupCwd() {
   if (type_ == kFsFuse) {
     // Try to jump to workspace / cache directory.  This tests, if it is
     // accessible and it brings speed later on.
-    int retval = chdir(workspace_.c_str());
+    const int retval = chdir(workspace_.c_str());
     if (retval != 0) {
       boot_error_ = "workspace " + workspace_ + " is unavailable";
       boot_status_ = loader::kFailCacheDir;
@@ -918,7 +918,7 @@ bool FileSystem::SetupNfsMaps() {
     return false;
   }
 
-  string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
+  const string inode_cache_dir = nfs_maps_dir_ + "/nfs_maps." + name_;
   if (!MkdirDeep(inode_cache_dir, 0700)) {
     boot_error_ = "Failed to initialize NFS maps";
     boot_status_ = loader::kFailNfsMaps;
@@ -970,7 +970,7 @@ bool FileSystem::SetupNfsMaps() {
 bool FileSystem::SetupPosixQuotaMgr(
     const FileSystem::PosixCacheSettings &settings, CacheManager *cache_mgr) {
   assert(settings.quota_limit >= 0);
-  int64_t quota_threshold = settings.quota_limit / 2;
+  const int64_t quota_threshold = settings.quota_limit / 2;
   string cache_workspace = settings.cache_path;
   if (settings.cache_path != settings.workspace) {
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
@@ -1016,7 +1016,7 @@ bool FileSystem::SetupPosixQuotaMgr(
     }
   }
 
-  int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
+  const int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
   assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "CernVM-FS: quota initialized, current size %luMB",
@@ -1204,12 +1204,12 @@ bool MountPoint::CheckBlacklists() {
  * multi-threaded context.
  */
 bool MountPoint::ReloadBlacklists() {
-  bool result = true;
+  const bool result = true;
   bool append = false;
   for (unsigned i = 0; i < blacklist_paths_.size(); ++i) {
-    string blacklist = blacklist_paths_[i];
+    const string blacklist = blacklist_paths_[i];
     if (FileExists(blacklist)) {
-      bool retval = signature_mgr_->LoadBlacklist(blacklist, append);
+      const bool retval = signature_mgr_->LoadBlacklist(blacklist, append);
       // TODO(jblomer): this can leave us with a half-loaded blacklist
       if (!retval)
         return false;
@@ -1324,8 +1324,9 @@ bool MountPoint::CreateCatalogManager() {
     retval = catalog_mgr_->Init();
   } else {
     fixed_catalog_ = true;
-    bool alt_root_path = options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg)
-                         && options_mgr_->IsOn(optarg);
+    const bool alt_root_path =
+        options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
+        options_mgr_->IsOn(optarg);
     retval = catalog_mgr_->InitFixed(root_hash, alt_root_path);
   }
   if (!retval) {
@@ -1429,13 +1430,13 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg)
-                    && options_mgr_->IsOn(optarg);
+  const bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
+                          options_mgr_->IsOn(optarg);
   if (do_geosort) {
     download_mgr_->ProbeGeo();
   }
   if (options_mgr_->GetValue("CVMFS_MAX_SERVERS", &optarg)) {
-    unsigned max_servers = String2Uint64(optarg);
+    const unsigned max_servers = String2Uint64(optarg);
     std::vector<std::string> host_chain;
     download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
     if (max_servers > 0 && max_servers < host_chain.size()) {
@@ -1466,10 +1467,10 @@ bool MountPoint::CreateDownloadManagers() {
                  optarg.size());
       } else {
         std::vector<std::string> tokens = SplitString(optarg, '|');
-        sanitizer::AlphaNumSanitizer sanitizer;
+        const sanitizer::AlphaNumSanitizer sanitizer;
 
         for (unsigned int i = 0; i < tokens.size(); i++) {
-          std::string token = Trim(tokens[i]);
+          const std::string token = Trim(tokens[i]);
 
           std::vector<std::string> key_val = SplitString(token, ':');
 
@@ -1482,8 +1483,8 @@ bool MountPoint::CreateDownloadManagers() {
             continue;
           }
 
-          std::string prefix = "X-CVMFS-";
-          std::string key = Trim(key_val[0]);
+          const std::string prefix = "X-CVMFS-";
+          const std::string key = Trim(key_val[0]);
 
           if (!sanitizer.IsValid(key)) {
             LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
@@ -1495,7 +1496,8 @@ bool MountPoint::CreateDownloadManagers() {
             continue;
           }
 
-          std::string final_token = prefix + key + ": " + Trim(key_val[1]);
+          const std::string final_token =
+              prefix + key + ": " + Trim(key_val[1]);
 
           download_mgr_->AddHTTPTracingHeader(final_token);
         }
@@ -1670,7 +1672,7 @@ bool MountPoint::CreateTracer() {
       boot_status_ = loader::kFailOptions;
       return false;
     }
-    string tracebuffer_file = optarg;
+    const string tracebuffer_file = optarg;
     uint64_t tracebuffer_size = kTracerBufferSize;
     uint64_t tracebuffer_threshold = kTracerFlushThreshold;
 
@@ -1708,8 +1710,8 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
   string history_path;
   if (!FetchHistory(&history_path))
     return false;
-  UnlinkGuard history_file(history_path);
-  UniquePtr<history::History> tag_db(
+  const UnlinkGuard history_file(history_path);
+  const UniquePtr<history::History> tag_db(
       history::SqliteHistory::Open(history_path));
   if (!tag_db.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
@@ -1725,7 +1727,7 @@ bool MountPoint::DetermineRootHash(shash::Any *root_hash) {
     string repository_date;
     // options_mgr_->IsDefined("CVMFS_REPOSITORY_DATE") must be true
     options_mgr_->GetValue("CVMFS_REPOSITORY_DATE", &repository_date);
-    time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
+    const time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
     if (repository_utctime == 0) {
       boot_error_ = "invalid timestamp in CVMFS_REPOSITORY_DATE: "
                     + repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
@@ -1768,7 +1770,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
     boot_status_ = loader::kFailHistory;
     return false;
   }
-  shash::Any history_hash = ensemble.manifest->history();
+  const shash::Any history_hash = ensemble.manifest->history();
   if (history_hash.IsNull()) {
     boot_error_ = "No history";
     boot_status_ = loader::kFailHistory;
@@ -1778,7 +1780,8 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
   label.path = fqrn_;
-  int fd = fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
+  const int fd =
+      fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;
@@ -1793,7 +1796,7 @@ bool MountPoint::FetchHistory(std::string *history_path) {
 unsigned MountPoint::GetEffectiveTtlSec() {
   unsigned max_ttl;
   {
-    MutexLockGuard lock_guard(lock_max_ttl_);
+    const MutexLockGuard lock_guard(lock_max_ttl_);
     max_ttl = max_ttl_sec_;
   }
   const unsigned catalog_ttl_sec = catalog_mgr_->GetTTL();
@@ -1803,7 +1806,7 @@ unsigned MountPoint::GetEffectiveTtlSec() {
 
 
 unsigned MountPoint::GetMaxTtlMn() {
-  MutexLockGuard lock_guard(lock_max_ttl_);
+  const MutexLockGuard lock_guard(lock_max_ttl_);
   return max_ttl_sec_ / 60;
 }
 
@@ -1858,7 +1861,7 @@ MountPoint::MountPoint(const string &fqrn,
     , talk_socket_path_(std::string("./cvmfs_io.") + fqrn)
     , talk_socket_uid_(0)
     , talk_socket_gid_(0) {
-  int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
+  const int retval = pthread_mutex_init(&lock_max_ttl_, NULL);
   assert(retval == 0);
 }
 
@@ -1907,7 +1910,7 @@ MountPoint::~MountPoint() {
 
 
 void MountPoint::ReEvaluateAuthz() {
-  string old_membership_req = membership_req_;
+  const string old_membership_req = membership_req_;
   has_membership_req_ = catalog_mgr_->GetVOMSAuthz(&membership_req_);
   if (old_membership_req != membership_req_) {
     authz_session_mgr_->ClearSessionCache();
@@ -1917,7 +1920,7 @@ void MountPoint::ReEvaluateAuthz() {
 
 
 void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
-  MutexLockGuard lock_guard(lock_max_ttl_);
+  const MutexLockGuard lock_guard(lock_max_ttl_);
   max_ttl_sec_ = value_minutes * 60;
 }
 
@@ -1970,7 +1973,7 @@ bool MountPoint::SetupBehavior() {
     std::vector<string> tmp = SplitString(optarg, ',');
 
     for (size_t i = 0; i < tmp.size(); i++) {
-      std::string trimmed = Trim(tmp[i]);
+      const std::string trimmed = Trim(tmp[i]);
       LogCvmfs(kLogCvmfs, kLogDebug, "Privileged gid for xattr added: %s",
                trimmed.c_str());
       protected_xattr_gids.insert(static_cast<gid_t>(String2Uint64(trimmed)));
@@ -1981,7 +1984,7 @@ bool MountPoint::SetupBehavior() {
     std::vector<string> tmp = SplitString(optarg, ',');
 
     for (size_t i = 0; i < tmp.size(); i++) {
-      std::string trimmed = Trim(tmp[i]);
+      const std::string trimmed = Trim(tmp[i]);
       LogCvmfs(kLogCvmfs, kLogDebug, "Protected xattr added: %s",
                trimmed.c_str());
       protected_xattrs.insert(trimmed);
@@ -2013,7 +2016,7 @@ bool MountPoint::SetupBehavior() {
     talk_socket_path_ = optarg;
   }
   if (options_mgr_->GetValue("CVMFS_TALK_OWNER", &optarg)) {
-    bool retval = GetUidOf(optarg, &talk_socket_uid_, &talk_socket_gid_);
+    const bool retval = GetUidOf(optarg, &talk_socket_uid_, &talk_socket_gid_);
     if (!retval) {
       boot_error_ = "unknown owner of cvmfs_talk socket: " + optarg;
       boot_status_ = loader::kFailOptions;
@@ -2130,7 +2133,7 @@ bool MountPoint::SetupExternalDownloadMgr(bool dogeosort) {
   }
 
   if (options_mgr_->GetValue("CVMFS_EXTERNAL_MAX_SERVERS", &optarg)) {
-    unsigned max_servers = String2Uint64(optarg);
+    const unsigned max_servers = String2Uint64(optarg);
     std::vector<std::string> host_chain;
     external_download_mgr_->GetHostInfo(&host_chain, NULL, NULL);
     if (max_servers > 0 && max_servers < host_chain.size()) {

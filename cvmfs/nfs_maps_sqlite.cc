@@ -87,7 +87,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
   maps->n_db_inode_found_ = statistics->Register("nfs.sqlite.n_inode_hit",
                                                  "path --> inode hits");
 
-  string db_path = db_dir + "/inode_maps.db";
+  const string db_path = db_dir + "/inode_maps.db";
 
   sqlite3_stmt *stmt;
   if (rebuild) {
@@ -142,7 +142,7 @@ NfsMapsSqlite *NfsMapsSqlite::Create(const string &db_dir,
   assert(retval == SQLITE_OK);
 
   // Check the root inode exists, if not create it
-  PathString rootpath("", 0);
+  const PathString rootpath("", 0);
   if (!maps->FindInode(rootpath)) {
     retval = sqlite3_prepare_v2(maps->db_, kSqlAddRoot, -1, &stmt, NULL);
     assert(retval == SQLITE_OK);
@@ -232,7 +232,7 @@ uint64_t NfsMapsSqlite::RetryGetInode(const PathString &path, int attempt) {
 
   uint64_t inode;
   {
-    MutexLockGuard m(lock_);
+    const MutexLockGuard m(lock_);
     inode = FindInode(path);
     if (inode) {
       perf::Inc(n_db_path_found_);
@@ -265,7 +265,7 @@ uint64_t NfsMapsSqlite::GetInode(const PathString &path) {
  */
 bool NfsMapsSqlite::GetPath(const uint64_t inode, PathString *path) {
   int sqlite_state;
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
 
   sqlite_state = sqlite3_bind_int64(stmt_get_path_, 1, inode);
   assert(sqlite_state == SQLITE_OK);
@@ -298,7 +298,7 @@ NfsMapsSqlite::NfsMapsSqlite()
     , n_db_path_found_(NULL)
     , n_db_inode_found_(NULL) {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 

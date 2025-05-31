@@ -67,10 +67,10 @@ void Tracer::Activate(const int buffer_size,
 int32_t Tracer::DoTrace(const int event,
                         const PathString &path,
                         const string &msg) {
-  int32_t my_seq_no = atomic_xadd32(&seq_no_, 1);
+  const int32_t my_seq_no = atomic_xadd32(&seq_no_, 1);
   timeval now;
   gettimeofday(&now, NULL);
-  int pos = my_seq_no % buffer_size_;
+  const int pos = my_seq_no % buffer_size_;
 
   while (my_seq_no - atomic_read32(&flushed_) >= buffer_size_) {
     timespec timeout;
@@ -90,8 +90,9 @@ int32_t Tracer::DoTrace(const int event,
   atomic_inc32(&commit_buffer_[pos]);
 
   if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
-    MutexLockGuard m(&sig_flush_mutex_);
-    int err_code __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
+    const MutexLockGuard m(&sig_flush_mutex_);
+    const int err_code __attribute__((unused)) =
+        pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
   }
 
@@ -103,15 +104,15 @@ void Tracer::Flush() {
   if (!active_)
     return;
 
-  int32_t save_seq_no = DoTrace(kEventFlush, PathString("Tracer", 6),
-                                "flushed ring buffer");
+  const int32_t save_seq_no =
+      DoTrace(kEventFlush, PathString("Tracer", 6), "flushed ring buffer");
   while (atomic_read32(&flushed_) <= save_seq_no) {
     timespec timeout;
     int retval;
 
     atomic_cas32(&flush_immediately_, 0, 1);
     {
-      MutexLockGuard m(&sig_flush_mutex_);
+      const MutexLockGuard m(&sig_flush_mutex_);
       retval = pthread_cond_signal(&sig_flush_);
       assert(retval == 0);
     }
@@ -143,7 +144,7 @@ void Tracer::GetTimespecRel(const int64_t ms, timespec *ts) {
 void *Tracer::MainFlush(void *data) {
   Tracer *tracer = reinterpret_cast<Tracer *>(data);
   int retval;
-  MutexLockGuard m(&tracer->sig_flush_mutex_);
+  const MutexLockGuard m(&tracer->sig_flush_mutex_);
   FILE *f = fopen(tracer->trace_file_.c_str(), "a");
   assert(f != NULL && "Could not open trace file");
   struct timespec timeout;
@@ -160,7 +161,7 @@ void *Tracer::MainFlush(void *data) {
       assert(retval != EINVAL);
     }
 
-    int base = atomic_read32(&tracer->flushed_) % tracer->buffer_size_;
+    const int base = atomic_read32(&tracer->flushed_) % tracer->buffer_size_;
     int pos, i = 0;
     while ((i <= tracer->flush_threshold_)
            && (atomic_read32(
@@ -190,7 +191,7 @@ void *Tracer::MainFlush(void *data) {
     atomic_cas32(&tracer->flush_immediately_, 1, 0);
 
     {
-      MutexLockGuard l(&tracer->sig_continue_trace_mutex_);
+      const MutexLockGuard l(&tracer->sig_continue_trace_mutex_);
       retval = pthread_cond_broadcast(&tracer->sig_continue_trace_);
       assert(retval == 0);
     }
@@ -206,7 +207,7 @@ void *Tracer::MainFlush(void *data) {
 
 void Tracer::Spawn() {
   if (active_) {
-    int retval = pthread_create(&thread_flush_, NULL, MainFlush, this);
+    const int retval = pthread_create(&thread_flush_, NULL, MainFlush, this);
     assert(retval == 0);
 
     spawned_ = true;
@@ -241,7 +242,7 @@ Tracer::~Tracer() {
     // Trigger flushing and wait for it
     atomic_inc32(&terminate_flush_thread_);
     {
-      MutexLockGuard m(&sig_flush_mutex_);
+      const MutexLockGuard m(&sig_flush_mutex_);
       retval = pthread_cond_signal(&sig_flush_);
       assert(retval == 0);
     }

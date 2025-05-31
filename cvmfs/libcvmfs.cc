@@ -86,8 +86,8 @@ static int expand_path(const int depth,
                        LibContext *ctx,
                        char const *path,
                        string *expanded_path) {
-  string p_path = GetParentPath(path);
-  string fname = GetFileName(path);
+  const string p_path = GetParentPath(path);
+  const string fname = GetFileName(path);
   int rc;
 
   if (fname == "..") {
@@ -163,7 +163,7 @@ static int expand_path(const int depth,
   }
   if (ln_buf[0] == '/') {
     // symlink is absolute path, strip /cvmfs/$repo
-    unsigned len = ctx->mount_point()->fqrn().length();
+    const unsigned len = ctx->mount_point()->fqrn().length();
     if (strncmp(ln_buf, ctx->mount_point()->fqrn().c_str(), len) == 0
         && (ln_buf[len] == '/' || ln_buf[len] == '\0')) {
       buf = ln_buf + len;
@@ -197,15 +197,15 @@ static int expand_path(const int depth,
 static int expand_ppath(LibContext *ctx,
                         const char *path,
                         string *expanded_path) {
-  string p_path = GetParentPath(path);
-  string fname = GetFileName(path);
+  const string p_path = GetParentPath(path);
+  const string fname = GetFileName(path);
 
   if (p_path == "") {
     *expanded_path = path;
     return 0;
   }
 
-  int rc = expand_path(0, ctx, p_path.c_str(), expanded_path);
+  const int rc = expand_path(0, ctx, p_path.c_str(), expanded_path);
   if (rc != 0) {
     return rc;
   }
@@ -237,7 +237,7 @@ int cvmfs_open(LibContext *ctx, const char *path) {
 
 ssize_t cvmfs_pread(
     LibContext *ctx, int fd, void *buf, size_t size, off_t off) {
-  ssize_t nbytes = ctx->Pread(fd, buf, size, off);
+  const ssize_t nbytes = ctx->Pread(fd, buf, size, off);
   if (nbytes < 0) {
     errno = -nbytes;
     return -1;
@@ -247,7 +247,7 @@ ssize_t cvmfs_pread(
 
 
 int cvmfs_close(LibContext *ctx, int fd) {
-  int rc = ctx->Close(fd);
+  const int rc = ctx->Close(fd);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -458,7 +458,7 @@ cvmfs_errors cvmfs_attach_repo_v2(const char *fqrn,
   opts->SwitchTemplateManager(new DefaultOptionsTemplateManager(fqrn));
   *ctx = LibContext::Create(fqrn, opts);
   assert(*ctx != NULL);
-  loader::Failures result = (*ctx)->mount_point()->boot_status();
+  const loader::Failures result = (*ctx)->mount_point()->boot_status();
   if (result != loader::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Attaching %s failed: %s (%d)", fqrn,
              (*ctx)->mount_point()->boot_error().c_str(), result);
@@ -478,7 +478,7 @@ void cvmfs_detach_repo(LibContext *ctx) { delete ctx; }
 
 
 cvmfs_errors cvmfs_init_v2(SimpleOptionsParser *opts) {
-  int result = LibGlobals::Initialize(opts);
+  const int result = LibGlobals::Initialize(opts);
   if (result != loader::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Initialization failed: %s (%d)",
              LibGlobals::GetInstance()->file_system()->boot_error().c_str(),
@@ -516,7 +516,7 @@ void cvmfs_set_log_fn(void (*log_fn)(const char *msg)) {
 
 char *cvmfs_statistics_format(cvmfs_context *ctx) {
   assert(ctx != NULL);
-  std::string stats = ctx->mount_point()->statistics()->PrintList(
+  const std::string stats = ctx->mount_point()->statistics()->PrintList(
       perf::Statistics::kPrintHeader);
   return strdup(stats.c_str());
 }

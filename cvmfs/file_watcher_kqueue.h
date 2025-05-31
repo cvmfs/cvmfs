@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#ifdef __APPLE__
 #ifndef CVMFS_FILE_WATCHER_KQUEUE_H_
 #define CVMFS_FILE_WATCHER_KQUEUE_H_
 
@@ -32,3 +33,4 @@ class FileWatcherKqueue : public FileWatcher {
 }  // namespace file_watcher
 
 #endif  // CVMFS_FILE_WATCHER_KQUEUE_H_
+#endif // __APPLE__

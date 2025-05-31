@@ -112,7 +112,7 @@ void FileWatcher::RegisterFilter(const std::string &file_path,
   bool done = false;
   BackoffThrottle throttle(kInitialDelay, kMaxDelay, kResetDelay);
   while (!done) {
-    int wd = TryRegisterFilter(file_path);
+    const int wd = TryRegisterFilter(file_path);
     if (wd < 0) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "FileWatcher - Could not add watch for file %s. Retrying.",

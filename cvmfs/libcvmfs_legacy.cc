@@ -32,7 +32,7 @@ static int set_option(char const *name, char const *value, bool *var) {
 static int set_option(char const *name, char const *value, unsigned *var) {
   unsigned v = 0;
   int end = 0;
-  int rc = sscanf(value, "%u%n", &v, &end);
+  const int rc = sscanf(value, "%u%n", &v, &end);
   if (rc != 1 || value[end] != '\0') {
     fprintf(stderr, "Invalid unsigned integer value for %s=%s\n", name, value);
     return -1;
@@ -45,7 +45,7 @@ static int set_option(char const *name, char const *value, unsigned *var) {
 static int set_option(char const *name, char const *value, int *var) {
   int v = 0;
   int end = 0;
-  int rc = sscanf(value, "%d%n", &v, &end);
+  const int rc = sscanf(value, "%d%n", &v, &end);
   if (rc != 1 || value[end] != '\0') {
     fprintf(stderr, "Invalid integer value for %s=%s\n", name, value);
     return -1;
@@ -250,7 +250,7 @@ struct cvmfs_options : public DerivedT {
       }
 
       if (!name.empty() || !value.empty()) {
-        int result = set_option(name.c_str(), value.c_str());
+        const int result = set_option(name.c_str(), value.c_str());
         if (result != 0) {
           return result;
         }
@@ -272,7 +272,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
  * Display the usage message.
  */
 static void usage() {
-  struct cvmfs_repo_options defaults;
+  struct cvmfs_repo_options const defaults;
   fprintf(
       stderr,
       "CernVM-FS version %s\n"
@@ -394,7 +394,7 @@ static int TranslateReturnValue(loader::Failures code) {
 
 SimpleOptionsParser *cvmfs_options_init_legacy(char const *legacy_options) {
   global_options global_opts;
-  int parse_result = global_opts.parse_options(legacy_options);
+  const int parse_result = global_opts.parse_options(legacy_options);
   if (parse_result != 0) {
     fprintf(stderr, "Invalid CVMFS global options: %s.\n", legacy_options);
     usage();
@@ -442,7 +442,7 @@ int cvmfs_init(char const *options) {
     return LIBCVMFS_FAIL_BADOPT;
   }
 
-  loader::Failures result = LibGlobals::Initialize(options_mgr);
+  const loader::Failures result = LibGlobals::Initialize(options_mgr);
   LibGlobals::GetInstance()->set_options_mgr(options_mgr);
   if (result != loader::kFailOk)
     LibGlobals::CleanupInstance();
@@ -454,7 +454,7 @@ SimpleOptionsParser *cvmfs_options_clone_legacy(SimpleOptionsParser *opts,
                                                 const char *legacy_options) {
   // Parse options
   repo_options repo_opts;
-  int parse_result = repo_opts.parse_options(legacy_options);
+  const int parse_result = repo_opts.parse_options(legacy_options);
   if ((parse_result != 0) || repo_opts.url.empty()) {
     return NULL;
   }
@@ -501,7 +501,7 @@ LibContext *cvmfs_attach_repo(char const *options) {
   }
 
   string repo_name;
-  bool retval = options_mgr->GetValue("CVMFS_FQRN", &repo_name);
+  const bool retval = options_mgr->GetValue("CVMFS_FQRN", &repo_name);
   assert(retval);
   LibContext *ctx = LibContext::Create(repo_name, options_mgr);
   assert(ctx != NULL);

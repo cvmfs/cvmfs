@@ -48,10 +48,10 @@ class ActivitySubscriber : public notify::SubscriberSSE {
     }
 
     manifest::ManifestEnsemble ensemble;
-    manifest::Failures res = manifest::Verify(
-        reinterpret_cast<unsigned char *>(&(msg.manifest_[0])),
-        msg.manifest_.size(), "", repo_name, 0, NULL, sig_mgr_, dl_mgr_,
-        &ensemble);
+    const manifest::Failures res =
+        manifest::Verify(reinterpret_cast<unsigned char *>(&(msg.manifest_[0])),
+                         msg.manifest_.size(), "", repo_name, 0, NULL, sig_mgr_,
+                         dl_mgr_, &ensemble);
 
     if (res != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogSyslogErr,
@@ -69,14 +69,14 @@ class ActivitySubscriber : public notify::SubscriberSSE {
       return notify::Subscriber::kError;
     }
 
-    uint64_t new_revision = manifest->revision();
+    const uint64_t new_revision = manifest->revision();
     LogCvmfs(kLogCvmfs, kLogSyslog,
              "NotificationClient - repository %s is now at revision %" PRIu64
              ", root hash: %s",
              repo_name.c_str(), new_revision,
              manifest->catalog_hash().ToString().c_str());
 
-    FuseRemounter::Status status = remounter_->CheckSynchronously();
+    const FuseRemounter::Status status = remounter_->CheckSynchronously();
     switch (status) {
       case FuseRemounter::kStatusFailGeneral:
         LogCvmfs(kLogCvmfs, kLogSyslog, "NotificationClient - remount failed");

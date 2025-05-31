@@ -118,8 +118,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
   if (rebuild) {
     LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "rebuilding NFS maps, might result in stale entries");
-    bool retval = RemoveTree(leveldb_dir + "/inode2path")
-                  && RemoveTree(leveldb_dir + "/path2inode");
+    const bool retval = RemoveTree(leveldb_dir + "/inode2path") &&
+                        RemoveTree(leveldb_dir + "/path2inode");
     if (!retval) {
       LogCvmfs(kLogNfsMaps, kLogDebug, "failed to remove previous databases");
       return NULL;
@@ -163,7 +163,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
   if (maps->seq_ == 0) {
     maps->seq_ = maps->root_inode_;
     // Insert root inode
-    PathString root_path;
+    const PathString root_path;
     maps->GetInode(root_path);
   }
 
@@ -174,7 +174,7 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
 
 void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,
                                      unsigned remainder) {
-  MutexLockGuard lock_guard(lock_);
+  const MutexLockGuard lock_guard(lock_);
   if (residue_class < 2) {
     inode_residue_class_ = 1;
     inode_remainder_ = 0;
@@ -189,8 +189,8 @@ void NfsMapsLeveldb::SetInodeResidue(unsigned residue_class,
 
 uint64_t NfsMapsLeveldb::FindInode(const shash::Md5 &path) {
   leveldb::Status status;
-  leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
-                     path.GetDigestSize());
+  const leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
+                           path.GetDigestSize());
   string result;
 
   status = db_path2inode_->Get(leveldb::ReadOptions(), key, &result);
@@ -218,7 +218,7 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
   if (inode != 0)
     return inode;
 
-  MutexLockGuard m(lock_);
+  const MutexLockGuard m(lock_);
   // Search again to avoid race
   inode = FindInode(md5_path);
   if (inode != 0) {
@@ -243,7 +243,8 @@ uint64_t NfsMapsLeveldb::GetInode(const PathString &path) {
  */
 bool NfsMapsLeveldb::GetPath(const uint64_t inode, PathString *path) {
   leveldb::Status status;
-  leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
+  const leveldb::Slice key(reinterpret_cast<const char *>(&inode),
+                           sizeof(inode));
   string result;
 
   status = db_inode2path_->Get(leveldb::ReadOptions(), key, &result);
@@ -295,7 +296,7 @@ NfsMapsLeveldb::NfsMapsLeveldb()
     , inode_remainder_(0)
     , n_db_added_(NULL) {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -320,8 +321,9 @@ NfsMapsLeveldb::~NfsMapsLeveldb() {
 void NfsMapsLeveldb::PutInode2Path(const uint64_t inode,
                                    const PathString &path) {
   leveldb::Status status;
-  leveldb::Slice key(reinterpret_cast<const char *>(&inode), sizeof(inode));
-  leveldb::Slice value(path.GetChars(), path.GetLength());
+  const leveldb::Slice key(reinterpret_cast<const char *>(&inode),
+                           sizeof(inode));
+  const leveldb::Slice value(path.GetChars(), path.GetLength());
 
   status = db_inode2path_->Put(leveldb::WriteOptions(), key, value);
   if (!status.ok()) {
@@ -337,9 +339,10 @@ void NfsMapsLeveldb::PutInode2Path(const uint64_t inode,
 void NfsMapsLeveldb::PutPath2Inode(const shash::Md5 &path,
                                    const uint64_t inode) {
   leveldb::Status status;
-  leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
-                     path.GetDigestSize());
-  leveldb::Slice value(reinterpret_cast<const char *>(&inode), sizeof(inode));
+  const leveldb::Slice key(reinterpret_cast<const char *>(path.digest),
+                           path.GetDigestSize());
+  const leveldb::Slice value(reinterpret_cast<const char *>(&inode),
+                             sizeof(inode));
 
   status = db_path2inode_->Put(leveldb::WriteOptions(), key, value);
   if (!status.ok()) {

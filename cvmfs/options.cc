@@ -73,7 +73,7 @@ string OptionsManager::TrimParameter(const string &parameter) {
 
 string OptionsManager::SanitizeParameterAssignment(string *line,
                                                    vector<string> *tokens) {
-  size_t comment_idx = line->find("#");
+  const size_t comment_idx = line->find("#");
   if (comment_idx != string::npos)
     *line = line->substr(0, comment_idx);
   *line = Trim(*line);
@@ -117,14 +117,14 @@ bool SimpleOptionsParser::TryParsePath(const string &config_file) {
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
     vector<string> tokens;
-    string parameter = SanitizeParameterAssignment(&line, &tokens);
+    const string parameter = SanitizeParameterAssignment(&line, &tokens);
     if (parameter.empty())
       continue;
 
     // Strip quotes from value
     tokens.erase(tokens.begin());
     string value = Trim(JoinStrings(tokens, "="));
-    unsigned value_length = value.length();
+    const unsigned value_length = value.length();
     if (value_length > 2) {
       if (((value[0] == '"') && ((value[value_length - 1] == '"')))
           || ((value[0] == '\'') && ((value[value_length - 1] == '\'')))) {
@@ -164,7 +164,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
         close(pipe_quit[1]);
         // If this is not a process group leader, create a new session
         if (getpgrp() != getpid()) {
-          pid_t new_session = setsid();
+          const pid_t new_session = setsid();
           assert(new_session != (pid_t)-1);
         }
         (void)open(config_file.c_str(), O_RDONLY);
@@ -233,7 +233,7 @@ void BashOptionsManager::ParsePath(const string &config_file,
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
     vector<string> tokens;
-    string parameter = SanitizeParameterAssignment(&line, &tokens);
+    const string parameter = SanitizeParameterAssignment(&line, &tokens);
     if (parameter.empty())
       continue;
 
@@ -264,7 +264,7 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
   if (GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository)) {
     if (config_repository.empty() || (config_repository == fqrn))
       return false;
-    sanitizer::RepositorySanitizer repository_sanitizer;
+    const sanitizer::RepositorySanitizer repository_sanitizer;
     if (!repository_sanitizer.IsValid(config_repository)) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
                "invalid CVMFS_CONFIG_REPOSITORY: %s",
@@ -280,7 +280,7 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
 
 void OptionsManager::ParseDefault(const string &fqrn) {
   if (taint_environment_) {
-    int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
+    const int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
     assert(retval == 0);
   }
 
@@ -318,7 +318,8 @@ void OptionsManager::ParseDefault(const string &fqrn) {
 
 
 void OptionsManager::PopulateParameter(const string &param, ConfigValue val) {
-  map<string, string>::const_iterator iter = protected_parameters_.find(param);
+  const map<string, string>::const_iterator iter =
+      protected_parameters_.find(param);
   if ((iter != protected_parameters_.end()) && (iter->second != val.value)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "error in cvmfs configuration: attempt to change protected %s "
@@ -333,14 +334,14 @@ void OptionsManager::PopulateParameter(const string &param, ConfigValue val) {
 
 void OptionsManager::UpdateEnvironment(const string &param, ConfigValue val) {
   if (taint_environment_) {
-    int retval = setenv(param.c_str(), val.value.c_str(), 1);
+    const int retval = setenv(param.c_str(), val.value.c_str(), 1);
     assert(retval == 0);
   }
 }
 
 void OptionsManager::ParseValue(std::string param, ConfigValue *val) {
-  string orig = val->value;
-  bool has_templ = opt_templ_mgr_->ParseString(&(val->value));
+  const string orig = val->value;
+  const bool has_templ = opt_templ_mgr_->ParseString(&(val->value));
   if (has_templ) {
     templatable_values_[param] = orig;
   }
@@ -360,13 +361,13 @@ void OptionsManager::ClearConfig() { config_.clear(); }
 
 
 bool OptionsManager::IsDefined(const std::string &key) {
-  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  const map<string, ConfigValue>::const_iterator iter = config_.find(key);
   return iter != config_.end();
 }
 
 
 bool OptionsManager::GetValue(const string &key, string *value) const {
-  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  const map<string, ConfigValue>::const_iterator iter = config_.find(key);
   if (iter != config_.end()) {
     *value = iter->second.value;
     return true;
@@ -378,7 +379,7 @@ bool OptionsManager::GetValue(const string &key, string *value) const {
 
 std::string OptionsManager::GetValueOrDie(const string &key) {
   std::string value;
-  bool retval = GetValue(key, &value);
+  const bool retval = GetValue(key, &value);
   if (!retval) {
     PANIC(kLogStderr | kLogDebug, "%s configuration parameter missing",
           key.c_str());
@@ -388,7 +389,7 @@ std::string OptionsManager::GetValueOrDie(const string &key) {
 
 
 bool OptionsManager::GetSource(const string &key, string *value) {
-  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  const map<string, ConfigValue>::const_iterator iter = config_.find(key);
   if (iter != config_.end()) {
     *value = iter->second.source;
     return true;

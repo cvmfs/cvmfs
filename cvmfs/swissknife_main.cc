@@ -188,9 +188,9 @@ int main(int argc, char **argv) {
   }
 
   // run the command
-  string start_time = GetGMTimestamp();
+  const string start_time = GetGMTimestamp();
   const int retval = command->Main(args);
-  string finish_time = GetGMTimestamp();
+  const string finish_time = GetGMTimestamp();
 
   if (display_statistics) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Command statistics");

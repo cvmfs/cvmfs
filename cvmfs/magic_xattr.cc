@@ -86,7 +86,7 @@ std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
   std::string result;
   std::map<std::string, BaseMagicXattr *>::iterator it = xattr_list_.begin();
   for (; it != xattr_list_.end(); ++it) {
-    MagicXattrFlavor flavor = (*it).second->GetXattrFlavor();
+    const MagicXattrFlavor flavor = (*it).second->GetXattrFlavor();
     // Skip those which should not be displayed
     switch (flavor) {
       case kXattrBase:
@@ -178,7 +178,7 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   }
 
   if (tmp.size() > 0) {
-    std::string msg = JoinStrings(tmp, ",");
+    const std::string msg = JoinStrings(tmp, ",");
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "Following CVMFS_XATTR_PROTECTED_XATTRS are "
              "set but not recognized: %s",
@@ -194,7 +194,7 @@ void MagicXattrManager::SanityCheckProtectedXattrs() {
   }
 
   if (tmp.size() > 0) {
-    std::string msg = JoinStrings(tmp, ",");
+    const std::string msg = JoinStrings(tmp, ",");
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
              "Following CVMFS_XATTR_PRIVILEGED_GIDS are set: %s", msg.c_str());
   }
@@ -446,16 +446,15 @@ void LHashMagicXattr::FinalizeValue() {
   label.path = path_.ToString();
   if (xattr_mgr_->mount_point()->catalog_mgr()->volatile_flag())
     label.flags = CacheManager::kLabelVolatile;
-  int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
+  const int fd = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Open(
       CacheManager::LabeledObject(dirent_->checksum(), label));
   if (fd < 0) {
     result = "Not in cache";
   } else {
     shash::Any hash(dirent_->checksum().algorithm);
-    int retval_i = xattr_mgr_->mount_point()
-                       ->file_system()
-                       ->cache_mgr()
-                       ->ChecksumFd(fd, &hash);
+    const int retval_i =
+        xattr_mgr_->mount_point()->file_system()->cache_mgr()->ChecksumFd(
+            fd, &hash);
     if (retval_i != 0)
       result = "I/O error (" + StringifyInt(retval_i) + ")";
     else
@@ -530,23 +529,21 @@ void NOpenMagicXattr::FinalizeValue() {
 }
 
 void HitrateMagicXattr::FinalizeValue() {
-  int64_t n_invocations = xattr_mgr_->mount_point()
-                              ->statistics()
-                              ->Lookup("fetch.n_invocations")
-                              ->Get();
+  const int64_t n_invocations = xattr_mgr_->mount_point()
+                                    ->statistics()
+                                    ->Lookup("fetch.n_invocations")
+                                    ->Get();
   if (n_invocations == 0) {
     result_pages_.push_back("n/a");
     return;
   }
 
-  int64_t n_downloads = xattr_mgr_->mount_point()
-                            ->statistics()
-                            ->Lookup("fetch.n_downloads")
-                            ->Get();
-  float hitrate = 100.
-                  * (1.
-                     - (static_cast<float>(n_downloads)
-                        / static_cast<float>(n_invocations)));
+  const int64_t n_downloads = xattr_mgr_->mount_point()
+                                  ->statistics()
+                                  ->Lookup("fetch.n_downloads")
+                                  ->Get();
+  const float hitrate = 100. * (1. - (static_cast<float>(n_downloads) /
+                                      static_cast<float>(n_invocations)));
   result_pages_.push_back(StringifyDouble(hitrate));
 }
 
@@ -676,24 +673,22 @@ void RepoMetainfoMagicXattr::FinalizeValue() {
   label.path = xattr_mgr_->mount_point()->fqrn() + "("
                + metainfo_hash_.ToString() + ")";
   label.flags = CacheManager::kLabelMetainfo;
-  int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
+  const int fd = xattr_mgr_->mount_point()->fetcher()->Fetch(
       CacheManager::LabeledObject(metainfo_hash_, label));
   if (fd < 0) {
     result_pages_.push_back("Failed to open metadata file");
     return;
   }
-  uint64_t actual_size = xattr_mgr_->mount_point()
-                             ->file_system()
-                             ->cache_mgr()
-                             ->GetSize(fd);
+  const uint64_t actual_size =
+      xattr_mgr_->mount_point()->file_system()->cache_mgr()->GetSize(fd);
   if (actual_size > kMaxMetainfoLength) {
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
     result_pages_.push_back("Failed to open: metadata file is too big");
     return;
   }
   char buffer[kMaxMetainfoLength];
-  int64_t
-      bytes_read = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Pread(
+  const int64_t bytes_read =
+      xattr_mgr_->mount_point()->file_system()->cache_mgr()->Pread(
           fd, buffer, actual_size, 0);
   xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
   if (bytes_read < 0) {
@@ -723,14 +718,14 @@ void RootHashMagicXattr::FinalizeValue() {
 
 void RxMagicXattr::FinalizeValue() {
   perf::Statistics *statistics = xattr_mgr_->mount_point()->statistics();
-  int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
+  const int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
   result_pages_.push_back(StringifyInt(rx / 1024));
 }
 
 void SpeedMagicXattr::FinalizeValue() {
   perf::Statistics *statistics = xattr_mgr_->mount_point()->statistics();
-  int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
-  int64_t time = statistics->Lookup("download.sz_transfer_time")->Get();
+  const int64_t rx = statistics->Lookup("download.sz_transferred_bytes")->Get();
+  const int64_t time = statistics->Lookup("download.sz_transfer_time")->Get();
   if (time == 0) {
     result_pages_.push_back("n/a");
   } else {

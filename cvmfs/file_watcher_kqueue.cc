@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#ifdef __APPLE__
 #include "file_watcher_kqueue.h"
 
 #include <errno.h>
@@ -137,7 +138,7 @@ void FileWatcherKqueue::RemoveFilter(int fd) {
 }
 
 int FileWatcherKqueue::TryRegisterFilter(const std::string &file_path) {
-  int fd = open(file_path.c_str(), O_RDONLY);
+  const int fd = open(file_path.c_str(), O_RDONLY);
   if (fd > 0) {
     struct kevent watch_event;
     EV_SET(&watch_event, fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR,
@@ -152,3 +153,4 @@ int FileWatcherKqueue::TryRegisterFilter(const std::string &file_path) {
 }
 
 }  // namespace file_watcher
+#endif __APPLE__

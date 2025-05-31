@@ -89,8 +89,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
 
-  int retval = pthread_create(&thread_collect_results_, NULL,
-                              MainCollectResults, this);
+  const int retval =
+      pthread_create(&thread_collect_results_, NULL, MainCollectResults, this);
   assert(retval == 0);
 }
 
@@ -420,7 +420,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   s3_handle->buffer->Commit();
 
-  size_t bytes_uploaded = s3_handle->buffer->GetSize();
+  const size_t bytes_uploaded = s3_handle->buffer->GetSize();
 
   s3fanout::JobInfo *info = new s3fanout::JobInfo(
       final_path,
@@ -469,7 +469,8 @@ void S3Uploader::OnReqComplete(const upload::UploaderResults &results,
   ctrl->return_code = results.return_code;
   if (ctrl->callback_forward != NULL) {
     // We are already in Respond() so we must not call it again
-    upload::UploaderResults fix_path(results.return_code, ctrl->original_path);
+    const upload::UploaderResults fix_path(results.return_code,
+                                           ctrl->original_path);
     (*(ctrl->callback_forward))(fix_path);
     delete ctrl->callback_forward;
     ctrl->callback_forward = NULL;

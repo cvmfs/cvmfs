@@ -29,8 +29,8 @@ string Letter::Sign(const shash::Algorithms hash_algorithm) {
   bool retval = signature_manager_->WriteCertificateMem(&cert_buf,
                                                         &cert_buf_size);
   assert(retval);
-  string cert_base64 = Base64(
-      string(reinterpret_cast<char *>(cert_buf), cert_buf_size));
+  const string cert_base64 =
+      Base64(string(reinterpret_cast<char *>(cert_buf), cert_buf_size));
   free(cert_buf);
 
   string output = text_;
@@ -90,7 +90,7 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
   map<char, string>::const_iterator iter;
   if ((iter = env.find('T')) == env.end())
     return kFailMalformed;
-  uint64_t timestamp = String2Uint64(iter->second);
+  const uint64_t timestamp = String2Uint64(iter->second);
   if (max_age > 0) {
     if (timestamp + max_age < static_cast<uint64_t>(time(NULL)))
       return kFailExpired;
@@ -101,7 +101,7 @@ Failures Letter::Verify(uint64_t max_age, string *msg, string *cert) {
     return kFailNameMismatch;
   if ((iter = env.find('X')) == env.end())
     return kFailMalformed;
-  string cert_b64 = iter->second;
+  const string cert_b64 = iter->second;
   retval = Debase64(cert_b64, cert);
   if (!retval)
     return kFailMalformed;

@@ -199,7 +199,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     inval_inodes_command->~InvalInodesCommand();
     free(inval_inodes_command);
 
-    uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
+    const uint64_t deadline = platform_monotonic_time() + handle->timeout_s_;
 
     // Fallback: drainout by timeout
     if ((invalidator->fuse_channel_or_session_ == NULL)
@@ -227,7 +227,7 @@ void *FuseInvalidator::MainInvalidator(void *data) {
     invalidator->inode_tracker_->EndEnumerate(&inode_cursor);
 
     unsigned i = 0;
-    unsigned N = invalidator->evict_list_.size();
+    const unsigned N = invalidator->evict_list_.size();
     while (i < N) {
       uint64_t inode = invalidator->evict_list_.At(i);
       if (inode == 0)

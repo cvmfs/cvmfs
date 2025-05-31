@@ -56,8 +56,8 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    ssize_t sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(), value,
-                                          256);
+    const ssize_t sz_value =
+        platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
     if (sz_value < 0)
       continue;
     result->Set(keys[i], string(value, sz_value));
@@ -81,7 +81,8 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   unsigned pos = sizeof(header);
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
     XattrEntry entry;
-    unsigned size_preamble = sizeof(entry.len_key) + sizeof(entry.len_value);
+    const unsigned size_preamble =
+        sizeof(entry.len_key) + sizeof(entry.len_value);
     if (size - pos < size_preamble)
       return NULL;
     memcpy(&entry, inbuf + pos, size_preamble);
@@ -92,7 +93,7 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
     pos += size_preamble;
     memcpy(entry.data, inbuf + pos, entry.GetSize() - size_preamble);
     pos += entry.GetSize() - size_preamble;
-    bool retval = result->Set(entry.GetKey(), entry.GetValue());
+    const bool retval = result->Set(entry.GetKey(), entry.GetValue());
     if (!retval)
       return NULL;
   }
@@ -107,7 +108,7 @@ bool XattrList::Has(const string &key) const {
 
 bool XattrList::Get(const string &key, string *value) const {
   assert(value);
-  map<string, string>::const_iterator iter = xattrs_.find(key);
+  const map<string, string>::const_iterator iter = xattrs_.find(key);
   if (iter != xattrs_.end()) {
     *value = iter->second;
     return true;
@@ -169,7 +170,7 @@ bool XattrList::Set(const string &key, const string &value) {
   if (value.length() > 256)
     return false;
 
-  map<string, string>::iterator iter = xattrs_.find(key);
+  const map<string, string>::iterator iter = xattrs_.find(key);
   if (iter != xattrs_.end()) {
     iter->second = value;
   } else {
@@ -182,7 +183,7 @@ bool XattrList::Set(const string &key, const string &value) {
 
 
 bool XattrList::Remove(const string &key) {
-  map<string, string>::iterator iter = xattrs_.find(key);
+  const map<string, string>::iterator iter = xattrs_.find(key);
   if (iter != xattrs_.end()) {
     xattrs_.erase(iter);
     return true;

@@ -51,7 +51,7 @@ ParameterList CommandGc::GetParams() const {
 
 
 int CommandGc::Main(const ArgumentList &args) {
-  std::string start_time = GetGMTimestamp();
+  const std::string start_time = GetGMTimestamp();
 
   const std::string &repo_url = *args.find('r')->second;
   const std::string &spooler = *args.find('u')->second;
@@ -109,7 +109,8 @@ int CommandGc::Main(const ArgumentList &args) {
                                signature_manager());
 
   UniquePtr<manifest::Manifest> manifest;
-  ObjectFetcher::Failures retval = object_fetcher.FetchManifest(&manifest);
+  const ObjectFetcher::Failures retval =
+      object_fetcher.FetchManifest(&manifest);
   if (retval != ObjectFetcher::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to load repository manifest "
@@ -129,7 +130,7 @@ int CommandGc::Main(const ArgumentList &args) {
   assert(reflog.IsValid());
 
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  UniquePtr<upload::AbstractUploader> uploader(
+  const UniquePtr<upload::AbstractUploader> uploader(
       upload::AbstractUploader::Construct(spooler_definition));
 
   if (!uploader.IsValid()) {
@@ -151,7 +152,7 @@ int CommandGc::Main(const ArgumentList &args) {
     }
   }
 
-  bool extended_stats = StatisticsDatabase::GcExtendedStats(repo_name);
+  const bool extended_stats = StatisticsDatabase::GcExtendedStats(repo_name);
 
   reflog->BeginTransaction();
 

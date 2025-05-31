@@ -68,7 +68,7 @@ bool SyncUnionTarball::Initialize() {
   if (tarball_path_ == "-") {
     result = archive_read_open_filename(src, NULL, kBlockSize);
   } else {
-    std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
+    const std::string tarball_absolute_path = GetAbsolutePath(tarball_path_);
     result = archive_read_open_filename(src, tarball_absolute_path.c_str(),
                                         kBlockSize);
   }
@@ -123,8 +123,8 @@ void SyncUnionTarball::Traverse() {
       SplitPath(*s, &parent_path, &filename);
       if (parent_path == ".")
         parent_path = "";
-      SharedPtr<SyncItem> sync_entry = CreateSyncItem(parent_path, filename,
-                                                      kItemDir);
+      const SharedPtr<SyncItem> sync_entry =
+          CreateSyncItem(parent_path, filename, kItemDir);
       mediator_->Remove(sync_entry);
     }
   }
@@ -138,7 +138,7 @@ void SyncUnionTarball::Traverse() {
     // Get the lock, wait if lock is not available yet
     read_archive_signal_->Wait();
 
-    int result = archive_read_next_header2(src, entry);
+    const int result = archive_read_next_header2(src, entry);
 
     switch (result) {
       case ARCHIVE_FATAL: {
@@ -158,7 +158,7 @@ void SyncUnionTarball::Traverse() {
       case ARCHIVE_EOF: {
         if (create_catalog_on_root_ && (base_directory_ != "/")) {
           CreateDirectories(base_directory_);  // necessary for empty archives
-          SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
+          const SharedPtr<SyncItem> catalog = SharedPtr<SyncItem>(
               new SyncItemDummyCatalog(base_directory_, this));
           ProcessFile(catalog);
           to_create_catalog_dirs_.insert(base_directory_);
@@ -167,7 +167,7 @@ void SyncUnionTarball::Traverse() {
              dir != to_create_catalog_dirs_.end();
              ++dir) {
           assert(dirs_.find(*dir) != dirs_.end());
-          SharedPtr<SyncItem> to_mark = dirs_[*dir];
+          const SharedPtr<SyncItem> to_mark = dirs_[*dir];
           assert(to_mark->IsDirectory());
           to_mark->SetCatalogMarker();
           to_mark->MakePlaceholderDirectory();
@@ -203,10 +203,10 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
   archive_file_path = SanitizePath(archive_file_path);
 
-  std::string complete_path = base_directory_ != "/"
-                                  ? MakeCanonicalPath(base_directory_ + "/"
-                                                      + archive_file_path)
-                                  : MakeCanonicalPath(archive_file_path);
+  const std::string complete_path =
+      base_directory_ != "/"
+          ? MakeCanonicalPath(base_directory_ + "/" + archive_file_path)
+          : MakeCanonicalPath(archive_file_path);
 
   std::string parent_path;
   std::string filename;
@@ -216,7 +216,7 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
 
   CreateDirectories(parent_path);
 
-  SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
+  const SharedPtr<SyncItem> sync_entry = SharedPtr<SyncItem>(
       new SyncItemTar(parent_path, filename, src, entry, read_archive_signal_,
                       this, uid_, gid_));
 
@@ -347,7 +347,7 @@ void SyncUnionTarball::CreateDirectories(const std::string &target) {
 
   if (dirname == ".")
     dirname = "";
-  SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
+  const SharedPtr<SyncItem> dummy = SharedPtr<SyncItem>(
       new SyncItemDummyDir(dirname, filename, this, kItemDir, uid_, gid_));
 
   ProcessUnmaterializedDirectory(dummy);

@@ -32,9 +32,9 @@ bool TieredCacheManager::DoFreeState(void *data) {
 
 int TieredCacheManager::DoRestoreState(void *data) {
   SavedState *state = reinterpret_cast<SavedState *>(data);
-  int new_root_fd = upper_->RestoreState(-1, state->state_upper);
+  const int new_root_fd = upper_->RestoreState(-1, state->state_upper);
   // The lower cache layer does not keep the root catalog open
-  int retval = lower_->RestoreState(-1, state->state_lower);
+  const int retval = lower_->RestoreState(-1, state->state_lower);
   assert(retval == -1);
   return new_root_fd;
 }
@@ -49,18 +49,18 @@ void *TieredCacheManager::DoSaveState() {
 
 
 int TieredCacheManager::Open(const LabeledObject &object) {
-  int fd = upper_->Open(object);
+  const int fd = upper_->Open(object);
   if ((fd >= 0) || (fd != -ENOENT)) {
     return fd;
   }
 
-  int fd2 = lower_->Open(object);
+  const int fd2 = lower_->Open(object);
   if (fd2 < 0) {
     return fd;
   }  // NOTE: use error code from upper.
 
   // Lower cache hit; upper cache miss.  Copy object into the upper cache.
-  int64_t size = lower_->GetSize(fd2);
+  const int64_t size = lower_->GetSize(fd2);
   if (size < 0) {
     lower_->Close(fd2);
     return fd;
@@ -78,7 +78,8 @@ int TieredCacheManager::Open(const LabeledObject &object) {
   uint64_t remaining = size;
   uint64_t offset = 0;
   while (remaining > 0) {
-    unsigned nbytes = remaining > kCopyBufferSize ? kCopyBufferSize : remaining;
+    const unsigned nbytes =
+        remaining > kCopyBufferSize ? kCopyBufferSize : remaining;
     int64_t result = lower_->Pread(fd2, &m_buffer[0], nbytes, offset);
     // The file we are reading is supposed to be exactly `size` bytes.
     if ((result < 0) || (result != nbytes)) {
@@ -96,7 +97,7 @@ int TieredCacheManager::Open(const LabeledObject &object) {
     remaining -= nbytes;
   }
   lower_->Close(fd2);
-  int fd_return = upper_->OpenFromTxn(txn);
+  const int fd_return = upper_->OpenFromTxn(txn);
   if (fd_return < 0) {
     upper_->AbortTxn(txn);
     return fd;
@@ -112,13 +113,13 @@ int TieredCacheManager::Open(const LabeledObject &object) {
 int TieredCacheManager::StartTxn(const shash::Any &id,
                                  uint64_t size,
                                  void *txn) {
-  int upper_result = upper_->StartTxn(id, size, txn);
+  const int upper_result = upper_->StartTxn(id, size, txn);
   if (lower_readonly_ || (upper_result < 0)) {
     return upper_result;
   }
 
   void *txn2 = static_cast<char *>(txn) + upper_->SizeOfTxn();
-  int lower_result = lower_->StartTxn(id, size, txn2);
+  const int lower_result = lower_->StartTxn(id, size, txn2);
   if (lower_result < 0) {
     upper_->AbortTxn(txn);
   }
@@ -149,7 +150,7 @@ void TieredCacheManager::CtrlTxn(const Label &label,
 
 
 int64_t TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
-  int upper_result = upper_->Write(buf, size, txn);
+  const int upper_result = upper_->Write(buf, size, txn);
   if (lower_readonly_ || (upper_result < 0)) {
     return upper_result;
   }
@@ -160,7 +161,7 @@ int64_t TieredCacheManager::Write(const void *buf, uint64_t size, void *txn) {
 
 
 int TieredCacheManager::Reset(void *txn) {
-  int upper_result = upper_->Reset(txn);
+  const int upper_result = upper_->Reset(txn);
 
   int lower_result = upper_result;
   if (!lower_readonly_) {
@@ -173,7 +174,7 @@ int TieredCacheManager::Reset(void *txn) {
 
 
 int TieredCacheManager::AbortTxn(void *txn) {
-  int upper_result = upper_->AbortTxn(txn);
+  const int upper_result = upper_->AbortTxn(txn);
 
   int lower_result = upper_result;
   if (!lower_readonly_) {
@@ -186,7 +187,7 @@ int TieredCacheManager::AbortTxn(void *txn) {
 
 
 int TieredCacheManager::CommitTxn(void *txn) {
-  int upper_result = upper_->CommitTxn(txn);
+  const int upper_result = upper_->CommitTxn(txn);
 
   int lower_result = upper_result;
   if (!lower_readonly_) {
@@ -208,7 +209,7 @@ manifest::Breadcrumb TieredCacheManager::LoadBreadcrumb(
 
 
 bool TieredCacheManager::StoreBreadcrumb(const manifest::Manifest &manifest) {
-  bool upper_success = upper_->StoreBreadcrumb(manifest);
+  const bool upper_success = upper_->StoreBreadcrumb(manifest);
   bool lower_success = true;
   if (!lower_readonly_)
     lower_success = lower_->StoreBreadcrumb(manifest);

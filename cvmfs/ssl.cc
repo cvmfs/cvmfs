@@ -59,7 +59,8 @@ SslCertificateStore::SslCertificateStore() {
 
 
 bool SslCertificateStore::ApplySslCertificatePath(CURL *handle) const {
-  CURLcode res1 = curl_easy_setopt(handle, CURLOPT_CAPATH, ca_path_.c_str());
+  const CURLcode res1 =
+      curl_easy_setopt(handle, CURLOPT_CAPATH, ca_path_.c_str());
   CURLcode res2 = CURLE_OK;
   if (!ca_bundle_.empty())
     res2 = curl_easy_setopt(handle, CURLOPT_CAINFO, ca_bundle_.c_str());

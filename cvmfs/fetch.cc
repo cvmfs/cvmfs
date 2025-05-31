@@ -29,7 +29,7 @@ void TLSDestructor(void *data) {
                                                                 ->tls_blocks_;
 
   {
-    MutexLockGuard m(tls->fetcher->lock_tls_blocks_);
+    const MutexLockGuard m(tls->fetcher->lock_tls_blocks_);
     for (vector<Fetcher::ThreadLocalStorage *>::iterator
              i = tls_blocks->begin(),
              iEnd = tls_blocks->end();
@@ -69,10 +69,10 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   MakePipe(tls->pipe_wait);
   tls->download_job.SetCompressed(true);
   tls->download_job.SetProbeHosts(true);
-  int retval = pthread_setspecific(thread_local_storage_, tls);
+  const int retval = pthread_setspecific(thread_local_storage_, tls);
   assert(retval == 0);
 
-  MutexLockGuard m(lock_tls_blocks_);
+  const MutexLockGuard m(lock_tls_blocks_);
   tls_blocks_.push_back(tls);
 
   return tls;
@@ -105,7 +105,8 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
   // Synchronization point: either act as a master thread for this object or
   // enqueue to the list of waiting threads.
   pthread_mutex_lock(lock_queues_download_);
-  ThreadQueues::iterator iDownloadQueue = queues_download_.find(object.id);
+  const ThreadQueues::iterator iDownloadQueue =
+      queues_download_.find(object.id);
   if (iDownloadQueue != queues_download_.end()) {
     LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s",
              object.label.path.c_str());
@@ -236,7 +237,7 @@ Fetcher::~Fetcher() {
   int retval;
 
   {
-    MutexLockGuard m(lock_tls_blocks_);
+    const MutexLockGuard m(lock_tls_blocks_);
     for (unsigned i = 0; i < tls_blocks_.size(); ++i)
       CleanupTls(tls_blocks_[i]);
   }
@@ -270,7 +271,7 @@ int Fetcher::OpenSelect(const CacheManager::LabeledObject &object) {
 void Fetcher::SignalWaitingThreads(const int fd,
                                    const shash::Any &id,
                                    ThreadLocalStorage *tls) {
-  MutexLockGuard m(lock_queues_download_);
+  const MutexLockGuard m(lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
     int fd_dup = (fd >= 0) ? cache_mgr_->Dup(fd) : fd;
     WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));

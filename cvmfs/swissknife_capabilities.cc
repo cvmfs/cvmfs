@@ -15,7 +15,7 @@
 namespace swissknife {
 
 bool ObtainDacReadSearchCapability() {
-  cap_value_t cap = CAP_DAC_READ_SEARCH;
+  const cap_value_t cap = CAP_DAC_READ_SEARCH;
 #ifdef CAP_IS_SUPPORTED
   assert(CAP_IS_SUPPORTED(cap));
 #endif

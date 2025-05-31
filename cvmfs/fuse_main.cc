@@ -28,8 +28,8 @@ using namespace stub;  // NOLINT
 
 int main(int argc, char **argv) {
   // Getopt option parsing modifies globals and the argv vector
-  int opterr_save = opterr;
-  int optc = argc;
+  const int opterr_save = opterr;
+  const int optc = argc;
   assert(optc > 0);
   char **optv = reinterpret_cast<char **>(smalloc(optc * sizeof(char *)));
   for (int i = 0; i < optc; ++i) {
@@ -71,8 +71,8 @@ int main(int argc, char **argv) {
   }
   free(optv);
 
-  std::string libname_fuse2 = platform_libname("cvmfs_fuse_stub");
-  std::string libname_fuse3 = platform_libname("cvmfs_fuse3_stub");
+  const std::string libname_fuse2 = platform_libname("cvmfs_fuse_stub");
+  const std::string libname_fuse3 = platform_libname("cvmfs_fuse3_stub");
 
   std::string error_messages;
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
 
   void *library_handle;
   std::vector<std::string>::const_iterator i = library_paths.begin();
-  std::vector<std::string>::const_iterator iend = library_paths.end();
+  const std::vector<std::string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {
     library_handle = dlopen(i->c_str(), RTLD_NOW | RTLD_LOCAL);
     if (library_handle != NULL) {

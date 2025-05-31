@@ -31,7 +31,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
   if (mountpoint_->catalog_mgr()->GetRootHash() == root_hash)
     return kStatusUp2Date;
 
-  FenceGuard fence_guard(&fence_maintenance_);
+  const FenceGuard fence_guard(&fence_maintenance_);
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
@@ -68,7 +68,7 @@ FuseRemounter::Status FuseRemounter::ChangeRoot(const shash::Any &root_hash) {
  * drainout mode if a new catalog is available online.
  */
 FuseRemounter::Status FuseRemounter::Check() {
-  FenceGuard fence_guard(&fence_maintenance_);
+  const FenceGuard fence_guard(&fence_maintenance_);
   if (IsInMaintenanceMode())
     return kStatusMaintenance;
 
@@ -113,8 +113,8 @@ FuseRemounter::Status FuseRemounter::Check() {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "catalog up to date (could be offline mode)");
       SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
-      unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
-                                   : mountpoint_->GetEffectiveTtlSec();
+      const unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
+                                         : mountpoint_->GetEffectiveTtlSec();
       catalogs_valid_until_ = time(NULL) + ttl;
       SetAlarm(ttl);
       return kStatusUp2Date;
@@ -132,7 +132,7 @@ FuseRemounter::Status FuseRemounter::Check() {
 FuseRemounter::Status FuseRemounter::CheckSynchronously() {
   BackoffThrottle throttle;
   while (true) {
-    Status status = Check();
+    const Status status = Check();
     switch (status) {
       case kStatusDraining:
         TryFinish();
@@ -205,11 +205,11 @@ void *FuseRemounter::MainRemountTrigger(void *data) {
   watch_ctrl.events = POLLIN | POLLPRI;
   while (true) {
     watch_ctrl.revents = 0;
-    int retval = poll(&watch_ctrl, 1, timeout_ms);
+    const int retval = poll(&watch_ctrl, 1, timeout_ms);
     if (retval < 0) {
       if (errno == EINTR) {
         if (timeout_ms >= 0) {
-          uint64_t now = platform_monotonic_time();
+          const uint64_t now = platform_monotonic_time();
           timeout_ms = (now > deadline) ? 0 : (deadline - now) * 1000;
         }
         continue;
@@ -272,13 +272,13 @@ void FuseRemounter::Spawn() {
   invalidator_->Spawn();
   if (!mountpoint_->fixed_catalog()) {
     MakePipe(pipe_remount_trigger_);
-    int retval = pthread_create(&thread_remount_trigger_, NULL,
-                                MainRemountTrigger, this);
+    const int retval = pthread_create(&thread_remount_trigger_, NULL,
+                                      MainRemountTrigger, this);
     assert(retval == 0);
 
     SetOfflineMode(mountpoint_->catalog_mgr()->offline_mode());
-    unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
-                                 : mountpoint_->GetEffectiveTtlSec();
+    const unsigned ttl = offline_mode_ ? MountPoint::kShortTermTTL
+                                       : mountpoint_->GetEffectiveTtlSec();
     catalogs_valid_until_ = time(NULL) + ttl;
     SetAlarm(ttl);
   }
@@ -292,7 +292,7 @@ void FuseRemounter::Spawn() {
  * flushed.
  */
 void FuseRemounter::TryFinish(const shash::Any &root_hash) {
-  FenceGuard fence_guard(&fence_maintenance_);
+  const FenceGuard fence_guard(&fence_maintenance_);
   if (IsInMaintenanceMode())
     return;
   if (!EnterCriticalSection())

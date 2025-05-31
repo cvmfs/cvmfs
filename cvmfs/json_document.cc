@@ -17,7 +17,7 @@ using namespace std;  // NOLINT
 
 JsonDocument *JsonDocument::Create(const string &text) {
   UniquePtr<JsonDocument> json(new JsonDocument());
-  bool retval = json->Parse(text);
+  const bool retval = json->Parse(text);
   if (!retval)
     return NULL;
   return json.Release();
@@ -114,7 +114,7 @@ string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
 string JsonDocument::PrintCanonical() {
   if (!root_)
     return "";
-  PrintOptions print_options;
+  const PrintOptions print_options;
   return PrintObject(root_->first_child, print_options);
 }
 

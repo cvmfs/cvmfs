@@ -325,7 +325,7 @@ SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
 }
 
 unsigned SqlCountTags::RetrieveCount() const {
-  int64_t count = RetrieveInt64(0);
+  const int64_t count = RetrieveInt64(0);
   assert(count >= 0);
   return static_cast<uint64_t>(count);
 }
@@ -388,10 +388,10 @@ SqlListBranches::SqlListBranches(const HistoryDatabase *database) {
 
 
 History::Branch SqlListBranches::RetrieveBranch() const {
-  std::string branch = RetrieveString(0);
-  std::string parent = (RetrieveType(1) == SQLITE_NULL) ? ""
-                                                        : RetrieveString(1);
-  unsigned initial_revision = RetrieveInt64(2);
+  const std::string branch = RetrieveString(0);
+  const std::string parent =
+      (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
+  const unsigned initial_revision = RetrieveInt64(2);
   return History::Branch(branch, parent, initial_revision);
 }
 
