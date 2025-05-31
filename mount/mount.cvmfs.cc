@@ -56,7 +56,8 @@ static string MkFqrn(const string &repository) {
   const string::size_type idx = repository.find_last_of('.');
   if (idx == string::npos) {
     string domain;
-    bool retval = options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    const bool retval =
+        options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "CVMFS_DEFAULT_DOMAIN missing");
@@ -147,7 +148,7 @@ static bool CheckStrictMount(const string &fqrn) {
 
 static bool CheckProxy() {
   string param;
-  int retval = options_manager_.GetValue("CVMFS_HTTP_PROXY", &param);
+  const int retval = options_manager_.GetValue("CVMFS_HTTP_PROXY", &param);
   if (!retval || param.empty()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_HTTP_PROXY required");
     return false;
@@ -161,7 +162,7 @@ static bool CheckConcurrentMount(const string &fqrn,
                                  string *mountpointp) {
   LockFile(workspace + "/cvmfs_io." + fqrn + ".mountcheck.lock");
   // Try connecting to cvmfs_io socket
-  int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+  const int socket_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (socket_fd < 0)
     return false;
 
@@ -181,18 +182,18 @@ static bool CheckConcurrentMount(const string &fqrn,
 static int GetExistingFuseFd(const string &fqrn, const string &workspace,
                              uid_t cvmfs_uid) {
   // Try connecting to cvmfs_io socket
-  int talk_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
+  const int talk_fd = ConnectSocket(workspace + "/cvmfs_io." + fqrn);
   if (talk_fd < 0)
     return -1;
 
   // Create temporary socket
-  std::string recv_sock_dir = CreateTempDir(workspace + "/fusefd");
+  const std::string recv_sock_dir = CreateTempDir(workspace + "/fusefd");
   if (recv_sock_dir.empty() || (chmod(recv_sock_dir.c_str(), 0755) != 0)) {
     close(talk_fd);
     return -1;
   }
-  std::string recv_sock_path = recv_sock_dir + "/sock";
-  int recv_sock_fd = MakeSocket(recv_sock_path, 0660);
+  const std::string recv_sock_path = recv_sock_dir + "/sock";
+  const int recv_sock_fd = MakeSocket(recv_sock_path, 0660);
   if ((recv_sock_fd < 0)
       || (chown(recv_sock_path.c_str(), cvmfs_uid, getegid()) != 0)) {
     if (recv_sock_fd >= 0)
@@ -218,8 +219,8 @@ static int GetExistingFuseFd(const string &fqrn, const string &workspace,
   if (result == "OK") {
     struct sockaddr_un addr;
     unsigned int len = sizeof(addr);
-    int con_fd = accept(recv_sock_fd,
-                        reinterpret_cast<struct sockaddr *>(&addr), &len);
+    const int con_fd =
+        accept(recv_sock_fd, reinterpret_cast<struct sockaddr *>(&addr), &len);
     fuse_fd = RecvFdFromSocket(con_fd);
     close(con_fd);
   }
@@ -274,12 +275,12 @@ static bool GetWorkspace(const string &fqrn, string *workspace) {
 
 static bool WaitForReload(const std::string &mountpoint) {
   string param;
-  int retval = options_manager_.GetValue("CVMFS_RELOAD_SOCKETS", &param);
+  const int retval = options_manager_.GetValue("CVMFS_RELOAD_SOCKETS", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_RELOAD_SOCKETS required");
     return false;
   }
-  string reload_guard = param + "/cvmfs.pause";
+  const string reload_guard = param + "/cvmfs.pause";
   // Deprecated, now a directory
   if (FileExists(reload_guard)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Waiting for CernVM-FS reload...");
@@ -303,7 +304,7 @@ static bool WaitForReload(const std::string &mountpoint) {
 
 static bool GetCvmfsUser(string *cvmfs_user) {
   string param;
-  int retval = options_manager_.GetValue("CVMFS_USER", &param);
+  const int retval = options_manager_.GetValue("CVMFS_USER", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_USER required");
     return false;
@@ -417,12 +418,12 @@ int main(int argc, char **argv) {
   // everything before the last slash (/)/
   if (HasPrefix(device, "/", false))
     device = GetFileName(device);
-  sanitizer::RepositorySanitizer repository_sanitizer;
+  const sanitizer::RepositorySanitizer repository_sanitizer;
   if (device.empty() || !repository_sanitizer.IsValid(device)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Invalid repository: %s", device.c_str());
     return 1;
   }
-  string mountpoint = argv[optind + 1];
+  const string mountpoint = argv[optind + 1];
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
@@ -507,7 +508,7 @@ int main(int argc, char **argv) {
     if ((mountpoint == prev_mountpoint) && !IsMountPoint(mountpoint)) {
       // Allow for group access to the socket receiving the fuse fd
       umask(007);
-      int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
+      const int fuse_fd = GetExistingFuseFd(fqrn, workspace, uid_cvmfs);
       if (fuse_fd < 0) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "Cannot connect to existing fuse module");
@@ -669,7 +670,7 @@ int main(int argc, char **argv) {
   close(fd_stdin);
 
   // Print stdout / stderr and collect exit code
-  int nfds = fd_stdout > fd_stderr ? fd_stdout + 1 : fd_stderr + 1;
+  const int nfds = fd_stdout > fd_stderr ? fd_stdout + 1 : fd_stderr + 1;
   fd_set readfds;
   bool stdout_open = true;
   bool stderr_open = true;
