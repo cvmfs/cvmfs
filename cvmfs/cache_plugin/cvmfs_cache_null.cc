@@ -66,7 +66,7 @@ map<std::string, cvmcache_breadcrumb> breadcrumbs;
 struct cvmcache_context *ctx;
 
 static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
-  ComparableHash h(*id);
+  const ComparableHash h(*id);
   if (storage.find(h) == storage.end())
     return CVMCACHE_STATUS_NOENTRY;
 
@@ -81,11 +81,11 @@ static int null_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
 
 static int null_obj_info(struct cvmcache_hash *id,
                          struct cvmcache_object_info *info) {
-  ComparableHash h(*id);
+  const ComparableHash h(*id);
   if (storage.find(h) == storage.end())
     return CVMCACHE_STATUS_NOENTRY;
 
-  Object obj = storage[h];
+  const Object obj = storage[h];
   info->size = obj.data.length();
   info->type = obj.type;
   info->pinned = obj.refcnt > 0;
@@ -98,12 +98,12 @@ static int null_pread(struct cvmcache_hash *id,
                       uint64_t offset,
                       uint32_t *size,
                       unsigned char *buffer) {
-  ComparableHash h(*id);
+  const ComparableHash h(*id);
   string data = storage[h].data;
   if (offset > data.length())
     return CVMCACHE_STATUS_OUTOFBOUNDS;
-  unsigned nbytes = std::min(*size,
-                             static_cast<uint32_t>(data.length() - offset));
+  const unsigned nbytes =
+      std::min(*size, static_cast<uint32_t>(data.length() - offset));
   memcpy(buffer, data.data() + offset, nbytes);
   *size = nbytes;
   return CVMCACHE_STATUS_OK;
@@ -138,8 +138,8 @@ static int null_write_txn(uint64_t txn_id,
 
 
 static int null_commit_txn(uint64_t txn_id) {
-  TxnInfo txn = transactions[txn_id];
-  ComparableHash h(txn.id);
+  const TxnInfo txn = transactions[txn_id];
+  const ComparableHash h(txn.id);
   storage[h] = txn.partial_object;
   transactions.erase(txn_id);
   return CVMCACHE_STATUS_OK;
@@ -181,8 +181,8 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
       ++i;
       continue;
     }
-    unsigned length = i->second.data.length();
-    map<ComparableHash, Object>::iterator delete_me = i++;
+    const unsigned length = i->second.data.length();
+    const map<ComparableHash, Object>::iterator delete_me = i++;
     storage.erase(delete_me);
     info.used_bytes -= length;
     if (info.used_bytes <= shrink_to) {
@@ -198,8 +198,8 @@ static int null_shrink(uint64_t shrink_to, uint64_t *used) {
       ++i;
       continue;
     }
-    unsigned length = i->second.data.length();
-    map<ComparableHash, Object>::iterator delete_me = i++;
+    const unsigned length = i->second.data.length();
+    const map<ComparableHash, Object>::iterator delete_me = i++;
     storage.erase(delete_me);
     info.used_bytes -= length;
     if (info.used_bytes <= shrink_to) {
@@ -265,8 +265,8 @@ static int null_breadcrumb_store(const char *fqrn,
 
 static int null_breadcrumb_load(const char *fqrn,
                                 cvmcache_breadcrumb *breadcrumb) {
-  map<std::string, cvmcache_breadcrumb>::const_iterator itr = breadcrumbs.find(
-      fqrn);
+  const map<std::string, cvmcache_breadcrumb>::const_iterator itr =
+      breadcrumbs.find(fqrn);
   if (itr == breadcrumbs.end())
     return CVMCACHE_STATUS_NOENTRY;
   *breadcrumb = itr->second;
@@ -321,7 +321,7 @@ int main(int argc, char **argv) {
   callbacks.capabilities = CVMCACHE_CAP_ALL_V2;
 
   ctx = cvmcache_init(&callbacks);
-  int retval = cvmcache_listen(ctx, locator);
+  const int retval = cvmcache_listen(ctx, locator);
   if (!retval) {
     fprintf(stderr, "failed to listen on %s\n", locator);
     return 1;
@@ -333,8 +333,8 @@ int main(int argc, char **argv) {
     int statloc;
     if ((pid = fork()) == 0) {
       if ((pid = fork()) == 0) {
-        int null_read = open("/dev/null", O_RDONLY);
-        int null_write = open("/dev/null", O_WRONLY);
+        const int null_read = open("/dev/null", O_RDONLY);
+        const int null_write = open("/dev/null", O_WRONLY);
         assert((null_read >= 0) && (null_write >= 0));
         int retval = dup2(null_read, 0);
         assert(retval == 0);
@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
     printf("Press <Ctrl+D> to quit\n");
     while (true) {
       char buf;
-      int retval = read(fileno(stdin), &buf, 1);
+      const int retval = read(fileno(stdin), &buf, 1);
       if (retval != 1)
         break;
       if (buf == 'R') {

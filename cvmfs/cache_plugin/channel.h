@@ -179,8 +179,8 @@ class CachePlugin {
     SessionCtxGuard(uint64_t session_id, CachePlugin *plugin) {
       char *reponame = NULL;
       char *client_instance = NULL;
-      std::map<uint64_t, SessionInfo>::const_iterator
-          iter = plugin->sessions_.find(session_id);
+      const std::map<uint64_t, SessionInfo>::const_iterator iter =
+          plugin->sessions_.find(session_id);
       if (iter != plugin->sessions_.end()) {
         reponame = iter->second.reponame;
         client_instance = iter->second.client_instance;

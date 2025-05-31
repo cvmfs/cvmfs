@@ -167,8 +167,8 @@ int posix_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
     if (change_by < 0) {
       return CVMCACHE_STATUS_BADCOUNT;
     }
-    CacheManager::LabeledObject labeled_object(Chash2Cpphash(id));
-    int fd = g_cache_mgr->Open(labeled_object);
+    const CacheManager::LabeledObject labeled_object(Chash2Cpphash(id));
+    const int fd = g_cache_mgr->Open(labeled_object);
     if (fd < 0) {
       return CVMCACHE_STATUS_NOENTRY;
     }
@@ -215,7 +215,8 @@ int posix_pread(struct cvmcache_hash *id, uint64_t offset, uint32_t *size,
   if (offset > object.size) {
     return CVMCACHE_STATUS_OUTOFBOUNDS;
   }
-  int64_t bytes_read = g_cache_mgr->Pread(object.fd, buffer, *size, offset);
+  const int64_t bytes_read =
+      g_cache_mgr->Pread(object.fd, buffer, *size, offset);
   if (bytes_read < 0) {
     return CVMCACHE_STATUS_IOERR;
   }
@@ -228,7 +229,7 @@ int posix_start_txn(struct cvmcache_hash *id,
                     struct cvmcache_object_info *info) {
   // cachemgr deletes txn in commit_txn
   void *txn = malloc(g_cache_mgr->SizeOfTxn());
-  int fd = g_cache_mgr->StartTxn(Chash2Cpphash(id), info->size, txn);
+  const int fd = g_cache_mgr->StartTxn(Chash2Cpphash(id), info->size, txn);
   if (fd < 0) {
     return CVMCACHE_STATUS_IOERR;
   }
@@ -258,7 +259,8 @@ int posix_write_txn(uint64_t txn_id, unsigned char *buffer, uint32_t size) {
   if (!g_transactions->Lookup(txn_id, &transaction)) {
     return CVMCACHE_STATUS_NOENTRY;
   }
-  int64_t bytes_written = g_cache_mgr->Write(buffer, size, transaction.txn);
+  const int64_t bytes_written =
+      g_cache_mgr->Write(buffer, size, transaction.txn);
   if ((bytes_written >= 0) && (static_cast<uint32_t>(bytes_written) == size)) {
     return CVMCACHE_STATUS_OK;
   } else {
@@ -277,7 +279,7 @@ int posix_commit_txn(uint64_t txn_id) {
     if (object.fd < 0) {
       return CVMCACHE_STATUS_IOERR;
     }
-    int result = g_cache_mgr->CommitTxn(transaction.txn);
+    const int result = g_cache_mgr->CommitTxn(transaction.txn);
     if (result) {
       return CVMCACHE_STATUS_IOERR;
     }
@@ -319,8 +321,8 @@ int posix_info(struct cvmcache_info *info) {
 
 int posix_breadcrumb_store(const char *fqrn,
                            const cvmcache_breadcrumb *breadcrumb) {
-  manifest::Breadcrumb bc(Chash2Cpphash(&breadcrumb->catalog_hash),
-                          breadcrumb->timestamp, breadcrumb->revision);
+  const manifest::Breadcrumb bc(Chash2Cpphash(&breadcrumb->catalog_hash),
+                                breadcrumb->timestamp, breadcrumb->revision);
   if (!g_cache_mgr->StoreBreadcrumb(fqrn, bc)) {
     return CVMCACHE_STATUS_IOERR;
   }
@@ -328,7 +330,7 @@ int posix_breadcrumb_store(const char *fqrn,
 }
 
 int posix_breadcrumb_load(const char *fqrn, cvmcache_breadcrumb *breadcrumb) {
-  manifest::Breadcrumb bc = g_cache_mgr->LoadBreadcrumb(fqrn);
+  const manifest::Breadcrumb bc = g_cache_mgr->LoadBreadcrumb(fqrn);
   if (!bc.IsValid()) {
     return CVMCACHE_STATUS_NOENTRY;
   }
@@ -423,7 +425,7 @@ int main(int argc, char **argv) {
                            + CVMCACHE_CAP_INFO + CVMCACHE_CAP_BREADCRUMB;
 
   g_ctx = cvmcache_init(&callbacks);
-  int retval = cvmcache_listen(g_ctx, locator);
+  const int retval = cvmcache_listen(g_ctx, locator);
   if (!retval) {
     LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr, "failed to listen on %s",
              locator);
@@ -436,8 +438,8 @@ int main(int argc, char **argv) {
     int statloc;
     if ((pid = fork()) == 0) {
       if ((pid = fork()) == 0) {
-        int null_read = open("/dev/null", O_RDONLY);
-        int null_write = open("/dev/null", O_WRONLY);
+        const int null_read = open("/dev/null", O_RDONLY);
+        const int null_write = open("/dev/null", O_WRONLY);
         assert((null_read >= 0) && (null_write >= 0));
         int retval = dup2(null_read, 0);
         assert(retval == 0);

@@ -147,7 +147,7 @@ class LruCache : SingleCopy {
      */
     explicit MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
-      unsigned int num_bytes_bitmap = num_slots / 8;
+      const unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
       assert((num_slots % bits_per_block_) == 0);
       assert(num_slots >= 2 * bits_per_block_);
@@ -533,7 +533,7 @@ class LruCache : SingleCopy {
                allocator_.bytes_allocated() + cache_.bytes_allocated());
 
 #ifdef LRU_CACHE_THREAD_SAFE
-    int retval = pthread_mutex_init(&lock_, NULL);
+    const int retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
 #endif
   }
@@ -603,7 +603,7 @@ class LruCache : SingleCopy {
     // Is not called from the client, only from the cache plugin
     assert(!pause_);
     CacheEntry entry;
-    bool retval = DoLookup(key, &entry);
+    const bool retval = DoLookup(key, &entry);
     assert(retval);
     perf::Inc(counters_.n_update);
     Touch(entry);
@@ -758,7 +758,7 @@ class LruCache : SingleCopy {
     assert(filter_entry_);
     assert(!filter_entry_->IsListHead());
     *key = static_cast<ConcreteListEntryContent *>(filter_entry_)->content();
-    bool rc = this->DoLookup(*key, &entry);
+    const bool rc = this->DoLookup(*key, &entry);
     assert(rc);
     *value = entry.value;
   }

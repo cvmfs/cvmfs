@@ -87,7 +87,7 @@ class ForwardCachePlugin : public CachePlugin {
   virtual cvmfs::EnumStatus ChangeRefcount(const shash::Any &id,
                                            int32_t change_by) {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
-    int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
+    const int result = callbacks_.cvmcache_chrefcnt(&c_hash, change_by);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -97,7 +97,7 @@ class ForwardCachePlugin : public CachePlugin {
     cvmcache_object_info c_info;
     memset(&c_info, 0, sizeof(c_info));
     c_info.size = CachePlugin::kSizeUnknown;
-    int result = callbacks_.cvmcache_obj_info(&c_hash, &c_info);
+    const int result = callbacks_.cvmcache_obj_info(&c_hash, &c_info);
     info->size = c_info.size;
     info->object_type = static_cast<cvmfs::EnumObjectType>(c_info.type);
     info->pinned = c_info.pinned;
@@ -113,7 +113,7 @@ class ForwardCachePlugin : public CachePlugin {
                                   uint32_t *size,
                                   unsigned char *buffer) {
     struct cvmcache_hash c_hash = Cpphash2Chash(id);
-    int result = callbacks_.cvmcache_pread(&c_hash, offset, size, buffer);
+    const int result = callbacks_.cvmcache_pread(&c_hash, offset, size, buffer);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -133,7 +133,7 @@ class ForwardCachePlugin : public CachePlugin {
     } else {
       c_info.description = strdup(info.description.c_str());
     }
-    int result = callbacks_.cvmcache_start_txn(&c_hash, txn_id, &c_info);
+    const int result = callbacks_.cvmcache_start_txn(&c_hash, txn_id, &c_info);
     free(c_info.description);
     return static_cast<cvmfs::EnumStatus>(result);
   }
@@ -144,7 +144,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_write_txn(txn_id, buffer, size);
+    const int result = callbacks_.cvmcache_write_txn(txn_id, buffer, size);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -152,7 +152,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_commit_txn(txn_id);
+    const int result = callbacks_.cvmcache_commit_txn(txn_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -160,7 +160,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_WRITE))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_abort_txn(txn_id);
+    const int result = callbacks_.cvmcache_abort_txn(txn_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -173,7 +173,7 @@ class ForwardCachePlugin : public CachePlugin {
     c_info.used_bytes = info->used_bytes;
     c_info.pinned_bytes = info->pinned_bytes;
     c_info.no_shrink = info->no_shrink;
-    int result = callbacks_.cvmcache_info(&c_info);
+    const int result = callbacks_.cvmcache_info(&c_info);
     if (result == CVMCACHE_STATUS_OK) {
       info->size_bytes = c_info.size_bytes;
       info->used_bytes = c_info.used_bytes;
@@ -187,7 +187,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_SHRINK))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_shrink(shrink_to, used);
+    const int result = callbacks_.cvmcache_shrink(shrink_to, used);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -196,8 +196,8 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_listing_begin(lst_id,
-                                                   ObjectType2CType(type));
+    const int result =
+        callbacks_.cvmcache_listing_begin(lst_id, ObjectType2CType(type));
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -207,7 +207,7 @@ class ForwardCachePlugin : public CachePlugin {
 
     struct cvmcache_object_info c_item;
     memset(&c_item, 0, sizeof(c_item));
-    int result = callbacks_.cvmcache_listing_next(lst_id, &c_item);
+    const int result = callbacks_.cvmcache_listing_next(lst_id, &c_item);
     if (result == CVMCACHE_STATUS_OK) {
       item->id = Chash2Cpphash(&c_item.id);
       item->size = c_item.size;
@@ -225,7 +225,7 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
-    int result = callbacks_.cvmcache_listing_end(lst_id);
+    const int result = callbacks_.cvmcache_listing_end(lst_id);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -235,8 +235,8 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     cvmcache_breadcrumb c_breadcrumb;
-    int result = callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(),
-                                                     &c_breadcrumb);
+    const int result =
+        callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(), &c_breadcrumb);
     if (result == CVMCACHE_STATUS_OK) {
       breadcrumb->catalog_hash = Chash2Cpphash(&c_breadcrumb.catalog_hash);
       breadcrumb->timestamp = c_breadcrumb.timestamp;
@@ -254,8 +254,8 @@ class ForwardCachePlugin : public CachePlugin {
     c_breadcrumb.catalog_hash = Cpphash2Chash(breadcrumb.catalog_hash);
     c_breadcrumb.timestamp = breadcrumb.timestamp;
     c_breadcrumb.revision = breadcrumb.revision;
-    int result = callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(),
-                                                      &c_breadcrumb);
+    const int result =
+        callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(), &c_breadcrumb);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

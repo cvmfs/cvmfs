@@ -31,7 +31,7 @@ void cvmcache_options_free(char *value) { free(value); }
 
 char *cvmcache_options_get(SimpleOptionsParser *opts, const char *key) {
   string arg;
-  bool retval = opts->GetValue(key, &arg);
+  const bool retval = opts->GetValue(key, &arg);
   if (!retval)
     return NULL;
   char *result = strdup(arg.c_str());
@@ -65,7 +65,7 @@ void cvmcache_options_set(SimpleOptionsParser *opts, const char *key,
 
 
 int cvmcache_options_parse(SimpleOptionsParser *opts, const char *path) {
-  bool result = opts->TryParsePath(path);
+  const bool result = opts->TryParsePath(path);
   return result ? 0 : -1;
 }
 

@@ -306,7 +306,7 @@ class SmallHashDynamic
 
   void Shrink() {
     if (size() < threshold_shrink_) {
-      uint32_t target_capacity = capacity() / 2;
+      const uint32_t target_capacity = capacity() / 2;
       if (target_capacity >= Base::initial_capacity_)
         Migrate(target_capacity);
     }

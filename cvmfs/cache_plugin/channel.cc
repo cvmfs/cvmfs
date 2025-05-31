@@ -38,7 +38,7 @@ void SessionCtx::CleanupInstance() {
 SessionCtx::SessionCtx() {
   lock_tls_blocks_ = reinterpret_cast<pthread_mutex_t *>(
       smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
+  const int retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
 }
 
@@ -51,7 +51,7 @@ SessionCtx::~SessionCtx() {
     delete tls_blocks_[i];
   }
 
-  int retval = pthread_key_delete(thread_local_storage_);
+  const int retval = pthread_key_delete(thread_local_storage_);
   assert(retval == 0);
 }
 
@@ -59,8 +59,8 @@ SessionCtx::~SessionCtx() {
 SessionCtx *SessionCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new SessionCtx();
-    int retval = pthread_key_create(&instance_->thread_local_storage_,
-                                    TlsDestructor);
+    const int retval =
+        pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
     assert(retval == 0);
   }
 
@@ -99,9 +99,9 @@ void SessionCtx::Set(uint64_t id, char *reponame, char *client_instance) {
 
   if (tls == NULL) {
     tls = new ThreadLocalStorage(id, reponame, client_instance);
-    int retval = pthread_setspecific(thread_local_storage_, tls);
+    const int retval = pthread_setspecific(thread_local_storage_, tls);
     assert(retval == 0);
-    MutexLockGuard lock_guard(lock_tls_blocks_);
+    const MutexLockGuard lock_guard(lock_tls_blocks_);
     tls_blocks_.push_back(tls);
   } else {
     tls->id = id;
@@ -117,7 +117,7 @@ void SessionCtx::TlsDestructor(void *data) {
   delete tls;
 
   assert(instance_);
-  MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
+  const MutexLockGuard lock_guard(instance_->lock_tls_blocks_);
   for (vector<ThreadLocalStorage *>::iterator
            i = instance_->tls_blocks_.begin(),
            iEnd = instance_->tls_blocks_.end();
@@ -196,14 +196,14 @@ CachePlugin::~CachePlugin() {
 
 void CachePlugin::HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
                                         CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgBreadcrumbReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   manifest::Breadcrumb breadcrumb;
-  bool retval = transport->ParseMsgHash(msg_req->breadcrumb().hash(),
-                                        &breadcrumb.catalog_hash);
+  const bool retval = transport->ParseMsgHash(msg_req->breadcrumb().hash(),
+                                              &breadcrumb.catalog_hash);
   if (!retval) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed hash received from client");
@@ -215,8 +215,8 @@ void CachePlugin::HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
     } else {
       breadcrumb.revision = 0;
     }
-    cvmfs::EnumStatus status = StoreBreadcrumb(msg_req->breadcrumb().fqrn(),
-                                               breadcrumb);
+    const cvmfs::EnumStatus status =
+        StoreBreadcrumb(msg_req->breadcrumb().fqrn(), breadcrumb);
     msg_reply.set_status(status);
   }
   transport->SendFrame(&frame_send);
@@ -225,13 +225,13 @@ void CachePlugin::HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
 
 void CachePlugin::HandleBreadcrumbLoad(cvmfs::MsgBreadcrumbLoadReq *msg_req,
                                        CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgBreadcrumbReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   manifest::Breadcrumb breadcrumb;
-  cvmfs::EnumStatus status = LoadBreadcrumb(msg_req->fqrn(), &breadcrumb);
+  const cvmfs::EnumStatus status = LoadBreadcrumb(msg_req->fqrn(), &breadcrumb);
   msg_reply.set_status(status);
   if (status == cvmfs::STATUS_OK) {
     assert(breadcrumb.IsValid());
@@ -250,7 +250,7 @@ void CachePlugin::HandleBreadcrumbLoad(cvmfs::MsgBreadcrumbLoadReq *msg_req,
 
 void CachePlugin::HandleHandshake(cvmfs::MsgHandshake *msg_req,
                                   CacheTransport *transport) {
-  uint64_t session_id = NextSessionId();
+  const uint64_t session_id = NextSessionId();
   if (msg_req->has_name()) {
     sessions_[session_id] = SessionInfo(session_id, msg_req->name());
   } else {
@@ -274,13 +274,13 @@ void CachePlugin::HandleHandshake(cvmfs::MsgHandshake *msg_req,
 
 void CachePlugin::HandleInfo(cvmfs::MsgInfoReq *msg_req,
                              CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   Info info;
-  cvmfs::EnumStatus status = GetInfo(&info);
+  const cvmfs::EnumStatus status = GetInfo(&info);
   if (status != cvmfs::STATUS_OK) {
     LogSessionError(msg_req->session_id(), status,
                     "failed to query cache status");
@@ -297,7 +297,7 @@ void CachePlugin::HandleInfo(cvmfs::MsgInfoReq *msg_req,
 void CachePlugin::HandleIoctl(cvmfs::MsgIoctl *msg_req) {
   if (!msg_req->has_conncnt_change_by())
     return;
-  int32_t conncnt_change_by = msg_req->conncnt_change_by();
+  const int32_t conncnt_change_by = msg_req->conncnt_change_by();
   if ((static_cast<int32_t>(num_inlimbo_clients_) + conncnt_change_by) < 0) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "invalid request to drop connection counter below zero");
@@ -314,7 +314,7 @@ void CachePlugin::HandleIoctl(cvmfs::MsgIoctl *msg_req) {
 
 void CachePlugin::HandleList(cvmfs::MsgListReq *msg_req,
                              CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgListReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
@@ -368,20 +368,20 @@ void CachePlugin::HandleList(cvmfs::MsgListReq *msg_req,
 
 void CachePlugin::HandleObjectInfo(cvmfs::MsgObjectInfoReq *msg_req,
                                    CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgObjectInfoReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   shash::Any object_id;
-  bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+  const bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
     ObjectInfo info;
-    cvmfs::EnumStatus status = GetObjectInfo(object_id, &info);
+    const cvmfs::EnumStatus status = GetObjectInfo(object_id, &info);
     msg_reply.set_status(status);
     if (status == cvmfs::STATUS_OK) {
       msg_reply.set_object_type(info.object_type);
@@ -397,13 +397,13 @@ void CachePlugin::HandleObjectInfo(cvmfs::MsgObjectInfoReq *msg_req,
 
 void CachePlugin::HandleRead(cvmfs::MsgReadReq *msg_req,
                              CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgReadReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   shash::Any object_id;
-  bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+  const bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval || (msg_req->size() > max_object_size_)) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed hash received from client");
@@ -417,7 +417,8 @@ void CachePlugin::HandleRead(cvmfs::MsgReadReq *msg_req,
 #else
   unsigned char buffer[size];
 #endif
-  cvmfs::EnumStatus status = Pread(object_id, msg_req->offset(), &size, buffer);
+  const cvmfs::EnumStatus status =
+      Pread(object_id, msg_req->offset(), &size, buffer);
   msg_reply.set_status(status);
   if (status == cvmfs::STATUS_OK) {
     frame_send.set_attachment(buffer, size);
@@ -434,19 +435,20 @@ void CachePlugin::HandleRead(cvmfs::MsgReadReq *msg_req,
 
 void CachePlugin::HandleRefcount(cvmfs::MsgRefcountReq *msg_req,
                                  CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgRefcountReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   shash::Any object_id;
-  bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
+  const bool retval = transport->ParseMsgHash(msg_req->object_id(), &object_id);
   if (!retval) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
-    cvmfs::EnumStatus status = ChangeRefcount(object_id, msg_req->change_by());
+    const cvmfs::EnumStatus status =
+        ChangeRefcount(object_id, msg_req->change_by());
     msg_reply.set_status(status);
     if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_NOENTRY)) {
       LogSessionError(msg_req->session_id(), status,
@@ -462,7 +464,7 @@ bool CachePlugin::HandleRequest(int fd_con) {
   char buffer[max_object_size_];
   CacheTransport::Frame frame_recv;
   frame_recv.set_attachment(buffer, max_object_size_);
-  bool retval = transport.RecvFrame(&frame_recv);
+  const bool retval = transport.RecvFrame(&frame_recv);
   if (!retval) {
     LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
              "failed to receive request from connection (%d)", errno);
@@ -477,8 +479,8 @@ bool CachePlugin::HandleRequest(int fd_con) {
     HandleHandshake(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
     cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
-    map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(
-        msg_req->session_id());
+    const map<uint64_t, SessionInfo>::const_iterator iter =
+        sessions_.find(msg_req->session_id());
     if (iter != sessions_.end()) {
       free(iter->second.reponame);
       free(iter->second.client_instance);
@@ -540,13 +542,13 @@ bool CachePlugin::HandleRequest(int fd_con) {
 
 void CachePlugin::HandleShrink(cvmfs::MsgShrinkReq *msg_req,
                                CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgShrinkReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
 
   msg_reply.set_req_id(msg_req->req_id());
   uint64_t used_bytes = 0;
-  cvmfs::EnumStatus status = Shrink(msg_req->shrink_to(), &used_bytes);
+  const cvmfs::EnumStatus status = Shrink(msg_req->shrink_to(), &used_bytes);
   msg_reply.set_used_bytes(used_bytes);
   msg_reply.set_status(status);
   if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_PARTIAL)) {
@@ -558,20 +560,20 @@ void CachePlugin::HandleShrink(cvmfs::MsgShrinkReq *msg_req,
 
 void CachePlugin::HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
                                    CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
   msg_reply.set_req_id(msg_req->req_id());
   msg_reply.set_part_nr(0);
   uint64_t txn_id;
-  UniqueRequest uniq_req(msg_req->session_id(), msg_req->req_id());
-  bool retval = txn_ids_.Lookup(uniq_req, &txn_id);
+  const UniqueRequest uniq_req(msg_req->session_id(), msg_req->req_id());
+  const bool retval = txn_ids_.Lookup(uniq_req, &txn_id);
   if (!retval) {
     LogSessionError(msg_req->session_id(), cvmfs::STATUS_MALFORMED,
                     "malformed transaction id received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
-    cvmfs::EnumStatus status = AbortTxn(txn_id);
+    const cvmfs::EnumStatus status = AbortTxn(txn_id);
     msg_reply.set_status(status);
     if (status != cvmfs::STATUS_OK) {
       LogSessionError(msg_req->session_id(), status,
@@ -586,7 +588,7 @@ void CachePlugin::HandleStoreAbort(cvmfs::MsgStoreAbortReq *msg_req,
 void CachePlugin::HandleStore(cvmfs::MsgStoreReq *msg_req,
                               CacheTransport::Frame *frame,
                               CacheTransport *transport) {
-  SessionCtxGuard session_guard(msg_req->session_id(), this);
+  const SessionCtxGuard session_guard(msg_req->session_id(), this);
   cvmfs::MsgStoreReply msg_reply;
   CacheTransport::Frame frame_send(&msg_reply);
   msg_reply.set_req_id(msg_req->req_id());
@@ -602,7 +604,7 @@ void CachePlugin::HandleStore(cvmfs::MsgStoreReq *msg_req,
     return;
   }
 
-  UniqueRequest uniq_req(msg_req->session_id(), msg_req->req_id());
+  const UniqueRequest uniq_req(msg_req->session_id(), msg_req->req_id());
   uint64_t txn_id;
   cvmfs::EnumStatus status = cvmfs::STATUS_OK;
   if (msg_req->part_nr() == 1) {
@@ -677,7 +679,7 @@ bool CachePlugin::IsRunning() { return atomic_read32(&running_) != 0; }
 bool CachePlugin::Listen(const string &locator) {
   vector<string> tokens = SplitString(locator, '=');
   if (tokens[0] == "unix") {
-    string lock_path = tokens[1] + ".lock";
+    const string lock_path = tokens[1] + ".lock";
     fd_socket_lock_ = TryLockFile(lock_path);
     if (fd_socket_lock_ == -1) {
       LogCvmfs(kLogCache, kLogSyslogErr | kLogDebug,
@@ -724,7 +726,7 @@ bool CachePlugin::Listen(const string &locator) {
     is_local_ = false;
     return false;
   }
-  int retval = listen(fd_socket_, 32);
+  const int retval = listen(fd_socket_, 32);
   assert(retval == 0);
 
   return true;
@@ -733,7 +735,8 @@ bool CachePlugin::Listen(const string &locator) {
 
 void CachePlugin::LogSessionInfo(uint64_t session_id, const string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(session_id);
+  const map<uint64_t, SessionInfo>::const_iterator iter =
+      sessions_.find(session_id);
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
@@ -746,7 +749,8 @@ void CachePlugin::LogSessionError(uint64_t session_id,
                                   cvmfs::EnumStatus status,
                                   const std::string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(session_id);
+  const map<uint64_t, SessionInfo>::const_iterator iter =
+      sessions_.find(session_id);
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
@@ -776,7 +780,7 @@ void *CachePlugin::MainProcessRequests(void *data) {
   while (!terminated) {
     for (unsigned i = 0; i < watch_fds.size(); ++i)
       watch_fds[i].revents = 0;
-    int retval = poll(&watch_fds[0], watch_fds.size(), -1);
+    const int retval = poll(&watch_fds[0], watch_fds.size(), -1);
     if (retval < 0) {
       if (errno == EINTR)
         continue;
@@ -805,8 +809,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
     if (watch_fds[1].revents) {
       struct sockaddr_un remote;
       socklen_t socket_size = sizeof(remote);
-      int fd_con = accept(watch_fds[1].fd, (struct sockaddr *)&remote,
-                          &socket_size);
+      const int fd_con =
+          accept(watch_fds[1].fd, (struct sockaddr *)&remote, &socket_size);
       if (fd_con < 0) {
         LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
                  "failed to establish connection (%d)", errno);
@@ -822,7 +826,7 @@ void *CachePlugin::MainProcessRequests(void *data) {
     // New request
     for (unsigned i = 2; i < watch_fds.size();) {
       if (watch_fds[i].revents) {
-        bool proceed = cache_plugin->HandleRequest(watch_fds[i].fd);
+        const bool proceed = cache_plugin->HandleRequest(watch_fds[i].fd);
         if (!proceed) {
           close(watch_fds[i].fd);
           cache_plugin->connections_.erase(watch_fds[i].fd);
@@ -861,14 +865,15 @@ void CachePlugin::NotifySupervisor(char signal) {
   char *pipe_ready = getenv(CacheTransport::kEnvReadyNotifyFd);
   if (pipe_ready == NULL)
     return;
-  int fd_pipe_ready = String2Int64(pipe_ready);
+  const int fd_pipe_ready = String2Int64(pipe_ready);
   WritePipe(fd_pipe_ready, &signal, 1);
 }
 
 
 void CachePlugin::ProcessRequests(unsigned num_workers) {
   num_workers_ = num_workers;
-  int retval = pthread_create(&thread_io_, NULL, MainProcessRequests, this);
+  const int retval =
+      pthread_create(&thread_io_, NULL, MainProcessRequests, this);
   assert(retval == 0);
   NotifySupervisor(CacheTransport::kReadyNotification);
   atomic_cas32(&running_, 0, 1);
@@ -877,7 +882,7 @@ void CachePlugin::ProcessRequests(unsigned num_workers) {
 
 void CachePlugin::SendDetachRequests() {
   set<int>::const_iterator iter = connections_.begin();
-  set<int>::const_iterator iter_end = connections_.end();
+  const set<int>::const_iterator iter_end = connections_.end();
   for (; iter != iter_end; ++iter) {
     CacheTransport transport(*iter,
                              CacheTransport::kFlagSendIgnoreFailure

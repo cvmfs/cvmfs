@@ -189,7 +189,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   void DropBreadcrumbs() { breadcrumbs_.clear(); }
 
   static int ram_chrefcnt(struct cvmcache_hash *id, int32_t change_by) {
-    ComparableHash h(*id);
+    const ComparableHash h(*id);
     ObjectHeader *object;
     if (!Me()->objects_all_->Lookup(h, &object))
       return CVMCACHE_STATUS_NOENTRY;
@@ -217,7 +217,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
   static int ram_obj_info(struct cvmcache_hash *id,
                           struct cvmcache_object_info *info) {
-    ComparableHash h(*id);
+    const ComparableHash h(*id);
     ObjectHeader *object;
     if (!Me()->objects_all_->Lookup(h, &object, false))
       return CVMCACHE_STATUS_NOENTRY;
@@ -236,14 +236,14 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
                        uint64_t offset,
                        uint32_t *size,
                        unsigned char *buffer) {
-    ComparableHash h(*id);
+    const ComparableHash h(*id);
     ObjectHeader *object;
-    bool retval = Me()->objects_all_->Lookup(h, &object, false);
+    const bool retval = Me()->objects_all_->Lookup(h, &object, false);
     assert(retval);
     if (offset > object->size_data)
       return CVMCACHE_STATUS_OUTOFBOUNDS;
-    unsigned nbytes = std::min(
-        *size, static_cast<uint32_t>(object->size_data - offset));
+    const unsigned nbytes =
+        std::min(*size, static_cast<uint32_t>(object->size_data - offset));
     memcpy(buffer, object->GetData() + offset, nbytes);
     *size = nbytes;
     return CVMCACHE_STATUS_OK;
@@ -265,8 +265,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     object_header.type = info->type;
     object_header.id = *id;
 
-    uint32_t total_size = sizeof(object_header) + object_header.size_desc
-                          + object_header.size_data;
+    const uint32_t total_size = sizeof(object_header) +
+                                object_header.size_desc +
+                                object_header.size_data;
     Me()->TryFreeSpace(total_size);
     ObjectHeader *allocd_object = reinterpret_cast<ObjectHeader *>(
         Me()->storage_->Allocate(total_size, &object_header,
@@ -291,12 +292,12 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if (txn_object->neg_nbytes_written > 0)
       txn_object->neg_nbytes_written = 0;
     if ((size - txn_object->neg_nbytes_written) > txn_object->size_data) {
-      uint32_t current_size = Me()->storage_->GetSize(txn_object);
-      uint32_t header_size = current_size - txn_object->size_data;
-      uint32_t new_size = std::max(
-          header_size + size - txn_object->neg_nbytes_written,
-          uint32_t(current_size * kObjectExpandFactor));
-      bool did_compact = Me()->TryFreeSpace(new_size);
+      const uint32_t current_size = Me()->storage_->GetSize(txn_object);
+      const uint32_t header_size = current_size - txn_object->size_data;
+      const uint32_t new_size =
+          std::max(header_size + size - txn_object->neg_nbytes_written,
+                   uint32_t(current_size * kObjectExpandFactor));
+      const bool did_compact = Me()->TryFreeSpace(new_size);
       if (did_compact) {
         retval = Me()->transactions_.Lookup(txn_id, &txn_object);
         assert(retval);
@@ -322,11 +323,11 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
       return CVMCACHE_STATUS_NOSPACE;
 
     ObjectHeader *txn_object;
-    int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
+    const int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
 
     Me()->transactions_.Erase(txn_id);
-    ComparableHash h(txn_object->id);
+    const ComparableHash h(txn_object->id);
     ObjectHeader *existing_object;
     if (Me()->objects_all_->Lookup(h, &existing_object)) {
       // Concurrent addition of same objects, drop the one at hand and
@@ -357,7 +358,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
   static int ram_abort_txn(uint64_t txn_id) {
     ObjectHeader *txn_object = NULL;
-    int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
+    const int retval = Me()->transactions_.Lookup(txn_id, &txn_object);
     assert(retval);
     Me()->transactions_.Erase(txn_id);
     Me()->storage_->MarkFree(txn_object);
@@ -413,7 +414,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   static int ram_listing_next(int64_t listing_id,
                               struct cvmcache_object_info *item) {
     Listing *lst;
-    bool retval = Me()->listings_.Lookup(listing_id, &lst);
+    const bool retval = Me()->listings_.Lookup(listing_id, &lst);
     assert(retval);
     if (lst->pos >= lst->elems.size())
       return CVMCACHE_STATUS_OUTOFBOUNDS;
@@ -425,7 +426,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
   static int ram_listing_end(int64_t listing_id) {
     Listing *lst;
-    bool retval = Me()->listings_.Lookup(listing_id, &lst);
+    const bool retval = Me()->listings_.Lookup(listing_id, &lst);
     assert(retval);
 
     // Don't free description strings, done by the library
@@ -444,8 +445,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
   static int ram_breadcrumb_load(const char *fqrn,
                                  cvmcache_breadcrumb *breadcrumb) {
-    map<std::string, cvmcache_breadcrumb>::const_iterator
-        itr = Me()->breadcrumbs_.find(fqrn);
+    const map<std::string, cvmcache_breadcrumb>::const_iterator itr =
+        Me()->breadcrumbs_.find(fqrn);
     if (itr == Me()->breadcrumbs_.end())
       return CVMCACHE_STATUS_NOENTRY;
     *breadcrumb = itr->second;
@@ -464,7 +465,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   explicit PluginRamCache(uint64_t mem_size) {
     in_danger_zone_ = false;
 
-    uint64_t heap_size = RoundUp8(
+    const uint64_t heap_size = RoundUp8(
         std::max(kMinSize, uint64_t(mem_size * (1.0 - kSlotFraction))));
     memset(&cache_info_, 0, sizeof(cache_info_));
     cache_info_.size_bytes = heap_size;
@@ -477,10 +478,10 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     transactions_.Init(64, uint64_t(-1), hasher_uint64);
     listings_.Init(8, uint64_t(-1), hasher_uint64);
 
-    double slot_size = lru::LruCache<ComparableHash,
-                                     ObjectHeader *>::GetEntrySize();
-    uint64_t num_slots = uint64_t((heap_size * kSlotFraction)
-                                  / (2.0 * slot_size));
+    const double slot_size =
+        lru::LruCache<ComparableHash, ObjectHeader *>::GetEntrySize();
+    const uint64_t num_slots =
+        uint64_t((heap_size * kSlotFraction) / (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
@@ -516,9 +517,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         return true;
     }
 
-    uint64_t shrink_to = std::min(
-        storage_->capacity() - (bytes_required + 8),
-        uint64_t(storage_->capacity() * kShrinkFactor));
+    const uint64_t shrink_to =
+        std::min(storage_->capacity() - (bytes_required + 8),
+                 uint64_t(storage_->capacity() * kShrinkFactor));
     DoShrink(shrink_to);
     return true;
   }
@@ -526,7 +527,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
   void OnBlockMove(const MallocHeap::BlockPtr &ptr) {
     assert(ptr.pointer);
     ObjectHeader *object = reinterpret_cast<ObjectHeader *>(ptr.pointer);
-    ComparableHash h(object->id);
+    const ComparableHash h(object->id);
     if (object->txn_id == uint64_t(-1)) {
       bool retval = objects_all_->UpdateValue(h, object);
       assert(retval);
@@ -535,7 +536,7 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         assert(retval);
       }
     } else {
-      uint64_t old_size = transactions_.size();
+      const uint64_t old_size = transactions_.size();
       transactions_.Insert(object->txn_id, object);
       assert(old_size == transactions_.size());
     }
@@ -708,8 +709,8 @@ int main(int argc, char **argv) {
     int statloc;
     if ((pid = fork()) == 0) {
       if ((pid = fork()) == 0) {
-        int null_read = open("/dev/null", O_RDONLY);
-        int null_write = open("/dev/null", O_WRONLY);
+        const int null_read = open("/dev/null", O_RDONLY);
+        const int null_write = open("/dev/null", O_WRONLY);
         assert((null_read >= 0) && (null_write >= 0));
         int retval = dup2(null_read, 0);
         assert(retval == 0);
