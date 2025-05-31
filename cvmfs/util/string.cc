@@ -148,7 +148,7 @@ std::string RfcTimestamp() {
   const char *day_of_week[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
   struct tm timestamp;
-  time_t now = time(NULL);
+  const time_t now = time(NULL);
   gmtime_r(&now, &timestamp);
 
   char buffer[30];
@@ -166,7 +166,7 @@ std::string RfcTimestamp() {
  */
 std::string IsoTimestamp() {
   struct tm timestamp;
-  time_t now = time(NULL);
+  const time_t now = time(NULL);
   gmtime_r(&now, &timestamp);
 
   char buffer[17];
@@ -207,7 +207,7 @@ string StringifyTimeval(const timeval value) {
  */
 time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
   time_t utc_time = 0;
-  unsigned length = iso8601.length();
+  const unsigned length = iso8601.length();
 
   if (length != 20)
     return utc_time;
@@ -397,12 +397,12 @@ void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
 }
 
 bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
-  int fd = open(filename.c_str(), O_RDONLY);
+  const int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0)
     return false;
 
   unsigned char buffer[4096];
-  ssize_t num_bytes = read(fd, buffer, sizeof(buffer));
+  const ssize_t num_bytes = read(fd, buffer, sizeof(buffer));
   close(fd);
 
   if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
@@ -430,7 +430,7 @@ bool GetLineFile(FILE *f, std::string *line) {
     } else if (retval == EOF) {
       break;
     }
-    char c = static_cast<char>(retval);
+    const char c = static_cast<char>(retval);
     if (c == '\n')
       break;
     line->push_back(c);
@@ -609,7 +609,7 @@ bool Debase64(const string &data, string *decoded) {
 
   while (pos < length) {
     unsigned char decoded_block[3];
-    bool retval = Debase64Block(data_ptr + pos, decoded_block);
+    const bool retval = Debase64Block(data_ptr + pos, decoded_block);
     if (!retval)
       return false;
     decoded->append(reinterpret_cast<char *>(decoded_block), 3);
@@ -631,10 +631,10 @@ string Tail(const string &source, unsigned num_lines) {
   if (source.empty() || (num_lines == 0))
     return "";
 
-  int l = static_cast<int>(source.length());
+  const int l = static_cast<int>(source.length());
   int i = l - 1;
   for (; i >= 0; --i) {
-    char c = source.data()[i];
+    const char c = source.data()[i];
     if (c == '\n') {
       if (num_lines == 0) {
         return source.substr(i + 1);
@@ -654,7 +654,7 @@ string Tail(const string &source, unsigned num_lines) {
 std::string GetGMTimestamp(const std::string &format) {
   struct tm time_ptr;
   char date_and_time[100];
-  time_t t = time(NULL);
+  const time_t t = time(NULL);
   gmtime_r(&t, &time_ptr);  // take UTC
   // return empty string if formatting fails
   if (!strftime(date_and_time, 100, format.c_str(), &time_ptr)) {

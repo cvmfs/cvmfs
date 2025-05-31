@@ -37,7 +37,7 @@ FileBackedBuffer::~FileBackedBuffer() {
     return;
 
   if (state_ == kWriteState) {
-    int retval = fclose(fp_);
+    const int retval = fclose(fp_);
     if (retval != 0)
       PANIC(kLogStderr, "could not close temporary file %s: error %d",
             file_path_.c_str(), retval);
@@ -45,7 +45,7 @@ FileBackedBuffer::~FileBackedBuffer() {
     mmapped_->Unmap();
     delete mmapped_;
   }
-  int retval = unlink(file_path_.c_str());
+  const int retval = unlink(file_path_.c_str());
   if (retval != 0)
     PANIC(kLogStderr, "could not delete temporary file %s: error %d",
           file_path_.c_str(), retval);
@@ -73,7 +73,8 @@ void FileBackedBuffer::Append(const void *source, uint64_t len) {
       buf_ = reinterpret_cast<unsigned char *>(smalloc(len));
       size_ = len;
     } else if (size_ < pos_ + len) {
-      uint64_t newsize = (size_ * 2 < pos_ + len) ? (pos_ + len) : (size_ * 2);
+      const uint64_t newsize =
+          (size_ * 2 < pos_ + len) ? (pos_ + len) : (size_ * 2);
       buf_ = reinterpret_cast<unsigned char *>(srealloc(buf_, newsize));
       size_ = newsize;
     }
@@ -82,7 +83,7 @@ void FileBackedBuffer::Append(const void *source, uint64_t len) {
     pos_ += len;
   } else {
     assert(fp_ != NULL);
-    uint64_t bytes_written = fwrite(source, 1, len, fp_);
+    const uint64_t bytes_written = fwrite(source, 1, len, fp_);
     if (bytes_written != len) {
       PANIC(kLogStderr,
             "could not append to temporary file %s: length %lu, "
@@ -98,7 +99,7 @@ void FileBackedBuffer::Commit() {
   assert(state_ == kWriteState);
 
   if (mode_ == kFileMode) {
-    int retval = fclose(fp_);
+    const int retval = fclose(fp_);
     if (retval != 0)
       PANIC(kLogStderr, "could not close file after writing finished: %s",
             file_path_.c_str());
@@ -120,9 +121,10 @@ void FileBackedBuffer::Commit() {
 int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
   assert(state_ == kReadState);
 
-  int64_t actual_len = (pos + len <= size_) ? len
-                                            : static_cast<int64_t>(size_)
-                                                  - static_cast<int64_t>(pos);
+  const int64_t actual_len =
+      (pos + len <= size_)
+          ? len
+          : static_cast<int64_t>(size_) - static_cast<int64_t>(pos);
   assert(actual_len >= 0);
 
   if (mode_ == kMemoryMode) {
@@ -134,14 +136,14 @@ int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
 }
 
 int64_t FileBackedBuffer::Read(void *ptr, int64_t len) {
-  int64_t bytes_read = ReadP(ptr, len, pos_);
+  const int64_t bytes_read = ReadP(ptr, len, pos_);
   pos_ += bytes_read;
   return bytes_read;
 }
 
 int64_t FileBackedBuffer::ReadP(void *ptr, int64_t len, uint64_t pos) {
   void *source;
-  int64_t bytes_read = Data(&source, len, pos);
+  const int64_t bytes_read = Data(&source, len, pos);
   memcpy(ptr, source, bytes_read);
   return bytes_read;
 }
@@ -167,7 +169,7 @@ void FileBackedBuffer::SaveToFile() {
   if (fp_ == NULL)
     PANIC(kLogStderr, "could not create temporary file");
 
-  uint64_t bytes_written = fwrite(buf_, 1, pos_, fp_);
+  const uint64_t bytes_written = fwrite(buf_, 1, pos_, fp_);
   if (bytes_written != pos_) {
     PANIC(kLogStderr,
           "could not write to temporary file %s: length %lu, "

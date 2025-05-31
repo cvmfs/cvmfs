@@ -46,7 +46,7 @@ int CheckNamespaceFeatures() {
   int result = kNsFeatureMount;  // available since kernel 2.4
   if (SymlinkExists("/proc/self/ns/pid"))
     result |= kNsFeaturePid;
-  int fd = open("/proc/sys/kernel/unprivileged_userns_clone", O_RDONLY);
+  const int fd = open("/proc/sys/kernel/unprivileged_userns_clone", O_RDONLY);
   if (fd < 0)
     return result;
   result |= kNsFeatureUserAvailable;
@@ -60,10 +60,10 @@ int CheckNamespaceFeatures() {
 
 NamespaceFailures CreateUserNamespace(uid_t map_uid_to, gid_t map_gid_to) {
 #ifdef CVMFS_HAS_UNSHARE
-  std::string uid_str = StringifyInt(geteuid());
-  std::string gid_str = StringifyInt(getegid());
+  const std::string uid_str = StringifyInt(geteuid());
+  const std::string gid_str = StringifyInt(getegid());
 
-  int rvi = unshare(CLONE_NEWUSER);
+  const int rvi = unshare(CLONE_NEWUSER);
   if (rvi != 0)
     return kFailNsUnshare;
 
@@ -107,7 +107,7 @@ bool BindMount(const std::string &from, const std::string &to) {
 #ifdef __APPLE__
   return false;
 #else
-  int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC, NULL);
+  const int rvi = mount(from.c_str(), to.c_str(), "", MS_BIND | MS_REC, NULL);
   return rvi == 0;
 #endif
 }
@@ -117,7 +117,7 @@ bool ProcMount(const std::string &to) {
 #ifdef __APPLE__
   return false;
 #else
-  int rvi = mount("proc", to.c_str(), "proc", 0, NULL);
+  const int rvi = mount("proc", to.c_str(), "proc", 0, NULL);
   return rvi == 0;
 #endif
 }
@@ -125,7 +125,7 @@ bool ProcMount(const std::string &to) {
 
 bool CreateMountNamespace() {
 #ifdef CVMFS_HAS_UNSHARE
-  std::string cwd = GetCurrentWorkingDirectory();
+  const std::string cwd = GetCurrentWorkingDirectory();
 
   int rvi = unshare(CLONE_NEWNS);
   if (rvi != 0)
@@ -144,7 +144,7 @@ namespace {
 
 static void Reaper(int /*sig*/, siginfo_t * /*siginfo*/, void * /*context*/) {
   while (true) {
-    pid_t retval = waitpid(-1, NULL, WNOHANG);
+    const pid_t retval = waitpid(-1, NULL, WNOHANG);
     if (retval <= 0)
       return;
   }

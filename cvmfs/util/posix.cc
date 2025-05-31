@@ -114,7 +114,7 @@ std::string MakeCanonicalPath(const std::string &path) {
 void SplitPath(const std::string &path,
                std::string *dirname,
                std::string *filename) {
-  size_t dir_sep = path.rfind('/');
+  const size_t dir_sep = path.rfind('/');
   if (dir_sep != std::string::npos) {
     *dirname = path.substr(0, dir_sep);
     *filename = path.substr(dir_sep + 1);
@@ -180,7 +180,7 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
   FileSystemInfo result;
 
   struct statfs info;
-  int retval = statfs(path.c_str(), &info);
+  const int retval = statfs(path.c_str(), &info);
   if (retval != 0)
     return result;
 
@@ -221,7 +221,7 @@ FileSystemInfo GetFileSystemInfo(const std::string &path) {
 std::string ReadSymlink(const std::string &path) {
   // TODO(jblomer): avoid PATH_MAX
   char buf[PATH_MAX + 1];
-  ssize_t nchars = readlink(path.c_str(), buf, PATH_MAX);
+  const ssize_t nchars = readlink(path.c_str(), buf, PATH_MAX);
   if (nchars >= 0) {
     buf[nchars] = '\0';
     return std::string(buf);
@@ -237,11 +237,11 @@ std::string ReadSymlink(const std::string &path) {
 std::string ResolvePath(const std::string &path) {
   if (path.empty() || (path == "/"))
     return "/";
-  std::string name = GetFileName(path);
+  const std::string name = GetFileName(path);
   std::string result = name;
   if (name != path) {
     // There is a parent path of 'path'
-    std::string parent = ResolvePath(GetParentPath(path));
+    const std::string parent = ResolvePath(GetParentPath(path));
     result = parent + (parent == "/" ? "" : "/") + name;
   }
   char *real_result = realpath(result.c_str(), NULL);
@@ -251,7 +251,7 @@ std::string ResolvePath(const std::string &path) {
   }
   if (SymlinkExists(result)) {
     char buf[PATH_MAX + 1];
-    ssize_t nchars = readlink(result.c_str(), buf, PATH_MAX);
+    const ssize_t nchars = readlink(result.c_str(), buf, PATH_MAX);
     if (nchars >= 0) {
       buf[nchars] = '\0';
       result = buf;
@@ -263,7 +263,7 @@ std::string ResolvePath(const std::string &path) {
 
 bool IsMountPoint(const std::string &path) {
   std::vector<std::string> mount_list = platform_mountlist();
-  std::string resolved_path = ResolvePath(path);
+  const std::string resolved_path = ResolvePath(path);
   for (unsigned i = 0; i < mount_list.size(); ++i) {
     if (mount_list[i] == resolved_path)
       return true;
@@ -278,7 +278,7 @@ bool IsMountPoint(const std::string &path) {
 void CreateFile(const std::string &path,
                 const int mode,
                 const bool ignore_failure) {
-  int fd = open(path.c_str(), O_CREAT, mode);
+  const int fd = open(path.c_str(), O_CREAT, mode);
   if (fd >= 0) {
     close(fd);
     return;
@@ -294,19 +294,19 @@ void CreateFile(const std::string &path,
  */
 static std::string MakeShortSocketLink(const std::string &path) {
   struct sockaddr_un sock_addr;
-  unsigned max_length = sizeof(sock_addr.sun_path);
+  const unsigned max_length = sizeof(sock_addr.sun_path);
 
   std::string result;
-  std::string tmp_path = CreateTempDir("/tmp/cvmfs");
+  const std::string tmp_path = CreateTempDir("/tmp/cvmfs");
   if (tmp_path.empty())
     return "";
-  std::string link = tmp_path + "/l";
+  const std::string link = tmp_path + "/l";
   result = link + "/" + GetFileName(path);
   if (result.length() >= max_length) {
     rmdir(tmp_path.c_str());
     return "";
   }
-  int retval = symlink(GetParentPath(path).c_str(), link.c_str());
+  const int retval = symlink(GetParentPath(path).c_str(), link.c_str());
   if (retval != 0) {
     rmdir(tmp_path.c_str());
     return "";
@@ -315,7 +315,7 @@ static std::string MakeShortSocketLink(const std::string &path) {
 }
 
 static void RemoveShortSocketLink(const std::string &short_path) {
-  std::string link = GetParentPath(short_path);
+  const std::string link = GetParentPath(short_path);
   unlink(link.c_str());
   rmdir(GetParentPath(link).c_str());
 }
@@ -435,9 +435,9 @@ int ConnectSocket(const std::string &path) {
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
 
-  int retval = connect(
-      socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
-      sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
+  const int retval =
+      connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
+              sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
 
@@ -485,7 +485,7 @@ int ConnectTcpEndpoint(const std::string &ipv4_address, int portno) {
  * Creating a pipe should always succeed.
  */
 void MakePipe(int pipe_fd[2]) {
-  int retval = pipe(pipe_fd);
+  const int retval = pipe(pipe_fd);
   assert(retval == 0);
 }
 
@@ -632,8 +632,8 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   }
 
   for (unsigned i = 0; i < subdirs.size(); ++i) {
-    bool retval_subtree = DiffTree(path_a + "/" + subdirs[i],
-                                   path_b + "/" + subdirs[i]);
+    const bool retval_subtree =
+        DiffTree(path_a + "/" + subdirs[i], path_b + "/" + subdirs[i]);
     if (!retval_subtree)
       return false;
   }
@@ -646,9 +646,9 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
  * Changes a non-blocking file descriptor to a blocking one.
  */
 void Nonblock2Block(int filedes) {
-  int flags = fcntl(filedes, F_GETFL);
+  const int flags = fcntl(filedes, F_GETFL);
   assert(flags != -1);
-  int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
+  const int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
   assert(retval != -1);
 }
 
@@ -657,9 +657,9 @@ void Nonblock2Block(int filedes) {
  * Changes a blocking file descriptor to a non-blocking one.
  */
 void Block2Nonblock(int filedes) {
-  int flags = fcntl(filedes, F_GETFL);
+  const int flags = fcntl(filedes, F_GETFL);
   assert(flags != -1);
-  int retval = fcntl(filedes, F_SETFL, flags | O_NONBLOCK);
+  const int retval = fcntl(filedes, F_SETFL, flags | O_NONBLOCK);
   assert(retval != -1);
 }
 
@@ -706,7 +706,7 @@ bool SendFd2Socket(int socket_fd, int passing_fd) {
   cmsgp->cmsg_type = SCM_RIGHTS;
   memcpy(CMSG_DATA(cmsgp), &passing_fd, sizeof(int));
 
-  ssize_t retval = sendmsg(socket_fd, &msgh, 0);
+  const ssize_t retval = sendmsg(socket_fd, &msgh, 0);
   return (retval != -1);
 }
 
@@ -741,7 +741,7 @@ int RecvFdFromSocket(int msg_fd) {
   msgh.msg_control = ctrl_msg.buf;
   msgh.msg_controllen = sizeof(ctrl_msg.buf);
 
-  ssize_t retval = recvmsg(msg_fd, &msgh, 0);
+  const ssize_t retval = recvmsg(msg_fd, &msgh, 0);
   if (retval == -1)
     return -errno;
 
@@ -761,7 +761,7 @@ int RecvFdFromSocket(int msg_fd) {
 
 std::string GetHostname() {
   char name[HOST_NAME_MAX + 1];
-  int retval = gethostname(name, HOST_NAME_MAX);
+  const int retval = gethostname(name, HOST_NAME_MAX);
   assert(retval == 0);
   return name;
 }
@@ -811,7 +811,7 @@ bool FileExists(const std::string &path) {
  */
 int64_t GetFileSize(const std::string &path) {
   platform_stat64 info;
-  int retval = platform_stat(path.c_str(), &info);
+  const int retval = platform_stat(path.c_str(), &info);
   if (retval != 0)
     return -1;
   return info.st_size;
@@ -962,7 +962,8 @@ int WritePidFile(const std::string &path) {
   char buf[64];
 
   snprintf(buf, sizeof(buf), "%" PRId64 "\n", static_cast<uint64_t>(getpid()));
-  bool retval = (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
+  const bool retval =
+      (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
   if (!retval) {
     UnlockFile(fd);
     return -1;
@@ -1001,7 +1002,7 @@ int LockFile(const std::string &path) {
 
 
 void UnlockFile(const int filedes) {
-  int retval = flock(filedes, LOCK_UN);
+  const int retval = flock(filedes, LOCK_UN);
   assert(retval == 0);
   close(filedes);
 }
@@ -1014,7 +1015,7 @@ FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path) {
   *final_path = path_prefix + ".XXXXXX";
   char *tmp_file = strdupa(final_path->c_str());
-  int tmp_fd = mkstemp(tmp_file);
+  const int tmp_fd = mkstemp(tmp_file);
   if (tmp_fd < 0) {
     return NULL;
   }
@@ -1052,7 +1053,7 @@ std::string CreateTempPath(const std::string &path_prefix, const int mode) {
  * Create a directory with a unique name.
  */
 std::string CreateTempDir(const std::string &path_prefix) {
-  std::string dir = path_prefix + ".XXXXXX";
+  const std::string dir = path_prefix + ".XXXXXX";
   char *tmp_dir = strdupa(dir.c_str());
   tmp_dir = mkdtemp(tmp_dir);
   if (tmp_dir == NULL)
@@ -1078,17 +1079,17 @@ class RemoveTreeHelper {
   bool success;
   RemoveTreeHelper() { success = true; }
   void RemoveFile(const std::string &parent_path, const std::string &name) {
-    int retval = unlink((parent_path + "/" + name).c_str());
+    const int retval = unlink((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
   }
   void RemoveDir(const std::string &parent_path, const std::string &name) {
-    int retval = rmdir((parent_path + "/" + name).c_str());
+    const int retval = rmdir((parent_path + "/" + name).c_str());
     if (retval != 0)
       success = false;
   }
   bool TryRemoveDir(const std::string &parent_path, const std::string &name) {
-    int retval = rmdir((parent_path + "/" + name).c_str());
+    const int retval = rmdir((parent_path + "/" + name).c_str());
     return (retval != 0);
   }
 };
@@ -1099,7 +1100,7 @@ class RemoveTreeHelper {
  */
 bool RemoveTree(const std::string &path) {
   platform_stat64 info;
-  int retval = platform_lstat(path.c_str(), &info);
+  const int retval = platform_lstat(path.c_str(), &info);
   if (retval != 0)
     return errno == ENOENT;
   if (!S_ISDIR(info.st_mode))
@@ -1115,7 +1116,7 @@ bool RemoveTree(const std::string &path) {
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.fn_new_dir_prefix = &RemoveTreeHelper::TryRemoveDir;
   traversal.Recurse(path);
-  bool result = remove_tree_helper->success;
+  const bool result = remove_tree_helper->success;
   delete remove_tree_helper;
 
   return result;
@@ -1188,7 +1189,7 @@ std::vector<std::string> FindDirectories(const std::string &parent_dir) {
     const std::string path = parent_dir + "/" + name;
 
     platform_stat64 info;
-    int retval = platform_stat(path.c_str(), &info);
+    const int retval = platform_stat(path.c_str(), &info);
     if (retval != 0)
       continue;
     if (S_ISDIR(info.st_mode))
@@ -1218,7 +1219,7 @@ bool ListDirectory(const std::string &directory,
     const std::string path = directory + "/" + name;
 
     platform_stat64 info;
-    int retval = platform_lstat(path.c_str(), &info);
+    const int retval = platform_lstat(path.c_str(), &info);
     if (retval != 0) {
       closedir(dirp);
       return false;
@@ -1385,7 +1386,7 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
  *       this function and beware of scalability bottlenecks
  */
 mode_t GetUmask() {
-  MutexLockGuard m(&getumask_mutex);
+  const MutexLockGuard m(&getumask_mutex);
   const mode_t my_umask = umask(0);
   umask(my_umask);
   return my_umask;
@@ -1396,7 +1397,7 @@ mode_t GetUmask() {
  * Adds gid to the list of supplementary groups
  */
 bool AddGroup2Persona(const gid_t gid) {
-  int ngroups = getgroups(0, NULL);
+  const int ngroups = getgroups(0, NULL);
   if (ngroups < 0)
     return false;
   gid_t *groups = static_cast<gid_t *>(smalloc((ngroups + 1) * sizeof(gid_t)));
@@ -1419,7 +1420,7 @@ bool AddGroup2Persona(const gid_t gid) {
 
 
 std::string GetHomeDirectory() {
-  uid_t uid = getuid();
+  const uid_t uid = getuid();
   struct passwd pwd;
   struct passwd *result = NULL;
   int bufsize = 16 * 1024;
@@ -1442,7 +1443,7 @@ std::string GetHomeDirectory() {
  */
 std::string GetArch() {
   struct utsname info;
-  int retval = uname(&info);
+  const int retval = uname(&info);
   assert(retval == 0);
   return info.machine;
 }
@@ -1459,7 +1460,7 @@ int SetLimitNoFile(unsigned limit_nofile) {
   if (rpl.rlim_max < limit_nofile)
     rpl.rlim_max = limit_nofile;
   rpl.rlim_cur = limit_nofile;
-  int retval = setrlimit(RLIMIT_NOFILE, &rpl);
+  const int retval = setrlimit(RLIMIT_NOFILE, &rpl);
   if (retval == 0)
     return 0;
 
@@ -1508,9 +1509,9 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
 
     std::vector<std::string> fd_names;
     std::vector<mode_t> fd_modes;
-    std::string proc_dir = "/proc/" + proc_names[i];
-    std::string fd_dir = proc_dir + "/fd";
-    bool rvb = ListDirectory(fd_dir, &fd_names, &fd_modes);
+    const std::string proc_dir = "/proc/" + proc_names[i];
+    const std::string fd_dir = proc_dir + "/fd";
+    const bool rvb = ListDirectory(fd_dir, &fd_names, &fd_modes);
     uid_t proc_uid = 0;
 
     // The working directory of the process requires special handling
@@ -1519,7 +1520,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
       platform_stat(proc_dir.c_str(), &info);
       proc_uid = info.st_uid;
 
-      std::string cwd = ReadSymlink(proc_dir + "/cwd");
+      const std::string cwd = ReadSymlink(proc_dir + "/cwd");
       if (HasPrefix(cwd + "/", path + "/", false /* ignore_case */)) {
         LsofEntry entry;
         entry.pid = static_cast<pid_t>(String2Uint64(proc_names[i]));
@@ -1537,7 +1538,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
       if (fd_names[j].find_first_not_of("1234567890") != std::string::npos)
         continue;
 
-      std::string target = ReadSymlink(fd_dir + "/" + fd_names[j]);
+      const std::string target = ReadSymlink(fd_dir + "/" + fd_names[j]);
       if (!HasPrefix(target + "/", path + "/", false /* ignore_case */))
         continue;
 
@@ -1557,7 +1558,7 @@ std::vector<LsofEntry> Lsof(const std::string &path) {
 
 bool ProcessExists(pid_t pid) {
   assert(pid > 0);
-  int retval = kill(pid, 0);
+  const int retval = kill(pid, 0);
   if (retval == 0)
     return true;
   return (errno != ESRCH);
@@ -1601,7 +1602,7 @@ int WaitForChild(pid_t pid, const std::vector<int> &sig_ok) {
   assert(pid > 0);
   int statloc;
   while (true) {
-    pid_t retval = waitpid(pid, &statloc, 0);
+    const pid_t retval = waitpid(pid, &statloc, 0);
     if (retval == -1) {
       if (errno == EINTR)
         continue;
@@ -1628,7 +1629,7 @@ bool ExecAsDaemon(const std::vector<std::string> &command_line,
   assert(command_line.size() >= 1);
 
   Pipe<kPipeDetachedChild> pipe_fork;
-  pid_t pid = fork();
+  const pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
     pid_t pid_grand_child;
@@ -1647,8 +1648,8 @@ bool ExecAsDaemon(const std::vector<std::string> &command_line,
       pipe_fork.Write<pid_t>(pid_grand_child);
       _exit(0);
     } else {
-      int null_read = open("/dev/null", O_RDONLY);
-      int null_write = open("/dev/null", O_WRONLY);
+      const int null_read = open("/dev/null", O_RDONLY);
+      const int null_write = open("/dev/null", O_WRONLY);
       assert((null_read >= 0) && (null_write >= 0));
       retval = dup2(null_read, 0);
       assert(retval == 0);
@@ -1688,8 +1689,8 @@ void Daemonize() {
     int retval = setsid();
     assert(retval != -1);
     if ((pid = fork()) == 0) {
-      int null_read = open("/dev/null", O_RDONLY);
-      int null_write = open("/dev/null", O_WRONLY);
+      const int null_read = open("/dev/null", O_RDONLY);
+      const int null_write = open("/dev/null", O_WRONLY);
       assert((null_read >= 0) && (null_write >= 0));
       retval = dup2(null_read, 0);
       assert(retval == 0);
@@ -1842,7 +1843,7 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
       continue;
     }
 
-    int fd = static_cast<int>(name_uint64);
+    const int fd = static_cast<int>(name_uint64);
     if (preserve_fildes.count(fd)) {
       continue;
     }
@@ -1861,7 +1862,7 @@ static bool CloseAllFildesInProcSelfFd(const std::set<int> &preserve_fildes) {
  * To be used after fork but before exec.
  */
 bool CloseAllFildes(const std::set<int> &preserve_fildes) {
-  int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
+  const int max_fd = static_cast<int>(sysconf(_SC_OPEN_MAX));
   if (max_fd < 0) {
     return false;
   }
@@ -1902,7 +1903,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
   assert(command_line.size() >= 1);
 
   Pipe<kPipeDetachedChild> pipe_fork;
-  pid_t pid = fork();
+  const pid_t pid = fork();
   assert(pid >= 0);
   if (pid == 0) {
     pid_t pid_grand_child;
@@ -1916,7 +1917,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
 #ifdef __APPLE__
       environ = NULL;
 #else
-      int retval = clearenv();
+      const int retval = clearenv();
       assert(retval == 0);
 #endif
     }
@@ -1931,7 +1932,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                                             iEnd = map_fildes.end();
          i != iEnd;
          ++i) {
-      int retval = dup2(i->first, i->second);
+      const int retval = dup2(i->first, i->second);
       if (retval == -1) {
         failed = ForkFailures::kFailDupFd;
         goto fork_failure;
@@ -2034,7 +2035,7 @@ void SafeSleepMs(const unsigned ms) {
  */
 bool SafeWrite(int fd, const void *buf, size_t nbyte) {
   while (nbyte) {
-    ssize_t retval = write(fd, buf, nbyte);
+    const ssize_t retval = write(fd, buf, nbyte);
     if (retval < 0) {
       if (errno == EINTR)
         continue;
@@ -2057,8 +2058,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
   unsigned iov_idx = 0;
 
   while (nbytes) {
-    ssize_t retval = writev(fd, &iov[iov_idx],
-                            static_cast<int>(iovcnt - iov_idx));
+    const ssize_t retval =
+        writev(fd, &iov[iov_idx], static_cast<int>(iovcnt - iov_idx));
     if (retval < 0) {
       if (errno == EINTR)
         continue;
@@ -2077,7 +2078,7 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
         return true;
       }
     }
-    unsigned offset = retval - sum_written_blocks;
+    const unsigned offset = retval - sum_written_blocks;
     iov[iov_idx].iov_len -= offset;
     iov[iov_idx].iov_base = reinterpret_cast<char *>(iov[iov_idx].iov_base)
                             + offset;
@@ -2093,7 +2094,7 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
 ssize_t SafeRead(int fd, void *buf, size_t nbyte) {
   ssize_t total_bytes = 0;
   while (nbyte) {
-    ssize_t retval = read(fd, buf, nbyte);
+    const ssize_t retval = read(fd, buf, nbyte);
     if (retval < 0) {
       if (errno == EINTR)
         continue;
@@ -2136,10 +2137,10 @@ bool SafeReadToString(int fd, std::string *final_result) {
 bool SafeWriteToFile(const std::string &content,
                      const std::string &path,
                      int mode) {
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+  const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   if (fd < 0)
     return false;
-  bool retval = SafeWrite(fd, content.data(), content.size());
+  const bool retval = SafeWrite(fd, content.data(), content.size());
   close(fd);
   return retval;
 }

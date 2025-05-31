@@ -31,14 +31,14 @@ Uuid *Uuid::Create(const string &store_path) {
   if (f == NULL) {
     // Create and store
     uuid->MkUuid();
-    string uuid_str = uuid->uuid();
+    const string uuid_str = uuid->uuid();
     string path_tmp;
     FILE *f_tmp = CreateTempFile(
         store_path + "_tmp", S_IWUSR | S_IWGRP | S_IRUSR | S_IRGRP | S_IROTH,
         "w", &path_tmp);
     if (!f_tmp)
       return NULL;
-    int written = fprintf(f_tmp, "%s\n", uuid_str.c_str());
+    const int written = fprintf(f_tmp, "%s\n", uuid_str.c_str());
     fclose(f_tmp);
     if (written != static_cast<int>(uuid_str.length() + 1)) {
       unlink(path_tmp.c_str());
@@ -52,11 +52,11 @@ Uuid *Uuid::Create(const string &store_path) {
   }
 
   // Read from cached file
-  bool retval = GetLineFile(f, &uuid->uuid_);
+  const bool retval = GetLineFile(f, &uuid->uuid_);
   fclose(f);
   if (!retval)
     return NULL;
-  int nitems = sscanf(
+  const int nitems = sscanf(
       uuid->uuid_.c_str(),
       "%08" SCNx32 "-%04" SCNx16 "-%04" SCNx16 "-%04" SCNx16 "-%08" SCNx32
       "%04" SCNx16,
@@ -87,7 +87,7 @@ void Uuid::MkUuid() {
   assert(sizeof(new_uuid) == 16);
   memcpy(uuid_presentation_.uuid, new_uuid, sizeof(uuid_presentation_.uuid));
   // Canonical UUID format, including trailing \0
-  unsigned uuid_len = 8 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 12 + 1;
+  const unsigned uuid_len = 8 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 12 + 1;
   char uuid_cstr[uuid_len];
   snprintf(uuid_cstr, uuid_len, "%08x-%04x-%04x-%04x-%08x%04x",
            uuid_presentation_.split.a, uuid_presentation_.split.b,

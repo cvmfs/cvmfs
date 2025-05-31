@@ -48,9 +48,9 @@ Signal::~Signal() {
 
 
 void Signal::Wait() {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   while (!fired_) {
-    int retval = pthread_cond_wait(&signal_, &lock_);
+    const int retval = pthread_cond_wait(&signal_, &lock_);
     assert(retval == 0);
   }
   fired_ = false;
@@ -58,14 +58,14 @@ void Signal::Wait() {
 
 
 void Signal::Wakeup() {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   fired_ = true;
-  int retval = pthread_cond_broadcast(&signal_);
+  const int retval = pthread_cond_broadcast(&signal_);
   assert(retval == 0);
 }
 
 bool Signal::IsSleeping() {
-  MutexLockGuard guard(lock_);
+  const MutexLockGuard guard(lock_);
   return fired_ == false;
 }
 

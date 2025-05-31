@@ -203,7 +203,7 @@ class CVMFS_EXPORT Pipe : public SingleCopy {
    * Creating a pipe should always succeed.
    */
   void MakePipe(int pipe_fd[2]) {
-    int retval = pipe(pipe_fd);
+    const int retval = pipe(pipe_fd);
     if (retval != 0) {
       PANIC(kLogSyslogErr | kLogDebug, "MakePipe failed with errno %d", errno);
     }

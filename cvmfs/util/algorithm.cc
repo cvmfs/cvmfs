@@ -31,20 +31,20 @@ bool HighPrecisionTimer::g_is_enabled = false;
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
   // Time subtraction, from GCC documentation
   if (end.tv_usec < start.tv_usec) {
-    int64_t nsec = (end.tv_usec - start.tv_usec) / 1000000 + 1;
+    const int64_t nsec = (end.tv_usec - start.tv_usec) / 1000000 + 1;
     start.tv_usec -= 1000000 * nsec;
     start.tv_sec += nsec;
   }
   if (end.tv_usec - start.tv_usec > 1000000) {
-    int64_t nsec = (end.tv_usec - start.tv_usec) / 1000000;
+    const int64_t nsec = (end.tv_usec - start.tv_usec) / 1000000;
     start.tv_usec += 1000000 * nsec;
     start.tv_sec -= nsec;
   }
 
   // Compute the time remaining to wait in microseconds.
   // tv_usec is certainly positive.
-  uint64_t elapsed_usec = ((end.tv_sec - start.tv_sec) * 1000000)
-                          + (end.tv_usec - start.tv_usec);
+  const uint64_t elapsed_usec =
+      ((end.tv_sec - start.tv_sec) * 1000000) + (end.tv_usec - start.tv_usec);
   return static_cast<double>(elapsed_usec) / 1000000.0;
 }
 
@@ -107,7 +107,7 @@ std::vector<atomic_int32> UTLog2Histogram::GetBins(const Log2Histogram &h) {
 }
 
 unsigned int Log2Histogram::GetQuantile(float n) {
-  uint64_t total = this->N();
+  const uint64_t total = this->N();
   // pivot is the index of the element corresponding to the requested quantile
   uint64_t pivot = static_cast<uint64_t>(static_cast<float>(total) * n);
   float normalized_pivot = 0.0;
@@ -115,8 +115,8 @@ unsigned int Log2Histogram::GetQuantile(float n) {
   // note that we _exclude_ the overflow bin
   unsigned int i = 0;
   for (i = 1; i <= this->bins_.size() - 1; i++) {
-    unsigned int bin_value = static_cast<unsigned int>(
-        atomic_read32(&(this->bins_[i])));
+    const unsigned int bin_value =
+        static_cast<unsigned int>(atomic_read32(&(this->bins_[i])));
     if (pivot <= bin_value) {
       normalized_pivot = static_cast<float>(pivot)
                          / static_cast<float>(bin_value);
@@ -129,8 +129,8 @@ unsigned int Log2Histogram::GetQuantile(float n) {
   }
   // now i stores the index of the bin corresponding to the requested quantile
   // and normalized_pivot is the element we want inside the bin
-  unsigned int min_value = this->boundary_values_[i - 1];
-  unsigned int max_value = this->boundary_values_[i];
+  const unsigned int min_value = this->boundary_values_[i - 1];
+  const unsigned int max_value = this->boundary_values_[i];
   // and we return the linear interpolation
   return min_value
          + static_cast<unsigned int>(static_cast<float>(max_value - min_value)
@@ -145,7 +145,7 @@ std::string Log2Histogram::ToString() {
   unsigned int max_value_count = 1;
   unsigned int max_stars = 0;
   unsigned int max_bins = 0;
-  unsigned int total_stars = 38;
+  const unsigned int total_stars = 38;
   uint64_t total_sum_of_bins = 0;
 
   for (i = 1; i <= this->bins_.size() - 1; i++) {
@@ -170,43 +170,34 @@ std::string Log2Histogram::ToString() {
     max_stars = max_bins * total_stars / total_sum_of_bins;
   }
 
-  std::string format = " %"
-                       + StringifyUint(max_left_boundary_count < 2
-                                           ? 2
-                                           : max_left_boundary_count)
-                       + "d -> %" + StringifyUint(max_right_boundary_count)
-                       + "d :     %" + StringifyUint(max_value_count) + "d | %"
-                       + StringifyUint(max_stars < 12 ? 12 : max_stars)
-                       + "s |\n";
+  const std::string format =
+      " %" +
+      StringifyUint(max_left_boundary_count < 2 ? 2 : max_left_boundary_count) +
+      "d -> %" + StringifyUint(max_right_boundary_count) + "d :     %" +
+      StringifyUint(max_value_count) + "d | %" +
+      StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
-  std::string title_format = " %"
-                             + StringifyUint((max_left_boundary_count < 2
-                                                  ? 2
-                                                  : max_left_boundary_count)
-                                             + max_right_boundary_count + 4)
-                             + "s | %" + StringifyUint(max_value_count + 4)
-                             + "s | %"
-                             + StringifyUint(max_stars < 12 ? 12 : max_stars)
-                             + "s |\n";
+  const std::string title_format =
+      " %" +
+      StringifyUint(
+          (max_left_boundary_count < 2 ? 2 : max_left_boundary_count) +
+          max_right_boundary_count + 4) +
+      "s | %" + StringifyUint(max_value_count + 4) + "s | %" +
+      StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
-  std::string overflow_format = "%"
-                                + StringifyUint(max_left_boundary_count
-                                                + max_right_boundary_count + 5)
-                                + "s : %" + StringifyUint(max_value_count + 4)
-                                + "d | %"
-                                + StringifyUint(max_stars < 12 ? 12 : max_stars)
-                                + "s |\n";
+  const std::string overflow_format =
+      "%" +
+      StringifyUint(max_left_boundary_count + max_right_boundary_count + 5) +
+      "s : %" + StringifyUint(max_value_count + 4) + "d | %" +
+      StringifyUint(max_stars < 12 ? 12 : max_stars) + "s |\n";
 
-  std::string total_format = "%"
-                             + StringifyUint(
-                                 max_left_boundary_count
-                                             + max_right_boundary_count + 5
-                                         < 8
-                                     ? 8
-                                     : max_left_boundary_count
-                                           + max_right_boundary_count + 5)
-                             + "s : %" + StringifyUint(max_value_count + 4)
-                             + "lld\n";
+  const std::string total_format =
+      "%" +
+      StringifyUint(max_left_boundary_count + max_right_boundary_count + 5 < 8
+                        ? 8
+                        : max_left_boundary_count + max_right_boundary_count +
+                              5) +
+      "s : %" + StringifyUint(max_value_count + 4) + "lld\n";
 
   std::string result_string = "";
 
@@ -256,8 +247,8 @@ std::string Log2Histogram::ToString() {
   result_string += buffer;
   memset(buffer, 0, sizeof(buffer));
 
-  float qs[15] = {.1,  .2, .25, .3,  .4,  .5,   .6,  .7,
-                  .75, .8, .9,  .95, .99, .995, .999};
+  const float qs[15] = {.1,  .2, .25, .3,  .4,  .5,   .6,  .7,
+                        .75, .8, .9,  .95, .99, .995, .999};
   snprintf(buffer, kBufSize,
            "\n\nQuantiles\n"
            "%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,%0.4f,"

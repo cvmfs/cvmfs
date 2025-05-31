@@ -97,15 +97,15 @@ static void (*alt_log_func)(const LogSource source, const int mask,
 class LogBuffer : SingleCopy {
  public:
   LogBuffer() : next_id_(0) {
-    int retval = pthread_mutex_init(&lock_, NULL);
+    const int retval = pthread_mutex_init(&lock_, NULL);
     assert(retval == 0);
   }
 
   ~LogBuffer() { pthread_mutex_destroy(&lock_); }
 
   void Append(const LogBufferEntry &entry) {
-    MutexLockGuard lock_guard(lock_);
-    size_t idx = next_id_++ % kBufferSize;
+    const MutexLockGuard lock_guard(lock_);
+    const size_t idx = next_id_++ % kBufferSize;
     if (idx >= buffer_.size()) {
       buffer_.push_back(entry);
     } else {
@@ -116,16 +116,16 @@ class LogBuffer : SingleCopy {
   std::vector<LogBufferEntry> GetBuffer() {
     // Return a buffer sorted from newest to oldest buffer
     std::vector<LogBufferEntry> sorted_buffer;
-    MutexLockGuard lock_guard(lock_);
+    const MutexLockGuard lock_guard(lock_);
     for (unsigned i = 1; i <= buffer_.size(); ++i) {
-      unsigned idx = (next_id_ - i) % kBufferSize;
+      const unsigned idx = (next_id_ - i) % kBufferSize;
       sorted_buffer.push_back(buffer_[idx]);
     }
     return sorted_buffer;
   }
 
   void Clear() {
-    MutexLockGuard lock_guard(lock_);
+    const MutexLockGuard lock_guard(lock_);
     next_id_ = 0;
     buffer_.clear();
   }
@@ -241,7 +241,7 @@ void SetLogSyslogPrefix(const std::string &prefix) {
   if (prefix == "") {
     syslog_prefix = NULL;
   } else {
-    unsigned len = prefix.length() + 1;
+    const unsigned len = prefix.length() + 1;
     syslog_prefix = static_cast<char *>(smalloc(len));
     syslog_prefix[len - 1] = '\0';
     memcpy(syslog_prefix, &prefix[0], prefix.length());
@@ -293,7 +293,7 @@ void SetLogMicroSyslog(const std::string &filename) {
     abort();
   }
   platform_stat64 info;
-  int retval = platform_fstat(usyslog_fd, &info);
+  const int retval = platform_fstat(usyslog_fd, &info);
   assert(retval == 0);
   usyslog_size = info.st_size;
   usyslog_dest = new string(filename);
@@ -319,7 +319,7 @@ static void LogMicroSyslog(const std::string &message) {
     return;
   }
 
-  int written = write(usyslog_fd, message.data(), message.size());
+  const int written = write(usyslog_fd, message.data(), message.size());
   if ((written < 0) || (static_cast<unsigned>(written) != message.size())) {
     close(usyslog_fd);
     usyslog_fd = -1;
@@ -344,7 +344,7 @@ static void LogMicroSyslog(const std::string &message) {
       assert(num_bytes >= 0);
       if (num_bytes == 0)
         break;
-      int written = write(usyslog_fd1, buf, num_bytes);
+      const int written = write(usyslog_fd1, buf, num_bytes);
       assert(written == num_bytes);
     } while (num_bytes == 4096);
     retval = lseek(usyslog_fd1, 0, SEEK_SET);
@@ -383,7 +383,7 @@ void SetLogDebugFile(const string &filename) {
       abort();
     }
   }
-  int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
+  const int fd = open(filename.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
   if ((fd < 0) || ((file_debug = fdopen(fd, "a")) == NULL)) {
     fprintf(stderr, "could not open debug log file %s (%d), aborting\n",
             filename.c_str(), errno);
@@ -435,7 +435,7 @@ void vLogCvmfs(const LogSource source, const int mask, const char *format,
 #endif
 
   // Format the message string
-  int retval = vasprintf(&msg, format, variadic_list);
+  const int retval = vasprintf(&msg, format, variadic_list);
   assert(retval != -1);  // else: out of memory
 
   if (alt_log_func) {
@@ -603,14 +603,15 @@ static void LogCustom(unsigned id, const std::string &message) {
   pthread_mutex_lock(&customlog_locks[id]);
   assert(customlog_fds[id] >= 0);
 
-  bool retval_b = SafeWrite(customlog_fds[id], message.data(), message.size());
+  const bool retval_b =
+      SafeWrite(customlog_fds[id], message.data(), message.size());
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "could not write into log file %s (%d), aborting - lost: %s",
              customlog_dests[id]->c_str(), errno, message.c_str());
     abort();
   }
-  int retval_i = fsync(customlog_fds[id]);
+  const int retval_i = fsync(customlog_fds[id]);
   assert(retval_i == 0);
 
   pthread_mutex_unlock(&customlog_locks[id]);

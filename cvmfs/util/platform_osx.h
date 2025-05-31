@@ -275,7 +275,7 @@ inline uint64_t platform_realtime_ns() {
   struct timeval tv;
   int ret = gettimeofday(&tv, NULL);
   assert(ret == 0);
-  uint64_t time = tv.tv_sec * 1e6 + tv.tv_usec * 1e3;
+  const uint64_t time = tv.tv_sec * 1e6 + tv.tv_usec * 1e3;
   return time;
 }
 
