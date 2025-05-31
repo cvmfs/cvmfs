@@ -102,8 +102,8 @@ class SmallhashFilter : public AbstractHashFilter {
  public:
   SmallhashFilter() : frozen_(false) {
     // zero_element is MD5("unobtanium")
-    shash::Any zero_element(shash::kMd5,
-                            shash::HexPtr("d61f853acc5a39e01f3906f73e31d256"));
+    const shash::Any zero_element(
+        shash::kMd5, shash::HexPtr("d61f853acc5a39e01f3906f73e31d256"));
     hashmap_.Init(1048576, zero_element, &SmallhashFilter::hasher);
   }
 

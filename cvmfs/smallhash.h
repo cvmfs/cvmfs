@@ -153,9 +153,9 @@ class SmallHashBase {
 
  protected:
   uint32_t ScaleHash(const Key &key) const {
-    double bucket = (static_cast<double>(hasher_(key))
-                     * static_cast<double>(capacity_)
-                     / static_cast<double>(static_cast<uint32_t>(-1)));
+    const double bucket =
+        (static_cast<double>(hasher_(key)) * static_cast<double>(capacity_) /
+         static_cast<double>(static_cast<uint32_t>(-1)));
     return static_cast<uint32_t>(bucket) % capacity_;
   }
 
@@ -330,7 +330,7 @@ class SmallHashDynamic
     // Shuffle (no shuffling for the last element)
     for (unsigned i = 0; i < N - 1; ++i) {
       const uint32_t swap_idx = i + g_prng.Next(N - i);
-      uint32_t tmp = shuffled[i];
+      const uint32_t tmp = shuffled[i];
       shuffled[i] = shuffled[swap_idx];
       shuffled[swap_idx] = tmp;
     }
@@ -340,8 +340,8 @@ class SmallHashDynamic
   void Migrate(const uint32_t new_capacity) {
     Key *old_keys = Base::keys_;
     Value *old_values = Base::values_;
-    uint32_t old_capacity = capacity();
-    uint32_t old_size = size();
+    const uint32_t old_capacity = capacity();
+    const uint32_t old_size = size();
 
     Base::capacity_ = new_capacity;
     SetThresholds();

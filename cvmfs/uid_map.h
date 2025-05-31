@@ -101,7 +101,7 @@ class IntegerMap {
    */
   T Map(const T k) const {
     assert(IsValid());
-    typename map_type::const_iterator i = map_.find(k);
+    const typename map_type::const_iterator i = map_.find(k);
     if (i != map_.end()) {
       return i->second;
     }
@@ -131,7 +131,7 @@ class IntegerMap {
       return false;
     }
 
-    sanitizer::IntegerSanitizer int_sanitizer;
+    const sanitizer::IntegerSanitizer int_sanitizer;
 
     std::string line;
     unsigned int line_number = 0;
