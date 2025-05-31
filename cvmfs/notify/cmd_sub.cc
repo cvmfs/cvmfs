@@ -65,8 +65,8 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
 
     sig_mgr_->Init();
 
-    std::string public_keys = JoinStrings(
-        FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
+    const std::string public_keys =
+        JoinStrings(FindFilesBySuffix("/etc/cvmfs/keys", ".pub"), ":");
     if (!sig_mgr_->LoadPublicRsaKeys(public_keys)) {
       LogCvmfs(kLogCvmfs, kLogError,
                "SwissknifeSubscriber - could not load public keys");
@@ -87,10 +87,10 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
     }
 
     manifest::ManifestEnsemble ensemble;
-    manifest::Failures res = manifest::Verify(
-        reinterpret_cast<unsigned char *>(&(msg.manifest_[0])),
-        msg.manifest_.size(), "", repo, 0, NULL, sig_mgr_.weak_ref(),
-        dl_mgr_.weak_ref(), &ensemble);
+    const manifest::Failures res =
+        manifest::Verify(reinterpret_cast<unsigned char *>(&(msg.manifest_[0])),
+                         msg.manifest_.size(), "", repo, 0, NULL,
+                         sig_mgr_.weak_ref(), dl_mgr_.weak_ref(), &ensemble);
 
     if (res != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError,
@@ -109,7 +109,7 @@ class SwissknifeSubscriber : public notify::SubscriberSSE {
       return notify::Subscriber::kError;
     }
 
-    uint64_t new_revision = manifest->revision();
+    const uint64_t new_revision = manifest->revision();
     bool triggered = false;
     if (new_revision > revision_) {
       LogCvmfs(

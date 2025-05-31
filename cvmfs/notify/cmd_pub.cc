@@ -47,7 +47,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
   const std::string manifest_url = repo_url + "/.cvmfspublished";
   if (IsHttpUrl(repo_url)) {
     perf::Statistics stats;
-    UniquePtr<download::DownloadManager> download_manager(
+    const UniquePtr<download::DownloadManager> download_manager(
         new download::DownloadManager(
             kMaxPoolHandles, perf::StatisticsTemplate("download", &stats)));
     assert(download_manager.IsValid());
@@ -58,7 +58,8 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
     cvmfs::MemSink manifest_memsink;
     download::JobInfo download_manifest(&manifest_url, false, false, NULL,
                                         &manifest_memsink);
-    download::Failures retval = download_manager->Fetch(&download_manifest);
+    const download::Failures retval =
+        download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -68,7 +69,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
         reinterpret_cast<char *>(manifest_memsink.data()),
         manifest_memsink.pos());
   } else {
-    int fd = open(manifest_url.c_str(), O_RDONLY);
+    const int fd = open(manifest_url.c_str(), O_RDONLY);
     if (fd == -1) {
       LogCvmfs(kLogCvmfs, kLogError, "Could not open manifest file");
       return 7;
@@ -81,7 +82,7 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
     close(fd);
   }
 
-  UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
+  const UniquePtr<manifest::Manifest> manifest(manifest::Manifest::LoadMem(
       reinterpret_cast<const unsigned char *>(manifest_contents.data()),
       manifest_contents.size()));
 
@@ -93,7 +94,8 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
   const std::string repository_name = manifest->repository_name();
 
   // Publish message
-  UniquePtr<notify::Publisher> publisher(new notify::PublisherHTTP(server_url));
+  const UniquePtr<notify::Publisher> publisher(
+      new notify::PublisherHTTP(server_url));
 
   std::string msg_text;
   notify::msg::Activity msg;

@@ -30,7 +30,7 @@ SubscriberSSE::SubscriberSSE(const std::string &server_url)
 SubscriberSSE::~SubscriberSSE() { }
 
 bool SubscriberSSE::Subscribe(const std::string &topic) {
-  UniquePtr<Url> url(Url::Parse(server_url_));
+  const UniquePtr<Url> url(Url::Parse(server_url_));
 
   if (!url.IsValid()) {
     LogCvmfs(kLogCvmfs, kLogError,
@@ -41,7 +41,8 @@ bool SubscriberSSE::Subscribe(const std::string &topic) {
 
   this->topic_ = topic;
 
-  std::string request = "{\"version\":1,\"repository\":\"" + topic + "\"}";
+  const std::string request =
+      "{\"version\":1,\"repository\":\"" + topic + "\"}";
 
   const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
@@ -75,7 +76,7 @@ bool SubscriberSSE::Subscribe(const std::string &topic) {
   curl_easy_setopt(h_curl, CURLOPT_XFERINFODATA, this);
 
   bool success = true;
-  CURLcode ret = curl_easy_perform(h_curl);
+  const CURLcode ret = curl_easy_perform(h_curl);
   if (ret && ret != CURLE_ABORTED_BY_CALLBACK) {
     LogCvmfs(kLogCvmfs, kLogError,
              "SubscriberSSE - event loop finished with error: %d. Reply: %s\n",
@@ -111,7 +112,7 @@ size_t SubscriberSSE::CurlRecvCB(void *buffer, size_t size, size_t nmemb,
     return 0;
   }
 
-  std::string buf(static_cast<char *>(buffer));
+  const std::string buf(static_cast<char *>(buffer));
 
   std::vector<std::string> lines = SplitString(buf, '\n');
 
@@ -119,7 +120,8 @@ size_t SubscriberSSE::CurlRecvCB(void *buffer, size_t size, size_t nmemb,
     sub->AppendToBuffer(lines[0]);
   } else {
     sub->AppendToBuffer(lines[0]);
-    notify::Subscriber::Status st = sub->Consume(sub->topic_, sub->buffer_);
+    const notify::Subscriber::Status st =
+        sub->Consume(sub->topic_, sub->buffer_);
     sub->ClearBuffer();
     for (size_t i = 1; i < lines.size(); ++i) {
       if (lines[i].substr(0, 5) == "data: ") {

@@ -23,7 +23,7 @@ SubscriberSupervisor::SubscriberSupervisor(notify::Subscriber *s, std::string t,
 SubscriberSupervisor::~SubscriberSupervisor() { }
 
 bool SubscriberSupervisor::Task() {
-  bool ret = subscriber_->Subscribe(topic_);
+  const bool ret = subscriber_->Subscribe(topic_);
   if (ret) {
     LogCvmfs(
         kLogCvmfs, kLogInfo,

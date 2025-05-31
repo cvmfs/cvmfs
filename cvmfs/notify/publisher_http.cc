@@ -63,7 +63,7 @@ bool PublisherHTTP::Publish(const std::string &msg, const std::string &topic) {
   curl_easy_setopt(h_curl, CURLOPT_WRITEFUNCTION, RecvCB);
   curl_easy_setopt(h_curl, CURLOPT_WRITEDATA, &buffer);
 
-  CURLcode ret = curl_easy_perform(h_curl);
+  const CURLcode ret = curl_easy_perform(h_curl);
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogError, "POST request failed: %d. Reply: %s", ret,
              buffer.data.c_str());
