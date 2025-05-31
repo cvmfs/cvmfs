@@ -61,18 +61,20 @@ class DiffReporter : public publish::DiffListener {
 
 
   virtual void OnStats(const catalog::DeltaCounters &delta) {
-    std::string operation = machine_readable_ ? "S " : "d(";
-    std::string type_file = machine_readable_ ? "F" : "# regular files):";
-    std::string type_symlink = machine_readable_ ? "S" : "# symlinks):";
-    std::string type_directory = machine_readable_ ? "D" : "# directories):";
-    std::string type_catalog = machine_readable_ ? "N" : "# catalogs):";
-    int64_t diff_file = delta.self.regular_files + delta.subtree.regular_files;
-    int64_t diff_symlink = delta.self.symlinks + delta.subtree.symlinks;
-    int64_t diff_catalog = delta.self.nested_catalogs
-                           + delta.subtree.nested_catalogs;
+    const std::string operation = machine_readable_ ? "S " : "d(";
+    const std::string type_file = machine_readable_ ? "F" : "# regular files):";
+    const std::string type_symlink = machine_readable_ ? "S" : "# symlinks):";
+    const std::string type_directory =
+        machine_readable_ ? "D" : "# directories):";
+    const std::string type_catalog = machine_readable_ ? "N" : "# catalogs):";
+    const int64_t diff_file =
+        delta.self.regular_files + delta.subtree.regular_files;
+    const int64_t diff_symlink = delta.self.symlinks + delta.subtree.symlinks;
+    const int64_t diff_catalog =
+        delta.self.nested_catalogs + delta.subtree.nested_catalogs;
     // Nested catalogs make internally two directory entries
-    int64_t diff_directory = delta.self.directories + delta.subtree.directories
-                             - diff_catalog;
+    const int64_t diff_directory =
+        delta.self.directories + delta.subtree.directories - diff_catalog;
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64, operation.c_str(),
              type_file.c_str(), diff_file);
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64, operation.c_str(),
@@ -86,7 +88,7 @@ class DiffReporter : public publish::DiffListener {
 
   virtual void OnAdd(const std::string &path,
                      const catalog::DirectoryEntry &entry) {
-    std::string operation = machine_readable_ ? "A" : "add";
+    const std::string operation = machine_readable_ ? "A" : "add";
     if (machine_readable_) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
                operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
@@ -105,7 +107,7 @@ class DiffReporter : public publish::DiffListener {
 
   virtual void OnRemove(const std::string &path,
                         const catalog::DirectoryEntry &entry) {
-    std::string operation = machine_readable_ ? "R" : "remove";
+    const std::string operation = machine_readable_ ? "R" : "remove";
     if (machine_readable_) {
       LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s %s %s",
                operation.c_str(), PrintEntryType(entry).c_str(), path.c_str());
@@ -138,14 +140,14 @@ class DiffReporter : public publish::DiffListener {
         return;
     }
 
-    std::string type_from = PrintEntryType(entry_from);
-    std::string type_to = PrintEntryType(entry_to);
+    const std::string type_from = PrintEntryType(entry_from);
+    const std::string type_to = PrintEntryType(entry_to);
     std::string type = type_from;
     if (type_from != type_to) {
       type += machine_readable_ ? type_to : ("->" + type_to);
     }
 
-    std::string operation = machine_readable_ ? "M" : "modify";
+    const std::string operation = machine_readable_ ? "M" : "modify";
     if (machine_readable_) {
       LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %s %s", operation.c_str(),
                PrintDifferences(diff).c_str(), type.c_str(), path.c_str());
@@ -225,7 +227,7 @@ int CmdDiff::Main(const Options &options) {
   SettingsBuilder builder;
 
   if (options.Has("worktree")) {
-    UniquePtr<SettingsPublisher> settings(builder.CreateSettingsPublisher(
+    const UniquePtr<SettingsPublisher> settings(builder.CreateSettingsPublisher(
         options.plain_args().empty() ? "" : options.plain_args()[0].value_str));
     settings->SetIsSilent(true);
     settings->GetTransaction()->SetDryRun(true);
@@ -238,8 +240,8 @@ int CmdDiff::Main(const Options &options) {
   SettingsRepository settings = builder.CreateSettingsRepository(
       options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
 
-  std::string from = options.GetStringDefault("from", "trunk-previous");
-  std::string to = options.GetStringDefault("to", "trunk");
+  const std::string from = options.GetStringDefault("from", "trunk-previous");
+  const std::string to = options.GetStringDefault("to", "trunk");
 
   if (options.Has("keychain")) {
     settings.GetKeychain()->SetKeychainDir(options.GetString("keychain"));

@@ -52,7 +52,7 @@ void SettingsSpoolArea::EnsureDirectories() {
   targets.push_back(ovl_work_dir());
 
   for (unsigned i = 0; i < targets.size(); ++i) {
-    bool rv = MkdirDeep(targets[i], 0700, true /* veryfy_writable */);
+    const bool rv = MkdirDeep(targets[i], 0700, true /* veryfy_writable */);
     if (!rv)
       throw publish::EPublish("cannot create directory " + targets[i]);
   }
@@ -337,7 +337,8 @@ void SettingsPublisher::SetProxy(const std::string &proxy) { proxy_ = proxy; }
 
 
 void SettingsPublisher::SetOwner(const std::string &user_name) {
-  bool retval = GetUidOf(user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
+  const bool retval =
+      GetUidOf(user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
   if (!retval) {
     throw EPublish("unknown user name for repository owner: " + user_name);
   }
@@ -365,7 +366,7 @@ SettingsBuilder::~SettingsBuilder() { delete options_mgr_; }
 
 std::map<std::string, std::string> SettingsBuilder::GetSessionEnvironment() {
   std::map<std::string, std::string> result;
-  std::string session_dir = Env::GetEnterSessionDir();
+  const std::string session_dir = Env::GetEnterSessionDir();
   if (session_dir.empty())
     return result;
 
@@ -417,8 +418,8 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   if (HasPrefix(ident, "http://", true /* ignore case */)
       || HasPrefix(ident, "https://", true /* ignore case */)
       || HasPrefix(ident, "file://", true /* ignore case */)) {
-    std::string fqrn = Repository::GetFqrnFromUrl(ident);
-    sanitizer::RepositorySanitizer sanitizer;
+    const std::string fqrn = Repository::GetFqrnFromUrl(ident);
+    const sanitizer::RepositorySanitizer sanitizer;
     if (!sanitizer.IsValid(fqrn)) {
       throw EPublish("malformed repository name: " + fqrn);
     }
@@ -427,10 +428,10 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
     return settings;
   }
 
-  std::string alias = ident.empty() ? GetSingleAlias() : ident;
-  std::string repo_path = config_path_ + "/" + alias;
-  std::string server_path = repo_path + "/server.conf";
-  std::string replica_path = repo_path + "/replica.conf";
+  const std::string alias = ident.empty() ? GetSingleAlias() : ident;
+  const std::string repo_path = config_path_ + "/" + alias;
+  const std::string server_path = repo_path + "/server.conf";
+  const std::string replica_path = repo_path + "/replica.conf";
   std::string fqrn = alias;
 
   delete options_mgr_;
@@ -464,8 +465,8 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
 
 std::string SettingsPublisher::GetReadOnlyXAttr(const std::string &attr) {
   std::string value;
-  bool rvb = platform_getxattr(this->transaction().spool_area().readonly_mnt(),
-                               attr, &value);
+  const bool rvb = platform_getxattr(
+      this->transaction().spool_area().readonly_mnt(), attr, &value);
   if (!rvb) {
     throw EPublish("cannot get extended attribute " + attr);
   }
@@ -473,9 +474,9 @@ std::string SettingsPublisher::GetReadOnlyXAttr(const std::string &attr) {
 }
 
 SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
-  std::string session_dir = Env::GetEnterSessionDir();
+  const std::string session_dir = Env::GetEnterSessionDir();
   std::map<std::string, std::string> session_env = GetSessionEnvironment();
-  std::string fqrn = session_env["CVMFS_FQRN"];
+  const std::string fqrn = session_env["CVMFS_FQRN"];
 
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
@@ -484,8 +485,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
       session_dir);
 
-  std::string base_hash = settings_publisher->GetReadOnlyXAttr(
-      "user.root_hash");
+  const std::string base_hash =
+      settings_publisher->GetReadOnlyXAttr("user.root_hash");
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -603,7 +604,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
         EPublish::kFailRepositoryNotFound);
   }
 
-  SettingsRepository settings_repository = CreateSettingsRepository(alias);
+  const SettingsRepository settings_repository =
+      CreateSettingsRepository(alias);
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
@@ -616,7 +618,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
       new SettingsPublisher(settings_repository));
 
   try {
-    std::string xattr = settings_publisher->GetReadOnlyXAttr("user.root_hash");
+    const std::string xattr =
+        settings_publisher->GetReadOnlyXAttr("user.root_hash");
     settings_publisher->GetTransaction()->SetBaseHash(
         shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
   } catch (const EPublish &e) {

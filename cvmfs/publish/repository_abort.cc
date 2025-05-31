@@ -48,7 +48,7 @@ void Publisher::WipeScratchArea() {
 }
 
 void Publisher::Abort() {
-  ServerLockFileGuard g(is_publishing_);
+  const ServerLockFileGuard g(is_publishing_);
 
   if (!in_transaction_.IsSet()) {
     if (session_->has_lease()) {
@@ -67,13 +67,13 @@ void Publisher::Abort() {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
     // in transaction
-    EUnionMountRepairMode
-        repair_mode = settings_.transaction().spool_area().repair_mode();
+    const EUnionMountRepairMode repair_mode =
+        settings_.transaction().spool_area().repair_mode();
     if (repair_mode == kUnionMountRepairSafe) {
       settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(
           kUnionMountRepairAlways);
     }
-    int rvi = managed_node_->Check(false /* is_quiet */);
+    const int rvi = managed_node_->Check(false /* is_quiet */);
     settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(repair_mode);
     if (rvi != 0)
       throw EPublish("publisher file system mount state is broken");

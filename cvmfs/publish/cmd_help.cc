@@ -37,7 +37,7 @@ int CmdHelp::Main(const Options &options) {
   LogCvmfs(kLogCvmfs, kLogStdout, "  %s %s %s\n", progname().c_str(),
            cmd->GetName().c_str(), cmd->GetUsage().c_str());
 
-  std::string examples = cmd->GetExamples();
+  const std::string examples = cmd->GetExamples();
   if (!examples.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Examples:");
     LogCvmfs(kLogCvmfs, kLogStdout, "---------");

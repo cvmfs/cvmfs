@@ -274,7 +274,8 @@ void Publisher::Session::Acquire() {
   if (has_lease_)
     return;
 
-  gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
+  const gateway::GatewayKey gw_key =
+      gateway::ReadGatewayKey(settings_.gw_key_path);
   if (!gw_key.IsValid()) {
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
                    EPublish::kFailGatewayKey);
@@ -284,11 +285,13 @@ void Publisher::Session::Acquire() {
                      settings_.llvl, &buffer);
 
   std::string session_token;
-  LeaseReply rep = ParseAcquireReply(buffer, &session_token, settings_.llvl);
+  const LeaseReply rep =
+      ParseAcquireReply(buffer, &session_token, settings_.llvl);
   switch (rep) {
     case kLeaseReplySuccess: {
       has_lease_ = true;
-      bool rvb = SafeWriteToFile(session_token, settings_.token_path, 0600);
+      const bool rvb =
+          SafeWriteToFile(session_token, settings_.token_path, 0600);
       if (!rvb) {
         throw EPublish("cannot write session token: " + settings_.token_path);
       }
@@ -311,14 +314,15 @@ void Publisher::Session::Drop() {
     return;
 
   std::string token;
-  int fd_token = open(settings_.token_path.c_str(), O_RDONLY);
-  bool rvb = SafeReadToString(fd_token, &token);
+  const int fd_token = open(settings_.token_path.c_str(), O_RDONLY);
+  const bool rvb = SafeReadToString(fd_token, &token);
   close(fd_token);
   if (!rvb) {
     throw EPublish("cannot read session token: " + settings_.token_path,
                    EPublish::kFailGatewayKey);
   }
-  gateway::GatewayKey gw_key = gateway::ReadGatewayKey(settings_.gw_key_path);
+  const gateway::GatewayKey gw_key =
+      gateway::ReadGatewayKey(settings_.gw_key_path);
   if (!gw_key.IsValid()) {
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
                    EPublish::kFailGatewayKey);
@@ -327,7 +331,7 @@ void Publisher::Session::Drop() {
   CurlBuffer buffer;
   MakeDropRequest(gw_key, token, settings_.service_endpoint, settings_.llvl,
                   &buffer);
-  LeaseReply rep = ParseDropReply(buffer, settings_.llvl);
+  const LeaseReply rep = ParseDropReply(buffer, settings_.llvl);
   int rvi = 0;
   switch (rep) {
     case kLeaseReplySuccess:

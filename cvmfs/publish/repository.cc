@@ -60,7 +60,7 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
 
   if (exists) {
     int rvb;
-    std::string keys = JoinStrings(
+    const std::string keys = JoinStrings(
         FindFilesBySuffix(settings.keychain().keychain_dir(), ".pub"), ":");
     rvb = signature_mgr_->LoadPublicRsaKeys(keys);
     if (!rvb) {
@@ -72,8 +72,8 @@ Repository::Repository(const SettingsRepository &settings, const bool exists)
   }
 
   if (!settings.cert_bundle().empty()) {
-    int rvi = setenv("X509_CERT_BUNDLE", settings.cert_bundle().c_str(),
-                     1 /* overwrite */);
+    const int rvi = setenv("X509_CERT_BUNDLE", settings.cert_bundle().c_str(),
+                           1 /* overwrite */);
     if (rvi != 0)
       throw EPublish("cannot set X509_CERT_BUNDLE environment variable");
   }
@@ -136,7 +136,7 @@ void Repository::DownloadRootObjects(const std::string &url,
                                      const std::string &tmp_dir) {
   delete whitelist_;
   whitelist_ = new whitelist::Whitelist(fqrn, download_mgr_, signature_mgr_);
-  whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
+  const whitelist::Failures rv_whitelist = whitelist_->LoadUrl(url);
   if (whitelist_->status() != whitelist::Whitelist::kStAvailable) {
     throw EPublish(std::string("cannot load whitelist [")
                    + whitelist::Code2Ascii(rv_whitelist) + "]");
@@ -145,9 +145,9 @@ void Repository::DownloadRootObjects(const std::string &url,
   manifest::ManifestEnsemble ensemble;
   const uint64_t minimum_timestamp = 0;
   const shash::Any *base_catalog = NULL;
-  manifest::Failures rv_manifest = manifest::Fetch(url, fqrn, minimum_timestamp,
-                                                   base_catalog, signature_mgr_,
-                                                   download_mgr_, &ensemble);
+  const manifest::Failures rv_manifest =
+      manifest::Fetch(url, fqrn, minimum_timestamp, base_catalog,
+                      signature_mgr_, download_mgr_, &ensemble);
   if (rv_manifest != manifest::kFailOk)
     throw EPublish("cannot load manifest");
   delete manifest_;
@@ -156,7 +156,7 @@ void Repository::DownloadRootObjects(const std::string &url,
   std::string reflog_path;
   FILE *reflog_fd = CreateTempFile(tmp_dir + "/reflog", kPrivateFileMode, "w",
                                    &reflog_path);
-  std::string reflog_url = url + "/.cvmfsreflog";
+  const std::string reflog_url = url + "/.cvmfsreflog";
   // TODO(jblomer): verify reflog hash
   // shash::Any reflog_hash(manifest_->GetHashAlgorithm());
   cvmfs::FileSink filesink(reflog_fd);
@@ -182,8 +182,9 @@ void Repository::DownloadRootObjects(const std::string &url,
   FILE *tags_fd = CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w",
                                  &tags_path);
   if (!manifest_->history().IsNull()) {
-    std::string tags_url = url + "/data/" + manifest_->history().MakePath();
-    shash::Any tags_hash(manifest_->history());
+    const std::string tags_url =
+        url + "/data/" + manifest_->history().MakePath();
+    const shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
     download::JobInfo download_tags(&tags_url, true /* compressed */,
                                     true /* probe hosts */, &tags_hash,
@@ -206,13 +207,13 @@ void Repository::DownloadRootObjects(const std::string &url,
   history_->TakeDatabaseFileOwnership();
 
   if (!manifest_->meta_info().IsNull()) {
-    shash::Any info_hash(manifest_->meta_info());
-    std::string info_url = url + "/data/" + info_hash.MakePath();
+    const shash::Any info_hash(manifest_->meta_info());
+    const std::string info_url = url + "/data/" + info_hash.MakePath();
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_info(&info_url, true /* compressed */,
                                     true /* probe_hosts */, &info_hash,
                                     &metainfo_memsink);
-    download::Failures rv_info = download_mgr_->Fetch(&download_info);
+    const download::Failures rv_info = download_mgr_->Fetch(&download_info);
     if (rv_info != download::kFailOk) {
       throw EPublish(std::string("cannot load meta info [")
                      + download::Code2Ascii(rv_info) + "]");
@@ -231,9 +232,9 @@ std::string Repository::GetFqrnFromUrl(const std::string &url) {
 
 
 bool Repository::IsMasterReplica() {
-  std::string url = settings_.url() + "/.cvmfs_master_replica";
+  const std::string url = settings_.url() + "/.cvmfs_master_replica";
   download::JobInfo head(&url, false /* probe_hosts */);
-  download::Failures retval = download_mgr_->Fetch(&head);
+  const download::Failures retval = download_mgr_->Fetch(&head);
   if (retval == download::kFailOk) {
     return true;
   }
@@ -267,7 +268,7 @@ void Publisher::ConstructSpoolers() {
   if (spooler_files_ == NULL)
     throw EPublish("could not initialize file spooler");
 
-  upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
+  const upload::SpoolerDefinition sd_catalogs(sd.Dup2DefaultCompression());
   spooler_catalogs_ = upload::Spooler::Construct(
       sd_catalogs, statistics_publish_.weak_ref());
   if (spooler_catalogs_ == NULL) {
@@ -290,12 +291,10 @@ void Publisher::CreateKeychain() {
     signature_mgr_->GenerateCertificate(settings_.fqrn());
 
   whitelist_ = new whitelist::Whitelist(settings_.fqrn(), NULL, signature_mgr_);
-  std::string whitelist_str = whitelist::Whitelist::CreateString(
-      settings_.fqrn(),
-      settings_.whitelist_validity_days(),
-      settings_.transaction().hash_algorithm(),
-      signature_mgr_);
-  whitelist::Failures rv_wl = whitelist_->LoadMem(whitelist_str);
+  const std::string whitelist_str = whitelist::Whitelist::CreateString(
+      settings_.fqrn(), settings_.whitelist_validity_days(),
+      settings_.transaction().hash_algorithm(), signature_mgr_);
+  const whitelist::Failures rv_wl = whitelist_->LoadMem(whitelist_str);
   if (rv_wl != whitelist::kFailOk)
     throw EPublish("whitelist generation failed");
 }
@@ -336,7 +335,7 @@ void Publisher::CreateRootObjects() {
   if (history_ == NULL)
     throw EPublish("could not create tag database");
   history_->TakeDatabaseFileOwnership();
-  history::History::Tag tag_trunk(
+  const history::History::Tag tag_trunk(
       "trunk", manifest_->catalog_hash(), manifest_->catalog_size(),
       manifest_->revision(), manifest_->publish_timestamp(), "empty repository",
       "" /* branch */);
@@ -588,7 +587,8 @@ void Publisher::CreateDirectoryAsOwner(const std::string &path, int mode) {
   const bool rvb = MkdirDeep(path, mode);
   if (!rvb)
     throw EPublish("cannot create directory " + path);
-  int rvi = chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
+  const int rvi =
+      chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
   if (rvi != 0)
     throw EPublish("cannot set ownership on directory " + path);
 }
@@ -630,7 +630,7 @@ Publisher::Publisher(const SettingsPublisher &settings, const bool exists)
     , sync_mediator_(NULL)
     , sync_union_(NULL) {
   if (settings.transaction().layout_revision() != kRequiredLayoutRevision) {
-    unsigned layout_revision = settings.transaction().layout_revision();
+    const unsigned layout_revision = settings.transaction().layout_revision();
     throw EPublish("This repository uses layout revision "
                        + StringifyInt(layout_revision)
                        + ".\n"
@@ -778,7 +778,7 @@ void Publisher::ConstructSyncManagers() {
       default:
         throw EPublish("unknown union file system");
     }
-    bool rvb = sync_union_->Initialize();
+    const bool rvb = sync_union_->Initialize();
     if (!rvb) {
       delete sync_union_;
       sync_union_ = NULL;
@@ -788,20 +788,20 @@ void Publisher::ConstructSyncManagers() {
 }
 
 void Publisher::ExitShell() {
-  std::string session_dir = Env::GetEnterSessionDir();
-  std::string session_pid_tmp = session_dir + "/session_pid";
+  const std::string session_dir = Env::GetEnterSessionDir();
+  const std::string session_pid_tmp = session_dir + "/session_pid";
   std::string session_pid;
-  int fd_session_pid = open(session_pid_tmp.c_str(), O_RDONLY);
+  const int fd_session_pid = open(session_pid_tmp.c_str(), O_RDONLY);
   if (fd_session_pid < 0)
     throw EPublish("Session pid cannot be retrieved");
   SafeReadToString(fd_session_pid, &session_pid);
 
-  pid_t pid_child = String2Uint64(session_pid);
+  const pid_t pid_child = String2Uint64(session_pid);
   kill(pid_child, SIGUSR1);
 }
 
 void Publisher::Sync() {
-  ServerLockFileGuard g(is_publishing_);
+  const ServerLockFileGuard g(is_publishing_);
 
   ConstructSyncManagers();
 

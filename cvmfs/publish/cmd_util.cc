@@ -32,13 +32,9 @@ int publish::CallServerHook(const std::string &func,
   std::vector<std::string> cmd_line;
   cmd_line.push_back("/bin/sh");
   pid_t child_pid;
-  bool rvb = ManagedExec(cmd_line,
-                         preserve_fildes,
-                         map_fildes,
-                         false /* drop_credentials */,
-                         false /* clear_env */,
-                         false /* double_fork */,
-                         &child_pid);
+  const bool rvb = ManagedExec(
+      cmd_line, preserve_fildes, map_fildes, false /* drop_credentials */,
+      false /* clear_env */, false /* double_fork */, &child_pid);
   if (!rvb) {
     ClosePipe(pipe_stdin);
     return -127;

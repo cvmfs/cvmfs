@@ -25,7 +25,7 @@ namespace publish {
 void Publisher::TransactionRetry() {
   bool waiting_on_lease = false;
   if (managed_node_.IsValid()) {
-    int rvi = managed_node_->Check(false /* is_quiet */);
+    const int rvi = managed_node_->Check(false /* is_quiet */);
     if (rvi != 0)
       throw EPublish("cannot establish writable mountpoint");
   }
@@ -84,12 +84,12 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   // run into problems when merging catalogs later, so for the time being we
   // disallow transactions on non-existing paths.
   if (!settings_.transaction().lease_path().empty()) {
-    std::string path = GetParentPath("/"
-                                     + settings_.transaction().lease_path());
+    const std::string path =
+        GetParentPath("/" + settings_.transaction().lease_path());
     catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
     catalog::DirectoryEntry dirent;
-    bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
-                                          &dirent);
+    const bool retval =
+        catalog_mgr->LookupPath(path, catalog::kLookupDefault, &dirent);
     if (!retval) {
       throw EPublish("cannot open transaction on non-existing path " + path,
                      EPublish::kFailLeaseNoEntry);
@@ -101,8 +101,7 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
     }
   }
 
-
-  UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
+  const UniquePtr<CheckoutMarker> marker(CheckoutMarker::CreateFrom(
       settings_.transaction().spool_area().checkout_marker()));
   // TODO(jblomer): take root hash from r/o mountpoint?
 
@@ -111,7 +110,7 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
       && waiting_on_lease) {
     DownloadRootObjects(settings_.url(), settings_.fqrn(),
                         settings_.transaction().spool_area().tmp_dir());
-    int rvi = managed_node_->Check(true /* is_quiet */);
+    const int rvi = managed_node_->Check(true /* is_quiet */);
     if (rvi != 0)
       throw EPublish("cannot establish writable mountpoint");
   }
@@ -134,7 +133,7 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
       catalog_mgr_->CloneTree(settings_.transaction().template_from(),
                               settings_.transaction().template_to());
     } catch (const ECvmfsException &e) {
-      std::string panic_msg = e.what();
+      const std::string panic_msg = e.what();
       in_transaction_.Clear();
       // TODO(aandvalenzuela): release session token (gateway publishing)
       throw publish::EPublish("cannot clone directory tree. " + panic_msg,

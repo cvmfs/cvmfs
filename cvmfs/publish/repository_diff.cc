@@ -31,7 +31,7 @@ static history::History::Tag GetTag(const std::string &tag_name,
     tag.root_hash = shash::MkFromHexPtr(shash::HexPtr(tag.name),
                                         shash::kSuffixCatalog);
   } else {
-    bool retval = history.GetByName(tag_name, &tag);
+    const bool retval = history.GetByName(tag_name, &tag);
     if (!retval)
       throw publish::EPublish("unknown repository tag name: " + tag_name);
   }
@@ -81,8 +81,8 @@ namespace publish {
 
 void Repository::Diff(const std::string &from, const std::string &to,
                       DiffListener *diff_listener) {
-  history::History::Tag from_tag = GetTag(from, *history_);
-  history::History::Tag to_tag = GetTag(to, *history_);
+  const history::History::Tag from_tag = GetTag(from, *history_);
+  const history::History::Tag to_tag = GetTag(to, *history_);
   diff_listener->OnInit(from_tag, to_tag);
 
   perf::Statistics stats_from;
@@ -105,8 +105,9 @@ void Repository::Diff(const std::string &from, const std::string &to,
       true /* manage_catalog_files */);
   mgr_to->Init();
 
-  catalog::Counters counters_from = mgr_from->GetRootCatalog()->GetCounters();
-  catalog::Counters counters_to = mgr_to->GetRootCatalog()->GetCounters();
+  const catalog::Counters counters_from =
+      mgr_from->GetRootCatalog()->GetCounters();
+  const catalog::Counters counters_to = mgr_to->GetRootCatalog()->GetCounters();
   diff_listener->OnStats(catalog::Counters::Diff(counters_from, counters_to));
 
   // DiffTool takes ownership of the catalog managers

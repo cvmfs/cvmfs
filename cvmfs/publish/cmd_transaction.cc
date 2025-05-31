@@ -64,7 +64,7 @@ int CmdTransaction::Main(const Options &options) {
   if (options.Has("template")) {
     if (options.Has("template-from") || options.Has("template-to"))
       throw EPublish("invalid parameter combination for templates");
-    std::string templ = options.GetString("template");
+    const std::string templ = options.GetString("template");
     std::vector<std::string> tokens = SplitString(templ, '=');
     if (tokens.size() != 2)
       throw EPublish("invalid syntax for --template parameter: " + templ);
@@ -76,7 +76,7 @@ int CmdTransaction::Main(const Options &options) {
     throw EPublish("No write permission to repository",
                    EPublish::kFailPermission);
   }
-  FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
+  const FileSystemInfo fs_info = GetFileSystemInfo("/cvmfs");
   if (fs_info.type == kFsTypeAutofs)
     throw EPublish("Autofs on /cvmfs has to be disabled");
 
@@ -99,8 +99,8 @@ int CmdTransaction::Main(const Options &options) {
     return EIO;
   }
 
-  double whitelist_valid_s = difftime(publisher->whitelist()->expires(),
-                                      time(NULL));
+  const double whitelist_valid_s =
+      difftime(publisher->whitelist()->expires(), time(NULL));
   if (whitelist_valid_s < (12 * 60 * 60)) {
     LogCvmfs(
         kLogCvmfs, kLogStdout,

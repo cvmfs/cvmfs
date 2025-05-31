@@ -35,7 +35,7 @@ namespace publish {
 
 int CmdAbort::Main(const Options &options) {
   SettingsBuilder builder;
-  std::string session_dir = Env::GetEnterSessionDir();
+  const std::string session_dir = Env::GetEnterSessionDir();
 
   if (!session_dir.empty()) {
     builder.SetConfigPath(session_dir);
@@ -46,7 +46,7 @@ int CmdAbort::Main(const Options &options) {
     // Legacy behaviour is that trailing paths after the repository name should
     // be ignored, e.g. cvmfs_server abort repo.cern.ch/some/path is equivalent
     // to cvmfs_server abort repo.cern.ch
-    std::string repository_ident = StripTrailingPath(
+    const std::string repository_ident = StripTrailingPath(
         options.plain_args().empty() ? "" : options.plain_args()[0].value_str);
     settings = builder.CreateSettingsPublisher(repository_ident,
                                                true /* needs_managed */);

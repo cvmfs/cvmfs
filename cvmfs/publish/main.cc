@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   }
 
   try {
-    publish::Command::Options options = command->ParseOptions(argc, argv);
+    const publish::Command::Options options = command->ParseOptions(argc, argv);
     return command->Main(options);
   } catch (const publish::EPublish &e) {
     if (e.failure() == publish::EPublish::kFailInvocation) {
