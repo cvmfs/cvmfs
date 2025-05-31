@@ -2958,7 +2958,7 @@ void DownloadManager::GetProxyInfo(vector<vector<ProxyInfo> > *proxy_chain,
   const MutexLockGuard m(lock_options_);
 
   if (!opt_proxy_groups_) {
-    const vector<vector<ProxyInfo>> empty_chain;
+    const vector< vector<ProxyInfo> > empty_chain;
     *proxy_chain = empty_chain;
     if (current_group != NULL)
       *current_group = 0;
