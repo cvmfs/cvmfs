@@ -34,7 +34,7 @@ Key *Key::CreateRandomly(const unsigned size) {
   result->size_ = size;
   result->data_ = reinterpret_cast<unsigned char *>(smalloc(size));
   // TODO(jblomer): pin memory in RAM
-  int retval = RAND_bytes(result->data_, result->size_);
+  const int retval = RAND_bytes(result->data_, result->size_);
   if (retval != 1) {
     // Not enough entropy
     delete result;
@@ -45,13 +45,13 @@ Key *Key::CreateRandomly(const unsigned size) {
 
 
 Key *Key::CreateFromFile(const string &path) {
-  int fd = open(path.c_str(), O_RDONLY);
+  const int fd = open(path.c_str(), O_RDONLY);
   if (fd < 0)
     return NULL;
   platform_disable_kcache(fd);
 
   platform_stat64 info;
-  int retval = platform_fstat(fd, &info);
+  const int retval = platform_fstat(fd, &info);
   if (retval != 0) {
     close(fd);
     return NULL;
@@ -64,7 +64,7 @@ Key *Key::CreateFromFile(const string &path) {
   Key *result = new Key();
   result->size_ = info.st_size;
   result->data_ = reinterpret_cast<unsigned char *>(smalloc(result->size_));
-  int nbytes = read(fd, result->data_, result->size_);
+  const int nbytes = read(fd, result->data_, result->size_);
   close(fd);
   if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != result->size_)) {
     delete result;
@@ -75,7 +75,7 @@ Key *Key::CreateFromFile(const string &path) {
 
 
 Key *Key::CreateFromString(const string &key) {
-  unsigned size = key.size();
+  const unsigned size = key.size();
   if ((size == 0) || (size > kMaxSize))
     return NULL;
   UniquePtr<Key> result(new Key());
@@ -95,12 +95,12 @@ Key::~Key() {
 
 
 bool Key::SaveToFile(const std::string &path) {
-  int fd = open(path.c_str(), O_WRONLY);
+  const int fd = open(path.c_str(), O_WRONLY);
   if (fd < 0)
     return false;
   platform_disable_kcache(fd);
 
-  int nbytes = write(fd, data_, size_);
+  const int nbytes = write(fd, data_, size_);
   close(fd);
   return (nbytes >= 0) && (static_cast<unsigned>(nbytes) == size_);
 }
@@ -116,7 +116,7 @@ string Key::ToBase64() const {
 
 MemoryKeyDatabase::MemoryKeyDatabase() {
   lock_ = reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_, NULL);
+  const int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 }
 
@@ -128,12 +128,12 @@ MemoryKeyDatabase::~MemoryKeyDatabase() {
 
 
 bool MemoryKeyDatabase::StoreNew(const Key *key, string *id) {
-  MutexLockGuard mutex_guard(lock_);
+  const MutexLockGuard mutex_guard(lock_);
   // TODO(jblomer): is this good enough for random keys? Salting? KDF2?
   shash::Any hash(shash::kShake128);
   HashMem(key->data(), key->size(), &hash);
   *id = "H" + hash.ToString();
-  map<string, const Key *>::const_iterator i = database_.find(*id);
+  const map<string, const Key *>::const_iterator i = database_.find(*id);
   if (i != database_.end())
     return false;
 
@@ -143,8 +143,8 @@ bool MemoryKeyDatabase::StoreNew(const Key *key, string *id) {
 
 
 const Key *MemoryKeyDatabase::Find(const string &id) {
-  MutexLockGuard mutex_guard(lock_);
-  map<string, const Key *>::const_iterator i = database_.find(id);
+  const MutexLockGuard mutex_guard(lock_);
+  const map<string, const Key *>::const_iterator i = database_.find(id);
   if (i != database_.end())
     return i->second;
   return NULL;
@@ -189,15 +189,15 @@ bool Cipher::Decrypt(const string &ciphertext,
   plaintext->clear();
   if (ciphertext.size() < 1)
     return false;
-  unsigned char envelope = ciphertext[0];
-  unsigned char version = envelope & 0x0F;
+  const unsigned char envelope = ciphertext[0];
+  const unsigned char version = envelope & 0x0F;
   if (version != 0)
     return false;
-  unsigned char algorithm = (envelope & 0xF0) >> 4;
+  const unsigned char algorithm = (envelope & 0xF0) >> 4;
   if (algorithm > kNone)
     return false;
 
-  UniquePtr<Cipher> cipher(Create(static_cast<Algorithms>(algorithm)));
+  const UniquePtr<Cipher> cipher(Create(static_cast<Algorithms>(algorithm)));
   if (key.size() != cipher->key_size())
     return false;
   *plaintext += cipher->DoDecrypt(ciphertext.substr(1), key);
@@ -325,7 +325,7 @@ string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
 shash::Md5 CipherAes256Cbc::GenerateIv(const Key &key) {
   // The UUID is random but not necessarily cryptographically random.  That
   // saves the entropy pool.
-  UniquePtr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
+  const UniquePtr<cvmfs::Uuid> uuid(cvmfs::Uuid::Create(""));
   assert(uuid.IsValid());
 
   // Now make it unpredictable, using an HMAC with the encryption key.

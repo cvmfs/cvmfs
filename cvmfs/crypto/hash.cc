@@ -107,36 +107,34 @@ Any MkFromSuffixedHexPtr(const HexPtr hex) {
   const unsigned length = hex.str->length();
   if ((length == 2 * kDigestSizes[kMd5])
       || (length == 2 * kDigestSizes[kMd5] + 1)) {
-    Suffix suffix = (length == 2 * kDigestSizes[kMd5] + 1)
-                        ? *(hex.str->rbegin())
-                        : kSuffixNone;
+    const Suffix suffix = (length == 2 * kDigestSizes[kMd5] + 1)
+                              ? *(hex.str->rbegin())
+                              : kSuffixNone;
     result = Any(kMd5, hex, suffix);
   }
   if ((length == 2 * kDigestSizes[kSha1])
       || (length == 2 * kDigestSizes[kSha1] + 1)) {
-    Suffix suffix = (length == 2 * kDigestSizes[kSha1] + 1)
-                        ? *(hex.str->rbegin())
-                        : kSuffixNone;
+    const Suffix suffix = (length == 2 * kDigestSizes[kSha1] + 1)
+                              ? *(hex.str->rbegin())
+                              : kSuffixNone;
     result = Any(kSha1, hex, suffix);
   }
   if ((length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160])
       || (length
           == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)) {
-    Suffix suffix = (length
-                     == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]
-                            + 1)
-                        ? *(hex.str->rbegin())
-                        : kSuffixNone;
+    const Suffix suffix =
+        (length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)
+            ? *(hex.str->rbegin())
+            : kSuffixNone;
     result = Any(kRmd160, hex, suffix);
   }
   if ((length == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128])
       || (length
           == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)) {
-    Suffix suffix = (length
-                     == 2 * kDigestSizes[kShake128]
-                            + kAlgorithmIdSizes[kShake128] + 1)
-                        ? *(hex.str->rbegin())
-                        : kSuffixNone;
+    const Suffix suffix = (length == 2 * kDigestSizes[kShake128] +
+                                         kAlgorithmIdSizes[kShake128] + 1)
+                              ? *(hex.str->rbegin())
+                              : kSuffixNone;
     result = Any(kShake128, hex, suffix);
   }
 
@@ -256,7 +254,7 @@ void Final(ContextPtr context, Any *any_digest) {
 
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest) {
-  Algorithms algorithm = any_digest->algorithm;
+  const Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
   context.buffer = alloca(context.size);
 
@@ -276,7 +274,7 @@ void Hmac(const string &key,
           const unsigned char *buffer,
           const unsigned buffer_size,
           Any *any_digest) {
-  Algorithms algorithm = any_digest->algorithm;
+  const Algorithms algorithm = any_digest->algorithm;
   assert(algorithm != kAny);
 
   const unsigned block_size = kBlockSizes[algorithm];
@@ -318,7 +316,7 @@ void Hmac(const string &key,
 
 
 bool HashFd(int fd, Any *any_digest) {
-  Algorithms algorithm = any_digest->algorithm;
+  const Algorithms algorithm = any_digest->algorithm;
   ContextPtr context(algorithm);
   context.buffer = alloca(context.size);
 
@@ -339,11 +337,11 @@ bool HashFd(int fd, Any *any_digest) {
 
 
 bool HashFile(const std::string &filename, Any *any_digest) {
-  int fd = open(filename.c_str(), O_RDONLY);
+  const int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
     return false;
 
-  bool result = HashFd(fd, any_digest);
+  const bool result = HashFd(fd, any_digest);
   close(fd);
   return result;
 }
@@ -412,7 +410,7 @@ string Sha256File(const string &filename) {
 #ifdef OPENSSL_API_INTERFACE_V09
   PANIC(NULL);
 #else
-  int fd = open(filename.c_str(), O_RDONLY);
+  const int fd = open(filename.c_str(), O_RDONLY);
   if (fd < 0)
     return "";
 

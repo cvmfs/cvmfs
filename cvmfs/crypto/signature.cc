@@ -49,7 +49,7 @@ static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
   if (ok)
     return ok;
 
-  int error = X509_STORE_CTX_get_error(ctx);
+  const int error = X509_STORE_CTX_get_error(ctx);
   X509 *current_cert = X509_STORE_CTX_get_current_cert(ctx);
   string subject = "subject n/a";
   if (current_cert) {
@@ -73,7 +73,7 @@ SignatureManager::SignatureManager() {
   certificate_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
-  int retval = pthread_mutex_init(&lock_blacklist_, NULL);
+  const int retval = pthread_mutex_init(&lock_blacklist_, NULL);
   assert(retval == 0);
 }
 
@@ -85,7 +85,7 @@ void SignatureManager::InitX509Store() {
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
-  unsigned long verify_flags =  // NOLINT(runtime/int)
+  const unsigned long verify_flags = // NOLINT(runtime/int)
       X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL;
 #ifdef OPENSSL_API_INTERFACE_V09
   X509_STORE_set_flags(x509_store_, verify_flags);
@@ -420,7 +420,7 @@ std::string SignatureManager::GetCertificate() const {
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
-  bool rvb = PEM_write_bio_X509(bp, certificate_);
+  const bool rvb = PEM_write_bio_X509(bp, certificate_);
   assert(rvb);
   char *bio_crt_text;
   long bytes = BIO_get_mem_data(bp, &bio_crt_text);  // NOLINT
@@ -437,7 +437,8 @@ std::string SignatureManager::GetPrivateKey() {
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
-  bool rvb = PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0, NULL);
+  const bool rvb =
+      PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0, NULL);
   assert(rvb);
   char *bio_privkey_text;
   long bytes = BIO_get_mem_data(bp, &bio_privkey_text);  // NOLINT
@@ -454,8 +455,8 @@ std::string SignatureManager::GetPrivateMasterKey() {
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
-  bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_, NULL, NULL, 0,
-                                         0, NULL);
+  const bool rvb = PEM_write_bio_RSAPrivateKey(bp, private_master_key_, NULL,
+                                               NULL, 0, 0, NULL);
   assert(rvb);
   char *bio_master_privkey_text;
   long bytes = BIO_get_mem_data(bp, &bio_master_privkey_text);  // NOLINT
@@ -560,17 +561,17 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
  */
 bool SignatureManager::LoadBlacklist(const std::string &path_blacklist,
                                      bool append) {
-  MutexLockGuard lock_guard(&lock_blacklist_);
+  const MutexLockGuard lock_guard(&lock_blacklist_);
   LogCvmfs(kLogSignature, kLogDebug, "reading from blacklist %s",
            path_blacklist.c_str());
   if (!append)
     blacklist_.clear();
 
-  int fd = open(path_blacklist.c_str(), O_RDONLY);
+  const int fd = open(path_blacklist.c_str(), O_RDONLY);
   if (fd < 0)
     return false;
   std::string blacklist_buffer;
-  bool retval = SafeReadToString(fd, &blacklist_buffer);
+  const bool retval = SafeReadToString(fd, &blacklist_buffer);
   close(fd);
   if (!retval)
     return false;
@@ -588,7 +589,7 @@ bool SignatureManager::LoadBlacklist(const std::string &path_blacklist,
 
 
 vector<string> SignatureManager::GetBlacklist() {
-  MutexLockGuard lock_guard(&lock_blacklist_);
+  const MutexLockGuard lock_guard(&lock_blacklist_);
   return blacklist_;
 }
 
@@ -608,8 +609,8 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
   }*/
   const vector<string> paths = SplitString(path_list, ':');
   for (unsigned i = 0; i < paths.size(); ++i) {
-    int retval = X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(),
-                                     X509_FILETYPE_PEM);
+    const int retval =
+        X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(), X509_FILETYPE_PEM);
     if (!retval)
       return false;
   }
@@ -650,7 +651,7 @@ shash::Any SignatureManager::HashCertificate(
  */
 string SignatureManager::FingerprintCertificate(
     const shash::Algorithms hash_algorithm) {
-  shash::Any hash = HashCertificate(hash_algorithm);
+  const shash::Any hash = HashCertificate(hash_algorithm);
   if (hash.IsNull())
     return "";
 
@@ -765,7 +766,7 @@ bool SignatureManager::VerifyCaChain() {
   assert(csc);
 
   X509_STORE_CTX_init(csc, x509_store_, certificate_, NULL);
-  bool result = X509_verify_cert(csc) == 1;
+  const bool result = X509_verify_cert(csc) == 1;
   X509_STORE_CTX_free(csc);
 
   return result;
@@ -837,8 +838,8 @@ bool SignatureManager::SignRsa(const unsigned char *buffer,
   unsigned char *from = (unsigned char *)smalloc(buffer_size);
   memcpy(from, buffer, buffer_size);
 
-  int size = RSA_private_encrypt(buffer_size, from, to, private_master_key_,
-                                 RSA_PKCS1_PADDING);
+  const int size = RSA_private_encrypt(buffer_size, from, to,
+                                       private_master_key_, RSA_PKCS1_PADDING);
   free(from);
   if (size < 0) {
     *signature_size = 0;
@@ -914,8 +915,8 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
     unsigned char *from = (unsigned char *)smalloc(signature_size);
     memcpy(from, signature, signature_size);
 
-    int size = RSA_public_decrypt(signature_size, from, to, public_keys_[i],
-                                  RSA_PKCS1_PADDING);
+    const int size = RSA_public_decrypt(signature_size, from, to,
+                                        public_keys_[i], RSA_PKCS1_PADDING);
     free(from);
     if ((size >= 0) && (unsigned(size) == buffer_size)
         && (memcmp(buffer, to, size) == 0)) {
@@ -978,7 +979,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     return false;
 
   string hash_str = "";
-  unsigned hash_pos = pos;
+  const unsigned hash_pos = pos;
   do {
     if (pos == buffer_size)
       return false;
@@ -988,7 +989,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     }
     hash_str.push_back(buffer[pos++]);
   } while (true);
-  shash::Any hash_printed = shash::MkFromHexPtr(shash::HexPtr(hash_str));
+  const shash::Any hash_printed = shash::MkFromHexPtr(shash::HexPtr(hash_str));
   shash::Any hash_computed(hash_printed.algorithm);
   shash::HashMem(buffer, letter_length, &hash_computed);
   if (hash_printed != hash_computed)
@@ -1038,11 +1039,11 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
     return false;
   }
 
-  int flags = 0;
+  const int flags = 0;
   STACK_OF(X509) *extra_signers = NULL;
   BIO *indata = NULL;
-  bool result = PKCS7_verify(pkcs7, extra_signers, x509_store_, indata,
-                             bp_content, flags);
+  const bool result = PKCS7_verify(pkcs7, extra_signers, x509_store_, indata,
+                                   bp_content, flags);
   if (result != 1) {
     BIO_free(bp_content);
     PKCS7_free(pkcs7);
@@ -1086,8 +1087,8 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
 #else
             ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
 #endif
-        int name_len = ASN1_STRING_length(
-            this_name->d.uniformResourceIdentifier);
+        const int name_len =
+            ASN1_STRING_length(this_name->d.uniformResourceIdentifier);
         if (!name_ptr || (name_len <= 0))
           continue;
         alt_uris->push_back(string(name_ptr, name_len));
