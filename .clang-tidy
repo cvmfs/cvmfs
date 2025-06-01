@@ -1,4 +1,6 @@
 ---
+HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
+WarningsAsErrors: '*'
 Checks: -*
    ,misc-const-correctness
 #TODO(vvolkl): re-enable one by one when fixed in code base
@@ -23,8 +25,6 @@ Checks: -*
 #  ,-performance-inefficient-string-concatenation
 #  ,portability-*
 #  # performance-enum-size is only supported since c++11. When using c++11 or later, this option can be re-enabled
-#WarningsAsErrors: '*'
-#HeaderFilterRegex: 'cvmfs\/[a-zA-Z0-9_]*\.h$'
 #CheckOptions:
 #  - key:    google-readability-braces-around-statements.ShortStatementLines
 #    value:  '2'
