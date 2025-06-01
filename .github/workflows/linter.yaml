@@ -76,6 +76,7 @@ jobs:
                 -path ./build -p1 \
                 -j 4 \
                 -extra-arg=-I${PWD}/build/cvmfs  \
+                -extra-arg=-I${PWD}/test/common  \
                 | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash
