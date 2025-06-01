@@ -34,14 +34,15 @@ type ManifestList struct {
 }
 
 type ManifestListItem struct {
-	MediaType string
-	Size      int
-	Digest    string
-	Platform  struct {
+	//MediaType string
+	Size     int
+	Digest   string
+	Platform struct {
 		Architecture string
 		OS           string
 		Variant      *string
 	}
+	Manifest Manifest
 }
 
 type ThinImageLayer struct {
