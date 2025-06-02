@@ -46,7 +46,6 @@ type Image struct {
 	Manifest     *da.Manifest
 	OCIImage     *image.Image
 	ManifestList *da.ManifestList
-	AllManifests []da.Manifest
 }
 
 type Credentials struct {
