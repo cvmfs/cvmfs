@@ -5,6 +5,7 @@
 #ifndef CVMFS_SWISSKNIFE_LEASE_JSON_H_
 #define CVMFS_SWISSKNIFE_LEASE_JSON_H_
 
+#include <cstdint>
 #include <string>
 
 #include "swissknife_lease_curl.h"
