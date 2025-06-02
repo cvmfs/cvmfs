@@ -102,14 +102,6 @@ static string sanitise_name(const char *name_cstr,
   while(*c == '/') {c++;} // strip any leading slashes
   string name = string(c);
   bool ok = true;
-#if 0
-  for (int i = strlen(name_cstr) - 1; i >= 0; i--) {
-    // prohibit control codes and whitespace
-    if (name_cstr[i] <= 33) {
-      ok = false;
-    }
-  }
-#endif
 
   if (!allow_leading_slash && HasPrefix(name, "/", true)) {
     reason=1;
@@ -401,7 +393,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   int ret = acl_from_text_to_xattr_value(string(acl_string), binary_acl, binary_size, equiv_mode);
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failure of acl_from_text_to_xattr_value(%s)", acl_string);
-    assert(0); // TODO incorporate error handling other than asserting
+    assert(0); // TODO(vavolkl): incorporate error handling other than asserting
     return aclobj;
   }
   if (!equiv_mode) {
@@ -1180,7 +1172,7 @@ void swissknife::IngestSQL::load_files(sqlite3 *db, const std::string &lease_pat
       hashes.push_back(
           shash::MkFromHexPtr(shash::HexPtr(tok), shash::kSuffixNone));
       tok = strtok_r(NULL, ",", &ref);
-      offset += kChunkSize;  // TODO: in the future we might want variable chunk
+      offset += kChunkSize;  // in the future we might want variable chunk
                              // sizes specified in the DB
     }
     size_t expected_num_chunks = size/kChunkSize;
@@ -1214,7 +1206,7 @@ void swissknife::IngestSQL::load_symlinks(sqlite3 *db, const std::string &lease_
 
     string names = additional_prefix + sanitise_name(name_cstr);
     CUSTOM_ASSERT(check_prefix(names, lease_path), "%s is not below lease path %s", names.c_str(), lease_path.c_str());
-    string target= target_cstr; //JCS like garbage in their symlinks //sanitise_symlink_target(target_cstr);
+    string target= target_cstr;
     string parent_dir = get_parent(names);
     
     if (!all_symlinks.count(parent_dir)) {
@@ -1325,7 +1317,6 @@ int swissknife::IngestSQL::do_deletions(
   return ret;
 }
 
-// see https://jumptrading.atlassian.net/wiki/spaces/server/pages/2268991898/CVMFS+swissknife+ingestsql+database+schema
 const char*schema[] = {
  "PRAGMA journal_mode=WAL;",
 
