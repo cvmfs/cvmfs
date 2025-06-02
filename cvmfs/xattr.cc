@@ -81,8 +81,8 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   unsigned pos = sizeof(header);
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
     XattrEntry entry;
-    const unsigned size_preamble =
-        sizeof(entry.len_key) + sizeof(entry.len_value);
+    unsigned size_preamble = //NOLINT
+               sizeof(entry.len_key) + sizeof(entry.len_value);
     if (size - pos < size_preamble)
       return NULL;
     memcpy(&entry, inbuf + pos, size_preamble);
