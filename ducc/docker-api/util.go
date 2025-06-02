@@ -34,7 +34,7 @@ type ManifestList struct {
 }
 
 type ManifestListItem struct {
-	//MediaType string
+	MediaType string
 	Size     int
 	Digest   string
 	Platform struct {
