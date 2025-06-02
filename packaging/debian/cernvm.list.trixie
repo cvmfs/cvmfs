@@ -1,0 +1,2 @@
+deb http://cvmrepo.s3.cern.ch/cvmrepo/apt trixie-prod main
+# deb http://cvmrepo.s3.cern.ch/cvmrepo/apt trixie-testing main

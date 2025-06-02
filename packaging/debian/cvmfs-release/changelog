@@ -1,3 +1,8 @@
+
+cvmfs-release (4.6-1) lucid; urgency=low
+
+  * Add Debian 13 "trixie"
+
 cvmfs-release (4.5-1) lucid; urgency=low
 
   * Avoid dependency on lsb-release

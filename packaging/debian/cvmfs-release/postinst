@@ -21,6 +21,7 @@ set -e
 case "$1" in
     configure)
 	codename=$(env -i sh -c '. /etc/os-release; echo $VERSION_CODENAME')
+	ID=$(env -i sh -c '. /etc/os-release; echo $ID')
 	repolist=/usr/share/cvmfs-release/cernvm.list.${codename}
 	mkdir -p /etc/apt/sources.list.d
 	if [ -f $repolist ]; then
@@ -28,19 +29,26 @@ case "$1" in
 	else
 		version_major=$(env -i sh -c '. /etc/os-release; echo $VERSION_ID' | cut -d. -f1)
 		fallback_release=
-		if [ $version_major -ge 22 ]; then
-			echo "Warning: this distribution is not supported. Using Ubuntu 22.04 packages as fallback."
-			fallback_release=jammy
-		elif [ $version_major -ge 20 ]; then
-			echo "Warning: this distribution is not supported. Using Ubuntu 20.04 packages as fallback."
-			fallback_release=focal
-		elif [ $version_major -ge 18 ]; then
-			echo "Warning: this distribution is not supported. Using Ubuntu 18.04 packages as fallback."
-			fallback_release=bionic
-		else
-			echo "Warning: this distribution is not supported. Using Ubuntu 16.04 packages as fallback."
-			fallback_release=xenial
-		fi
+    if [ "$ID" = "Ubuntu" ]; then
+      if [ $version_major -ge 22 ]; then
+        echo "Warning: this distribution is not supported. Using Ubuntu 22.04 packages as fallback."
+        fallback_release=jammy
+      elif [ $version_major -ge 20 ]; then
+        echo "Warning: this distribution is not supported. Using Ubuntu 20.04 packages as fallback."
+        fallback_release=focal
+      elif [ $version_major -ge 18 ]; then
+        echo "Warning: this distribution is not supported. Using Ubuntu 18.04 packages as fallback."
+        fallback_release=bionic
+      else
+        echo "Warning: this distribution is not supported. Using Ubuntu 16.04 packages as fallback."
+        fallback_release=xenial
+      fi
+    else
+      # debian
+      echo "Warning: this distribution is not supported. Using Debian bookworm packages as fallback."
+      fallback_release=bookworm
+    fi
+    
 		ln -f -s /usr/share/cvmfs-release/cernvm.list.$fallback_release \
 	        /etc/apt/sources.list.d/cernvm.list
 	fi
