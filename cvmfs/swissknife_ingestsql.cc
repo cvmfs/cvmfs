@@ -478,7 +478,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     exit(1);
   }
 
-  bool enable_corefiles = (args.find('c') != args.end());
+  const bool enable_corefiles = (args.find('c') != args.end());
   if( !enable_corefiles ) {
     struct rlimit rlim;
     rlim.rlim_cur = rlim.rlim_max = 0;
