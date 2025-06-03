@@ -164,13 +164,12 @@ static string acquire_lease(const string& key_id, const string& secret, const st
                             unsigned int refresh_interval) {
   CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
   CUSTOM_ASSERT(ret == CURLE_OK, "failed to init curl");
-  bool acquired = false;
 
   string gateway_metadata_str;
   char *gateway_metadata = getenv("CVMFS_GATEWAY_METADATA");
   if (gateway_metadata != NULL) gateway_metadata_str = gateway_metadata;
 
-  while (!acquired) {
+  while (true) {
     CurlBuffer buffer;
     if (MakeAcquireRequest(key_id, secret, lease_path, repo_service_url,
                            &buffer, gateway_metadata_str)) {
@@ -179,7 +178,6 @@ static string acquire_lease(const string& key_id, const string& secret, const st
       LeaseReply rep = ParseAcquireReplyWithRevision(buffer, &session_token, current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
-          acquired = true;
           g_lease_acquired = true;
           g_last_lease_refresh = time(NULL);
           return session_token;
