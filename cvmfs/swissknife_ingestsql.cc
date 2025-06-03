@@ -294,7 +294,7 @@ static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
     for (vector<string>::iterator it = tables.begin(); it != tables.end();
          it++) {
       sqlite3_stmt *stmt;
-      string query = "SELECT name FROM " + *it;
+      const string query = "SELECT name FROM " + *it;
       ret = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL);
       CHECK_SQLITE_ERROR(ret, SQLITE_OK);
       while (sqlite3_step(stmt) == SQLITE_ROW) {
