@@ -258,7 +258,7 @@ static void cancel_lease() {
 }
 
 static void on_signal(int sig) {
-  signal(sig, SIG_DFL);
+  (void)signal(sig, SIG_DFL);
   if (g_lease_acquired) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Cancelling lease");
     cancel_lease();
