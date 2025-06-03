@@ -339,7 +339,7 @@ static int get_row_count(sqlite3 *db, const std::string &table_name) {
 
   ret = sqlite3_step(stmt);
   CHECK_SQLITE_ERROR(ret, SQLITE_ROW);
-  std::string count_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
+  const std::string count_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
   return std::stoi(count_str);
 }
