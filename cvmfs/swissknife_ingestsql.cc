@@ -207,7 +207,7 @@ static string acquire_lease(const string& key_id, const string& secret, const st
 static uint64_t make_commit_on_gateway( const std::string &old_root_hash, const std::string &new_root_hash, int priority) {
   CurlBuffer buffer;
   char priorityStr[100];
-  sprintf(priorityStr, "%d", priority);
+  (void)sprintf(priorityStr, "%d", priority); // skipping return value check; no way such large buffer will overflow
   buffer.data="";
 
   std::string payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
