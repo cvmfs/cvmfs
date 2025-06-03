@@ -299,7 +299,7 @@ static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
       CHECK_SQLITE_ERROR(ret, SQLITE_OK);
       while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
-        string names = sanitise_name(name);
+        const string names = sanitise_name(name);
         if (*it=="dirs") { 
           paths.push_back(names);
         } else {
