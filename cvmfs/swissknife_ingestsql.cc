@@ -416,7 +416,7 @@ std::unordered_map<string, string> load_config(const string& config_file) {
 
   for (auto it = lines.begin(); it != lines.end(); it++) {
     const string l = *it;
-    const size_t p = l.find("=", 0);
+    const size_t p = l.find('=', 0);
     if (p != string::npos) {
       const string key = l.substr(0, p);
       string val = l.substr(p + 1);
