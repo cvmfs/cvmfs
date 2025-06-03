@@ -66,7 +66,7 @@ static string g_session_token_file;
 static string g_s3_file;
 static time_t g_last_lease_refresh=0;
 static bool   g_stop_refresh = false;
-static int    g_priority=0;
+static int64_t g_priority=0;
 static bool   g_add_missing_catalogs = false;
 static string get_lease_from_paths(vector<string> paths);
 static vector<string> get_all_dirs_from_sqlite(vector<string>& sqlite_db_vec,
@@ -204,10 +204,10 @@ static string acquire_lease(const string& key_id, const string& secret, const st
   return "";
 }
 
-static uint64_t make_commit_on_gateway( const std::string &old_root_hash, const std::string &new_root_hash, int priority) {
+static uint64_t make_commit_on_gateway( const std::string &old_root_hash, const std::string &new_root_hash, int64_t priority) {
   CurlBuffer buffer;
   char priorityStr[100];
-  (void)sprintf(priorityStr, "%d", priority); // skipping return value check; no way such large buffer will overflow
+  (void)sprintf(priorityStr, "%" PRId64, priority); // skipping return value check; no way such large buffer will overflow
   buffer.data="";
 
   const std::string payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
@@ -496,7 +496,13 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
 
   if (args.find('P') != args.end()) {
-    g_priority = atoi((*args.find('P')->second).c_str());
+    const char *arg = (*args.find('P')->second).c_str();
+    char* at_null_terminator_if_number;
+    g_priority = strtoll(arg, &at_null_terminator_if_number, 10);
+    if (*at_null_terminator_if_number != '\0') {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Priority parameter value '%s' parsing failed", arg);
+      return 1;
+    }
   } else {
     g_priority = -time(NULL);
   }
@@ -800,7 +806,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 //    return 1;
 //  }
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "Committing with priority %d", g_priority);
+  LogCvmfs(kLogCvmfs, kLogStdout, "Committing with priority %" PRId64, g_priority);
 
   bool ok = make_commit_on_gateway( old_root_hash, new_root_hash, g_priority );
   if(!ok) {
