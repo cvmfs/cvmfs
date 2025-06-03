@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <memory>
 
 #include <cstdlib>
 
@@ -17,6 +18,10 @@
 using namespace std;  // NOLINT
 
 const uint32_t QuotaManager::kProtocolRevision = 2;
+
+void QuotaManager::GetFdRefcountManager(const std::shared_ptr<FdRefcountMgr>& mgr){
+  rc_mgr_ = mgr;
+}
 
 void QuotaManager::BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);

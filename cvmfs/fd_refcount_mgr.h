@@ -23,6 +23,7 @@ static inline uint32_t hasher_int(const int &key) {
 }
 
 class FdRefcountMgr {
+  FRIEND_TEST(T_QuotaManager, CleanupLru);
  public:
   /**
    * Helper class containing the values for the map: fd -> refcount+id
@@ -54,6 +55,8 @@ class FdRefcountMgr {
   int Dup(int fd);
 
   FdRefcountMgr *Clone();
+
+  bool Contains(const shash::Any& );
 
  private:
   /**

@@ -550,18 +550,24 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     };
 
 
+    auto ref_count_manager = rc_mgr_;
+    bool is_open = false;
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
-      bool is_pinned = pinned_chunks_.find(candidates[i].hash)
+      const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
                        != pinned_chunks_.end();
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      bool is_open = std::find(open_files_.begin(), open_files_.end(),
-                               candidates[i].hash)
-                     != open_files_.end();
+
+      if(use_non_open_lru_cleanup_){
+        is_open = (ref_count_manager)? ref_count_manager->Contains(candidates[i].hash):false;
+      }
+
+      // if an open files aware cleanup policy is disabled, only pinned files will be skipped
+      // is_open will always be false
       if (is_pinned or is_open) {
         skip_eviction(candidates[i]);
         continue;
@@ -594,6 +600,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     assert(result);
   }
 
+  // if an open files aware cleanup policy is disabled,
+  // lru_ordered_open will always be empty
   while (!lru_ordered_open.empty() and gauge_ > leave_size) {
     // cleanup files in use
     auto &candidate = lru_ordered_open[0];

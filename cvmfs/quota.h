@@ -6,6 +6,7 @@
 #define CVMFS_QUOTA_H_
 
 #include <pthread.h>
+#include <memory>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -14,7 +15,9 @@
 #include <vector>
 
 #include "crypto/hash.h"
+#include "fd_refcount_mgr.h"
 #include "util/single_copy.h"
+#include "gtest/gtest_prod.h"
 
 /**
  * The QuotaManager keeps track of the cache contents.  It is informed by the
@@ -34,6 +37,7 @@
  * get large and should be released.
  */
 class QuotaManager : SingleCopy {
+  FRIEND_TEST(T_QuotaManager, CleanupLru);
  public:
   /**
    * Quota manager protocol revision.
@@ -86,6 +90,7 @@ class QuotaManager : SingleCopy {
                                    const std::string &channel_id) = 0;
   virtual void UnregisterBackChannel(int back_channel[2],
                                      const std::string &channel_id) = 0;
+  virtual void GetFdRefcountManager(const std::shared_ptr<FdRefcountMgr>& mgr);
   void BroadcastBackchannels(const std::string &message);
 
  protected:
@@ -108,6 +113,11 @@ class QuotaManager : SingleCopy {
    * and set during initialization of concrete instances.
    */
   uint32_t protocol_revision_;
+
+  /**
+   * Used from PosixQuotaManager on DoCleanup
+   */
+  std::shared_ptr<FdRefcountMgr> rc_mgr_;
 };
 
 
