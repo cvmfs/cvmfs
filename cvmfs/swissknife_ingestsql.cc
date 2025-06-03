@@ -325,7 +325,7 @@ static int get_db_schema_revision(sqlite3 *db, const std::string &db_name = "") 
   ret = sqlite3_step(stmt);
   // if table exists, we require that it must have a schema_revision row
   CHECK_SQLITE_ERROR(ret, SQLITE_ROW);
-  std::string schema_revision_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
+  const std::string schema_revision_str(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
   return std::stoi(schema_revision_str);
 }
