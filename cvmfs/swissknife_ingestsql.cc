@@ -210,7 +210,7 @@ static uint64_t make_commit_on_gateway( const std::string &old_root_hash, const 
   (void)sprintf(priorityStr, "%d", priority); // skipping return value check; no way such large buffer will overflow
   buffer.data="";
 
-  std::string payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
+  const std::string payload = "{\n\"old_root_hash\": \"" + old_root_hash + "\",\n\"new_root_hash\": \""+new_root_hash+"\",\n\"priority\": "+priorityStr+"}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, payload,  &buffer, true);
@@ -223,7 +223,7 @@ static void refresh_lease() {
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, "", &buffer,false)) {
-    int ret = ParseDropReply(buffer);
+    const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
       g_last_lease_refresh=time(NULL);
@@ -245,7 +245,7 @@ static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
                      g_session_token, g_gateway_url, "", &buffer, false)) {
-    int ret = ParseDropReply(buffer);
+    const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
     } else {
