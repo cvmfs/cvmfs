@@ -29,11 +29,11 @@
 #include "catalog_downloader.h"
 #include "shortstring.h"
 
-#define CHECK_SQLITE_ERROR(ret, expected) do {                                                          \
-                                            if (ret!=expected) {                                        \
-                                              LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d", ret); \
-                                              assert(0);                                                \
-                                            }                                                           \
+#define CHECK_SQLITE_ERROR(ret, expected) do {                                                            \
+                                            if ((ret)!=expected) {                                        \
+                                              LogCvmfs(kLogCvmfs, kLogStderr, "SQLite error: %d", (ret)); \
+                                              assert(0);                                                  \
+                                            }                                                             \
                                           } while (0)
 
 #define CUSTOM_ASSERT(check, msg, ...) do {                                                     \
@@ -43,10 +43,10 @@
                                          }                                                      \
                                        } while (0)
 
-#define SHOW_PROGRESS(item, freq, curr, total) do {                                                                          \
-                                                 if (curr % freq == 0 || curr == total) {                                    \
-                                                   LogCvmfs(kLogCvmfs, kLogStdout, "Processed %d/%d %s", curr, total, item); \
-                                                 }                                                                           \
+#define SHOW_PROGRESS(item, freq, curr, total) do {                                                                            \
+                                                 if ((curr) % freq == 0 || (curr) == total) {                                  \
+                                                   LogCvmfs(kLogCvmfs, kLogStdout, "Processed %d/%d %s", (curr), total, item); \
+                                                 }                                                                             \
                                                } while (0)
 
 
