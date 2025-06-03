@@ -441,7 +441,7 @@ static vector<string> get_file_list(string& path) {
   vector<string> paths;
   const char *cpath = path.c_str();
   struct stat st;
-  int ret = stat(cpath, &st);
+  const int ret = stat(cpath, &st);
   CUSTOM_ASSERT(ret == 0, "failed to stat file %s", cpath);
 
   if (S_ISDIR(st.st_mode)) {
