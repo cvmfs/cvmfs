@@ -147,7 +147,7 @@ static string get_parent(const string& path) {
 }
 
 static string get_basename(const string& path) {
-  size_t found = path.find_last_of('/');
+  const size_t found = path.find_last_of('/');
   if (found == string::npos) {
     return path;
   }
@@ -162,7 +162,7 @@ static string MakeCatalogPath(const std::string &relative_path) {
 static string acquire_lease(const string& key_id, const string& secret, const string& lease_path,
                             const string& repo_service_url, bool force_cancel_lease, uint64_t *current_revision, string &current_root_hash,
                             unsigned int refresh_interval) {
-  CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
+  const CURLcode ret = curl_global_init(CURL_GLOBAL_ALL);
   CUSTOM_ASSERT(ret == CURLE_OK, "failed to init curl");
 
   string gateway_metadata_str;
@@ -175,7 +175,7 @@ static string acquire_lease(const string& key_id, const string& secret, const st
                            &buffer, gateway_metadata_str)) {
       string session_token;
 
-      LeaseReply rep = ParseAcquireReplyWithRevision(buffer, &session_token, current_revision, current_root_hash);
+      const LeaseReply rep = ParseAcquireReplyWithRevision(buffer, &session_token, current_revision, current_root_hash);
       switch (rep) {
         case kLeaseReplySuccess:
           g_lease_acquired = true;
