@@ -388,7 +388,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   bool equiv_mode;
   size_t binary_size;
   char *binary_acl;
-  int ret = acl_from_text_to_xattr_value(string(acl_string), binary_acl, binary_size, equiv_mode);
+  const int ret = acl_from_text_to_xattr_value(string(acl_string), binary_acl, binary_size, equiv_mode);
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failure of acl_from_text_to_xattr_value(%s)", acl_string);
     assert(0); // TODO(vavolkl): incorporate error handling other than asserting
