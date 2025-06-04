@@ -9,6 +9,8 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include "string.h"
+
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
