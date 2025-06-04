@@ -17,6 +17,7 @@
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
 #include "shortstring.h"
+#include "catalog_merge_tool.h"
 
 inline PathString MakeRelative(const PathString &path) {
   std::string rel_path;
