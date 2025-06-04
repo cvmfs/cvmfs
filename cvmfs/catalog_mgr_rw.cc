@@ -1593,7 +1593,7 @@ void WritableCatalogManager::AddCatalogToQueue(const std::string &path)
 {
   SyncLock();
   WritableCatalog *catalog = NULL;
-  bool retval = FindCatalog(MakeRelativePath(path), &catalog, NULL);
+  bool const retval = FindCatalog(MakeRelativePath(path), &catalog, NULL);
   assert(retval);
   assert(catalog);
   catalog->SetDirty(); // ensure it's dirty so its parent will wait for it
@@ -1629,14 +1629,14 @@ void WritableCatalogManager::SingleCatalogUploadCallback(
   // see WritableCatalogManager::ScheduleCatalogProcessing()
   WritableCatalog *catalog = NULL;
   {
-    MutexLockGuard guard(catalog_processing_lock_);
-    std::map<std::string, WritableCatalog*>::iterator c =
+    MutexLockGuard const guard(catalog_processing_lock_);
+    std::map<std::string, WritableCatalog*>::iterator const c =
       catalog_processing_map_.find(result.local_path);
     assert(c != catalog_processing_map_.end());
     catalog = c->second;
   }
 
-  uint64_t catalog_size = GetFileSize(result.local_path);
+  uint64_t const catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
 
   SyncLock();
@@ -1673,11 +1673,11 @@ void WritableCatalogManager::LoadCatalogs(const std::string &base_path, const st
   Catalog::NestedCatalogList nested_catalogs = base_catalog->ListNestedCatalogs();
   for (auto it = nested_catalogs.begin(); it != nested_catalogs.end(); ++it) {
     // schedule relevant child nested catalogs for download
-    std::string mountpoint = it->mountpoint.ToString();
+    std::string const mountpoint = it->mountpoint.ToString();
     if (dirs.find(mountpoint) != dirs.end()) {
       Catalog *catalog = CreateCatalog(it->mountpoint, it->hash, NULL /* parent */);
       {
-        MutexLockGuard guard(catalog_download_lock_);
+        MutexLockGuard const guard(catalog_download_lock_);
         catalog_download_map_.insert(std::make_pair(it->hash.ToString(), catalog));
       }
       catalog_download_pipeline_->Process(it->hash);
@@ -1692,7 +1692,7 @@ bool WritableCatalogManager::LookupDirEntry(const string &path,
                                             const LookupOptions options,
                                             DirectoryEntry *dirent) {
   SyncLock();
-  bool exists = LookupPath(path, options, dirent);
+  bool const exists = LookupPath(path, options, dirent);
   SyncUnlock();
   return exists;
 }
@@ -1700,7 +1700,7 @@ bool WritableCatalogManager::LookupDirEntry(const string &path,
 void WritableCatalogManager::CatalogHashSerializedCallback(
   const CompressHashResult &result)
 {
-  MutexLockGuard guard(catalog_hash_lock_);
+  MutexLockGuard const guard(catalog_hash_lock_);
   catalog_hash_map_[result.path] = result.hash;
 }
 
@@ -1710,7 +1710,7 @@ void WritableCatalogManager::CatalogDownloadCallback(
 {
   Catalog *downloaded_catalog;
   {
-    MutexLockGuard guard(catalog_download_lock_);
+    MutexLockGuard const guard(catalog_download_lock_);
     auto it = catalog_download_map_.find(result.hash);
     assert(it != catalog_download_map_.end());
     downloaded_catalog = it->second;
@@ -1728,7 +1728,7 @@ void WritableCatalogManager::CatalogDownloadCallback(
     if (context.dirs->find(it->mountpoint.ToString()) != context.dirs->end()) {
       Catalog *child_catalog = CreateCatalog(it->mountpoint, it->hash, NULL /* parent */);
       {
-        MutexLockGuard guard(catalog_download_lock_);
+        MutexLockGuard const guard(catalog_download_lock_);
         catalog_download_map_.insert(std::make_pair(it->hash.ToString(), child_catalog));
       }
       catalog_download_pipeline_->Process(it->hash);

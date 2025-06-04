@@ -22,7 +22,7 @@ static void should_pass_noncompat(const char *textual, unsigned char *acl_binary
   size_t binary_size;
   char *binary_acl;
   bool equiv_mode;
-  int ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
+  int const ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
   ASSERT_EQ(ret, 0);
   ASSERT_EQ(binary_size, acl_binary_expected_len);
   if (binary_size == 0) {
@@ -44,7 +44,7 @@ static void should_pass(const char *textual, unsigned char *acl_binary_expected,
 #ifdef COMPARE_TO_LIBACL
   int ret = acl_from_text_to_xattr_value_both_impl(string(textual), binary_acl, binary_size, equiv_mode);
 #else // COMPARE_TO_LIBACL
-  int ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
+  int const ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
 #endif // COMPARE_TO_LIBACL
   ASSERT_EQ(ret, 0);
   ASSERT_EQ(binary_size, acl_binary_expected_len);
@@ -67,7 +67,7 @@ static void should_fail(const char *textual)
 #ifdef COMPARE_TO_LIBACL
   int ret = acl_from_text_to_xattr_value_both_impl(string(textual), binary_acl, binary_size, equiv_mode);
 #else // COMPARE_TO_LIBACL
-  int ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
+  int const ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
 #endif // COMPARE_TO_LIBACL
   ASSERT_EQ(ret, EINVAL);
 }
@@ -93,7 +93,7 @@ TEST_F(T_Acl, t1) {
     0x10, 0x00, 0x07, 0x00, 0xff, 0xff, 0xff, 0xff,
     0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
   };
-  unsigned int acl_binary_expected_len = 52;
+  unsigned int const acl_binary_expected_len = 52;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
 }
 
@@ -137,7 +137,7 @@ TEST_F(T_Acl, t3) {
     0x10, 0x00, 0x07, 0x00, 0xff, 0xff, 0xff, 0xff,
     0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
   };
-  unsigned int acl_binary_expected_len = 44;
+  unsigned int const acl_binary_expected_len = 44;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
 }
 
@@ -152,7 +152,7 @@ TEST_F(T_Acl, t5) {
     0x20, 0x00, 0x07, 0x00, 0xff, 0xff, 0xff, 0xff
   };
 
-  unsigned int acl_binary_expected_len = 44;
+  unsigned int const acl_binary_expected_len = 44;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
 }
 
@@ -167,7 +167,7 @@ TEST_F(T_Acl, t6) {
     0x10, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
     0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
   };
-  unsigned int acl_binary_expected_len = 52;
+  unsigned int const acl_binary_expected_len = 52;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
 }
 
@@ -177,7 +177,7 @@ TEST_F(T_Acl, t8) {
   size_t binary_size;
   char *binary_acl;
   bool equiv_mode;
-  int ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
+  int const ret = acl_from_text_to_xattr_value(string(textual), binary_acl, binary_size, equiv_mode);
   ASSERT_EQ(ret, EINVAL);
 }
 
@@ -193,6 +193,6 @@ TEST_F(T_Acl, t9) {
     0x10, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
     0x20, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
   };
-  unsigned int acl_binary_expected_len = 60;
+  unsigned int const acl_binary_expected_len = 60;
   should_pass(textual, acl_binary_expected, acl_binary_expected_len);
 }

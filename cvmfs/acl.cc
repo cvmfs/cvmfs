@@ -90,7 +90,7 @@ static int acl_from_text_to_string_entries(const string &acl_string, vector<stri
     entry_pos = next_pos;
 
     // search for '#'-starting comment, discard if found
-    size_t comment_pos = entry.find('#');
+    size_t const comment_pos = entry.find('#');
     if (comment_pos != string::npos) {
       entry = string(entry, 0, comment_pos);
     }
@@ -144,7 +144,7 @@ static int acl_entry_from_text(const string &str, acl_ea_entry &entry)
   }
   string const qualifier(str, next_field_pos, sep_pos - next_field_pos);
   next_field_pos = sep_pos + 1;
-  string permissions(str, next_field_pos);
+  string const permissions(str, next_field_pos);
 
   if (!type.compare("user") || !type.compare("u")) {
     entry.e_tag = qualifier.empty() ? ACL_USER_OBJ : ACL_USER;
@@ -290,7 +290,7 @@ int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl,
   }
 
   // get one big buffer with all the entries in the "on-disk" xattr format
-  size_t acl_entry_count = entries.size();
+  size_t const acl_entry_count = entries.size();
   size_t const buf_size = sizeof(acl_ea_header) + (acl_entry_count * sizeof(acl_ea_entry));
   char *buf = static_cast<char*>(malloc(buf_size));
   if (!buf) {
