@@ -20,7 +20,7 @@ class CatalogItem : SingleCopy {
  public:
   explicit CatalogItem(const shash::Any &hash);
   static CatalogItem *CreateQuitBeacon() {
-    shash::Any empty;
+    shash::Any const empty;
     return new CatalogItem(empty);
   }
   bool IsQuitBeacon() {
