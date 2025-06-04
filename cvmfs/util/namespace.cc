@@ -5,7 +5,6 @@
 
 #include "namespace.h"
 
-#include <bits/types/siginfo_t.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>

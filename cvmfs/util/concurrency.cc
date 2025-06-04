@@ -12,7 +12,6 @@
 #include <cstddef>
 
 #include "util/logging.h"
-#include "util/logging_internal.h"
 #include "util/mutex.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
