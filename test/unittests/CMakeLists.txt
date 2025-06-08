@@ -49,7 +49,7 @@ if (BUILD_LIBCVMFS_CACHE)
   target_link_libraries (cvmfs_test_cache
                          cvmfs_crypto
                          cvmfs_util
-                         ${GTEST_LIBRARIES}
+                         GTest::gtest
                          ${ZLIB_LIBRARIES}
                          ${RT_LIBRARY}
                          ${PROTOBUF_LITE_LIBRARY}
@@ -98,7 +98,7 @@ if (BUILD_SHRINKWRAP)
                          cvmfs_client
                          cvmfs_crypto
                          cvmfs_util
-                         ${GTEST_LIBRARIES}
+                         GTest::gtest
                          pthread
                          dl
   )
@@ -217,7 +217,7 @@ if (BUILD_SERVER)
   )
   set (CVMFS_UNITTEST_SERVER_LINK_LIBRARIES "")
   list (APPEND CVMFS_UNITTEST_SERVER_LINK_LIBRARIES
-        ${GTEST_LIBRARIES}
+        GTest::gtest
         ${OPENSSL_LIBRARIES}
         ${CURL_LIBRARIES}
         ${CARES_LIBRARIES} ${CARES_LDFLAGS}
@@ -543,7 +543,7 @@ endif ()
 
 set (CVMFS_UNITTESTS_LINK_LIBRARIES "")
 list (APPEND CVMFS_UNITTESTS_LINK_LIBRARIES
-      ${GTEST_LIBRARIES}
+      GTest::gtest
       ${OPENSSL_LIBRARIES}
       ${CURL_LIBRARIES}
       ${CARES_LIBRARIES} ${CARES_LDFLAGS}

@@ -39,6 +39,8 @@ option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* comman
 # ${CMAKE_SOURCE_DIR}/externals_install. If this variable is set to OFF, these
 # libraries are picked up from the system
 option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
+option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installation if available. Set to ON or OFF to force cmake to either download it from the fly, or take it from the system." AUTO)
+
 
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
