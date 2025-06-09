@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"net/http"
 )
 
 func ReadChanges(file *os.File) chan string {
@@ -62,7 +63,174 @@ func ProcessRequest(logfile_name string, file_name string, repository_name strin
 			ProcessRequest(logfile_name, file_name, repository_name, rotation)
 		}
 
-		ExecDucc(msg, logfile_name, repository_name)
+		typeValue, err := checkImageType (msg)
+		msg_split := strings.Split(msg, "|")
+		action := msg_split[len(msg_split)-2]
+		if action == "push" {
+			if err != nil {
+				log.Fatalf("Error checking image type querying harbor's API: %s", err)
+			}
+			if typeValue == "IMAGE" {
+				ExecDucc(msg, logfile_name, repository_name)
+			} else if typeValue == "SIF" {
+				ExecSIF(msg, logfile_name, repository_name)
+			}
+		} else if action == "delete" {
+			ExecDucc(msg, logfile_name, repository_name)
+		}
+	}
+}
+
+type Artifact struct {
+	Type string `json:"type"`
+}
+
+func checkImageType(msg string) (string, error) {
+
+	// Extract the image URL from the message
+	parts := strings.Split(msg, "|")
+	imageURL := parts[len(parts)-1]
+
+	// Remove https:// and split into components
+	image := strings.TrimPrefix(imageURL, "https://")
+	segments := strings.Split(image, "/")
+	if len(segments) < 3 {
+		return "", fmt.Errorf("unexpected image URL format")
+	}
+
+	host := segments[len(segments)-3]
+	project := segments[len(segments)-2]
+	repoTag := segments[len(segments)-1]
+	repoParts := strings.SplitN(repoTag, ":", 2)
+
+	if len(repoParts) != 2 {
+		return "", fmt.Errorf("unexpected repo format in image URL")
+	}
+	repo, tag := repoParts[0], repoParts[1]
+
+	// Build API URL
+	apiURL := fmt.Sprintf("https://%s/api/v2.0/projects/%s/repositories/%s/artifacts/%s", host, project, repo, tag)
+
+	// Make HTTP GET request
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return "", fmt.Errorf("HTTP request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Decode JSON response
+	var artifact Artifact
+	if err := json.NewDecoder(resp.Body).Decode(&artifact); err != nil {
+		return "", fmt.Errorf("failed to decode JSON: %v", err)
+	}
+
+	if artifact.Type == "" {
+		return "", fmt.Errorf("'type' field not found or empty")
+	}
+
+	return artifact.Type, nil
+}
+
+func ExecSIF(msg string, logfile_name string, repository_name string) {
+
+	msg_split := strings.Split(msg, "|")
+	image := msg_split[len(msg_split)-1]
+	image = strings.ReplaceAll(image, "https://", "")
+	action := msg_split[len(msg_split)-2]
+	ima_split := strings.Split(image, "/")
+	dkrepo := ima_split[len(ima_split)-1]
+
+	nOfE := 0
+	repeat := true
+
+	for repeat {
+		nOfE++
+		repeat = false
+		currentTime := time.Now()
+		timestamp := currentTime.Format("060102-150405")
+		lf_name := logfile_name + "_" + dkrepo + "_" + timestamp
+		logFile, err := os.OpenFile(lf_name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+		if err != nil {
+			fmt.Printf("Error opening log file: %v\n", err)
+			return
+		}
+		defer logFile.Close()
+		logger := log.New(logFile, "", log.LstdFlags)
+		logger.Printf("[SIF conversion n.%d for %s started...]\n", nOfE, image)
+		fmt.Printf("[SIF conversion n.%d for %s started...]\n", nOfE, image)
+		_, traErr := exec.Command("sudo", "cvmfs_server", "transaction", repository_name).Output()
+		if traErr != nil {
+			log.Fatal(traErr)
+		}
+		p := "/cvmfs/" +  repository_name + "/" + image
+		orasURI := "oras://" + image
+		_, buiErr := exec.Command("sudo", "apptainer", "build", "--force", "--sandbox", p, orasURI).Output()
+		_, cleErr := exec.Command("sudo", "apptainer", "cache", "clean", "-f").Output()
+		if buiErr != nil {
+			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+			log.Fatal(buiErr)
+		}
+		pcat := p + "/.cvmfscatalog"
+		_, cleErr = exec.Command("sudo", "touch", pcat).Output()
+		if cleErr != nil {
+			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+			log.Fatal(cleErr)
+		}
+		_, pubErr := exec.Command("sudo", "cvmfs_server", "publish", repository_name).Output()
+		if pubErr != nil {
+			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+			log.Fatal(pubErr)
+		}
+		// Open the JSON file for reading
+		_, chmodErr := exec.Command("sudo", "chmod", "0755", lf_name).Output()
+		if chmodErr != nil {
+			fmt.Println("Error executing chmod:", chmodErr)
+			return
+		}
+                //TODO: adapt to SIF image
+		file, fileErr := os.Open(lf_name)
+		if fileErr != nil {
+			fmt.Println("Error opening file:", fileErr)
+			return
+		}
+		defer file.Close()
+
+		// Create a scanner to read the file line by line
+		scanner := bufio.NewScanner(file)
+
+		// Loop through each line in the file
+		for scanner.Scan() {
+
+			line := scanner.Text()
+			// Parse the line as a JSON object
+			var data map[string]interface{}
+			if err := json.Unmarshal([]byte(line), &data); err != nil {
+				fmt.Printf("Error parsing JSON: %v\n", err)
+				continue
+			}
+
+			// Check if "status" is "error"
+			status, exists := data["status"]
+			if exists && status == "error" {
+				// Perform some action when "status" is "error"
+				if action == "push" {
+					logger.Printf("[SIF conversion n.%d failed for layer %s]\n", nOfE, data["layer"])
+					fmt.Printf("[SIF conversion n.%d failed for layer %s]\n", nOfE, data["layer"])
+				}
+				repeat = true
+				break;
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error reading file:", err)
+		}
+		logger.Printf("[SIF conversion n.%d completed 'ok']\n", nOfE)
+		fmt.Printf("[SIF conversion n.%d completed 'ok']\n", nOfE)
 	}
 }
 
@@ -73,17 +241,27 @@ func DeletePathsInRepo(repository_name string, paths_to_delete []string) (err er
 		log.Fatal(err)
 	}
 	for _, p := range paths_to_delete {
-		if strings.HasPrefix(p, "/cvmfs/") {
-			_, rmErr := exec.Command("sudo", "rm", "-rf", p).Output()
-			if rmErr != nil {
-				_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
-				log.Fatal(rmErr)
-			}
-		} else {
+		if !strings.HasPrefix(p, "/cvmfs/") {
 			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
 			log.Fatalln("Refusing to remove path outside of /cvmfs: ", p)
 		}
+		// Check if the path exists
+		if _, statErr := os.Stat(p); os.IsNotExist(statErr) {
+			log.Printf("Path does not exist, skipping: %s\n", p)
+			continue
+		} else if statErr != nil {
+			// Other error (e.g., permission denied), abort and report
+			_, _ = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+			log.Fatalf("Error checking path %s: %v\n", p, statErr)
+		}
+		// Only delete if it exists
+		_, rmErr := exec.Command("sudo", "rm", "-rf", p).Output()
+		if rmErr != nil {
+			_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
+			log.Fatal(rmErr)
+		}
 	}
+
 	_, pubErr := exec.Command("sudo", "cvmfs_server", "publish", repository_name).Output()
 	if pubErr != nil {
 		_, err = exec.Command("sudo", "cvmfs_server", "abort", "-f", repository_name).Output()
