@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-	"net/http"
 )
 
 func ReadChanges(file *os.File) chan string {
@@ -63,7 +63,7 @@ func ProcessRequest(logfile_name string, file_name string, repository_name strin
 			ProcessRequest(logfile_name, file_name, repository_name, rotation)
 		}
 
-		typeValue, err := checkImageType (msg)
+		typeValue, err := checkImageType(msg)
 		msg_split := strings.Split(msg, "|")
 		action := msg_split[len(msg_split)-2]
 		if action == "push" {
@@ -166,7 +166,7 @@ func ExecSIF(msg string, logfile_name string, repository_name string) {
 		if traErr != nil {
 			log.Fatal(traErr)
 		}
-		p := "/cvmfs/" +  repository_name + "/" + image
+		p := "/cvmfs/" + repository_name + "/" + image
 		orasURI := "oras://" + image
 		_, buiErr := exec.Command("sudo", "apptainer", "build", "--force", "--sandbox", p, orasURI).Output()
 		_, cleErr := exec.Command("sudo", "apptainer", "cache", "clean", "-f").Output()
@@ -191,7 +191,7 @@ func ExecSIF(msg string, logfile_name string, repository_name string) {
 			fmt.Println("Error executing chmod:", chmodErr)
 			return
 		}
-                //TODO: adapt to SIF image
+		//TODO: adapt to SIF image
 		file, fileErr := os.Open(lf_name)
 		if fileErr != nil {
 			fmt.Println("Error opening file:", fileErr)
@@ -222,7 +222,7 @@ func ExecSIF(msg string, logfile_name string, repository_name string) {
 					fmt.Printf("[SIF conversion n.%d failed for layer %s]\n", nOfE, data["layer"])
 				}
 				repeat = true
-				break;
+				break
 			}
 		}
 
