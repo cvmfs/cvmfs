@@ -1,4 +1,3 @@
-
 cvmfs-release (4.6-1) lucid; urgency=low
 
   * Add Debian 13 "trixie"
