@@ -17,27 +17,35 @@ fi
 
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
+CVMFS_BUILD_LOCATION="$2/build/cvmfs-release"
+mkdir -p $CVMFS_BUILD_LOCATION
+
 
 # sanity checks
-[ ! -d ${CVMFS_SOURCE_LOCATION}/debian ]   || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/debian exists)"
-[ ! -f ${CVMFS_SOURCE_LOCATION}/Makefile ] || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/Makefile exists)"
+[ ! -d ${CVMFS_BUILD_LOCATION}/debian ]   || die "source directory seemed to be built before (${CVMFS_BUILD_LOCATION}/debian exists)"
+[ ! -f ${CVMFS_BUILD_LOCATION}/Makefile ] || die "source directory seemed to be built before (${CVMFS_BUILD_LOCATION}/Makefile exists)"
 
 echo "preparing source directory for the build ($config_package)..."
+
+#TODO: adapt Makefile, copy only .list files
+cp -r $CVMFS_SOURCE_LOCATION/packaging $CVMFS_BUILD_LOCATION 
+
 cp -rv ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs-release \
-       ${CVMFS_SOURCE_LOCATION}/debian
+       ${CVMFS_BUILD_LOCATION}/debian
 cp -v ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs-release/Makefile \
-      ${CVMFS_SOURCE_LOCATION}/Makefile
+      ${CVMFS_BUILD_LOCATION}/Makefile
 
 echo "switching to the debian source directory..."
-cd ${CVMFS_SOURCE_LOCATION}/debian
+cd ${CVMFS_BUILD_LOCATION}/debian
 
 echo "running the debian package build..."
 debuild --no-tgz-check -us -uc # -us -uc == skip signing
-mv ${CVMFS_SOURCE_LOCATION}/../cvmfs-release_* ${CVMFS_RESULT_LOCATION}/
+mv ${CVMFS_BUILD_LOCATION}/../cvmfs-release_* ${CVMFS_RESULT_LOCATION}/
+
+
+echo "cleaning up..."
+rm -fR ${CVMFS_BUILD_LOCATION}/debian
+rm -f  ${CVMFS_BUILD_LOCATION}/Makefile
 
 echo "switching back to the source directory..."
 cd ${CVMFS_SOURCE_LOCATION}
-
-echo "cleaning up..."
-rm -fR ${CVMFS_SOURCE_LOCATION}/debian
-rm -f  ${CVMFS_SOURCE_LOCATION}/Makefile
