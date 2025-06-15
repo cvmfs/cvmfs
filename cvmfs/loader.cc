@@ -427,7 +427,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   return mount_options;
 }
 
-
+#if CVMFS_USE_LIBFUSE != 2
 static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
   for (int i = 0; i < mount_options->argc; i++) {
     char *arg = mount_options->argv[i];
@@ -444,7 +444,7 @@ static bool MatchFuseOption(const fuse_args *mount_options, const char *opt) {
   }
   return false;
 }
-
+#endif
 
 static void SetFuseOperations(struct fuse_lowlevel_ops *loader_operations) {
   memset(loader_operations, 0, sizeof(*loader_operations));
