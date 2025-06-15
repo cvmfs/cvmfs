@@ -8,6 +8,7 @@ libarchive_install_dir=${cdir}/libarchive_install
 # so use cmake only in that case, as we don't want 
 # to introduce an additional cmake dependency
 
+# CMAKE_POLICY_VERSION_MINIMUM is a workaround to fix compilation with cmake 4
 
 if [ "$(uname -s)" == "Darwin" ]; then
 mkdir mybuild && cd mybuild
@@ -36,6 +37,7 @@ cmake \
   -DENABLE_TEST=OFF \
   -DENABLE_XATTR=OFF \
   -DENABLE_ZLIB=OFF \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   ../
 
 else
