@@ -517,7 +517,7 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   const char *env_tmpdir;
   if (args.find('t') != args.end()) {
     dir_temp = MakeCanonicalPath(*args.find('t')->second);
-  } else if (env_tmpdir = getenv("TMPDIR")) {
+  } else if ((env_tmpdir = getenv("TMPDIR"))) {
     dir_temp = MakeCanonicalPath(env_tmpdir);
   } else {
     LogCvmfs(kLogCvmfs, kLogStderr, "-t or TMPDIR required");
