@@ -926,7 +926,7 @@ int FuseMain(int argc, char *argv[]) {
                                      ",default_permissions" : "",
       MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
     unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
-    if (!MatchFuseOption(mount_options, "rw")) {
+    if (MatchFuseOption(mount_options, "ro")) {
       flags |= MS_RDONLY;
     }
     if (mount("cvmfs2", mount_point_->c_str(), "fuse", flags, opts) == -1) {
