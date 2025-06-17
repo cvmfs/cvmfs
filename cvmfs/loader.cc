@@ -926,6 +926,9 @@ int FuseMain(int argc, char *argv[]) {
                                      ",default_permissions" : "",
       MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
     unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
+    // Note that during the handling of the `CVMFS_MOUNT_RW` option, we ensure that
+    // at least one of `rw` or `ro` is part of the mount option string (we won't have both unset).
+    // If both `rw` and `ro` are set, the read-only option takes precedence.
     if (MatchFuseOption(mount_options, "ro")) {
       flags |= MS_RDONLY;
     }
