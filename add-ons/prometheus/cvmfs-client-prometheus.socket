@@ -1,0 +1,14 @@
+[Unit]
+Description=Prometheus Exporter for CVMFS clients network socket
+
+[Socket]
+ListenStream=9868
+Accept=true
+MaxConnections=30
+MaxConnectionsPerSource=10
+DeferAcceptSec=1
+SocketUser=cvmfs
+SocketGroup=cvmfs
+
+[Install]
+WantedBy=sockets.target
