@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12)
+cmake_minimum_required (VERSION 3.12..3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -367,7 +367,6 @@ endif()
 if(NOT GTest_FOUND)
   message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
   Include(FetchContent)
-  cmake_policy( SET CMP0135 NEW )
   set(INSTALL_GTEST OFF)
   FetchContent_Declare(
     GoogleTest
