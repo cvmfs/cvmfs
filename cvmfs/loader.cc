@@ -1236,8 +1236,6 @@ int FuseMain(int argc, char *argv[]) {
   delete fence_reload_;
   delete loader_exports_;
   delete config_files_;
-  delete repository_name_;
-  delete mount_point_;
   delete socket_path_;
   fence_reload_ = NULL;
   loader_exports_ = NULL;
@@ -1258,6 +1256,8 @@ int FuseMain(int argc, char *argv[]) {
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
            mount_point_->c_str(), repository_name_->c_str());
 
+  delete repository_name_;
+  delete mount_point_;
   repository_name_ = NULL;
   mount_point_ = NULL;
 
@@ -1282,6 +1282,8 @@ cleanup:
   }
 #endif
 
+  delete repository_name_;
+  delete mount_point_;
   repository_name_ = NULL;
   mount_point_ = NULL;
 
