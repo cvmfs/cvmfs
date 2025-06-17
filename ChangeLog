@@ -1,3 +1,6 @@
+2.13.1:
+  * [client] Fix mount options that can lead to "futimes" error with docker (#3872)
+
 2.13.0:
   * [server] swissknife_lease: Fix bug in response receiver callback (#3823)
   * [server] Install default logrotate configs for /var/log/cvmfs and statsdb (#3839)
