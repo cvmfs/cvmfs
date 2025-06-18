@@ -4,23 +4,16 @@ cvmfs_test_name="Metalink"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
-has_correct_external_url() {
-  cvmfs_mntpnt=${1}
-  external_base=${2}
-  filename=${3}
-
-  local cvmfs_fullpath=$cvmfs_mntpnt/$filename
-  local external_fullpath=$external_base/$filename
-
-  [ x"$(attr -qg external_url "$cvmfs_fullpath")" = x"$external_fullpath" ]
-} 
-
 get_content_hash() {
   local full_file_path="$1"
   attr -qg hash "$full_file_path"
 }
 
+CVMFS_TEST_691_METALINK1_PID=
+CVMFS_TEST_691_METALINK2_PID=
 CVMFS_TEST_691_INTERNAL2_PID=
+CVMFS_TEST_691_EXTERNAL1_PID=
+CVMFS_TEST_691_EXTERNAL2_PID=
 cleanup() {
   echo "running cleanup()"
   [ -z $CVMFS_TEST_691_METALINK1_PID ] || sudo kill $CVMFS_TEST_691_METALINK1_PID
@@ -62,7 +55,6 @@ cvmfs_run_test() {
   local external_http_base1="http://localhost:$external_port1"
   local external_http_base2="http://localhost:$external_port2"
   local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
-  local original_root_hash=$(attr -qg root_hash ${cvmfs_mnt})
 
   echo "*** install a disaster cleanup"
   trap cleanup EXIT HUP INT TERM || return $?
@@ -122,8 +114,8 @@ cvmfs_run_test() {
   #CVMFS_DEBUGLOG="$scratch_dir/cvmfs-debug.log"
 !EOF!
   ) | sudo tee --append $client_config
-  sudo umount ${repo_dir}                                || return 42
-  sudo umount ${cvmfs_mnt}                               || return 43
+  cvmfs_suid_helper rw_umount     $CVMFS_TEST_REPO       || return 42
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO       || return 43
   # the next two lines along with CVMFS_DEBUGLOG enable debugging
   #sudo sed -i '/^cvmfs2/s/allow_other/debug,allow_other/' /etc/fstab
   #sudo systemctl daemon-reload
@@ -162,8 +154,7 @@ cvmfs_run_test() {
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-  local test_pipe=$(cat /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf | \
-                      grep ^CVMFS_TALK_SOCKET= | cut -d= -f2)
+  local test_pipe=$(grep ^CVMFS_TALK_SOCKET= $client_config | cut -d= -f2)
 
   echo "*** Read first file from first internal server"
   cat ${repo_dir}/internal/file1                             || return 51

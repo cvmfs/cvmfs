@@ -1114,7 +1114,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   // Check if metalink and host chains need to be reset
   CheckHostInfoReset("metalink", opt_metalink_, info, now);
-  CheckHostInfoReset("host", opt_metalink_, info, now);
+  CheckHostInfoReset("host", opt_host_, info, now);
 
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
   if (info->proxy() != "DIRECT") {

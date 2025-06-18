@@ -1,0 +1,130 @@
+#!/bin/bash
+
+cvmfs_test_name="Reset after"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cleanup() {
+  echo "running cleanup()"
+
+  echo "removing extra apache config"
+  local apache_config_file="$(get_apache_config_filename reset_after)"
+  remove_apache_config_file "$apache_config_file"
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+  local repo_dir="/cvmfs/${CVMFS_TEST_REPO}"
+  local scratch_dir="$(pwd)"
+
+  echo "*** create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -Z none || return $?
+
+  echo "*** get some global base paths and configs"
+  load_repo_config $CVMFS_TEST_REPO
+  local cvmfs_cache="${CVMFS_CACHE_BASE}/$CVMFS_TEST_REPO"
+  local host_port2=11693
+  local proxy_port1=12693
+  local proxy_port2=13693
+  local host_base1="http://127.0.0.1"
+  local host_base2="http://127.0.0.1:$host_port2"
+  local proxy_base1="http://127.0.0.1:$proxy_port1"
+  local proxy_base2="http://127.0.0.1:$proxy_port2"
+  local client_config="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/client.conf"
+  local test_pipe=$(grep ^CVMFS_TALK_SOCKET= $client_config | cut -d= -f2)
+  local apache_config_file="$(get_apache_config_filename reset_after)"
+
+  echo "*** install a disaster cleanup"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "*** fill repository with some files"
+  start_transaction $CVMFS_TEST_REPO                     || return $?
+  echo "Hello 1" >${repo_dir}/file1                      || return 11
+  echo "Hello 2" >${repo_dir}/file2                      || return 12
+  echo "Hello 3" >${repo_dir}/file3                      || return 13
+
+  echo "*** creating CVMFS revision with files"
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "*** unmount $CVMFS_TEST_REPO"
+  cvmfs_suid_helper rw_umount     $CVMFS_TEST_REPO       || return 31
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO       || return 32
+
+  echo "*** configure first proxy port in apache"
+  create_apache_config_file $apache_config_file << EOF
+# Created by test case 693.  Don't touch.
+Listen 127.0.0.1:$proxy_port1
+<VirtualHost 127.0.0.1:$proxy_port1>
+  ProxyRequests On
+  <Proxy "*">
+  </Proxy>
+</VirtualHost>
+EOF
+
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+
+  echo "*** Reconfigure $CVMFS_TEST_REPO"
+  (
+  cat <<!EOF!
+  CVMFS_SERVER_URL="$host_base2/cvmfs/@fqrn@;$CVMFS_SERVER_URL"
+  CVMFS_HTTP_PROXY="$proxy_base2;$proxy_base1"
+  CVMFS_PROXY_RESET_AFTER=3
+  CVMFS_HOST_RESET_AFTER=5
+  #CVMFS_DEBUGLOG="$scratch_dir/cvmfs-debug.log"
+!EOF!
+  ) | sudo tee --append $client_config
+  # the next two lines along with CVMFS_DEBUGLOG enable debugging
+  #sudo sed -i '/^cvmfs2/s/allow_other/debug,allow_other/' /etc/fstab
+  #sudo systemctl daemon-reload
+  sudo cvmfs_server mount $CVMFS_TEST_REPO               || return 41
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "*** make sure expected host and proxy are in use"
+  
+  cat ${repo_dir}/file1                                            || return 51
+  cvmfs_talk -p $test_pipe host info | grep "Active host 1:"       || return 52
+  cvmfs_talk -p $test_pipe proxy info | grep "Active proxy: \[1\]" || return 53
+
+  echo "*** reconfigure apache with second host and proxy"
+  create_apache_config_file $apache_config_file << EOF
+# Created by test case 693.  Don't touch.
+Listen 127.0.0.1:$host_port2
+
+Listen 127.0.0.1:$proxy_port1
+<VirtualHost 127.0.0.1:$proxy_port1>
+  ProxyRequests On
+  <Proxy "*">
+  </Proxy>
+</VirtualHost>
+
+Listen 127.0.0.1:$proxy_port2
+<VirtualHost 127.0.0.1:$proxy_port2>
+  ProxyRequests On
+  <Proxy "*">
+  </Proxy>
+</VirtualHost>
+EOF
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+
+  echo "*** wait four seconds for the proxy reset after"
+  sleep 4
+
+  echo "*** make sure proxy has re-set to the other one"
+  cat ${repo_dir}/file2                                            || return 61
+  cvmfs_talk -p $test_pipe proxy info | grep "Active proxy: \[0\]" || return 62
+
+  echo "*** wait two more seconds for the host reset after"
+  sleep 2
+
+  echo "*** make sure host has re-set to the other one"
+  cat ${repo_dir}/file3                                            || return 71
+  cvmfs_talk -p $test_pipe host info | grep "Active host 0:"       || return 72
+
+  return 0
+}
