@@ -627,12 +627,14 @@ systemctl daemon-reload
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
+%if 0%{?build_fuse2} 
 %{_libdir}/libcvmfs_fuse_stub.so
 %{_libdir}/libcvmfs_fuse_stub.so.%{version}
 %{_libdir}/libcvmfs_fuse.so
 %{_libdir}/libcvmfs_fuse.so.%{version}
 %{_libdir}/libcvmfs_fuse_debug.so
 %{_libdir}/libcvmfs_fuse_debug.so.%{version}
+%endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
