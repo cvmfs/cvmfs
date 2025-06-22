@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+//REMOVE ME
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
