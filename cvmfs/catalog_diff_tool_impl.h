@@ -8,6 +8,10 @@
 #include <algorithm>
 #include <string>
 
+// Only needed to let clang-tidy see the class definitions.
+// This would be an include loop if not for the header guard.
+#include "catalog_diff_tool.h"
+
 #include "catalog.h"
 #include "crypto/hash.h"
 #include "network/download.h"

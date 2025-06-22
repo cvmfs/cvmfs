@@ -15,8 +15,8 @@
 #include <string>
 #include <vector>
 
-// only needed for clang-tidy to let it see the class definitions.
-// this would an include loop if not for the header guard
+// Only needed to let clang-tidy see the class definitions.
+// This would by an include loop if not for the header guard.
 #include "catalog_mgr.h"
 
 #include "shortstring.h"
