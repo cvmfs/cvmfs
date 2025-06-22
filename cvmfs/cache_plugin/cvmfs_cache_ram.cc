@@ -144,7 +144,8 @@ static inline uint32_t hasher_uint64(const uint64_t &key) {
 }
 
 static inline uint32_t hasher_any(const ComparableHash &key) {
-  return static_cast<uint32_t>(*(reinterpret_cast<const uint32_t *>(&key.hash)));
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(&key.hash)));
 }
 
 }  // anonymous namespace
