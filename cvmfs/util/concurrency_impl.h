@@ -8,7 +8,7 @@
 // clang-format off
 // Only needed to let clang-tidy see the class definitions.
 #ifndef CVMFS_UTIL_CONCURRENCY_H_
-#include "catalog_mgr.h"
+#include "util/concurrency.h"
 #endif
 // clang-format on
 
