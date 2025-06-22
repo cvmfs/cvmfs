@@ -8,9 +8,11 @@
 #include <algorithm>
 #include <string>
 
+// clang-format off
 // Only needed to let clang-tidy see the class definitions.
 // This would be an include loop if not for the header guard.
 #include "catalog_diff_tool.h"
+// clang-format on
 
 #include "catalog.h"
 #include "crypto/hash.h"

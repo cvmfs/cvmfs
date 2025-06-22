@@ -15,9 +15,11 @@
 #include <string>
 #include <vector>
 
+// clang-format off
 // Only needed to let clang-tidy see the class definitions.
 // This would by an include loop if not for the header guard.
 #include "catalog_mgr.h"
+// clang-format on
 
 #include "shortstring.h"
 #include "statistics.h"
