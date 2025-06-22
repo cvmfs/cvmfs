@@ -73,15 +73,15 @@ int CmdMkfs::Main(const Options &options) {
         options.GetString("s3config"),
         settings.transaction().spool_area().tmp_dir());
   }
-  const bool configure_apache =
-      (settings.storage().type() == upload::SpoolerDefinition::Local) &&
-      options.HasNot("no-apache");
+  const bool configure_apache = (settings.storage().type()
+                                 == upload::SpoolerDefinition::Local)
+                                && options.HasNot("no-apache");
 
   // Permission check
   if (geteuid() != 0) {
-    const bool can_unprivileged = options.Has("no-publisher") &&
-                                  !configure_apache &&
-                                  (user_name == GetUserName());
+    const bool can_unprivileged = options.Has("no-publisher")
+                                  && !configure_apache
+                                  && (user_name == GetUserName());
     if (!can_unprivileged)
       throw EPublish("root privileges required");
   }
@@ -90,9 +90,9 @@ int CmdMkfs::Main(const Options &options) {
   if (options.Has("stratum0")) {
     settings.SetUrl(options.GetString("stratum0"));
   } else {
-    const bool need_stratum0 =
-        (settings.storage().type() != upload::SpoolerDefinition::Local) &&
-        options.HasNot("no-publisher");
+    const bool need_stratum0 = (settings.storage().type()
+                                != upload::SpoolerDefinition::Local)
+                               && options.HasNot("no-publisher");
     if (need_stratum0) {
       throw EPublish("repository stratum 0 URL for non-local storage "
                      "(add option -w)");

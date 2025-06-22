@@ -8,6 +8,12 @@
 #include <algorithm>
 #include <string>
 
+// clang-format off
+// Only needed to let clang-tidy see the class definitions.
+// This would be an include loop if not for the header guard.
+#include "catalog_diff_tool.h"
+// clang-format on
+
 #include "catalog.h"
 #include "crypto/hash.h"
 #include "network/download.h"
@@ -31,11 +37,11 @@ inline void AppendLastEntry(catalog::DirectoryEntryList *entry_list) {
 
 inline bool IsSmaller(const catalog::DirectoryEntry &a,
                       const catalog::DirectoryEntry &b) {
-  const bool a_is_first =
-      (a.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  const bool a_is_first = (a.inode()
+                           == catalog::DirectoryEntryBase::kInvalidInode);
   const bool a_is_last = (a.inode() == kLastInode);
-  const bool b_is_first =
-      (b.inode() == catalog::DirectoryEntryBase::kInvalidInode);
+  const bool b_is_first = (b.inode()
+                           == catalog::DirectoryEntryBase::kInvalidInode);
   const bool b_is_last = (b.inode() == kLastInode);
 
   if (a_is_last || b_is_first)
@@ -194,8 +200,8 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
     i_from++;
     i_to++;
 
-    const catalog::DirectoryEntryBase::Differences diff =
-        old_entry.CompareTo(new_entry);
+    const catalog::DirectoryEntryBase::Differences diff = old_entry.CompareTo(
+        new_entry);
     if ((diff == catalog::DirectoryEntryBase::Difference::kIdentical)
         && old_entry.IsNestedCatalogMountpoint()) {
       // Early recursion stop if nested catalogs are identical
@@ -216,8 +222,8 @@ void CatalogDiffTool<RoCatalogMgr>::DiffRec(const PathString &path) {
         new_catalog_mgr_->ListFileChunks(new_path, new_entry.hash_algorithm(),
                                          &chunks);
       }
-      const bool recurse =
-          ReportModification(old_path, old_entry, new_entry, xattrs, chunks);
+      const bool recurse = ReportModification(old_path, old_entry, new_entry,
+                                              xattrs, chunks);
       if (!recurse)
         continue;
     }

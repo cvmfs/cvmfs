@@ -4,12 +4,12 @@
 
 #include "acl.h"
 
+#include <string.h>
+
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <vector>
-#include <algorithm>
-
-#include <string.h>
 
 #include "util/posix.h"
 
@@ -17,26 +17,26 @@ using namespace std;  // NOLINT
 
 #ifdef COMPARE_TO_LIBACL
 #include "acl/libacl.h"
-#else // COMPARE_TO_LIBACL
+#else  // COMPARE_TO_LIBACL
 
 // ACL permission bits
-#define ACL_READ (0x04)
-#define ACL_WRITE (0x02)
-#define ACL_EXECUTE (0x01)
+#define ACL_READ          (0x04)
+#define ACL_WRITE         (0x02)
+#define ACL_EXECUTE       (0x01)
 
 // ACL tag types
 #define ACL_UNDEFINED_TAG (0x00)
-#define ACL_USER_OBJ (0x01)
-#define ACL_USER (0x02)
-#define ACL_GROUP_OBJ (0x04)
-#define ACL_GROUP (0x08)
-#define ACL_MASK (0x10)
-#define ACL_OTHER (0x20)
+#define ACL_USER_OBJ      (0x01)
+#define ACL_USER          (0x02)
+#define ACL_GROUP_OBJ     (0x04)
+#define ACL_GROUP         (0x08)
+#define ACL_MASK          (0x10)
+#define ACL_OTHER         (0x20)
 
 // ACL qualifier constants
-#define ACL_UNDEFINED_ID ((id_t) - 1)
+#define ACL_UNDEFINED_ID  ((id_t) - 1)
 
-#endif // COMPARE_TO_LIBACL
+#endif  // COMPARE_TO_LIBACL
 
 #define ACL_EA_VERSION 0x0002
 
@@ -47,7 +47,7 @@ struct acl_ea_entry {
   u_int32_t e_id;
 
   // implements sorting compatible with libacl
-  bool operator<(const acl_ea_entry& other) const {
+  bool operator<(const acl_ea_entry &other) const {
     if (e_tag != other.e_tag) {
       return e_tag < other.e_tag;
     }
@@ -60,8 +60,8 @@ struct acl_ea_header {
   acl_ea_entry a_entries[0];
 };
 
-static int acl_from_text_to_string_entries(const string &acl_string, vector<string> &string_entries)
-{
+static int acl_from_text_to_string_entries(const string &acl_string,
+                                           vector<string> &string_entries) {
   std::size_t entry_pos = 0;
   while (entry_pos != string::npos) {
     size_t entry_length;
@@ -107,8 +107,7 @@ static int acl_from_text_to_string_entries(const string &acl_string, vector<stri
   return 0;
 }
 
-static int acl_parms_from_text(const string &str, u_int16_t *perms)
-{
+static int acl_parms_from_text(const string &str, u_int16_t *perms) {
   // Currently unsupported syntax features found in setfacl:
   // - X (capital x)
   // - numeric syntax
@@ -116,19 +115,26 @@ static int acl_parms_from_text(const string &str, u_int16_t *perms)
 
   *perms = 0;
   for (const char &c : str) {
-    switch(c) {
-      case 'r': *perms |= ACL_READ; break;
-      case 'w': *perms |= ACL_WRITE; break;
-      case 'x': *perms |= ACL_EXECUTE; break;
-      case '-': break;
-      default: return EINVAL;
+    switch (c) {
+      case 'r':
+        *perms |= ACL_READ;
+        break;
+      case 'w':
+        *perms |= ACL_WRITE;
+        break;
+      case 'x':
+        *perms |= ACL_EXECUTE;
+        break;
+      case '-':
+        break;
+      default:
+        return EINVAL;
     }
   }
   return 0;
 }
 
-static int acl_entry_from_text(const string &str, acl_ea_entry &entry)
-{
+static int acl_entry_from_text(const string &str, acl_ea_entry &entry) {
   // break down to 3 fields by ':'
   // type:qualifier:permissions according to terminology
   // e_tag:e_id:e_perm are acl_ea_entry field names
@@ -162,7 +168,7 @@ static int acl_entry_from_text(const string &str, acl_ea_entry &entry)
   if (qualifier.empty()) {
     entry.e_id = ACL_UNDEFINED_ID;
   } else {
-    char* at_null_terminator_if_number;
+    char *at_null_terminator_if_number;
     long number = strtol(qualifier.c_str(), &at_null_terminator_if_number, 10);
     if (*at_null_terminator_if_number != '\0') {
       bool ok;
@@ -197,8 +203,7 @@ static int acl_entry_from_text(const string &str, acl_ea_entry &entry)
   return 0;
 }
 
-static bool acl_valid_builtin(const vector<acl_ea_entry> &entries)
-{
+static bool acl_valid_builtin(const vector<acl_ea_entry> &entries) {
   // From man acl_valid:
   // The three required entries ACL_USER_OBJ, ACL_GROUP_OBJ, and ACL_OTHER must
   // exist exactly once in the ACL.
@@ -211,7 +216,9 @@ static bool acl_valid_builtin(const vector<acl_ea_entry> &entries)
   // The user identifiers must be unique among all entries of type ACL_USER.
   // The group identifiers must be unique among all entries of type ACL_GROUP.
 
-  bool types_met[ACL_OTHER + 1] = {false, };
+  bool types_met[ACL_OTHER + 1] = {
+      false,
+  };
 
   for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
     const acl_ea_entry &e = *entry_it;
@@ -237,7 +244,8 @@ static bool acl_valid_builtin(const vector<acl_ea_entry> &entries)
         assert(false);
     }
   }
-  if (!(types_met[ACL_USER_OBJ] && types_met[ACL_GROUP_OBJ] && types_met[ACL_OTHER])) {
+  if (!(types_met[ACL_USER_OBJ] && types_met[ACL_GROUP_OBJ]
+        && types_met[ACL_OTHER])) {
     return false;
   }
   if ((types_met[ACL_USER] || types_met[ACL_GROUP]) && !types_met[ACL_MASK]) {
@@ -247,8 +255,8 @@ static bool acl_valid_builtin(const vector<acl_ea_entry> &entries)
   return true;
 }
 
-int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode)
-{
+int acl_from_text_to_xattr_value(const string &textual_acl, char *&o_binary_acl,
+                                 size_t &o_size, bool &o_equiv_mode) {
   int ret;
 
   o_equiv_mode = true;
@@ -262,7 +270,9 @@ int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl,
 
   // get individual entries in structural form
   vector<acl_ea_entry> entries;
-  for (auto string_it = string_entries.begin(); string_it != string_entries.end(); ++string_it) {
+  for (auto string_it = string_entries.begin();
+       string_it != string_entries.end();
+       ++string_it) {
     acl_ea_entry entry;
     ret = acl_entry_from_text(*string_it, entry);
     if (ret) {
@@ -291,14 +301,15 @@ int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl,
 
   // get one big buffer with all the entries in the "on-disk" xattr format
   size_t const acl_entry_count = entries.size();
-  size_t const buf_size = sizeof(acl_ea_header) + (acl_entry_count * sizeof(acl_ea_entry));
-  char *buf = static_cast<char*>(malloc(buf_size));
+  size_t const buf_size = sizeof(acl_ea_header)
+                          + (acl_entry_count * sizeof(acl_ea_entry));
+  char *buf = static_cast<char *>(malloc(buf_size));
   if (!buf) {
     return ENOMEM;
   }
-  acl_ea_header* header = reinterpret_cast<acl_ea_header*>(buf);
+  acl_ea_header *header = reinterpret_cast<acl_ea_header *>(buf);
   header->a_version = htole32(ACL_EA_VERSION);
-  acl_ea_entry* ext_entry = reinterpret_cast<acl_ea_entry*>(header + 1);
+  acl_ea_entry *ext_entry = reinterpret_cast<acl_ea_entry *>(header + 1);
   for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
     *ext_entry = *entry_it;
     ext_entry += 1;
@@ -310,9 +321,11 @@ int acl_from_text_to_xattr_value(const string& textual_acl, char *&o_binary_acl,
 }
 
 #ifdef COMPARE_TO_LIBACL
-int acl_from_text_to_xattr_value_libacl(const string textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode)
-{
-  acl_t acl = acl_from_text(textual_acl.c_str());  // Convert ACL string to acl_t object
+int acl_from_text_to_xattr_value_libacl(const string textual_acl,
+                                        char *&o_binary_acl, size_t &o_size,
+                                        bool &o_equiv_mode) {
+  acl_t acl = acl_from_text(
+      textual_acl.c_str());  // Convert ACL string to acl_t object
   if (!acl) {
     return EINVAL;
   }
@@ -336,16 +349,19 @@ int acl_from_text_to_xattr_value_libacl(const string textual_acl, char *&o_binar
   return 0;
 }
 
-int acl_from_text_to_xattr_value_both_impl(const string textual_acl, char *&o_binary_acl, size_t &o_size, bool &o_equiv_mode)
-{
+int acl_from_text_to_xattr_value_both_impl(const string textual_acl,
+                                           char *&o_binary_acl, size_t &o_size,
+                                           bool &o_equiv_mode) {
   struct impl_result {
     int ret;
     size_t binary_size;
     char *binary_acl;
     bool equiv_mode;
   } b, l;
-  b.ret = acl_from_text_to_xattr_value(textual_acl, b.binary_acl, b.binary_size, b.equiv_mode);
-  l.ret = acl_from_text_to_xattr_value_libacl(textual_acl, l.binary_acl, l.binary_size, l.equiv_mode);
+  b.ret = acl_from_text_to_xattr_value(textual_acl, b.binary_acl, b.binary_size,
+                                       b.equiv_mode);
+  l.ret = acl_from_text_to_xattr_value_libacl(textual_acl, l.binary_acl,
+                                              l.binary_size, l.equiv_mode);
   assert(b.ret == l.ret);
   if (!l.ret) {
     assert(b.binary_size == l.binary_size);
@@ -358,4 +374,4 @@ int acl_from_text_to_xattr_value_both_impl(const string textual_acl, char *&o_bi
   o_equiv_mode = b.equiv_mode;
   return b.ret;
 }
-#endif // COMPARE_TO_LIBACL
+#endif  // COMPARE_TO_LIBACL

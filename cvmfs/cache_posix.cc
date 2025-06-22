@@ -380,8 +380,8 @@ int PosixCacheManager::Dup(int fd) {
 int PosixCacheManager::Flush(Transaction *transaction) {
   if (transaction->buf_pos == 0)
     return 0;
-  const int written =
-      write(transaction->fd, transaction->buffer, transaction->buf_pos);
+  const int written = write(transaction->fd, transaction->buffer,
+                            transaction->buf_pos);
   if (written < 0)
     return -errno;
   if (static_cast<unsigned>(written) != transaction->buf_pos) {
@@ -547,8 +547,8 @@ int PosixCacheManager::StartTxn(const shash::Any &id,
       const uint64_t cache_capacity = quota_mgr_->GetCapacity();
       assert(cache_capacity >= size);
       if ((cache_size + size) > cache_capacity) {
-        const uint64_t leave_size =
-            std::min(cache_capacity / 2, cache_capacity - size);
+        const uint64_t leave_size = std::min(cache_capacity / 2,
+                                             cache_capacity - size);
         quota_mgr_->Cleanup(leave_size);
       }
     }
@@ -637,8 +637,8 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
       }
     }
     const uint64_t remaining = size - written;
-    const uint64_t space_in_buffer =
-        sizeof(transaction->buffer) - transaction->buf_pos;
+    const uint64_t space_in_buffer = sizeof(transaction->buffer)
+                                     - transaction->buf_pos;
     const uint64_t batch_size = std::min(remaining, space_in_buffer);
     memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
     transaction->buf_pos += batch_size;

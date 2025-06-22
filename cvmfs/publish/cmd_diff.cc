@@ -64,17 +64,17 @@ class DiffReporter : public publish::DiffListener {
     const std::string operation = machine_readable_ ? "S " : "d(";
     const std::string type_file = machine_readable_ ? "F" : "# regular files):";
     const std::string type_symlink = machine_readable_ ? "S" : "# symlinks):";
-    const std::string type_directory =
-        machine_readable_ ? "D" : "# directories):";
+    const std::string type_directory = machine_readable_ ? "D"
+                                                         : "# directories):";
     const std::string type_catalog = machine_readable_ ? "N" : "# catalogs):";
-    const int64_t diff_file =
-        delta.self.regular_files + delta.subtree.regular_files;
+    const int64_t diff_file = delta.self.regular_files
+                              + delta.subtree.regular_files;
     const int64_t diff_symlink = delta.self.symlinks + delta.subtree.symlinks;
-    const int64_t diff_catalog =
-        delta.self.nested_catalogs + delta.subtree.nested_catalogs;
+    const int64_t diff_catalog = delta.self.nested_catalogs
+                                 + delta.subtree.nested_catalogs;
     // Nested catalogs make internally two directory entries
-    const int64_t diff_directory =
-        delta.self.directories + delta.subtree.directories - diff_catalog;
+    const int64_t diff_directory = delta.self.directories
+                                   + delta.subtree.directories - diff_catalog;
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64, operation.c_str(),
              type_file.c_str(), diff_file);
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s %" PRId64, operation.c_str(),

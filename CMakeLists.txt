@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 2.6.2...3.12)
+cmake_minimum_required (VERSION 3.12..3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -353,7 +353,29 @@ find_package (Libcrypto REQUIRED)
 # to avoid a clash with the system openssl. We only use it for libcvmfs_crypto
 message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
-find_package (GTest REQUIRED)
+
+# GoogleTest
+set(GOOGLETEST_MIN_VERSION "1.10.0")
+if(USE_EXTERNAL_GOOGLETEST)
+  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
+    find_package(GTest ${GOOGLETEST_MIN_VERSION})
+  else()
+    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
+  endif()
+endif()
+
+if(NOT GTest_FOUND)
+  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
+  Include(FetchContent)
+  set(INSTALL_GTEST OFF)
+  FetchContent_Declare(
+    GoogleTest
+    URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+    URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+    )
+  FetchContent_MakeAvailable(GoogleTest)
+endif()
+get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)

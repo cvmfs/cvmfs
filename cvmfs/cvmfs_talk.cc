@@ -46,8 +46,8 @@ struct InstanceInfo {
     options_mgr.ParseDefault(fqrn);
     if (!options_mgr.GetValue("CVMFS_WORKSPACE", &workspace)) {
       if (!options_mgr.GetValue("CVMFS_CACHE_DIR", &workspace)) {
-        const bool retval =
-            options_mgr.GetValue("CVMFS_CACHE_BASE", &workspace);
+        const bool retval = options_mgr.GetValue("CVMFS_CACHE_BASE",
+                                                 &workspace);
         if (!retval) {
           LogCvmfs(kLogCvmfs, kLogStderr,
                    "CVMFS_WORKSPACE, CVMFS_CACHE_DIR, and CVMFS_CACHE_BASE "

@@ -29,8 +29,8 @@ string Letter::Sign(const shash::Algorithms hash_algorithm) {
   bool retval = signature_manager_->WriteCertificateMem(&cert_buf,
                                                         &cert_buf_size);
   assert(retval);
-  const string cert_base64 =
-      Base64(string(reinterpret_cast<char *>(cert_buf), cert_buf_size));
+  const string cert_base64 = Base64(
+      string(reinterpret_cast<char *>(cert_buf), cert_buf_size));
   free(cert_buf);
 
   string output = text_;

@@ -87,12 +87,12 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
     return 1;
   }
 
-  ObjectFetcher object_fetcher(
-      repo_name, repo_url, tmp_dir, download_manager(), signature_manager());
+  ObjectFetcher object_fetcher(repo_name, repo_url, tmp_dir, download_manager(),
+                               signature_manager());
 
   UniquePtr<manifest::Manifest> manifest;
-  const ObjectFetcher::Failures retval =
-      object_fetcher.FetchManifest(&manifest);
+  const ObjectFetcher::Failures retval = object_fetcher.FetchManifest(
+      &manifest);
   if (retval != ObjectFetcher::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to load repository manifest "
@@ -116,8 +116,8 @@ int CommandReconstructReflog::Main(const ArgumentList &args) {
 
   reflog->BeginTransaction();
   AddStaticManifestObjects(reflog.weak_ref(), manifest.weak_ref());
-  RootChainWalker walker(
-      manifest.weak_ref(), &object_fetcher, reflog.weak_ref());
+  RootChainWalker walker(manifest.weak_ref(), &object_fetcher,
+                         reflog.weak_ref());
   walker.FindObjectsAndPopulateReflog();
   reflog->CommitTransaction();
 
@@ -255,8 +255,8 @@ RootChainWalker::CatalogTN *RootChainWalker::FetchCatalog(
     const shash::Any catalog_hash) {
   CatalogTN *catalog = NULL;
   const char *root_path = "";
-  const ObjectFetcherFailures::Failures failure =
-      object_fetcher_->FetchCatalog(catalog_hash, root_path, &catalog);
+  const ObjectFetcherFailures::Failures failure = object_fetcher_->FetchCatalog(
+      catalog_hash, root_path, &catalog);
 
   return ReturnOrAbort(failure, catalog_hash, catalog);
 }
@@ -265,8 +265,8 @@ RootChainWalker::CatalogTN *RootChainWalker::FetchCatalog(
 RootChainWalker::HistoryTN *RootChainWalker::FetchHistory(
     const shash::Any history_hash) {
   HistoryTN *history = NULL;
-  const ObjectFetcherFailures::Failures failure =
-      object_fetcher_->FetchHistory(&history, history_hash);
+  const ObjectFetcherFailures::Failures failure = object_fetcher_->FetchHistory(
+      &history, history_hash);
 
   return ReturnOrAbort(failure, history_hash, history);
 }

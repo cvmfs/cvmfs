@@ -55,8 +55,8 @@ class StreamingSink : public cvmfs::Sink {
     const uint64_t copy_offset = std::max(old_pos, window_offset_);
     const uint64_t inbuf_offset = copy_offset - old_pos;
     const uint64_t outbuf_offset = copy_offset - window_offset_;
-    const uint64_t copy_size =
-        std::min(sz - inbuf_offset, window_size_ - outbuf_offset);
+    const uint64_t copy_size = std::min(sz - inbuf_offset,
+                                        window_size_ - outbuf_offset);
 
     memcpy(reinterpret_cast<unsigned char *>(window_buf_) + outbuf_offset,
            reinterpret_cast<const unsigned char *>(buf) + inbuf_offset,
@@ -215,8 +215,8 @@ int64_t StreamingCacheManager::Stream(const FdInfo &info,
       perf::Inc(counters_->n_buffer_evicts);
       perf::Dec(counters_->n_buffer_objects);
     }
-    const RingBuffer::ObjectHandle_t handle =
-        buffer_->PushFront(object, nbytes_in_buffer);
+    const RingBuffer::ObjectHandle_t handle = buffer_->PushFront(
+        object, nbytes_in_buffer);
     buffered_objects_.Insert(info.object_id, handle);
     perf::Inc(counters_->n_buffer_objects);
   }
@@ -411,8 +411,8 @@ int StreamingCacheManager::DoRestoreState(void *data) {
 
   SavedState *state = reinterpret_cast<SavedState *>(data);
 
-  const int new_backing_root_fd =
-      cache_mgr_->RestoreState(-1, state->state_backing_cachemgr);
+  const int new_backing_root_fd = cache_mgr_->RestoreState(
+      -1, state->state_backing_cachemgr);
   fd_table_.AssignFrom(*state->fd_table);
 
   int new_root_fd = -1;

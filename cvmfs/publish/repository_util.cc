@@ -122,10 +122,10 @@ void RunSuidHelper(const std::string &verb, const std::string &fqrn) {
   preserved_fds.insert(1);
   preserved_fds.insert(2);
   pid_t child_pid;
-  const bool retval =
-      ManagedExec(cmd_line, preserved_fds, std::map<int, int>(),
-                  false /* drop_credentials */, true /* clear_env */,
-                  false /* double_fork */, &child_pid);
+  const bool retval = ManagedExec(cmd_line, preserved_fds, std::map<int, int>(),
+                                  false /* drop_credentials */,
+                                  true /* clear_env */, false /* double_fork */,
+                                  &child_pid);
   if (!retval)
     throw EPublish("cannot spawn suid helper");
   const int exit_code = WaitForChild(child_pid);

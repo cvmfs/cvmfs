@@ -337,8 +337,8 @@ void SettingsPublisher::SetProxy(const std::string &proxy) { proxy_ = proxy; }
 
 
 void SettingsPublisher::SetOwner(const std::string &user_name) {
-  const bool retval =
-      GetUidOf(user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
+  const bool retval = GetUidOf(
+      user_name, owner_uid_.GetPtr(), owner_gid_.GetPtr());
   if (!retval) {
     throw EPublish("unknown user name for repository owner: " + user_name);
   }
@@ -485,8 +485,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisherFromSession() {
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
       session_dir);
 
-  const std::string base_hash =
-      settings_publisher->GetReadOnlyXAttr("user.root_hash");
+  const std::string base_hash = settings_publisher->GetReadOnlyXAttr(
+      "user.root_hash");
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -604,8 +604,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
         EPublish::kFailRepositoryNotFound);
   }
 
-  const SettingsRepository settings_repository =
-      CreateSettingsRepository(alias);
+  const SettingsRepository settings_repository = CreateSettingsRepository(
+      alias);
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
@@ -618,8 +618,8 @@ SettingsPublisher *SettingsBuilder::CreateSettingsPublisher(
       new SettingsPublisher(settings_repository));
 
   try {
-    const std::string xattr =
-        settings_publisher->GetReadOnlyXAttr("user.root_hash");
+    const std::string xattr = settings_publisher->GetReadOnlyXAttr(
+        "user.root_hash");
     settings_publisher->GetTransaction()->SetBaseHash(
         shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
   } catch (const EPublish &e) {

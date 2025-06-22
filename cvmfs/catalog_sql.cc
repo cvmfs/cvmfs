@@ -305,9 +305,10 @@ bool CatalogDatabase::InsertInitialValues(const std::string &root_path,
 
   // Path hashes
   const shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
-  const shash::Md5 root_parent_hash =
-      (root_path == "") ? shash::Md5()
-                        : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
+  const shash::Md5 root_parent_hash = (root_path == "")
+                                          ? shash::Md5()
+                                          : shash::Md5(shash::AsciiPtr(
+                                                GetParentPath(root_path)));
 
   // Start initial filling transaction
   retval = BeginTransaction();
@@ -506,8 +507,8 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
 zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(
     const unsigned flags) const {
   // 3 bits, so use 7 (111) to only pull out the flags we want
-  const unsigned in_flags =
-      ((7 << kFlagPosCompression) & flags) >> kFlagPosCompression;
+  const unsigned in_flags = ((7 << kFlagPosCompression) & flags)
+                            >> kFlagPosCompression;
   return static_cast<zlib::Algorithms>(in_flags);
 }
 
@@ -1345,15 +1346,16 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 
 SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
   const int hash_mask = 7 << SqlDirent::kFlagPosHash;
-  const string flags2hash = " ((flags&" + StringifyInt(hash_mask) + ") >> " +
-                            StringifyInt(SqlDirent::kFlagPosHash) +
-                            ")+1 AS hash_algorithm ";
+  const string flags2hash = " ((flags&" + StringifyInt(hash_mask) + ") >> "
+                            + StringifyInt(SqlDirent::kFlagPosHash)
+                            + ")+1 AS hash_algorithm ";
 
   const int compression_mask = 7 << SqlDirent::kFlagPosCompression;
-  const string flags2compression =
-      " ((flags&" + StringifyInt(compression_mask) + ") >> " +
-      StringifyInt(SqlDirent::kFlagPosCompression) + ") " +
-      "AS compression_algorithm ";
+  const string flags2compression = " ((flags&" + StringifyInt(compression_mask)
+                                   + ") >> "
+                                   + StringifyInt(
+                                       SqlDirent::kFlagPosCompression)
+                                   + ") " + "AS compression_algorithm ";
 
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely

@@ -131,7 +131,8 @@ Settings GetSettings(cvmcache_option_map *options) {
 }
 
 uint32_t cvmcache_hash_hasher(const struct cvmcache_hash &key) {
-  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(key.digest) + 1));
 }
 
 uint32_t uint64_hasher(const uint64_t &key) { return (uint32_t)key; }
@@ -215,8 +216,8 @@ int posix_pread(struct cvmcache_hash *id, uint64_t offset, uint32_t *size,
   if (offset > object.size) {
     return CVMCACHE_STATUS_OUTOFBOUNDS;
   }
-  const int64_t bytes_read =
-      g_cache_mgr->Pread(object.fd, buffer, *size, offset);
+  const int64_t bytes_read = g_cache_mgr->Pread(object.fd, buffer, *size,
+                                                offset);
   if (bytes_read < 0) {
     return CVMCACHE_STATUS_IOERR;
   }
@@ -259,8 +260,8 @@ int posix_write_txn(uint64_t txn_id, unsigned char *buffer, uint32_t size) {
   if (!g_transactions->Lookup(txn_id, &transaction)) {
     return CVMCACHE_STATUS_NOENTRY;
   }
-  const int64_t bytes_written =
-      g_cache_mgr->Write(buffer, size, transaction.txn);
+  const int64_t bytes_written = g_cache_mgr->Write(buffer, size,
+                                                   transaction.txn);
   if ((bytes_written >= 0) && (static_cast<uint32_t>(bytes_written) == size)) {
     return CVMCACHE_STATUS_OK;
   } else {

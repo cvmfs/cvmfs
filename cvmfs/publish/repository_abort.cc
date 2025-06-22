@@ -67,8 +67,8 @@ void Publisher::Abort() {
     // We already checked for is_publishing and in_transaction.  Normally, at
     // this point we do want to repair the mount points of a repository
     // in transaction
-    const EUnionMountRepairMode repair_mode =
-        settings_.transaction().spool_area().repair_mode();
+    const EUnionMountRepairMode
+        repair_mode = settings_.transaction().spool_area().repair_mode();
     if (repair_mode == kUnionMountRepairSafe) {
       settings_.GetTransaction()->GetSpoolArea()->SetRepairMode(
           kUnionMountRepairAlways);

@@ -593,8 +593,8 @@ inode_t Catalog::GetMangledInode(const uint64_t row_id,
   // Hardlinks are encoded in catalog-wide unique hard link group ids.
   // These ids must be resolved to actual inode relationships at runtime.
   if (hardlink_group > 0) {
-    const HardlinkGroupMap::const_iterator inode_iter =
-        hardlink_groups_.find(hardlink_group);
+    const HardlinkGroupMap::const_iterator inode_iter = hardlink_groups_.find(
+        hardlink_group);
 
     // Use cached entry if possible
     if (inode_iter == hardlink_groups_.end()) {

@@ -63,8 +63,8 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
                                  const string &dir_name) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, dir_name, kItemDir);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name,
+                                                   kItemDir);
   return ProcessDirectory(entry);
 }
 
@@ -101,8 +101,8 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
                                    const string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemFile);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                                   kItemFile);
   ProcessFile(entry);
 }
 
@@ -110,8 +110,8 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
                                const string &link_name) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, link_name,
+                                                   kItemSymlink);
   ProcessFile(entry);
 }
 
@@ -136,15 +136,15 @@ void SyncUnion::ProcessFile(SharedPtr<SyncItem> entry) {
 
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name) {
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, dir_name, kItemDir);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name,
+                                                   kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name) {
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, dir_name, kItemDir);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, dir_name,
+                                                   kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -153,8 +153,8 @@ void SyncUnion::ProcessCharacterDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                                   kItemCharacterDevice);
   ProcessFile(entry);
 }
 
@@ -163,8 +163,8 @@ void SyncUnion::ProcessBlockDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessBlockDevice(%s, %s)", parent_dir.c_str(),
            filename.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemBlockDevice);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                                   kItemBlockDevice);
   ProcessFile(entry);
 }
 
@@ -172,8 +172,8 @@ void SyncUnion::ProcessFifo(const std::string &parent_dir,
                             const std::string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFifo(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemFifo);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                                   kItemFifo);
   ProcessFile(entry);
 }
 
@@ -181,8 +181,8 @@ void SyncUnion::ProcessSocket(const std::string &parent_dir,
                               const std::string &filename) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessSocket(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  const SharedPtr<SyncItem> entry =
-      CreateSyncItem(parent_dir, filename, kItemSocket);
+  const SharedPtr<SyncItem> entry = CreateSyncItem(parent_dir, filename,
+                                                   kItemSocket);
   ProcessFile(entry);
 }
 

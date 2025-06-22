@@ -63,8 +63,8 @@ bool Reflog::ReadChecksum(const std::string &path, shash::Any *checksum) {
 
 
 bool Reflog::WriteChecksum(const std::string &path, const shash::Any &value) {
-  const int fd =
-      open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, kDefaultFileMode);
+  const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+                      kDefaultFileMode);
   if (fd < 0) {
     return false;
   }
@@ -223,8 +223,8 @@ bool Reflog::ContainsCatalog(const shash::Any &catalog) const {
 bool Reflog::GetCatalogTimestamp(const shash::Any &catalog,
                                  uint64_t *timestamp) const {
   assert(catalog.HasSuffix() && catalog.suffix == shash::kSuffixCatalog);
-  const bool result =
-      GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog, timestamp);
+  const bool result = GetReferenceTimestamp(catalog, SqlReflog::kRefCatalog,
+                                            timestamp);
   return result;
 }
 
@@ -265,8 +265,8 @@ bool Reflog::ContainsReference(const shash::Any &hash,
 bool Reflog::GetReferenceTimestamp(const shash::Any &hash,
                                    const SqlReflog::ReferenceType type,
                                    uint64_t *timestamp) const {
-  const bool retval =
-      get_timestamp_->BindReference(hash, type) && get_timestamp_->FetchRow();
+  const bool retval = get_timestamp_->BindReference(hash, type)
+                      && get_timestamp_->FetchRow();
 
   if (retval) {
     *timestamp = get_timestamp_->RetrieveTimestamp();

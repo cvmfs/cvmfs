@@ -251,15 +251,15 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 // TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_setxattr(const std::string &path, const std::string &name,
                               const std::string &value) {
-  const int retval =
-      setxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
+  const int retval = setxattr(path.c_str(), name.c_str(), value.c_str(),
+                              value.size(), 0);
   return retval == 0;
 }
 
 inline bool platform_lsetxattr(const std::string &path, const std::string &name,
                                const std::string &value) {
-  const int retval =
-      lsetxattr(path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
+  const int retval = lsetxattr(path.c_str(), name.c_str(), value.c_str(),
+                               value.size(), 0);
   return retval == 0;
 }
 

@@ -132,8 +132,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     cvmfs::MemSink manifest_memsink;
     download::JobInfo download_manifest(&url, false, false, NULL,
                                         &manifest_memsink);
-    const download::Failures retval =
-        download_manager()->Fetch(&download_manifest);
+    const download::Failures retval = download_manager()->Fetch(
+        &download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));
@@ -256,8 +256,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     cvmfs::MemSink metainfo_memsink;
     download::JobInfo download_metainfo(&url, true, false, &meta_info,
                                         &metainfo_memsink);
-    const download::Failures retval =
-        download_manager()->Fetch(&download_metainfo);
+    const download::Failures retval = download_manager()->Fetch(
+        &download_metainfo);
     if (retval != download::kFailOk) {
       if (human_readable)
         LogCvmfs(kLogCvmfs, kLogStderr,

@@ -91,8 +91,8 @@ bool Interrupted(const std::string &fqrn, JobInfo *info) {
     // it is up to the user the create this sentinel file ("pause_file") if
     // CVMFS_FAILOVER_INDEFINITELY is used. It must be created during
     // "cvmfs_config reload" and "cvmfs_config reload $fqrn"
-    const std::string pause_file =
-        std::string("/var/run/cvmfs/interrupt.") + fqrn;
+    const std::string pause_file = std::string("/var/run/cvmfs/interrupt.")
+                                   + fqrn;
 
     LogCvmfs(kLogDownload, kLogDebug,
              "(id %" PRId64 ") Interrupted(): checking for existence of %s",
@@ -273,9 +273,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   }
 
   if (info->compressed()) {
-    const zlib::StreamStates retval =
-        zlib::DecompressZStream2Sink(ptr, static_cast<int64_t>(num_bytes),
-                                     info->GetZstreamPtr(), info->sink());
+    const zlib::StreamStates retval = zlib::DecompressZStream2Sink(
+        ptr, static_cast<int64_t>(num_bytes), info->GetZstreamPtr(),
+        info->sink());
     if (retval == zlib::kStreamDataError) {
       LogCvmfs(kLogDownload, kLogSyslogErr,
                "(id %" PRId64 ") failed to decompress %s", info->id(),
@@ -610,16 +610,16 @@ void *DownloadManager::MainDownload(void *data) {
           1000 * DiffTimeSeconds(timeval_start, timeval_stop));
       perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
     }
-    const int retval =
-        poll(download_mgr->watch_fds_, download_mgr->watch_fds_inuse_, timeout);
+    const int retval = poll(download_mgr->watch_fds_,
+                            download_mgr->watch_fds_inuse_, timeout);
     if (retval < 0) {
       continue;
     }
 
     // Handle timeout
     if (retval == 0) {
-      curl_multi_socket_action(
-          download_mgr->curl_multi_, CURL_SOCKET_TIMEOUT, 0, &still_running);
+      curl_multi_socket_action(download_mgr->curl_multi_, CURL_SOCKET_TIMEOUT,
+                               0, &still_running);
     }
 
     // Terminate I/O thread
@@ -638,8 +638,8 @@ void *DownloadManager::MainDownload(void *data) {
       download_mgr->InitializeRequest(info, handle);
       download_mgr->SetUrlOptions(info);
       curl_multi_add_handle(download_mgr->curl_multi_, handle);
-      curl_multi_socket_action(
-          download_mgr->curl_multi_, CURL_SOCKET_TIMEOUT, 0, &still_running);
+      curl_multi_socket_action(download_mgr->curl_multi_, CURL_SOCKET_TIMEOUT,
+                               0, &still_running);
     }
 
     // Activity on curl sockets
@@ -851,8 +851,8 @@ string DownloadManager::ProxyInfo::Print() {
     return url;
 
   string result = url;
-  const int remaining =
-      static_cast<int>(host.deadline()) - static_cast<int>(time(NULL));
+  const int remaining = static_cast<int>(host.deadline())
+                        - static_cast<int>(time(NULL));
   string expinfo = (remaining >= 0) ? "+" : "";
   if (abs(remaining) >= 3600) {
     expinfo += StringifyInt(remaining / 3600) + "h";
@@ -1128,8 +1128,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   if (url.substr(0, 5) == "https") {
-    const bool rvb =
-        ssl_certificate_store_.ApplySslCertificatePath(curl_handle);
+    const bool rvb = ssl_certificate_store_.ApplySslCertificatePath(
+        curl_handle);
     if (!rvb) {
       LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                "(manager %s - id %" PRId64 ") "
@@ -2539,8 +2539,8 @@ bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
   const unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
   vector<uint64_t> geo_order(servers->size());
   for (unsigned i = 0; i < max_attempts; ++i) {
-    const string url =
-        host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
+    const string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/"
+                       + host_list;
     LogCvmfs(kLogDownload, kLogDebug,
              "(manager '%s') requesting ordered server list from %s",
              name_.c_str(), url.c_str());
@@ -2909,8 +2909,8 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
                  name_.c_str(), hosts[num_proxy].name().c_str(),
                  hosts[num_proxy].status(),
                  dns::Code2Ascii(hosts[num_proxy].status()));
-        const dns::Host failed_host =
-            dns::Host::ExtendDeadline(hosts[num_proxy], resolver_->min_ttl());
+        const dns::Host failed_host = dns::Host::ExtendDeadline(
+            hosts[num_proxy], resolver_->min_ttl());
         infos.push_back(ProxyInfo(failed_host, this_group[j]));
         continue;
       }
@@ -2958,7 +2958,7 @@ void DownloadManager::GetProxyInfo(vector<vector<ProxyInfo> > *proxy_chain,
   const MutexLockGuard m(lock_options_);
 
   if (!opt_proxy_groups_) {
-    const vector< vector<ProxyInfo> > empty_chain;
+    const vector<vector<ProxyInfo> > empty_chain;
     *proxy_chain = empty_chain;
     if (current_group != NULL)
       *current_group = 0;
@@ -2989,8 +2989,8 @@ DownloadManager::ProxyInfo *DownloadManager::ChooseProxyUnlocked(
     return NULL;
 
   const uint32_t key = (hash ? hash->Partial32() : 0);
-  const map<uint32_t, ProxyInfo *>::iterator it =
-      opt_proxy_map_.lower_bound(key);
+  const map<uint32_t, ProxyInfo *>::iterator it = opt_proxy_map_.lower_bound(
+      key);
   ProxyInfo *proxy = it->second;
 
   return proxy;
@@ -3024,8 +3024,9 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
         const std::pair<uint32_t, ProxyInfo *> entry(prng.Next(max_key), proxy);
         opt_proxy_map_.insert(entry);
       }
-      const std::string proxy_name =
-          proxy->host.name().empty() ? "" : " (" + proxy->host.name() + ")";
+      const std::string proxy_name = proxy->host.name().empty()
+                                         ? ""
+                                         : " (" + proxy->host.name() + ")";
       opt_proxies_.push_back(proxy->url + proxy_name);
     }
     // Ensure lower_bound() finds a value for all keys
@@ -3038,8 +3039,9 @@ void DownloadManager::UpdateProxiesUnlocked(const string &reason) {
     ProxyInfo *proxy = &(*group)[select];
     const std::pair<uint32_t, ProxyInfo *> entry(max_key, proxy);
     opt_proxy_map_.insert(entry);
-    const std::string proxy_name =
-        proxy->host.name().empty() ? "" : " (" + proxy->host.name() + ")";
+    const std::string proxy_name = proxy->host.name().empty()
+                                       ? ""
+                                       : " (" + proxy->host.name() + ")";
     opt_proxies_.push_back(proxy->url + proxy_name);
   }
   sort(opt_proxies_.begin(), opt_proxies_.end());
@@ -3101,8 +3103,8 @@ void DownloadManager::SwitchProxyGroup() {
                               % opt_proxy_groups_->size();
   opt_timestamp_backup_proxies_ = time(NULL);
 
-  const std::string msg =
-      "switch to proxy group " + StringifyUint(opt_proxy_groups_current_);
+  const std::string msg = "switch to proxy group "
+                          + StringifyUint(opt_proxy_groups_current_);
   RebalanceProxiesUnlocked(msg);
 }
 

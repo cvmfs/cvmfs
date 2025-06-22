@@ -16,9 +16,9 @@
 shash::Any HashMeta(const struct cvmfs_attr *stat_info) {
   // TODO(steuber): Can we do any better here?
   shash::Any meta_hash(shash::kMd5);
-  const unsigned min_buffer_size = sizeof(mode_t) / sizeof(unsigned char) + 1 +
-                                   sizeof(uid_t) / sizeof(unsigned char) + 1 +
-                                   sizeof(gid_t) / sizeof(unsigned char) + 1;
+  const unsigned min_buffer_size = sizeof(mode_t) / sizeof(unsigned char) + 1
+                                   + sizeof(uid_t) / sizeof(unsigned char) + 1
+                                   + sizeof(gid_t) / sizeof(unsigned char) + 1;
   XattrList *xlist = reinterpret_cast<XattrList *>(stat_info->cvm_xattrs);
   unsigned xlist_buffer_size = 0;
   unsigned char *xlist_buffer;

@@ -10,7 +10,6 @@ PACPARSER_VERSION=1.4.3
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
-GOOGLETEST_VERSION=1.8.0
 IPADDRESS_VERSION=1.0.22
 MAXMINDDB_VERSION=1.5.4
 PROTOBUF_VERSION=2.6.1
@@ -214,11 +213,6 @@ build_lib() {
                                   "arm64_memory_barrier.patch"
       do_build "leveldb"
       ;;
-    googletest)
-        do_extract "googletest"   "googletest-release-${GOOGLETEST_VERSION}.tar.gz"
-        patch_external "googletest"     "cmake_compatibility.patch"
-        do_build "googletest"
-      ;;
     maxminddb)
       if [ x"$BUILD_SERVER" != x ] && [ x"$BUILD_GEOAPI" != x ]; then
         do_extract "maxminddb" "MaxMind-DB-Reader-python-${MAXMINDDB_VERSION}.tar.gz"
@@ -273,7 +267,7 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb googletest maxminddb protobuf sqlite3 vjson sha3 libarchive"
+missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 vjson sha3 libarchive"
 
 if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
     missing_libs="$missing_libs googlebench"
@@ -301,7 +295,24 @@ fi
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
   for l in $existing_libs; do
-    if [ x"$l" != x ]; then
+    # cleanup dependencies that are updated or no longer vendored
+    if [ "$l" = "golang" ]; then
+      existing_libs=$(echo $existing_libs | sed  's/golang\b//')
+      if [ -d $externals_install_dir/go ]; then
+        rm -rf $externals_install_dir/go
+      fi
+    elif [ "$l" = "googletest" ]; then
+      existing_libs=$(echo $existing_libs | sed  's/googletest\b//')
+      if [ -d $externals_install_dir/include/gtest ]; then
+        rm -rf $externals_install_dir/include/gtest
+      fi
+      if [ -f $externals_install_dir/lib/libgtest.a ]; then
+        rm $externals_install_dir/lib/libgtest.a
+      fi
+      if [ -f $externals_install_dir/lib/libgtest_main.a ]; then
+        rm $externals_install_dir/lib/libgtest_main.a
+      fi
+    elif [ x"$l" != x ]; then
       echo "Bootstrap - found $l"
       missing_libs=$(echo $missing_libs | sed -e "s/$l\b//")
     fi

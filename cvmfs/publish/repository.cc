@@ -145,9 +145,9 @@ void Repository::DownloadRootObjects(const std::string &url,
   manifest::ManifestEnsemble ensemble;
   const uint64_t minimum_timestamp = 0;
   const shash::Any *base_catalog = NULL;
-  const manifest::Failures rv_manifest =
-      manifest::Fetch(url, fqrn, minimum_timestamp, base_catalog,
-                      signature_mgr_, download_mgr_, &ensemble);
+  const manifest::Failures rv_manifest = manifest::Fetch(
+      url, fqrn, minimum_timestamp, base_catalog, signature_mgr_, download_mgr_,
+      &ensemble);
   if (rv_manifest != manifest::kFailOk)
     throw EPublish("cannot load manifest");
   delete manifest_;
@@ -182,8 +182,8 @@ void Repository::DownloadRootObjects(const std::string &url,
   FILE *tags_fd = CreateTempFile(tmp_dir + "/tags", kPrivateFileMode, "w",
                                  &tags_path);
   if (!manifest_->history().IsNull()) {
-    const std::string tags_url =
-        url + "/data/" + manifest_->history().MakePath();
+    const std::string tags_url = url + "/data/"
+                                 + manifest_->history().MakePath();
     const shash::Any tags_hash(manifest_->history());
     cvmfs::FileSink filesink(tags_fd);
     download::JobInfo download_tags(&tags_url, true /* compressed */,
@@ -587,8 +587,8 @@ void Publisher::CreateDirectoryAsOwner(const std::string &path, int mode) {
   const bool rvb = MkdirDeep(path, mode);
   if (!rvb)
     throw EPublish("cannot create directory " + path);
-  const int rvi =
-      chown(path.c_str(), settings_.owner_uid(), settings_.owner_gid());
+  const int rvi = chown(path.c_str(), settings_.owner_uid(),
+                        settings_.owner_gid());
   if (rvi != 0)
     throw EPublish("cannot set ownership on directory " + path);
 }

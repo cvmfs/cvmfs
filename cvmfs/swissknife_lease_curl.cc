@@ -4,6 +4,8 @@
 
 #include "swissknife_lease_curl.h"
 
+#include <unistd.h>
+
 #include "crypto/hash.h"
 #include "gateway_util.h"
 #include "json_document.h"
@@ -13,8 +15,6 @@
 #include "util/pointer.h"
 #include "util/posix.h"
 #include "util/string.h"
-
-#include <unistd.h>
 
 
 namespace {
@@ -49,11 +49,10 @@ size_t RecvCB(void *buffer, size_t size, size_t nmemb, void *userp) {
 
 }  // namespace
 
-bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
-                        const std::string& repo_path,
-                        const std::string& repo_service_url,
-                        CurlBuffer* buffer,
-                        const std::string& metadata) {
+bool MakeAcquireRequest(const std::string &key_id, const std::string &secret,
+                        const std::string &repo_path,
+                        const std::string &repo_service_url, CurlBuffer *buffer,
+                        const std::string &metadata) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL *h_curl = PrepareCurl("POST");
@@ -104,10 +103,11 @@ bool MakeAcquireRequest(const std::string& key_id, const std::string& secret,
   return !ret;
 }
 
-bool MakeEndRequest(const std::string& method, const std::string& key_id,
-                    const std::string& secret, const std::string& session_token,
-                    const std::string& repo_service_url,
-                    const std::string& request_payload, CurlBuffer* reply, bool expect_final_revision) {
+bool MakeEndRequest(const std::string &method, const std::string &key_id,
+                    const std::string &secret, const std::string &session_token,
+                    const std::string &repo_service_url,
+                    const std::string &request_payload, CurlBuffer *reply,
+                    bool expect_final_revision) {
   CURLcode ret = static_cast<CURLcode>(0);
 
   CURL *h_curl = PrepareCurl(method);
@@ -150,19 +150,17 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
 
   JsonDocument *doc = JsonDocument::Create(reply->data);
   bool ok = true;
-  if (!doc ) {
-       ok=false;
-  }
-  else {
+  if (!doc) {
+    ok = false;
+  } else {
     UniquePtr<JsonDocument> const reply_json(doc);
-    const JSON *reply_status =
-      JsonDocument::SearchInObject(reply_json->root(), "status", JSON_STRING);
-    ok = (reply_status != NULL &&
-                   std::string(reply_status->string_value) == "ok");
+    const JSON *reply_status = JsonDocument::SearchInObject(
+        reply_json->root(), "status", JSON_STRING);
+    ok = (reply_status != NULL
+          && std::string(reply_status->string_value) == "ok");
     if (!ok) {
       LogCvmfs(kLogUploadGateway, kLogStderr,
-             "Lease end request - error reply: %s",
-             reply->data.c_str());
+               "Lease end request - error reply: %s", reply->data.c_str());
     }
   }
 
@@ -171,4 +169,3 @@ bool MakeEndRequest(const std::string& method, const std::string& key_id,
 
   return ok && !ret;
 }
-

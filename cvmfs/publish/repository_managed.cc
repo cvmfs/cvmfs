@@ -65,8 +65,8 @@ void Publisher::ManagedNode::ClearScratch() {
   const std::string waste_dir = CreateTempDir(scratch_wastebin + "/waste");
   if (waste_dir.empty())
     throw EPublish("cannot create wastebin directory");
-  const int rvi =
-      rename(scratch_dir.c_str(), (waste_dir + "/delete-me").c_str());
+  const int rvi = rename(scratch_dir.c_str(),
+                         (waste_dir + "/delete-me").c_str());
   if (rvi != 0)
     throw EPublish("cannot move scratch directory to wastebin");
 
@@ -94,8 +94,9 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   const std::string
       union_mnt = publisher_->settings_.transaction().spool_area().union_mnt();
   const std::string fqrn = publisher_->settings_.fqrn();
-  const EUnionMountRepairMode repair_mode =
-      publisher_->settings_.transaction().spool_area().repair_mode();
+  const EUnionMountRepairMode repair_mode = publisher_->settings_.transaction()
+                                                .spool_area()
+                                                .repair_mode();
 
   int result = kFailOk;
 
@@ -110,8 +111,8 @@ int Publisher::ManagedNode::Check(bool is_quiet) {
   } else {
     const std::string root_hash_xattr = "user.root_hash";
     std::string root_hash_str;
-    const bool retval =
-        platform_getxattr(rdonly_mnt, root_hash_xattr, &root_hash_str);
+    const bool retval = platform_getxattr(rdonly_mnt, root_hash_xattr,
+                                          &root_hash_str);
     if (retval) {
       const shash::Any root_hash = shash::MkFromHexPtr(
           shash::HexPtr(root_hash_str), shash::kSuffixCatalog);

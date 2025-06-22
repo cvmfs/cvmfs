@@ -521,7 +521,7 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   }
 
   // Extra stack for signal handlers
-  const int stack_size = kSignalHandlerStacksize; // 2 MB
+  const int stack_size = kSignalHandlerStacksize;  // 2 MB
   sighandler_stack_.ss_sp = smalloc(stack_size);
   sighandler_stack_.ss_size = stack_size;
   sighandler_stack_.ss_flags = 0;
@@ -542,8 +542,8 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
   old_signal_handlers_ = SetSignalHandlers(signal_handlers);
 
   pipe_terminate_ = new Pipe<kPipeThreadTerminator>();
-  const int retval =
-      pthread_create(&thread_listener_, NULL, MainWatchdogListener, this);
+  const int retval = pthread_create(&thread_listener_, NULL,
+                                    MainWatchdogListener, this);
   assert(retval == 0);
 
   pipe_watchdog_->Write(ControlFlow::kSupervise);

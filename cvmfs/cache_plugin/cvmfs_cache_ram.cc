@@ -144,7 +144,8 @@ static inline uint32_t hasher_uint64(const uint64_t &key) {
 }
 
 static inline uint32_t hasher_any(const ComparableHash &key) {
-  return (uint32_t) * (reinterpret_cast<const uint32_t *>(&key.hash));
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(&key.hash)));
 }
 
 }  // anonymous namespace
@@ -242,8 +243,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     assert(retval);
     if (offset > object->size_data)
       return CVMCACHE_STATUS_OUTOFBOUNDS;
-    const unsigned nbytes =
-        std::min(*size, static_cast<uint32_t>(object->size_data - offset));
+    const unsigned nbytes = std::min(
+        *size, static_cast<uint32_t>(object->size_data - offset));
     memcpy(buffer, object->GetData() + offset, nbytes);
     *size = nbytes;
     return CVMCACHE_STATUS_OK;
@@ -265,9 +266,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     object_header.type = info->type;
     object_header.id = *id;
 
-    const uint32_t total_size = sizeof(object_header) +
-                                object_header.size_desc +
-                                object_header.size_data;
+    const uint32_t total_size = sizeof(object_header) + object_header.size_desc
+                                + object_header.size_data;
     Me()->TryFreeSpace(total_size);
     ObjectHeader *allocd_object = reinterpret_cast<ObjectHeader *>(
         Me()->storage_->Allocate(total_size, &object_header,
@@ -294,9 +294,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     if ((size - txn_object->neg_nbytes_written) > txn_object->size_data) {
       const uint32_t current_size = Me()->storage_->GetSize(txn_object);
       const uint32_t header_size = current_size - txn_object->size_data;
-      const uint32_t new_size =
-          std::max(header_size + size - txn_object->neg_nbytes_written,
-                   uint32_t(current_size * kObjectExpandFactor));
+      const uint32_t new_size = std::max(
+          header_size + size - txn_object->neg_nbytes_written,
+          uint32_t(current_size * kObjectExpandFactor));
       const bool did_compact = Me()->TryFreeSpace(new_size);
       if (did_compact) {
         retval = Me()->transactions_.Lookup(txn_id, &txn_object);
@@ -445,8 +445,8 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
 
   static int ram_breadcrumb_load(const char *fqrn,
                                  cvmcache_breadcrumb *breadcrumb) {
-    const map<std::string, cvmcache_breadcrumb>::const_iterator itr =
-        Me()->breadcrumbs_.find(fqrn);
+    const map<std::string, cvmcache_breadcrumb>::const_iterator
+        itr = Me()->breadcrumbs_.find(fqrn);
     if (itr == Me()->breadcrumbs_.end())
       return CVMCACHE_STATUS_NOENTRY;
     *breadcrumb = itr->second;
@@ -478,10 +478,10 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
     transactions_.Init(64, uint64_t(-1), hasher_uint64);
     listings_.Init(8, uint64_t(-1), hasher_uint64);
 
-    const double slot_size =
-        lru::LruCache<ComparableHash, ObjectHeader *>::GetEntrySize();
-    const uint64_t num_slots =
-        uint64_t((heap_size * kSlotFraction) / (2.0 * slot_size));
+    const double slot_size = lru::LruCache<ComparableHash,
+                                           ObjectHeader *>::GetEntrySize();
+    const uint64_t num_slots = uint64_t((heap_size * kSlotFraction)
+                                        / (2.0 * slot_size));
     const unsigned mask_64 = ~((1 << 6) - 1);
 
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
@@ -517,9 +517,9 @@ class PluginRamCache : public Callbackable<MallocHeap::BlockPtr> {
         return true;
     }
 
-    const uint64_t shrink_to =
-        std::min(storage_->capacity() - (bytes_required + 8),
-                 uint64_t(storage_->capacity() * kShrinkFactor));
+    const uint64_t shrink_to = std::min(
+        storage_->capacity() - (bytes_required + 8),
+        uint64_t(storage_->capacity() * kShrinkFactor));
     DoShrink(shrink_to);
     return true;
   }

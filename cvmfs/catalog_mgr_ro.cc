@@ -99,8 +99,8 @@ LoadReturn SimpleCatalogManager::LoadCatalogByHash(
   FILE *fcatalog;
 
   if (UseLocalCache()) {
-    const std::string cache_path =
-        dir_cache_ + "/" + effective_hash.MakePathWithoutSuffix();
+    const std::string cache_path = dir_cache_ + "/"
+                                   + effective_hash.MakePathWithoutSuffix();
 
     ctlg_context->SetSqlitePath(cache_path);
 

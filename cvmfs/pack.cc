@@ -235,8 +235,8 @@ unsigned ObjectPackProducer::ProduceNext(const unsigned buf_size,
   unsigned nbytes_payload = 0;
 
   if (big_file_) {
-    const size_t nbytes =
-        fread(buf + nbytes_header, 1, remaining_in_buf, big_file_);
+    const size_t nbytes = fread(buf + nbytes_header, 1, remaining_in_buf,
+                                big_file_);
     nbytes_payload = nbytes;
     pos_ += nbytes_payload;
   } else if (idx_ < pack_->GetNoObjects()) {
@@ -423,8 +423,8 @@ bool ObjectPackConsumer::ParseHeader() {
   uint64_t sum_size = 0;
   do {
     const unsigned remaining_in_header = raw_header_.size() - index_idx;
-    const string line =
-        GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
+    const string line = GetLineMem(raw_header_.data() + index_idx,
+                                   remaining_in_header);
     if (line == "")
       break;
 
@@ -485,8 +485,8 @@ bool ObjectPackConsumer::ParseItem(const std::string &line,
       return false;
     }
 
-    const uint64_t size =
-        String2Uint64(line.substr(separator1 + 1, separator2 - separator1 - 1));
+    const uint64_t size = String2Uint64(
+        line.substr(separator1 + 1, separator2 - separator1 - 1));
 
     std::string name;
     if (!Debase64(line.substr(separator2 + 1), &name)) {

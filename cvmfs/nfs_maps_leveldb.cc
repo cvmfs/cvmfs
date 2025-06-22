@@ -118,8 +118,8 @@ NfsMapsLeveldb *NfsMapsLeveldb::Create(const string &leveldb_dir,
   if (rebuild) {
     LogCvmfs(kLogNfsMaps, kLogSyslogWarn,
              "rebuilding NFS maps, might result in stale entries");
-    const bool retval = RemoveTree(leveldb_dir + "/inode2path") &&
-                        RemoveTree(leveldb_dir + "/path2inode");
+    const bool retval = RemoveTree(leveldb_dir + "/inode2path")
+                        && RemoveTree(leveldb_dir + "/path2inode");
     if (!retval) {
       LogCvmfs(kLogNfsMaps, kLogDebug, "failed to remove previous databases");
       return NULL;

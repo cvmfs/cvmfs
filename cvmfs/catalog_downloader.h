@@ -2,8 +2,8 @@
 #define CVMFS_CATALOG_DOWNLOADER_H_
 
 #include "catalog_mgr_ro.h"
-#include "ingestion/task.h"
 #include "crypto/hash.h"
+#include "ingestion/task.h"
 #include "util/concurrency.h"
 
 extern int kCatalogDownloadMultiplier;
@@ -11,7 +11,7 @@ extern int kCatalogDownloadMultiplier;
 struct CatalogDownloadResult {
   CatalogDownloadResult() { }
   explicit CatalogDownloadResult(const std::string &p, const std::string &h)
-    : db_path(p), hash(h) { }
+      : db_path(p), hash(h) { }
   std::string db_path;
   std::string hash;
 };
@@ -23,23 +23,22 @@ class CatalogItem : SingleCopy {
     shash::Any const empty;
     return new CatalogItem(empty);
   }
-  bool IsQuitBeacon() {
-    return hash_.IsNull();
-  }
-  shash::Any *GetHash() {
-    return &hash_;
-  }
+  bool IsQuitBeacon() { return hash_.IsNull(); }
+  shash::Any *GetHash() { return &hash_; }
 
  private:
   shash::Any hash_;
 };
 
-class TaskCatalogDownload
-  : public TubeConsumer<CatalogItem>
-  , public Observable<CatalogDownloadResult> {
+class TaskCatalogDownload : public TubeConsumer<CatalogItem>,
+                            public Observable<CatalogDownloadResult> {
  public:
-  TaskCatalogDownload(catalog::SimpleCatalogManager *catalog_mgr, Tube<CatalogItem> *tube_in, Tube<CatalogItem> *tube_counter)
-    : TubeConsumer<CatalogItem>(tube_in), tube_counter_(tube_counter), catalog_mgr_(catalog_mgr) { }
+  TaskCatalogDownload(catalog::SimpleCatalogManager *catalog_mgr,
+                      Tube<CatalogItem> *tube_in,
+                      Tube<CatalogItem> *tube_counter)
+      : TubeConsumer<CatalogItem>(tube_in)
+      , tube_counter_(tube_counter)
+      , catalog_mgr_(catalog_mgr) { }
 
  protected:
   virtual void Process(CatalogItem *input_hash);
@@ -70,4 +69,4 @@ class CatalogDownloadPipeline : public Observable<CatalogDownloadResult> {
   catalog::SimpleCatalogManager *catalog_mgr_;
 };
 
-#endif // CVMFS_CATALOG_DOWNLOADER_H_
+#endif  // CVMFS_CATALOG_DOWNLOADER_H_

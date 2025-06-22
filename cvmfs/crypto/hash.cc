@@ -122,17 +122,19 @@ Any MkFromSuffixedHexPtr(const HexPtr hex) {
   if ((length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160])
       || (length
           == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)) {
-    const Suffix suffix =
-        (length == 2 * kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160] + 1)
-            ? *(hex.str->rbegin())
-            : kSuffixNone;
+    const Suffix suffix = (length
+                           == 2 * kDigestSizes[kRmd160]
+                                  + kAlgorithmIdSizes[kRmd160] + 1)
+                              ? *(hex.str->rbegin())
+                              : kSuffixNone;
     result = Any(kRmd160, hex, suffix);
   }
   if ((length == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128])
       || (length
           == 2 * kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128] + 1)) {
-    const Suffix suffix = (length == 2 * kDigestSizes[kShake128] +
-                                         kAlgorithmIdSizes[kShake128] + 1)
+    const Suffix suffix = (length
+                           == 2 * kDigestSizes[kShake128]
+                                  + kAlgorithmIdSizes[kShake128] + 1)
                               ? *(hex.str->rbegin())
                               : kSuffixNone;
     result = Any(kShake128, hex, suffix);

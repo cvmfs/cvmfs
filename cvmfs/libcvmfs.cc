@@ -235,8 +235,8 @@ int cvmfs_open(LibContext *ctx, const char *path) {
 }
 
 
-ssize_t cvmfs_pread(
-    LibContext *ctx, int fd, void *buf, size_t size, off_t off) {
+ssize_t cvmfs_pread(LibContext *ctx, int fd, void *buf, size_t size,
+                    off_t off) {
   const ssize_t nbytes = ctx->Pread(fd, buf, size, off);
   if (nbytes < 0) {
     errno = -nbytes;

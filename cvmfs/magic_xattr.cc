@@ -452,9 +452,10 @@ void LHashMagicXattr::FinalizeValue() {
     result = "Not in cache";
   } else {
     shash::Any hash(dirent_->checksum().algorithm);
-    const int retval_i =
-        xattr_mgr_->mount_point()->file_system()->cache_mgr()->ChecksumFd(
-            fd, &hash);
+    const int retval_i = xattr_mgr_->mount_point()
+                             ->file_system()
+                             ->cache_mgr()
+                             ->ChecksumFd(fd, &hash);
     if (retval_i != 0)
       result = "I/O error (" + StringifyInt(retval_i) + ")";
     else
@@ -542,8 +543,10 @@ void HitrateMagicXattr::FinalizeValue() {
                                   ->statistics()
                                   ->Lookup("fetch.n_downloads")
                                   ->Get();
-  const float hitrate = 100. * (1. - (static_cast<float>(n_downloads) /
-                                      static_cast<float>(n_invocations)));
+  const float hitrate = 100.
+                        * (1.
+                           - (static_cast<float>(n_downloads)
+                              / static_cast<float>(n_invocations)));
   result_pages_.push_back(StringifyDouble(hitrate));
 }
 
@@ -679,16 +682,18 @@ void RepoMetainfoMagicXattr::FinalizeValue() {
     result_pages_.push_back("Failed to open metadata file");
     return;
   }
-  const uint64_t actual_size =
-      xattr_mgr_->mount_point()->file_system()->cache_mgr()->GetSize(fd);
+  const uint64_t actual_size = xattr_mgr_->mount_point()
+                                   ->file_system()
+                                   ->cache_mgr()
+                                   ->GetSize(fd);
   if (actual_size > kMaxMetainfoLength) {
     xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
     result_pages_.push_back("Failed to open: metadata file is too big");
     return;
   }
   char buffer[kMaxMetainfoLength];
-  const int64_t bytes_read =
-      xattr_mgr_->mount_point()->file_system()->cache_mgr()->Pread(
+  const int64_t
+      bytes_read = xattr_mgr_->mount_point()->file_system()->cache_mgr()->Pread(
           fd, buffer, actual_size, 0);
   xattr_mgr_->mount_point()->file_system()->cache_mgr()->Close(fd);
   if (bytes_read < 0) {

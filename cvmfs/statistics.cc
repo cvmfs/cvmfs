@@ -230,8 +230,8 @@ void Recorder::TickAt(uint64_t timestamp) {
   } else {
     // When clearing bins between last_timestamp_ and now, avoid cycling the
     // ring buffer multiple times.
-    const unsigned max_bins_clear =
-        std::min(bin_abs, last_bin_abs + no_bins_ + 1);
+    const unsigned max_bins_clear = std::min(bin_abs,
+                                             last_bin_abs + no_bins_ + 1);
     for (uint64_t i = last_bin_abs + 1; i < max_bins_clear; ++i)
       bins_[i % no_bins_] = 0;
     bins_[bin_abs % no_bins_] = 1;
@@ -248,9 +248,9 @@ uint64_t Recorder::GetNoTicks(uint32_t retrospect_s) const {
 
   const uint64_t last_bin_abs = last_timestamp_ / resolution_s_;
   const uint64_t past_bin_abs = (now - retrospect_s) / resolution_s_;
-  const int64_t min_bin_abs =
-      std::max(past_bin_abs,
-               (last_bin_abs < no_bins_) ? 0 : (last_bin_abs - (no_bins_ - 1)));
+  const int64_t min_bin_abs = std::max(
+      past_bin_abs,
+      (last_bin_abs < no_bins_) ? 0 : (last_bin_abs - (no_bins_ - 1)));
   uint64_t result = 0;
   for (int64_t i = last_bin_abs; i >= min_bin_abs; --i) {
     result += bins_[i % no_bins_];

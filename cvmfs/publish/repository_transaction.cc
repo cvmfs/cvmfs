@@ -84,12 +84,12 @@ void Publisher::TransactionImpl(bool waiting_on_lease) {
   // run into problems when merging catalogs later, so for the time being we
   // disallow transactions on non-existing paths.
   if (!settings_.transaction().lease_path().empty()) {
-    const std::string path =
-        GetParentPath("/" + settings_.transaction().lease_path());
+    const std::string path = GetParentPath(
+        "/" + settings_.transaction().lease_path());
     catalog::SimpleCatalogManager *catalog_mgr = GetSimpleCatalogManager();
     catalog::DirectoryEntry dirent;
-    const bool retval =
-        catalog_mgr->LookupPath(path, catalog::kLookupDefault, &dirent);
+    const bool retval = catalog_mgr->LookupPath(path, catalog::kLookupDefault,
+                                                &dirent);
     if (!retval) {
       throw EPublish("cannot open transaction on non-existing path " + path,
                      EPublish::kFailLeaseNoEntry);

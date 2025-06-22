@@ -602,8 +602,8 @@ int64_t ExternalCacheManager::Pread(int fd,
   transport_.FillMsgHash(id, &object_id);
   uint64_t nbytes = 0;
   while (nbytes < size) {
-    const uint64_t batch_size =
-        std::min(size - nbytes, static_cast<uint64_t>(max_object_size_));
+    const uint64_t batch_size = std::min(
+        size - nbytes, static_cast<uint64_t>(max_object_size_));
     cvmfs::MsgReadReq msg_read;
     msg_read.set_session_id(session_id_);
     msg_read.set_req_id(NextRequestId());
