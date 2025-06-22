@@ -77,9 +77,9 @@ jobs:
                -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  \
                 -path ./build -p1 \
                 -j 4 \
-                --allow-no-checks \
                 -extra-arg=-I${PWD}/build/cvmfs  \
                 -extra-arg=-I${PWD}/test/common  \
+                -- --allow-no-checks \
                 | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash
