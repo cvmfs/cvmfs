@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 3.12..3.30)
+cmake_minimum_required (VERSION 3.12...3.30)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -371,6 +371,7 @@ if(NOT GTest_FOUND)
   FetchContent_Declare(
     GoogleTest
     URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+               https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
     URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
     )
   FetchContent_MakeAvailable(GoogleTest)
