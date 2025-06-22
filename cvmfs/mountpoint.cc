@@ -1295,8 +1295,8 @@ void MountPoint::CreateAuthz() {
   if (options_mgr_->GetValue("CVMFS_AUTHZ_SEARCH_PATH", &optarg))
     authz_search_path = optarg;
 
-  authz_fetcher_ = new AuthzExternalFetcher(
-      fqrn_, authz_helper, authz_search_path, options_mgr_);
+  authz_fetcher_ = new AuthzExternalFetcher(fqrn_, authz_helper,
+                                            authz_search_path, options_mgr_);
   assert(authz_fetcher_ != NULL);
 
   authz_session_mgr_ = AuthzSessionManager::Create(authz_fetcher_, statistics_);
@@ -1324,9 +1324,9 @@ bool MountPoint::CreateCatalogManager() {
     retval = catalog_mgr_->Init();
   } else {
     fixed_catalog_ = true;
-    const bool alt_root_path =
-        options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH", &optarg) &&
-        options_mgr_->IsOn(optarg);
+    const bool alt_root_path = options_mgr_->GetValue("CVMFS_ALT_ROOT_PATH",
+                                                      &optarg)
+                               && options_mgr_->IsOn(optarg);
     retval = catalog_mgr_->InitFixed(root_hash, alt_root_path);
   }
   if (!retval) {
@@ -1430,8 +1430,8 @@ bool MountPoint::CreateDownloadManagers() {
   download_mgr_->SetProxyChain(proxies, fallback_proxies,
                                download::DownloadManager::kSetProxyBoth);
 
-  const bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg) &&
-                          options_mgr_->IsOn(optarg);
+  const bool do_geosort = options_mgr_->GetValue("CVMFS_USE_GEOAPI", &optarg)
+                          && options_mgr_->IsOn(optarg);
   if (do_geosort) {
     download_mgr_->ProbeGeo();
   }
@@ -1496,8 +1496,8 @@ bool MountPoint::CreateDownloadManagers() {
             continue;
           }
 
-          const std::string final_token =
-              prefix + key + ": " + Trim(key_val[1]);
+          const std::string final_token = prefix + key + ": "
+                                          + Trim(key_val[1]);
 
           download_mgr_->AddHTTPTracingHeader(final_token);
         }
@@ -1780,8 +1780,8 @@ bool MountPoint::FetchHistory(std::string *history_path) {
   CacheManager::Label label;
   label.flags = CacheManager::kLabelHistory;
   label.path = fqrn_;
-  const int fd =
-      fetcher_->Fetch(CacheManager::LabeledObject(history_hash, label));
+  const int fd = fetcher_->Fetch(
+      CacheManager::LabeledObject(history_hash, label));
   if (fd < 0) {
     boot_error_ = "failed to download history: " + StringifyInt(-fd);
     boot_status_ = loader::kFailHistory;

@@ -85,7 +85,7 @@ void SignatureManager::InitX509Store() {
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
-  const unsigned long verify_flags = // NOLINT(runtime/int)
+  const unsigned long verify_flags =  // NOLINT(runtime/int)
       X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL;
 #ifdef OPENSSL_API_INTERFACE_V09
   X509_STORE_set_flags(x509_store_, verify_flags);
@@ -437,8 +437,8 @@ std::string SignatureManager::GetPrivateKey() {
 
   BIO *bp = BIO_new(BIO_s_mem());
   assert(bp != NULL);
-  const bool rvb =
-      PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0, NULL);
+  const bool rvb = PEM_write_bio_PrivateKey(bp, private_key_, NULL, NULL, 0, 0,
+                                            NULL);
   assert(rvb);
   char *bio_privkey_text;
   long bytes = BIO_get_mem_data(bp, &bio_privkey_text);  // NOLINT
@@ -519,7 +519,8 @@ void SignatureManager::GenerateCertificate(const std::string &cn) {
 
   Prng prng;
   prng.InitLocaltime();
-  unsigned long rnd_serial_no = prng.Next(uint64_t(1) + uint32_t(-1));  // NOLINT
+  unsigned long rnd_serial_no = prng.Next(uint64_t(1)
+                                          + uint32_t(-1));  // NOLINT
   rnd_serial_no = rnd_serial_no
                   | uint64_t(prng.Next(uint64_t(1) + uint32_t(-1))) << 32;
   ASN1_INTEGER_set(X509_get_serialNumber(certificate_), rnd_serial_no);
@@ -609,8 +610,8 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
   }*/
   const vector<string> paths = SplitString(path_list, ':');
   for (unsigned i = 0; i < paths.size(); ++i) {
-    const int retval =
-        X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(), X509_FILETYPE_PEM);
+    const int retval = X509_LOOKUP_add_dir(x509_lookup_, paths[i].c_str(),
+                                           X509_FILETYPE_PEM);
     if (!retval)
       return false;
   }
@@ -1087,8 +1088,8 @@ bool SignatureManager::VerifyPkcs7(const unsigned char *buffer,
 #else
             ASN1_STRING_data(this_name->d.uniformResourceIdentifier));
 #endif
-        const int name_len =
-            ASN1_STRING_length(this_name->d.uniformResourceIdentifier);
+        const int name_len = ASN1_STRING_length(
+            this_name->d.uniformResourceIdentifier);
         if (!name_ptr || (name_len <= 0))
           continue;
         alt_uris->push_back(string(name_ptr, name_len));

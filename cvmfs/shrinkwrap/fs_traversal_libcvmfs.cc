@@ -113,8 +113,8 @@ int libcvmfs_do_fread(void *file_ctx,
                       size_t *read_len) {
   struct libcvmfs_file_handle
       *handle = reinterpret_cast<libcvmfs_file_handle *>(file_ctx);
-  const ssize_t read =
-      cvmfs_pread(handle->ctx, handle->fd, buff, len, handle->off);
+  const ssize_t read = cvmfs_pread(handle->ctx, handle->fd, buff, len,
+                                   handle->off);
   if (read == -1) {
     return -1;
   }

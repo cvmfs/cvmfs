@@ -603,8 +603,8 @@ static void LogCustom(unsigned id, const std::string &message) {
   pthread_mutex_lock(&customlog_locks[id]);
   assert(customlog_fds[id] >= 0);
 
-  const bool retval_b =
-      SafeWrite(customlog_fds[id], message.data(), message.size());
+  const bool retval_b = SafeWrite(customlog_fds[id], message.data(),
+                                  message.size());
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "could not write into log file %s (%d), aborting - lost: %s",

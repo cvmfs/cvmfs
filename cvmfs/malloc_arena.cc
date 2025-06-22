@@ -67,10 +67,10 @@ void MallocArena::Free(void *ptr) {
 
   if (prior_tag == kTagAvail) {
     // Merge with block before and remove the block from the list
-    const int32_t prior_size =
-        reinterpret_cast<AvailBlockTag *>(reinterpret_cast<char *>(block_ctl) -
-                                          sizeof(AvailBlockTag))
-            ->size;
+    const int32_t prior_size = reinterpret_cast<AvailBlockTag *>(
+                                   reinterpret_cast<char *>(block_ctl)
+                                   - sizeof(AvailBlockTag))
+                                   ->size;
     assert(prior_size > 0);
     new_size += prior_size;
     new_avail = reinterpret_cast<AvailBlockCtl *>(
@@ -171,9 +171,9 @@ MallocArena::MallocArena(unsigned arena_size)
 
   const unsigned char padding = 7;
   // Size of the initial free block: everything minus arena boundaries
-  const int32_t usable_size =
-      arena_size_ - (sizeof(uint64_t) + sizeof(AvailBlockCtl) + padding + 1 +
-                     sizeof(int32_t));
+  const int32_t usable_size = arena_size_
+                              - (sizeof(uint64_t) + sizeof(AvailBlockCtl)
+                                 + padding + 1 + sizeof(int32_t));
   assert((usable_size % 8) == 0);
 
   // First 8 bytes of arena: this pointer (occupies only 4 bytes on 32bit
@@ -212,8 +212,8 @@ MallocArena *MallocArena::CreateInitialized(unsigned arena_size,
   assert(free_block != result->head_avail_);
   assert(free_block->size > 0);
   // Strip control information at both ends of the block
-  const int usable_size =
-      free_block->size - (sizeof(AvailBlockCtl) + sizeof(AvailBlockTag));
+  const int usable_size = free_block->size
+                          - (sizeof(AvailBlockCtl) + sizeof(AvailBlockTag));
   assert(usable_size > 0);
   memset(free_block + 1, pattern, usable_size);
   return result;

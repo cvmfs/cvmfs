@@ -86,8 +86,8 @@ static inline void * __attribute__((used)) smmap(size_t size) {
 
   const int anonymous_fd = -1;
   const off_t offset = 0;
-  const size_t pages =
-      ((size + 2 * sizeof(size_t)) + 4095) / 4096; // round to full page
+  const size_t pages = ((size + 2 * sizeof(size_t)) + 4095)
+                       / 4096;  // round to full page
   unsigned char *mem = NULL;
 
 #ifdef CVMFS_SUPPRESS_ASSERTS

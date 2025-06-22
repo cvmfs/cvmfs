@@ -540,8 +540,8 @@ static Failures CaresExtractIpv6(const unsigned char *abuf, int alen,
  * Called when a DNS query returns or times out.  Sets the return status and the
  * IP addresses (if successful) in the QueryInfo object.
  */
-static void CallbackCares(
-    void *arg, int status, int timeouts_ms, unsigned char *abuf, int alen) {
+static void CallbackCares(void *arg, int status, int timeouts_ms,
+                          unsigned char *abuf, int alen) {
   QueryInfo *info = reinterpret_cast<QueryInfo *>(arg);
 
   info->complete = true;
@@ -596,8 +596,8 @@ static Failures CaresExtractIpv4(const unsigned char *abuf,
   struct hostent *host_entry = NULL;
   struct ares_addrttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  const int retval =
-      ares_parse_a_reply(abuf, alen, &host_entry, records, &naddrttls);
+  const int retval = ares_parse_a_reply(abuf, alen, &host_entry, records,
+                                        &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
@@ -646,8 +646,8 @@ static Failures CaresExtractIpv6(const unsigned char *abuf,
   struct hostent *host_entry = NULL;
   struct ares_addr6ttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  const int retval =
-      ares_parse_aaaa_reply(abuf, alen, &host_entry, records, &naddrttls);
+  const int retval = ares_parse_aaaa_reply(abuf, alen, &host_entry, records,
+                                           &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
@@ -1083,8 +1083,8 @@ void HostfileResolver::DoResolve(const vector<string> &names,
     (*failures)[i] = kFailUnknownHost;
     (*fqdns)[i] = names[i];
     for (unsigned j = 0; j < effective_names.size(); ++j) {
-      const map<string, HostEntry>::iterator iter =
-          host_map_.find(effective_names[j]);
+      const map<string, HostEntry>::iterator iter = host_map_.find(
+          effective_names[j]);
       if (iter != host_map_.end()) {
         (*ipv4_addresses)[i].insert((*ipv4_addresses)[i].end(),
                                     iter->second.ipv4_addresses.begin(),
@@ -1237,8 +1237,8 @@ NormalResolver *NormalResolver::Create(const bool ipv4_only,
     delete cares_resolver;
     return NULL;
   }
-  const bool retval =
-      hostfile_resolver->SetSearchDomains(cares_resolver->domains());
+  const bool retval = hostfile_resolver->SetSearchDomains(
+      cares_resolver->domains());
   assert(retval);
 
   NormalResolver *normal_resolver = new NormalResolver();
@@ -1285,8 +1285,8 @@ void NormalResolver::SetSystemResolvers() {
 
 void NormalResolver::SetSystemSearchDomains() {
   cares_resolver_->SetSystemSearchDomains();
-  const bool retval =
-      hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
+  const bool retval = hostfile_resolver_->SetSearchDomains(
+      cares_resolver_->domains());
   assert(retval);
 }
 

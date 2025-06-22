@@ -452,8 +452,8 @@ void SyncItem::CheckGraft() {
              graftfile.c_str());
     valid_graft_ = false;
   }
-  graft_chunklist_->PushBack(FileChunk(
-      chunk_checksums.back(), last_offset, graft_size_ - last_offset));
+  graft_chunklist_->PushBack(FileChunk(chunk_checksums.back(), last_offset,
+                                       graft_size_ - last_offset));
 }
 
 }  // namespace publish

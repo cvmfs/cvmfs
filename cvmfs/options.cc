@@ -318,8 +318,8 @@ void OptionsManager::ParseDefault(const string &fqrn) {
 
 
 void OptionsManager::PopulateParameter(const string &param, ConfigValue val) {
-  const map<string, string>::const_iterator iter =
-      protected_parameters_.find(param);
+  const map<string, string>::const_iterator iter = protected_parameters_.find(
+      param);
   if ((iter != protected_parameters_.end()) && (iter->second != val.value)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "error in cvmfs configuration: attempt to change protected %s "

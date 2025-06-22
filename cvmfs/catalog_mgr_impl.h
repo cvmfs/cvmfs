@@ -964,8 +964,8 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
     return NULL;
   }
 
-  attached_catalog = CreateCatalog(
-      ctlg_context.mountpoint(), ctlg_context.hash(), parent_catalog);
+  attached_catalog = CreateCatalog(ctlg_context.mountpoint(),
+                                   ctlg_context.hash(), parent_catalog);
 
   // Attach loaded catalog
   if (!AttachCatalog(ctlg_context.sqlite_path(), attached_catalog)) {

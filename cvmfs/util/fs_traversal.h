@@ -169,8 +169,8 @@ class FileSystemTraversal {
 
       // Notify user about found directory entry
       platform_stat64 info;
-      const int retval =
-          platform_lstat((path + "/" + dit->d_name).c_str(), &info);
+      const int retval = platform_lstat((path + "/" + dit->d_name).c_str(),
+                                        &info);
       if (retval != 0) {
         PANIC(kLogStderr, "failed to lstat '%s' errno: %d",
               (path + "/" + dit->d_name).c_str(), errno);

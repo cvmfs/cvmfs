@@ -45,8 +45,8 @@ ClientCtx::~ClientCtx() {
 ClientCtx *ClientCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new ClientCtx();
-    const int retval =
-        pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
+    const int retval = pthread_key_create(&instance_->thread_local_storage_,
+                                          TlsDestructor);
     assert(retval == 0);
   }
 
@@ -110,7 +110,8 @@ void ClientCtx::TlsDestructor(void *data) {
   for (vector<ThreadLocalStorage *>::iterator
            i = instance_->tls_blocks_.begin(),
            iEnd = instance_->tls_blocks_.end();
-       i != iEnd; ++i) {
+       i != iEnd;
+       ++i) {
     if ((*i) == tls) {
       instance_->tls_blocks_.erase(i);
       break;

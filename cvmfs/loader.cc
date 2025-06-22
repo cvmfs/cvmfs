@@ -85,10 +85,8 @@ enum {
   KEY_CVMFS_DEBUG,
   KEY_OPTIONS_PARSE,
 };
-#define CVMFS_OPT(t, p, v) \
-  { t, offsetof(struct CvmfsOptions, p), v }
-#define CVMFS_SWITCH(t, p) \
-  { t, offsetof(struct CvmfsOptions, p), 1 }
+#define CVMFS_OPT(t, p, v) {t, offsetof(struct CvmfsOptions, p), v}
+#define CVMFS_SWITCH(t, p) {t, offsetof(struct CvmfsOptions, p), 1}
 static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_OPT("config=%s", config, 0),
     CVMFS_OPT("uid=%d", uid, 0),
@@ -191,9 +189,10 @@ static void Usage(const string &exename) {
 bool CheckPremounted(const std::string &mountpoint) {
   int len;
   unsigned fd;
-  const bool retval =
-      (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len) == 1) &&
-      (len >= 0) && (static_cast<unsigned>(len) == mountpoint.length());
+  const bool retval = (sscanf(mountpoint.c_str(), "/dev/fd/%u%n", &fd, &len)
+                       == 1)
+                      && (len >= 0)
+                      && (static_cast<unsigned>(len) == mountpoint.length());
   if (retval) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: pre-mounted on file descriptor %d", fd);
@@ -592,8 +591,8 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
     return kFailLoadLibrary;
   retval = cvmfs_exports_->fnInit(loader_exports_);
   if (retval != kFailOk) {
-    const string msg_progress =
-        cvmfs_exports_->fnGetErrorMsg() + " (" + StringifyInt(retval) + ")\n";
+    const string msg_progress = cvmfs_exports_->fnGetErrorMsg() + " ("
+                                + StringifyInt(retval) + ")\n";
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", msg_progress.c_str());
     SendMsg2Socket(fd_progress, msg_progress);
     return (Failures)retval;
@@ -852,15 +851,15 @@ int FuseMain(int argc, char *argv[]) {
 
   // Apply OOM score adjustment
   if (options_manager->GetValue("CVMFS_OOM_SCORE_ADJ", &parameter)) {
-    const string proc_path =
-        "/proc/" + StringifyInt(getpid()) + "/oom_score_adj";
+    const string proc_path = "/proc/" + StringifyInt(getpid())
+                             + "/oom_score_adj";
     const int fd_oom = open(proc_path.c_str(), O_WRONLY);
     if (fd_oom < 0) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn, "failed to open %s",
                proc_path.c_str());
     } else {
-      const bool retval =
-          SafeWrite(fd_oom, parameter.data(), parameter.length());
+      const bool retval = SafeWrite(fd_oom, parameter.data(),
+                                    parameter.length());
       if (!retval) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                  "failed to set OOM score adjustment to %s", parameter.c_str());
@@ -915,9 +914,10 @@ int FuseMain(int argc, char *argv[]) {
             : "",
         MatchFuseOption(mount_options, "allow_other") ? ",allow_other" : "");
     unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME;
-    // Note that during the handling of the `CVMFS_MOUNT_RW` option, we ensure that
-    // at least one of `rw` or `ro` is part of the mount option string (we won't have both unset).
-    // If both `rw` and `ro` are set, the read-only option takes precedence.
+    // Note that during the handling of the `CVMFS_MOUNT_RW` option, we ensure
+    // that at least one of `rw` or `ro` is part of the mount option string (we
+    // won't have both unset). If both `rw` and `ro` are set, the read-only
+    // option takes precedence.
     if (MatchFuseOption(mount_options, "ro")) {
       flags |= MS_RDONLY;
     }

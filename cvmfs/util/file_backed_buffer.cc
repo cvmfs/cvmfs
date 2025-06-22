@@ -73,8 +73,8 @@ void FileBackedBuffer::Append(const void *source, uint64_t len) {
       buf_ = reinterpret_cast<unsigned char *>(smalloc(len));
       size_ = len;
     } else if (size_ < pos_ + len) {
-      const uint64_t newsize =
-          (size_ * 2 < pos_ + len) ? (pos_ + len) : (size_ * 2);
+      const uint64_t newsize = (size_ * 2 < pos_ + len) ? (pos_ + len)
+                                                        : (size_ * 2);
       buf_ = reinterpret_cast<unsigned char *>(srealloc(buf_, newsize));
       size_ = newsize;
     }
@@ -121,10 +121,10 @@ void FileBackedBuffer::Commit() {
 int64_t FileBackedBuffer::Data(void **ptr, int64_t len, uint64_t pos) {
   assert(state_ == kReadState);
 
-  const int64_t actual_len =
-      (pos + len <= size_)
-          ? len
-          : static_cast<int64_t>(size_) - static_cast<int64_t>(pos);
+  const int64_t actual_len = (pos + len <= size_)
+                                 ? len
+                                 : static_cast<int64_t>(size_)
+                                       - static_cast<int64_t>(pos);
   assert(actual_len >= 0);
 
   if (mode_ == kMemoryMode) {

@@ -105,8 +105,8 @@ void Repository::Diff(const std::string &from, const std::string &to,
       true /* manage_catalog_files */);
   mgr_to->Init();
 
-  const catalog::Counters counters_from =
-      mgr_from->GetRootCatalog()->GetCounters();
+  const catalog::Counters counters_from = mgr_from->GetRootCatalog()
+                                              ->GetCounters();
   const catalog::Counters counters_to = mgr_to->GetRootCatalog()->GetCounters();
   diff_listener->OnStats(catalog::Counters::Diff(counters_from, counters_to));
 

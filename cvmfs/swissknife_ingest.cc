@@ -136,8 +136,8 @@ int swissknife::Ingest::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
-  const bool with_gateway =
-      spooler_definition.driver_type == upload::SpoolerDefinition::Gateway;
+  const bool with_gateway = spooler_definition.driver_type
+                            == upload::SpoolerDefinition::Gateway;
 
   // This may fail, in which case a warning is printed and the process continues
   ObtainDacReadSearchCapability();

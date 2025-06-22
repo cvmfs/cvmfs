@@ -126,7 +126,8 @@ std::string TelemetryAggregatorInflux::MakePayload() {
   bool add_token = false;
   for (std::map<std::string, int64_t>::iterator it = counters_.begin(),
                                                 iEnd = counters_.end();
-       it != iEnd; it++) {
+       it != iEnd;
+       it++) {
     if (it->second != 0) {
       if (add_token) {
         ret += ",";
@@ -184,7 +185,8 @@ std::string TelemetryAggregatorInflux::MakeDeltaPayload() {
   bool add_token = false;
   for (std::map<std::string, int64_t>::iterator it = counters_.begin(),
                                                 iEnd = counters_.end();
-       it != iEnd; it++) {
+       it != iEnd;
+       it++) {
     const int64_t value = it->second;
     if (value != 0) {
       int64_t old_value;
@@ -242,10 +244,10 @@ TelemetryReturn TelemetryAggregatorInflux::SendToInflux(
   dest_addr = reinterpret_cast<sockaddr_in *>(res_->ai_addr);
   dest_addr->sin_port = htons(influx_port_);
 
-  const ssize_t num_bytes_sent =
-      sendto(socket_fd_, payload.data(), payload.size(), 0,
-             reinterpret_cast<struct sockaddr *>(dest_addr),
-             sizeof(struct sockaddr_in));
+  const ssize_t num_bytes_sent = sendto(
+      socket_fd_, payload.data(), payload.size(), 0,
+      reinterpret_cast<struct sockaddr *>(dest_addr),
+      sizeof(struct sockaddr_in));
 
   if (num_bytes_sent < 0) {
     LogCvmfs(kLogTelemetry, kLogDebug | kLogSyslogErr,

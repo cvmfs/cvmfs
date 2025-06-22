@@ -389,8 +389,9 @@ SqlListBranches::SqlListBranches(const HistoryDatabase *database) {
 
 History::Branch SqlListBranches::RetrieveBranch() const {
   const std::string branch = RetrieveString(0);
-  const std::string parent =
-      (RetrieveType(1) == SQLITE_NULL) ? "" : RetrieveString(1);
+  const std::string parent = (RetrieveType(1) == SQLITE_NULL)
+                                 ? ""
+                                 : RetrieveString(1);
   const unsigned initial_revision = RetrieveInt64(2);
   return History::Branch(branch, parent, initial_revision);
 }

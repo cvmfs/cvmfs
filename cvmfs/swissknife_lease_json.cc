@@ -9,9 +9,11 @@
 #include "util/logging.h"
 #include "util/pointer.h"
 
-//TODO(@vvolkl): refactor
+// TODO(@vvolkl): refactor
 LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
-                             std::string *session_token, uint64_t *current_revision, std::string &current_root_hash) {
+                                         std::string *session_token,
+                                         uint64_t *current_revision,
+                                         std::string &current_root_hash) {
   if (buffer.data.size() == 0 || session_token == NULL) {
     return kLeaseReplyFailure;
   }
@@ -21,8 +23,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
     return kLeaseReplyFailure;
   }
 
-  const JSON *result =
-      JsonDocument::SearchInObject(reply->root(), "status", JSON_STRING);
+  const JSON *result = JsonDocument::SearchInObject(reply->root(), "status",
+                                                    JSON_STRING);
   if (result != NULL) {
     const std::string status = result->string_value;
     if (status == "ok") {
@@ -30,10 +32,17 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
       const JSON *token = JsonDocument::SearchInObject(
           reply->root(), "session_token", JSON_STRING);
       if (token != NULL) {
-        const JSON *rev  = JsonDocument::SearchInObject(reply->root(), "revision", JSON_INT); //TODO FIXME: make the json lib uint64 aware
-        if(rev!=NULL) { *current_revision = (uint64_t) rev->int_value; }
-        const JSON *hash = JsonDocument::SearchInObject(reply->root(), "root_hash", JSON_STRING);
-        if(hash!=NULL) { current_root_hash = hash->string_value; }
+        const JSON *rev = JsonDocument::SearchInObject(
+            reply->root(), "revision",
+            JSON_INT);  // TODO FIXME: make the json lib uint64 aware
+        if (rev != NULL) {
+          *current_revision = (uint64_t)rev->int_value;
+        }
+        const JSON *hash = JsonDocument::SearchInObject(
+            reply->root(), "root_hash", JSON_STRING);
+        if (hash != NULL) {
+          current_root_hash = hash->string_value;
+        }
         LogCvmfs(kLogCvmfs, kLogDebug, "Session token: %s",
                  token->string_value);
         *session_token = token->string_value;
@@ -48,8 +57,8 @@ LeaseReply ParseAcquireReplyWithRevision(const CurlBuffer &buffer,
         return kLeaseReplyBusy;
       }
     } else if (status == "error") {
-      const JSON *reason =
-          JsonDocument::SearchInObject(reply->root(), "reason", JSON_STRING);
+      const JSON *reason = JsonDocument::SearchInObject(reply->root(), "reason",
+                                                        JSON_STRING);
       if (reason != NULL) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s", reason->string_value);
       }

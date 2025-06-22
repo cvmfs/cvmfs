@@ -8,16 +8,16 @@
 #include <string>
 
 #include "catalog.h"
+#include "catalog_merge_tool.h"
 #include "crypto/hash.h"
 #include "manifest.h"
 #include "options.h"
+#include "shortstring.h"
 #include "upload.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/posix.h"
 #include "util/raii_temp_dir.h"
-#include "shortstring.h"
-#include "catalog_merge_tool.h"
 
 inline PathString MakeRelative(const PathString &path) {
   std::string rel_path;

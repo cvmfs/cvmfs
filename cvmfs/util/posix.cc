@@ -435,9 +435,9 @@ int ConnectSocket(const std::string &path) {
   const int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   assert(socket_fd != -1);
 
-  const int retval =
-      connect(socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
-              sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
+  const int retval = connect(
+      socket_fd, reinterpret_cast<struct sockaddr *>(&sock_addr),
+      sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path));
   if (short_path != path)
     RemoveShortSocketLink(short_path);
 
@@ -632,8 +632,8 @@ bool DiffTree(const std::string &path_a, const std::string &path_b) {
   }
 
   for (unsigned i = 0; i < subdirs.size(); ++i) {
-    const bool retval_subtree =
-        DiffTree(path_a + "/" + subdirs[i], path_b + "/" + subdirs[i]);
+    const bool retval_subtree = DiffTree(path_a + "/" + subdirs[i],
+                                         path_b + "/" + subdirs[i]);
     if (!retval_subtree)
       return false;
   }
@@ -962,8 +962,8 @@ int WritePidFile(const std::string &path) {
   char buf[64];
 
   snprintf(buf, sizeof(buf), "%" PRId64 "\n", static_cast<uint64_t>(getpid()));
-  const bool retval =
-      (ftruncate(fd, 0) == 0) && SafeWrite(fd, buf, strlen(buf));
+  const bool retval = (ftruncate(fd, 0) == 0)
+                      && SafeWrite(fd, buf, strlen(buf));
   if (!retval) {
     UnlockFile(fd);
     return -1;
@@ -2058,8 +2058,8 @@ bool SafeWriteV(int fd, struct iovec *iov, unsigned iovcnt) {
   unsigned iov_idx = 0;
 
   while (nbytes) {
-    const ssize_t retval =
-        writev(fd, &iov[iov_idx], static_cast<int>(iovcnt - iov_idx));
+    const ssize_t retval = writev(fd, &iov[iov_idx],
+                                  static_cast<int>(iovcnt - iov_idx));
     if (retval < 0) {
       if (errno == EINTR)
         continue;

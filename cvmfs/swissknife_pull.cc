@@ -319,7 +319,8 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
     for (catalog::Catalog::NestedCatalogList::const_iterator
              i = nested_catalogs.begin(),
              iEnd = nested_catalogs.end();
-         i != iEnd; ++i) {
+         i != iEnd;
+         ++i) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->mountpoint.c_str());
       const bool retval = Pull(i->hash, i->mountpoint.ToString());
@@ -637,8 +638,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
-  m_retval = FetchRemoteManifestEnsemble(
-      *stratum0_url, repository_name, &ensemble);
+  m_retval = FetchRemoteManifestEnsemble(*stratum0_url, repository_name,
+                                         &ensemble);
   if (m_retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
              m_retval, manifest::Code2Ascii(m_retval));
@@ -874,8 +875,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     }
 
     if (preload_cache) {
-      const bool retval =
-          ensemble.manifest->ExportBreadcrumb(*preload_cachedir, 0660);
+      const bool retval = ensemble.manifest->ExportBreadcrumb(*preload_cachedir,
+                                                              0660);
       assert(retval);
     } else {
       // pkcs#7 structure contains content + certificate + signature
