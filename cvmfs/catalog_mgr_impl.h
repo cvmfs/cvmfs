@@ -2,8 +2,6 @@
  * This file is part of the CernVM File System
  */
 
-// avoid clang-tidy false positives (at least starting with clang14)
-// NOLINTBEGIN
 
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
@@ -16,6 +14,10 @@
 #include <cassert>
 #include <string>
 #include <vector>
+
+// only needed for clang-tidy to let it see the class definitions.
+// this would an include loop if not for the header guard
+#include "catalog_mgr.h"
 
 #include "shortstring.h"
 #include "statistics.h"
@@ -884,7 +886,7 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
                          : const_cast<CatalogT *>(entry_point);
   assert(path.StartsWith(parent->mountpoint()));
 
-  unsigned path_len = path.GetLength();
+  const unsigned path_len = path.GetLength();
 
   // Try to find path as a super string of nested catalog mount points
   perf::Inc(statistics_.n_nested_listing);
@@ -1203,4 +1205,3 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
 
 
 #endif  // CVMFS_CATALOG_MGR_IMPL_H_
-// NOLINTEND
