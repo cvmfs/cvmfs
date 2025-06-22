@@ -271,7 +271,8 @@ int acl_from_text_to_xattr_value(const string &textual_acl, char *&o_binary_acl,
   // get individual entries in structural form
   vector<acl_ea_entry> entries;
   for (auto string_it = string_entries.begin();
-       string_it != string_entries.end(); ++string_it) {
+       string_it != string_entries.end();
+       ++string_it) {
     acl_ea_entry entry;
     ret = acl_entry_from_text(*string_it, entry);
     if (ret) {
