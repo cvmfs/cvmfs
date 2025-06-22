@@ -131,7 +131,7 @@ Settings GetSettings(cvmcache_option_map *options) {
 }
 
 uint32_t cvmcache_hash_hasher(const struct cvmcache_hash &key) {
-  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return static_cast<uint32_t>(*(reinterpret_cast<const uint32_t *>(key.digest) + 1));
 }
 
 uint32_t uint64_hasher(const uint64_t &key) { return (uint32_t)key; }
