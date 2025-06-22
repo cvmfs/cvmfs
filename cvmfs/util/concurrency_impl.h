@@ -13,6 +13,7 @@
 // clang-format on
 
 #include <cstddef>
+
 #include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
