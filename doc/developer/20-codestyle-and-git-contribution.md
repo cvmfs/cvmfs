@@ -20,10 +20,12 @@ It is useful to have the forked `devel` branch to track the upstream `cvmfs/deve
   git branch -u upstream/devel devel
 ```
 
+CVMFS releases are built from the `cvmfs-2.X` version branches, but PRs should target `devel`. The release managers will take care of backporting patches if needed.
+
 
 ### Branch naming policy
 
-The name of the branch should be self-explanatory with a prefix (listed below) that describes the general nature of the work done within the branch, e.g. `fix-openssl3-workaround`.
+The name of the branch should be short and self-explanatory. It is recommended, but not required, to add a prefix (listed below) that describes the general nature of the work done within the branch, e.g. `fix-openssl3-workaround`.
 It might be useful to add the issue number as a postfix to the branch name, e.g. `fix-catalogXattr#2900`.
 
 |Type|Prefix|
@@ -35,12 +37,11 @@ It might be useful to add the issue number as a postfix to the branch name, e.g.
 
 ### Issues and pull requests
 
-For each pull requests (PR) there should be an issue assigned to it.
-Linking between PR and issue can be done by adding in the comment `#<issueNumber>`.
+Linking between PR and issue can be done by adding in the comment `Fixes #<issueNumber>`.
 For cross-project linking, e.g. between `cvmfs/cvmfs` and `cvmfs/doc-cvmfs` one can use the full URL of the issue.
 
 > **_NOTE_**&nbsp;
->  Please **do NOT squash commits** if it obscures the git history and tracking of changes made due to, e.g. suggestions made during review.
+>  Please **do NOT squash commits** if it obscures the git history and tracking of changes made due to, e.g. suggestions made during review. Commits are usually squashed anyways when PRs are merged
 
 
 ### Useful git commands
@@ -89,11 +90,12 @@ In case of a necessary line break, the following style should be followed
 ```
 
 ### Code style checker for C++
-- Currently needs `python2`
-- Go in main repo `/cvmfs`
-- Call `python cpplint.py <myCppFileToCheck>`
-  - e.g. `python2 cpplint.py cvmfs/cvmfs.cc`
-- It is convenient to set this up as a pre-commit hook. This will only allow you to commit changes that pass the linter and avoid excessive code style commits. To enable this, create the file `.git/hooks/pre-commit` in your cvmfs repository with the following content:
+
+The C++ sources should conform to clang-format and clang-tidy (best to use a version newer than 18), with the .clang-format and .clang-tidy configurations in the top level directory of the repository. 
+
+CI workflows are set up to check this, and will complain if your patches would introduce errors.
+
+It is convenient to set this up as a pre-commit hook. This will only allow you to commit changes that pass the linter and avoid excessive code style commits. To enable this, create the file `.git/hooks/pre-commit` in your cvmfs repository with the following content:
 
 ```bash
 #!/bin/sh
@@ -104,20 +106,17 @@ In case of a necessary line break, the following style should be followed
 # it wants to stop the commit.
 #
 
-if git rev-parse --verify HEAD >/dev/null 2>&1
-then
-  against=HEAD
-else
-  # Initial commit: diff against an empty tree object
-  against=$(git hash-object -t tree /dev/null)
-fi
 
-cpplint="python cpplint.py"
 sum=0
-
 # for cpp
-for file in $(git diff-index --name-status $against -- | grep -E '\.[ch](c)?$' | awk '{print $2}'); do
-    $cpplint $file
+for file in $(git diff-index --name-status HEAD -- | grep -E '\.[ch](c)?$' | awk '{print $2}'); do
+    clang-format-20 -i $file
+    sum=$(expr ${sum} + $?)
+done
+
+# for golang
+for file in $(git diff-index --name-status HEAD -- | grep '.go$' | awk '{print $2}'); do
+    gofmt -l -w $file
     sum=$(expr ${sum} + $?)
 done
 
@@ -126,4 +125,5 @@ if [ ${sum} -eq 0 ]; then
 else
     exit 1
 fi
+
 ```
