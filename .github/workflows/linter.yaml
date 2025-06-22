@@ -79,7 +79,7 @@ jobs:
                 -j 4 \
                 -extra-arg=-I${PWD}/build/cvmfs  \
                 -extra-arg=-I${PWD}/test/common  \
-                -- --allow-no-checks \
+                -allow-no-checks \
                 | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash
