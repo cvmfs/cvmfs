@@ -77,6 +77,7 @@ jobs:
                -clang-tidy-binary clang-tidy-${{ env.CLANG_VERSION }}  \
                 -path ./build -p1 \
                 -j 4 \
+                --allow-no-checks \
                 -extra-arg=-I${PWD}/build/cvmfs  \
                 -extra-arg=-I${PWD}/test/common  \
                 | tee clang-tidy.out
