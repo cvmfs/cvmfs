@@ -27,6 +27,7 @@ Architecture: amd64 armhf arm64
 Depends:
  cvmfs-config-default | cvmfs-config,
  cvmfs-fuse3,
+#BUILD_LIBFUSE2 fuse,
  gawk,
  psmisc,
  lsof,
