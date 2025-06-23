@@ -471,7 +471,7 @@ endif ()
 
 # Server only: unzip, libcap
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
-  find_package(Python3 REQUIRED)
+  find_package(PythonLibs REQUIRED)
   find_package(LibCAP REQUIRED)
   if (BUILD_COMPARE_TO_LIBACL)
     add_definitions(-DCOMPARE_TO_LIBACL)
