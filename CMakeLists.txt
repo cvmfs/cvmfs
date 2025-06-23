@@ -184,7 +184,7 @@ set (EXTERNALS_INSTALL_LOCATION   "${EXTERNALS_PREFIX}/externals_install")
 # run the bootstrap shellscript (not needed in the distributed version of the source)
 #
 if (BUILTIN_EXTERNALS)
-  if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+  if (EXISTS "${CMAKE_SOURCE_DIR}/externals/bootstrap.sh")
     # Set some environment variables for the bootstrap script
     set(ENV{EXTERNALS_LIB_LOCATION} ${EXTERNALS_LIB_LOCATION})
     set(ENV{EXTERNALS_BUILD_LOCATION} ${EXTERNALS_BUILD_LOCATION})
@@ -217,7 +217,7 @@ if (BUILTIN_EXTERNALS)
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
-      COMMAND           sh ${CMAKE_SOURCE_DIR}/bootstrap.sh
+      COMMAND           sh ${CMAKE_SOURCE_DIR}/externals/bootstrap.sh
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       RESULT_VARIABLE   BOOTSTRAPPING_RESULT
     )
@@ -238,7 +238,7 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
-  endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+  endif (EXISTS "${CMAKE_SOURCE_DIR}/externals/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
   # point to the prefix where the libraries are installed. This path will take precedence
