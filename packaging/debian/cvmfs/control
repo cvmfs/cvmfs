@@ -4,13 +4,13 @@ Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
 Build-Depends:
  libfuse3-dev (>= 3.3.0),
+#BUILD_LIBFUSE2 libfuse-dev,
  debhelper (>= 9),
  autotools-dev,
  cmake,
  cpio,
  libcap-dev,
  libssl-dev,
- libfuse-dev,
  libattr1-dev,
  libz-dev,
  patch,
@@ -41,9 +41,6 @@ Depends:
  ${shlibs:Depends}
 Recommends:
  autofs (>= 5.1.2)
-Suggests:
- fuse,
- libfuse2
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.

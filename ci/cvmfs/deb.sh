@@ -68,6 +68,20 @@ echo "copy packaging meta information and get in place..."
 cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
 cd $copied_source
 
+source /etc/os-release
+VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
+BUILD_LIBFUSE2=yes
+if [ "$ID" = "ubuntu" ] && [ ${VERSION_NUMBER} -ge 2504 ]; then
+  BUILD_LIBFUSE2=no
+fi
+if [ "$ID" = "debian" ] && [ ${VERSION_NUMBER} -ge 13 ]; then
+  BUILD_LIBFUSE2=no
+fi
+if [ "${BUILD_LIBUFSE2}" = "yes" ]; then
+  sed -i -e "s/^#BUILD_LIBFUSE2//g" debian/control
+  sed -i -e "s/^#BUILD_LIBFUSE2/BUILD_LIBFUSE2/g" debian/rules
+fi
+
 
 cpu_cores=$(get_number_of_cpu_cores)
 echo "do the build (with $cpu_cores cores)..."
