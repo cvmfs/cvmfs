@@ -90,8 +90,8 @@ bool FileWatcherInotify::RunEventLoop(const FileWatcher::HandlerMap &handlers,
         struct inotify_event
             *inotify_event = reinterpret_cast<struct inotify_event *>(
                 &buffer[i]);
-        const std::map<int, WatchRecord>::const_iterator it =
-            watch_records_.find(inotify_event->wd);
+        const std::map<int, WatchRecord>::const_iterator
+            it = watch_records_.find(inotify_event->wd);
         if (it != watch_records_.end()) {
           WatchRecord current_record = it->second;
           file_watcher::Event event = file_watcher::kInvalid;

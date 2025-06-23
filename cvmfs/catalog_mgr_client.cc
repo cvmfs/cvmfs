@@ -153,8 +153,8 @@ LoadReturn ClientCatalogManager::GetNewRootCatalogContext(
   uint64_t local_newest_timestamp = 0;
   uint64_t local_newest_revision = manifest::Breadcrumb::kInvalidRevision;
 
-  const manifest::Breadcrumb breadcrumb =
-      fetcher_->cache_mgr()->LoadBreadcrumb(repo_name_);
+  const manifest::Breadcrumb breadcrumb = fetcher_->cache_mgr()->LoadBreadcrumb(
+      repo_name_);
   if (breadcrumb.IsValid()) {
     local_newest_hash = breadcrumb.catalog_hash;
     local_newest_timestamp = breadcrumb.timestamp;
@@ -288,8 +288,8 @@ std::string ClientCatalogManager::GetCatalogDescription(
  */
 LoadReturn ClientCatalogManager::LoadCatalogByHash(
     CatalogContext *ctlg_context) {
-  const string catalog_descr =
-      GetCatalogDescription(ctlg_context->mountpoint(), ctlg_context->hash());
+  const string catalog_descr = GetCatalogDescription(ctlg_context->mountpoint(),
+                                                     ctlg_context->hash());
   string alt_root_catalog_path = "";
 
   // root catalog needs special handling because of alt_root_catalog_path
@@ -385,8 +385,8 @@ void ClientCatalogManager::UnloadCatalog(const Catalog *catalog) {
   LogCvmfs(kLogCache, kLogDebug, "unloading catalog %s",
            catalog->mountpoint().c_str());
 
-  const map<PathString, shash::Any>::iterator iter =
-      mounted_catalogs_.find(catalog->mountpoint());
+  const map<PathString, shash::Any>::iterator iter = mounted_catalogs_.find(
+      catalog->mountpoint());
   assert(iter != mounted_catalogs_.end());
   fetcher_->cache_mgr()->quota_mgr()->Unpin(iter->second);
   mounted_catalogs_.erase(iter);

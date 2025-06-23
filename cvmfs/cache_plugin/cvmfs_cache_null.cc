@@ -102,8 +102,8 @@ static int null_pread(struct cvmcache_hash *id,
   string data = storage[h].data;
   if (offset > data.length())
     return CVMCACHE_STATUS_OUTOFBOUNDS;
-  const unsigned nbytes =
-      std::min(*size, static_cast<uint32_t>(data.length() - offset));
+  const unsigned nbytes = std::min(
+      *size, static_cast<uint32_t>(data.length() - offset));
   memcpy(buffer, data.data() + offset, nbytes);
   *size = nbytes;
   return CVMCACHE_STATUS_OK;
@@ -265,8 +265,8 @@ static int null_breadcrumb_store(const char *fqrn,
 
 static int null_breadcrumb_load(const char *fqrn,
                                 cvmcache_breadcrumb *breadcrumb) {
-  const map<std::string, cvmcache_breadcrumb>::const_iterator itr =
-      breadcrumbs.find(fqrn);
+  const map<std::string, cvmcache_breadcrumb>::const_iterator
+      itr = breadcrumbs.find(fqrn);
   if (itr == breadcrumbs.end())
     return CVMCACHE_STATUS_NOENTRY;
   *breadcrumb = itr->second;

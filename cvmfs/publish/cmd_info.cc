@@ -45,8 +45,8 @@ int CmdInfo::Main(const Options &options) {
   if (repository.whitelist()->IsExpired()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Whitelist is expired");
   } else {
-    const double delta_s =
-        difftime(repository.whitelist()->expires(), time(NULL));
+    const double delta_s = difftime(repository.whitelist()->expires(),
+                                    time(NULL));
     const int delta_d = static_cast<int>(delta_s / 86400);
     LogCvmfs(kLogCvmfs, kLogStdout, "Whitelist is valid for another %d days",
              delta_d);

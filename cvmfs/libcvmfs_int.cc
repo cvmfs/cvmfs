@@ -519,8 +519,8 @@ int LibContext::ListNestedCatalogs(const char *c_path,
   path.Assign(c_path, strlen(c_path));
 
   std::vector<PathString> skein;
-  const bool retval =
-      mount_point_->catalog_mgr()->ListCatalogSkein(path, &skein);
+  const bool retval = mount_point_->catalog_mgr()->ListCatalogSkein(path,
+                                                                    &skein);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "cvmfs_list_nc failed to find skein of path: %s", c_path);
@@ -615,8 +615,8 @@ int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
     SimpleChunkTables::OpenChunks
         open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
-    const zlib::Algorithms compression_alg =
-        open_chunks.chunk_reflist.compression_alg;
+    const zlib::Algorithms compression_alg = open_chunks.chunk_reflist
+                                                 .compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -658,8 +658,8 @@ int64_t LibContext::Pread(int fd, void *buf, uint64_t size, uint64_t off) {
       const size_t remaining_bytes_in_chunk = chunk_list->AtPtr(chunk_idx)
                                                   ->size()
                                               - offset_in_chunk;
-      const size_t bytes_to_read_in_chunk =
-          std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const size_t bytes_to_read_in_chunk = std::min(bytes_to_read,
+                                                     remaining_bytes_in_chunk);
       const int64_t bytes_fetched = file_system()->cache_mgr()->Pread(
           chunk_fd->fd,
           reinterpret_cast<char *>(buf) + overall_bytes_fetched,
@@ -690,8 +690,8 @@ int LibContext::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
   if (fd & kFdChunked) {
     const int chunk_handle = fd & ~kFdChunked;
-    const SimpleChunkTables::OpenChunks open_chunks =
-        mount_point_->simple_chunk_tables()->Get(chunk_handle);
+    const SimpleChunkTables::OpenChunks
+        open_chunks = mount_point_->simple_chunk_tables()->Get(chunk_handle);
     if (open_chunks.chunk_reflist.list == NULL)
       return -EBADF;
     if (open_chunks.chunk_fd->fd != -1)

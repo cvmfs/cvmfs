@@ -79,6 +79,8 @@ jobs:
                 -j 4 \
                 -extra-arg=-I${PWD}/build/cvmfs  \
                 -extra-arg=-I${PWD}/test/common  \
+                -extra-arg=-DCVMFS_USE_LIBFUSE=3  \
+                -allow-no-checks \
                 | tee clang-tidy.out
           echo "::remove-matcher owner=clang::"
         shell: bash

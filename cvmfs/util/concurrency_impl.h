@@ -5,6 +5,15 @@
 #ifndef CVMFS_UTIL_CONCURRENCY_IMPL_H_
 #define CVMFS_UTIL_CONCURRENCY_IMPL_H_
 
+// clang-format off
+// Only needed to let clang-tidy see the class definitions.
+#ifndef CVMFS_UTIL_CONCURRENCY_H_
+#include "util/concurrency.h"
+#endif
+// clang-format on
+
+#include <cstddef>
+
 #include "util/logging.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD

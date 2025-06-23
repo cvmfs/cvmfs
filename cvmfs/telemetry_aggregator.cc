@@ -65,8 +65,8 @@ void TelemetryAggregator::Spawn() {
   assert(pipe_terminate_[0] == -1);
   assert(send_rate_sec_ > 0);
   MakePipe(pipe_terminate_);
-  const int retval =
-      pthread_create(&thread_telemetry_, NULL, MainTelemetry, this);
+  const int retval = pthread_create(&thread_telemetry_, NULL, MainTelemetry,
+                                    this);
   assert(retval == 0);
   LogCvmfs(kLogTelemetry, kLogDebug, "Spawning of telemetry thread.");
 }
@@ -79,10 +79,10 @@ void TelemetryAggregator::ManuallyUpdateSelectedCounters() {
   // Manually setting the inode tracker numbers
   glue::InodeTracker::Statistics inode_stats = mount_point_->inode_tracker()
                                                    ->GetStatistics();
-  const glue::DentryTracker::Statistics dentry_stats =
-      mount_point_->dentry_tracker()->GetStatistics();
-  const glue::PageCacheTracker::Statistics page_cache_stats =
-      mount_point_->page_cache_tracker()->GetStatistics();
+  const glue::DentryTracker::Statistics
+      dentry_stats = mount_point_->dentry_tracker()->GetStatistics();
+  const glue::PageCacheTracker::Statistics
+      page_cache_stats = mount_point_->page_cache_tracker()->GetStatistics();
   mount_point_->statistics()
       ->Lookup("inode_tracker.n_insert")
       ->Set(atomic_read64(&inode_stats.num_inserts));

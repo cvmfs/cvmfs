@@ -45,8 +45,8 @@ bool Dirtab::Parse(const std::string &dirtab) {
   valid_ = true;
   off_t line_offset = 0;
   while (line_offset < static_cast<off_t>(dirtab.size())) {
-    const std::string line =
-        GetLineMem(dirtab.c_str() + line_offset, dirtab.size() - line_offset);
+    const std::string line = GetLineMem(dirtab.c_str() + line_offset,
+                                        dirtab.size() - line_offset);
     line_offset += line.size() + 1;  // +1 == skipped \n
     if (!ParseLine(line)) {
       valid_ = false;

@@ -691,9 +691,9 @@ int SyncInit(struct fs_traversal *src,
     for (unsigned i = 0; i < num_parallel_; ++i) {
       specificWorkerContexts[i].mwc = mwc;
       specificWorkerContexts[i].num_thread = i;
-      const int retval =
-          pthread_create(&workers[i], NULL, MainWorker,
-                         static_cast<void *>(&(specificWorkerContexts[i])));
+      const int retval = pthread_create(
+          &workers[i], NULL, MainWorker,
+          static_cast<void *>(&(specificWorkerContexts[i])));
       assert(retval == 0);
     }
   }

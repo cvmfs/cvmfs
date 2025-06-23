@@ -93,7 +93,8 @@ class InodeEx {
 
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) * (reinterpret_cast<const uint32_t *>(key.digest) + 1);
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(key.digest) + 1));
 }
 
 static inline uint32_t hasher_inode(const uint64_t &inode) {
@@ -405,8 +406,8 @@ class PathMap {
 
   uint64_t LookupInodeByPath(const PathString &path) {
     uint64_t inode;
-    const bool found =
-        map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()), &inode);
+    const bool found = map_.Lookup(
+        shash::Md5(path.GetChars(), path.GetLength()), &inode);
     if (found)
       return inode;
     return 0;
@@ -599,8 +600,8 @@ class InodeTracker {
         // TODO(jblomer): pop operation (Lookup+Erase)
         shash::Md5 md5path;
         InodeEx inode_ex(inode, InodeEx::kUnknownType);
-        const bool found =
-            tracker_->inode_ex_map_.LookupMd5Path(&inode_ex, &md5path);
+        const bool found = tracker_->inode_ex_map_.LookupMd5Path(&inode_ex,
+                                                                 &md5path);
         if (!found) {
           PANIC(kLogSyslogErr | kLogDebug,
                 "inode tracker ref map and path map out of sync: %" PRIu64,

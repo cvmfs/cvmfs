@@ -5,11 +5,14 @@
 
 #include "util/concurrency.h"
 
+#include <pthread.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstddef>
 
 #include "util/logging.h"
+#include "util/mutex.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

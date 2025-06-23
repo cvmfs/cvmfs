@@ -249,8 +249,8 @@ void *S3FanoutManager::MainUpload(void *data) {
     if (retval == 0) {
       // Handle timeout
       int still_running = 0;
-      retval = curl_multi_socket_action(
-          s3fanout_mgr->curl_multi_, CURL_SOCKET_TIMEOUT, 0, &still_running);
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                        CURL_SOCKET_TIMEOUT, 0, &still_running);
       if (retval != CURLM_OK) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Error, timeout due to: %d", retval);
         assert(retval == CURLM_OK);
@@ -273,8 +273,8 @@ void *S3FanoutManager::MainUpload(void *data) {
       if (handle == NULL) {
         PANIC(kLogStderr, "Failed to acquire CURL handle.");
       }
-      const s3fanout::Failures init_failure =
-          s3fanout_mgr->InitializeRequest(info, handle);
+      const s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(
+          info, handle);
       if (init_failure != s3fanout::kFailOk) {
         PANIC(kLogStderr,
               "Failed to initialize CURL handle (error: %d - %s | errno: %d)",
@@ -286,8 +286,8 @@ void *S3FanoutManager::MainUpload(void *data) {
       s3fanout_mgr->active_requests_->insert(info);
       jobs_in_flight++;
       int still_running = 0, retval = 0;
-      retval = curl_multi_socket_action(
-          s3fanout_mgr->curl_multi_, CURL_SOCKET_TIMEOUT, 0, &still_running);
+      retval = curl_multi_socket_action(s3fanout_mgr->curl_multi_,
+                                        CURL_SOCKET_TIMEOUT, 0, &still_running);
 
       LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d",
                retval, still_running);
@@ -340,8 +340,8 @@ void *S3FanoutManager::MainUpload(void *data) {
       if (s3fanout_mgr->VerifyAndFinalize(curl_error, info)) {
         curl_multi_add_handle(s3fanout_mgr->curl_multi_, easy_handle);
         int still_running = 0;
-        curl_multi_socket_action(
-            s3fanout_mgr->curl_multi_, CURL_SOCKET_TIMEOUT, 0, &still_running);
+        curl_multi_socket_action(s3fanout_mgr->curl_multi_, CURL_SOCKET_TIMEOUT,
+                                 0, &still_running);
       } else {
         // Return easy handle into pool and write result back
         jobs_in_flight--;
@@ -422,8 +422,8 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
     const CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
     assert(retval == CURLE_OK);
     curl_easy_cleanup(handle);
-    const std::map<CURL *, S3FanOutDnsEntry *>::size_type retitems =
-        curl_sharehandles_->erase(handle);
+    const std::map<CURL *, S3FanOutDnsEntry *>::size_type
+        retitems = curl_sharehandles_->erase(handle);
     assert(retitems == 1);
   } else {
     pool_handles_idle_->insert(handle);
@@ -518,11 +518,11 @@ string S3FanoutManager::GetAwsV4SigningKey(const string &date) const {
   if (last_signing_key_.first == date)
     return last_signing_key_.second;
 
-  const string date_key =
-      shash::Hmac256("AWS4" + config_.secret_key, date, true);
+  const string date_key = shash::Hmac256("AWS4" + config_.secret_key, date,
+                                         true);
   const string date_region_key = shash::Hmac256(date_key, config_.region, true);
-  const string date_region_service_key =
-      shash::Hmac256(date_region_key, "s3", true);
+  const string date_region_service_key = shash::Hmac256(date_region_key, "s3",
+                                                        true);
   string signing_key = shash::Hmac256(date_region_service_key, "aws4_request",
                                       true);
   last_signing_key_.first = date;
@@ -575,19 +575,19 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
                        + "x-amz-date:" + timestamp + "\n";
 
   const string scope = date + "/" + config_.region + "/s3/aws4_request";
-  const string uri =
-      config_.dns_buckets
-          ? (string("/") + info.object_key)
-          : (string("/") + config_.bucket + "/" + info.object_key);
+  const string uri = config_.dns_buckets ? (string("/") + info.object_key)
+                                         : (string("/") + config_.bucket + "/"
+                                            + info.object_key);
 
-  const string canonical_request =
-      GetRequestString(info) + "\n" + GetUriEncode(uri, false) + "\n" + "\n" +
-      canonical_headers + "\n" + signed_headers + "\n" + payload_hash;
+  const string canonical_request = GetRequestString(info) + "\n"
+                                   + GetUriEncode(uri, false) + "\n" + "\n"
+                                   + canonical_headers + "\n" + signed_headers
+                                   + "\n" + payload_hash;
 
   const string hash_request = shash::Sha256String(canonical_request.c_str());
 
-  const string string_to_sign =
-      "AWS4-HMAC-SHA256\n" + timestamp + "\n" + scope + "\n" + hash_request;
+  const string string_to_sign = "AWS4-HMAC-SHA256\n" + timestamp + "\n" + scope
+                                + "\n" + hash_request;
 
   const string signing_key = GetAwsV4SigningKey(date);
   const string signature = shash::Hmac256(signing_key, string_to_sign);
@@ -614,11 +614,10 @@ bool S3FanoutManager::MkV4Authz(const JobInfo &info,
 bool S3FanoutManager::MkAzureAuthz(const JobInfo &info,
                                    vector<string> *headers) const {
   const string timestamp = RfcTimestamp();
-  const string canonical_headers =
-      "x-ms-blob-type:BlockBlob\nx-ms-date:" + timestamp +
-      "\nx-ms-version:2011-08-18";
-  const string canonical_resource =
-      "/" + config_.access_key + "/" + config_.bucket + "/" + info.object_key;
+  const string canonical_headers = "x-ms-blob-type:BlockBlob\nx-ms-date:"
+                                   + timestamp + "\nx-ms-version:2011-08-18";
+  const string canonical_resource = "/" + config_.access_key + "/"
+                                    + config_.bucket + "/" + info.object_key;
 
   string string_to_sign;
   if ((info.request == JobInfo::kReqHeadOnly)
@@ -662,8 +661,8 @@ void S3FanoutManager::InitializeDnsSettingsCurl(CURL *handle,
 int S3FanoutManager::InitializeDnsSettings(CURL *handle,
                                            std::string host_with_port) const {
   // Use existing handle
-  const std::map<CURL *, S3FanOutDnsEntry *>::const_iterator it =
-      curl_sharehandles_->find(handle);
+  const std::map<CURL *, S3FanOutDnsEntry *>::const_iterator
+      it = curl_sharehandles_->find(handle);
   if (it != curl_sharehandles_->end()) {
     InitializeDnsSettingsCurl(handle, it->second->sharehandle,
                               it->second->clist);
@@ -942,8 +941,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_PROXY_SSL_VERIFYPEER, 1L);
     assert(retval == CURLE_OK);
-    const bool add_cert =
-        ssl_certificate_store_.ApplySslCertificatePath(handle);
+    const bool add_cert = ssl_certificate_store_.ApplySslCertificatePath(
+        handle);
     assert(add_cert);
   }
 
@@ -1103,8 +1102,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->request = JobInfo::kReqPutCas;
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
-    const s3fanout::Failures init_failure =
-        InitializeRequest(info, info->curl_handle);
+    const s3fanout::Failures init_failure = InitializeRequest(
+        info, info->curl_handle);
 
     if (init_failure != s3fanout::kFailOk) {
       PANIC(kLogStderr,

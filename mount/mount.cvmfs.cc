@@ -56,8 +56,8 @@ static string MkFqrn(const string &repository) {
   const string::size_type idx = repository.find_last_of('.');
   if (idx == string::npos) {
     string domain;
-    const bool retval =
-        options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    const bool retval = options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN",
+                                                  &domain);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "CVMFS_DEFAULT_DOMAIN missing");
@@ -219,8 +219,8 @@ static int GetExistingFuseFd(const string &fqrn, const string &workspace,
   if (result == "OK") {
     struct sockaddr_un addr;
     unsigned int len = sizeof(addr);
-    const int con_fd =
-        accept(recv_sock_fd, reinterpret_cast<struct sockaddr *>(&addr), &len);
+    const int con_fd = accept(recv_sock_fd,
+                              reinterpret_cast<struct sockaddr *>(&addr), &len);
     fuse_fd = RecvFdFromSocket(con_fd);
     close(con_fd);
   }

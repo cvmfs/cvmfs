@@ -588,10 +588,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   const std::string watchdog_dir = "/tmp";
   char watchdog_path[PATH_MAX];
   const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-  const int path_size =
-      snprintf(watchdog_path, sizeof(watchdog_path),
-               "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
-               watchdog_dir.c_str(), timestamp.c_str(), getpid());
+  const int path_size = snprintf(watchdog_path, sizeof(watchdog_path),
+                                 "%s/cvmfs-swissknife-sync-stacktrace.%s.%d",
+                                 watchdog_dir.c_str(), timestamp.c_str(),
+                                 getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
   const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
@@ -652,8 +652,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
   }
   if (args.find('z') != args.end()) {
-    const unsigned log_level =
-        1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
+    const unsigned log_level = 1 << (kLogLevel0
+                                     + String2Uint64(*args.find('z')->second));
     if (log_level > kLogNone) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Swissknife Sync: invalid log level");
       return 1;

@@ -73,8 +73,8 @@ int CmdCommit::Main(const Options &options) {
     }
   }
 
-  const double whitelist_valid_s =
-      difftime(publisher->whitelist()->expires(), time(NULL));
+  const double whitelist_valid_s = difftime(publisher->whitelist()->expires(),
+                                            time(NULL));
   if (whitelist_valid_s < (12 * 60 * 60)) {
     LogCvmfs(
         kLogCvmfs, kLogStdout,

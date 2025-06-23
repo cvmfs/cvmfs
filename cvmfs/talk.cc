@@ -190,8 +190,8 @@ void *TalkManager::MainResponder(void *data) {
     }
     LogCvmfs(kLogTalk, kLogDebug, "accepting connections on socketfd %d",
              talk_mgr->socket_fd_);
-    if ((con_fd = accept(
-             talk_mgr->socket_fd_, (struct sockaddr *)&remote, &socket_size))
+    if ((con_fd = accept(talk_mgr->socket_fd_, (struct sockaddr *)&remote,
+                         &socket_size))
         < 0) {
       LogCvmfs(kLogTalk, kLogDebug, "terminating talk thread (fd %d, errno %d)",
                con_fd, errno);
@@ -379,8 +379,8 @@ void *TalkManager::MainResponder(void *data) {
       if (line.length() < 8) {
         talk_mgr->Answer(con_fd, "Usage: chroot <hash>\n");
       } else {
-        const std::string root_hash =
-            Trim(line.substr(7), true /* trim_newline */);
+        const std::string root_hash = Trim(line.substr(7),
+                                           true /* trim_newline */);
         const FuseRemounter::Status status = remounter->ChangeRoot(
             MkFromHexPtr(shash::HexPtr(root_hash), shash::kSuffixCatalog));
         switch (status) {
@@ -396,8 +396,8 @@ void *TalkManager::MainResponder(void *data) {
       mount_point->catalog_mgr()->DetachNested();
       talk_mgr->Answer(con_fd, "OK\n");
     } else if (line == "revision") {
-      const string revision =
-          StringifyInt(mount_point->catalog_mgr()->GetRevision());
+      const string revision = StringifyInt(
+          mount_point->catalog_mgr()->GetRevision());
       talk_mgr->Answer(con_fd, revision + "\n");
     } else if (line == "max ttl info") {
       const unsigned max_ttl = mount_point->GetMaxTtlMn();
@@ -503,12 +503,12 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "OK\n");
       }
     } else if (line == "external proxy info") {
-      const string external_proxy_info =
-          talk_mgr->FormatProxyInfo(mount_point->external_download_mgr());
+      const string external_proxy_info = talk_mgr->FormatProxyInfo(
+          mount_point->external_download_mgr());
       talk_mgr->Answer(con_fd, external_proxy_info);
     } else if (line == "proxy info") {
-      const string proxy_info =
-          talk_mgr->FormatProxyInfo(mount_point->download_mgr());
+      const string proxy_info = talk_mgr->FormatProxyInfo(
+          mount_point->download_mgr());
       talk_mgr->Answer(con_fd, proxy_info);
     } else if (line == "proxy rebalance") {
       mount_point->download_mgr()->RebalanceProxies();
@@ -618,10 +618,10 @@ void *TalkManager::MainResponder(void *data) {
       // Manually setting the inode tracker numbers
       glue::InodeTracker::Statistics inode_stats = mount_point->inode_tracker()
                                                        ->GetStatistics();
-      const glue::DentryTracker::Statistics dentry_stats =
-          mount_point->dentry_tracker()->GetStatistics();
-      const glue::PageCacheTracker::Statistics page_cache_stats =
-          mount_point->page_cache_tracker()->GetStatistics();
+      const glue::DentryTracker::Statistics
+          dentry_stats = mount_point->dentry_tracker()->GetStatistics();
+      const glue::PageCacheTracker::Statistics
+          page_cache_stats = mount_point->page_cache_tracker()->GetStatistics();
       mount_point->statistics()
           ->Lookup("inode_tracker.n_insert")
           ->Set(atomic_read64(&inode_stats.num_inserts));
@@ -822,8 +822,8 @@ void *TalkManager::MainResponder(void *data) {
         talk_mgr->Answer(con_fd, "In read-only mode\n");
       }
     } else if (line == "latency") {
-      const string result =
-          talk_mgr->FormatLatencies(*mount_point, file_system);
+      const string result = talk_mgr->FormatLatencies(*mount_point,
+                                                      file_system);
       talk_mgr->Answer(con_fd, result);
     } else {
       talk_mgr->Answer(con_fd, "unknown command\n");

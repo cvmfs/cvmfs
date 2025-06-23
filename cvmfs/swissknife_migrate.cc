@@ -158,8 +158,8 @@ int CommandMigrate::Main(const ArgumentList &args) {
       return 1;
     }
 
-    ObjectFetcher fetcher(
-        repo_name, repo_url, tmp_dir, download_manager(), signature_manager());
+    ObjectFetcher fetcher(repo_name, repo_url, tmp_dir, download_manager(),
+                          signature_manager());
 
     loading_successful = LoadCatalogs(manual_root_hash, &fetcher);
   } else {
@@ -626,8 +626,8 @@ void CommandMigrate::AnalyzeCatalogStatistics() const {
   double aggregated_migration_time = 0.0;
 
   CatalogStatisticsList::const_iterator i = catalog_statistics_list_.begin();
-  const CatalogStatisticsList::const_iterator iend =
-      catalog_statistics_list_.end();
+  const CatalogStatisticsList::const_iterator iend = catalog_statistics_list_
+                                                         .end();
   for (; i != iend; ++i) {
     aggregated_entry_count += i->entry_count;
     aggregated_max_row_id += i->max_row_id;
@@ -1342,8 +1342,8 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
     lookup_mountpoint.Reset();
 
     // Compare nested catalog mountpoint and nested catalog root entries
-    const catalog::DirectoryEntry::Differences diffs =
-        mountpoint_entry.CompareTo(nested_root_entry);
+    const catalog::DirectoryEntry::Differences
+        diffs = mountpoint_entry.CompareTo(nested_root_entry);
 
     // We MUST deal with two directory entries that are a pair of nested cata-
     // log mountpoint and root entry! Thus we expect their transition flags to
@@ -1612,8 +1612,8 @@ bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
   bool retval;
 
   std::string root_path = data->root_path();
-  const shash::Md5 root_path_hash =
-      shash::Md5(root_path.data(), root_path.size());
+  const shash::Md5 root_path_hash = shash::Md5(root_path.data(),
+                                               root_path.size());
 
   catalog::SqlLookupPathHash lookup_root_entry(writable);
   retval = lookup_root_entry.BindPathHash(root_path_hash)
@@ -1624,8 +1624,8 @@ bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
     return false;
   }
 
-  const catalog::DirectoryEntry entry =
-      lookup_root_entry.GetDirent(data->new_catalog);
+  const catalog::DirectoryEntry entry = lookup_root_entry.GetDirent(
+      data->new_catalog);
   if (entry.linkcount() < 2 || entry.hardlink_group() > 0) {
     Error("Retrieved linkcount of catalog root entry is not sane.", data);
     return false;
@@ -1791,8 +1791,8 @@ bool CommandMigrate::MigrationWorker_217::UpdateCatalogSchema(
   const bool retval = update_schema_version.BindDouble(1, 2.5)
                       && update_schema_version.Execute();
   if (!retval) {
-    Error(
-        "Failed to update catalog schema version", update_schema_version, data);
+    Error("Failed to update catalog schema version", update_schema_version,
+          data);
     return false;
   }
 

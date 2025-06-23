@@ -89,8 +89,8 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
   s3fanout_mgr_ = new s3fanout::S3FanoutManager(s3config);
   s3fanout_mgr_->Spawn();
 
-  const int retval =
-      pthread_create(&thread_collect_results_, NULL, MainCollectResults, this);
+  const int retval = pthread_create(&thread_collect_results_, NULL,
+                                    MainCollectResults, this);
   assert(retval == 0);
 }
 

@@ -33,4 +33,4 @@ class FileWatcherKqueue : public FileWatcher {
 }  // namespace file_watcher
 
 #endif  // CVMFS_FILE_WATCHER_KQUEUE_H_
-#endif // __APPLE__
+#endif  // __APPLE__

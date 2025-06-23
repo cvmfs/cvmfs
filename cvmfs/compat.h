@@ -448,8 +448,8 @@ class PathMap {
   }
   uint64_t LookupInode(const PathString &path) {
     PathInfo value;
-    const bool found =
-        map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()), &value);
+    const bool found = map_.Lookup(
+        shash_v1::Md5(path.GetChars(), path.GetLength()), &value);
     if (found)
       return value.inode;
     return 0;

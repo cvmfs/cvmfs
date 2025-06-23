@@ -33,8 +33,8 @@ namespace {
 
 PathString RemoveRepoName(const PathString &lease_path) {
   std::string abs_path = lease_path.ToString();
-  const std::string::const_iterator it =
-      std::find(abs_path.begin(), abs_path.end(), '/');
+  const std::string::const_iterator it = std::find(abs_path.begin(),
+                                                   abs_path.end(), '/');
   if (it != abs_path.end()) {
     const size_t idx = it - abs_path.begin() + 1;
     return lease_path.Suffix(idx);

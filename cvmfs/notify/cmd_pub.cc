@@ -58,8 +58,8 @@ int DoPublish(const std::string &server_url, const std::string &repository_url,
     cvmfs::MemSink manifest_memsink;
     download::JobInfo download_manifest(&manifest_url, false, false, NULL,
                                         &manifest_memsink);
-    const download::Failures retval =
-        download_manager->Fetch(&download_manifest);
+    const download::Failures retval = download_manager->Fetch(
+        &download_manifest);
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogError, "Failed to download manifest (%d - %s)",
                retval, download::Code2Ascii(retval));

@@ -552,8 +552,8 @@ class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
                 const TraversalType type = Base::kBreadthFirst) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    TraversalContext ctx(
-        this->default_history_depth_, this->default_timestamp_threshold_, type);
+    TraversalContext ctx(this->default_history_depth_,
+                         this->default_timestamp_threshold_, type);
     Push(root_catalog_hash, &ctx);
     return DoTraverse(&ctx);
   }
@@ -572,8 +572,8 @@ class CatalogTraversal : public CatalogTraversalBase<ObjectFetcherT> {
   bool TraverseRevision(const shash::Any &root_catalog_hash,
                         const TraversalType type = Base::kBreadthFirst) {
     // add the given root catalog as the first element on the job stack
-    TraversalContext ctx(
-        Parameters::kNoHistory, Parameters::kNoTimestampThreshold, type);
+    TraversalContext ctx(Parameters::kNoHistory,
+                         Parameters::kNoTimestampThreshold, type);
     Push(root_catalog_hash, &ctx);
     return DoTraverse(&ctx);
   }

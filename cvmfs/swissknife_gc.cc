@@ -109,8 +109,8 @@ int CommandGc::Main(const ArgumentList &args) {
                                signature_manager());
 
   UniquePtr<manifest::Manifest> manifest;
-  const ObjectFetcher::Failures retval =
-      object_fetcher.FetchManifest(&manifest);
+  const ObjectFetcher::Failures retval = object_fetcher.FetchManifest(
+      &manifest);
   if (retval != ObjectFetcher::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failed to load repository manifest "

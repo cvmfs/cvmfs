@@ -36,17 +36,17 @@
 #include <map>
 #include <set>
 #include <string>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 
+#include "catalog_downloader.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
 #include "file_chunk.h"
+#include "ingestion/pipeline.h"
 #include "upload_spooler_result.h"
 #include "util/future.h"
 #include "xattr.h"
-#include "catalog_downloader.h"
-#include "ingestion/pipeline.h"
 
 class XattrList;
 namespace upload {
@@ -162,7 +162,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
     }
   }
 
-  void LoadCatalogs(const std::string &base_path, const std::unordered_set<std::string> &dirs);
+  void LoadCatalogs(const std::string &base_path,
+                    const std::unordered_set<std::string> &dirs);
   void SetupSingleCatalogUploadCallback();
   void RemoveSingleCatalogUploadCallback();
   void AddCatalogToQueue(const std::string &path);
@@ -170,7 +171,6 @@ class WritableCatalogManager : public SimpleCatalogManager {
   bool LookupDirEntry(const std::string &path,
                       const LookupOptions options,
                       DirectoryEntry *dirent);
-
 
 
  protected:
@@ -209,13 +209,12 @@ class WritableCatalogManager : public SimpleCatalogManager {
   };
 
   struct CatalogDownloadContext {
-    const std::unordered_set<std::string> * dirs;
+    const std::unordered_set<std::string> *dirs;
   };
 
   void CatalogDownloadCallback(const CatalogDownloadResult &result,
                                const CatalogDownloadContext context);
   void SingleCatalogUploadCallback(const upload::SpoolerResult &result);
-
 
 
   CatalogInfo SnapshotCatalogs(const bool stop_for_tweaks);
@@ -252,8 +251,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void CatalogUploadSerializedCallback(const upload::SpoolerResult &result,
                                        const CatalogUploadContext unused);
   CatalogInfo SnapshotCatalogsSerialized(const bool stop_for_tweaks);
-    void CatalogHashSerializedCallback(
-    const CompressHashResult &result);
+  void CatalogHashSerializedCallback(const CompressHashResult &result);
   //****************************************************************************
 
   // defined in catalog_mgr_rw.cc
@@ -267,12 +265,12 @@ class WritableCatalogManager : public SimpleCatalogManager {
   std::map<std::string, WritableCatalog *> catalog_processing_map_;
 
   // ingestsql
-  std::list<WritableCatalog*>              pending_catalogs_;
-  CatalogDownloadPipeline                  *catalog_download_pipeline_;
-  pthread_mutex_t                          *catalog_download_lock_;
-  std::unordered_map<std::string, Catalog*> catalog_download_map_;
-  pthread_mutex_t                   *catalog_hash_lock_; 
-  std::map<std::string, shash::Any>  catalog_hash_map_;
+  std::list<WritableCatalog *> pending_catalogs_;
+  CatalogDownloadPipeline *catalog_download_pipeline_;
+  pthread_mutex_t *catalog_download_lock_;
+  std::unordered_map<std::string, Catalog *> catalog_download_map_;
+  pthread_mutex_t *catalog_hash_lock_;
+  std::map<std::string, shash::Any> catalog_hash_map_;
 
   // TODO(jblomer): catalog limits should become its own struct
   bool enforce_limits_;

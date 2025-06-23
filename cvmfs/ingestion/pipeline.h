@@ -157,22 +157,18 @@ class ScrubbingPipeline : public Observable<ScrubbingResult> {
 struct CompressHashResult {
   CompressHashResult() { }
   CompressHashResult(const std::string &p, const shash::Any &h)
-    : path(p), hash(h) { }
+      : path(p), hash(h) { }
   std::string path;
   shash::Any hash;
 };
 
 
-class TaskCompressHashCallback
-  : public TubeConsumer<BlockItem>
-  , public Observable<CompressHashResult>
-{
+class TaskCompressHashCallback : public TubeConsumer<BlockItem>,
+                                 public Observable<CompressHashResult> {
  public:
   TaskCompressHashCallback(Tube<BlockItem> *tube_in,
                            Tube<FileItem> *tube_counter)
-    : TubeConsumer<BlockItem>(tube_in)
-    , tube_counter_(tube_counter)
-  { }
+      : TubeConsumer<BlockItem>(tube_in), tube_counter_(tube_counter) { }
 
  protected:
   virtual void Process(BlockItem *block_item);
@@ -188,7 +184,7 @@ class CompressHashPipeline : public Observable<CompressHashResult> {
   ~CompressHashPipeline();
 
   void Spawn();
-  void Process(IngestionSource* source,
+  void Process(IngestionSource *source,
                shash::Algorithms hash_algorithm,
                shash::Suffix hash_suffix);
   void WaitFor();

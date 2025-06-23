@@ -123,8 +123,8 @@ void SyncUnionTarball::Traverse() {
       SplitPath(*s, &parent_path, &filename);
       if (parent_path == ".")
         parent_path = "";
-      const SharedPtr<SyncItem> sync_entry =
-          CreateSyncItem(parent_path, filename, kItemDir);
+      const SharedPtr<SyncItem> sync_entry = CreateSyncItem(parent_path,
+                                                            filename, kItemDir);
       mediator_->Remove(sync_entry);
     }
   }
@@ -203,10 +203,11 @@ void SyncUnionTarball::ProcessArchiveEntry(struct archive_entry *entry) {
   std::string archive_file_path(archive_entry_pathname(entry));
   archive_file_path = SanitizePath(archive_file_path);
 
-  const std::string complete_path =
-      base_directory_ != "/"
-          ? MakeCanonicalPath(base_directory_ + "/" + archive_file_path)
-          : MakeCanonicalPath(archive_file_path);
+  const std::string complete_path = base_directory_ != "/"
+                                        ? MakeCanonicalPath(base_directory_
+                                                            + "/"
+                                                            + archive_file_path)
+                                        : MakeCanonicalPath(archive_file_path);
 
   std::string parent_path;
   std::string filename;

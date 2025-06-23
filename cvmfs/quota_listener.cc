@@ -128,9 +128,9 @@ ListenerHandle *RegisterUnpinListener(QuotaManager *quota_manager,
   handle->quota_manager = quota_manager;
   handle->catalog_manager = catalog_manager;
   handle->repository_name = repository_name;
-  const int retval =
-      pthread_create(&handle->thread_listener, NULL, MainUnpinListener,
-                     static_cast<void *>(handle));
+  const int retval = pthread_create(&handle->thread_listener, NULL,
+                                    MainUnpinListener,
+                                    static_cast<void *>(handle));
   assert(retval == 0);
   return handle;
 }
@@ -148,9 +148,9 @@ ListenerHandle *RegisterWatchdogListener(QuotaManager *quota_manager,
   handle->quota_manager = quota_manager;
   handle->catalog_manager = NULL;
   handle->repository_name = repository_name;
-  const int retval =
-      pthread_create(&handle->thread_listener, NULL, MainWatchdogListener,
-                     static_cast<void *>(handle));
+  const int retval = pthread_create(&handle->thread_listener, NULL,
+                                    MainWatchdogListener,
+                                    static_cast<void *>(handle));
   assert(retval == 0);
   return handle;
 }

@@ -70,13 +70,13 @@ void VirtualCatalog::CreateNestedCatalogMarker() {
   DirectoryEntryBase entry_marker;
   // Note that another entity needs to ensure that the object of an empty
   // file is in the repository!  It is currently done by the sync_mediator.
-  const shash::Algorithms algorithm =
-      catalog_mgr_->spooler_->GetHashAlgorithm();
+  const shash::Algorithms algorithm = catalog_mgr_->spooler_
+                                          ->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
   void *empty_compressed;
   uint64_t sz_empty_compressed;
-  const bool retval =
-      zlib::CompressMem2Mem(NULL, 0, &empty_compressed, &sz_empty_compressed);
+  const bool retval = zlib::CompressMem2Mem(NULL, 0, &empty_compressed,
+                                            &sz_empty_compressed);
   assert(retval);
   shash::HashMem(static_cast<unsigned char *>(empty_compressed),
                  sz_empty_compressed, &file_hash);
@@ -111,8 +111,8 @@ void VirtualCatalog::CreateSnapshotDirectory() {
  */
 void VirtualCatalog::EnsurePresence() {
   DirectoryEntry e;
-  const bool retval =
-      catalog_mgr_->LookupPath("/" + string(kVirtualPath), kLookupDefault, &e);
+  const bool retval = catalog_mgr_->LookupPath("/" + string(kVirtualPath),
+                                               kLookupDefault, &e);
   if (!retval) {
     LogCvmfs(kLogCatalog, kLogDebug, "creating new virtual catalog");
     CreateBaseDirectory();
@@ -262,8 +262,8 @@ void VirtualCatalog::InsertSnapshot(TagId tag) {
   WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
       kVirtualPath);
   assert(virtual_catalog != NULL);
-  const string mountpoint = "/" + string(kVirtualPath) + "/" +
-                            string(kSnapshotDirectory) + "/" + tag.name;
+  const string mountpoint = "/" + string(kVirtualPath) + "/"
+                            + string(kSnapshotDirectory) + "/" + tag.name;
   DirectoryEntry entry_bind_mountpoint(entry_dir);
   entry_bind_mountpoint.set_is_bind_mountpoint(true);
   virtual_catalog->UpdateEntry(entry_bind_mountpoint, mountpoint);
@@ -296,8 +296,8 @@ void VirtualCatalog::Remove() {
 
 void VirtualCatalog::RemoveRecursively(const string &directory) {
   DirectoryEntryList listing;
-  const bool retval =
-      catalog_mgr_->Listing(PathString("/" + directory), &listing);
+  const bool retval = catalog_mgr_->Listing(PathString("/" + directory),
+                                            &listing);
   assert(retval);
   for (unsigned i = 0; i < listing.size(); ++i) {
     const string this_path = directory + "/" + listing[i].name().ToString();
@@ -319,8 +319,8 @@ void VirtualCatalog::RemoveSnapshot(TagId tag) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remove snapshot %s (%s) from virtual catalog", tag.name.c_str(),
            tag.hash.ToString().c_str());
-  const string tag_dir =
-      string(kVirtualPath) + "/" + string(kSnapshotDirectory) + "/" + tag.name;
+  const string tag_dir = string(kVirtualPath) + "/" + string(kSnapshotDirectory)
+                         + "/" + tag.name;
   catalog_mgr_->RemoveDirectory(tag_dir);
 
   WritableCatalog *virtual_catalog = catalog_mgr_->GetHostingCatalog(
