@@ -398,10 +398,8 @@ popd
 %pretrans libs
 %check_transaction
 
-%if 0%{?build_fuse3}
 %pretrans fuse3
 %check_transaction
-%endif
 
 %pretrans devel
 %check_transaction
@@ -466,11 +464,6 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
-
-# Don't install coincidentially built libfuse3 libraries
-%if ! 0%{?build_fuse3}
-rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
-%endif
 
 # Fix docdir on SuSE
 %if 0%{?suse_version}
@@ -538,10 +531,8 @@ fi
 %post libs
 /sbin/ldconfig
 
-%if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
-%endif
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
@@ -680,7 +671,6 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_util_debug.so.%{version}
 %doc COPYING AUTHORS README.md ChangeLog
 
-%if 0%{?build_fuse3}
 %files fuse3
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_fuse3_stub.so
@@ -690,7 +680,6 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_fuse3_debug.so
 %{_libdir}/libcvmfs_fuse3_debug.so.%{version}
 %doc COPYING AUTHORS README.md ChangeLog
-%endif
 
 %files devel
 %defattr(-,root,root)
