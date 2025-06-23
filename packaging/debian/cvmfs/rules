@@ -5,21 +5,12 @@
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
 
-# Extract version information
-VERSION_ID := $(shell grep '^VERSION_ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-VERSION_CODENAME := $(shell grep '^VERSION_CODENAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
-ID := $(shell grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-VERSION_NUMBER := $(shell echo $(VERSION_ID) | tr -d '.')
 
 # Check if we should build libfuse2 support.
 # Turn it off for all platforms first supported in 2.13 and newer
-BUILD_LIBFUSE2 := 'yes'
-ifeq ($(ID),ubuntu)
-BUILD_LIBFUSE2 := $(shell if  [ $(VERSION_NUMBER) -ge 2504 ]; then echo 'no'; else echo 'yes'; fi)
-endif
-ifeq ($(ID),debian)
-BUILD_LIBFUSE2 := $(shell if  [ $(VERSION_NUMBER) -ge 13 ]; then echo 'no'; else echo 'yes'; fi)
-endif
+BUILD_LIBFUSE2 := 'no'
+# modified in ci/cvmfs/deb.sh
+#BUILD_LIBFUSE2 := 'yes'
 
 
 # TODO:
