@@ -50,7 +50,6 @@ cp -R --dereference ${CVMFS_SOURCE_LOCATION}/AUTHORS            \
                     ${CVMFS_SOURCE_LOCATION}/INSTALL            \
                     ${CVMFS_SOURCE_LOCATION}/README.md          \
                     ${CVMFS_SOURCE_LOCATION}/add-ons            \
-                    ${CVMFS_SOURCE_LOCATION}/bootstrap.sh       \
                     ${CVMFS_SOURCE_LOCATION}/cmake              \
                     ${CVMFS_SOURCE_LOCATION}/cvmfs              \
                     ${CVMFS_SOURCE_LOCATION}/doc                \

@@ -88,7 +88,6 @@ create_cvmfs_source_tarball() {
                       ${source_directory}/INSTALL            \
                       ${source_directory}/README.md          \
                       ${source_directory}/add-ons            \
-                      ${source_directory}/bootstrap.sh       \
                       ${source_directory}/cmake              \
                       ${source_directory}/cvmfs              \
                       ${source_directory}/doc                \
