@@ -452,6 +452,7 @@ endif ()
 # Fuse client only
 if (BUILD_CVMFS)
   if (MACOSX)
+    set(BUILD_LIBFUSE2 ON)
     find_package (OSXFuse REQUIRED)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${MACOS_FUSE_INCLUDE_DIR})
     set (FUSE_LIBRARIES ${MACOS_FUSE_LIBRARIES}) # just abstract the difference here... they are compatible
