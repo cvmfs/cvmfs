@@ -68,7 +68,7 @@ echo "copy packaging meta information and get in place..."
 cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
 cd $copied_source
 
-source /etc/os-release
+. /etc/os-release
 VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
 BUILD_LIBFUSE2=yes
 if [ "$ID" = "ubuntu" ] && [ ${VERSION_NUMBER} -ge 2504 ]; then
