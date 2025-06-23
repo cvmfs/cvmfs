@@ -43,9 +43,9 @@ class Prng {
    */
   uint32_t Next(const uint64_t boundary) {
     state_ = a * state_ + c;
-    const double scaled_val = static_cast<double>(state_) *
-                              static_cast<double>(boundary) /
-                              static_cast<double>(18446744073709551616.0);
+    const double scaled_val = static_cast<double>(state_)
+                              * static_cast<double>(boundary)
+                              / static_cast<double>(18446744073709551616.0);
     return static_cast<uint32_t>(static_cast<uint64_t>(scaled_val) % boundary);
   }
 
@@ -54,8 +54,8 @@ class Prng {
    */
   double NextDouble() {
     state_ = a * state_ + c;
-    const double unit_val = static_cast<double>(state_) /
-                            static_cast<double>(18446744073709551616.0);
+    const double unit_val = static_cast<double>(state_)
+                            / static_cast<double>(18446744073709551616.0);
     return unit_val;
   }
   /**

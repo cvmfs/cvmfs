@@ -91,8 +91,8 @@ int32_t Tracer::DoTrace(const int event,
 
   if (my_seq_no - atomic_read32(&flushed_) == flush_threshold_) {
     const MutexLockGuard m(&sig_flush_mutex_);
-    const int err_code __attribute__((unused)) =
-        pthread_cond_signal(&sig_flush_);
+    const int err_code
+        __attribute__((unused)) = pthread_cond_signal(&sig_flush_);
     assert(err_code == 0 && "Could not signal flush thread");
   }
 
@@ -104,8 +104,8 @@ void Tracer::Flush() {
   if (!active_)
     return;
 
-  const int32_t save_seq_no =
-      DoTrace(kEventFlush, PathString("Tracer", 6), "flushed ring buffer");
+  const int32_t save_seq_no = DoTrace(kEventFlush, PathString("Tracer", 6),
+                                      "flushed ring buffer");
   while (atomic_read32(&flushed_) <= save_seq_no) {
     timespec timeout;
     int retval;
@@ -119,8 +119,8 @@ void Tracer::Flush() {
 
     GetTimespecRel(250, &timeout);
     retval = pthread_mutex_lock(&sig_continue_trace_mutex_);
-    retval |= pthread_cond_timedwait(
-        &sig_continue_trace_, &sig_continue_trace_mutex_, &timeout);
+    retval |= pthread_cond_timedwait(&sig_continue_trace_,
+                                     &sig_continue_trace_mutex_, &timeout);
     retval |= pthread_mutex_unlock(&sig_continue_trace_mutex_);
     assert(retval == ETIMEDOUT || retval == 0);
   }
@@ -156,8 +156,8 @@ void *Tracer::MainFlush(void *data) {
         && (atomic_read32(&tracer->seq_no_) - atomic_read32(&tracer->flushed_)
             <= tracer->flush_threshold_)) {
       tracer->GetTimespecRel(2000, &timeout);
-      retval = pthread_cond_timedwait(
-          &tracer->sig_flush_, &tracer->sig_flush_mutex_, &timeout);
+      retval = pthread_cond_timedwait(&tracer->sig_flush_,
+                                      &tracer->sig_flush_mutex_, &timeout);
       assert(retval != EINVAL);
     }
 

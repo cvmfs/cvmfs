@@ -274,9 +274,9 @@ void CmdEnter::WriteCvmfsConfig(const std::string &extra_config) {
   options_manager.SetValue("CVMFS_CACHE_private_SHARED", "on");
   options_manager.SetValue("CVMFS_CACHE_private_QUOTA_LIMIT", "4000");
 
-  const bool rv =
-      SafeWriteToFile(options_manager.Dump(),
-                      settings_spool_area_.client_config(), kPrivateFileMode);
+  const bool rv = SafeWriteToFile(options_manager.Dump(),
+                                  settings_spool_area_.client_config(),
+                                  kPrivateFileMode);
   if (!rv) {
     throw EPublish("cannot write client config to "
                    + settings_spool_area_.client_config());
@@ -361,9 +361,9 @@ void CmdEnter::MountOverlayfs() {
   map_fds[fd_stdout] = 1;
   map_fds[fd_stderr] = 2;
   pid_t pid_child;
-  const bool rvb =
-      ManagedExec(cmdline, preserved_fds, map_fds, true /* drop_credentials */,
-                  false /* clear_env */, false /* double_fork */, &pid_child);
+  const bool rvb = ManagedExec(
+      cmdline, preserved_fds, map_fds, true /* drop_credentials */,
+      false /* clear_env */, false /* double_fork */, &pid_child);
   if (!rvb) {
     close(fd_stdout);
     close(fd_stderr);
@@ -590,8 +590,8 @@ int CmdEnter::Main(const Options &options) {
                  repo_config_.c_str());
 
         std::string config;
-        const std::string config_file =
-            repo_config_ + "/" + fqrn_ + "/server.conf";
+        const std::string config_file = repo_config_ + "/" + fqrn_
+                                        + "/server.conf";
         const std::string folderpath = session_dir_ + "/" + fqrn_;
         MkdirDeep(folderpath.c_str(), 0700, true /* veryfy_writable */);
 

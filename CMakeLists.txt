@@ -371,6 +371,7 @@ if(NOT GTest_FOUND)
   FetchContent_Declare(
     GoogleTest
     URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+               https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
     URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
     )
   FetchContent_MakeAvailable(GoogleTest)

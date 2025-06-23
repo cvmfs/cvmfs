@@ -47,15 +47,15 @@ Breadcrumb::Breadcrumb(const std::string &from_string) {
 
 bool Breadcrumb::Export(const string &fqrn, const string &directory,
                         const int mode) const {
-  const string breadcrumb_path =
-      MakeCanonicalPath(directory) + "/cvmfschecksum." + fqrn;
+  const string breadcrumb_path = MakeCanonicalPath(directory)
+                                 + "/cvmfschecksum." + fqrn;
   string tmp_path;
   FILE *fbreadcrumb = CreateTempFile(breadcrumb_path, mode, "w", &tmp_path);
   if (fbreadcrumb == NULL)
     return false;
   string str_breadcrumb = ToString();
-  const int written =
-      fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(), fbreadcrumb);
+  const int written = fwrite(&(str_breadcrumb[0]), 1, str_breadcrumb.length(),
+                             fbreadcrumb);
   fclose(fbreadcrumb);
   if (static_cast<unsigned>(written) != str_breadcrumb.length()) {
     unlink(tmp_path.c_str());

@@ -48,11 +48,13 @@ std::string Whitelist::CreateString(
     int validity_days,
     shash::Algorithms hash_algorithm,
     signature::SignatureManager *signature_manager) {
-  const std::string to_sign =
-      WhitelistTimestamp(time(NULL)) + "\n" + "E" +
-      WhitelistTimestamp(time(NULL) + validity_days * 24 * 3600) + "\n" + "N" +
-      fqrn + "\n" + signature_manager->FingerprintCertificate(hash_algorithm) +
-      "\n";
+  const std::string to_sign = WhitelistTimestamp(time(NULL)) + "\n" + "E"
+                              + WhitelistTimestamp(time(NULL)
+                                                   + validity_days * 24 * 3600)
+                              + "\n" + "N" + fqrn + "\n"
+                              + signature_manager->FingerprintCertificate(
+                                  hash_algorithm)
+                              + "\n";
   shash::Any hash(hash_algorithm);
   shash::HashString(to_sign, &hash);
   std::string hash_str = hash.ToString();
@@ -96,8 +98,8 @@ Failures Whitelist::VerifyLoadedCertificate() const {
 
   vector<string> blacklist = signature_manager_->GetBlacklist();
   for (unsigned i = 0; i < blacklist.size(); ++i) {
-    const shash::Any this_hash =
-        signature::SignatureManager::MkFromFingerprint(blacklist[i]);
+    const shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(
+        blacklist[i]);
     if (this_hash.IsNull())
       continue;
 
@@ -375,8 +377,8 @@ Failures Whitelist::ParseWhitelist(const unsigned char *whitelist,
   do {
     if (line == "--")
       break;
-    const shash::Any this_hash =
-        signature::SignatureManager::MkFromFingerprint(line);
+    const shash::Any this_hash = signature::SignatureManager::MkFromFingerprint(
+        line);
     if (!this_hash.IsNull())
       fingerprints_.push_back(this_hash);
 

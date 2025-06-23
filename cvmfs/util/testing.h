@@ -5,15 +5,9 @@
 #ifndef CVMFS_UTIL_TESTING_H_
 #define CVMFS_UTIL_TESTING_H_
 
-#include <fcntl.h>
-#include <unistd.h>
 
 #include <cstdlib>
-#include <string>
 
-#include "util/posix.h"
-#include "util/prng.h"
-#include "util/string.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {

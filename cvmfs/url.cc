@@ -45,8 +45,8 @@ Url *Url::Parse(const std::string &url, const std::string &default_protocol,
 
     // Check that part between ":" and "/" or the end of the string is an
     // unsigned number
-    const size_t port_end =
-        slash_pos == std::string::npos ? std::string::npos : slash_pos - cursor;
+    const size_t port_end = slash_pos == std::string::npos ? std::string::npos
+                                                           : slash_pos - cursor;
     if (!String2Uint64Parse(url.substr(cursor, port_end), &port)) {
       return NULL;
     }

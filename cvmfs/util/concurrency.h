@@ -8,6 +8,7 @@
 #include <pthread.h>
 
 #include <cassert>
+#include <cstddef>
 #include <queue>
 #include <set>
 #include <vector>

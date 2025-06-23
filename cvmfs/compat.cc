@@ -99,7 +99,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v2 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) * ((uint32_t *)key.digest + 1);  // NOLINT
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(key.digest + 1)));
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {
@@ -135,7 +136,8 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v3 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) * ((uint32_t *)key.digest + 1);  // NOLINT
+  return static_cast<uint32_t>(
+      *(reinterpret_cast<const uint32_t *>(key.digest + 1)));
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {

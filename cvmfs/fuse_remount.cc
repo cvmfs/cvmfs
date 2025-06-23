@@ -165,8 +165,8 @@ FuseRemounter::FuseRemounter(MountPoint *mountpoint,
                              bool fuse_notify_invalidation)
     : mountpoint_(mountpoint)
     , inode_generation_info_(inode_generation_info)
-    , invalidator_(new FuseInvalidator(
-          mountpoint, fuse_channel_or_session, fuse_notify_invalidation))
+    , invalidator_(new FuseInvalidator(mountpoint, fuse_channel_or_session,
+                                       fuse_notify_invalidation))
     , invalidator_handle_(static_cast<int>(mountpoint->kcache_timeout_sec()))
     , fence_(new Fence())
     , offline_mode_(false)

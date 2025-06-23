@@ -274,8 +274,8 @@ void Publisher::Session::Acquire() {
   if (has_lease_)
     return;
 
-  const gateway::GatewayKey gw_key =
-      gateway::ReadGatewayKey(settings_.gw_key_path);
+  const gateway::GatewayKey gw_key = gateway::ReadGatewayKey(
+      settings_.gw_key_path);
   if (!gw_key.IsValid()) {
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
                    EPublish::kFailGatewayKey);
@@ -285,13 +285,13 @@ void Publisher::Session::Acquire() {
                      settings_.llvl, &buffer);
 
   std::string session_token;
-  const LeaseReply rep =
-      ParseAcquireReply(buffer, &session_token, settings_.llvl);
+  const LeaseReply rep = ParseAcquireReply(buffer, &session_token,
+                                           settings_.llvl);
   switch (rep) {
     case kLeaseReplySuccess: {
       has_lease_ = true;
-      const bool rvb =
-          SafeWriteToFile(session_token, settings_.token_path, 0600);
+      const bool rvb = SafeWriteToFile(session_token, settings_.token_path,
+                                       0600);
       if (!rvb) {
         throw EPublish("cannot write session token: " + settings_.token_path);
       }
@@ -321,8 +321,8 @@ void Publisher::Session::Drop() {
     throw EPublish("cannot read session token: " + settings_.token_path,
                    EPublish::kFailGatewayKey);
   }
-  const gateway::GatewayKey gw_key =
-      gateway::ReadGatewayKey(settings_.gw_key_path);
+  const gateway::GatewayKey gw_key = gateway::ReadGatewayKey(
+      settings_.gw_key_path);
   if (!gw_key.IsValid()) {
     throw EPublish("cannot read gateway key: " + settings_.gw_key_path,
                    EPublish::kFailGatewayKey);

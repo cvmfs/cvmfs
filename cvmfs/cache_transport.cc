@@ -451,8 +451,8 @@ void CacheTransport::SendData(void *message,
                               uint32_t msg_size,
                               void *attachment,
                               uint32_t att_size) {
-  const uint32_t total_size =
-      msg_size + att_size + ((att_size > 0) ? kInnerHeaderSize : 0);
+  const uint32_t total_size = msg_size + att_size
+                              + ((att_size > 0) ? kInnerHeaderSize : 0);
 
   assert(total_size > 0);
   assert(total_size <= kMaxMsgSize);

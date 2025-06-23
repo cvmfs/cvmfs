@@ -78,8 +78,8 @@ int TieredCacheManager::Open(const LabeledObject &object) {
   uint64_t remaining = size;
   uint64_t offset = 0;
   while (remaining > 0) {
-    const unsigned nbytes =
-        remaining > kCopyBufferSize ? kCopyBufferSize : remaining;
+    const unsigned nbytes = remaining > kCopyBufferSize ? kCopyBufferSize
+                                                        : remaining;
     int64_t result = lower_->Pread(fd2, &m_buffer[0], nbytes, offset);
     // The file we are reading is supposed to be exactly `size` bytes.
     if ((result < 0) || (result != nbytes)) {

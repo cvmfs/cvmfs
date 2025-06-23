@@ -284,8 +284,8 @@ bool Reactor::HandleCheckToken(const std::string &req, std::string *reply) {
 
   std::string path;
   JsonStringGenerator input;
-  const TokenCheckResult ret =
-      CheckToken(token->string_value, secret->string_value, &path);
+  const TokenCheckResult ret = CheckToken(token->string_value,
+                                          secret->string_value, &path);
   switch (ret) {
     case kExpired:
       // Expired token
@@ -349,9 +349,9 @@ bool Reactor::HandleSubmitPayload(int fdin, const std::string &req,
   const UniquePtr<PayloadProcessor> proc(MakePayloadProcessor());
   proc->SetStatistics(&statistics);
   JsonStringGenerator reply_input;
-  const PayloadProcessor::Result res =
-      proc->Process(fdin, digest_json->string_value, path_json->string_value,
-                    header_size_json->int_value);
+  const PayloadProcessor::Result res = proc->Process(
+      fdin, digest_json->string_value, path_json->string_value,
+      header_size_json->int_value);
 
   switch (res) {
     case PayloadProcessor::kPathViolation:
@@ -435,9 +435,9 @@ bool Reactor::HandleCommit(const std::string &req, std::string *reply) {
       shash::HexPtr(new_root_hash_json->string_value));
   const RepositoryTag repo_tag(tag_name_json->string_value,
                                tag_description_json->string_value);
-  const CommitProcessor::Result res =
-      proc->Process(lease_path_json->string_value, old_root_hash, new_root_hash,
-                    repo_tag, &final_revision);
+  const CommitProcessor::Result res = proc->Process(
+      lease_path_json->string_value, old_root_hash, new_root_hash, repo_tag,
+      &final_revision);
 
   JsonStringGenerator reply_input;
   switch (res) {

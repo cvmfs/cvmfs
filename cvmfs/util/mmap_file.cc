@@ -12,10 +12,12 @@
 
 #include "mmap_file.h"
 
+#include <cstddef>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <string>
 
 #include <cassert>
 

@@ -196,8 +196,8 @@ class ForwardCachePlugin : public CachePlugin {
     if (!(callbacks_.capabilities & CVMCACHE_CAP_LIST))
       return cvmfs::STATUS_NOSUPPORT;
 
-    const int result =
-        callbacks_.cvmcache_listing_begin(lst_id, ObjectType2CType(type));
+    const int result = callbacks_.cvmcache_listing_begin(
+        lst_id, ObjectType2CType(type));
     return static_cast<cvmfs::EnumStatus>(result);
   }
 
@@ -235,8 +235,8 @@ class ForwardCachePlugin : public CachePlugin {
       return cvmfs::STATUS_NOSUPPORT;
 
     cvmcache_breadcrumb c_breadcrumb;
-    const int result =
-        callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(), &c_breadcrumb);
+    const int result = callbacks_.cvmcache_breadcrumb_load(fqrn.c_str(),
+                                                           &c_breadcrumb);
     if (result == CVMCACHE_STATUS_OK) {
       breadcrumb->catalog_hash = Chash2Cpphash(&c_breadcrumb.catalog_hash);
       breadcrumb->timestamp = c_breadcrumb.timestamp;
@@ -254,8 +254,8 @@ class ForwardCachePlugin : public CachePlugin {
     c_breadcrumb.catalog_hash = Cpphash2Chash(breadcrumb.catalog_hash);
     c_breadcrumb.timestamp = breadcrumb.timestamp;
     c_breadcrumb.revision = breadcrumb.revision;
-    const int result =
-        callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(), &c_breadcrumb);
+    const int result = callbacks_.cvmcache_breadcrumb_store(fqrn.c_str(),
+                                                            &c_breadcrumb);
     return static_cast<cvmfs::EnumStatus>(result);
   }
 

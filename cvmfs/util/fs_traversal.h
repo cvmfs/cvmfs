@@ -8,14 +8,14 @@
 #ifndef CVMFS_UTIL_FS_TRAVERSAL_H_
 #define CVMFS_UTIL_FS_TRAVERSAL_H_
 
+#include <dirent.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include <cassert>
 #include <cstdlib>
-#include <set>
 #include <string>
 
-#include "util/async.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/platform.h"
@@ -169,8 +169,8 @@ class FileSystemTraversal {
 
       // Notify user about found directory entry
       platform_stat64 info;
-      const int retval =
-          platform_lstat((path + "/" + dit->d_name).c_str(), &info);
+      const int retval = platform_lstat((path + "/" + dit->d_name).c_str(),
+                                        &info);
       if (retval != 0) {
         PANIC(kLogStderr, "failed to lstat '%s' errno: %d",
               (path + "/" + dit->d_name).c_str(), errno);

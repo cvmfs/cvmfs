@@ -104,9 +104,9 @@ static bool ParsePac(const char *pac_data, const size_t size,
   unsigned current_host;
   download_manager->GetHostInfo(&host_list, &rtt, &current_host);
   for (unsigned i = 0; i < host_list.size(); ++i) {
-    const size_t hostname_begin = 7; // Strip http:// or file://
-    const size_t hostname_end =
-        host_list[i].find_first_of(":/", hostname_begin);
+    const size_t hostname_begin = 7;  // Strip http:// or file://
+    const size_t hostname_end = host_list[i].find_first_of(":/",
+                                                           hostname_begin);
     const size_t hostname_len = (hostname_end == string::npos)
                                     ? string::npos
                                     : hostname_end - hostname_begin;
@@ -239,8 +239,8 @@ string ResolveProxyDescription(const string &cvmfs_proxies,
         }
       }
     } else {
-      const bool retval =
-          SafeWriteToFile(discovered_proxies, path_fallback_cache, 0660);
+      const bool retval = SafeWriteToFile(discovered_proxies,
+                                          path_fallback_cache, 0660);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
                  "failed to write proxy settings into %s",
@@ -278,8 +278,8 @@ int MainResolveProxyDescription(int argc, char **argv) {
   DownloadManager download_manager(
       1, perf::StatisticsTemplate("pac", &statistics));
   download_manager.SetHostChain(host_list);
-  const string resolved_proxies =
-      ResolveProxyDescription(proxy_configuration, "", &download_manager);
+  const string resolved_proxies = ResolveProxyDescription(
+      proxy_configuration, "", &download_manager);
 
   LogCvmfs(kLogDownload, kLogStdout, "%s", resolved_proxies.c_str());
   return resolved_proxies == "";

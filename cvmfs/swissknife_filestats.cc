@@ -114,8 +114,8 @@ void *CommandFileStats::MainProcessing(void *data) {
   while (fin == 0 || processed < downloaded) {
     if (processed < downloaded) {
       LogCvmfs(kLogCatalog, kLogStdout, "Processing catalog %d", processed);
-      const string db_path =
-          repo_stats->tmp_db_path_ + "/" + StringifyInt(processed + 1) + ".db";
+      const string db_path = repo_stats->tmp_db_path_ + "/"
+                             + StringifyInt(processed + 1) + ".db";
       repo_stats->ProcessCatalog(db_path);
       ++processed;
     }
@@ -138,8 +138,8 @@ void CommandFileStats::ProcessCatalog(string db_path) {
   sqlite::Sql *catalog_count = new sqlite::Sql(cat_db->sqlite_db(),
                                                "SELECT count(*) FROM catalog;");
   catalog_count->Execute();
-  const int cur_catalog_id =
-      db_->StoreCatalog(catalog_count->RetrieveInt64(0), file_size);
+  const int cur_catalog_id = db_->StoreCatalog(catalog_count->RetrieveInt64(0),
+                                               file_size);
   delete catalog_count;
 
   sqlite::Sql *catalog_list = new sqlite::Sql(

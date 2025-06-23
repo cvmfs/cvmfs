@@ -8,6 +8,9 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>

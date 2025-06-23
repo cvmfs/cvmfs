@@ -3,6 +3,8 @@
  */
 
 #include "raii_temp_dir.h"
+#include <string>
+#include <cstddef>
 
 #include "util/posix.h"
 

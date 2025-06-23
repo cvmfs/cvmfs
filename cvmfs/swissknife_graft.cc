@@ -126,12 +126,14 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
   if (!output_file_.size()) {
     return true;
   }
-  const std::string full_output_path =
-      output_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
-      dir_name;
-  const std::string full_input_path =
-      input_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
-      dir_name;
+  const std::string full_output_path = output_file_ + "/"
+                                       + (relative_path.size() ? relative_path
+                                                               : ".")
+                                       + "/" + dir_name;
+  const std::string full_input_path = input_file_ + "/"
+                                      + (relative_path.size() ? relative_path
+                                                              : ".")
+                                      + "/" + dir_name;
   platform_stat64 sbuf;
   if (-1 == platform_stat(full_input_path.c_str(), &sbuf)) {
     return false;
@@ -141,9 +143,10 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
 
 void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
                                             const std::string &file_name) {
-  const std::string full_input_path =
-      input_file_ + "/" + (relative_path.size() ? relative_path : ".") + "/" +
-      file_name;
+  const std::string full_input_path = input_file_ + "/"
+                                      + (relative_path.size() ? relative_path
+                                                              : ".")
+                                      + "/" + file_name;
   std::string full_output_path;
   if (output_file_.size()) {
     full_output_path = output_file_ + "/"
@@ -181,9 +184,11 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   chunk_size_ *= 1024 * 1024;  // Convert to MB.
 
   platform_stat64 sbuf;
-  const bool output_file_is_dir =
-      output_file.size() && (0 == platform_stat(output_file.c_str(), &sbuf)) &&
-      S_ISDIR(sbuf.st_mode);
+  const bool output_file_is_dir = output_file.size()
+                                  && (0
+                                      == platform_stat(output_file.c_str(),
+                                                       &sbuf))
+                                  && S_ISDIR(sbuf.st_mode);
   if (output_file_is_dir && (input_file == "-")) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Output file (%s): Is a directory\n",
              output_file.c_str());
@@ -191,9 +196,9 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   }
 
   if (input_file != "-") {
-    const bool input_file_is_dir =
-        (0 == platform_stat(input_file.c_str(), &sbuf)) &&
-        S_ISDIR(sbuf.st_mode);
+    const bool input_file_is_dir = (0
+                                    == platform_stat(input_file.c_str(), &sbuf))
+                                   && S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
         LogCvmfs(kLogCvmfs, kLogStderr,
@@ -230,8 +235,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   } else {
     fd = open(input_file.c_str(), O_RDONLY);
     if (fd < 0) {
-      const std::string errmsg =
-          "Unable to open input file (" + input_file + ")";
+      const std::string errmsg = "Unable to open input file (" + input_file
+                                 + ")";
       perror(errmsg.c_str());
       return 1;
     }
@@ -259,8 +264,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     close(fd);
   }
   if (!retval) {
-    const std::string errmsg =
-        "Unable to checksum input file (" + input_file + ")";
+    const std::string errmsg = "Unable to checksum input file (" + input_file
+                               + ")";
     perror(errmsg.c_str());
     return 1;
   }
@@ -278,8 +283,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     }
     fd = open(graft_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
     if (fd < 0) {
-      const std::string errmsg =
-          "Unable to open graft file (" + graft_fname + ")";
+      const std::string errmsg = "Unable to open graft file (" + graft_fname
+                                 + ")";
       perror(errmsg.c_str());
       return 1;
     }
@@ -328,8 +333,8 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   fd = open(output_fname.c_str(), O_CREAT | O_TRUNC | O_WRONLY,
             input_file_mode);
   if (fd < 0) {
-    const std::string errmsg =
-        "Unable to open output file (" + output_file + ")";
+    const std::string errmsg = "Unable to open output file (" + output_file
+                               + ")";
     perror(errmsg.c_str());
     return 1;
   }

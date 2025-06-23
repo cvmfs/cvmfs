@@ -105,8 +105,8 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
   // Synchronization point: either act as a master thread for this object or
   // enqueue to the list of waiting threads.
   pthread_mutex_lock(lock_queues_download_);
-  const ThreadQueues::iterator iDownloadQueue =
-      queues_download_.find(object.id);
+  const ThreadQueues::iterator iDownloadQueue = queues_download_.find(
+      object.id);
   if (iDownloadQueue != queues_download_.end()) {
     LogCvmfs(kLogCache, kLogDebug, "waiting for download of %s",
              object.label.path.c_str());

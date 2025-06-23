@@ -40,8 +40,8 @@ catalog::Catalog *Assistant::GetCatalog(const shash::Any &catalog_hash,
           catalog_root_path, local_path, catalog_hash);
       break;
     case kOpenReadOnly:
-      catalog = catalog::Catalog::AttachFreely(
-          catalog_root_path, local_path, catalog_hash);
+      catalog = catalog::Catalog::AttachFreely(catalog_root_path, local_path,
+                                               catalog_hash);
       break;
     default:
       abort();

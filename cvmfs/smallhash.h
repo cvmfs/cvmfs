@@ -153,9 +153,9 @@ class SmallHashBase {
 
  protected:
   uint32_t ScaleHash(const Key &key) const {
-    const double bucket =
-        (static_cast<double>(hasher_(key)) * static_cast<double>(capacity_) /
-         static_cast<double>(static_cast<uint32_t>(-1)));
+    const double bucket = (static_cast<double>(hasher_(key))
+                           * static_cast<double>(capacity_)
+                           / static_cast<double>(static_cast<uint32_t>(-1)));
     return static_cast<uint32_t>(bucket) % capacity_;
   }
 

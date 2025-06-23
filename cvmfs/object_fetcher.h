@@ -166,8 +166,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
       return retval;
     }
 
-    *catalog = CatalogTN::AttachFreely(
-        catalog_path, path, catalog_hash, parent, is_nested);
+    *catalog = CatalogTN::AttachFreely(catalog_path, path, catalog_hash, parent,
+                                       is_nested);
     if (NULL == *catalog) {
       return kFailLocalIO;
     }
@@ -228,8 +228,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
                         const bool is_nested = false,
                         CatalogTN *parent = NULL) {
     CatalogTN *raw_catalog_ptr = NULL;
-    Failures failure = FetchCatalog(
-        catalog_hash, catalog_path, &raw_catalog_ptr, is_nested, parent);
+    Failures failure = FetchCatalog(catalog_hash, catalog_path,
+                                    &raw_catalog_ptr, is_nested, parent);
     if (failure == kFailOk)
       *catalog = raw_catalog_ptr;
     return failure;
@@ -278,8 +278,8 @@ class AbstractObjectFetcher : public ObjectFetcherFailures {
                  const bool decompress,
                  const bool nocache,
                  std::string *file_path) {
-    return static_cast<DerivedT *>(this)->Fetch(
-        relative_path, decompress, nocache, file_path);
+    return static_cast<DerivedT *>(this)->Fetch(relative_path, decompress,
+                                                nocache, file_path);
   }
 
   /**

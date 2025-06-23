@@ -14,15 +14,20 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/syslog.h>
+#include <stdio.h>
+#include <stdio.h>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <cassert>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string>
 #include <vector>
 
 #include "util/export.h"
@@ -603,8 +608,8 @@ static void LogCustom(unsigned id, const std::string &message) {
   pthread_mutex_lock(&customlog_locks[id]);
   assert(customlog_fds[id] >= 0);
 
-  const bool retval_b =
-      SafeWrite(customlog_fds[id], message.data(), message.size());
+  const bool retval_b = SafeWrite(customlog_fds[id], message.data(),
+                                  message.size());
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "could not write into log file %s (%d), aborting - lost: %s",

@@ -56,8 +56,8 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    const ssize_t sz_value =
-        platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
+    const ssize_t sz_value = platform_lgetxattr(path.c_str(), keys[i].c_str(),
+                                                value, 256);
     if (sz_value < 0)
       continue;
     result->Set(keys[i], string(value, sz_value));
@@ -81,8 +81,8 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   unsigned pos = sizeof(header);
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
     XattrEntry entry;
-    unsigned size_preamble = //NOLINT
-               sizeof(entry.len_key) + sizeof(entry.len_value);
+    unsigned size_preamble =  // NOLINT
+        sizeof(entry.len_key) + sizeof(entry.len_value);
     if (size - pos < size_preamble)
       return NULL;
     memcpy(&entry, inbuf + pos, size_preamble);

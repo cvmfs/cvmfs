@@ -175,8 +175,8 @@ static void *MainCheck(void *data __attribute__((unused))) {
     platform_disable_kcache(fd_src);
 
     // Compress every file and calculate SHA-1 of stream
-    const shash::Any expected_hash =
-        shash::MkFromHexPtr(shash::HexPtr(hash_name));
+    const shash::Any expected_hash = shash::MkFromHexPtr(
+        shash::HexPtr(hash_name));
     shash::Any hash(expected_hash.algorithm);
     if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",

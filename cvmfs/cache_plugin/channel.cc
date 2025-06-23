@@ -59,8 +59,8 @@ SessionCtx::~SessionCtx() {
 SessionCtx *SessionCtx::GetInstance() {
   if (instance_ == NULL) {
     instance_ = new SessionCtx();
-    const int retval =
-        pthread_key_create(&instance_->thread_local_storage_, TlsDestructor);
+    const int retval = pthread_key_create(&instance_->thread_local_storage_,
+                                          TlsDestructor);
     assert(retval == 0);
   }
 
@@ -121,7 +121,8 @@ void SessionCtx::TlsDestructor(void *data) {
   for (vector<ThreadLocalStorage *>::iterator
            i = instance_->tls_blocks_.begin(),
            iEnd = instance_->tls_blocks_.end();
-       i != iEnd; ++i) {
+       i != iEnd;
+       ++i) {
     if ((*i) == tls) {
       instance_->tls_blocks_.erase(i);
       break;
@@ -215,8 +216,8 @@ void CachePlugin::HandleBreadcrumbStore(cvmfs::MsgBreadcrumbStoreReq *msg_req,
     } else {
       breadcrumb.revision = 0;
     }
-    const cvmfs::EnumStatus status =
-        StoreBreadcrumb(msg_req->breadcrumb().fqrn(), breadcrumb);
+    const cvmfs::EnumStatus status = StoreBreadcrumb(
+        msg_req->breadcrumb().fqrn(), breadcrumb);
     msg_reply.set_status(status);
   }
   transport->SendFrame(&frame_send);
@@ -417,8 +418,8 @@ void CachePlugin::HandleRead(cvmfs::MsgReadReq *msg_req,
 #else
   unsigned char buffer[size];
 #endif
-  const cvmfs::EnumStatus status =
-      Pread(object_id, msg_req->offset(), &size, buffer);
+  const cvmfs::EnumStatus status = Pread(object_id, msg_req->offset(), &size,
+                                         buffer);
   msg_reply.set_status(status);
   if (status == cvmfs::STATUS_OK) {
     frame_send.set_attachment(buffer, size);
@@ -447,8 +448,8 @@ void CachePlugin::HandleRefcount(cvmfs::MsgRefcountReq *msg_req,
                     "malformed hash received from client");
     msg_reply.set_status(cvmfs::STATUS_MALFORMED);
   } else {
-    const cvmfs::EnumStatus status =
-        ChangeRefcount(object_id, msg_req->change_by());
+    const cvmfs::EnumStatus status = ChangeRefcount(object_id,
+                                                    msg_req->change_by());
     msg_reply.set_status(status);
     if ((status != cvmfs::STATUS_OK) && (status != cvmfs::STATUS_NOENTRY)) {
       LogSessionError(msg_req->session_id(), status,
@@ -479,8 +480,8 @@ bool CachePlugin::HandleRequest(int fd_con) {
     HandleHandshake(msg_req, &transport);
   } else if (msg_typed->GetTypeName() == "cvmfs.MsgQuit") {
     cvmfs::MsgQuit *msg_req = reinterpret_cast<cvmfs::MsgQuit *>(msg_typed);
-    const map<uint64_t, SessionInfo>::const_iterator iter =
-        sessions_.find(msg_req->session_id());
+    const map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(
+        msg_req->session_id());
     if (iter != sessions_.end()) {
       free(iter->second.reponame);
       free(iter->second.client_instance);
@@ -735,8 +736,8 @@ bool CachePlugin::Listen(const string &locator) {
 
 void CachePlugin::LogSessionInfo(uint64_t session_id, const string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  const map<uint64_t, SessionInfo>::const_iterator iter =
-      sessions_.find(session_id);
+  const map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(
+      session_id);
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
@@ -749,8 +750,8 @@ void CachePlugin::LogSessionError(uint64_t session_id,
                                   cvmfs::EnumStatus status,
                                   const std::string &msg) {
   string session_str("unidentified client (" + StringifyInt(session_id) + ")");
-  const map<uint64_t, SessionInfo>::const_iterator iter =
-      sessions_.find(session_id);
+  const map<uint64_t, SessionInfo>::const_iterator iter = sessions_.find(
+      session_id);
   if (iter != sessions_.end()) {
     session_str = iter->second.name;
   }
@@ -809,8 +810,8 @@ void *CachePlugin::MainProcessRequests(void *data) {
     if (watch_fds[1].revents) {
       struct sockaddr_un remote;
       socklen_t socket_size = sizeof(remote);
-      const int fd_con =
-          accept(watch_fds[1].fd, (struct sockaddr *)&remote, &socket_size);
+      const int fd_con = accept(watch_fds[1].fd, (struct sockaddr *)&remote,
+                                &socket_size);
       if (fd_con < 0) {
         LogCvmfs(kLogCache, kLogSyslogWarn | kLogDebug,
                  "failed to establish connection (%d)", errno);
@@ -872,8 +873,8 @@ void CachePlugin::NotifySupervisor(char signal) {
 
 void CachePlugin::ProcessRequests(unsigned num_workers) {
   num_workers_ = num_workers;
-  const int retval =
-      pthread_create(&thread_io_, NULL, MainProcessRequests, this);
+  const int retval = pthread_create(&thread_io_, NULL, MainProcessRequests,
+                                    this);
   assert(retval == 0);
   NotifySupervisor(CacheTransport::kReadyNotification);
   atomic_cas32(&running_, 0, 1);

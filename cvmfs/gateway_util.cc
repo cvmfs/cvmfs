@@ -5,6 +5,7 @@
 #include "gateway_util.h"
 
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <vector>

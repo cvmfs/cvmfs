@@ -41,8 +41,8 @@ bool SubscriberSSE::Subscribe(const std::string &topic) {
 
   this->topic_ = topic;
 
-  const std::string request =
-      "{\"version\":1,\"repository\":\"" + topic + "\"}";
+  const std::string request = "{\"version\":1,\"repository\":\"" + topic
+                              + "\"}";
 
   const char *user_agent_string = "cvmfs/" CVMFS_VERSION;
 
@@ -120,8 +120,8 @@ size_t SubscriberSSE::CurlRecvCB(void *buffer, size_t size, size_t nmemb,
     sub->AppendToBuffer(lines[0]);
   } else {
     sub->AppendToBuffer(lines[0]);
-    const notify::Subscriber::Status st =
-        sub->Consume(sub->topic_, sub->buffer_);
+    const notify::Subscriber::Status st = sub->Consume(sub->topic_,
+                                                       sub->buffer_);
     sub->ClearBuffer();
     for (size_t i = 1; i < lines.size(); ++i) {
       if (lines[i].substr(0, 5) == "data: ") {

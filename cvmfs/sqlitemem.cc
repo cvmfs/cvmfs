@@ -65,9 +65,9 @@ SqliteMemoryManager::LookasideBufferArena::~LookasideBufferArena() {
 
 void SqliteMemoryManager::LookasideBufferArena::PutBuffer(void *buffer) {
   assert(buffer >= arena_);
-  const ptrdiff_t nbuffer =
-      (reinterpret_cast<char *>(buffer) - reinterpret_cast<char *>(arena_)) /
-      kBufferSize;
+  const ptrdiff_t nbuffer = (reinterpret_cast<char *>(buffer)
+                             - reinterpret_cast<char *>(arena_))
+                            / kBufferSize;
   assert(static_cast<uint64_t>(nbuffer) < kBuffersPerArena);
   const int nfreemap = nbuffer / (sizeof(int) * 8);
   freemap_[nfreemap] |= 1 << (nbuffer % (sizeof(int) * 8));
@@ -155,9 +155,9 @@ void *SqliteMemoryManager::AssignLookasideBuffer(sqlite3 *db) {
 
   void *buffer = GetLookasideBuffer();
   assert(buffer != NULL);
-  const int retval =
-      sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, buffer,
-                        kLookasideSlotSize, kLookasideSlotsPerDb);
+  const int retval = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, buffer,
+                                       kLookasideSlotSize,
+                                       kLookasideSlotsPerDb);
   assert(retval == SQLITE_OK);
   return buffer;
 }
@@ -176,8 +176,8 @@ void *SqliteMemoryManager::GetLookasideBuffer() {
   void *result;
   vector<LookasideBufferArena *>::reverse_iterator
       reverse_iter = lookaside_buffer_arenas_.rbegin();
-  const vector<LookasideBufferArena *>::reverse_iterator i_rend =
-      lookaside_buffer_arenas_.rend();
+  const vector<LookasideBufferArena *>::reverse_iterator
+      i_rend = lookaside_buffer_arenas_.rend();
   for (; reverse_iter != i_rend; ++reverse_iter) {
     result = (*reverse_iter)->GetBuffer();
     if (result != NULL)

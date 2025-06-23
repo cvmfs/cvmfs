@@ -154,8 +154,8 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
   catalog::Counters::FieldsMap::const_iterator i = map_a.begin();
   const catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
   for (; i != iend; ++i) {
-    const catalog::Counters::FieldsMap::const_iterator comp =
-        map_b.find(i->first);
+    const catalog::Counters::FieldsMap::const_iterator comp = map_b.find(
+        i->first);
     assert(comp != map_b.end());
 
     if (*(i->second) != *(comp->second)) {
@@ -426,8 +426,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  full_path.c_str());
         retval = false;
       } else {
-        const HardlinkMap::iterator hardlink_group =
-            hardlinks.find(entries[i].hardlink_group());
+        const HardlinkMap::iterator hardlink_group = hardlinks.find(
+            entries[i].hardlink_group());
         if (hardlink_group == hardlinks.end()) {
           hardlinks[entries[i].hardlink_group()];
           hardlinks[entries[i].hardlink_group()].push_back(entries[i]);
@@ -684,8 +684,8 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
   cvmfs::PathSink pathsink(dest);
   download::JobInfo download_catalog(&url, true, false, &catalog_hash,
                                      &pathsink);
-  const download::Failures retval =
-      download_manager()->Fetch(&download_catalog);
+  const download::Failures retval = download_manager()->Fetch(
+      &download_catalog);
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object %s (%d)",
              catalog_hash.ToString().c_str(), retval);
@@ -765,8 +765,8 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
     }
 
     current_path += "/" + *i;
-    if (current_catalog->FindNested(
-            PathString(current_path), root_hash, root_size)) {
+    if (current_catalog->FindNested(PathString(current_path), root_hash,
+                                    root_size)) {
       delete current_catalog;
 
       if (current_path.length() < subtree_path.length()) {
@@ -795,8 +795,8 @@ bool CommandCheck::InspectTree(const string &path,
   LogCvmfs(kLogCvmfs, kLogStdout | kLogInform, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
-  const catalog::Catalog *catalog = FetchCatalog(
-      path, catalog_hash, catalog_size);
+  const catalog::Catalog *catalog = FetchCatalog(path, catalog_hash,
+                                                 catalog_size);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -885,7 +885,8 @@ bool CommandCheck::InspectTree(const string &path,
   for (catalog::Catalog::NestedCatalogList::const_iterator
            i = nested_catalogs.begin(),
            iEnd = nested_catalogs.end();
-       i != iEnd; ++i) {
+       i != iEnd;
+       ++i) {
     nested_catalog_paths.insert(i->mountpoint);
   }
   if (nested_catalog_paths.size() != nested_catalogs.size()) {
@@ -897,7 +898,8 @@ bool CommandCheck::InspectTree(const string &path,
   for (catalog::Catalog::NestedCatalogList::const_iterator
            i = nested_catalogs.begin(),
            iEnd = nested_catalogs.end();
-       i != iEnd; ++i) {
+       i != iEnd;
+       ++i) {
     if (bind_mountpoints.find(i->mountpoint) != bind_mountpoints.end()) {
       catalog::DirectoryEntry bind_mountpoint;
       const PathString mountpoint("/" + i->mountpoint.ToString().substr(1));

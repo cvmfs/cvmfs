@@ -41,6 +41,7 @@ class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
                        const bool copy_to_tmp_dir = false);
 
   virtual LoadReturn LoadCatalogByHash(CatalogContext *ctlg_context);
+
  protected:
   virtual LoadReturn GetNewRootCatalogContext(CatalogContext *result);
   virtual Catalog *CreateCatalog(const PathString &mountpoint,

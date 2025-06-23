@@ -33,10 +33,10 @@ bool SyncUnionOverlayfs::Initialize() {
 }
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  /*const*/ const cap_value_t cap =
-      CAP_SYS_ADMIN; // is non-const as cap_set_flag()
-                     // expects a non-const pointer
-                     // on RHEL 5 and older
+  /*const*/ const cap_value_t
+      cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
+                            // expects a non-const pointer
+                            // on RHEL 5 and older
 
 // do sanity-check if supported in <sys/capability.h> otherwise just pray...
 // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
@@ -242,20 +242,21 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(SharedPtr<SyncItem> entry) const {
    * 3. whiteouts are marked as .wh. (as in aufs)
    */
 
-  const bool is_chardev_whiteout = entry->IsCharacterDevice() &&
-                                   entry->GetRdevMajor() == 0 &&
-                                   entry->GetRdevMinor() == 0;
+  const bool is_chardev_whiteout = entry->IsCharacterDevice()
+                                   && entry->GetRdevMajor() == 0
+                                   && entry->GetRdevMinor() == 0;
   if (is_chardev_whiteout)
     return true;
 
   const std::string whiteout_prefix_ = ".wh.";
-  const bool has_wh_prefix =
-      HasPrefix(entry->filename().c_str(), whiteout_prefix_, true);
+  const bool has_wh_prefix = HasPrefix(entry->filename().c_str(),
+                                       whiteout_prefix_, true);
   if (has_wh_prefix)
     return true;
 
-  const bool is_symlink_whiteout =
-      entry->IsSymlink() && IsWhiteoutSymlinkPath(entry->GetScratchPath());
+  const bool is_symlink_whiteout = entry->IsSymlink()
+                                   && IsWhiteoutSymlinkPath(
+                                       entry->GetScratchPath());
   if (is_symlink_whiteout)
     return true;
 
