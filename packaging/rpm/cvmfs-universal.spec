@@ -37,9 +37,11 @@
 %define systemd_autofs_patch 1
 %endif
 
-%if 0%{?fedora} < 42 || 0%{?rhel} < 10
 %define build_fuse2 1
+%if 0%{?fedora} >= 42 || 0%{?rhel} >= 10
+%define build_fuse2 0
 %endif
+
 
 %if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
 %define cvmfs_python_devel python3-devel
