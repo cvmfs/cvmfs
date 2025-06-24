@@ -12,12 +12,12 @@ sudo dnf -y update || echo "---- WARNING: dnf reported non-zero status code"
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $LIBS_PACKAGE
+install_rpm $FUSE3_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
-install_rpm $FUSE3_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."

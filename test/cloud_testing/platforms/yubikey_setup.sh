@@ -11,10 +11,10 @@ sudo dnf -y remove "cvmfs*" || true
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $LIBS_PACKAGE
+install_rpm $FUSE3_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $DEVEL_PACKAGE
-install_rpm $FUSE3_PACKAGE
 
 #NOTE: the yubikey machine is now setup to run tests on bare metal and does not need setup. 
 # This is the setup used to initially setup the machine:
