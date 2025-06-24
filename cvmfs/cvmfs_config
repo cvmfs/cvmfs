@@ -450,7 +450,7 @@ cvmfs_chksetup() {
   if [ "$sys_arch" = "Darwin" ]; then
     cvmfs_libs="libcvmfs_fuse.dylib libcvmfs_fuse_debug.dylib"
   else
-    cvmfs_libs="libcvmfs_fuse.so libcvmfs_fuse_debug.so"
+    cvmfs_libs="libcvmfs_fuse3.so libcvmfs_fuse3_debug.so"
   fi
   for library in $cvmfs_libs
   do

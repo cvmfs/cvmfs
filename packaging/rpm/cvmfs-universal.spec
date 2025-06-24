@@ -37,10 +37,8 @@
 %define systemd_autofs_patch 1
 %endif
 
-# fuse3 is in epel starting with epel6;
-# the fuse3 libraries are available in SLES 15, too, but the devel package is missing
-%if 0%{?fedora} >= 29 || 0%{?rhel} >= 6
-%define build_fuse3 1
+%if 0%{?fedora} < 42 || 0%{?rhel} < 10
+%define build_fuse2 1
 %endif
 
 %if 0%{?sle15} || 0%{?rhel} >= 8 || 0%{?fedora} >= 31
@@ -99,10 +97,10 @@ BuildRequires: gcc-c++
 BuildRequires: valgrind-devel
 %endif
 BuildRequires: cmake
+%if 0%{?build_fuse2}
 BuildRequires: fuse-devel
-%if 0%{?build_fuse3}
-BuildRequires: fuse3-devel >= 3.3.0
 %endif
+BuildRequires: fuse3-devel >= 3.3.0
 BuildRequires: libattr-devel
 BuildRequires: openssl-devel
 BuildRequires: patch
@@ -130,7 +128,9 @@ Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
 Requires: aaa_base
+%if 0%{?build_fuse2} 
 Requires: libfuse2
+%endif
 Requires: glibc
   %if 0%{?suse_version} < 1500
 Requires: pwdutils
@@ -190,7 +190,6 @@ Summary: CernVM-FS common libraries
 %description libs
 Common utility libraries for CernVM-FS packages
 
-%if 0%{?build_fuse3}
 %package fuse3
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
@@ -198,7 +197,6 @@ Requires: cvmfs = %{version}-%{release}
 Requires: fuse3-libs >= 3.3.0
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
-%endif
 
 %package devel
 Summary: CernVM-FS static client library
@@ -343,6 +341,10 @@ BUILD_SNAPSHOTTER=no
 %if 0%{?build_snapshotter}
 BUILD_SNAPSHOTTER=yes
 %endif
+BUILD_LIBFUSE2=no
+%if 0%{?build_fuse2}
+BUILD_LIBFUSE2=yes
+%endif
 
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -357,6 +359,7 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
   -DINSTALL_UNITTESTS=yes \
+  -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
 make %{?_smp_mflags}
@@ -395,10 +398,8 @@ popd
 %pretrans libs
 %check_transaction
 
-%if 0%{?build_fuse3}
 %pretrans fuse3
 %check_transaction
-%endif
 
 %pretrans devel
 %check_transaction
@@ -463,11 +464,6 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
-
-# Don't install coincidentially built libfuse3 libraries
-%if ! 0%{?build_fuse3}
-rm -f $RPM_BUILD_ROOT%{_libdir}/libcvmfs_fuse3*
-%endif
 
 # Fix docdir on SuSE
 %if 0%{?suse_version}
@@ -538,10 +534,8 @@ fi
 %post libs
 /sbin/ldconfig
 
-%if 0%{?build_fuse3}
 %post fuse3
 /sbin/ldconfig
-%endif
 
 %post server
 /usr/bin/cvmfs_server fix-permissions || :
@@ -627,12 +621,14 @@ systemctl daemon-reload
 %files
 %defattr(-,root,root)
 %{_bindir}/cvmfs2
+%if 0%{?build_fuse2} 
 %{_libdir}/libcvmfs_fuse_stub.so
 %{_libdir}/libcvmfs_fuse_stub.so.%{version}
 %{_libdir}/libcvmfs_fuse.so
 %{_libdir}/libcvmfs_fuse.so.%{version}
 %{_libdir}/libcvmfs_fuse_debug.so
 %{_libdir}/libcvmfs_fuse_debug.so.%{version}
+%endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
@@ -678,7 +674,6 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_util_debug.so.%{version}
 %doc COPYING AUTHORS README.md ChangeLog
 
-%if 0%{?build_fuse3}
 %files fuse3
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_fuse3_stub.so
@@ -688,7 +683,6 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_fuse3_debug.so
 %{_libdir}/libcvmfs_fuse3_debug.so.%{version}
 %doc COPYING AUTHORS README.md ChangeLog
-%endif
 
 %files devel
 %defattr(-,root,root)

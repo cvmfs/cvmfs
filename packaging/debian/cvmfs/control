@@ -1,75 +1,120 @@
-# The file is adjusted in ci/cvmfs/deb.sh
-
 Source: cvmfs
 Section: utils
 Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
-Build-Depends: libfuse3-dev (>= 3.3.0), debhelper (>= 9), autotools-dev, cmake, cpio, libcap-dev, libssl-dev, libfuse-dev, pkg-config, libattr1-dev, patch, python3-dev, python3-setuptools, unzip, uuid-dev, valgrind, libz-dev
+Build-Depends:
+ libfuse3-dev (>= 3.3.0),
+#BUILD_LIBFUSE2 libfuse-dev,
+ debhelper (>= 9),
+ autotools-dev,
+ cmake,
+ cpio,
+ libcap-dev,
+ libssl-dev,
+ libattr1-dev,
+ libz-dev,
+ patch,
+ pkg-config,
+ python3-dev,
+ python3-setuptools,
+ unzip,
+ uuid-dev
 Standards-Version: 3.9.6.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-config-default | cvmfs-config, gawk, psmisc, lsof, autofs, fuse, curl, attr, libfuse2, zlib1g, gdb, uuid-dev, uuid, adduser, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
-Recommends: cvmfs-fuse3, autofs (>= 5.1.2)
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ cvmfs-config-default | cvmfs-config,
+ cvmfs-fuse3,
+#BUILD_LIBFUSE2 fuse,
+ gawk,
+ psmisc,
+ lsof,
+ attr,
+ zlib1g,
+ gdb,
+ uuid-dev,
+ uuid,
+ adduser,
+ cvmfs-libs (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends}
+Recommends:
+ autofs (>= 5.1.2)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
 
 Package: cvmfs-libs
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS common libraries
  Common utility libraries for CernVM-FS packages.
 
 Package: cvmfs-server
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: psmisc, curl, attr, openssl, libcap2, libcap2-bin, lsof, rsync, jq, usbutils, sqlite3, tar, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
-Recommends: cvmfs-fuse3, apache2, logrotate
+Depends:
+ psmisc,
+ curl,
+ attr,
+ openssl,
+ libcap2,
+ libcap2-bin,
+ lsof,
+ rsync,
+ jq,
+ usbutils,
+ sqlite3,
+ tar,
+ cvmfs-libs (= ${binary:Version}),
+ cvmfs-fuse3 (= ${binary:Version}),
+ ${misc:Depends}
+Recommends:
+ apache2,
+ logrotate
 Conflicts: cvmfs-server (<< 2.1)
-#Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS server utilities
  HTTP File System Repository Server for Distributing Software to CernVM.
 
 Package: cvmfs-dev
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: openssl, ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ openssl,
+ ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS client library
  CernVM-FS static client library
 
 Package: cvmfs-shrinkwrap
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: openssl, python3, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ openssl,
+ python3,
+ cvmfs-libs (= ${binary:Version}),
+ ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
  CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container images.
 
 Package: cvmfs-unittests
 Architecture: amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libssl-dev, uuid-dev, cvmfs-libs (= ${binary:Version}), ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ libssl-dev,
+ uuid-dev,
+ cvmfs-libs (= ${binary:Version}),
+ ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests
  HTTP File System for Distributing Software to CernVM.
 
 Package: cvmfs-fuse3
-Architecture: i386 amd64 armhf arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libfuse3-3 (>= 3.3.0) | libfuse3-4, cvmfs (= ${binary:Version})
-#Multi-Arch: same   (preparation for multiarch support)
+Architecture: amd64 armhf arm64
+Depends:
+ cvmfs (= ${binary:Version}),
+ ${shlibs:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
  Shared libraries implementing the CernVM-FS fuse module based on libfuse3
@@ -77,9 +122,10 @@ Description: CernVM File System fuse3 libraries
 #GATEWAY-BEGIN
 Package: cvmfs-gateway
 Architecture: amd64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: psmisc, cvmfs-server, ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ psmisc,
+ cvmfs-server,
+ ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS Repository Gateway
  The CernVM-FS repository gateway service enables multiple remote publishers to write to the same repository.
@@ -88,9 +134,10 @@ Description: CernVM-FS Repository Gateway
 #SNAPSHOTTER-BEGIN
 Package: cvmfs-snapshotter
 Architecture: amd64 arm64
-#Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: psmisc, cvmfs, ${misc:Depends}
-#Multi-Arch: same   (preparation for multiarch support)
+Depends:
+ psmisc,
+ cvmfs,
+ ${misc:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM-FS Snapshotter
  A containerd snapshotter service for lazy-loading of containers from CVMFS

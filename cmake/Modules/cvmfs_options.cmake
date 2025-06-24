@@ -34,6 +34,7 @@ option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"            
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
 option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
 option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
+option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"                         OFF)
 
 # By default, all the external third-party libraries are built and installed in
 # ${CMAKE_SOURCE_DIR}/externals_install. If this variable is set to OFF, these
