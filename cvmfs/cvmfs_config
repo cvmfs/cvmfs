@@ -3,6 +3,8 @@
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
+# workaround for fedora 42
+INSTALL_BASE=$(echo "$INSTALL_BASE" | sed -e 's/^\(.*\)\/sbin$/\1/')
 SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
 
 if [ -f /etc/cvmfs/config.sh ]; then
