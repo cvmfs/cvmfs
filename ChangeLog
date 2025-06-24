@@ -1,5 +1,8 @@
 2.13.1:
   * [client] Fix mount options that can lead to "futimes" error with docker (#3872)
+  * [rpm] Allow builds without libfuse2 (#3879)
+  * [client] Fix a segfault in one of the unmount branches of the loader (#3873)
+  * [client] Fix host reset timeout (CVMFS_HOST_RESET_AFTER) (#3864)
 
 2.13.0:
   * [server] swissknife_lease: Fix bug in response receiver callback (#3823)
