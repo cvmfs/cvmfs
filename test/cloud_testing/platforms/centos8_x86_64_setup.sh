@@ -31,6 +31,7 @@ install_rpm $UNITTEST_PACKAGE
 install_rpm $SHRINKWRAP_PACKAGE
 install_rpm $GATEWAY_PACKAGE
 install_rpm $DUCC_PACKAGE
+install_rpm $FUSE3_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."

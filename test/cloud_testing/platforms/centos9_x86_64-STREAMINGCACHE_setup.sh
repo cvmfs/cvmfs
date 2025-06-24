@@ -13,6 +13,7 @@ install_rpm "$CONFIG_PACKAGES"
 install_rpm $LIBS_PACKAGE
 install_rpm $CLIENT_PACKAGE
 install_rpm $UNITTEST_PACKAGE
+install_rpm $FUSE3_PACKAGE
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."

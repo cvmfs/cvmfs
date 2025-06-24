@@ -70,6 +70,7 @@ install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 install_deb $SHRINKWRAP_PACKAGE
 install_deb $GATEWAY_PACKAGE
+install_deb $FUSE3_PACKAGE
 
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
