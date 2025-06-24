@@ -499,22 +499,6 @@ cvmfs_chksetup() {
     num_errors=$(($num_errors+1))
   fi
 
-  # Fusermount (not necessary under Mac OS X)
-  if [ "$sys_arch" = "Linux" ]; then
-    if [ ! -x $fusermount ]; then
-      echo "Error: failed to locate fusermount"
-      num_errors=$(($num_errors+1))
-    fi
-    if [ ! -u $fusermount ]; then
-      echo "Error: fusermount needs to be a suid binary"
-      num_errors=$(($num_errors+1))
-    fi
-    if ! runascvmfsuser "$fusermount -V" > /dev/null 2>&1; then
-      echo "Error: failed to run $fusermount as cvmfs user"
-      num_errors=$(($num_errors+1))
-    fi
-  fi
-
   # saving global mount directory configuration
   local global_mount_dir
   global_mount_dir=$CVMFS_MOUNT_DIR
