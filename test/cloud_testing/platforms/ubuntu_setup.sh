@@ -59,6 +59,8 @@ echo -n "installing gdebi-core... "
 install_from_repo gdebi-core || die "fail (install gdebi-core)"
 echo "done"
 
+install_from_repo autofs || die "fail (installing autofs)"
+
 # install deb packages
 echo "installing DEB packages... "
 install_deb "$CONFIG_PACKAGES"
