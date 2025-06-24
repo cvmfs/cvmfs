@@ -168,6 +168,7 @@ Requires: util-linux
 %endif
 Requires: cvmfs-config
 Requires: cvmfs-libs = %{version}-%{release}
+Requires: cvmfs-fuse3 = %{version}-%{release}
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -195,7 +196,7 @@ Common utility libraries for CernVM-FS packages
 %package fuse3
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
-Requires: cvmfs = %{version}-%{release}
+Requires: cvmfs-libs = %{version}-%{release}
 Requires: fuse3-libs >= 3.3.0
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3

@@ -26,7 +26,7 @@ Package: cvmfs
 Architecture: amd64 armhf arm64
 Depends:
  cvmfs-config-default | cvmfs-config,
- cvmfs-fuse3,
+ cvmfs-fuse3 (= ${binary:Version}),
 #BUILD_LIBFUSE2 fuse,
  gawk,
  psmisc,
@@ -113,7 +113,7 @@ Description: CernVM File System Unit Tests
 Package: cvmfs-fuse3
 Architecture: amd64 armhf arm64
 Depends:
- cvmfs (= ${binary:Version}),
+ cvmfs-libs (= ${binary:Version}),
  ${shlibs:Depends}
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System fuse3 libraries
