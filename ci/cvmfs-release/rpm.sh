@@ -28,6 +28,7 @@ package_spec="${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-release.spec"
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-release.spec  ${CVMFS_RESULT_LOCATION}
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/BSD                 ${CVMFS_RESULT_LOCATION}/SOURCES/
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/RPM-GPG-KEY-CernVM  ${CVMFS_RESULT_LOCATION}/SOURCES/
+cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/RPM-GPG-KEY-CernVM-2048  ${CVMFS_RESULT_LOCATION}/SOURCES/
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cernvm.repo         ${CVMFS_RESULT_LOCATION}/SOURCES/
 cp $package_spec                                              ${CVMFS_RESULT_LOCATION}
 

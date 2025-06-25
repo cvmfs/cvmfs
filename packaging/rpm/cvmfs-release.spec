@@ -83,7 +83,7 @@ fi
 
 
 %changelog
-* Tue Jun 25 2025 Valentin Volkl <vavolkl@cern.ch> - 6-1
+* Wed Jun 25 2025 Valentin Volkl <vavolkl@cern.ch> - 6-1
 - Use 2048 bit signing key for Almalinux 10 and newer
 * Tue Feb 25 2025 Valentin Volkl <vavolkl@cern.ch> - 5-1
 - Drop explicit dependence on *-release packages
