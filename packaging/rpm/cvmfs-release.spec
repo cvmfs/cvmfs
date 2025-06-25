@@ -13,6 +13,7 @@ URL:            http://cvmrepo.s3.cern.ch/cvmrepo/yum
 Source0:        http://cvmrepo.s3.cern.ch/cvmrepo/yum/RPM-GPG-KEY-CernVM
 Source1:        BSD
 Source2:        cernvm.repo
+Source3:        RPM-GPG-KEY-CernVM-2048
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -38,6 +39,8 @@ rm -rf $RPM_BUILD_ROOT
 #GPG Key
 install -Dpm 644 %{SOURCE0} \
     $RPM_BUILD_ROOT%{_sysconfdir}/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+install -Dpm 644 %{SOURCE3} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048
 
 # yum
 install -dm 755 $RPM_BUILD_ROOT%{_sysconfdir}/yum.repos.d
@@ -70,10 +73,18 @@ fi
 if  [[ "$ID" == "fedora" ]]; then
 sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
 fi
+if  [[ "$ID" == "almalinux" ]]; then
+  VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
+  if [[ "${VERSION_NUMBER}" -ge "100" ]]; then
+     sed -i 's/RPM-GPG-KEY-CernVM/RPM-GPG-KEY-CernVM-2048/g' /etc/yum.repos.d/cernvm.repo
+  fi
+fi
 fi
 
 
 %changelog
+* Tue Jun 25 2025 Valentin Volkl <vavolkl@cern.ch> - 6-1
+- Use 2048 bit signing key for Almalinux 10 and newer
 * Tue Feb 25 2025 Valentin Volkl <vavolkl@cern.ch> - 5-1
 - Drop explicit dependence on *-release packages
 * Sat Jan 04 2025 Valentin Volkl <vavolkl@cern.ch> - 4-1
