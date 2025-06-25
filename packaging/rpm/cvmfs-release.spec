@@ -1,5 +1,5 @@
 Name:           cvmfs-release
-Version:        5
+Version:        6
 Release:        1
 Summary:        Packages for the CernVM File System
 
