@@ -1,6 +1,6 @@
 Name:           cvmfs-release
 Version:        6
-Release:        1
+Release:        2
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -74,8 +74,8 @@ if  [[ "$ID" == "fedora" ]]; then
 sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
 fi
 if  [[ "$ID" == "almalinux" ]]; then
-  VERSION_NUMBER=$(echo ${VERSION_ID} | tr -d '.')
-  if [[ "${VERSION_NUMBER}" -ge "100" ]]; then
+  VERSION_MAJOR=$(echo ${VERSION_ID} | cut -d '.' -f1)
+  if [[ "${VERSION_MAJOR}" -ge "10" ]]; then
      sed -i 's/RPM-GPG-KEY-CernVM/RPM-GPG-KEY-CernVM-2048/g' /etc/yum.repos.d/cernvm.repo
   fi
 fi
@@ -83,6 +83,8 @@ fi
 
 
 %changelog
+* Thu Jun 26 2025 Valentin Volkl <vavolkl@cern.ch> - 6-2
+- Fix a bug in distro version number parsing
 * Wed Jun 25 2025 Valentin Volkl <vavolkl@cern.ch> - 6-1
 - Use 2048 bit signing key for Almalinux 10 and newer
 * Tue Feb 25 2025 Valentin Volkl <vavolkl@cern.ch> - 5-1
