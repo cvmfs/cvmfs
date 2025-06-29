@@ -20,7 +20,7 @@ var (
 )
 
 var (
-	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman bool
+	convertAgain, overwriteLayer, skipLayers, skipFlat, skipThinImage, skipPodman, multiArch bool
 )
 
 func init() {
@@ -30,6 +30,7 @@ func init() {
 	convertCmd.Flags().BoolVarP(&skipLayers, "skip-layers", "d", false, "do not unpack the layers into the repository, implies --skip-thin-image and --skip-podman")
 	convertCmd.Flags().BoolVarP(&skipThinImage, "skip-thin-image", "i", false, "do not create and push the docker thin image")
 	convertCmd.Flags().BoolVarP(&skipPodman, "skip-podman", "p", false, "do not create podman image store")
+	convertCmd.Flags().BoolVarP(&multiArch, "multi-arch", "m", false, "convert all architectures for multi-arch images")
 	rootCmd.AddCommand(convertCmd)
 }
 
@@ -68,7 +69,7 @@ var convertCmd = &cobra.Command{
 				"output image": wish.OutputName}
 			l.Log().WithFields(fields).Info("Start conversion of wish")
 			if !skipLayers {
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch)
 				if err != nil {
 					l.LogE(err).WithFields(fields).Error("Error in converting wish (layers)")
 					return err

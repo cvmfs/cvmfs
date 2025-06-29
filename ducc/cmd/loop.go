@@ -72,7 +72,7 @@ var loopCmd = &cobra.Command{
 					"output image": wish.OutputName}
 				l.Log().WithFields(fields).Info("Start conversion of wish")
 				if !skipLayers {
-					err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+					err = lib.ConvertWish(wish, convertAgain, overwriteLayer, false)
 					if err != nil {
 						l.LogE(err).WithFields(fields).Error("Error in converting wish (layers), going on")
 					}

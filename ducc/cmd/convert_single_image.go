@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -23,6 +24,7 @@ func init() {
 	convertSingleImageCmd.Flags().StringVarP(&username, "username", "u", "", "username to use when pushing thin image into the docker registry")
 	convertSingleImageCmd.Flags().StringVarP(&thinImageName, "thin-image-name", "", "", "name to use for the thin image to upload, if empty implies --skip-thin-image.")
 	convertSingleImageCmd.Flags().IntVarP(&attempts, "attempts", "r", 1, "number of time to try to unpack the image, default one")
+	convertSingleImageCmd.Flags().BoolVarP(&multiArch, "multi-arch", "m", false, "Convert all architectures for multi-arch images")
 	rootCmd.AddCommand(convertSingleImageCmd)
 }
 
@@ -94,7 +96,7 @@ var convertSingleImageCmd = &cobra.Command{
 
 		if !skipLayers {
 			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWish(wish, convertAgain, overwriteLayer)
+				err = lib.ConvertWish(wish, convertAgain, overwriteLayer, multiArch)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
