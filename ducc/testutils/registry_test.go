@@ -4,27 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"testing"
-  "net/http"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-
 )
+
 var (
-    MyTestRegistryPort   int
- )
-
-
-
+	MyTestRegistryPort int
+)
 
 // TestMain sets up and tears down the test registry server
 func TestMain(m *testing.M) {
 	// Start the registry server
-  var MyTestRegistryServer *http.Server
-  var err error
-	if MyTestRegistryServer, MyTestRegistryPort,  err = StartTestRegistryServer(); err != nil {
+	var MyTestRegistryServer *http.Server
+	var err error
+	if MyTestRegistryServer, MyTestRegistryPort, err = StartTestRegistryServer(); err != nil {
 		log.Fatalf("Failed to start test registry server: %v ", err)
 	}
 
@@ -39,7 +36,7 @@ func TestMain(m *testing.M) {
 }
 
 // Example test functions
-func TestRegistryServer(t *testing.T) {
+func TestRegistryServerVarious(t *testing.T) {
 	tests := []struct {
 		name string
 		test func(t *testing.T)
@@ -59,7 +56,7 @@ func testPushAndPullImage(t *testing.T) {
 	imageName := "test-image:v1.0.0"
 
 	// Create and push test image
-	if err := CreateTestImageForTests(ctx,MyTestRegistryPort, imageName); err != nil {
+	if err := CreateTestImageForTests(ctx, MyTestRegistryPort, imageName); err != nil {
 		t.Fatalf("Failed to push test image: %v", err)
 	}
 
@@ -98,7 +95,7 @@ func testMultipleImages(t *testing.T) {
 
 	// Push multiple images
 	for _, imageName := range imageNames {
-		if err := CreateTestImageForTests(ctx,MyTestRegistryPort, imageName); err != nil {
+		if err := CreateTestImageForTests(ctx, MyTestRegistryPort, imageName); err != nil {
 			t.Fatalf("Failed to push image %s: %v", imageName, err)
 		}
 	}

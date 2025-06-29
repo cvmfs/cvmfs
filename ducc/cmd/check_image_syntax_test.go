@@ -10,6 +10,11 @@ func TestCheckImageSyntaxCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cmd.SetArgs([]string{"check-image-syntax", "my.registry.tld/my_image:mytag"})
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
 	cmd.SetArgs([]string{"check-image-syntax", "thatshouldntwork"})
 	err = cmd.Execute()
 	if err == nil {

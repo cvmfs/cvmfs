@@ -15,13 +15,13 @@ import (
 )
 
 var (
-	serverOnce         sync.Once
-	serverMutex        sync.RWMutex
-	serverReady        bool
+	serverOnce  sync.Once
+	serverMutex sync.RWMutex
+	serverReady bool
 )
 
 // startTestRegistryServer starts the registry server once
-func StartTestRegistryServer() (TestRegistryServer *http.Server, TestRegistryPort int,  err error) {
+func StartTestRegistryServer() (TestRegistryServer *http.Server, TestRegistryPort int, err error) {
 	var startErr error
 
 	serverOnce.Do(func() {
@@ -104,7 +104,6 @@ func waitForServerReady(address string, timeout time.Duration) error {
 	}
 }
 
-
 // Helper function to create test images
 func CreateTestImageForTests(ctx context.Context, TestRegistryPort int, imageName string) error {
 	img, err := createPlatformSpecificImage("linux", "amd64", "", "test")
@@ -119,15 +118,15 @@ func CreateTestImageForTests(ctx context.Context, TestRegistryPort int, imageNam
 
 	return remote.Write(tag, img, remote.WithContext(ctx))
 }
+
 // getTestRegistryURL returns the test registry URL
 func GetTestRegistryURL(TestRegistryPort int) string {
-       serverMutex.RLock()
-       defer serverMutex.RUnlock()
+	serverMutex.RLock()
+	defer serverMutex.RUnlock()
 
-       if !serverReady {
-               panic("test registry server not ready")
-       }
+	if !serverReady {
+		panic("test registry server not ready")
+	}
 
-return fmt.Sprintf("localhost:%d", TestRegistryPort)
+	return fmt.Sprintf("localhost:%d", TestRegistryPort)
 }
-
