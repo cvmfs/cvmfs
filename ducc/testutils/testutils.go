@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"context"
-	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -10,9 +9,9 @@ import (
 	"strconv"
 )
 
-var Online *bool
-var LocalRegistry *bool
-var MockCvmfs *bool
+var Online *bool = new(bool)
+var LocalRegistry *bool = new(bool)
+var MockCvmfs *bool = new(bool)
 var TestRegistryPort = 0
 var TestRegistryServer *http.Server
 var TestRepo string
@@ -23,11 +22,9 @@ func GetTestRegistryUrl() string {
 
 func AdditionalTestFlags() {
 
-	MockCvmfs = flag.Bool("mock-cvmfs", true, "Mock cvmfs_server repo operations with local filesystem only")
-	Online = flag.Bool("online", false, "Use real registries for testing")
-	LocalRegistry = flag.Bool("local-registry", true, "Use local test container registry for testing")
-	flag.Parse()
-
+	*MockCvmfs = (os.Getenv("TEST_DUCC_NOMOCK") == "")
+	*Online = (os.Getenv("TEST_DUCC_ONLINE") == "")
+	*LocalRegistry = !(os.Getenv("TEST_DUCC_NOLOCALREGISTRY") == "")
 }
 
 func MockCvmfsSetup() {
