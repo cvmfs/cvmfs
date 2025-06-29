@@ -14,7 +14,6 @@ else()
     file(MAKE_DIRECTORY ${MAN_OUTPUT_DIR})
 
     # cvmfs2
-    get_filename_component(CVMFS2_BINARY_DIR "$<TARGET_FILE:cvmfs2>" DIRECTORY)
     add_custom_command(
         OUTPUT "${MAN_OUTPUT_DIR}/cvmfs2.1"
         COMMAND ${HELP2MAN} 
@@ -26,7 +25,7 @@ else()
             --name "cvmfs2: fuse client for the CernVM-Filesystem" 
             "$<TARGET_FILE:cvmfs2>"
         DEPENDS cvmfs2
-        WORKING_DIRECTORY ${CVMFS2_BINARY_DIR}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cvmfs/
         COMMENT "Generating man page for cvmfs2"
         VERBATIM
     )
