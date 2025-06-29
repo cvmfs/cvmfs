@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
