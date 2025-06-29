@@ -30,4 +30,4 @@ jobs:
            [ -z "$(go fmt ./...)" ]
       - name: Test with the Go CLI
         working-directory: ./ducc
-        run: go test -v ./...
+        run: go test -v ./... --online=true
