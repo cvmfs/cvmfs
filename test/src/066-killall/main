@@ -21,8 +21,8 @@ fs_setup(){
     exit 51
   fi
 
-	fallocate -l 8M -- "$SRC"
-	mkfs.ext4 -q -- "$SRC"
+	fallocate -l 8M -- "$SRC" &&\
+	mkfs.ext4 -q -- "$SRC" &&\
 	sudo mount -o loop -- "$SRC" "$DEST"
 }
 
@@ -193,7 +193,7 @@ cvmfs_run_test() {
     return 0
   fi
 
-  fs_setup
+  fs_setup || return 0
   trap fs_cleanup EXIT
 
   logdebug "Testing killall -r(reset fuse)"
