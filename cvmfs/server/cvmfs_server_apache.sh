@@ -69,14 +69,23 @@ wait_for_apache() {
 }
 
 
+get_url() {
+  local url="$1"
+  local timeout="$2"
+  local curlopts="$3"
+
+  curl -f -sS --max-time $timeout \
+    --retry 2 --retry-delay 5 $curlopts \
+    $(get_curl_proxy) $(get_x509_cert_settings) \
+    $(get_follow_http_redirects_flag) "$url"
+}
+
+
 check_url() {
   local url="$1"
   local timeout="$2"
 
-  curl -f -I --max-time $timeout \
-    --retry 2 --retry-delay 5 \
-    $(get_curl_proxy) $(get_x509_cert_settings) \
-    $(get_follow_http_redirects_flag) "$url" >/dev/null 2>&1
+  get_url "$1" "$2" -I >/dev/null 2>&1
 }
 
 

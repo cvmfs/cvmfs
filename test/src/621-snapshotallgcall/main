@@ -17,6 +17,10 @@ has_jq() {
   which jq >/dev/null 2>&1
 }
 
+get_last_gc() {
+  curl -f -s "$(get_repo_url $1)/.cvmfs_status.json"|grep last_gc
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -125,21 +129,21 @@ cvmfs_run_test() {
   echo "*** remove evidence of initial repo gc"
   ! has_jq || delete_from_backend $CVMFS_TEST_REPO .cvmfs_status.json || return 43
 
-  echo "*** running cvmfs_server gc -af"
-  cvmfs_server gc -af || return 44
+  echo "*** running cvmfs_server gc -Af"
+  cvmfs_server gc -Af || return 44
 
   if ! has_jq; then
     return 0
   fi
 
   echo "*** checking if gc worked on test repo and replicas 1 and 4"
-  curl -f -s "$(get_repo_url $CVMFS_TEST_REPO)/.cvmfs_status.json"|grep last_gc  || return 50
-  curl -f -s "$(get_repo_url ${replica_name}-1)/.cvmfs_status.json"|grep last_gc || return 51
-  curl -f -s "$(get_repo_url ${replica_name}-4)/.cvmfs_status.json"|grep last_gc || return 52
+  get_last_gc $CVMFS_TEST_REPO                            || return 50
+  get_last_gc ${replica_name}-1                           || return 51
+  get_last_gc ${replica_name}-4                           || return 52
 
   echo "*** verifying gc did not work on replicas 2 and 3"
-  curl -f -s "$(get_repo_url ${replica_name}-2)/.cvmfs_status.json"|grep last_gc && return 53
-  curl -f -s "$(get_repo_url ${replica_name}-3)/.cvmfs_status.json"|grep last_gc && return 54
+  get_last_gc ${replica_name}-2                           && return 53
+  get_last_gc ${replica_name}-3                           && return 54
 
   if ! running_on_s3; then
     echo "*** checking if (only) replica 0 is marked as pass-through"
@@ -155,6 +159,27 @@ cvmfs_run_test() {
   load_repo_config $CVMFS_TEST_REPO
   test -f ${CVMFS_SPOOL_DIR}/is_updating.lock && return 60
   test -f ${CVMFS_SPOOL_DIR}/is_collecting.lock && return 61
+
+  echo "*** checking to make sure gc -af skips repos collected more recently than upstream"
+
+  cvmfs_server gc -f $CVMFS_TEST_REPO                     || return 70
+  sleep 2 # make sure the timestamp is newer
+  cvmfs_server gc -f ${replica_name}-1                    || return 71
+
+  local rep1_last_gc rep4_last_gc rep1_now_gc rep4_now_gc
+  rep1_last_gc="$(get_last_gc ${replica_name}-1)"
+  [ -n "$rep1_last_gc" ]                                  || return 72
+  rep4_last_gc="$(get_last_gc ${replica_name}-4)"
+  [ -n "$rep4_last_gc" ]                                  || return 73
+
+  cvmfs_server gc -af                                     || return 74
+
+  rep1_now_gc="$(get_last_gc ${replica_name}-1)"
+  [ -n "$rep1_now_gc" ]                                   || return 80
+  rep4_now_gc="$(get_last_gc ${replica_name}-4)"
+  [ -n "$rep4_now_gc" ]                                   || return 81
+  [ "$rep1_last_gc" = "$rep1_now_gc" ]                    || return 82
+  [ "$rep4_last_gc" != "$rep4_now_gc" ]                   || return 83
 
   return 0
 }

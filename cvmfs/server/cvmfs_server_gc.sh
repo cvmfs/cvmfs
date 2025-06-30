@@ -18,13 +18,14 @@ cvmfs_server_gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
-  local all_collectable=0
+  local all_collect=0
+  local all_collected=0
   local deletion_log=""
   local reconstruct_reflog="0"
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:faL:" option
+  while getopts "ldr:t:faAL:" option
   do
     case $option in
       l)
@@ -43,7 +44,11 @@ cvmfs_server_gc() {
         force=1
       ;;
       a)
-        all_collectable=1
+        all_collect=1
+        all_collected=1
+      ;;
+      A)
+        all_collect=1
       ;;
       L)
         deletion_log="$OPTARG"
@@ -57,14 +62,14 @@ cvmfs_server_gc() {
   shift $(($OPTIND-1))
 
   # get repository names
-  if [ $all_collectable -ne 0 ] && [ -z "$@" ]; then
+  if [ $all_collect -ne 0 ] && [ -z "$@" ]; then
     set -- '*'
   fi
   check_parameter_count_for_multiple_repositories $#
   names=$(get_or_guess_multiple_repository_names "$@")
   check_multiple_repository_existence "$names"
 
-  if [ $all_collectable -ne 0 ]; then
+  if [ $all_collect -ne 0 ]; then
     # reduce the names to those that are collectable
     local collectable_names
     for name in $names; do
@@ -76,6 +81,24 @@ cvmfs_server_gc() {
     names="`echo $collectable_names`"
     if [ -z "$names" ]; then
       die "There are no active garbage-collectable repositories"
+    fi
+    if [ $all_collected -ne 0 ]; then
+      # further reduce the list to either stratum0s or replicas that have
+      # been collected upstream after they were collected here
+      collectable_names=""
+      for name in $names; do
+        if is_stratum0 $name || __was_garbage_collected_upstream $name; then
+          collectable_names="$collectable_names $name"
+        elif [ $dry_run -ne 0 ]; then
+          # pretend that gc was done to keep monitors happy
+          update_repo_status $name last_gc "`date --utc`"
+        fi
+      done
+      names="`echo $collectable_names`"
+      if [ -z "$names" ]; then
+        echo "There are no garbage-collectable repositories that were collected upstream"
+        exit
+      fi
     fi
   fi
 
@@ -131,7 +154,7 @@ cvmfs_server_gc() {
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
-  if [ $force -eq 0 ] || [ $all_collectable -eq 0 ]; then
+  if [ $force -eq 0 ] || [ $all_collect -eq 0 ]; then
     local dry_run_msg="no"
     if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
 
@@ -162,7 +185,7 @@ cvmfs_server_gc() {
 
   for name in $names; do
 
-    if [ $all_collectable -eq 0 ]; then
+    if [ $all_collect -eq 0 ]; then
       __do_gc_cmd "$name"                       \
                   "$dry_run"                    \
                   "$list_deleted_objects"       \
@@ -207,6 +230,51 @@ __restore_cvmfs_gateway() {
   else
     sudo service cvmfs-gateway start
   fi
+}
+
+# return true (0) if the upstream repo was garbage collected more recently
+# than the local repo, otherwise return a positive number indicating which
+# of the various ways it was not found to be more recent
+__was_garbage_collected_upstream() {
+  local name="$1"
+
+  load_repo_config $name
+  local upstreamstatus="$(get_url "${CVMFS_STRATUM0}/.cvmfs_status.json" 10 2>/dev/null)"
+  if [ -z "$upstreamstatus" ]; then
+    # status file not found upstream
+    return 1
+  fi
+  local upstreamdate="$(get_json_field "$upstreamstatus" "last_gc")"
+  if [ -z "$upstreamdate" ]; then
+    # last_gc date not found in status file upstream
+    return 2
+  fi
+  local localstatus="$(read_repo_item $name .cvmfs_status.json)"
+  if [ -z "$localstatus" ]; then
+    # status file not found locally
+    return 0
+  fi
+  local localdate="$(get_json_field "$localstatus" "last_gc")"
+  if [ -z "$localdate" ]; then
+    # last_gc date not found locally
+    return 0
+  fi
+  local upstreamepoch="$(date --date="$upstreamdate" +%s)"
+  if [ -z "$upstreamepoch" ]; then
+    # couldn't convert upstream last_gc date to epoch time
+    return 3
+  fi
+  local localepoch="$(date --date="$localdate" +%s)"
+  if [ -z "$localepoch" ]; then
+    # couldn't convert local last_gc date to epoch time
+    return 0
+  fi
+  if [ "$localepoch" -gt "$upstreamepoch" ]; then
+    # local last_gc time is greater than upstream last_gc time
+    return 4
+  fi
+  # local last_gc time is less than (or equal to) upstream last_gc time
+  return 0
 }
 
 # this is used when gc is invoked from the cvmfs_server command line
