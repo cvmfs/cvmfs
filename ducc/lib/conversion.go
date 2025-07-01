@@ -312,6 +312,10 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool)
 }
 
 func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool) (err error) {
+	if multiArch {
+
+	} else {
+	}
 	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
@@ -409,7 +413,7 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	defer os.RemoveAll(tmpDir)
 
 	// this will start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(layersChanell, manifestChanell, stopGettingLayers, tmpDir)
+	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir)
 	if err != nil {
 		return err
 	}

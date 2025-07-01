@@ -90,6 +90,11 @@ func SetupRegistries() {
 	}
 }
 
+//func (i *Image) GetNameWithArch() string {
+//	name := GetSimpleName()
+//  return name
+//}
+
 func (i *Image) GetSimpleName() string {
 	name := fmt.Sprintf("%s/%s", i.Registry, i.Repository)
 	if i.Tag == "" {
@@ -691,20 +696,13 @@ func (d *downloadedLayer) GetSize() int64 {
 	return 0
 }
 
-func (img *Image) GetLayers(layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
+func (img *Image) GetLayers(manifest da.Manifest, layersChan chan<- downloadedLayer, manifestChan chan<- string, stopGettingLayers <-chan bool, rootPath string) error {
 	defer close(layersChan)
 	defer close(manifestChan)
 
 	layerDownloader := NewLayerDownloader(img)
 	_, err := layerDownloader.getToken()
 	if err != nil {
-		return err
-	}
-
-	// then we try to get the manifest from our database
-	manifest, err := img.GetManifest()
-	if err != nil {
-		l.LogE(err).Warn("Error in getting the manifest")
 		return err
 	}
 
