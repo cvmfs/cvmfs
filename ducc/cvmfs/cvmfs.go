@@ -213,11 +213,10 @@ func GetBacklinkFromLayer(CVMFSRepo, layerDigest string) (backlink Backlink, err
 	return
 }
 
-func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, imageName string, layerDigest []string) error {
+func SaveLayersBacklink(CVMFSRepo string, imgManifest da.Manifest, layerDigest []string) error {
 	llog := func(l *log.Entry) *log.Entry {
 		return l.WithFields(log.Fields{"action": "save backlink",
-			"repo":  CVMFSRepo,
-			"image": imageName})
+			"repo": CVMFSRepo})
 	}
 
 	llog(l.Log()).Info("Start saving backlinks")

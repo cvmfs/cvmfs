@@ -338,7 +338,7 @@ func (img *Image) GetManifestList() (da.ManifestList, error) {
 	} else if err == nil {
 		var placeholderitem da.ManifestListItem
 		placeholderitem.Manifest = *manifest
-		placeholderitem.Platform.Architecture = "amd64" //for images without manifestlist, assume amd64 arch
+		placeholderitem.Platform.Architecture = "" //for images without manifestlist, assume amd64 arch
 		manifestList.Manifests = append(manifestList.Manifests, placeholderitem)
 		manifestList.MediaType = "SingleManifest"
 

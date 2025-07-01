@@ -312,158 +312,169 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool)
 }
 
 func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool) (err error) {
-	if multiArch {
+	manifestList, err := inputImage.GetManifestList()
+	path := filepath.Join("/", "cvmfs", repo, ".metadata")
+	nameWithArch := ""
+	err = nil
 
-	} else {
-	}
-	manifest, err := inputImage.GetManifest()
 	if err != nil {
 		return
 	}
-	manifestPath := filepath.Join("/", "cvmfs", repo, ".metadata", inputImage.GetSimpleName(), "manifest.json")
-	alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
-
-	if alreadyConverted == ConversionMatch {
-		if !convertAgain {
-			l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
-				"Already converted the image, skipping.")
-			return nil
+	for _, manifestEntry := range manifestList.Manifests {
+		manifest := manifestEntry.Manifest
+		if manifestEntry.Platform.Variant != nil {
+			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture, ":", *manifestEntry.Platform.Variant)
+		} else {
+			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
 		}
-	}
+		nameWithArch = filepath.Join(nameWithArch, inputImage.GetSimpleName())
+		manifestPath := filepath.Join(path, nameWithArch, "manifest.json")
+		alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
 
-	layersChanell := make(chan downloadedLayer, 10)
-	manifestChanell := make(chan string, 1)
-	stopGettingLayers := make(chan bool, 1)
-	noErrorInConversion := make(chan bool, 1)
+		if alreadyConverted == ConversionMatch {
+			if !convertAgain {
+				l.Log().WithFields(log.Fields{"alreadyConverted": alreadyConverted}).Info(
+					"Already converted the image, skipping.")
+				continue
+			}
+		}
 
-	layerDigestChan := make(chan string, 10)
+		layersChanell := make(chan downloadedLayer, 10)
+		manifestChanell := make(chan string, 1)
+		stopGettingLayers := make(chan bool, 1)
+		noErrorInConversion := make(chan bool, 1)
 
-	n := notification.NewNotification(NotificationService)
-	n = n.AddField("image", inputImage.GetSimpleName())
+		layerDigestChan := make(chan string, 10)
 
-	go func() {
-		noErrors := true
+		n := notification.NewNotification(NotificationService)
+		n = n.AddField("image", inputImage.GetSimpleName())
+
+		go func() {
+			noErrors := true
+			var wg sync.WaitGroup
+			defer func() {
+				wg.Wait()
+				close(layerDigestChan)
+			}()
+			defer func() {
+				noErrorInConversion <- noErrors
+				stopGettingLayers <- true
+				close(stopGettingLayers)
+			}()
+
+			for layer := range layersChanell {
+
+				l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
+				layerDigest := strings.Split(layer.Name, ":")[1]
+				layerPath := cvmfs.LayerRootfsPath(repo, layerDigest)
+
+				var pathExists bool
+				if _, err := os.Stat(layerPath); os.IsNotExist(err) {
+					pathExists = false
+				} else {
+					pathExists = true
+				}
+
+				// need to run this into a goroutine to avoid a deadlock
+				wg.Add(1)
+				go func(layerDigest string) {
+					layerDigestChan <- layerDigest
+					wg.Done()
+				}(layerDigest)
+
+				if pathExists == false || forceDownload {
+
+					ln := n.AddField("layer", layerDigest).AddId()
+					ln.Action("start_layer_conversion").Send()
+
+					t1 := time.Now()
+					err = layer.IngestIntoCVMFS(repo)
+
+					ln.Elapsed(t1).Action("end_layer_conversion").Error(err).SizeBytes(layer.GetSize()).Send()
+
+					if err != nil {
+						l.LogE(err).Error("Error in ingesting the layer in cvmfs")
+						noErrors = false
+					}
+					if err == nil {
+						n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
+					}
+					l.Log().WithFields(
+						log.Fields{"layer": layer.Name}).
+						Info("Finish Ingesting the file")
+				} else {
+					l.Log().WithFields(
+						log.Fields{"layer": layer.Name}).
+						Info("Skipping ingestion of layer, already exists")
+				}
+
+				layer.Close()
+			}
+			l.Log().Info("Finished pushing the layers into CVMFS")
+		}()
+		// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
+		tmpDir := ""
+		tmpDir, err = temp.UserDefinedTempDir("", "conversion")
+		if err != nil {
+			l.LogE(err).Error("Error in creating a temporary directory for all the files")
+			return
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// this will start to feed the above goroutine by writing into layersChanell
+		err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir)
+		if err != nil {
+			return err
+		}
+
 		var wg sync.WaitGroup
-		defer func() {
-			wg.Wait()
-			close(layerDigestChan)
+
+		var layerDigests []string
+		wg.Add(1)
+		go func() {
+			for layerDigest := range layerDigestChan {
+				layerDigests = append(layerDigests, layerDigest)
+			}
+			wg.Done()
 		}()
-		defer func() {
-			noErrorInConversion <- noErrors
-			stopGettingLayers <- true
-			close(stopGettingLayers)
-		}()
+		wg.Wait()
 
-		for layer := range layersChanell {
+		// we wait for the goroutines to finish
+		// and if there was no error we conclude everything writing the manifest into the repository
+		noErrorInConversionValue := <-noErrorInConversion
 
-			l.Log().WithFields(log.Fields{"layer": layer.Name}).Info("Start Ingesting the file into CVMFS")
-			layerDigest := strings.Split(layer.Name, ":")[1]
-			layerPath := cvmfs.LayerRootfsPath(repo, layerDigest)
+		err = cvmfs.SaveLayersBacklink(repo, manifest, layerDigests)
+		if err != nil {
+			l.LogE(err).Error("Error in saving the backlinks")
+			noErrorInConversionValue = false
+		}
 
-			var pathExists bool
-			if _, err := os.Stat(layerPath); os.IsNotExist(err) {
-				pathExists = false
-			} else {
-				pathExists = true
+		if noErrorInConversionValue {
+			manifestPath := filepath.Join(".metadata", nameWithArch, "manifest.json")
+			errIng := cvmfs.PublishToCVMFS(repo, manifestPath, <-manifestChanell)
+			if errIng != nil {
+				l.LogE(errIng).Error("Error in storing the manifest in the repository")
 			}
-
-			// need to run this into a goroutine to avoid a deadlock
-			wg.Add(1)
-			go func(layerDigest string) {
-				layerDigestChan <- layerDigest
-				wg.Done()
-			}(layerDigest)
-
-			if pathExists == false || forceDownload {
-
-				ln := n.AddField("layer", layerDigest).AddId()
-				ln.Action("start_layer_conversion").Send()
-
-				t1 := time.Now()
-				err = layer.IngestIntoCVMFS(repo)
-
-				ln.Elapsed(t1).Action("end_layer_conversion").Error(err).SizeBytes(layer.GetSize()).Send()
-
-				if err != nil {
-					l.LogE(err).Error("Error in ingesting the layer in cvmfs")
-					noErrors = false
+			var errRemoveSchedule error
+			if alreadyConverted == ConversionNotMatch {
+				l.Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
+				errRemoveSchedule = cvmfs.AddManifestToRemoveScheduler(repo, manifest)
+				if errRemoveSchedule != nil {
+					l.Log().Warning("Error in adding the image to the remove schedule")
+					return errRemoveSchedule
 				}
-				if err == nil {
-					n.Action("publish_layer").AddField("layer_digest", layerDigest).Send()
-				}
-				l.Log().WithFields(
-					log.Fields{"layer": layer.Name}).
-					Info("Finish Ingesting the file")
-			} else {
-				l.Log().WithFields(
-					log.Fields{"layer": layer.Name}).
-					Info("Skipping ingestion of layer, already exists")
 			}
-
-			layer.Close()
-		}
-		l.Log().Info("Finished pushing the layers into CVMFS")
-	}()
-	// we create a temp directory for all the files needed, when this function finish we can remove the temp directory cleaning up
-	tmpDir, err := temp.UserDefinedTempDir("", "conversion")
-	if err != nil {
-		l.LogE(err).Error("Error in creating a temporary directory for all the files")
-		return
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// this will start to feed the above goroutine by writing into layersChanell
-	err = inputImage.GetLayers(manifest, layersChanell, manifestChanell, stopGettingLayers, tmpDir)
-	if err != nil {
-		return err
-	}
-
-	var wg sync.WaitGroup
-
-	var layerDigests []string
-	wg.Add(1)
-	go func() {
-		for layerDigest := range layerDigestChan {
-			layerDigests = append(layerDigests, layerDigest)
-		}
-		wg.Done()
-	}()
-	wg.Wait()
-
-	// we wait for the goroutines to finish
-	// and if there was no error we conclude everything writing the manifest into the repository
-	noErrorInConversionValue := <-noErrorInConversion
-
-	err = cvmfs.SaveLayersBacklink(repo, manifest, inputImage.GetSimpleName(), layerDigests)
-	if err != nil {
-		l.LogE(err).Error("Error in saving the backlinks")
-		noErrorInConversionValue = false
-	}
-
-	if noErrorInConversionValue {
-		manifestPath := filepath.Join(".metadata", inputImage.GetSimpleName(), "manifest.json")
-		errIng := cvmfs.PublishToCVMFS(repo, manifestPath, <-manifestChanell)
-		if errIng != nil {
-			l.LogE(errIng).Error("Error in storing the manifest in the repository")
-		}
-		var errRemoveSchedule error
-		if alreadyConverted == ConversionNotMatch {
-			l.Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
-			errRemoveSchedule = cvmfs.AddManifestToRemoveScheduler(repo, manifest)
-			if errRemoveSchedule != nil {
-				l.Log().Warning("Error in adding the image to the remove schedule")
-				return errRemoveSchedule
+			if errIng == nil && errRemoveSchedule == nil {
+				l.Log().Info("Conversion completed")
+				return nil
 			}
+			return
+		} else {
+			l.Log().Warn("Some error during the conversion, we are not storing it into the database")
+			return
 		}
-		if errIng == nil && errRemoveSchedule == nil {
-			l.Log().Info("Conversion completed")
-			return nil
-		}
-		return
-	} else {
-		l.Log().Warn("Some error during the conversion, we are not storing it into the database")
-		return
 	}
+	return nil
 }
 
 func CreateThinImage(manifest da.Manifest, layerLocations map[string]string, inputImage, outputImage Image) (err error) {
