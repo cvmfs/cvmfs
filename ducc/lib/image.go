@@ -569,6 +569,12 @@ func (img *Image) GetSingularityPath() (string, error) {
 
 // the one that the user see, without the /cvmfs/$repo.cern.ch prefix
 // used mostly by Singularity
+func (i *Image) GetPublicSymlinkPathWithArch(arch string) string {
+	return filepath.Join(arch, i.Registry, i.Repository+":"+i.GetSimpleReference())
+}
+
+// the one that the user see, without the /cvmfs/$repo.cern.ch prefix
+// used mostly by Singularity
 func (i *Image) GetPublicSymlinkPath() string {
 	return filepath.Join(i.Registry, i.Repository+":"+i.GetSimpleReference())
 }
