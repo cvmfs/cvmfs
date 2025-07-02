@@ -37,7 +37,7 @@ const (
 	ConversionNotMatch = iota
 )
 
-func ConvertWishFlat(wish WishFriendly) error {
+func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 	var firstError = error(nil)
 
 	n := notification.NewNotification(NotificationService).AddField("image_request", wish.InputName)
@@ -313,7 +313,7 @@ func ConvertWish(wish WishFriendly, convertAgain, forceDownload, multiArch bool)
 
 func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownload bool, multiArch bool) (err error) {
 	manifestList, err := inputImage.GetManifestList()
-	path := filepath.Join("/", "cvmfs", repo, ".metadata")
+	path := ""
 	nameWithArch := ""
 	err = nil
 
@@ -321,9 +321,11 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		return
 	}
 	for _, manifestEntry := range manifestList.Manifests {
+		path = filepath.Join("/", "cvmfs", repo, ".metadata")
+		nameWithArch = ""
 		manifest := manifestEntry.Manifest
 		if manifestEntry.Platform.Variant != nil {
-			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture, ":", *manifestEntry.Platform.Variant)
+			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
 		} else {
 			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
 		}
@@ -450,8 +452,8 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		}
 
 		if noErrorInConversionValue {
-			manifestPath := filepath.Join(".metadata", nameWithArch, "manifest.json")
-			errIng := cvmfs.PublishToCVMFS(repo, manifestPath, <-manifestChanell)
+			manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
+			errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
 			if errIng != nil {
 				l.LogE(errIng).Error("Error in storing the manifest in the repository")
 			}

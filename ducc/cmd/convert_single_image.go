@@ -77,7 +77,7 @@ var convertSingleImageCmd = &cobra.Command{
 
 		if !skipFlat {
 			for i := 0; i < attempts; i++ {
-				err = lib.ConvertWishFlat(wish)
+				err = lib.ConvertWishFlat(wish, multiArch)
 				log := l.LogE(err).WithFields(fields).
 					WithFields(log.Fields{"attempts number": i})
 				if err != nil {
