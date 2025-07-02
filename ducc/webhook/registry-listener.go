@@ -102,7 +102,7 @@ func checkImageType(msg string) (string, error) {
 	host := segments[0]
 	project := segments[1]
 
-	 // Join the remaining segments (everything after host and project) using %252F
+	// Join the remaining segments (everything after host and project) using %252F
 	pathParts := segments[2:]
 	if len(pathParts) < 1 {
 		return "", fmt.Errorf("repository part is missing")
@@ -120,7 +120,7 @@ func checkImageType(msg string) (string, error) {
 	} else {
 		repo = repoParts[0]
 	}
-        tag := repoParts[1]
+	tag := repoParts[1]
 
 	// Build API URL
 	apiURL := fmt.Sprintf("https://%s/api/v2.0/projects/%s/repositories/%s/artifacts/%s", host, project, repo, tag)
