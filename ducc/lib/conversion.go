@@ -37,6 +37,23 @@ const (
 	ConversionNotMatch = iota
 )
 
+func GetNameWithArch(manifestEntry da.ManifestListItem) (nameWithArch string) {
+
+	nameWithArch = ""
+	//manifest := manifestEntry.Manifest
+
+	if manifestEntry.Platform.Variant != nil {
+		nameWithArch = filepath.Join(".multiarch", nameWithArch, manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
+	} else {
+		if manifestEntry.Platform.Architecture == "" {
+			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
+		} else {
+			nameWithArch = filepath.Join(".multiarch", nameWithArch, manifestEntry.Platform.Architecture)
+		}
+	}
+	return nameWithArch
+}
+
 func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 	var firstError = error(nil)
 
@@ -56,19 +73,20 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 	if err := cvmfs.CreateCatalogIntoDir(wish.CvmfsRepo, ".flat"); err != nil {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
+
+	if _, err := os.Stat(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current")); err != nil {
+		cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
+			os.MkdirAll(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch"), constants.DirPermision)
+			return os.Symlink("${CVMFS_DOCKER_ARCH:-"+filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "amd64")+"}", filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current"))
+		})
+	}
 	nameWithArch := ""
 	for _, inputImage := range wish.ExpandedTagImagesFlat {
 
 		manifestList, _ := inputImage.GetManifestList()
 		for _, manifestEntry := range manifestList.Manifests {
 
-			nameWithArch = ""
-			//manifest := manifestEntry.Manifest
-			if manifestEntry.Platform.Variant != nil {
-				nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
-			} else {
-				nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
-			}
+			nameWithArch = GetNameWithArch(manifestEntry)
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
 			pubDirInfo, errPub := os.Stat(completePubSymPath)
@@ -335,13 +353,8 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 	}
 	for _, manifestEntry := range manifestList.Manifests {
 		path = filepath.Join("/", "cvmfs", repo, ".metadata")
-		nameWithArch = ""
 		manifest := manifestEntry.Manifest
-		if manifestEntry.Platform.Variant != nil {
-			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture+":"+*manifestEntry.Platform.Variant)
-		} else {
-			nameWithArch = filepath.Join(nameWithArch, manifestEntry.Platform.Architecture)
-		}
+		nameWithArch = GetNameWithArch(manifestEntry)
 		nameWithArch = filepath.Join(nameWithArch, inputImage.GetSimpleName())
 		manifestPath := filepath.Join(path, nameWithArch, "manifest.json")
 		alreadyConverted := AlreadyConverted(manifestPath, manifest.Config.Digest)
@@ -465,7 +478,9 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 		}
 
 		if noErrorInConversionValue {
+
 			manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
+			l.Log().Info("manifestPath2", manifestPath2)
 			errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
 			if errIng != nil {
 				l.LogE(errIng).Error("Error in storing the manifest in the repository")
