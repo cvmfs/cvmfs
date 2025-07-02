@@ -558,6 +558,16 @@ func filterUsingGlob(pattern string, toFilter []string) ([]string, error) {
 }
 
 // here is where in the FS we are going to store the singularity image
+func (img *Image) GetSingularityPath2(manifest da.Manifest) (string, error) {
+	var err error
+	if err != nil {
+		l.LogE(err).Error("Error in getting the manifest to figureout the singularity path")
+		return "", err
+	}
+	return manifest.GetSingularityPath(), nil
+}
+
+// here is where in the FS we are going to store the singularity image
 func (img *Image) GetSingularityPath() (string, error) {
 	manifest, err := img.GetManifest()
 	if err != nil {

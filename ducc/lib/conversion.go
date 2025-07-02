@@ -86,12 +86,13 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		manifestList, _ := inputImage.GetManifestList()
 		for _, manifestEntry := range manifestList.Manifests {
 
+			manifest := manifestEntry.Manifest
 			nameWithArch = GetNameWithArch(manifestEntry)
 			publicSymlinkPath := inputImage.GetPublicSymlinkPathWithArch(nameWithArch)
 			completePubSymPath := filepath.Join("/", "cvmfs", wish.CvmfsRepo, publicSymlinkPath)
 			pubDirInfo, errPub := os.Stat(completePubSymPath)
 
-			singularityPrivatePath, err := inputImage.GetSingularityPath()
+			singularityPrivatePath, err := inputImage.GetSingularityPath2(manifest)
 			if err != nil {
 				errF := fmt.Errorf("Error in getting the path where to save Singularity filesystem: %s", err)
 				l.LogE(err).Warning(errF)
@@ -466,6 +467,12 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 			wg.Done()
 		}()
 		wg.Wait()
+		manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
+		l.Log().Info("manifestPath2", manifestPath2)
+		errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
+		if errIng != nil {
+			l.LogE(errIng).Error("Error in storing the manifest in the repository")
+		}
 
 		// we wait for the goroutines to finish
 		// and if there was no error we conclude everything writing the manifest into the repository
@@ -479,12 +486,6 @@ func convertInputOutput(inputImage *Image, repo string, convertAgain, forceDownl
 
 		if noErrorInConversionValue {
 
-			manifestPath2 := filepath.Join(".metadata", nameWithArch, "manifest.json")
-			l.Log().Info("manifestPath2", manifestPath2)
-			errIng := cvmfs.PublishToCVMFS(repo, manifestPath2, <-manifestChanell)
-			if errIng != nil {
-				l.LogE(errIng).Error("Error in storing the manifest in the repository")
-			}
 			var errRemoveSchedule error
 			if alreadyConverted == ConversionNotMatch {
 				l.Log().Info("Image already converted, but it does not match the manifest, adding it to the remove scheduler")
