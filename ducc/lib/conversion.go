@@ -74,12 +74,12 @@ func ConvertWishFlat(wish WishFriendly, multiArch bool) error {
 		l.LogE(err).Error("Error in creating catalog inside `.flat` directory")
 	}
 
-	if _, err := os.Stat(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current")); err != nil {
-		cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
-			os.MkdirAll(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch"), constants.DirPermision)
-			return os.Symlink("${CVMFS_DOCKER_ARCH:-"+filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "amd64")+"}", filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current"))
-		})
-	}
+	//if _, err := os.Stat(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current")); err != nil {
+	//	cvmfs.WithinTransaction(wish.CvmfsRepo, func() error {
+	//		os.MkdirAll(filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch"), constants.DirPermision)
+	//		return os.Symlink("${CVMFS_DOCKER_ARCH:-"+filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "amd64")+"}", filepath.Join("/", "cvmfs", wish.CvmfsRepo, ".multiarch", "current"))
+	//	})
+	//}
 	nameWithArch := ""
 	for _, inputImage := range wish.ExpandedTagImagesFlat {
 
