@@ -687,6 +687,10 @@ func (d *downloadedLayer) IngestIntoCVMFS(CVMFSRepo string) error {
 	superDir := filepath.Dir(filepath.Dir(cvmfs.TrimCVMFSRepoPrefix(layerPath)))
 	go cvmfs.CreateCatalogIntoDir(CVMFSRepo, superDir)
 	ingestPath := cvmfs.TrimCVMFSRepoPrefix(layerPath)
+
+	l.Log().WithFields(
+		log.Fields{"ingestPath": ingestPath}).
+		Info("ingetstPath")
 	err := cvmfs.Ingest(CVMFSRepo, d.Path,
 		"--catalog", "-t", "-",
 		"-b", ingestPath)
