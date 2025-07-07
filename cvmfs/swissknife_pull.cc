@@ -495,6 +495,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   shash::Any meta_info_hash;
   string meta_info;
   shash::Any previous_catalog_hash;
+  shash::Any current_catalog_hash;
 
   // Option parsing
   if (args.find('c') != args.end())
@@ -771,15 +772,16 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
+  current_catalog_hash = ensemble.manifest->catalog_hash();
   do {
-    retval = Pull(ensemble.manifest->catalog_hash(), "", previous_catalog_hash);
+    retval = Pull(current_catalog_hash, "", previous_catalog_hash);
     if (pull_history && !previous_catalog_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                previous_catalog_hash.ToString().c_str());
     }
+    current_catalog_hash = previous_catalog_hash;
   } while (pull_history && !previous_catalog_hash.IsNull());
 
-  pull_history = false;
   if (!historic_tags.empty()) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Checking tagged snapshots...");
   }
@@ -794,12 +796,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     apply_timestamp_threshold = false;
 
     const bool retval2;
+    current_catalog_hash = i->root_hash;
     do {
-      retval2 = Pull(i->root_hash, "", previous_catalog_hash);
+      retval2 = Pull(current_catalog_hash, "", previous_catalog_hash);
       if (pull_history && !previous_catalog_hash.IsNull()) {
         LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                  previous_catalog_hash.ToString().c_str());
       }
+      current_catalog_hash = previous_catalog_hash;
     } while (pull_history && !previous_catalog_hash.IsNull());
     retval = retval && retval2;
   }
