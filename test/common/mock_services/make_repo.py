@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ CVMFS testing helper script to generate a populated nested directory.
 
 Example usage:

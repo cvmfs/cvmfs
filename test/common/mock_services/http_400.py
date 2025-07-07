@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 try:
   import http.server as BaseHTTPServer
   import socketserver as SocketServer
