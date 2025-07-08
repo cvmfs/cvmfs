@@ -795,7 +795,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              i->name.c_str());
     apply_timestamp_threshold = false;
 
-    const bool retval2;
+    bool retval2;
     current_catalog_hash = i->root_hash;
     do {
       retval2 = Pull(current_catalog_hash, "", previous_catalog_hash);
