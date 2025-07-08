@@ -310,7 +310,7 @@ bool CommandPull::PullRecursion(catalog::Catalog *catalog,
          ++i) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
                i->mountpoint.c_str());
-      shash::Any previous_catalog_hash;  // expected to be null for subcataolg
+      shash::Any previous_catalog_hash;  // expected to be null for subcatalog
       const bool retval = Pull(i->hash, i->mountpoint.ToString(),
                          previous_catalog_hash);
       if (!retval)
