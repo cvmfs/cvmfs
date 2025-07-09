@@ -8,24 +8,18 @@ CVMFS_TEST084_FUSEPREMOUNT=
 
 cleanup() {
   echo "*** cleanup "
-  if [ x"$CVMFS_TEST084_FUSEPREMOUNT" != "x" ]; then
-    sudo rm -f "$CVMFS_TEST084_FUSEPREMOUNT"
-  fi
   if [ x"$CVMFS_TEST084_MOUNTPOINT" != "x" ]; then
     sudo umount $CVMFS_TEST084_MOUNTPOINT
     rmdir $CVMFS_TEST084_MOUNTPOINT
     echo "  *** unmounted $CVMFS_TEST084_MOUNTPOINT"
   fi
-  if [ x"$workdir" != "x" ]; then
-    rm -rf $workdir
-  fi
+  trap '' HUP EXIT TERM INT
 }
 
 cvmfs_run_test() {
   local logfile=$1
   local sourcedir="$2"
-  workdir="/tmp/cvmfs-test/workdir-084-premount"
-  mkdir -p $workdir
+  workdir="$PWD"
 
   echo "*** creating fuse-premount"
   cc -o $workdir/fuse_premount "$sourcedir/fuse_premount.c" || return 1
@@ -57,7 +51,6 @@ EOF
   ls -lah "$CVMFS_TEST084_MOUNTPOINT" > $workdir/cvm-test-084-repo-listing.log  || return 12
   echo "*** checking dirtab in  $CVMFS_TEST084_MOUNTPOINT"
   cat "$CVMFS_TEST084_MOUNTPOINT/.cvmfsdirtab" > $workdir/cvm-test-084-repo-dirtab.log || return 13
-
 
   echo "*** finished successfully!"
   cleanup
