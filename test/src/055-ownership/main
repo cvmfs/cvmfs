@@ -6,7 +6,10 @@ cvmfs_test_suites="quick"
 cvmfs_run_test() {
   logfile=$1
 
-  local cvmfs_user=$(sh -c '. /etc/cvmfs/default.conf && echo $CVMFS_USER')
+  local cvmfs_user=$(
+    eval "$(cvmfs_config showconfig grid.cern.ch | grep CVMFS_USER=)"
+    echo $CVMFS_USER
+  )
   local cvmfs_uid=$(get_user_data "$cvmfs_user" | cut -d: -f3)
   local cvmfs_gid=$(get_user_data "$cvmfs_user" | cut -d: -f4)
 
