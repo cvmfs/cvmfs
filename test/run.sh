@@ -279,9 +279,9 @@ do
 
   # write some status info to the screen
   TEST_NR="$(basename $t | head -c3)"
-  to_syslog "Test $TEST_NR (${cvmfs_test_name}) started"
-  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $TEST_NR)" >> $logfile
-  echo -n "Testing ${cvmfs_test_name}... "
+  to_syslog "Test $t (${cvmfs_test_name}) started"
+  echo "-- Testing $t ${cvmfs_test_name} ($(date "+%F %T %z"))" >> $logfile
+  echo -n "Testing $t ${cvmfs_test_name}... "
   echo "$cvmfs_test_name"          > ${scratchdir}/name
   echo "$(basename $t | head -c3)" > ${scratchdir}/number
 
@@ -343,7 +343,7 @@ do
   fi
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
-  echo "execution took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
+  echo "Execution of $t took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
   echo "$test_time_elapsed" > ${scratchdir}/elapsed
   echo "$RETVAL"            > ${scratchdir}/retval
 
@@ -357,42 +357,42 @@ do
   case $RETVAL in
     0)
       clean_workdir
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished successfully"
-      report_passed "Test passed" >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) finished successfully"
+      report_passed "Test $t passed ($(date "+%F %T %z"))" >> $logfile
       touch ${scratchdir}/success
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
       clean_workdir
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with memory warning"
-      report_warning "Memory limit exceeded!" >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) finished with memory warning"
+      report_warning "Test $t exceeded memory limit ($(date "+%F %T %z"))" >> $logfile
       touch ${scratchdir}/memorywarning
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
       clean_workdir
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with time warning"
-      report_warning "Time limit exceeded!" >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) finished with time warning"
+      report_warning "Test $t exceeded time limit ($(date "+%F %T %z"))" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/timewarning
       echo "Time Warning!"
       ;;
     $CVMFS_GENERAL_WARNING)
       clean_workdir
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) finished with warning"
-      report_warning "Test case finished with warnings!" >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) finished with warning"
+      report_warning "Test $t finished with warnings! ($(date "+%F %T %z"))" >> $logfile
       touch ${scratchdir}/generalwarning
       echo "Warning!"
       ;;
     $CVMFS_TEST_RETVAL_TIMEOUT)
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) timed out"
-      report_failure "Testcase timed out" $workdir >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) timed out"
+      report_failure "Test $t timed out ($(date "+%F %T %z"))" $workdir >> $logfile
       touch ${scratchdir}/failure
       echo "Timeout!"
       ;;
     *)
-      to_syslog "Test $TEST_NR (${cvmfs_test_name}) failed"
-      report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
+      to_syslog "Test $t (${cvmfs_test_name}) failed"
+      report_failure "Test $t failed with RETVAL $RETVAL ($(date "+%F %T %z"))" $workdir >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/failure
       echo "Failed!"
