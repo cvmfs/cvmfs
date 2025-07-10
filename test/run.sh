@@ -268,7 +268,11 @@ do
     continue
   fi
 
-  wc -l < $logfile > ${scratchdir}/log_begin
+  # Allow non-regular files e.g. /dev/stdout to be used as logfile.
+  # Don't expect the possibility to read it back.
+  if [[ -f "$logfile" ]]; then
+    wc -l < "$logfile" > ${scratchdir}/log_begin
+  fi
 
   cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   if ! . $t/main; then
@@ -320,7 +324,11 @@ do
     echo "Failed! (setup)"
     echo "0"         > ${scratchdir}/elapsed
     echo "102"       > ${scratchdir}/retval
-    wc -l < $logfile > ${scratchdir}/log_end
+    # Allow non-regular files e.g. /dev/stdout to be used as logfile.
+    # Don't expect the possibility to read it back.
+    if [[ -f "$logfile" ]]; then
+      wc -l < "$logfile" > ${scratchdir}/log_end
+    fi
     touch              ${scratchdir}/failure
     continue
   fi
@@ -399,7 +407,11 @@ do
       ;;
   esac
 
-  wc -l < $logfile > ${scratchdir}/log_end
+  # Allow non-regular files e.g. /dev/stdout to be used as logfile.
+  # Don't expect the possibility to read it back.
+  if [[ -f "$logfile" ]]; then
+    wc -l < "$logfile" > ${scratchdir}/log_end
+  fi
 done
 
 testsuite_end="$(get_millisecond_epoch)"
