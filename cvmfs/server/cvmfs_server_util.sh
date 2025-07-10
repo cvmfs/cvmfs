@@ -362,20 +362,25 @@ __hc_transition() {
 
 ### Locking functions
 
+declare -A _lock_fds
 
 acquire_lock() {
   local path="$1"
   local lock_file="${path}.lock"
-  exec 9<>${lock_file}
-  flock -n 9
+  exec {_lock_fds[$path]}<>${lock_file}
+  if ! flock -n ${_lock_fds[$path]}; then
+    exec {_lock_fds[$path]}<&-
+    unset _lock_fds[$path]
+    return 1
+  fi
 }
 
 
 wait_and_acquire_lock() {
   local path="$1"
   local lock_file="${path}.lock"
-  exec 9<>${lock_file}
-  flock 9
+  exec {_lock_fds[$path]}<>${lock_file}
+  flock ${_lock_fds[$path]}
 }
 
 
@@ -383,7 +388,8 @@ release_lock() {
   local path="$1"
   local lock_file="${path}.lock"
   rm -f $lock_file
-  exec 9<&-
+  exec {_lock_fds[$path]}<&-
+  unset _lock_fds[$path]
 }
 
 
