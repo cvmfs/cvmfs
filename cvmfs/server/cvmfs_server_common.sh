@@ -828,7 +828,7 @@ acquire_update_lock()
     fi
 
     echo "waiting for another update to finish..."
-    if ! wait_and_acquire_lock $update_lock; then
+    if ! acquire_lock $update_lock 1; then
       echo "failed to acquire update lock"
       to_syslog_for_repo $name "did not $update_type (locking issues)"
       return 1
@@ -877,7 +877,7 @@ acquire_gc_lock()
     fi
 
     echo "Waiting for gc on $name to finish..."
-    if ! wait_and_acquire_lock $gc_lock; then
+    if ! acquire_lock $gc_lock 1; then
       echo "failed to acquire gc lock"
       to_syslog_for_repo $name "did not $check_type (locking issues)"
       return 1

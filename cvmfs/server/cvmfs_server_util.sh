@@ -366,21 +366,28 @@ declare -A _lock_fds
 
 acquire_lock() {
   local path="$1"
+  local wait_for_lock="${2:-0}"
   local lock_file="${path}.lock"
-  exec {_lock_fds[$path]}<>${lock_file}
-  if ! flock -n ${_lock_fds[$path]}; then
+  while true; do
+    exec {_lock_fds[$path]}<>${lock_file}
+    if [ $wait_for_lock -eq 0 ]; then
+      if ! flock -n ${_lock_fds[$path]}; then
+        # didn't get it, clean up and return failure
+        exec {_lock_fds[$path]}<&-
+        unset _lock_fds[$path]
+        return 1
+      fi
+    else
+      flock ${_lock_fds[$path]}
+    fi
+    # now have the lock
+    if [ -f $lock_file ]; then
+      # was not removed by the former lock holder, good
+      break
+    fi
+    # was removed by former lock holder; close and try again
     exec {_lock_fds[$path]}<&-
-    unset _lock_fds[$path]
-    return 1
-  fi
-}
-
-
-wait_and_acquire_lock() {
-  local path="$1"
-  local lock_file="${path}.lock"
-  exec {_lock_fds[$path]}<>${lock_file}
-  flock ${_lock_fds[$path]}
+  done
 }
 
 
