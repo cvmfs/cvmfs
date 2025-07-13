@@ -1,0 +1,24 @@
+name: Test cvmfs_server_util.sh
+
+on:
+  push:
+      paths:
+        - 'cvmfs/server/**'
+      branches: ['devel', 'cvmfs*']
+  pull_request:
+      paths:
+        - 'cvmfs/server/**'
+      branches: ['devel', 'cvmfs*']
+
+jobs:
+  docker:
+    name: "test_cvmfs_server"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Test CVMFS server util
+        run: | 
+           cd cvmfs/server
+           . test_cvmfs_server_util.sh
+
