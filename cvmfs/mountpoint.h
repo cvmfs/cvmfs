@@ -100,6 +100,7 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CacheSettings);
   FRIEND_TEST(T_MountPoint, CheckInstanceName);
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
+  FRIEND_TEST(T_Cvmfs, Basics);
 
  public:
   enum Type {
@@ -250,6 +251,9 @@ class FileSystem : SingleCopy, public BootFactory {
   Type type() { return type_; }
   cvmfs::Uuid *uuid_cache() { return uuid_cache_; }
   std::string workspace() { return workspace_; }
+
+ protected:
+  void SetHasCustomVfs(bool setting) { has_custom_sqlitevfs_ = setting; }
 
  private:
   /**
@@ -549,6 +553,10 @@ class MountPoint : SingleCopy, public BootFactory {
   void DisableCacheSymlinks();
   void EnableFuseExpireEntry();
 
+  MountPoint(const std::string &fqrn,
+             FileSystem *file_system,
+             OptionsManager *options_mgr);
+
  private:
   /**
    * The maximum TTL can be used to cap a root catalogs registered ttl.  By
@@ -598,9 +606,6 @@ class MountPoint : SingleCopy, public BootFactory {
   static const int kDefaultTelemetrySendRateSec = 5 * 60;  // 5min
   static const int kMinimumTelemetrySendRateSec = 5;       // 5sec
 
-  MountPoint(const std::string &fqrn,
-             FileSystem *file_system,
-             OptionsManager *options_mgr);
 
   void CreateStatistics();
   void CreateAuthz();

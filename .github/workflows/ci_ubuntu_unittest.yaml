@@ -1,0 +1,78 @@
+name: unittest_ubuntu
+on:
+  pull_request:
+    branches: [devel, cvmfs*]
+  push:
+  workflow_dispatch:
+
+jobs:
+  unittest_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+
+      - id: lsb-release
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            source /etc/lsb-release
+            echo "id=${DISTRIB_ID}" >> $GITHUB_OUTPUT
+            echo "release=${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "codename=${DISTRIB_CODENAME}" >> $GITHUB_OUTPUT
+            echo "description=${DISTRIB_DESCRIPTION}" >> $GITHUB_OUTPUT
+            echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            echo "id-release=macOS-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
+        run: |
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            # we could add the hash of the control file here
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs
+          mk-build-deps ./packaging/debian/cvmfs/control
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+      - name: Hash Externals
+        id: get-externals-hash
+        run: |
+          echo "hash=$(ls -Rs externals | sha1sum)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Build CVMFS
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir build; cd build
+          cmake .. -DBUILD_UNITTESTS=ON
+          make -j 8
+          cd ..
+      - name: Run Unittests - Mockfuse
+        run: |
+          ./build/test/unittests/cvmfs_unittests_mockfuse
+      - name: Run Unittests - Regular
+        run: |
+          ./build/test/unittests/cvmfs_unittests
