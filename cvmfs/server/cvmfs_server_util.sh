@@ -362,23 +362,24 @@ __hc_transition() {
 
 ### Locking functions
 
-declare -A _lock_fds
+_lock_fds=""
+_lock_paths=""
 
 acquire_lock() {
   local path="$1"
   local wait_for_lock="${2:-0}"
   local lock_file="${path}.lock"
+  local lock_fd
   while true; do
-    exec {_lock_fds[$path]}<>${lock_file}
+    exec {lock_fd}<>${lock_file}
     if [ $wait_for_lock -eq 0 ]; then
-      if ! flock -n ${_lock_fds[$path]}; then
+      if ! flock -n ${lock_fd}; then
         # didn't get it, clean up and return failure
-        exec {_lock_fds[$path]}<&-
-        unset _lock_fds[$path]
+        exec {lock_fd}<&-
         return 1
       fi
     else
-      flock ${_lock_fds[$path]}
+      flock ${lock_fd}
     fi
     # now have the lock
     if [ -f $lock_file ]; then
@@ -386,17 +387,49 @@ acquire_lock() {
       break
     fi
     # was removed by former lock holder; close and try again
-    exec {_lock_fds[$path]}<&-
+    exec {lock_fd}<&-
   done
+  # add the fd number and path to the two lists
+  _lock_fds="$_lock_fds $lock_fd"
+  _lock_paths="$_lock_paths $path"
 }
 
 
 release_lock() {
   local path="$1"
   local lock_file="${path}.lock"
+  local lock_fd=-1
+  # Find the index of $path in $_lock_paths and from that find $lock_fd.
+  # Would be much easier with an associative array if we could rely on bash.
+  local index=0
+  local lock_index=0
+  local lock_path
+  local new_paths=""
+  for lock_path in $_lock_paths; do
+    let index+=1
+    if [ "$path" = "$lock_path" ]; then
+      lock_index=$index
+    else
+      new_paths="$new_paths $lock_path"
+    fi
+  done
+  [ "$lock_index" != 0 ] || die "attempt to release $path lock when it was not acquired"
+  index=0
+  local fd
+  local new_fds
+  for fd in $_lock_fds; do
+    let index+=1
+    if [ "$index" = "$lock_index" ]; then
+      lock_fd=$fd
+    else
+      new_fds="$new_fds $fd"
+    fi
+  done
+  [ "$lock_fd" != -1 ] || die "_lock_fds and _lock_paths out of sync while releasing $path lock"
+  _lock_fds="$new_fds"
+  _lock_paths="$new_paths"
   rm -f $lock_file
-  exec {_lock_fds[$path]}<&-
-  unset _lock_fds[$path]
+  exec {lock_fd}<&-
 }
 
 
