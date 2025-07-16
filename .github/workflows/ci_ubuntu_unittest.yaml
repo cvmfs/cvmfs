@@ -63,7 +63,7 @@ jobs:
       - name: Build CVMFS
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3
+          sudo apt-get -y install devscripts ccache apache2 libapache2-mod-wsgi-py3 gdb
           export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           mkdir build; cd build
