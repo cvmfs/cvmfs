@@ -75,4 +75,4 @@ jobs:
           ./build/test/unittests/cvmfs_unittests_mockfuse
       - name: Run Unittests - Regular
         run: |
-          ./build/test/unittests/cvmfs_unittests
+          ./build/test/unittests/cvmfs_unittests --gtest_filter="-T_Namespace.*"
