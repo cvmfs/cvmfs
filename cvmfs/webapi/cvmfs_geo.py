@@ -134,6 +134,10 @@ def name_geoinfo(now, name):
     if (len(name) > 256) or not addr_pattern.search(name):
         return None
 
+# ignore short names and non-FQDNs in lookups, since they will fail anyway:
+    if "." not in name:
+        return None
+        
     global namelookups
     namelock.acquire()
     if name in geo_cache:
