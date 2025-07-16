@@ -11,7 +11,6 @@ project (${PROJECT_NAME})
 
 message ("Running CMake version ${CMAKE_VERSION}")
 
-set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 
 #
 # The version numbers
