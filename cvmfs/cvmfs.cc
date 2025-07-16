@@ -1548,7 +1548,8 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
   const HighPrecisionTimer guard_timer(file_system_->hist_fs_release());
 
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
-
+  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
+  uint64_t(ino));
 
 #ifdef __APPLE__
   if (fi->fh == kFileHandleIgnore) {
@@ -2312,7 +2313,6 @@ static unsigned CheckMaxOpenFiles() {
 
   return max_open_files;
 }
-
 
 
 static int Init(const loader::LoaderExports *loader_exports) {

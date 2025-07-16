@@ -11,7 +11,6 @@ project (${PROJECT_NAME})
 
 message ("Running CMake version ${CMAKE_VERSION}")
 
-
 #
 # The version numbers
 #
