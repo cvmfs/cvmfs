@@ -265,7 +265,8 @@ class PosixQuotaManager : public QuotaManager {
                                std::string *cache_dir,
                                std::string *workspace_dir);
   PosixQuotaManager(const uint64_t limit, const uint64_t cleanup_threshold,
-                    const std::string &cache_workspace);
+                    const std::string &cache_workspace,
+                    const bool use_of_aware_cleanup = false);
 
   /**
    * Indicates if the cache manager is a shared process or a thread within the

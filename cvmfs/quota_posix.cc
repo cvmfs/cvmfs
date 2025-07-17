@@ -258,11 +258,8 @@ PosixQuotaManager *PosixQuotaManager::Create(const string &cache_workspace,
   }
 
   PosixQuotaManager *quota_manager = new PosixQuotaManager(
-      limit, cleanup_threshold, cache_workspace);
+      limit, cleanup_threshold, cache_workspace, use_of_aware_cleanup);
 
-  if (quota_manager){
-    quota_manager->use_non_open_lru_cleanup_=use_of_aware_cleanup;
-  }
   // Initialize cache catalog
   if (!quota_manager->InitDatabase(rebuild_database)) {
     delete quota_manager;
@@ -302,12 +299,11 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   }
 
   PosixQuotaManager *quota_mgr = new PosixQuotaManager(limit, cleanup_threshold,
-                                                       cache_workspace);
+                                                       cache_workspace, use_of_aware_cleanup);
 
   if(quota_mgr){
     quota_mgr->shared_ = true;
     quota_mgr->spawned_ = true;
-    quota_mgr->use_non_open_lru_cleanup_=use_of_aware_cleanup;
   }
 
   // Try to connect to pipe
@@ -1732,7 +1728,8 @@ bool PosixQuotaManager::Pin(const shash::Any &hash,
 
 PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
                                      const uint64_t cleanup_threshold,
-                                     const string &cache_workspace)
+                                     const string &cache_workspace,
+                                     const bool use_of_aware_cleanup)
     : shared_(false)
     , spawned_(false)
     , limit_(limit)
@@ -1759,6 +1756,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_pinned_(NULL)
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
+    , use_non_open_lru_cleanup_(use_of_aware_cleanup)
     , initialized_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
