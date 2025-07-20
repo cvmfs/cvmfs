@@ -1,5 +1,6 @@
 test/test.log
 *.swp
+*.kate-swp
 test/mylog
 *.DS_Store
 *._.DS_Store
@@ -23,6 +24,7 @@ python/MANIFEST
 .cproject
 .metadata
 .settings
+.cache
 RemoteSystemsTempFiles/
 
 # Externals

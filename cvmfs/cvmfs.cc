@@ -108,9 +108,9 @@
 #include "util/logging.h"
 #include "util/mutex.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "util/posix.h"
 #include "util/testing.h"
 #include "util/uuid.h"
 #include "wpad.h"
@@ -120,7 +120,7 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-#ifndef __TEST_CVMFS_MOCKFUSE // will be mocked in tests
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 FileSystem *file_system_ = NULL;
 MountPoint *mount_point_ = NULL;
 TalkManager *talk_mgr_ = NULL;
@@ -128,7 +128,7 @@ NotificationClient *notification_client_ = NULL;
 Watchdog *watchdog_ = NULL;
 FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
-#endif // __TEST_CVMFS_MOCKFUSE
+#endif  // __TEST_CVMFS_MOCKFUSE
 
 
 /**
@@ -160,7 +160,7 @@ DirectoryHandles *directory_handles_ = NULL;
 pthread_mutex_t lock_directory_handles_ = PTHREAD_MUTEX_INITIALIZER;
 uint64_t next_directory_handle_ = 0;
 
-unsigned max_open_files_; /**< maximum allowed number of open files */
+unsigned int max_open_files_; /**< maximum allowed number of open files */
 /**
  * The refcounted cache manager should suppress checking the current number
  * of files opened through cvmfs_open() against the process' file descriptor
@@ -225,7 +225,7 @@ void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
   *maintenance_mode = fuse_remounter_->IsInMaintenanceMode();
 }
 
-#ifndef __TEST_CVMFS_MOCKFUSE // will be mocked in tests
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 static bool UseWatchdog() {
   if (loader_exports_ == NULL || loader_exports_->version < 2) {
     return true;  // spawn watchdog by default
@@ -280,6 +280,7 @@ static bool HasDifferentContent(const catalog::DirectoryEntry &dirent,
   return true;
 }
 
+#ifndef __TEST_CVMFS_MOCKFUSE
 /**
  * When we lookup an inode (cvmfs_lookup(), cvmfs_opendir()), we usually provide
  * the live inode, i.e. the one in the inode tracker.  However, if the inode
@@ -450,6 +451,7 @@ static uint64_t GetDirentForPath(const PathString &path,
     mount_point_->md5path_cache()->InsertNegative(md5path);
   return 0;
 }
+#endif
 
 
 static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
@@ -1549,7 +1551,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
   ino = mount_point_->catalog_mgr()->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_release on inode: %" PRIu64,
-  uint64_t(ino));
+           uint64_t(ino));
 
 #ifdef __APPLE__
   if (fi->fh == kFileHandleIgnore) {
@@ -2163,7 +2165,7 @@ __attribute__((
     visibility("default"))) loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
-#ifndef __TEST_CVMFS_MOCKFUSE // will be mocked in tests
+#ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 /**
  * Begin section of cvmfs.cc-specific magic extended attributes
  */
@@ -2438,7 +2440,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   return loader::kFailOk;
 }
-#endif // __TEST_CVMFS_MOCKFUSE
+#endif  // __TEST_CVMFS_MOCKFUSE
 
 
 /**
@@ -3021,11 +3023,11 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnFini = Fini;
   g_cvmfs_exports->fnGetErrorMsg = GetErrorMsg;
   g_cvmfs_exports->fnMaintenanceMode = MaintenanceMode;
-  #ifndef __TEST_CVMFS_MOCKFUSE
+#ifndef __TEST_CVMFS_MOCKFUSE
   g_cvmfs_exports->fnSaveState = SaveState;
   g_cvmfs_exports->fnRestoreState = RestoreState;
   g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
-  #endif
+#endif
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
 }
 
