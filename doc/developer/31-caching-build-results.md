@@ -6,7 +6,7 @@
 
 `ccache` is easy to install with common package managers and can be set up either via environment variable:
 
-```
+```bash
   export CMAKE_CXX_COMPILER_LAUNCHER=ccache
 ```
 
