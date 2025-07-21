@@ -360,6 +360,22 @@ __hc_transition() {
 }
 
 
+# Find an available file descriptor
+find_available_fd()
+{
+  local fd=11
+  local max=$(ulimit -n) 
+  while [ $fd -lt $max ]; do
+    if [ ! -e /proc/$$/fd/$fd ]; then
+      echo $fd
+      return
+    fi
+    fd=$((fd + 1))
+  done
+  echo "No file descriptor available" >&2
+  return 1
+}
+
 ### Locking functions
 
 _lock_fds=""
@@ -371,11 +387,12 @@ acquire_lock() {
   local lock_file="${path}.lock"
   local lock_fd
   while true; do
-    exec {lock_fd}<>${lock_file}
+    lock_fd=$(find_available_fd)
+    eval "exec ${lock_fd}<>${lock_file}"
     if [ $wait_for_lock -eq 0 ]; then
       if ! flock -n ${lock_fd}; then
         # didn't get it, clean up and return failure
-        exec {lock_fd}<&-
+        eval "exec ${lock_fd}<&-"
         return 1
       fi
     else
@@ -387,7 +404,7 @@ acquire_lock() {
       break
     fi
     # was removed by former lock holder; close and try again
-    exec {lock_fd}<&-
+    eval "exec ${lock_fd}<&-"
   done
   # add the fd number and path to the two lists
   _lock_fds="$_lock_fds $lock_fd"
@@ -406,7 +423,7 @@ release_lock() {
   local lock_path
   local new_paths=""
   for lock_path in $_lock_paths; do
-    let index+=1
+    index=$((index + 1))
     if [ "$path" = "$lock_path" ]; then
       lock_index=$index
     else
@@ -418,7 +435,7 @@ release_lock() {
   local fd
   local new_fds
   for fd in $_lock_fds; do
-    let index+=1
+    index=$((index + 1))
     if [ "$index" = "$lock_index" ]; then
       lock_fd=$fd
     else
@@ -429,7 +446,7 @@ release_lock() {
   _lock_fds="$new_fds"
   _lock_paths="$new_paths"
   rm -f $lock_file
-  exec {lock_fd}<&-
+  eval "exec ${lock_fd}<&-"
 }
 
 
