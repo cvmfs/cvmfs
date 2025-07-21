@@ -124,31 +124,32 @@ def addr_geoinfo(now, addr):
 
     return response['location']
 
-# Look up geo info by name.  Try IPv4 first since that DB is
+# Look up geo info by name (dns or ip address).  Try IPv4 first since that DB is
 # better and most servers today are dual stack if they have IPv6.
 # Store results in a cache.  Wsgi is multithreaded so need to lock
 # accesses to the shared cache.
 # Return geo info record or None if none found.
-def name_geoinfo(now, name):
+def name_geoinfo(now, hostname):
     global geo_cache
-    if (len(name) > 256) or not addr_pattern.search(name):
+    if (len(hostname) > 256) or not addr_pattern.search(hostname):
         return None
 
 # ignore short names and non-FQDNs in lookups, since they will fail anyway:
-    if "." not in name:
+    if not '.' in hostname and not ':' in hostname:
+        # not an fqdn or IPv4 or IPv6 address
         return None
         
     global namelookups
     namelock.acquire()
-    if name in geo_cache:
-        (stamp, gir) = geo_cache[name]
+    if hostname in geo_cache:
+        (stamp, gir) = geo_cache[hostname]
         if now <= stamp + geo_cache_secs:
             # still good, use it
             namelock.release()
             return gir
         # update the timestamp so only one thread needs to wait
         #  when a lookup is slow
-        geo_cache[name] = (now, gir)
+        geo_cache[hostname] = (now, gir)
     elif len(geo_cache) >= geo_cache_max_entries:
         # avoid denial of service by removing one arbitrary entry
         #   before we add one
@@ -158,7 +159,7 @@ def name_geoinfo(now, name):
 
     ai = ()
     try:
-        ai = socket.getaddrinfo(name,80,0,0,socket.IPPROTO_TCP)
+        ai = socket.getaddrinfo(hostname,80,0,0,socket.IPPROTO_TCP)
     except:
         pass
     gir = None
@@ -180,11 +181,11 @@ def name_geoinfo(now, name):
             gir = None
 
     namelock.acquire()
-    if gir == None and name in geo_cache:
+    if gir == None and hostname in geo_cache:
         # reuse expired entry
-        gir = geo_cache[name][1]
+        gir = geo_cache[hostname][1]
 
-    geo_cache[name] = (now, gir)
+    geo_cache[hostname] = (now, gir)
     namelock.release()
 
     return gir
