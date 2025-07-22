@@ -1238,7 +1238,7 @@ int FuseMain(int argc, char *argv[]) {
 
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
-    close(premount_fd);
+    goto cleanup;
   }
 #endif
 
@@ -1259,13 +1259,13 @@ cleanup:
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
-    } else if (umount(mount_point_->c_str()) < 0) {
+    // do lazy unmount and ignore if it is already unmounted
+    } else if (umount2(mount_point_->c_str(), MNT_DETACH) < 0 && errno != EINVAL) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "failed to umount %s (%d)", mount_point_->c_str(), errno);
-      retval = kFailPermission;
+                    "failed to umount %s (%d)", mount_point_->c_str(), errno);
     } else {
       LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-               mount_point_->c_str(), repository_name_->c_str());
+                  mount_point_->c_str(), repository_name_->c_str());
     }
     close(premount_fd);
   }
