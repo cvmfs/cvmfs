@@ -23,7 +23,8 @@ CVMFS_CONFIG_PACKAGE="cvmfs-config-default_2.2-1_all.deb"
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
-echo "detected upstream version: $cvmfs_version"
+cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
+echo "detected upstream version: ${cvmfs_version}${cvmfs_preelease}"
 
 # generate the release tag for either a nightly build or a release
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
@@ -31,10 +32,12 @@ if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   cvmfs_version="${cvmfs_version}~0.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
   echo "creating nightly build '$cvmfs_version'"
 else
-  cvmfs_version="${cvmfs_version}~1"
+  cvmfs_version="${cvmfs_version}-1"
 fi
 cvmfs_version="${cvmfs_version}+$(lsb_release -si | tr [:upper:] [:lower:])"
 cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
+cvmfs_version="${cvmfs_version}${cvmfs_prerelease}"
+
 echo "creating release: $cvmfs_version"
 
 # copy the entire source tree into a working directory

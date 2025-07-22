@@ -16,6 +16,7 @@ message ("Running CMake version ${CMAKE_VERSION}")
 #
 # DON'T DELETE
 ## CVMFS_VERSION 2.13.1
+## CVMFS_PRERELEASE ~pre1
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 13)
