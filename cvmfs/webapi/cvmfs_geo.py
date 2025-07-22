@@ -135,7 +135,7 @@ def name_geoinfo(now, hostname):
         return None
 
     # ignore short names and non-FQDNs in lookups, since they will fail anyway:
-    #TODO(vavolkl): The client currently cannot use an IPv6 adress for this lookup;
+    #TODO(vavolkl): The client currently cannot use an IPv6 address for this lookup;
     # should be supported. Allow it here already in preparation for this
     if not '.' in hostname and not ':' in hostname:
         # not an fqdn or IPv4 or IPv6 address
