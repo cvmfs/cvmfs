@@ -363,8 +363,10 @@ __hc_transition() {
 # Find an available file descriptor
 find_available_fd()
 {
-  local fd=11
-  local max=$(ulimit -n) 
+  # dash only supports single-digit file descriptors so the number
+  # of locks available is limited
+  local fd=3
+  local max=10
   while [ $fd -lt $max ]; do
     if [ ! -e /proc/$$/fd/$fd ]; then
       echo $fd
@@ -372,8 +374,7 @@ find_available_fd()
     fi
     fd=$((fd + 1))
   done
-  echo "No file descriptor available" >&2
-  return 1
+  die "No file descriptor available"
 }
 
 ### Locking functions
