@@ -70,6 +70,7 @@
 Summary: CernVM File System
 Name: cvmfs
 Version: 2.13.2~pre1
+%global base_version %(echo %{version} | cut -d'~' -f1)
 Release: 1%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
@@ -625,11 +626,11 @@ systemctl daemon-reload
 %{_bindir}/cvmfs2
 %if 0%{?build_fuse2} 
 %{_libdir}/libcvmfs_fuse_stub.so
-%{_libdir}/libcvmfs_fuse_stub.so.%{version}
+%{_libdir}/libcvmfs_fuse_stub.so.%{base_version}
 %{_libdir}/libcvmfs_fuse.so
-%{_libdir}/libcvmfs_fuse.so.%{version}
+%{_libdir}/libcvmfs_fuse.so.%{base_version}
 %{_libdir}/libcvmfs_fuse_debug.so
-%{_libdir}/libcvmfs_fuse_debug.so.%{version}
+%{_libdir}/libcvmfs_fuse_debug.so.%{base_version}
 %endif
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
@@ -665,27 +666,27 @@ systemctl daemon-reload
 %files libs
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_cache.so
-%{_libdir}/libcvmfs_cache.so.%{version}
+%{_libdir}/libcvmfs_cache.so.%{base_version}
 %{_libdir}/libcvmfs_client.so
-%{_libdir}/libcvmfs_client.so.%{version}
+%{_libdir}/libcvmfs_client.so.%{base_version}
 %{_libdir}/libcvmfs_crypto.so
-%{_libdir}/libcvmfs_crypto.so.%{version}
+%{_libdir}/libcvmfs_crypto.so.%{base_version}
 %{_libdir}/libcvmfs_crypto_debug.so
-%{_libdir}/libcvmfs_crypto_debug.so.%{version}
+%{_libdir}/libcvmfs_crypto_debug.so.%{base_version}
 %{_libdir}/libcvmfs_util.so
-%{_libdir}/libcvmfs_util.so.%{version}
+%{_libdir}/libcvmfs_util.so.%{base_version}
 %{_libdir}/libcvmfs_util_debug.so
-%{_libdir}/libcvmfs_util_debug.so.%{version}
+%{_libdir}/libcvmfs_util_debug.so.%{base_version}
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files fuse3
 %defattr(-,root,root)
 %{_libdir}/libcvmfs_fuse3_stub.so
-%{_libdir}/libcvmfs_fuse3_stub.so.%{version}
+%{_libdir}/libcvmfs_fuse3_stub.so.%{base_version}
 %{_libdir}/libcvmfs_fuse3.so
-%{_libdir}/libcvmfs_fuse3.so.%{version}
+%{_libdir}/libcvmfs_fuse3.so.%{base_version}
 %{_libdir}/libcvmfs_fuse3_debug.so
-%{_libdir}/libcvmfs_fuse3_debug.so.%{version}
+%{_libdir}/libcvmfs_fuse3_debug.so.%{base_version}
 %doc COPYING AUTHORS README.md ChangeLog
 
 %files devel
@@ -706,9 +707,9 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_server
 %{_bindir}/cvmfs_rsync
 %{_libdir}/libcvmfs_server.so
-%{_libdir}/libcvmfs_server.so.%{version}
+%{_libdir}/libcvmfs_server.so.%{base_version}
 %{_libdir}/libcvmfs_server_debug.so
-%{_libdir}/libcvmfs_server_debug.so.%{version}
+%{_libdir}/libcvmfs_server_debug.so.%{base_version}
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %dir %{_sysconfdir}/cvmfs/repositories.d
 %dir /var/log/cvmfs
