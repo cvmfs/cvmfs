@@ -45,7 +45,7 @@ if [ ! -f /etc/os-release ]; then
 fi
 
 # retrieve the upstream version string from CVMFS
-cvmfs_prerelease="$(get_cvmfs_prerelase_from_cmake $CVMFS_SOURCE_LOCATION)"
+cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
 cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
 echo "detected upstream version: $cvmfs_version"
 
