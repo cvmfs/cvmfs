@@ -479,7 +479,7 @@ mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/do
 
 # Fix docdir on Fedora
 %if 0%{?fedora} || 0%{?rhel} >= 8
-rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
+rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{base_version}
 %endif
 
 %if 0%{?selinux_cvmfs}
