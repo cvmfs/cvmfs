@@ -637,12 +637,14 @@ check_overlayfs_version() {
     if compare_versions "$krnl_version" -ge "$required_version" ; then
       # If the mounted filesystem name is long df will split output into two
       #  lines, so use tail -n +2 to skip first line and echo to combine them
-      local scratch_fstype=$(echo $(df -T /var/spool/cvmfs | tail -n +2) | awk {'print $2'})
+      local scratch_line="$(echo $(df -T /var/spool/cvmfs | tail -n +2))"
+      local scratch_fstype=$(echo $scratch_line | awk {'print $2'})
       if [ "x$scratch_fstype" = "xext3" ] || [ "x$scratch_fstype" = "xext4" ] ; then
         return 0
       fi
       if [ "x$scratch_fstype" = "xxfs" ] ; then
-        if [ "x$(xfs_info /var/spool/cvmfs 2>/dev/null | grep ftype=1)" != "x" ] ; then
+        local scratch_fsmnt=$(echo $scratch_line | awk {'print $7'})
+        if [ "x$(xfs_info $scratch_fsmnt 2>/dev/null | grep ftype=1)" != "x" ] ; then
           return 0
         else
           echo "XFS with ftype=0 is not supported for /var/spool/cvmfs. XFS with ftype=1 is required"

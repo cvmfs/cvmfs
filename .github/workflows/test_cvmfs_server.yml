@@ -11,7 +11,7 @@ on:
       branches: ['devel', 'cvmfs*']
 
 jobs:
-  docker:
+  test_cvmfs_server:
     name: "test_cvmfs_server"
     runs-on: ubuntu-latest
     steps:
@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Test CVMFS server util
         run: | 
+           sudo mkdir -p /var/spool/cvmfs
            cd cvmfs/server
-           . test_cvmfs_server_util.sh
+           sh ./test_cvmfs_server_util.sh
 
