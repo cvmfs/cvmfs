@@ -1238,7 +1238,7 @@ int FuseMain(int argc, char *argv[]) {
 
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
-    goto cleanup;
+    close(premount_fd);
   }
 #endif
 
