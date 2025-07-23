@@ -852,11 +852,11 @@ void FileSystem::SetupGlobalEnvironmentParams() {
   // Calculate and set CVMFS_VERSION_NUMERIC
   // Format: major * 10000 + minor * 100 + patch
   // Example: 2.13.2 becomes 21302
-  const int version_numeric = CVMFS_VERSION_MAJOR * 10000 +
-                              CVMFS_VERSION_MINOR * 100 +
-                              CVMFS_VERSION_PATCH;
+  const int version_numeric = CVMFS_VERSION_MAJOR * 10000
+                              + CVMFS_VERSION_MINOR * 100 + CVMFS_VERSION_PATCH;
   char version_numeric_str[16];
-  snprintf(version_numeric_str, sizeof(version_numeric_str), "%d", version_numeric);
+  snprintf(version_numeric_str, sizeof(version_numeric_str), "%d",
+           version_numeric);
   setenv("CVMFS_VERSION_NUMERIC", version_numeric_str, 1 /* overwrite */);
 }
 
