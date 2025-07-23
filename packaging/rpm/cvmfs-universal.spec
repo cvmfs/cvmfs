@@ -719,11 +719,11 @@ systemctl daemon-reload
 /var/spool/cvmfs/README
 %doc COPYING AUTHORS README.md ChangeLog
 # sqlite version on rhel8 is too old for the statsdb logrotate script (needs >= 3.27)
-%if 0%{?rhel} <= 8
-%else
+%define sqlite_version %(sqlite3 --version 2>/dev/null | cut -d' ' -f1 || echo "0")
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
+%if "%(echo '%{sqlite_version}' | awk 'BEGIN{print ("%{sqlite_version}" < "3.27")}')" == "1"
+%exclude %{_sysconfdir}/logrotate.d/cvmfs-statsdb
 %endif
-%config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 %doc %{_mandir}/man1/cvmfs_server.1.gz
 %doc %{_mandir}/man1/cvmfs_swissknife.1.gz
 
