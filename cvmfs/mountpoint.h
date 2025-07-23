@@ -101,6 +101,8 @@ class FileSystem : SingleCopy, public BootFactory {
   FRIEND_TEST(T_MountPoint, CheckInstanceName);
   FRIEND_TEST(T_MountPoint, CheckPosixCacheSettings);
   FRIEND_TEST(T_Cvmfs, Basics);
+  FRIEND_TEST(T_VersionEnv, SetupGlobalEnvironmentParams);
+  FRIEND_TEST(T_VersionEnv, VersionNumericFormat);
 
  public:
   enum Type {
