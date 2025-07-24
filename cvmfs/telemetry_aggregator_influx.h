@@ -27,6 +27,9 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
   FRIEND_TEST(T_TelemetryAggregator, FailCreate);
   FRIEND_TEST(T_TelemetryAggregator, ExtraFields_Tags);
   FRIEND_TEST(T_TelemetryAggregator, UpdateCounters_WithExtraFields_Tags);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaDisabled);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaEnabledByDefault);
+  FRIEND_TEST(T_TelemetryAggregator, SendDeltaExplicitlyEnabled);
 
  public:
   TelemetryAggregatorInflux(Statistics *statistics,
@@ -43,6 +46,7 @@ class TelemetryAggregatorInflux : TelemetryAggregator {
   std::string influx_metric_name_;
   std::string influx_extra_fields_;
   std::string influx_extra_tags_;
+  bool send_delta_;
   int socket_fd_;
   struct addrinfo *res_;
 

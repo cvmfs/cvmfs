@@ -30,6 +30,7 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(
     : TelemetryAggregator(statistics, send_rate_sec, mount_point, fqrn)
     , influx_extra_fields_("")
     , influx_extra_tags_("")
+    , send_delta_(true)
     , socket_fd_(-1)
     , res_(NULL) {
   int params = 0;
@@ -65,6 +66,12 @@ TelemetryAggregatorInflux::TelemetryAggregatorInflux(
   if (!options_mgr->GetValue("CVMFS_INFLUX_EXTRA_FIELDS",
                              &influx_extra_fields_)) {
     influx_extra_fields_ = "";
+  }
+
+  // Read CVMFS_INFLUX_SEND_DELTA option, default to true (ON)
+  std::string send_delta_str;
+  if (options_mgr->GetValue("CVMFS_INFLUX_SEND_DELTA", &send_delta_str)) {
+    send_delta_ = !options_mgr->IsOff(send_delta_str);
   }
 
   if (params == 3) {
@@ -115,7 +122,11 @@ TelemetryAggregatorInflux::~TelemetryAggregatorInflux() {
 */
 std::string TelemetryAggregatorInflux::MakePayload() {
   // measurement and tags
-  std::string ret = influx_metric_name_ + "_absolute,repo=" + fqrn_;
+  std::string metric_name = influx_metric_name_;
+  if (send_delta_) {
+    metric_name += "_absolute";
+  }
+  std::string ret = metric_name + ",repo=" + fqrn_;
 
   if (influx_extra_tags_ != "") {
     ret += "," + influx_extra_tags_;
@@ -269,7 +280,7 @@ void TelemetryAggregatorInflux::PushMetrics() {
   // create payload
   std::string payload = MakePayload();
   std::string delta_payload = "";
-  if (old_counters_.size() > 0) {
+  if (send_delta_ && old_counters_.size() > 0) {
     delta_payload = MakeDeltaPayload();
     payload = payload + "\n" + delta_payload;
   }
@@ -278,8 +289,10 @@ void TelemetryAggregatorInflux::PushMetrics() {
   // send to influx
   SendToInflux(payload);
 
-  // current counter is now old counter
-  counters_.swap(old_counters_);
+  // current counter is now old counter (only if delta sending is enabled)
+  if (send_delta_) {
+    counters_.swap(old_counters_);
+  }
 }
 
 }  // namespace perf

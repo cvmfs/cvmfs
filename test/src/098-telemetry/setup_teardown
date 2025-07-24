@@ -20,5 +20,13 @@ cleanup() {
     echo "Log content:"
     cat $CVMFS_TEST_098_TMPFILE
     rm $CVMFS_TEST_098_TMPFILE
+
+    # Clean up additional test file if it exists
+    if [ -f "${CVMFS_TEST_098_TMPFILE}.nodelta" ]; then
+      echo ""
+      echo "No-delta test log content:"
+      cat ${CVMFS_TEST_098_TMPFILE}.nodelta
+      rm ${CVMFS_TEST_098_TMPFILE}.nodelta
+    fi
   fi
 }
