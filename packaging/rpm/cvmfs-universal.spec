@@ -474,7 +474,7 @@ rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 # Fix docdir on SuSE
 %if 0%{?suse_version}
 mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
-mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
+mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{base_version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
 # Fix docdir on Fedora
