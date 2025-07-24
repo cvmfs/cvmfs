@@ -32,7 +32,7 @@ if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   cvmfs_version="${cvmfs_version}~0.${CVMFS_NIGHTLY_BUILD_NUMBER}git${git_hash}"
   echo "creating nightly build '$cvmfs_version'"
 else
-  cvmfs_version="${cvmfs_version}-1"
+  cvmfs_version="${cvmfs_version}"
 fi
 cvmfs_version="${cvmfs_version}+$(lsb_release -si | tr [:upper:] [:lower:])"
 cvmfs_version="${cvmfs_version}$(lsb_release -sr)"
