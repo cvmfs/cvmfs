@@ -43,7 +43,7 @@ option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party librar
 option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installation if available. Set to ON or OFF to force cmake to either download it from the fly, or take it from the system." AUTO)
 
 # List of external libraries to build (overrides default list in bootstrap.sh)
-set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list)")
+set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list). Eg =libcurl;libcrypto;pacparser")
 
 
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
