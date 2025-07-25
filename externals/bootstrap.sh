@@ -267,29 +267,35 @@ build_lib() {
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Build a list of libs that need to be built
-missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 vjson sha3 libarchive"
+# Check if BUILTIN_EXTERNALS_LIST is set and override missing_libs
+if [ x"$BUILTIN_EXTERNALS_LIST" != x"" ]; then
+    # Convert semicolon-separated list to space-separated
+    missing_libs=$(echo "$BUILTIN_EXTERNALS_LIST" | tr ';' ' ')
+    echo "Bootstrap - Using custom externals list: $missing_libs"
+else
+    missing_libs="libcurl libcrypto pacparser zlib sparsehash leveldb maxminddb protobuf sqlite3 vjson sha3 libarchive"
 
-if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
-    missing_libs="$missing_libs googlebench"
-fi
-
-if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
-    required_go_minor_version="23"
-    if [ -n "$(command -v go)" ]; then
-      go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
-       if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then 
-         missing_libs="$missing_libs golang_rev2"
-       fi  
-    else
-      missing_libs="$missing_libs golang_rev2"
+    if [ x"$BUILD_UBENCHMARKS" != x"" ]; then
+        missing_libs="$missing_libs googlebench"
     fi
-fi
 
-echo $missing_libs
+    if [ x"$BUILD_GATEWAY" != x ] || [ x"$BUILD_DUCC" != x ] || [ x"$BUILD_SNAPSHOTTER" != x ]; then
+        required_go_minor_version="23"
+        if [ -n "$(command -v go)" ]; then
+          go_minor_version=`go version | { read _ _ v _; echo ${v#go}; } | cut -d '.' -f2`
+           if expr "'$go_minor_version" \< "'$required_go_minor_version"   > /dev/null ; then
+             missing_libs="$missing_libs golang_rev2"
+           fi
+        else
+          missing_libs="$missing_libs golang_rev2"
+        fi
+    fi
 
+    if [ x"$BUILD_QC_TESTS" != x"" ]; then
+        missing_libs="$missing_libs rapidcheck"
+    fi
 
-if [ x"$BUILD_QC_TESTS" != x"" ]; then
-    missing_libs="$missing_libs rapidcheck"
+    echo "Bootstrap - Using default externals list: $missing_libs"
 fi
 
 if [ -f $externals_install_dir/.bootstrapDone ]; then
