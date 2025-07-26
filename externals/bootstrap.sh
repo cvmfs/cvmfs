@@ -298,6 +298,23 @@ else
     echo "Bootstrap - Using default externals list: $missing_libs"
 fi
 
+# Apply exclusions if BUILTIN_EXTERNALS_EXCLUDE is set
+if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ]; then
+    # Convert semicolon-separated list to space-separated
+    exclude_libs=$(echo "$BUILTIN_EXTERNALS_EXCLUDE" | tr ';' ' ')
+    echo "Bootstrap - Excluding libraries: $exclude_libs"
+
+    # Remove each excluded library from missing_libs
+    for exclude_lib in $exclude_libs; do
+        missing_libs=$(echo $missing_libs | sed -e "s/\b$exclude_lib\b//g" | tr -s ' ')
+    done
+
+    # Clean up any leading/trailing spaces
+    missing_libs=$(echo $missing_libs | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+    echo "Bootstrap - Final externals list after exclusions: $missing_libs"
+fi
+
 if [ -f $externals_install_dir/.bootstrapDone ]; then
   existing_libs=$(cat $externals_install_dir/.bootstrapDone)
   for l in $existing_libs; do

@@ -45,6 +45,9 @@ option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installa
 # List of external libraries to build (overrides default list in bootstrap.sh)
 set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list). Eg =libcurl;libcrypto;pacparser")
 
+# List of external libraries to exclude from building
+set (BUILTIN_EXTERNALS_EXCLUDE "" CACHE STRING "Semicolon-separated list of external libraries to exclude from building")
+
 
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
