@@ -221,6 +221,12 @@ if (BUILTIN_EXTERNALS)
     if (BUILD_SNAPSHOTTER)
       set(ENV{BUILD_SNAPSHOTTER} "true")
     endif()
+    if (BUILTIN_EXTERNALS_LIST)
+      set(ENV{BUILTIN_EXTERNALS_LIST} "${BUILTIN_EXTERNALS_LIST}")
+    endif()
+    if (BUILTIN_EXTERNALS_EXCLUDE)
+      set(ENV{BUILTIN_EXTERNALS_EXCLUDE} "${BUILTIN_EXTERNALS_EXCLUDE}")
+    endif()
 
     message (STATUS "running bootstrap.sh ...")
     execute_process (
@@ -245,6 +251,8 @@ if (BUILTIN_EXTERNALS)
     set(ENV{BUILD_GATEWAY} "")
     set(ENV{BUILD_DUCC} "")
     set(ENV{BUILD_SNAPSHOTTER} "")
+    set(ENV{BUILTIN_EXTERNALS_LIST} "")
+    set(ENV{BUILTIN_EXTERNALS_EXCLUDE} "")
   endif (EXISTS "${CMAKE_SOURCE_DIR}/externals/bootstrap.sh")
 
   # In the case of built-in external libraries, we need to set CMAKE_PREFIX_PATH to
