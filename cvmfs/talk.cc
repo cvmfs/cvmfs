@@ -1080,7 +1080,7 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
 
   // CPU usage from /proc/pid/stat
   const pid_t pid = cvmfs::pid_;
-  string proc_stat_path = "/proc/" + StringifyInt(pid) + "/stat";
+  const string proc_stat_path = "/proc/" + StringifyInt(pid) + "/stat";
   FILE *stat_file = fopen(proc_stat_path.c_str(), "r");
   if (stat_file) {
     char stat_line[1024];
