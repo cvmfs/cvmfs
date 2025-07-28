@@ -39,5 +39,17 @@ cvmfs_run_test() {
   [ "x$(sudo cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET pid)" = "x$(get_xattr pid /cvmfs/cernvm-prod.cern.ch)" ] \
     || return 40
 
+  echo "*** test metrics prometheus command"
+  # Get version from metrics prometheus output
+  metrics_version=$(sudo cvmfs_talk -p $CVMFS_TEST091_TALK_SOCKET "metrics prometheus" | \
+    grep 'cvmfs_repo{.*version=' | \
+    sed 's/.*version="\([^"]*\)".*/\1/')
+
+  # Get version from xattr
+  xattr_version=$(get_xattr version /cvmfs/cernvm-prod.cern.ch)
+
+  echo "*** comparing versions: metrics='$metrics_version' xattr='$xattr_version'"
+  [ "x$metrics_version" = "x$xattr_version" ] || return 50
+
   return 0
 }
