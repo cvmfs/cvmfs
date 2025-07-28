@@ -1,14 +1,18 @@
 
 2.13.2:
   * [client] Fix loader return value when automounter unmounts (#3929)
+  * [client] Fix race when using page cache tracker for chunked files (#3685)
+  * [client] Correct PCT Close in cvmfs_open (#3917)
+  * [server] Change gc -a to only do repos where gc was run on the stratum0 (#3895)
+  * [server] Move the no collectable repos message to gc.log (#3915)
+  * [server] Do only one gc -a at a time, and remove need for check -a to be run by root (#3575)
+  * [server] snapshot: Avoid recursion into history (#3846)
   * [server] Optimize DNS lookups by cvmfs_geo.py to ignore short host names (#3920)
   * [client] Add cvmfs_talk metrics prometheus command for faster telemetry (#3944)
-  * [rpm]  Temporarily re-add fuse3 dependency to server to fix fstab #3943 
-  * [server] Change gc -a to only do repos where gc was run on the stratum0 (#3895)
+  * [rpm]  Temporarily re-add fuse3 dependency to server to fix fstab #3943
   * [build system] cmake: add BUILTIN_EXTERNALS_LIST and EXCLUDE options (#3940)
   * [client] Add CVMFS_VERSION and CVMFS_VERSION_NUMERIC env vars to config (#3934)
   * [rpm] fix logrotate config for el8 (#3932)
-
 
 2.13.1:
   * [client] Fix mount options that can lead to "futimes" error with docker (#3872)
