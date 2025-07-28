@@ -930,13 +930,20 @@ string TalkManager::FormatPrometheusMetrics(MountPoint &mount_point,
   const string mountpoint = cvmfs::loader_exports_->mount_point;
 
   // Helper function to format a prometheus metric
-  auto format_metric = [&result](const string &name, const string &type,
-                                  const string &help, const string &labels,
-                                  const string &value) {
-    result += "# HELP " + name + " " + help + "\n";
-    result += "# TYPE " + name + " " + type + "\n";
-    result += name + "{" + labels + "} " + value + "\n";
+  class MetricFormatter {
+   public:
+    explicit MetricFormatter(string &result_ref) : result_(result_ref) {}
+    void operator()(const string &name, const string &type,
+                    const string &help, const string &labels,
+                    const string &value) {
+      result_ += "# HELP " + name + " " + help + "\n";
+      result_ += "# TYPE " + name + " " + type + "\n";
+      result_ += name + "{" + labels + "} " + value + "\n";
+    }
+   private:
+    string &result_;
   };
+  MetricFormatter format_metric(result);
 
   // Get cache information
   QuotaManager *quota_mgr = file_system->cache_mgr()->quota_mgr();
