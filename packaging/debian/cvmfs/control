@@ -57,6 +57,8 @@ Description: CernVM-FS common libraries
 Package: cvmfs-server
 Architecture: amd64 armhf arm64
 Depends:
+# TODO(vavolkl): remove fuse3 once server fstab is modernized
+ fuse3,
  psmisc,
  curl,
  attr,
