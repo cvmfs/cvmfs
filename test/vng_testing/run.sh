@@ -16,12 +16,16 @@ if [ ! -d "$TEST_DIR" ]; then
     exit 1
 fi
 
+setup() {
+    mkdir -p results
+}
 
 # Function to create and run the VM with virtme-ng
 create_and_run_vm() {
     echo "Creating VM with kernel: $KERNEL_BZIMAGE"
     vng \
     --run "$KERNEL_BZIMAGE" \
+    --rwdir=results \
     --exec '
         ./run_tests.sh
     '
@@ -34,6 +38,7 @@ create_test_script() {
     # Create a script that will run all tests in $TEST_DIR
     cat << EOF > ./run_tests.sh
 #!/bin/bash
+RESULTS_DIR="./results/test_failures.log"
 echo "Running tests from directory: $TEST_DIR"
 
 echo "Sourcing test_functions"
@@ -48,12 +53,15 @@ for test in $TEST_DIR/*; do
         # Run the test script
         source "\$test/main"
         cvmfs_run_test
+        exit_code=\$?
 
+        timestamp=\$(date +"%Y-%m-%d %H:%M:%S")
         # Check if the test passed
-        if [ \$? -eq 0 ]; then
+        if [ \$exit_code -eq 0 ]; then
             echo "Test \$test_name passed."
         else
-            echo "Test \$test_name failed."
+            echo "Test \$test_name failed with exit code \$exit_code."
+            echo "[\$timestamp] \$test_name : \$exit_code" >> "\$RESULTS_DIR"
         fi
     fi
 done
@@ -65,5 +73,6 @@ EOF
 
 
 # Boot VM and run tests
+setup
 create_test_script
 create_and_run_vm
