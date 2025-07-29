@@ -53,8 +53,12 @@ echo "copying RPM package specification and dependencies..."
 cp ${rpm_src_dir}/$spec_file $CVMFS_RESULT_LOCATION
 cp ${rpm_src_dir}/cvmfs.te \
    ${rpm_src_dir}/cvmfs.fc \
+   ${rpm_src_dir}/local-googletest.patch \
    $CVMFS_RESULT_LOCATION/SOURCES
 cd  $CVMFS_RESULT_LOCATION
+cd SOURCES
+curl -LO https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+cd ..
 
 # generate the release tag for either a nightly build or a release
 # (for the nightly build this requires some changes in the spec file)

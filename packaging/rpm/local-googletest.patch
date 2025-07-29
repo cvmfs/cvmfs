@@ -1,0 +1,12 @@
+--- CMakeLists.txt-orig	2025-07-30 00:04:38.365974346 +0200
++++ CMakeLists.txt	2025-07-30 00:04:44.294212180 +0200
+@@ -385,8 +385,7 @@
+   set(INSTALL_GTEST OFF)
+   FetchContent_Declare(
+     GoogleTest
+-    URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+-               https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
++    URL        file://${CMAKE_SOURCE_DIR}/googletest-1.17.0.tar.gz
+     URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+     )
+   FetchContent_MakeAvailable(GoogleTest)

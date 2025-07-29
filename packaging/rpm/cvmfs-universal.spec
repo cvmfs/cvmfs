@@ -71,13 +71,15 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.13.2
 %global base_version %(echo %{version} | cut -d'~' -f1)
-Release: 1%{?dist}
+Release: 2%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
 Source2: cvmfs.fc
 %endif
+Source3: https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+Patch0: local-googletest.patch
 Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -316,6 +318,10 @@ A containerd snapshotter inspired by StarGZ that gives instant container startup
 mkdir SELinux
 cp %{SOURCE1} %{SOURCE2} SELinux
 %endif
+
+cp %{SOURCE3} .
+
+%patch0
 
 %build
 
