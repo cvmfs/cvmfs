@@ -229,8 +229,6 @@ Requires: libcap-progs
 Requires: initscripts
   %endif
 %endif
-# TODO(vavolkl): remove fuse3 once server fstab is modernized
-Requires: fuse3
 Requires: bash
 Requires: coreutils
 Requires: grep
