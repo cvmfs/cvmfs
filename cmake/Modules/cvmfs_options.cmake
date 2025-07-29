@@ -4,6 +4,7 @@
 
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
 if (MACOSX)
+  option (USE_MACFUSE_KEXT      "Use the macFUSE kernel extensions (best performance)"             ON)
   option (BUILD_SERVER          "Build writer's end programs"                                      OFF)
   option (BUILD_RECEIVER        "Build the receiver program used with the gateway services"        OFF)
 else (MACOSX)
