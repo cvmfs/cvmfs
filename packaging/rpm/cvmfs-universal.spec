@@ -321,7 +321,7 @@ cp %{SOURCE1} %{SOURCE2} SELinux
 
 cp %{SOURCE3} .
 
-%patch0
+%patch 0
 
 %build
 
