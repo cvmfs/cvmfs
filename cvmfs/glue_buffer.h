@@ -8,7 +8,7 @@
  * functions.
  */
 
-#include <gtest/gtest_prod.h>
+#include "duplex_testing.h"
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>

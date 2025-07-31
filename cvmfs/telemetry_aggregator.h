@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "mountpoint.h"
 #include "options.h"
 #include "statistics.h"

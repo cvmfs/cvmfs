@@ -19,7 +19,7 @@
 #include "cache.h"
 #include "crypto/hash.h"
 #include "file_watcher.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "loader.h"
 #include "magic_xattr.h"
 #include "util/algorithm.h"

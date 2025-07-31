@@ -5,7 +5,7 @@
 #ifndef CVMFS_FENCE_H_
 #define CVMFS_FENCE_H_
 
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "util/atomic.h"
 #include "util/posix.h"
 #include "util/single_copy.h"

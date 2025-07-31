@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <string>
 
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "util/export.h"
 #include "util/mmap_file.h"
 #include "util/single_copy.h"

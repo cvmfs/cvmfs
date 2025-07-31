@@ -19,7 +19,7 @@
 #include "compression/compression.h"
 #include "crypto/hash.h"
 #include "duplex_curl.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "network/dns.h"
 #include "network/health_check.h"
 #include "network/jobinfo.h"

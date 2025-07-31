@@ -10,7 +10,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <gtest/gtest_prod.h>
+#include "duplex_testing.h"
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
