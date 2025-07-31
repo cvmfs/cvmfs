@@ -91,7 +91,7 @@ cvmfs_server_gc() {
       for name in $names; do
         if is_stratum0 $name || __was_garbage_collected_upstream $name; then
           collectable_names="$collectable_names $name"
-        elif [ $dry_run -eq 1 ]; then
+        elif [ $dry_run -eq 0 ]; then
           # pretend that gc was done to keep monitors happy
           update_repo_status $name last_gc "`date --utc`"
         fi
