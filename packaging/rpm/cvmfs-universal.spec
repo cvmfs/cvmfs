@@ -31,7 +31,9 @@
   %define build_snapshotter 1
 %endif
 
-# make testing flags an packages conditional
+# flag to control building of unittests.
+# No tests are built by default, can be overriden 
+# with rpmbuild --define="build_testing 1"
 %{!?build_testing: %define build_testing 0}
 
 
