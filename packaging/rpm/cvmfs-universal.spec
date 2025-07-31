@@ -788,7 +788,7 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
-* Thu Jul 31 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.14.0
+* Thu Jul 31 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.3
 - Make building of unittests optional 
 * Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
 - Add logrotate config files and tidy to satisfy rpmlint v2.6
