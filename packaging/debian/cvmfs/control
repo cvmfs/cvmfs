@@ -102,17 +102,6 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM-FS shrinkwrap utility to export /cvmfs file system trees
  CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container images.
 
-Package: cvmfs-unittests
-Architecture: amd64 armhf arm64
-Depends:
- libssl-dev,
- uuid-dev,
- cvmfs-libs (= ${binary:Version}),
- ${misc:Depends}
-Homepage: http://cernvm.cern.ch
-Description: CernVM File System Unit Tests
- HTTP File System for Distributing Software to CernVM.
-
 Package: cvmfs-fuse3
 Architecture: amd64 armhf arm64
 Depends:
