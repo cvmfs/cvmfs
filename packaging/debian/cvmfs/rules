@@ -12,6 +12,7 @@ BUILD_LIBFUSE2 := 'no'
 # modified in ci/cvmfs/deb.sh
 #BUILD_LIBFUSE2 := 'yes'
 
+CVMFS_BUILD_UNITTESTS ?= no
 
 # TODO:
 #  -> Support debian multiarch
@@ -29,7 +30,7 @@ Makefile:
 	dh_testdir
 	cmake -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes \
 		-DBUILD_RECEIVER=yes -DBUILD_RECEIVER_DEBUG=yes -DBUILD_SHRINKWRAP=yes \
-		-DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no \
+		-DBUILD_UNITTESTS=$(CVMFS_BUILD_UNITTESTS) -DINSTALL_UNITTESTS=no -DINSTALL_PUBLIC_KEYS=no \
 		-DBUILD_LIBCVMFS=yes -DBUILD_LIBCVMFS_CACHE=yes \
 		-DBUILD_GATEWAY=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
 		-DBUILD_SNAPSHOTTER=$(shell if go version >/dev/null 2>&1; then echo "yes"; else echo "no"; fi) \
@@ -41,6 +42,7 @@ build: build-stamp
 build-stamp: Makefile
 	dh_testdir
 	dh_auto_build --parallel
+	dh_auto_test
 	touch build-stamp
 
 clean:
@@ -63,7 +65,7 @@ debian/%.install: debian/%.install.in
   fi
 	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9][0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< | grep . > $@
 
-install: build debian/cvmfs-libs.install debian/cvmfs-dev.install debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-unittests.install debian/cvmfs-fuse3.install debian/cvmfs-gateway.install debian/cvmfs-snapshotter.install
+install: build debian/cvmfs-libs.install debian/cvmfs-dev.install debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-fuse3.install debian/cvmfs-gateway.install debian/cvmfs-snapshotter.install
 	dh_testdir
 	dh_testroot
 	dh_prep

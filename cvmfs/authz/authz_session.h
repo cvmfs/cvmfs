@@ -12,7 +12,7 @@
 #include <string>
 
 #include "authz/authz.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "smallhash.h"
 #include "statistics.h"
 #include "util/murmur.hxx"

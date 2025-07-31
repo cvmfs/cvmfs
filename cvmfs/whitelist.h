@@ -5,7 +5,7 @@
 #ifndef CVMFS_WHITELIST_H_
 #define CVMFS_WHITELIST_H_
 
-#include <gtest/gtest_prod.h>
+#include "duplex_testing.h"
 #include <inttypes.h>
 
 #include <ctime>

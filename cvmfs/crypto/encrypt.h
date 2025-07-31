@@ -19,7 +19,7 @@
 #include <string>
 
 #include "crypto/hash.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "util/export.h"
 #include "util/single_copy.h"
 

@@ -4,6 +4,50 @@
 
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
+# GoogleTest
+set(GOOGLETEST_MIN_VERSION "1.10.0")
+if(USE_EXTERNAL_GOOGLETEST)
+  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
+    find_package(GTest ${GOOGLETEST_MIN_VERSION})
+  else()
+    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
+  endif()
+endif()
+
+if(NOT GTest_FOUND)
+  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
+  Include(FetchContent)
+  set(INSTALL_GTEST OFF)
+
+  # Check if local file exists first
+  set(GOOGLETEST_LOCAL_PATH "${PROJECT_SOURCE_DIR}/externals/googletest-1.17.0.tar.gz")
+
+  if(EXISTS "${GOOGLETEST_LOCAL_PATH}")
+      message(STATUS "Using local GoogleTest archive: ${GOOGLETEST_LOCAL_PATH}")
+      FetchContent_Declare(
+          GoogleTest
+          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
+          URL "file://${GOOGLETEST_LOCAL_PATH}"
+          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+      )
+  else()
+      message(STATUS "Local GoogleTest archive not found, downloading from remote")
+      FetchContent_Declare(
+          GoogleTest
+          #DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+          DOWNLOAD_DIR ${PROJECT_SOURCE_DIR}/externals
+          URL https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
+              https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
+          URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
+      )
+  endif()
+
+FetchContent_MakeAvailable(GoogleTest)
+endif()
+get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
+
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
 set (CVMFS_UNITTEST_COMMON_CFLAGS "-DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
 

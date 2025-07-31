@@ -369,30 +369,6 @@ find_package (Libcrypto REQUIRED)
 message("Using libcrypto for libcvmfs_crypto from ${Libcrypto_INCLUDE_DIRS}")
 
 
-# GoogleTest
-set(GOOGLETEST_MIN_VERSION "1.10.0")
-if(USE_EXTERNAL_GOOGLETEST)
-  if (USE_EXTERNAL_GOOGLETEST STREQUAL AUTO)
-    find_package(GTest ${GOOGLETEST_MIN_VERSION})
-  else()
-    find_package(GTest ${GOOGLETEST_MIN_VERSION} REQUIRED)
-  endif()
-endif()
-
-if(NOT GTest_FOUND)
-  message(STATUS "Fetching local copy of Googletest library v1.17.0 for unit-tests...")
-  Include(FetchContent)
-  set(INSTALL_GTEST OFF)
-  FetchContent_Declare(
-    GoogleTest
-    URL        https://github.com/google/googletest/releases/download/v1.17.0/googletest-1.17.0.tar.gz
-               https://ecsft.cern.ch/dist/cvmfs/build_externals/googletest-1.17.0.tar.gz
-    URL_HASH MD5=b6f100bc2a5853a48046aa168ececf84
-    )
-  FetchContent_MakeAvailable(GoogleTest)
-endif()
-get_target_property(GTEST_INCLUDE_DIRS GTest::gtest INCLUDE_DIRECTORIES)
-set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 
 find_package (VJSON REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_INCLUDE_DIRS})
@@ -523,6 +499,7 @@ endif ()
 # compile the unit tests, if necessary
 #
 if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+  add_compile_definitions(_CVMFS_UNITTESTS_ENABLED)
   enable_testing ()
   add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
   add_subdirectory (test/unittests)

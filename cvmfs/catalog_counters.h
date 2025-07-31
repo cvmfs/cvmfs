@@ -5,7 +5,7 @@
 #ifndef CVMFS_CATALOG_COUNTERS_H_
 #define CVMFS_CATALOG_COUNTERS_H_
 
-#include <gtest/gtest_prod.h>
+#include "duplex_testing.h"
 #include <stdint.h>
 
 #include <map>

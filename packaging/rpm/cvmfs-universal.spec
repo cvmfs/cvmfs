@@ -31,6 +31,11 @@
   %define build_snapshotter 1
 %endif
 
+# flag to control building of unittests.
+# No tests are built by default, can be overriden 
+# with rpmbuild --define="build_testing 1"
+%{!?build_testing: %define build_testing 0}
+
 
 # List of platforms that require systemd/autofs fix as described in CVM-1200
 %if 0%{?rhel} >= 7 || 0%{?fedora} || 0%{?sle12} || 0%{?sle15}
@@ -273,12 +278,14 @@ Requires: cvmfs-libs = %{version}-%{release}
 CernVM-FS shrinkwrap utility to export /cvmfs file system trees into container
 images.
 
+%if 0%{?build_testing}
 %package unittests
 Summary: CernVM-FS unit tests binary
 Group: Application/System
 Requires: cvmfs-libs = %{version}-%{release}
 %description unittests
 CernVM-FS unit tests binary.  This RPM is not required except for testing.
+%endif
 
 %if 0%{?build_gateway}
 %package gateway
@@ -351,6 +358,12 @@ BUILD_LIBFUSE2=no
 %if 0%{?build_fuse2}
 BUILD_LIBFUSE2=yes
 %endif
+BUILD_UNITTESTS=no
+INSTALL_UNITTESTS=no
+%if 0%{?build_testing}
+BUILD_UNITTESTS=yes
+INSTALL_UNITTESTS=yes
+%endif
 
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_SERVER=yes \
@@ -360,11 +373,11 @@ cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} \
   -DBUILD_LIBCVMFS=yes \
   -DBUILD_LIBCVMFS_CACHE=yes \
   -DBUILD_SHRINKWRAP=yes \
-  -DBUILD_UNITTESTS=yes \
+  -DBUILD_UNITTESTS=$BUILD_UNITTESTS \
   -DBUILD_GATEWAY=$BUILD_GATEWAY \
   -DBUILD_DUCC=$BUILD_DUCC \
   -DBUILD_SNAPSHOTTER=$BUILD_SNAPSHOTTER \
-  -DINSTALL_UNITTESTS=yes \
+  -DINSTALL_UNITTESTS=$INSTALL_UNITTESTS \
   -DBUILD_LIBFUSE2=$BUILD_LIBFUSE2 \
   -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 
@@ -416,8 +429,10 @@ popd
 %pretrans shrinkwrap
 %check_transaction
 
+%if 0%{?build_testing}
 %pretrans unittests
 %check_transaction
+%endif
 
 %if 0%{?build_gateway}
 %pretrans gateway
@@ -734,6 +749,7 @@ systemctl daemon-reload
 /usr/libexec/cvmfs/shrinkwrap/spec_builder.py*
 %doc COPYING AUTHORS README.md ChangeLog
 
+%if 0%{?build_testing}
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
@@ -741,6 +757,7 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_test_shrinkwrap
 %{_bindir}/cvmfs_test_publish
 %doc COPYING AUTHORS README.md ChangeLog
+%endif
 
 %if 0%{?build_gateway}
 %files gateway
@@ -769,6 +786,8 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
+* Thu Jul 31 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.3
+- Make building of unittests optional 
 * Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
 - Add logrotate config files and tidy to satisfy rpmlint v2.6
 * Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2

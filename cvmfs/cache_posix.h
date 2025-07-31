@@ -18,7 +18,7 @@
 #include "crypto/signature.h"
 #include "fd_refcount_mgr.h"
 #include "file_chunk.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 #include "statistics.h"

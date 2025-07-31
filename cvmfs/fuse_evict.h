@@ -10,7 +10,7 @@
 
 #include "bigvector.h"
 #include "duplex_fuse.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "shortstring.h"
 #include "util/atomic.h"
 #include "util/concurrency.h"

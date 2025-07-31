@@ -12,7 +12,7 @@
 #include <cstddef>
 
 #include "exception.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "util/export.h"
 #include "util/logging.h"
 #include "util/single_copy.h"

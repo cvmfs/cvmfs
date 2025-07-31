@@ -5,7 +5,7 @@
 #ifndef CVMFS_INGESTION_CHUNK_DETECTOR_H_
 #define CVMFS_INGESTION_CHUNK_DETECTOR_H_
 
-#include <gtest/gtest_prod.h>
+#include "duplex_testing.h"
 #include <stdint.h>
 
 #include <algorithm>

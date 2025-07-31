@@ -32,6 +32,7 @@ externals/build_*/
 externals/.decompressionDone
 externals_build
 externals_install
+externals/*.tar*
 
 # golang build products
 ducc/ducc
