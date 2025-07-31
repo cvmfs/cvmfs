@@ -16,7 +16,7 @@
 // This compiles too, and just hardcoding it here 
 // instead of including gtest_prod.h
 // could help make the compilation faster in the future.
-// While the unittests don't re-use object files 
+// While the unittests don't reuse object files 
 // there's no reason though.
 //
 //#define FRIEND_TEST(test_case_name, test_name) friend class test_case_name##_##test_name##_Test
