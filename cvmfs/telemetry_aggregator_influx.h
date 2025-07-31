@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "options.h"
 #include "statistics.h"
 #include "telemetry_aggregator.h"

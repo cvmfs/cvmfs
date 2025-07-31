@@ -12,7 +12,7 @@
 #include <string>
 
 #include "authz/authz.h"
-#include "gtest/gtest_prod.h"
+#include "duplex_testing.h"
 #include "json_document.h"
 #include "util/single_copy.h"
 

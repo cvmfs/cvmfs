@@ -144,7 +144,7 @@ This can be done by using the argument `--gtest_filter=` which accepts `*` as wi
     ```c++
       FRIEND_TEST(<testClassName>, <funcName>);
     ```
-  - In the class `XY` add `#include "gtest/gtest_prod.h"`
+  - In the class `XY` add `#include "duplex_testing.h"`
 - Have stdcout for the test 
   ```c++
     #define GTEST_COUT std::cerr << "[ ] [ INFO ]"
