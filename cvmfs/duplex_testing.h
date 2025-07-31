@@ -13,8 +13,8 @@
 #define FRIEND_TEST(test_case_name, test_name)
 
 // This is the definition of FRIEND_TEST in gtest_prod.h
-// This compiles too, and just hardcoding it here 
-// instead of including gtest_prod.h
+// This compiles even when not building the unittests,
+// and just hardcoding it here instead of including gtest_prod.h
 // could help make the compilation faster in the future.
 // While the unittests don't reuse object files 
 // there's no reason though.
