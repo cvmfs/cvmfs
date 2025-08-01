@@ -16,7 +16,6 @@ option (BUILD_GEOAPI            "Build the geo api service"                     
 option (BUILD_LIBCVMFS          "Build the CernVM-FS client library"                               ON)
 option (BUILD_LIBCVMFS_CACHE    "Build the cache plugin library"                                   ON)
 option (BUILD_SHRINKWRAP        "Build the shrinkwrap tool"                                        OFF)
-
 option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
@@ -26,35 +25,11 @@ option (BUILD_QC_TESTS          "Build the QuickCheck property random tests"    
 option (BUILD_STRESS_TESTS      "Build the stress tests"                                           OFF)
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
-option (BUILD_ALL               "Build client, server, lib, preload, shrinkwrap, unit tests"       OFF)
-
-option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
-
-option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
-option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
-option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
-option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
-option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
 option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"                         OFF)
-
-# By default, all the external third-party libraries are built and installed in
-# ${CMAKE_SOURCE_DIR}/externals_install. If this variable is set to OFF, these
-# libraries are picked up from the system
-option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
-option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installation if available. Set to ON or OFF to force cmake to either download it from the fly, or take it from the system." AUTO)
-
-# List of external libraries to build (overrides default list in bootstrap.sh)
-set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list). Eg =libcurl;libcrypto;pacparser")
-
-# List of external libraries to exclude from building
-set (BUILTIN_EXTERNALS_EXCLUDE "" CACHE STRING "Semicolon-separated list of external libraries to exclude from building")
-
-
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
-
 option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler"               OFF)
-
+option (BUILD_ALL               "Build client, server, lib, preload, shrinkwrap, unit tests"       OFF)
 if (BUILD_ALL)
   set (BUILD_CVMFS ON)
   set (BUILD_UNITTESTS ON)
@@ -68,3 +43,28 @@ if (BUILD_ALL)
   endif (!MACOSX)
 endif (BUILD_ALL)
 
+
+
+option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
+option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
+option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
+option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
+option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
+
+# By default, all the external third-party libraries are built and installed in
+# ${CMAKE_SOURCE_DIR}/externals_install. If this variable is set to OFF, these
+# libraries are picked up from the system
+option (BUILTIN_EXTERNALS       "Use built-in versions of all third-party libraries"               ON)
+option (USE_EXTERNAL_GOOGLETEST "Use external (non-vendored) googletest installation if available. Set to ON or OFF to force cmake to either download it from the fly, or take it from the system." AUTO)
+# List of external libraries to build (overrides default list in bootstrap.sh)
+set (BUILTIN_EXTERNALS_LIST "" CACHE STRING "Semicolon-separated list of external libraries to build (overrides default list). Eg =libcurl;libcrypto;pacparser")
+# List of external libraries to exclude from building
+set (BUILTIN_EXTERNALS_EXCLUDE "" CACHE STRING "Semicolon-separated list of external libraries to exclude from building")
+
+
+option (ENABLE_ASAN             "Enable the Address Sanitizer"                                     OFF)
+# Enable creation of compile_commands.json by default. Needed by LSPs, useful for devs
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+option (CHECK_SYSTEM_HEADERS    "Check System for required headers"                                 OFF)
