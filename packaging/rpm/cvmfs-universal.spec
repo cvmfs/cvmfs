@@ -204,7 +204,12 @@ Common utility libraries for CernVM-FS packages
 Summary: additional libraries to enable libfuse3 support
 Group: Applications/System
 Requires: cvmfs-libs = %{version}-%{release}
+# fuse library package name differs on suse
+%if 0%{?suse_version}
+Requires: libfuse3-3
+%else
 Requires: fuse3-libs >= 3.3.0
+%endif
 %description fuse3
 Shared libraries implementing the CernVM-FS fuse module based on libfuse3
 
