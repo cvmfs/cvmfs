@@ -19,6 +19,7 @@ CVMFS_TEST_CLASS_NAME=${CVMFS_TEST_CLASS_NAME:=IntegrationTests}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
 CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
+CVMFS_TEST_CACHE_BASE=${CVMFS_TEST_CACHE_BASE:=/mnt/cvmfs_cache}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
 CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
@@ -47,6 +48,9 @@ CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
 CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=~/.benchmark}
 CVMFS_OPT_PARALLEL_RUNS=${CVMFS_OPT_PARALLEL_RUNS:=1}
 CVMFS_OPT_MTAB_MODIFIED="false"
+
+# Manually mounting as autofs does not work in virtme-ng
+cvmfs_test_autofs_on_startup=false
 
 # backward compatibility.
 #     CVMFS_TEST_STRATUM0 was replaced by CVMFS_TEST_HTTP_BASE to better reflect
@@ -522,6 +526,7 @@ cvmfs_mount() {
   sudo sh -c 'echo "CVMFS_TIMEOUT_DIRECT=20" >> /etc/cvmfs/default.local' || return 100
   sudo sh -c "echo CVMFS_SYSLOG_FACILITY=$CVMFS_TEST_SYSLOG_FACILITY >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_USE_MACFUSE_KEXT=$CVMFS_TEST_USE_MACFUSE_KEXT >> /etc/cvmfs/default.local" || return 100
+  sudo sh -c "echo CVMFS_CACHE_BASE=$CVMFS_TEST_CACHE_BASE >> /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo CVMFS_REPOSITORY_TAG=TESTING > /etc/cvmfs/config.d/cvmfs-config.cern.ch.local" || return 100
   if running_on_osx ; then
     sudo sh -c 'echo "CVMFS_MAGIC_XATTRS_VISIBILITY=ALWAYS" >> /etc/cvmfs/default.local' || return 100
