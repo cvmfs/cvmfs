@@ -3,6 +3,8 @@ set -e
 
 KERNEL_DIR="./kernel"
 TEST_DIR="./tests"
+DISK_PATH="${DISK_PATH:-./cvmfs.img}"
+DISK_SIZE="${DISK_SIZE:-5}"
 
 # Check if the kernel directory exists
 if [ ! -d "$KERNEL_DIR" ]; then
@@ -18,6 +20,21 @@ fi
 
 setup() {
     mkdir -p results
+
+    # add /mnt/cvmfs_cache dir
+    sudo mkdir -p /mnt/cvmfs_cache
+
+    # create cvmfs_cache.img if not already present
+    if [ -f "$DISK_PATH" ]; then
+        echo "Disk already exists at $DISK_PATH. Skipping creation"
+    else
+        echo "Creating disk image: $DISK_PATH (${DISK_SIZE}G)"
+        dd if=/dev/zero of="$DISK_PATH" bs=1G count="$DISK_SIZE" status=none
+        echo "Disk created successfully"
+    fi
+
+    # reformat cvmfs_cache.img
+    mkfs.ext4 -F "$DISK_PATH" >/dev/null 2>&1
 }
 
 # Function to create and run the VM with virtme-ng
@@ -25,60 +42,16 @@ create_and_run_vm() {
     local bzImage="$1"
     local kernel_version="$2"
 
-    echo "Creating test script for kernel $kernel_version"
-    create_test_script "$kernel_version"
-
     echo "Booting VM with kernel: $kernel_version"
     vng \
     --run "$bzImage" \
     --rwdir=results \
-    --exec '
-        ./run_tests.sh
-    '
+    --disk "$DISK_PATH" \
+    --network user \
+    --exec "
+        ./guest/run_tests.sh $kernel_version
+    "
 }
-
-# Function to run tests in the test directory
-create_test_script() {
-    local kernel_version="$1"
-
-    # Create a script that will run all tests in $TEST_DIR
-    cat << EOF > ./run_tests.sh
-#!/bin/bash
-RESULTS_DIR="./results/test_failures.log"
-KERNEL_VERSION="__KERNEL_VERSION__"
-
-echo "Running tests from directory: $TEST_DIR"
-echo "Sourcing test_functions"
-source ./test_functions
-
-# Loop through each test and execute it
-for test in $TEST_DIR/*; do
-    if [ -d "\$test" ] && [ -f "\$test/main" ]; then
-        test_name=\$(basename "\$test")
-        timestamp=\$(date +"%Y-%m-%d %H:%M:%S")
-        echo "[\$timestamp] Running test: \$test_name on kernel \$KERNEL_VERSION"
-
-        # Run the test script
-        source "\$test/main"
-        cvmfs_run_test
-        exit_code=\$?
-
-        timestamp=\$(date +"%Y-%m-%d %H:%M:%S")
-        # Check if the test passed
-        if [ \$exit_code -eq 0 ]; then
-            echo "Test \$test_name passed on \$KERNEL_VERSION."
-        else
-            echo "Test \$test_name failed with exit code \$exit_code on \$KERNEL_VERSION."
-            echo "[\$timestamp] [\$KERNEL_VERSION] \$test_name : \$exit_code" >> "\$RESULTS_DIR"
-        fi
-    fi
-done
-EOF
-
-    sed -i "s/__KERNEL_VERSION__/$kernel_version/g" ./run_tests.sh
-    chmod +x ./run_tests.sh
-}
-
 
 # Boot VM and run tests
 setup
