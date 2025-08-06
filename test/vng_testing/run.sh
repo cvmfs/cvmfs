@@ -48,6 +48,7 @@ create_and_run_vm() {
     --rwdir=results \
     --disk "$DISK_PATH" \
     --network user \
+    --user $(whoami) \
     --exec "
         ./guest/run_tests.sh $kernel_version
     "

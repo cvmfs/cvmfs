@@ -2,8 +2,10 @@
 RESULTS_DIR="./results/test_failures.log"
 KERNEL_VERSION="$1"
 
-mount -t tmpfs -o size=512M tmpfs /cvmfs
-mount /dev/vda /mnt/cvmfs_cache
+# using tmpfs for /cvmfs mountpoint as / is readonly in virtme
+sudo mount -t tmpfs -o size=512M tmpfs /cvmfs
+# mounting cache disk
+sudo mount /dev/vda /mnt/cvmfs_cache
 
 echo "Running tests from directory: ./tests"
 echo "Sourcing test_functions"
