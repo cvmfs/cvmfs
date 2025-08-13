@@ -128,77 +128,66 @@ TEST(T_IPC_SingleServerSingleClient, ExchangeMultipleHashes){
     EXPECT_EQ(hashes[i], result[i]);
   }
 }
-/*
-TEST(T_LocalUnixSocket, SingleClientServerCommunication){
+
+TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleCommand){
   constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
-  constexpr size_t BufferSize = 12;
-  std::string msg = "Hello, world!";
-
-  LocalUnixSocket<BufferSize, ProcessType::Server, util::reached_reading_end,util::clean_result> server{socket_name};
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> client(socket_name);
-
-  client.connect().write(msg).write("END");
-  EXPECT_EQ(msg,server.accept().read());
-
-  msg="Hello back!";
-  server.write(msg).write("END");
-  EXPECT_EQ(msg,client.read());
-}
-
-TEST(T_LocalUnixSocket, MultipleClientsServerCommunicationSerial){
-  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
-  constexpr size_t BufferSize = 12;
-
-  LocalUnixSocket<BufferSize, ProcessType::Server, util::reached_reading_end,util::clean_result> server{socket_name};
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c0(socket_name);
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c1(socket_name);
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c2(socket_name);
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> c0(socket_name);
+  LocalUnixSocket<ProcessType::Client> c1(socket_name);
 
   c0.connect();
   c1.connect();
-  c2.connect();
-
-  server.accept();
   server.accept();
   server.accept();
 
-  auto exchange_messages = [&server](const auto& client, size_t index){
-    std::string msg = "Hello, world!";
-    client.write(msg).write("END");
-    EXPECT_EQ(msg,server.read(index));
+  util::Command send{util::Command::SendHashes};
+  util::Command recv{util::Command::RecvHashes};
+  server.write(send,0);
+  server.write(recv ,1);
 
-    msg="Hello back!";
-    server.write(msg,index).write("END",index);
-    EXPECT_EQ(msg,client.read());
-  };
-  
-  exchange_messages(c0,0);
-  exchange_messages(c1,1);
-  exchange_messages(c2,2);
+  EXPECT_EQ(send,c0.read<util::Command>()[0]);
+  EXPECT_EQ(recv,c1.read<util::Command>()[0]);
 }
 
-TEST(T_LocalUnixSocket, MultipleClientsServerCommunicationMixed){
+TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleNumber){
   constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
-  constexpr size_t BufferSize = 12;
-
-  LocalUnixSocket<BufferSize, ProcessType::Server, util::reached_reading_end,util::clean_result> server{socket_name};
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c0(socket_name);
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c1(socket_name);
-  LocalUnixSocket<BufferSize, ProcessType::Client,util::reached_reading_end,util::clean_result> c2(socket_name);
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> c0(socket_name);
+  LocalUnixSocket<ProcessType::Client> c1(socket_name);
 
   c0.connect();
   c1.connect();
-  c2.connect();
-
-  server.accept();
   server.accept();
   server.accept();
 
-  c0.write("c0").write("END");
-  c2.write("c2").write("END");
-  c1.write("c1").write("END");
-  EXPECT_EQ(server.read(0),"c0");
-  EXPECT_EQ(server.read(1),"c1");
-  EXPECT_EQ(server.read(2),"c2");
+  c0.write(42);
+  c1.write(24);
+
+  EXPECT_EQ(42,server.read<int>(1,0)[0]);
+  EXPECT_EQ(24,server.read<int>(1,1)[0]);
 }
-*/
+
+TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleHash){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> c0(socket_name);
+  LocalUnixSocket<ProcessType::Client> c1(socket_name);
+
+  c0.connect();
+  c1.connect();
+  server.accept();
+  server.accept();
+
+  shash::Any hash;
+  shash::Any hashes[2];
+  hash.Randomize(42);
+  hashes[0]=hash;
+  hash.Randomize(24);
+  hashes[1]=hash;
+
+  c0.write(hashes[0]);
+  c1.write(hashes[1]);
+
+  EXPECT_EQ(hashes[0],server.read<shash::Any>(1,0)[0]);
+  EXPECT_EQ(hashes[1],server.read<shash::Any>(1,1)[0]);
+}
