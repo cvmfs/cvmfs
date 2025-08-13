@@ -404,6 +404,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_polymorphic_construction.cc
   t_prng.cc
   t_quota.cc
+  t_util_socket.cc
   t_reactor.cc
   t_reflog.cc
   t_relaxed_path_filter.cc
