@@ -1,5 +1,8 @@
+#include <crypto/hash.h>
 #include <gtest/gtest.h>
+#include <vector>
 #include "util/socket.h"
+#include "smallhash.h"
 
 namespace util{
   enum class Command{SendHashes,RecvHashes};
@@ -84,6 +87,47 @@ TEST(T_IPC_SingleServerSingleClient, ExchangeMultipleNumbers){
   EXPECT_EQ(result[3],45);
 }
 
+TEST(T_IPC_SingleServerSingleClient, ExchangeSingleHash){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  shash::Any hash;
+  hash.Randomize(42);
+
+  client.write(hash);
+  EXPECT_EQ(hash, server.read<shash::Any>()[0] );
+}
+
+TEST(T_IPC_SingleServerSingleClient, ExchangeMultipleHashes){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  constexpr size_t N = 250;
+  std::vector<shash::Any> hashes;
+  for(size_t i =0 ; i<N ; ++i){
+    shash::Any hash;
+    hash.Randomize(i);
+    hashes.emplace_back(hash);
+  }
+
+  client.connect();
+  server.accept();
+
+  for(size_t i =0 ; i<N ; ++i){
+    client.write(hashes[i]);
+  }
+  std::vector<shash::Any> result = server.read<shash::Any>(N);
+  for(size_t i =0 ; i<N ; ++i){
+    EXPECT_EQ(hashes[i], result[i]);
+  }
+}
 /*
 TEST(T_LocalUnixSocket, SingleClientServerCommunication){
   constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
