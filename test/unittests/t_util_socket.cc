@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include "util/socket.h"
-#include "smallhash.h"
 
 namespace util{
   enum class Command{SendHashes,RecvHashes};
@@ -190,4 +189,51 @@ TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleHash){
 
   EXPECT_EQ(hashes[0],server.read<shash::Any>(1,0)[0]);
   EXPECT_EQ(hashes[1],server.read<shash::Any>(1,1)[0]);
+}
+
+TEST(T_IPC_SingleServerMultipleClients, RealisticCase){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> c0(socket_name);
+  LocalUnixSocket<ProcessType::Client> c1(socket_name);
+
+  c0.connect();
+  c1.connect();
+  server.accept();
+  server.accept();
+
+  server.write(util::Command::SendHashes,0);
+  server.write(util::Command::SendHashes,1);
+
+  EXPECT_EQ(util::Command::SendHashes,c0.read<util::Command>()[0]);
+  EXPECT_EQ(util::Command::SendHashes,c1.read<util::Command>()[0]);
+
+  c0.write(util::Command::RecvHashes);
+  c1.write(util::Command::RecvHashes);
+
+  EXPECT_EQ(util::Command::RecvHashes,server.read<util::Command>(1,0)[0]);
+  EXPECT_EQ(util::Command::RecvHashes,server.read<util::Command>(1,1)[0]);
+  constexpr size_t c0_hash_n = 42, c1_hash_n = 35;
+  shash::Any c0_hashes[c0_hash_n], c1_hashes[c1_hash_n];
+  shash::Any hash;
+
+  for(size_t i=0; i<c0_hash_n; ++i){
+    hash.Randomize(i);
+    c0_hashes[i]=hash;
+    c0.write(hash);
+  }
+  std::vector<shash::Any> c0_res = server.read<shash::Any>(c0_hash_n,0);
+  for(size_t i=0; i<c0_hash_n; ++i){
+    EXPECT_EQ(c0_hashes[i],c0_res[i]);
+  }
+
+  for(size_t i=0; i<c1_hash_n; ++i){
+    hash.Randomize(i);
+    c1_hashes[i]=hash;
+    c1.write(hash);
+  }
+  std::vector<shash::Any> c1_res = server.read<shash::Any>(c1_hash_n,1);
+  for(size_t i=0; i<c1_hash_n; ++i){
+    EXPECT_EQ(c1_hashes[i],c1_res[i]);
+  }
 }
