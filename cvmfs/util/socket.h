@@ -18,9 +18,8 @@ enum class ProcessType {
   Server
 };
 
-template<size_t BufferSize, ProcessType PT,
-         bool (*TerminationCriterion)(const std::string &),
-         std::string &(*ResultPolisher)(std::string &)>
+
+template<ProcessType PT>
 class LocalUnixSocket {
  public:
   template<ProcessType X = PT,
@@ -93,27 +92,28 @@ class LocalUnixSocket {
     return *this;
   }
 
-  template<ProcessType X = PT,
+  template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  std::string read(size_t socket_number = 0) const {
-    return read_from_socket(data_v_[socket_number]);
+  std::vector<ContiguousType> read(size_t elements = 1,
+                                   size_t socket_number = 0) const {
+    return read_from_socket<ContiguousType>(elements, data_v_[socket_number]);
   }
-  template<ProcessType X = PT,
+  template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Client, int>::type = 0>
-  std::string read() const {
-    return read_from_socket(socket_);
+  std::vector<ContiguousType> read(size_t elements = 1) const {
+    return read_from_socket<ContiguousType>(elements, socket_);
   }
 
-  template<ProcessType X = PT,
+  template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  const LocalUnixSocket &write(const std::string &data,
+  const LocalUnixSocket &write(const ContiguousType &data,
                                size_t socket_number = 0) const {
-    return write_to_socket(data_v_[socket_number], data);
+    return write_to_socket<ContiguousType>(data_v_[socket_number], data);
   }
-  template<ProcessType X = PT,
+  template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Client, int>::type = 0>
-  const LocalUnixSocket &write(const std::string &data) const {
-    return write_to_socket(socket_, data);
+  const LocalUnixSocket &write(const ContiguousType &data) const {
+    return write_to_socket<ContiguousType>(socket_, data);
   }
 
  private:
@@ -132,26 +132,26 @@ class LocalUnixSocket {
     struct sockaddr_un addr_;
   };
 
-  std::string read_from_socket(int socket) const {
-    std::string result;
-    static char buffer[BufferSize + 1];
-    buffer[BufferSize - 1] = '\0';
-
-    do {
-      int res = ::read(socket, buffer, BufferSize);
+  template<typename ContiguousType>
+  std::vector<ContiguousType> read_from_socket(size_t elements,
+                                               int socket) const {
+    std::vector<ContiguousType> result;
+    ContiguousType buffer;
+    for (int i = 0; i < elements; ++i) {
+      int res = ::read(socket, &buffer, sizeof(ContiguousType));
       if (res == -1) {
         perror("read");
         exit(EXIT_FAILURE);
       }
-      buffer[res] = '\0';
-      result += buffer;
-    } while (!TerminationCriterion(result));
-    return ResultPolisher(result);
+      result.emplace_back(buffer);
+    }
+    return result;
   }
 
+  template<typename ContiguousType>
   const LocalUnixSocket &write_to_socket(int socket,
-                                         const std::string &data) const {
-    int res = ::write(socket, data.c_str(), data.size());
+                                         const ContiguousType &data) const {
+    int res = ::write(socket, &data, sizeof(ContiguousType));
     if (res == -1) {
       perror("write");
       exit(EXIT_FAILURE);

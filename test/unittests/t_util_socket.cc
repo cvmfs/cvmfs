@@ -2,23 +2,89 @@
 #include "util/socket.h"
 
 namespace util{
-  bool reached_reading_end(const std::string &msg) {
-    if (msg.size() >= 3 and msg.substr(msg.size() - 3) == "END") {
-      return true;
-    }
-    return false;
-  }
+  enum class Command{SendHashes,RecvHashes};
+};
 
-  std::string &clean_result(std::string &res) {
-    if (res.size() >= 3) {
-      res.erase(res.size() - 3);
-    } else {
-      exit(EXIT_FAILURE);
-    }
-    return res;
-  }
+TEST(T_IPC_SingleServerSingleClient, ExchangeSingleCommand){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  util::Command cmd{util::Command::SendHashes};
+  server.write(cmd);
+  EXPECT_EQ(cmd,client.read<util::Command>()[0]);
+
+  cmd=util::Command::RecvHashes;
+  client.write(cmd);
+  EXPECT_EQ(cmd, server.read<util::Command>()[0]);
 }
 
+TEST(T_IPC_SingleServerSingleClient, ExchangeMultipleCommands){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  server.write(util::Command::RecvHashes)
+    .write(util::Command::RecvHashes)
+    .write(util::Command::SendHashes)
+    .write(util::Command::RecvHashes);
+
+  auto result = client.read<util::Command>(4);
+  EXPECT_EQ(result[0],util::Command::RecvHashes);
+  EXPECT_EQ(result[1],util::Command::RecvHashes);
+  EXPECT_EQ(result[2],util::Command::SendHashes);
+  EXPECT_EQ(result[3],util::Command::RecvHashes);
+}
+
+TEST(T_IPC_SingleServerSingleClient, ExchangeSingleNumber){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  int number=42;
+
+  server.write(number);
+  EXPECT_EQ(number,client.read<int>()[0]);
+
+  number = 24;
+  client.write(number);
+  EXPECT_EQ(number,server.read<int>()[0]);
+}
+
+TEST(T_IPC_SingleServerSingleClient, ExchangeMultipleNumbers){
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  server.write(42)
+    .write(43)
+    .write(44)
+    .write(45);
+
+  auto result = client.read<int>(4);
+  EXPECT_EQ(result[0],42);
+  EXPECT_EQ(result[1],43);
+  EXPECT_EQ(result[2],44);
+  EXPECT_EQ(result[3],45);
+}
+
+/*
 TEST(T_LocalUnixSocket, SingleClientServerCommunication){
   constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
   constexpr size_t BufferSize = 12;
@@ -91,3 +157,4 @@ TEST(T_LocalUnixSocket, MultipleClientsServerCommunicationMixed){
   EXPECT_EQ(server.read(1),"c1");
   EXPECT_EQ(server.read(2),"c2");
 }
+*/
