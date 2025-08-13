@@ -11,6 +11,7 @@
 #include <cstring>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 enum class ProcessType {
   Client,
@@ -61,7 +62,9 @@ class LocalUnixSocket {
   ~LocalUnixSocket() {
     close(socket_);
     if constexpr (PT == ProcessType::Server) {
-      close(data_);
+      for (auto socket : data_v_) {
+        close(socket);
+      }
     }
     unlink(name_.c_str());
   }
@@ -69,11 +72,12 @@ class LocalUnixSocket {
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
   LocalUnixSocket &accept() {
-    data_ = ::accept(socket_, NULL, NULL);
-    if (data_ == -1) {
+    int res = ::accept(socket_, NULL, NULL);
+    if (res == -1) {
       perror("listen");
       exit(EXIT_FAILURE);
     }
+    data_v_.emplace_back(res);
     return *this;
   }
 
@@ -91,23 +95,24 @@ class LocalUnixSocket {
 
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  std::string read() {
-    return read_from_socket(data_);
+  std::string read(size_t socket_number = 0) const {
+    return read_from_socket(data_v_[socket_number]);
   }
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Client, int>::type = 0>
-  std::string read() {
+  std::string read() const {
     return read_from_socket(socket_);
   }
 
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  LocalUnixSocket &write(const std::string &data) {
-    return write_to_socket(data_, data);
+  const LocalUnixSocket &write(const std::string &data,
+                               size_t socket_number = 0) const {
+    return write_to_socket(data_v_[socket_number], data);
   }
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Client, int>::type = 0>
-  LocalUnixSocket &write(const std::string &data) {
+  const LocalUnixSocket &write(const std::string &data) const {
     return write_to_socket(socket_, data);
   }
 
@@ -127,7 +132,7 @@ class LocalUnixSocket {
     struct sockaddr_un addr_;
   };
 
-  std::string read_from_socket(int socket) {
+  std::string read_from_socket(int socket) const {
     std::string result;
     static char buffer[BufferSize + 1];
     buffer[BufferSize - 1] = '\0';
@@ -144,7 +149,8 @@ class LocalUnixSocket {
     return ResultPolisher(result);
   }
 
-  LocalUnixSocket &write_to_socket(int socket, const std::string &data) {
+  const LocalUnixSocket &write_to_socket(int socket,
+                                         const std::string &data) const {
     int res = ::write(socket, data.c_str(), data.size());
     if (res == -1) {
       perror("write");
@@ -156,7 +162,7 @@ class LocalUnixSocket {
   LocalUnixSocketAddress addr_;
   std::string name_;
   int socket_ = -1;
-  int data_ = -1;
+  std::vector<int> data_v_;
 };
 
 #endif  // __LOCAL_UNIX_SOCKET_H_
