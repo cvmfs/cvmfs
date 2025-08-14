@@ -68,7 +68,13 @@ class LocalUnixSocket {
     }
   }
 
-  ~LocalUnixSocket() {
+  // Disable any copy or moving
+  LocalUnixSocket(const LocalUnixSocket &) = delete;
+  LocalUnixSocket &operator=(const LocalUnixSocket &) = delete;
+  LocalUnixSocket(LocalUnixSocket &&) = delete;
+  LocalUnixSocket &operator=(LocalUnixSocket &&) = delete;
+
+  virtual ~LocalUnixSocket() {
     close(socket_);
     if constexpr (PT == ProcessType::Server) {
       for (auto socket : data_v_) {
@@ -155,7 +161,7 @@ class LocalUnixSocket {
     return data_v_.size();
   }
 
- private:
+ protected:
   class LocalUnixSocketAddress {
    public:
     explicit LocalUnixSocketAddress(const char *name) {
