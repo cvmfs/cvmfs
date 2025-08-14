@@ -166,7 +166,7 @@ install_deps_deb() {
     $SUDO apt-get -y install devscripts equivs
   fi
   # Use mk-build-deps to create and install the meta-package, then remove it
-  DEBIAN_FRONTEND=noninteractive mk-build-deps -i -r "$DEB_CONTROL"
+  $SUDO DEBIAN_FRONTEND=noninteractive mk-build-deps -i -r "$DEB_CONTROL"
 }
 
 install_deps_rhel() {
