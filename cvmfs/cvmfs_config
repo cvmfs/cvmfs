@@ -1690,11 +1690,11 @@ cvmfs_bugreport() {
    done
 
    cd ..
-   tar cfz cvmfs-bugreport.tar.gz *
+   tar cfz cvmfs-bugreport-$(date -I)-$(hostname).tar.gz *
    rm -rf bugreport
 
    echo
-   echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
+   echo "System information has been collected in ${tmpdir}/cvmfs-bugreport$(date -I)-$(hostname).tar.gz"
    echo "Please attach this file to your problem description and send it as a"
    echo "bug report to https://github.com/cvmfs/cvmfs/issues"
 }
