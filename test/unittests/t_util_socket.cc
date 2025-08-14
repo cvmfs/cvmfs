@@ -1,16 +1,16 @@
+#include <cache.h>
 #include <crypto/hash.h>
 #include <gtest/gtest.h>
+#include <unistd.h>  // fork()
 
+#include <set>
 #include <vector>
 
 #include "util/socket.h"
 
-namespace util {
-enum class Command {
-  SendHashes,
-  RecvHashes
-};
-};  // namespace util
+// TODO(christge): The test suit is mature enough to have central setup and
+// cleanup
+
 
 TEST(T_IPC_SingleServerSingleClient, ExchangeSingleCommand) {
   constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
@@ -28,6 +28,29 @@ TEST(T_IPC_SingleServerSingleClient, ExchangeSingleCommand) {
   cmd = util::Command::RecvHashes;
   client.write(cmd);
   EXPECT_EQ(cmd, server.read<util::Command>()[0]);
+}
+
+TEST(T_IPC_SingleServerSingleClient, ExchangeSingleCommandMultiprocess) {
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+      break;
+    case 0:
+      // Client code
+      LocalUnixSocket<ProcessType::Client> client(socket_name);
+      client.connect();
+      EXPECT_EQ(util::Command::SendHashes, client.read<util::Command>()[0]);
+      client.write(util::Command::RecvHashes);
+      _exit(0);
+  }
+
+  server.accept();
+  server.write(util::Command::SendHashes);
+  EXPECT_EQ(util::Command::RecvHashes, server.read<util::Command>()[0]);
 }
 
 TEST(T_IPC_SingleServerSingleClient, ExchangeSingleCommandAsync) {
@@ -415,7 +438,7 @@ TEST(T_IPC_SingleServerMultipleClients, RealisticCaseAsync) {
 
   // SERVER gets the hashes of c0, while waiting for the hashes of c1
   std::vector<shash::Any> c0_res = server.try_read<shash::Any>(c0_hash_n, 0);
-  EXPECT_EQ(c0_hash_n,c0_res.size());
+  EXPECT_EQ(c0_hash_n, c0_res.size());
   for (size_t i = 0; i < c0_hash_n; ++i) {
     EXPECT_EQ(c0_hashes[i], c0_res[i]);
   }
@@ -430,9 +453,70 @@ TEST(T_IPC_SingleServerMultipleClients, RealisticCaseAsync) {
     c1.write(hash);
   }
   std::vector<shash::Any> c1_res = server.try_read<shash::Any>(c1_hash_n, 1);
-  EXPECT_EQ(c1_hash_n,c1_res.size());
+  EXPECT_EQ(c1_hash_n, c1_res.size());
   for (size_t i = 0; i < c1_hash_n; ++i) {
     EXPECT_EQ(c1_hashes[i], c1_res[i]);
+  }
+}
+
+TEST(T_IPC_QuotaCacheMgrsCommunication, CollectHashes) {
+  constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
+  QuotaManagerSocket qm{socket_name};
+
+  constexpr size_t cm0_n = 42, cm1_n = 35;
+  shash::Any hash;
+  shash::Any cm0_hashes[cm0_n], cm1_hashes[cm1_n];
+  for (size_t i = 0; i < cm0_n; ++i) {
+    hash.Randomize(i);
+    cm0_hashes[i] = hash;
+  }
+  for (size_t i = 0; i < cm1_n; ++i) {
+    hash.Randomize(i);
+    cm1_hashes[i] = hash;
+  }
+
+  pid_t pid = fork();
+  // handshake to establish communication with each CacheManager
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+      break;
+    case 0:
+      // CacheManager-s code
+      CacheManagerSocket cm0{socket_name};
+      CacheManagerSocket cm1{socket_name};
+      cm0.connect();
+      cm1.connect();
+
+      auto cmd = cm0.read<util::Command>();
+      EXPECT_TRUE(cmd.size() > 0);
+      EXPECT_EQ(cmd[0], util::Command::SendHashes);
+      cm0.write(util::Command::RecvHashes);
+      cm0.write(cm0_n);
+      for (size_t i = 0; i < cm0_n; ++i) {
+        cm0.write(cm0_hashes[i]);
+      }
+
+      cmd = cm1.read<util::Command>();
+      EXPECT_TRUE(cmd.size() > 0);
+      EXPECT_EQ(cmd[0], util::Command::SendHashes);
+      cm1.write(util::Command::RecvHashes);
+      cm1.write(cm1_n);
+      for (size_t i = 0; i < cm1_n; ++i) {
+        cm0.write(cm1_hashes[i]);
+      }
+
+      _exit(0);
+  }
+  // QuotaManager code
+  qm.accept();
+  // asking for hashes
+  std::set<shash::Any> collected = qm.collect<shash::Any>();
+  for (size_t i = 0; i < cm0_n; ++i) {
+    EXPECT_TRUE(collected.find(cm0_hashes[i]) != collected.end());
+  }
+  for (size_t i = 0; i < cm1_n; ++i) {
+    EXPECT_TRUE(collected.find(cm1_hashes[i]) != collected.end());
   }
 }
 

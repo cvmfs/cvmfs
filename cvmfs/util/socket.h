@@ -2,7 +2,9 @@
 #define __LOCAL_UNIX_SOCKET_H_
 
 #include <asm/termbits.h>  // FIONREAD: examine if there are data in socket
+#include <crypto/hash.h>
 #include <errno.h>
+#include <quota.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>  // ioctl: examine if there are data in socket
@@ -13,6 +15,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -24,6 +27,12 @@ enum class ProcessType {
   Server
 };
 
+namespace util {
+enum class Command {
+  SendHashes,
+  RecvHashes
+};
+};  // namespace util
 
 template<ProcessType PT>
 class LocalUnixSocket {
@@ -228,6 +237,83 @@ class LocalUnixSocket {
   std::string name_;
   int socket_ = -1;
   std::vector<int> data_v_;
+};
+
+class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {
+ public:
+  CacheManagerSocket(const char *socket_name)
+      : LocalUnixSocket<ProcessType::Client>(socket_name) { }
+
+  void send_hashes(size_t socket_number = 0) { }
+};
+
+class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
+ public:
+  QuotaManagerSocket(const char *socket_name)
+      : LocalUnixSocket<ProcessType::Server>::LocalUnixSocket(socket_name) { }
+
+  /*
+   * TODO(christge) Points to consider:
+   * 1. One a more mature version LocalUnixSocket should have methods send() for
+   * the Client and try_recv() for the server. The real bottleneck here is that
+   * we don't have std::optional here yet, so we can't say if a client isn't
+   * responsive or doesn't have any hashes to send.
+   * 2. Maybe collect<ContiguousType> should be a method of a
+   * LocalUnixSocket<ProcessType::Server> and the override here should be a
+   * specialized: collect<shash::Any>
+   */
+  std::set<shash::Any> collect_hashes() { return collect<shash::Any>(); }
+
+  template<typename ContiguousType>
+  std::set<ContiguousType> collect() {
+    std::set<ContiguousType> result{};
+    size_t nclients = data_v_.size();
+
+    // ask every CM socket for the hashes
+    for (size_t i = 0; i < nclients; ++i) {
+      write(util::Command::SendHashes, i);
+    }
+
+    auto still_missing = [] [[__nodiscard__]] (const std::vector<bool> vec) {
+      bool res = false;
+      for (const auto &elem : vec) {
+        if (!elem) {
+          res = true;
+          break;
+        }
+      }
+      return res;
+    };
+
+    auto try_collect = [this, &result](int socket_number) -> bool {
+      auto res = try_read<util::Command>(1, socket_number);
+      if (res.size()) {
+        if (res[0] == util::Command::RecvHashes) {
+          auto ndata = read<size_t>(1, socket_number);
+          auto data = read<ContiguousType>(ndata[0], socket_number);
+          for (auto elem : data) {
+            result.insert(elem);
+          }
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // TODO(gchr): this won't abort until the last CM communicates its hashes,
+    // which is not what we want. After a couple of rounds, the QM should
+    // proceed with the cleanup with what's available
+    std::vector<bool> collected(nclients, false);
+
+    while (still_missing(collected)) {
+      for (size_t i = 0; i < nclients; ++i) {
+        if (not collected[i]) {
+          collected[i] = try_collect(i);
+        }
+      }
+    }
+    return result;
+  }
 };
 
 #endif  // __LOCAL_UNIX_SOCKET_H_
