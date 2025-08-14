@@ -27,8 +27,9 @@ function install_builddeps_from_repo {
       sudo apt-get install -y devscripts equivs
     fi
     mk-build-deps ./packaging/debian/cvmfs/control
-    mv cvmfs-build-deps_2.1.0_all.deb /tmp
-    sudo apt-get install -y /tmp/cvmfs-build-deps_2.1.0_all.deb
+    mkdir -p /tmp/cvmfs-build-deps
+    mv cvmfs-build-deps_*_all.deb /tmp/cvmfs-build-deps
+    sudo apt-get install -y /tmp/cvmfs-build-deps/cvmfs-build-deps_*_all.deb
   fi
 }
 
