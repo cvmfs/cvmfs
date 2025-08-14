@@ -1,9 +1,11 @@
 #ifndef __LOCAL_UNIX_SOCKET_H_
 #define __LOCAL_UNIX_SOCKET_H_
 
+#include <asm/termbits.h>  // FIONREAD: examine if there are data in socket
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>  // ioctl: examine if there are data in socket
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -104,6 +106,25 @@ class LocalUnixSocket {
     return *this;
   }
 
+  /*
+   * try_read() will only attempt to read when there are SOME data inside the
+   * socket. More precisely, when multiple data are asked, it will read when
+   * there is at least one instance available. After that the call to read will
+   * be blocking.
+   */
+  template<typename ContiguousType, ProcessType X = PT,
+           typename std::enable_if<X == ProcessType::Server, int>::type = 0>
+  std::vector<ContiguousType> try_read(size_t elements = 1,
+                                       size_t socket_number = 0) const {
+    return try_read_from_socket<ContiguousType>(elements,
+                                                data_v_[socket_number]);
+  }
+  template<typename ContiguousType, ProcessType X = PT,
+           typename std::enable_if<X == ProcessType::Client, int>::type = 0>
+  std::vector<ContiguousType> try_read(size_t elements = 1) const {
+    return try_read_from_socket<ContiguousType>(elements, socket_);
+  }
+
   template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
   std::vector<ContiguousType> read(size_t elements = 1,
@@ -149,6 +170,24 @@ class LocalUnixSocket {
    private:
     struct sockaddr_un addr_;
   };
+
+  template<typename ContiguousType>
+  std::vector<ContiguousType> try_read_from_socket(size_t elements,
+                                                   int socket) const {
+    std::vector<ContiguousType> result{};
+
+    int bytes = 0;
+    if (ioctl(socket, FIONREAD, &bytes) == -1 or bytes <= 0
+        or static_cast<std::size_t>(bytes) / sizeof(ContiguousType) == 0) {
+      /*
+       * If there are not enough data for one ContiguousType word
+       *  RETURN empty
+       */
+      return result;
+    }
+
+    return read_from_socket<ContiguousType>(elements, socket);
+  }
 
   template<typename ContiguousType>
   std::vector<ContiguousType> read_from_socket(size_t elements,
