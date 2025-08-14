@@ -139,6 +139,8 @@ TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleCommand){
   server.accept();
   server.accept();
 
+  EXPECT_EQ(server.nclients(),2);
+
   util::Command send{util::Command::SendHashes};
   util::Command recv{util::Command::RecvHashes};
   server.write(send,0);
@@ -158,6 +160,8 @@ TEST(T_IPC_SingleServerMultipleClients, ExchangeSingleNumber){
   c1.connect();
   server.accept();
   server.accept();
+
+  EXPECT_EQ(server.nclients(),2);
 
   c0.write(42);
   c1.write(24);
@@ -201,6 +205,8 @@ TEST(T_IPC_SingleServerMultipleClients, RealisticCase){
   c1.connect();
   server.accept();
   server.accept();
+
+  EXPECT_EQ(server.nclients(),2);
 
   server.write(util::Command::SendHashes,0);
   server.write(util::Command::SendHashes,1);

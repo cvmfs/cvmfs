@@ -8,6 +8,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -125,6 +126,12 @@ class LocalUnixSocket {
            typename std::enable_if<X == ProcessType::Client, int>::type = 0>
   const LocalUnixSocket &write(const ContiguousType &data) const {
     return write_to_socket<ContiguousType>(socket_, data);
+  }
+
+  template<ProcessType X = PT,
+           typename std::enable_if<X == ProcessType::Server, int>::type = 0>
+  [[__nodiscard__]] std::size_t nclients() const {
+    return data_v_.size();
   }
 
  private:
