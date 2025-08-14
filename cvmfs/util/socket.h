@@ -1,6 +1,7 @@
 #ifndef __LOCAL_UNIX_SOCKET_H_
 #define __LOCAL_UNIX_SOCKET_H_
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -12,6 +13,8 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+
+#include "util/logging.h"
 
 enum class ProcessType {
   Client,
@@ -29,19 +32,22 @@ class LocalUnixSocket {
       , addr_(LocalUnixSocketAddress(name))
       , name_{name} {
     if (socket_ == -1) {
-      perror("socket");
+      LogCvmfs(kLogCvmfs, kLogDebug, "creating socket %s failed (%d)",
+               name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
     int res = bind(socket_, (const struct sockaddr *)&addr_.get(),
                    sizeof(struct sockaddr_un));
     if (res == -1) {
-      perror("bind");
+      LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
+               name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
 
     res = listen(socket_, 20);
     if (res == -1) {
-      perror("listen");
+      LogCvmfs(kLogCvmfs, kLogDebug, "listening to socket %s failed (%d)",
+               name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
   }
@@ -53,7 +59,8 @@ class LocalUnixSocket {
       , addr_(LocalUnixSocketAddress(name))
       , name_{name} {
     if (socket_ == -1) {
-      perror("socket");
+      LogCvmfs(kLogCvmfs, kLogDebug, "creating socket %s failed (%d)",
+               name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
   }
@@ -73,7 +80,9 @@ class LocalUnixSocket {
   LocalUnixSocket &accept() {
     int res = ::accept(socket_, NULL, NULL);
     if (res == -1) {
-      perror("listen");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "accepting connection with socket %s failed (%d)", name_.c_str(),
+               errno);
       exit(EXIT_FAILURE);
     }
     data_v_.emplace_back(res);
@@ -86,7 +95,9 @@ class LocalUnixSocket {
     int res = ::connect(socket_, (const struct sockaddr *)&addr_.get(),
                         sizeof(struct sockaddr_un));
     if (res == -1) {
-      perror("connect");
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "connecting to server with socket %s failed (%d)", name_.c_str(),
+               errno);
       exit(EXIT_FAILURE);
     }
     return *this;
@@ -140,7 +151,8 @@ class LocalUnixSocket {
     for (int i = 0; i < elements; ++i) {
       int res = ::read(socket, &buffer, sizeof(ContiguousType));
       if (res == -1) {
-        perror("read");
+        LogCvmfs(kLogCvmfs, kLogDebug, "reading from socket %s failed (%d)",
+                 name_.c_str(), errno);
         exit(EXIT_FAILURE);
       }
       result.emplace_back(buffer);
@@ -153,7 +165,8 @@ class LocalUnixSocket {
                                          const ContiguousType &data) const {
     int res = ::write(socket, &data, sizeof(ContiguousType));
     if (res == -1) {
-      perror("write");
+      LogCvmfs(kLogCvmfs, kLogDebug, "writing to socket %s failed (%d)",
+               name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
     return *this;
