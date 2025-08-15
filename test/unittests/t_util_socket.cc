@@ -1,4 +1,3 @@
-#include <cache.h>
 #include <crypto/hash.h>
 #include <gtest/gtest.h>
 #include <unistd.h>  // fork()
@@ -6,12 +5,14 @@
 #include <set>
 #include <vector>
 
+#include "smallhash.h"
 #include "util/socket.h"
 
 class T_IPC_QM : public ::testing::Test {
  protected:
-  void SetUp() override{
+  void SetUp() override {
     shash::Any hash;
+    srand(time(NULL));
     for (size_t i = 0; i < c0_hash_n; ++i) {
       hash.Randomize(i);
       c0_hashes[i] = hash;
@@ -20,12 +21,26 @@ class T_IPC_QM : public ::testing::Test {
       hash.Randomize(i);
       c1_hashes[i] = hash;
     }
+    const shash::Any hash_null;
+    map_fd_.Init(magic_n, hash_null, ::hasher_any);
+    EXPECT_EQ(map_fd_.size(), 0);
+    for (size_t i = 0; i < map_size; ++i) {
+      hash.Randomize(i);
+      map_fd_.Insert(hash, i);
+    }
+    EXPECT_EQ(map_fd_.size(), map_size);
+    EXPECT_GE(map_fd_.capacity(), map_size);
   }
 
   void TearDown() override { }
   static constexpr char socket_name[] = "/tmp/socket-exp/test.sock";
-  static constexpr size_t c0_hash_n = 250, c1_hash_n = 42;
+  static constexpr int magic_n = 16;  // TODO(christge): 16 initializes
+                                      // everything in fd_refcount_mgr. Ask WHY?
+  static constexpr size_t c0_hash_n = 250, c1_hash_n = magic_n;
   shash::Any c0_hashes[c0_hash_n], c1_hashes[c1_hash_n];
+
+  static constexpr size_t map_size = 256;
+  SmallHashDynamic<shash::Any, int> map_fd_;
 };
 
 TEST_F(T_IPC_QM, SingleClientExchangeSingleCommand) {
@@ -456,6 +471,7 @@ TEST_F(T_IPC_QM, CollectHashes) {
   }
   // QuotaManager code
   qm.accept();
+  qm.accept();
   // asking for hashes
   std::set<shash::Any> collected = qm.collect<shash::Any>();
   for (size_t i = 0; i < c0_hash_n; ++i) {
@@ -463,6 +479,36 @@ TEST_F(T_IPC_QM, CollectHashes) {
   }
   for (size_t i = 0; i < c1_hash_n; ++i) {
     EXPECT_TRUE(collected.find(c1_hashes[i]) != collected.end());
+  }
+}
+
+TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUse) {
+  QuotaManagerSocket qm{socket_name};
+
+  pid_t pid = fork();
+  // handshake to establish communication with each CacheManager
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+      break;
+    case 0:
+      // CacheManager-s code
+      CacheManagerSocket cm0{socket_name};
+      cm0.connect();
+
+      auto cmd = cm0.read<util::Command>();
+      EXPECT_TRUE(cmd.size() > 0);
+      EXPECT_EQ(cmd[0], util::Command::SendHashes);
+      cm0.send_hashes(map_fd_);
+      _exit(0);
+  }
+  // QuotaManager code
+  qm.accept();
+  std::set<shash::Any> collected = qm.collect<shash::Any>();
+  EXPECT_EQ(collected.size(), map_size);
+  for(const auto& hash: collected){
+    int value;
+    EXPECT_TRUE(map_fd_.Lookup(hash,&value));
   }
 }
 

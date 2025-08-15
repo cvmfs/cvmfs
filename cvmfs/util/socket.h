@@ -20,6 +20,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "smallhash.h"  // SmallHashDynamic
 #include "util/logging.h"
 
 enum class ProcessType {
@@ -244,7 +245,18 @@ class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {
   CacheManagerSocket(const char *socket_name)
       : LocalUnixSocket<ProcessType::Client>(socket_name) { }
 
-  void send_hashes(size_t socket_number = 0) { }
+  void send_hashes(const SmallHashDynamic<shash::Any, int> &hash_map,
+                   size_t socket_number = 0) {
+    const size_t &msize = hash_map.size();
+    write(util::Command::RecvHashes);
+    write(msize);
+    for (size_t i = 0; i < hash_map.capacity(); ++i) {
+      shash::Any hash, empty = hash_map.empty_key_, *keys = hash_map.keys_;
+      if ((hash = keys[i]) != empty) {
+        write(hash);
+      }
+    }
+  }
 };
 
 class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
@@ -254,10 +266,11 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
 
   /*
    * TODO(christge) Points to consider:
-   * 1. One a more mature version LocalUnixSocket should have methods send() for
-   * the Client and try_recv() for the server. The real bottleneck here is that
-   * we don't have std::optional here yet, so we can't say if a client isn't
-   * responsive or doesn't have any hashes to send.
+   * 1. On a more mature version LocalUnixSocket should have methods send() for
+   * the Client and try_recv() for the server. The real bottleneck in this
+   * version is that we don't have std::optional in our current C++ version, so
+   * we can't say if a client isn't responsive or doesn't have any hashes to
+   * send (bc both case would return an empty std::set of hashes).
    * 2. Maybe collect<ContiguousType> should be a method of a
    * LocalUnixSocket<ProcessType::Server> and the override here should be a
    * specialized: collect<shash::Any>

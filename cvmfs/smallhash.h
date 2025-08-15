@@ -10,7 +10,6 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include "duplex_testing.h"
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -20,6 +19,7 @@
 #include <cstdlib>
 #include <new>
 
+#include "duplex_testing.h"
 #include "util/atomic.h"
 #include "util/murmur.hxx"
 #include "util/prng.h"
@@ -255,10 +255,12 @@ class SmallHashFixed
 };
 
 
+class CacheManagerSocket;
 template<class Key, class Value>
 class SmallHashDynamic
     : public SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> > {
   friend class SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> >;
+  friend class CacheManagerSocket;
 
  public:
   typedef SmallHashBase<Key, Value, SmallHashDynamic<Key, Value> > Base;
@@ -510,3 +512,4 @@ template<class Key, class Value>
 const double SmallHashDynamic<Key, Value>::kThresholdShrink = 0.25;
 
 #endif  // CVMFS_SMALLHASH_H_
+
