@@ -306,7 +306,7 @@ void CreateFile(const std::string &path,
 /**
  * Symlinks /tmp/cvmfs.XYZ/l --> ParentPath(path) to make it shorter
  */
-static std::string MakeShortSocketLink(const std::string &path) {
+std::string MakeShortSocketLink(const std::string &path) {
   struct sockaddr_un sock_addr;
   const unsigned max_length = sizeof(sock_addr.sun_path);
 
@@ -328,7 +328,7 @@ static std::string MakeShortSocketLink(const std::string &path) {
   return result;
 }
 
-static void RemoveShortSocketLink(const std::string &short_path) {
+void RemoveShortSocketLink(const std::string &short_path) {
   const std::string link = GetParentPath(short_path);
   unlink(link.c_str());
   rmdir(GetParentPath(link).c_str());

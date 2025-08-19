@@ -12,10 +12,17 @@
 #include <string>
 #include <vector>
 
-#include "smallhash.h"  // SmallHashDynamic
-#include "util/logging.h"
-#include "util/posix.h"  // MakeSocket
+#include "crypto/hash.h"   // shash::Any
+#include "smallhash.h"     // SmallHashDynamic
+#include "util/logging.h"  // LogCvmfs
+#include "util/posix.h"    // MakeSocket
 
+/*
+ * TODO(christge): How do we handle failure?
+ * What we're now doing is exit(EXIT_FAILURE) which is NOT what we want
+ * Probably the best idea is to create an is_valid_ state, and then allow the
+ * caller to handle the failure appropriately
+ */
 enum class ProcessType {
   Client,
   Server
@@ -28,34 +35,58 @@ enum class Command {
 };
 };  // namespace util
 
+
+// This container will only work iff the socket name is within the OS limits
 template<ProcessType PT>
 class LocalUnixSocket {
  public:
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  explicit LocalUnixSocket(const char *name)
+  explicit LocalUnixSocket(const char *name, const int mode = 0777,
+                           const bool auto_listen = true)
       : socket_{socket(AF_UNIX, SOCK_STREAM, 0)}
       , addr_(LocalUnixSocketAddress(name))
       , name_{name} {
+    std::string path{name};
     if (socket_ == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "creating socket %s failed (%d)",
                name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
+#ifndef __APPLE__
+    // fchmod on a socket is not allowed under Mac OS X
+    // using default 0770 here
+    if (fchmod(socket_, mode) != 0) {
+      exit(EXIT_FAILURE);
+    }
+#endif
     int res = bind(socket_,
                    reinterpret_cast<const struct sockaddr *>(&addr_.get()),
                    sizeof(struct sockaddr_un));
     if (res == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
-               name_.c_str(), errno);
-      exit(EXIT_FAILURE);
-    }
+      if ((errno == EADDRINUSE) && (unlink(path.c_str()) == 0)) {
+        res = bind(socket_,
+                   reinterpret_cast<const struct sockaddr *>(&addr_.get()),
+                   sizeof(struct sockaddr_un));
+        if (res == -1) {
+          LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
+                   name_.c_str(), errno);
+          exit(EXIT_FAILURE);
+        }
 
-    res = listen(socket_, 20);
-    if (res == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "listening to socket %s failed (%d)",
-               name_.c_str(), errno);
-      exit(EXIT_FAILURE);
+      } else {
+        LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
+                 name_.c_str(), errno);
+        exit(EXIT_FAILURE);
+      }
+    }
+    if (auto_listen) {
+      res = listen(socket_, 20);
+      if (res == -1) {
+        LogCvmfs(kLogCvmfs, kLogDebug, "listening to socket %s failed (%d)",
+                 name_.c_str(), errno);
+        exit(EXIT_FAILURE);
+      }
     }
   }
 
@@ -79,9 +110,6 @@ class LocalUnixSocket {
   LocalUnixSocket &operator=(LocalUnixSocket &&) = delete;
 
   virtual ~LocalUnixSocket() {
-    if (socket_ != -1) {
-      close(socket_);
-    }
     if constexpr (PT == ProcessType::Server) {
       for (auto socket : data_v_) {
         if (socket != -1) {

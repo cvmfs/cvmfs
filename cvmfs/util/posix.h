@@ -83,6 +83,8 @@ CVMFS_EXPORT FileSystemInfo GetFileSystemInfo(const std::string &path);
 
 CVMFS_EXPORT void CreateFile(const std::string &path, const int mode,
                              const bool ignore_failure = false);
+CVMFS_EXPORT void RemoveShortSocketLink(const std::string &short_path);
+CVMFS_EXPORT std::string MakeShortSocketLink(const std::string &path);
 CVMFS_EXPORT int MakeSocket(const std::string &path, const int mode);
 CVMFS_EXPORT int MakeTcpEndpoint(const std::string &ipv4_address, int portno);
 CVMFS_EXPORT int ConnectSocket(const std::string &path);
