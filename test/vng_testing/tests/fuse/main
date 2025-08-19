@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cvmfs_test_name="FUSE negotiation"
+
+cvmfs_run_test() {
+    SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+
+    gcc -o "$SCRIPT_DIR"/fuse_version "$SCRIPT_DIR"/fuse_version.c `pkg-config fuse3 --cflags --libs`
+
+    FUSE_MOUNTPOINT="/tmp/fuse_mountpoint"
+    mkdir -p $FUSE_MOUNTPOINT
+    
+    "$SCRIPT_DIR"/fuse_version -f $FUSE_MOUNTPOINT
+}
+
