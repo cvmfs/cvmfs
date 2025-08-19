@@ -21,9 +21,6 @@ fi
 setup() {
     mkdir -p results
 
-    # add /mnt/cvmfs_cache dir
-    sudo mkdir -p /mnt/cvmfs_cache
-
     # create cvmfs_cache.img if not already present
     if [ -f "$DISK_PATH" ]; then
         echo "Disk already exists at $DISK_PATH. Skipping creation"
@@ -45,6 +42,7 @@ create_and_run_vm() {
     echo "Booting VM with kernel: $kernel_version"
     vng \
     --run "$bzImage" \
+    --force-9p \
     --rwdir=results \
     --disk "$DISK_PATH" \
     --network user \

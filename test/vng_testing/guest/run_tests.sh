@@ -5,7 +5,7 @@ KERNEL_VERSION="$1"
 # using tmpfs for /cvmfs mountpoint as / is readonly in virtme
 sudo mount -t tmpfs -o size=512M tmpfs /cvmfs
 # mounting cache disk
-sudo mount /dev/vda /mnt/cvmfs_cache
+sudo mount /dev/vda /var/lib/cvmfs
 
 echo "Running tests from directory: ./tests"
 echo "Sourcing test_functions"
