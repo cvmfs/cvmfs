@@ -2,22 +2,14 @@
 #define __LOCAL_UNIX_SOCKET_H_
 
 #include <asm/termbits.h>  // FIONREAD: examine if there are data in socket
-#include <crypto/hash.h>
 #include <errno.h>
-#include <quota.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>  // ioctl: examine if there are data in socket
 #include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
+#include <sys/un.h>  // sizeof
+#include <unistd.h>  // unlink
 
-#include <cstddef>
-#include <cstdlib>
-#include <cstring>
 #include <set>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "smallhash.h"  // SmallHashDynamic
@@ -49,7 +41,8 @@ class LocalUnixSocket {
                name_.c_str(), errno);
       exit(EXIT_FAILURE);
     }
-    int res = bind(socket_, (const struct sockaddr *)&addr_.get(),
+    int res = bind(socket_,
+                   reinterpret_cast<const struct sockaddr *>(&addr_.get()),
                    sizeof(struct sockaddr_un));
     if (res == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
@@ -234,9 +227,9 @@ class LocalUnixSocket {
     return *this;
   }
 
+  int socket_ = -1;
   LocalUnixSocketAddress addr_;
   std::string name_;
-  int socket_ = -1;
   std::vector<int> data_v_;
 };
 
