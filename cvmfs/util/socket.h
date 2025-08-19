@@ -14,6 +14,7 @@
 
 #include "smallhash.h"  // SmallHashDynamic
 #include "util/logging.h"
+#include "util/posix.h"  // MakeSocket
 
 enum class ProcessType {
   Client,
@@ -256,6 +257,20 @@ class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {
         write(hash);
       }
     }
+  }
+
+ private:
+  friend int MakeSocket(const std::string &path, const int mode);
+  /*
+   * Release the handled socket only if there are no active client connections
+   */
+  int release() {
+    if (not data_v_.empty()) {
+      return -1;
+    }
+    int res = socket_;
+    socket_ = -1;
+    return res;
   }
 };
 
