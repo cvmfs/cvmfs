@@ -78,13 +78,20 @@ class LocalUnixSocket {
   LocalUnixSocket &operator=(LocalUnixSocket &&) = delete;
 
   virtual ~LocalUnixSocket() {
-    close(socket_);
+    if (socket_ != -1) {
+      close(socket_);
+    }
     if constexpr (PT == ProcessType::Server) {
       for (auto socket : data_v_) {
-        close(socket);
+        if (socket != -1) {
+          close(socket);
+        }
       }
     }
-    unlink(name_.c_str());
+    if (socket_ != -1) {
+      close(socket_);
+      unlink(name_.c_str());
+    }
   }
 
   template<ProcessType X = PT,
