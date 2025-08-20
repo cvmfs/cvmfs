@@ -134,7 +134,6 @@ bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
     return false;
   delete quota_mgr_;
   quota_mgr_ = quota_mgr;
-  quota_mgr_->GetFdRefcountManager(fd_mgr_);
   return true;
 }
 

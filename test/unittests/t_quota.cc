@@ -9,12 +9,10 @@
 #include <algorithm>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "cache_posix.h"
 #include "compression/compression.h"
 #include "crypto/hash.h"
-#include "fd_refcount_mgr.h"
 #include "quota_posix.h"
 #include "testutil.h"
 #include "util/algorithm.h"
@@ -231,37 +229,21 @@ TEST_F(T_QuotaManager, CleanupLru) {
     quota_mgr_->Touch(hashes_[i]);
   }
 
-  auto reference_count_manager_=std::make_shared<FdRefcountMgr>();
-  quota_mgr_->rc_mgr_=reference_count_manager_;
-
   const unsigned open_files = N / 1000;
-  const auto cleanup_target = N/2;
-  std::vector<int> open_indexes{};
-
-  // Open <open_files> number of random files within the cleanup range
-  // and keep track of their index to verify they servived while
-  // the cleanup target was met.
   for (unsigned i = 0; i < open_files; ++i) {
-    const auto index = prng_.Next(cleanup_target);
-    reference_count_manager_-> map_fd_.Insert(hashes_[index],index);
-    open_indexes.push_back(index);
+    quota_mgr_->open_files_.push_back(hashes_[i]);
   }
-  std::sort(open_indexes.begin(),open_indexes.end());
 
-  EXPECT_TRUE(quota_mgr_->Cleanup(cleanup_target));
+  EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
   vector<string> remaining = quota_mgr_->List();
   EXPECT_EQ(N / 2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
     if (i < open_files) {
-      EXPECT_EQ(StringifyIntLeadingZeros(open_indexes[i]), remaining[i]);
+      EXPECT_EQ(StringifyIntLeadingZeros(i), remaining[i]);
     } else {
       EXPECT_EQ(StringifyIntLeadingZeros(N / 2 + i), remaining[i]);
     }
-  }
-
-  for (unsigned i = 0; i < open_files; ++i) {
-    reference_count_manager_->map_refcount_.Erase(open_indexes[i]);
   }
 }
 

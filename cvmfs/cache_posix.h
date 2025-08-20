@@ -6,7 +6,6 @@
 #define CVMFS_CACHE_POSIX_H_
 
 #include <stdint.h>
-#include <memory>
 #include <sys/types.h>
 
 #include <map>
@@ -193,7 +192,7 @@ class PosixCacheManager : public CacheManager {
    * Refcount and return only unique file descriptors
    */
   bool do_refcount_;
-  std::shared_ptr<FdRefcountMgr> fd_mgr_;
+  UniquePtr<FdRefcountMgr> fd_mgr_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_

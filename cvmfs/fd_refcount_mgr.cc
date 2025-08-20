@@ -85,12 +85,6 @@ FdRefcountMgr *FdRefcountMgr::Clone() {
   return clone;
 }
 
-bool FdRefcountMgr::Contains(const shash::Any& hash){
-  int result=-1;
-  const MutexLockGuard lock_guard(lock_cache_refcount_);
-  return map_fd_.Lookup(hash,&result);
-}
-
 SmallHashDynamic<shash::Any, int> *FdRefcountMgr::GetFdMapPtr() {
   return &map_fd_;
 }

@@ -35,6 +35,7 @@ class Recorder;
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
   FRIEND_TEST(T_QuotaManager, Cleanup);
+  FRIEND_TEST(T_QuotaManager, CleanupLru);
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
@@ -381,6 +382,14 @@ class PosixQuotaManager : public QuotaManager {
    * Used in the destructor to steer closing of the database and so on.
    */
   bool initialized_;
+
+  /**
+   * Used in DoCleanup to exclude currently used files from eviction
+   */
+  // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
+  // operator for shash::Any
+  std::vector<shash::Any> open_files_;
+
 };  // class PosixQuotaManager
 
 #endif  // CVMFS_QUOTA_POSIX_H_
