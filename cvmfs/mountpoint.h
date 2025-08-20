@@ -274,6 +274,7 @@ class FileSystem : SingleCopy, public BootFactory {
         , cache_base_defined(false)
         , cache_dir_defined(false)
         , quota_limit(0)
+        , use_of_aware_cleanup(false)
         , do_refcount(true) { }
     bool is_shared;
     bool is_alien;
@@ -286,6 +287,7 @@ class FileSystem : SingleCopy, public BootFactory {
      * cache when the limit is exceeded.
      */
     int64_t quota_limit;
+    bool use_of_aware_cleanup; // OF: open files
     bool do_refcount;
     std::string cache_path;
     /**

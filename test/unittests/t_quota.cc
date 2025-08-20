@@ -51,7 +51,7 @@ class T_QuotaManager : public ::testing::Test {
     threshold_ = 5 * 1024 * 1024;  // 5M
 
     quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_,
-                                           false);
+                                           false,true);
     ASSERT_TRUE(quota_mgr_ != NULL);
     quota_mgr_->Spawn();
 

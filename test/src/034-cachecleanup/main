@@ -107,7 +107,7 @@ test_advanced_lru(){
   echo "Mount atlas allowing an open file aware cleanup policy"
   cvmfs_umount atlas.cern.ch
   cvmfs_mount "atlas.cern.ch,atlas-condb.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=1600" "CVMFS_CACHE_EXTERNAL_SIZE=750" "CVMFS_CACHE_OF_AWARE_CLEANUP=yes"|| return 1
+    "CVMFS_QUOTA_LIMIT=1600" "CVMFS_CACHE_EXTERNAL_SIZE=750" "CVMFS_CACHE_CLEANUP_NONOPENLRU=yes"|| return 1
 
   local file_sizes="$(compute_actual_sizes)"
   local total="$(echo "$file_sizes" | awk '{ print$1 }')"
@@ -141,7 +141,7 @@ test_vanilla_lru(){
   echo "Mount atlas disabling the open file aware cleanup policy"
   cvmfs_umount atlas.cern.ch
   cvmfs_mount "atlas.cern.ch,atlas-condb.cern.ch" \
-    "CVMFS_QUOTA_LIMIT=1600" "CVMFS_CACHE_EXTERNAL_SIZE=750" "CVMFS_CACHE_OF_AWARE_CLEANUP=no"|| return 1
+    "CVMFS_QUOTA_LIMIT=1600" "CVMFS_CACHE_EXTERNAL_SIZE=750" "CVMFS_CACHE_CLEANUP_NONOPENLRU=no"|| return 1
 
   local file_sizes="$(compute_actual_sizes)"
   local total=$(echo "$file_sizes" | awk '{ print $1 }')

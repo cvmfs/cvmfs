@@ -247,7 +247,8 @@ void PosixQuotaManager::CheckFreeSpace() {
 PosixQuotaManager *PosixQuotaManager::Create(const string &cache_workspace,
                                              const uint64_t limit,
                                              const uint64_t cleanup_threshold,
-                                             const bool rebuild_database) {
+                                             const bool rebuild_database,
+                                             const bool use_of_aware_cleanup) {
   if (cleanup_threshold >= limit) {
     LogCvmfs(kLogQuota, kLogDebug,
              "invalid parameters: limit %" PRIu64 ", "
@@ -259,6 +260,9 @@ PosixQuotaManager *PosixQuotaManager::Create(const string &cache_workspace,
   PosixQuotaManager *quota_manager = new PosixQuotaManager(
       limit, cleanup_threshold, cache_workspace);
 
+  if (quota_manager){
+    quota_manager->use_non_open_lru_cleanup_=use_of_aware_cleanup;
+  }
   // Initialize cache catalog
   if (!quota_manager->InitDatabase(rebuild_database)) {
     delete quota_manager;
@@ -281,7 +285,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     const std::string &cache_workspace,
     const uint64_t limit,
     const uint64_t cleanup_threshold,
-    bool foreground) {
+    bool foreground,
+    const bool use_of_aware_cleanup) {
   string cache_dir;
   string workspace_dir;
   ParseDirectories(cache_workspace, &cache_dir, &workspace_dir);
@@ -298,8 +303,12 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
 
   PosixQuotaManager *quota_mgr = new PosixQuotaManager(limit, cleanup_threshold,
                                                        cache_workspace);
-  quota_mgr->shared_ = true;
-  quota_mgr->spawned_ = true;
+
+  if(quota_mgr){
+    quota_mgr->shared_ = true;
+    quota_mgr->spawned_ = true;
+    quota_mgr->use_non_open_lru_cleanup_=use_of_aware_cleanup;
+  }
 
   // Try to connect to pipe
   const string fifo_path = workspace_dir + "/cachemgr";

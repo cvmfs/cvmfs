@@ -306,6 +306,13 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
     settings.do_refcount = false;
   }
 
+  if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_CLEANUP_NONOPENLRU", instance),
+                             &optarg)
+      && options_mgr_->IsOn(optarg)) {
+    // if refcounting is disabled, open files aware cleanup can't work
+    settings.use_of_aware_cleanup = settings.do_refcount;
+  }
+
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
       && options_mgr_->IsOn(optarg)) {
@@ -973,7 +980,8 @@ bool FileSystem::SetupPosixQuotaMgr(
                                                 cache_workspace,
                                                 settings.quota_limit,
                                                 quota_threshold,
-                                                foreground_);
+                                                foreground_,
+                                                settings.use_of_aware_cleanup);
     if (quota_mgr == NULL) {
       boot_error_ = "Failed to initialize shared lru cache";
       boot_status_ = loader::kFailQuota;
@@ -983,7 +991,8 @@ bool FileSystem::SetupPosixQuotaMgr(
     quota_mgr = PosixQuotaManager::Create(cache_workspace,
                                           settings.quota_limit,
                                           quota_threshold,
-                                          found_previous_crash_);
+                                          found_previous_crash_,
+                                          settings.use_of_aware_cleanup);
     if (quota_mgr == NULL) {
       boot_error_ = "Failed to initialize lru cache";
       boot_status_ = loader::kFailQuota;

@@ -43,12 +43,15 @@ class PosixQuotaManager : public QuotaManager {
   static PosixQuotaManager *Create(const std::string &cache_workspace,
                                    const uint64_t limit,
                                    const uint64_t cleanup_threshold,
-                                   const bool rebuild_database);
-  static PosixQuotaManager *CreateShared(const std::string &exe_path,
-                                         const std::string &cache_workspace,
-                                         const uint64_t limit,
-                                         const uint64_t cleanup_threshold,
-                                         bool foreground);
+                                   const bool rebuild_database,
+                                   const bool use_of_aware_cleanup = false);
+  static PosixQuotaManager *CreateShared(
+      const std::string &exe_path,
+      const std::string &cache_workspace,
+      const uint64_t limit,
+      const uint64_t cleanup_threshold,
+      bool foreground,
+      const bool use_of_aware_cleanup = false);
   static int MainCacheManager(int argc, char **argv);
 
   virtual ~PosixQuotaManager();
@@ -369,9 +372,15 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_list_volatile_;
 
   /**
+   * Will determine if open files will be ignored if possible during cleanup
+   */
+  bool use_non_open_lru_cleanup_;
+
+  /**
    * Used in the destructor to steer closing of the database and so on.
    */
   bool initialized_;
 };  // class PosixQuotaManager
 
 #endif  // CVMFS_QUOTA_POSIX_H_
+
