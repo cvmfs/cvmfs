@@ -483,7 +483,7 @@ TEST_F(T_IPC_QM, CollectHashes) {
   }
 }
 
-TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUse) {
+TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUseAPI) {
   QuotaManagerSocket qm{socket_name};
 
   pid_t pid = fork();
