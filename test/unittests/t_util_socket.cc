@@ -483,6 +483,34 @@ TEST_F(T_IPC_QM, CollectHashes) {
   }
 }
 
+TEST_F(T_IPC_QM, CollectHashesCCZero){
+  QuotaManagerSocket qm{socket_name};
+
+  pid_t pid = fork();
+  // handshake to establish communication with each CacheManager
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+      break;
+    case 0:
+      // CacheManager-s code
+      CacheManagerSocket cm0{socket_name};
+      cm0.connect();
+
+      auto cmd = cm0.read<util::Command>();
+      EXPECT_TRUE(cmd.size() > 0);
+      EXPECT_EQ(cmd[0], util::Command::SendHashes);
+      cm0.write(util::Command::RecvHashes);
+      cm0.write(0);
+      _exit(0);
+  }
+  // QuotaManager code
+  qm.accept();
+  // asking for hashes
+  std::set<shash::Any> collected = qm.collect<shash::Any>();
+  EXPECT_EQ(collected.size(),0);
+}
+
 TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUseAPI) {
   QuotaManagerSocket qm{socket_name};
 
