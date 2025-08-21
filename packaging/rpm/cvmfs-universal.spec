@@ -678,7 +678,7 @@ systemctl daemon-reload
 %config %{_sysconfdir}/cvmfs/default.conf
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 %{_unitdir}/cvmfs-reload.service
 %doc %{_mandir}/man1/cvmfs2.1.gz
 %doc %{_mandir}/man1/cvmfs_config.1.gz
@@ -697,7 +697,7 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_util.so.%{base_version}
 %{_libdir}/libcvmfs_util_debug.so
 %{_libdir}/libcvmfs_util_debug.so.%{base_version}
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files fuse3
 %defattr(-,root,root)
@@ -707,13 +707,13 @@ systemctl daemon-reload
 %{_libdir}/libcvmfs_fuse3.so.%{base_version}
 %{_libdir}/libcvmfs_fuse3_debug.so
 %{_libdir}/libcvmfs_fuse3_debug.so.%{base_version}
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files devel
 %defattr(-,root,root)
 %{_includedir}/libcvmfs.h
 %{_includedir}/libcvmfs_cache.h
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %files server
 %defattr(-,root,root)
@@ -737,7 +737,7 @@ systemctl daemon-reload
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
 /var/spool/cvmfs/README
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs
 %config(noreplace) %{_sysconfdir}/logrotate.d/cvmfs-statsdb
 # sqlite version on rhel8 is too old for the statsdb logrotate script (needs >= 3.27)
@@ -752,7 +752,7 @@ systemctl daemon-reload
 %defattr(-,root,root)
 %{_bindir}/cvmfs_shrinkwrap
 /usr/libexec/cvmfs/shrinkwrap/spec_builder.py*
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 
 %if 0%{?build_testing}
 %files unittests
@@ -761,7 +761,7 @@ systemctl daemon-reload
 %{_bindir}/cvmfs_test_cache
 %{_bindir}/cvmfs_test_shrinkwrap
 %{_bindir}/cvmfs_test_publish
-%doc COPYING AUTHORS README.md ChangeLog
+%doc COPYING CITATION.cff README.md ChangeLog
 %endif
 
 %if 0%{?build_gateway}
