@@ -19,14 +19,14 @@ class T_IPC_QM : public ::testing::Test {
       c0_hashes[i] = hash;
     }
     for (size_t i = 0; i < c1_hash_n; ++i) {
-      hash.Randomize(i);
+      hash.Randomize(i+c0_hash_n);
       c1_hashes[i] = hash;
     }
     const shash::Any hash_null;
     map_fd_.Init(magic_n, hash_null, ::hasher_any);
     EXPECT_EQ(map_fd_.size(), 0);
     for (size_t i = 0; i < map_size; ++i) {
-      hash.Randomize(i);
+      hash.Randomize(i+c0_hash_n+c1_hash_n);
       map_fd_.Insert(hash, i);
     }
     EXPECT_EQ(map_fd_.size(), map_size);
