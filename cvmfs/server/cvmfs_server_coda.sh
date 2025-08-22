@@ -48,19 +48,19 @@ publish_after_hook() { :; }
 
 cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
 
-if [ "$CVMFS_UPDATEGEO_SOURCE" == openhtc ]; then
+if [ "$CVMFS_UPDATEGEO_SOURCE" = "openhtc" ]; then
   CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-7}
   CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-14}
   CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-iplocation.mmdb}"
   CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://geoipdb.openhtc.io}"
   CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-/${CVMFS_UPDATEGEO_DB}.gz}"
-elif [ "$CVMFS_UPDATEGEO_SOURCE" == maxmind ]; then
+elif [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
   CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-14}
   CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-28}
   CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-GeoLite2-City.mmdb}"
   CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://download.maxmind.com/geoip/databases/GeoLite2-City/download}"
   CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-?suffix=tar.gz}"
-elif [ -n "$CVMFS_UPDATEGEO_SOURCE" ] && [ "$CVMFS_UPDATEGEO_SOURCE" != none ]; then
+elif [ -n "$CVMFS_UPDATEGEO_SOURCE" ] && [ "$CVMFS_UPDATEGEO_SOURCE" != "none" ]; then
   die "CVMFS_UPDATEGEO_SOURCE not openhtc, maxmind, or none"
 fi
 
