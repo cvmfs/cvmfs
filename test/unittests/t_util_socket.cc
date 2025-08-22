@@ -483,7 +483,7 @@ TEST_F(T_IPC_QM, CollectHashes) {
   }
 }
 
-TEST_F(T_IPC_QM, CollectHashesCCZero){
+TEST_F(T_IPC_QM, CollectHashesCCZero) {
   QuotaManagerSocket qm{socket_name};
 
   pid_t pid = fork();
@@ -508,7 +508,7 @@ TEST_F(T_IPC_QM, CollectHashesCCZero){
   qm.accept();
   // asking for hashes
   std::set<shash::Any> collected = qm.collect<shash::Any>();
-  EXPECT_EQ(collected.size(),0);
+  EXPECT_EQ(collected.size(), 0);
 }
 
 TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUseAPI) {
@@ -535,9 +535,9 @@ TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUseAPI) {
   qm.accept();
   std::set<shash::Any> collected = qm.collect<shash::Any>();
   EXPECT_EQ(collected.size(), map_size);
-  for(const auto& hash: collected){
+  for (const auto &hash : collected) {
     int value;
-    EXPECT_TRUE(map_fd_.Lookup(hash,&value));
+    EXPECT_TRUE(map_fd_.Lookup(hash, &value));
   }
 }
 
