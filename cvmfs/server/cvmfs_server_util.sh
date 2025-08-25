@@ -1066,8 +1066,9 @@ _update_geodb_install() {
   # downloading the GeoIP database file
   curl -L -sS --connect-timeout 10 \
               --max-time 60        \
+              --retry 2            \
               $authopts            \
-              "$dburl" > $download_target || true
+              "$dburl" -o $download_target || true
 
   if [ -n "$untar_dir" ]; then
     if ! tar tzf $download_target >/dev/null 2>&1; then
