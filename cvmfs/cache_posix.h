@@ -16,13 +16,15 @@
 #include "cache.h"
 #include "catalog_mgr.h"
 #include "crypto/signature.h"
+#include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "file_chunk.h"
-#include "duplex_testing.h"
 #include "manifest_fetch.h"
+#include "quota_cache_mgr_socket.h"  // quota_cache_communication_socket
 #include "shortstring.h"
 #include "statistics.h"
 #include "util/atomic.h"
+#include "util/socket.h"  // CacheManagerSocket
 
 namespace catalog {
 class DirectoryEntry;
@@ -146,7 +148,8 @@ class PosixCacheManager : public CacheManager {
       , reports_correct_filesize_(true)
       , is_tmpfs_(false)
       , do_refcount_(do_refcount)
-      , fd_mgr_(new FdRefcountMgr()) {
+      , fd_mgr_(new FdRefcountMgr())
+      , cm_socket_(quota_cache_communication_socket) {
     atomic_init32(&no_inflight_txns_);
   }
 
@@ -193,6 +196,14 @@ class PosixCacheManager : public CacheManager {
    */
   bool do_refcount_;
   UniquePtr<FdRefcountMgr> fd_mgr_;
+
+  /**
+   * Use this socket to communicate with the QuotaManager and propagate the open
+   * files/hashes
+   */
+  CacheManagerSocket cm_socket_;
+
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
+

@@ -20,6 +20,7 @@
 #include "quota.h"
 #include "statistics.h"
 #include "util/single_copy.h"
+#include "util/socket.h"  // QuotaManagerSocket
 #include "util/string.h"
 
 namespace perf {
@@ -91,7 +92,6 @@ class PosixQuotaManager : public QuotaManager {
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
   void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_; };
-
 
  private:
   /**
@@ -377,6 +377,12 @@ class PosixQuotaManager : public QuotaManager {
    * Will determine if open files will be ignored if possible during cleanup
    */
   bool use_non_open_lru_cleanup_;
+
+  /**
+   * Use this socket to communicate with the cache managers and get the
+   * information of which files/hashes are open
+   */
+  QuotaManagerSocket qm_socket_;
 
   /**
    * Used in the destructor to steer closing of the database and so on.

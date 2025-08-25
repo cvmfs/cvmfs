@@ -58,7 +58,7 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-
+#include "quota_cache_mgr_socket.h" // quota_cache_communication_socket
 using namespace std;  // NOLINT
 
 
@@ -1749,6 +1749,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
     , use_non_open_lru_cleanup_(use_of_aware_cleanup)
+    , qm_socket_(quota_cache_communication_socket)
     , initialized_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
