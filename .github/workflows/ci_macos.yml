@@ -26,7 +26,7 @@ jobs:
           which greadlink
           sudo mkdir /usr/local/include
           ls /usr/local
-          brew install sqlite3
+          sudo xcode-select -s "/Applications/Xcode_16.app"
           
       - name: Install Fuse-t and dependencies
         run: |
