@@ -9,7 +9,7 @@ on:
 jobs:
   macos_build_and_test:
     name: "macos_build_and_test"
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -26,6 +26,7 @@ jobs:
           which greadlink
           sudo mkdir /usr/local/include
           ls /usr/local
+          sudo xcode-select -s "/Applications/Xcode_16.app"
           
       - name: Install Fuse-t and dependencies
         run: |
@@ -38,9 +39,9 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
-          # TODO: figure out why include paths prefer this over externals
-          sudo rm  /Library/Frameworks/Mono.framework/Headers/sqlite*
           export USE_MACFUSE_KEXT=OFF
+          export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
+          export CVMFS_EXTERNALS_EXCLUDE=sqlite3
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
 
       - name: Setup firmlinks
@@ -85,13 +86,14 @@ jobs:
             src/006-buildkernel                               \
             src/007-testjobs                                  \
             src/008-default_domain                            \
-            src/015-rebuild_on_crash                           \
+            src/015-rebuild_on_crash                          \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
             src/024-reload-during-asetup                      \
             src/028-negativecache                             \
             src/039-reloadalarm                               \
             src/040-aliencache                                \
+            src/041-rocache                                   \
             src/045-oasis                                     \
             src/052-roundrobindns                             \
             src/050-configrepo                                \
@@ -102,6 +104,7 @@ jobs:
             src/059-fallbackproxy                             \
             src/060-hidexattrs                                \
             src/061-systemdnokill                             \
+            src/064-fsck                                      \
             src/069-systemremount                             \
             src/074-oom                                       \
             src/077-doublemount                               \

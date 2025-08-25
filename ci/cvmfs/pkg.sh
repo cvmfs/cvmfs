@@ -58,6 +58,7 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX \
       -DBUILD_SERVER=no                                 \
       -DBUILD_SERVER_DEBUG=no                           \
       -DBUILD_UNITTESTS=no                              \
+      -DBUILTIN_EXTERNALS_EXCLUDE=${CVMFS_EXTERNALS_EXCLUDE:-""}                             \
       -DUSE_MACFUSE_KEXT=${USE_MACFUSE_KEXT:-ON}        \
       $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION
