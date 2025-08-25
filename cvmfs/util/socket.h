@@ -6,7 +6,7 @@
 #include <sys/ioctl.h>  // ioctl: examine if there are data in socket
 #include <sys/socket.h>
 #include <sys/un.h>  // sizeof
-#include <unistd.h>  // unlink
+#include <unistd.h>  // unlink, sleep
 
 #include <set>
 #include <string>
@@ -323,6 +323,11 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
    */
   std::set<shash::Any> collect_hashes() { return collect<shash::Any>(); }
 
+  /*
+   * collect() works on a best effort basis; QuotaManagerSocket will attempt up
+   * to <number_of_attempts> times to collect data from each socket and then
+   * will return what is available so far.
+   */
   template<typename ContiguousType>
   std::set<ContiguousType> collect() {
     std::set<ContiguousType> result{};
@@ -359,20 +364,22 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
       return false;
     };
 
-    // TODO(gchr): this won't abort until the last CM communicates its hashes,
-    // which is not what we want. After a couple of rounds, the QM should
-    // proceed with the cleanup with what's available
     std::vector<bool> collected(nclients, false);
-
-    while (still_missing(collected)) {
+    int attempt = 0;
+    while (still_missing(collected) and attempt <= number_of_attempts) {
+      sleep(static_cast<int>(pow(2, attempt) / 100));
       for (size_t i = 0; i < nclients; ++i) {
         if (not collected[i]) {
           collected[i] = try_collect(i);
         }
       }
+      ++attempt;
     }
     return result;
   }
+
+ private:
+  static constexpr size_t number_of_attempts = 8;
 };
 
 #endif  // __LOCAL_UNIX_SOCKET_H_

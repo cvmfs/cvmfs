@@ -543,6 +543,7 @@ TEST_F(T_IPC_QM, CollectHashes) {
   qm.accept();
   // asking for hashes
   std::set<shash::Any> collected = qm.collect<shash::Any>();
+  EXPECT_EQ(collected.size(), c0_hash_n+c1_hash_n);
   for (size_t i = 0; i < c0_hash_n; ++i) {
     EXPECT_TRUE(collected.find(c0_hashes[i]) != collected.end());
   }
@@ -582,6 +583,44 @@ TEST_F(T_IPC_QM, CollectHashesCCZero) {
   EXPECT_EQ(collected.size(), 0);
 }
 */
+
+TEST_F(T_IPC_QM, CollectHashesCCNonResponsiveCacheMgr){
+  QuotaManagerSocket qm{socket_name};
+
+  pid_t pid = fork();
+  // handshake to establish communication with each CacheManager
+  switch (pid) {
+    case -1:
+      ASSERT_TRUE(false);
+      break;
+    case 0:
+      // CacheManager-s code
+      CacheManagerSocket cm0{socket_name};
+      CacheManagerSocket cm1{socket_name};
+      cm0.connect();
+      cm1.connect();
+
+      auto cmd1=cm1.read<util::Command>(1);
+      EXPECT_EQ(cmd1.size(),1);
+      EXPECT_EQ(cmd1[0],util::Command::SendHashes);
+      cm1.write(util::Command::RecvHashes);
+      cm1.write(c1_hash_n);
+      for (size_t i = 0; i < c1_hash_n; ++i) {
+        cm1.write(c1_hashes[i]);
+      }
+
+      _exit(0);
+  }
+  // QuotaManager code
+  qm.accept();
+  qm.accept();
+  // asking for hashes
+  std::set<shash::Any> collected = qm.collect<shash::Any>();
+  EXPECT_EQ(collected.size(), c1_hash_n);
+  for (size_t i = 0; i < c1_hash_n; ++i) {
+    EXPECT_TRUE(collected.find(c1_hashes[i]) != collected.end());
+  }
+}
 
 TEST_F(T_IPC_QM, SingleClientSendSmallHashDynamicUseAPI) {
   QuotaManagerSocket qm{socket_name};
