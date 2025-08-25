@@ -191,21 +191,6 @@ jobs:
           sudo cvmfs_config setup
           sudo systemctl start apache2
           sudo systemctl status apache2
-            
-          geoip_local_url="https://ecsft.cern.ch/dist/cvmfs/geodb/GeoLite2-City.mmdb"
-          dbfile="/var/lib/cvmfs-server/geo/GeoLite2-City-test.mmdb"
-          sudo mkdir -p /var/lib/cvmfs-server/geo/
-          if [ ! -f "/home/runner/.cache/testgeo.mmdb" ]; then
-            echo "Downloading $geoip_local_url ..."
-            curl  $geoip_local_url -o /home/runner/.cache/testgeo.mmdb
-          fi
-          sudo cp /home/runner/.cache/testgeo.mmdb $dbfile
-          if ! [ -f $dbfile ]; then
-            echo "failed to download geodb!"
-            exit 300 
-          fi  
-          sudo mkdir -p /etc/cvmfs
-          echo "CVMFS_GEO_DB_FILE=$dbfile" | sudo tee -a /etc/cvmfs/server.local > /dev/null
       - name: Check CCache Hits
         run: |
           ccache -s
