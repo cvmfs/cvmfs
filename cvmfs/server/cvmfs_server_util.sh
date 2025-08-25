@@ -1047,7 +1047,7 @@ _update_geodb_install() {
   esac
 
   local authopts=""
-  if [ "$CVMFS_UPDATEGEO_SOURCE" == maxmind ]; then
+  if [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
     if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
       echo "CVMFS_GEO_ACCOUNT_ID not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_ACCOUNT_ID not set"
