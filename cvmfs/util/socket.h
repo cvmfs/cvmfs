@@ -116,10 +116,10 @@ class LocalUnixSocket {
           close(socket);
         }
       }
+      unlink(name_.c_str());
     }
     if (socket_ != -1) {
       close(socket_);
-      unlink(name_.c_str());
     }
   }
 
@@ -238,6 +238,9 @@ class LocalUnixSocket {
   std::vector<ContiguousType> read_from_socket(size_t elements,
                                                int socket) const {
     std::vector<ContiguousType> result;
+    if (not(elements > 0)) {
+      return result;
+    }
     ContiguousType buffer;
     for (int i = 0; i < elements; ++i) {
       int res = ::read(socket, &buffer, sizeof(ContiguousType));
