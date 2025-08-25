@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # This tester listens on port 8051 for a single http request, with
 #  a URL that starts with /api/v....
