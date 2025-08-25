@@ -51,6 +51,23 @@ print_hint() {
   echo "--> $msg"
 }
 
+# Helper function to remove a word from a space-separated list
+# Works consistently across macOS (BSD sed) and Linux (GNU sed)
+remove_word_from_list() {
+  local list="$1"
+  local word_to_remove="$2"
+
+  # Use a more portable approach that works on both BSD and GNU sed
+  # First, handle the word at the beginning of the list
+  list=$(echo "$list" | sed "s/^$word_to_remove //" | sed "s/^$word_to_remove$//")
+  # Then handle the word in the middle or end of the list
+  list=$(echo "$list" | sed "s/ $word_to_remove / /g" | sed "s/ $word_to_remove$//")
+  # Clean up any extra spaces
+  list=$(echo "$list" | sed 's/  */ /g' | sed 's/^ *//' | sed 's/ *$//')
+
+  echo "$list"
+}
+
 get_destination_dir() {
   local library_name="$1"
   echo "$externals_build_dir/build_$library_name"
@@ -306,11 +323,11 @@ if [ x"$BUILTIN_EXTERNALS_EXCLUDE" != x"" ]; then
 
     # Remove each excluded library from missing_libs
     for exclude_lib in $exclude_libs; do
-        missing_libs=$(echo $missing_libs | sed -e "s/\b$exclude_lib\b//g" | tr -s ' ')
+        missing_libs=$(remove_word_from_list "$missing_libs" "$exclude_lib")
     done
 
     # Clean up any leading/trailing spaces
-    missing_libs=$(echo $missing_libs | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    missing_libs=$(echo "$missing_libs" | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
 
     echo "Bootstrap - Final externals list after exclusions: $missing_libs"
 fi
@@ -320,12 +337,12 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
   for l in $existing_libs; do
     # cleanup dependencies that are updated or no longer vendored
     if [ "$l" = "golang" ]; then
-      existing_libs=$(echo $existing_libs | sed  's/golang\b//')
+      existing_libs=$(remove_word_from_list "$existing_libs" "golang")
       if [ -d $externals_install_dir/go ]; then
         rm -rf $externals_install_dir/go
       fi
     elif [ "$l" = "googletest" ]; then
-      existing_libs=$(echo $existing_libs | sed  's/googletest\b//')
+      existing_libs=$(remove_word_from_list "$existing_libs" "googletest")
       if [ -d $externals_install_dir/include/gtest ]; then
         rm -rf $externals_install_dir/include/gtest
       fi
@@ -337,7 +354,7 @@ if [ -f $externals_install_dir/.bootstrapDone ]; then
       fi
     elif [ x"$l" != x ]; then
       echo "Bootstrap - found $l"
-      missing_libs=$(echo $missing_libs | sed -e "s/$l\b//")
+      missing_libs=$(remove_word_from_list "$missing_libs" "$l")
     fi
   done
 else
