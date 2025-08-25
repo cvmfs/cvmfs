@@ -86,13 +86,14 @@ jobs:
             src/006-buildkernel                               \
             src/007-testjobs                                  \
             src/008-default_domain                            \
-            src/015-rebuild_on_crash                           \
+            src/015-rebuild_on_crash                          \
             src/016-dnsunreachable                            \
             src/017-dnstimeout                                \
             src/024-reload-during-asetup                      \
             src/028-negativecache                             \
             src/039-reloadalarm                               \
             src/040-aliencache                                \
+            src/041-rocache                                   \
             src/045-oasis                                     \
             src/052-roundrobindns                             \
             src/050-configrepo                                \
@@ -103,6 +104,7 @@ jobs:
             src/059-fallbackproxy                             \
             src/060-hidexattrs                                \
             src/061-systemdnokill                             \
+            src/064-fsck                                      \
             src/069-systemremount                             \
             src/074-oom                                       \
             src/077-doublemount                               \
