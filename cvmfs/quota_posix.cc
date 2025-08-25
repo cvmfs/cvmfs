@@ -42,13 +42,14 @@
 #include <cstring>
 #include <limits>
 #include <map>
-#include <set>
+#include <set> // returned from collect_hashes
 #include <string>
 #include <vector>
 
 #include "crypto/hash.h"
 #include "duplex_sqlite3.h"
 #include "monitor.h"
+#include "quota_cache_mgr_socket.h"  // quota_cache_communication_socket
 #include "statistics.h"
 #include "util/concurrency.h"
 #include "util/exception.h"
@@ -58,7 +59,6 @@
 #include "util/posix.h"
 #include "util/smalloc.h"
 #include "util/string.h"
-#include "quota_cache_mgr_socket.h" // quota_cache_communication_socket
 using namespace std;  // NOLINT
 
 
@@ -298,10 +298,10 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     return NULL;
   }
 
-  PosixQuotaManager *quota_mgr = new PosixQuotaManager(limit, cleanup_threshold,
-                                                       cache_workspace, use_of_aware_cleanup);
+  PosixQuotaManager *quota_mgr = new PosixQuotaManager(
+      limit, cleanup_threshold, cache_workspace, use_of_aware_cleanup);
 
-  if(quota_mgr){
+  if (quota_mgr) {
     quota_mgr->shared_ = true;
     quota_mgr->spawned_ = true;
   }
@@ -513,6 +513,11 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   // So -1 can be a marker that will never appear in the database.
   int64_t max_acseq = -1;
   std::vector<EvictCandidate> lru_ordered_open;
+  std::set<shash::Any> open_files;
+
+  if (use_non_open_lru_cleanup_) {
+    open_files = qm_socket_.collect_hashes();
+  }
 
   do {
     sqlite3_reset(stmt_lru_);
@@ -564,9 +569,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      bool is_open = std::find(open_files_.begin(), open_files_.end(),
-                               candidates[i].hash)
-                     != open_files_.end();
+      bool is_open = (open_files.find(candidates[i].hash) != open_files.end());
+
       if (is_pinned or is_open) {
         skip_eviction(candidates[i]);
         continue;
@@ -576,8 +580,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
         lru_ordered_open.push_back(candidates[i]);
       }
 
-      trash.push_back(cache_dir_ + "/" +
-                      candidates[i].hash.MakePathWithoutSuffix());
+      trash.push_back(cache_dir_ + "/"
+                      + candidates[i].hash.MakePathWithoutSuffix());
       gauge_ -= candidates[i].size;
       max_acseq = candidates[i].acseq;
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
@@ -2147,3 +2151,4 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
           "Error: quota manager could not read from cachemanager pipe");
   }
 }
+

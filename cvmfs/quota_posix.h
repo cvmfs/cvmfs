@@ -392,8 +392,7 @@ class PosixQuotaManager : public QuotaManager {
   /**
    * Used in DoCleanup to exclude currently used files from eviction
    */
-  // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
-  // operator for shash::Any
+  // TODO(christge): Remove this completely
   std::vector<shash::Any> open_files_;
 
 };  // class PosixQuotaManager
