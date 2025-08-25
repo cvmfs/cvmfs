@@ -38,8 +38,6 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           mkdir -p build
-          # TODO: figure out why include paths prefer this over externals
-          sudo rm  /Library/Frameworks/Mono.framework/Headers/sqlite*
           export USE_MACFUSE_KEXT=OFF
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
 
