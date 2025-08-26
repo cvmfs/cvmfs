@@ -1260,7 +1260,7 @@ cleanup:
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
     // do lazy unmount and ignore if it is already unmounted
-    } else if (umount2(mount_point_->c_str(), MNT_DETACH) < 0 && errno != EINVAL) {
+    } else if (umount2(mount_point_->c_str(), MNT_DETACH) < 0 && errno != EINVAL && errno != ENOENT) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                     "failed to umount %s (%d)", mount_point_->c_str(), errno);
     } else {
