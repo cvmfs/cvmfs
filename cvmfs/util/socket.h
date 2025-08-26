@@ -17,12 +17,6 @@
 #include "util/logging.h"  // LogCvmfs
 #include "util/posix.h"    // MakeSocket
 
-/*
- * TODO(christge): How do we handle failure?
- * What we're now doing is exit(EXIT_FAILURE) which is NOT what we want
- * Probably the best idea is to create an is_valid_ state, and then allow the
- * caller to handle the failure appropriately
- */
 enum class ProcessType {
   Client,
   Server
@@ -36,7 +30,15 @@ enum class Command {
 };  // namespace util
 
 
-// This container will only work iff the socket name is within the OS limits
+/*
+ *  Design decisions
+ *  1. This container will only work iff the socket name is within the OS limits
+ *  2. A Linux socket construction, binding, listening, connection
+ * request/acceptance are considered core socket functionalities. If any of
+ * those fails, the container will become invalid. It is entirely up to the user
+ * to handle failure. read/write are not considered core functionalities and the
+ * user will find out about their failure via their side effects
+ */
 template<ProcessType PT>
 class LocalUnixSocket {
  public:
@@ -51,13 +53,15 @@ class LocalUnixSocket {
     if (socket_ == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "creating socket %s failed (%d)",
                name_.c_str(), errno);
-      exit(EXIT_FAILURE);
+      is_valid_ = false;
+      return;
     }
 #ifndef __APPLE__
     // fchmod on a socket is not allowed under Mac OS X
     // using default 0770 here
     if (fchmod(socket_, mode) != 0) {
-      exit(EXIT_FAILURE);
+      is_valid_ = false;
+      return;
     }
 #endif
     int res = bind(socket_,
@@ -71,13 +75,15 @@ class LocalUnixSocket {
         if (res == -1) {
           LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
                    name_.c_str(), errno);
-          exit(EXIT_FAILURE);
+          is_valid_ = false;
+          return;
         }
 
       } else {
         LogCvmfs(kLogCvmfs, kLogDebug, "binding to socket %s failed (%d)",
                  name_.c_str(), errno);
-        exit(EXIT_FAILURE);
+        is_valid_ = false;
+        return;
       }
     }
     if (auto_listen) {
@@ -85,7 +91,8 @@ class LocalUnixSocket {
       if (res == -1) {
         LogCvmfs(kLogCvmfs, kLogDebug, "listening to socket %s failed (%d)",
                  name_.c_str(), errno);
-        exit(EXIT_FAILURE);
+        is_valid_ = false;
+        return;
       }
     }
   }
@@ -99,7 +106,8 @@ class LocalUnixSocket {
     if (socket_ == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "creating socket %s failed (%d)",
                name_.c_str(), errno);
-      exit(EXIT_FAILURE);
+      is_valid_ = false;
+      return;
     }
   }
 
@@ -131,7 +139,8 @@ class LocalUnixSocket {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "accepting connection with socket %s failed (%d)", name_.c_str(),
                errno);
-      exit(EXIT_FAILURE);
+      is_valid_ = false;
+      return (*this);
     }
     data_v_.emplace_back(res);
     return *this;
@@ -146,7 +155,8 @@ class LocalUnixSocket {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "connecting to server with socket %s failed (%d)", name_.c_str(),
                errno);
-      exit(EXIT_FAILURE);
+      is_valid_ = false;
+      return (*this);
     }
     return *this;
   }
@@ -200,6 +210,8 @@ class LocalUnixSocket {
     return data_v_.size();
   }
 
+  explicit operator bool() const { return is_valid_; }
+
  protected:
   class LocalUnixSocketAddress {
    public:
@@ -247,7 +259,6 @@ class LocalUnixSocket {
       if (res == -1) {
         LogCvmfs(kLogCvmfs, kLogDebug, "reading from socket %s failed (%d)",
                  name_.c_str(), errno);
-        exit(EXIT_FAILURE);
       }
       result.emplace_back(buffer);
     }
@@ -261,7 +272,6 @@ class LocalUnixSocket {
     if (res == -1) {
       LogCvmfs(kLogCvmfs, kLogDebug, "writing to socket %s failed (%d)",
                name_.c_str(), errno);
-      exit(EXIT_FAILURE);
     }
     return *this;
   }
@@ -270,6 +280,9 @@ class LocalUnixSocket {
   LocalUnixSocketAddress addr_;
   std::string name_;
   std::vector<int> data_v_;
+
+ private:
+  bool is_valid_ = true;
 };
 
 class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {

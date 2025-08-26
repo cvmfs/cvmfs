@@ -44,6 +44,18 @@ class T_IPC_QM : public ::testing::Test {
   SmallHashDynamic<shash::Any, int> map_fd_;
 };
 
+TEST_F(T_IPC_QM, CheckSocketsValidity) {
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  client.connect();
+  server.accept();
+
+  EXPECT_TRUE(( client )?true:false);
+  EXPECT_TRUE(( server)?true:false);
+
+}
+
 TEST_F(T_IPC_QM, SingleClientExchangeSingleCommand) {
   LocalUnixSocket<ProcessType::Server> server{socket_name};
   LocalUnixSocket<ProcessType::Client> client(socket_name);
