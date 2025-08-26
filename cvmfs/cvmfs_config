@@ -1573,8 +1573,8 @@ cvmfs_killall() {
 cvmfs_bugreport() {
   tmpdir=`mktemp -d -t cvmfs-bugreport.XXXXXX` || exit 1
   cd $tmpdir
-  mkdir bugreport
-  cd bugreport
+  mkdir bugreport_$(date -I)_$(hostname)
+  cd bugreport_$(date -I)_$(hostname)
 
   local timeout_sec
   if [ -z "$1" ]; then
@@ -1690,11 +1690,11 @@ cvmfs_bugreport() {
    done
 
    cd ..
-   tar cfz cvmfs-bugreport.tar.gz *
-   rm -rf bugreport
+   tar cfz cvmfs-bugreport_$(date -I)_$(hostname).tar.gz *
+   rm -rf bugreport_$(date -I)_$(hostname)
 
    echo
-   echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
+   echo "System information has been collected in ${tmpdir}/cvmfs-bugreport_$(date -I)_$(hostname).tar.gz"
    echo "Please attach this file to your problem description and send it as a"
    echo "bug report to https://github.com/cvmfs/cvmfs/issues"
 }
