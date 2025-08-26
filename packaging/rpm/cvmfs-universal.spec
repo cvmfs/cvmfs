@@ -531,7 +531,7 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs-gateway
 
 %post
 if [ $1 -eq 1 ]; then
-   mkdir /cvmfs
+   mkdir -p /cvmfs
    chmod 755 /cvmfs
 fi
 %if 0%{?selinux_cvmfs}
@@ -793,6 +793,7 @@ systemctl daemon-reload
 # - When using fuse3, require at least version 3.3.0 (for premounting).
 * Thu Jul 31 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.3
 - Make building of unittests optional 
+- Silence a mkdir warning when /cvmfs already exists
 * Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
 - Add logrotate config files and tidy to satisfy rpmlint v2.6
 * Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
