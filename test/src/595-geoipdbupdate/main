@@ -4,24 +4,27 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 # NOTE:
-#  A full test requires a valid CVMFS_GEO_ACCOUNT_ID and CVMFS_GEO_LICENSE_KEY
-#  in a /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER.
-#  Test will be skipped with a warning if either CVMFS_GEO_DB_FILE is
-#    set or there's no CVMFS_GEO_LICENSE_KEY but there is a system
-#    geo DB in /usr/share/GeoIP.
+#  If CVMFS_GEO_ACCOUNT_ID and CVMFS_GEO_LICENSE_KEY exist in a
+#  /etc/cvmfs/server.local that is readable by $CVMFS_TEST_USER,
+#  this will test the maxmind source, otherwise it will test the
+#  openhtc source.
+#  Test will be skipped with a warning if CVMFS_GEO_DB_FILE is set.
 
 #
 # Location of the system-wide GeoIP databases
 # configurable: to be changed if $CVMFS_UPDATEGEO_DIR or CVMFS_UPDATEGEO_DB
 #    in cvmfs_server changes
 #
-CVMFS_TEST_595_GEODB="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+CVMFS_TEST_595_GEODB=    # set at the beginning of the test below
+CVMFS_TEST_595_GEODBMAX="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+CVMFS_TEST_595_GEODBHTC="/var/lib/cvmfs-server/geo/iplocation.mmdb"
 CVMFS_TEST_595_ATTEMPT_FILE="/var/lib/cvmfs-server/geo/.last_attempt_day"
 CVMFS_TEST_595_SERVER_HOOKS="/etc/cvmfs/cvmfs_server_hooks.sh"
 
 CVMFS_TEST_595_REPLICA_NAME=
 CVMFS_TEST_595_GEODB_TOUCHED=0
-CVMFS_TEST_595_GEODB_STASH=
+CVMFS_TEST_595_GEODBMAX_STASH=
+CVMFS_TEST_595_GEODBHTC_STASH=
 CVMFS_TEST_595_GEODB_OWNER=
 CVMFS_TEST_595_GEODB_GROUP=
 CVMFS_TEST_595_SERVER_HOOKS_TOUCHED=0
@@ -30,7 +33,8 @@ cleanup() {
   echo "running cleanup... "
   [ -z $CVMFS_TEST_595_REPLICA_NAME ]            || sudo cvmfs_server rmfs -f $CVMFS_TEST_595_REPLICA_NAME
   [ $CVMFS_TEST_595_GEODB_TOUCHED -eq 0 ]        || sudo rm -f $CVMFS_TEST_595_GEODB
-  [ -z $CVMFS_TEST_595_GEODB_STASH  ]            || cvmfs_unstash GEODB
+  [ -z $CVMFS_TEST_595_GEODBMAX_STASH  ]         || cvmfs_unstash GEODBMAX
+  [ -z $CVMFS_TEST_595_GEODBHTC_STASH  ]         || cvmfs_unstash GEODBHTC
   [ -z $CVMFS_TEST_595_GEODB_OWNER ]             || sudo chown ${CVMFS_TEST_595_GEODB_OWNER}:${CVMFS_TEST_595_GEODB_GROUP} $(dirname $CVMFS_TEST_595_GEODB)
   [ $CVMFS_TEST_595_SERVER_HOOKS_TOUCHED -eq 0 ] || sudo rm -f $CVMFS_TEST_595_SERVER_HOOKS
   [ -z $CVMFS_TEST_595_SERVER_HOOKS_STASH ]      || sudo cp -f $CVMFS_TEST_595_SERVER_HOOKS_STASH $CVMFS_TEST_595_SERVER_HOOKS
@@ -58,28 +62,26 @@ cvmfs_unstash()
   eval source="\$$var"
   local stash
   eval stash="\$${var}_STASH"
-  sudo cp -f $stash $source
-  sudo chown ${CVMFS_TEST_595_GEODB_OWNER}:${CVMFS_TEST_595_GEODB_GROUP} $source
+  if [ -f "$stash" ]; then
+    sudo cp -f $stash $source
+    sudo chown ${CVMFS_TEST_595_GEODB_OWNER}:${CVMFS_TEST_595_GEODB_GROUP} $source
+  fi
 }
 
-recreate_server_hooks_from_stashed_if_needed() {
+recreate_server_hooks() {
   sudo rm -f $CVMFS_TEST_595_SERVER_HOOKS || true
   if [ ! -z $CVMFS_TEST_595_SERVER_HOOKS_STASH ] && \
      [   -f $CVMFS_TEST_595_SERVER_HOOKS_STASH ]; then
     # copying over CVMFS_UPDATEGEO_URLBASE configuration if necessary
-    grep -e 'CVMFS_UPDATEGEO_URLBASE='  $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 50
-    grep -e 'CVMFS_UPDATEGEO_URLBASE6=' $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 51
+    grep -e 'CVMFS_UPDATEGEO_URLBASE='  $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 100
+    grep -e 'CVMFS_UPDATEGEO_URLBASE6=' $CVMFS_TEST_595_SERVER_HOOKS_STASH | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 101
   fi
+  # add type configuration
+  echo "CVMFS_UPDATEGEO_SOURCE=$updategeo_source" | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 102
 }
 
 cvmfs_run_test() {
   logfile=$1
-
-  if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
-    echo "No geo database directory, disabled on this platform"
-    CVMFS_GENERAL_WARNING_FLAG=1
-    return 0
-  fi
 
   if [ -f /etc/cvmfs/server.local ]; then
     . /etc/cvmfs/server.local
@@ -90,22 +92,20 @@ cvmfs_run_test() {
     return 0
   fi
 
-  if [ -z "$CVMFS_GEO_ACCOUNT_ID" -o -z "$CVMFS_GEO_LICENSE_KEY" ]; then
-    if [ -z "$CVMFS_GEO_LICENSE_KEY" -a -f /usr/share/GeoIP/`basename $CVMFS_TEST_595_GEODB` ]; then
-      echo "System geo database installed, skipping tests"
-      CVMFS_GENERAL_WARNING_FLAG=1
-      return 0
-    fi
-    ACCT_MSG=
-    LICENSE_MSG=
-    if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
-      ACCT_MSG=", geo account ID"
-    fi
-    if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
-      LICENSE_MSG=", geo license key"
-    fi
-    echo The following are not found: db file${ACCT_MSG}${LICENSE_MSG}
-    return 1
+  if [ -n "$CVMFS_GEO_ACCOUNT_ID" -a -n "$CVMFS_GEO_LICENSE_KEY" ]; then
+    echo "testing maxmind source"
+    updategeo_source=maxmind
+    CVMFS_TEST_595_GEODB="$CVMFS_TEST_595_GEODBMAX"
+  else
+    echo "testing openhtc source"
+    updategeo_source=openhtc
+    CVMFS_TEST_595_GEODB="$CVMFS_TEST_595_GEODBHTC"
+  fi
+
+  if [ ! -d `dirname $CVMFS_TEST_595_GEODB` ]; then
+    echo "No geo database directory, disabled on this platform"
+    CVMFS_GENERAL_WARNING_FLAG=1
+    return 0
   fi
 
   # can't start out as root, it causes some of the tests below to fail
@@ -129,11 +129,12 @@ cvmfs_run_test() {
   echo "install a disaster cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  cvmfs_stash GEODB
+  cvmfs_stash GEODBMAX
+  cvmfs_stash GEODBHTC
   cvmfs_stash SERVER_HOOKS
 
-  echo "create initial $CVMFS_TEST_595_SERVER_HOOKS if necessary"
-  recreate_server_hooks_from_stashed_if_needed || return 50
+  echo "create initial $CVMFS_TEST_595_SERVER_HOOKS"
+  recreate_server_hooks || return 50
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -311,8 +312,8 @@ cvmfs_run_test() {
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  echo "removing $CVMFS_TEST_595_SERVER_HOOKS"
-  recreate_server_hooks_from_stashed_if_needed || return 43
+  echo "recreating $CVMFS_TEST_595_SERVER_HOOKS"
+  recreate_server_hooks || return 43
 
   echo "create a stratum1 snapshot (should find database up to date)"
   local snapshot_1_log="snapshot_1.log"
@@ -344,9 +345,6 @@ cvmfs_run_test() {
   local snapshot_6_log="snapshot_6.log"
   echo CVMFS_GEO_AUTO_UPDATE=false | sudo tee --append $CVMFS_TEST_595_SERVER_HOOKS || return 51
   cvmfs_server snapshot $replica_name > $snapshot_6_log 2>&1 || return 52
-
-  echo "removing $CVMFS_TEST_595_SERVER_HOOKS"
-  recreate_server_hooks_from_stashed_if_needed || return 53
 
   echo "check output logs for the expected status messages"
   test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 61

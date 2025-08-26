@@ -1027,70 +1027,117 @@ _to_syslog_for_geoip() {
 
 _update_geodb_install() {
   local retcode=0
-  local dburl="${CVMFS_UPDATEGEO_URLBASE}?suffix=tar.gz"
+  local dburl="${CVMFS_UPDATEGEO_URLBASE}${CVMFS_UPDATEGEO_URLSUFFIX}"
   local dbfile="${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_DB}"
-  local download_target=${dbfile}.tgz
-  local untar_dir=${dbfile}.untar
+  local download_target
+  local untar_dir=""
 
-  if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
+  case "$CVMFS_UPDATEGEO_URLSUFFIX" in
+    *tar.gz|*.tgz)
+      download_target="${dbfile}.tgz"
+      untar_dir="${dbfile}.untar"
+      ;;
+    *.gz)
+      download_target="${dbfile}.gz"
+      ;;
+    *) echo "CVMFS_UPDATEGEO_URLSUFFIX ($CVMFS_UPDATEGEO_URLSUFFIX) ends in unrecognized suffix" >&2
+      _to_syslog_for_geoip "CVMFS_UPDATEGEO_URLSUFFIX ends in unrecognized suffix"
+      return 1
+      ;;
+  esac
+
+  local authopts=""
+  if [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
+    if [ -z "$CVMFS_GEO_ACCOUNT_ID" ]; then
       echo "CVMFS_GEO_ACCOUNT_ID not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_ACCOUNT_ID not set"
-      return 1
-  fi
-  if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
+      return 2
+    fi
+    if [ -z "$CVMFS_GEO_LICENSE_KEY" ]; then
       echo "CVMFS_GEO_LICENSE_KEY not set" >&2
       _to_syslog_for_geoip "CVMFS_GEO_LICENSE_KEY not set"
-      return 1
+      return 3
+    fi
+    authopts="-u ${CVMFS_GEO_ACCOUNT_ID}:${CVMFS_GEO_LICENSE_KEY}"
   fi
 
   _to_syslog_for_geoip "started update from $dburl"
 
   # downloading the GeoIP database file
-  curl -L -sS  --connect-timeout 10 \
-            --max-time 60        \
-            -u "${CVMFS_GEO_ACCOUNT_ID}:${CVMFS_GEO_LICENSE_KEY}" \
-            "$dburl" > $download_target || true
-  if ! tar tzf $download_target >/dev/null 2>&1; then
-    local msg
-    if file $download_target|grep -q "ASCII text$"; then
-      msg="`cat -v $download_target|head -1`"
-    else
-      msg="file not valid tarball"
+  curl -L -sS --connect-timeout 10 \
+              --max-time 60        \
+              --retry 2            \
+              $authopts            \
+              "$dburl" -o $download_target || true
+
+  if [ -n "$untar_dir" ]; then
+    if ! tar tzf $download_target >/dev/null 2>&1; then
+      local msg
+      if file $download_target|grep -q "ASCII text$"; then
+        msg="`cat -v $download_target|head -1`"
+      else
+        msg="file not valid tarball"
+      fi
+      echo "failed to download geodb (see url in syslog): $msg" >&2
+      _to_syslog_for_geoip "failed to download from $dburl: $msg"
+      rm -f $download_target
+      return 4
     fi
-    echo "failed to download geodb (see url in syslog): $msg" >&2
-    _to_syslog_for_geoip "failed to download from $dburl: $msg"
-    rm -f $download_target
-    return 1
-  fi
 
-  # untar the GeoIP database file
-  rm -rf $untar_dir
-  mkdir -p $untar_dir
-  if ! tar xmf $download_target -C $untar_dir --no-same-owner 2>/dev/null; then
-    echo "failed to untar $download_target into $untar_dir" >&2
-    _to_syslog_for_geoip "failed to untar $download_target into $untar_dir"
-    rm -rf $download_target $untar_dir
-    return 2
-  fi
-
-  # get rid of the tarred GeoIP database
-  rm -f $download_target
-
-  # atomically install the GeoIP database
-  if ! mv -f $untar_dir/*/${CVMFS_UPDATEGEO_DB} $dbfile; then
-    echo "failed to install $dbfile" >&2
-    _to_syslog_for_geoip "failed to install $dbfile"
+    # untar the GeoIP database file
     rm -rf $untar_dir
-    return 3
+    mkdir -p $untar_dir
+    if ! tar xmf $download_target -C $untar_dir --no-same-owner 2>/dev/null; then
+      echo "failed to untar $download_target into $untar_dir" >&2
+      _to_syslog_for_geoip "failed to untar $download_target into $untar_dir"
+      rm -rf $download_target $untar_dir
+      return 5
+    fi
+
+    # get rid of the tarred GeoIP database
+    rm -f $download_target
+
+    # atomically install the GeoIP database
+    if ! mv -f $untar_dir/*/${CVMFS_UPDATEGEO_DB} $dbfile; then
+      echo "failed to install $dbfile" >&2
+      _to_syslog_for_geoip "failed to install $dbfile"
+      rm -rf $untar_dir
+      return 6
+    fi
+
+    # get rid of any other files in the untar
+    rm -rf $untar_dir
+  else # must be .gz
+    if ! zcat $download_target >$dbfile.new; then
+      local msg
+      if file $download_target|grep -q "ASCII text$"; then
+        msg="`cat -v $download_target|head -1`"
+      else
+        msg="file could not be uncompressed"
+      fi
+      echo "failed to download geodb (see url in syslog): $msg" >&2
+      _to_syslog_for_geoip "failed to download from $dburl: $msg"
+      rm -f $download_target $dbfile.new
+      return 7
+    fi
+
+    rm -f $download_target
+
+    if ! mv -f $dbfile.new $dbfile; then
+      echo "failed to install $dbfile" >&2
+      _to_syslog_for_geoip "failed to install $dbfile"
+      rm -f $dbfile.new
+      return 8
+    fi
   fi
+
+  # Remove any old name .mmdb
+  find $CVMFS_UPDATEGEO_DIR -name '*.mmdb' ! -name $CVMFS_UPDATEGEO_DB | xargs -r rm -f
 
   if [ -w "$(get_global_info_v1_path)" ]; then
     # update repositories.json for the new geodb timestamp, if possible
     update_global_repository_info || die "fail (update global repository info)"
   fi
-
-  # get rid of other files in the untar
-  rm -rf $untar_dir
 
   set_selinux_httpd_context_if_needed "$CVMFS_UPDATEGEO_DIR"
 

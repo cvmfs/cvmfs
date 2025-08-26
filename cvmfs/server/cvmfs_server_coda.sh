@@ -8,16 +8,19 @@
 #   /etc/cvmfs/cvmfs_server_hooks.sh, /etc/cvmfs/server.local, or
 #   per-repo in replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot
-#   once every 4 weeks in the 10 o'clock hour of Tuesday.
+#   in the 10 o'clock hour of Tuesday, every 2 weeks for openhtc or
+#   every 4 weeks for maxmind.
 CVMFS_GEO_AUTO_UPDATE=true # Automatically update from cvmfs_server snapshot
+CVMFS_UPDATEGEO_SOURCE=openhtc # Database source: openhtc, maxmind, or none
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
-CVMFS_UPDATEGEO_MINDAYS=14 # Minimum days between update attempts
-CVMFS_UPDATEGEO_MAXDAYS=28 # Maximum days before considering it urgent
+CVMFS_UPDATEGEO_MINDAYS= # Minimum days between update attempts (set below)
+CVMFS_UPDATEGEO_MAXDAYS= # Maximum days before considering it urgent (set below)
 
-CVMFS_UPDATEGEO_URLBASE="https://download.maxmind.com/geoip/databases/GeoLite2-City/download"
-CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
-CVMFS_UPDATEGEO_DB="GeoLite2-City.mmdb"
+CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo" # Directory to download into
+CVMFS_UPDATEGEO_DB=      # DB name (set below)
+CVMFS_UPDATEGEO_URLBASE= # Base of URL for download (set below)
+CVMFS_UPDATEGEO_URLSUFFIX= # Suffix to add to URLBASE for download
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
@@ -44,6 +47,22 @@ publish_before_hook() { :; }
 publish_after_hook() { :; }
 
 cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
+
+if [ "$CVMFS_UPDATEGEO_SOURCE" = "openhtc" ]; then
+  CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-7}
+  CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-14}
+  CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-iplocation.mmdb}"
+  CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://geoipdb.openhtc.io}"
+  CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-/${CVMFS_UPDATEGEO_DB}.gz}"
+elif [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
+  CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-14}
+  CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-28}
+  CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-GeoLite2-City.mmdb}"
+  CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://download.maxmind.com/geoip/databases/GeoLite2-City/download}"
+  CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-?suffix=tar.gz}"
+elif [ -n "$CVMFS_UPDATEGEO_SOURCE" ] && [ "$CVMFS_UPDATEGEO_SOURCE" != "none" ]; then
+  die "CVMFS_UPDATEGEO_SOURCE not openhtc, maxmind, or none"
+fi
 
 # Path to some useful sbin utilities
 LSOF_BIN="$(find_sbin       lsof)"       || true
