@@ -791,12 +791,12 @@ systemctl daemon-reload
 
 %changelog
 # - When using fuse3, require at least version 3.3.0 (for premounting).
-* Thu Jul 31 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.3
+* Wed Aug 27 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.3
 - Make building of unittests optional 
 - Silence a mkdir warning when /cvmfs already exists
-* Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch>> - 2.13.0
+* Fri May 23 2025 Valentin Volkl <vavolkl@cern.ch> - 2.13.0
 - Add logrotate config files and tidy to satisfy rpmlint v2.6
-* Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch>> - 2.12.7-2
+* Mon Mar 3 2025 Dave Dykstra <dwd@cern.ch> - 2.12.7-2
 - Apply pretrans transaction check to all subpackages that need to
   have their version stay in sync
 * Mon Dec 2 2024 Valentin Volkl <vavolkl@cern.ch> - 2.12
