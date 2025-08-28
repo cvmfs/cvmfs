@@ -16,22 +16,37 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y virtme-ng
       
-      - name: Install build tools and dependencies
+      - name: Check for builddep package
+        id: cvmfs-builddep-check
         run: |
-          sudo apt-get update
-          sudo apt-get install -y devscripts equivs lsb-release
+          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+            echo "package_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "package_exists=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Generate and install build-dep metapackage
+      - name: Generate build-dep metapackage
+        if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
         run: |
+          sudo apt-get -y update
+          sudo apt-get install -y devscripts equivs ccache
           mk-build-deps ./packaging/debian/cvmfs/control
-          sudo apt-get install -y cvmfs-build-deps_*_all.deb
+          mv cvmfs-build-deps_*_all.deb /home/runner/.cache
 
-      - name: Build CVMFS packages
+      - name: Install build dependencies
         run: |
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+
+      - name: Build packages
+        run: |
+          export CVMFS_EXTERNALS_PREFIX=/home/runner/.cache/cvmfs_externals_install
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          mkdir /tmp/build-ubuntu
+          mkdir /tmp/build-ubuntu-config
           ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
           ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
 
-      - name: Install built CVMFS packages
+      - name: Install packages
         run: |
           sudo apt-get -y remove "cvmfs*"
           sudo apt-get -y install /tmp/build-ubuntu*/*.deb
