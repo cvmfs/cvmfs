@@ -10,6 +10,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      
+      - name: Create cache directories
+        run: |
+          mkdir -p /home/runner/.cache
 
       - name: Install dependencies
         run: |
