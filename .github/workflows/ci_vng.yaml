@@ -19,7 +19,7 @@ jobs:
       - name: Check for builddep package
         id: cvmfs-builddep-check
         run: |
-          if [ -f "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
+          if [ compgen -G "/home/runner/.cache/cvmfs-build-deps_*_all.deb" ]; then
             echo "package_exists=true" >> $GITHUB_OUTPUT
           else
             echo "package_exists=false" >> $GITHUB_OUTPUT
@@ -35,7 +35,13 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
+          deb=$(find /home/runner/.cache -name 'cvmfs-build-deps_*_all.deb' -print -quit)
+          if [ -n "$deb" ]; then
+            sudo apt-get install -y "$deb"
+          else
+            echo "::error ::No .deb package found to install"
+            exit 1
+          fi
 
       - name: Build packages
         run: |
