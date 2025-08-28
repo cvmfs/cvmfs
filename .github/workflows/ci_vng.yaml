@@ -1,0 +1,52 @@
+name: virtme-ng CI
+on:
+  pull_request:
+    branches: [devel]
+  push:
+
+jobs:
+  vng_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y virtme-ng
+      
+      - name: Install build tools and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts equivs lsb-release
+
+      - name: Generate and install build-dep metapackage
+        run: |
+          mk-build-deps ./packaging/debian/cvmfs/control
+          sudo apt-get install -y cvmfs-build-deps_*_all.deb
+
+      - name: Build CVMFS packages
+        run: |
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu-config cvmfs-config
+          ./ci/build_package.sh $PWD /tmp/build-ubuntu cvmfs
+
+      - name: Install built CVMFS packages
+        run: |
+          sudo apt-get -y remove "cvmfs*"
+          sudo apt-get -y install /tmp/build-ubuntu*/*.deb
+          sudo cvmfs_config setup
+
+      - name: Run vng_testing
+        run: |
+          cd test/vng_testing
+          ./run.sh
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vng_testing-results
+          path: |
+            test/vng_testing/results/test_failures.log
+            test/vng_testing/results/test_run.log
