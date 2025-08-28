@@ -378,7 +378,7 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
     };
 
     std::vector<bool> collected(nclients, false);
-    int attempt = 0;
+    size_t attempt = 0;
     while (still_missing(collected) and attempt <= number_of_attempts) {
       sleep(static_cast<int>(pow(2, attempt) / 100));
       for (size_t i = 0; i < nclients; ++i) {
