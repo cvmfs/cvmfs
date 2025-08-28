@@ -254,7 +254,7 @@ class LocalUnixSocket {
       return result;
     }
     ContiguousType buffer;
-    for (int i = 0; i < elements; ++i) {
+    for (size_t i = 0; i < elements; ++i) {
       int res = ::read(socket, &buffer, sizeof(ContiguousType));
       if (res == -1) {
         LogCvmfs(kLogCvmfs, kLogDebug, "reading from socket %s failed (%d)",
