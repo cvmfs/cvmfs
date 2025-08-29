@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <memory> //unique_ptr
 
 #include "magic_xattr.h"
 #include "mountpoint.h"
@@ -65,7 +66,7 @@ class T_MagicXattr : public ::testing::Test {
 TEST_F(T_MagicXattr, TestFqrn) {
   std::set<std::string> protected_xattrs;
   std::set<gid_t> protected_xattr_gids;
-  MagicXattrManager *mgr = new MagicXattrManager(
+  std::unique_ptr<MagicXattrManager> mgr = std::make_unique<MagicXattrManager>(
       mount_point_, MagicXattrManager::kVisibilityAlways, protected_xattrs,
       protected_xattr_gids);
 
@@ -218,4 +219,22 @@ TEST_F(T_MagicXattr, MultiPageHumanModeXattr) {
   EXPECT_EQ((int)attr.GetValue(3, kXattrHumanMode)
                 .second.find("Page requested does not exists."),
             0);
+}
+
+TEST_F(T_MagicXattr, OpenHashesMachineXattr) {
+  std::set<std::string> protected_xattrs;
+  std::set<gid_t> protected_xattr_gids;
+  MagicXattrManager *mgr = new MagicXattrManager(
+      mount_point_, MagicXattrManager::kVisibilityAlways, protected_xattrs,
+      protected_xattr_gids);
+
+  catalog::DirectoryEntry
+      dirent = catalog::DirectoryEntryTestFactory::ExternalFile();
+  PathString path("/asdf");
+  MagicXattrRAIIWrapper attr(mgr->GetLocked("user.open_hashes", path, &dirent));
+  ASSERT_FALSE(attr.IsNull());
+  EXPECT_STREQ("0",
+               attr->GetValue(0, kXattrMachineMode).second.c_str());
+//  ASSERT_TRUE(attr->PrepareValueFenced());
+
 }

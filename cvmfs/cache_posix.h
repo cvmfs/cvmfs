@@ -48,6 +48,7 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, Rename);
   FRIEND_TEST(T_CacheManager, StartTxn);
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
+  friend class OpenHashesMagicXattr;
 
  public:
   enum CacheModes {
@@ -151,6 +152,7 @@ class PosixCacheManager : public CacheManager {
       , fd_mgr_(new FdRefcountMgr())
       , cm_socket_(quota_cache_communication_socket) {
     atomic_init32(&no_inflight_txns_);
+    cm_socket_.connect();
   }
 
   std::string GetPathInCache(const shash::Any &id);

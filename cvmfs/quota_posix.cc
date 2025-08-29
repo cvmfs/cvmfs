@@ -267,6 +267,7 @@ PosixQuotaManager *PosixQuotaManager::Create(const string &cache_workspace,
   }
   quota_manager->CheckFreeSpace();
   MakePipe(quota_manager->pipe_lru_);
+  quota_manager->qm_socket_.accept();
 
   quota_manager->protocol_revision_ = kProtocolRevision;
   quota_manager->initialized_ = true;
@@ -309,6 +310,7 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
   // Try to connect to pipe
   const string fifo_path = workspace_dir + "/cachemgr";
   LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
+  quota_mgr->qm_socket_.accept();
   quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
   if (quota_mgr->pipe_lru_[1] >= 0) {
     const int fd_lockfile_rw = open((workspace_dir + "/lock_cachemgr").c_str(),
@@ -467,6 +469,8 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     delete quota_mgr;
     return NULL;
   }
+
+  quota_mgr->qm_socket_.accept();
 
   // Finalize handshake
   buf = 'C';

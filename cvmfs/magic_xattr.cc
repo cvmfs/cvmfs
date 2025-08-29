@@ -72,6 +72,8 @@ MagicXattrManager::MagicXattrManager(
 
   Register("user.authz", new AuthzMagicXattr());
   Register("user.external_url", new ExternalURLMagicXattr());
+
+  Register("user.open_hashes", new OpenHashesMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -799,4 +801,17 @@ void ExternalURLMagicXattr::FinalizeValue() {
 
 bool ExternalURLMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular() && dirent_->IsExternalFile();
+}
+
+bool OpenHashesMagicXattr::PrepareValueFenced() {
+  PosixCacheManager* cache_mgr = dynamic_cast<PosixCacheManager*>(xattr_mgr_->mount_point()->file_system()->cache_mgr());
+
+  if(not cache_mgr) return false;
+
+  number_of_open_hashes_ = cache_mgr->cm_socket_.send_hashes(cache_mgr->fd_mgr_->GetFdMapPtr());
+  return true;
+}
+
+void OpenHashesMagicXattr::FinalizeValue() {
+  result_pages_.push_back(StringifyInt(number_of_open_hashes_));
 }

@@ -5,6 +5,8 @@
 #ifndef CVMFS_MAGIC_XATTR_H_
 #define CVMFS_MAGIC_XATTR_H_
 
+#include <cache_posix.h>
+
 #include <map>
 #include <set>
 #include <string>
@@ -496,4 +498,14 @@ class ExternalURLMagicXattr : public ExternalMagicXattr {
   virtual void FinalizeValue();
 };
 
+class OpenHashesMagicXattr : public BaseMagicXattr {
+  FRIEND_TEST(T_MagicXattr, OpenHashesMachineXattr);
+  friend class PosixCacheManager;
+
+  int number_of_open_hashes_ = 0;
+  virtual bool PrepareValueFenced();
+  virtual void FinalizeValue();
+};
+
 #endif  // CVMFS_MAGIC_XATTR_H_
+

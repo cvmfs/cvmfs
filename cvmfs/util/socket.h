@@ -321,8 +321,7 @@ class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {
   CacheManagerSocket(const char *socket_name)
       : LocalUnixSocket<ProcessType::Client>(socket_name) { }
 
-  void send_hashes(const SmallHashDynamic<shash::Any, int> &hash_map,
-                   size_t socket_number = 0) {
+  size_t send_hashes(const SmallHashDynamic<shash::Any, int> &hash_map) {
     const size_t &msize = hash_map.size();
     write(util::Command::RecvHashes);
     write(msize);
@@ -332,6 +331,11 @@ class CacheManagerSocket : public LocalUnixSocket<ProcessType::Client> {
         write(hash);
       }
     }
+    return msize;
+  }
+
+  size_t send_hashes(const SmallHashDynamic<shash::Any, int> *hash_map_ptr) {
+    return send_hashes(*hash_map_ptr);
   }
 
  private:
