@@ -4,12 +4,22 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites="quick"
 
 CVMFS_TEST_621_REPLICA_NAMES=
+CVMFS_TEST_621_LOG_OWNER=
 
 cleanup() {
   if [ -n "$CVMFS_TEST_621_REPLICA_NAMES" ]; then
     for repo in $CVMFS_TEST_621_REPLICA_NAMES; do
       sudo cvmfs_server rmfs -f $repo
     done
+  fi
+  if [ -n "$CVMFS_TEST_621_LOG_OWNER" ]; then
+    for log in snapshots.log gc.log; do
+      if [ -f /var/log/cvmfs/$log ]; then
+        echo "*** contents of $log"
+        cat /var/log/cvmfs/$log
+      fi
+    done
+    sudo chown -R $CVMFS_TEST_621_LOG_OWNER /var/log/cvmfs
   fi
 }
 
@@ -67,7 +77,11 @@ cvmfs_run_test() {
   sudo $SHELL -c "sed -i 's,^\(CVMFS_STRATUM0=.*\),\1Bogus,' /etc/cvmfs/repositories.d/${replica_name}-3/server.conf"
 
   echo "*** making /var/log/cvmfs user-writable"
-  sudo mkdir -p /var/log/cvmfs
+  if [ -d /var/log/cvmfs ]; then
+    CVMFS_TEST_621_LOG_OWNER=$(stat --format='%U' /var/log/cvmfs)
+  else
+    sudo mkdir -p /var/log/cvmfs
+  fi
   sudo chown -R $CVMFS_TEST_USER /var/log/cvmfs
   echo "*** removing old snapshots.log and gc.log"
   rm -f /var/log/cvmfs/snapshots.log /var/log/cvmfs/gc.log
@@ -180,14 +194,28 @@ cvmfs_run_test() {
   rep4_last_gc="$(get_last_gc ${replica_name}-4)"
   [ -n "$rep4_last_gc" ]                                  || return 73
 
-  cvmfs_server gc -af                                     || return 74
+  # Disable gc on the main repo so only replicas are collected
+  sudo sed -i 's/^\(CVMFS_GARBAGE_COLLECTION\)=.*/\1=false/' \
+   /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf || return 74
+
+  # keep a copy of the gc.log for comparison
+  cp /var/log/cvmfs/gc.log .                              || return 75
+
+  sleep 2 # make sure these timestamps are newer
+  cvmfs_server gc -af                                     || return 76
 
   rep1_now_gc="$(get_last_gc ${replica_name}-1)"
   [ -n "$rep1_now_gc" ]                                   || return 80
   rep4_now_gc="$(get_last_gc ${replica_name}-4)"
   [ -n "$rep4_now_gc" ]                                   || return 81
-  [ "$rep1_last_gc" = "$rep1_now_gc" ]                    || return 82
+
+  echo "*** checking that the timestamps were updated in replica 1 and 4"
+  [ "$rep1_last_gc" != "$rep1_now_gc" ]                   || return 82
   [ "$rep4_last_gc" != "$rep4_now_gc" ]                   || return 83
+
+  echo "*** checking that gc only ran in replica 4"
+  diff gc.log /var/log/cvmfs | grep ${replica_name}-1     && return 85
+  diff gc.log /var/log/cvmfs | grep ${replica_name}-4     || return 86
 
   return 0
 }
