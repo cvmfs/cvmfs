@@ -1,5 +1,6 @@
 #!/bin/bash
 RESULTS_DIR="./results/test_failures.log"
+LOGFILE="./results/test_run.log"
 KERNEL_VERSION="$1"
 
 # using tmpfs for /cvmfs mountpoint as / is readonly in virtme
@@ -16,11 +17,15 @@ for test in ./tests/*; do
     if [ -d "$test" ] && [ -f "$test/main" ]; then
         test_name=$(basename "$test")
         timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-        echo "[$timestamp] Running test: $test_name on kernel $KERNEL_VERSION"
+        echo "[$timestamp] Running test: $test_name on kernel $KERNEL_VERSION" >> "$LOGFILE"
 
-        # Run the test script
-        source "$test/main"
-        cvmfs_run_test
+        bash -c "
+            source ./test_functions
+            source $test/main
+            cvmfs_run_test
+            retval=\$?
+            exit \$retval
+        " >> "$LOGFILE" 2>&1
         exit_code=$?
 
         timestamp=$(date +"%Y-%m-%d %H:%M:%S")
