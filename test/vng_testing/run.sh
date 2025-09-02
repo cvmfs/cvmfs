@@ -6,6 +6,13 @@ TEST_DIR="./tests"
 DISK_PATH="${DISK_PATH:-./cvmfs.img}"
 DISK_SIZE="${DISK_SIZE:-5}"
 
+# All arguments after run.sh are captured here
+EXTRA_ARGS=()
+while [[ $# -gt 0 ]]; do
+  EXTRA_ARGS+=("$1")
+  shift
+done
+
 # Check if the kernel directory exists
 if [ ! -d "$KERNEL_DIR" ]; then
     echo "Error: Kernel directory not found at $KERNEL_DIR."
@@ -38,6 +45,8 @@ setup() {
 create_and_run_vm() {
     local bzImage="$1"
     local kernel_version="$2"
+    shift 2
+    local escaped_args=$(printf "'%q' " "${EXTRA_ARGS[@]}")
 
     echo "Booting VM with kernel: $kernel_version"
     vng \
@@ -48,7 +57,7 @@ create_and_run_vm() {
     --network user \
     --user $(whoami) \
     --exec "
-        ./guest/run_tests.sh $kernel_version
+        bash -c './guest/run_tests.sh $kernel_version $escaped_args'
     "
 }
 
