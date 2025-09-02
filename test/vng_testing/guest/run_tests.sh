@@ -2,6 +2,35 @@
 RESULTS_DIR="./results/test_failures.log"
 LOGFILE="./results/test_run.log"
 KERNEL_VERSION="$1"
+shift
+
+exclusions="$CVMFS_TEST_EXCLUDE"
+labels="$CVMFS_TEST_SUITES"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s)
+      labels="$2"
+      shift 2
+      ;;
+    -x)
+      shift
+      while [[ $# -ne 0 && x"$1" != x"--" ]]; do
+        exclusions="$exclusions $1"
+        shift
+      done
+      shift # get rid of '--'
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# Remaining args after "--" (if any) are test_list
+test_list="$@"
+if [ -z "$test_list" ]; then
+  test_list="../src/*"
+fi
 
 # using tmpfs for /cvmfs mountpoint as / is readonly in virtme
 sudo mount -t tmpfs -o size=512M tmpfs /cvmfs
@@ -16,6 +45,22 @@ source ./test_functions
 for test in ./tests/*; do
     if [ -d "$test" ] && [ -f "$test/main" ]; then
         test_name=$(basename "$test")
+
+        # Skip if test is excluded
+        if contains "$exclusions" "$test"; then
+            echo "--Skipping $test_name (excluded)..." >> "$LOGFILE"
+            echo "--Skipping $test_name (excluded)..."
+            continue
+        fi
+
+        # Skip if test doesn't match label (if labels specified)
+        t=$test
+        if ! is_in_suite $test $labels; then
+            echo "--Skipping $test_name (suite not selected)..." >> $LOGFILE
+            echo "--Skipping $test_name (suite not selected)..."
+            continue
+        fi
+
         timestamp=$(date +"%Y-%m-%d %H:%M:%S")
         echo "[$timestamp] Running test: $test_name on kernel $KERNEL_VERSION" >> "$LOGFILE"
 
