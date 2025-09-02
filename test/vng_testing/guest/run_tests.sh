@@ -1,6 +1,9 @@
 #!/bin/bash
-RESULTS_DIR="./results/test_failures.log"
-LOGFILE="./results/test_run.log"
+
+SCRIPT_DIR=$(realpath "$(dirname "$0")")
+VNG_DIR=$(dirname "$SCRIPT_DIR")
+RESULTS_DIR="$VNG_DIR/results/test_failures.log"
+LOGFILE="$VNG_DIR/results/test_run.log"
 KERNEL_VERSION="$1"
 shift
 
