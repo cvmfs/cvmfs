@@ -40,12 +40,12 @@ sudo mount -t tmpfs -o size=512M tmpfs /cvmfs
 # mounting cache disk
 sudo mount /dev/vda /var/lib/cvmfs
 
-echo "Running tests from directory: ./tests"
+echo "Running tests from: $test_list"
 echo "Sourcing test_functions"
 source ./test_functions
 
 # Loop through each test and execute it
-for test in ./tests/*; do
+for test in $test_list; do
     if [ -d "$test" ] && [ -f "$test/main" ]; then
         test_name=$(basename "$test")
 
