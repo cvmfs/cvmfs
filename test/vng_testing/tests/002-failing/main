@@ -7,7 +7,7 @@ cvmfs_run_test() {
   logfile=$1
 
   echo "Dummy failing test"
-  if [ $(get_number_of_cpu_cores) -ge 12 ]; then
+  if [ $(get_number_of_cpu_cores) -ge $(nproc) ]; then
     echo "source successful"
   else
     echo "source failed"
