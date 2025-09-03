@@ -36,7 +36,7 @@ if [ -z "$test_list" ]; then
 fi
 
 # using tmpfs for /cvmfs mountpoint as / is readonly in virtme
-sudo mount -t tmpfs -o size=512M tmpfs /cvmfs
+sudo mount -t tmpfs -o size=512M cvmfs_root /cvmfs
 # mounting cache disk
 sudo mount /dev/vda /var/lib/cvmfs
 
