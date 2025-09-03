@@ -81,7 +81,38 @@ jobs:
       - name: Run vng_testing
         run: |
           cd test/vng_testing
-          ./run.sh
+
+          export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"src/0* src/1* src/5* src/6* src/7* src/8*"' }}
+          export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
+          CVMFS_TEST_PROXY=http://localhost:3128 \
+          CVMFS_TEST_USER=$(whoami) \
+          ./run.sh -s "${CVMFS_TEST_SUITES}"  \
+                   -x ../src/095-fuser   \
+                      ../src/004-davinci                              \
+                      ../src/005-asetup                               \
+                      ../src/007-testjobs                             \
+                      ../src/024-reload-during-asetup                 \
+                      ../src/056-lowspeedlimit                        \
+                      ../src/084-premounted                           \
+                      ../src/094-attachmount                          \
+                      ../src/104-concurrent_mounts                    \
+                      ../src/518-hardlinkstresstest                   \
+                      ../src/593-nestedwhiteout                       \
+                      ../src/600-securecvmfs                          \
+                      ../src/628-pythonwrappedcvmfsserver             \
+                      ../src/647-bearercvmfs                          \
+                      ../src/672-publish_stats_hardlinks              \
+                      ../src/673-acl                                  \
+                      ../src/682-enter                                \
+                      ../src/684-https_s3                             \
+                      ../src/686-azureblob_s3                         \
+                      ../src/687-import_s3                            \
+                      ../src/692-https_azureblob_s3                   \
+                      ../src/702-symlink_caching                      \
+                      ../src/803-repository_gateway_large_files       \
+                      ../src/811-commit-gateway                       \
+                    --                                             \
+                   "${CVMFS_TESTCASES}"      || exit 1
 
       - name: Upload results
         if: always()
