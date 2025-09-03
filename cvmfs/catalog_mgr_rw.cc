@@ -61,6 +61,15 @@ WritableCatalogManager::WritableCatalogManager(
       smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(catalog_processing_lock_, NULL);
   assert(retval == 0);
+  catalog_hash_lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(catalog_hash_lock_, NULL);
+  assert(retval == 0);
+  catalog_download_lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(catalog_download_lock_, NULL);
+  assert(retval == 0);
+
 }
 
 
@@ -69,6 +78,10 @@ WritableCatalogManager::~WritableCatalogManager() {
   free(sync_lock_);
   pthread_mutex_destroy(catalog_processing_lock_);
   free(catalog_processing_lock_);
+  pthread_mutex_destroy(catalog_hash_lock_);
+  free(catalog_hash_lock_);
+  pthread_mutex_destroy(catalog_download_lock_);
+  free(catalog_download_lock_);
 }
 
 
