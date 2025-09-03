@@ -8,12 +8,34 @@ jobs:
   vng_tests:
     runs-on: ubuntu-latest
     steps:
+      - id: lsb-release
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            source /etc/lsb-release
+            echo "id=${DISTRIB_ID}" >> $GITHUB_OUTPUT
+            echo "release=${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "codename=${DISTRIB_CODENAME}" >> $GITHUB_OUTPUT
+            echo "description=${DISTRIB_DESCRIPTION}" >> $GITHUB_OUTPUT
+            echo "id-release=${DISTRIB_ID}-${DISTRIB_RELEASE}" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            echo "id-release=macOS-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+            echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Create cache directories
         run: |
           mkdir -p /home/runner/.cache
+
+      - name: Restore CI cache
+        uses: actions/cache/restore@v4
+        id: cvmfs-ci-cache-restore
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
 
       - name: Install dependencies
         run: |
@@ -77,3 +99,11 @@ jobs:
           path: |
             test/vng_testing/results/test_failures.log
             test/vng_testing/results/test_run.log
+
+      - name: Save CI cache
+        if: github.ref == 'refs/heads/devel' && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        id: cvmfs-ci-cache-save
+        with:
+          path: /home/runner/.cache/
+          key: v3-cvmfs-ci-cache-${{ steps.lsb-release.outputs.id-release }}-${{ steps.lsb-release.outputs.arch }}
