@@ -55,21 +55,13 @@ jobs:
         if: steps.cvmfs-builddep-check.outputs.package_exists != 'true'
         run: |
           sudo apt-get -y update
-          sudo apt-get install -y devscripts equivs ccache
+          sudo apt-get install -y devscripts equivs ccache apache2 libapache2-mod-wsgi-py3
           mk-build-deps ./packaging/debian/cvmfs/control
-          ls -l cvmfs-build-deps_*.deb
           mv cvmfs-build-deps_*_all.deb /home/runner/.cache
-          ls -l /home/runner/.cache/
 
       - name: Install build dependencies
         run: |
-          deb=$(find /home/runner/.cache -name 'cvmfs-build-deps_*_all.deb' -print -quit)
-          if [ -n "$deb" ]; then
-            sudo apt-get install -y "$deb"
-          else
-            echo "::error ::No .deb package found to install"
-            exit 1
-          fi
+          sudo apt-get install -y /home/runner/.cache/cvmfs-build-deps_*_all.deb
 
       - name: Build packages
         run: |
