@@ -506,6 +506,7 @@ class MountPoint : SingleCopy, public BootFactory {
   unsigned GetMaxTtlMn();
   unsigned GetEffectiveTtlSec();
   void SetMaxTtlMn(unsigned value_minutes);
+  void SetMaxTtlSec(unsigned value_secs);
   void ReEvaluateAuthz();
 
   AuthzSessionManager *authz_session_mgr() { return authz_session_mgr_; }

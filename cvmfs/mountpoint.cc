@@ -1937,11 +1937,18 @@ void MountPoint::SetMaxTtlMn(unsigned value_minutes) {
   max_ttl_sec_ = value_minutes * 60;
 }
 
+void MountPoint::SetMaxTtlSec(unsigned value_secs) {
+  const MutexLockGuard lock_guard(lock_max_ttl_);
+  max_ttl_sec_ = value_secs;
+}
+
 bool MountPoint::SetupBehavior() {
   string optarg;
 
   if (options_mgr_->GetValue("CVMFS_MAX_TTL", &optarg))
     SetMaxTtlMn(String2Uint64(optarg));
+  if (options_mgr_->GetValue("CVMFS_MAX_TTL_SECS", &optarg))
+    SetMaxTtlSec(String2Uint64(optarg));
 
   if (options_mgr_->GetValue("CVMFS_KCACHE_TIMEOUT", &optarg)) {
     // Can be negative and should then be interpreted as 0.0
