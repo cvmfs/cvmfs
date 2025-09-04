@@ -56,6 +56,20 @@ TEST_F(T_IPC_QM, CheckSocketsValidity) {
 
 }
 
+TEST_F(T_IPC_QM, CheckTryAccept) {
+  LocalUnixSocket<ProcessType::Server> server{socket_name};
+  LocalUnixSocket<ProcessType::Client> client(socket_name);
+
+  EXPECT_FALSE(server.try_accept());
+
+  client.connect();
+  EXPECT_TRUE(server.try_accept());
+
+  EXPECT_TRUE(( client )?true:false);
+  EXPECT_TRUE(( server)?true:false);
+
+}
+
 TEST_F(T_IPC_QM, SingleClientExchangeSingleCommand) {
   LocalUnixSocket<ProcessType::Server> server{socket_name};
   LocalUnixSocket<ProcessType::Client> client(socket_name);

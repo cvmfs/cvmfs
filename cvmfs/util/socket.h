@@ -3,6 +3,7 @@
 
 #include <asm/termbits.h>  // FIONREAD: examine if there are data in socket
 #include <errno.h>
+#include <fcntl.h>      // fcntl: examine if there are pending connect requests
 #include <sys/ioctl.h>  // ioctl: examine if there are data in socket
 #include <sys/socket.h>
 #include <sys/un.h>  // sizeof
@@ -133,17 +134,32 @@ class LocalUnixSocket {
 
   template<ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
-  LocalUnixSocket &accept() {
+  bool accept() {
+    int res = ::accept(socket_, NULL, NULL);
+    return handle_accept(res);
+  }
+
+  template<ProcessType X = PT,
+           typename std::enable_if<X == ProcessType::Server, int>::type = 0>
+  bool try_accept() {
+    int socket_flags = fcntl(socket_, F_GETFL, 0);
+    if (socket_flags == -1) {
+      return false;
+    }
+
+    if (!(socket_flags & O_NONBLOCK)) {
+      if (fcntl(socket_, F_SETFL, socket_flags | O_NONBLOCK) == -1) {
+        return false;
+      }
+    }
+
     int res = ::accept(socket_, NULL, NULL);
     if (res == -1) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "accepting connection with socket %s failed (%d)", name_.c_str(),
-               errno);
-      is_valid_ = false;
-      return (*this);
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {  // no pending connection
+        return false;
+      }
     }
-    data_v_.emplace_back(res);
-    return *this;
+    return handle_accept(res);
   }
 
   template<ProcessType X = PT,
@@ -164,8 +180,8 @@ class LocalUnixSocket {
   /*
    * try_read() will only attempt to read when there are SOME data inside the
    * socket. More precisely, when multiple data are asked, it will read when
-   * there is at least one instance available. After that the call to read will
-   * be blocking.
+   * there is at least one instance available. After that the call to read
+   * will be blocking.
    */
   template<typename ContiguousType, ProcessType X = PT,
            typename std::enable_if<X == ProcessType::Server, int>::type = 0>
@@ -227,6 +243,21 @@ class LocalUnixSocket {
    private:
     struct sockaddr_un addr_;
   };
+
+
+  template<ProcessType X = PT,
+           typename std::enable_if<X == ProcessType::Server, int>::type = 0>
+  bool handle_accept(int val) {
+    if (val == -1) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "accepting connection with socket %s failed (%d)", name_.c_str(),
+               errno);
+      is_valid_ = false;
+      return (val != -1);
+    }
+    data_v_.emplace_back(val);
+    return (val != -1);
+  }
 
   template<typename ContiguousType>
   std::vector<ContiguousType> try_read_from_socket(size_t elements,
@@ -325,11 +356,11 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
 
   /*
    * TODO(christge) Points to consider:
-   * 1. On a more mature version LocalUnixSocket should have methods send() for
-   * the Client and try_recv() for the server. The real bottleneck in this
-   * version is that we don't have std::optional in our current C++ version, so
-   * we can't say if a client isn't responsive or doesn't have any hashes to
-   * send (bc both case would return an empty std::set of hashes).
+   * 1. On a more mature version LocalUnixSocket should have methods send()
+   * for the Client and try_recv() for the server. The real bottleneck in this
+   * version is that we don't have std::optional in our current C++ version,
+   * so we can't say if a client isn't responsive or doesn't have any hashes
+   * to send (bc both case would return an empty std::set of hashes).
    * 2. Maybe collect<ContiguousType> should be a method of a
    * LocalUnixSocket<ProcessType::Server> and the override here should be a
    * specialized: collect<shash::Any>
@@ -337,9 +368,9 @@ class QuotaManagerSocket : public LocalUnixSocket<ProcessType::Server> {
   std::set<shash::Any> collect_hashes() { return collect<shash::Any>(); }
 
   /*
-   * collect() works on a best effort basis; QuotaManagerSocket will attempt up
-   * to <number_of_attempts> times to collect data from each socket and then
-   * will return what is available so far.
+   * collect() works on a best effort basis; QuotaManagerSocket will attempt
+   * up to <number_of_attempts> times to collect data from each socket and
+   * then will return what is available so far.
    */
   template<typename ContiguousType>
   std::set<ContiguousType> collect() {
