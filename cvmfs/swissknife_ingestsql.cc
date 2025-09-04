@@ -1718,7 +1718,7 @@ static void invalidate_manifest( std::string proxy_list, std::string url ) {
    bool first=true;
    for( auto p = proxies.begin(); p != proxies.end(); p++) {
      bool ok=true;
-     string proxy=*p;
+     const string proxy=*p;
      CURL *curl=NULL;
      CURLcode res=CURLE_OK;
      struct curl_slist *headers = NULL;
@@ -1762,7 +1762,7 @@ static void wait_for_update( std::string path, long revision) {
   long current=-1;
   DIR *d;
   while (-1 !=  getxattr( path.c_str(), "user.revision", val, 100 ) ) {
-    long x = atol(val);
+    const long x = atol(val);
     if (x>=revision) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Mount reached revision %ld", x);
       return;
