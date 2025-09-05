@@ -2,7 +2,7 @@
 
 ## Objective
 
-VNG Testing provides a framework for automating and validating kernel and filesystem-related tests in a virtualized environment. It is designed to facilitate testing with custom Linux kernels and CernVM-FS images, ensuring reproducibility and isolation.
+VNG Testing provides a framework for automating and validating kernel and filesystem-related tests in a virtualized environment. It is designed to facilitate testing with Linux kernels and CernVM-FS images, ensuring reproducibility and isolation.
 
 ## Project Structure
 
