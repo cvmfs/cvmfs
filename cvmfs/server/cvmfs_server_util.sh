@@ -1105,6 +1105,9 @@ _update_geodb_install() {
       return 6
     fi
 
+    # get rid of old database if present
+    rm -f ${CVMFS_UPDATEGEO_DIR}/${CVMFS_UPDATEGEO_OLDDB}
+
     # get rid of any other files in the untar
     rm -rf $untar_dir
   else # must be .gz

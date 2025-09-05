@@ -18,7 +18,10 @@ def open_geodb(dbname):
         import maxminddb
     return maxminddb.open_database(dbname)
 
-gidb="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+gidbpath1="/var/lib/cvmfs-server/geo/iplocation.mmdb"
+gidbpath2="/var/lib/cvmfs-server/geo/GeoLite2-City.mmdb"
+oldgidb=""
+gidb=""
 gireader=None
 oldgireader=None
 gichecktime=0
@@ -57,12 +60,23 @@ def lookup_geoinfo(now, addr):
                     #  acquire the lock for every lookup.
                     oldgireader.close()
                     oldgireader = None
-                    print('cvmfs_geo: closed old ' + gidb)
+                    print('cvmfs_geo: closed old ' + oldgidb)
                 gichecktime = now
-                modtime = os.stat(gidb).st_mtime
+                try:
+                    gidb = gidbpath1
+                    statb = os.stat(gidb)
+                except FileNotFoundError:
+                    try:
+                        gidb = gidbpath2
+                        statb = os.stat(gidb)
+                    except FileNotFoundError as e:
+                        e.filename = gidbpath1 + ' or ' + gidbpath2
+                        raise e
+                modtime = statb.st_mtime
                 if modtime != gimodtime:
                     # database was modified, reopen it
                     oldgireader = gireader
+                    oldgidb = gidb
                     gireader = open_geodb(gidb)
                     gimodtime = modtime
                     print('cvmfs_geo: opened ' + gidb)
