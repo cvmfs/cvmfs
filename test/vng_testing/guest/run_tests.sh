@@ -69,7 +69,9 @@ for test in $test_list; do
 
         bash -c "
             source ./test_functions
-            source $test/main
+            cd ../
+            test=${test/../.}
+            source \$test/main
             cvmfs_run_test
             retval=\$?
             exit \$retval
