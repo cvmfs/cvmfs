@@ -14,7 +14,6 @@ if [ $1 == "--help" ]; then
 fi
 
 KERNEL_DIR="./kernel"
-TEST_DIR="./tests"
 DISK_PATH="${DISK_PATH:-./cvmfs.img}"
 DISK_SIZE="${DISK_SIZE:-5}"
 
@@ -28,12 +27,6 @@ done
 # Check if the kernel directory exists
 if [ ! -d "$KERNEL_DIR" ]; then
     echo "Error: Kernel directory not found at $KERNEL_DIR."
-    exit 1
-fi
-
-# Check if the test directory exists
-if [ ! -d "$TEST_DIR" ]; then
-    echo "Error: Test directory not found at $TEST_DIR."
     exit 1
 fi
 
