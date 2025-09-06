@@ -1,4 +1,5 @@
 #!/bin/bash
+# This script is not meant to be run directly. It is invoked by run.sh.
 set -e
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")

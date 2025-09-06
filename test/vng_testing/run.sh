@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+usage() {
+    echo "Usage: $0 "
+    echo "    [--help] [-s <labels>] [-x <exclusions> --] [(optional) <test_list> (default: ../src/*)]"
+    echo "    The script will run tests from user given directory (default: ../src) using kernels from kernel/ directory."
+    exit 0
+}
+
+if [ $1 == "--help" ]; then
+    shift
+    usage
+fi
+
 KERNEL_DIR="./kernel"
 TEST_DIR="./tests"
 DISK_PATH="${DISK_PATH:-./cvmfs.img}"
