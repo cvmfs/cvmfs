@@ -6,7 +6,7 @@ usage() {
     echo "    <linux-source-path> - Path to the Linux kernel source directory."
     echo "    The script will build the bzImage and place it in kernel/vx.xx/ directory."
     echo "    It also provides options to add/remove kernel config options and select a git tag or commit."
-    exit 1
+    exit 0
 }
 
 if [ $# -lt 1 ]; then
