@@ -13,7 +13,9 @@ if [ $1 == "--help" ]; then
     usage
 fi
 
-KERNEL_DIR="./kernel"
+SCRIPT_DIR=$(realpath "$(dirname "$0")")
+KERNEL_DIR="$SCRIPT_DIR/kernel"
+# This disk serves as cvmfs cache
 DISK_PATH="${DISK_PATH:-./cvmfs.img}"
 DISK_SIZE="${DISK_SIZE:-5}"
 
