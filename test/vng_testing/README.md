@@ -34,13 +34,14 @@ vng_testing/
    The `run.sh` script launches a virtual machine via virtme-ng, boots it with the selected kernel, and mounts the `cvmfs.img` filesystem. It then triggers `guest/run_tests.sh` inside the VM.
 
 3. **Test Discovery and Execution:**
-   `guest/run_tests.sh` automatically discovers and executes each test suite under `tests/`. Each test is organized in its own directory with a `main` script or binary. Additional files (e.g., C sources) may be included as needed.
+   `guest/run_tests.sh` automatically discovers and executes each test suite under `../src/`. Each test is organized in its own directory with a `main` script or binary. Additional files (e.g., C sources) may be included as needed.
 
 4. **Result Collection:**
    Test failures and relevant logs are collected in `results/test_failures.log` for analysis.
+   Full test logs are collected in `results/test_run.log`
 
 5. **Extensibility:**
-   New tests can be added by creating a new subdirectory under `tests/` with a `main` executable or script.
+   New tests can be added by creating a new subdirectory under `tests/` with a `main` executable or script and can later be merged in `../src` after a successful run.
 
 ## Dependencies
 
@@ -50,11 +51,18 @@ vng_testing/
 - Bash shell
 - GNU compiler (for building kernels and C programs - visit [here](https://docs.kernel.org/process/changes.html) for a comprehensive list specific to the build machine)
 
+## Configs
+A level of configuration can be achieved by exporting the environment variables to desired value to provide control.
+```sh
+DISK_PATH="" default: ./cvmfs.img
+DISK_SIZE="" default: 5G
+```
+
 ## Usage
 
 1. **Build the Kernel (if not already built):**
    ```sh
-   ./build_kernel.sh
+   ./build_kernel.sh <linux-source-path>
    ```
 
 2. **Run All Tests:**
