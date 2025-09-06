@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
 VNG_DIR=$(dirname "$SCRIPT_DIR")
