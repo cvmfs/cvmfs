@@ -628,6 +628,7 @@ const Catalog::NestedCatalogList &Catalog::ListNestedCatalogs() const {
       nested.mountpoint = PlantPath(sql_list_nested_->GetPath());
       nested.hash = sql_list_nested_->GetContentHash();
       nested.size = sql_list_nested_->GetSize();
+      assert(!nested.hash.IsNull());
       nested_catalog_cache_.push_back(nested);
     }
     sql_list_nested_->Reset();
