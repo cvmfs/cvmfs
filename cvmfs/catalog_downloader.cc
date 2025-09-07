@@ -45,6 +45,7 @@ void CatalogDownloadPipeline::OnFileProcessed(
 
 void CatalogDownloadPipeline::Process(const shash::Any &catalog_hash) {
   CatalogItem *catalog_item = new CatalogItem(catalog_hash);
+  assert(!catalog_item->IsQuitBeacon());
   tube_counter_.EnqueueBack(catalog_item);
   tube_input_.EnqueueBack(catalog_item);
 }
