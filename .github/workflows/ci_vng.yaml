@@ -227,7 +227,7 @@ jobs:
                       ../src/803-repository_gateway_large_files       \
                       ../src/811-commit-gateway                       \
                     --                                             \
-                   "${CVMFS_TESTCASES}"      || exit 1
+                   "${CVMFS_TESTCASES}"
 
       - name: Upload results
         if: always()
