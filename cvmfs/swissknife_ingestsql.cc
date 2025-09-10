@@ -92,8 +92,9 @@ static void cancel_lease();
 static void refresh_lease();
 static vector<string> get_file_list(string &path);
 static int check_hash(const char *hash);
-static void recursively_delete_directory(
-    PathString &path, catalog::WritableCatalogManager &catalog_manager);
+static int recursively_delete_directory(
+    PathString &path, catalog::WritableCatalogManager &catalog_manager)
+    __attribute__((warn_unused_result));
 static void create_empty_database(string &filename);
 static void relax_db_locking(sqlite3 *db);
 static bool check_prefix(const std::string &path, const std::string &prefix);
@@ -441,9 +442,12 @@ static XattrList marshal_xattrs(const char *acl_string) {
     return aclobj;
   }
   if (!equiv_mode) {
-    CUSTOM_ASSERT(
-        aclobj.Set("system.posix_acl_access", string(binary_acl, binary_size)),
-        "failed to set system.posix_acl_access (ACL size %ld)", binary_size);
+    if (!aclobj.Set("system.posix_acl_access",
+                    string(binary_acl, binary_size))) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to set system.posix_acl_access (ACL size %ld)",
+               binary_size);
+    }
     free(binary_acl);
   }
 
@@ -517,6 +521,7 @@ static vector<string> get_file_list(string &path) {
 extern bool g_log_with_time;
 
 int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
+  int ret;
   // the catalog code uses assert() liberally.
   // install ABRT signal handler to catch an abort and cancel lease
   if (signal(SIGINT, &on_signal) == SIG_ERR
@@ -703,10 +708,14 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     s3_file = *args.find('3')->second;
   }
 
-  CUSTOM_ASSERT(access(public_keys.c_str(), R_OK) == 0, "%s is not readable",
-                public_keys.c_str());
-  CUSTOM_ASSERT(access(key_file.c_str(), R_OK) == 0, "%s is not readable",
-                key_file.c_str());
+  if (access(public_keys.c_str(), R_OK) != 0) {
+    LogCvmfs(kLogCvmfs, kLogWarning, "%s is not readable", public_keys.c_str());
+    return 1;
+  }
+  if (access(key_file.c_str(), R_OK) != 0) {
+    LogCvmfs(kLogCvmfs, kLogWarning, "%s is not readable", key_file.c_str());
+    return 1;
+  }
 
   //  string spooler_definition_string = string("gw,,") + g_gateway_url;
   // create a spooler that will upload to S3
@@ -737,9 +746,12 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   free(_tmpfile);
 
   FILE *fout = fdopen(temp_fd, "wb");
-  CUSTOM_ASSERT(fout != NULL,
-                "failed to open session token file %s for writing",
-                g_session_token_file.c_str());
+  if (fout == NULL) {
+    LogCvmfs(kLogCvmfs, kLogWarning,
+             "failed to open session token file %s for writing",
+             g_session_token_file.c_str());
+    return 1;
+  }
   fputs(g_session_token.c_str(), fout);
   fclose(fout);
 
@@ -862,8 +874,12 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     relax_db_locking(db);
     open_dbs.push_back(db);
   }
-  process_sqlite(open_dbs, catalog_manager, allow_additions, allow_deletions,
-                 lease_path.substr(1), additional_prefix);
+  ret = process_sqlite(open_dbs, catalog_manager, allow_additions,
+                       allow_deletions, lease_path.substr(1),
+                       additional_prefix);
+  if (ret) {
+    return 1;
+  }
   for (auto &&db : open_dbs) {
     CHECK_SQLITE_ERROR(sqlite3_close_v2(db), SQLITE_OK);
   }
@@ -944,7 +960,7 @@ void replaceAllSubstrings(std::string &str, const std::string &from,
 }
 
 
-void swissknife::IngestSQL::process_sqlite(
+int swissknife::IngestSQL::process_sqlite(
     const std::vector<sqlite3 *> &dbs,
     catalog::WritableCatalogManager &catalog_manager, bool allow_additions,
     bool allow_deletions, const std::string &lease_path,
@@ -952,9 +968,13 @@ void swissknife::IngestSQL::process_sqlite(
   std::map<std::string, Directory> all_dirs;
   std::map<std::string, std::vector<File> > all_files;
   std::map<std::string, std::vector<Symlink> > all_symlinks;
+  int ret;
 
   for (auto &&db : dbs) {
-    load_dirs(db, lease_path, additional_prefix, all_dirs);
+    ret = load_dirs(db, lease_path, additional_prefix, all_dirs);
+    if (ret) {
+      return 1;
+    }
   }
 
   // put in a nested scope so we can free up memory of `dir_names`
@@ -972,8 +992,14 @@ void swissknife::IngestSQL::process_sqlite(
   }
 
   for (auto &&db : dbs) {
-    load_files(db, lease_path, additional_prefix, all_files);
-    load_symlinks(db, lease_path, additional_prefix, all_symlinks);
+    ret = load_files(db, lease_path, additional_prefix, all_files);
+    if (ret) {
+      return 1;
+    }
+    ret = load_symlinks(db, lease_path, additional_prefix, all_symlinks);
+    if (ret) {
+      return 1;
+    }
   }
 
   // perform all deletions first
@@ -989,9 +1015,13 @@ void swissknife::IngestSQL::process_sqlite(
   if (allow_additions) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Processing additions...");
     // first ensure all directories are present and create missing ones
-    do_additions(all_dirs, all_files, all_symlinks, lease_path,
-                 catalog_manager);
+    ret = do_additions(all_dirs, all_files, all_symlinks, lease_path,
+                       catalog_manager);
+    if (ret) {
+      return 1;
+    }
   }
+  return 0;
 }
 
 void add_dir_to_tree(
@@ -1014,6 +1044,7 @@ int swissknife::IngestSQL::do_additions(
     const DirMap &all_dirs, const FileMap &all_files,
     const SymlinkMap &all_symlinks, const std::string &lease_path,
     catalog::WritableCatalogManager &catalog_manager) {
+  int ret;
   // STEP 1:
   // - collect all the dirs/symlinks/files we need to process from the DB
   // - build a tree of paths for DFS traversal
@@ -1059,10 +1090,16 @@ int swissknife::IngestSQL::do_additions(
     if (visited.count(curr_dir)) {
       curr_row++;
       if (all_symlinks.count(curr_dir)) {
-        add_symlinks(catalog_manager, all_symlinks.at(curr_dir));
+        ret = add_symlinks(catalog_manager, all_symlinks.at(curr_dir));
+        if (ret) {
+          return 1;
+        }
       }
       if (all_files.count(curr_dir)) {
-        add_files(catalog_manager, all_files.at(curr_dir));
+        ret = add_files(catalog_manager, all_files.at(curr_dir));
+        if (ret) {
+          return 1;
+        }
       }
       // snapshot the dir (if it's a nested catalog mountpoint)
       catalog::DirectoryEntry dir_entry;
@@ -1097,10 +1134,13 @@ int swissknife::IngestSQL::do_additions(
       bool exists = false;
       exists = catalog_manager.LookupDirEntry(
           MakeCatalogPath(curr_dir), catalog::kLookupDefault, &dir_entry);
-      CUSTOM_ASSERT(
-          !(exists && !S_ISDIR(dir_entry.mode_)),
-          "Refusing to replace existing file/symlink at %s with a directory",
-          dir.name.c_str());
+      if (exists && !S_ISDIR(dir_entry.mode_)) {
+        LogCvmfs(
+            kLogCvmfs, kLogVerboseMsg,
+            "Refusing to replace existing file/symlink at %s with a directory",
+            dir.name.c_str());
+        return 1;
+      }
 
       dir_entry.name_ = NameString(get_basename(dir.name));
       dir_entry.mtime_ = dir.mtime / 1000000000;
@@ -1200,12 +1240,17 @@ int swissknife::IngestSQL::add_symlinks(
                    symlink.name.c_str());
           catalog_manager.RemoveFile(symlink.name);
         } else {
-          CUSTOM_ASSERT(0, "unknown mode for dirent: %d", dir.mode_);
+          LogCvmfs(kLogCvmfs, kLogWarning, "unknown mode for dirent: %d",
+                   dir.mode_);
+          return 1;
         }
       } else {
-        CUSTOM_ASSERT(!S_ISDIR(dir.mode_),
-                      "Not removing directory [%s] to create symlink",
-                      symlink.name.c_str());
+        if (S_ISDIR(dir.mode_)) {
+          LogCvmfs(kLogCvmfs, kLogWarning,
+                   "Not removing directory [%s] to create symlink",
+                   symlink.name.c_str());
+          return 1;
+        }
         LogCvmfs(kLogCvmfs, kLogVerboseMsg,
                  "Removing existing file/symlink [%s]", symlink.name.c_str());
         catalog_manager.RemoveFile(symlink.name);
@@ -1250,7 +1295,7 @@ bool check_prefix(const std::string &path, const std::string &prefix) {
   return true;
 }
 
-void swissknife::IngestSQL::load_dirs(
+int swissknife::IngestSQL::load_dirs(
     sqlite3 *db, const std::string &lease_path,
     const std::string &additional_prefix,
     std::map<std::string, Directory> &all_dirs) {
@@ -1272,9 +1317,11 @@ void swissknife::IngestSQL::load_dirs(
     int const nested = schema_revision <= 3 ? 1 : sqlite3_column_int(stmt, 6);
 
     string const name = additional_prefix + sanitise_name(name_cstr);
-    CUSTOM_ASSERT(check_prefix(name, lease_path),
-                  "%s is not below lease path %s", name.c_str(),
-                  lease_path.c_str());
+    if (!check_prefix(name, lease_path)) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "%s is not below lease path %s",
+               name.c_str(), lease_path.c_str());
+      return 1;
+    }
 
     Directory dir(name, mtime, mode, owner, grp, nested);
     char *acl = (char *)sqlite3_column_text(stmt, 5);
@@ -1282,9 +1329,10 @@ void swissknife::IngestSQL::load_dirs(
     all_dirs.insert(std::make_pair(name, dir));
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
+  return 0;
 }
 
-void swissknife::IngestSQL::load_files(
+int swissknife::IngestSQL::load_files(
     sqlite3 *db, const std::string &lease_path,
     const std::string &additional_prefix,
     std::map<std::string, std::vector<File> > &all_files) {
@@ -1311,9 +1359,11 @@ void swissknife::IngestSQL::load_files(
                                                 : sqlite3_column_int(stmt, 8);
 
     string names = additional_prefix + sanitise_name(name);
-    CUSTOM_ASSERT(check_prefix(names, lease_path),
-                  "%s is not below lease path %s", names.c_str(),
-                  lease_path.c_str());
+    if (!check_prefix(names, lease_path)) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "%s is not below lease path %s",
+               names.c_str(), lease_path.c_str());
+      return 1;
+    }
     string const parent_dir = get_parent(names);
 
     if (!all_files.count(parent_dir)) {
@@ -1331,17 +1381,22 @@ void swissknife::IngestSQL::load_files(
     vector<shash::Any> hashes;
     off_t offset = 0;
 
-    CUSTOM_ASSERT(size >= 0, "file size cannot be negative [%s]",
-                  names.c_str());
+    if (size < 0) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "file size cannot be negative [%s]",
+               names.c_str());
+      return 1;
+    }
     size_t const kChunkSize = internal ? kInternalChunkSize
                                        : kExternalChunkSize;
 
     while (tok) {
       offsets.push_back(offset);
       // TODO: check the hash format
-      CUSTOM_ASSERT(check_hash(tok) == 0,
-                    "provided hash for [%s] is invalid: %s", names.c_str(),
-                    tok);
+      if (check_hash(tok) != 0) {
+        LogCvmfs(kLogCvmfs, kLogWarning,
+                 "provided hash for [%s] is invalid: %s", names.c_str(), tok);
+        return 1;
+      }
       hashes.push_back(
           shash::MkFromHexPtr(shash::HexPtr(tok), shash::kSuffixNone));
       tok = strtok_r(NULL, ",", &ref);
@@ -1352,10 +1407,12 @@ void swissknife::IngestSQL::load_files(
     if (expected_num_chunks * (size_t)kChunkSize < (size_t)size || size == 0) {
       expected_num_chunks++;
     }
-    CUSTOM_ASSERT(
-        offsets.size() == expected_num_chunks,
-        "offsets size %ld does not match expected number of chunks %ld",
-        offsets.size(), expected_num_chunks);
+    if (offsets.size() != expected_num_chunks) {
+      LogCvmfs(kLogCvmfs, kLogWarning,
+               "offsets size %ld does not match expected number of chunks %ld",
+               offsets.size(), expected_num_chunks);
+      return 1;
+    }
     for (size_t i = 0; i < offsets.size() - 1; i++) {
       sizes.push_back(size_t(offsets[i + 1] - offsets[i]));
     }
@@ -1367,9 +1424,10 @@ void swissknife::IngestSQL::load_files(
     }
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
+  return 0;
 }
 
-void swissknife::IngestSQL::load_symlinks(
+int swissknife::IngestSQL::load_symlinks(
     sqlite3 *db, const std::string &lease_path,
     const std::string &additional_prefix,
     std::map<std::string, std::vector<Symlink> > &all_symlinks) {
@@ -1387,9 +1445,11 @@ void swissknife::IngestSQL::load_symlinks(
     int const skip_if_file_or_dir = sqlite3_column_int(stmt, 5);
 
     string names = additional_prefix + sanitise_name(name_cstr);
-    CUSTOM_ASSERT(check_prefix(names, lease_path),
-                  "%s is not below lease path %s", names.c_str(),
-                  lease_path.c_str());
+    if (!check_prefix(names, lease_path)) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "%s is not below lease path %s",
+               names.c_str(), lease_path.c_str());
+      return 1;
+    }
     string target = target_cstr;
     string const parent_dir = get_parent(names);
 
@@ -1401,6 +1461,7 @@ void swissknife::IngestSQL::load_symlinks(
                                           skip_if_file_or_dir);
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
+  return 0;
 }
 
 int swissknife::IngestSQL::add_files(
@@ -1428,9 +1489,12 @@ int swissknife::IngestSQL::add_files(
         shash::kSuffixNone);
 
     // compression is permitted only for internal data
-    CUSTOM_ASSERT(file.internal || (!file.internal && file.compressed < 2),
-                  "compression is only allowed for internal data [%s]",
-                  file.name.c_str());
+    if (!(file.internal || (!file.internal && file.compressed < 2))) {
+      LogCvmfs(kLogCvmfs, kLogWarning,
+               "compression is only allowed for internal data [%s]",
+               file.name.c_str());
+      return 1;
+    }
 
     switch (file.compressed) {
       case 1:  // Uncompressed
@@ -1447,10 +1511,12 @@ int swissknife::IngestSQL::add_files(
     }
 
     if (exists) {
-      CUSTOM_ASSERT(
-          !S_ISDIR(dir.mode()) && !S_ISLNK(dir.mode()),
-          "Refusing to replace existing dir/symlink at %s with a file",
-          file.name.c_str());
+      if (!(!S_ISDIR(dir.mode()) && !S_ISLNK(dir.mode()))) {
+        LogCvmfs(kLogCvmfs, kLogWarning,
+                 "Refusing to replace existing dir/symlink at %s with a file",
+                 file.name.c_str());
+        return 1;
+      }
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Removing existing file [%s]",
                file.name.c_str());
       catalog_manager.RemoveFile(file.name);
@@ -1485,9 +1551,11 @@ int swissknife::IngestSQL::do_deletions(
     int64_t const islink = sqlite3_column_int64(stmt, 3);
 
     string const names = additional_prefix + sanitise_name(name);
-    CUSTOM_ASSERT(check_prefix(names, lease_path),
-                  "%s is not below lease path %s", names.c_str(),
-                  lease_path.c_str());
+    if (!check_prefix(names, lease_path)) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "%s is not below lease path %s",
+               names.c_str(), lease_path.c_str());
+      return 1;
+    }
 
     catalog::DirectoryEntry dirent;
     bool exists = false;
@@ -1499,7 +1567,10 @@ int swissknife::IngestSQL::do_deletions(
           || (isfile && S_ISREG(dirent.mode()))) {
         if (S_ISDIR(dirent.mode())) {
           PathString names_path(names);
-          recursively_delete_directory(names_path, catalog_manager);
+          ret = recursively_delete_directory(names_path, catalog_manager);
+          if (ret) {
+            return 1;
+          }
         } else {
           LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Removing link/file [%s]",
                    names.c_str());
@@ -1589,16 +1660,21 @@ static void create_empty_database(string &filename) {
   sqlite3_close(db_out);
 }
 
-static void recursively_delete_directory(
+static int recursively_delete_directory(
     PathString &path, catalog::WritableCatalogManager &catalog_manager) {
   catalog::DirectoryEntryList const listing;
+  int ret;
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
   bool const retval = catalog_manager.ListingStat(
       PathString("/" + path.ToString()), &listing_from_catalog);
 
-  CUSTOM_ASSERT(retval, "failed to call ListingStat for %s", path.c_str());
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogWarning, "failed to call ListingStat for %s",
+             path.c_str());
+    return 1;
+  }
 
   if (!catalog_manager.IsTransitionPoint(path.ToString())) {
     for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
@@ -1611,9 +1687,10 @@ static void recursively_delete_directory(
       if (S_ISDIR(listing_from_catalog.AtPtr(i)->info.st_mode)) {
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Recursing into %s/",
                  entry_path.ToString().c_str());
-        recursively_delete_directory(entry_path, catalog_manager);
-
-
+        ret = recursively_delete_directory(entry_path, catalog_manager);
+        if (ret) {
+          return 1;
+        }
       } else {
         LogCvmfs(kLogCvmfs, kLogVerboseMsg, " Recursively removing %s",
                  entry_path.ToString().c_str());
@@ -1628,6 +1705,7 @@ static void recursively_delete_directory(
   LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Removing directory %s",
            path.ToString().c_str());
   catalog_manager.RemoveDirectory(path.ToString());
+  return 0;
 }
 
 
