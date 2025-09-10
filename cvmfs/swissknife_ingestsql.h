@@ -125,33 +125,40 @@ class IngestSQL : public Command {
   typedef std::map<std::string, std::vector<Symlink> > SymlinkMap;
 
  private:
-  void process_sqlite(const std::vector<sqlite3 *> &dbs,
-                      catalog::WritableCatalogManager &catalog_manager,
-                      bool allow_additions, bool allow_deletions,
-                      const std::string &lease_path,
-                      const std::string &additional_prefix);
+  int process_sqlite(const std::vector<sqlite3 *> &dbs,
+                     catalog::WritableCatalogManager &catalog_manager,
+                     bool allow_additions, bool allow_deletions,
+                     const std::string &lease_path,
+                     const std::string &additional_prefix)
+      __attribute__((warn_unused_result));
   int add_files(catalog::WritableCatalogManager &catalog_manager,
-                const std::vector<File> &files);
+                const std::vector<File> &files)
+      __attribute__((warn_unused_result));
   int add_symlinks(catalog::WritableCatalogManager &catalog_manager,
-                   const std::vector<Symlink> &symlinks);
+                   const std::vector<Symlink> &symlinks)
+      __attribute__((warn_unused_result));
   int do_additions(const DirMap &all_dirs, const FileMap &all_files,
                    const SymlinkMap &all_symlinks,
                    const std::string &lease_path,
-                   catalog::WritableCatalogManager &catalog_manager);
+                   catalog::WritableCatalogManager &catalog_manager)
+      __attribute__((warn_unused_result));
   int do_deletions(sqlite3 *db,
                    catalog::WritableCatalogManager &catalog_manager,
                    const std::string &lease_path,
-                   const std::string &additional_prefix);
-  void load_dirs(sqlite3 *db, const std::string &lease_path,
+                   const std::string &additional_prefix)
+      __attribute__((warn_unused_result));
+  int load_dirs(sqlite3 *db, const std::string &lease_path,
+                const std::string &additional_prefix,
+                std::map<std::string, Directory> &all_dirs)
+      __attribute__((warn_unused_result));
+  int load_files(sqlite3 *db, const std::string &lease_path,
                  const std::string &additional_prefix,
-                 std::map<std::string, Directory> &all_dirs);
-  void load_files(sqlite3 *db, const std::string &lease_path,
-                  const std::string &additional_prefix,
-                  std::map<std::string, std::vector<File> > &all_files);
-  void load_symlinks(
-      sqlite3 *db, const std::string &lease_path,
-      const std::string &additional_prefix,
-      std::map<std::string, std::vector<Symlink> > &all_symlinks);
+                 std::map<std::string, std::vector<File> > &all_files)
+      __attribute__((warn_unused_result));
+  int load_symlinks(sqlite3 *db, const std::string &lease_path,
+                    const std::string &additional_prefix,
+                    std::map<std::string, std::vector<Symlink> > &all_symlinks)
+      __attribute__((warn_unused_result));
 };
 }  // namespace swissknife
 
