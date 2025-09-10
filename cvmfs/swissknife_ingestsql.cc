@@ -519,8 +519,7 @@ extern bool g_log_with_time;
 int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
   // the catalog code uses assert() liberally.
   // install ABRT signal handler to catch an abort and cancel lease
-  if (signal(SIGABRT, &on_signal) == SIG_ERR
-      || signal(SIGINT, &on_signal) == SIG_ERR
+  if (signal(SIGINT, &on_signal) == SIG_ERR
       || signal(SIGTERM, &on_signal) == SIG_ERR) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Setting signal handlers failed");
     exit(1);
