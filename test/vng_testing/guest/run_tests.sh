@@ -43,7 +43,7 @@ sudo mount /dev/vda /var/lib/cvmfs
 
 echo "Running tests from: $test_list"
 echo "Sourcing test_functions"
-source ./test_functions
+source ../test_functions
 
 # Loop through each test and execute it
 for test in $test_list; do
@@ -69,8 +69,9 @@ for test in $test_list; do
         echo "[$timestamp] Running test: $test_name on kernel $KERNEL_VERSION" >> "$LOGFILE"
 
         bash -c "
-            source ./test_functions
             cd ../
+            source ./test_functions
+            export cvmfs_test_autofs_on_startup=false
             test=${test/../.}
             source \$test/main
             cvmfs_run_test
