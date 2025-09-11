@@ -878,8 +878,13 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
                        allow_deletions, lease_path.substr(1),
                        additional_prefix);
   if (ret) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Exiting without committing changes due to inconsistencies.");
+    cancel_lease();
+    unlink(g_session_token_file.c_str());
+    pthread_join(lease_thread, NULL);
     return 1;
   }
+
   for (auto &&db : open_dbs) {
     CHECK_SQLITE_ERROR(sqlite3_close_v2(db), SQLITE_OK);
   }
