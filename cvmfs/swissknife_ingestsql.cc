@@ -70,6 +70,7 @@ static string g_s3_file;
 static time_t g_last_lease_refresh = 0;
 static bool g_stop_refresh = false;
 static string g_wait_for_update;
+static int g_wait_for_update_timeout_sec = -1;
 static int64_t g_priority = 0;
 static bool g_add_missing_catalogs = false;
 static string get_lease_from_paths(vector<string> paths);
@@ -103,7 +104,7 @@ static bool isDatabaseMarkedComplete(const char *dbfile);
 static void setDatabaseMarkedComplete(const char *dbfile);
 
 static void invalidate_manifest(std::string proxy_list, std::string url);
-static void wait_for_update(std::string path, long revision);
+static int wait_for_update(std::string path, long revision, int timeout_sec);
 
 extern "C" void *lease_refresh_thread(void *payload);
 
@@ -545,6 +546,17 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('B') != args.end()) {
     g_wait_for_update = *args.find('B')->second;
+
+    if (args.find('W') != args.end()) {
+      const char *arg = (*args.find('W')->second).c_str();
+      char *at_null_terminator_if_number;
+      g_wait_for_update_timeout_sec = strtoll(arg, &at_null_terminator_if_number, 10);
+      if (*at_null_terminator_if_number != '\0') {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "'W' parameter value '%s' parsing failed", arg);
+        return 1;
+      }
+    }
   }
 
   if (args.find('P') != args.end()) {
@@ -936,7 +948,10 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   if (g_wait_for_update != "") {
     invalidate_manifest(proxy, stratum0 + "/.cvmfspublished");
-    wait_for_update(g_wait_for_update, g_final_revision);
+    const int ret = wait_for_update(g_wait_for_update, g_final_revision, g_wait_for_update_timeout_sec);
+    if (ret) {
+      return ret;
+    }
   }
 
   if (check_completed_graft_property) {
@@ -1847,19 +1862,32 @@ static void invalidate_manifest(std::string proxy_list, std::string url) {
 }
 
 
-static void wait_for_update(std::string path, long revision) {
+static int wait_for_update(std::string path, long revision, int timeout_sec) {
   char val[101];
   memset(val, 0, 101);
   long current = -1;
   DIR *d;
+  time_t waiting_since;
+  if (timeout_sec >= 0) {
+    waiting_since = time(NULL);
+  }
+
   while (-1 != getxattr(path.c_str(), "user.revision", val, 100)) {
-    const long x = atol(val);
+    long const x = atol(val);
     if (x >= revision) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Mount reached revision %ld", x);
-      return;
+      return 0;
     } else if (x != current) {
       current = x;
       LogCvmfs(kLogCvmfs, kLogStdout, "Mount at revision %ld, waiting..", x);
+    }
+
+    if (timeout_sec >= 0) {
+      int const waited_seconds = time(NULL) - waiting_since;
+      if ((waited_seconds >= 0) && (waited_seconds > timeout_sec)) {
+        LogCvmfs(kLogCvmfs, kLogStdout, "Out of time waiting for the mount to reach revision %ld (waited %u seconds)", revision, waited_seconds);
+        return 1;
+      }
     }
     sleep(1);
     d = opendir(path.c_str());
@@ -1870,4 +1898,5 @@ static void wait_for_update(std::string path, long revision) {
   LogCvmfs(kLogCvmfs, kLogStdout,
            "Unable to query user.revision xattr of [%s]: errno: %d",
            path.c_str(), errno);
+  return 2;
 }
