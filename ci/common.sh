@@ -86,7 +86,7 @@ create_cvmfs_source_tarball() {
   local tmpd=$(mktemp -d)
   mkdir ${tmpd}/${tar_name}
   cd $tmpd
-  cp -R --dereference ${source_directory}/AUTHORS            \
+  cp -R --dereference ${source_directory}/CITATION.cff       \
                       ${source_directory}/CMakeLists.txt     \
                       ${source_directory}/COPYING            \
                       ${source_directory}/ChangeLog          \

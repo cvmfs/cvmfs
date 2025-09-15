@@ -1,0 +1,106 @@
+# citation metadata for the CernVM-FS project
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "The CernVM File System (CVMFS)"
+doi: 10.5281/zenodo.1010441
+repository-code: "https://github.com/cvmfs/cvmfs"
+license: "BSD-3-Clause"
+
+abstract: >
+  The CernVM-File System (CernVM-FS) provides a scalable, reliable and
+  low-maintenance software distribution service for large scientific
+  collaborations. Implemented as a POSIX, read-only FUSE file system,
+  CernVM-FS publishes files and directories from standard web servers into
+  the global namespace /cvmfs. Internally it relies on
+  content-addressable storage and Merkle trees, and uses outgoing HTTP
+  connections only, which eases firewall traversal.
+
+keywords:
+  - CernVM-FS
+  - software distribution
+  - distributed file system
+  - FUSE
+  - scientific computing
+  - high-energy physics
+  - CERN
+
+authors:
+  - given-names: Jakob
+    family-names: Blomer
+    orcid: "https://orcid.org/0000-0001-9750-6224"
+  - given-names: Brian
+    family-names: Bockelman
+    orcid: "https://orcid.org/0000-0003-2981-3809"
+  - given-names: Dan
+    family-names: Bradley
+  - given-names: Michael
+    family-names: Brown
+  - given-names: Predrag
+    family-names: Buncic
+  - given-names: Daniel-Florin
+    family-names: Dosaru
+  - given-names: Dave
+    family-names: Dykstra
+    orcid: "https://orcid.org/0000-0003-2653-9015"
+  - given-names: Sébastien
+    family-names: Fabbro
+    orcid: "https://orcid.org/0000-0003-2239-7988"
+  - given-names: Simon
+    family-names: Fayer
+  - given-names: Gerardo
+    family-names: Ganis
+  - given-names: Manuel
+    family-names: Giffels
+    orcid: "https://orcid.org/0000-0003-0193-3032"
+  - given-names: Nikola
+    family-names: Hardi
+  - given-names: Matt
+    family-names: Harvey
+  - given-names: Nick
+    family-names: Hazekamp
+    orcid: "https://orcid.org/0000-0003-4197-2810"
+  - given-names: Seppo
+    family-names: Heikkila
+    orcid: "https://orcid.org/0000-0002-6423-6739"
+  - given-names: René
+    family-names: Meusel
+  - given-names: Jose
+    family-names: Molina
+  - given-names: Simone
+    family-names: Mosciatti
+  - given-names: Radu
+    family-names: Popescu
+  - given-names: Laura
+    family-names: Promberger
+  - given-names: Joshua C.
+    family-names: Randall
+  - given-names: Francesco
+    family-names: Ruvolo
+  - given-names: Tim
+    family-names: Shaffer
+    orcid: "https://orcid.org/0000-0002-7028-5246"
+  - given-names: Douglas
+    family-names: Thain
+    orcid: "https://orcid.org/0000-0001-5218-1956"
+  - given-names: Samuel
+    family-names: Teuber
+    orcid: "https://orcid.org/0000-0001-7945-9110"
+  - given-names: Steve
+    family-names: Traylen
+    orcid: "https://orcid.org/0009-0001-9793-5245"
+  - given-names: Valentin
+    family-names: Völkl
+    orcid: "https://orcid.org/0000-0002-9172-6629"
+  - given-names: Derek
+    family-names: Weitzel
+    orcid: "https://orcid.org/0000-0002-8115-7573"
+  - given-names: Jesse
+    family-names: Williamson
+
+# Acknowledgements:
+#   The project received valuable help from
+#   Carlos Aguado Sanchez, Mike Anderson, Doug Benjamin, Enrico Bocchi, Ian Collier,
+#   Ben Couturier, Carsten Burgard, John DeStefano, Tom Downes, Alessandra Forti,
+#   Artem Harutyunyan, Elisa Lanciotti, Todd Olson, Sam Skipsey, Ronald Starink,
+#   Hervé Rousseau, Dan van der Ster, Ryan Taylor, Ben Tovar, Mattias Wadenstein,
+#   Gordon Watts, Yushu Yao, Rik Yoshida

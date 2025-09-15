@@ -583,7 +583,7 @@ endif ()
 # Documentation
 #
 install (
-  FILES                   README.md AUTHORS ChangeLog COPYING
+  FILES                   README.md CITATION.cff ChangeLog COPYING
   DESTINATION             share/doc/cvmfs-${CernVM-FS_VERSION_STRING}
   PERMISSIONS             OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
 )

@@ -46,7 +46,7 @@ mkdir -p $CVMFS_RESULT_LOCATION
 copied_source="${CVMFS_RESULT_LOCATION}/wd_src"
 [ ! -d $copied_source ] || die "build directory is not empty"
 mkdir -p $copied_source
-cp -R --dereference ${CVMFS_SOURCE_LOCATION}/AUTHORS            \
+cp -R --dereference ${CVMFS_SOURCE_LOCATION}/CITATION.cff       \
                     ${CVMFS_SOURCE_LOCATION}/CMakeLists.txt     \
                     ${CVMFS_SOURCE_LOCATION}/COPYING            \
                     ${CVMFS_SOURCE_LOCATION}/ChangeLog          \
