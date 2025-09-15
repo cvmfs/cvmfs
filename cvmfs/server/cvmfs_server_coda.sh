@@ -19,6 +19,7 @@ CVMFS_UPDATEGEO_MAXDAYS= # Maximum days before considering it urgent (set below)
 
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo" # Directory to download into
 CVMFS_UPDATEGEO_DB=      # DB name (set below)
+CVMFS_UPDATEGEO_OLDDB=   # DB name to remove if present (set below)
 CVMFS_UPDATEGEO_URLBASE= # Base of URL for download (set below)
 CVMFS_UPDATEGEO_URLSUFFIX= # Suffix to add to URLBASE for download
 
@@ -51,12 +52,14 @@ cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs
 if [ "$CVMFS_UPDATEGEO_SOURCE" = "openhtc" ]; then
   CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-7}
   CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-14}
+  CVMFS_UPDATEGEO_OLDDB=GeoLite2-City.mmdb
   CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-iplocation.mmdb}"
   CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://geoipdb.openhtc.io}"
   CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-/${CVMFS_UPDATEGEO_DB}.gz}"
 elif [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
   CVMFS_UPDATEGEO_MINDAYS=${CVMFS_UPDATEGEO_MINDAYS:-14}
   CVMFS_UPDATEGEO_MAXDAYS=${CVMFS_UPDATEGEO_MAXDAYS:-28}
+  CVMFS_UPDATEGEO_OLDDB=iplocation.mmdb
   CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-GeoLite2-City.mmdb}"
   CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://download.maxmind.com/geoip/databases/GeoLite2-City/download}"
   CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-?suffix=tar.gz}"
