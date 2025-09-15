@@ -1,6 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="GeoIP Service"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_614_GEO_DIR=/var/lib/cvmfs-server/geo
 CVMFS_TEST_614_REPLICA_NAME=
