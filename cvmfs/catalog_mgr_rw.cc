@@ -1485,12 +1485,15 @@ void WritableCatalogManager::CatalogUploadCallback(
 
   const uint64_t catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
+  assert(catalog!=NULL);
+
+  SyncLock();
+
 
   if (UseLocalCache()) {
     CopyCatalogToLocalCache(result);
   }
 
-  SyncLock();
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer and schedule
     // them for processing (continuation) if the 'dirty children count' == 0
@@ -1656,18 +1659,25 @@ WritableCatalogManager::SnapshotCatalogsSerialized(const bool stop_for_tweaks) {
   spooler_->RegisterListener(
       &WritableCatalogManager::CatalogUploadSerializedCallback, this, unused);
 
+  // create special CompressHashPipeline for computing the hash
+  CompressHashPipeline pipeline;
+  pipeline.RegisterListener(&WritableCatalogManager::CatalogHashSerializedCallback, this);
+  pipeline.Spawn();
+
   CatalogInfo root_catalog_info;
   WritableCatalogList::const_iterator i = catalogs_to_snapshot.begin();
   const WritableCatalogList::const_iterator iend = catalogs_to_snapshot.end();
   for (; i != iend; ++i) {
     FinalizeCatalog(*i, stop_for_tweaks);
 
-    // Compress and upload catalog
-    shash::Any hash_catalog(spooler_->GetHashAlgorithm(),
-                            shash::kSuffixCatalog);
-    if (!zlib::CompressPath2Null((*i)->database_path(), &hash_catalog)) {
-      PANIC(kLogStderr, "could not compress catalog %s",
-            (*i)->mountpoint().ToString().c_str());
+    // wait for hash to finish and retrieve it from the map
+    pipeline.Process(new FileIngestionSource((*i)->database_path()), spooler_->GetHashAlgorithm(), shash::kSuffixCatalog);
+    pipeline.WaitFor();
+
+    shash::Any hash_catalog;
+    {
+      MutexLockGuard const guard(catalog_hash_lock_);
+      hash_catalog = catalog_hash_map_[(*i)->database_path()];
     }
 
     const int64_t catalog_size = GetFileSize((*i)->database_path());
@@ -1758,11 +1768,12 @@ void WritableCatalogManager::SingleCatalogUploadCallback(
 
   uint64_t const catalog_size = GetFileSize(result.local_path);
   assert(catalog_size > 0);
+  assert(catalog != NULL);
 
   SyncLock();
   if (catalog->HasParent()) {
     // finalized nested catalogs will update their parent's pointer
-    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link [%s] [%s]", catalog->mountpoint().ToString().c_str(), result.content_hash.ToString().c_str());
     WritableCatalog *parent = catalog->GetWritableParent();
 
     parent->UpdateNestedCatalog(catalog->mountpoint().ToString(),
@@ -1773,7 +1784,6 @@ void WritableCatalogManager::SingleCatalogUploadCallback(
     catalog->delta_counters_.SetZero();
   }
   // JUMP: detach the catalog after uploading to free sqlite related resources
-  DetachCatalog(catalog);
   SyncUnlock();
 }
 // using the given list of dirs, fetch all relevant catalogs
