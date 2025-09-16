@@ -22,18 +22,16 @@ jobs:
           brew install coreutils
           sudo ln -s /usr/local/bin/gtimeout /usr/local/bin/timeout
           sudo ln -s /opt/homebrew/bin/greadlink /usr/local/bin/greadlink
-          which timeout
-          which greadlink
           sudo mkdir /usr/local/include
-          ls /usr/local
           sudo xcode-select -s "/Applications/Xcode_16.app"
           
       - name: Install Fuse-t and dependencies
         run: |
           brew install python-setuptools
-          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.44/fuse-t-macos-installer-1.0.44.pkg
-          sudo installer -pkg fuse-t-macos-installer-1.0.44.pkg -target /
-          ls /usr/local/include
+          wget -q https://github.com/macos-fuse-t/fuse-t/releases/download/1.0.49/fuse-t-macos-installer-1.0.49.pkg
+          sudo installer -pkg fuse-t-macos-installer-1.0.49.pkg -target /
+          mkdir -p /Library/Application\ Support/fuse-t/cfg/
+          sudo zsh -c 'echo "namedattr=true" >> /Library/Application\ Support/fuse-t/cfg/fuse-t.ini'
 
       - name: Build CVMFS
         run: |
@@ -41,7 +39,8 @@ jobs:
           mkdir -p build
           export USE_MACFUSE_KEXT=OFF
           export CVMFS_TEST_USE_MACFUSE_KEXT=OFF
-          export CVMFS_EXTERNALS_EXCLUDE=sqlite3
+          export CVMFS_EXTERNALS_EXCLUDE="sqlite3;zlib"
+          export CPATH=$CPATH:/usr/local/include
           ./ci/build_package.sh ${GITHUB_WORKSPACE} ${GITHUB_WORKSPACE}/build cvmfs
 
       - name: Setup firmlinks
