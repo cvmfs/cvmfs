@@ -15,6 +15,7 @@ fi
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
 KERNEL_DIR="$SCRIPT_DIR/kernel"
+KERNEL_BASE_URL=${KERNEL_BASE_URL:="https://ecsft.cern.ch/dist/cvmfs/caches/kernel/"}
 # This disk serves as cvmfs cache
 DISK_PATH="${DISK_PATH:-./cvmfs.img}"
 DISK_SIZE="${DISK_SIZE:-5}"
@@ -28,8 +29,8 @@ done
 
 # Check if the kernel directory exists
 if [ ! -d "$KERNEL_DIR" ]; then
-    echo "Error: Kernel directory not found at $KERNEL_DIR."
-    exit 1
+    echo "Kernel directory not found at $KERNEL_DIR. Creating..."
+    mkdir -p "$KERNEL_DIR"
 fi
 
 setup() {
@@ -46,6 +47,16 @@ setup() {
 
     # reformat cvmfs_cache.img
     mkfs.ext4 -F "$DISK_PATH" >/dev/null 2>&1
+}
+
+fetch_kernels() {
+    echo "Fetching kernels from $KERNEL_BASE_URL..."
+    if ! wget --recursive --no-parent --no-host-directories --cut-dirs=4 --accept bzImage --quiet -P "$KERNEL_DIR" "$KERNEL_BASE_URL"; then
+        echo "Error fetching kernels from $KERNEL_BASE_URL"
+        exit 1
+    fi
+    echo "Listing fetched kernels:"
+    ls "$KERNEL_DIR"
 }
 
 # Function to create and run the VM with virtme-ng
@@ -68,6 +79,8 @@ create_and_run_vm() {
     "
 }
 
+# Fetch kernels
+fetch_kernels
 # Boot VM and run tests
 setup
 for bzImage in "$KERNEL_DIR"/*/bzImage; do

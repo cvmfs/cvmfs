@@ -28,7 +28,7 @@ vng_testing/
 ## How It Works
 
 1. **Kernel Preparation:**
-   Use `build_kernel.sh` to build custom kernels with additional config options as specified in `configs/kernel_config.conf`. Built kernels are stored under `kernel/vX.YZ`.
+   Use `build_kernel.sh` to build custom kernels with additional config options as specified in `configs/kernel_config.conf`. Kernels will be fetched from `KERNEL_BASE_URL` and will be kept under `kernel/vX.YZ`.
 
 2. **Test Orchestration:**
    The `run.sh` script launches a virtual machine via virtme-ng, boots it with the selected kernel, and mounts the `cvmfs.img` filesystem. It then triggers `guest/run_tests.sh` inside the VM.
@@ -54,6 +54,7 @@ vng_testing/
 ## Configs
 A level of configuration can be achieved by exporting the environment variables to desired value to provide control.
 ```sh
+KERNEL_BASE_URL="" default: "https://ecsft.cern.ch/dist/cvmfs/caches/kernel/"
 DISK_PATH="" default: ./cvmfs.img
 DISK_SIZE="" default: 5G
 ```
