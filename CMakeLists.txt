@@ -600,7 +600,7 @@ endif ()
 # Builds of golang components
 # First check if we have golang available
 #
-if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER)
+if (BUILD_GATEWAY OR BUILD_DUCC OR BUILD_SNAPSHOTTER OR BUILD_POSIX_TOOLS)
   if (NOT CVMFS_GO_DIR AND NOT "$ENV{CVMFS_GO_DIR}" STREQUAL "")
     set (CVMFS_GO_DIR "$ENV{CVMFS_GO_DIR}")
   endif ()
@@ -625,6 +625,9 @@ if (BUILD_SNAPSHOTTER)
   add_subdirectory (snapshotter)
 endif ()
 
+if (BUILD_POSIX_TOOLS)
+  add_subdirectory (cvmfs-posix-tools)
+endif ()
 
 #
 # Documentation
