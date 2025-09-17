@@ -1,0 +1,204 @@
+# Config File for cvmfs_rsync
+---
+repos:
+  {{ .Repo }}:
+    proxy: "http://127.0.0.1:6081"
+    s3_access_key: ""
+    s3_secret_key: ""
+    dot-scheme: false
+    content-addressable: true
+    external-url-prefix: http://storage-host/bucket-name/files
+    internal-url-prefix: http://storage-host/bucket-name/data
+    groups:
+      {{ .Group }}:
+        test_dir83:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        disallow-upload:
+          allow-upload: false
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        disallow-upload/allow-upload-inner:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        disallow-delete:
+          allow-upload: true
+          allow-purge: false
+          allow-delete: false
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        disallow-delete/allow-delete-inner:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        allow-upload:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        allow-upload/disallow-upload-inner:
+          allow-upload: false
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        allow-delete:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        allow-delete/disallow-delete-inner:
+          allow-upload: true
+          allow-purge: false
+          allow-delete: false
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        disallow-upload-delete:
+          allow-upload: false
+          allow-purge: false
+          allow-delete: false
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        check-permissions:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        check-permissions2:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: true
+        no-check-permissions:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: false
+          allow-acl: true
+        acl-flag:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: false
+          allow-acl: true
+        acl-flag/no-acl-flag:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: false
+          allow-acl: false
+        no-acl-flag:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: false
+          allow-acl: false
+        DEFAULT:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: false
+          allow-acl: true
+      DEFAULT:
+        test_dir9:
+          allow-upload: true
+          allow-purge: true
+          allow-delete: true
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+        DEFAULT:
+          allow-upload: false
+          allow-purge: false
+          allow-delete: false
+          user: {{ .Uid }} 
+          group: {{ .Gid }}
+          file-mode: 420
+          directory-mode: 493
+          check-permissions: true
+          allow-acl: false
+
