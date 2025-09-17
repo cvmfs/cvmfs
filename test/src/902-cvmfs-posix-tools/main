@@ -1,0 +1,19 @@
+#!/bin/bash
+cvmfs_test_name="cvmfs-posix-tools"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="cvmfs-posix-tools"
+
+cleanup() {
+  true
+}
+
+cvmfs_run_test() {
+  [[ -v TEST_ROOT ]] # expected /home/sftnight/cvmfs/test
+  this_script_dir=$TEST_ROOT/src/902-cvmfs-posix-tools
+  # We want strict mode here, to catch any failure.
+  # But turning on errexit (set -e) inside a function has no effect.
+  # So we exec our script to keep its error handling mode independent from test/run.sh.
+  exe="$this_script_dir"/run_test
+  echo Launching "$exe"
+  exec "$exe" "$@"
+}
