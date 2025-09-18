@@ -227,8 +227,9 @@ class S3FanoutManager : SingleCopy {
  private:
   // Reflects the default Apache configuration of the local backend
   static const char *kCacheControlCas;          // Cache-Control: max-age=259200
-  static const char *kCacheControlDotCvmfs;     // Cache-Control: max-age=61
   static const unsigned kLowSpeedLimit = 1024;  // Require at least 1kB/s
+
+  std::string MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge=61, int overrideMaxAge=-1);
 
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -335,6 +336,8 @@ class S3FanoutManager : SingleCopy {
    * Carries the path settings for SSL certificates
    */
   SslCertificateStore ssl_certificate_store_;
+
+  std::string dot_cvmfs_cache_control_header;           // Cache-Control: max-age=...
 };  // S3FanoutManager
 
 }  // namespace s3fanout

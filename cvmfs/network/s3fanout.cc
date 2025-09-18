@@ -25,14 +25,53 @@ using namespace std;  // NOLINT
 namespace s3fanout {
 
 const char *S3FanoutManager::kCacheControlCas = "Cache-Control: max-age=259200";
-const char
-    *S3FanoutManager::kCacheControlDotCvmfs = "Cache-Control: max-age=61";
 const unsigned S3FanoutManager::kDefault429ThrottleMs = 250;
 const unsigned S3FanoutManager::kMax429ThrottleMs = 10000;
 const unsigned S3FanoutManager::kThrottleReportIntervalSec = 10;
 const unsigned S3FanoutManager::kDefaultHTTPPort = 80;
 const unsigned S3FanoutManager::kDefaultHTTPSPort = 443;
 
+std::string S3FanoutManager::MkDotCvmfsCacheControlHeader(unsigned defaultMaxAge, int overrideMaxAge)
+{
+  const char *var;
+  int max_age_sec;
+  char *at_null_terminator_if_number;
+  bool value_determined = false;
+
+  if (overrideMaxAge >= 0) {
+    max_age_sec = overrideMaxAge;
+    value_determined = true;
+  }
+
+  if (!value_determined) {
+    var = getenv("CVMFS_MAX_TTL_SECS");
+    if (var && var[0]) {
+      max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
+      if (*at_null_terminator_if_number == '\0'
+          && max_age_sec >= 0) {
+        value_determined = true;
+      }
+    }
+  }
+
+  if (!value_determined) {
+    var = getenv("CVMFS_MAX_TTL");
+    if (var && var[0]) {
+      max_age_sec = strtoll(var, &at_null_terminator_if_number, 10);
+      if (*at_null_terminator_if_number == '\0'
+          && max_age_sec >= 0) {
+        max_age_sec *= 60;
+        value_determined = true;
+      }
+    }
+  }
+
+  if (!value_determined) {
+    max_age_sec = defaultMaxAge;
+  }
+
+  return "Cache-Control: max-age=" + std::to_string(max_age_sec);
+}
 
 /**
  * Parses Retry-After and X-Retry-In headers attached to HTTP 429 responses
@@ -871,8 +910,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     assert(retval == CURLE_OK);
 
     if (info->request == JobInfo::kReqPutDotCvmfs) {
-      info->http_headers = curl_slist_append(info->http_headers,
-                                             kCacheControlDotCvmfs);
+      info->http_headers = curl_slist_append(
+          info->http_headers, dot_cvmfs_cache_control_header.c_str());
     } else if (info->request == JobInfo::kReqPutCas) {
       info->http_headers = curl_slist_append(info->http_headers,
                                              kCacheControlCas);
@@ -1180,6 +1219,7 @@ S3FanoutManager::S3FanoutManager(const S3Config &config) : config_(config) {
   user_agent_ = new string();
   *user_agent_ = "User-Agent: cvmfs " + string(CVMFS_VERSION);
   complete_hostname_ = MkCompleteHostname();
+  dot_cvmfs_cache_control_header = MkDotCvmfsCacheControlHeader();
 
   const CURLcode cretval = curl_global_init(CURL_GLOBAL_ALL);
   assert(cretval == CURLE_OK);
