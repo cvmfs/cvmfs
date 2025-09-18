@@ -96,7 +96,14 @@ EOF
 
     if [[ -v DEBUG ]]; then
 	cp "$this_script_dir"/swissknife-wrapper /usr/local/bin/cvmfs_swissknife
+	#which ngrep || dnf install -y ngrep
+	#ngrep -t -e -d any -W byline -O /var/log/ngrep.pcap port 9000 or port 6081 > /var/log/ngrep.log &
     fi
+
+    export CVMFS_MAX_TTL_SECS=1
+    cat > /etc/cvmfs/default.d/98-ttl-for-mkfs.conf <<-EOF
+CVMFS_MAX_TTL_SECS=$CVMFS_MAX_TTL_SECS
+EOF
 }
 
 repo_set_layout_ingestsql() {
@@ -144,8 +151,7 @@ CVMFS_HTTP_PROXY=$PROXY_SPEC
 CVMFS_EXTERNAL_HTTP_PROXY=$PROXY_SPEC
 CVMFS_EXTERNAL_URL=http://$S3_HOST:9000/mybucket/$CVMFS_TEST_REPO/external
 CVMFS_KCACHE_TIMEOUT=0
-CVMFS_MAX_TTL_SEC=1
-CVMFS_MAX_TTL_SECS=1
+CVMFS_MAX_TTL_SECS=$CVMFS_MAX_TTL_SECS
 CVMFS_AUTO_UPDATE=yes
 CVMFS_DEBUGLOG=/var/log/cvmfs-debug.log
 EOF
@@ -198,6 +204,18 @@ revision() {
     attr -q -g revision /cvmfs/"$CVMFS_TEST_REPO"
 }
 
+revision_compare() {
+    SAYS_S3=$(       curl --fail --no-progress-meter -H 'Cache-Control: no-cache, max-age=0, must-revalidate'                        http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
+    if [[ "$PROXY_SPEC" != DIRECT ]]; then
+	SAYS_PROXY=$(curl --fail --no-progress-meter -H 'Cache-Control: no-cache, max-age=0, must-revalidate' --proxy "$PROXY_SPEC"  http://$S3_HOST:9000/mybucket/"$CVMFS_TEST_REPO"/.cvmfspublished | grep --text ^S | sed s/^S//)
+    else
+	SAYS_PROXY=
+    fi
+    SAYS_MOUNT=$(attr -q -g revision "$CVMFS_TEST_MOUNTPOINT")
+
+    echo -e "Revision comparison:\nmount: $SAYS_MOUNT\nS3: $SAYS_S3\nproxy: $SAYS_PROXY"
+}
+
 check_ingestsql_works() {
     # Usage:
     # check_ingestsql_works     - loops remounting and checking for refresh
@@ -239,9 +257,15 @@ check_ingestsql_works() {
 	WAIT_IN_REMOUNT_LOOP_UNTIL_REVISION_INCR=0
     fi
 
+    LAPS=0
     if [[ "$WAIT_IN_REMOUNT_LOOP_UNTIL_REVISION_INCR" == 1 ]]; then
 	TIME_START=$(date +%s)
 	while [[ "$(revision)" == "$LAST_REPO_REVISION" ]]; do
+	    revision_compare "$CVMFS_TEST_REPO"
+	    LAPS=$(( LAPS + 1 ))
+	    if [[ "$LAPS" -gt 61 ]]; then
+		exit 1
+	    fi
 	    sleep 1
 	    if [[ "$REMOUNT_WHILE_WAITING" == 1 ]]; then
 		umount "$CVMFS_TEST_MOUNTPOINT"
@@ -256,6 +280,7 @@ check_ingestsql_works() {
 	    fi
 	done
 	echo Revision incremented after $(( "$(date +%s)" - TIME_START )) seconds
+	revision_compare "$CVMFS_TEST_REPO"
     fi
 
     [[ -f "$CVMFS_TEST_MOUNTPOINT"/"$SOME_FILE_NAME" ]]
