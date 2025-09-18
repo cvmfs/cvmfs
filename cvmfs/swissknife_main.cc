@@ -14,6 +14,7 @@
 #include "swissknife_history.h"
 #include "swissknife_info.h"
 #include "swissknife_ingest.h"
+#include "swissknife_ingestsql.h"
 #include "swissknife_lease.h"
 #include "swissknife_letter.h"
 #include "swissknife_list_reflog.h"
@@ -37,15 +38,16 @@ Commands command_list;
 
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
-          "CernVM-FS repository storage management commands\n"
-          "Usage (normally called from cvmfs_server):\n"
-          "  cvmfs_swissknife <command> [options]\n");
+           "CernVM-FS repository storage management commands\n"
+           "Usage (normally called from cvmfs_server):\n"
+           "  cvmfs_swissknife <command> [options]\n");
 
   for (unsigned i = 0; i < command_list.size(); ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
              "\n"
              "Command %s\n"
-             "--", command_list[i]->GetName().c_str());
+             "--",
+             command_list[i]->GetName().c_str());
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "\n");
     LogCvmfs(kLogCvmfs, kLogStdout, "%s",
              command_list[i]->GetDescription().c_str());
@@ -97,6 +99,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandReconstructReflog());
   command_list.push_back(new swissknife::CommandLease());
   command_list.push_back(new swissknife::Ingest());
+  command_list.push_back(new swissknife::IngestSQL());
   command_list.push_back(new swissknife::CommandNotify());
   command_list.push_back(new swissknife::CommandFileStats());
 

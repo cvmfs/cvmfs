@@ -24,6 +24,6 @@ bool MakeEndRequest(const std::string &method, const std::string &key_id,
                     const std::string &secret, const std::string &session_token,
                     const std::string &repo_service_url,
                     const std::string &request_payload, CurlBuffer *reply,
-                    bool expect_final_revision = true);
+                    bool expect_final_revision = false);
 
 #endif  // CVMFS_SWISSKNIFE_LEASE_CURL_H_

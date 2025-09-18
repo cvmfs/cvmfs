@@ -69,6 +69,7 @@ static string g_session_token_file;
 static string g_s3_file;
 static time_t g_last_lease_refresh = 0;
 static bool g_stop_refresh = false;
+static string g_wait_for_update;
 static int64_t g_priority = 0;
 static bool g_add_missing_catalogs = false;
 static string get_lease_from_paths(vector<string> paths);
@@ -100,7 +101,13 @@ static bool check_prefix(const std::string &path, const std::string &prefix);
 static bool isDatabaseMarkedComplete(const char *dbfile);
 static void setDatabaseMarkedComplete(const char *dbfile);
 
+static void invalidate_manifest(std::string proxy_list, std::string url);
+static void wait_for_update(std::string path, long revision);
+
 extern "C" void *lease_refresh_thread(void *payload);
+
+extern long g_final_revision;
+
 
 static string sanitise_name(const char *name_cstr,
                             bool allow_leading_slash = false) {
@@ -237,7 +244,7 @@ static uint64_t make_commit_on_gateway(const std::string &old_root_hash,
                               + "\",\n\"priority\": " + priorityStr + "}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
-                        g_session_token, g_gateway_url, payload, &buffer, true);
+                        g_session_token, g_gateway_url, payload, &buffer, true /*expect_final_revision*/);
 }
 
 static void refresh_lease() {
@@ -248,7 +255,7 @@ static void refresh_lease() {
   }
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false)) {
+                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
@@ -270,7 +277,7 @@ static void refresh_lease() {
 static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false)) {
+                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
@@ -532,9 +539,9 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
     exit(0);
   }
 
-  // TODO(@vvolkl): add 'B' option to wait_for_update
-  // TODO(@vvolkl): add 'T' option for ttl
-
+  if (args.find('B') != args.end()) {
+    g_wait_for_update = *args.find('B')->second;
+  }
 
   if (args.find('P') != args.end()) {
     const char *arg = (*args.find('P')->second).c_str();
@@ -903,6 +910,10 @@ int swissknife::IngestSQL::Main(const swissknife::ArgumentList &args) {
 
   g_stop_refresh = true;
 
+  if (g_wait_for_update != "") {
+    invalidate_manifest(proxy, stratum0 + "/.cvmfspublished");
+    wait_for_update(g_wait_for_update, g_final_revision);
+  }
 
   if (check_completed_graft_property) {
     setDatabaseMarkedComplete(sqlite_db_vec[0].c_str());
@@ -1514,7 +1525,7 @@ const char *schema[] = {"PRAGMA journal_mode=WAL;",
                         "CREATE TABLE IF NOT EXISTS dirs ( \
         name  TEXT    PRIMARY KEY, \
         mode  INTEGER NOT NULL DEFAULT 493,\
-        mtime INTEGER NOT NULL DEFAULT (unixepoch()),\
+        mtime INTEGER NOT NULL DEFAULT 0,\
         owner INTEGER NOT NULL DEFAULT 0, \
         grp   INTEGER NOT NULL DEFAULT 0, \
         acl   TEXT    NOT NULL DEFAULT '', \
@@ -1523,7 +1534,7 @@ const char *schema[] = {"PRAGMA journal_mode=WAL;",
                         "CREATE TABLE IF NOT EXISTS files ( \
         name   TEXT    PRIMARY KEY, \
         mode   INTEGER NOT NULL DEFAULT 420, \
-        mtime  INTEGER NOT NULL DEFAULT (unixepoch()),\
+        mtime  INTEGER NOT NULL DEFAULT 0,\
         owner  INTEGER NOT NULL DEFAULT 0,\
         grp    INTEGER NOT NULL DEFAULT 0,\
         size   INTEGER NOT NULL DEFAULT 0,\
@@ -1535,7 +1546,7 @@ const char *schema[] = {"PRAGMA journal_mode=WAL;",
                         "CREATE TABLE IF NOT EXISTS links (\
         name   TEXT    PRIMARY KEY,\
         target TEXT    NOT NULL DEFAULT '',\
-        mtime  INTEGER NOT NULL DEFAULT (unixepoch()),\
+        mtime  INTEGER NOT NULL DEFAULT 0,\
         owner  INTEGER NOT NULL DEFAULT 0,\
         grp    INTEGER NOT NULL DEFAULT 0,\
         skip_if_file_or_dir INTEGER NOT NULL DEFAULT 0\
@@ -1679,4 +1690,98 @@ static void setDatabaseMarkedComplete(const char *dbfile) {
     return;
   }
   sqlite3_close(db);
+}
+
+static void invalidate_manifest(std::string proxy_list, std::string url) {
+  // split the proxy string -- remove any '"' and split on '|' or ';'
+  size_t pos = 0;
+  // replace any ';' with '|' to simplify subsequent split
+  while ((pos = proxy_list.find(';', pos)) != std::string::npos) {
+    proxy_list.replace(pos, 1, 1, '|');
+    ++pos;
+  }
+  // remove any leading or trailing '"'
+  if (HasPrefix(proxy_list, "\"", true)) {
+    proxy_list = proxy_list.substr(1);
+  }
+  if (HasSuffix(proxy_list, "\"", true)) {
+    proxy_list = proxy_list.substr(0, proxy_list.size() - 1);
+  }
+  // rewrite the port from 6086 to 6081 to ensure the invalidation works
+  replaceAllSubstrings(proxy_list, ":6086", ":6081");
+
+  std::vector<std::string> proxies = SplitString(proxy_list, '|');
+
+  // now iterate over all the proxies
+  // for the first, force a no-cache GET back to google
+  // for the remainder just PURGE
+  bool first = true;
+  for (auto p = proxies.begin(); p != proxies.end(); p++) {
+    bool ok = true;
+    const string proxy = *p;
+    CURL *curl = NULL;
+    CURLcode res = CURLE_OK;
+    struct curl_slist *headers = NULL;
+    curl = curl_easy_init();
+    if (!curl) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Unable to init curl!");
+      return;
+    }
+    res = curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    if (proxy != "DIRECT") {
+      res = curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+    }
+    res = curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1l);
+    res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3l);
+    res = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);
+
+    if (first) {
+      headers = curl_slist_append(headers, "Cache-Control: no-cache");
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    } else {
+      curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PURGE");
+    }
+
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
+      LogCvmfs(kLogCvmfs, kLogStdout,
+               "Manifest invalidation failed: curl error = [%d] [%s] url = %s "
+               "proxy = %s",
+               res, curl_easy_strerror(res), url.c_str(), proxy.c_str());
+      ok = false;
+    }
+    if (headers) {
+      curl_slist_free_all(headers);
+    }
+    curl_easy_cleanup(curl);
+    if (ok) {
+      first = false;
+    }
+  }
+}
+
+
+static void wait_for_update(std::string path, long revision) {
+  char val[101];
+  memset(val, 0, 101);
+  long current = -1;
+  DIR *d;
+  while (-1 != getxattr(path.c_str(), "user.revision", val, 100)) {
+    const long x = atol(val);
+    if (x >= revision) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Mount reached revision %ld", x);
+      return;
+    } else if (x != current) {
+      current = x;
+      LogCvmfs(kLogCvmfs, kLogStdout, "Mount at revision %ld, waiting..", x);
+    }
+    sleep(1);
+    d = opendir(path.c_str());
+    if (d) {
+      closedir(d);
+    }
+  }
+  LogCvmfs(kLogCvmfs, kLogStdout,
+           "Unable to query user.revision xattr of [%s]: errno: %d",
+           path.c_str(), errno);
 }
