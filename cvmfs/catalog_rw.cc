@@ -750,6 +750,7 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
   bool needs_defragmentation = false;
   double ratio = 0.0;
   std::string reason;
+  const MutexLockGuard m(lock_);
 
   if ((ratio = db.GetFreePageRatio()) > kMaximalFreePageRatio) {
     needs_defragmentation = true;
