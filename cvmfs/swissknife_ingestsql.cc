@@ -244,7 +244,7 @@ static uint64_t make_commit_on_gateway(const std::string &old_root_hash,
                               + "\",\n\"priority\": " + priorityStr + "}";
 
   return MakeEndRequest("POST", g_gateway_key_id, g_gateway_secret,
-                        g_session_token, g_gateway_url, payload, &buffer, true);
+                        g_session_token, g_gateway_url, payload, &buffer, true /*expect_final_revision*/);
 }
 
 static void refresh_lease() {
@@ -255,7 +255,7 @@ static void refresh_lease() {
   }
 
   if (MakeEndRequest("PATCH", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false)) {
+                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogVerboseMsg, "Lease refreshed");
@@ -277,7 +277,7 @@ static void refresh_lease() {
 static void cancel_lease() {
   CurlBuffer buffer;
   if (MakeEndRequest("DELETE", g_gateway_key_id, g_gateway_secret,
-                     g_session_token, g_gateway_url, "", &buffer, false)) {
+                     g_session_token, g_gateway_url, "", &buffer, false /*expect_final_revision*/)) {
     const int ret = ParseDropReply(buffer);
     if (kLeaseReplySuccess == ret) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Lease cancelled");
