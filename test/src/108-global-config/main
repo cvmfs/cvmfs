@@ -1,0 +1,36 @@
+#!/bin/bash
+
+cvmfs_test_name="Global Configuration Variables"
+
+CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
+REPO=/cvmfs/atlas.cern.ch
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local logfile=/tmp/version_env_test.log
+
+  if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
+    sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
+
+    sudo cp src/108-global-config/default.local "${CVMFS_CONFIG_FILE}" 
+    sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
+
+    sudo umount "${REPO}"
+    ls "${REPO}" &> /dev/null
+    if ! grep -q -- "CVMFS_VERSION" "$logfile"; then
+      return 1
+    fi 
+
+    if ! grep -q -- "CVMFS_ARCH" "$logfile"; then
+      return 2
+    fi 
+
+    sudo mv "${CVMFS_CONFIG_FILE}.bak" "${CVMFS_CONFIG_FILE}"
+  else
+    echo "config doesn't exist"
+  fi
+
+  sudo rm -rf $logfile
+}
+
