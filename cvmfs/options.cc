@@ -277,6 +277,22 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
   return false;
 }
 
+void OptionsManager::SetupGlobalEnvironmentParams() {
+  setenv("CVMFS_ARCH", GetArch().c_str(), 1 /* overwrite */);
+
+  // Set CVMFS_VERSION environment variable
+  setenv("CVMFS_VERSION", CVMFS_VERSION, 1 /* overwrite */);
+
+  // Calculate and set CVMFS_VERSION_NUMERIC
+  // Format: major * 10000 + minor * 100 + patch
+  // Example: 2.13.2 becomes 21302
+  const int version_numeric = CVMFS_VERSION_MAJOR * 10000
+                              + CVMFS_VERSION_MINOR * 100 + CVMFS_VERSION_PATCH;
+  char version_numeric_str[16];
+  snprintf(version_numeric_str, sizeof(version_numeric_str), "%d",
+           version_numeric);
+  setenv("CVMFS_VERSION_NUMERIC", version_numeric_str, 1 /* overwrite */);
+}
 
 void OptionsManager::ParseDefault(const string &fqrn) {
   if (taint_environment_) {
@@ -284,6 +300,7 @@ void OptionsManager::ParseDefault(const string &fqrn) {
     assert(retval == 0);
   }
 
+  SetupGlobalEnvironmentParams();
   protected_parameters_.clear();
   ParsePath("/etc/cvmfs/default.conf", false);
   vector<string> dist_defaults = FindFilesBySuffix("/etc/cvmfs/default.d",
