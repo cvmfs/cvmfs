@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 cvmfs_test_name="System Configuration Variables"
+cvmfs_test_suites="quick"
 
 CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
 REPO=/cvmfs/atlas.cern.ch
