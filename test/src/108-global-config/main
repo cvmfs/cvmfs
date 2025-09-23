@@ -9,21 +9,10 @@ clean_up() {
   sudo rm -rf $1
 }
 
-
-cvmfs_run_test() {
-  local logfile=$1
-
-  if [[ -z "$logfile" ]]; then
-    logfile=/tmp/version_env_test.log
-  fi
-
-  trap "eval 'clean_up $logfile'" EXIT HUP INT TERM || return $?
-
-  if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
-    sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
-
+do_test() {
     sudo cp src/108-global-config/default.local "${CVMFS_CONFIG_FILE}" 
     sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
+    sudo sed -i "s|PROXY_SERVER|$CVMFS_TEST_PROXY|g" "$CVMFS_CONFIG_FILE"
 
     sudo umount "${REPO}" &> /dev/null
     ls "${REPO}" &> /dev/null
@@ -34,9 +23,24 @@ cvmfs_run_test() {
     if ! grep -q -- "CVMFS_ARCH" "$logfile"; then
       return 2
     fi 
+    sudo rm -rf "${CVMFS_CONFIG_FILE}"
+}
 
+cvmfs_run_test() {
+  local logfile=$1
+
+  if [[ -z "$logfile" ]]; then
+    logfile=/tmp/version_env_test.log
+  fi
+
+  trap "eval 'clean_up $logfile'" EXIT HUP INT TERM || return $?
+
+  # if configuration file exists keep it as a backup and restore it
+  if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
+    sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
+    do_test
     sudo mv "${CVMFS_CONFIG_FILE}.bak" "${CVMFS_CONFIG_FILE}"
   else
-    echo "config doesn't exist"
+    do_test
   fi
 }

@@ -1,5 +1,5 @@
 CVMFS_REPOSITORIES=atlas-condb.cern.ch
-CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128"
+CVMFS_HTTP_PROXY=PROXY_SERVER
 
 if [[ -n "${CVMFS_VERSION:-}" ]]; then
   echo "CVMFS_VERSION available" > LOGFILE
