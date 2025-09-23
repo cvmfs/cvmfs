@@ -1,14 +1,23 @@
 #!/bin/bash
-
+set -e
 cvmfs_test_name="System Configuration Variables"
 
 CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
 REPO=/cvmfs/atlas.cern.ch
 
-cvmfs_run_test() {
-  logfile=$1
+clean_up() {
+  sudo rm -rf $1
+}
 
-  local logfile=/tmp/version_env_test.log
+
+cvmfs_run_test() {
+  local logfile=$1
+
+  if [[ -z "$logfile" ]]; then
+    logfile=/tmp/version_env_test.log
+  fi
+
+  trap "eval 'clean_up $logfile'" EXIT HUP INT TERM || return $?
 
   if [[ -f "${CVMFS_CONFIG_FILE}" ]]; then
     sudo mv "${CVMFS_CONFIG_FILE}" "${CVMFS_CONFIG_FILE}.bak"
@@ -16,7 +25,7 @@ cvmfs_run_test() {
     sudo cp src/108-global-config/default.local "${CVMFS_CONFIG_FILE}" 
     sudo sed -i "s|LOGFILE|$logfile|g" "$CVMFS_CONFIG_FILE"
 
-    sudo umount "${REPO}"
+    sudo umount "${REPO}" &> /dev/null
     ls "${REPO}" &> /dev/null
     if ! grep -q -- "CVMFS_VERSION" "$logfile"; then
       return 1
@@ -30,7 +39,4 @@ cvmfs_run_test() {
   else
     echo "config doesn't exist"
   fi
-
-  sudo rm -rf $logfile
 }
-
