@@ -443,7 +443,6 @@ set(CVMFS_UNITTEST_SOURCES
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
-  t_version_env.cc
   t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
