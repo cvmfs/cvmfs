@@ -61,6 +61,16 @@ or
 - Copy respective `libcvmfs*` from `cvmfs/build/cvmfs/` to `/usr/lib/`
 
 
+### Example: Use specific libfuse version (e.g. 3.17.4)
+```
+mkdir build && cd build
+cmake -DLIBFUSE_VERSION=3.17.4 ../
+ninja
+sudo ninja install
+```
+- This will fetch given valid libfuse version from [libfuse repository](https://github.com/libfuse/libfuse/releases), build it and link it to cvmfs for use.
+- The source and build artifacts for libfuse will be present in externals and externals_build respectively.
+
 ### Example: Locally build Fuse3 to have version 3.10
 
 1) Build [libfuse](https://github.com/libfuse/libfuse/) from source 
