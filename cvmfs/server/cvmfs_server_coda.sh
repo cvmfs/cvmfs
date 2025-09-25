@@ -46,7 +46,8 @@ abort_before_hook() { :; }
 abort_after_hook() { :; }
 publish_before_hook() { :; }
 publish_after_hook() { :; }
-
+rollback_before_hook() { :; }
+rollback_after_hook() { :; }
 cvmfs_sys_file_is_regular /etc/cvmfs/cvmfs_server_hooks.sh && . /etc/cvmfs/cvmfs_server_hooks.sh
 
 if [ "$CVMFS_UPDATEGEO_SOURCE" = "openhtc" ]; then
