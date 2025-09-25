@@ -321,3 +321,42 @@ func (s *Services) CommitLease(ctx context.Context, token, oldRootHash, newRootH
 
 	return finalRev, nil
 }
+
+func (s *Services) RefreshLease(ctx context.Context, token string) (int64, error) {
+	leaseMutex.Lock()
+	defer leaseMutex.Unlock()
+	t0 := time.Now()
+
+	outcome := "success"
+	defer logAction(ctx, "refresh_lease", &outcome, t0)
+
+	tx, err := s.DB.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		outcome = err.Error()
+		return 0, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	lease, err := FindLeaseByToken(ctx, tx, token)
+	if err != nil {
+		outcome = err.Error()
+		return 0, err
+	}
+
+	if lease == nil || lease.Expiration.Before(time.Now()) {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return 0, err
+	}
+
+	lease.Expiration = time.Now().Add(s.Config.MaxLeaseTime)
+
+	changes, err := RefreshLeaseByToken(ctx, tx, token, lease.Expiration.UnixMilli())
+	if err != nil || changes != 1 {
+		err := InvalidLeaseError{}
+		outcome = err.Error()
+		return 0, err
+	}
+	return lease.Expiration.UnixMilli(), nil
+
+}

@@ -149,3 +149,37 @@ func TestLeaseHandlerCommitLease(t *testing.T) {
 		t.Errorf("Invalid response body: %v", string(respBody))
 	}
 }
+
+func TestLeaseHandlerRefreshLease(t *testing.T) {
+	backend := mockBackend{}
+	token := "lease_token"
+
+	msg, _ := json.Marshal(map[string]interface{}{})
+
+	req := httptest.NewRequest("PATCH", "/api/v1/leases/"+token, bytes.NewReader(msg))
+	HMAC := ComputeHMAC([]byte(token), backend.GetKey(context.TODO(), "keyid2").Secret)
+	req.Header["Authorization"] = []string{"keyid2 " + base64.StdEncoding.EncodeToString(HMAC)}
+
+	w := httptest.NewRecorder()
+	handler := MakeLeasesHandler(&backend)
+
+	ps := httprouter.Params{httprouter.Param{Key: "token", Value: token}}
+	handler(w, req, ps)
+
+	resp := w.Result()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Invalid HTTP response status code: %v", resp.StatusCode)
+	}
+
+	expected, _ := json.Marshal(map[string]interface{}{
+		"status": "ok",
+		"expiry": 1,
+	})
+
+	respBody, _ := ioutil.ReadAll(resp.Body)
+
+	if !bytes.Equal(respBody, expected) {
+		t.Errorf("Invalid response body: %v", string(respBody))
+	}
+}

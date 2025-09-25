@@ -29,6 +29,8 @@ func MakeLeasesHandler(services be.ActionController) httprouter.Handle {
 			}
 		case "DELETE":
 			handleCancelLease(services, token, w, h)
+		case "PATCH":
+			handleRefreshLease(services, token, w, h)
 		default:
 			gw.LogC(h.Context(), "http", gw.LogError).
 				Msgf("invalid HTTP method: %v", h.Method)
@@ -157,6 +159,27 @@ func handleCancelLease(services be.ActionController, token string, w http.Respon
 		msg["reason"] = err.Error()
 	} else {
 		msg["status"] = "ok"
+	}
+
+	replyJSON(ctx, w, msg)
+}
+
+func handleRefreshLease(services be.ActionController, token string, w http.ResponseWriter, h *http.Request) {
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	ctx := h.Context()
+
+	msg := make(map[string]interface{})
+
+	if expiry, err := services.RefreshLease(ctx, token); err != nil {
+		msg["status"] = "error"
+		msg["reason"] = err.Error()
+	} else {
+		msg["status"] = "ok"
+		msg["expiry"] = expiry
 	}
 
 	replyJSON(ctx, w, msg)

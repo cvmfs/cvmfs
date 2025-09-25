@@ -32,6 +32,7 @@ type ActionController interface {
 	GetLease(ctx context.Context, tokenStr string) (*LeaseDTO, error)
 	CancelLeases(ctx context.Context, repoPath string) error
 	CancelLease(ctx context.Context, tokenStr string) error
+	RefreshLease(ctx context.Context, tokenStr string) (int64, error)
 	CommitLease(ctx context.Context, tokenStr, oldRootHash, newRootHash string, tag gw.RepositoryTag) (uint64, error)
 	SubmitPayload(ctx context.Context, token string, payload io.Reader, digest string, headerSize int) error
 	RunGC(ctx context.Context, options GCOptions) (string, error)
