@@ -479,6 +479,56 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${PROTOBUF_INCLUDE_DIRS})
 endif ()
 
+# Fetch and build libfuse if a specific version is requested
+if (LIBFUSE_VERSION)
+  include(ExternalProject)
+  set(LIBFUSE_URL "https://github.com/libfuse/libfuse/releases/download/fuse-${LIBFUSE_VERSION}/fuse-${LIBFUSE_VERSION}.tar.gz")
+  set(LIBFUSE_INSTALL_DIR "${EXTERNALS_INSTALL_LOCATION}/libfuse-${LIBFUSE_VERSION}")
+  set(LIBFUSE_BUILD_DIR "${EXTERNALS_BUILD_LOCATION}/build_libfuse-${LIBFUSE_VERSION}")
+  set(LIBFUSE_SOURCE_DIR "${EXTERNALS_LIB_LOCATION}/libfuse-${LIBFUSE_VERSION}")
+
+  ExternalProject_Add(libfuse_external
+    URL ${LIBFUSE_URL}
+    SOURCE_DIR ${LIBFUSE_SOURCE_DIR}
+    BINARY_DIR ${LIBFUSE_BUILD_DIR}
+    INSTALL_DIR ${LIBFUSE_INSTALL_DIR}
+    PREFIX "${EXTERNALS_BUILD_LOCATION}/build_libfuse-${LIBFUSE_VERSION}"
+    CONFIGURE_COMMAND
+      meson setup
+      --prefix=${LIBFUSE_INSTALL_DIR}
+      -Dudevrulesdir=lib/udev/rules.d
+      -Dinitscriptdir=etc/init.d
+      -Duseroot=false
+      -Dexamples=false
+      -Dtests=false
+      ${LIBFUSE_BUILD_DIR}
+      ${LIBFUSE_SOURCE_DIR}
+    BUILD_COMMAND ninja -C ${LIBFUSE_BUILD_DIR}
+    INSTALL_COMMAND ninja -C ${LIBFUSE_BUILD_DIR} install
+  )
+
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+  
+  # Set FUSE3_INCLUDE_DIR and FUSE3_LIBRARY to use the locally built libfuse
+  set(FUSE3_INCLUDE_DIR "${LIBFUSE_INSTALL_DIR}/include" CACHE PATH "libfuse3 include dir")
+  set(FUSE3_LIBRARY "${LIBFUSE_INSTALL_DIR}/lib/x86_64-linux-gnu/libfuse3.so" CACHE FILEPATH "libfuse3 library path")
+
+  # Add dependencies for all FUSE-related targets
+  if(TARGET cvmfs_fuse3_stub)
+    add_dependencies(cvmfs_fuse3_stub libfuse_external)
+  endif()
+  if(TARGET cvmfs_fuse3)
+    add_dependencies(cvmfs_fuse3 libfuse_external)
+  endif()
+  if(TARGET cvmfs_fuse3_debug)
+    add_dependencies(cvmfs_fuse3_debug libfuse_external)
+  endif()
+
+  message(STATUS "Using libfuse: ${LIBFUSE_VERSION} from ${LIBFUSE_INSTALL_DIR}")
+else()
+  message(STATUS "No LIBFUSE_VERSION specified, using system libfuse")
+endif()
+
 # Fuse client only
 if (BUILD_CVMFS)
   if (MACOSX)
