@@ -37,7 +37,7 @@ COPY --from=builder /home/sftnight/buildpackage_config/RPMS/noarch/ /tmp/.
 RUN dnf -y install /tmp/*.rpm
 
 # cloudtest dependencies
-RUN dnf install -y sudo gcc autofs fuse fuse3 httpd  lsof \
+RUN dnf install -y sudo gcc autofs bind-utils fuse fuse3 httpd iproute lsof \
     python python3-pip attr nc sqlite python3-mod_wsgi jq usbutils
 
 RUN pip3 install flask
