@@ -30,6 +30,7 @@ RemoteSystemsTempFiles/
 # Externals
 externals/build_*/
 externals/.decompressionDone
+externals/libfuse*
 externals_build*
 externals_install*
 externals/*.tar*
