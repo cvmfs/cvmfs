@@ -129,7 +129,9 @@ cvmfs_server_publish() {
     check_url "${CVMFS_STRATUM0}/.cvmfspublished" 20 || { echo "Repository unavailable under $CVMFS_STRATUM0"; retcode=1; continue; }
     check_expiry $name $stratum0   || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
-    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
+    if [ "$CVMFS_SKIP_FD_CHECK" != "true" ]; then
+      [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
+    fi 
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
     if [ x"$manual_revision" != x"" ]; then
@@ -344,7 +346,9 @@ cvmfs_server_publish() {
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
-    handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+    if [ "$CVMFS_SKIP_FD_CHECK" != "true" ]; then
+      handle_read_only_file_descriptors_on_mount_point $name $open_fd_dialog || use_fd_fallback=1
+    fi
 
     # synchronize the repository
     publish_starting $name
@@ -445,7 +449,7 @@ cvmfs_server_publish() {
     fi
 
     # check again for open file descriptors (potential race condition)
-    if has_file_descriptors_on_mount_point $name && \
+    if [ "$CVMFS_SKIP_FD_CHECK" != "true" ] && has_file_descriptors_on_mount_point $name && \
        [ $use_fd_fallback -ne 1 ]; then
       file_descriptor_warning $name
       echo "Forcing remount of already committed repository revision"
