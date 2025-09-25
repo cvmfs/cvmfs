@@ -26,6 +26,7 @@ option (BUILD_STRESS_TESTS      "Build the stress tests"                        
 option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 option (BUILD_LIBFUSE2          "Build the libraries for libfuse2 support"                         OFF)
+option (LIBFUSE_VERSION         "Build the libraries for a specific libfuse version (e.g. 3.10.5)" "")
 option (BUILD_GATEWAY           "Build cvmfs_gateway, requires go compiler"                        OFF)
 option (BUILD_DUCC              "Build cvmfs_ducc, requires go compiler"                           OFF)
 option (BUILD_SNAPSHOTTER       "Build cvmfs_snapshotter, it requires a go compiler"               OFF)
