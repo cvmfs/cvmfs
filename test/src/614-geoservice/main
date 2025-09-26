@@ -1,6 +1,7 @@
 #!/bin/bash
 cvmfs_test_name="GeoIP Service"
 cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
 
 CVMFS_TEST_614_GEO_DIR=/var/lib/cvmfs-server/geo
 CVMFS_TEST_614_REPLICA_NAME=
@@ -9,7 +10,7 @@ cleanup() {
   [ -z "$CVMFS_TEST_614_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_614_REPLICA_NAME
 }
 
-cvmfs_getaddr() {
+cvmfs_getmyaddr() {
   # exit after the first line in case there are multiple addresses
   ip $1 -o addr show scope global|awk '{split($4,a,"/");print a[1];exit}'
 }
@@ -42,7 +43,7 @@ cvmfs_check_georesult() {
       expectorder=$fnal,$cern,$ihep
     fi
   else
-    # not testing at CERN or FNAL, so any order will do unless there's
+    # not testing from CERN or FNAL, so any order will do unless there's
     #  an exact match; if so, that one should be first
     if [[ "$reqorder" = $from,*,* ]]; then
       expectorder="1,[23],[23]"
@@ -80,15 +81,6 @@ cvmfs_run_test() {
     return 0
   fi
 
-  echo "checking if both IPv4 and IPv6 addresses are available"
-  local ipv4addr="`cvmfs_getaddr -4`"
-  local ipv6addr="`cvmfs_getaddr -6`"
-  [ -n "$ipv4addr" ] || return 1
-  if [ -z "$ipv6addr" ]; then
-    echo "WARNING: No IPv6 address available, skipping IPv6 tests"
-    CVMFS_GENERAL_WARNING_FLAG=1
-  fi
-
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
@@ -108,10 +100,10 @@ cvmfs_run_test() {
                   root                                   \
                   $CVMFS_STRATUM0                        \
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
-                  || return 3
+                  || return 1
 
   echo "do a snapshot to make sure geo ip database is downloaded"
-  sudo cvmfs_server snapshot $replica_name || return 4
+  sudo cvmfs_server snapshot $replica_name || return 2
 
   local me="`uname -n`"
   local api="cvmfs/$replica_name/api/v1.0/geo"
@@ -129,6 +121,29 @@ cvmfs_run_test() {
   local cdnheader="CF-Connecting-IP"
   local result
 
+  echo "finding IPv4 and IPv6 addresses to use for source"
+  local ipv4addr="`cvmfs_getmyaddr -4`"
+  local ipv6addr="`cvmfs_getmyaddr -6`"
+  local fakesource=false
+  if [ -z "$ipv4addr" ] || [ -z "$ipv6addr" ]; then
+    fakesource=true
+    echo "WARNING: couldn't get both IPv4 & IPv6 local addresses, skipping direct IP address tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  elif [[ "$me" != *.fnal.gov ]] && [[ "$me" != *.cern.ch ]]; then
+    fakesource=true
+    echo "WARNING: not running from fnal.gov or cern.ch, skipping direct IP address tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
+  if $fakesource; then
+    me=$cernbp
+    echo "using addresses of $me instead of local machine as source"
+    local hostout="$(host $me)"
+    ipv4addr="`echo "$hostout"|sed -n 's/.* has address //p'|head -1`"
+    ipv6addr="`echo "$hostout"|sed -n 's/.* has IPv6 address //p'|head -1`"
+    [ -n "$ipv4addr" ] || return 3
+    [ -n "$ipv6addr" ] || return 4
+  fi
+
   # limit the output from curl to 5 lines so in case there's some kind
   #   of error some useful output will show but not too much
 
@@ -136,45 +151,43 @@ cvmfs_run_test() {
   result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/x/$fnal,$cern,$ihep|head -5`"
   cvmfs_check_georesult "$result" $me fnal,cern,ihep || return 5
 
-  if [ -n "$ipv6addr" ]; then
-    echo "checking x-forwarded-for IPv6"
-    result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/x/$ihep,$fnal,$cern|head -5`"
-    cvmfs_check_georesult "$result" $me ihep,fnal,cern || return 6
-  fi
+  echo "checking x-forwarded-for IPv6"
+  result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/x/$ihep,$fnal,$cern|head -5`"
+  cvmfs_check_georesult "$result" $me ihep,fnal,cern || return 6
 
-  echo "checking direct IPv4"
-  result="`curl -s http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
-  cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 7
+  if ! $fakesource; then
+    echo "checking direct IPv4"
+    result="`curl -s http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
+    cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 7
 
-  if [ -n "$ipv6addr" ]; then
     echo "checking direct IPv6"
     result="`curl -s -g http://[$ipv6addr]/$api/x/$fnal,$ihep,$cern|head -5`"
     cvmfs_check_georesult "$result" $me fnal,ihep,cern || return 8
-  fi
 
-  echo "checking direct IPv4 with localhost x-forwarded-for"
-  # this can happen when the client is on the same host as a forward proxy
-  #  squid and there's no reverse proxy squid on the stratum 1
-  result="`curl -s -H "x-forwarded-for: 127.0.0.1" http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
-  cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 9
+    echo "checking direct IPv4 with localhost x-forwarded-for"
+    # this can happen when the client is on the same host as a forward proxy
+    #  squid and there's no reverse proxy squid on the stratum 1
+    result="`curl -s -H "x-forwarded-for: 127.0.0.1" http://$ipv4addr/$api/x/$cern,$ihep,$fnal|head -5`"
+    cvmfs_check_georesult "$result" $me cern,ihep,fnal || return 9
+  fi
 
   echo "checking CDN IPv4"
   result="`curl -s -H "$cdnheader: $ipv4addr" http://localhost/$api/x/$cerncdn,$fnalcdn,$ihepcdn|head -5`"
   cvmfs_check_georesult "$result" $me cern,fnal,ihep || return 10
 
-  if [ -n "$ipv6addr" ]; then
-    echo "checking $CDN IPv6"
-    result="`curl -s -H "$cdnheader: $ipv6addr" http://localhost/$api/x/$ihepcdn,$cerncdn,$fnalcdn|head -5`"
-    cvmfs_check_georesult "$result" $me ihep,cern,fnal || return 11
-  fi
+  echo "checking $CDN IPv6"
+  result="`curl -s -H "$cdnheader: $ipv6addr" http://localhost/$api/x/$ihepcdn,$cerncdn,$fnalcdn|head -5`"
+  cvmfs_check_georesult "$result" $me ihep,cern,fnal || return 11
 
   echo "checking CDN with proxy name"
   result="`curl -s -H "$cdnheader: anything" http://localhost/$api/$fnal/$ihepcdn,$fnalcdn,$cerncdn|head -5`"
   cvmfs_check_georesult "$result" $fnal ihep,fnal,cern || return 12
 
-  echo "checking IPv6-only server"
-  result="`curl -s http://$ipv4addr/$api/x/$ipv6,$cern,$fnal|head -5`"
-  cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 20
+  if ! $fakesource; then
+    echo "checking IPv6-only server"
+    result="`curl -s http://$ipv4addr/$api/x/$ipv6,$cern,$fnal|head -5`"
+    cvmfs_check_georesult "$result" ipv6onlytest ipv6,cern,fnal || return 20
+  fi
 
   echo "checking proxy name IPv4"
   result="`curl -s http://localhost/$api/$other/$cern,$ipv6,$other|head -5`"
