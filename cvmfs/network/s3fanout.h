@@ -68,7 +68,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "S3: unknown service error, perhaps wrong authentication protocol";
   texts[8] = "S3: too many requests, service asks for backoff and retry";
   texts[9] = "S3: Insufficient Storage";
-  texts[10] = "no text";
+  texts[10] = "unclassified failure";
   return texts[error];
 }
 
