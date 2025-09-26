@@ -1195,6 +1195,10 @@ cvmfs_status() {
     if [ -z "$repos" ]; then
       continue
     fi
+    if [ "$sys_arch" = "Darwin" ]; then
+      # no more detail is available on macOS
+      continue
+    fi
     # provide more detail if specific repo(s) requested
     local s1="$(attr -qg host $mountpoint)"
     if [ -z "$s1" ]; then

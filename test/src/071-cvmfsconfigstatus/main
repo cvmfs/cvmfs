@@ -19,9 +19,11 @@ cvmfs_run_test() {
     return 11
   fi
 
-  num_status=$(cvmfs_config status sft.cern.ch | wc -l)
-  if [ $num_status -lt 10 ]; then
-    return 20
+  if ! running_on_osx; then
+    num_status=$(cvmfs_config status sft.cern.ch | wc -l)
+    if [ $num_status -lt 10 ]; then
+      return 20
+    fi
   fi
 
   return 0
