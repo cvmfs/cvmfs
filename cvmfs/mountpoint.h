@@ -301,7 +301,6 @@ class FileSystem : SingleCopy, public BootFactory {
 
   explicit FileSystem(const FileSystemInfo &fs_info);
 
-  static void SetupGlobalEnvironmentParams();
   void SetupLogging();
   void CreateStatistics();
   void SetupSqlite();
@@ -687,3 +686,4 @@ class MountPoint : SingleCopy, public BootFactory {
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
+
