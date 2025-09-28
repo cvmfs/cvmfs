@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cvmfs_test_name="Global Configuration Variables"
+cvmfs_test_name="System Configuration Variables"
 
 CVMFS_CONFIG_FILE=/etc/cvmfs/default.local
 REPO=/cvmfs/atlas.cern.ch
