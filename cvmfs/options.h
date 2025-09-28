@@ -89,6 +89,7 @@ class OptionsManager {
    * Parses the default config files for cvmfs
    */
   void ParseDefault(const std::string &fqrn);
+  void SetupGlobalEnvironmentParams();
 
   /**
    * Cleans all information about the variables
