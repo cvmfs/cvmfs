@@ -127,14 +127,15 @@ cvmfs_run_test() {
   local fakesource=false
   if [ -z "$ipv4addr" ] || [ -z "$ipv6addr" ]; then
     fakesource=true
-    echo "WARNING: couldn't get both IPv4 & IPv6 local addresses, skipping direct IP address tests"
+    echo "WARNING: couldn't get both IPv4 & IPv6 local addresses"
     CVMFS_GENERAL_WARNING_FLAG=1
   elif [[ "$me" != *.fnal.gov ]] && [[ "$me" != *.cern.ch ]]; then
     fakesource=true
-    echo "WARNING: not running from fnal.gov or cern.ch, skipping direct IP address tests"
+    echo "WARNING: not running from fnal.gov or cern.ch"
     CVMFS_GENERAL_WARNING_FLAG=1
   fi
   if $fakesource; then
+    echo "skipping direct IP address and parallelism tests"
     me=$cernbp
     echo "using addresses of $me instead of local machine as source"
     local hostout="$(host $me)"
@@ -204,6 +205,10 @@ cvmfs_run_test() {
   echo "checking ordering from FNAL fallback proxy"
   result="`curl -s http://localhost/$api/$other/$cern,$fnal,$ihep,$sep,$fnalbp|head -5`"
   cvmfs_check_geosepresult "$result" $fnalbp cern,fnal,ihep || return 24
+
+  if $fakesource; then
+    return 0
+  fi
 
   echo "checking parallelism and cache limit (could take several minutes)"
   # The number of api processing threads is 64, and cache limit is 100k.
