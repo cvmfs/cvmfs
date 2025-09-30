@@ -747,6 +747,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
 
   cache.pb.cc cache.pb.h
 )

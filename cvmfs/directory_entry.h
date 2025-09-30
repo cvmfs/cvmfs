@@ -397,3 +397,4 @@ typedef BigVector<StatEntry> StatEntryList;
 }  // namespace catalog
 
 #endif  // CVMFS_DIRECTORY_ENTRY_H_
+
