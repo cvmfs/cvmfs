@@ -181,6 +181,7 @@ class DirectoryEntryBase {
   inline void set_has_xattrs(const bool has_xattrs) {
     has_xattrs_ = has_xattrs;
   }
+  inline void set_is_bundle_trigger(bool val) { is_bundle_trigger_ = val; }
 
   inline zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;

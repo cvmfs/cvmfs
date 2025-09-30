@@ -203,6 +203,8 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   if (!retval)
     return false;
 
+  *result = static_cast<WritableCatalog *>(catalog);
+
   catalog::DirectoryEntry dummy;
   if (NULL == dirent) {
     dirent = &dummy;
@@ -211,7 +213,6 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   if (!found || !catalog->IsWritable())
     return false;
 
-  *result = static_cast<WritableCatalog *>(catalog);
   return true;
 }
 
@@ -233,17 +234,23 @@ WritableCatalog *WritableCatalogManager::GetHostingCatalog(
  */
 void WritableCatalogManager::RemoveFile(const std::string &path) {
   const string file_path = MakeRelativePath(path);
-  const string parent_path = GetParentPath(file_path);
 
   SyncLock();
-  WritableCatalog *catalog;
-  if (!FindCatalog(parent_path, &catalog)) {
+  WritableCatalog *catalog = NULL;
+  DirectoryEntry entry;
+  if (FindCatalog(file_path, &catalog, &entry)) {
+    if (entry.IsBundleTrigger()) {
+      catalog->RemoveEntry(
+        GetParentPath(file_path) + "/.cvmfsbundle-" + GetFileName(file_path));
+    }
+    catalog->RemoveEntry(file_path);
+  }
+  SyncUnlock();
+
+  if (catalog == NULL) {
     PANIC(kLogStderr, "catalog for file '%s' cannot be found",
           file_path.c_str());
   }
-
-  catalog->RemoveEntry(file_path);
-  SyncUnlock();
 }
 
 
@@ -559,6 +566,43 @@ void WritableCatalogManager::AddChunkedFile(const DirectoryEntryBase &entry,
   for (unsigned i = 0; i < file_chunks.size(); ++i) {
     catalog->AddFileChunk(file_path, *file_chunks.AtPtr(i));
   }
+  SyncUnlock();
+}
+
+/**
+ * Reads the entry given by file_path and sets the bundle trigger flag
+ * accordingly. If new_value is true, the regular file at file_path must exist.
+ * If new_value is false, a missing file_path is ignored (otherwise it would
+ * be hard to get rid of dangling bundle trigger markers).
+ */
+void WritableCatalogManager::UpdateBundleTrigger(const std::string &file_path,
+                                                 bool new_value)
+{
+  SyncLock();
+
+  WritableCatalog *catalog = NULL;
+  DirectoryEntry entry;
+  if (!FindCatalog(file_path, &catalog, &entry)) {
+    SyncUnlock();
+
+    if (new_value) {
+      PANIC(kLogStderr, "failed to find catalog of %s", file_path.c_str());
+    }
+
+    LogCvmfs(kLogCatalog, kLogDebug, "dangling bundle trigger %s",
+             file_path.c_str());
+    return;
+  }
+
+  if (new_value && !entry.IsRegular()) {
+    SyncUnlock();
+    PANIC(kLogStderr, "failed to set bundle trigger on non-regular file %s",
+          file_path.c_str());
+  }
+
+  entry.set_is_bundle_trigger(new_value);
+  catalog->UpdateEntry(entry, file_path);
+
   SyncUnlock();
 }
 

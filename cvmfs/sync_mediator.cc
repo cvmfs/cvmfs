@@ -92,39 +92,19 @@ void SyncMediator::Add(SharedPtr<SyncItem> entry) {
     return;
   }
 
-  // .cvmfsbundles file type
   if (entry->IsBundleSpec()) {
-    PrintWarning(".cvmfsbundles file encountered. "
+    PrintWarning(".cvmfsbundle file encountered. "
                  "Bundles is currently an experimental feature.");
 
-    if (!entry->IsRegularFile()) {
-      PANIC(kLogStderr, "Error: .cvmfsbundles file must be a regular file");
+    if (!entry->IsRegularFile() && !entry->IsSymlink()) {
+      PANIC(kLogStderr,
+            "Error: bundle specification must be a regular file or a symlink");
     }
     if (entry->HasHardlinks()) {
-      PANIC(kLogStderr, "Error: .cvmfsbundles file must not be a hard link");
+      PANIC(kLogStderr, "Error: bundle specification must not be a hard link");
     }
 
-    const std::string parent_path = GetParentPath(entry->GetUnionPath());
-    if (parent_path != union_engine_->union_path()) {
-      PANIC(kLogStderr,
-            "Error: .cvmfsbundles file must be in the root"
-            " directory of the repository. Found in %s",
-            parent_path.c_str());
-    }
-
-    std::string json_string;
-
-    const int fd = open(entry->GetUnionPath().c_str(), O_RDONLY);
-    if (fd < 0) {
-      PANIC(kLogStderr, "Could not open file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    if (!SafeReadToString(fd, &json_string)) {
-      PANIC(kLogStderr, "Could not read contents of file: %s",
-            entry->GetUnionPath().c_str());
-    }
-    const UniquePtr<JsonDocument> json(JsonDocument::Create(json_string));
-
+    InsertBundleSpec(entry);
     AddFile(entry);
     return;
   }
@@ -238,7 +218,8 @@ void SyncMediator::Remove(SharedPtr<SyncItem> entry) {
   }
 
   if (entry->WasBundleSpec()) {
-    // for now remove using RemoveFile()
+    if (!params_->dry_run)
+      catalog_manager_->UpdateBundleTrigger(GetBundleTriggerPath(entry), false);
     RemoveFile(entry);
     return;
   }
@@ -348,6 +329,11 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
     }
   }
 
+  if (!bundle_specs_.empty()) {
+    LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
+    AddBundleSpecs();
+  }
+
   if (union_engine_)
     union_engine_->PostUpload();
 
@@ -387,6 +373,36 @@ bool SyncMediator::Commit(manifest::Manifest *manifest) {
                                   params_->manual_revision, manifest);
 }
 
+std::string SyncMediator::GetBundleTriggerPath(
+  SharedPtr<SyncItem> bundle_spec_entry) const
+{
+  static const size_t nStrip = strlen(".cvmfsbundle-");
+  std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
+  if (main_file_name.empty()) {
+    PANIC(kLogStderr, "invalid empty bundle specification: %s",
+          bundle_spec_entry->GetUnionPath().c_str());
+  }
+  return bundle_spec_entry->relative_parent_path() + "/" + main_file_name;
+}
+
+void SyncMediator::InsertBundleSpec(SharedPtr<SyncItem> entry) {
+  assert(entry->IsBundleSpec());
+
+  // When we leave the directory, we'll check all the bundle specs and set
+  // the corresponding flags on the main file.
+  bundle_specs_.push_back(GetBundleTriggerPath(entry));
+}
+
+void SyncMediator::AddBundleSpecs() {
+  if (params_->dry_run)
+    return;
+
+  for (BundleSpecs::const_iterator itr = bundle_specs_.begin();
+       itr != bundle_specs_.end(); ++itr)
+  {
+    catalog_manager_->UpdateBundleTrigger(*itr, true);
+  }
+}
 
 void SyncMediator::InsertHardlink(SharedPtr<SyncItem> entry) {
   assert(handle_hardlinks_);
@@ -1004,8 +1020,8 @@ void SyncMediator::AddUnmaterializedDirectory(SharedPtr<SyncItem> entry) {
 void SyncMediator::AddDirectory(SharedPtr<SyncItem> entry) {
   if (entry->IsBundleSpec()) {
     PANIC(kLogStderr,
-          "Illegal directory name: .cvmfsbundles (%s). "
-          ".cvmfsbundles is reserved for bundles specification files",
+          "Illegal directory name: %s. "
+          "The .cvmfsbundle- prefix is reserved for bundles specifications",
           entry->GetUnionPath().c_str());
   }
 
