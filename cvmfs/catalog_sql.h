@@ -209,6 +209,11 @@ class SqlDirent : public SqlCatalog {
    * For regular files, indicates that the file should be opened with direct I/O
    */
   static const int kFlagDirectIo = 0x10000;  // 2^16
+  /**
+   * For regular files, indicates that this file has an attached file bundle
+   * list, that should be prefetched upon opening the file.
+   */
+  static const int kFlagBundleTrigger = 0x20000;  // 2^17
 
 
  protected:
