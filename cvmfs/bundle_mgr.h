@@ -6,9 +6,11 @@
 #define CVMFS_BUNDLE_MGR_H_
 #include <string>
 
-#include "duplex_fuse.h"  // fuse_ino_t
-#include "mountpoint.h"   //MountPoint*, FileSystem*
-#include "shortstring.h"  // GetParentPath, GetFileName
+#include "duplex_fuse.h"   // fuse_ino_t
+#include "file_bundle.h"   // BundleFileMgr
+#include "mountpoint.h"    //MountPoint*, FileSystem*
+#include "shortstring.h"   // GetParentPath, GetFileName
+#include "util/pointer.h"  // UniquePtr
 
 namespace cvmfs {
 /*
@@ -30,6 +32,8 @@ class BundleMgr {
     // contents of the bundle
     bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle."
                                    + fname_.ToString());
+
+    bfm_ = new BundleFileMgr(bundle_file_path_);
   }
 
   void Fetch();
@@ -41,6 +45,7 @@ class BundleMgr {
   NameString fname_;
   PathString parent_path_;
   PathString bundle_file_path_;
+  UniquePtr<BundleFileMgr> bfm_;
   bool is_valid_;
 };
 #endif  // CVMFS_BUNDLE_MGR_H_
