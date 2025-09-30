@@ -40,6 +40,8 @@ class BundleMgr {
   explicit operator bool() const { return is_valid_; }
 
  private:
+  static void *DoFetch(void *data);
+
   catalog::DirectoryEntry dirent_;
   PathString path_;
   NameString fname_;
