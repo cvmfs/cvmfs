@@ -65,6 +65,7 @@ MagicXattrManager::MagicXattrManager(
   Register("user.chunks", new ChunksMagicXattr());
   Register("user.compression", new CompressionMagicXattr());
   Register("user.direct_io", new DirectIoMagicXattr());
+  Register("user.bundle_trigger", new BundleTriggerMagicXattr());
   Register("user.external_file", new ExternalFileMagicXattr());
 
   Register("user.rawlink", new RawlinkMagicXattr());
@@ -363,6 +364,14 @@ bool DirectIoMagicXattr::PrepareValueFenced() { return dirent_->IsRegular(); }
 
 void DirectIoMagicXattr::FinalizeValue() {
   result_pages_.push_back(dirent_->IsDirectIo() ? "1" : "0");
+}
+
+bool BundleTriggerMagicXattr::PrepareValueFenced() {
+  return dirent_->IsRegular();
+}
+
+void BundleTriggerMagicXattr::FinalizeValue() {
+  result_pages_.push_back(dirent_->IsBundleTrigger() ? "1" : "0");
 }
 
 bool ExternalFileMagicXattr::PrepareValueFenced() {
