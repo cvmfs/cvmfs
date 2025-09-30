@@ -162,7 +162,9 @@ struct LoaderExports {
       , foreground(false)
       , disable_watchdog(false)
       , simple_options_parsing(false)
-      , fuse_channel_or_session(NULL) { }
+      , fuse_channel_or_session(NULL)
+      , fuse_passthrough(false)
+  { }
 
   ~LoaderExports() {
     for (unsigned i = 0; i < history.size(); ++i)
@@ -193,6 +195,8 @@ struct LoaderExports {
   // void **fuse_channel_or_session
   // in order to work with both libfuse2 and libfuse3
   void **fuse_channel_or_session;
+
+  bool fuse_passthrough;
 
   // Linux only, stores the major:minor internal mountpoint identifier
   // The identifier is read just after mount from /proc/self/mountinfo

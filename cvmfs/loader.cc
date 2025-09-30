@@ -65,6 +65,7 @@ struct CvmfsOptions {
   int simple_options_parsing;
   int foreground;
   int fuse_debug;
+  int fuse_passthrough;
 
   // Ignored options
   int ign_netdev;
@@ -98,6 +99,8 @@ static struct fuse_opt cvmfs_array_opts[] = {
     CVMFS_SWITCH("simple_options_parsing", simple_options_parsing),
     CVMFS_SWITCH("foreground", foreground),
     CVMFS_SWITCH("fuse_debug", fuse_debug),
+    CVMFS_SWITCH("fuse_passthrough", fuse_passthrough),
+    CVMFS_SWITCH("fuse_passthru", fuse_passthrough),
 
     // Ignore these options
     CVMFS_SWITCH("_netdev", ign_netdev),
@@ -141,6 +144,7 @@ bool suid_mode_ = false;
 bool premounted_ = false;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
+bool fuse_passthrough_ = false;
 void *library_handle_;
 Fence *fence_reload_;
 CvmfsExports *cvmfs_exports_;
@@ -171,6 +175,8 @@ static void Usage(const string &exename) {
     "  -o cvmfs_suid        Enable suid mode\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "  -o foreground        Run in foreground\n"
+    "  -o fuse_passthrough  Enables FUSE passthrough (read requests bypass userspace, improves performance)\n"
+    "  -o fuse_passthru     Alias for fuse_passthrough\n"
     "  -o libfuse=[2,3]     Enforce a certain libfuse version\n"
     "Fuse mount options:\n"
     "  -o allow_other       allow access to other users\n"
@@ -419,6 +425,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   if (cvmfs_options.fuse_debug) {
     fuse_opt_add_arg(mount_options, "-d");
   }
+  fuse_passthrough_ = cvmfs_options.fuse_passthrough;
 
   return mount_options;
 }
@@ -788,6 +795,7 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->device_id = "0:0";  // initially unknown, set after mount
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
+  loader_exports_->fuse_passthrough = fuse_passthrough_;
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else

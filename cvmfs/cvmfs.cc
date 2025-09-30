@@ -130,6 +130,14 @@ FuseRemounter *fuse_remounter_ = NULL;
 InodeGenerationInfo inode_generation_info_;
 #endif  // __TEST_CVMFS_MOCKFUSE
 
+#ifdef FUSE_CAP_PASSTHROUGH
+typedef struct fuse_passthru_ctx {
+  int backing_id;
+  int refcount;
+} fuse_passthru_ctx_t;
+static std::unordered_map<fuse_ino_t, fuse_passthru_ctx_t> *fuse_passthru_tracker = NULL;
+pthread_mutex_t fuse_passthru_tracker_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 /**
  * For cvmfs_opendir / cvmfs_readdir
@@ -1317,6 +1325,44 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                fd);
       fi->fh = fd;
       FillOpenFlags(open_directives, fi);
+#ifdef FUSE_CAP_PASSTHROUGH
+      if (loader_exports_->fuse_passthrough) {
+        if(!dirent.IsChunkedFile()) {
+          /* "Currently there should be only one backing id per node / backing file."
+           * So says libfuse documentation on fuse_passthrough_open().
+           * So we reuse and refcount backing id based on inode.
+           * Passthrough can be used with libfuse methods open, opendir, create,
+           * but since CVMFS is read-only and has synthesizes its directories,
+           * we only need to handle it in `open`. */
+          int backing_id;
+          pthread_mutex_lock(&fuse_passthru_tracker_lock);
+          auto iter = fuse_passthru_tracker->find(ino);
+          if (iter == fuse_passthru_tracker->end()) {
+            auto pair_with_iterator = fuse_passthru_tracker->emplace(ino, fuse_passthru_ctx_t());
+            assert(pair_with_iterator.second == true);
+            iter = pair_with_iterator.first;
+            fuse_passthru_ctx_t &entry = iter->second;
+
+            backing_id = fuse_passthrough_open(req, fd);
+            assert(backing_id != 0);
+            entry.backing_id = backing_id;
+            entry.refcount++;
+          } else {
+            fuse_passthru_ctx_t &entry = iter->second;
+            assert(entry.refcount > 0);
+            backing_id = entry.backing_id;
+            entry.refcount++;
+          }
+          pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+
+          fi->backing_id = backing_id;
+
+          /* according to libfuse example/passthrough_hp.cc:
+           * "open in passthrough mode must drop old page cache" */
+          fi->keep_cache = false;
+        }
+      }
+#endif
       fuse_reply_open(req, fi);
       return;
     } else {
@@ -1615,6 +1661,30 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
     if (file_system_->cache_mgr()->Close(abs_fd) == 0) {
       perf::Dec(file_system_->no_open_files());
     }
+#ifdef FUSE_CAP_PASSTHROUGH
+    if (loader_exports_->fuse_passthrough) {
+
+      if (fi->backing_id != 0) {
+        int ret;
+        pthread_mutex_lock(&fuse_passthru_tracker_lock);
+        auto iter = fuse_passthru_tracker->find(ino);
+        assert(iter != fuse_passthru_tracker->end());
+        fuse_passthru_ctx_t &entry = iter->second;
+        assert(entry.refcount > 0);
+        assert(entry.backing_id == fi->backing_id);
+        entry.refcount--;
+        if (entry.refcount == 0) {
+          ret = fuse_passthrough_close(req, fi->backing_id);
+          if (ret < 0) {
+            LogCvmfs(kLogCvmfs, kLogDebug, "fuse_passthrough_close(fd=%ld) failed: %d", fd, ret);
+            assert(false);
+          }
+          fuse_passthru_tracker->erase(iter);
+        }
+        pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+      }
+    }
+#endif
   }
   fuse_reply_err(req, 0);
 }
@@ -2088,11 +2158,46 @@ static void cvmfs_init(void *userdata, struct fuse_conn_info *conn) {
         FUSE_VERSION);
   }
 #endif
+
+#ifdef FUSE_CAP_PASSTHROUGH
+  if (conn->capable & FUSE_CAP_PASSTHROUGH) {
+    if (loader_exports_->fuse_passthrough) {
+      conn->want |= FUSE_CAP_PASSTHROUGH;
+      /* "Passthrough and writeback cache are conflicting modes"
+       * libfuse example/passthrough_hp.cc says,
+       * but we don't use writeback cache mode in CVMFS. */
+      pthread_mutex_lock(&fuse_passthru_tracker_lock);
+      assert(!fuse_passthru_tracker);
+      fuse_passthru_tracker = new std::unordered_map<fuse_ino_t,
+                                                     fuse_passthru_ctx_t>();
+      pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "FUSE: Passthrough enabled.");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "FUSE: Passthrough enabled in build, available at runtime, but "
+               "not enabled by the config option.");
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+             "FUSE: Passthrough enabled in build but unavailable at runtime.");
+  }
+#else
+  LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+           "FUSE: Passthrough disabled in this build.");
+#endif
 }
 
 static void cvmfs_destroy(void *unused __attribute__((unused))) {
   // The debug log is already closed at this point
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_destroy");
+#ifdef FUSE_CAP_PASSTHROUGH
+  pthread_mutex_lock(&fuse_passthru_tracker_lock);
+  assert(fuse_passthru_tracker);
+  delete fuse_passthru_tracker;
+  fuse_passthru_tracker = NULL;
+  pthread_mutex_unlock(&fuse_passthru_tracker_lock);
+#endif
 }
 
 /**
