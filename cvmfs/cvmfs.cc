@@ -64,6 +64,7 @@
 #include "auto_umount.h"
 #include "backoff.h"
 #include "bigvector.h"
+#include "bundle_mgr.h"
 #include "cache.h"
 #include "cache_posix.h"
 #include "cache_stream.h"
@@ -310,7 +311,7 @@ static bool FixupOpenInode(const PathString &path,
   return is_stale;
 }
 
-static bool GetDirentForInode(const fuse_ino_t ino,
+bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent) {
   // Lookup inode in cache
   if (mount_point_->inode_cache()->Lookup(ino, dirent))
@@ -454,7 +455,7 @@ static uint64_t GetDirentForPath(const PathString &path,
 #endif
 
 
-static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
+bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
   // Check the path cache first
   if (mount_point_->path_cache()->Lookup(ino, path))
     return true;
@@ -1174,6 +1175,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     fuse_remounter_->fence()->Leave();
     fuse_reply_err(req, EEXIST);
     return;
+  }
+
+  if (dirent.IsBundleTrigger()) {
+    // fetch dependences if not there already
+    BundleMgr bundle_mgr(mount_point_, file_system_, ino);
+    if (bundle_mgr) {
+      bundle_mgr.Fetch();
+    } else {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Couldn't fetch bundle associated to file %s", path.c_str());
+    }
   }
 
   perf::Inc(file_system_->n_fs_open());  // Count actual open / fetch operations
@@ -3036,3 +3048,4 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
+
