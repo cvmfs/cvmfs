@@ -377,7 +377,7 @@ std::string SyncMediator::GetBundleTriggerPath(
   SharedPtr<SyncItem> bundle_spec_entry) const
 {
   static const size_t nStrip = strlen(".cvmfsbundle-");
-  std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
+  const std::string main_file_name = bundle_spec_entry->filename().substr(nStrip);
   if (main_file_name.empty()) {
     PANIC(kLogStderr, "invalid empty bundle specification: %s",
           bundle_spec_entry->GetUnionPath().c_str());
