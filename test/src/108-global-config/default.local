@@ -2,7 +2,7 @@ CVMFS_REPOSITORIES=atlas-condb.cern.ch
 CVMFS_HTTP_PROXY=PROXY_SERVER
 
 if [[ -n "${CVMFS_VERSION:-}" ]]; then
-  echo "CVMFS_VERSION available" > LOGFILE
+  echo "CVMFS_VERSION available" >> LOGFILE
 fi
 
 if [[ -n "${CVMFS_ARCH:-}" ]]; then
