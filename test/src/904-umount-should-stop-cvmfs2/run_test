@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+set -x
+
+mkdir -p /var/{spool,run}/cvmfs/
+[[ -d /etc/cvmfs/default.d ]]
+cat > /etc/cvmfs/default.d/99-test.conf <<EOF
+CVMFS_USER=$(whoami)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_AUTO_UPDATE=yes
+CVMFS_DEBUGLOG=/var/log/cvmfs-debug.log
+EOF
+export CVMFS_TEST_USER=$(whoami)
+export CVMFS_TEST_REPO=test.repo.$(date +%F_%H_%M_%S.%N)
+
+rsyslogd &
+systemctl enable --now httpd
+
+rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO # just in case
+cp -a /etc/fstab{,.orig}
+> /etc/fstab
+cvmfs_server mkfs -o "$CVMFS_TEST_USER" "$CVMFS_TEST_REPO"
+export CVMFS_TEST_MOUNTPOINT=/cvmfs/$CVMFS_TEST_REPO
+cat "$CVMFS_TEST_MOUNTPOINT"/new_repository
+
+# BUG FIXME umount does not reliably stops cvmfs2, its processes linger and block new mount.
+pgrep cvmfs2
+umount /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
+sleep 10
+[[ "$(pgrep cvmfs2)" == "" ]]
+timeout 10 mount  /var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly
