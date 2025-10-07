@@ -173,6 +173,7 @@ static void Usage(const string &exename) {
                             "before mounting (required for autofs)\n"
     "  -o parse             Parse and print cvmfs parameters\n"
     "  -o cvmfs_suid        Enable suid mode\n"
+    "  -o debug             Enable debug to CVMFS_DEBUGLOG\n"
     "  -o disable_watchdog  Do not spawn a post mortem crash handler\n"
     "  -o foreground        Run in foreground\n"
     "  -o fuse_passthrough  Enables FUSE passthrough (read requests bypass userspace, improves performance)\n"
