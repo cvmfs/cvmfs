@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 cvmfs_test_name="fuse-passthru"
 cvmfs_test_autofs_on_startup=false
 cvmfs_test_suites=""
@@ -8,7 +8,6 @@ cleanup() {
 }
 
 cvmfs_run_test() {
-  [[ -v TEST_ROOT ]] # expected /home/sftnight/cvmfs/test
   this_script_dir=$TEST_ROOT/src/108-fuse-passthru
   # We want strict mode here, to catch any failure.
   # But turning on errexit (set -e) inside a function has no effect.
