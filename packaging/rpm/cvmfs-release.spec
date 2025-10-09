@@ -73,7 +73,7 @@ fi
 if  [[ "$ID" == "fedora" ]]; then
 sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
 fi
-if  [[ " $ID_LIKE " == *" rhel "* ]]; then
+if  [[ "$ID" == "rhel" || " $ID_LIKE " == *" rhel "* ]]; then
   VERSION_MAJOR=$(echo ${VERSION_ID} | cut -d '.' -f1)
   if [[ "${VERSION_MAJOR}" -ge "10" ]]; then
      sed -i 's/RPM-GPG-KEY-CernVM/RPM-GPG-KEY-CernVM-2048/g' /etc/yum.repos.d/cernvm.repo
