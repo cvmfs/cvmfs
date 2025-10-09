@@ -83,6 +83,8 @@ fi
 
 
 %changelog
+* Thu Oct 09 2025 Valentin Volkl <vavolkl@cern.ch> - 6-4
+- Fix postinst for RHEL itself
 * Fri Jun 27 2025 Valentin Volkl <vavolkl@cern.ch> - 6-3
 - Fix postinst for RHEL-clones that aren't Alma
 * Thu Jun 26 2025 Valentin Volkl <vavolkl@cern.ch> - 6-2
