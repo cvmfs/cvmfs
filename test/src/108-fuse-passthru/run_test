@@ -28,6 +28,7 @@ cp -a /etc/fstab{,.orig}
 
 create_repo() {
 	MOUNT_OPTS=$1
+	EXTRA_CONFIG=$2
 	export CVMFS_USE_FILE_CHUNKING=false
 	mv /etc/fstab{,.bkp}
 	cvmfs_server mkfs -o "$CVMFS_TEST_USER" "$CVMFS_TEST_REPO"
@@ -48,6 +49,7 @@ create_repo() {
 	CVMFS_AUTO_UPDATE=yes
 	CVMFS_DEBUGLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-debug.log
 	CVMFS_USYSLOG=/var/log/$CVMFS_TEST_REPO.cvmfs-usyslog.log
+	$EXTRA_CONFIG
 	EOF
 	cat >> /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/server.conf <<-EOF
 	CVMFS_USE_FILE_CHUNKING=false
@@ -109,8 +111,15 @@ create_repo() {
 }
 
 export CVMFS_TEST_REPO=test.repo.dumbdumb
-create_repo ''
+create_repo '' ''
+grep -F 'FUSE: Passthrough enabled in build, available at runtime, but not enabled by the config option.' /var/log/test.repo.dumbdumb.cvmfs-debug.log
+
 export CVMFS_TEST_REPO=test.repo.passthru
-create_repo ,fuse_passthrough
+create_repo ,fuse_passthrough ''
+grep -F 'FUSE: Passthrough enabled.' /var/log/test.repo.passthru.cvmfs-debug.log
+
+export CVMFS_TEST_REPO=test.repo.with-var
+create_repo '' 'CVMFS_FUSE_PASSTHROUGH=on'
+grep -F 'FUSE: Passthrough enabled.' /var/log/test.repo.with-var.cvmfs-debug.log
 
 head /tmp/test.repo.{passthru,dumbdumb}.big.bin.read.duration

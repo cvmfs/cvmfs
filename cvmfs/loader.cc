@@ -797,6 +797,11 @@ int FuseMain(int argc, char *argv[]) {
   loader_exports_->disable_watchdog = disable_watchdog_;
   loader_exports_->simple_options_parsing = simple_options_parsing_;
   loader_exports_->fuse_passthrough = fuse_passthrough_;
+  if (options_manager->GetValue("CVMFS_FUSE_PASSTHROUGH", &parameter)) {
+    // CVMFS_FUSE_PASSTHROUGH set to on in configs enables the feature.
+    // Presence of mount option can also enable the feature (but not disable it).
+    loader_exports_->fuse_passthrough |= options_manager->IsOn(parameter);
+  }
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else
