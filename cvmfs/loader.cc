@@ -179,6 +179,77 @@ static void Usage(const string &exename) {
      exename.c_str());
 }
 
+void UmountOnCleanup(const string* mountpoint_) {
+  if (!mountpoint_) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: no mountpoint");
+    return;
+  }
+
+  std::vector<std::string> all_mountpoints = platform_mountlist();
+  if (all_mountpoints.empty()) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "crash cleanup handler: "
+             "failed to read mount point list");
+    return;
+  }
+
+  // Mitigate auto-mount - crash - umount - auto-mount loops
+  SafeSleepMs(2000);
+
+  // Check if *mountpoint_ is still mounted
+  // (we don't want to trigger a mount by immediately doing stat *mountpoint_)
+  bool still_mounted = false;
+  for (unsigned i = 0; i < all_mountpoints.size(); ++i) {
+    if (*mountpoint_ == all_mountpoints[i]) {
+      still_mounted = true;
+      break;
+    }
+  }
+  if (!still_mounted) {
+    LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: %s not mounted",
+             mountpoint_->c_str());
+    return;
+  }
+
+  // stat() might be served from caches.  Opendir ensures fuse module is called.
+  int expected_error;
+#ifdef __APPLE__
+  expected_error = ENXIO;
+#else
+  expected_error = ENOTCONN;
+#endif
+  DIR *dirp = opendir(mountpoint_->c_str());
+  if (dirp || (errno != expected_error)) {
+    if (dirp)
+      closedir(dirp);
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "unmount un cleanup: "
+             "%s seems not to be stalled (%d)",
+             mountpoint_->c_str(), errno);
+    return;
+  }
+
+  // sudo umount -l *mountpoint_
+  if (!SwitchCredentials(0, getegid(), true)) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "unmount on cleanup: "
+             "failed to re-gain root privileges");
+    return;
+  }
+  const bool lazy = true;
+  bool retval = platform_umount(mountpoint_->c_str(), lazy);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "unmount on cleanup: "
+             "failed to unmount %s",
+             mountpoint_->c_str());
+    return;
+  }
+
+  LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s",
+           mountpoint_->c_str());
+}
+
 /**
  * For an premounted mountpoint, the argument is the file descriptor to
  * /dev/fuse provided in the form /dev/fd/%d
@@ -1260,10 +1331,8 @@ cleanup:
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
     // do lazy unmount and ignore if it is already unmounted
-    } else if (umount2(mount_point_->c_str(), MNT_DETACH) < 0 && errno != EINVAL && errno != ENOENT) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-                    "failed to umount %s (%d)", mount_point_->c_str(), errno);
     } else {
+      UmountOnCleanup(mount_point_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
                   mount_point_->c_str(), repository_name_->c_str());
     }
