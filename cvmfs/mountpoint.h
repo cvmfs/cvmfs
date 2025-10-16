@@ -686,4 +686,3 @@ class MountPoint : SingleCopy, public BootFactory {
 };  // class MointPoint
 
 #endif  // CVMFS_MOUNTPOINT_H_
-
