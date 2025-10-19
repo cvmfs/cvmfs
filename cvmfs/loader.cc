@@ -181,14 +181,14 @@ static void Usage(const string &exename) {
 
 void UmountOnCleanup(const string* mountpoint_) {
   if (!mountpoint_) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: no mountpoint");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "unmount on cleanup: no mountpoint");
     return;
   }
 
   std::vector<std::string> all_mountpoints = platform_mountlist();
   if (all_mountpoints.empty()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "crash cleanup handler: "
+             "unmount on cleanup: "
              "failed to read mount point list");
     return;
   }
@@ -206,7 +206,7 @@ void UmountOnCleanup(const string* mountpoint_) {
     }
   }
   if (!still_mounted) {
-    LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: %s not mounted",
+    LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s not mounted",
              mountpoint_->c_str());
     return;
   }
@@ -223,7 +223,7 @@ void UmountOnCleanup(const string* mountpoint_) {
     if (dirp)
       closedir(dirp);
     LogCvmfs(kLogCvmfs, kLogSyslog,
-             "unmount un cleanup: "
+             "unmount on cleanup: "
              "%s seems not to be stalled (%d)",
              mountpoint_->c_str(), errno);
     return;
@@ -1326,16 +1326,9 @@ int FuseMain(int argc, char *argv[]) {
 cleanup:
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
-    if (!SwitchCredentials(0, getgid(), true)) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "failed to re-gain root permissions for umounting");
-      retval = kFailPermission;
-    // do lazy unmount and ignore if it is already unmounted
-    } else {
-      UmountOnCleanup(mount_point_);
-      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-                  mount_point_->c_str(), repository_name_->c_str());
-    }
+    UmountOnCleanup(mount_point_);
+    LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+                mount_point_->c_str(), repository_name_->c_str());
     close(premount_fd);
   }
 #endif
