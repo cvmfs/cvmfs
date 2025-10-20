@@ -179,10 +179,10 @@ static void Usage(const string &exename) {
      exename.c_str());
 }
 
-void UmountOnCleanup(const string* mountpoint_) {
+int UmountOnCleanup(const string* mountpoint_) {
   if (!mountpoint_) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "unmount on cleanup: no mountpoint");
-    return;
+    return kFailMount;
   }
 
   std::vector<std::string> all_mountpoints = platform_mountlist();
@@ -190,7 +190,7 @@ void UmountOnCleanup(const string* mountpoint_) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "unmount on cleanup: "
              "failed to read mount point list");
-    return;
+    return kFailMount;
   }
 
   // Mitigate auto-mount - crash - umount - auto-mount loops
@@ -208,7 +208,7 @@ void UmountOnCleanup(const string* mountpoint_) {
   if (!still_mounted) {
     LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s not mounted",
              mountpoint_->c_str());
-    return;
+    return kFailMount;
   }
 
   // stat() might be served from caches.  Opendir ensures fuse module is called.
@@ -226,7 +226,7 @@ void UmountOnCleanup(const string* mountpoint_) {
              "unmount on cleanup: "
              "%s seems not to be stalled (%d)",
              mountpoint_->c_str(), errno);
-    return;
+    return kFailMount;
   }
 
   // sudo umount -l *mountpoint_
@@ -234,20 +234,21 @@ void UmountOnCleanup(const string* mountpoint_) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "unmount on cleanup: "
              "failed to re-gain root privileges");
-    return;
+    return kFailPermission;
   }
   const bool lazy = true;
-  bool retval = platform_umount(mountpoint_->c_str(), lazy);
+  const bool retval = platform_umount(mountpoint_->c_str(), lazy);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "unmount on cleanup: "
              "failed to unmount %s",
              mountpoint_->c_str());
-    return;
+    return kFailMount;
   }
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s",
            mountpoint_->c_str());
+  return kFailOk;
 }
 
 /**
@@ -1326,7 +1327,7 @@ int FuseMain(int argc, char *argv[]) {
 cleanup:
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
-    UmountOnCleanup(mount_point_);
+    retval = UmountOnCleanup(mount_point_);
     LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
                 mount_point_->c_str(), repository_name_->c_str());
     close(premount_fd);
