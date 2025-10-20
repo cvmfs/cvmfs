@@ -79,11 +79,11 @@ __do_check() {
   local with_reflog=
   has_reflog_checksum $name && with_reflog="-R $(get_reflog_checksum $name)"
 
-  default_scratch_dir="$CVMFS_SPOOL_DIR/tmp"
-
+  default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
   if [ -z "$scratch_dir" ]; then
     scratch_dir=$default_scratch_dir
   fi
+
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
@@ -157,12 +157,17 @@ __check_repair_reflog() {
     to_syslog_for_repo $name "reference log reconstruction started"
     local repository_url
 
+    default_scratch_dir="${CVMFS_SPOOL_DIR}/tmp"
+    if [ -z "$scratch_dir" ]; then
+      scratch_dir=$default_scratch_dir
+    fi
+
     local reflog_reconstruct_command="$(__swissknife_cmd dbg) reconstruct_reflog \
                                                   -r $repository_url             \
                                                   $(get_swissknife_proxy)        \
                                                   -u $CVMFS_UPSTREAM_STORAGE     \
                                                   -n $CVMFS_REPOSITORY_NAME      \
-                                                  -t ${CVMFS_SPOOL_DIR}/tmp/     \
+                                                  -t ${scratch_dir}              \
                                                   -k $CVMFS_PUBLIC_KEY           \
                                                   -R $(get_reflog_checksum $name)"
     if ! $user_shell "$reflog_reconstruct_command"; then
