@@ -84,7 +84,6 @@ __do_check() {
   if [ -z "$scratch_dir" ]; then
     scratch_dir=$default_scratch_dir
   fi
-  echo "scratch_dir: $scratch_dir"
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag        \
@@ -92,7 +91,7 @@ __do_check() {
                      $log_level_param                  \
                      $subtree_param                    \
                      -r $url                           \
-                    -t ${scratch_dir}                 \
+                     -t ${scratch_dir}                 \
                      -k ${CVMFS_PUBLIC_KEY}            \
                      -N ${CVMFS_REPOSITORY_NAME}       \
                      $(get_swissknife_proxy)           \
