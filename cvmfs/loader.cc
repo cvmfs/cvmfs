@@ -1238,7 +1238,11 @@ int FuseMain(int argc, char *argv[]) {
 
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
-    goto cleanup;
+    if (retval == kFailOk) {
+      goto fuse_exit_success;
+    } else {
+      goto cleanup;
+    }
   }
 #endif
 
@@ -1269,6 +1273,24 @@ cleanup:
     }
     close(premount_fd);
   }
+#endif
+
+  delete repository_name_;
+  delete mount_point_;
+  repository_name_ = NULL;
+  mount_point_ = NULL;
+
+  return retval;
+
+// The fuse main loop exists with 0 either on a umount,
+// or when the filesystem connection is aborted.
+// In the first case we don't need to attempt to unmount,
+// the second case we can ignore because it only ever happens on admin intervention.
+fuse_exit_success:
+#if CVMFS_USE_LIBFUSE != 2
+    LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+                mount_point_->c_str(), repository_name_->c_str());
+  close(premount_fd);
 #endif
 
   delete repository_name_;
