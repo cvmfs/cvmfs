@@ -35,22 +35,31 @@ void SetMountpoint(const string &mountpoint) {
 }
 
 
-void UmountOnCrash() {
+void UmountOnExit(const bool crashed) {
+  const char *cleanuptype = "exit";
+  if (crashed)
+    cleanuptype = "crash";
+
   if (!mountpoint_) {
-    LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: no mountpoint");
+    LogCvmfs(kLogCvmfs, kLogSyslogErr,
+             "%s cleanup handler: no mountpoint",
+             cleanuptype);
     return;
   }
 
   std::vector<std::string> all_mountpoints = platform_mountlist();
   if (all_mountpoints.empty()) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "crash cleanup handler: "
-             "failed to read mount point list");
+             "%s cleanup handler: "
+             "failed to read mount point list",
+             cleanuptype);
     return;
   }
 
-  // Mitigate auto-mount - crash - umount - auto-mount loops
-  SafeSleepMs(2000);
+  if (crashed) {
+    // Mitigate auto-mount - crash - umount - auto-mount loops
+    SafeSleepMs(2000);
+  }
 
   // Check if *mountpoint_ is still mounted
   // (we don't want to trigger a mount by immediately doing stat *mountpoint_)
@@ -62,10 +71,18 @@ void UmountOnCrash() {
     }
   }
   if (!still_mounted) {
-    LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler: %s not mounted",
-             mountpoint_->c_str());
+    int logtype = kLogDebug;
+    if (crashed)
+      logtype = kLogSyslog;
+    LogCvmfs(kLogCvmfs, logtype,
+             "%s cleanup handler: %s not mounted",
+             cleanuptype, mountpoint_->c_str());
     return;
   }
+
+  // It is still mounted; now check to see if it is live.  That can happen
+  // if the unmount happened due to an explicit external umount call
+  // (e.g. the automounter) but then it quickly got mounted again.
 
   // stat() might be served from caches.  Opendir ensures fuse module is called.
   int expected_error;
@@ -75,35 +92,49 @@ void UmountOnCrash() {
   expected_error = ENOTCONN;
 #endif
   DIR *dirp = opendir(mountpoint_->c_str());
-  if (dirp || (errno != expected_error)) {
-    if (dirp)
-      closedir(dirp);
+  if (dirp) {
+    closedir(dirp);
     LogCvmfs(kLogCvmfs, kLogSyslog,
-             "crash cleanup handler: "
-             "%s seems not to be stalled (%d)",
-             mountpoint_->c_str(), errno);
+             "%s cleanup handler: "
+             "%s seems to be active, skipping unmount",
+             cleanuptype, mountpoint_->c_str());
+    return;
+  }
+  if (errno != expected_error) {
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "%s cleanup handler: "
+             "error when checking %s liveness (%d), skipping unmount",
+             cleanuptype, mountpoint_->c_str(), errno);
     return;
   }
 
   // sudo umount -l *mountpoint_
   if (!SwitchCredentials(0, getegid(), true)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "crash cleanup handler: "
-             "failed to re-gain root privileges");
+             "%s cleanup handler: "
+             "failed to re-gain root privileges",
+             cleanuptype);
     return;
   }
   const bool lazy = true;
   bool retval = platform_umount(mountpoint_->c_str(), lazy);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
-             "crash cleanup handler: "
+             "%s cleanup handler: "
              "failed to unmount %s",
-             mountpoint_->c_str());
+             cleanuptype, mountpoint_->c_str());
     return;
   }
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "crash cleanup handler unmounted stalled %s",
-           mountpoint_->c_str());
+  if (crashed) {
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "crash cleanup handler unmounted stalled %s",
+             mountpoint_->c_str());
+  } else {
+    LogCvmfs(kLogCvmfs, kLogSyslog,
+             "exit cleanup handler unmounted %s",
+             mountpoint_->c_str());
+  }
 }
 
 }  // namespace auto_umount

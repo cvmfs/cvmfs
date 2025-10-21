@@ -64,9 +64,9 @@ int Watchdog::g_suppressed_signals[] = {
 int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
                                    SIGSEGV, SIGBUS, SIGPIPE, SIGXFSZ};
 
-Watchdog *Watchdog::Create(FnOnCrash on_crash) {
+Watchdog *Watchdog::Create(FnOnExit on_exit) {
   assert(instance_ == NULL);
-  instance_ = new Watchdog(on_crash);
+  instance_ = new Watchdog(on_exit);
   instance_->Fork();
   return instance_;
 }
@@ -478,11 +478,16 @@ bool Watchdog::WaitForSupervisee() {
 
   if (!pipe_watchdog_->TryRead(&control_flow)) {
     LogCvmfs(kLogMonitor, kLogDebug, "supervisee canceled watchdog");
-    return false;
+    // see if unmounting is needed anyway
+    control_flow = ControlFlow::kQuitWithExit;
   }
 
   switch (control_flow) {
     case ControlFlow::kQuit:
+      return false;
+    case ControlFlow::kQuitWithExit:
+      if (on_exit_)
+        on_exit_(false);
       return false;
     case ControlFlow::kSupervise:
       break;
@@ -603,14 +608,19 @@ void Watchdog::Supervise() {
   if (!pipe_watchdog_->TryRead<ControlFlow::Flags>(&control_flow)) {
     LogEmergency("watchdog: unexpected termination ("
                  + StringifyInt(control_flow) + ")");
-    if (on_crash_)
-      on_crash_();
+    if (on_exit_)
+      on_exit_(true);
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
-        if (on_crash_)
-          on_crash_();
+        if (on_exit_)
+          on_exit_(true);
+        break;
+
+      case ControlFlow::kQuitWithExit:
+        if (on_exit_)
+          on_exit_(false);
         break;
 
       case ControlFlow::kQuit:
@@ -624,11 +634,12 @@ void Watchdog::Supervise() {
 }
 
 
-Watchdog::Watchdog(FnOnCrash on_crash)
+Watchdog::Watchdog(FnOnExit on_exit)
     : spawned_(false)
     , exe_path_(string(platform_getexepath()))
     , watchdog_pid_(0)
-    , on_crash_(on_crash) {
+    , on_exit_(on_exit)
+{
   const int retval = platform_spinlock_init(&lock_handler_, 0);
   assert(retval == 0);
   memset(&sighandler_stack_, 0, sizeof(sighandler_stack_));
@@ -636,6 +647,9 @@ Watchdog::Watchdog(FnOnCrash on_crash)
 
 
 Watchdog::~Watchdog() {
+  ControlFlow::Flags quitcommand = ControlFlow::kQuit;
+  if (on_exit_)
+    quitcommand = ControlFlow::kQuitWithExit;
   if (spawned_) {
     // Reset signal handlers
     signal(SIGQUIT, SIG_DFL);
@@ -649,12 +663,12 @@ Watchdog::~Watchdog() {
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
 
-    pipe_terminate_->Write(ControlFlow::kQuit);
+    pipe_terminate_->Write(quitcommand);
     pthread_join(thread_listener_, NULL);
     pipe_terminate_->Close();
   }
 
-  pipe_watchdog_->Write(ControlFlow::kQuit);
+  pipe_watchdog_->Write(quitcommand);
   pipe_watchdog_->CloseWriteFd();
   pipe_listener_->CloseReadFd();
 

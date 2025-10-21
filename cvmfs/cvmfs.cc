@@ -2332,7 +2332,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
-    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;

@@ -927,7 +927,11 @@ int FuseMain(int argc, char *argv[]) {
   }
 #endif
 
-  int fd_mountinfo = -1;  // needs to be declared before start using goto
+  // these need to be declared before start using goto
+  int fd_mountinfo = -1;
+#if CVMFS_USE_LIBFUSE != 2
+  const bool delegatedunmount = !disable_watchdog_;
+#endif
 
   // Drop credentials
   if ((uid_ != 0) || (gid_ != 0)) {
@@ -1254,7 +1258,7 @@ int FuseMain(int argc, char *argv[]) {
 
 cleanup:
 #if CVMFS_USE_LIBFUSE != 2
-  if (premount_fd >= 0) {
+  if ((premount_fd >= 0) && !delegatedunmount) {
     if (!SwitchCredentials(0, getgid(), true)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for umounting");
