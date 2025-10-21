@@ -1288,8 +1288,8 @@ cleanup:
 // the second case we can ignore because it only ever happens on admin intervention.
 fuse_exit_success:
 #if CVMFS_USE_LIBFUSE != 2
-    LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-                mount_point_->c_str(), repository_name_->c_str());
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+           mount_point_->c_str(), repository_name_->c_str());
   close(premount_fd);
 #endif
 
