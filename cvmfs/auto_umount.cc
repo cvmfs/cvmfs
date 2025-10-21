@@ -35,6 +35,8 @@ void SetMountpoint(const string &mountpoint) {
 }
 
 
+// NOTE: this function has much in common with UmountOnCleanup().  If making
+// changes to either function consider making the same changes to the other.
 void UmountOnCrash() {
   if (!mountpoint_) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "crash cleanup handler: no mountpoint");
@@ -66,6 +68,10 @@ void UmountOnCrash() {
              mountpoint_->c_str());
     return;
   }
+
+  // It is still mounted; now check to see if it is live.  That can happen
+  // if the unmount happened due to an explicit external umount call
+  // (e.g. the automounter) but then it quickly got mounted again.
 
   // stat() might be served from caches.  Opendir ensures fuse module is called.
   int expected_error;

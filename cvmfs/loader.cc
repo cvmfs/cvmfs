@@ -179,8 +179,12 @@ static void Usage(const string &exename) {
      exename.c_str());
 }
 
-int UmountOnCleanup(const string* mountpoint_) {
-  if (!mountpoint_) {
+#if CVMFS_USE_LIBFUSE != 2
+
+// NOTE: this function has much in common with UmountOnCrash().  If making
+// changes to either function consider making the same changes to the other.
+int UmountOnCleanup(const string* mountpoint) {
+  if (!mountpoint) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "unmount on cleanup: no mountpoint");
     return kFailMount;
   }
@@ -193,43 +197,22 @@ int UmountOnCleanup(const string* mountpoint_) {
     return kFailMount;
   }
 
-  // Mitigate auto-mount - crash - umount - auto-mount loops
-  SafeSleepMs(2000);
-
-  // Check if *mountpoint_ is still mounted
-  // (we don't want to trigger a mount by immediately doing stat *mountpoint_)
+  // Check if *mountpoint is still mounted to avoid race conditions
+  // with the automounter when doing a lazy unmount.
   bool still_mounted = false;
   for (unsigned i = 0; i < all_mountpoints.size(); ++i) {
-    if (*mountpoint_ == all_mountpoints[i]) {
+    if (*mountpoint == all_mountpoints[i]) {
       still_mounted = true;
       break;
     }
   }
   if (!still_mounted) {
     LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s not mounted",
-             mountpoint_->c_str());
+             mountpoint->c_str());
     return kFailMount;
   }
 
-  // stat() might be served from caches.  Opendir ensures fuse module is called.
-  int expected_error;
-#ifdef __APPLE__
-  expected_error = ENXIO;
-#else
-  expected_error = ENOTCONN;
-#endif
-  DIR *dirp = opendir(mountpoint_->c_str());
-  if (dirp || (errno != expected_error)) {
-    if (dirp)
-      closedir(dirp);
-    LogCvmfs(kLogCvmfs, kLogSyslog,
-             "unmount on cleanup: "
-             "%s seems not to be stalled (%d)",
-             mountpoint_->c_str(), errno);
-    return kFailMount;
-  }
-
-  // sudo umount -l *mountpoint_
+  // sudo umount -l *mountpoint
   if (!SwitchCredentials(0, getegid(), true)) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "unmount on cleanup: "
@@ -237,19 +220,18 @@ int UmountOnCleanup(const string* mountpoint_) {
     return kFailPermission;
   }
   const bool lazy = true;
-  const bool retval = platform_umount(mountpoint_->c_str(), lazy);
+  const bool retval = platform_umount(mountpoint->c_str(), lazy);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "unmount on cleanup: "
              "failed to unmount %s",
-             mountpoint_->c_str());
+             mountpoint->c_str());
     return kFailMount;
   }
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "unmount on cleanup: %s",
-           mountpoint_->c_str());
   return kFailOk;
 }
+#endif /* CVMFS_USE_LIBFUSE != 2 */
 
 /**
  * For an premounted mountpoint, the argument is the file descriptor to
@@ -1328,8 +1310,10 @@ cleanup:
 #if CVMFS_USE_LIBFUSE != 2
   if (premount_fd >= 0) {
     retval = UmountOnCleanup(mount_point_);
-    LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
-                mount_point_->c_str(), repository_name_->c_str());
+    if (retval == kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+               mount_point_->c_str(), repository_name_->c_str());
+    }
     close(premount_fd);
   }
 #endif
