@@ -1,7 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * Implements stub callback functions for Fuse.  Their purpose is to
+ * Implements stub callback functions for Fuse. Their purpose is to
  * redirect calls to the cvmfs shared library and to block calls during the
  * update of the library.
  *
@@ -1024,7 +1024,7 @@ int FuseMain(int argc, char *argv[]) {
 #if CVMFS_USE_LIBFUSE != 2
   if (!premounted_ && !suid_mode_ && getuid() == 0) {
     // If not already premounted or using suid mode, premount the fuse
-    // mountpoint  to avoid the need for fusermount.
+    // mountpoint to avoid the need for fusermount.
     // Requires libfuse >= 3.3.0.
     //
     if ((uid_ != 0) || (gid_ != 0)) {
@@ -1220,6 +1220,10 @@ int FuseMain(int argc, char *argv[]) {
 #endif  // fuse2/3
   }
   SetLogMicroSyslog(*usyslog_path_);
+  if (retval != 0) {
+    LogCvmfs(kLogCvmfs, kLogSyslogErr, "CernVM-FS: fuse loop exited with error %i",
+             retval;
+  }
 
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
@@ -1270,7 +1274,7 @@ int FuseMain(int argc, char *argv[]) {
 #endif
   }
 
-  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+  LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (exit success)",
            mount_point_->c_str(), repository_name_->c_str());
 
   delete repository_name_;
@@ -1292,7 +1296,7 @@ cleanup:
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                     "failed to umount %s (%d)", mount_point_->c_str(), errno);
     } else {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
+      LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s) (error cleanup) ",
                   mount_point_->c_str(), repository_name_->c_str());
     }
     close(premount_fd);
