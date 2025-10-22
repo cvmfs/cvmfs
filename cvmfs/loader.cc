@@ -1024,7 +1024,7 @@ int FuseMain(int argc, char *argv[]) {
 #if CVMFS_USE_LIBFUSE != 2
   if (!premounted_ && !suid_mode_ && getuid() == 0) {
     // If not already premounted or using suid mode, premount the fuse
-    // mountpoint before dropping privileges to avoid the need for fusermount.
+    // mountpoint  to avoid the need for fusermount.
     // Requires libfuse >= 3.3.0.
     //
     if ((uid_ != 0) || (gid_ != 0)) {
