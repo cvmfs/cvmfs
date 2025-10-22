@@ -1071,15 +1071,15 @@ int FuseMain(int argc, char *argv[]) {
                mount_point_->c_str(), errno);
       return kFailPermission;
     }
-  }
-  // Drop credentials
-  if ((uid_ != 0) || (gid_ != 0)) {
-    const bool retrievable = (suid_mode_ || !disable_watchdog_);
-    if (!SwitchCredentials(uid_, gid_, retrievable)) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "Failed to drop credentials");
-      retval = kFailPermission;
-      goto cleanup;
+
+    // Drop credentials
+    if ((uid_ != 0) || (gid_ != 0)) {
+      if (!SwitchCredentials(uid_, gid_, true /*retrievable*/)) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "Failed to drop credentials");
+        retval = kFailPermission;
+        goto cleanup;
+      }
     }
   }
 #endif
