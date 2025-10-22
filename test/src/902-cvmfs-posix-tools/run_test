@@ -36,7 +36,7 @@ proxy_setup() {
     echo CVMFS_HTTP_PROXY="$PROXY_SPEC" | sudo tee /etc/cvmfs/default.d/98-proxy.conf
 
     if [[ "$PROXY_SPEC" != DIRECT ]]; then
-	which varnish || dnf install -y varnish
+	which varnishd || dnf install -y varnish
 	cat > /etc/varnish/default.vcl <<-EOF
 vcl 4.1;
 backend default {
