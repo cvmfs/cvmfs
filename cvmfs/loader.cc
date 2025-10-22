@@ -1222,7 +1222,7 @@ int FuseMain(int argc, char *argv[]) {
   SetLogMicroSyslog(*usyslog_path_);
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr, "CernVM-FS: fuse loop exited with error %i",
-             retval;
+             retval);
   }
 
   loader_talk::Fini();
