@@ -884,7 +884,9 @@ int FuseMain(int argc, char *argv[]) {
 
 
   int fd_mountinfo = -1;  // needs to be declared before start using goto
+#if CVMFS_USE_LIBFUSE != 2
   int premount_fd = -1;
+#endif
 
   // Drop credentials
   if ((uid_ != 0) || (gid_ != 0)) {
@@ -1025,11 +1027,13 @@ int FuseMain(int argc, char *argv[]) {
     // mountpoint before dropping privileges to avoid the need for fusermount.
     // Requires libfuse >= 3.3.0.
     //
-    if (!SwitchCredentials(0, getgid(), true)) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "failed to re-gain root permissions for mounting");
-      retval = kFailPermission;
-      goto cleanup;
+    if ((uid_ != 0) || (gid_ != 0)) {
+      if (!SwitchCredentials(0, getgid(), true)) {
+        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+                 "failed to re-gain root permissions for mounting");
+        retval = kFailPermission;
+        goto cleanup;
+      }
     }
     platform_stat64 info;
     // Need to know if it is a directory or not
@@ -1070,8 +1074,6 @@ int FuseMain(int argc, char *argv[]) {
   }
   // Drop credentials
   if ((uid_ != 0) || (gid_ != 0)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
-             uid_, gid_);
     const bool retrievable = (suid_mode_ || !disable_watchdog_);
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
