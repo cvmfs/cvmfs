@@ -1243,7 +1243,9 @@ int FuseMain(int argc, char *argv[]) {
 #endif
   } else {
     retval = kFailOk;
+#if CVMFS_USE_LIBFUSE != 2
     if (premount_fd >= 0) close(premount_fd);
+#endif
   }
 
   LogCvmfs(kLogCvmfs, kLogSyslog, "CernVM-FS: unmounted %s (%s)",
