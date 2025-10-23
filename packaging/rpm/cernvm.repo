@@ -21,3 +21,11 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1
 enabled=0
 protect=1
+
+[cernvm-future]
+name=CernVM prerelease packages
+baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-future/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-future/EL/$releasever/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgcheck=1
+enabled=0
+protect=1
