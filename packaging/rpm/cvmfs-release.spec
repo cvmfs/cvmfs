@@ -84,7 +84,7 @@ fi
 
 %changelog
 * Thu Oct 23 2025 Valentin Volkl <vavolkl@cern.ch> - 7-1
-- Add cvmfs-future package repo for pre-releases
+- Add cernvm-future package repo for pre-releases
 * Thu Oct 09 2025 Valentin Volkl <vavolkl@cern.ch> - 6-4
 - Fix postinst for RHEL itself
 * Fri Jun 27 2025 Valentin Volkl <vavolkl@cern.ch> - 6-3
