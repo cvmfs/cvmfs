@@ -138,7 +138,7 @@ bool system_mount_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
-bool premounted_ = false;
+bool premount_fuse_ = true;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
 void *library_handle_;
@@ -728,6 +728,10 @@ int FuseMain(int argc, char *argv[]) {
   } else {
     options_manager->ParseDefault(*repository_name_);
   }
+  if (options_manager->GetValue("CVMFS_PREMOUNT_FUSE", &parameter)
+      && options_manager->IsOff(parameter)) {
+    premount_fuse_ = false;
+  }
 
 #ifdef __APPLE__
   string volname = "-ovolname=" + *repository_name_;
@@ -1022,7 +1026,8 @@ int FuseMain(int argc, char *argv[]) {
   }
 
 #if CVMFS_USE_LIBFUSE != 2
-  if (!premounted_ && !suid_mode_ && getuid() == 0) {
+
+  if (!premounted_ && !suid_mode_ && getuid() == 0 && premount_fuse_) {
     // If not already premounted or using suid mode, premount the fuse
     // mountpoint to avoid the need for fusermount.
     // Requires libfuse >= 3.3.0.
