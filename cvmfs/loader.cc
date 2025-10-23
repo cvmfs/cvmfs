@@ -138,6 +138,7 @@ bool system_mount_ = false;
 bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
+bool premounted_ = false;
 bool premount_fuse_ = true;
 bool disable_watchdog_ = false;
 bool simple_options_parsing_ = false;
