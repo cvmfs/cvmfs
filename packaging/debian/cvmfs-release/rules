@@ -2,5 +2,7 @@
 %:
 	dh $@
 
+# for compatibility with debian 11
+# can be removed when all distros support zstd
 override_dh_builddeb:
 	dh_builddeb -- -Zxz
