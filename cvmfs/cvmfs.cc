@@ -1111,6 +1111,10 @@ static void ReplyBufferSlice(const fuse_req_t req, const char *buffer,
     fuse_reply_buf(
         req, buffer + offset,
         std::min(static_cast<size_t>(buffer_size - offset), max_size));
+    perf::Inc(file_system_->n_fs_readdir());
+    if (offset == 0) {
+      perf::Inc(file_system_->n_fs_readdir_0_offset());
+    }
   } else {
     fuse_reply_buf(req, NULL, 0);
   }
@@ -1164,6 +1168,7 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
   }
 
   fuse_reply_err(req, EINVAL);
+  perf::Inc(file_system_->n_fs_readdir_einval());
 }
 
 static void FillOpenFlags(const glue::PageCacheTracker::OpenDirectives od,
