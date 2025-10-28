@@ -63,7 +63,11 @@ elif [ "$CVMFS_UPDATEGEO_SOURCE" = "maxmind" ]; then
   CVMFS_UPDATEGEO_DB="${CVMFS_UPDATEGEO_DB:-GeoLite2-City.mmdb}"
   CVMFS_UPDATEGEO_URLBASE="${CVMFS_UPDATEGEO_URLBASE:-https://download.maxmind.com/geoip/databases/GeoLite2-City/download}"
   CVMFS_UPDATEGEO_URLSUFFIX="${CVMFS_UPDATEGEO_URLSUFFIX:-?suffix=tar.gz}"
-elif [ -n "$CVMFS_UPDATEGEO_SOURCE" ] && [ "$CVMFS_UPDATEGEO_SOURCE" != "none" ]; then
+elif [ "$CVMFS_UPDATEGEO_SOURCE" = "none" ] || [ "$CVMFS_UPDATEGEO_SOURCE" = "NONE" ]; then
+  if [ -z "$CVMFS_GEO_DB_FILE" ]; then
+    CVMFS_GEO_DB_FILE=NONE
+  fi
+else
   die "CVMFS_UPDATEGEO_SOURCE not openhtc, maxmind, or none"
 fi
 

@@ -323,10 +323,6 @@ cvmfs_run_test() {
   mv -f $CVMFS_TEST_595_GEODB . || return 45
 
   echo "try snapshot with a dbfile of NONE"
-  local snapshot_2_log="snapshot_2.log"
-  CVMFS_GEO_DB_FILE=NONE cvmfs_server snapshot $replica_name > $snapshot_2_log 2>&1 || return 46
-
-  echo "try again with a dbfile of NONE (database should be up to date)"
   local snapshot_3_log="snapshot_3.log"
   CVMFS_GEO_DB_FILE=NONE cvmfs_server snapshot $replica_name > $snapshot_3_log 2>&1 || return 47
 
@@ -348,7 +344,6 @@ cvmfs_run_test() {
 
   echo "check output logs for the expected status messages"
   test -z "`cat $snapshot_1_log | grep GeoIP`"                                   || return 61
-  cat $snapshot_2_log | grep "Linking GeoIP Database"                            || return 62
   test -z "`cat $snapshot_3_log | grep GeoIP`"                                   || return 63
   cat $snapshot_4_log | grep "Linking GeoIP Database"                            || return 64
   cat $snapshot_5_log | grep -e "Directory.*not writable.*$CVMFS_TEST_USER"      || return 65
