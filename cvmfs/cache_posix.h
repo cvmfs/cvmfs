@@ -16,9 +16,9 @@
 #include "cache.h"
 #include "catalog_mgr.h"
 #include "crypto/signature.h"
+#include "duplex_testing.h"
 #include "fd_refcount_mgr.h"
 #include "file_chunk.h"
-#include "duplex_testing.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 #include "statistics.h"
@@ -70,10 +70,9 @@ class PosixCacheManager : public CacheManager {
   virtual std::string Describe();
 
   static PosixCacheManager *Create(
-      const std::string &cache_path,
-      const bool alien_cache,
+      const std::string &cache_path, const bool alien_cache,
       const RenameWorkarounds rename_workaround = kRenameNormal,
-      const bool do_refcount = true);
+      const bool do_refcount = true, const bool cleanup_unused_first = false);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -105,6 +104,7 @@ class PosixCacheManager : public CacheManager {
   std::string cache_path() { return cache_path_; }
   bool is_tmpfs() { return is_tmpfs_; }
   bool do_refcount() const { return do_refcount_; }
+  bool cleanup_unused_first() const { return cleanup_unused_first_; }
 
  protected:
   virtual void *DoSaveState();
@@ -137,7 +137,8 @@ class PosixCacheManager : public CacheManager {
   };
 
   PosixCacheManager(const std::string &cache_path, const bool alien_cache,
-                    const bool do_refcount = true)
+                    const bool do_refcount = true,
+                    const bool cleanup_unused_first = false)
       : cache_path_(cache_path)
       , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
       , alien_cache_(alien_cache)
@@ -146,7 +147,8 @@ class PosixCacheManager : public CacheManager {
       , reports_correct_filesize_(true)
       , is_tmpfs_(false)
       , do_refcount_(do_refcount)
-      , fd_mgr_(new FdRefcountMgr()) {
+      , fd_mgr_(new FdRefcountMgr())
+      , cleanup_unused_first_(cleanup_unused_first) {
     atomic_init32(&no_inflight_txns_);
   }
 
@@ -193,6 +195,9 @@ class PosixCacheManager : public CacheManager {
    */
   bool do_refcount_;
   UniquePtr<FdRefcountMgr> fd_mgr_;
+
+  bool cleanup_unused_first_;
 };  // class PosixCacheManager
 
 #endif  // CVMFS_CACHE_POSIX_H_
+

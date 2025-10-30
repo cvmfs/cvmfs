@@ -308,7 +308,7 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
 
   if (options_mgr_->GetValue(
           MkCacheParm("CVMFS_CACHE_CLEANUP_NONOPENLRU", instance), &optarg)
-      && options_mgr_->IsOff(optarg)) {
+      && options_mgr_->IsOn(optarg)) {
     settings.cleanup_unused_first = settings.do_refcount;
   }
 
@@ -688,7 +688,7 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
       settings.is_alien,
       settings.avoid_rename ? PosixCacheManager::kRenameLink
                             : PosixCacheManager::kRenameNormal,
-      settings.do_refcount));
+      settings.do_refcount,settings.cleanup_unused_first));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in "
                   + settings.cache_path + ": " + strerror(errno);
