@@ -306,6 +306,12 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
     settings.do_refcount = false;
   }
 
+  if (options_mgr_->GetValue(
+          MkCacheParm("CVMFS_CACHE_CLEANUP_NONOPENLRU", instance), &optarg)
+      && options_mgr_->IsOff(optarg)) {
+    settings.cleanup_unused_first = settings.do_refcount;
+  }
+
   if (options_mgr_->GetValue(MkCacheParm("CVMFS_CACHE_SHARED", instance),
                              &optarg)
       && options_mgr_->IsOn(optarg)) {
@@ -2258,3 +2264,4 @@ bool MountPoint::SetupOwnerMaps() {
 
   return true;
 }
+
