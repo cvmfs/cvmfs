@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "cache_posix.h"  // PosixCacheManager
 #include "catalog_mgr_client.h"
 #include "crypto/signature.h"
 #include "fetch.h"
@@ -72,6 +73,8 @@ MagicXattrManager::MagicXattrManager(
 
   Register("user.authz", new AuthzMagicXattr());
   Register("user.external_url", new ExternalURLMagicXattr());
+
+  Register("user.cleanup_unused_first", new CleanupUnusedFirstMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -800,3 +803,18 @@ void ExternalURLMagicXattr::FinalizeValue() {
 bool ExternalURLMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular() && dirent_->IsExternalFile();
 }
+
+void CleanupUnusedFirstMagicXattr::FinalizeValue() {
+  auto cm = xattr_mgr_->mount_point()->file_system()->cache_mgr();
+  PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
+  if (pcm != nullptr) {
+    if (pcm->cleanup_unused_first()) {
+      result_pages_.push_back("yes");
+    } else {
+      result_pages_.push_back("no");
+    }
+  } else {
+    result_pages_.push_back("no");
+  }
+}
+
