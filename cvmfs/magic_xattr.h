@@ -500,5 +500,8 @@ class CleanupUnusedFirstMagicXattr : public ExternalMagicXattr {
   virtual void FinalizeValue();
 };
 
+class ListOpenHashesMagicXattr : public ExternalMagicXattr {
+  virtual void FinalizeValue();
+};
 #endif  // CVMFS_MAGIC_XATTR_H_
 

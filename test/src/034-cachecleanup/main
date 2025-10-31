@@ -123,6 +123,7 @@ test_advanced_lru(){
   sudo cvmfs_config wipecache > /dev/null && echo "Whipping cache.. OK" || $(echo "Wipping cache.. FAILED!" && return 30)
   
   open_files "$OPEN_FILE_DB"
+  attr -qg list_open_hashes /cvmfs/$TARGET_REPO
   create_lru_access_pattern $FILE_DB
 }
 

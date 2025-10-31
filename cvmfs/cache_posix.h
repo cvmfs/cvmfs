@@ -37,6 +37,7 @@ class DownloadManager;
  * Cache manager implementation using a file system (cache directory) as a
  * backing storage.
  */
+class ListOpenHashesMagicXattr;  // FD needed to access fd_mgr_
 class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, CommitTxnQuotaNotifications);
   FRIEND_TEST(T_CacheManager, CommitTxnRenameFail);
@@ -46,6 +47,7 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, Rename);
   FRIEND_TEST(T_CacheManager, StartTxn);
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
+  friend class ListOpenHashesMagicXattr;
 
  public:
   enum CacheModes {
