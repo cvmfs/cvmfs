@@ -786,16 +786,13 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
 }
 
 void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
-  int pipe_rm[2];
-  MakeReturnPipe(pipe_rm);
-
   LruCommand cmd;
   cmd.command_type = kRegisterMountpoint;
-  cmd.return_pipe = pipe_rm[0];
   WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
-  size_t mp_size = mountpoint.size() + 1;
-  WritePipe(pipe_rm[1], &mp_size, sizeof(size_t));
-  WritePipe(pipe_rm[1], mountpoint.c_str(), mp_size);
+
+  size_t mp_size = mountpoint.size();
+  WritePipe(pipe_lru_[1], &mp_size, sizeof(size_t));
+  WritePipe(pipe_lru_[1], mountpoint.c_str(), mp_size);
 }
 
 std::string PosixQuotaManager::GetMountpoints() {
@@ -1320,20 +1317,14 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     }
 
     // Register a new mountpoint
-    if (command_type == kGetProtocolRevision) {
-      const int return_pipe = quota_mgr->BindReturnPipe(
-          command_buffer[num_commands].return_pipe);
-      if (return_pipe < 0)
-        continue;
-
+    if (command_type == kRegisterMountpoint) {
       size_t mp_size = 0;
-      ReadPipe(return_pipe, &mp_size, sizeof(size_t));
+      ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
       char *buf = (char *)malloc(mp_size * sizeof(char));
       if (buf == nullptr)
         continue;
-      ReadPipe(return_pipe, buf, mp_size);
+      ReadPipe(quota_mgr->pipe_lru_[0], buf, mp_size);
       quota_mgr->mountpoints_.push_back(std::string{buf});
-      quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }
 
@@ -1350,7 +1341,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
            ++it) {
         mps += *it + "\n";
       }
-      size_t mp_size = mps.size() + 1;
+      size_t mp_size = mps.size();
       WritePipe(return_pipe, &mp_size, sizeof(size_t));
       WritePipe(return_pipe, mps.c_str(), mp_size);
       quota_mgr->UnbindReturnPipe(return_pipe);
