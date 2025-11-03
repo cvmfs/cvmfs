@@ -85,6 +85,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual void Spawn();
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
+  virtual void RegisterMountpoint(const std::string &mountpoint);
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
   void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_; };
@@ -125,6 +126,8 @@ class PosixQuotaManager : public QuotaManager {
     kListVolatile,
     kCleanupRate,
     kSetLimit,
+    // After non open aware LRU cleanup
+    kRegisterMountpoint,
   };
 
   /**
@@ -381,6 +384,8 @@ class PosixQuotaManager : public QuotaManager {
   // operator for shash::Any
   std::vector<shash::Any> open_files_;
 
+  std::vector<std::string> mountpoints_;
 };  // class PosixQuotaManager
 
 #endif  // CVMFS_QUOTA_POSIX_H_
+

@@ -571,8 +571,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
         lru_ordered_open.push_back(candidates[i]);
       }
 
-      trash.push_back(cache_dir_ + "/" +
-                      candidates[i].hash.MakePathWithoutSuffix());
+      trash.push_back(cache_dir_ + "/"
+                      + candidates[i].hash.MakePathWithoutSuffix());
       gauge_ -= candidates[i].size;
       max_acseq = candidates[i].acseq;
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %" PRIu64,
@@ -785,6 +785,18 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
   return revision;
 }
 
+void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
+  int pipe_rm[2];
+  MakeReturnPipe(pipe_rm);
+
+  LruCommand cmd;
+  cmd.command_type = kRegisterMountpoint;
+  cmd.return_pipe = pipe_rm[0];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  size_t mp_size = mountpoint.size() + 1;
+  WritePipe(pipe_rm[1], &mp_size, sizeof(size_t));
+  WritePipe(pipe_rm[1], mountpoint.c_str(), mp_size);
+}
 
 /**
  * Queries the shared local hard disk quota manager.
@@ -1288,6 +1300,24 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
         continue;
       WritePipe(return_pipe, &quota_mgr->kProtocolRevision,
                 sizeof(quota_mgr->kProtocolRevision));
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Register a new mountpoint
+    if (command_type == kGetProtocolRevision) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      size_t mp_size = 0;
+      ReadPipe(return_pipe, &mp_size, sizeof(size_t));
+      char *buf = (char *)malloc(mp_size * sizeof(char));
+      if (buf == nullptr)
+        continue;
+      ReadPipe(return_pipe, buf, mp_size);
+      quota_mgr->mountpoints_.push_back(std::string{ buf });
       quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }
@@ -2139,3 +2169,4 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
           "Error: quota manager could not read from cachemanager pipe");
   }
 }
+
