@@ -1011,10 +1011,6 @@ bool FileSystem::SetupPosixQuotaMgr(
   }
 
   const int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
-  PosixQuotaManager* pqm = dynamic_cast<PosixQuotaManager*>(cache_mgr->quota_mgr());
-  if (pqm!=nullptr){
-    pqm->RegisterMountpoint(mountpoint_);
-  }
   assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "CernVM-FS: quota initialized, current size %luMB",
