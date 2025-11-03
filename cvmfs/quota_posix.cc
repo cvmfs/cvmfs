@@ -798,6 +798,21 @@ void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
   WritePipe(pipe_rm[1], mountpoint.c_str(), mp_size);
 }
 
+std::string PosixQuotaManager::GetMountpoints() {
+  int pipe_mp[2];
+  MakeReturnPipe(pipe_mp);
+
+  LruCommand cmd;
+  cmd.command_type = kGetMountpoints;
+  cmd.return_pipe = pipe_mp[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  size_t mp_str_size = 0;
+  ManagedReadHalfPipe(pipe_mp[0], &mp_str_size, sizeof(size_t));
+  char *buf = (char *)malloc(mp_str_size * sizeof(char));
+  ManagedReadHalfPipe(pipe_mp[0], buf, mp_str_size);
+  return std::string{buf};
+}
+
 /**
  * Queries the shared local hard disk quota manager.
  */
@@ -1317,7 +1332,27 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (buf == nullptr)
         continue;
       ReadPipe(return_pipe, buf, mp_size);
-      quota_mgr->mountpoints_.push_back(std::string{ buf });
+      quota_mgr->mountpoints_.push_back(std::string{buf});
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Mountpoints are returned immediately
+    if (command_type == kGetMountpoints) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      std::string mps;
+      for (auto it = quota_mgr->mountpoints_.begin();
+           it != quota_mgr->mountpoints_.end();
+           ++it) {
+        mps += *it + "\n";
+      }
+      size_t mp_size = mps.size() + 1;
+      WritePipe(return_pipe, &mp_size, sizeof(size_t));
+      WritePipe(return_pipe, mps.c_str(), mp_size);
       quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }

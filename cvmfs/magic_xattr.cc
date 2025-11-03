@@ -13,6 +13,7 @@
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
+#include "quota_posix.h"
 #include "quota.h"
 #include "util/logging.h"
 #include "util/string.h"
@@ -76,6 +77,7 @@ MagicXattrManager::MagicXattrManager(
 
   Register("user.cleanup_unused_first", new CleanupUnusedFirstMagicXattr());
   Register("user.list_open_hashes", new ListOpenHashesMagicXattr());
+  Register("user.list_managed_mountpoints", new ListManagedMountpointsMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -841,3 +843,15 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
   result_pages_.push_back(result);
 }
 
+void ListManagedMountpointsMagicXattr::FinalizeValue() {
+  auto cm = xattr_mgr_->mount_point()->file_system()->cache_mgr();
+  PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
+  std::string result;
+  if (pcm != nullptr) {
+    PosixQuotaManager* pqm = dynamic_cast<PosixQuotaManager*>(pcm->quota_mgr());
+    if(pqm!=nullptr){
+      result = pqm->GetMountpoints();
+    }
+  }
+  result_pages_.push_back(result);
+}
