@@ -785,6 +785,14 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
   return revision;
 }
 
+void PosixQuotaManager::SetCleanupPolicy(bool cleanup_unused_first) {
+  LruCommand cmd;
+  cmd.command_type = kSetCleanupPolicy;
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+  WritePipe(pipe_lru_[1], &cleanup_unused_first, sizeof(bool));
+}
+
 void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
   LruCommand cmd;
   cmd.command_type = kRegisterMountpoint;
@@ -1328,6 +1336,14 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       continue;
     }
 
+    // Set Cleanup Policy
+    if (command_type == kSetCleanupPolicy) {
+      bool policy = false;
+      ReadPipe(quota_mgr->pipe_lru_[0], &policy, sizeof(bool));
+      quota_mgr->cleanup_unused_first_=policy;
+      continue;
+    }
+
     // Mountpoints are returned immediately
     if (command_type == kGetMountpoints) {
       const int return_pipe = quota_mgr->BindReturnPipe(
@@ -1798,7 +1814,8 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_pinned_(NULL)
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
-    , initialized_(false) {
+    , initialized_(false)
+    , cleanup_unused_first_(false){
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution

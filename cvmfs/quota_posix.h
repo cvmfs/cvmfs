@@ -86,6 +86,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual pid_t GetPid();
   virtual uint32_t GetProtocolRevision();
   virtual void RegisterMountpoint(const std::string &mountpoint);
+  virtual void SetCleanupPolicy(bool cleanup_unused_first);
   virtual std::string GetMountpoints();
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
@@ -130,6 +131,7 @@ class PosixQuotaManager : public QuotaManager {
     // After non open aware LRU cleanup
     kRegisterMountpoint,
     kGetMountpoints,
+    kSetCleanupPolicy,
   };
 
   /**
@@ -386,6 +388,7 @@ class PosixQuotaManager : public QuotaManager {
   // operator for shash::Any
   std::vector<shash::Any> open_files_;
 
+  bool cleanup_unused_first_;
   std::vector<std::string> mountpoints_;
 };  // class PosixQuotaManager
 

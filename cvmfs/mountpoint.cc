@@ -1009,6 +1009,7 @@ bool FileSystem::SetupPosixQuotaMgr(
       return false;
     }
   }
+  quota_mgr->SetCleanupPolicy(settings.cleanup_unused_first);
 
   const int retval = cache_mgr->AcquireQuotaManager(quota_mgr);
   assert(retval);
