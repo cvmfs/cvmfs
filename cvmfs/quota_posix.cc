@@ -549,6 +549,16 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       assert(res);
     };
 
+    auto &&collect_hashes = []() -> std::vector<shash::Any> {
+      // TODO(christge): Implement the last missing component
+      // mountpoints_ contains all the mountopint associated to this QM.
+      // we can now retrieve the open hashes of a mountpoint just by getting the
+      // value of the dedicated magic xattr "list_open_hashes"
+    };
+
+    std::vector<shash::Any> open_files = (cleanup_unused_first_)
+                                             ? collect_hashes()
+                                             : std::vector<shash::Any>{};
 
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
@@ -559,10 +569,11 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      bool is_open = std::find(open_files_.begin(), open_files_.end(),
+      bool is_open = std::find(open_files.begin(), open_files.end(),
                                candidates[i].hash)
-                     != open_files_.end();
-      if (is_pinned or is_open) {
+                     != open_files.end();
+
+      if (is_pinned or (cleanup_unused_first_) ? is_open : true) {
         skip_eviction(candidates[i]);
         continue;
       }
@@ -1340,7 +1351,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     if (command_type == kSetCleanupPolicy) {
       bool policy = false;
       ReadPipe(quota_mgr->pipe_lru_[0], &policy, sizeof(bool));
-      quota_mgr->cleanup_unused_first_=policy;
+      quota_mgr->cleanup_unused_first_ = policy;
       continue;
     }
 
@@ -1815,7 +1826,7 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
     , stmt_list_catalogs_(NULL)
     , stmt_list_volatile_(NULL)
     , initialized_(false)
-    , cleanup_unused_first_(false){
+    , cleanup_unused_first_(false) {
   ParseDirectories(cache_workspace, &cache_dir_, &workspace_dir_);
   pipe_lru_[0] = pipe_lru_[1] = -1;
   cleanup_recorder_.AddRecorder(1, 90);  // last 1.5 min with second resolution
