@@ -29,6 +29,8 @@
 #include <sys/dir.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
+
+#include <algorithm>  //std::all_of
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -2277,8 +2279,12 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 }
 
 std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
-  std::vector<CollectorHandler*> handlers;
-  std::vector<pthread_t*> threads;
+  std::vector<CollectorHandler *> handlers;
+  std::vector<pthread_t *> threads;
+
+  auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
+    return (a.tv_sec > b.tv_sec) ? true : false;
+  };
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
     handlers.push_back(
@@ -2290,15 +2296,19 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
   assert(retval == 0);
 
   for (size_t i = 0; i < mountpoints_.size(); ++i) {
-    pthread_create(threads[i], nullptr, CollectMountpointsHashes,
-                   handlers[i]);
+    pthread_create(threads[i], nullptr, CollectMountpointsHashes, handlers[i]);
   }
 
   std::vector<bool> joined(handlers.size(), false);
+  struct timespec reference, current;
+  clock_gettime(CLOCK_REALTIME, &reference);
+  clock_gettime(CLOCK_REALTIME, &current);
+  reference.tv_sec += 10;  // Give 10sec for hash collection
   size_t i = 0;
-  while (not std::all_of(joined.begin(),joined.end(),[](bool b){return b;})) {
+  while ((not std::all_of(joined.begin(), joined.end(),
+                          [](bool b) { return b; }))and a_after_b(reference,current)) {
     // as long as there are still threads that haven't joined yet
-    // TODO(christge): implement a timeout mechanism
+    // and for 10 seconds
     if (not joined[i]) {
       int s = pthread_tryjoin_np(*threads[i], NULL);
       if (s == 0) {
@@ -2306,9 +2316,10 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
       }
     }
     i = (++i) % handlers.size();
+    clock_gettime(CLOCK_REALTIME, &current);
   }
 
-  for(size_t i=0; i<handlers.size(); ++i){
+  for (size_t i = 0; i < handlers.size(); ++i) {
     delete handlers[i];
   }
 
