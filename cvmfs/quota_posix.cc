@@ -18,6 +18,7 @@
 
 #include "quota_posix.h"
 
+#include <algorithm> //std::all_of
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -27,6 +28,7 @@
 #include <stdint.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
@@ -549,16 +551,8 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       assert(res);
     };
 
-    auto &&collect_hashes = []() -> std::vector<shash::Any> {
-      // TODO(christge): Implement the last missing component
-      // mountpoints_ contains all the mountopint associated to this QM.
-      // we can now retrieve the open hashes of a mountpoint just by getting the
-      // value of the dedicated magic xattr "list_open_hashes"
-    };
-
-    std::vector<shash::Any> open_files = (cleanup_unused_first_)
-                                             ? collect_hashes()
-                                             : std::vector<shash::Any>{};
+    open_files_ = (cleanup_unused_first_) ? CollectGroupsHashes()
+                                          : std::vector<shash::Any>{};
 
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
@@ -569,9 +563,9 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      bool is_open = std::find(open_files.begin(), open_files.end(),
+      bool is_open = std::find(open_files_.begin(), open_files_.end(),
                                candidates[i].hash)
-                     != open_files.end();
+                     != open_files_.end();
 
       if (is_pinned or (cleanup_unused_first_) ? is_open : true) {
         skip_eviction(candidates[i]);
@@ -1369,7 +1363,6 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       quota_mgr->cleanup_unused_first_ = policy;
       continue;
     }
-
     // Mountpoints are returned immediately
     if (command_type == kGetMountpoints) {
       const int return_pipe = quota_mgr->BindReturnPipe(
@@ -1397,10 +1390,14 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::string gh = "Group Hashes";
-      size_t gh_size = gh.size();
-      WritePipe(return_pipe, &gh_size, sizeof(size_t));
-      WritePipe(return_pipe, gh.c_str(), gh_size);
+      std::vector<shash::Any> gh = quota_mgr->CollectGroupsHashes();
+      std::string result;
+      for (auto it = gh.begin(); it != gh.end(); ++it) {
+        result += (*it).ToString() + "\n";
+      }
+      size_t result_size = result.size();
+      WritePipe(return_pipe, &result_size, sizeof(size_t));
+      WritePipe(return_pipe, result.c_str(), result_size);
       quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }
@@ -1866,6 +1863,9 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
   cleanup_recorder_.AddRecorder(20 * 60, 60 * 60 * 18);
   // last 4 days with hour resolution
   cleanup_recorder_.AddRecorder(60 * 60, 60 * 60 * 24 * 4);
+
+  lock_open_files_ = reinterpret_cast<pthread_mutex_t *>(
+      smalloc(sizeof(pthread_mutex_t)));
 }
 
 
@@ -1873,6 +1873,7 @@ PosixQuotaManager::~PosixQuotaManager() {
   if (!initialized_)
     return;
 
+  free(lock_open_files_);
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
@@ -2252,5 +2253,66 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
     PANIC(kLogStderr,
           "Error: quota manager could not read from cachemanager pipe");
   }
+}
+
+void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
+  pthread_setname_np(pthread_self(), "hash_collector");
+  auto *handler = static_cast<CollectorHandler *>(data);
+  shash::Any hash;
+
+  const MutexLockGuard lock_guard(handler->l);
+  handler->of.push_back(hash);
+  /*
+    ssize_t n = getxattr(handler->mountpoint.c_str(), "user.list_open_hashes",
+                         nullptr, 0);
+    if (n < 0) {
+      pthread_exit(nullptr);
+    }
+    std::vector<char> buf((size_t)n);
+    n = getxattr(handler->mountpoint.c_str(), "user.list_open_hashes",
+    buf.data(), buf.size()); if (n < 0) { pthread_exit(nullptr);
+    }
+  */
+  pthread_exit(nullptr);
+}
+
+std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
+  std::vector<CollectorHandler*> handlers;
+  std::vector<pthread_t*> threads;
+
+  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+    handlers.push_back(
+        new CollectorHandler{open_files_, mountpoints_, lock_open_files_, i});
+    threads.push_back(new pthread_t);
+  }
+
+  const int retval = pthread_mutex_init(lock_open_files_, NULL);
+  assert(retval == 0);
+
+  for (size_t i = 0; i < mountpoints_.size(); ++i) {
+    pthread_create(threads[i], nullptr, CollectMountpointsHashes,
+                   handlers[i]);
+  }
+
+  std::vector<bool> joined(handlers.size(), false);
+  size_t i = 0;
+  while (not std::all_of(joined.begin(),joined.end(),[](bool b){return b;})) {
+    // as long as there are still threads that haven't joined yet
+    // TODO(christge): implement a timeout mechanism
+    if (not joined[i]) {
+      int s = pthread_tryjoin_np(*threads[i], NULL);
+      if (s == 0) {
+        joined[i] = true;
+      }
+    }
+    i = (++i) % handlers.size();
+  }
+
+  for(size_t i=0; i<handlers.size(); ++i){
+    delete handlers[i];
+  }
+
+  pthread_mutex_destroy(lock_open_files_);
+  return open_files_;
 }
 

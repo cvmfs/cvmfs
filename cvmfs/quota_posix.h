@@ -390,10 +390,22 @@ class PosixQuotaManager : public QuotaManager {
    */
   // TODO(gchr): it would be faster if it was a std::set. Needs a comparison
   // operator for shash::Any
+  pthread_mutex_t *lock_open_files_;
   std::vector<shash::Any> open_files_;
 
   bool cleanup_unused_first_;
   std::vector<std::string> mountpoints_;
+
+  std::vector<shash::Any> CollectGroupsHashes();
+
+  struct CollectorHandler {
+    std::vector<shash::Any> &of;
+    const std::vector<std::string> &mp;
+    pthread_mutex_t *l;
+    size_t i;
+  };
+
+  static void *CollectMountpointsHashes(void *data);
 };  // class PosixQuotaManager
 
 #endif  // CVMFS_QUOTA_POSIX_H_
