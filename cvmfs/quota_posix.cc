@@ -806,7 +806,7 @@ void PosixQuotaManager::RegisterMountpoint(const std::string &mountpoint) {
 
   size_t mp_size = mountpoint.size();
   WritePipe(pipe_lru_[1], &mp_size, sizeof(size_t));
-  WritePipe(pipe_lru_[1], mountpoint.c_str(), mp_size);
+  WritePipe(pipe_lru_[1], mountpoint.data(), mp_size);
 }
 
 std::string PosixQuotaManager::GetMountpoints() {
@@ -1349,11 +1349,11 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     if (command_type == kRegisterMountpoint) {
       size_t mp_size = 0;
       ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
-      char *buf = (char *)malloc(mp_size * sizeof(char));
-      if (buf == nullptr)
-        continue;
-      ReadPipe(quota_mgr->pipe_lru_[0], buf, mp_size);
-      quota_mgr->mountpoints_.push_back(std::string{buf});
+      std::string mountpoint(mp_size,'\0');
+      ReadPipe(quota_mgr->pipe_lru_[0], mountpoint.data(), mp_size);
+      quota_mgr->mountpoints_.push_back(mountpoint);
+      LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
+               "Mountpoint %s registered in the group", mountpoint.c_str());
       continue;
     }
 
