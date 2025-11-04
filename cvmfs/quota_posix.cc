@@ -552,6 +552,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       assert(res);
     };
 
+    open_files_.clear();
     open_files_ = (cleanup_unused_first_) ? CollectGroupsHashes()
                                           : std::vector<shash::Any>{};
 
