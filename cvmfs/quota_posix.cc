@@ -829,6 +829,21 @@ std::string PosixQuotaManager::GetMountpoints() {
   return std::string{buf};
 }
 
+std::string PosixQuotaManager::GetGroupHashes() {
+  int pipe_gh[2];
+  MakeReturnPipe(pipe_gh);
+
+  LruCommand cmd;
+  cmd.command_type = kGetGroupHashes;
+  cmd.return_pipe = pipe_gh[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+  size_t mp_str_size = 0;
+  ManagedReadHalfPipe(pipe_gh[0], &mp_str_size, sizeof(size_t));
+  char *buf = (char *)malloc(mp_str_size * sizeof(char));
+  ManagedReadHalfPipe(pipe_gh[0], buf, mp_str_size);
+  return std::string{buf};
+}
+
 /**
  * Queries the shared local hard disk quota manager.
  */
@@ -1371,6 +1386,21 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       size_t mp_size = mps.size();
       WritePipe(return_pipe, &mp_size, sizeof(size_t));
       WritePipe(return_pipe, mps.c_str(), mp_size);
+      quota_mgr->UnbindReturnPipe(return_pipe);
+      continue;
+    }
+
+    // Group hashes are returned immediately
+    if (command_type == kGetGroupHashes) {
+      const int return_pipe = quota_mgr->BindReturnPipe(
+          command_buffer[num_commands].return_pipe);
+      if (return_pipe < 0)
+        continue;
+
+      std::string gh = "Group Hashes";
+      size_t gh_size = gh.size();
+      WritePipe(return_pipe, &gh_size, sizeof(size_t));
+      WritePipe(return_pipe, gh.c_str(), gh_size);
       quota_mgr->UnbindReturnPipe(return_pipe);
       continue;
     }

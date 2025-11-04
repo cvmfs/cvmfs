@@ -13,8 +13,8 @@
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
-#include "quota_posix.h"
 #include "quota.h"
+#include "quota_posix.h"
 #include "util/logging.h"
 #include "util/string.h"
 
@@ -77,7 +77,10 @@ MagicXattrManager::MagicXattrManager(
 
   Register("user.cleanup_unused_first", new CleanupUnusedFirstMagicXattr());
   Register("user.list_open_hashes", new ListOpenHashesMagicXattr());
-  Register("user.list_managed_mountpoints", new ListManagedMountpointsMagicXattr());
+  Register("user.list_groups_open_hashes",
+           new ListGroupsOpenHashesMagicXattr());
+  Register("user.list_managed_mountpoints",
+           new ListManagedMountpointsMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -830,14 +833,28 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
       if (pcm->fd_mgr_.IsValid()) {
         const auto &hash_map = pcm->fd_mgr_->map_fd_;
         auto empty = hash_map.empty_key();
-        auto* keys = hash_map.keys();
+        auto *keys = hash_map.keys();
         for (size_t i = 0; i < hash_map.capacity(); ++i) {
-          shash::Any& hash = keys[i];
-          if (hash  != empty) {
-            result+=hash.ToString()+"\n";
+          shash::Any &hash = keys[i];
+          if (hash != empty) {
+            result += hash.ToString() + "\n";
           }
         }
       }
+    }
+  }
+  result_pages_.push_back(result);
+}
+
+void ListGroupsOpenHashesMagicXattr::FinalizeValue() {
+  auto cm = xattr_mgr_->mount_point()->file_system()->cache_mgr();
+  PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
+  std::string result;
+  if (pcm != nullptr) {
+    PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
+        pcm->quota_mgr());
+    if (pqm != nullptr) {
+      result = pqm->GetGroupHashes();
     }
   }
   result_pages_.push_back(result);
@@ -848,10 +865,12 @@ void ListManagedMountpointsMagicXattr::FinalizeValue() {
   PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
   std::string result;
   if (pcm != nullptr) {
-    PosixQuotaManager* pqm = dynamic_cast<PosixQuotaManager*>(pcm->quota_mgr());
-    if(pqm!=nullptr){
+    PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
+        pcm->quota_mgr());
+    if (pqm != nullptr) {
       result = pqm->GetMountpoints();
     }
   }
   result_pages_.push_back(result);
 }
+

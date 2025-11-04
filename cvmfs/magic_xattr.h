@@ -507,5 +507,9 @@ class ListOpenHashesMagicXattr : public ExternalMagicXattr {
 class ListManagedMountpointsMagicXattr : public ExternalMagicXattr {
   virtual void FinalizeValue();
 };
+
+class ListGroupsOpenHashesMagicXattr : public ExternalMagicXattr {
+  virtual void FinalizeValue();
+};
 #endif  // CVMFS_MAGIC_XATTR_H_
 

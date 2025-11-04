@@ -32,6 +32,7 @@ class Recorder;
  *
  * TODO(jblomer): split into client, server, and protocol classes.
  */
+class ListGroupsOpenHashesMagicXattr;
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
   FRIEND_TEST(T_QuotaManager, Cleanup);
@@ -39,6 +40,7 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
+  friend class ListGroupsOpenHashesMagicXattr;
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_workspace,
@@ -88,6 +90,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual void RegisterMountpoint(const std::string &mountpoint);
   virtual void SetCleanupPolicy(bool cleanup_unused_first);
   virtual std::string GetMountpoints();
+  virtual std::string GetGroupHashes();
 
   void ManagedReadHalfPipe(int fd, void *buf, size_t nbyte);
   void SetCacheMgrPid(pid_t pid_) { cachemgr_pid_ = pid_; };
@@ -131,6 +134,7 @@ class PosixQuotaManager : public QuotaManager {
     // After non open aware LRU cleanup
     kRegisterMountpoint,
     kGetMountpoints,
+    kGetGroupHashes,
     kSetCleanupPolicy,
   };
 
