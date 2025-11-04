@@ -18,7 +18,6 @@
 
 #include "quota_posix.h"
 
-#include <algorithm> //std::all_of
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -2260,27 +2259,40 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
 void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   pthread_setname_np(pthread_self(), "hash_collector");
   auto *handler = static_cast<CollectorHandler *>(data);
-  shash::Any hash;
 
+  std::string mountpoint = handler->mp[handler->i];
+  ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
+  if (n < 0) {
+    pthread_exit(nullptr);
+  }
+  std::vector<char> buf((size_t)n);
+  n = getxattr(mountpoint.c_str(), "user.list_open_hashes", buf.data(),
+               buf.size());
+  if (n < 0) {
+    pthread_exit(nullptr);
+  }
+
+  std::vector<std::string> hash_strs;
+  std::string hash_str;
+  for (char c : buf) {
+    if (c == '\n') {
+      hash_strs.push_back(hash_str);
+      hash_str.clear();
+    } else {
+      hash_str += c;
+    }
+  }
   const MutexLockGuard lock_guard(handler->l);
-  handler->of.push_back(hash);
-  /*
-    ssize_t n = getxattr(handler->mountpoint.c_str(), "user.list_open_hashes",
-                         nullptr, 0);
-    if (n < 0) {
-      pthread_exit(nullptr);
-    }
-    std::vector<char> buf((size_t)n);
-    n = getxattr(handler->mountpoint.c_str(), "user.list_open_hashes",
-    buf.data(), buf.size()); if (n < 0) { pthread_exit(nullptr);
-    }
-  */
+  for (auto hash_str : hash_strs) {
+    handler->of.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
+  }
   pthread_exit(nullptr);
 }
 
 std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
   std::vector<CollectorHandler *> handlers;
   std::vector<pthread_t *> threads;
+  open_files_.clear();
 
   auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
     return (a.tv_sec > b.tv_sec) ? true : false;
