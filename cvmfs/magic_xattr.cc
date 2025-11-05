@@ -835,7 +835,7 @@ void ListOpenHashesMagicXattr::FinalizeValue() {
         auto empty = hash_map.empty_key();
         auto *keys = hash_map.keys();
         for (size_t i = 0; i < hash_map.capacity(); ++i) {
-          shash::Any &hash = keys[i];
+          const shash::Any &hash = keys[i];
           if (hash != empty) {
             result += hash.ToString() + "\n";
           }

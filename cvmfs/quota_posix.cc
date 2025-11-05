@@ -560,12 +560,12 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       // That's a critical condition.  We must not delete a not yet inserted
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
-      bool is_pinned = pinned_chunks_.find(candidates[i].hash)
+      const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
                        != pinned_chunks_.end();
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
-      bool is_open = std::find(open_files_.begin(), open_files_.end(),
+      const bool is_open = std::find(open_files_.begin(), open_files_.end(),
                                candidates[i].hash)
                      != open_files_.end();
 
@@ -2261,7 +2261,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   pthread_setname_np(pthread_self(), "hash_collector");
   auto *handler = static_cast<CollectorHandler *>(data);
 
-  std::string mountpoint = handler->mp[handler->i];
+  const std::string mountpoint = handler->mp[handler->i];
   ssize_t n = getxattr(mountpoint.c_str(), "user.list_open_hashes", nullptr, 0);
   if (n < 0) {
     pthread_exit(nullptr);
@@ -2275,7 +2275,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
 
   std::vector<std::string> hash_strs;
   std::string hash_str;
-  for (char c : buf) {
+  for (const char c : buf) {
     if (c == '\n') {
       hash_strs.push_back(hash_str);
       hash_str.clear();
@@ -2323,7 +2323,7 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
     // as long as there are still threads that haven't joined yet
     // and for 10 seconds
     if (not joined[i]) {
-      int s = pthread_tryjoin_np(*threads[i], NULL);
+      const int s = pthread_tryjoin_np(*threads[i], NULL);
       if (s == 0) {
         joined[i] = true;
       }
