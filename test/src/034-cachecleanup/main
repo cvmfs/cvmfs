@@ -9,6 +9,8 @@ CLEANUP_TARGET=772
 
 TARGET_REPO=atlas-condb.cern.ch
 
+vanilla_post=""
+
 cleanup(){
   rm -rf $FILE_DB, $OPEN_FILE_DB
   close_readers
@@ -121,6 +123,7 @@ test_vanilla_lru(){
   echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
   sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 21)
   print_cache_statistics
+  vanilla_post=$(get_cache_size_linked)
   close_readers
 }
 
@@ -137,9 +140,22 @@ test_advanced_lru(){
     return 31
   fi
   print_cache_statistics
+  local pre=$(get_cache_size_linked)
   echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
   sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 32)
   print_cache_statistics
+  local post=$(get_cache_size_linked)
+  if [ "$pre" -eq "$post" ]; then
+    return 33
+  elif [ "$post" -gt "$pre" ]; then
+    return 34
+  fi
+  if [ "$vanilla_post" -eq "$post" ]; then
+    return 35
+  elif [ "$post" -gt "$vanilla_post" ]; then
+    return 36
+  fi
+  return 0
 }
 
 cvmfs_run_test() {
@@ -150,7 +166,7 @@ cvmfs_run_test() {
   print_file_statistics
 
   test_vanilla_lru
-  test_advanced_lru 
+  test_advanced_lru || return $?
   cleanup
   return 0
 }
