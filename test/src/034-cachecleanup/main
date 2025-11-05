@@ -82,13 +82,6 @@ get_cache_size_unlinked(){
   sudo lsof -nP +L1 2>/dev/null | ag cvmfs | ag REG | awk '{s+=$7} END {printf "%.2f\n", s/1024/1024}'
 }
 
-get_total_cache_size(){
-  local linked=$(get_cache_size_linked)
-  local unlinked=$(get_cache_size_unlinked)
-
-  awk -v a="$linked" -v b="$unlinked" 'BEGIN { print a + b }'
-}
-
 print_files(){
   local file_list=$1
   while IFS= read -r -d '' file; do
@@ -103,39 +96,62 @@ print_file_hashes(){
   done < $file_list
 }
 
-test_vanilla_lru(){
-  mount_repo_fresh "no"
+print_file_statistics(){
   local file_sizes="$(compute_actual_sizes)"
   local total=$(echo "$file_sizes" | awk '{ print $1 }')
   local subtotal=$(echo "$file_sizes" | awk '{ print $2 }')
   echo -e "\tTotal file size is: $total MB"
   echo -e "\tOpen files size is: $subtotal MB"
+}
+
+print_cache_statistics(){
+  sleep 0.5
+  echo -e "\t$ statistics:"
+  echo -e "\t\tlinked: $(get_cache_size_linked) MB"
+  echo -e "\t\tunlinked: $(get_cache_size_unlinked) MB"
+}
+test_vanilla_lru(){
+  mount_repo_fresh "no"
+  sudo cvmfs_config wipecache > /dev/null && echo "Whipping cache.. OK" || $(echo "Wipping cache.. FAILED!" && return 20)
+  
+  open_files "$OPEN_FILE_DB" &> /dev/null
+  create_lru_access_pattern $FILE_DB
+
+  print_cache_statistics
+  echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
+  sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 21)
+  print_cache_statistics
+  close_readers
 }
 
 test_advanced_lru(){
   mount_repo_fresh "yes"
-  local file_sizes="$(compute_actual_sizes)"
-  local total=$(echo "$file_sizes" | awk '{ print $1 }')
-  local subtotal=$(echo "$file_sizes" | awk '{ print $2 }')
-  echo -e "\tTotal file size is: $total MB"
-  echo -e "\tOpen files size is: $subtotal MB"
-
   sudo cvmfs_config wipecache > /dev/null && echo "Whipping cache.. OK" || $(echo "Wipping cache.. FAILED!" && return 30)
   
-  open_files "$OPEN_FILE_DB"
-  attr -qg list_open_hashes /cvmfs/$TARGET_REPO
+  open_files "$OPEN_FILE_DB" &> /dev/null
   create_lru_access_pattern $FILE_DB
+
+  echo "Retrieving the open hashes.."
+  local open_hashes="$(attr -qg list_open_hashes /cvmfs/$TARGET_REPO)"
+  if [ "x$open_hashes" = "x" ]; then
+    return 31
+  fi
+  print_cache_statistics
+  echo -n "Target: $CLEANUP_TARGET. Cleaning up.. "
+  sudo cvmfs_talk -i "$TARGET_REPO" cleanup $CLEANUP_TARGET || $(echo "FAILED" && return 32)
+  print_cache_statistics
 }
 
 cvmfs_run_test() {
-  trap cleanup EXIT
   logfile=$1
 
   mount_repo_fresh "no"
   pick_files_for_testing
+  print_file_statistics
 
-#  test_vanilla_lru && \
-    test_advanced_lru
+  test_vanilla_lru
+  test_advanced_lru 
+  cleanup
   return 0
 }
 
