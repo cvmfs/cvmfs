@@ -569,13 +569,15 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
                                candidates[i].hash)
                      != open_files_.end();
 
-      if (is_pinned or (cleanup_unused_first_) ? is_open : false) {
+      if (is_pinned) {
         skip_eviction(candidates[i]);
         continue;
       }
 
-      if (is_open) {
+      if (cleanup_unused_first_ and is_open) {
+        skip_eviction(candidates[i]);
         lru_ordered_open.push_back(candidates[i]);
+        continue;
       }
 
       trash.push_back(cache_dir_ + "/"
