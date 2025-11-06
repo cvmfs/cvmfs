@@ -119,24 +119,30 @@ cvmfs_run_test() {
 
   local list_open_hashes_err=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local list_open_hashes=$(get_xattr list_open_hashes /cvmfs/grid.cern.ch)
-  if [ "x$list_open_hashes" = "x" ] || [ "x$list_open_hashes_err" != "x" ]; then
-    return 13
+  if [ "$cleanup_unused_first" = "yes" ]; then
+    if [ "x$list_open_hashes" = "x" ] || [ "x$list_open_hashes_err" != "x" ]; then
+      return 14
+    fi
   fi
 
   echo "Test 'list_groups_open_hashes' magic extended attribute"
 
   local list_groups_open_hashes_err=$(get_xattr list_groups_open_hashes /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local list_groups_open_hashes=$(get_xattr list_groups_open_hashes /cvmfs/grid.cern.ch)
-  if [ "x$list_groups_open_hashes" = "x" ] || [ "x$list_groups_open_hashes_err" != "x" ]; then
-    return 13
+  if [ "$cleanup_unused_first" = "yes" ]; then
+    if [ "x$list_groups_open_hashes" = "x" ] || [ "x$list_groups_open_hashes_err" != "x" ]; then
+      return 15
+    fi
   fi
 
   echo "Test 'list_managed_mountpoints' magic extended attribute"
 
   local list_managed_mountpoints_err=$(get_xattr list_managed_mountpoints /cvmfs/grid.cern.ch 2>&1 1>/dev/null)
   local list_managed_mountpoints=$(get_xattr list_managed_mountpoints /cvmfs/grid.cern.ch)
-  if [ "x$list_managed_mountpoints" = "x" ] || [ "x$list_managed_mountpoints_err" != "x" ]; then
-    return 13
+  if [ "$cleanup_unused_first" = "yes" ]; then
+    if [ "x$list_managed_mountpoints" = "x" ] || [ "x$list_managed_mountpoints_err" != "x" ]; then
+      return 16
+    fi
   fi
 
   echo "*** Test log buffer (quite basic)"
