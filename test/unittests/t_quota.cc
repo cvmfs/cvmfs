@@ -229,21 +229,13 @@ TEST_F(T_QuotaManager, CleanupLru) {
     quota_mgr_->Touch(hashes_[i]);
   }
 
-  const unsigned open_files = N / 1000;
-  for (unsigned i = 0; i < open_files; ++i) {
-    quota_mgr_->open_files_.push_back(hashes_[i]);
-  }
-
-  EXPECT_TRUE(quota_mgr_->Cleanup(N/2));
+  quota_mgr_->cleanup_unused_first_ = false;
+  EXPECT_TRUE(quota_mgr_->Cleanup(N / 2));
   vector<string> remaining = quota_mgr_->List();
   EXPECT_EQ(N / 2, remaining.size());
   sort(remaining.begin(), remaining.end());
   for (unsigned i = 0; i < remaining.size(); ++i) {
-    if (i < open_files) {
-      EXPECT_EQ(StringifyIntLeadingZeros(i), remaining[i]);
-    } else {
-      EXPECT_EQ(StringifyIntLeadingZeros(N / 2 + i), remaining[i]);
-    }
+    EXPECT_EQ(StringifyIntLeadingZeros(N / 2 + i), remaining[i]);
   }
 }
 
@@ -583,3 +575,4 @@ TEST_F(T_QuotaManager, SetLimit) {
   const uint64_t limit = quota_mgr_->GetCapacity();
   EXPECT_EQ(100ul, limit);
 }
+
