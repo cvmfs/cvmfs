@@ -851,10 +851,12 @@ void ListGroupsOpenHashesMagicXattr::FinalizeValue() {
   PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
   std::string result;
   if (pcm != nullptr) {
-    PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
-        pcm->quota_mgr());
-    if (pqm != nullptr) {
-      result = pqm->GetGroupHashes();
+    if (pcm->cleanup_unused_first()) {
+      PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
+          pcm->quota_mgr());
+      if (pqm != nullptr) {
+        result = pqm->GetGroupHashes();
+      }
     }
   }
   result_pages_.push_back(result);
