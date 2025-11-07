@@ -555,13 +555,6 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   return *exports_ptr;
 }
 
-/*
- * This is just a type converter for pthread_create
- */
-static void *MainCvmfsSpawn(void *data __attribute__((unused))) {
-  cvmfs_exports_->fnSpawn();
-  return NULL;
-}
 
 Failures Reload(const int fd_progress, const bool stop_and_go,
                 const ReloadMode reload_mode) {
@@ -624,14 +617,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go,
   loader_exports_->saved_states.clear();
 
   SendMsg2Socket(fd_progress, "Activating Fuse module\n");
-
-  // Run cvmfs Spawn in a separate temporary thread because it reduces
-  // capabilities and we want this loader_talk thread to retain its
-  // capabilities.
-  pthread_t spawn_thread;
-  retval = pthread_create(&spawn_thread, NULL, MainCvmfsSpawn, NULL);
-  assert(retval == 0);
-  pthread_join(spawn_thread, NULL);
+  cvmfs_exports_->fnSpawn();
 
   fence_reload_->Open();
   return kFailOk;
@@ -1242,12 +1228,11 @@ int FuseMain(int argc, char *argv[]) {
   if (!foreground_)
     Daemonize();
 
-  // The loader_talk thread needs to retain more capabilities so that
-  // it can reload later, so start it before cvmfs Spawn() which 
-  // reduces capabilities.
-  loader_talk::Spawn();
-
+  // Note that this has a side effect of significantly reducing capabilities
+  // after it starts things that need more privileges
   cvmfs_exports_->fnSpawn();
+
+  loader_talk::Spawn();
 
   if (delegatedunmount) {
     // Unmounting in this case might be delegated to the watchdog process.

@@ -65,10 +65,13 @@ int Watchdog::g_suppressed_signals[] = {
 int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
                                    SIGSEGV, SIGBUS, SIGPIPE, SIGXFSZ};
 
-Watchdog *Watchdog::Create(FnOnExit on_exit) {
+Watchdog *Watchdog::Create(FnOnExit on_exit, WatchdogState *saved_state) {
   assert(instance_ == NULL);
   instance_ = new Watchdog(on_exit);
-  instance_->Fork();
+  if (saved_state != 0)
+    instance_->RestoreState(saved_state);
+  else
+    instance_->Fork();
   return instance_;
 }
 
@@ -529,6 +532,7 @@ bool Watchdog::WaitForSupervisee() {
   return true;
 }
 
+
 /**
  * Set up the signal handling and kick off the supervision.
  */
@@ -567,6 +571,12 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
                                     MainWatchdogListener, this);
   assert(retval == 0);
 
+  if (spawned_) {
+    // This happens after a reload, when the watchdog process is
+    // already running so we can exit here.
+    return;
+  }
+
   pipe_watchdog_->Write(ControlFlow::kSupervise);
   const size_t path_size = crash_dump_path.size();
   pipe_watchdog_->Write(path_size);
@@ -581,6 +591,11 @@ void Watchdog::Spawn(const std::string &crash_dump_path) {
 void *Watchdog::MainWatchdogListener(void *data) {
   Watchdog *watchdog = static_cast<Watchdog *>(data);
   LogCvmfs(kLogMonitor, kLogDebug, "starting watchdog listener");
+
+  if ((getuid() != 0) && SetuidCapabilityPermitted()) {
+    // Drop all capabilities, none are needed in the listener
+    assert(ClearPermittedCapabilities(0, 0, 0, 0));
+  }
 
   struct pollfd watch_fds[2];
   watch_fds[0].fd = watchdog->pipe_listener_->GetReadFd();
@@ -650,8 +665,36 @@ void Watchdog::Supervise() {
 }
 
 
+/**
+ * Save the state of the watchdog listener thread before reload.
+ */
+void Watchdog::SaveState(WatchdogState *saved_state) {
+  saved_state->spawned = spawned_;
+  saved_state->pid = watchdog_pid_;
+  if (spawned_) {
+    saved_state->watchdog_write_fd = pipe_watchdog_->GetWriteFd();
+    saved_state->listener_read_fd = pipe_listener_->GetReadFd();
+  }
+}
+
+
+/**
+ * Restore the state of the watchdog listener reload
+ */
+void Watchdog::RestoreState(WatchdogState *saved_state) {
+  watchdog_pid_ = saved_state->pid;
+  if (!saved_state->spawned) {
+    return;
+  }
+  pipe_watchdog_ = new Pipe<kPipeWatchdog>(-1, saved_state->watchdog_write_fd);
+  pipe_listener_ = new Pipe<kPipeWatchdogSupervisor>(saved_state->listener_read_fd, -1);
+  spawned_ = true;
+}
+
+
 Watchdog::Watchdog(FnOnExit on_exit)
     : spawned_(false)
+    , maintenance_mode_(false)
     , exe_path_(string(platform_getexepath()))
     , watchdog_pid_(0)
     , on_exit_(on_exit)
@@ -676,22 +719,26 @@ Watchdog::~Watchdog() {
     free(sighandler_stack_.ss_sp);
     sighandler_stack_.ss_size = 0;
 
-    if (on_exit_) {
-      pipe_terminate_->Write(ControlFlow::kQuitWithExit);
-    } else {
-      pipe_terminate_->Write(ControlFlow::kQuit);
-    }
+    // The watchdog listener thread exits on any message received
+    pipe_terminate_->Write(ControlFlow::kQuit);
     pthread_join(thread_listener_, NULL);
     pipe_terminate_->Close();
   }
 
-  if (on_exit_) {
-    pipe_watchdog_->Write(ControlFlow::kQuitWithExit);
+  if (!maintenance_mode_) {
+    // Shutdown the watchdog except when doing a reload
+    if (on_exit_) {
+      pipe_watchdog_->Write(ControlFlow::kQuitWithExit);
+    } else {
+      pipe_watchdog_->Write(ControlFlow::kQuit);
+    }
+    pipe_watchdog_->CloseWriteFd();
+    pipe_listener_->CloseReadFd();
   } else {
-    pipe_watchdog_->Write(ControlFlow::kQuit);
+    // Release the references to the watchdog pipes without closing them
+    pipe_watchdog_.Release();
+    pipe_listener_.Release();
   }
-  pipe_watchdog_->CloseWriteFd();
-  pipe_listener_->CloseReadFd();
 
   platform_spinlock_destroy(&lock_handler_);
   LogCvmfs(kLogMonitor, kLogDebug, "monitor stopped");

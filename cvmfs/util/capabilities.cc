@@ -49,9 +49,12 @@ bool checkCapabilityPermitted(const cap_value_t) {
 // Clear all CAP_PERMITTED capabilities except those requested.
 // This function requires being run with CAP_SETPCAP capability permitted.
 // If the real uid & gid do not match the effective uid & gid, it also
-// requires CAP_SETUID and CAP_SETGID capabilities to be permmitted and
+// requires CAP_SETUID and CAP_SETGID capabilities to be permitted and
 // ends up switching the real uid & gid to match the incoming effective
-// uid & gid.  Capabilities listed in inheritcaps will be made inheritable.
+// uid & gid.  Beware that switching the uid is not thread-safe; it is
+// process-wide and clears all capabilities from threads that do not
+// have keepcaps enabled.
+// Capabilities listed in inheritcaps will be made inheritable.
 
 bool ClearPermittedCapabilities(int nreservecaps,
                                 const cap_value_t *reservecaps,

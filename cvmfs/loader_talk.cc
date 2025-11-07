@@ -102,20 +102,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
 void Spawn() {
   int retval;
-  // Setting platform_keepcaps here prevents the loader_talk thread from
-  // a race condition where it could otherwise lose its capabilities when
-  // the spawning thread reduces its capabilities.  That's because the
-  // setuid() call that is done in ClearPermittedCapabilities() clears
-  // capabilities from all threads that don't have keepcaps enabled.
-  // The loader_talk thread needs to retain at least setuid and setgid
-  // capabilities in order to perform the reload function, but we leave
-  // it with all capabilities (which isn't really any more risky) because
-  // otherwise we would need to leave keepcaps enabled permanently on
-  // all threads.
-  platform_keepcaps(true);
   retval = pthread_create(&thread_talk_, NULL, MainTalk, NULL);
   assert(retval == 0);
-  platform_keepcaps(false);
   spawned_ = true;
 }
 
