@@ -540,21 +540,9 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
     const unsigned N = candidates.size();
 
-    auto &&skip_eviction = [&hash_str, &stmt_block_ = this->stmt_block_](
-                               EvictCandidate &candidate) {
-      bool res = true;
-      hash_str = candidate.hash.ToString();
-      LogCvmfs(kLogQuota, kLogDebug, "skip %s for eviction", hash_str.c_str());
-      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-      sqlite3_reset(stmt_block_);
-      assert(res);
-    };
-
     open_files_.clear();
     open_files_ = (cleanup_unused_first_) ? CollectGroupsHashes()
-                                          : std::vector<shash::Any>{};
+                                          : std::vector<shash::Any>();
 
     for (i = 0; i < N; ++i) {
       // That's a critical condition.  We must not delete a not yet inserted
@@ -570,12 +558,12 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
                      != open_files_.end();
 
       if (is_pinned) {
-        skip_eviction(candidates[i]);
+        SkipEviction(candidates[i]);
         continue;
       }
 
       if (cleanup_unused_first_ and is_open) {
-        skip_eviction(candidates[i]);
+        SkipEviction(candidates[i]);
         lru_ordered_open.push_back(candidates[i]);
         continue;
       }
@@ -824,7 +812,7 @@ std::string PosixQuotaManager::GetMountpoints() {
   ManagedReadHalfPipe(pipe_mp[0], &mp_str_size, sizeof(size_t));
   char *buf = (char *)malloc(mp_str_size * sizeof(char));
   ManagedReadHalfPipe(pipe_mp[0], buf, mp_str_size);
-  return std::string{buf};
+  return std::string( buf );
 }
 
 std::string PosixQuotaManager::GetGroupHashes() {
@@ -1753,6 +1741,16 @@ void PosixQuotaManager::ParseDirectories(const std::string cache_workspace,
   }
 }
 
+void PosixQuotaManager::SkipEviction(const EvictCandidate &candidate){
+      bool res = true;
+      std::string hash_str = candidate.hash.ToString();
+      LogCvmfs(kLogQuota, kLogDebug, "Exclude %s from eviction", hash_str.c_str());
+      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                        SQLITE_STATIC);
+      res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+      sqlite3_reset(stmt_block_);
+      assert(res);
+}
 
 /**
  * Immediately inserts a new pinned catalog. Does cache cleanup if necessary.
