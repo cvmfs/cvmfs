@@ -2258,6 +2258,7 @@ void PosixQuotaManager::ManagedReadHalfPipe(int fd, void *buf, size_t nbyte) {
 }
 
 void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
+#ifndef __APPLE__
   pthread_setname_np(pthread_self(), "hash_collector");
   auto *handler = static_cast<CollectorHandler *>(data);
 
@@ -2287,6 +2288,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   for (auto hash_str : hash_strs) {
     handler->of.push_back(shash::MkFromHexPtr(shash::HexPtr(hash_str)));
   }
+#endif
   pthread_exit(nullptr);
 }
 
@@ -2294,7 +2296,7 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
   std::vector<CollectorHandler *> handlers;
   std::vector<pthread_t *> threads;
   open_files_.clear();
-
+#ifndef __APPLE__
   auto &&a_after_b = [](const struct timespec a, const struct timespec b) {
     return (a.tv_sec > b.tv_sec) ? true : false;
   };
@@ -2337,6 +2339,7 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
   }
 
   pthread_mutex_destroy(lock_open_files_);
+#endif
   return open_files_;
 }
 
