@@ -827,7 +827,7 @@ std::string PosixQuotaManager::GetGroupHashes() {
   ManagedReadHalfPipe(pipe_gh[0], &mp_str_size, sizeof(size_t));
   char *buf = (char *)malloc(mp_str_size * sizeof(char));
   ManagedReadHalfPipe(pipe_gh[0], buf, mp_str_size);
-  return std::string{buf};
+  return std::string( buf );
 }
 
 /**
@@ -1341,7 +1341,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       size_t mp_size = 0;
       ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
       std::string mountpoint(mp_size,'\0');
-      ReadPipe(quota_mgr->pipe_lru_[0], mountpoint.data(), mp_size);
+      ReadPipe(quota_mgr->pipe_lru_[0], static_cast<void*>(mountpoint.data()), mp_size);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
