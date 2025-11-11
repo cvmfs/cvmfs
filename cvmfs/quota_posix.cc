@@ -1341,7 +1341,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       size_t mp_size = 0;
       ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
       std::string mountpoint(mp_size,'\0');
-      ReadPipe(quota_mgr->pipe_lru_[0], static_cast<void*>(mountpoint.data()), mp_size);
+      ReadPipe(quota_mgr->pipe_lru_[0], (void*)mountpoint.data(), mp_size);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
