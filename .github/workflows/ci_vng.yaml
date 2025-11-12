@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       inputTestCases:
-        description: 'Ex. src/0* src/1*'    
+        description: 'Ex. ../src/0* ../src/1*'    
         required: true
-        default: 'src/0* src/1*'
+        default: '../src/0* ../src/1*'
       inputSuites:
         description: 'Test scenario tags'
         required: true
