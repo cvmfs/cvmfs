@@ -211,11 +211,6 @@ jobs:
 
           export CVMFS_TESTCASES=${{ github.event.inputs.testCases || '"../src/0* ../src/1*"' }}
           export CVMFS_TEST_SUITES=${{ github.event.inputs.testSuites || 'quick' }}
-
-          # 10.0.2.2 is the host's gateway address reachable from the VM when using virtme-ng(QEMU) with --network user (SLIRP)
-          # this equals to quering localhost from within th VM where apache and squid is setup
-          export CVMFS_TEST_PROXY=http://10.0.2.2:3128
-          export CVMFS_TEST_USER=$(whoami)
           ./run.sh -s "${CVMFS_TEST_SUITES}"  \
                    -x ../src/095-fuser   \
                       ../src/004-davinci                              \
