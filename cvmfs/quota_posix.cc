@@ -549,13 +549,13 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
       // pinned file as it is already reserved (but will be inserted later).
       // Instead, set the pin bit in the db to not run into an endless loop
       const bool is_pinned = pinned_chunks_.find(candidates[i].hash)
-                       != pinned_chunks_.end();
+                             != pinned_chunks_.end();
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
       const bool is_open = std::find(open_files_.begin(), open_files_.end(),
-                               candidates[i].hash)
-                     != open_files_.end();
+                                     candidates[i].hash)
+                           != open_files_.end();
 
       if (is_pinned) {
         SkipEviction(candidates[i]);
@@ -812,7 +812,7 @@ std::string PosixQuotaManager::GetMountpoints() {
   ManagedReadHalfPipe(pipe_mp[0], &mp_str_size, sizeof(size_t));
   char *buf = (char *)malloc(mp_str_size * sizeof(char));
   ManagedReadHalfPipe(pipe_mp[0], buf, mp_str_size);
-  return std::string( buf );
+  return std::string(buf);
 }
 
 std::string PosixQuotaManager::GetGroupHashes() {
@@ -827,7 +827,7 @@ std::string PosixQuotaManager::GetGroupHashes() {
   ManagedReadHalfPipe(pipe_gh[0], &mp_str_size, sizeof(size_t));
   char *buf = (char *)malloc(mp_str_size * sizeof(char));
   ManagedReadHalfPipe(pipe_gh[0], buf, mp_str_size);
-  return std::string( buf );
+  return std::string(buf);
 }
 
 /**
@@ -1340,8 +1340,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     if (command_type == kRegisterMountpoint) {
       size_t mp_size = 0;
       ReadPipe(quota_mgr->pipe_lru_[0], &mp_size, sizeof(size_t));
-      std::string mountpoint(mp_size,'\0');
-      ReadPipe(quota_mgr->pipe_lru_[0], (void*)mountpoint.data(), mp_size);
+      std::string mountpoint(mp_size, '\0');
+      ReadPipe(quota_mgr->pipe_lru_[0], (void *)mountpoint.data(), mp_size);
       quota_mgr->mountpoints_.push_back(mountpoint);
       LogCvmfs(kLogQuota, kLogDebug | kLogSyslog,
                "Mountpoint %s registered in the group", mountpoint.c_str());
@@ -1741,15 +1741,15 @@ void PosixQuotaManager::ParseDirectories(const std::string cache_workspace,
   }
 }
 
-void PosixQuotaManager::SkipEviction(const EvictCandidate &candidate){
-      bool res = true;
-      std::string hash_str = candidate.hash.ToString();
-      LogCvmfs(kLogQuota, kLogDebug, "Exclude %s from eviction", hash_str.c_str());
-      sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
-                        SQLITE_STATIC);
-      res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
-      sqlite3_reset(stmt_block_);
-      assert(res);
+void PosixQuotaManager::SkipEviction(const EvictCandidate &candidate) {
+  bool res = true;
+  std::string hash_str = candidate.hash.ToString();
+  LogCvmfs(kLogQuota, kLogDebug, "Exclude %s from eviction", hash_str.c_str());
+  sqlite3_bind_text(stmt_block_, 1, &hash_str[0], hash_str.length(),
+                    SQLITE_STATIC);
+  res = (sqlite3_step(stmt_block_) == SQLITE_DONE);
+  sqlite3_reset(stmt_block_);
+  assert(res);
 }
 
 /**
@@ -2320,8 +2320,9 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
   clock_gettime(CLOCK_REALTIME, &current);
   reference.tv_sec += 10;  // Give 10sec for hash collection
   size_t i = 0;
-  while ((not std::all_of(joined.begin(), joined.end(),
-                          [](bool b) { return b; }))and a_after_b(reference,current)) {
+  while (
+      (not std::all_of(joined.begin(), joined.end(), [](bool b) { return b; }))
+      and a_after_b(reference, current)) {
     // as long as there are still threads that haven't joined yet
     // and for 10 seconds
     if (not joined[i]) {
