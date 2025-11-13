@@ -51,3 +51,4 @@ void BundleMgr::Fetch() {
   }
 }
 
+void* BundleMgr::DoFetch(void* data){}
