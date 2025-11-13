@@ -22,7 +22,7 @@ bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dirent);
 
 class BundleMgr {
  public:
-  BundleMgr(MountPoint *mp, FileSystem *fs, fuse_ino_t ino) : is_valid_(true) {
+  BundleMgr(MountPoint *mp, fuse_ino_t ino) : is_valid_(true) {
     is_valid_ = cvmfs::GetPathForInode(ino, &path_);
     is_valid_ &= cvmfs::GetDirentForInode(ino, &dirent_);
     fname_ = GetFileName(path_);
