@@ -1179,7 +1179,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   if (dirent.IsBundleTrigger()) {
     // fetch dependences if not there already
-    BundleMgr bundle_mgr(mount_point_, file_system_, ino);
+    BundleMgr bundle_mgr(mount_point_,  ino);
     if (bundle_mgr) {
       bundle_mgr.Fetch();
     } else {
