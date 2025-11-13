@@ -8,6 +8,20 @@
 
 #include <vector>
 
+BundleMgr::BundleMgr(MountPoint *mp, fuse_ino_t ino) : is_valid_(true) {
+    is_valid_ = cvmfs::GetPathForInode(mp, mp->file_system(), ino, &path_);
+    is_valid_ &= cvmfs::GetDirentForInode(mp, mp->file_system(), ino, &dirent_);
+    fname_ = GetFileName(path_);
+    parent_path_ = GetParentPath(path_);
+
+    // There is a naming convention regarding the name of the file with the
+    // contents of the bundle
+    bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle."
+                                   + fname_.ToString());
+
+    bfm_ = new BundleFileMgr(bundle_file_path_);
+  }
+
 void BundleMgr::Fetch() {
   std::vector<pthread_t> fetcher_pool;
 
