@@ -116,6 +116,7 @@
 #include "util/uuid.h"
 #include "wpad.h"
 #include "xattr.h"
+#include "util/inode.h"
 
 using namespace std;  // NOLINT
 
@@ -313,84 +314,7 @@ static bool FixupOpenInode(const PathString &path,
 
 bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent) {
-  // Lookup inode in cache
-  if (mount_point_->inode_cache()->Lookup(ino, dirent))
-    return true;
-
-  // Look in the catalogs in 2 steps: lookup inode->path, lookup path
-  static const catalog::DirectoryEntry
-      dirent_negative = catalog::DirectoryEntry(catalog::kDirentNegative);
-  // Reset directory entry.  If the function returns false and dirent is no
-  // the kDirentNegative, it was an I/O error
-  *dirent = catalog::DirectoryEntry();
-
-  catalog::ClientCatalogManager *catalog_mgr = mount_point_->catalog_mgr();
-
-  if (file_system_->IsNfsSource()) {
-    // NFS mode
-    PathString path;
-    const bool retval = file_system_->nfs_maps()->GetPath(ino, &path);
-    if (!retval) {
-      *dirent = dirent_negative;
-      return false;
-    }
-    if (catalog_mgr->LookupPath(path, catalog::kLookupDefault, dirent)) {
-      // Fix inodes
-      dirent->set_inode(ino);
-      mount_point_->inode_cache()->Insert(ino, *dirent);
-      return true;
-    }
-    return false;  // Not found in catalog or catalog load error
-  }
-
-  // Non-NFS mode
-  PathString path;
-  if (ino == catalog_mgr->GetRootInode()) {
-    const bool retval = catalog_mgr->LookupPath(
-        PathString(), catalog::kLookupDefault, dirent);
-
-    if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
-                     "GetDirentForInode: Race condition? Not found dirent %s",
-                     dirent->name().c_str())) {
-      return false;
-    }
-
-    dirent->set_inode(ino);
-    mount_point_->inode_cache()->Insert(ino, *dirent);
-    return true;
-  }
-
-  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
-  const bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, &path);
-  if (!retval) {
-    // This may be a retired inode whose stat information is only available
-    // in the page cache tracker because there is still an open file
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "GetDirentForInode inode lookup failure %" PRId64, ino);
-    *dirent = dirent_negative;
-    // Indicate that the inode was not found in the tracker rather than not
-    // found in the catalog
-    dirent->set_inode(ino);
-    return false;
-  }
-  if (catalog_mgr->LookupPath(path, catalog::kLookupDefault, dirent)) {
-    if (!inode_ex.IsCompatibleFileType(dirent->mode())) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
-               "Warning: inode %" PRId64 " (%s) changed file type", ino,
-               path.c_str());
-      // TODO(jblomer): we detect this issue but let it continue unhandled.
-      // Fix me.
-    }
-
-    // Fix inodes
-    dirent->set_inode(ino);
-    mount_point_->inode_cache()->Insert(ino, *dirent);
-    return true;
-  }
-
-  // Can happen after reload of catalogs or on catalog load failure
-  LogCvmfs(kLogCvmfs, kLogDebug, "GetDirentForInode path lookup failure");
-  return false;
+  return GetDirentForInode(mount_point_,file_system_,ino, dirent);
 }
 
 
@@ -456,37 +380,7 @@ static uint64_t GetDirentForPath(const PathString &path,
 
 
 bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
-  // Check the path cache first
-  if (mount_point_->path_cache()->Lookup(ino, path))
-    return true;
-
-  if (file_system_->IsNfsSource()) {
-    // NFS mode, just a lookup
-    LogCvmfs(kLogCvmfs, kLogDebug, "MISS %lu - lookup in NFS maps", ino);
-    if (file_system_->nfs_maps()->GetPath(ino, path)) {
-      mount_point_->path_cache()->Insert(ino, *path);
-      return true;
-    }
-    return false;
-  }
-
-  if (ino == mount_point_->catalog_mgr()->GetRootInode())
-    return true;
-
-  LogCvmfs(kLogCvmfs, kLogDebug, "MISS %lu - looking in inode tracker", ino);
-  glue::InodeEx inode_ex(ino, glue::InodeEx::kUnknownType);
-  const bool retval = mount_point_->inode_tracker()->FindPath(&inode_ex, path);
-
-  if (!AssertOrLog(retval, kLogCvmfs, kLogSyslogWarn | kLogDebug,
-                   "GetPathForInode: Race condition? "
-                   "Inode not found in inode tracker at path %s",
-                   path->c_str())) {
-    return false;
-  }
-
-
-  mount_point_->path_cache()->Insert(ino, *path);
-  return true;
+  return GetPathForInode(mount_point_,file_system_,ino,path);
 }
 
 static void DoTraceInode(const int event,
