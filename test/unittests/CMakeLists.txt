@@ -748,6 +748,7 @@ set(CVMFS_UNITTEST_MOCKFUSE_SOURCES
   ${CVMFS_SOURCE_DIR}/wpad.cc
   ${CVMFS_SOURCE_DIR}/xattr.cc
   ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
+  ${CVMFS_SOURCE_DIR}/util/inode.cc
 
   cache.pb.cc cache.pb.h
 )

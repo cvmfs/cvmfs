@@ -244,6 +244,7 @@ if (BUILD_CVMFS)
        notify/subscriber_supervisor.cc
        notify/subscriber_sse.cc
        quota_listener.cc
+       util/inode.cc
        shortstring.cc
        supervisor.cc
        talk.cc
