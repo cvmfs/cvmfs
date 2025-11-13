@@ -10,21 +10,14 @@
 #include "file_bundle.h"   // BundleFileMgr
 #include "mountpoint.h"    //MountPoint*, FileSystem*
 #include "shortstring.h"   // GetParentPath, GetFileName
+#include "util/inode.h"    // GetPathForInode, GetDirentForInode
 #include "util/pointer.h"  // UniquePtr
-
-namespace cvmfs {
-/*
- * functions defined inside /cvmfs/cvmfs.cc
- */
-bool GetPathForInode(const fuse_ino_t ino, PathString *path);
-bool GetDirentForInode(const fuse_ino_t ino, catalog::DirectoryEntry *dirent);
-}  // namespace cvmfs
 
 class BundleMgr {
  public:
   BundleMgr(MountPoint *mp, fuse_ino_t ino) : is_valid_(true) {
-    is_valid_ = cvmfs::GetPathForInode(ino, &path_);
-    is_valid_ &= cvmfs::GetDirentForInode(ino, &dirent_);
+    is_valid_ = cvmfs::GetPathForInode(mp, mp->file_system(), ino, &path_);
+    is_valid_ &= cvmfs::GetDirentForInode(mp, mp->file_system(), ino, &dirent_);
     fname_ = GetFileName(path_);
     parent_path_ = GetParentPath(path_);
 
