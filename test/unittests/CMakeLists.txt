@@ -447,6 +447,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_whitelist.cc
   t_wpad.cc
   t_xattr.cc
+  t_bundle_mgr.cc
 
   ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc
@@ -503,6 +504,8 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_legacy.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/magic_xattr.cc
+  ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
+  ${CVMFS_SOURCE_DIR}/util/inode.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
