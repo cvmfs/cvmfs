@@ -239,6 +239,12 @@ jobs:
                     --                                             \
                    "${CVMFS_TESTCASES}"
 
+          EXIT_CODE=$(cat results/tests_status)
+          if [ "$EXIT_CODE" -ne 0 ]; then
+              echo "Some tests failed."
+              exit 1
+          fi
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4

@@ -5,6 +5,7 @@ SCRIPT_DIR=$(realpath "$(dirname "$0")")
 VNG_DIR=$(dirname "$SCRIPT_DIR")
 RESULTS_DIR="$VNG_DIR/results/test_failures.log"
 LOGFILE="$VNG_DIR/results/test_run.log"
+TESTS_STATUS="$VNG_DIR"/results/tests_status
 KERNEL_VERSION="$1"
 shift
 
@@ -53,6 +54,7 @@ echo "Sourcing test_functions"
 source ../test_functions
 
 # Loop through each test and execute it
+overall_retval=0
 for test in $test_list; do
     if [ -d "$test" ] && [ -f "$test/main" ]; then
         test_name=$(basename "$test")
@@ -94,6 +96,9 @@ for test in $test_list; do
         else
             echo "Test $test_name failed with exit code $exit_code on $KERNEL_VERSION."
             echo "[$timestamp] [$KERNEL_VERSION] $test_name : $exit_code" >> "$RESULTS_DIR"
+            overall_retval=1
         fi
     fi
 done
+
+echo $overall_retval > $TESTS_STATUS
