@@ -43,9 +43,10 @@ sudo mount /dev/vda /var/lib/cvmfs
 
 echo "Running tests from: $test_list"
 
-# 10.0.2.2 is the host's gateway address reachable from the VM when using virtme-ng(QEMU) with --network user (SLIRP)
+# 10.0.2.2 can also be used if squid is configured instead of 'DIRECT'
+# this is the host's gateway address reachable from the VM when using virtme-ng(QEMU) with --network user (SLIRP)
 # this equals to quering localhost from within th VM where apache and squid is setup
-export CVMFS_TEST_PROXY=http://10.0.2.2:3128
+export CVMFS_TEST_PROXY=DIRECT
 export CVMFS_TEST_USER=$(whoami)
 
 echo "Sourcing test_functions"
