@@ -1,7 +1,7 @@
 [cernvm]
 name=CernVM packages
 baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/$releasever/$basearch/
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048
 gpgcheck=1
 enabled=1
 protect=1
@@ -9,7 +9,7 @@ protect=1
 [cernvm-config]
 name=CernVM-FS extra config packages
 baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048
 gpgcheck=1
 enabled=0
 protect=1
@@ -17,7 +17,7 @@ protect=1
 [cernvm-testing]
 name=CernVM testing packages
 baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-testing/EL/$releasever/$basearch/
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048
 gpgcheck=1
 enabled=0
 protect=1
@@ -25,7 +25,7 @@ protect=1
 [cernvm-future]
 name=CernVM prerelease packages
 baseurl=http://cvmrepo.s3.cern.ch/cvmrepo/yum/cvmfs-future/EL/$releasever/$basearch/ http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-future/EL/$releasever/$basearch/
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048
 gpgcheck=1
 enabled=0
 protect=1

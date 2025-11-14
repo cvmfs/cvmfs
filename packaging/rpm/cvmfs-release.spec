@@ -1,6 +1,6 @@
 Name:           cvmfs-release
-Version:        6
-Release:        4
+Version:        7
+Release:        2
 Summary:        Packages for the CernVM File System
 
 Group:          Applications/System
@@ -57,32 +57,35 @@ install -pm 644 %{SOURCE2}  \
 if [[ ! -f /etc/os-release ]]; then
   >&2 echo "Warning: could not find /etc/os-release. Assuming this is a RHEL-compatible distribution."
 else
-. /etc/os-release
-if  [[ "$ID_LIKE" == *"suse"* ]]; then
-mv /etc/yum.repos.d/cernvm.repo /etc/zypp/repos.d
-sed -i 's/EL/suse/g' /etc/zypp/repos.d/cernvm.repo
-sed -i 's/releasever/releasever_major/g' /etc/zypp/repos.d/cernvm.repo
-fi
-if  [[ "$ID" == "amzn" ]]; then
-if  [[ "$VERSION" == "2" ]]; then
-sed -i 's/$releasever/7/g' /etc/yum.repos.d/cernvm.repo
-elif  [[ "$VERSION" == "2023" ]]; then
-sed -i 's/$releasever/9/g' /etc/yum.repos.d/cernvm.repo
-fi
-fi
-if  [[ "$ID" == "fedora" ]]; then
-sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
-fi
-if  [[ "$ID" == "rhel" || " $ID_LIKE " == *" rhel "* ]]; then
-  VERSION_MAJOR=$(echo ${VERSION_ID} | cut -d '.' -f1)
-  if [[ "${VERSION_MAJOR}" -ge "10" ]]; then
-     sed -i 's/RPM-GPG-KEY-CernVM/RPM-GPG-KEY-CernVM-2048/g' /etc/yum.repos.d/cernvm.repo
+  . /etc/os-release
+  if  [[ "$ID_LIKE" == *"suse"* ]]; then
+    mv /etc/yum.repos.d/cernvm.repo /etc/zypp/repos.d
+    sed -i 's/EL/suse/g' /etc/zypp/repos.d/cernvm.repo
+    sed -i 's/releasever/releasever_major/g' /etc/zypp/repos.d/cernvm.repo
+    sed -i 's;gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048;gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048;g' /etc/zypp/repos.d/cernvm.repo
   fi
-fi
+  if  [[ "$ID" == "amzn" ]]; then
+    if  [[ "$VERSION" == "2" ]]; then
+      sed -i 's/$releasever/7/g' /etc/yum.repos.d/cernvm.repo
+    elif  [[ "$VERSION" == "2023" ]]; then
+      sed -i 's/$releasever/9/g' /etc/yum.repos.d/cernvm.repo
+    fi
+  fi
+  if  [[ "$ID" == "fedora" ]]; then
+  sed -i 's/EL/fedora/g' /etc/yum.repos.d/cernvm.repo
+  fi
+  if  [[ "$ID" == "rhel" || " $ID_LIKE " == *" rhel "* ]]; then
+    VERSION_MAJOR=$(echo ${VERSION_ID} | cut -d '.' -f1)
+    if [[ "${VERSION_MAJOR}" -ge "10" ]]; then
+       sed -i 's;gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048;gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM-2048;g' /etc/yum.repos.d/cernvm.repo
+    fi
+  fi
 fi
 
 
 %changelog
+* Tue Nov 11 2025 Valentin Volkl <vavolkl@cern.ch> - 7-2
+- Add both old and new key to gpgkey in .repo
 * Thu Oct 23 2025 Valentin Volkl <vavolkl@cern.ch> - 7-1
 - Add cernvm-future package repo for pre-releases
 * Thu Oct 09 2025 Valentin Volkl <vavolkl@cern.ch> - 6-4
