@@ -76,7 +76,7 @@ Summary: CernVM File System
 Name: cvmfs
 Version: 2.13.3
 %global base_version %(echo %{version} | cut -d'~' -f1)
-Release: 1%{?dist}
+Release: 2%{?dist}
 URL: https://cernvm.cern.ch/fs/
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -176,6 +176,8 @@ Requires: util-linux
 Requires: cvmfs-config
 Requires: cvmfs-libs = %{version}-%{release}
 Requires: cvmfs-fuse3 = %{version}-%{release}
+Provides: group(cvmfs)
+Provides: user(cvmfs)
 
 # SELinux integration
 # These are needed to build the selinux policy module.
