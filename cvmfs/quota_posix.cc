@@ -29,7 +29,6 @@
 #include <sys/stat.h>
 #include <sys/xattr.h>
 
-#include <algorithm>  //std::all_of
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif

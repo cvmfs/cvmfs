@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "cache_posix.h"  // PosixCacheManager
+#include "cache_posix.h"
 #include "catalog_mgr_client.h"
 #include "crypto/signature.h"
 #include "fetch.h"
