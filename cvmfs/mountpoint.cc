@@ -309,6 +309,8 @@ FileSystem::PosixCacheSettings FileSystem::DeterminePosixCacheSettings(
   if (options_mgr_->GetValue(
           MkCacheParm("CVMFS_CACHE_CLEANUP_NONOPENLRU", instance), &optarg)
       && options_mgr_->IsOn(optarg)) {
+    // Enable this policy only in a refcounted cache.
+    // Because it's the reference counter who will say if a file is open.
     settings.cleanup_unused_first = settings.do_refcount;
   }
 
@@ -684,11 +686,10 @@ CacheManager *FileSystem::SetupPosixCacheMgr(const string &instance) {
   if (!CheckPosixCacheSettings(settings))
     return NULL;
   UniquePtr<PosixCacheManager> cache_mgr(PosixCacheManager::Create(
-      settings.cache_path,
-      settings.is_alien,
+      settings.cache_path, settings.is_alien,
       settings.avoid_rename ? PosixCacheManager::kRenameLink
                             : PosixCacheManager::kRenameNormal,
-      settings.do_refcount,settings.cleanup_unused_first));
+      settings.do_refcount, settings.cleanup_unused_first));
   if (!cache_mgr.IsValid()) {
     boot_error_ = "Failed to setup posix cache '" + instance + "' in "
                   + settings.cache_path + ": " + strerror(errno);
