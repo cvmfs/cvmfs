@@ -2330,7 +2330,8 @@ std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
         joined[i] = true;
       }
     }
-    i = (++i) % handlers.size();
+    ++i;
+    i = i % handlers.size();
     clock_gettime(CLOCK_REALTIME, &current);
   }
 
