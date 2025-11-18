@@ -32,7 +32,8 @@ class BundleFileMgr {
   // TODO(christge): this is to be reverted. It's the basic interface needed to
   // interact with the file bundle. Now there are some mocks for prototyping
   BundleFileMgr(const PathString &bf) { }
-  CacheManager::LabeledObject *GetNext() {
+  virtual ~BundleFileMgr() = default;
+  CacheManager::LabeledObject *GetNext() const {
     // TODO(christge): return actual labled objects
     CacheManager::Label label;
     label.path = std::string{};

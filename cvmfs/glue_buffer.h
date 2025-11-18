@@ -8,7 +8,6 @@
  * functions.
  */
 
-#include "duplex_testing.h"
 #include <pthread.h>
 #include <sched.h>
 #include <stdint.h>
@@ -23,6 +22,7 @@
 #include "bigvector.h"
 #include "crypto/hash.h"
 #include "directory_entry.h"
+#include "duplex_testing.h"
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util/atomic.h"
@@ -651,7 +651,7 @@ class InodeTracker {
   InodeTracker();
   explicit InodeTracker(const InodeTracker &other);
   InodeTracker &operator=(const InodeTracker &other);
-  ~InodeTracker();
+  virtual ~InodeTracker();
 
   void VfsGetBy(const InodeEx inode_ex, const uint32_t by,
                 const PathString &path) {
@@ -673,7 +673,7 @@ class InodeTracker {
 
   VfsPutRaii GetVfsPutRaii() { return VfsPutRaii(this); }
 
-  bool FindPath(InodeEx *inode_ex, PathString *path) {
+  virtual bool FindPath(InodeEx *inode_ex, PathString *path) {
     Lock();
     shash::Md5 md5path;
     bool found = inode_ex_map_.LookupMd5Path(inode_ex, &md5path);
@@ -1087,3 +1087,4 @@ class PageCacheTracker {
 }  // namespace glue
 
 #endif  // CVMFS_GLUE_BUFFER_H_
+
