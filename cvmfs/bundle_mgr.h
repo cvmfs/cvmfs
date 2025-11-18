@@ -4,6 +4,8 @@
 
 #ifndef CVMFS_BUNDLE_MGR_H_
 #define CVMFS_BUNDLE_MGR_H_
+#include <gtest/gtest_prod.h>
+
 #include <tuple>
 #include <vector>
 
@@ -11,10 +13,14 @@
 #include "mountpoint.h"
 #include "shortstring.h"
 #include "util/pointer.h"
+#include "util/single_copy.h"
 
-class BundleMgr {
+class BundleMgr : SingleCopy {
+  friend class T_BundleMgr;
+
  public:
   BundleMgr(MountPoint *mp, fuse_ino_t ino);
+  virtual ~BundleMgr() { delete bfm_; }
   void Fetch();
   explicit operator bool() const { return is_valid_; }
 
@@ -36,7 +42,7 @@ class BundleMgr {
 
   // The file that contains the dependences
   PathString bundle_file_path_;
-  UniquePtr<BundleFileMgr> bfm_;
+  BundleFileMgr *bfm_;
 
   std::vector<std::tuple<pthread_t, int> > fetcher_pool_;
 

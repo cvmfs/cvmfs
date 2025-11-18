@@ -99,11 +99,13 @@ void BundleMgr::SpawnFetchers() {
 void *BundleMgr::EstablishConnection(void *data) {
   pthread_setname_np(pthread_self(), "bm_fetcher");
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
-  int rfd = mgr->pipe_bm_[0];
+  int wfd = mgr->pipe_bm_[1];
   int back_channel[2];
   MakePipe(back_channel);
 
-  WritePipe(rfd, back_channel + 1, sizeof(int));
+  WritePipe(wfd, &back_channel[1], sizeof(int));
+
+  int& rfd=back_channel[0];
 
   Command cmd;
   while (read(rfd, &cmd, sizeof(Command)) == sizeof(Command)) {
@@ -128,6 +130,7 @@ void *BundleMgr::EstablishConnection(void *data) {
 }
 
 CacheManager::LabeledObject BundleMgr::ReceiveLabeledObject(int fd) const {
+  (void)fd;
   return CacheManager::LabeledObject(shash::Any{}, CacheManager::Label());
 }
 
