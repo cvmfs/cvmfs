@@ -17,7 +17,6 @@
 
 class BundleMgr : SingleCopy {
   friend class T_BundleMgr;
-  FRIEND_TEST(T_BundleMgr, Simple);
 
  public:
   BundleMgr(MountPoint *mp, fuse_ino_t ino);
