@@ -216,5 +216,6 @@ class T_BundleMgr : public ::testing::Test {
 TEST_F(T_BundleMgr, Fetch) {
   bfm_->Reset(entries_);
   bundle_mgr_->Fetch();
+  EXPECT_EQ(bfm_->it,entries_.end());
 }
 
