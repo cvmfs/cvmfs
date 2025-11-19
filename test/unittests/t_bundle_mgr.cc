@@ -5,6 +5,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "bundle_mgr.h"
 #include "catalog_mgr_client.h"
 #include "file_bundle.h"
@@ -67,6 +69,10 @@ class MockBundleFileMgr : public BundleFileMgr {
   virtual ~MockBundleFileMgr() = default;
   MOCK_METHOD(size_t, Size, (), (const));
   MOCK_METHOD(CacheManager::LabeledObject *, GetNext, (), (const));
+  void Reset(std::vector<CacheManager::LabeledObject *> &vec) {
+    it = vec.begin();
+  }
+  std::vector<CacheManager::LabeledObject *>::iterator it;
 };
 
 
@@ -122,10 +128,39 @@ class T_BundleMgr : public ::testing::Test {
     mount_point_->inode_tracker_ = mock_inode_tracker_;
 
     bundle_mgr_ = new BundleMgr(mount_point_, trigger_ino_);
+
+    // Create a BundleFileMgr mock
     bfm_ = new testing::NiceMock<MockBundleFileMgr>(trigger_file_path_);
     ON_CALL(*bfm_, Size).WillByDefault(testing::Return(10));
+    EXPECT_EQ(bfm_->Size(), 10);
+    srand(time(NULL));
+    shash::Any hash;
+    for (size_t i = 0; i < bfm_->Size(); ++i) {
+      CacheManager::Label label;
+      label.path = std::string{};
+      label.size = sizeof(hash);
+      label.zip_algorithm = zlib::kZlibDefault;
+      auto *obj = new CacheManager::LabeledObject(hash, label);
+      entries_.push_back(obj);
+    }
+    EXPECT_EQ(entries_.size(), bfm_->Size());
+    ON_CALL(*bfm_, GetNext)
+        .WillByDefault([this]() -> CacheManager::LabeledObject * {
+          auto &it = this->bfm_->it;
+          auto end = this->entries_.end();
+          auto res = it;
+          if (it != end) {
+            ++it;
+            return *res;
+          } else {
+            return nullptr;
+          }
+        });
+    // replace the real bfm_ with the mock
     delete bundle_mgr_->bfm_;
     bundle_mgr_->bfm_ = bfm_;
+    EXPECT_TRUE(bundle_mgr_);
+    EXPECT_EQ(bundle_mgr_->bfm_, bfm_);
   }
 
   virtual void TearDown() {
@@ -141,6 +176,9 @@ class T_BundleMgr : public ::testing::Test {
     delete file_system_;
     delete mount_point_;
     delete bundle_mgr_;
+    for (auto entry : entries_) {
+      delete entry;
+    }
   }
 
  protected:
@@ -165,6 +203,8 @@ class T_BundleMgr : public ::testing::Test {
   catalog::DirectoryEntry trigger_dirent_{};
   PathString trigger_path_{};
 
+  std::vector<CacheManager::LabeledObject *> entries_;
+
   // Mocks
   testing::NiceMock<MockBundleFileMgr> *bfm_;
   testing::NiceMock<MockPathCache> *mock_path_cache_;
@@ -173,5 +213,8 @@ class T_BundleMgr : public ::testing::Test {
   testing::NiceMock<MockInodeTracker> *mock_inode_tracker_;
 };
 
-TEST_F(T_BundleMgr, Simple) { EXPECT_TRUE(bundle_mgr_); }
+TEST_F(T_BundleMgr, Fetch) {
+  bfm_->Reset(entries_);
+  bundle_mgr_->Fetch();
+}
 

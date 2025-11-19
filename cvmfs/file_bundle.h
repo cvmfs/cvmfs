@@ -33,7 +33,7 @@ class BundleFileMgr {
   // interact with the file bundle. Now there are some mocks for prototyping
   BundleFileMgr(const PathString &bf) { }
   virtual ~BundleFileMgr() = default;
-  CacheManager::LabeledObject *GetNext() const {
+  virtual CacheManager::LabeledObject *GetNext() const {
     // TODO(christge): return actual labled objects
     CacheManager::Label label;
     label.path = std::string{};
@@ -42,11 +42,9 @@ class BundleFileMgr {
     return new CacheManager::LabeledObject(shash::Any{}, label);
   };
 
-  size_t Size() const { return size_; }
+  virtual size_t Size() const { return size_; }
 
  private:
-  // TODO(christge): properly setup in construction to return the number of
-  // files in the bundle
   size_t size_ = 42;
 };
 

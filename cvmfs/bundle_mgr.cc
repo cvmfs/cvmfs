@@ -99,11 +99,11 @@ void BundleMgr::SpawnFetchers() {
 void *BundleMgr::EstablishConnection(void *data) {
   pthread_setname_np(pthread_self(), "bm_fetcher");
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
-  int rfd = mgr->pipe_bm_[0];
+  int rfd = mgr->pipe_bm_[1];
   int back_channel[2];
   MakePipe(back_channel);
 
-  WritePipe(rfd, back_channel + 1, sizeof(int));
+  WritePipe(rfd, &back_channel[1], sizeof(int));
 
   Command cmd;
   while (read(rfd, &cmd, sizeof(Command)) == sizeof(Command)) {
