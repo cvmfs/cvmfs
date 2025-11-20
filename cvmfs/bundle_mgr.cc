@@ -116,7 +116,7 @@ void BundleMgr::SpawnFetchers() {
     // Make the write operation to the return pipe non blocking
     // According to the man (7) page of write, when attempting to write
     // n<=PIPE_BUF data on a non blocking pipe, it will either write all of them
-    // or errno will set to EAGAIN. PIPE_BUF is at least 512bytes on and linux
+    // or errno will be set to EAGAIN. PIPE_BUF is at least 512bytes on and linux
     // 4096bytes.
     int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
