@@ -29,8 +29,9 @@ class BundleMgr : SingleCopy {
   void SpawnFetchers();
   void JoinFetchers();
   CacheManager::LabeledObject ReceiveLabeledObject(int fd) const;
-  void SendLabeledObject(int fd, const CacheManager::LabeledObject &obj) const;
-  bool TrySendData(int fd, const CacheManager::LabeledObject &obj) const;
+  void SendLabeledObject(int fd,
+                         UniquePtr<CacheManager::LabeledObject> &obj) const;
+  bool TrySendData(int fd, UniquePtr<CacheManager::LabeledObject> &obj) const;
 
   MountPoint *mount_point_;
 #ifndef __TEST_CVMFS_MOCKFUSE

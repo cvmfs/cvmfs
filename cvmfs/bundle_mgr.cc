@@ -11,6 +11,7 @@
 #include "fetch.h"
 #include "util/inode.h"
 #include "util/posix.h"
+#include "util/pointer.h"
 
 BundleMgr::BundleMgr(MountPoint *mp, fuse_ino_t ino) : mount_point_(mp) {
   is_valid_ = cvmfs::GetPathForInode(mp, mp->file_system(), ino, &path_);
@@ -34,7 +35,6 @@ BundleMgr::BundleMgr(MountPoint *mp, fuse_ino_t ino) : mount_point_(mp) {
 void BundleMgr::Fetch() {
   SpawnFetchers();
 
-  CacheManager::LabeledObject *obj;
   auto it = fetcher_pool_.begin();
   if (it == fetcher_pool_.end()) {
     LogCvmfs(kLogBungleMgr,
@@ -43,18 +43,21 @@ void BundleMgr::Fetch() {
              "Aborting Op.");
     return;
   }
-  while ((obj = bfm_->GetNext()) != nullptr) {
-    auto pair = *it;
-    auto wfd = std::get<1>(pair);
+
+  while (true) {
+    UniquePtr<CacheManager::LabeledObject> obj = bfm_->GetNext();
+    if (not obj.IsValid()) {
+      break;
+    }
+    auto wfd = std::get<1>(*it);
     // Find the first available Fetcher to send the data
-    while (not TrySendData(wfd, *obj)) {
-      if (( ++it ) == fetcher_pool_.end()) {
+    while (not TrySendData(wfd, obj)) {
+      if ((++it) == fetcher_pool_.end()) {
         it = fetcher_pool_.begin();
       }
-      pair = *it;
-      wfd = std::get<1>(pair);
+      wfd = std::get<1>(*it);
     }
-    if (( ++it ) == fetcher_pool_.end()) {
+    if ((++it) == fetcher_pool_.end()) {
       it = fetcher_pool_.begin();
     }
   }
@@ -100,7 +103,7 @@ void BundleMgr::JoinFetchers() {
 void BundleMgr::SpawnFetchers() {
   MakePipe(pipe_bm_);
 
-  size_t size = bfm_->Size() / 30;
+  size_t size = 1+( bfm_->Size() / 30 ); // Spawn at least one fetcher
   for (size_t i = 0; i < size; ++i) {
     pthread_t thread;
     int res = pthread_create(&thread, nullptr, EstablishConnection, this);
@@ -160,11 +163,12 @@ CacheManager::LabeledObject BundleMgr::ReceiveLabeledObject(int fd) const {
 }
 
 void BundleMgr::SendLabeledObject(
-    int fd, const CacheManager::LabeledObject &obj) const {
+    int fd, UniquePtr<CacheManager::LabeledObject>& obj) const {
   (void)obj;
 }
 
 bool BundleMgr::TrySendData(
-    int fd, const CacheManager::LabeledObject &obj) const {
-  (void)obj;
+    int fd, UniquePtr<CacheManager::LabeledObject>& obj) const {
+  return true;
 }
+
