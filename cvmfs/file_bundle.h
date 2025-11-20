@@ -33,13 +33,14 @@ class BundleFileMgr {
   // interact with the file bundle. Now there are some mocks for prototyping
   BundleFileMgr(const PathString &bf) { }
   virtual ~BundleFileMgr() = default;
-  virtual CacheManager::LabeledObject *GetNext() const {
+  virtual UniquePtr<CacheManager::LabeledObject> GetNext() const {
     // TODO(christge): return actual labled objects
     CacheManager::Label label;
     label.path = std::string{};
     label.size = sizeof(shash::Any);
     label.zip_algorithm = zlib::kZlibDefault;
-    return new CacheManager::LabeledObject(shash::Any{}, label);
+    return UniquePtr<CacheManager::LabeledObject>(
+        new CacheManager::LabeledObject(shash::Any{}, label));
   };
 
   virtual size_t Size() const { return size_; }
