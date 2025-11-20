@@ -29,7 +29,7 @@ class BundleMgr : SingleCopy {
   void SpawnFetchers();
   void JoinFetchers();
   CacheManager::LabeledObject ReceiveLabeledObject(int fd) const;
-  void SendLabeledObject(int fd,
+  bool SendLabeledObject(int fd,
                          UniquePtr<CacheManager::LabeledObject> &obj) const;
   bool TrySendData(int fd, UniquePtr<CacheManager::LabeledObject> &obj) const;
 
