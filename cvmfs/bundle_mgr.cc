@@ -35,11 +35,28 @@ void BundleMgr::Fetch() {
   SpawnFetchers();
 
   CacheManager::LabeledObject *obj;
+  auto it = fetcher_pool_.begin();
+  if (it == fetcher_pool_.end()) {
+    LogCvmfs(kLogBungleMgr,
+             kLogDebug,
+             "The pool of fetchers is empty. Can't fetch dependencies. "
+             "Aborting Op.");
+    return;
+  }
   while ((obj = bfm_->GetNext()) != nullptr) {
-    // TODO(christge): In this form the assignment of a fetcher is left to
-    // SendLabeledObject. This is incorrect. SendLabeledObject should only
-    // unpack the LabeledObject and send it over the pipe
-    SendLabeledObject(*obj);
+    auto pair = *it;
+    auto wfd = std::get<1>(pair);
+    // Find the first available Fetcher to send the data
+    while (not TrySendData(wfd, *obj)) {
+      if (( ++it ) == fetcher_pool_.end()) {
+        it = fetcher_pool_.begin();
+      }
+      pair = *it;
+      wfd = std::get<1>(pair);
+    }
+    if (( ++it ) == fetcher_pool_.end()) {
+      it = fetcher_pool_.begin();
+    }
   }
 
   JoinFetchers();
@@ -92,6 +109,14 @@ void BundleMgr::SpawnFetchers() {
     }
     int fd;
     ReadPipe(pipe_bm_[0], &fd, sizeof(int));
+
+    // Make the write operation to the return pipe non blocking
+    // According to the man (7) page of write, when attempting to write
+    // n<=PIPE_BUF data on a non blocking pipe, it will either write all of them
+    // or errno will set to EAGAIN. PIPE_BUF is at least 512bytes on and linux
+    // 4096bytes.
+    int flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     fetcher_pool_.push_back({thread, fd});
   }
 }
@@ -105,7 +130,7 @@ void *BundleMgr::EstablishConnection(void *data) {
 
   WritePipe(wfd, &back_channel[1], sizeof(int));
 
-  int& rfd=back_channel[0];
+  int &rfd = back_channel[0];
 
   Command cmd;
   while (read(rfd, &cmd, sizeof(Command)) == sizeof(Command)) {
@@ -135,7 +160,11 @@ CacheManager::LabeledObject BundleMgr::ReceiveLabeledObject(int fd) const {
 }
 
 void BundleMgr::SendLabeledObject(
-    const CacheManager::LabeledObject &obj) const {
+    int fd, const CacheManager::LabeledObject &obj) const {
   (void)obj;
 }
 
+bool BundleMgr::TrySendData(
+    int fd, const CacheManager::LabeledObject &obj) const {
+  (void)obj;
+}
