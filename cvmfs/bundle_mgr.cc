@@ -10,8 +10,8 @@
 
 #include "fetch.h"
 #include "util/inode.h"
-#include "util/posix.h"
 #include "util/pointer.h"
+#include "util/posix.h"
 
 BundleMgr::BundleMgr(MountPoint *mp, fuse_ino_t ino) : mount_point_(mp) {
   is_valid_ = cvmfs::GetPathForInode(mp, mp->file_system(), ino, &path_);
@@ -103,7 +103,7 @@ void BundleMgr::JoinFetchers() {
 void BundleMgr::SpawnFetchers() {
   MakePipe(pipe_bm_);
 
-  size_t size = 1+( bfm_->Size() / 30 ); // Spawn at least one fetcher
+  size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
   for (size_t i = 0; i < size; ++i) {
     pthread_t thread;
     int res = pthread_create(&thread, nullptr, EstablishConnection, this);
@@ -116,8 +116,8 @@ void BundleMgr::SpawnFetchers() {
     // Make the write operation to the return pipe non blocking
     // According to the man (7) page of write, when attempting to write
     // n<=PIPE_BUF data on a non blocking pipe, it will either write all of them
-    // or errno will be set to EAGAIN. PIPE_BUF is at least 512bytes on and linux
-    // 4096bytes.
+    // or errno will be set to EAGAIN. PIPE_BUF is at least 512bytes on and
+    // linux 4096bytes.
     int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     fetcher_pool_.push_back({thread, fd});
@@ -162,13 +162,28 @@ CacheManager::LabeledObject BundleMgr::ReceiveLabeledObject(int fd) const {
   return CacheManager::LabeledObject(shash::Any{}, CacheManager::Label());
 }
 
-void BundleMgr::SendLabeledObject(
-    int fd, UniquePtr<CacheManager::LabeledObject>& obj) const {
-  (void)obj;
+bool BundleMgr::SendLabeledObject(
+    int fd, UniquePtr<CacheManager::LabeledObject> &obj) const {
+  return true;
 }
 
-bool BundleMgr::TrySendData(
-    int fd, UniquePtr<CacheManager::LabeledObject>& obj) const {
+bool BundleMgr::TrySendData(int fd,
+                            UniquePtr<CacheManager::LabeledObject> &obj) const {
+  Command cmd = Command::kFetch;
+  size_t n = write(fd, &cmd, sizeof(Command));
+  if (n != sizeof(Command)) {
+    if (not(errno == EAGAIN || errno == EWOULDBLOCK)) {
+      LogCvmfs(kLogBungleMgr,
+               kLogDebug,
+               "write() on back channel failed unexpectedly");
+    }
+    return false;
+  } else {
+    while (SendLabeledObject(fd, obj) != true) {
+      // If a Fetcher receives a kFetch command should receive the Labeled Object also.
+    }
+  }
+
   return true;
 }
 
