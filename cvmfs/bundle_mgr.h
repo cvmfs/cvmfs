@@ -15,6 +15,8 @@
 #include "util/pointer.h"
 #include "util/single_copy.h"
 
+class MockFetcher;
+
 class BundleMgr : SingleCopy {
   friend class T_BundleMgr;
 

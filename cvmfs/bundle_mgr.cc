@@ -22,7 +22,6 @@ BundleMgr::BundleMgr(MountPoint *mp, fuse_ino_t ino) : mount_point_(mp) {
   fname_ = GetFileName(path_);
   parent_path_ = GetParentPath(path_);
   fetcher_ = dirent_.IsExternalFile() ? mp->external_fetcher() : mp->fetcher();
-
   // There is a naming convention regarding the name of the file with the
   // contents of the bundle
   bundle_file_path_ = PathString(parent_path_.ToString() + "/.cvmfsbundle."

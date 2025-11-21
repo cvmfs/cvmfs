@@ -505,6 +505,7 @@ set(CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_options.cc
   ${CVMFS_SOURCE_DIR}/magic_xattr.cc
   ${CVMFS_SOURCE_DIR}/bundle_mgr.cc
+  ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/util/inode.cc
   ${CVMFS_SOURCE_DIR}/malloc_arena.cc
   ${CVMFS_SOURCE_DIR}/malloc_heap.cc
