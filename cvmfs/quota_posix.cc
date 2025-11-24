@@ -540,7 +540,7 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
     const unsigned N = candidates.size();
 
     open_files_.clear();
-    open_files_ = (cleanup_unused_first_) ? CollectGroupsHashes()
+    open_files_ = (cleanup_unused_first_) ? CollectAllOpenHashes()
                                           : std::vector<shash::Any>();
 
     for (i = 0; i < N; ++i) {
@@ -1381,7 +1381,7 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (return_pipe < 0)
         continue;
 
-      std::vector<shash::Any> gh = quota_mgr->CollectGroupsHashes();
+      std::vector<shash::Any> gh = quota_mgr->CollectAllOpenHashes();
       std::string result;
       for (auto it = gh.begin(); it != gh.end(); ++it) {
         result += (*it).ToString() + "\n";
@@ -1871,10 +1871,11 @@ PosixQuotaManager::PosixQuotaManager(const uint64_t limit,
 
 
 PosixQuotaManager::~PosixQuotaManager() {
+  free(lock_open_files_);
+
   if (!initialized_)
     return;
 
-  free(lock_open_files_);
   if (shared_) {
     // Most of cleanup is done elsewhen by shared cache manager
     close(pipe_lru_[1]);
@@ -2291,7 +2292,7 @@ void *PosixQuotaManager::CollectMountpointsHashes(void *data) {
   pthread_exit(nullptr);
 }
 
-std::vector<shash::Any> PosixQuotaManager::CollectGroupsHashes() {
+std::vector<shash::Any> PosixQuotaManager::CollectAllOpenHashes() {
   std::vector<CollectorHandler *> handlers;
   std::vector<pthread_t *> threads;
   open_files_.clear();

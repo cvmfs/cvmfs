@@ -32,7 +32,6 @@ class Recorder;
  *
  * TODO(jblomer): split into client, server, and protocol classes.
  */
-class ListGroupsOpenHashesMagicXattr;
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
   FRIEND_TEST(T_QuotaManager, Cleanup);
@@ -40,7 +39,6 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
   FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
-  friend class ListGroupsOpenHashesMagicXattr;
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_workspace,
@@ -397,7 +395,7 @@ class PosixQuotaManager : public QuotaManager {
   bool cleanup_unused_first_;
   std::vector<std::string> mountpoints_;
 
-  std::vector<shash::Any> CollectGroupsHashes();
+  std::vector<shash::Any> CollectAllOpenHashes();
 
   struct CollectorHandler {
     std::vector<shash::Any> &of;
