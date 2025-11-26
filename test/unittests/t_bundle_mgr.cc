@@ -42,13 +42,13 @@ class MockFetcher : public cvmfs::Fetcher {
               download::DownloadManager *download_mgr,
               BackoffThrottle *backoff_throttle,
               perf::StatisticsTemplate statistics)
-    : Fetcher(cache_mgr, download_mgr, backoff_throttle, statistics),statistics_(statistics.statistics()) { 
-    };
+      : Fetcher(cache_mgr, download_mgr, backoff_throttle, statistics)
+      , statistics_(statistics.statistics()) { };
   int Fetch(const CacheManager::LabeledObject &object,
             const std::string &alt_url = "") override {
     return ++counter_;
   }
-  virtual ~MockFetcher(){delete statistics_;}
+  virtual ~MockFetcher() { delete statistics_; }
   void Reset() { counter_ = 0; }
 
   size_t counter_ = 0;
@@ -124,7 +124,11 @@ class T_BundleMgr : public ::testing::Test {
         64 * 1024, new perf::Statistics());
     mock_catalog_mgr_ = new testing::NiceMock<MockCatalogManager>(mount_point_);
     mock_inode_tracker_ = new testing::NiceMock<MockInodeTracker>();
-    mock_fetcher_ = new testing::NiceMock<MockFetcher>(nullptr, nullptr, nullptr, perf::StatisticsTemplate("fetch", new perf::Statistics()));
+    mock_fetcher_ = new testing::NiceMock<MockFetcher>(
+        nullptr,
+        nullptr,
+        nullptr,
+        perf::StatisticsTemplate("fetch", new perf::Statistics()));
     // Determine mock behavior
     ON_CALL(*mock_catalog_mgr_, LookupPath(testing::_, testing::_, testing::_))
         .WillByDefault([this](const PathString &,
@@ -169,7 +173,7 @@ class T_BundleMgr : public ::testing::Test {
         return UniquePtr<CacheManager::LabeledObject>{nullptr};
       }
     });
-    if (bundle_mgr_->fetcher_!=nullptr){
+    if (bundle_mgr_->fetcher_ != nullptr) {
       delete bundle_mgr_->fetcher_;
     }
 
@@ -262,6 +266,24 @@ TEST_F(T_BundleMgr, ExchangeCT) {
   test_blocking_exchange(algo);
   test_blocking_exchange(offset);
   test_blocking_exchange(string);
+}
+
+TEST_F(T_BundleMgr, ExchangeLabeledObjects) { 
+  shash::Any hash;
+  hash.Randomize(42);
+  CacheManager::Label label{};
+  UniquePtr<CacheManager::LabeledObject> object {new CacheManager::LabeledObject{hash,label}};
+
+  bundle_mgr_->SendLabeledObject(wfd_, object);
+  UniquePtr<CacheManager::LabeledObject> replied_obj = bundle_mgr_->ReceiveLabeledObject(rfd_);
+  EXPECT_TRUE(replied_obj.IsValid());
+
+  EXPECT_EQ(object->id,replied_obj->id);
+  EXPECT_EQ(object->label.flags,replied_obj->label.flags);
+  EXPECT_EQ(object->label.size,replied_obj->label.size);
+  EXPECT_EQ(object->label.zip_algorithm,replied_obj->label.zip_algorithm);
+  EXPECT_EQ(object->label.range_offset,replied_obj->label.range_offset);
+  EXPECT_EQ(object->label.path,replied_obj->label.path);
 }
 
 TEST_F(T_BundleMgr, Fetch) {

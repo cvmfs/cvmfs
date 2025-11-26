@@ -33,13 +33,14 @@ class BundleMgr : SingleCopy {
   static void *EstablishConnection(void *data);
   void SpawnFetchers();
   void JoinFetchers();
-  CacheManager::LabeledObject ReceiveLabeledObject(int fd) const;
-  bool SendLabeledObject(int fd,
-                         UniquePtr<CacheManager::LabeledObject> &obj) const;
+  UniquePtr<CacheManager::LabeledObject> ReceiveLabeledObject(int fd) const;
+  bool SendLabeledObject(
+      int fd, const UniquePtr<CacheManager::LabeledObject> &obj) const;
   bool TrySendData(int fd, UniquePtr<CacheManager::LabeledObject> &obj) const;
 
   // CT stands for contiguous type
-  template<typename CT>
+  template<typename CT,
+           typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
   void BlockingSend(int fd, const CT &obj, size_t size = sizeof(CT)) const {
     using T = std::remove_cv_t<CT>;
     static_assert(
@@ -56,7 +57,7 @@ class BundleMgr : SingleCopy {
     }
   }
 
-  void BlockingSend(int fd, const std::string &string) {
+  void BlockingSend(int fd, const std::string &string) const {
     size_t size = string.size();
     BlockingSend(fd, size);
     while ((::write(fd, string.data(), size * sizeof(char)))
@@ -67,7 +68,7 @@ class BundleMgr : SingleCopy {
 
   template<typename CT,
            typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
-  CT BlockingReceive(int fd) {
+  CT BlockingReceive(int fd) const {
     using T = std::remove_cv_t<CT>;
     static_assert(
         sizeof(T) <= PIPE_BUF,
@@ -77,7 +78,7 @@ class BundleMgr : SingleCopy {
     return item;
   }
 
-  std::string BlockingReceive(int fd) {
+  std::string BlockingReceive(int fd) const {
     size_t size = BlockingReceive<size_t>(fd);
     assert(size * sizeof(char) < PIPE_BUF);
     std::string result(size, '\t');

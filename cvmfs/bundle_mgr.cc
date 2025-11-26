@@ -139,8 +139,12 @@ void *BundleMgr::EstablishConnection(void *data) {
     bool terminate = false;
     switch (cmd) {
       case Command::kFetch: {
-        auto object = mgr->ReceiveLabeledObject(rfd);
-        mgr->fetcher_->Fetch(object);
+        auto obj = mgr->ReceiveLabeledObject(rfd);
+        if (not obj.IsValid()) {
+          LogCvmfs(kLogBungleMgr, kLogDebug, "Received a null object");
+          break;
+        }
+        mgr->fetcher_->Fetch(*obj);
       } break;
       case Command::kTerminate:
       default:
@@ -156,13 +160,29 @@ void *BundleMgr::EstablishConnection(void *data) {
   pthread_exit(nullptr);
 }
 
-CacheManager::LabeledObject BundleMgr::ReceiveLabeledObject(int fd) const {
-  (void)fd;
-  return CacheManager::LabeledObject(shash::Any{}, CacheManager::Label());
+UniquePtr<CacheManager::LabeledObject> BundleMgr::ReceiveLabeledObject(
+    int fd) const {
+  shash::Any id = BlockingReceive<shash::Any>(fd);
+  CacheManager::Label label;
+  label.flags=BlockingReceive<int>(fd);
+  label.size=BlockingReceive<uint64_t>(fd);
+  label.zip_algorithm=BlockingReceive<zlib::Algorithms>(fd);
+  label.range_offset=BlockingReceive<off_t>(fd);
+  label.path=BlockingReceive(fd);
+  CacheManager::LabeledObject* obj = new CacheManager::LabeledObject(id,label);
+  assert(obj!=nullptr);
+  return UniquePtr<CacheManager::LabeledObject>(obj);
 }
 
 bool BundleMgr::SendLabeledObject(
-    int fd, UniquePtr<CacheManager::LabeledObject> &obj) const {
+    int fd, const UniquePtr<CacheManager::LabeledObject> &obj) const {
+  BlockingSend(fd, obj->id);
+  BlockingSend(fd, obj->label.flags);
+  BlockingSend(fd, obj->label.size);
+  BlockingSend(fd, obj->label.zip_algorithm);
+  BlockingSend(fd, obj->label.range_offset);
+  const std::string &path=obj->label.path;
+  BlockingSend(fd, path);
   return true;
 }
 
@@ -179,7 +199,8 @@ bool BundleMgr::TrySendData(int fd,
     return false;
   } else {
     while (SendLabeledObject(fd, obj) != true) {
-      // If a Fetcher receives a kFetch command should receive the Labeled Object also.
+      // If a Fetcher receives a kFetch command should receive the Labeled
+      // Object also.
     }
   }
 
