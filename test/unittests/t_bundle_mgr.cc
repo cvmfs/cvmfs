@@ -5,6 +5,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <type_traits>
 #include <vector>
 
 #include "bundle_mgr.h"
@@ -178,6 +179,7 @@ class T_BundleMgr : public ::testing::Test {
     bundle_mgr_->bfm_ = bfm_;
     EXPECT_TRUE(bundle_mgr_);
     EXPECT_EQ(bundle_mgr_->bfm_, bfm_);
+    MakePipe(common_pipe_);
   }
 
   virtual void TearDown() {
@@ -194,6 +196,21 @@ class T_BundleMgr : public ::testing::Test {
     delete mount_point_;
     delete mock_fetcher_;
     delete bundle_mgr_;
+    ClosePipe(common_pipe_);
+  }
+
+  template<typename CT,
+           typename = std::enable_if_t<std::is_trivially_copyable_v<CT> > >
+  void test_blocking_exchange(const CT &obj) {
+    using T = std::remove_cv_t<CT>;
+    bundle_mgr_->BlockingSend(wfd_, obj);
+    T reply = bundle_mgr_->BlockingReceive<T>(rfd_);
+    EXPECT_EQ(obj, reply);
+  }
+  void test_blocking_exchange(const std::string&obj) {
+    bundle_mgr_->BlockingSend(wfd_, obj);
+    std::string reply = bundle_mgr_->BlockingReceive(rfd_);
+    EXPECT_EQ(obj, reply);
   }
 
  protected:
@@ -210,7 +227,6 @@ class T_BundleMgr : public ::testing::Test {
    */
   cvmfs::Uuid *uuid_dummy_;
 
-
   PathString trigger_file_path_;
   BundleMgr *bundle_mgr_;
 
@@ -225,7 +241,28 @@ class T_BundleMgr : public ::testing::Test {
   testing::NiceMock<MockCatalogManager> *mock_catalog_mgr_;
   testing::NiceMock<MockInodeTracker> *mock_inode_tracker_;
   testing::NiceMock<MockFetcher> *mock_fetcher_;
+
+  int common_pipe_[2];
+  int &rfd_ = common_pipe_[0];
+  int &wfd_ = common_pipe_[1];
 };
+
+TEST_F(T_BundleMgr, ExchangeCT) {
+  int integer = 42;
+  shash::Any hash;
+  uint64_t size = 42;
+  zlib::Algorithms algo{zlib::Algorithms::kNoCompression};
+  off_t offset = 42;
+  hash.Randomize(integer);
+  std::string string="Test_String";
+
+  test_blocking_exchange(integer);
+  test_blocking_exchange(hash);
+  test_blocking_exchange(size);
+  test_blocking_exchange(algo);
+  test_blocking_exchange(offset);
+  test_blocking_exchange(string);
+}
 
 TEST_F(T_BundleMgr, Fetch) {
   bfm_->Reset();
