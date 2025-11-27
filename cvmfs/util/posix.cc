@@ -783,13 +783,18 @@ std::string GetHostname() {
 
 /**
  * set(e){g/u}id wrapper.
+ *
+ * avoid_mutexes: if true, means that we are a forked child and must not use
+ * mutexes.
  */
-bool SwitchCredentials(const uid_t uid, const gid_t gid,
-                       const bool temporarily) {
-  LogCvmfs(kLogCvmfs, kLogDebug,
-           "current credentials uid %d gid %d "
-           "euid %d egid %d, switching to %d %d (temp: %d)",
-           getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
+bool SwitchCredentials(const uid_t uid, const gid_t gid, const bool temporarily,
+                       const bool avoid_mutexes) {
+  if (!avoid_mutexes) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "current credentials uid %d gid %d "
+             "euid %d egid %d, switching to %d %d (temp: %d)",
+             getuid(), getgid(), geteuid(), getegid(), uid, gid, temporarily);
+  }
   int retval = 0;
   if (temporarily) {
     if (gid != getegid())
@@ -805,8 +810,10 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
     }
     retval = setgid(gid) || setuid(uid);
   }
-  LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", retval,
-           errno);
+  if (!avoid_mutexes) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "switch credentials result %d (%d)", retval,
+             errno);
+  }
   return retval == 0;
 }
 
@@ -1901,6 +1908,7 @@ bool CloseAllFildes(const std::set<int> &preserve_fildes) {
  * process (dup2) using map_fildes.  Can be useful for
  * stdout/in/err redirection.
  * NOTE: The destination fildes have to be preserved!
+ * NOTE: For forked child, held mutexes have invalid state, avoid operations.
  * Does a double fork to detach child.
  * The command_line parameter contains the binary at index 0 and the arguments
  * in the rest of the vector.
@@ -1981,7 +1989,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false)) {
+    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false, true)) {
       failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }

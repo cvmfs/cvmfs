@@ -48,6 +48,7 @@ enum Failures {
   kFailNotFound,
   kFailServiceUnavailable,
   kFailRetry,
+  kFailInsufficientStorage,
   kFailOther,
 
   kFailNumEntries
@@ -66,7 +67,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[7] = "S3: service not available";
   texts[8] = "S3: unknown service error, perhaps wrong authentication protocol";
   texts[8] = "S3: too many requests, service asks for backoff and retry";
-  texts[9] = "no text";
+  texts[9] = "S3: Insufficient Storage";
+  texts[10] = "unclassified failure";
   return texts[error];
 }
 

@@ -22,7 +22,6 @@ script_location=$(portable_dirname $0)
 #  DEVEL_PACKAGE         location of the CernVM-FS devel package to install
 #  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
-#  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
 #  SHRINKWRAP_PACKAGE    location of the CernVM-FS shrinkwrap package
 #  GATEWAY_PACKAGE       location of the CernVM-FS gateway package
 #  LOG_DIRECTORY         location of the test log files to be created
@@ -34,7 +33,6 @@ SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
 FUSE3_PACKAGE=""
 DEVEL_PACKAGE=""
-UNITTEST_PACKAGE=""
 SHRINKWRAP_PACKAGE=""
 GATEWAY_PACKAGE=""
 CONFIG_PACKAGES=""
@@ -64,7 +62,7 @@ usage() {
 }
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:L:" option; do
+while getopts "s:c:d:k:t:l:w:n:p:f:D:C:L:" option; do
   case $option in
     L)
       LIBS_PACKAGE=$OPTARG
@@ -86,9 +84,6 @@ while getopts "s:c:d:k:t:g:l:w:n:p:f:D:C:L:" option; do
       ;;
     t)
       SOURCE_DIRECTORY=$OPTARG
-      ;;
-    g)
-      UNITTEST_PACKAGE=$OPTARG
       ;;
     p)
       SHRINKWRAP_PACKAGE=$OPTARG
@@ -125,7 +120,6 @@ fi
 if [ "x$(uname -s)" != "xDarwin" ]; then
     if [ "x$SERVER_PACKAGE"        = "x" ] ||
        [ "x$CONFIG_PACKAGES"       = "x" ] ||
-       [ "x$UNITTEST_PACKAGE"      = "x" ] ||
        [ "x$SHRINKWRAP_PACKAGE"    = "x" ] ||
        [ "x$DEVEL_PACKAGE"         = "x" ]; then
       echo "missing parameter(s), cannot run platform dependent test script"

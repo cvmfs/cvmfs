@@ -1,3 +1,10 @@
+
+cvmfs-release (4.7) unstable; urgency=low
+
+  * Force build with xz for debian 11 compatibility
+
+ -- Valentin Volkl <vavolkl@cern.ch>  Sat, 25 Oct 2025 13:20:00 +0200
+
 cvmfs-release (4.6-1) lucid; urgency=low
 
   * Add Debian 13 "trixie"

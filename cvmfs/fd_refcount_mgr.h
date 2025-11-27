@@ -22,7 +22,10 @@ static inline uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
 }
 
+class ListOpenHashesMagicXattr;  // FD needed to access fd_mgr_
 class FdRefcountMgr {
+  friend class ListOpenHashesMagicXattr;
+
  public:
   /**
    * Helper class containing the values for the map: fd -> refcount+id
@@ -72,3 +75,4 @@ class FdRefcountMgr {
 };
 
 #endif  // CVMFS_FD_REFCOUNT_MGR_H_
+

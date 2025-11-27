@@ -2462,6 +2462,17 @@ static int Init(const loader::LoaderExports *loader_exports) {
              ->do_refcount()) {
     cvmfs::check_fd_overflow_ = false;
   }
+  if (cvmfs::file_system_->cache_mgr()->id() == kPosixCacheManager) {
+    PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(
+        cvmfs::file_system_->cache_mgr());
+    if (pcm != nullptr) {
+      PosixQuotaManager *pqm = dynamic_cast<PosixQuotaManager *>(
+          pcm->quota_mgr());
+      if (pqm != nullptr) {
+        pqm->RegisterMountpoint(loader_exports->mount_point);
+      }
+    }
+  }
 
   cvmfs::mount_point_ = MountPoint::Create(loader_exports->repository_name,
                                            cvmfs::file_system_);
@@ -3141,3 +3152,4 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
+

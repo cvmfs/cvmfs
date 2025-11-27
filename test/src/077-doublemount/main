@@ -28,6 +28,11 @@ cvmfs_run_test() {
   sudo mount -t cvmfs grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_TWO" 2>&1 \
     | grep "$CVMFS_TEST077_MOUNTPOINT_ONE" \
     || return 21
+  # TODO(vvolkl) check mounting on same directory without the mount helper
+  # sudo cvmfs2 -o uid=996,gid=993 -d -f grid.cern.ch "$CVMFS_TEST077_MOUNTPOINT_ONE" 2>&1 \
+  #  | grep "$CVMFS_TEST077_MOUNTPOINT_ONE" \
+  #  || return 22
+
 
   return 0
 }

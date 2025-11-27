@@ -8,11 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "cache_posix.h"
 #include "catalog_mgr_client.h"
 #include "crypto/signature.h"
 #include "fetch.h"
 #include "mountpoint.h"
 #include "quota.h"
+#include "quota_posix.h"
 #include "util/logging.h"
 #include "util/string.h"
 
@@ -72,6 +74,9 @@ MagicXattrManager::MagicXattrManager(
 
   Register("user.authz", new AuthzMagicXattr());
   Register("user.external_url", new ExternalURLMagicXattr());
+
+  Register("user.cleanup_unused_first", new CleanupUnusedFirstMagicXattr());
+  Register("user.list_open_hashes", new ListOpenHashesMagicXattr());
 }
 
 std::string MagicXattrManager::GetListString(catalog::DirectoryEntry *dirent) {
@@ -800,3 +805,40 @@ void ExternalURLMagicXattr::FinalizeValue() {
 bool ExternalURLMagicXattr::PrepareValueFenced() {
   return dirent_->IsRegular() && dirent_->IsExternalFile();
 }
+
+void CleanupUnusedFirstMagicXattr::FinalizeValue() {
+  auto cm = xattr_mgr_->mount_point()->file_system()->cache_mgr();
+  PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
+  if (pcm != nullptr) {
+    if (pcm->cleanup_unused_first()) {
+      result_pages_.push_back("yes");
+    } else {
+      result_pages_.push_back("no");
+    }
+  } else {
+    result_pages_.push_back("no");
+  }
+}
+
+void ListOpenHashesMagicXattr::FinalizeValue() {
+  auto cm = xattr_mgr_->mount_point()->file_system()->cache_mgr();
+  PosixCacheManager *pcm = dynamic_cast<PosixCacheManager *>(cm);
+  std::string result;
+  if (pcm != nullptr) {
+    if (pcm->cleanup_unused_first()) {
+      if (pcm->fd_mgr_.IsValid()) {
+        const auto &hash_map = pcm->fd_mgr_->map_fd_;
+        auto empty = hash_map.empty_key();
+        auto *keys = hash_map.keys();
+        for (size_t i = 0; i < hash_map.capacity(); ++i) {
+          const shash::Any &hash = keys[i];
+          if (hash != empty) {
+            result += hash.ToString() + "\n";
+          }
+        }
+      }
+    }
+  }
+  result_pages_.push_back(result);
+}
+
