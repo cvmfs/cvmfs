@@ -102,10 +102,10 @@ void BundleMgr::JoinFetchers() {
 void BundleMgr::SpawnFetchers() {
   MakePipe(pipe_bm_);
 
-  size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
+  const size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
   for (size_t i = 0; i < size; ++i) {
     pthread_t thread;
-    int res = pthread_create(&thread, nullptr, EstablishConnection, this);
+    const int res = pthread_create(&thread, nullptr, EstablishConnection, this);
     if (res != 0) {
       continue;
     }
@@ -117,7 +117,7 @@ void BundleMgr::SpawnFetchers() {
     // n<=PIPE_BUF data on a non blocking pipe, it will either write all of them
     // or errno will be set to EAGAIN. PIPE_BUF is at least 512bytes on and
     // linux 4096bytes.
-    int flags = fcntl(fd, F_GETFL);
+    const int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     fetcher_pool_.push_back({thread, fd});
   }
@@ -132,7 +132,7 @@ void *BundleMgr::EstablishConnection(void *data) {
 
   WritePipe(wfd, &back_channel[1], sizeof(int));
 
-  int &rfd = back_channel[0];
+  const int &rfd = back_channel[0];
 
   Command cmd;
   while (read(rfd, &cmd, sizeof(Command)) == sizeof(Command)) {
@@ -189,8 +189,7 @@ bool BundleMgr::SendLabeledObject(
 bool BundleMgr::TrySendData(int fd,
                             UniquePtr<CacheManager::LabeledObject> &obj) const {
   Command cmd = Command::kFetch;
-  size_t n = write(fd, &cmd, sizeof(Command));
-  if (n != sizeof(Command)) {
+  if ((write(fd, &cmd, sizeof(Command))) != sizeof(Command)) {
     if (not(errno == EAGAIN || errno == EWOULDBLOCK)) {
       LogCvmfs(kLogBungleMgr,
                kLogDebug,
