@@ -4,12 +4,12 @@
 
 #ifndef CVMFS_BUNDLE_MGR_H_
 #define CVMFS_BUNDLE_MGR_H_
-#include <gtest/gtest_prod.h>
 
 #include <tuple>
 #include <type_traits>
 #include <vector>
 
+#include "duplex_testing.h"
 #include "file_bundle.h"
 #include "mountpoint.h"
 #include "shortstring.h"
