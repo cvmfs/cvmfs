@@ -87,8 +87,7 @@ void BundleMgr::JoinFetchers() {
       ts.tv_sec += 10;
       Command cmd = Command::kTerminate;
       WritePipe(fd, &cmd, sizeof(Command));
-      int res = pthread_timedjoin_np(thread, nullptr, &ts);
-      if (res != 0) {
+      if (pthread_timedjoin_np(thread, nullptr, &ts) != 0) {
         LogCvmfs(kLogBungleMgr,
                  kLogDebug,
                  "Fetcher is busy for too long. Detaching.");
@@ -102,10 +101,10 @@ void BundleMgr::JoinFetchers() {
 void BundleMgr::SpawnFetchers() {
   MakePipe(pipe_bm_);
 
-  size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
+  const size_t size = 1 + (bfm_->Size() / 30);  // Spawn at least one fetcher
   for (size_t i = 0; i < size; ++i) {
     pthread_t thread;
-    int res = pthread_create(&thread, nullptr, EstablishConnection, this);
+    const int res = pthread_create(&thread, nullptr, EstablishConnection, this);
     if (res != 0) {
       continue;
     }
@@ -117,7 +116,7 @@ void BundleMgr::SpawnFetchers() {
     // n<=PIPE_BUF data on a non blocking pipe, it will either write all of them
     // or errno will be set to EAGAIN. PIPE_BUF is at least 512bytes on and
     // linux 4096bytes.
-    int flags = fcntl(fd, F_GETFL);
+    const int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     fetcher_pool_.push_back({thread, fd});
   }
@@ -126,13 +125,13 @@ void BundleMgr::SpawnFetchers() {
 void *BundleMgr::EstablishConnection(void *data) {
   pthread_setname_np(pthread_self(), "bm_fetcher");
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
-  int wfd = mgr->pipe_bm_[1];
+  const int& wfd = mgr->pipe_bm_[1];
   int back_channel[2];
   MakePipe(back_channel);
 
   WritePipe(wfd, &back_channel[1], sizeof(int));
 
-  int &rfd = back_channel[0];
+  const int &rfd = back_channel[0];
 
   Command cmd;
   while (read(rfd, &cmd, sizeof(Command)) == sizeof(Command)) {
@@ -162,15 +161,15 @@ void *BundleMgr::EstablishConnection(void *data) {
 
 UniquePtr<CacheManager::LabeledObject> BundleMgr::ReceiveLabeledObject(
     int fd) const {
-  shash::Any id = BlockingReceive<shash::Any>(fd);
+  const shash::Any id = BlockingReceive<shash::Any>(fd);
   CacheManager::Label label;
-  label.flags=BlockingReceive<int>(fd);
-  label.size=BlockingReceive<uint64_t>(fd);
-  label.zip_algorithm=BlockingReceive<zlib::Algorithms>(fd);
-  label.range_offset=BlockingReceive<off_t>(fd);
-  label.path=BlockingReceive(fd);
-  CacheManager::LabeledObject* obj = new CacheManager::LabeledObject(id,label);
-  assert(obj!=nullptr);
+  label.flags = BlockingReceive<int>(fd);
+  label.size = BlockingReceive<uint64_t>(fd);
+  label.zip_algorithm = BlockingReceive<zlib::Algorithms>(fd);
+  label.range_offset = BlockingReceive<off_t>(fd);
+  label.path = BlockingReceive(fd);
+  CacheManager::LabeledObject *obj = new CacheManager::LabeledObject(id, label);
+  assert(obj != nullptr);
   return UniquePtr<CacheManager::LabeledObject>(obj);
 }
 
@@ -181,7 +180,7 @@ bool BundleMgr::SendLabeledObject(
   BlockingSend(fd, obj->label.size);
   BlockingSend(fd, obj->label.zip_algorithm);
   BlockingSend(fd, obj->label.range_offset);
-  const std::string &path=obj->label.path;
+  const std::string &path = obj->label.path;
   BlockingSend(fd, path);
   return true;
 }
@@ -189,8 +188,7 @@ bool BundleMgr::SendLabeledObject(
 bool BundleMgr::TrySendData(int fd,
                             UniquePtr<CacheManager::LabeledObject> &obj) const {
   Command cmd = Command::kFetch;
-  size_t n = write(fd, &cmd, sizeof(Command));
-  if (n != sizeof(Command)) {
+  if ((write(fd, &cmd, sizeof(Command))) != sizeof(Command)) {
     if (not(errno == EAGAIN || errno == EWOULDBLOCK)) {
       LogCvmfs(kLogBungleMgr,
                kLogDebug,

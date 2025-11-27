@@ -58,7 +58,7 @@ class BundleMgr : SingleCopy {
   }
 
   void BlockingSend(int fd, const std::string &string) const {
-    size_t size = string.size();
+    const size_t size = string.size();
     BlockingSend(fd, size);
     while ((::write(fd, string.data(), size * sizeof(char)))
            != static_cast<ssize_t>(size * sizeof(char))) {
@@ -79,7 +79,7 @@ class BundleMgr : SingleCopy {
   }
 
   std::string BlockingReceive(int fd) const {
-    size_t size = BlockingReceive<size_t>(fd);
+    const size_t size = BlockingReceive<size_t>(fd);
     assert(size * sizeof(char) < PIPE_BUF);
     std::string result(size, '\t');
     ::read(fd, static_cast<void *>(result.data()), size * sizeof(char));
