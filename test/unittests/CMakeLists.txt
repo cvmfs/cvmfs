@@ -448,6 +448,7 @@ set(CVMFS_UNITTEST_SOURCES
   t_wpad.cc
   t_xattr.cc
   t_bundle_mgr.cc
+  t_bundle_file_mgr.cc
 
   ${CVMFS_SOURCE_DIR}/acl.cc
   ${CVMFS_SOURCE_DIR}/authz/authz.cc

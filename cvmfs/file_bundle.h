@@ -7,9 +7,11 @@
 #ifndef CVMFS_FILE_BUNDLE_H_
 #define CVMFS_FILE_BUNDLE_H_
 
-#include "cache.h"         // LabeledObject
-#include "shortstring.h"   // PathString
-#include "util/pointer.h"  // UniquePtr
+#include "cache.h"
+#include "json_document.h"
+#include "shortstring.h"
+#include "util/pointer.h"
+#include "util/single_copy.h"
 
 /*
 
@@ -27,12 +29,24 @@ The file format should be versioned, with the header:
 
 */
 
-class BundleFileMgr {
+class BundleFileMgr : SingleCopy {
  public:
-  // TODO(christge): this is to be reverted. It's the basic interface needed to
-  // interact with the file bundle. Now there are some mocks for prototyping
-  BundleFileMgr(const PathString &bf) { }
-  virtual ~BundleFileMgr() = default;
+  BundleFileMgr() = default;
+  BundleFileMgr(const PathString &bf) : file_content_(nullptr) { }
+  BundleFileMgr(UniquePtr<JsonDocument> &fc) : file_content_(fc.Release()) { }
+  BundleFileMgr(JsonDocument *fc) : file_content_(fc) { fc = nullptr; }
+
+  void Manage(UniquePtr<JsonDocument> &fc) {
+    ReleaseDocument();
+    file_content_ = fc.Release();
+  }
+  void Manage(JsonDocument *fc) {
+    ReleaseDocument();
+    file_content_ = fc;
+  }
+
+  virtual ~BundleFileMgr() { ReleaseDocument(); }
+
   virtual UniquePtr<CacheManager::LabeledObject> GetNext() const {
     // TODO(christge): return actual labled objects
     CacheManager::Label label;
@@ -45,8 +59,19 @@ class BundleFileMgr {
 
   virtual size_t Size() const { return size_; }
 
+  operator bool() const {
+    return (file_content_ != nullptr) ? file_content_->IsValid() : false;
+  }
+
  private:
+  void ReleaseDocument() {
+    if (file_content_ != nullptr) {
+      delete file_content_;
+      file_content_ = nullptr;
+    }
+  }
   size_t size_ = 42;
+  JsonDocument *file_content_ = nullptr;
 };
 
 #endif
