@@ -20,7 +20,7 @@ CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 # retrieve the upstream version string from CVMFS
-cvmfs_prerelease="$(get_cvmfs_prerelase_from_cmake $CVMFS_SOURCE_LOCATION)"
+cvmfs_prerelease="$(get_cvmfs_prerelease_from_cmake $CVMFS_SOURCE_LOCATION)"
 cvmfs_version=${cvmfs_version}${cvmfs_prerelease}
 
 git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
