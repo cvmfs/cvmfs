@@ -80,7 +80,7 @@ static vector<string> get_all_dirs_from_sqlite(vector<string> &sqlite_db_vec,
 static string get_parent(const string &path);
 static string get_basename(const string &path);
 
-static XattrList marshal_xattrs(const char *acl);
+static bool marshal_xattrs(const char *acl, XattrList &result);
 static string sanitise_name(const char *name_cstr, bool allow_leading_slash);
 static void on_signal(int sig);
 static string acquire_lease(const string &key_id, const string &secret,
@@ -423,11 +423,12 @@ static string get_lease_from_paths(vector<string> paths) {
   return prefix;
 }
 
-static XattrList marshal_xattrs(const char *acl_string) {
+static bool marshal_xattrs(const char *acl_string, XattrList &result) {
   XattrList aclobj;
 
   if (acl_string == NULL || acl_string[0] == '\0') {
-    return aclobj;
+    result = aclobj;
+    return true;
   }
 
   bool equiv_mode;
@@ -438,9 +439,7 @@ static XattrList marshal_xattrs(const char *acl_string) {
   if (ret) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "failure of acl_from_text_to_xattr_value(%s)", acl_string);
-    assert(
-        0);  // TODO(vavolkl): incorporate error handling other than asserting
-    return aclobj;
+    return false;
   }
   if (!equiv_mode) {
     if (!aclobj.Set("system.posix_acl_access",
@@ -448,11 +447,13 @@ static XattrList marshal_xattrs(const char *acl_string) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "failed to set system.posix_acl_access (ACL size %ld)",
                binary_size);
+      return false;
     }
     free(binary_acl);
   }
 
-  return aclobj;
+  result = aclobj;
+  return true;
 }
 
 std::unordered_map<string, string> load_config(const string &config_file) {
@@ -1345,7 +1346,12 @@ int swissknife::IngestSQL::load_dirs(
 
     Directory dir(name, mtime, mode, owner, grp, nested);
     char *acl = (char *)sqlite3_column_text(stmt, 5);
-    dir.xattr = marshal_xattrs(acl);
+    bool ok = marshal_xattrs(acl, dir.xattr);
+    if (!ok) {
+      LogCvmfs(kLogCvmfs, kLogWarning, "Failed to marshal xattrs for dir '%s'",
+               name.c_str());
+      return 1;
+    }
     all_dirs.insert(std::make_pair(name, dir));
   }
   CHECK_SQLITE_ERROR(sqlite3_finalize(stmt), SQLITE_OK);
