@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 
 #include <type_traits>
-#include <vector>
 
 #include "bundle_mgr.h"
 #include "catalog_mgr_client.h"
