@@ -104,6 +104,11 @@ class CacheManager : SingleCopy {
     bool IsExternal() const { return flags & kLabelExternal; }
     bool IsCertificate() const { return flags & kLabelCertificate; }
 
+    bool operator==(const Label &other) const {
+      return flags == other.flags and size == other.size
+             and zip_algorithm == other.zip_algorithm
+             and range_offset == other.range_offset and path == other.path;
+    }
     /**
      * The description for the quota manager
      */
@@ -139,6 +144,10 @@ class CacheManager : SingleCopy {
   struct LabeledObject {
     explicit LabeledObject(const shash::Any &id) : id(id), label() { }
     LabeledObject(const shash::Any &id, const Label &l) : id(id), label(l) { }
+
+    bool operator==(const LabeledObject &other) const {
+      return id == other.id && label == other.label;
+    }
 
     shash::Any id;
     Label label;
@@ -252,3 +261,4 @@ class CacheManager : SingleCopy {
 };  // class CacheManager
 
 #endif  // CVMFS_CACHE_H_
+
