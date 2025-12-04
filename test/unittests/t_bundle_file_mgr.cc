@@ -11,15 +11,15 @@
 #include "crypto/hash.h"
 #include "file_bundle.h"
 #include "json_document.h"
-#include "shortstring.h"
 #include "util/pointer.h"
 
 class T_BundleFileMgr : public ::testing::Test {
  protected:
   virtual void SetUp() {
     InitObjects(42);
-    UniquePtr<JsonDocument> json_doc(JsonDocument::Create("{}"));
+    UniquePtr<JsonDocument> json_doc(JsonDocument::Create(CreateJsonTxt()));
     EXPECT_TRUE(json_doc->IsValid());
+    EXPECT_TRUE(json_doc.weak_ref()!=nullptr);
     bfm_.Manage(json_doc);
     EXPECT_TRUE(bfm_);
   }
@@ -92,6 +92,14 @@ class T_BundleFileMgr : public ::testing::Test {
       objects_.push_back(CacheManager::LabeledObject(hash, label));
     }
   }
+  std::string CreateJsonTxt(){
+    std::string result{"{\"labeled_objects\":["};
+    for(size_t i=0; i<objects_.size();++i){
+      result+=ToJsonStr(objects_[i]);
+    }
+    result+="]}";
+    return result;
+  }
 };
 
 TEST_F(T_BundleFileMgr, Conversions) {
@@ -103,8 +111,7 @@ TEST_F(T_BundleFileMgr, Conversions) {
   }
 }
 
-TEST_F(T_BundleFileMgr, Construction) {
-  PathString path("test_string");
-  BundleFileMgr mgr(path);
+TEST_F(T_BundleFileMgr, Size) {
+  EXPECT_EQ(objects_.size(),bfm_.Size());
 }
 

@@ -7,6 +7,8 @@
 #ifndef CVMFS_FILE_BUNDLE_H_
 #define CVMFS_FILE_BUNDLE_H_
 
+#include <json.h>
+
 #include "cache.h"
 #include "json_document.h"
 #include "shortstring.h"
@@ -27,6 +29,10 @@ The file format should be versioned, with the header:
 
 ? end marker
 
+The json file should contain an array of labeled objects as follows:
+{
+"labeled_objects":[{"id":{"algorithm":%d,"suffix":"%c","digest":"%s"},"label":{"flags":%d,"size":%PRIu64,"zip_algorithm":%d,"range_offset":%d,"path":"%s"}}]
+}
 */
 
 class BundleFileMgr : SingleCopy {
@@ -36,13 +42,11 @@ class BundleFileMgr : SingleCopy {
   BundleFileMgr(UniquePtr<JsonDocument> &fc) : file_content_(fc.Release()) { }
   BundleFileMgr(JsonDocument *fc) : file_content_(fc) { fc = nullptr; }
 
-  void Manage(UniquePtr<JsonDocument> &fc) {
-    ReleaseDocument();
-    file_content_ = fc.Release();
-  }
+  void Manage(UniquePtr<JsonDocument> &fc) { Manage(fc.Release()); }
   void Manage(JsonDocument *fc) {
     ReleaseDocument();
     file_content_ = fc;
+    UpdateSize();
   }
 
   virtual ~BundleFileMgr() { ReleaseDocument(); }
@@ -64,13 +68,25 @@ class BundleFileMgr : SingleCopy {
   }
 
  private:
+  void UpdateSize() {
+    if (not file_content_) {
+      size_ = 0;
+    } else {
+      auto *ptr = JsonDocument::SearchInObject(file_content_->root(),
+                                               "labeled_objects", JSON_ARRAY);
+      size_ = 0;
+      for (ptr = ptr->first_child; ptr != nullptr; ptr = ptr->next_sibling) {
+        ++size_;
+      }
+    }
+  }
   void ReleaseDocument() {
     if (file_content_ != nullptr) {
       delete file_content_;
       file_content_ = nullptr;
     }
   }
-  size_t size_ = 42;
+  size_t size_ = 0;
   JsonDocument *file_content_ = nullptr;
 };
 
