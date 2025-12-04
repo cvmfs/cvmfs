@@ -102,7 +102,7 @@ class T_BundleFileMgr : public ::testing::Test {
   }
 };
 
-TEST_F(T_BundleFileMgr, Conversions) {
+TEST_F(T_BundleFileMgr, CheckConversions) {
   for (size_t i = 0; i < objects_.size(); ++i) {
     auto *obj = ToLabeledObject(ToJsonStr(objects_[i]));
     EXPECT_EQ(objects_[i].id, (obj)->id);
@@ -111,7 +111,7 @@ TEST_F(T_BundleFileMgr, Conversions) {
   }
 }
 
-TEST_F(T_BundleFileMgr, Size) {
+TEST_F(T_BundleFileMgr, TestSize) {
   EXPECT_EQ(objects_.size(),bfm_.Size());
 }
 
