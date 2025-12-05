@@ -115,3 +115,11 @@ TEST_F(T_BundleFileMgr, TestSize) {
   EXPECT_EQ(objects_.size(),bfm_.Size());
 }
 
+TEST_F(T_BundleFileMgr, TestGetNext) {
+  for(size_t i=0; i<objects_.size(); ++i){
+    auto obj = bfm_.GetNext();
+    EXPECT_TRUE(obj.IsValid());
+    EXPECT_EQ(*(obj),objects_[i]);
+  }
+  EXPECT_TRUE(bfm_.GetNext().weak_ref() == nullptr);
+}
