@@ -52,9 +52,9 @@ class XattrList {
 
  private:
   struct XattrHeader {
-    XattrHeader() : version(kVersion), num_xattrs(0) { }
+    XattrHeader() : version(kVersionSmall), num_xattrs(0) { }
     explicit XattrHeader(const uint8_t num_xattrs)
-        : version(kVersion), num_xattrs(num_xattrs) { }
+        : version(kVersionSmall), num_xattrs(num_xattrs) { }
     uint8_t version;
     uint8_t num_xattrs;
   };
