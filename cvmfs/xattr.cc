@@ -104,11 +104,11 @@ XattrList *XattrList::Deserialize(const unsigned char *inbuf,
   for (unsigned i = 0; i < header.num_xattrs; ++i) {
     std::string key;
     std::string value;
-    uint32_t nbytes =
+    const uint32_t nbytes =
       entry_serializer.Deserialize(bufpos, remain, &key, &value);
     if (nbytes == 0)
       return NULL;
-    bool retval = result->Set(key, value);
+    const bool retval = result->Set(key, value);
     if (!retval)
       return NULL;
 
