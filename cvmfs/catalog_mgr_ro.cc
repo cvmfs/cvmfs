@@ -44,25 +44,30 @@ LoadReturn SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
     *catalog_hash = hash;
     // catalog is cached in "cache_dir/" + standard cvmfs file hierarchy
     if (FileExists(tmp_path.c_str())) {
-      LogCvmfs(kLogCvmfs, kLogSyslog, "LoadCatalog: serving catalog %s from cache", effective_hash.ToString().c_str() );
-        const std::string cache_path = tmp_path;
-        const std::string tmp_path = CopyCatalogToTempFile(cache_path);
-        *catalog_path=tmp_path;
-        return kLoadNew;
+      LogCvmfs(kLogCvmfs, kLogSyslog,
+               "LoadCatalog: serving catalog %s from cache",
+               effective_hash.ToString().c_str());
+      const std::string cache_path = tmp_path;
+      const std::string tmp_path = CopyCatalogToTempFile(cache_path);
+      *catalog_path = tmp_path;
+      return kLoadNew;
     }
     // file not cached yet
     // open file to download into "cache_dir/" + standard cvmfs file hierarchy
     // open temporary file to write it to, then atomically rename to destination
     fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
     if (!fcatalog) {
-      PANIC(kLogStderr, "failed to create file in cache.server when loading %s",
-                        url.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to create file in cache.server when loading %s",
+               url.c_str());
+      return kLoadFail;
     }
   } else {  // no local cache; just create a random tmp file for download
     fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w", &tmp_path);
     if (!fcatalog) {
-      PANIC(kLogStderr, "failed to create temp file when loading %s",
-                        url.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to create temp file when loading %s", url.c_str());
+      return kLoadFail;
     }
     *catalog_path=tmp_path;
   }
@@ -77,15 +82,19 @@ LoadReturn SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   if (retval != download::kFailOk) {
     unlink(catalog_path->c_str());
-    PANIC(kLogStderr, "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
-          retval, download::Code2Ascii(retval));
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(), retval,
+             download::Code2Ascii(retval));
+      return kLoadFail;
   }
 
   if(UseLocalCache()) {
     assert(tmp_path!="");
     int const ret = rename( tmp_path.c_str(), catalog_path->c_str() );
     if (ret!=0) {
-      PANIC(kLogStderr, "failed to rename %s to %s: errno= %d", tmp_path.c_str(), catalog_path->c_str(), errno );
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to rename %s to %s: errno= %d",
+               tmp_path.c_str(), catalog_path->c_str(), errno);
+      return kLoadFail;
     }
   }
 
