@@ -1846,7 +1846,10 @@ void WritableCatalogManager::CatalogDownloadCallback(
   {
     MutexLockGuard const guard(catalog_download_lock_);
     auto it = catalog_download_map_.find(result.hash);
-    assert(it != catalog_download_map_.end());
+    if (it == catalog_download_map_.end()) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "failed to download a catalog '%s' (hash %s)", result.db_path.c_str(), result.hash.c_str());
+      return;
+    }
     downloaded_catalog = it->second;
   }
 
