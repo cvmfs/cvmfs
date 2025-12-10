@@ -87,8 +87,7 @@ void BundleMgr::JoinFetchers() {
       ts.tv_sec += 10;
       Command cmd = Command::kTerminate;
       WritePipe(fd, &cmd, sizeof(Command));
-      int res = pthread_timedjoin_np(thread, nullptr, &ts);
-      if (res != 0) {
+      if (pthread_timedjoin_np(thread, nullptr, &ts) != 0) {
         LogCvmfs(kLogBungleMgr,
                  kLogDebug,
                  "Fetcher is busy for too long. Detaching.");
@@ -126,7 +125,7 @@ void BundleMgr::SpawnFetchers() {
 void *BundleMgr::EstablishConnection(void *data) {
   pthread_setname_np(pthread_self(), "bm_fetcher");
   BundleMgr *mgr = static_cast<BundleMgr *>(data);
-  int wfd = mgr->pipe_bm_[1];
+  const int& wfd = mgr->pipe_bm_[1];
   int back_channel[2];
   MakePipe(back_channel);
 
@@ -164,13 +163,13 @@ UniquePtr<CacheManager::LabeledObject> BundleMgr::ReceiveLabeledObject(
     int fd) const {
   shash::Any id = BlockingReceive<shash::Any>(fd);
   CacheManager::Label label;
-  label.flags=BlockingReceive<int>(fd);
-  label.size=BlockingReceive<uint64_t>(fd);
-  label.zip_algorithm=BlockingReceive<zlib::Algorithms>(fd);
-  label.range_offset=BlockingReceive<off_t>(fd);
-  label.path=BlockingReceive(fd);
-  CacheManager::LabeledObject* obj = new CacheManager::LabeledObject(id,label);
-  assert(obj!=nullptr);
+  label.flags = BlockingReceive<int>(fd);
+  label.size = BlockingReceive<uint64_t>(fd);
+  label.zip_algorithm = BlockingReceive<zlib::Algorithms>(fd);
+  label.range_offset = BlockingReceive<off_t>(fd);
+  label.path = BlockingReceive(fd);
+  CacheManager::LabeledObject *obj = new CacheManager::LabeledObject(id, label);
+  assert(obj != nullptr);
   return UniquePtr<CacheManager::LabeledObject>(obj);
 }
 
@@ -181,7 +180,7 @@ bool BundleMgr::SendLabeledObject(
   BlockingSend(fd, obj->label.size);
   BlockingSend(fd, obj->label.zip_algorithm);
   BlockingSend(fd, obj->label.range_offset);
-  const std::string &path=obj->label.path;
+  const std::string &path = obj->label.path;
   BlockingSend(fd, path);
   return true;
 }
