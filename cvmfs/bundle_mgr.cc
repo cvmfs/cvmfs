@@ -161,7 +161,7 @@ void *BundleMgr::EstablishConnection(void *data) {
 
 UniquePtr<CacheManager::LabeledObject> BundleMgr::ReceiveLabeledObject(
     int fd) const {
-  shash::Any id = BlockingReceive<shash::Any>(fd);
+  const shash::Any id = BlockingReceive<shash::Any>(fd);
   CacheManager::Label label;
   label.flags = BlockingReceive<int>(fd);
   label.size = BlockingReceive<uint64_t>(fd);
