@@ -6,6 +6,7 @@
 
 #ifndef CVMFS_UTIL_PLATFORM_OSX_H_
 #define CVMFS_UTIL_PLATFORM_OSX_H_
+#ifdef __APPLE__
 
 #include <alloca.h>
 #include <dirent.h>
@@ -325,4 +326,5 @@ inline uint16_t platform_le16toh(uint16_t little_endian_16bits) {
 inline int prctl(int, uint64_t, uint64_t, uint64_t, uint64_t) { return 0; }
 #define PR_SET_DUMPABLE 0
 
+#endif // __APPLE__
 #endif  // CVMFS_UTIL_PLATFORM_OSX_H_
