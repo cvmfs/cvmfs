@@ -21,9 +21,9 @@
  * to support POSIX file capabilities.  Cvmfs' support for custom extended
  * attributes is limited to 256 attributes, with names <= 255 characters and
  * values <= 64k bytes. Note that values > 255 characters require cvmfs
- * version >= 2.12.  Earlier versions will ignore big attributes.
- * Attribute names must not be the empty string and must not contain the
- * zero character.  There are no restrictions on the content.
+ * version >= 2.14.  Earlier versions will ignore all xattrs for a file
+ * if a big one is set. Attribute names must not be the empty string and
+ * must not contain the zero character. There are no restrictions on the content.
  */
 class XattrList {
  public:

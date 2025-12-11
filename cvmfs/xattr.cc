@@ -21,7 +21,7 @@
 using namespace std;  // NOLINT
 
 const uint8_t XattrList::kVersionSmall = 1;
-const uint8_t XattrList::kVersionBig = 2;  // As of cvmfs 2.12
+const uint8_t XattrList::kVersionBig = 2;  // As of cvmfs 2.14
 
 /**
  * Converts all the extended attributes of path into a XattrList.  Attributes
