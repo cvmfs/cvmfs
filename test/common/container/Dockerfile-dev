@@ -41,6 +41,7 @@ RUN dnf install -y \
     attr \
     autofs \
     bind-utils \
+    e2fsprogs \
     fuse \
     fuse3 \
     gcc \
