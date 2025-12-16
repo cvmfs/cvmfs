@@ -66,14 +66,14 @@ const char kSuffixMetainfo = 'M';
  * When the maximum digest size changes, the memory layout of DirectoryEntry and
  * PosixQuotaManager::LruCommand changes, too!
  */
-const unsigned kDigestSizes[] = {16, 20, 20, 20, 20};
+constexpr unsigned kDigestSizes[] = {16, 20, 20, 20, 20};
 // Md5  Sha1  Rmd160  Shake128  Any
-const unsigned kMaxDigestSize = 20;
+constexpr unsigned kMaxDigestSize = 20;
 
 /**
  * The maximum of GetContextSize()
  */
-const unsigned kMaxContextSize = 256;
+constexpr unsigned kMaxContextSize = 256;
 
 /**
  * Hex representations of hashes with the same length need a suffix
@@ -472,7 +472,31 @@ struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Md5 CastToMd5();
 };
 
+struct CVMFS_EXPORT Short : public Digest<kMaxDigestSize / 4, kAny> {
+  explicit Short(const Any &full)
+      : Digest<kMaxDigestSize / 4, kAny>()
+      , digest_size_(kDigestSizes[full.algorithm] / 4) {
+    algorithm = full.algorithm;
+    suffix = full.suffix;
+    memcpy(digest, full.digest, digest_size_);
+  }
 
+  bool operator==(const Short &other) const {
+    if (this->algorithm != other.algorithm) {
+      return false;
+    }
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      if (this->digest[i] != other.digest[i])
+        return false;
+    }
+    return true;
+  }
+
+  bool collide(const Any &other) const { return *this == Short(other); }
+
+ private:
+  const size_t digest_size_;
+};
 /**
  * Actual operations on digests, like "hash a file", "hash a buffer", or
  * iterative operations.
@@ -548,3 +572,4 @@ CVMFS_EXPORT Any MkFromSuffixedHexPtr(const HexPtr hex);
 #endif
 
 #endif  // CVMFS_CRYPTO_HASH_H_
+

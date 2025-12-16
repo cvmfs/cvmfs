@@ -21,6 +21,21 @@
 
 using namespace std;  // NOLINT
 
+class RandomHashGenerator {
+ public:
+  explicit RandomHashGenerator(Prng &rng) : rng_(rng) { }
+
+  shash::Any operator()() {
+    const shash::Algorithms type = static_cast<shash::Algorithms>(rng_.Next(3));
+    shash::Any result_hash(type);
+    result_hash.Randomize(&rng_);
+    return result_hash;
+  }
+
+ private:
+  Prng &rng_;
+};
+
 TEST(T_Shash, ContextSize) {
   unsigned max_size = 0;
   for (int i = 0; i < shash::kAny; ++i) {
@@ -1249,4 +1264,13 @@ TEST(T_Shash, Sha256) {
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       hash.c_str());
 #endif
+}
+
+TEST(T_Shash, ShortHash) {
+  Prng rng;
+  rng.InitSeed(42);
+  RandomHashGenerator random_hash_generator(rng);
+  auto hash = random_hash_generator();
+  shash::Short short_hash(hash);
+  EXPECT_TRUE(short_hash.collide(hash));
 }
