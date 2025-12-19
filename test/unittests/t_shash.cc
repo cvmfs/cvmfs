@@ -1273,4 +1273,5 @@ TEST(T_Shash, ShortHash) {
   auto hash = random_hash_generator();
   shash::Short short_hash(hash);
   EXPECT_TRUE(short_hash.collide(hash));
+  EXPECT_FALSE(short_hash.collide(random_hash_generator()));
 }
