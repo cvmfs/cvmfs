@@ -151,7 +151,7 @@ struct CVMFS_EXPORT Digest {
       return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
-    char ToHex(const char c) const {
+    static char ToHex(const char c) {
       return static_cast<char>(c + ((c <= 9) ? '0' : 'a' - 10));
     }
 
@@ -472,17 +472,21 @@ struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Md5 CastToMd5();
 };
 
-struct CVMFS_EXPORT Short : public Digest<kMaxDigestSize / 4, kAny> {
-  explicit Short(const Any &full)
-      : Digest<kMaxDigestSize / 4, kAny>()
-      , digest_size_(kDigestSizes[full.algorithm] / 4) {
+constexpr size_t kShortDigestSize = kMaxDigestSize;
+struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
+  explicit Short(const Any &full) : Digest<kShortDigestSize, kAny>() {
     algorithm = full.algorithm;
     suffix = full.suffix;
-    memcpy(digest, full.digest, digest_size_);
+    digest_size_ = kShortDigestSize / 4;
+    hex_size_ = 2 * digest_size_ + kAlgorithmIdSizes[algorithm];
+    memcpy(digest, full.digest, kShortDigestSize);
   }
 
   bool operator==(const Short &other) const {
     if (this->algorithm != other.algorithm) {
+      return false;
+    }
+    if (this->digest_size_ != other.digest_size_) {
       return false;
     }
     for (unsigned i = 0; i < digest_size_; ++i) {
@@ -492,10 +496,29 @@ struct CVMFS_EXPORT Short : public Digest<kMaxDigestSize / 4, kAny> {
     return true;
   }
 
+  std::string ToString(const bool with_suffix = false) {
+    Hex hex(this);
+    const bool use_suffix = with_suffix && HasSuffix();
+    const unsigned string_length = hex_size_ + use_suffix;
+    std::string result(string_length, 0);
+
+    for (unsigned int i = 0; i < hex_size_; ++i) {
+      result[i] = hex[i];
+    }
+
+    if (use_suffix) {
+      result[string_length - 1] = suffix;
+    }
+
+    assert(result.length() == string_length);
+    return result;
+  }
+
   bool collide(const Any &other) const { return *this == Short(other); }
 
  private:
-  const size_t digest_size_;
+  size_t digest_size_;
+  size_t hex_size_;
 };
 /**
  * Actual operations on digests, like "hash a file", "hash a buffer", or
