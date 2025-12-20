@@ -514,9 +514,16 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
     return result;
   }
 
-  // TODO(christge):
-  // avoid memcpy for comparison. Compare here directly
-  bool Collide(const Any &other) const { return *this == Short(other); }
+  bool Collide(const Any &other) const {
+    if (this->algorithm != other.algorithm) {
+      return false;
+    }
+    for (unsigned i = 0; i < digest_size_; ++i) {
+      if (this->digest[i] != other.digest[i])
+        return false;
+    }
+    return true;
+  }
 
  private:
   size_t digest_size_;
