@@ -514,7 +514,7 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
     return result;
   }
 
-  bool collide(const Any &other) const { return *this == Short(other); }
+  bool Collide(const Any &other) const { return *this == Short(other); }
 
  private:
   size_t digest_size_;
