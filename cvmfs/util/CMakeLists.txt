@@ -8,6 +8,7 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS OR BUILD_LIBCVMFS_CACHE OR
 
 set (LIBCVMFS_UTIL_SOURCES
   util/algorithm.cc
+  util/capabilities.cc
   util/concurrency.cc
   util/exception.cc
   util/file_backed_buffer.cc
@@ -24,6 +25,7 @@ set (LIBCVMFS_UTIL_CFLAGS "-D_FILE_OFFSET_BITS=64 -DCVMFS_LIBRARY -DCVMFS_RAISE_
 set (LIBCVMFS_UTIL_LINK_LIBRARIES "")
 list (APPEND LIBCVMFS_UTIL_LINK_LIBRARIES
       ${UUID_LIBRARIES}
+      ${CAP_LIBRARIES}
       ${RT_LIBRARY}
       pthread
       dl)

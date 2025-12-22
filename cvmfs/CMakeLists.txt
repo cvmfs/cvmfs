@@ -167,6 +167,7 @@ if (BUILD_CVMFS)
   #
   add_executable (cvmfs2
                   fuse_main.cc
+                  util/capabilities.cc
                   util/exception.cc
                   util/logging.cc
                   util/posix.cc
@@ -174,9 +175,8 @@ if (BUILD_CVMFS)
   )
   set_target_properties (cvmfs2 PROPERTIES
     COMPILE_FLAGS "-DCVMFS_NAMESPACE_GUARD=stub -DCVMFS_FUSE_MODULE"
-    LINK_FLAGS    "-ldl"
   )
-  target_link_libraries(cvmfs2 pthread dl)
+  target_link_libraries(cvmfs2 pthread dl ${CAP_LIBRARIES})
 
   #
   # /usr/lib/libcvmfs_fuse_stub[3]
@@ -191,6 +191,7 @@ if (BUILD_CVMFS)
        options.cc
        sanitizer.cc
        statistics.cc
+       util/capabilities.cc
        util/exception.cc
        util/logging.cc
        util/posix.cc
@@ -656,7 +657,6 @@ if (BUILD_SERVER)
        supervisor.cc
        swissknife.cc
        swissknife_assistant.cc
-       swissknife_capabilities.cc
        swissknife_check.cc
        swissknife_gc.cc
        swissknife_graft.cc
@@ -707,7 +707,6 @@ if (BUILD_SERVER)
         ${OPENSSL_LIBRARIES}
         ${RT_LIBRARY}
         ${VJSON_LIBRARIES}
-        ${CAP_LIBRARIES}
         LibArchive::LibArchive
         pthread
         dl
@@ -821,7 +820,6 @@ if (BUILD_SERVER)
         ${SQLITE3_LIBRARY}
         ${ZLIB_LIBRARIES}
         ${VJSON_LIBRARIES}
-        ${CAP_LIBRARIES}
         LibArchive::LibArchive
         ${RT_LIBRARY}
         pthread
@@ -1161,7 +1159,6 @@ if (BUILD_SHRINKWRAP)
   endif ()
 
   add_executable (cvmfs_shrinkwrap
-                  monitor.cc
                   shrinkwrap/fs_traversal.cc
                   shrinkwrap/fs_traversal_libcvmfs.cc
                   shrinkwrap/posix/data_dir_mgmt.cc

@@ -35,12 +35,13 @@ class Watchdog : SingleCopy {
   /**
    * Crash cleanup handler signature.
    */
-  typedef void (*FnOnCrash)(void);
+  typedef void (*FnOnExit)(const bool crashed);
 
-  static Watchdog *Create(FnOnCrash on_crash);
+  static Watchdog *Create(FnOnExit on_exit);
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
+  void ClearOnExitFn() { on_exit_ = 0; }
 
   /**
    * Signals that watchdog should not receive. If it does, report and exit.
@@ -64,6 +65,7 @@ class Watchdog : SingleCopy {
     enum Flags {
       kProduceStacktrace = 0,
       kQuit,
+      kQuitWithExit,
       kSupervise,
       kUnknown,
     };
@@ -89,7 +91,7 @@ class Watchdog : SingleCopy {
                                       void *context);
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
-  explicit Watchdog(FnOnCrash on_crash);
+  explicit Watchdog(FnOnExit on_exit);
   void Fork();
   bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);
@@ -109,7 +111,7 @@ class Watchdog : SingleCopy {
   /// Send the terminate signal to the listener
   UniquePtr<Pipe<kPipeThreadTerminator> > pipe_terminate_;
   pthread_t thread_listener_;
-  FnOnCrash on_crash_;
+  FnOnExit on_exit_;
   platform_spinlock lock_handler_;
   stack_t sighandler_stack_;
   SigactionMap old_signal_handlers_;

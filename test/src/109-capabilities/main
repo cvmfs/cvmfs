@@ -1,0 +1,94 @@
+#!/bin/bash
+
+cvmfs_test_name="Client capabilities check"
+cvmfs_test_autofs_on_startup=false
+cvmfs_test_suites="quick"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  if running_on_osx; then
+    echo "Skipping test on macOS"
+    return 0
+  fi
+
+  local repo=lhcb.cern.ch
+
+  # mount a repository
+  cvmfs_mount $repo || return 1
+  trap "sudo umount -l /cvmfs/${repo}" EXIT
+
+  ls /cvmfs/${repo} || return 2
+
+  local pid
+  local cap
+  local dec
+
+  echo "check default capabilities on the main fuse cvmfs process"
+  pid=$(sudo cvmfs_talk -i $repo pid)
+  [ -n "$pid" ] || return 10
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "cap_dac_read_search" ] || return 11
+
+  echo "check default capabilities on the watchdog cvmfs process"
+  pid=$(sudo cvmfs_talk -i $repo pid watchdog)
+  [ -n "$pid" ] || return 12
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "cap_sys_ptrace,cap_sys_admin" ] || return 13
+  cap="$(sudo sed -n 's/^CapInh:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapInh: $dec"
+  [ "$dec" == "cap_sys_ptrace" ] || return 14
+
+  echo "check default capabilities on the main cache manager process"
+  pid=$(sudo cvmfs_talk -i $repo pid cachemgr)
+  [ -n "$pid" ] || return 15
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "" ] || return 16
+
+  echo "reloading $repo"
+  sudo cvmfs_config reload $repo || return 20
+
+  echo "check env-reading capabilities on the main fuse cvmfs process after reload"
+  pid=$(sudo cvmfs_talk -i $repo pid)
+  [ -n "$pid" ] || return 30
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "cap_dac_read_search" ] || return 31
+
+  echo "check env-reading capabilities on the watchdog cvmfs process"
+  pid=$(sudo cvmfs_talk -i $repo pid watchdog)
+  [ -n "$pid" ] || return 32
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "cap_sys_ptrace,cap_sys_admin" ] || return 33
+  cap="$(sudo sed -n 's/^CapInh:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapInh: $dec"
+  [ "$dec" == "cap_sys_ptrace" ] || return 34
+
+  echo "check default capabilities on the main cache manager process"
+  pid=$(sudo cvmfs_talk -i $repo pid cachemgr)
+  [ -n "$pid" ] || return 35
+
+  cap="$(sudo sed -n 's/^CapPrm:[^0]*//p' /proc/$pid/status)"
+  dec="$(capsh --decode=$cap|cut -d= -f2)"
+  echo "CapPrm: $dec"
+  [ "$dec" == "" ] || return 36
+
+  return 0
+}
+

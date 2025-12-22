@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-// Internal use, include only logging.h!
+// Internal use, included only by logging.h and logging.cc!
 
 #ifndef CVMFS_UTIL_LOGGING_INTERNAL_H_
 #define CVMFS_UTIL_LOGGING_INTERNAL_H_

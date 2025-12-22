@@ -60,6 +60,7 @@
 #include <utility>
 #include <vector>
 
+#include "authz/authz_fetch.h"
 #include "authz/authz_session.h"
 #include "auto_umount.h"
 #include "backoff.h"
@@ -104,6 +105,9 @@
 #include "telemetry_aggregator.h"
 #include "tracer.h"
 #include "util/algorithm.h"
+#include "util/atomic.h"
+#include "util/capabilities.h"
+#include "util/concurrency.h"
 #include "util/exception.h"
 #include "util/logging.h"
 #include "util/mutex.h"
@@ -2437,7 +2441,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Monitor, check for maximum number of open files
   if (cvmfs::UseWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
-    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnCrash);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit);
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
@@ -2560,7 +2564,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
 
 /**
- * Things that have to be executed after fork() / daemon()
+ * Things that have to be executed after fork() / daemon().
+ * Reduces capabilities for the processes or threads that don't need
+ * them, including the current thread.
  */
 static void Spawn() {
   // First thing: kick off the watchdog while we still have a single-threaded
@@ -2569,6 +2575,23 @@ static void Spawn() {
   if (cvmfs::watchdog_) {
     cvmfs::watchdog_->Spawn(GetCurrentWorkingDirectory() + "/stacktrace."
                             + cvmfs::mount_point_->fqrn());
+  }
+
+  cvmfs::mount_point_->authz_fetcher()->CheckHelper(
+                                        cvmfs::mount_point_->membership_req());
+
+  if ((getuid() != 0) && SetuidCapabilityPermitted()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Reducing to minimum capabilities");
+    // Earlier switched to using elevated capabilities without real uid root,
+    // now reduce to minimum capabilities.
+    // CAP_DAC_READ_SEARCH will be sometimes needed for a future feature;
+    // for now reserve it all the time for testing.
+    cap_value_t reservecaps[] = {CAP_DAC_READ_SEARCH};
+    assert(ClearPermittedCapabilities(
+      sizeof(reservecaps)/sizeof(cap_value_t), reservecaps, 0, 0));
+  } else {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
+                                   getuid(), geteuid());
   }
 
   cvmfs::fuse_remounter_->Spawn();
@@ -2631,7 +2654,7 @@ static void ShutdownMountpoint() {
   delete cvmfs::notification_client_;
   cvmfs::notification_client_ = NULL;
 
-  // The remonter has a reference to the mount point and the inode generation
+  // The remounter has a reference to the mount point and the inode generation
   delete cvmfs::fuse_remounter_;
   cvmfs::fuse_remounter_ = NULL;
 
@@ -2693,6 +2716,8 @@ static bool MaintenanceMode(const int fd_progress) {
                   + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
   cvmfs::fuse_remounter_->EnterMaintenanceMode();
+  // this keeps the watchdog from unmounting when it gets deleted
+  cvmfs::watchdog_->ClearOnExitFn();
   return true;
 }
 
@@ -3130,6 +3155,12 @@ static void FreeSavedState(const int fd_progress,
 #endif
 
 
+// The watchdog no longer needs to do any unmounting
+static void ClearExit() {
+  cvmfs::watchdog_->ClearOnExitFn();
+}
+
+
 static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports = new loader::CvmfsExports();
   g_cvmfs_exports->so_version = CVMFS_VERSION;
@@ -3145,6 +3176,7 @@ static void __attribute__((constructor)) LibraryMain() {
   g_cvmfs_exports->fnFreeSavedState = FreeSavedState;
 #endif
   cvmfs::SetCvmfsOperations(&g_cvmfs_exports->cvmfs_operations);
+  g_cvmfs_exports->fnClearExit = ClearExit;
 }
 
 

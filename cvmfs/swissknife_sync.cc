@@ -28,7 +28,6 @@
 #include <glob.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <sys/capability.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -46,11 +45,11 @@
 #include "sanitizer.h"
 #include "statistics.h"
 #include "statistics_database.h"
-#include "swissknife_capabilities.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
 #include "sync_union_aufs.h"
 #include "sync_union_overlayfs.h"
+#include "util/capabilities.h"
 #include "util/logging.h"
 #include "util/platform.h"
 #include "util/string.h"

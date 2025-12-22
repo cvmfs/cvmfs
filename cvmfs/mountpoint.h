@@ -524,6 +524,7 @@ class MountPoint : SingleCopy, public BootFactory {
   std::string fqrn() const { return fqrn_; }
   // TODO(jblomer): use only a singler fetcher object
   cvmfs::Fetcher *external_fetcher() { return external_fetcher_; }
+  AuthzFetcher *authz_fetcher() { return authz_fetcher_; };
   FileSystem *file_system() { return file_system_; }
   MagicXattrManager *magic_xattr_mgr() { return magic_xattr_mgr_; }
   bool has_membership_req() { return has_membership_req_; }

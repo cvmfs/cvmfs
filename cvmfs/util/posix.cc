@@ -62,6 +62,7 @@
 #include <vector>
 
 #include "util/algorithm.h"
+#include "util/capabilities.h"
 #include "util/exception.h"
 #include "util/fs_traversal.h"
 #include "util/logging.h"
@@ -783,6 +784,7 @@ std::string GetHostname() {
 
 /**
  * set(e){g/u}id wrapper.
+ * If temporarily is true, reserve the ability to switch back.
  *
  * avoid_mutexes: if true, means that we are a forked child and must not use
  * mutexes.
@@ -802,11 +804,15 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid, const bool temporarily,
     if ((retval == 0) && (uid != geteuid()))
       retval = seteuid(uid);
   } else {
-    // If effective uid is not root, we must first gain root access back
-    if ((getuid() == 0) && (getuid() != geteuid())) {
-      retval = SwitchCredentials(0, getgid(), true);
+    // If effective uid is not root, we probably need setuid+setgid
+    // capabilities first
+    if (geteuid() != 0) {
+      retval = ObtainSetuidgidCapabilities();
       if (!retval)
-        return false;
+        LogCvmfs(kLogCvmfs, kLogDebug,
+          "unable to obtain setuid & setgid capabilities first");
+      // The setuid below will drop the capability again unless
+      // switching to root or keepcaps has been enabled.
     }
     retval = setgid(gid) || setuid(uid);
   }
@@ -1515,6 +1521,18 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 }
 
 
+/**
+ * Sets soft and hard limit for maximum core size
+ */
+int SetLimitCore(unsigned limit_core) {
+  struct rlimit rpl;
+  memset(&rpl, 0, sizeof(rpl));
+  rpl.rlim_max = limit_core;
+  rpl.rlim_cur = limit_core;
+  return (setrlimit(RLIMIT_CORE, &rpl));
+}
+
+
 std::vector<LsofEntry> Lsof(const std::string &path) {
   std::vector<LsofEntry> result;
 
@@ -1989,7 +2007,8 @@ bool ManagedExec(const std::vector<std::string> &command_line,
 #ifdef DEBUGMSG
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
-    if (drop_credentials && !SwitchCredentials(geteuid(), getegid(), false, true)) {
+    if (drop_credentials && SetuidCapabilityPermitted() &&
+        !SwitchCredentials(geteuid(), getegid(), false, true)) {
       failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }
