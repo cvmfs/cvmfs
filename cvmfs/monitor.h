@@ -61,7 +61,9 @@ class Watchdog : SingleCopy {
    */
   typedef void (*FnOnExit)(const bool crashed);
 
-  static Watchdog *Create(FnOnExit on_exit, WatchdogState *saved_state = 0);
+  static Watchdog *Create(FnOnExit on_exit,
+                          bool needs_read_environ,
+                          WatchdogState *saved_state = 0);
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
@@ -118,7 +120,7 @@ class Watchdog : SingleCopy {
   static void SendTrace(int sig, siginfo_t *siginfo, void *context);
 
   explicit Watchdog(FnOnExit on_exit);
-  void Fork();
+  void Fork(bool needs_read_environ);
   void RestoreState(WatchdogState *saved_state);
   bool WaitForSupervisee();
   SigactionMap SetSignalHandlers(const SigactionMap &signal_handlers);

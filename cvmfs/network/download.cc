@@ -394,25 +394,6 @@ const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown = -2;
 const int DownloadManager::kProbeGeo = -3;
 
-bool DownloadManager::EscapeUrlChar(unsigned char input, char output[3]) {
-  if (((input >= '0') && (input <= '9')) || ((input >= 'A') && (input <= 'Z'))
-      || ((input >= 'a') && (input <= 'z')) || (input == '/') || (input == ':')
-      || (input == '.') || (input == '@') || (input == '+') || (input == '-')
-      || (input == '_') || (input == '~') || (input == '[') || (input == ']')
-      || (input == ',')) {
-    output[0] = static_cast<char>(input);
-    return false;
-  }
-
-  output[0] = '%';
-  output[1] = static_cast<char>((input / 16)
-                                + ((input / 16 <= 9) ? '0' : 'A' - 10));
-  output[2] = static_cast<char>((input % 16)
-                                + ((input % 16 <= 9) ? '0' : 'A' - 10));
-  return true;
-}
-
-
 /**
  * Escape special chars from the URL, except for ':' and '/',
  * which should keep their meaning.
@@ -423,7 +404,7 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
 
   char escaped_char[3];
   for (unsigned i = 0, s = url.length(); i < s; ++i) {
-    if (EscapeUrlChar(url[i], escaped_char)) {
+    if (JobInfo::EscapeUrlChar(url[i], escaped_char)) {
       escaped.append(escaped_char, 3);
     } else {
       escaped.push_back(escaped_char[0]);
@@ -433,38 +414,6 @@ string DownloadManager::EscapeUrl(const int64_t jobinfo_id, const string &url) {
            jobinfo_id, url.c_str(), escaped.c_str());
 
   return escaped;
-}
-
-/**
- * escaped array needs to be sufficiently large.  Its size is calculated by
- * passing NULL to EscapeHeader.
- */
-unsigned DownloadManager::EscapeHeader(const string &header,
-                                       char *escaped_buf,
-                                       size_t buf_size) {
-  unsigned esc_pos = 0;
-  char escaped_char[3];
-  for (unsigned i = 0, s = header.size(); i < s; ++i) {
-    if (EscapeUrlChar(header[i], escaped_char)) {
-      for (unsigned j = 0; j < 3; ++j) {
-        if (escaped_buf) {
-          if (esc_pos >= buf_size)
-            return esc_pos;
-          escaped_buf[esc_pos] = escaped_char[j];
-        }
-        esc_pos++;
-      }
-    } else {
-      if (escaped_buf) {
-        if (esc_pos >= buf_size)
-          return esc_pos;
-        escaped_buf[esc_pos] = escaped_char[0];
-      }
-      esc_pos++;
-    }
-  }
-
-  return esc_pos;
 }
 
 /**
@@ -2002,16 +1951,18 @@ Failures DownloadManager::Fetch(JobInfo *info) {
 
   // Prepare cvmfs-info: header, allocate string on the stack
   info->SetInfoHeader(NULL);
-  if (enable_info_header_ && info->extra_info()) {
-    const char *header_name = "cvmfs-info: ";
-    const size_t header_name_len = strlen(header_name);
-    const unsigned header_size = 1 + header_name_len
-                                 + EscapeHeader(*(info->extra_info()), NULL, 0);
-    info->SetInfoHeader(static_cast<char *>(alloca(header_size)));
-    memcpy(info->info_header(), header_name, header_name_len);
-    EscapeHeader(*(info->extra_info()), info->info_header() + header_name_len,
-                 header_size - header_name_len);
-    info->info_header()[header_size - 1] = '\0';
+  if (enable_info_header_) {
+    const string header_info = info->GetInfoHeaderContents(info_header_template_);
+    if (header_info != "") {
+      const char * const header_name = "cvmfs-info: ";
+      const size_t header_name_len = strlen(header_name);
+      const size_t info_len = header_info.length();
+      char *buf = static_cast<char *>(alloca(header_name_len + info_len + 1));
+      memcpy(buf, header_name, header_name_len);
+      memcpy(buf + header_name_len, header_info.c_str(), info_len);
+      buf[header_name_len + info_len] = '\0';
+      info->SetInfoHeader(buf);
+    }
   }
 
   if (enable_http_tracing_) {

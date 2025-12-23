@@ -593,7 +593,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                  getpid());
   assert(path_size > 0);
   assert(path_size < PATH_MAX);
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
+  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL, false));
   watchdog->Spawn(std::string(watchdog_path));
 
   SyncParameters params;

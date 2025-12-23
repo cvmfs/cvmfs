@@ -1224,7 +1224,7 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
     assert(SetLimitCore(0));
   }
 
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
+  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL, false));
   assert(watchdog.IsValid());
   watchdog->Spawn("./stacktrace.cachemgr");
 

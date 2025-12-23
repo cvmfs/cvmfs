@@ -157,7 +157,7 @@ int Fetcher::Fetch(const CacheManager::LabeledObject &object,
   tls->download_job.SetUrl(&url);
   tls->download_job.SetSink(&sink);
   tls->download_job.SetExpectedHash(&object.id);
-  tls->download_job.SetExtraInfo(&object.label.path);
+  tls->download_job.SetPathInfo(&object.label.path);
   ClientCtx *ctx = ClientCtx::GetInstance();
   if (ctx->IsSet()) {
     ctx->Get(tls->download_job.GetUidPtr(),

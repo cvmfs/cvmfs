@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     const std::string timestamp = GetGMTimestamp("%Y.%m.%d-%H.%M.%S");
-    watchdog = Watchdog::Create(NULL);
+    watchdog = Watchdog::Create(NULL, false);
     if (watchdog.IsValid() == false) {
       LogCvmfs(kLogReceiver, kLogSyslogErr | kLogStderr,
                "Failed to initialize watchdog");

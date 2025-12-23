@@ -30,15 +30,27 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &,
 
 namespace {
 
+uid_t old_uid;
+gid_t old_gid;
+
 bool ObtainCapability(const cap_value_t,
                       const char *,
                       const bool avoid_mutexes = false) {
   // there are no individual capabilities on OSX so switch back to root
+  old_uid = geteuid();
+  old_gid = getegid();
   return (SwitchCredentials(0, getgid(), true, avoid_mutexes));
 }
 
 bool CheckCapabilityPermitted(const cap_value_t) {
   return (getuid() == 0);
+}
+
+bool DropCapability(const cap_value_t,
+                    const char *,
+                    const bool avoid_mutexes = false) {
+  // there are no individual capabilities on OSX so temporarily back to user
+  return (SwitchCredentials(old_uid, old_gid, true, avoid_mutexes));
 }
 
 } // namespace
@@ -175,8 +187,8 @@ bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
 namespace {
 
 bool ObtainCapability(const cap_value_t cap,
-                            const char *capname,
-                            const bool avoid_mutexes = false) {
+                      const char *capname,
+                      const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
   assert(CAP_IS_SUPPORTED(cap));
 #endif
@@ -224,6 +236,43 @@ bool ObtainCapability(const cap_value_t cap,
   return true;
 }
 
+bool DropCapability(const cap_value_t cap,
+                    const char *capname,
+                    const bool avoid_mutexes = false) {
+#ifdef CAP_IS_SUPPORTED
+  assert(CAP_IS_SUPPORTED(cap));
+#endif
+
+  cap_t caps_proc = cap_get_proc();
+  assert(caps_proc != NULL);
+
+  cap_flag_value_t cap_state;
+  int retval = cap_get_flag(caps_proc, cap, CAP_EFFECTIVE, &cap_state);
+  assert(retval == 0);
+
+  if (cap_state == CAP_CLEAR) {
+    cap_free(caps_proc);
+    return true;
+  }
+
+  retval = cap_set_flag(caps_proc, CAP_EFFECTIVE, 1, &cap, CAP_CLEAR);
+  assert(retval == 0);
+
+  retval = cap_set_proc(caps_proc);
+  cap_free(caps_proc);
+
+  if (retval != 0) {
+    if (!avoid_mutexes) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogDebug,
+               "Cannot reset %s capability for current process (errno: %d)",
+               capname, errno);
+    }
+    return false;
+  }
+
+  return true;
+}
+
 bool CheckCapabilityPermitted(const cap_value_t cap) {
   cap_t caps_proc = cap_get_proc();
   assert(caps_proc != NULL);
@@ -245,12 +294,20 @@ bool ObtainDacReadSearchCapability() {
   return ObtainCapability(CAP_DAC_READ_SEARCH, "CAP_DAC_READ_SEARCH");
 }
 
+bool DropDacReadSearchCapability() {
+  return DropCapability(CAP_DAC_READ_SEARCH, "CAP_DAC_READ_SEARCH");
+}
+
 bool ObtainSysAdminCapability() {
   return ObtainCapability(CAP_SYS_ADMIN, "CAP_SYS_ADMIN");
 }
 
 bool ObtainSysPtraceCapability() {
   return ObtainCapability(CAP_SYS_PTRACE, "CAP_SYS_PTRACE");
+}
+
+bool DropSysPtraceCapability() {
+  return DropCapability(CAP_SYS_PTRACE, "CAP_SYS_PTRACE");
 }
 
 bool ObtainSetuidgidCapabilities(const bool avoid_mutexes) {

@@ -203,6 +203,7 @@ static bool GetDirentForInode(const fuse_ino_t,
 }  // namespace cvmfs
 
 static int Init(const loader::LoaderExports *loader_export) { return 0; }
+static bool NeedsReadEnviron() { return false; }
 
 #define fuse_reply_err cvmfs::fuse_reply_err
 #define fuse_reply_open cvmfs::fuse_reply_open

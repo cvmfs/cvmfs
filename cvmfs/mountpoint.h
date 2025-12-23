@@ -502,6 +502,9 @@ class MountPoint : SingleCopy, public BootFactory {
                             OptionsManager *options_mgr = NULL);
   ~MountPoint();
 
+  // Check whether permission is needed to read from user process environment
+  static bool NeedsReadEnviron(OptionsManager *omgr);
+
   unsigned GetMaxTtlMn();
   unsigned GetEffectiveTtlSec();
   void SetMaxTtlMn(unsigned value_minutes);

@@ -2442,6 +2442,11 @@ static unsigned CheckMaxOpenFiles() {
 }
 
 
+static bool NeedsReadEnviron() {
+  return MountPoint::NeedsReadEnviron(cvmfs::options_mgr_);
+}
+
+
 static int Init(const loader::LoaderExports *loader_exports) {
   g_boot_error = new string("unknown error");
   cvmfs::loader_exports_ = loader_exports;
@@ -2458,7 +2463,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // an old loader that expected the FUSE module to start a watchdog
   if (cvmfs::ShouldStartWatchdog()) {
     auto_umount::SetMountpoint(loader_exports->mount_point);
-    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit);
+    cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
+                                        NeedsReadEnviron());
     if (cvmfs::watchdog_ == NULL) {
       *g_boot_error = "failed to initialize watchdog.";
       return loader::kFailMonitor;
@@ -2608,10 +2614,13 @@ static void Spawn() {
     // Earlier switched to using elevated capabilities without real uid root,
     // now reduce to minimum capabilities.
     const std::vector<cap_value_t> nocaps;
-    // CAP_DAC_READ_SEARCH will be sometimes needed for a future feature;
-    // for now reserve it all the time for testing.
-    const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH};
-    assert(ClearPermittedCapabilities(reservecaps, nocaps));
+    if (NeedsReadEnviron()) {
+      // Reserve the capabilities to read process environments
+      const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE};
+      assert(ClearPermittedCapabilities(reservecaps, nocaps));
+    } else {
+      assert(ClearPermittedCapabilities(nocaps, nocaps));
+    }
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
                                    getuid(), geteuid());
@@ -3113,6 +3122,7 @@ static bool RestoreState(const int fd_progress,
       WatchdogState *watchdog_state = static_cast<WatchdogState *>(
           saved_states[i]->state);
       cvmfs::watchdog_ = Watchdog::Create(auto_umount::UmountOnExit,
+                                          NeedsReadEnviron(),
                                           watchdog_state);
       assert(cvmfs::watchdog_ != NULL);
       SendMsg2Socket(fd_progress, " done\n");
