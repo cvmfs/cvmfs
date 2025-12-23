@@ -111,7 +111,6 @@ reload_with_debuglog() {
 cvmfs_run_test() {
   logfile=$1
   local_script_dir=$2
-  trap cleanup HUP INT TERM EXIT || return $?
 
   echo "create temporary directory"
   CVMFS_TEST_100_TMPFILE=$(mktemp /tmp/cvmfs_test100.log.XXXXXXXX)
