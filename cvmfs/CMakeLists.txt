@@ -110,6 +110,10 @@ if (BUILD_CVMFS OR BUILD_LIBCVMFS)
       add_definitions (-DCVMFS_ENABLE_INOTIFY)
     endif ()
   endif ()
+
+  if (GET_XATTR_FAST)
+    add_definitions(-DCVMFS_GET_XATTR_FAST)
+  endif(GET_XATTR_FAST)
 endif (BUILD_CVMFS OR BUILD_LIBCVMFS)
 
 
