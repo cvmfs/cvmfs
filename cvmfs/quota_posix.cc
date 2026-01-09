@@ -552,12 +552,18 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
 
       // Avoid evicting open files hopping there are enough more recently used
       // files to satisfy the cleanup request
+/*
       const bool is_open = std::find_if(
                                open_files_.begin(), open_files_.end(),
                                [&candidates, &i](const auto &elem) -> bool {
                                  return elem.Collide(candidates[i].hash);
                                })
                            != open_files_.end();
+*/
+      bool is_open=false;
+      for(auto it=open_files_.begin();it!=open_files_.end();++it){
+        if (it->Collide(candidates[i].hash)){is_open=true; break;}
+      }
 
       if (is_pinned) {
         SkipEviction(candidates[i]);
