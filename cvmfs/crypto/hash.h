@@ -66,14 +66,14 @@ const char kSuffixMetainfo = 'M';
  * When the maximum digest size changes, the memory layout of DirectoryEntry and
  * PosixQuotaManager::LruCommand changes, too!
  */
-constexpr unsigned kDigestSizes[] = {16, 20, 20, 20, 20};
+const unsigned kDigestSizes[] = {16, 20, 20, 20, 20};
 // Md5  Sha1  Rmd160  Shake128  Any
-constexpr unsigned kMaxDigestSize = 20;
+const unsigned kMaxDigestSize = 20;
 
 /**
  * The maximum of GetContextSize()
  */
-constexpr unsigned kMaxContextSize = 256;
+const unsigned kMaxContextSize = 256;
 
 /**
  * Hex representations of hashes with the same length need a suffix
@@ -472,7 +472,7 @@ struct CVMFS_EXPORT Any : public Digest<kMaxDigestSize, kAny> {
   Md5 CastToMd5();
 };
 
-constexpr size_t kShortDigestSize = kMaxDigestSize;
+const size_t kShortDigestSize = kMaxDigestSize;
 struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
   explicit Short(const Any &full) : Digest<kShortDigestSize, kAny>() {
     algorithm = full.algorithm;
