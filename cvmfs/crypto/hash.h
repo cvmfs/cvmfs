@@ -497,7 +497,7 @@ struct CVMFS_EXPORT Short : public Digest<kShortDigestSize, kAny> {
   }
 
   std::string ToString(const bool with_suffix = false) {
-    Hex hex(this);
+    const Hex hex(this);
     const bool use_suffix = with_suffix && HasSuffix();
     const unsigned string_length = hex_size_ + use_suffix;
     std::string result(string_length, 0);
