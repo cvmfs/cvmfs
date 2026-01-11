@@ -144,7 +144,7 @@ create_repo() {
 	sed -i /etc/fstab -e 's/,noauto/,debug,noauto/'
     fi
     cp -a /etc/fstab{,.non-hacky}
-    grep ^"$CVMFS_TEST_REPO" /etc/fstab | sed -e s:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly:/cvmfs/"$CVMFS_TEST_REPO": > /etc/fstab.hack
+    grep -E '^(cvmfs2#)?'"$CVMFS_TEST_REPO" /etc/fstab | sed -e s:/var/spool/cvmfs/"$CVMFS_TEST_REPO"/rdonly:/cvmfs/"$CVMFS_TEST_REPO": > /etc/fstab.hack
 
     cat >> /etc/cvmfs/repositories.d/"$CVMFS_TEST_REPO"/client.conf <<EOF
 CVMFS_HTTP_PROXY=$PROXY_SPEC
