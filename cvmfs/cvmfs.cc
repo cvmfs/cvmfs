@@ -240,10 +240,7 @@ void GetReloadStatus(bool *drainout_mode, bool *maintenance_mode) {
 #ifndef __TEST_CVMFS_MOCKFUSE  // will be mocked in tests
 // returns whether or not to start a watchdog
 static bool ShouldStartWatchdog() {
-  if (loader_exports_ == NULL) {
-    // Very old loader?
-    return true;
-  }
+  assert(loader_exports_ != NULL);
 
   if (loader_exports_->version < 2) {
     return true;  // spawn watchdog by default during reload
@@ -260,8 +257,6 @@ static bool ShouldStartWatchdog() {
 
   if ((loader_exports_->version < 6) && !loader_exports_->disable_watchdog) {
     // This is an older loader so need to start a watchdog
-    // Set the version to 6 so it will only start on the first reload
-    const_cast<loader::LoaderExports*>(loader_exports_)->version = 6;
     return true;
   }
 
@@ -2612,11 +2607,11 @@ static void Spawn() {
     LogCvmfs(kLogCvmfs, kLogDebug, "Reducing to minimum capabilities");
     // Earlier switched to using elevated capabilities without real uid root,
     // now reduce to minimum capabilities.
+    const std::vector<cap_value_t> nocaps;
     // CAP_DAC_READ_SEARCH will be sometimes needed for a future feature;
     // for now reserve it all the time for testing.
-    cap_value_t reservecaps[] = {CAP_DAC_READ_SEARCH};
-    assert(ClearPermittedCapabilities(
-      sizeof(reservecaps)/sizeof(cap_value_t), reservecaps, 0, 0));
+    const std::vector<cap_value_t> reservecaps = {CAP_DAC_READ_SEARCH};
+    assert(ClearPermittedCapabilities(reservecaps, nocaps));
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug, "Not clearing capabilities, uid %d euid%d",
                                    getuid(), geteuid());
@@ -2704,6 +2699,13 @@ static void ShutdownMountpoint() {
 }
 
 
+static void ClearExit() {
+  if (cvmfs::watchdog_ != NULL) {
+    cvmfs::watchdog_->ClearOnExitFn();
+  }
+}
+
+
 static void Fini() {
   ShutdownMountpoint();
 
@@ -2712,6 +2714,9 @@ static void Fini() {
   cvmfs::file_system_ = NULL;
   cvmfs::options_mgr_ = NULL;
 
+  if (cvmfs::loader_exports_->version < 6) {
+    ClearExit();
+  }
   delete cvmfs::watchdog_;
   cvmfs::watchdog_ = NULL;
 
@@ -2743,7 +2748,9 @@ static bool MaintenanceMode(const int fd_progress) {
                       cvmfs::mount_point_->kcache_timeout_sec()))
                   + "s)\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  cvmfs::watchdog_->EnterMaintenanceMode();
+  if (cvmfs::watchdog_ != NULL && cvmfs::loader_exports_->version >= 6) {
+    cvmfs::watchdog_->EnterMaintenanceMode();
+  }
   cvmfs::fuse_remounter_->EnterMaintenanceMode();
   return true;
 }
@@ -2838,7 +2845,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   state_fuse->state = saved_fuse_state;
   saved_states->push_back(state_fuse);
 
-  if (cvmfs::watchdog_) {
+  if (cvmfs::watchdog_ != NULL && cvmfs::loader_exports_->version >= 6) {
     msg_progress = "Saving watchdog listener state\n";
     SendMsg2Socket(fd_progress, msg_progress);
     WatchdogState *saved_watchdog_state = new WatchdogState();
@@ -3206,14 +3213,6 @@ static void FreeSavedState(const int fd_progress,
   }
 }
 #endif
-
-
-// The watchdog no longer needs to do any unmounting
-static void ClearExit() {
-  if (cvmfs::watchdog_ != NULL) {
-    cvmfs::watchdog_->ClearOnExitFn();
-  }
-}
 
 
 static void __attribute__((constructor)) LibraryMain() {

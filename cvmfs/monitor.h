@@ -19,13 +19,10 @@
 #include "util/single_copy.h"
 
 
-class Watchdog;
-
 /**
  * Information for the FUSE module to communicate with the watchdog process
  * that needs to be preserved through reloads.
  */
-
 class WatchdogState {
  friend class Watchdog;
  public:
@@ -68,7 +65,7 @@ class Watchdog : SingleCopy {
   static pid_t GetPid();
   ~Watchdog();
   void Spawn(const std::string &crash_dump_path);
-  void ClearOnExitFn() { on_exit_ = 0; }
+  void ClearOnExitFn() { on_exit_ = NULL; }
   void EnterMaintenanceMode() { maintenance_mode_ = true; }
   void SaveState(WatchdogState *state);
 

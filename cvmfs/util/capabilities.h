@@ -5,6 +5,8 @@
 #ifndef CVMFS_CAPABILITIES_H_
 #define CVMFS_CAPABILITIES_H_
 
+#include <vector>
+
 #ifdef __APPLE__
 typedef int cap_value_t;
 #define CAP_DAC_READ_SEARCH 0
@@ -26,14 +28,13 @@ namespace CVMFS_NAMESPACE_GUARD {
 CVMFS_EXPORT bool ObtainDacReadSearchCapability();
 CVMFS_EXPORT bool ObtainSysAdminCapability();
 CVMFS_EXPORT bool ObtainSysPtraceCapability();
-CVMFS_EXPORT bool ObtainSetuidgidCapabilities();
+CVMFS_EXPORT bool ObtainSetuidgidCapabilities(const bool avoid_mutexes = false);
 CVMFS_EXPORT bool ObtainSetpcapCapability();
 CVMFS_EXPORT bool SetuidCapabilityPermitted();
 CVMFS_EXPORT bool SetpcapCapabilityPermitted();
-CVMFS_EXPORT bool ClearPermittedCapabilities(int nreservecaps,
-                                             const cap_value_t *reservecaps,
-                                             int ninheritcaps,
-                                             const cap_value_t *inheritcaps);
+CVMFS_EXPORT bool ClearPermittedCapabilities(
+                   const std::vector<cap_value_t> &reservecaps,
+                   const std::vector<cap_value_t> &inheritcaps);
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD

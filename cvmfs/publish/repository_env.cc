@@ -19,7 +19,8 @@ void Env::DropCapabilities() {
   if (!platform_set_dumpable())
     throw EPublish("cannot set dumpable state");
 
-  if (!ClearPermittedCapabilities(0, 0, 0, 0))
+  const std::vector<cap_value_t> nocaps;
+  if (!ClearPermittedCapabilities(nocaps, nocaps))
     throw EPublish("cannot clear process capabilities");
 }
 

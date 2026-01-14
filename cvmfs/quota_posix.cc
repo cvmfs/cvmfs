@@ -1195,18 +1195,19 @@ int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
   if (!foreground)
     Daemonize();
 
-  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
-  assert(watchdog.IsValid());
-  watchdog->Spawn("./stacktrace.cachemgr");
-
   if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
     // Permanently drop credentials
-    assert(ClearPermittedCapabilities(0, 0, 0, 0));
+    const std::vector<cap_value_t> nocaps;
+    assert(ClearPermittedCapabilities(nocaps, nocaps));
     // Leave this process ptraceable
     assert(platform_set_dumpable());
     // but without core dumps
-    assert(SetLimitCore(0) == 0);
+    assert(SetLimitCore(0));
   }
+
+  const UniquePtr<Watchdog> watchdog(Watchdog::Create(NULL));
+  assert(watchdog.IsValid());
+  watchdog->Spawn("./stacktrace.cachemgr");
 
   // Initialize pipe, open non-blocking as cvmfs is not yet connected
   const int fd_lockfile_fifo = LockFile(shared_manager.workspace_dir_

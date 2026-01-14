@@ -68,7 +68,7 @@ int Watchdog::g_crash_signals[] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE,
 Watchdog *Watchdog::Create(FnOnExit on_exit, WatchdogState *saved_state) {
   assert(instance_ == NULL);
   instance_ = new Watchdog(on_exit);
-  if (saved_state != 0)
+  if (saved_state != NULL)
     instance_->RestoreState(saved_state);
   else
     instance_->Fork();
@@ -408,22 +408,21 @@ void Watchdog::Fork() {
           pipe_watchdog_->CloseWriteFd();
           Daemonize();
           if ((geteuid() != 0) && SetuidCapabilityPermitted()) {
+            const std::vector<cap_value_t> nocaps;
             if (on_exit_) {
               // Reduce to minimum capabilities, which unfortunately is
               // still quite powerful.
               // CAP_SYS_ADMIN is needed to unmount, and CAP_SYS_PTRACE
               // is needed in order to get a stack trace since one of
               // the main process threads is privileged.
-              cap_value_t reservecaps[] = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
-              cap_value_t inheritablecaps[] = {CAP_SYS_PTRACE};
-              assert(ClearPermittedCapabilities(
-                sizeof(reservecaps)/sizeof(cap_value_t), reservecaps,
-                sizeof(inheritablecaps)/sizeof(cap_value_t), inheritablecaps));
+              const std::vector<cap_value_t> reservecaps = {CAP_SYS_ADMIN, CAP_SYS_PTRACE};
+              const std::vector<cap_value_t> inheritcaps = {CAP_SYS_PTRACE};
+              assert(ClearPermittedCapabilities(reservecaps, inheritcaps));
             } else {
               // Only need to be able to do the stack trace, and the
               // main process needs no extra capabilities, so we can
               // drop all capabilities.
-              assert(ClearPermittedCapabilities(0, 0, 0, 0));
+              assert(ClearPermittedCapabilities(nocaps, nocaps));
             }
           }
           // send the watchdog PID to the supervisee
@@ -594,7 +593,8 @@ void *Watchdog::MainWatchdogListener(void *data) {
 
   if ((getuid() != 0) && SetuidCapabilityPermitted()) {
     // Drop all capabilities, none are needed in the listener
-    assert(ClearPermittedCapabilities(0, 0, 0, 0));
+    const std::vector<cap_value_t> nocaps;
+    assert(ClearPermittedCapabilities(nocaps, nocaps));
   }
 
   struct pollfd watch_fds[2];
@@ -640,18 +640,18 @@ void Watchdog::Supervise() {
     LogEmergency("watchdog: unexpected termination ("
                  + StringifyInt(control_flow) + ")");
     if (on_exit_)
-      on_exit_(true);
+      on_exit_(true /* crashed */);
   } else {
     switch (control_flow) {
       case ControlFlow::kProduceStacktrace:
         LogEmergency(ReportStacktrace());
         if (on_exit_)
-          on_exit_(true);
+          on_exit_(true /* crashed */);
         break;
 
       case ControlFlow::kQuitWithExit:
         if (on_exit_)
-          on_exit_(false);
+          on_exit_(false /* crashed */);
         break;
 
       case ControlFlow::kQuit:

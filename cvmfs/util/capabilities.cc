@@ -4,12 +4,13 @@
 
 
 #include <errno.h>
-
-#include <cassert>
-
 #ifdef __APPLE__
 #include <unistd.h>
+#else
+#include <sys/prctl.h>
 #endif
+
+#include <cassert>
 
 #include "util/capabilities.h"
 #include "util/logging.h"
@@ -22,21 +23,21 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 #ifdef __APPLE__
 
-bool ClearPermittedCapabilities(int,
-                                const cap_value_t *,
-                                int,
-                                const cap_value_t *) {
+bool ClearPermittedCapabilities(const std::vector<cap_value_t> &,
+                                const std::vector<cap_value_t> &) {
   return true;
 }
 
 namespace {
 
-bool obtainCapability(const cap_value_t, const char *) {
+bool ObtainCapability(const cap_value_t,
+                      const char *,
+                      const bool avoid_mutexes = false) {
   // there are no individual capabilities on OSX so switch back to root
-  return (SwitchCredentials(0, getgid(), true));
+  return (SwitchCredentials(0, getgid(), true, avoid_mutexes));
 }
 
-bool checkCapabilityPermitted(const cap_value_t) {
+bool CheckCapabilityPermitted(const cap_value_t) {
   return (getuid() == 0);
 }
 
@@ -44,24 +45,25 @@ bool checkCapabilityPermitted(const cap_value_t) {
 
 #else
 
-#include <sys/prctl.h>
-
-// Clear all CAP_PERMITTED capabilities except those requested.
-// This function requires being run with CAP_SETPCAP capability permitted.
-// If the real uid & gid do not match the effective uid & gid, it also
-// requires CAP_SETUID and CAP_SETGID capabilities to be permitted and
-// ends up switching the real uid & gid to match the incoming effective
-// uid & gid.  Beware that switching the uid is not thread-safe; it is
-// process-wide and clears all capabilities from threads that do not
-// have keepcaps enabled.
-// Capabilities listed in inheritcaps will be made inheritable.
-
-bool ClearPermittedCapabilities(int nreservecaps,
-                                const cap_value_t *reservecaps,
-                                int ninheritcaps,
-                                const cap_value_t *inheritcaps) {
+/**
+ * Clear all CAP_PERMITTED capabilities except those reserved.
+ * This function requires being run with CAP_SETPCAP capability permitted.
+ * If the real uid & gid do not match the effective uid & gid, it also
+ * requires CAP_SETUID and CAP_SETGID capabilities to be permitted and
+ * ends up switching the real uid & gid to match the incoming effective
+ * uid & gid.  Beware that switching the uid is not thread-safe; it is
+ * process-wide and clears all capabilities from threads that do not
+ * have keepcaps enabled.
+ *
+ * @param[in] reservecaps  vector of capabilities to reserve
+ * @param[in] inheritcaps  vector of capabilities to make inheritable
+ */
+bool ClearPermittedCapabilities(const std::vector<cap_value_t> &reservecaps,
+                                const std::vector<cap_value_t> &inheritcaps) {
   int retval = 0;
   uid_t uid, gid;
+  const int nreservecaps = (int) reservecaps.size();
+  const int ninheritcaps = (int) inheritcaps.size();
 
   if (!SetpcapCapabilityPermitted()) {
     if (nreservecaps > 0) {
@@ -80,10 +82,10 @@ bool ClearPermittedCapabilities(int nreservecaps,
     // Only do setuid & setgid when necessary because it is a process-wide
     // setting, not a per-thread setting.
     if (!ObtainSetuidgidCapabilities()) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogDebug,
-          "Failed to obtain setuid/setgid capabilities"
-          " while clearing capabilities (errno: %d)",
-          errno);
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+        "Failed to obtain setuid/setgid capabilities"
+        " while clearing capabilities (errno: %d)",
+        errno);
       return false;
     }
     if (nreservecaps != 0) {
@@ -96,9 +98,9 @@ bool ClearPermittedCapabilities(int nreservecaps,
       assert(platform_keepcaps(false));
     }
     if (retval != 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr | kLogDebug,
-          "Failed to set uid %d gid %d while clearing capabilities (errno: %d)",
-          uid, gid, errno);
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+        "Failed to set uid %d gid %d while clearing capabilities (errno: %d)",
+        uid, gid, errno);
       return false;
     }
     if (nreservecaps == 0) {
@@ -124,7 +126,7 @@ bool ClearPermittedCapabilities(int nreservecaps,
     assert(retval == 0);
     if (cap_state != CAP_SET) {
       LogCvmfs(kLogCvmfs, kLogDebug,
-               "Warning: cap %d cannot be reserved. "
+               "Warning: cap 0x%x cannot be reserved. "
                "It's not in the process's permitted set.",
                cap);
     }
@@ -137,11 +139,11 @@ bool ClearPermittedCapabilities(int nreservecaps,
 
   if (nreservecaps != 0) {
     retval = cap_set_flag(caps_proc, CAP_PERMITTED,
-                          nreservecaps, reservecaps, CAP_SET);
+                          nreservecaps, reservecaps.data(), CAP_SET);
     assert(retval == 0);
     if (ninheritcaps != 0) {
       retval = cap_set_flag(caps_proc, CAP_INHERITABLE,
-                            ninheritcaps, inheritcaps, CAP_SET);
+                            ninheritcaps, inheritcaps.data(), CAP_SET);
       assert(retval == 0);
     }
   }
@@ -172,7 +174,9 @@ bool ClearPermittedCapabilities(int nreservecaps,
 
 namespace {
 
-bool obtainCapability(const cap_value_t cap, const char *capname) {
+bool ObtainCapability(const cap_value_t cap,
+                            const char *capname,
+                            const bool avoid_mutexes = false) {
 #ifdef CAP_IS_SUPPORTED
   assert(CAP_IS_SUPPORTED(cap));
 #endif
@@ -192,10 +196,12 @@ bool obtainCapability(const cap_value_t cap, const char *capname) {
   retval = cap_get_flag(caps_proc, cap, CAP_PERMITTED, &cap_state);
   assert(retval == 0);
   if (cap_state != CAP_SET) {
-    LogCvmfs(kLogCvmfs, kLogDebug,
-             "Warning: %s cannot be obtained. "
-             "It's not in the process's permitted set.",
-             capname);
+    if (!avoid_mutexes) {
+      LogCvmfs(kLogCvmfs, kLogDebug,
+               "Warning: %s cannot be obtained. "
+               "It's not in the process's permitted set.",
+               capname);
+    }
     cap_free(caps_proc);
     return false;
   }
@@ -207,17 +213,18 @@ bool obtainCapability(const cap_value_t cap, const char *capname) {
   cap_free(caps_proc);
 
   if (retval != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogDebug,
-             "Cannot reset capabilities for current process "
-             "(errno: %d)",
-             errno);
+    if (!avoid_mutexes) {
+      LogCvmfs(kLogCvmfs, kLogSyslogErr | kLogDebug,
+               "Cannot set %s capability for current process (errno: %d)",
+               capname, errno);
+    }
     return false;
   }
 
   return true;
 }
 
-bool checkCapabilityPermitted(const cap_value_t cap) {
+bool CheckCapabilityPermitted(const cap_value_t cap) {
   cap_t caps_proc = cap_get_proc();
   assert(caps_proc != NULL);
   cap_flag_value_t cap_state;
@@ -235,32 +242,32 @@ bool checkCapabilityPermitted(const cap_value_t cap) {
 #endif // __APPLE__
 
 bool ObtainDacReadSearchCapability() {
-  return obtainCapability(CAP_DAC_READ_SEARCH, "CAP_DAC_READ_SEARCH");
+  return ObtainCapability(CAP_DAC_READ_SEARCH, "CAP_DAC_READ_SEARCH");
 }
 
 bool ObtainSysAdminCapability() {
-  return obtainCapability(CAP_SYS_ADMIN, "CAP_SYS_ADMIN");
+  return ObtainCapability(CAP_SYS_ADMIN, "CAP_SYS_ADMIN");
 }
 
 bool ObtainSysPtraceCapability() {
-  return obtainCapability(CAP_SYS_PTRACE, "CAP_SYS_PTRACE");
+  return ObtainCapability(CAP_SYS_PTRACE, "CAP_SYS_PTRACE");
 }
 
-bool ObtainSetuidgidCapabilities() {
-  return (obtainCapability(CAP_SETUID, "CAP_SETUID") &&
-    obtainCapability(CAP_SETGID, "CAP_SETGID"));
+bool ObtainSetuidgidCapabilities(const bool avoid_mutexes) {
+  return (ObtainCapability(CAP_SETUID, "CAP_SETUID", avoid_mutexes) &&
+    ObtainCapability(CAP_SETGID, "CAP_SETGID", avoid_mutexes));
 }
 
 bool ObtainSetpcapCapability() {
-  return (obtainCapability(CAP_SETPCAP, "CAP_SETPCAP"));
+  return (ObtainCapability(CAP_SETPCAP, "CAP_SETPCAP"));
 }
 
 bool SetuidCapabilityPermitted() {
-  return (checkCapabilityPermitted(CAP_SETUID));
+  return (CheckCapabilityPermitted(CAP_SETUID));
 }
 
 bool SetpcapCapabilityPermitted() {
-  return (checkCapabilityPermitted(CAP_SETPCAP));
+  return (CheckCapabilityPermitted(CAP_SETPCAP));
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

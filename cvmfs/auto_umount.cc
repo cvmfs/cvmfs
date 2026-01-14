@@ -114,7 +114,7 @@ void UmountOnExit(const bool crashed) {
     LogCvmfs(kLogCvmfs, kLogSyslogErr,
              "%s cleanup handler: "
              "failed to unmount %s",
-             mountpoint_->c_str(), cleanuptype);
+             cleanuptype, mountpoint_->c_str());
     return;
   }
 

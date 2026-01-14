@@ -159,7 +159,7 @@ CVMFS_EXPORT std::string GetArch();
 
 CVMFS_EXPORT int SetLimitNoFile(unsigned limit_nofile);
 CVMFS_EXPORT void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit);
-CVMFS_EXPORT int SetLimitCore(unsigned limit_core);
+CVMFS_EXPORT bool SetLimitCore(unsigned limit_core);
 
 /**
  * Searches for open file descriptors on the subtree starting at path.

@@ -807,10 +807,11 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid, const bool temporarily,
     // If effective uid is not root, we probably need setuid+setgid
     // capabilities first
     if (geteuid() != 0) {
-      retval = ObtainSetuidgidCapabilities();
-      if (!retval)
+      retval = ObtainSetuidgidCapabilities(avoid_mutexes);
+      if (!retval && !avoid_mutexes) {
         LogCvmfs(kLogCvmfs, kLogDebug,
           "unable to obtain setuid & setgid capabilities first");
+      }
       // The setuid below will drop the capability again unless
       // switching to root or keepcaps has been enabled.
     }
@@ -1524,12 +1525,12 @@ void GetLimitNoFile(unsigned *soft_limit, unsigned *hard_limit) {
 /**
  * Sets soft and hard limit for maximum core size
  */
-int SetLimitCore(unsigned limit_core) {
+bool SetLimitCore(unsigned limit_core) {
   struct rlimit rpl;
   memset(&rpl, 0, sizeof(rpl));
   rpl.rlim_max = limit_core;
   rpl.rlim_cur = limit_core;
-  return (setrlimit(RLIMIT_CORE, &rpl));
+  return (setrlimit(RLIMIT_CORE, &rpl) == 0);
 }
 
 
@@ -2008,7 +2009,10 @@ bool ManagedExec(const std::vector<std::string> &command_line,
     assert(setenv("__CVMFS_DEBUG_MODE__", "yes", 1) == 0);
 #endif
     if (drop_credentials && SetuidCapabilityPermitted() &&
-        !SwitchCredentials(geteuid(), getegid(), false, true)) {
+        !SwitchCredentials(geteuid(),
+                           getegid(),
+                           false /* temporarily */,
+                           true /* avoid_mutexes */)) {
       failed = ForkFailures::kFailDropCredentials;
       goto fork_failure;
     }

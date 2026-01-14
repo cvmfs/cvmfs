@@ -692,7 +692,7 @@ int FuseMain(int argc, char *argv[]) {
                  alien_cache_dir.c_str(), uid_owner, gid_owner);
         return 1;
       }
-      retval = SwitchCredentials(uid_owner, gid_owner, false);
+      retval = SwitchCredentials(uid_owner, gid_owner, false /* temporarily */);
       if (!retval) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Failed to impersonate %d:%d",
                  uid_owner, gid_owner);
@@ -724,25 +724,24 @@ int FuseMain(int argc, char *argv[]) {
 
   string parameter;
   OptionsManager *options_manager;
-  int origuid = -1;
-  int origgid = -1;
+  bool restore_origids = false;
+  uid_t origuid;
+  gid_t origgid;
   if (simple_options_parsing_) {
     options_manager = new SimpleOptionsParser(
         new DefaultOptionsTemplateManager(*repository_name_));
   } else {
     if ((uid_ != 0) || (gid_ != 0)) {
       // temporarily switch to requested uid/gid while running bash parser
-      origuid = (int) getuid();
-      origgid = (int) getgid();
-      if (((int) uid_ != origuid) || ((int) gid_ != origgid)) {
-        if (!SwitchCredentials(uid_, gid_, true)) {
+      origuid = geteuid();
+      origgid = getegid();
+      if ((uid_ != origuid) || (gid_ != origgid)) {
+        if (!SwitchCredentials(uid_, gid_, true /* temporarily */)) {
           LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                    "Failed to switch credentials for options parser");
           return kFailPermission;
         }
-      } else {
-        origuid = -1;
-        origgid = -1;
+        restore_origids = true;
       }
     }
     options_manager = new BashOptionsManager(
@@ -756,8 +755,8 @@ int FuseMain(int argc, char *argv[]) {
   } else {
     options_manager->ParseDefault(*repository_name_);
   }
-  if (origuid != -1) {
-    if (!SwitchCredentials(origuid, origgid, true)) {
+  if (restore_origids) {
+    if (!SwitchCredentials(origuid, origgid, true /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "Failed to switch credentials back after options parser");
       return kFailPermission;
@@ -931,7 +930,7 @@ int FuseMain(int argc, char *argv[]) {
 
   // these need to be declared before start using goto
   int fd_mountinfo = -1;
-  const bool delegatedunmount = (!suid_mode_ && !disable_watchdog_);
+  const bool delegated_unmount = (!suid_mode_ && !disable_watchdog_);
   bool dounmount = false;
 #if CVMFS_USE_LIBFUSE != 2
   int premount_fd = -1;
@@ -953,7 +952,7 @@ int FuseMain(int argc, char *argv[]) {
   if (disable_watchdog_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "No watchdog, enabling core files");
     if (!platform_set_dumpable()) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Failed to set process dumpable");
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogWarning, "Failed to set process dumpable");
     }
   }
 
@@ -1080,7 +1079,7 @@ int FuseMain(int argc, char *argv[]) {
     // Requires libfuse >= 3.3.0.
     //
     if ((uid_ != 0) || (gid_ != 0)) {
-      if (!SwitchCredentials(0, getgid(), true)) {
+      if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                  "failed to re-gain root permissions for mounting");
         retval = kFailPermission;
@@ -1208,7 +1207,7 @@ int FuseMain(int argc, char *argv[]) {
     // because switching the uid after threads are created affects
     // all threads and causes race conditions.
     platform_keepcaps(true);
-    if (!SwitchCredentials(uid_, gid_, false)) {
+    if (!SwitchCredentials(uid_, gid_, false /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to switch to only capabilities after mounting");
       cvmfs_exports_->fnFini();
@@ -1259,15 +1258,14 @@ int FuseMain(int argc, char *argv[]) {
 
   loader_talk::Spawn();
 
-  if (delegatedunmount) {
+  if (delegated_unmount) {
     // Unmounting in this case might be delegated to the watchdog process.
     // Allow ptracing by the watchdog.
     if (!platform_set_dumpable()) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "Failed to set process dumpable");
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogWarning, "Failed to set process dumpable");
     }
     // but still disallow core dump
-    retval = SetLimitCore(0);
-    if (retval != 0) {
+    if (!SetLimitCore(0)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "Failed to set core dump limit to 0");
     }
   }
@@ -1326,7 +1324,7 @@ int FuseMain(int argc, char *argv[]) {
     dounmount = false;
   }
 
-  if (dounmount && delegatedunmount) {
+  if (dounmount && delegated_unmount) {
     if (cvmfs_exports_->version == 1) {
       // This can happen if the cvmfs version was downgraded.  The
       // watchdog won't know how to do a clean unmount, so the best we
@@ -1345,11 +1343,11 @@ int FuseMain(int argc, char *argv[]) {
   loader_talk::Fini();
   cvmfs_exports_->fnFini();
 
-  if (!delegatedunmount) {
+  if (!delegated_unmount) {
     // Restore privileges for unmount even if we don't need to do it
     // ourselves, because the fuse library might need it.
     if (!ObtainSysAdminCapability()) {
-      LogCvmfs(kLogCvmfs, kLogDebug,
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
                 "Failed to regain SYS_ADMIN capability for doing unmount");
     }
   }
@@ -1404,8 +1402,8 @@ int FuseMain(int argc, char *argv[]) {
 
 cleanup:
 #if CVMFS_USE_LIBFUSE != 2
-  if (dounmount && !delegatedunmount) {
-    if (!SwitchCredentials(0, getgid(), true)) {
+  if (dounmount && !delegated_unmount) {
+    if (!SwitchCredentials(0, getgid(), true /* temporarily */)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to re-gain root permissions for umounting");
       retval = kFailPermission;
