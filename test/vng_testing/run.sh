@@ -13,6 +13,7 @@ if [ $1 == "--help" ]; then
     usage
 fi
 
+KERNEL_VERSION="v5.12"
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 KERNEL_BASE_URL=${KERNEL_BASE_URL:="https://ecsft.cern.ch/dist/cvmfs/caches/kernel/"}
@@ -49,6 +50,17 @@ setup() {
     mkfs.ext4 -F "$DISK_PATH" >/dev/null 2>&1
 }
 
+fetch_kernel() {
+    echo "Fetching kernel $KERNEL_VERSION from $KERNEL_BASE_URL ..."
+    [ -d "$KERNEL_DIR/$KERNEL_VERSION" ] || mkdir -p "$KERNEL_DIR/$KERNEL_VERSION"
+    if ! wget --quiet -O "$KERNEL_DIR/$KERNEL_VERSION/bzImage" "$KERNEL_BASE_URL/$KERNEL_VERSION/bzImage"; then
+        echo "Error fetching kernel $KERNEL_VERSION from $KERNEL_BASE_URL"
+        exit 1
+    fi
+    echo "Listing fetched kernels:"
+    ls "$KERNEL_DIR"
+}
+
 fetch_kernels() {
     echo "Fetching kernels from $KERNEL_BASE_URL..."
     if ! wget --recursive --no-parent --no-host-directories --cut-dirs=4 --accept bzImage --quiet -P "$KERNEL_DIR" "$KERNEL_BASE_URL"; then
@@ -80,7 +92,7 @@ create_and_run_vm() {
 }
 
 # Fetch kernels
-fetch_kernels
+fetch_kernel
 # Boot VM and run tests
 setup
 for bzImage in "$KERNEL_DIR"/*/bzImage; do
