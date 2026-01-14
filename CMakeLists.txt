@@ -301,6 +301,14 @@ if (BUILTIN_EXTERNALS)
 endif(BUILTIN_EXTERNALS)
 
 #
+# Migrate bootstrap.sh to cmake
+#
+if(BUILTIN_EXTERNALS)
+  message(STATUS "Enterning external dependencies setup")
+  include(cmake/Modules/ExternalDependencies.cmake)
+endif()
+
+#
 # include some common functionality
 #
 include (FindPythonModule)
