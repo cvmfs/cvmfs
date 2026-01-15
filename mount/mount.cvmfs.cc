@@ -427,9 +427,9 @@ int main(int argc, char **argv) {
 
   options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
-  // Bail in case we could not from a Fqrn
+  // Bail in case we could not form a Fqrn
   if (fqrn.empty()) {
-    return 1
+    return 1;
   }
   options_manager_.SwitchTemplateManager(
       new DefaultOptionsTemplateManager(fqrn));
