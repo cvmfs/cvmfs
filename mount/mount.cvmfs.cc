@@ -60,7 +60,7 @@ static string MkFqrn(const string &repository) {
                                                   &domain);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-               "CVMFS_DEFAULT_DOMAIN missing - cannot mount incompletely named repo %s", repository);
+               "CVMFS_DEFAULT_DOMAIN missing - cannot mount incompletely named repo %s", repository.c_str());
       return ""; // empty repo name indicates error
     }
     return repository + "." + domain;
