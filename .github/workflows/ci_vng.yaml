@@ -127,7 +127,40 @@ jobs:
                       ../src/702-symlink_caching                      \
                       ../src/803-repository_gateway_large_files       \
                       ../src/811-commit-gateway                       \
-                    --                                             \
+                      ../src/013-certificate_cache                    \ 
+                      ../src/014-corrupt_lru                          \
+                      ../src/015-rebuild_on_crash                     \
+                      ../src/016-dnsunreachable                       \
+                      ../src/018-httpunreachable                      \
+                      ../src/020-emptyrepofailover                    \
+                      ../src/027-autoumount                           \
+                      ../src/030-missingrootcatalog                   \
+                      ../src/037-strictmount                          \
+                      ../src/040-aliencache                           \
+                      ../src/042-cleanuppipes                         \
+                      ../src/043-highinodes                           \
+                      ../src/046-defaultd                             \
+                      ../src/047-blacklist                            \
+                      ../src/051-failonbrokenpubkey                   \
+                      ../src/063-uidmap                               \
+                      ../src/065-http                                 \
+                      ../src/067-wpad                                 \
+                      ../src/068-rocache                              \
+                      ../src/074-oom                                  \
+                      ../src/077-doublemount                          \
+                      ../src/078-offlinemode                          \
+                      ../src/079-dnsroaming                           \
+                      ../src/080-tracing                              \
+                      ../src/081-shrinkwrap                           \
+                      ../src/082-shrinkwrap                           \
+                      ../src/092-stat                                 \
+                      ../src/096-cancelreq                            \
+                      ../src/098-telemetry                            \
+                      ../src/101-cpuaffinity                          \
+                      ../src/102-reusefd                              \
+                      ../src/103-reloadcachemgr                       \
+                      ../src/106-talksocket                           \
+                    --                                                \
                    "${CVMFS_TESTCASES}"
 
           EXIT_CODE=$(cat results/tests_status)
